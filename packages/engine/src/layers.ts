@@ -22,8 +22,9 @@ import { evalAmount, partySize } from "./amounts";
 import { bindChosen, objectMatches, printedMatches } from "./effects";
 import { basePower, baseToughness, defOf, pairedWith } from "./cards";
 import { meldPartnerName } from "./meld-results";
+import { sameName } from "./faces";
 import { liveEmblems } from "./emblems";
-import { bindChosenKeywords, subtypeSet } from "./keywords";
+import { bindChosenKeywords, IDENTITY_PROTECTION, subtypeSet } from "./keywords";
 import { compileCard, compileGranted } from "./oracle";
 import type { CardDef, Color, GameObject, GameState, ObjectId, PlayerId } from "./types";
 
@@ -284,6 +285,8 @@ interface Inst {
   granted?: true;
   /** An emblem's static ability (CR 114.4): its source is in the command zone, with `controller` its owner. */
   emblem?: true;
+  /** A static ability that works from its card's graveyard (StaticAbility.zone), with `controller` its owner. */
+  fromGraveyard?: true;
 }
 
 function gather(s: GameState): Inst[] {
@@ -324,6 +327,15 @@ function gather(s: GameState): Inst[] {
       // A damage replacement's (Ajani Steadfast's emblem) is read in damage.ts.
       if (st.affects.kind === "filter") out.push({ key: `${o.id}#${i}`, timestamp: o.timestamp, order: order++, sourceId: o.id, sourceName: defOf(s, o).name, untilEndOfTurn: false, mods: st.mods, affects: st.affects, controller: o.controller, emblem: true });
     });
+  // Static abilities that work from a graveyard (CR 113.6b), each with its card's timestamp there (CR 613.7d).
+  for (const pid of s.turnOrder)
+    for (const id of s.players[pid]!.graveyard) {
+      const o = s.objects[id]!;
+      const d = defOf(s, o);
+      compileCard(d).statics.forEach((st, i) => {
+        if (st.zone === "graveyard") out.push({ key: `${id}#${i}`, timestamp: o.timestamp, order: order++, sourceId: id, sourceName: d.name, untilEndOfTurn: false, mods: st.mods, affects: st.affects, condition: st.condition, controller: o.owner, fromGraveyard: true });
+      });
+    }
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
     const d = defOf(s, o);
@@ -341,7 +353,7 @@ function gather(s: GameState): Inst[] {
     if (o.attachedTo && compileCard(d).reconfigure)
       out.push({ key: `reconfigure:${id}`, timestamp: o.timestamp, order: order++, sourceName: d.name, untilEndOfTurn: false, mods: [{ kind: "loseTypes", types: ["Creature"] }], controller: o.controller, fixed: [id] });
     compileCard(d).statics.forEach((st, i) =>
-      out.push({
+      st.zone !== "graveyard" && out.push({
         key: `${id}#${i}`,
         timestamp: o.timestamp, // CR 613.7a
         order: order++,
@@ -361,6 +373,7 @@ const sameCI = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 
 /** Does a static ability's source still have it? It must be on the battlefield and not have lost its abilities. */
 function exists(s: GameState, e: Inst, chars: CharMap): boolean {
+  if (e.fromGraveyard) return !e.condition || conditionMet(s, e.condition, e.sourceId!, e.controller!, chars);
   if (!e.affects || e.emblem) return true;
   const src = chars.get(e.sourceId!);
   if (!src || (!src.hasPrintedAbilities && !e.granted)) return false;
@@ -580,6 +593,18 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "opponentsDealtExcess":
       // As the permanent was when it was dealt the damage, wherever it is now (Rith rulings).
       return (s.turnLog?.excessDealt ?? []).some((e) => e.controller !== you && e.types.some((ty) => cond.types.includes(ty)));
+    case "subjectNameUnique": {
+      // Checked as it triggers and as it resolves (CR 603.4): if the creature has left, the card (now maybe in your
+      // graveyard) or the new object it became shares its name (rulings).
+      const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
+      if (!sub) return false;
+      const here = sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc;
+      if (here && sub.faceDown) return true;
+      const name = here ? chars.get(sub.id)?.name : defOf(s, sub).name;
+      if (!name) return true;
+      for (const [id, c] of chars) if (c.controller === you && c.types.includes("Creature") && !(here && id === sub.id) && !s.objects[id]!.faceDown && sameName(c.name, name)) return false;
+      return !yard().some((d) => d.types.includes("Creature") && sameName(d.name, name));
+    }
     case "subjectDamagedBy":
       return (s.turnLog?.damageDealtTo?.[`${subjectId}@${subjectZc}`] ?? []).some((d) => d.controller === you && ((cond.spell && !!d.spell) || d.subtypes.some((st) => cond.subtypes.includes(st))));
     case "opponentGainedLife":
@@ -701,12 +726,17 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const whose = cond.who === "defending" ? (src.attacking !== undefined ? [src.attacking] : []) : cond.who === "opponent" ? s.turnOrder.filter((p) => p !== you && !s.players[p]!.lost) : [you];
       return whose.some((who) => {
         let n = 0;
+        // A face-down permanent has no name (CR 708.2), so it adds none.
+        const names = new Set<string>();
         for (const [id, c] of chars) {
           if (cond.other && id === sourceId) continue;
           if (cond.otherThanSubject && id === subjectId) continue;
           if (c.controller !== who) continue;
-          if (objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c, (x) => chars.get(x.id))) n++;
+          if (!objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c, (x) => chars.get(x.id))) continue;
+          if (!cond.differentNames) n++;
+          else if (!s.objects[id]!.faceDown) names.add(c.name);
         }
+        if (cond.differentNames) n = names.size;
         return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max);
       });
     }
@@ -777,12 +807,15 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "control":
       c.controller = controllerOfInst(e, chars);
       return;
-    case "addTypes":
+    case "addTypes": {
       for (const t of m.types) if (!c.types.includes(t)) c.types.push(t);
       for (const t of m.subtypes) if (!c.subtypes.includes(t)) c.subtypes.push(t);
+      const chosen = m.chosenType && e.sourceId ? s.objects[e.sourceId]?.chosen?.type : undefined;
+      if (chosen && !c.subtypes.includes(chosen)) c.subtypes.push(chosen);
       for (const t of m.supertypes ?? []) if (!c.supertypes.includes(t)) c.supertypes.push(t);
       if (m.allCreatureTypes) c.allCreatureTypes = true;
       return;
+    }
     case "setTypes": {
       // The new card types replace the old, but an instant or sorcery stays one (CR 205.1a). Subtypes of
       // card types it no longer has go too; those of types it keeps stay unless the effect sets that kind.
@@ -825,7 +858,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "addKeywords":
       // "Has protection from the chosen color": the color chosen as the source entered.
-      for (const k of bindChosenKeywords(m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined)) {
+      for (const k of bindChosenKeywords(m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined, m.keywords.includes(IDENTITY_PROTECTION) ? commandersIdentity(s, controllerOfInst(e, chars)) : undefined)) {
         const key = k.toLowerCase();
         if (!c.keywords.some((x) => sameCI(x, k))) {
           c.keywords.push(k);
@@ -1127,7 +1160,11 @@ function countsSomething(st: StaticAbility): boolean {
 
 /** Does any static ability on the battlefield count something? */
 function usesCounts(s: GameState): boolean {
-  return s.battlefield.some((id) => compileCard(defOf(s, s.objects[id]!)).statics.some(countsSomething)) || liveEmblems(s).some((o) => compileCard(defOf(s, o)).statics.some(countsSomething));
+  return (
+    s.battlefield.some((id) => compileCard(defOf(s, s.objects[id]!)).statics.some(countsSomething)) ||
+    liveEmblems(s).some((o) => compileCard(defOf(s, o)).statics.some(countsSomething)) ||
+    s.turnOrder.some((pid) => s.players[pid]!.graveyard.some((id) => compileCard(defOf(s, s.objects[id]!)).statics.some((st) => st.zone === "graveyard" && countsSomething(st))))
+  );
 }
 
 /** Turn the cache off to check that invalidation is complete (tests compare both ways). */
@@ -1172,3 +1209,10 @@ function withCounters(o: GameObject, c: Characteristics): Characteristics {
 
 /** Who controls this object right now (after control-changing effects). */
 export const controllerOf = (s: GameState, o: GameObject): PlayerId => (o.zone === "battlefield" ? characteristics(s, o).controller : o.controller);
+
+/** The combined color identity of `pid`'s commanders (CR 903.4), or undefined if they have none. */
+function commandersIdentity(s: GameState, pid: PlayerId | undefined): string[] | undefined {
+  if (pid === undefined) return undefined;
+  const cmds = Object.values(s.objects).filter((o) => o.isCommander && o.owner === pid);
+  return cmds.length ? [...new Set(cmds.flatMap((o) => s.cards[o.cardId]?.colorIdentity ?? []))] : undefined;
+}

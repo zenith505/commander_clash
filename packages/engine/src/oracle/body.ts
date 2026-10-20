@@ -275,6 +275,7 @@ function parseFaceDownPlay(sentences: string[], at: number, ctx: Ctx): { effect:
   let seen = false;
   let play: FaceDownPlay | undefined;
   let upkeepGraveyard = false;
+  let endStepHand = false;
   const ANY = "(?:mana of any type can be spent to cast (?:it|them|that spell|those spells)|you may spend mana as though it were mana of any type to cast (?:it|them|that spell|those spells))";
   for (;;) {
     const t = sentences[next];
@@ -293,15 +294,18 @@ function parseFaceDownPlay(sentences: string[], at: number, ctx: Ctx): { effect:
         if (play.until === "source" && ctx.spell) return "fail";
       } else if (play && /^(?:If you cast a spell this way, you may spend mana as though it were mana of any type to cast it|Mana of any type can be spent to cast (?:a spell this way|that spell|it))$/.test(t)) play.anyType = true;
       else if (play?.until === "yourNextTurn" && /^At the beginning of your next upkeep, put any of those cards you didn't play into your graveyard$/.test(t) && whose === "you") upkeepGraveyard = true;
+      // "Exile the top card of your library face down. Put that card into your hand at the beginning of your next end step."
+      // (Necropotence): a delayed trigger for the card (rulings), which nobody may look at until then.
+      else if (!play && !seen && !endStepHand && count === "card" && whose === "you" && t === "Put that card into your hand at the beginning of your next end step") endStepHand = true;
       else break;
     }
     next++;
   }
-  if (!play && !seen) return null;
+  if (!play && !seen && !endStepHand) return null;
   // A face-down card nobody may look at: Duplicity's, without the look (read as a plain sentence).
   const who = parsePlayer(whose, ctx);
   if (!who) return "fail";
-  const effect: Effect = { type: "exileFaceDown", from: "top", ...(n !== 1 ? { n } : {}), ...(who.ref !== "you" ? { who } : {}), ...(seen ? { look: true as const } : {}), ...(play ? { play } : {}), ...(upkeepGraveyard ? { upkeepGraveyard: true as const } : {}) };
+  const effect: Effect = { type: "exileFaceDown", from: "top", ...(n !== 1 ? { n } : {}), ...(who.ref !== "you" ? { who } : {}), ...(seen ? { look: true as const } : {}), ...(play ? { play } : {}), ...(upkeepGraveyard ? { upkeepGraveyard: true as const } : {}), ...(endStepHand ? { endStepHand: true as const } : {}) };
   return { effect, next };
 }
 
@@ -499,6 +503,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // "Choose target battle. If an opponent protects it, remove a defense counter from it. Otherwise, put a defense counter
   // on it." (Portent Tracker) is one instruction about one battle.
   text = text.replace(/Choose target battle\. If an opponent protects it, remove (a|\w+) defense counters? from it\. Otherwise, put \1 defense counters? on it\./, (_, n: string) => `Remove ${n} defense counter${n === "a" ? "" : "s"} from target battle if an opponent protects it, otherwise put that many on it.`);
+  // "Create a Treasure token and exile the top card of that player's library. Until end of turn, you may cast that card."
+  // (Ragavan): two instructions, the second an impulse with its permission.
+  text = text.replace(/(^|\. )([Cc]reate an? [^.]+? token) and exile the top card of (your|that player's) library\. (?=(?:Until end of turn, )?[Yy]ou may (?:cast|play) that card)/, "$1$2. Exile the top card of $3 library. ");
   // "..., then shuffle and you gain 1 life" (Brokers Hideout): the search, then the life.
   text = text.replace(/, then shuffle and you gain (\d+) life\./g, ", then shuffle. You gain $1 life.");
   // "Destroy all creatures other than ~" (Magister of Worth) is "destroy all other creatures".
@@ -531,7 +538,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // Not after "If you do,": all of it depends on the payment ("If you do, choose a color, then ...").
     // Not after a leading condition either: "If you control a blue creature, draw a card, then discard a card" (Statute
     // of Denial) is all conditional.
-    .flatMap((x) => (/^If [^,]+, /.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then reveals the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|meld them into )/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
+    // Nor "you may exile target creature you control, then return that card to the battlefield" (Conjurer's Closet): one
+    // blink, all of it optional.
+    .flatMap((x) => (/^If [^,]+, /.test(x) || /^[Yy]ou may exile [^,]+, then return (?:it|that card) to the battlefield under (?:its owner's|your) control\.?$/.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then reveals the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|meld them into )/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
     // "Target opponent reveals their hand and you choose a nonland card from it": two instructions, in order.
     .flatMap((x) => x.split(/(?<=reveals (?:their|his or her) hand) and (?=you choose )/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p)))
     .flatMap(splitSpentPair)
@@ -590,6 +599,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     row = null;
     return true;
   };
+  let chosenCards: ObjRef | undefined;
   for (let si = 0; si < sentences.length; si++) {
     // "It" is the spell cast only as the first instruction: "Untap ~. It gains ..." is about ~ (Pristine Skywise).
     if (si > 0) delete ctx.spellIt;
@@ -598,6 +608,26 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // beginning of the next end step" (one instruction, no condition).
     const atNext = /^At the beginning of (the|your) next end step, ((?:sacrifice|exile|destroy|return) [^,]+)$/.exec(s);
     if (atNext && !/\b(?:if|unless|then|instead)\b| to the battlefield/.test(atNext[2]!)) s = `${atNext[2]!.charAt(0).toUpperCase()}${atNext[2]!.slice(1)} at the beginning of ${atNext[1]} next end step`;
+    // "Choose two target creature cards in your graveyard. Sacrifice a creature. If you do, return the chosen cards to the
+    // battlefield tapped." (Victimize): the targets, chosen as it's cast (CR 601.2c); "the chosen cards" are them.
+    const chooseCards = /^Choose ((?:two|three) target [a-z]+ cards) in your graveyard$/.exec(s);
+    if (chooseCards) {
+      const what = parseObject(`${chooseCards[1]} from your graveyard`, ctx, true);
+      if (what?.ref !== "target" || !what.n) return null;
+      chosenCards = what;
+      continue;
+    }
+    // "Sacrifice a creature. If you do, ...": only if one was sacrificed (you must if you can, rulings on Victimize).
+    const sacDo = /^If you do, (.+)$/.exec(s);
+    const sacPrev = effects[effects.length - 1];
+    if (sacDo && sacPrev?.type === "pick" && sacPrev.action === "sacrifice" && sacPrev.who.ref === "you" && sacPrev.n === 1 && !sacPrev.unless) {
+      const before = ctx.targets.length;
+      const back = /^return the chosen cards to the battlefield( tapped)?$/.exec(sacDo[1]!);
+      const inner: Effect[] | null = back ? (chosenCards ? [{ type: "putOntoBattlefield", what: chosenCards, ...(back[1] ? { tapped: true } : {}) }] : null) : parseOne(capital(sacDo[1]!), ctx);
+      if (!inner || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: inner });
+      continue;
+    }
     if (s.startsWith(ROW_MARK)) {
       // Rows only after the roll (CR 706.3b).
       if (payFirst || dig || !closeGate() || !closeRow() || !allEffects(effects).some((e) => e.type === "roll")) return null;
@@ -759,6 +789,15 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const exEqualN = exEqual ? parseCount(exEqual[1]!, ctx) : null;
     if (exEqual && !exEqualN) return null;
     const exTop = exEqual ? (["", "X"] as unknown as RegExpExecArray) : new RegExp(`^[Ee]xile the top (?:card|${NUMX} cards) of your library$`).exec(impulseIf && !impulseIf.not ? impulseIf.text : s);
+    // "Exile the top card of that player's library. Until end of turn, you may cast that card." (Ragavan, after combat
+    // damage to a player): that player's card, cast only (no land play, rulings), paying its costs.
+    const theirTop = !exTop && !impulseIf && ctx.eventPlayer && /^[Ee]xile the top card of that player's library$/.test(s) ? /^(?:Until end of turn, you may cast that card|You may cast that card this turn)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (theirTop) {
+      effects.push({ type: "impulse", n: 1, until: "thisTurn", who: { ref: "eventPlayer" }, castOnly: true });
+      ctx.exiledTop = true;
+      si++;
+      continue;
+    }
     // With no duration (Dungeon of the Mad Mage's Runestone Caverns), for as long as each card stays exiled (CR 611.2a, 400.7).
     // "Until your next end step, you may play it" (Yasmin Khan, Wiccan, Ob Nixilis): over as your next end step begins.
     const playRe = /^(?:(Until the end of your next turn|Until end of turn|Until your next end step), you may play (?:that card|those cards|them|it)|You may play (?:that card|those cards|them|it)(?: (this turn|until the end of your next turn|until your next end step))?)$/;
@@ -1822,8 +1861,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       // Only one of the two happens, so neither may wait on a choice or need targets of its own (one "you may"
       // instead would leave nothing done on a "no").
       // A punisher waits on its players but always does its whole process (Court of Ambition's "instead" one), and so do
-      // sacrificing and discarding, which only wait on which ones (Vona's Hunger).
-      if (!inner || !previous.length || ctx.targets.length !== before || [...previous, ...inner].some((e) => pauses(e) && e.type !== "punisher" && !(e.type === "pick" && e.action === "sacrifice") && e.type !== "discard")) return null;
+      // sacrificing and discarding, which only wait on which ones (Vona's Hunger), and so does a search (Entish Restoration).
+      if (!inner || !previous.length || ctx.targets.length !== before || [...previous, ...inner].some((e) => pauses(e) && e.type !== "punisher" && !(e.type === "pick" && e.action === "sacrifice") && e.type !== "discard" && e.type !== "search")) return null;
       const done = insteadOfAffected(inner, previous);
       if (!done) return null;
       effects.splice(from, effects.length - from, { type: "if", cond: { kind: "state", cond: insteadOf }, effects: done, otherwise: previous });
@@ -2073,6 +2112,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       last.loseAtEnd = true;
       continue;
     }
+    // The Pacts: "At the beginning of your next upkeep, pay {2}{B}. If you don't, you lose the game." A delayed trigger
+    // made as the spell resolves (CR 603.7a; none if it doesn't resolve, rulings). Paying is up to you; if you don't or
+    // can't, you lose (CR 104.3e).
+    const pact = /^At the beginning of your next upkeep, pay ((?:\{[^}]+\})+)$/.exec(s);
+    if (pact && opts.spell && sentences[si + 1] === "If you don't, you lose the game") {
+      const pay = parsePayCost(pact[1]!);
+      if (!pay) return null;
+      const text = `pay ${pact[1]} or lose the game`;
+      effects.push({ type: "delayed", when: "yourNextUpkeep", effects: [{ type: "may", effects: [], pay, otherwise: [{ type: "loseGame", who: { ref: "you" } }], text }], text });
+      si++;
+      continue;
+    }
     // "~ deals 4 damage to target creature. The damage can't be prevented." (CR 615.12)
     if (/^The damage can't be prevented$/.test(s)) {
       const last = effects[effects.length - 1];
@@ -2147,6 +2198,8 @@ export function parsePayCost(text: string): PayCost | null {
 const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true; activatedOnly?: true; noTargets?: true }[] = [
   { re: "~ was bargained", cond: { kind: "bargained" }, spellOnly: true },
   { re: "~ was cast using teamwork", cond: { kind: "teamwork" }, spellOnly: true },
+  // Addendum (CR 207.2c). Not for targets: CastHow doesn't know when it's cast.
+  { re: "you cast ~ during your main phase", cond: { kind: "castInMain" }, spellOnly: true, noTargets: true },
   // In a spell, or its permanent's enters trigger (compile checks it's one of those).
   { re: "evidence was collected", cond: { kind: "evidence" } },
   { re: "the gift was promised", cond: { kind: "gift" } },
@@ -2322,7 +2375,19 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
   }
   t = t.replace(/^It deals /, "~ deals ");
   const before = ctx.targets.length;
-  const fx = parseOne(t, ctx);
+  // "If you cast this spell during your main phase, instead scry 3, then draw three cards" (Precognitive Perception).
+  // Under an "if" its instructions run one at a time, so any of them may wait on a choice (see the "if" effect).
+  const thenParts = (): Effect[] | null => {
+    const out: Effect[] = [];
+    const parts = t.split(/, then (?!shuffle)/);
+    for (const [i, p] of parts.entries()) {
+      const one = parseOne(i ? thenSubject(parts[0]!, p) : p, ctx);
+      if (!one) return null;
+      out.push(...one);
+    }
+    return out;
+  };
+  const fx = parseOne(t, ctx) ?? (/, then (?!shuffle)/.test(t) ? attempt(ctx, thenParts) : null);
   if (!fx || (!newTargets && ctx.targets.length !== before)) return null;
   // Under an "if", either branch's instructions run one at a time, so one may wait on a player (see the "if" effect).
   const done = instead ? insteadOfAffected(fx, previous) : fx;
@@ -2440,6 +2505,9 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     if (last?.type === "counters" && last.what.ref === "each") ctx.lastGroup = last.what;
     // "Double the power of each other creature you control until end of turn. Those creatures gain vigilance" (Rhonas).
     if (last?.type === "doublePT" && last.what.ref === "each") ctx.lastGroup = last.what;
+    // "Draw a card for each creature you control with a +1/+1 counter on it. Those creatures gain indestructible until end
+    // of turn" (Inspiring Call): the ones counted, as it resolves (CR 611.2c).
+    if (last?.type === "draw" && typeof last.n === "object" && "count" in last.n && last.n.count.kind === "permanents" && last.n.count.filter.kind === "object") ctx.lastGroup = { ref: "each", filter: last.n.count.filter };
   }
 }
 
@@ -2652,11 +2720,13 @@ function parseModal(count: string, bullets: string, text: string, opts: Paramete
 
 /** "X and Y" where each half is its own effect. */
 function parseConjunction(s: string, ctx: Ctx): Effect[] | null {
-  const parts = s.split(/,? and (?=(?:you|each|target|draw|~|its|create|put|return|exile|destroy|tap|untap|mill|suspect|convert|transform|after this phase)\b|get (?:\{E\}|\w+ \{E\}|an amount of \{E\}))/i);
+  const parts = s.split(/,? and (?=(?:you|each|target|draw|~|its|create|put|return|exile|destroy|tap|untap|mill|suspect|convert|transform|after this phase|they gain)\b|get (?:\{E\}|\w+ \{E\}|an amount of \{E\}))/i);
   if (parts.length < 2) return null;
   const out: Effect[] = [];
   for (const p of parts) {
-    const part = p.charAt(0).toUpperCase() + p.slice(1);
+    // "that player discards a card and you untap all lands you control" (Sword of Feast and Famine): "you untap" is
+    // "untap", done by the ability's controller.
+    const part = (p.charAt(0).toUpperCase() + p.slice(1)).replace(/^You (untap|tap|create|exile|destroy|return) /, (_, v: string) => `${capital(v)} `);
     // "Put a +1/+1 counter on ~ for each strength vote and create a 1/1 white Soldier creature token for each numbers vote"
     // (Lieutenants of the Guard): either part may count.
     const fx = attempt(ctx, () => parseSentence(part, ctx)) ?? attempt(ctx, () => parseForEach(part, ctx));

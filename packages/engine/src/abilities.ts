@@ -485,7 +485,7 @@ export type ObjRef =
   /** "Each creature dealt damage this way" (Aurelia's Fury): `filter` for the kind of permanent. */
   | { ref: "damagedThisWay"; filter?: TargetSpec }
   /** The card a "whenever a creature dies" trigger was about, in the zone it went to, while it's still that object (CR 400.7). */
-  | { ref: "subjectCard" } // "a creature dealt damage this way": what this ability's damage hit
+  | { ref: "subjectCard"; /** Only while it's in this zone ("exile that card from your graveyard"). */ zone?: "graveyard" } // "a creature dealt damage this way": what this ability's damage hit
   | { ref: "subject" } // the object its trigger event was about: exalted's "that creature" (see PendingTrigger.subject)
   /**
    * After a leaves-the-battlefield trigger: the card in the zone it went to, if it's still that object ("return it to your
@@ -700,7 +700,8 @@ export interface DamageMod {
 export type Modification =
   | { kind: "control" } // layer 2: the effect's controller controls it
   /** Layer 4, "in addition to its other types"; `allCreatureTypes`: "with all creature types" (Mutavault). */
-  | { kind: "addTypes"; types: string[]; subtypes: string[]; supertypes?: string[]; allCreatureTypes?: true }
+  /** `chosenType`: also the creature type chosen as its source entered ("~ is the chosen type in addition to its other types"). */
+  | { kind: "addTypes"; types: string[]; subtypes: string[]; supertypes?: string[]; allCreatureTypes?: true; chosenType?: true }
   | { kind: "setTypes"; types: string[]; subtypes: string[]; /** "Becomes a legendary 4/4 red Dragon creature" (Sarkhan, the Dragonspeaker): it gains these supertypes and keeps its others (CR 205.4b). */ supertypes?: string[] } // layer 4, "becomes a 3/3 Elemental creature": new card types replace the old (CR 205.1a)
   | { kind: "setSubtypes"; subtypes: string[] } // layer 4, "becomes a Frog": replaces only subtypes of the same kind (CR 205.1a)
   /**
@@ -834,6 +835,11 @@ export interface StaticAbility {
   text: string;
   /** "As long as there are seven or more cards in your graveyard" (threshold): applies only while true. */
   condition?: StaticCondition;
+  /**
+   * "As long as ~ is in your graveyard and you control a Mountain, creatures you control have haste" (Anger): it works
+   * only while its card is in its owner's graveyard (CR 113.6b), controlled by its owner (CR 108.4a).
+   */
+  zone?: "graveyard";
 }
 
 /**
@@ -847,6 +853,11 @@ export type StaticCondition =
   | { kind: "damagedBySelfDied" }
   /** "If that creature was dealt excess damage this turn" (CR 120.10): the trigger's subject, as the object it was. */
   | { kind: "subjectDealtExcess" }
+  /**
+   * Guardian Project: "if it doesn't have the same name as another creature you control or a creature card in your
+   * graveyard", about the creature that entered. A face-down creature has no name (CR 708.2), so it shares none (rulings).
+   */
+  | { kind: "subjectNameUnique" }
   /** Rith: "if a creature or planeswalker an opponent controlled was dealt excess damage this turn" (any of `types`). */
   | { kind: "opponentsDealtExcess"; types: string[] }
   /**
@@ -1039,7 +1050,7 @@ export type StaticCondition =
    * "As long as you control three or more artifacts / another Wizard / no untapped lands", "as long as
    * an opponent controls an Island", "as long as defending player controls an artifact".
    */
-  | { kind: "control"; who: "you" | "opponent" | "defending"; filter: TargetSpec; min?: number; max?: number; other?: boolean; /** "Five other Mountains" after "Whenever a Mountain you control enters" (Valakut): other than the one that entered (rulings). */ otherThanSubject?: true }
+  | { kind: "control"; who: "you" | "opponent" | "defending"; filter: TargetSpec; min?: number; max?: number; other?: boolean; /** "Five other Mountains" after "Whenever a Mountain you control enters" (Valakut): other than the one that entered (rulings). */ otherThanSubject?: true; /** "Lands with different names" (Field of the Dead): each name counted once. */ differentNames?: true }
   /** "If an opponent controls an Island and you control a Mountain" (Mogg Salvage): all of them at once. */
   | { kind: "allOf"; conds: StaticCondition[] }
   /**
@@ -1092,10 +1103,16 @@ export type Effect =
       evenly?: true;
       /** "The damage can't be prevented." (CR 615.12) */ unpreventable?: true;
       /** "It deals ..." after "Whenever a commander you control deals combat damage" (Kediss): the trigger's creature deals it, as it last existed if it's gone (CR 608.2h). */
-      by?: "subject";
+      /** `target`: "Target creature you control deals damage equal to its power to each other creature" (Chandra's Ignition): that target, if still legal. */
+      by?: "subject" | { target: number };
       /** "Excess damage is dealt to that creature's controller instead" (Flame Spill): the damage beyond lethal goes there (CR 120.4a). */
       excessToController?: true;
     }
+  /**
+   * "Each creature deals 1 damage to its controller" (Rakdos Charm): each of those permanents is the source of its own
+   * damage, all dealt at the same time (CR 120.3, 120.4).
+   */
+  | { type: "eachDealsDamage"; what: ObjRef; amount: Amount; toController: true }
   | { type: "draw"; who: PlayerRef; n: Amount }
   /** "Its controller may draw up to two cards" (Arcane Denial): each player chooses how many, 0 to `n`, before drawing (rulings). */
   | { type: "drawUpTo"; who: PlayerRef; n: number }
@@ -1157,7 +1174,7 @@ export type Effect =
    * library"); yours by default. `upkeepGraveyard`: "At the beginning of your next upkeep, put any of those cards you
    * didn't play into your graveyard" (Three Wishes).
    */
-  | { type: "exileFaceDown"; from: "top" | "hand" | "handCard"; n?: Amount; look?: true; who?: PlayerRef; play?: FaceDownPlay; upkeepGraveyard?: true }
+  | { type: "exileFaceDown"; from: "top" | "hand" | "handCard"; n?: Amount; look?: true; who?: PlayerRef; play?: FaceDownPlay; upkeepGraveyard?: true; /** "Put that card into your hand at the beginning of your next end step" (Necropotence). */ endStepHand?: true }
   /**
    * Cards exiled with ~ (CR 607.2a): "Put all cards exiled with ~ into their owner's graveyard", "Return a card you own
    * exiled with ~ to your hand" (`one`, `yours`), "put all other cards you own exiled with ~ into your hand" (`other`:
@@ -1227,7 +1244,8 @@ export type Effect =
       among: TargetSpec;
       youChoose?: true;
     }
-  | { type: "bounce"; what: ObjRef } // return to owner's hand (from the battlefield or a graveyard)
+  /** Return to owner's hand (from the battlefield or a graveyard). `hidden`: a face-down card, named only to its owner. */
+  | { type: "bounce"; what: ObjRef; hidden?: true }
   /** "Return target creature card from your graveyard to the battlefield": enters under the effect controller's control (CR 110.2a). */
   /**
    * "You may put a land card from your hand onto the battlefield": the player picks one (or, with `any`, any number) of
@@ -1441,7 +1459,7 @@ export type Effect =
    * spell's) is its event player, "that spell's mana value" (Mana Drain) its event amount. `yourNextMain`: "at the
    * beginning of your next main phase", the next one that begins after it's made (rulings on Mana Drain).
    */
-  | { type: "delayed"; when: "nextTurnUpkeep" | "nextEndStep" | "yourNextEndStep" | "yourNextMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies"; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard"; of?: ObjRef; thisTurn?: true; event?: { player?: PlayerRef; amount?: Amount } }
+  | { type: "delayed"; when: "nextTurnUpkeep" | "yourNextUpkeep" | "nextEndStep" | "yourNextEndStep" | "yourNextMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies"; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard"; of?: ObjRef; thisTurn?: true; event?: { player?: PlayerRef; amount?: Amount } }
   /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
   | { type: "ninjutsu" }
   /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */
@@ -1464,7 +1482,8 @@ export type Effect =
   /** Warp's end-step trigger (CR 702.185a): exile the permanent; its owner may cast the card after this turn. */
   | { type: "warpExile" }
   /** "Exile the top two cards of your library. Until the end of your next turn, you may play those cards." */
-  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" | "yourNextEndStep" }
+  /** `who`: "the top card of that player's library" (Ragavan), not yours; `castOnly`: "you may cast that card", not play it. */
+  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" | "yourNextEndStep"; who?: PlayerRef; castOnly?: true }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
   /** "Remove a +1/+1 counter from it", "remove all -1/-1 counters from ~" (CR 122.8): as many as it has, at most. */
   /**
@@ -1481,7 +1500,7 @@ export type Effect =
   /** "When you next cast an instant or sorcery spell this turn, ...": a delayed trigger on that cast (CR 603.7). */
   /** `cascade`: "the next noncreature spell you cast this turn has cascade" (Dark Apostle): that spell's own cascade. */
   /** `who`: "the next spell they cast": that player's (a target player), not the controller's. */
-  | { type: "nextCast"; filter: TargetSpec; effects: Effect[]; text: string; cascade?: true; who?: PlayerRef; /** "When you next cast an instant or sorcery spell from your hand this turn" (Narset Transcendent). */ fromHand?: true }
+  | { type: "nextCast"; filter: TargetSpec; effects: Effect[]; text: string; cascade?: true; who?: PlayerRef; /** "When you next cast an instant or sorcery spell from your hand this turn" (Narset Transcendent). */ fromHand?: true; /** "The next spell you cast this turn can't be countered" (Mistrise Village). */ uncounterable?: true }
   /**
    * "Until end of turn, whenever you cast a spell, ~ deals 2 damage to up to one target creature" (CR 603.7b): a delayed
    * triggered ability that triggers each time its event happens until `until` ends (see GameState.floatingTriggers).
@@ -1706,6 +1725,8 @@ export type Effect =
       who?: PlayerRef;
       /** "Spend this mana only to cast instant and sorcery spells" after it (CR 106.6). */
       only?: ManaSpend;
+      /** "Add {B} or {G} for each ...": `times` mana, each of either color (chosen as it resolves). */
+      split?: [ManaType, ManaType];
     }
   /** "Creatures without flying can't block this turn" (Falter): a rule for the turn, not locked to the creatures there now,
    * since it doesn't change characteristics (CR 611.2c; Magmatic Chasm rulings). */
@@ -2097,6 +2118,8 @@ export type SpellCondition =
   | { kind: "foretold" }
   /** "If ~ was bargained" (CR 702.166b). */
   | { kind: "bargained" }
+  /** "If you cast this spell during your main phase" (addendum, CR 207.2c): a copy wasn't cast (CR 707.10). */
+  | { kind: "castInMain" }
   /** "If evidence was collected" (CR 701.59c): its "you may collect evidence N" additional cost was paid. */
   | { kind: "evidence" }
   /** "If mana from a Treasure was spent to cast ~" / "to activate this ability" (CR 106.3). */
@@ -2986,7 +3009,20 @@ export interface CastFromGraveyard {
  * Doubling Season, Hardened Scales, Xorn. `who`: "you" = only for its controller's tokens / permanents.
  */
 export type CountMod =
-  | { what: "tokens"; who: "you" | "any"; op: "double" | "plusOne"; subtype?: string }
+  /**
+   * Token replacements (CR 614.1a): "twice that many of those tokens" (`double`), "three times that many" (`triple`), "those
+   * tokens plus an additional Treasure token" (`plusOne`, Xorn), only when the tokens include one with `subtype` or of
+   * card type `type` ("creature tokens").
+   */
+  | { what: "tokens"; who: "you" | "any"; op: "double" | "triple" | "plusOne"; subtype?: string; type?: string }
+  /** "Those tokens plus an additional Food token" (Peregrin Took), "... plus a 1/1 white Soldier creature token" (Queen Allenal): one more `token`, once. */
+  | { what: "tokens"; who: "you"; op: "plusToken"; token: TokenSpec; type?: string }
+  /** "Those tokens plus that many 1/1 green Squirrel creature tokens" (Chatterfang): one `token` for each token. */
+  | { what: "tokens"; who: "you"; op: "plusThatMany"; token: TokenSpec }
+  /** "If you would create a Food token, instead create a Food token and a Treasure token" (Bilbo): a `token` too for each one with `subtype`. */
+  | { what: "tokens"; who: "you"; op: "andEach"; subtype: string; token: TokenSpec }
+  /** "If you would create a Clue, Food, or Treasure token, instead create one of each" (Academy Manufactor): each of those is one of each of `subtypes`. */
+  | { what: "tokens"; who: "you"; op: "oneOfEach"; subtypes: string[] }
   | { what: "counters"; counter?: CounterKind; on: "creature" | "permanent" | "artifactOrCreature"; who: "you" | "any"; op: "double" | "plusOne" | "minusOne"; other?: boolean };
 
 /**

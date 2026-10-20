@@ -3,7 +3,7 @@ import { cardIdOf, defOf, objHasKeyword, objIsType, power, toughness } from "../
 import { addPhases, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, log, loseLife, obj, player, playerLoses, winGame } from "../game";
 import { MONARCH } from "../oracle";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
-import { cardSource, dealDamage, dealDamageBatch, excessOver, lethalAmounts, objectSource, type DamageEvent, type DamageSource } from "../damage";
+import { cardSource, dealDamage, dealDamageBatch, dealPlanned, excessOver, lethalAmounts, objectSource, planShields, type DamageEvent, type DamageSource } from "../damage";
 import type { GameObject, GameState, ManaOrigin, ManaType, ObjectId, PlayerId, RedirectShield } from "../types";
 import { addMana, manaOriginsOf } from "../spend";
 import { tapManaTimes, timesAsMuch } from "../manaabilities";
@@ -92,7 +92,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
             })
           : [{ ...damageRecipients(s, to, ctx), n: amount }];
       const all = [e.to, ...(e.also ?? [])].flatMap(parts);
-      const by = e.by === "subject" ? subjectSource(s, ctx) : ctxSource(s, ctx);
+      const by = e.by === "subject" ? subjectSource(s, ctx) : e.by ? targetSource(s, ctx, e.by.target) : ctxSource(s, ctx);
       if (!by) return;
       const from = { ...by, ...(e.unpreventable ? { unpreventable: "all" as const } : {}) };
       // All dealt at once: lifelink is one life-gain event (CR 119.10).
@@ -113,6 +113,20 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const dealt = dealtWithExcess(s, from, events, (evs) => dealDamageBatch(s, evs, { lifelink }));
       gainLife(s, from.controller, lifelink.n);
       if (dealt && from.id) fireEvent(s, { type: "dealtDamage", id: from.id, amount: dealt, combat: false });
+      return;
+    }
+    case "eachDealsDamage": {
+      // Each permanent deals its own damage, all at the same time (CR 120.3); lifelink is one life gain per player (CR 119.10).
+      const n = amountNow(s, e.amount, ctx);
+      const events: DamageEvent[] = objects(s, e.what, ctx)
+        .filter((o) => o.zone === "battlefield")
+        .map((o) => ({ src: objectSource(s, o), to: { player: controllerOf(s, o) }, n }));
+      const gains = new Map<PlayerId, { n: number }>();
+      const dealt = dealPlanned(s, planShields(s, events, [], true), { lifelink: (ev) => gains.get(ev.src.controller) ?? gains.set(ev.src.controller, { n: 0 }).get(ev.src.controller)! });
+      for (const [pid, g] of gains) gainLife(s, pid, g.n);
+      const by = new Map<ObjectId, number>();
+      for (const d of dealt) if (d.dealt > 0 && d.src.id) by.set(d.src.id, (by.get(d.src.id) ?? 0) + d.dealt);
+      for (const [id, amount] of by) fireEvent(s, { type: "dealtDamage", id, amount, combat: false });
       return;
     }
     case "preventNext": {
@@ -324,6 +338,23 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       const p = player(s, ctx.controller);
       const color = s.resolving?.chosen?.color;
+      if (e.split) {
+        // How many of the first color, the rest the second, chosen as it resolves (CR 608.2d).
+        const n = amountNow(s, e.times ?? 1, ctx);
+        const sc = (s.resolving!.scratch ??= {});
+        if (!n) return;
+        const mix = (k: number) => `{${e.split![0]}}`.repeat(k) + `{${e.split![1]}}`.repeat(n - k);
+        if (sc.either === undefined) {
+          const ks = Array.from({ length: n + 1 }, (_, i) => n - i);
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "either", options: ks.map(String), labels: ks.map((k) => `Add ${mix(k)}`), prompt: "choose the mana" };
+          return "paused";
+        }
+        const k = Math.max(0, Math.min(n, sc.either));
+        delete sc.either;
+        for (const m of mix(k).matchAll(/\{([WUBRGC])\}/g)) addMana(s, p.id, [m[1] as ManaType], { from: manaSourceOrigins(s, ctx) });
+        log(s, `${p.name} adds ${mix(k)}.`);
+        return;
+      }
       let added = e.mana ? e.mana.repeat(e.times === undefined ? 1 : amountNow(s, e.times, ctx)) : color && e.chosen ? `{${color}}`.repeat(e.chosen) : "";
       // An activated mana ability with {T} in its cost taps its source for mana (CR 106.12): Mana Reflection's
       // replacement effect multiplies what it produces (106.12b).
@@ -503,6 +534,12 @@ export function becomeMonarch(s: GameState, pid: PlayerId) {
  * it last existed there once it has left (CR 608.2h), with the lifelink or deathtouch it had then (rulings on Warstorm
  * Surge, Fiendlash).
  */
+/** A target permanent that deals the damage itself, while it's still a legal target (CR 608.2b). */
+function targetSource(s: GameState, ctx: ResolveCtx, index: number): DamageSource | undefined {
+  const o = ctx.legal[index] ? objects(s, { ref: "target", index }, ctx)[0] : undefined;
+  return o?.zone === "battlefield" ? objectSource(s, o) : undefined;
+}
+
 function subjectSource(s: GameState, ctx: ResolveCtx): DamageSource | undefined {
   const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
   if (!o) return undefined;

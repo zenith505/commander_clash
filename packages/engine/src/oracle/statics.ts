@@ -100,6 +100,15 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   // A type-changing effect (layer 4) whose condition looks at the permanent as the earlier effects in that layer left it.
   if ((m = /^As long as (?:enchanted|equipped) permanent is an? (Vehicle), it's a creature in addition to its other types$/.exec(text)))
     return { affects: { kind: "attached" }, mods: [{ kind: "addTypes", types: ["Creature"], subtypes: [] }], text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [m[1]!], text: m[1]! } } };
+  // The Incarnations: "As long as ~ is in your graveyard and you control a Mountain, creatures you control have haste"
+  // (Anger): it works only from its owner's graveyard (CR 113.6b).
+  if ((m = /^As long as ~ is in your graveyard(?: and (.+?))?, ((?:creatures|lands) you control (?:have|get) .+)$/.exec(text))) {
+    const st = parseStatic(`${capital(m[2]!)}.`);
+    if (!st || st.condition || st.affects.kind !== "filter") return null;
+    const condition = m[1] ? parseStaticCondition(m[1], st) : undefined;
+    if (m[1] && !condition) return null;
+    return { ...st, text: line, zone: "graveyard", ...(condition ? { condition } : {}) };
+  }
   if ((m = /^(.+?) as long as (.+)$/.exec(text))) [statement, cond] = [m[1], m[2]];
   else if ((m = /^As long as (~ is enchanted, equipped, and has a counter on it|[^,]+), (.+)$/.exec(text))) [cond, statement] = [m[1], m[2]];
   else if ((m = /^During your turn, (.+)$/.exec(text))) [cond, statement] = ["it's your turn", m[1]];
@@ -477,6 +486,12 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^(you|an opponent|defending player) controls? (.+)$/.exec(text))) {
     // "At least three other enchantments" (Ephara, Ever-Sheltering) is "three or more other enchantments".
     m[2] = m[2]!.replace(/^at least (\w+) /, "$1 or more ");
+    // "Seven or more lands with different names" (Field of the Dead): names counted once each.
+    const names = new RegExp(`^${NUM} or more (lands|creatures|artifacts) with different names$`).exec(m[2]!);
+    if (names && m[1] === "you") {
+      const filter = pickFilter(names[2]!);
+      return filter ? { kind: "control", who: "you", filter, min: num(names[1]!), differentNames: true } : null;
+    }
     const who = m[1] === "you" ? "you" : m[1] === "an opponent" ? "opponent" : "defending";
     // Each attacking creature has its own defending player (CR 506.2), so only the source's own is modeled.
     if (who === "defending" && st.affects.kind !== "self") return null;
@@ -919,6 +934,9 @@ function parseStaticLine(line: string): StaticAbility | null {
   // snow supertype added in the type-changing layer (CR 205.4a, 613.1d).
   const snow = { kind: "addTypes" as const, types: [], subtypes: [], supertypes: ["Snow"] };
   if (/^Enchanted (?:land|permanent) is snow$/.test(text)) return { affects: { kind: "attached" }, mods: [snow], text: line };
+  // "This creature is the chosen type in addition to its other types" (Metallic Mimic, Roaming Throne): the creature type
+  // chosen as it entered, added in the type-changing layer (CR 613.1d).
+  if (/^~ is the chosen type in addition to its other types$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "addTypes", types: [], subtypes: [], chosenType: true }], text: line };
   if (/^Permanents with ice counters on them are snow$/.test(text)) return { affects: { kind: "filter", types: [], spec: { kind: "object", counter: "ice", text: "permanent with an ice counter on it" } }, mods: [snow], text: line };
   // Null Rod: "Activated abilities of artifacts can't be activated", mana abilities too (CR 605.1a); only permanents'.
   const silenced = /^Activated abilities of (.+?) can't be activated( unless they're mana abilities)?$/.exec(text);

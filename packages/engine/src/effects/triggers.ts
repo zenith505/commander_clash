@@ -64,7 +64,8 @@ function triggersAgain(s: GameState, src: GameObject, controller: PlayerId, caus
   for (const { id, again } of statics)
     for (const a of again) {
       if (a.by && !(cause?.event === a.by.event && cause.objs.some((x) => !a.by!.filter || a.by!.filter.some((f) => objectMatches(s, f, x.o, controller, false, undefined, x.c) && (f.controller !== "you" || x.controller === controller))))) continue;
-      if (a.of && !a.of.some((k) => !(k.other && src.id === id) && ofMatches(k.filter))) continue;
+      // "Of the chosen type": the one chosen as that permanent entered (Roaming Throne).
+      if (a.of && !a.of.some((k) => !(k.other && src.id === id) && ((f) => !f.chosen && ofMatches(f))(bindChosen(k.filter, s.objects[id]?.chosen)))) continue;
       n++;
     }
   return n;
@@ -972,7 +973,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (d.controller !== ev.controller || d.turn !== s.turn || !printedMatches(d.filter, ev.card) || (d.fromHand && spell?.castFrom !== "hand")) continue;
       s.nextCast = s.nextCast!.filter((x) => x !== d);
       // "Has cascade": the spell's own cascade ability triggers (CR 702.85a).
-      if (d.cascade && spell) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: CASCADE_BODY, cause: ev.stackId });
+      if (d.uncounterable) {
+        if (spell) spell.uncounterableCast = true;
+      } else if (d.cascade && spell) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: CASCADE_BODY, cause: ev.stackId });
       else if (!d.cascade) s.triggerQueue.push({ sourceId: d.sourceId, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, body: d.body, cause: ev.stackId });
     }
     // Casualty's copy only if its casualty cost was paid (CR 702.153a).
@@ -1097,7 +1100,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if ((d.by === "you" && ev.player !== you) || (d.by === "opponent" && ev.player === you)) return false;
         if ((d.cycled && !ev.cycled) || (d.other && ev.id === o.id)) return false;
         return !d.filter || printedMatches(d.filter, ev.card);
-      }, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+        // The card as it is now, where it went ("exile that card from your graveyard").
+      }, undefined, undefined, card, undefined, undefined, undefined, { player: ev.player });
     }
     // "When you cycle ~" works from the zone the card went to (CR 702.29c), and its owner controls it (CR 113.8).
     if (ev.cycled && card && card.zone !== "battlefield") add(card, card.owner, (e) => e === "selfCycled", compileCard(defOf(s, card)).triggers);

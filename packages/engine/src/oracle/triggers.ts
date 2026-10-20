@@ -840,7 +840,10 @@ function parseDiscardTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!f || f.kind !== "card") return "fail";
     filter = f;
   }
-  const body = parseBody(m[5]!, { eventPlayer: true });
+  // "Exile that card from your graveyard" (Necropotence): the discarded card, if it's there (rulings: not if it went
+  // somewhere else, as with madness, or has left).
+  const exileIt = m[1] === "you" && m[2] === "discard" && m[3] === "a" && m[4] === "card" && m[5] === "exile that card from your graveyard.";
+  const body = exileIt ? { targets: [], effects: [{ type: "exile" as const, what: { ref: "subjectCard" as const, zone: "graveyard" as const } }], text: m[5]! } : parseBody(m[5]!, { eventPlayer: true });
   if (!body) return "fail";
   const by = m[1] === "you" ? "you" : m[1] === "an opponent" ? "opponent" : "any";
   return { event: "playerDiscards", discards: { by, ...(/^cycles?$/.test(m[2]!) ? { cycled: true as const } : {}), ...(m[3] === "another" ? { other: true as const } : {}), ...(filter ? { filter } : {}) }, body };
@@ -1025,6 +1028,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (!t || t === "fail" || t.zone !== "graveyard" || t.ifCond) return "fail";
     return { ...t, ifCond: { kind: "selfInGraveyard", ...(inYard[2] ? { creatureAbove: true as const } : {}) } };
   }
+  // "At the beginning of your upkeep, if ~ is in your graveyard, you may pay {2}{G}. If you do, return target creature
+  // card from your graveyard to your hand." (Genesis): the same, about other cards; its target may be the card itself.
+  const inYardOther = /^(At the beginning of your upkeep), if ~ is in your graveyard, (.+)$/.exec(line);
+  if (inYardOther && !/~|\bit\b/.test(inYardOther[2]!)) {
+    const t = parseTrigger(`${inYardOther[1]}, ${inYardOther[2]}`);
+    if (!t || t === "fail" || t.zone || t.ifCond || t.host) return "fail";
+    return { ...t, zone: "graveyard", ifCond: { kind: "selfInGraveyard" } };
+  }
   // "Whenever you cast a multicolored spell, you may return ~ from your graveyard to your hand": the effect moves the
   // card out of the graveyard, so the ability works only there (CR 113.6m). Only that one sentence: anything after it
   // would be about the card in its new zone. A trigger about ~ itself can't happen while it's in a graveyard.
@@ -1084,7 +1095,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // resolves (CR 603.4, rulings).
   const typeIf = intervening && /^(?:When|Whenever) ~ /.test(intervening[1]!) ? /^(?:it's|~ is) an? (creature|artifact|enchantment|land)$/.exec(intervening[2]!) : null;
   const typeCond: StaticCondition | null = typeIf && { kind: "selfIs", filter: { kind: "object", types: [(typeIf[1]!.charAt(0).toUpperCase() + typeIf[1]!.slice(1)) as "Creature"], text: typeIf[1]! } };
-  const ifCond = typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
+  // "Whenever a nontoken creature you control enters, if it doesn't have the same name as another creature you control
+  // or a creature card in your graveyard" (Guardian Project): about the creature that entered.
+  const nameCond: StaticCondition | null = intervening && /^Whenever an? [^,]*creature you control enters$/.test(intervening[1]!) && intervening[2] === "it doesn't have the same name as another creature you control or a creature card in your graveyard" ? { kind: "subjectNameUnique" } : null;
+  const ifCond = nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
   // "That player" is the attacked player only in "Whenever ~ attacks a player".
   if (ifCond && ifCond.kind === "defenderMostLife" && !/^Whenever ~ attacks a player$/.test(intervening![1]!)) return "fail";
   if (intervening && ifCond) {

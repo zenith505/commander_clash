@@ -1,7 +1,7 @@
 # Roadmap
 
-20,987 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 842 of 992 (84%), top 2,000: 1,504 of 1,989 (75%), top 5,000: 3,220 of 4,988 (64%).
+21,072 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 871 of 992 (87%), top 2,000: 1,538 of 1,989 (77%), top 5,000: 3,266 of 4,988 (65%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,21 +22,22 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 90, most played first: Victimize ("choose two target cards
-   ... sacrifice ... return the chosen cards"), Roaming Throne (extra triggers for the chosen type), Sink into Stupor's
-   "spell or nonland permanent" (also Venser, Shaper Savant and Unsubstantiate: a target that's a spell or a
-   permanent), Gemstone Caverns (opening hand), Syr Konrad, Academy Manufactor, Bolas's Citadel, Hullbreaker Horror,
-   Etali, Inspiring Call ("those creatures"), Ragavan, Braids, The Ozolith, Guardian Project, Rakdos Charm ("each
-   creature deals 1 damage to its controller"), Sevinne's Reclamation, Anger and Wonder (statics from the graveyard),
-   Goldspan Dragon, Pact of Negation, Arena of Glory, Mistrise Village, Spark Double, Underworld Breach. Smaller gaps
-   round 90 left: Simian and Elvish Spirit Guide (a mana ability activated from the hand: the UI, autopay and bots
-   would need it), Lion's Eye Diamond, Goreclaw ("creature spells with power 4 or greater cost less"), Puresteel
-   Paladin, Peregrin Took ("plus an additional Food token"), Essence Flux ("If it's a Spirit" after a flicker),
-   Tergrid ("sacrifices a nontoken permanent or discards a permanent card"), Zenith Chronicler ("each other player"
-   meaning other than the player who cast the spell; "each other player" is read as each opponent only where no other
-   player is in play). Bots don't hold Teferi's Protection for anything but lethal combat damage or a board wipe of
-   their own permanents worth 12+ mana value; bots only animate the biggest creature card with Animate Dead, and pay
-   Sylvan Library's life only with 30 or more.
+00. Most played first (`npm run popular`). Out after round 91, most played first: Sink into Stupor's "spell or
+   nonland permanent" (also Venser, Shaper Savant and Unsubstantiate: a target that's a spell or a permanent),
+   Gemstone Caverns (opening hand), Syr Konrad, Bolas's Citadel, Etali, Braids, The Ozolith, Sevinne's Reclamation,
+   Arena of Glory, Spark Double, Underworld Breach, Forgotten Ancient, Dauthi Voidwalker, Kutzil, Demolition Field,
+   Selvala, Mondrak, Disciple of Freyalise. Smaller gaps round 91 left: Chatterfang's "Sacrifice X Squirrels", Tail
+   Swipe, Contractual Safeguard, Return to Dust (addendum targets), Lion's Eye Diamond, Goreclaw ("creature spells
+   with power 4 or greater cost less"), Puresteel Paladin, Second Harvest, Champion of Lambholt, Six, Saw in Half,
+   Nesting Grounds, Strionic Resonator, Emry, Essence Flux ("If it's a Spirit" after a flicker), Tergrid ("sacrifices
+   a nontoken permanent or discards a permanent card"), Zenith Chronicler ("each other player" meaning other than the
+   player who cast the spell). Round 88 leftovers still out: Ob Nixilis of the Black Oath and Karn, Living Legacy
+   emblems, Karn, Scion of Urza, Toralf, Death Kiss, Burning-Rune Demon, Emergent Ultimatum, Ecological Appreciation,
+   Ormos. Bots never exile a Spirit Guide from their hand for mana (the player can, from the hand-card menu; autopay
+   doesn't use it either). Bots don't hold Teferi's Protection for anything but lethal combat damage or a board wipe
+   of their own permanents worth 12+ mana value; bots only animate the biggest creature card with Animate Dead, and
+   pay Sylvan Library's life only with 30 or more. To check: token creation by Jace-style effects may skip token
+   doublers.
 0. Cards with faces (CR 709, 710, 712, 715, 722): 486 of the 846 legal ones play now (`npm run faces` lists each
    layout's support and the lines blocking it): 181 of 388 transforming double-faced (all 36 Invasion Sieges),
    109 of 151 adventurer, 78 of 123 split (15 of 28 Rooms), 49 of 98 modal double-faced, 51 of 67 preparation, 18 of

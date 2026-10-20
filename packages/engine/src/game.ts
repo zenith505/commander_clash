@@ -1231,7 +1231,11 @@ function othersAddCounters(s: GameState, o: GameObject): Record<string, number> 
     const rules = abilitiesOf(s, src).othersEnterWithCounters;
     if (!rules) continue;
     const you = controllerOf(s, src);
-    for (const r of rules) if (objectMatches(s, r.filter, o, you, false)) out[r.counter] = (out[r.counter] ?? 0) + r.n;
+    for (const r of rules) {
+      // "Of the chosen type": the one chosen as the source entered.
+      const filter = bindChosen(r.filter, src.chosen);
+      if (!filter.chosen && objectMatches(s, filter, o, you, false)) out[r.counter] = (out[r.counter] ?? 0) + r.n;
+    }
   }
   return out;
 }
@@ -3531,6 +3535,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Storm counts the spells cast before it (CR 702.40a); a copy of it made later copies it as it was cast (707.10).
   item.castNth = s.spellsCastThisTurn ?? 0;
   s.spellsCastThisTurn = item.castNth + 1;
+  if (isMainPhase(s) && s.activePlayer === p.id) item.castInMain = true;
   s.cards[d.oracleId] ??= d;
   (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors], from: castFrom, ...(paid.treasure ? { treasure: true as const } : {}) });
   (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv: spellManaValue(s, item) };
@@ -4862,7 +4867,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   if (pend.what === "either") {
     (r.scratch ??= {}).either = Number(choice);
-    log(s, `${p.name} chooses to ${pend.labels?.[Number(choice)] ?? choice} (${pend.source}).`);
+    log(s, `${p.name} chooses to ${(pend.labels?.[Number(choice)] ?? choice).replace(/^[A-Z](?=[a-z])/, (c) => c.toLowerCase())} (${pend.source}).`);
     continueResolution(s);
     return;
   }
@@ -5151,7 +5156,7 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
   }
   (r.scratch ??= {}).may = yes;
   // The prompt speaks to the player ("discard your hand"); the log is about them.
-  if (!yes) log(s, `${p.name} chooses not to ${pend.prompt.replace(/\.$/, "").replace(/\byour\b/g, "their")}.`);
+  if (!yes) log(s, `${p.name} chooses not to ${pend.prompt.replace(/\.$/, "").replace(/ or lose the game$/, "").replace(/\byour\b/g, "their")}.`);
   s.pending = null;
   continueResolution(s);
 }

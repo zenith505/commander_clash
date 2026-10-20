@@ -3,13 +3,14 @@
 import { DUNGEONS, UNDERCITY, dungeonSupported } from "../dungeons";
 import { allEffects } from "../../abilities";
 import type { Amount, AmountExpr, DamageRecipient, Effect, ObjRef, PlayerRef, PunisherOption, TargetSpec } from "../../abilities";
-import { NUM, NUMX, amt, num, plainMana, sacrificeSelf } from "../words";
+import { NUM, NUMX, amt, isGroup, num, plainMana, sacrificeSelf } from "../words";
 import { parsePayCost, addTarget, parseUnlessPays } from "../body";
 import { halfX, parseBoundCount, parseCount, roundOf } from "../counts";
 import { parseSearch, parseSearchFilter } from "../search";
 import { parseDamageRecipient, parsePlayer, parseObject, parseTargetPhrase, pickFilter } from "../targets";
 import { parseSentence } from "../sentence";
 import type { Ctx } from "../body";
+import type { ManaType } from "../../types";
 import { parsePreventAll } from "../statics";
 import { emblemAbilityOk } from "../grants";
 
@@ -370,6 +371,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const times = parseCount(m[2]!, ctx, true);
     return times && [{ type: "addMana", mana: m[1]!, times }];
   }
+  // "Add {B} or {G} for each permanent destroyed this way" (Culling Ritual): either color for each one, chosen as it
+  // resolves (rulings: "You aren't limited to one color").
+  if ((m = /^[Aa]dd \{([WUBRG])\} or \{([WUBRG])\} for each (.+)$/.exec(s)) && m[1] !== m[2]) {
+    const times = parseCount(m[3]!, ctx, true);
+    return times && [{ type: "addMana", split: [m[1] as ManaType, m[2] as ManaType], times }];
+  }
   // "Add an amount of {R} equal to ~'s power" (Molten-Core Maestro): counted as it resolves.
   if ((m = /^[Aa]dd an amount of (\{[WUBRGC]\}) equal to (.+)$/.exec(s))) {
     const times = parseCount(m[2]!, ctx);
@@ -455,6 +462,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const from = /^(~|any target|target .+)$/i.test(m[3]!) ? parseDamageRecipient(m[3]!, ctx) : null;
     const to = from && /^(~|any target|any other target|another target|target .+|another target .+)$/i.test(m[5]!) ? parseDamageRecipient(m[5]!, ctx) : null;
     return from && to ? [{ type: "redirectNext", n: amt(m[1]!), from, to }] : null;
+  }
+  // "Each creature deals 1 damage to its controller" (Rakdos Charm): each one deals it.
+  if ((m = new RegExp(`^(each (?:[a-z]+ )?creature(?: [a-z ]+)?) deals ${NUMX} damage to its controller$`, "i").exec(s))) {
+    const what = parseObject(m[1]!.toLowerCase(), ctx);
+    return what && isGroup(what) ? [{ type: "eachDealsDamage", what, amount: amt(m[2]!), toController: true }] : null;
   }
   // "~ deals 2 damage to any target and 1 damage to any other target" (Arc Trail): both at once.
   if ((m = new RegExp(`^~ deals ${NUMX} damage to (.+?) and ${NUMX} damage to (.+)$`, "i").exec(s))) {

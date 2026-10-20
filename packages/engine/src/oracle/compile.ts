@@ -744,7 +744,9 @@ export function compile(d: CardDef): CompiledCard {
       const g = parseGroup(`each ${that ? `${that[1]} or ${that[2]} creature you control` : othersExtra[2]}`);
       const types = g?.filter.types ?? [];
       const couldBeSelf = !othersExtra[1] && d.types.some((ty) => types.includes(ty) || (!types.length && ty === "Creature"));
-      if (!g || g.other || couldBeSelf || g.filter.kind !== "object" || g.filter.controller !== "you" || g.filter.chosen) out.unsupported.push(raw);
+      // "Each other creature you control of the chosen type" (Metallic Mimic): the type chosen as it entered.
+      const chosenOk = !g?.filter.chosen || (g.filter.kind === "object" && g.filter.chosen === "type" && /^As ~ enters(?: the battlefield)?, choose a creature type\.$/m.test(normalizeSelf(d)));
+      if (!g || g.other || couldBeSelf || g.filter.kind !== "object" || g.filter.controller !== "you" || !chosenOk) out.unsupported.push(raw);
       else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(othersExtra[4]!), n: /^an?$/.test(othersExtra[3]!) ? 1 : num(othersExtra[3]!), text: line });
       continue;
     }
@@ -1669,7 +1671,8 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // A spell's "When you next cast ... this turn, ..." creates a delayed trigger as it resolves (CR 603.7); it isn't a triggered ability of the card.
-    if (isSpell && /^When you next cast /.test(line)) {
+    // So does a Pact's "At the beginning of your next upkeep, pay {2}{B}. If you don't, you lose the game." (CR 603.7a).
+    if (isSpell && (/^When you next cast /.test(line) || /^At the beginning of your next upkeep, pay (?:\{[^}]+\})+\. If you don't, you lose the game\.$/.test(line))) {
       spellLines.push(line);
       continue;
     }
@@ -1684,6 +1687,8 @@ export function compile(d: CardDef): CompiledCard {
       /^When(?:ever)? ~ enters or (attacks|dies|leaves the battlefield|the creature it haunts dies|deals combat damage to a player|transforms into ~), (.+)$/.exec(line) ??
       /^When ~ (transforms into ~) or dies, (.+)$/.exec(line) ??
       /^When ~ enters and whenever it (attacks while saddled), (.+)$/.exec(line) ??
+      // "Whenever ~ attacks or becomes the target of a spell, create a Treasure token" (Goldspan Dragon).
+      /^Whenever ~ (attacks) or (becomes the target of a spell), (.+)$/.exec(line) ??
       // "Whenever you create or sacrifice a token, ..." (Mirkwood Bats); "When ~ enters and whenever an opponent draws a
       // card except the first one they draw in each of their draw steps, ..." (Orcish Bowmasters).
       /^Whenever you (create or sacrifice) a token, (.+)$/.exec(line) ??
@@ -1706,6 +1711,8 @@ export function compile(d: CardDef): CompiledCard {
               ? [`Whenever you create a token, ${effect}`, `Whenever you sacrifice a token, ${effect}`]
             : /^When ~ enters and whenever an opponent draws/.test(line)
               ? [`When ~ enters, ${effect}`, `W${twice[1]!.slice(1)}, ${effect}`]
+            : /^Whenever ~ attacks or becomes the target of a spell, /.test(line)
+              ? [`Whenever ~ attacks, ${effect}`, `Whenever ~ becomes the target of a spell, ${effect}`]
             : /^Whenever an? [^,]+? enters or attacks, /.test(line)
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} attacks, ${effect}`]
             : [`When ~ enters, ${effect}`, `${/^(?:attacks|deals)/.test(twice[1]!) ? "Whenever" : "When"} ~ ${twice[1]}, ${effect}`];
@@ -2185,6 +2192,12 @@ function triggersAgainLine(line: string): NonNullable<CompiledCard["triggersAgai
     return filter ? { by: { event, filter: filter.map((x) => x.filter) } } : null;
   }
   m = /^If a triggered ability of (?:an? )?(.+?) triggers, (?:that ability|it) triggers an additional time\.$/.exec(line);
+  // "Another creature you control of the chosen type" (Roaming Throne): the creature type chosen as it entered.
+  const ofChosen = m && /^(another )?(creature you control) of the chosen type$/.exec(m[1]!);
+  if (ofChosen) {
+    const of = kinds(ofChosen[2]!, !!ofChosen[1]);
+    return of?.length === 1 ? { of: [{ ...of[0]!, filter: { ...of[0]!.filter, chosen: "type", text: `${of[0]!.filter.text} of the chosen type` } }] } : null;
+  }
   if (m) {
     const all = /^another (.+ or .+ you control)$/.exec(m[1]!);
     const of = kinds(all ? all[1]! : m[1]!, !!all);

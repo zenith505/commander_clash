@@ -146,7 +146,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // "You may pay {1}. If you do, ...": worth it when the rest is, and it leaves us some life.
       const { mana, life = 0 } = pend.pay;
       const taps = mana ? planMana(s, pid, parseManaCost(mana)) : [];
-      const ok = !!taps && player(s, pid).life > life + 5 && wantsMay(s, pid);
+      // A Pact's "If you don't, you lose the game": always pay when we can.
+      const e = s.resolving?.body.effects[s.resolving.next];
+      const orLose = e?.type === "may" && !!e.otherwise?.some((x) => x.type === "loseGame");
+      const ok = !!taps && (orLose || (player(s, pid).life > life + 5 && wantsMay(s, pid)));
       return ok ? [...taps!, { type: "chooseMay", player: pid, yes: true }] : [{ type: "chooseMay", player: pid, yes: false }];
     }
     // Clash (CR 701.30a): keep a card we'd like to draw on top, put the rest on the bottom.
@@ -328,6 +331,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Sylvan Library: 4 life for a card only while well ahead on life; otherwise it goes back.
     if (pend.kind === "chooseOption" && pend.what === "payOrTop") return [{ type: "chooseOption", player: pid, choice: s.players[pid]!.life >= 30 ? "pay" : "top" }];
     // "A Food token or a Treasure token": the Treasure (mana now beats life later); otherwise the first.
+    // "Add {B} or {G} for each ..." (Culling Ritual): the split that best matches the colored symbols in the hand.
+    if (pend.kind === "chooseOption" && pend.what === "either" && pend.prompt === "choose the mana") {
+      const want = (sym: string) => s.players[pid]!.hand.reduce((n, id) => n + (defOf(s, obj(s, id)).manaCost.split(sym).length - 1), 0);
+      const score = (label: string) => [...new Set(label.match(/\{[WUBRG]\}/g) ?? [])].reduce((n, sym) => n + Math.min(label.split(sym).length - 1, want(sym)), 0);
+      const best = pend.labels!.reduce((b, l, i) => (score(l) > score(pend.labels![b]!) ? i : b), 0);
+      return [{ type: "chooseOption", player: pid, choice: pend.options[best]! }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "either") {
       const i = pend.labels?.findIndex((l) => /Treasure/.test(l)) ?? -1;
       return [{ type: "chooseOption", player: pid, choice: pend.options[Math.max(0, i)]! }];
@@ -1002,6 +1012,9 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   // Mox Diamond with no other land card to discard would only go to the graveyard.
   const discard = compileCard(d).entersDiscardInstead;
   if (discard && !player(s, pid).hand.some((c) => c !== id && printedMatches(discard, defOf(s, obj(s, c))))) return null;
+  // A Pact: only when our lands can pay its upkeep cost, and any other Pact's we still owe.
+  const pact = pactCost(compileCard(d).spell?.effects ?? []);
+  if (pact && pact + owedPacts(s, pid) > lands(s, pid)) return null;
   // A foretold card is cast for its foretell cost (CR 702.143a).
   if (!free && !via && alt === undefined && foretoldCast(s, pid, obj(s, id))) alt = "foretell";
   // Cast as madness or miracle resolves, for that cost (CR 702.35a, 702.94a): its X is paid then.
@@ -1823,6 +1836,16 @@ function chooseOptionalSacrifices(s: GameState, pid: PlayerId, pend: Extract<Pen
   return cheapest && (cheapest.isToken || worth(s, pid, cheapest) <= 3) ? [cheapest.id] : [];
 }
 
+/** What a Pact's "pay {2}{B}. If you don't, you lose the game" asks for at the next upkeep, as mana value. */
+function pactCost(effects: Effect[]): number {
+  for (const e of effects) {
+    const lose = e.type === "delayed" ? e.effects.find((x) => x.type === "may" && x.otherwise?.some((y) => y.type === "loseGame")) : undefined;
+    if (lose?.type === "may" && lose.pay?.mana) return manaValue(parseManaCost(lose.pay.mana));
+  }
+  return 0;
+}
+/** The Pacts this player still has to pay for. */
+const owedPacts = (s: GameState, pid: PlayerId) => (s.delayed ?? []).filter((d) => d.controller === pid).reduce((n, d) => n + pactCost([{ type: "delayed", when: "yourNextUpkeep", effects: d.body.effects, text: "" }]), 0);
 const lands = (s: GameState, pid: PlayerId) => s.battlefield.filter((x) => controllerOf(s, obj(s, x)) === pid && objIsType(s, obj(s, x), "Land")).length;
 
 /** Explore revealed a nonland card: keep it on top if we could cast it soon, otherwise mill it. */
@@ -2189,6 +2212,13 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
         else if (e.to.ref !== "each" && e.to.ref !== "eachPlayer") v += e.to.ref === "eachOpponent" ? 2 * estimate(e.amount) : estimate(e.amount);
         break;
       }
+      case "eachDealsDamage": {
+        // "Each creature deals 1 damage to its controller": life off each player, by how many of them they control.
+        if (e.what.ref !== "each") break;
+        const f = e.what.filter;
+        for (const id of s.battlefield) if (objectMatches(s, f, obj(s, id), pid, false)) v += (controllerOf(s, obj(s, id)) === pid ? -1 : 1) * estimate(e.amount);
+        break;
+      }
       case "draw":
         v += e.who.ref === "you" ? 3 * estimate(e.n) : 0;
         break;
@@ -2350,7 +2380,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const freeCost = !ab.tap && !manaValue(parseManaCost(ab.manaCost)) && !parseManaCost(ab.manaCost).hasX && !ab.costs?.length && !(ab.removeCounters && !/^[+-]1\/[+-]1$/.test(ab.removeCounters.counter));
       // A coin flip's own cost is weighed with what winning and losing do (flipWorth).
       const flips = flipBranches(ab.body);
-      if ((ab.sacrificeSelf && !cashIn && !flips) || ab.exileSelf || freeCost || ab.station) continue;
+      // Necropotence's "Pay 1 life: ... into your hand at your next end step": a few cards a turn while life is plentiful.
+      const necro = !!ab.lifeCost && ab.body.effects.some((e) => e.type === "exileFaceDown" && e.endStepHand) && player(s, pid).life >= 20 && (o.activatedThisTurn?.filter((n) => n === i).length ?? 0) < 3;
+      if ((ab.sacrificeSelf && !cashIn && !flips) || ab.exileSelf || (freeCost && !necro) || ab.station) continue;
       // "Pay half your life, rounded up" (Murderous Betrayal, Lurking Evil): only while that's a few life at most.
       if (halfLifeCost(s, pid, ab) > 3) continue;
       // Level up (CR 702.87a) past the last level symbol does nothing more.
@@ -2367,7 +2399,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // (CR 514.1), and take one back when there's room in the hand. Nothing else exiles our hand face down.
       const hand = player(s, pid).hand.length;
       const handRoom = hasNoMaxHandSize(s, pid) ? Infinity : MAX_HAND_SIZE - hand;
-      if (ab.body.effects.some((e) => e.type === "exileFaceDown" && (e.from !== "handCard" || handRoom >= 0))) continue;
+      if (!necro && ab.body.effects.some((e) => e.type === "exileFaceDown" && (e.from !== "handCard" || handRoom >= 0))) continue;
       if (ab.body.effects.some((e) => e.type === "moveLinked" && (!linkedOwned(s, id, pid) || (e.dest === "hand" && handRoom <= 0)))) continue;
       // An Incubator becomes a 0/0 Phyrexian: only worth it with +1/+1 counters on it (CR 701.53b).
       if (ab.body.effects.some((e) => e.type === "transformSelf") && !((o.counters["+1/+1"] ?? 0) > 0)) continue;

@@ -3438,6 +3438,8 @@ export interface CompiledCard {
   strive?: string;
   /** "Spells your opponents cast that target ~ cost {2} more to cast": once per spell however often it targets it (rulings). */
   targetTax?: number;
+  /** "Spells your opponents cast that target ~ cost an additional 3 life to cast" (Terror of the Peaks): an additional cost (CR 601.2f, 119.4). */
+  targetLifeTax?: number;
   /**
    * A permanent's static abilities that make spells cost more or less: "Creature spells you cast cost
    * {1} less to cast", "Noncreature spells cost {1} more to cast" (CR 601.2f).

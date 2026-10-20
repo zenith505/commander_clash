@@ -2963,7 +2963,7 @@ export function castProblem(
   if (or && choices?.costOr === undefined && or.every((c) => c.cost && extraCostProblem(s, pid, o, [c.cost], undefined, `cast ${d.name}`)))
     return `you can't pay ${d.name}'s additional cost (${or.map((c) => c.text).join(" or ")})`;
   if (via && x && manaX && via.mana && !parseManaCost(via.mana).hasX && !costX) return "X is 0 unless the cost you pay has {X}";
-  const ap = additionalCostProblem(s, pid, o, choices, x ?? 0, spell?.modal ? modes : undefined);
+  const ap = additionalCostProblem(s, pid, o, choices, x ?? 0, spell?.modal ? modes : undefined, targets);
   if (ap) return ap;
   const cp = casualtyProblem(s, pid, d, choices) ?? bargainProblem(s, pid, id, d, choices) ?? evidenceCastProblem(s, pid, o, d, choices) ?? teamworkProblem(s, pid, d, choices, convoke) ?? conspireProblem(s, pid, id, choices, convoke) ?? harmonizeProblem(s, pid, choices, convoke) ?? giftProblem(s, pid, d, choices);
   if (cp) return cp;
@@ -3512,7 +3512,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   closeZoneBatch(s);
   // Additional costs are paid with the mana (CR 601.2h); what they did is known to the spell.
   const returned: LastKnown = {};
-  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, { ...choices, ...(chosen ? { modes: chosen } : {}) }, x ?? 0, s, p.id), choices, returned);
+  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, { ...choices, targets, ...(chosen ? { modes: chosen } : {}) }, x ?? 0, s, p.id), choices, returned);
   if (sacrificed.length) item.sacrificed = sacrificed;
   if (choices.alt === "sneak") o.sneak = returned;
   // Casualty: "you may sacrifice a creature with power N or greater" (CR 702.153a).
@@ -3847,19 +3847,27 @@ function casualtyProblem(s: GameState, pid: PlayerId, d: CardDef, choices?: Cost
 }
 
 /** Can these additional costs be paid (CR 601.2b, 601.2f-h)? Without choices, just whether they could be. */
-function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choices?: CostChoices, x = 0, modes?: number[]): string | null {
+function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choices?: CostChoices, x = 0, modes?: number[], targets?: TargetChoice[]): string | null {
   const d = defOf(s, o);
-  return extraCostProblem(s, pid, o, castExtraCosts(d, { ...choices, ...(modes ? { modes } : {}) }, x, s, pid), choices, `cast ${d.name}`);
+  return extraCostProblem(s, pid, o, castExtraCosts(d, { ...choices, ...(modes ? { modes } : {}), ...(targets ? { targets } : {}) }, x, s, pid), choices, `cast ${d.name}`);
 }
 
 /** The costs beyond mana of casting it this way: additional costs, and those of a graveyard or alternative cost (CR 601.2f-h). */
-export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr" | "buyback"> & { modes?: number[] }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
+export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr" | "buyback"> & { modes?: number[]; targets?: TargetChoice[] }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
   const or = choices?.costOr === undefined ? undefined : compileCard(d).costOr?.[choices.costOr]?.cost;
   // "Escalate—Discard a card": that cost once for each mode beyond the first (CR 702.120a).
   const esc = compileCard(d).spell?.modal?.escalate?.cost;
   const beyond = Math.max(0, (choices?.modes?.length ?? 0) - 1);
   const escalate: AdditionalCost[] = esc && beyond && "n" in esc ? [{ ...esc, n: esc.n * beyond }] : [];
-  const costs = [...(compileCard(d).additionalCosts ?? []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : [])];
+  // "Spells your opponents cast that target ~ cost an additional 3 life to cast" (Terror of the Peaks): each such
+  // permanent once, however often it's targeted, as for a mana increase.
+  let lifeTax = 0;
+  if (s && pid !== undefined)
+    for (const id of new Set((choices?.targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])))) {
+      const t = s.objects[id];
+      if (t?.zone === "battlefield" && controllerOf(s, t) !== pid) lifeTax += abilitiesOf(s, t).targetLifeTax ?? 0;
+    }
+  const costs = [...(compileCard(d).additionalCosts ?? []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : [])];
   // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a); the Shoals' "a red card with mana value
   // X", that mana value.
   return costs.map((c) =>

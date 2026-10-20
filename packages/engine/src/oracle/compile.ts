@@ -1654,6 +1654,7 @@ export function compile(d: CardDef): CompiledCard {
       else if ("less" in cost) out.costLess = [...(out.costLess ?? []), cost.less];
       else if ("lessIfTargets" in cost) out.costLessIfTargets = [...(out.costLessIfTargets ?? []), cost.lessIfTargets];
       else if ("targetTax" in cost) out.targetTax = (out.targetTax ?? 0) + cost.targetTax;
+      else if ("targetLifeTax" in cost) out.targetLifeTax = (out.targetLifeTax ?? 0) + cost.targetLifeTax;
       else out.costLessIf = [...(out.costLessIf ?? []), cost.lessIf];
       continue;
     }

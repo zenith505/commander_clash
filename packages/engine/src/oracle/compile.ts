@@ -1,6 +1,6 @@
 import { faceDef, hasFuse, isRoom, restingDef, roomDoorDefs } from "../faces";
 import { isMeldResult, meldPartnerName, meldResultDef } from "../meld-results";
-import { allEffects } from "../abilities";
+import { allEffects, GRANTED_WAY_COSTS } from "../abilities";
 import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq } from "../abilities";
 import { CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, stripReminder } from "../keywords";
 import { parseManaCost } from "../mana";
@@ -1008,6 +1008,34 @@ export function compile(d: CardDef): CompiledCard {
       out.landsFromGraveyard = true;
       continue;
     }
+    // Underworld Breach, The Master of Keys, Lier, Return the Past, Six, Deeproot Historian: escape, flashback or retrace
+    // for the cards in your graveyard (CR 702.138a, 702.34a, 702.81a). Each grant's cost is the card's own mana cost.
+    const grant =
+      /^(During your turn, )?(?:[Ee]ach )?(.+?) cards? in your graveyard (?:has|have) (escape|flashback|retrace)( \{\d+\})?\.(?: (?:The|Its) (?:escape|flashback) cost is equal to (?:the card's|that card's|its) mana cost( plus exile three other cards from your graveyard)?\.)?$/.exec(line);
+    if (grant) {
+      const kind = grant[3]!;
+      const filter = parseTargetPhrase(`${grant[2]!.replace(/ and /g, " or ")} card from a graveyard`);
+      // Escape and flashback name their cost; retrace has none of its own (its land discard is in the keyword).
+      // Iroh's "each Lesson card in your graveyard has flashback {1}": a cost of its own.
+      const mana = grant[4]?.trim();
+      const named = /cost is equal/.test(line);
+      const ok = filter?.kind === "card" && (kind === "retrace" ? !named && !mana : kind === "flashback" && mana ? !named : named && !mana && (kind === "escape") === !!grant[5]);
+      // Flashback works only for an instant or sorcery (CR 702.34a): only grants to those cards.
+      // Iroh's Lessons: every Lesson is an instant or sorcery (CR 205.3k), so flashback works for each of them.
+      const spellsOnly = !!filter && (filter.subtypes?.length === 1 && filter.subtypes[0] === "Lesson" ? true : !!filter.types?.length && filter.types.every((t) => t === "Instant" || t === "Sorcery"));
+      if (!ok || (kind === "flashback" && !spellsOnly)) out.unsupported.push(raw);
+      else {
+        const { owner: _, ...f } = filter;
+        const way: import("../abilities").CastFromGraveyard =
+          kind === "escape"
+            ? { kind: "grantedEscape", costs: GRANTED_WAY_COSTS.grantedEscape!, exile: false }
+            : kind === "flashback"
+              ? { kind: "grantedFlashback", ...(mana ? { mana } : {}), costs: [], exile: true }
+              : { kind: "grantedRetrace", costs: GRANTED_WAY_COSTS.grantedRetrace!, exile: false };
+        (out.graveyardGrants ??= []).push({ filter: { ...f, text: `${grant[2]} cards` }, way, ...(grant[1] ? { yourTurn: true as const } : {}) });
+      }
+      continue;
+    }
     // Information that's public while the permanent is on the battlefield (CR 401.5; hands, CR 402.3).
     if (line === "Play with the top card of your library revealed." || line === "Players play with the top card of their libraries revealed.") {
       out.revealTop = /^Players/.test(line) ? "players" : "you";
@@ -1705,7 +1733,7 @@ export function compile(d: CardDef): CompiledCard {
       /^When you cast or cycle ~, (.+)$/.exec(line) ??
       /^When ~ enters and (at the beginning of (?:your upkeep|your end step|each upkeep|each end step)), (.+)$/.exec(line) ??
       /^When you cycle ~ and when ~ dies, (.+)$/.exec(line) ??
-      /^When(?:ever)? ~ enters or (attacks|dies|leaves the battlefield|the creature it haunts dies|deals combat damage to a player|transforms into ~), (.+)$/.exec(line) ??
+      /^When(?:ever)? ~ enters or (attacks|dies|is put into a graveyard from the battlefield|leaves the battlefield|the creature it haunts dies|deals combat damage to a player|transforms into ~), (.+)$/.exec(line) ??
       /^When ~ (transforms into ~) or dies, (.+)$/.exec(line) ??
       /^When ~ enters and whenever it (attacks while saddled), (.+)$/.exec(line) ??
       // "Whenever ~ attacks or becomes the target of a spell, create a Treasure token" (Goldspan Dragon).

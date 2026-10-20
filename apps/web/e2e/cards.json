@@ -2370,6 +2370,42 @@
   ]
  },
  {
+  "oracleId": "da3e7d3d-2ca0-40c3-9602-fca37c92f507",
+  "name": "Emry, Lurker of the Loch",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Merfolk Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Merfolk",
+   "Wizard"
+  ],
+  "oracleText": "Affinity for artifacts (This spell costs {1} less to cast for each artifact you control.)\nWhen Emry enters, mill four cards.\n{T}: Choose target artifact card in your graveyard. You may cast that card this turn. (You still pay its costs. Timing rules still apply.)",
+  "power": "1",
+  "toughness": "2",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Affinity",
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "mul",
+  "releasedAt": "2023-04-21",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c62a9e10-cfc6-48cc-a3f7-68d624182a5a",
   "name": "Endless Swarm",
   "manaCost": "{5}{G}{G}{G}",
@@ -2862,6 +2898,36 @@
   "set": "trk",
   "releasedAt": "2026-11-13",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2ef75cf3-30dc-4852-a6d1-1d6391fad022",
+  "name": "Forgotten Ancient",
+  "manaCost": "{3}{G}",
+  "cmc": 4,
+  "typeLine": "Creature — Elemental",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental"
+  ],
+  "oracleText": "Whenever a player casts a spell, you may put a +1/+1 counter on this creature.\nAt the beginning of your upkeep, you may move any number of +1/+1 counters from this creature onto other creatures.",
+  "power": "0",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -4654,6 +4720,31 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d9a10971-f32b-4978-952d-fed0a5bc9e36",
+  "name": "Krosan Verge",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "This land enters tapped.\n{T}: Add {C}.\n{2}, {T}, Sacrifice this land: Search your library for a Forest card and a Plains card, put them onto the battlefield tapped, then shuffle.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "znc",
+  "releasedAt": "2020-09-25",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e36f4649-934d-4e8a-bd5f-39f164ea6937",
   "name": "Land Grant",
   "manaCost": "{1}{G}",
@@ -5575,6 +5666,57 @@
   "set": "zen",
   "releasedAt": "2009-10-02",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d27bb97d-286b-4947-8d7b-443e4df93319",
+  "name": "Nesting Grounds",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {C}.\n{1}, {T}: Move a counter from target permanent you control onto a second target permanent. Activate only as a sorcery.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "7ffae8f8-3006-4969-a339-6d30678f87ea",
+  "name": "Night's Whisper",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "You draw two cards and lose 2 life.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -8089,6 +8231,32 @@
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "27e0948b-9916-473b-8d8c-a51bdfbc7457",
+  "name": "Underworld Breach",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Each nonland card in your graveyard has escape. The escape cost is equal to the card's mana cost plus exile three other cards from your graveyard. (You may cast cards from your graveyard for their escape cost.)\nAt the beginning of the end step, sacrifice this enchantment.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "thb",
+  "releasedAt": "2020-01-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": true
  },
  {
   "oracleId": "c5da5c31-0cf1-4393-8701-eda7880ecebc",

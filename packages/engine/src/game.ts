@@ -8,11 +8,12 @@ import { meldResultsFor } from "./meld-results";
 import { asFace, castableFaces, defMv, hasName, isRoom, landFaces, layoutOf, registerRoom, restingDef, setFace, transformedFace } from "./faces";
 import { checkDayNight, dayNightUntapCheck } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
+import { GRANTED_WAY_COSTS } from "./abilities";
 import { abilitiesOf, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
 import { pickOptions, playerProtectedFrom, spellManaValue } from "./effects/targeting";
-import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, COLOR_NAMES } from "./effects";
+import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateTargets, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
 import { putCounters } from "./counters";
@@ -684,7 +685,7 @@ export function moveObject(
     to = "command";
     log(s, `${defOf(s, o).name} goes to the command zone instead.`);
   }
-  const escaped = fromZone === "stack" && to === "battlefield" && o.castVia === "escape";
+  const escaped = fromZone === "stack" && to === "battlefield" && (o.castVia === "escape" || o.castVia === "grantedEscape");
   // The Myojin: "~ enters with a divinity counter on it if you cast it from your hand" (a commander cast from the command
   // zone wasn't, rulings).
   const castFromHand = fromZone === "stack" && o.castFrom === "hand" && !o.spellCopy;
@@ -1366,7 +1367,7 @@ const turnRule = (s: GameState, pid: PlayerId, rule: TurnRule["rule"]) => (s.tur
 
 /** Can this player lose life, or does "you can't lose life this turn" stop it (CR 119.8)? */
 export function canLoseLife(s: GameState, pid: PlayerId): boolean {
-  return !turnRule(s, pid, "cantLoseLife") && !player(s, pid).lifeCantChange;
+  return !turnRule(s, pid, "cantLoseLife") && !player(s, pid).lifeCantChange && player(s, pid).lifeCantChangeTurn !== s.turn;
 }
 
 /** An activated ability's "pay half your life, rounded up" right now: 0 with 0 or less life (rulings on Lurking Evil). */
@@ -1381,7 +1382,7 @@ export function payableLife(s: GameState, pid: PlayerId): number {
 
 /** Can this player gain life, or does a "can't gain life" effect stop it (CR 119.7)? */
 export function canGainLife(s: GameState, pid: PlayerId): boolean {
-  if (player(s, pid).lifeCantChange) return false;
+  if (player(s, pid).lifeCantChange || player(s, pid).lifeCantChangeTurn === s.turn) return false;
   const stops = (who: "all" | "opponents" | "enchanted" | undefined, controller: PlayerId, o?: GameObject) => who === "all" || (who === "opponents" && controller !== pid) || (who === "enchanted" && o?.attachedToPlayer === pid);
   if ((s.noLifeGain ?? []).some((e) => e.turn === s.turn && stops(e.who, e.controller))) return false;
   return !s.battlefield.some((id) => stops(abilitiesOf(s, obj(s, id)).cantGainLife, controllerOf(s, obj(s, id)), obj(s, id)));
@@ -2282,7 +2283,10 @@ function resolveTop(s: GameState) {
   const item = s.stack.pop()!;
   if (item.kind === "ability") {
     const def = s.cards[item.sourceCardId!]!;
-    if (item.ifCond && item.sourceId && !staticConditionNow(s, item.ifCond, item.sourceId, item.controller, item.event?.player, item.event?.amount, item.sourceZc, item.subject?.id, item.subject?.zc)) {
+    // Mangara: those attackers still at you or your planeswalkers, or gone from the battlefield (as they last were, rulings).
+    const still = item.event?.attackingYou;
+    const atYou = still && (item.event!.group ?? []).filter((g) => { const a = s.objects[g.id]; return !a || a.zone !== "battlefield" || (a.zoneChanges ?? 0) !== g.zc || attackingYouNow(s, g.id, still.you, !!still.orPlaneswalkers); }).length;
+    if ((still && atYou! < still.min) || (item.ifCond && item.sourceId && !staticConditionNow(s, item.ifCond, item.sourceId, item.controller, item.event?.player, item.event?.amount, item.sourceZc, item.subject?.id, item.subject?.zc))) {
       log(s, `${def.name}'s ability does nothing (its "if" condition is no longer true).`); // CR 603.4
       return;
     }
@@ -3640,6 +3644,7 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
 
 /** The card's way of being cast from a graveyard of this kind, if it has one. */
 export function graveyardCast(d: CardDef, via?: CastFromGraveyardKind): CastFromGraveyard | undefined {
+  if (via && GRANTED_WAY_COSTS[via]) return { kind: via, costs: GRANTED_WAY_COSTS[via]!, exile: false };
   return via ? compileCard(d).fromGraveyard?.find((g) => g.kind === via) : undefined;
 }
 
@@ -3662,7 +3667,31 @@ export function graveyardWays(s: GameState, o: GameObject): CastFromGraveyard[] 
   // (702.127a), or flashback an effect gave the card, for that half's mana cost.
   if (o.face === undefined && layoutOf(s, o) === "split") return castableFaces(s, o).flatMap((f) => asFace(s, o, f, () => graveyardWays(s, o)).map((g) => ({ ...g, face: f })));
   const d = defOf(s, o);
-  return [...(compileCard(d).fromGraveyard ?? []), ...(hasGrantedFlashback(s, o) ? [{ kind: "grantedFlashback" as const, mana: d.manaCost, costs: [], exile: true }] : [])];
+  return [...(compileCard(d).fromGraveyard ?? []), ...(hasGrantedFlashback(s, o) ? [{ kind: "grantedFlashback" as const, mana: d.manaCost, costs: [], exile: true }] : []), ...grantedWays(s, o, d)];
+}
+
+/**
+ * Escape, flashback or retrace a permanent its owner controls gives this card in their graveyard (Underworld Breach,
+ * Lier, Six), one of each kind; the cost is the card's mana cost, so a card without one can't be cast this way (rulings).
+ */
+function grantedWays(s: GameState, o: GameObject, d: CardDef): CastFromGraveyard[] {
+  if (o.zone !== "graveyard") return [];
+  const out: CastFromGraveyard[] = [];
+  // "You may cast that card this turn" (Emry): its owner, paying its mana cost; a card without one can't be cast.
+  const m = o.mayPlay;
+  if (m && m.player === o.owner && m.zc === (o.zoneChanges ?? 0) && m.until === "thisTurn" && m.turn === s.turn && d.manaCost && !compileCard(d).fromGraveyard?.some((w) => w.kind === "permission" && !w.costs.length))
+    out.push({ kind: "permission", mana: d.manaCost, costs: [], exile: false });
+  for (const id of s.battlefield) {
+    const p = obj(s, id);
+    if (controllerOf(s, p) !== o.owner) continue;
+    for (const g of abilitiesOf(s, p).graveyardGrants ?? []) {
+      if (g.yourTurn && s.activePlayer !== o.owner) continue;
+      if (!d.manaCost && !g.way.mana) continue;
+      if (!printedMatches(g.filter, d) || out.some((w) => w.kind === g.way.kind) || (g.way.kind === "grantedFlashback" && hasGrantedFlashback(s, o))) continue;
+      out.push({ ...g.way, mana: g.way.mana ?? d.manaCost });
+    }
+  }
+  return out;
 }
 
 /** One way to cast it from a graveyard, if it has it. */
@@ -3671,7 +3700,7 @@ export function graveyardWay(s: GameState, o: GameObject, via?: CastFromGraveyar
 }
 
 export function describeVia(via: CastFromGraveyardKind | FaceDownKind): string {
-  return via === "jumpStart" ? "jump-start" : via === "grantedFlashback" ? "flashback" : via === "permission" ? "a way to cast it from your graveyard" : via;
+  return via === "jumpStart" ? "jump-start" : via === "grantedFlashback" ? "flashback" : via === "grantedEscape" ? "escape" : via === "grantedRetrace" ? "retrace" : via === "permission" ? "a way to cast it from your graveyard" : via;
 }
 
 /** ", kicked", ", kicked twice", ", kicked with {1}{U}", for the log. */
@@ -4662,10 +4691,11 @@ function distributeChosen(s: GameState, p: Player, parts: Record<ObjectId, numbe
   const given = Object.entries(parts).filter(([, n]) => n !== 0);
   if (given.some(([id, n]) => !pend.options.includes(id) || !Number.isInteger(n) || n < 0)) throw new RulesError(`distribute the counters among the ${pend.what}`);
   const sum = given.reduce((a, [, n]) => a + n, 0);
-  if (sum !== pend.total) throw new RulesError(`distribute all ${pend.total} ${pend.counter} counters`);
+  if (pend.move ? sum > pend.total : sum !== pend.total) throw new RulesError(pend.move ? `move at most ${pend.total} ${pend.counter} counters` : `distribute all ${pend.total} ${pend.counter} counters`);
   r.scratch = { ...r.scratch, distributed: Object.fromEntries(given) };
   s.pending = null;
-  log(s, `${p.name} distributes ${pend.total} ${pend.counter} counter${pend.total > 1 ? "s" : ""}: ${given.map(([id, n]) => `${n} on ${nameOf(s, id)}`).join(", ")}.`);
+  if (pend.move) log(s, sum ? `${p.name} moves ${sum} ${pend.counter} counter${sum > 1 ? "s" : ""}: ${given.map(([id, n]) => `${n} onto ${nameOf(s, id)}`).join(", ")}.` : `${p.name} moves no counters.`);
+  else log(s, `${p.name} distributes ${pend.total} ${pend.counter} counter${pend.total > 1 ? "s" : ""}: ${given.map(([id, n]) => `${n} on ${nameOf(s, id)}`).join(", ")}.`);
   continueResolution(s);
 }
 
@@ -4743,9 +4773,19 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
     throw new RulesError("choose cards with different mana values");
   if (pend.shareLandType && !shareLandType(found.map((id) => defOf(s, obj(s, id)))))
     throw new RulesError("choose cards that share a land type");
+  if (pend.oneOfEach && !oneOfEachFits(pend.oneOfEach, found.map((id) => defOf(s, obj(s, id)))))
+    throw new RulesError(`find one card for each: ${pend.oneOfEach.map((f) => f.text).join(", ")}`);
   r.scratch = { ...r.scratch, found };
   s.pending = null;
   continueResolution(s);
+}
+
+/** "A Forest card and a Plains card" (Krosan Verge): each card matches a different one of `specs` (a dual land is either). */
+export function oneOfEachFits(specs: TargetSpec[], defs: CardDef[]): boolean {
+  if (defs.length > specs.length) return false;
+  const [d, ...rest] = defs;
+  if (!d) return true;
+  return specs.some((f, i) => printedMatches(f, d) && oneOfEachFits(specs.filter((_, j) => j !== i), rest));
 }
 
 /** A creature type or color named for a permanent entering (CR 614.12) or a resolving spell. */
@@ -4924,6 +4964,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     const pt = r.scratch?.payOrTop;
     if (!pt) throw new RulesError("nothing to choose");
     pt.answer = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "counterKind") {
+    if (!pend.options.includes(choice)) throw new RulesError("choose one of the kinds of counter it has");
+    (r.scratch ??= {}).counterKind = choice;
+    log(s, `${p.name} chooses a ${choice} counter (${pend.source}).`);
     continueResolution(s);
     return;
   }
@@ -5321,21 +5368,29 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
  */
 /**
  * What attacking `defender` costs for each creature (Ghostly Prison, Propaganda): generic mana, paid as attackers are
- * declared (CR 508.1g-h). Attacking their planeswalkers isn't attacking them.
+ * declared (CR 508.1g-h). Attacking their planeswalkers isn't attacking them, except for "you or planeswalkers you
+ * control" (Sphere of Safety); a battle they protect never is.
  */
-export function attackTaxPer(s: GameState, defender: PlayerId): number {
+export function attackTaxPer(s: GameState, defender: PlayerId, planeswalker = false): number {
   let n = 0;
   for (const id of s.battlefield) {
     const o = obj(s, id);
     const c = characteristics(s, o);
-    if (c.attackTax && c.controller === defender) n += c.attackTax;
+    if (c.controller === defender) n += planeswalker ? c.attackTaxPlaneswalkers : c.attackTax;
   }
   return n;
 }
 
+/** What one attack costs: at a player, or at a planeswalker or battle (`planeswalker`, the permanent attacked). */
+export function attackTaxOf(s: GameState, a: { defender: PlayerId; planeswalker?: ObjectId }): number {
+  if (a.planeswalker === undefined) return attackTaxPer(s, a.defender);
+  const pw = s.objects[a.planeswalker];
+  return pw && objIsType(s, pw, "Planeswalker") && controllerOf(s, pw) === a.defender ? attackTaxPer(s, a.defender, true) : 0;
+}
+
 /** The total attack tax for a declaration. */
 export function attackTax(s: GameState, attacks: { defender: PlayerId; planeswalker?: ObjectId }[]): number {
-  return attacks.reduce((n, a) => n + (a.planeswalker === undefined ? attackTaxPer(s, a.defender) : 0), 0);
+  return attacks.reduce((n, a) => n + attackTaxOf(s, a), 0);
 }
 
 export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, planeswalker = false): string | null {

@@ -144,6 +144,7 @@ import {
   faceDef,
   pickOptions,
   shareLandType,
+  oneOfEachFits,
 } from "@cc/engine";
 import { HUMAN, STOPPABLE, cardOf, seenCardOf, isCreature, isLand, loopReady, newGame, useGame, type DeckBundle, type LoopRecording, type PriorityMode } from "./useGame";
 import { Arrows, targetSelectors as baseSelectors, type ArrowSpec } from "./Arrows";
@@ -1674,7 +1675,7 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   convert: "cast it converted: its back face is the spell, and it enters with that face up",
 };
 
-const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", grantedFlashback: "Flashback", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape", mayhem: "Mayhem", harmonize: "Harmonize", permission: "Cast from graveyard", aftermath: "Aftermath:", disturb: "Disturb:" };
+const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", grantedFlashback: "Flashback", grantedEscape: "Escape", grantedRetrace: "Retrace", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape", mayhem: "Mayhem", harmonize: "Harmonize", permission: "Cast from graveyard", aftermath: "Aftermath:", disturb: "Disturb:" };
 
 /** "discard a card", "pay 3 life", "exile two other cards from your graveyard". */
 function describeExtraCost(c: AdditionalCost): string {
@@ -1987,7 +1988,8 @@ function DistributeChoice({
   return (
     <div className="controls">
       <span>
-        <strong>{pending.source}:</strong> distribute {pending.total} {pending.counter} counter{pending.total > 1 ? "s" : ""} among any number of {pending.what} ({left} left)
+        <strong>{pending.source}:</strong>{" "}
+        {pending.move ? `move up to ${pending.total} ${pending.counter} counter${pending.total > 1 ? "s" : ""} from it onto ${pending.what}, if you want (${left} left)` : `distribute ${pending.total} ${pending.counter} counter${pending.total > 1 ? "s" : ""} among any number of ${pending.what} (${left} left)`}
       </span>
       {pending.options.map((id) => {
         const n = parts[id] ?? 0;
@@ -2005,7 +2007,7 @@ function DistributeChoice({
           </span>
         );
       })}
-      <button disabled={left !== 0} onClick={() => dispatch([{ type: "distribute", player: HUMAN, parts }])}>
+      <button disabled={pending.move ? left < 0 : left !== 0} onClick={() => dispatch([{ type: "distribute", player: HUMAN, parts }])}>
         Done
       </button>
     </div>
@@ -3155,7 +3157,8 @@ function LibrarySearch({
   // "Cards with different mana values" (Seasons Past): a card can't join one with the same mana value.
   const mvOf = (id: string) => manaValue(parseManaCost(cardOf(s, id).manaCost));
   // "Basic land cards that share a land type" (Myriad Landscape): a card joins only ones it shares a land type with.
-  const clashes = (id: string) => (!!pending.distinctManaValues && found.some((f) => mvOf(f) === mvOf(id))) || (!!pending.shareLandType && !shareLandType([...found, id].map((x) => cardOf(s, x))));
+  // "A Forest card and a Plains card" (Krosan Verge): a card joins only if each found card can still be a different one.
+  const clashes = (id: string) => (!!pending.distinctManaValues && found.some((f) => mvOf(f) === mvOf(id))) || (!!pending.shareLandType && !shareLandType([...found, id].map((x) => cardOf(s, x)))) || (!!pending.oneOfEach && !oneOfEachFits(pending.oneOfEach, [...found, id].map((x) => cardOf(s, x))));
   const add = (ids: string[]) => {
     const next = ids.find((id) => !found.includes(id) && !clashes(id));
     if (next && found.length < pending.max) setFound([...found, next]);
@@ -3204,6 +3207,8 @@ function LibrarySearch({
                   ? `Chosen ${found.length}. Each must have a different mana value.`
                   : pending.shareLandType
                   ? `Found ${found.length} of ${pending.max}. They must share a land type.`
+                  : pending.oneOfEach
+                  ? `Found ${found.length} of ${pending.max}: one for each of ${pending.oneOfEach.map((f) => f.text).join(" and ")}.`
                   : pending.also?.length
                     ? `Found ${found.length} of ${pending.max}. The ${pending.also.length} in the graveyard ${pending.also.length === 1 ? "is" : "are"} exiled too.`
                     : `Found ${found.length} of ${pending.max}.`}
@@ -3257,7 +3262,7 @@ function LibrarySearch({
               const d = cardOf(s, ids[0]!);
               const can = left > 0 && found.length < pending.max && !clashes(ids[0]!);
               return (
-                <div key={name} className={`card big ${can ? "targetable" : "dim"}`} data-pick={ids[0]} onClick={() => can && add(ids)} {...hoverProps(d, onHover)} title={left > 0 && clashes(ids[0]!) ? "You already chose a card with this mana value" : undefined}>
+                <div key={name} className={`card big ${can ? "targetable" : "dim"}`} data-pick={ids[0]} onClick={() => can && add(ids)} {...hoverProps(d, onHover)} title={left > 0 && clashes(ids[0]!) ? (pending.oneOfEach ? "You already found a card of this kind" : pending.shareLandType ? "It doesn't share a land type with the cards you chose" : "You already chose a card with this mana value") : undefined}>
                   <CardFace d={d} />
                   {ids.length > 1 && <span className="zone-count">×{left}</span>}
                   {zones && <span className="muted small" data-zone={name}>in {name}</span>}
@@ -3886,7 +3891,7 @@ function Controls({
         ))}
       </div>
     );
-  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "anchor" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "either" || pending.what === "payOrTop" || pending.what === "discardInstead") && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "anchor" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "either" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "counterKind") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>

@@ -29,6 +29,16 @@ export function parseEveryPlayerZonesSentence(s: string, ctx: Ctx): Effect[] | u
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
+  // Narset's Reversal: "Copy target instant or sorcery spell, then return it to its owner's hand": it leaves the stack
+  // without being countered, so even a spell that can't be countered goes (rulings).
+  if (/^(?:Then )?[Rr]eturn (?:it|that spell) to its owner's hand$/.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "spell")
+    return ctx.targets[ctx.lastObjectTarget]!.stackAbilities ? null : [{ type: "counterSpell", index: ctx.lastObjectTarget, bounce: true }];
+  // Emry: "Choose target artifact card in your graveyard. You may cast that card this turn."
+  // The one target so far is that card, in your graveyard.
+  if (/^You may cast (?:that card|it) this turn$/.test(s) && ctx.targets.length === 1) {
+    const t = ctx.targets[0]!;
+    if (t.kind === "card" && t.owner === "you" && !t.many) return [{ type: "mayCastFromGraveyard", what: { ref: "target", index: 0 } }];
+  }
   // "Exile any number of target spells" (Mindbreak Trap): they leave the stack without being countered (rulings).
   if ((m = /^Exile (target spell|any number of target spells)$/i.exec(s))) {
     const spec: TargetSpec = { kind: "spell", types: [], notTypes: [], notColors: [], text: "target spell", ...(m[1] === "target spell" ? {} : { many: "any" as const }) };
@@ -183,6 +193,9 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     if (filter === null || !Number.isInteger(n) || n < 1) return null;
     return [{ type: "chooseFromGraveyard", n, ...(filter ? { filter } : {}), ...(/^up to /.test(m[1]!) ? { upTo: true as const } : {}) }];
   }
+  // Ripples of Undeath: "Mill three cards. Then you may pay {1} and 3 life. If you do, put a card from among those cards into
+  // your hand": one of the cards just milled, still in your graveyard.
+  if (ctx.afterMill && /^[Pp]ut a card from among (?:those cards|them) into your hand$/.test(s)) return [{ type: "chooseFromGraveyard", n: 1, milled: true }];
   // "You may put a land card from your graveyard on top of your library" (Halo-Charged Skaab, after milling): chosen as
   // it resolves, not targeted.
   if ((m = /^(?:[Yy]ou may )?[Pp]ut (an?|one) (.+?) from your graveyard on top of your library$/.exec(s)) && !/\b(?:target|other|another|that|those)\b/.test(m[2]!)) {

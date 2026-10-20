@@ -73,6 +73,8 @@ export interface Ctx {
   lastPut?: boolean;
   /** The last sentence created tokens, any number: "Sacrifice them at the beginning of the next end step". */
   lastCreatedAny?: boolean;
+  /** The instruction before was "mill N cards" (yours): "those cards" in what follows can be the milled cards (Ripples of Undeath). */
+  afterMill?: boolean;
   /** An instant or sorcery: "other" can't mean other than its source, which isn't a permanent. */
   spell?: boolean;
   /** A "whenever a player casts a spell" trigger: "it" or "that spell" can be the spell cast. */
@@ -604,6 +606,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "It" is the spell cast only as the first instruction: "Untap ~. It gains ..." is about ~ (Pristine Skywise).
     if (si > 0) delete ctx.spellIt;
     let s = sentences[si]!.replace(/^Then,? (.)/, (_, c: string) => c.toUpperCase());
+    const last = effects[effects.length - 1];
+    ctx.afterMill = last?.type === "mill" && last.who.ref === "you";
     // "At the beginning of the next end step, sacrifice that creature" (Meek Attack) is "Sacrifice that creature at the
     // beginning of the next end step" (one instruction, no condition).
     const atNext = /^At the beginning of (the|your) next end step, ((?:sacrifice|exile|destroy|return) [^,]+)$/.exec(s);
@@ -880,6 +884,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       if (!filter) return null;
       effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, untilHits: { n: 2, filter }, hitToHand: true, max: 1, rest: { dest: "bottomRandom" } });
       si += 3;
+      continue;
+    }
+    // Etali, Primal Storm: "exile the top card of each player's library, then you may cast any number of spells from
+    // among those cards without paying their mana costs". The cards not cast stay exiled (rulings).
+    if (/^[Ee]xile the top card of each player's library$/.test(s) && /^[Yy]ou may cast any number of spells from among those cards without paying their mana costs$/.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 1, each: true });
+      si++;
       continue;
     }
     if (untilMv && /^You may cast any number of spells from among them without paying their mana costs\.?$/.test(sentences[si + 1] ?? "")) {
@@ -1561,6 +1572,12 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
         for (const e of both) if (e.type === "copySpell") e.newTargets = true;
         continue;
       }
+      // Narset's Reversal: "Copy target ..., then return it to its owner's hand. You may choose new targets for the copy."
+      const before = prev?.type === "counterSpell" && prev.bounce ? effects[effects.length - 2] : undefined;
+      if (before?.type === "copySpell") {
+        before.newTargets = true;
+        continue;
+      }
       if (copy?.type !== "copySpell") return null;
       copy.newTargets = true;
       continue;
@@ -1664,10 +1681,30 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "if", cond: { kind: "milledIs", filter }, effects: inner });
       continue;
     }
+    // "Mill three cards. You may put a land card from among them into your hand." (Six, Eerie Gravestone), "... from among
+    // the cards milled this way ..." (Blanchwood Prowler), "You may put an instant or sorcery card milled this way into
+    // your hand" (Leyline Dowser): one of the cards your mill just put into your graveyard, if any matches.
+    const fromMilled =
+      /^[Yy]ou may put (an? .+?) from among (?:them|the cards milled this way|the milled cards|those cards) into your hand$/.exec(s) ?? /^[Yy]ou may put (an? .+?) milled this way into your hand$/.exec(s);
+    if (fromMilled) {
+      const prev = effects[effects.length - 1];
+      const filter = parseSearchFilter(fromMilled[1]!.replace(/^an? /, ""));
+      if (prev?.type !== "mill" || prev.who.ref !== "you" || filter === null) return null;
+      effects.push({ type: "chooseFromGraveyard", n: 1, upTo: true, milled: true, ...(filter ? { filter } : {}) });
+      // "If you don't, put a +1/+1 counter on this creature." (Ainok Wayfarer): no card was put into your hand.
+      const didnt = /^If you don't, (.+)$/.exec(sentences[si + 1] ?? "");
+      if (didnt) {
+        const inner = parseOne(capital(didnt[1]!), ctx);
+        if (!inner) return null;
+        effects.push({ type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner });
+        si++;
+      }
+      continue;
+    }
     const otherwise = /^Otherwise, (.+)$/.exec(s);
     if (otherwise) {
       const prev = effects[effects.length - 1];
-      if (prev?.type !== "if" || (prev.cond.kind !== "wonClash" && prev.cond.kind !== "suspected" && prev.cond.kind !== "milledIs" && prev.cond.kind !== "targetCardWas") || prev.otherwise) return null;
+      if (prev?.type !== "if" || (prev.cond.kind !== "wonClash" && prev.cond.kind !== "suspected" && prev.cond.kind !== "milledIs" && prev.cond.kind !== "targetCardWas" && !(prev.cond.kind === "state" && prev.cond.cond.kind === "subjectPT")) || prev.otherwise) return null;
       const inner = parseOne(otherwise[1]!.charAt(0).toUpperCase() + otherwise[1]!.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       prev.otherwise = inner;
@@ -1823,6 +1860,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "It deals that much damage to each other opponent if ~'s power is 7 or greater" (Vincent), "Then if ~'s power is 4
     // or greater, draw a card" (Jor Kadeen): ~'s power as the ability resolves, or as it last existed on the battlefield
     // once it has left (CR 608.2h; rulings on Vincent). "Its" is ~ only where "it" is.
+    // Tribute to the World Tree: "draw a card if its power is 3 or greater. Otherwise, put two +1/+1 counters on it": the
+    // trigger's subject as it resolves (CR 608.2c), or as it last existed.
+    const subjPT = ctx.subjectIt && !ctx.spell ? new RegExp(`^(.+) if its (power|toughness) is ${NUM} or (greater|less)$`).exec(s) : null;
+    if (subjPT && !/\binstead$/.test(subjPT[1]!) && !/\b(?:it|its|that creature)\b/.test(subjPT[1]!)) {
+      const inner = parseOne(capital(subjPT[1]!), ctx);
+      if (!inner) return null;
+      const n = num(subjPT[3]!);
+      effects.push({ type: "if", cond: { kind: "state", cond: { kind: "subjectPT", stat: subjPT[2] as "power" | "toughness", ...(subjPT[4] === "less" ? { max: n } : { min: n }) } }, effects: inner });
+      continue;
+    }
     const trailPT = !ctx.spell && !ctx.subjectIt ? new RegExp(`^(.+) if (~'s|its) (power|toughness) is ${NUM} or (greater|less)$`).exec(s) : null;
     const leadPT = !ctx.spell && !ctx.subjectIt && !trailPT ? new RegExp(`^If (~'s|its) (power|toughness) is ${NUM} or (greater|less), (.+)$`).exec(s) : null;
     const selfPTIf = trailPT ? { then: trailPT[1]!, whose: trailPT[2]!, stat: trailPT[3]!, n: trailPT[4]!, cmp: trailPT[5]! } : leadPT ? { then: leadPT[5]!, whose: leadPT[1]!, stat: leadPT[2]!, n: leadPT[3]!, cmp: leadPT[4]! } : null;
@@ -1933,7 +1980,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "You may play the exiled card without paying its mana cost" asks as it plays it (see the playLinked effect).
     // "You may play an additional land this turn" is a permission, not a choice made now (CR 305.2a).
     // "You may draw a card unless that player pays {1}" (Rhystic Study): they decide first (see the punisher sentences).
-    const may = /^[Yy]ou may (?!play the exiled card |play (?:an|up to \w+) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast spells this turn as though they had flash$)(.+)$/.exec(s);
+    const may = /^[Yy]ou may (?!play the exiled card |play (?:an|up to \w+) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast spells this turn as though they had flash$|cast (?:that card|it) this turn$)(.+)$/.exec(s);
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
       // don't control": ~ does it, if you choose.
@@ -2237,6 +2284,7 @@ export function parsePayCost(text: string): PayCost | null {
 /** The ways a spell can have been cast that a sentence may depend on, as said in its text. */
 const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true; activatedOnly?: true; noTargets?: true }[] = [
   { re: "~ was bargained", cond: { kind: "bargained" }, spellOnly: true },
+  { re: "~ was cast from a graveyard", cond: { kind: "castFromGraveyard" }, spellOnly: true, noTargets: true },
   { re: "~ was cast using teamwork", cond: { kind: "teamwork" }, spellOnly: true },
   // Addendum (CR 207.2c). Not for targets: CastHow doesn't know when it's cast.
   { re: "you cast ~ during your main phase", cond: { kind: "castInMain" }, spellOnly: true, noTargets: true },

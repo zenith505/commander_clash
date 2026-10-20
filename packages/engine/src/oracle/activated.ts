@@ -1,5 +1,5 @@
 import { allEffects, type AbilityBody, type ActivatedAbility, type AdditionalCost, type Effect } from "../abilities";
-import { NUM, num, X, sacrificeSelf, counterKind } from "./words";
+import { NUM, num, X, sacrificeSelf, counterKind, singular } from "./words";
 import { removeCounterCost } from "./mana-abilities";
 import { parseBody, usesX } from "./body";
 import { parseSearchFilter } from "./search";
@@ -60,10 +60,12 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       const selfIf = pickFilter(c[2]!);
       if (!filter || !selfIf) return "fail";
       extra.push({ kind: "sacrifice", filter: { ...filter, text: `${c[1]} or ${/^[aeiou]/i.test(c[2]!) ? "an" : "a"} ${c[2]}` }, n: 1, other: true, selfIf });
-    } else if (part !== "Sacrifice ~" && (c = new RegExp(`^Sacrifice (another|${NUM}) (.+)$`).exec(part))) {
-      const filter = pickFilter(c[3]!); // NUM is a group of its own
-      if (!filter) return "fail";
-      extra.push({ kind: "sacrifice", filter, n: c[1] === "another" ? 1 : num(c[1]!), ...(c[1] === "another" ? { other: true } : {}) });
+    } else if (part !== "Sacrifice ~" && (c = new RegExp(`^Sacrifice (another|${NUM}) (other )?(.+)$`).exec(part))) {
+      // "Sacrifice two other artifacts and/or creatures" (Mondrak): not this permanent; any mix of the two.
+      const andOr = / and\/or /.test(c[4]!) ? c[4]!.split(" and/or ").map((w) => singular(w)).join(" or ") : undefined;
+      const filter = pickFilter(andOr ?? c[4]!); // NUM is a group of its own
+      if (!filter || (c[3] && c[1] === "another")) return "fail";
+      extra.push({ kind: "sacrifice", filter: c[3] ? { ...filter, text: `other ${andOr ?? c[4]!}` } : filter, n: c[1] === "another" ? 1 : num(c[1]!), ...(c[1] === "another" || c[3] ? { other: true } : {}) });
     } else if ((c = new RegExp(`^Tap ${NUM} untapped (.+) you control$`).exec(part))) {
       const filter = pickFilter(c[2]!);
       if (!filter) return "fail";

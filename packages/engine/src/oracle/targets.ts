@@ -473,7 +473,7 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   const ofChosen = /^creatures of the chosen type$/i.test(p);
   if (!all && !whose.test(p) && !bare && !combat && !ofChosen) return null;
   // The kinds come first; plurals become the singular parseTargetPhrase reads ("Elves" -> "Elf").
-  const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of|that attacked this turn|that didn't attack this turn)\b/i.exec(p);
+  const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of|that attacked this turn|that didn't attack this turn|that entered (?:the battlefield )?this turn)\b/i.exec(p);
   let head = (cut ? p.slice(0, cut.index) : p).trim();
   const tail = cut ? p.slice(cut.index).replace(/^your opponents control/i, "an opponent controls").replace(/ your opponents control/i, " an opponent controls") : "";
   const words = head.replace(/,? and |, or |, /g, " or ").split(/\s+/);
@@ -556,6 +556,12 @@ export function parseTargetPhrase(
     if (!opts.chosen) return null;
     extra.chosen = "name";
     p = (p.slice(0, withName.index) + p.slice(withName.index + withName[0].length)).trim();
+  }
+  // "Each green creature that entered this turn" (Oran-Rief, the Vastwood).
+  const entered = / that entered (?:the battlefield )?this turn$/.exec(p);
+  if (entered) {
+    extra.enteredThisTurn = true;
+    p = p.slice(0, entered.index);
   }
   // "Untap all creatures that attacked this turn" (Relentless Assault), "creatures you control that attacked this turn".
   const attacked = / that attacked this turn$/.exec(p);
@@ -757,7 +763,7 @@ export function parseTargetPhrase(
         if (COLOR_WORDS[rest]) notColors.push(COLOR_WORDS[rest]!);
         else if (TYPE_WORDS[rest]) notTypes.push(TYPE_WORDS[rest]!);
         else if (SUPERTYPE_WORDS[rest]) notSupertypes.push(SUPERTYPE_WORDS[rest]!);
-        else if (alts.length === 1 && (CREATURE_TYPES.has(capital(rest)) || BASIC_TYPES.includes(capital(rest)) || ["Aura", "Equipment", "Vehicle", "Lair"].includes(capital(rest)))) notSubtypes.push(capital(rest)); // "non-Wall", "non-Aura", "non-Lair"
+        else if (alts.length === 1 && (CREATURE_TYPES.has(capital(rest)) || BASIC_TYPES.includes(capital(rest)) || ["Aura", "Equipment", "Vehicle", "Lair", "Lesson"].includes(capital(rest)))) notSubtypes.push(capital(rest)); // "non-Wall", "non-Aura", "non-Lair", "non-Lesson"
         else return null;
       } else if (TYPE_WORDS[w]) types.push(TYPE_WORDS[w]!);
       // "Nonlegendary attacking creature": attacking after a supertype.

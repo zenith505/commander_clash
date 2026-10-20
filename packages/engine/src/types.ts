@@ -569,6 +569,8 @@ export interface Player {
   gainedUntilNextTurn?: string[];
   /** "Until your next turn, your life total can't change" (Teferi's Protection): no life gained or lost (CR 119.7-8). */
   lifeCantChange?: true;
+  /** "Until end of turn, your life total can't change" (Flare of Fortitude): the turn it's for (CR 119.7-8). */
+  lifeCantChangeTurn?: number;
   /** The turn this player last began to activate an exhaust ability (CR 702.177b, Elvish Refueler). */
   exhaustTurn?: number;
   /** Times each commander (by object id) has been cast from the command zone. CR 903.8 */
@@ -1017,13 +1019,13 @@ export type PendingDecision =
    * Searching your library (CR 701.23): `cards` are the ones that match; pick between `min` and
    * `max` of them. With `firstTo`, the first one picked goes there and the rest to `othersTo`.
    */
-  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; min: number; max: number; firstTo?: string; othersTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string }; /** Not a search: cards in the hand to put onto the battlefield, or with `reveal` to reveal, with `bottom` to put on the bottom of the library. */ fromHand?: boolean; reveal?: true; bottom?: true; /** Not a search: cards in the graveyard to return to the hand, to exile, or to put onto the battlefield. */ fromGraveyard?: "hand" | "exile" | "battlefield" | "libraryTop"; /** "Cards with different mana values" (Seasons Past): no two found may share a mana value. */ distinctManaValues?: true; /** "Basic land cards that share a land type" (Myriad Landscape): every card found shares a land type with each other one. */ shareLandType?: true; /** The Leylines' "begin the game with it on the battlefield", before the first turn (CR 103.6a); with `exile`, the cards from the hand Gemstone Caverns exiles ("If you do, exile a card from your hand"). */ opening?: true; exile?: true; /** Choosing from this player's revealed hand ("You choose a nonland card from it"); `dig.looked` is the whole hand. */ hand?: PlayerId; /** Searching this player's graveyard, hand and library (Memoricide): `cards` are in any of them; `also`, the graveyard's that are found anyway ("all cards"). */ zonesOf?: PlayerId; also?: ObjectId[]; /** An opponent choosing from this player's revealed cards (Gifts Ungiven, Intuition); `helps` when where the chosen ones go is better for that player than where the rest go. */ forPlayer?: PlayerId; helps?: true }
+  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; min: number; max: number; firstTo?: string; othersTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string }; /** Not a search: cards in the hand to put onto the battlefield, or with `reveal` to reveal, with `bottom` to put on the bottom of the library. */ fromHand?: boolean; reveal?: true; bottom?: true; /** Not a search: cards in the graveyard to return to the hand, to exile, or to put onto the battlefield. */ fromGraveyard?: "hand" | "exile" | "battlefield" | "libraryTop"; /** "Cards with different mana values" (Seasons Past): no two found may share a mana value. */ distinctManaValues?: true; /** "Basic land cards that share a land type" (Myriad Landscape): every card found shares a land type with each other one. */ shareLandType?: true; /** "A Forest card and a Plains card" (Krosan Verge): the cards found can each be one of these, a different one each. */ oneOfEach?: TargetSpec[]; /** The Leylines' "begin the game with it on the battlefield", before the first turn (CR 103.6a); with `exile`, the cards from the hand Gemstone Caverns exiles ("If you do, exile a card from your hand"). */ opening?: true; exile?: true; /** Choosing from this player's revealed hand ("You choose a nonland card from it"); `dig.looked` is the whole hand. */ hand?: PlayerId; /** Searching this player's graveyard, hand and library (Memoricide): `cards` are in any of them; `also`, the graveyard's that are found anyway ("all cards"). */ zonesOf?: PlayerId; also?: ObjectId[]; /** An opponent choosing from this player's revealed cards (Gifts Ungiven, Intuition); `helps` when where the chosen ones go is better for that player than where the rest go. */ forPlayer?: PlayerId; helps?: true }
   /**
    * Choosing a creature type or a color by name: as a permanent enters (`objectId`, CR 614.12) or
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "commander" | "drawUpTo" | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom" | "searchZones" | "vote" | "mutate" | "either" | "payOrTop"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "commander" | "drawUpTo" | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom" | "searchZones" | "vote" | "mutate" | "either" | "payOrTop" | "counterKind"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -1032,7 +1034,8 @@ export type PendingDecision =
    */
   | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId; /** The player whose permanents these are, when someone else chooses: for "keep" (Mythos of Snapdax), or the target player of Split the Party. */ of?: PlayerId }
   /** "Distribute X +1/+1 counters among any number of creatures you control": how many each of `options` gets, adding up to `total`. */
-  | { kind: "distribute"; player: PlayerId; source: string; counter: CounterKind; total: number; options: ObjectId[]; what: string }
+  /** `move`: moving the counters on the source, any number of them (Forgotten Ancient); otherwise all `total` are distributed. */
+  | { kind: "distribute"; player: PlayerId; source: string; counter: CounterKind; total: number; options: ObjectId[]; what: string; move?: true }
   /** `x`: the trigger's X (an enters trigger's is its spell's, CR 107.3m), which "up to X target ..." can't choose more than. */
   | { kind: "chooseTargets"; player: PlayerId; sourceId: ObjectId; specs: TargetSpec[]; description: string; x?: number }
   /**
@@ -1422,6 +1425,11 @@ export interface TriggerEventInfo {
   /** "Whenever one or more Dragons you control deal combat damage": those that did, as the objects they were ("one of those Dragons"). */
   group?: { id: ObjectId; zc: number }[];
   player?: PlayerId;
+  /**
+   * "If two or more of those creatures are attacking you and/or planeswalkers you control" (Mangara): checked again as it
+   * resolves (CR 603.4) with `group`, those attackers; one that left the battlefield counts as it last was (rulings).
+   */
+  attackingYou?: { you: PlayerId; min: number; orPlaneswalkers?: true };
   /** A permanent's enters trigger: the opponent its spell's gift was promised to (CR 702.174b). */
   gift?: PlayerId;
   /** A permanent's enters trigger: evidence was collected for its spell (CR 701.59c). */
@@ -1599,6 +1607,8 @@ export interface Resolving {
     /** A clash (CR 701.30): the opponent, the revealed cards, who still decides, who puts theirs on the bottom. */
     endure?: string; // "counters" or "token" (CR 701.63a)
     either?: number; // which of an "either" effect's options
+    /** "Move a counter" (Nesting Grounds): the kind chosen. */
+    counterKind?: string;
     payOrTop?: { idx: number; answer?: string }; // Sylvan Library: the chosen card being handled, and pay or put back
 
     tapOrUntap?: string; // "tap", "untap" or "neither", for "tap or untap target permanent"

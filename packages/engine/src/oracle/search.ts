@@ -34,6 +34,16 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
     const filter: TargetSpec = { kind: "card", anyOf: [both[1]!, both[2]!].map((name) => ({ kind: "card" as const, named: name, text: `card named ${name}` })), text: m[3]! };
     return [{ type: "search", filter, n: 2, upTo: true, oneEach: true, reveal, dest: searchDest(r[1]!) }];
   }
+  // Krosan Verge: "a Forest card and a Plains card", Yasharn: "a basic Forest card and a basic Plains card": up to one for
+  // each (a search may find less, CR 701.23b), a dual land being either one but not both.
+  const pair = /^((?:basic )?[A-Z][a-z]+ card) and an? ((?:basic )?[A-Z][a-z]+ card)$/.exec(m[3]!);
+  if (pair && n === 1 && !m[1]) {
+    const r = new RegExp(`^put (?:them|those cards) ${SEARCH_DEST}, then shuffle$`, "i").exec(rest);
+    const specs = [pair[1]!, pair[2]!].map((p) => parseSearchFilter(p));
+    if (!r || specs.some((f) => !f)) return null;
+    const anyOf = specs as TargetSpec[];
+    return [{ type: "search", filter: { kind: "card", anyOf, text: `${pair[1]} and a ${pair[2]}` }, n: 2, upTo: true, oneOfEach: anyOf, reveal, dest: searchDest(r[1]!) }];
+  }
   // "Up to four Minotaur creature cards with different names" (Deathbellow War Cry): no two with the same name, which is
   // one of each name offered (oneEach). Several of them only.
   // "Up to X creature cards with different names that each have mana value X" (Uncage the Menagerie): the X it was cast

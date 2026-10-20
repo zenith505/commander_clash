@@ -77,6 +77,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.combat === "blocking" && !o.blocking) return false;
   if (spec.combat === "attackingOrBlocking" && o.attacking === undefined && !o.blocking) return false;
   if (spec.combat === "attackedThisTurn" && o.attacked?.turn !== s.turn) return false;
+  if (spec.enteredThisTurn && o.enteredTurn !== s.turn) return false;
   if (spec.combat === "attackingBattle" && !(o.attacking !== undefined && attackedBattle(s, o))) return false;
   if (spec.combat === "couldButDidntAttack" && (o.couldAttack !== s.turn || o.attacked?.turn === s.turn)) return false;
   if (spec.controller === "you" && c.controller !== controller) return false;
@@ -324,7 +325,8 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     const item = s.stack.find((x) => x.id === t.id) ?? (s.resolving?.item.id === t.id ? s.resolving.item : undefined);
     if (!item) return false;
     if (spec.singleTarget && (item.targets ?? []).filter((x) => x.kind !== "none").length !== 1) return false;
-    if (item.kind === "ability") return !!spec.stackAbilities && (spec.stackAbilities === "both" || (spec.stackAbilities === "triggered") === !!item.triggered);
+    // "Target triggered ability you control" (Strionic Resonator).
+    if (item.kind === "ability") return !!spec.stackAbilities && (spec.stackAbilities === "both" || (spec.stackAbilities === "triggered") === !!item.triggered) && (spec.controller !== "you" || item.controller === controller) && (spec.controller !== "opponent" || item.controller !== controller);
     if (spec.noSpells || !item.objectId) return false;
     // "Target spell you control", "... you don't control" / "... an opponent controls" (no teammates here).
     if ((spec.controller === "you" && item.controller !== controller) || (spec.controller === "opponent" && item.controller === controller)) return false;

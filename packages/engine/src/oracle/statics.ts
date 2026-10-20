@@ -112,6 +112,8 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   if ((m = /^(.+?) as long as (.+)$/.exec(text))) [statement, cond] = [m[1], m[2]];
   else if ((m = /^As long as (~ is enchanted, equipped, and has a counter on it|[^,]+), (.+)$/.exec(text))) [cond, statement] = [m[1], m[2]];
   else if ((m = /^During your turn, (.+)$/.exec(text))) [cond, statement] = ["it's your turn", m[1]];
+  // Razorkin Needlehead: "~ has first strike during your turn".
+  else if ((m = /^(~ (?:has|gets) [^,]+?) during your turn$/.exec(text))) [statement, cond] = [m[1], "it's your turn"];
   // Wayward Swordtooth: "~ can't attack or block unless you have the city's blessing".
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless you have the city's blessing$/.exec(text))) [statement, cond] = [m[1], "you don't have the city's blessing"];
   // Flowering Lumberknot: "~ can't attack or block unless it's paired with a creature with soulbond".
@@ -396,6 +398,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^you have a full party$/.test(text)) return { kind: "fullParty" }; // CR 700.8a
   // CR 903.3: whoever's commander it is (rulings on Fierce Guardianship).
   if (/^you control a commander$/.test(text)) return { kind: "controlCommander" };
+  if (/^you control your commander$/.test(text)) return { kind: "controlCommander", own: true };
   if (/^you control a commander that's a creature or planeswalker$/.test(text)) return { kind: "controlCommander", types: ["Creature", "Planeswalker"] };
   if ((m = /^you (don't )?control a Ring-bearer$/.exec(text))) return { kind: "ringBearer", ...(m[1] ? { not: true as const } : {}) };
   if (/^~ is your Ring-bearer$/.test(text)) return { kind: "ringBearer", self: true };
@@ -471,6 +474,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Kosei, Penitent Warlord: "as long as ~ is enchanted, equipped, and has a counter on it": all three (any counter).
   if (/^~ is enchanted, equipped, and has a counter on it$/.test(text))
     return { kind: "allOf", conds: [{ kind: "self", is: "enchanted" }, { kind: "self", is: "equipped" }, { kind: "self", is: "hasCounter" }] };
+  // The Ozolith: "if ~ has counters on it" (any kind).
+  if (/^~ has (?:counters|a counter|one or more counters) on it$/.test(text)) return { kind: "self", is: "hasCounter" };
   // "If ~ is enchanted by two or more Auras, flip it" (Kitsune Mystic): the Auras attached to it.
   if ((m = new RegExp(`^~ is enchanted by ${NUM} or more Auras$`).exec(text))) return { kind: "amount", amount: { count: { kind: "attachedToSelf", subtypes: ["Aura"] } }, min: num(m[1]!) };
   // "When ~ has flying, flip it" (Student of Elements): one of its keywords.
@@ -630,6 +635,8 @@ function parseAffected(subject: string): Affects | null {
   // Anything else a group can say: "Each creature you control with a +1/+1 counter on it", "Creatures of the chosen type";
   // "Creatures you control with +1/+1 counters on them" is the same group.
   // "Creatures with ice counters on them" (Rimescale Dragon) likewise.
+  // "Equipment you control have equip {0}" (Puresteel Paladin): the plural of Equipment is Equipment.
+  if ((m = /^(Other )?Equipment you control$/.exec(x))) return parseAffected(`Each ${m[1] ? "other " : ""}Equipment you control`);
   const plural = /^Creatures( you control)? with ([+-]1\/[+-]1|ice) counters on them$/.exec(x);
   const g = parseGroup(plural ? `Each creature${plural[1] ?? ""} with ${plural[2] === "ice" ? "an" : "a"} ${plural[2]} counter on it` : x, true);
   return g ? { kind: "filter", types: [], spec: g.filter, ...(g.other ? { other: true } : {}) } : null;
@@ -955,8 +962,14 @@ function parseStaticLine(line: string): StaticAbility | null {
   // "You control enchanted creature." (Mind Control)
   if (/^You control enchanted (creature|permanent|artifact|land)$/.test(text)) return { affects: { kind: "attached" }, mods: [{ kind: "control" }], text: line };
   // Ghostly Prison, Propaganda (CR 508.1g-h).
-  const tax = /^Creatures can't attack you unless their controller pays \{(\d+)\} for each creature they control that's attacking you$/.exec(text);
-  if (tax) return { affects: { kind: "self" }, mods: [{ kind: "attackTax", n: Number(tax[1]) }], text: line };
+  // Sphere of Safety: "you or planeswalkers you control ... {X} for each of those creatures, where X is ...", counted now.
+  const tax = /^Creatures can't attack you( or planeswalkers you control)? unless their controller pays \{(\d+|X)\} for each (?:creature they control that's attacking you|of those creatures)(?:, where X is (.+))?$/.exec(text);
+  if (tax) {
+    if ((tax[2] === "X") !== !!tax[3]) return null;
+    const amount = tax[3] ? parseCount(tax[3], null) : null;
+    if (tax[3] && !amount) return null;
+    return { affects: { kind: "self" }, mods: [{ kind: "attackTax", n: amount ? 0 : Number(tax[2]), ...(amount ? { amount } : {}), ...(tax[1] ? { planeswalkers: true as const } : {}) }], text: line };
+  }
   // "Untap ~ during each other player's untap step", "Untap all permanents you control during ..." (Seedborn Muse):
   // they untap with the active player's permanents (CR 502.3); "doesn't untap during your untap step" doesn't apply.
   const untaps = /^Untap (~|all (.+?) you control|each (.+? you control(?: with .+)?)) during each other player's untap step$/.exec(text);

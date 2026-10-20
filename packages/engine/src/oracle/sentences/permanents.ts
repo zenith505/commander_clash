@@ -1,7 +1,7 @@
 // Sentences that act on permanents: destroy, tap, connive, regenerate, counters, gaining control, continuous changes until end of turn.
 
 import type { Effect, ObjRef } from "../../abilities";
-import { NUM, NUMX, COUNTER, counterKind, amt, isGroup, num } from "../words";
+import { NUM, NUMX, COUNTER, counterKind, amt, isGroup, num, capital } from "../words";
 import { pickFilter, parseGroup, parseObject, parsePlayer, parseTargetPhrase } from "../targets";
 import { addTarget } from "../body";
 import { parseCount } from "../counts";
@@ -287,10 +287,19 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return what && !isGroup(what) ? [{ type: "removeAllCounters", what }] : null;
   }
   // "Move all counters from target creature onto another target creature" (CR 122.5).
-  if ((m = /^Move all counters from (target .+?) onto (another target .+)$/i.exec(s))) {
+  // The Ozolith: "move all counters from ~ onto target creature" (rulings: all of them or none).
+  if ((m = /^Move all counters from (target .+?|~) onto ((?:another )?target .+)$/i.exec(s)) && (m[1] === "~") === !/^another /i.test(m[2]!)) {
     const from = parseObject(m[1]!, ctx);
     const to = from && !isGroup(from) ? parseObject(m[2]!, ctx) : null;
     return from && to && !isGroup(to) ? [{ type: "moveAllCounters", from, to }] : null;
+  }
+  // "Move a +1/+1 counter from target creature you control onto another target creature", Nesting Grounds' "move a
+  // counter from target permanent you control onto a second target permanent" (a kind it has, chosen as it resolves).
+  if ((m = new RegExp(`^Move (?:a|one) (?:(?<kind>${COUNTER}) )?counter from (?<from>target .+?) onto (?<to>another target .+|a second target .+)$`, "i").exec(s))) {
+    const g = m.groups!;
+    const from = parseObject(g.from!, ctx);
+    const to = from && !isGroup(from) ? parseObject(g.to!.replace(/^a second /i, ""), ctx) : null;
+    return from && to && !isGroup(to) ? [{ type: "moveCounter", counter: g.kind ? counterKind(g.kind) : "any", from, to }] : null;
   }
   // Portent Tracker (see parseBody): an opponent's battle loses defense, anyone else's gains it.
   if ((m = /^Remove (a|\w+) defense counters? from (target battle) if an opponent protects it, otherwise put that many on it$/.exec(s))) {
@@ -302,6 +311,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[3]!, ctx);
     return what && !isGroup(what) ? [{ type: "removeCounters", what, counter: counterKind(m[2]!), n: /^all$/i.test(m[1]!) ? "all" : amt(m[1]!) }] : null;
   }
+  // The Ozolith: "Whenever a creature you control leaves the battlefield, if it had counters on it, put those counters on
+  // ~": as many of each kind as that creature had as it last existed, put on (rulings: not moved).
+  if (/^Put those counters on ~$/i.test(s) && ctx.subjectLeft) return [{ type: "lastKnownCounters", what: { ref: "self" } }];
   // "When ~ dies, put its counters on target creature you control": as many of each kind as it had as it last
   // existed, put on, not moved (rulings on Dockworker Drone); "its +1/+1 counters" only that kind.
   if ((m = new RegExp(`^Put its (?:${COUNTER} )?counters on (.+)$`, "i").exec(s)) && ctx.selfCard) {
@@ -338,6 +350,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const n = m[3] ? parseCount(m[3], ctx) : amt(m[1]!);
     return filter && n ? [{ type: "distribute", counter: counterKind(m[2]!), n, filter: { ...filter, text: `${m[4]!} you control` } }] : null;
   }
+  // Forgotten Ancient: "you may move any number of +1/+1 counters from ~ onto other creatures". Chosen as it resolves, not
+  // targeted (rulings); any creatures but ~, whoever controls them.
+  if ((m = new RegExp(`^(?:[Yy]ou may )?[Mm]ove any number of ${COUNTER} counters from ~ onto other creatures$`).exec(s)))
+    return [{ type: "distribute", counter: counterKind(m[1]!), n: { count: { kind: "counters", counter: counterKind(m[1]!), of: { ref: "self" } } }, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "other creatures" }, move: true }];
   // "Double the number of +1/+1 counters on each creature you control" (Kalonian Hydra), "... of each kind of counter on
   // any number of target permanents" (Deepglow Skate): as many more as each has as it resolves (CR 701.10e), put on it.
   if ((m = new RegExp(`^Double the number of (?:${COUNTER} counters|(each kind of) counter) on (.+)$`, "i").exec(s))) {

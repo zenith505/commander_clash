@@ -1,7 +1,7 @@
 # Roadmap
 
-21,167 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 892 of 992 (89%), top 2,000: 1,562 of 1,989 (78%), top 5,000: 3,299 of 4,988 (66%).
+21,271 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 917 of 992 (92%), top 2,000: 1,590 of 1,989 (79%), top 5,000: 3,343 of 4,988 (67%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,12 +22,16 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 92, most played first: Etali, The Ozolith, Sevinne's
-   Reclamation, Arena of Glory, Underworld Breach, Forgotten Ancient, Dauthi Voidwalker, Kutzil, Demolition Field,
-   Selvala, Mondrak ("{W/P}" in an activation cost, "sacrifice two other artifacts and/or creatures"), Maskwood Nexus,
-   Birgi, Ripples of Undeath, Second Harvest, Nesting Grounds, Conduit of Worlds, Return the Favor, Saw in Half,
-   Opposition Agent, Six, Puresteel Paladin, Tibalt's Trickery, Strionic Resonator, Emry, Mangara, Tribute to the
-   World Tree, Banner of Kinship, Trouble in Pairs, Midnight Clock, Opal Palace, Sphere of Safety, Shared Animosity.
+00. Most played first (`npm run popular`). Out after round 93, most played first: Arena of Glory, Dauthi Voidwalker,
+   Kutzil, Selvala ("X mana in any combination of colors"), Maskwood Nexus, Birgi, Second Harvest, Conduit of Worlds,
+   Return the Favor, Saw in Half, Opposition Agent, Tibalt's Trickery, Hydroelectric Specimen, Banner of Kinship,
+   Trouble in Pairs, Midnight Clock, Opal Palace, Innkeeper's Talent, Archaeomancer's Map, Springheart Nantuko, Fact or
+   Fiction, Hammer of Nazahn, Mockingbird, Spelunking ("Lands you control enter untapped" needs the player's choice of
+   order against "enters tapped", rulings), Veyran, Isochron Scepter, Bloodchief Ascension, Eldritch Evolution, Kaya's
+   Ghostform, Terrasymbiosis, Inkshield, High Tide, Coat of Arms (a bonus counted for each creature it affects).
+   From round 93: Angelic Field Marshal and Thunderfoot Baloth (one Lieutenant static about two groups), Iroh ("non-Lesson
+   instant or sorcery"), Master of Keys, Szarekh and Rick Jones (their filters). Bots never move Forgotten Ancient's
+   counters.
    Smaller gaps from round 91 still out: Chatterfang's "Sacrifice X Squirrels", Tail Swipe, Contractual Safeguard,
    Return to Dust (addendum targets), Essence Flux ("If it's a Spirit" after a flicker), Tergrid ("sacrifices a
    nontoken permanent or discards a permanent card"), Zenith Chronicler ("each other player" meaning other than the

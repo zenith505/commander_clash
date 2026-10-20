@@ -238,6 +238,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.foretold
             : e.cond.kind === "castInMain"
             ? !!s.resolving!.item.castInMain
+            : e.cond.kind === "castFromGraveyard"
+            ? !s.resolving!.item.copy && s.objects[s.resolving!.item.objectId ?? ""]?.castFrom === "graveyard"
             : e.cond.kind === "bargained"
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.bargained
             : e.cond.kind === "evidence"
@@ -271,7 +273,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "suspected"
             ? objects(s, e.cond.what, ctx).some((o) => o.zone === "battlefield" && o.suspected !== undefined)
             : e.cond.kind === "state"
-            ? staticConditionNow(s, e.cond.cond, ctx.sourceId ?? s.resolving!.item.objectId!, ctx.controller, undefined, undefined, ctx.sourceId ? ctx.sourceZc : undefined)
+            ? staticConditionNow(s, e.cond.cond, ctx.sourceId ?? s.resolving!.item.objectId!, ctx.controller, undefined, undefined, ctx.sourceId ? ctx.sourceZc : undefined, ctx.subject?.id, ctx.subject?.zc)
             : e.cond.kind === "voteWins"
             ? voteWins(s, e.cond.option, !!e.cond.orTie)
             : e.cond.kind === "amountNow"

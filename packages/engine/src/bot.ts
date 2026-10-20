@@ -16,6 +16,7 @@ import {
   attackablePermanentProblem,
   attackProblem,
   attackTax,
+  attackTaxOf,
   attackTaxPer,
   blockProblem,
   cantBlockNow,
@@ -68,6 +69,7 @@ import {
   MAX_HAND_SIZE,
   hasNoMaxHandSize,
   stackItemQuality,
+  oneOfEachFits,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
@@ -225,8 +227,15 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const best = groups.reduce<string[]>((a, g) => (g.length > a.length ? g : a), []);
       return [{ type: "searchLibrary", player: pid, found: best }];
     }
+    // "A Forest card and a Plains card" (Krosan Verge): the best-ranked cards that still fit one each.
+    if (pend.kind === "searchLibrary" && pend.oneOfEach) {
+      const found: string[] = [];
+      for (const id of chooseSearch(s, pid, pend.cards, pend.cards.length)) if (found.length < pend.max && oneOfEachFits(pend.oneOfEach, [...found, id].map((x) => defOf(s, obj(s, x))))) found.push(id);
+      return [{ type: "searchLibrary", player: pid, found }];
+    }
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
-    if (pend.kind === "distribute") return [{ type: "distribute", player: pid, parts: chooseDistribution(s, pid, pend.options, pend.total, pend.counter) }];
+    // Moving counters off its own permanent (Forgotten Ancient): bots keep them where they are.
+    if (pend.kind === "distribute") return [{ type: "distribute", player: pid, parts: pend.move ? {} : chooseDistribution(s, pid, pend.options, pend.total, pend.counter) }];
     // Soulbond: always pair, with the best creature (the bonus lands on both).
     if (pend.kind === "pickPermanents" && pend.action === "pair") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, 1, "populate") }];
     // Banding (CR 702.22c): the bot doesn't band; a block on one would block them all.
@@ -350,6 +359,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const best = pend.labels!.reduce((b, l, i) => (score(l) > score(pend.labels![b]!) ? i : b), 0);
       return [{ type: "chooseOption", player: pid, choice: pend.options[best]! }];
     }
+    // Which counter to move: a +1/+1 counter if it has one (moved onto our creature), else the first.
+    if (pend.kind === "chooseOption" && pend.what === "counterKind") return [{ type: "chooseOption", player: pid, choice: pend.options.includes("+1/+1") ? "+1/+1" : pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "either") {
       const i = pend.labels?.findIndex((l) => /Treasure/.test(l)) ?? -1;
       return [{ type: "chooseOption", player: pid, choice: pend.options[Math.max(0, i)]! }];
@@ -3304,10 +3315,10 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
       if (declared.length === 1 && characteristics(s, obj(s, declared[0]!.attacker)).cantAttackAlone) declared = [];
       return [...(declared.length ? taps : []), { type: "declareAttackers", player: pid, attacks: declared }];
     }
-    const taxed = declared.filter((a) => a.planeswalker === undefined && attackTaxPer(s, a.defender)).sort((a, b) => power(s, obj(s, a.attacker)) - power(s, obj(s, b.attacker)))[0]!;
+    const taxed = declared.filter((a) => attackTaxOf(s, a)).sort((a, b) => power(s, obj(s, a.attacker)) - power(s, obj(s, b.attacker)))[0]!;
     const o = obj(s, taxed.attacker);
     const elsewhere = opps.find((d) => !attackTaxPer(s, d) && !attackProblem(s, o, d) && !characteristics(s, o).goadedBy.includes(d));
-    declared = declared.flatMap((a) => (a !== taxed ? [a] : elsewhere !== undefined ? [{ ...a, defender: elsewhere }] : []));
+    declared = declared.flatMap((a) => (a !== taxed ? [a] : elsewhere !== undefined ? [{ attacker: a.attacker, defender: elsewhere }] : []));
   }
 }
 

@@ -1219,6 +1219,17 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (enters) return enters;
   const draws = parseDrawTrigger(line);
   if (draws) return draws;
+  const attacked = /^Whenever an opponent attacks (?:you with two or more creatures|with creatures, if two or more of those creatures are attacking you and\/or planeswalkers you control), (.+)$/.exec(line);
+  if (attacked) {
+    const body = parseBody(attacked[1]!.replace(/\bthat opponent\b/g, "that player"), { eventPlayer: true });
+    if (!body) return "fail";
+    return { event: "opponentAttacksYou", attacksYou: { min: 2, ...(/planeswalkers you control/.test(line) ? { orPlaneswalkers: true as const } : {}) }, body: { ...body, text: attacked[1]! } };
+  }
+  const searches = /^Whenever an opponent searches their library, (.+)$/.exec(line);
+  if (searches) {
+    const body = parseBody(theyAreThatPlayer(searches[1]!), { eventPlayer: true });
+    return body ? { event: "opponentSearchesLibrary", body } : "fail";
+  }
   const activates = parseActivatesTrigger(line);
   if (activates) return activates;
   const manaTap = parseManaTapTrigger(line);

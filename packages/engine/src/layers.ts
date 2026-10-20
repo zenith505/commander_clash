@@ -117,6 +117,8 @@ export interface Characteristics {
   untapsDuringOthers: boolean;
   /** Generic mana per creature attacking its controller (Ghostly Prison). */
   attackTax: number;
+  /** The same for attacking a planeswalker its controller controls (Sphere of Safety). */
+  attackTaxPlaneswalkers: number;
   /** Players it has to attack if able (encore). */
   mustAttack: PlayerId[];
   /** "Can't be blocked by creatures with power 2 or less", "by Walls" (CR 509.1b). */
@@ -214,6 +216,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     attacksIfAble: false,
     untapsDuringOthers: false,
     attackTax: 0,
+    attackTaxPlaneswalkers: 0,
     mustAttack: [],
     cantBeBlockedBy: [],
     cantBlockCreatures: [],
@@ -464,6 +467,15 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const n = cond.stat === "power" ? c.power : c.toughness;
       return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max);
     }
+    case "subjectPT": {
+      const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
+      const here = !!sub && chars.has(sub.id) && (sub.zoneChanges ?? 0) === subjectZc;
+      const lk = !here && subjectId !== undefined ? s.lastKnown?.[subjectId] : undefined;
+      const c = here ? chars.get(subjectId!) : lk?.zc === subjectZc ? lk : undefined;
+      if (!c) return false;
+      const n = cond.stat === "power" ? c.power : c.toughness;
+      return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max);
+    }
     case "yourTurn":
       return (s.activePlayer === you) !== !!cond.not;
     case "anyOf":
@@ -495,7 +507,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "controlCommander":
       return s.battlefield.some((id) => {
         const c = s.objects[id]!.isCommander ? chars.get(id) : undefined;
-        return !!c && c.controller === you && (!cond.types || cond.types.some((t) => c.types.includes(t)));
+        return !!c && c.controller === you && (!cond.own || s.objects[id]!.owner === you) && (!cond.types || cond.types.some((t) => c.types.includes(t)));
       });
     case "ringBearer": {
       // On the battlefield under your control, with the designation (CR 701.54e).
@@ -938,9 +950,12 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "untapsDuringOthers":
       c.untapsDuringOthers = true;
       return;
-    case "attackTax":
-      c.attackTax += m.n;
+    case "attackTax": {
+      const n = m.amount !== undefined ? Math.max(0, num(m.amount)) : m.n;
+      c.attackTax += n;
+      if (m.planeswalkers) c.attackTaxPlaneswalkers += n;
       return;
+    }
     case "blocksOnlyFlyers":
       c.blocksOnlyFlyers = true;
       return;
@@ -1166,6 +1181,7 @@ function countsSomething(st: StaticAbility): boolean {
   for (const m of st.mods) {
     if (m.kind === "definePT") return true;
     if ((m.kind === "modifyPT" || m.kind === "setPT") && (isCounted(m.power) || isCounted(m.toughness))) return true;
+    if (m.kind === "attackTax" && m.amount !== undefined && isCounted(m.amount)) return true;
   }
   return false;
 }

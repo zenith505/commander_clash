@@ -795,7 +795,8 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.subtypes = c.subtypes.filter((st) => hasSet(setOf(st)));
       if (!c.types.includes("Creature")) c.allCreatureTypes = false;
       setSubtypes(c, m.subtypes);
-      if (m.supertypes) c.supertypes = [...m.supertypes];
+      // "Becomes a legendary ... creature": it gains the supertype and keeps any others (CR 205.4b).
+      for (const t of m.supertypes ?? []) if (!c.supertypes.includes(t)) c.supertypes.push(t);
       return;
     }
     case "setSubtypes":

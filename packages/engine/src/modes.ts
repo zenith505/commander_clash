@@ -166,6 +166,7 @@ export function expandMany(body: AbilityBody, k: number, optional = false): Abil
     ...(t.distinctFrom ? { distinctFrom: t.distinctFrom.map(shift) } : {}),
     ...(t.sameGraveyardAs ? { sameGraveyardAs: t.sameGraveyardAs.map(shift) } : {}),
     ...(t.sharesCreatureTypeWith ? { sharesCreatureTypeWith: t.sharesCreatureTypeWith.map(shift) } : {}),
+    ...(t.differentNameFrom ? { differentNameFrom: t.differentNameFrom.map(shift) } : {}),
     ...(t.divided ? { divided: { ...t.divided, first: shift(t.divided.first) } } : {}),
   });
   const { many: _many, ...spec0 } = fix(body.targets[i]!);
@@ -197,6 +198,7 @@ export function expandPerOpponent(body: AbilityBody, opponents: PlayerId[]): Abi
     ...(t.distinctFrom ? { distinctFrom: t.distinctFrom.map(shift) } : {}),
     ...(t.sameGraveyardAs ? { sameGraveyardAs: t.sameGraveyardAs.map(shift) } : {}),
     ...(t.sharesCreatureTypeWith ? { sharesCreatureTypeWith: t.sharesCreatureTypeWith.map(shift) } : {}),
+    ...(t.differentNameFrom ? { differentNameFrom: t.differentNameFrom.map(shift) } : {}),
     ...(t.divided ? { divided: { ...t.divided, first: shift(t.divided.first) } } : {}),
   });
   const { perOpponent: _p, controller: _c, ...spec } = body.targets[i]!;

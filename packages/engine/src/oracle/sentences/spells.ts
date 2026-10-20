@@ -237,7 +237,7 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const filter = parseTargetPhrase(m[1]!.replace(/^an? /, ""));
     if (filter?.kind !== "spell") return null;
     const before = ctx.targets.length;
-    const inner = parseSentence(m[2]!.replace(/^./, (c) => c.toUpperCase()), { ...ctx, castSpell: true });
+    const inner = parseSentence(m[2]!.replace(/^./, (c) => c.toUpperCase()), { ...ctx, castSpell: true, spellIt: true });
     if (!inner || ctx.targets.length !== before) return null;
     if (/choose new targets/.test(s)) for (const y of inner) if (y.type === "copySpell") y.newTargets = true;
     return [{ type: "nextCast", filter, effects: inner, text: m[2]!, ...(fromHand ? { fromHand: true as const } : {}) }];

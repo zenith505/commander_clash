@@ -225,7 +225,8 @@ export function parseBecomes(text: string): Modification[] | null {
   if ((m = /^(\d+\/\d+ (?:[A-Z]\w* )*creature)s\b(.*)$/.exec(rest))) rest = `a ${m[1]}${m[2]}`;
   if (!(m = /^an? (.+)$/i.exec(rest))) return null;
   rest = m[1]!;
-  // "A legendary 4/4 red Dragon creature" (Sarkhan, the Dragonspeaker): a new supertype replaces the old ones (CR 205.1b).
+  // "A legendary 4/4 red Dragon creature" (Sarkhan, the Dragonspeaker): new card types replace the old ones (CR 205.1a),
+  // and it gains the supertype, keeping any others (205.4b).
   let legendary = false;
   if ((m = /^legendary (.+)$/.exec(rest))) {
     legendary = true;

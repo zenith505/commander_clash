@@ -77,6 +77,8 @@ export interface Ctx {
   spell?: boolean;
   /** A "whenever a player casts a spell" trigger: "it" or "that spell" can be the spell cast. */
   castSpell?: boolean;
+  /** A cast trigger's first instruction: "it gains haste" (Tyvar Kell's emblem) is the spell cast. */
+  spellIt?: boolean;
   /** In a "when you cast this spell" ability: "copy it" is the spell itself. */
   selfCastSpell?: boolean;
   /** An exchange of life totals came before: "the life lost this way", "those players' life totals" are about it. */
@@ -431,7 +433,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     ...(opts.activated ? { activated: true } : {}),
     ...(opts.costLinked ? { costLinked: true } : {}),
     ...(opts.spell ? { spell: true } : {}),
-    ...(opts.castSpell ? { castSpell: true } : {}),
+    ...(opts.castSpell ? { castSpell: true, spellIt: true } : {}),
     ...(opts.eventPlayer ? { eventPlayer: true } : {}),
     ...(opts.defending ? { defending: true } : {}),
     ...(opts.selfCastSpell ? { selfCastSpell: true } : {}),
@@ -576,6 +578,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     return true;
   };
   for (let si = 0; si < sentences.length; si++) {
+    // "It" is the spell cast only as the first instruction: "Untap ~. It gains ..." is about ~ (Pristine Skywise).
+    if (si > 0) delete ctx.spellIt;
     let s = sentences[si]!.replace(/^Then,? (.)/, (_, c: string) => c.toUpperCase());
     // "At the beginning of the next end step, sacrifice that creature" (Meek Attack) is "Sacrifice that creature at the
     // beginning of the next end step" (one instruction, no condition).
@@ -2040,7 +2044,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const last = [...effects].reverse().find((e) => e.type === "continuous" && e.mods.some((x) => x.kind === "setTypes" || (x.kind === "addTypes" && x.types.includes("Creature"))));
       if (!last || last.type !== "continuous") return null;
       // "Becomes a 2/2 Assembly-Worker artifact creature" already keeps its card types (CR 205.1b).
-      last.mods = last.mods.map((x) => (x.kind === "setTypes" ? { kind: "addTypes", types: x.types, subtypes: x.subtypes } : x));
+      // Every prior card type, subtype and supertype stays, and a new supertype ("a legendary 6/6 ...") is added (205.1b).
+      last.mods = last.mods.map((x) => (x.kind === "setTypes" ? { kind: "addTypes", types: x.types, subtypes: x.subtypes, ...(x.supertypes ? { supertypes: x.supertypes } : {}) } : x));
       continue;
     }
     // 'It has "Sacrifice ~: Add {C}."' gives the tokens just created that ability (CR 111.3).

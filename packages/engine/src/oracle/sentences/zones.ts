@@ -189,6 +189,13 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     if (filter === null) return null;
     return [{ type: "chooseFromGraveyard", n: 0, upTo: true, distinctManaValues: true, ...(filter ? { filter } : {}) }];
   }
+  // "Return any number of permanent cards with different names from your graveyard to the battlefield" (Eerie Ultimatum):
+  // chosen as it resolves (rulings), one of each name; an Aura can't enchant another card entering with it (rulings).
+  if ((m = /^[Rr]eturn any number of (.+?) with different names from your graveyard to the battlefield$/.exec(s)) && !/\b(?:target|other|another|that|those)\b/.test(m[1]!)) {
+    const filter = parseSearchFilter(m[1]!.replace(/\bcards\b/, "card"));
+    if (filter === null) return null;
+    return [{ type: "chooseFromGraveyard", n: 99, upTo: true, oneEach: true, dest: "battlefield", ...(filter ? { filter } : {}) }];
+  }
   // "Return a creature card from your graveyard to the battlefield" (Summon Undead), "... tapped" (Port of Karfell), "... with
   // a finality counter on it" (Charnel Serenade): chosen as it resolves, not targeted, under your control (CR 110.2a).
   // "Each player puts a creature card from their graveyard onto the battlefield" (Exhume), "... a creature card with mana

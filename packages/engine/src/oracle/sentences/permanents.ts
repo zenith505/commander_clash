@@ -52,7 +52,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // "It gains haste until end of turn" about the spell a cast trigger is about (Tyvar Kell's emblem): the permanent it
   // becomes has it until end of turn (CR 400.7a, rulings on Tyvar Kell).
   // "It gains rebound" (Narset Transcendent): as it resolves (CR 702.88a).
-  if (ctx.castSpell && (m = /^(?:[Ii]t|[Tt]hat spell) gains (.+?)( until end of turn)?$/.exec(s))) {
+  if (ctx.castSpell && (m = /^(?:[Ii]t|[Tt]hat spell) gains (.+?)( until end of turn)?$/.exec(s)) && (ctx.spellIt || /^[Tt]hat spell/.test(s))) {
     if (m[1] === "rebound" && !m[2]) return [{ type: "spellGains", mods: [{ kind: "addKeywords", keywords: ["Rebound"] }] }];
     const mods = m[2] ? parseGrants(m[1]!) : null;
     return mods?.length && mods.every((x) => x.kind === "addKeywords") ? [{ type: "spellGains", mods }] : null;

@@ -69,7 +69,7 @@ import {
   hasNoMaxHandSize,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
-import { asFace, castableFaces, defMv, layoutOf, registerFace } from "./faces";
+import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { castingBody, compileCard } from "./oracle";
 import type { Action, CardDef, Chosen, Color, CostChoices, GameObject, GameState, ObjectId, PendingDecision, PlayerId, StackItem } from "./types";
@@ -601,6 +601,13 @@ const botSource = (s: GameState, id: ObjectId) => (s.objects[id] && s.objects[id
  * they'd kill or the biggest threat), helpful ones at our own stuff. Returns null when
  * there's no sensible choice. With `forced`, always returns some legal choice.
  */
+/** "Target creature cards with different names": `t` has the name of one of the group already chosen. */
+function namedLike(s: GameState, spec: TargetSpec, out: TargetChoice[], t: TargetChoice): boolean {
+  if (t.kind !== "object" || !spec.differentNameFrom) return false;
+  const name = defOf(s, obj(s, t.id)).name;
+  return spec.differentNameFrom.some((j) => { const c = out[j]; return c?.kind === "object" && sameName(defOf(s, obj(s, c.id)).name, name); });
+}
+
 export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced = false, sourceId?: string, x = 0): TargetChoice[] | null {
   // "Any number of target creatures": each one there could be, as an "up to" target (CR 601.2c); none there, not worth it.
   const body = offerMany(s, printed, pid, x, sourceId ? botSource(s, sourceId) : undefined, sourceId);
@@ -641,7 +648,7 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     // "Remove all counters from", "move all counters from": only something with counters on it.
     const countersFrom = allEffects(body.effects).some((e) => (e.type === "removeAllCounters" && e.what.ref === "target" && refCovers(e.what, i)) || (e.type === "moveAllCounters" && e.from.ref === "target" && e.from.index === i));
     const all = legalTargets(s, spec, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).filter(
-      (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId) && totalOk(s, body.targets, out, i, t) && !(countersFrom && t.kind === "object" && !Object.values(obj(s, t.id).counters).some((n) => n > 0)),
+      (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId) && totalOk(s, body.targets, out, i, t) && !namedLike(s, spec, out, t) && !(countersFrom && t.kind === "object" && !Object.values(obj(s, t.id).counters).some((n) => n > 0)),
     );
     // Reanimating takes the best creature from any graveyard it may.
     const reanimators = allEffects(body.effects).filter((e): e is Extract<Effect, { type: "putOntoBattlefield" }> => e.type === "putOntoBattlefield" && e.what.ref === "target" && i >= e.what.index && i < e.what.index + (e.what.n ?? 1));

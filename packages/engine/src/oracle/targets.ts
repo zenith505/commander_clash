@@ -13,7 +13,7 @@ HYPHENATED.set("time-lord", "Time Lord");
 
 /** Spell and enchantment subtypes a filter can name: "Spirit or Arcane spell", "a Cartouche you control" (CR 205.3h, 205.3k). */
 // Artifact subtypes (CR 205.3g) other than Vehicle, which "creature or Vehicle" handles: "a Food", "a Clue", "Equipment".
-const OTHER_SUBTYPES = ["Arcane", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure", "Gate", "Desert", "Cave"];
+const OTHER_SUBTYPES = ["Arcane", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure", "Gate", "Desert", "Cave", "Town"];
 
 export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | null {
   if (/^any target$/i.test(p)) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", text: "any target" }) };
@@ -354,11 +354,13 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   // "Cards from a single graveyard" (all in one), "creature cards that share a creature type" (each with each other).
   const single = (n > 1 || !!many) && / from a single graveyard$/.test(mine0);
   const share = (n > 1 || !!many) && / that share a creature type(?= from |$)/.test(mine0);
+  // "Up to six target creature cards with different names" (Behold the Sinister Six!): each a name the others don't have.
+  const differ = n > 1 && !many && / with different names(?= from |$)/.test(mine0);
   // "With total mana value 6 or less" (TargetSpec.total): the group together, X being the one announced (CR 107.3a).
   const totalM = n > 1 || many ? / with total (mana value|power) (\d+|X) or less(?= from | in |$)/.exec(mine0) : null;
   if (totalM && totalM[2] === "X" && (!(ctx.spell || ctx.activated || ctx.ownX) || ctx.whereX)) return null;
   const total: TargetSpec["total"] | undefined = totalM ? { key: totalM[1] === "power" ? "power" : "manaValue", ...(totalM[2] === "X" ? { x: true as const } : { max: Number(totalM[2]) }) } : undefined;
-  const mine = mine0.replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "").replace(/ with total (?:mana value|power) (?:\d+|X) or less(?= from | in |$)/, "");
+  const mine = mine0.replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "").replace(/ with different names(?= from |$)/, "").replace(/ with total (?:mana value|power) (?:\d+|X) or less(?= from | in |$)/, "");
   const parsed = n > 1 || many ? parseTargetPhrase(singularPhrase(mine)) : parseTargetPhrase(mine, { x: true, count: boundCount(ctx) });
   if (!parsed || parsed.kind === "player" || parsed.kind === "spell" || (parsed.kind === "card") !== cards || (theirs && (parsed.kind !== "object" || parsed.controller))) return null;
   // "Up to one target creature card with mana value X or less": as for one target (see parseTarget).
@@ -395,7 +397,8 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
       ...(distinct.length ? { distinctFrom: distinct } : {}),
       ...(single && k ? { sameGraveyardAs: group } : {}),
       ...(share && k ? { sharesCreatureTypeWith: group } : {}),
-      ...(single || share ? { text: `${spec.text.replace(/ from a graveyard$/, single ? " from a single graveyard" : " from a graveyard")}${share ? " sharing a creature type" : ""}` } : {}),
+      ...(differ && k ? { differentNameFrom: group } : {}),
+      ...(single || share || differ ? { text: `${spec.text.replace(/ from a graveyard$/, single ? " from a single graveyard" : " from a graveyard")}${share ? " sharing a creature type" : ""}${differ ? " with a different name" : ""}` } : {}),
     });
   }
   // "It" can't mean one of several; "they" / "those creatures" means all of them.

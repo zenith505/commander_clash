@@ -1,4 +1,4 @@
-import type { Effect } from "../abilities";
+import type { Effect, PlayerRef, SearchDest } from "../abilities";
 import { cardIdOf, defOf } from "../cards";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
@@ -464,7 +464,14 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // to enchant it stays in the library (303.4g), and is shuffled with it.
       const searchers = searchedBy.map((x) => x.pid);
       const foundBy = (pid: PlayerId) => searchedBy.find((x) => x.pid === pid)!.found;
-      const dest = (pid: PlayerId, id: ObjectId) => (foundBy(pid).indexOf(id) > 0 && e.others ? e.others : e.dest);
+      // "Target opponent chooses two of those cards" (Gifts Ungiven): from the revealed cards, before any is put anywhere.
+      let picked: ObjectId[] = [];
+      if (e.split && searchers.length === 1) {
+        const got = opponentPicks(s, ctx, src, e.split.chooser, searchers[0]!, foundBy(searchers[0]!), foundBy(searchers[0]!), e.split.n, e.split.to, e.dest);
+        if (got === "paused") return "paused";
+        picked = got;
+      }
+      const dest = (pid: PlayerId, id: ObjectId) => (picked.includes(id) ? e.split!.to : foundBy(pid).indexOf(id) > 0 && e.others ? e.others : e.dest);
       const onto = searchers.flatMap((pid) => foundBy(pid).filter((id) => dest(pid, id).zone === "battlefield").map((id) => ({ o: obj(s, id), under: pid })));
       const hosts = chooseAuraHosts(s, onto, src);
       if (hosts === "paused") return "paused";
@@ -510,6 +517,28 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         }
       return;
     }
+    case "revealPick": {
+      // "Reveal the top three cards of your library. An opponent chooses one of them." (Murmurs from Beyond): revealed
+      // first, then the opponent chooses (one that fits, if it says what kind: Animal Magnetism), then the cards move.
+      const r = s.resolving!;
+      const sc = (r.scratch ??= {});
+      const p = player(s, ctx.controller);
+      if (!sc.looked) {
+        sc.looked = p.library.slice(0, amountNow(s, e.n, ctx));
+        if (!sc.looked.length) return;
+        log(s, `${p.name} reveals ${sc.looked.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of their library.`);
+      }
+      const looked = sc.looked.filter((id) => obj(s, id).zone === "library");
+      const fits = looked.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
+      const got = opponentPicks(s, ctx, src, e.chooser, p.id, looked, fits, 1, e.to, e.rest);
+      if (got === "paused") return "paused";
+      const rest = looked.filter((id) => !got.includes(id));
+      enterTogether(s, () => {
+        for (const id of got) moveObject(s, id, e.to.zone === "libraryTop" ? "library" : e.to.zone, e.to.zone === "battlefield" ? { controller: p.id, ...(e.to.tapped ? { tapped: true } : {}) } : undefined);
+        if (e.rest) for (const id of rest) moveObject(s, id, e.rest.zone === "libraryTop" ? "library" : e.rest.zone);
+      });
+      return;
+    }
     case "dig": {
       const pid = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
       if (pid === undefined || player(s, pid).lost) return;
@@ -531,7 +560,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           const kind = (e.filter?.text ?? "card").replace(/~/g, src).replace(/ X or less$/, ` ${mvMax} or less`);
           // "Take none" says it's optional; "up to" only reads well with a number.
           const what = max === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${min < max ? "up to " : ""}${max} ${kind.replace(/\bcard\b/, "cards")}`;
-          const to = e.into === "hand" ? "into your hand" : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : "back on top of your library";
+          const to = e.into === "hand" ? "into your hand" : e.into === "exile" ? `into exile${e.play ? " (you may play it this turn)" : ""}` : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : "back on top of your library";
           const rest = e.rest === "graveyard" ? "into your graveyard" : e.rest === "shuffle" ? "shuffled into your library" : e.rest === "hand" ? "into your hand" : "on the bottom of your library";
           s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards: options, min, max, dig: { looked: sc.looked, to, rest } };
           return "paused";
@@ -555,12 +584,18 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       });
       const rest = looked.filter((id) => !found.includes(id) && obj(s, id).zone === "library");
       if (found.length && faceDown) log(s, `${p.name} ${faceDown}s ${found.length === 1 ? "a card" : `${found.length} cards`}: ${found.length === 1 ? "a" : "each a"} face-down 2/2 creature${faceDown === "cloak" ? " with ward {2}" : ""}.`);
+      else if (found.length && e.into === "exile") log(s, `${p.name} exiles ${names(found)}${e.play ? " and may play it this turn" : ""}.`);
       else if (found.length) log(s, `${p.name} puts ${e.into === "hand" ? (e.reveal || e.filter ? names(found) : found.length === 1 ? "a card" : `${found.length} cards`) + " into their hand" : e.into === "battlefield" ? names(found) + " onto the battlefield" : names(found) + " back on top"}.`);
       if (e.into === "battlefield" || faceDown) r.created = [];
       enterTogether(s, () => {
         for (const id of found) {
           if (e.into === "hand") moveObject(s, id, "hand");
-          else if (faceDown) {
+          else if (e.into === "exile") {
+            // Face up (CR 406.3); "you may play the exiled card this turn" is that object's only (CR 400.7).
+            moveObject(s, id, "exile");
+            const o = obj(s, id);
+            if (e.play) o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn };
+          } else if (faceDown) {
             // One at a time (CR 701.40e, 701.58e), each a 2/2 face-down creature; "it" in what follows.
             moveObject(s, id, "battlefield", { controller: p.id, faceDown });
             if (obj(s, id).zone === "battlefield") r.created!.push(id);
@@ -661,4 +696,56 @@ function clashValue(s: GameState, id: ObjectId): number {
   return defOf(s, obj(s, id))
     .manaCost.split(" // ")
     .reduce((n, half) => n + manaValue(parseManaCost(half)), 0);
+}
+
+const DEST_RANK: Record<string, number> = { battlefield: 4, hand: 3, libraryTop: 2, graveyard: 1, exile: 0 };
+
+/**
+ * "Target opponent chooses two of those cards" (Gifts Ungiven), "An opponent chooses one of them" (Murmurs from
+ * Beyond): of `owner`'s revealed `cards`, the chooser picks `n` from `eligible`, to go `to`; the rest go `rest` (or
+ * stay where they are). "An opponent" is one you choose as it resolves (rulings on Steam Augury). With no more cards
+ * than that to choose from there's no choice: they're all chosen (rulings on Gifts Ungiven and Realms Uncharted).
+ */
+function opponentPicks(s: GameState, ctx: ResolveCtx, src: string, chooserRef: PlayerRef | undefined, owner: PlayerId, cards: ObjectId[], eligible: ObjectId[], n: number, to: SearchDest, rest: SearchDest | undefined): ObjectId[] | "paused" {
+  const r = s.resolving!;
+  const sc = (r.scratch ??= {});
+  if (sc.picking && sc.found) {
+    sc.picked = sc.found;
+    sc.picking = undefined;
+    sc.found = undefined;
+  }
+  if (sc.picked) return sc.picked;
+  if (eligible.length <= n) return (sc.picked = eligible);
+  let chooser: PlayerId | undefined;
+  if (chooserRef) chooser = players(s, chooserRef, ctx)[0];
+  else {
+    const opps = opponents(s, ctx.controller);
+    if (r.chosen?.player === undefined && opps.length === 1) {
+      r.chosen = { ...r.chosen, player: opps[0]! };
+      log(s, `${player(s, ctx.controller).name} chooses ${player(s, opps[0]!).name} for ${src}.`);
+    }
+    if (r.chosen?.player === undefined && opps.length > 1) {
+      s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "opponent", options: opps.map(String), labels: opps.map((x) => player(s, x).name), prompt: "choose an opponent to choose the cards" };
+      return "paused";
+    }
+    chooser = r.chosen?.player;
+  }
+  // No opponent to choose (they've all left the game): the cards it says to choose can't be chosen.
+  if (chooser === undefined || player(s, chooser).lost) return (sc.picked = []);
+  const whose = player(s, owner).name;
+  const theirs = (d: SearchDest | undefined) => (d ? describeDest(d).replace(/\byour\b/, `${whose}'s`) : `stay on top of ${whose}'s library`);
+  sc.picking = true;
+  s.pending = {
+    kind: "searchLibrary",
+    player: chooser,
+    source: src,
+    what: n === 1 ? "one" : String(n),
+    cards: eligible,
+    min: n,
+    max: n,
+    dig: { looked: cards, to: `to put ${theirs(to)}`, rest: rest ? `go ${theirs(rest)}` : theirs(rest) },
+    forPlayer: owner,
+    ...(DEST_RANK[to.zone]! > (rest ? DEST_RANK[rest.zone]! : 2.5) ? { helps: true as const } : {}),
+  };
+  return "paused";
 }

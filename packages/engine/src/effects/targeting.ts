@@ -521,6 +521,7 @@ function relatedOk(s: GameState, spec: TargetSpec, chosen: TargetChoice[], t: Ta
   const others = (idx: number[] | undefined) => (idx ?? []).flatMap((j) => { const c = chosen[j]; const o = c?.kind === "object" ? s.objects[c.id] : undefined; return o ? [o] : []; });
   const o = obj(s, t.id);
   if (others(spec.sameGraveyardAs).some((x) => x.owner !== o.owner)) return false;
+  if (others(spec.differentNameFrom).some((x) => sameName(defOf(s, x).name, defOf(s, o).name))) return false;
   return others(spec.sharesCreatureTypeWith).every((x) => shareCreatureType(creatureTypesOf(s, x), creatureTypesOf(s, o)));
 }
 
@@ -577,7 +578,7 @@ export function hasLegalTargets(s: GameState, specs: TargetSpec[], controller: P
   const free = (spec: TargetSpec) => spec.optional || spec.skip || !!spec.many;
   const options = specs.map((spec, i) => (free(spec) ? [] : legalTargets(s, spec, controller, undefined, src, sourceId).filter((t) => canChooseTarget(s, specs, [], i, t, controller, src, sourceId))));
   if (options.some((o, i) => !free(specs[i]!) && !o.length)) return false;
-  if (!specs.some((spec) => spec.distinctFrom?.length || spec.sharesCreatureTypeWith?.length || spec.sameGraveyardAs?.length || spec.total)) return true;
+  if (!specs.some((spec) => spec.distinctFrom?.length || spec.sharesCreatureTypeWith?.length || spec.sameGraveyardAs?.length || spec.differentNameFrom?.length || spec.total)) return true;
   // Some targets must differ from each other: look for one way to choose them all.
   const chosen: TargetChoice[] = [];
   const fill = (i: number): boolean => {

@@ -1270,11 +1270,12 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "You can't cast creature spells" (Steel Golem), "noncreature spells" (Nikya of the Old Ways): a "can't" that wins
     // over any "can" (CR 101.2); putting creatures onto the battlefield isn't casting them (rulings).
-    const cantCast = /^You can't cast (creature|noncreature) spells\.$/.exec(line);
+    // "Your opponents can't cast noncreature spells" (Narset Transcendent's emblem): each opponent of its controller.
+    const cantCast = /^(You|Your opponents) can't cast (creature|noncreature) spells\.$/.exec(line);
     if (cantCast) {
-      const filter = parseTargetPhrase(`${cantCast[1]} spell`);
+      const filter = parseTargetPhrase(`${cantCast[2]} spell`);
       if (filter?.kind !== "spell") out.unsupported.push(raw);
-      else (out.youCantCast ??= []).push({ ...filter, text: `${cantCast[1]} spell` });
+      else (cantCast[1] === "You" ? (out.youCantCast ??= []) : (out.opponentsCantCast ??= [])).push({ ...filter, text: `${cantCast[2]} spell` });
       continue;
     }
     // Mana that isn't lost as steps and phases end (CR 500.4): "Players don't lose unspent mana" (Upwelling), "You don't lose
@@ -1438,6 +1439,12 @@ export function compile(d: CardDef): CompiledCard {
     const mvBan = new RegExp(`^Your opponents can't cast spells with mana value ${NUM} or less\\.$`).exec(line);
     if (mvBan && out.opponentsCantCastMvAtMost === undefined) {
       out.opponentsCantCastMvAtMost = num(mvBan[1]!);
+      continue;
+    }
+    // Teferi, Temporal Archmage's emblem: loyalty abilities when you could cast an instant, still one per permanent each
+    // turn (CR 606.3, rulings).
+    if (line === "You may activate loyalty abilities of planeswalkers you control on any player's turn any time you could cast an instant.") {
+      out.loyaltyAtInstantSpeed = true;
       continue;
     }
     if (line === "Your opponents can't cast spells during your turn.") {

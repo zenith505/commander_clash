@@ -36,10 +36,15 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
   }
   // "Up to four Minotaur creature cards with different names" (Deathbellow War Cry): no two with the same name, which is
   // one of each name offered (oneEach). Several of them only.
-  const different = / with different names$/.exec(m[3]!);
-  if (different && n === 1) return null;
-  const filter = parseSearchFilter(different ? m[3]!.slice(0, different.index) : m[3]!, count);
-  if (filter === null) return null;
+  // "Up to X creature cards with different names that each have mana value X" (Uncage the Menagerie): the X it was cast
+  // with; a card with {X} in its mana cost counts X as 0 in the library (CR 202.3e, rulings).
+  const eachX = / that each have mana value X$/.exec(m[3]!);
+  const phrase = eachX ? m[3]!.slice(0, eachX.index) : m[3]!;
+  const different = / with different names$/.exec(phrase);
+  if ((different && n === 1) || (eachX && !different)) return null;
+  const filter0 = parseSearchFilter(different ? phrase.slice(0, different.index) : phrase, count);
+  if (filter0 === null || (eachX && (!filter0 || filter0.bound))) return null;
+  const filter = eachX ? { ...filter0!, bound: { key: "manaValue" as const, at: "exact" as const, amount: X }, text: `${filter0!.text} with mana value X` } : filter0;
   let r: RegExpExecArray | null;
   // An Aura put onto the battlefield this way: its controller chooses what it enchants as it enters (CR 303.4f).
   const base = { type: "search" as const, ...(filter ? { filter: different ? { ...filter, text: `${filter.text} with different names` } : filter } : {}), n, upTo, reveal, ...(different ? { oneEach: true as const } : {}) };
@@ -91,6 +96,13 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
   const basics = /^basic ([A-Z][a-z]+(?:, [A-Z][a-z]+)*,? or [A-Z][a-z]+) card$/.exec(p);
   if (basics) {
     const subs = basics[1]!.split(/,? or |, /).map((t) => parseSearchFilter(`basic ${t} card`));
+    if (subs.some((x) => !x)) return null;
+    return { kind: "card", anyOf: subs as TargetSpec[], text: p };
+  }
+  // "Basic land cards and/or Town cards" (Reach the Horizon): cards of either kind, in any mix.
+  const andOr = /^(.+ card) and\/or (.+ card)$/.exec(p);
+  if (andOr) {
+    const subs = [andOr[1]!, andOr[2]!].map((x) => parseSearchFilter(x));
     if (subs.some((x) => !x)) return null;
     return { kind: "card", anyOf: subs as TargetSpec[], text: p };
   }

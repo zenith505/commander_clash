@@ -189,6 +189,13 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     if (filter === null) return null;
     return [{ type: "chooseFromGraveyard", n: 0, upTo: true, distinctManaValues: true, ...(filter ? { filter } : {}) }];
   }
+  // "Return any number of permanent cards with different names from your graveyard to the battlefield" (Eerie Ultimatum):
+  // chosen as it resolves (rulings), one of each name; an Aura can't enchant another card entering with it (rulings).
+  if ((m = /^[Rr]eturn any number of (.+?) with different names from your graveyard to the battlefield$/.exec(s)) && !/\b(?:target|other|another|that|those)\b/.test(m[1]!)) {
+    const filter = parseSearchFilter(m[1]!.replace(/\bcards\b/, "card"));
+    if (filter === null) return null;
+    return [{ type: "chooseFromGraveyard", n: 99, upTo: true, oneEach: true, dest: "battlefield", ...(filter ? { filter } : {}) }];
+  }
   // "Return a creature card from your graveyard to the battlefield" (Summon Undead), "... tapped" (Port of Karfell), "... with
   // a finality counter on it" (Charnel Serenade): chosen as it resolves, not targeted, under your control (CR 110.2a).
   // "Each player puts a creature card from their graveyard onto the battlefield" (Exhume), "... a creature card with mana
@@ -307,10 +314,12 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     return what ? [{ type: "bounce", what }] : null;
   }
   // "... to the battlefield with an additional +1/+1 counter on it" (Cauldron's Gift): it enters with it (CR 614.1c).
-  if ((m = new RegExp(`^(Return|Put) ((?:(?:up to )?(?:one|two|three|four|five|six|\\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyard) (?:to|onto) the battlefield( tapped)?( under your control)?(?: with (?:an additional|an?) (${COUNTER}) counter on it)?$`, "i").exec(s))) {
+  if ((m = new RegExp(`^(Return|Put) ((?:(?:up to )?(?:one|two|three|four|five|six|\\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyard) (?:to|onto) the battlefield( tapped)?( under your control| under its owner's control)?(?: with (?:an additional|an?) (${COUNTER}) counter on it)?$`, "i").exec(s))) {
     // Without "under your control", only your own cards: the card then enters under your control (CR 110.2a)
-    // either way, but "return" text that reaches other graveyards always says whose control.
+    // either way, but "return" text that reaches other graveyards always says whose control. "Under its owner's
+    // control" (Bilbo, Unexpected Adventurer): a card from any graveyard, for its owner.
     const underYou = !!m[4];
+    const owner = m[4] === " under its owner's control";
     if (m[1]!.toLowerCase() === "put" && !underYou) return null;
     const i = ctx.targets.length;
     const what = parseCardTarget(m[2]!, ctx, underYou ? undefined : "you");
@@ -318,7 +327,7 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     // Only permanent cards can be put onto the battlefield (CR 110.4b); an Aura's controller chooses what it enchants as it
     // enters (CR 303.4f).
     if (!what || !spec || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty)) || (m[5] && (what.ref !== "target" || what.n))) return null;
-    return [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}), ...(m[5] ? { counters: { [counterKind(m[5])]: 1 } } : {}) }];
+    return [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}), ...(owner ? { owner: true } : {}), ...(m[5] ? { counters: { [counterKind(m[5])]: 1 } } : {}) }];
   }
   // "When this creature dies, return it to the battlefield under its owner's control and suspect it" (Presumed Dead's
   // granted ability): the card that went to the graveyard, if it's still there (CR 400.7), and then the permanent it

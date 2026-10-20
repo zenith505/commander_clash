@@ -55,6 +55,11 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       if (mvX) Object.assign(filter, { ...(whereX ? { bound: { key: "manaValue", at: "most", amount: whereX } } : { xRange: { key: "manaValue", at: "most" } }), text: `${filter.text} with mana value X or less` });
       Object.assign(dig, { count, upTo: !required, ...(required ? { required: true } : {}), filter, into: "battlefield", ...(m[4] ? { tapped: true } : {}), ...(m[5] ? { counters: { counter: counterKind(m[5]), n: 1 } } : {}) });
       if (m[6]) Object.assign(dig, restOf(m[6]));
+    } else if ((m = new RegExp(`^(You may exile|Exile) one of (?:them|those cards)(?: and put the rest ${REST})?$`).exec(s))) {
+      // "You may exile one of those cards ... You may play the exiled card this turn" (Nahiri's Warcrafting, Florian): the
+      // permission is the sentence after (see parseBody).
+      Object.assign(dig, { count: 1, upTo: m[1] === "You may exile", into: "exile" });
+      if (m[2]) Object.assign(dig, restOf(m[2]));
     } else if (/^You may put one of (?:them|those cards) back on top of your library$/.test(s)) {
       Object.assign(dig, { count: 1, upTo: true, into: "libraryTop" });
     } else return null;
@@ -220,6 +225,13 @@ export function parseBecomes(text: string): Modification[] | null {
   if ((m = /^(\d+\/\d+ (?:[A-Z]\w* )*creature)s\b(.*)$/.exec(rest))) rest = `a ${m[1]}${m[2]}`;
   if (!(m = /^an? (.+)$/i.exec(rest))) return null;
   rest = m[1]!;
+  // "A legendary 4/4 red Dragon creature" (Sarkhan, the Dragonspeaker): new card types replace the old ones (CR 205.1a),
+  // and it gains the supertype, keeping any others (205.4b).
+  let legendary = false;
+  if ((m = /^legendary (.+)$/.exec(rest))) {
+    legendary = true;
+    rest = m[1]!;
+  }
   // "A 2/2 creature with all creature types" (Mutavault), "with vigilance and all creature types" (Faceless Haven): every
   // creature type, like changeling (CR 702.73a), in the type-changing layer.
   let everyType = false;
@@ -271,9 +283,10 @@ export function parseBecomes(text: string): Modification[] | null {
     // creature" keeps them too, except that its creature types are replaced (CR 205.1b).
     out.push({ kind: "addTypes", types, subtypes: [] });
     if (subtypes.length) out.push({ kind: "setSubtypes", subtypes });
-  } else if (types.length) out.push(still ? { kind: "addTypes", types, subtypes } : { kind: "setTypes", types, subtypes });
+  } else if (types.length) out.push(still ? { kind: "addTypes", types, subtypes } : { kind: "setTypes", types, subtypes, ...(legendary ? { supertypes: ["Legendary"] } : {}) });
   else if (subtypes.length && !still) out.push({ kind: "setSubtypes", subtypes });
   else if (still) return null;
+  if (legendary && (still || addition || !types.length || types.join(" ") === "Artifact Creature")) return null;
   if (everyType) {
     if (!types.includes("Creature") || subtypes.length) return null;
     out.push({ kind: "addTypes", types: [], subtypes: [], allCreatureTypes: true });

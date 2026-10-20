@@ -16,7 +16,7 @@ import { foundWith, newObjects } from "../mutate";
 import { addDelayed, paidUnless } from "./run-spells";
 import { toBottom } from "./run-library";
 import { attackDefault, fireEvent, inCombat } from "./triggers";
-import { asFace, defMv, registerFace, transformedFace } from "../faces";
+import { asFace, defMv, registerFace, sameName, transformedFace } from "../faces";
 import { meld, meldPartners } from "../meld";
 
 /** A suspended card (CR 702.62b): in exile, with suspend and a time counter on it. */
@@ -113,7 +113,9 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
   while (sc.queue.length) {
     const pid = sc.queue[0]!;
     const n = nFor[pid] ?? 0;
-    const options = e.among ? (among === undefined ? [] : pickOptions(s, e, among, ctx.sourceId)) : pickOptions(s, e, pid, ctx.sourceId);
+    // "One of those Dragons" (Zurgo and Ojutai): those still on the battlefield as the objects they were, whoever controls them now.
+    const group = e.fromGroup ? (ctx.event?.group ?? []).filter((g) => s.objects[g.id]?.zone === "battlefield" && (obj(s, g.id).zoneChanges ?? 0) === g.zc).map((g) => g.id) : undefined;
+    const options = group ?? (e.among ? (among === undefined ? [] : pickOptions(s, e, among, ctx.sourceId)) : pickOptions(s, e, pid, ctx.sourceId));
     if (!n) {
       sc.chosen![pid] = [];
       sc.queue.shift();
@@ -1289,12 +1291,16 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // Only permanent cards can be put onto the battlefield (CR 110.4b).
         const mvMax = e.mvMax === undefined ? undefined : amountNow(s, e.mvMax, ctx);
         const filter = e.filter && mvMax !== undefined ? { ...e.filter, manaValue: { max: mvMax }, text: e.filter.text.replace(/ X or less$/, ` ${mvMax} or less`) } : e.filter;
-        const cards = p.graveyard.filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (e.dest !== "battlefield" || isPermanentCard(defOf(s, obj(s, id)))));
+        const all = p.graveyard.filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (e.dest !== "battlefield" || isPermanentCard(defOf(s, obj(s, id)))));
+        // "With different names": one card of each name is offered (cards of one name are alike).
+        const cards = e.oneEach ? all.filter((id, i) => all.findIndex((x) => sameName(defOf(s, obj(s, x)).name, defOf(s, obj(s, id)).name)) === i) : all;
         const max = e.distinctManaValues ? new Set(cards.map((id) => defMv(defOf(s, obj(s, id))))).size : Math.min(e.n, cards.length);
         if (!max) return;
         const kind = filter?.text ?? "card";
         const what = e.distinctManaValues
           ? `any number of ${kind.replace(/\bcard\b/, "cards")} with different mana values`
+          : e.oneEach && e.upTo && e.n >= 99
+            ? `any number of ${kind.replace(/\bcard\b/, "cards")} with different names`
           : e.n === 1
             ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`
             : `${e.upTo ? "up to " : ""}${e.n} ${kind.replace(/\bcard\b/, "cards")}`;

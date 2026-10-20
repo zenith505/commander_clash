@@ -231,14 +231,16 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Counterspells, maybe "unless its controller pays {2}" (CR 118.12)
   // "When you next cast an instant or sorcery spell this turn, copy that spell" (a delayed trigger, CR 603.7).
-  if ((m = /^[Ww]hen you next cast (an? .+?) this turn, (.+?)(?:,? and you may choose new targets for the cop(?:y|ies))?$/.exec(s))) {
+  if ((m = /^[Ww]hen you next cast (an? .+?)( from your hand)? this turn, (.+?)(?:,? and you may choose new targets for the cop(?:y|ies))?$/.exec(s))) {
+    const fromHand = !!m[2];
+    m.splice(2, 1);
     const filter = parseTargetPhrase(m[1]!.replace(/^an? /, ""));
     if (filter?.kind !== "spell") return null;
     const before = ctx.targets.length;
-    const inner = parseSentence(m[2]!.replace(/^./, (c) => c.toUpperCase()), { ...ctx, castSpell: true });
+    const inner = parseSentence(m[2]!.replace(/^./, (c) => c.toUpperCase()), { ...ctx, castSpell: true, spellIt: true });
     if (!inner || ctx.targets.length !== before) return null;
     if (/choose new targets/.test(s)) for (const y of inner) if (y.type === "copySpell") y.newTargets = true;
-    return [{ type: "nextCast", filter, effects: inner, text: m[2]! }];
+    return [{ type: "nextCast", filter, effects: inner, text: m[2]!, ...(fromHand ? { fromHand: true as const } : {}) }];
   }
   // "The next noncreature spell you cast this turn has cascade" (Dark Apostle), "the next instant spell and the next sorcery
   // spell you cast this turn each have cascade" (Smoldering Stagecoach): the spell gains cascade as it's cast and it

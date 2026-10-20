@@ -148,7 +148,7 @@ export type TriggerSourceEvent =
   /** A player declared these attackers (CR 508.1): "whenever one or more creatures you control attack". */
   | { type: "groupAttack"; controller: PlayerId; ids: ObjectId[] }
   /** In one combat damage step, these creatures of `controller` dealt `player` combat damage. */
-  | { type: "groupCombatDamage"; controller: PlayerId; player: PlayerId; ids: ObjectId[]; amounts: number[] }
+  | { type: "groupCombatDamage"; controller: PlayerId; player: PlayerId; ids: ObjectId[]; amounts: number[]; /** Dealt to this battle, `player` its protector (CR 310). */ battle?: ObjectId }
   /** The last counter of a kind was removed from it (vanishing's time counters, CR 702.63a). */
   | { type: "lastCounterRemoved"; id: ObjectId; counter: string }
   /** A face-down permanent was turned face up (CR 702.37e, 708.8). */
@@ -165,7 +165,11 @@ export type TriggerSourceEvent =
   /** `source` is the permanent dealing it, or "" for a spell or a gone permanent's ability (CR 120.3); `by` controls it. */
   | { type: "damagedPlayer"; source: ObjectId; by: PlayerId; player: PlayerId; amount: number; combat: boolean }
   /** A permanent dealt damage to a creature (`id`). */
-  | { type: "damagedCreature"; source: ObjectId; id: ObjectId; amount: number; combat: boolean }
+  | { type: "damagedCreature"; source: ObjectId; id: ObjectId; amount: number; combat: boolean; /** The excess damage that creature has been dealt this turn (CR 120.10). */ excess?: number }
+  /** A spell (`card`, controlled by `by`) dealt damage to a player or a battle. */
+  | { type: "spellDealtDamage"; by: PlayerId; card: CardDef; player?: PlayerId; battle?: ObjectId }
+  /** Damage dealt at the same time was excess damage to these permanents (CR 120.10), under `controller` then. */
+  | { type: "excessDamage"; hits: { id: ObjectId; amount: number; controller: PlayerId }[]; combat: boolean }
   /** The Ring tempted a player, who chose `chosen` as their Ring-bearer, if they could choose one (CR 701.54d). */
   | { type: "ringTempted"; player: PlayerId; chosen?: ObjectId }
   /** A source dealt damage: everything it dealt at once is one event (CR 120.3, 603.2c). */
@@ -307,7 +311,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (t.oncePerTurn && onceUsed(o, t.zone, t.body.text)) return;
       const once = t.body.effects[0];
       if (once?.type === "may" && once.once && onceUsed(o, t.zone, `do:${once.text}`)) return; // CR 603.2h
-      if (pred(t.event, t) && (!t.ifCond || staticConditionNow(s, t.ifCond, o.id, controller, event?.player, event?.amount, undefined, subject?.id))) {
+      if (pred(t.event, t) && (!t.ifCond || staticConditionNow(s, t.ifCond, o.id, controller, event?.player, event?.amount, undefined, subject?.id, subject?.zoneChanges ?? 0))) {
         if (t.oncePerTurn) (o.triggeredThisTurn ??= []).push(`${lookingBack(o, t.zone) ? (o.zoneChanges ?? 0) - 1 : (o.zoneChanges ?? 0)}|${t.body.text}`);
         const queued: PendingTrigger = {
           ...(t.ifCond ? { ifCond: t.ifCond } : {}),
@@ -789,11 +793,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const fits = (t: TriggeredAbility) => ev.ids.map((x, i) => [x, i] as const).filter(([x]) => s.objects[x] && (!t.group || objectMatches(s, t.group, obj(s, x), ev.controller, false)));
       for (const t of abilitiesOf(s, o).triggers) {
         if (t.event !== want) continue;
+        // "To a player or battle": only those are about a battle dealt it (CR 310).
+        if (ev.type === "groupCombatDamage" && ev.battle !== undefined && !t.orBattle) continue;
         const hit = fits(t);
         if (hit.length < (t.minAttackers ?? 1)) continue;
         const amount = ev.type === "groupCombatDamage" ? hit.reduce((n, [, i]) => n + ev.amounts[i]!, 0) : undefined;
         const same = (tt: TriggeredAbility) => tt.event === want && tt.body.text === t.body.text && JSON.stringify(tt.group) === JSON.stringify(t.group) && tt.minAttackers === t.minAttackers;
-        add(o, ev.controller, (_, tt) => same(tt), undefined, undefined, undefined, undefined, undefined, undefined, ev.type === "groupCombatDamage" ? { player: ev.player, amount } : undefined);
+        const group = hit.map(([x]) => ({ id: x, zc: obj(s, x).zoneChanges ?? 0 }));
+        add(o, ev.controller, (_, tt) => same(tt) && !(ev.type === "groupCombatDamage" && ev.battle !== undefined && !tt.orBattle), undefined, undefined, undefined, undefined, undefined, undefined, ev.type === "groupCombatDamage" ? { player: ev.player, amount, group } : undefined);
       }
     };
     for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === ev.controller) groupWatch(obj(s, id));
@@ -872,8 +879,26 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const o = s.objects[ev.source];
     const hit = s.objects[ev.id];
     if (o?.zone === "battlefield" && hit) {
-      add(o, controllerOf(s, o), (e) => e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature"), undefined, undefined, hit, undefined, undefined, undefined, { amount: ev.amount });
-      addHosted(o, (e) => e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature"), undefined, hit, { amount: ev.amount });
+      const info = { amount: ev.amount, ...(ev.excess ? { excess: ev.excess } : {}) };
+      add(o, controllerOf(s, o), (e) => e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature"), undefined, undefined, hit, undefined, undefined, undefined, info);
+      addHosted(o, (e) => e === "selfDealsDamageToCreature" || (ev.combat && e === "selfDealsCombatDamageToCreature"), undefined, hit, info);
+    }
+  } else if (ev.type === "spellDealtDamage") {
+    // "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix, in
+    // a graveyard too): once for each player or battle dealt damage (CR 603.2c).
+    const fits = (t: TriggeredAbility) => !!t.spellDamage && printedMatches(t.spellDamage.filter, ev.card) && (ev.battle !== undefined ? !!t.spellDamage.orBattle : ev.player !== ev.by);
+    const watch = (w: GameObject) => add(w, ev.by, (e, t) => e === "spellYouControlDealsDamage" && fits(t));
+    for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === ev.by) watch(obj(s, id));
+    fromGraveyards((o, owner) => owner === ev.by && watch(o));
+  } else if (ev.type === "excessDamage") {
+    // "Whenever a creature an opponent controls is dealt excess damage" (CR 120.10): once for each permanent, which is
+    // the subject and its excess "that excess damage"; "one or more creatures ... are dealt" once for all of them.
+    const fits = (t: TriggeredAbility, hit: GameObject, wc: PlayerId) => !!t.excess && !(t.excess.noncombat && ev.combat) && objectMatches(s, t.excess.filter, hit, wc, false);
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      const wc = controllerOf(s, w);
+      for (const h of ev.hits) add(w, wc, (e, t) => e === "permanentDealtExcess" && !t.excess?.oneOrMore && fits(t, obj(s, h.id), wc), undefined, undefined, obj(s, h.id), undefined, undefined, undefined, { amount: h.amount, player: h.controller });
+      add(w, wc, (e, t) => e === "permanentDealtExcess" && !!t.excess?.oneOrMore && ev.hits.some((h) => fits(t, obj(s, h.id), wc)));
     }
   } else if (ev.type === "wasDealtDamage") {
     // "Whenever ~ is dealt damage", "When enchanted creature is dealt damage": it's still on the battlefield as the
@@ -932,7 +957,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const spell = item?.objectId ? s.objects[item.objectId] : undefined;
     // "When you next cast ... this turn": once, for the first such spell (CR 603.7c).
     for (const d of ev.copy ? [] : [...(s.nextCast ?? [])]) {
-      if (d.controller !== ev.controller || d.turn !== s.turn || !printedMatches(d.filter, ev.card)) continue;
+      if (d.controller !== ev.controller || d.turn !== s.turn || !printedMatches(d.filter, ev.card) || (d.fromHand && spell?.castFrom !== "hand")) continue;
       s.nextCast = s.nextCast!.filter((x) => x !== d);
       // "Has cascade": the spell's own cascade ability triggers (CR 702.85a).
       if (d.cascade && spell) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: CASCADE_BODY, cause: ev.stackId });

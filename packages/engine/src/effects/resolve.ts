@@ -558,6 +558,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "addMana":
     case "cantBlockRule":
     case "cantAttackRule":
+    case "keepManaThisTurn":
     case "costModThisTurn":
     case "fight":
     case "bite":
@@ -697,6 +698,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "counterCause":
     case "counterSpell":
     case "spellEntersWith":
+    case "spellGains":
     case "counterEach":
     case "changeTarget":
       return runSpellsEffect(s, e, ctx, src);
@@ -718,6 +720,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "shuffleSpell":
     case "shuffleZones":
     case "search":
+    case "revealPick":
     case "dig":
       return runLibraryEffect(s, e, ctx, src);
     case "exileNamed":
@@ -776,7 +779,7 @@ function finishSpell(s: GameState, id: ObjectId, item: StackItem) {
     if (s.objects[id]?.zone === "exile") log(s, `${d.name} is exiled (paradigm).`);
     return;
   }
-  if (compileCard(d).rebound && o.castFrom === "hand" && !o.exileIfLeaves) {
+  if ((compileCard(d).rebound || o.reboundGained) && o.castFrom === "hand" && !o.exileIfLeaves) {
     moveObject(s, id, "exile");
     log(s, `${d.name} is exiled (rebound).`);
     addDelayed(s, "yourNextUpkeep", controller, o, { targets: [], effects: [{ type: "castFromExileFree" }], text: "Rebound: you may cast ~ from exile without paying its mana cost." });

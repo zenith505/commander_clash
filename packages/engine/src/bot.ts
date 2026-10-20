@@ -69,7 +69,7 @@ import {
   hasNoMaxHandSize,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
-import { asFace, castableFaces, defMv, layoutOf, registerFace } from "./faces";
+import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { castingBody, compileCard } from "./oracle";
 import type { Action, CardDef, Chosen, Color, CostChoices, GameObject, GameState, ObjectId, PendingDecision, PlayerId, StackItem } from "./types";
@@ -167,6 +167,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "searchLibrary" && pend.zonesOf !== undefined) {
       const rank = (id: string) => (s.objects[id]!.zone === "hand" ? 1 : 0);
       return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => rank(a) - rank(b)).slice(0, pend.max) }];
+    }
+    // Choosing among an opponent's revealed cards (Gifts Ungiven, Intuition): the ones they'd least like where the chosen
+    // ones go, by how they'd rank them for themselves.
+    if (pend.kind === "searchLibrary" && pend.forPlayer !== undefined) {
+      const ranked = chooseSearch(s, pend.forPlayer, pend.cards, pend.cards.length);
+      return [{ type: "searchLibrary", player: pid, found: pend.helps ? ranked.slice(ranked.length - pend.max) : ranked.slice(0, pend.max) }];
     }
     if (pend.kind === "searchLibrary" && pend.hand !== undefined) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, pend.max) }];
     // "Put any number of cards from your hand on the bottom of your library, then draw that many plus one": lands once
@@ -595,6 +601,13 @@ const botSource = (s: GameState, id: ObjectId) => (s.objects[id] && s.objects[id
  * they'd kill or the biggest threat), helpful ones at our own stuff. Returns null when
  * there's no sensible choice. With `forced`, always returns some legal choice.
  */
+/** "Target creature cards with different names": `t` has the name of one of the group already chosen. */
+function namedLike(s: GameState, spec: TargetSpec, out: TargetChoice[], t: TargetChoice): boolean {
+  if (t.kind !== "object" || !spec.differentNameFrom) return false;
+  const name = defOf(s, obj(s, t.id)).name;
+  return spec.differentNameFrom.some((j) => { const c = out[j]; return c?.kind === "object" && sameName(defOf(s, obj(s, c.id)).name, name); });
+}
+
 export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced = false, sourceId?: string, x = 0): TargetChoice[] | null {
   // "Any number of target creatures": each one there could be, as an "up to" target (CR 601.2c); none there, not worth it.
   const body = offerMany(s, printed, pid, x, sourceId ? botSource(s, sourceId) : undefined, sourceId);
@@ -635,10 +648,13 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     // "Remove all counters from", "move all counters from": only something with counters on it.
     const countersFrom = allEffects(body.effects).some((e) => (e.type === "removeAllCounters" && e.what.ref === "target" && refCovers(e.what, i)) || (e.type === "moveAllCounters" && e.from.ref === "target" && e.from.index === i));
     const all = legalTargets(s, spec, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).filter(
-      (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId) && totalOk(s, body.targets, out, i, t) && !(countersFrom && t.kind === "object" && !Object.values(obj(s, t.id).counters).some((n) => n > 0)),
+      (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId) && totalOk(s, body.targets, out, i, t) && !namedLike(s, spec, out, t) && !(countersFrom && t.kind === "object" && !Object.values(obj(s, t.id).counters).some((n) => n > 0)),
     );
     // Reanimating takes the best creature from any graveyard it may.
-    const reanimate = allEffects(body.effects).some((e) => e.type === "putOntoBattlefield" && e.what.ref === "target" && i >= e.what.index && i < e.what.index + (e.what.n ?? 1));
+    const reanimators = allEffects(body.effects).filter((e): e is Extract<Effect, { type: "putOntoBattlefield" }> => e.type === "putOntoBattlefield" && e.what.ref === "target" && i >= e.what.index && i < e.what.index + (e.what.n ?? 1));
+    const reanimate = reanimators.length > 0;
+    // "Under its owner's control" (Bilbo): only our own cards do us good.
+    const forOwner = reanimators.some((e) => e.owner);
     // "Becomes a copy of target creature": the best one anywhere, but not a legendary one of ours (the legend rule
     // would cost us one of them) or the source itself; what becomes the copy is our weakest.
     const copies = allEffects(body.effects).filter((e): e is Extract<Effect, { type: "becomeCopy" }> => e.type === "becomeCopy");
@@ -651,7 +667,7 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
       : copied
       ? all.filter((t) => t.kind !== "object" || (t.id !== sourceId && !(isMine(s, pid, t) && objIsLegendary(s, t.id))))
       : reanimate
-        ? all
+        ? forOwner ? all.filter((t) => t.kind === "object" && obj(s, t.id).owner === pid) : all
         : all.filter((t) => (harm[i] ? !isMine(s, pid, t) : isMine(s, pid, t)) && !isBattleTarget(s, t));
     // Provoke: a creature ours kills without dying (wantsMay then says yes), else anything (and it says no).
     const provoke = allEffects(body.effects).some((e) => e.type === "mustBlockSource" && e.what.ref === "target" && e.what.index === i);

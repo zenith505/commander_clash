@@ -420,6 +420,10 @@ export interface GameObject {
   treasureSpent?: number;
   /** A spell: "that creature enters with an additional +1/+1 counter on it" (Boreal Outrider, CR 614.1c), as it resolves. */
   extraCounters?: Record<string, number>;
+  /** A spell: "it gains haste until end of turn" from a cast trigger (Tyvar Kell's emblem), applying to the permanent it becomes (CR 400.7a). */
+  spellGains?: { mods: Modification[]; timestamp: number; controller: PlayerId; source: string }[];
+  /** A spell that gained rebound (Narset Transcendent), as it resolves (CR 702.88a). */
+  reboundGained?: true;
   /** Tribute (CR 702.104): the opponent chosen as it entered, and whether they put the +1/+1 counters on it. */
   tribute?: { to: PlayerId; paid?: true };
   /**
@@ -984,7 +988,7 @@ export type PendingDecision =
    * Searching your library (CR 701.23): `cards` are the ones that match; pick between `min` and
    * `max` of them. With `firstTo`, the first one picked goes there and the rest to `othersTo`.
    */
-  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; min: number; max: number; firstTo?: string; othersTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string }; /** Not a search: cards in the hand to put onto the battlefield, or with `reveal` to reveal, with `bottom` to put on the bottom of the library. */ fromHand?: boolean; reveal?: true; bottom?: true; /** Not a search: cards in the graveyard to return to the hand, to exile, or to put onto the battlefield. */ fromGraveyard?: "hand" | "exile" | "battlefield" | "libraryTop"; /** "Cards with different mana values" (Seasons Past): no two found may share a mana value. */ distinctManaValues?: true; /** The Leylines' "begin the game with it on the battlefield", before the first turn (CR 103.6a). */ opening?: true; /** Choosing from this player's revealed hand ("You choose a nonland card from it"); `dig.looked` is the whole hand. */ hand?: PlayerId; /** Searching this player's graveyard, hand and library (Memoricide): `cards` are in any of them; `also`, the graveyard's that are found anyway ("all cards"). */ zonesOf?: PlayerId; also?: ObjectId[] }
+  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; min: number; max: number; firstTo?: string; othersTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string }; /** Not a search: cards in the hand to put onto the battlefield, or with `reveal` to reveal, with `bottom` to put on the bottom of the library. */ fromHand?: boolean; reveal?: true; bottom?: true; /** Not a search: cards in the graveyard to return to the hand, to exile, or to put onto the battlefield. */ fromGraveyard?: "hand" | "exile" | "battlefield" | "libraryTop"; /** "Cards with different mana values" (Seasons Past): no two found may share a mana value. */ distinctManaValues?: true; /** The Leylines' "begin the game with it on the battlefield", before the first turn (CR 103.6a). */ opening?: true; /** Choosing from this player's revealed hand ("You choose a nonland card from it"); `dig.looked` is the whole hand. */ hand?: PlayerId; /** Searching this player's graveyard, hand and library (Memoricide): `cards` are in any of them; `also`, the graveyard's that are found anyway ("all cards"). */ zonesOf?: PlayerId; also?: ObjectId[]; /** An opponent choosing from this player's revealed cards (Gifts Ungiven, Intuition); `helps` when where the chosen ones go is better for that player than where the rest go. */ forPlayer?: PlayerId; helps?: true }
   /**
    * Choosing a creature type or a color by name: as a permanent enters (`objectId`, CR 614.12) or
    * while a spell or ability resolves. `options` are the names allowed.
@@ -1067,6 +1071,18 @@ export interface TurnLog {
   sourceDamage?: Record<number, Record<string, number>>;
   /** The card types of the cards put into each player's graveyard from anywhere (Cloakwood Hermit). */
   toOwnGraveyardTypes?: Record<number, string[]>;
+  /**
+   * Each time a permanent was dealt excess damage (CR 120.10): the permanent as it was then (`id`, `zc`), its
+   * controller and card types then, and how much (Rith's "if a creature an opponent controlled was dealt excess damage
+   * this turn", Maarika's "if that creature was dealt excess damage this turn").
+   */
+  excessDealt?: { id: ObjectId; zc: number; controller: PlayerId; types: string[]; amount: number; combat?: true }[];
+  /**
+   * What dealt damage to each creature and planeswalker this turn, keyed `id@zoneChanges` (the permanent as it was):
+   * each source's controller, whether it was a spell, and its subtypes then (Aegar's "if a Giant, Wizard, or spell you
+   * controlled dealt damage to it this turn").
+   */
+  damageDealtTo?: Record<string, { controller: PlayerId; spell?: true; subtypes: string[] }[]>;
 }
 
 /**
@@ -1122,7 +1138,7 @@ export interface GameState {
   /** Cards in graveyards that gained flashback until end of turn (Snapcaster Mage), as they are there. */
   flashbackGrants?: { id: ObjectId; zc: number }[];
   /** "When you next cast an instant or sorcery spell this turn, copy that spell": delayed triggers on a cast (CR 603.7). */
-  nextCast?: { controller: PlayerId; filter: TargetSpec; sourceId: ObjectId; sourceCardId: string; body: AbilityBody; turn: number; cascade?: true }[];
+  nextCast?: { controller: PlayerId; filter: TargetSpec; sourceId: ObjectId; sourceCardId: string; body: AbilityBody; turn: number; cascade?: true; /** "From your hand" (Narset Transcendent): cast from there (CR 601.2a). */ fromHand?: true }[];
   /**
    * "Until end of turn, whenever you cast a spell, ...": delayed triggered abilities with a stated duration, which trigger
    * every time their event happens until then (CR 603.7b). Their source is the spell or the source of the ability that made
@@ -1136,6 +1152,8 @@ export interface GameState {
   castThisTurn?: { player: PlayerId; card: string; /** Its colors as it was cast (Ricochet Trap). */ colors?: Color[]; /** The zone it was cast from. */ from?: ZoneName; /** Mana from a Treasure was spent to cast it (CR 106.3). */ treasure?: true }[];
   /** "Instant and sorcery spells you cast this turn cost {1} less to cast": cost changes for one player this turn (CR 601.2f). */
   costModsThisTurn?: { player: PlayerId; mod: CostMod }[];
+  /** "Until end of turn, you don't lose unspent red mana as steps and phases end" (CR 500.4): who, and which color (all if unset). */
+  keepManaThisTurn?: { player: PlayerId; color?: ManaType }[];
   /** "Creatures without flying can't block this turn": matching creatures can't block, also ones that arrive later. */
   cantBlockThisTurn?: { filter: TargetSpec; controller: PlayerId }[];
   /** "Creatures can't attack this turn": matching creatures can't attack, also ones that arrive later. */
@@ -1355,6 +1373,10 @@ export interface TurnRule {
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */
 export interface TriggerEventInfo {
   amount?: number;
+  /** "Deals damage to a creature": the excess damage that creature has been dealt this turn (CR 120.10). */
+  excess?: number;
+  /** "Whenever one or more Dragons you control deal combat damage": those that did, as the objects they were ("one of those Dragons"). */
+  group?: { id: ObjectId; zc: number }[];
   player?: PlayerId;
   /** A permanent's enters trigger: the opponent its spell's gift was promised to (CR 702.174b). */
   gift?: PlayerId;
@@ -1416,6 +1438,10 @@ export interface Resolving {
   revealedFromHand?: number;
   /** The excess damage its damage instructions dealt to permanents (CR 120.10): "the excess damage dealt this way". */
   excessDamage?: number;
+  /** That excess damage by the permanent dealt it (a fight's "the creature the opponent controls"). */
+  excessTo?: Record<ObjectId, number>;
+  /** The part of it dealt to creatures ("if excess damage was dealt to a creature this way", Vikya). */
+  excessToCreatures?: number;
   /** How many permanents its tapAnyNumber instruction tapped ("for each creature tapped this way"). */
   tappedThisWay?: number;
   /** Whether the player paid its counterSpell instruction's "unless" cost ("If they do, ..."). */
@@ -1509,6 +1535,8 @@ export interface Resolving {
     nFor?: Record<string, number>; // the same, for each player when it counts their own ("half the cards in their hand")
     distributed?: Record<ObjectId, number>; // how a "distribute" effect's counters were divided, as it resolves
     found?: ObjectId[]; // the cards a library search found
+    picking?: true; // an opponent is choosing among revealed cards (Gifts Ungiven); `picked`, what they chose
+    picked?: ObjectId[];
     /** "Each player puts a creature card from their graveyard onto the battlefield" (Exhume): players still to choose, and the cards chosen so far. */
     yardPicks?: { queue: PlayerId[]; picked: Record<string, ObjectId[]> };
     /** "Each player may put ... from their hand onto the battlefield" (Show and Tell): players still to choose, and the cards chosen. */

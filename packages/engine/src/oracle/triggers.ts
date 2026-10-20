@@ -186,6 +186,37 @@ const BLOCK_TRIGGERS: [RegExp, TriggerEvent][] = [
 ];
 
 /**
+ * "Whenever a creature an opponent controls is dealt excess noncombat damage, amass Orcs X, where X is that excess damage"
+ * (Fall of Cair Andros), "Whenever one or more creatures your opponents control are dealt excess noncombat damage"
+ * (Magmatic Galleon), Aegar's "if a Giant, Wizard, or spell you controlled dealt damage to it this turn" (an intervening
+ * if, CR 603.4): excess damage as CR 120.10 has it, the permanent the subject.
+ */
+function parseExcessTrigger(line: string): TriggeredAbility | "fail" | null {
+  const m = /^Whenever (one or more|an?) (.+?) (?:is|are) dealt excess (noncombat )?damage, (.+)$/.exec(line);
+  if (!m) return null;
+  const oneOrMore = m[1] === "one or more";
+  const phrase = oneOrMore ? m[2]!.replace(/^creatures your opponents control$/, "creature an opponent controls") : m[2]!;
+  const filter = parseTargetPhrase(phrase);
+  if (!filter || filter.kind !== "object") return "fail";
+  let text = m[4]!;
+  let ifCond: StaticCondition | undefined;
+  const aegar = /^if a ((?:[A-Z][a-z]+, )*[A-Z][a-z]+,? or )?spell you controlled dealt damage to it this turn, (.+)$/.exec(text);
+  if (aegar) {
+    const subtypes = (aegar[1] ?? "").replace(/,? or $/, "").split(", ").filter(Boolean);
+    if (!subtypes.every((st) => CREATURE_TYPES.has(st))) return "fail";
+    ifCond = { kind: "subjectDamagedBy", subtypes, spell: true };
+    text = aegar[2]!;
+  } else if (/^if /.test(text)) return "fail";
+  const where = /^(.+), where X is that excess damage\.$/.exec(text);
+  if (where) text = `${where[1]}.`;
+  if (oneOrMore && /\b(it|that|those)\b/.test(text)) return "fail";
+  let body = parseBody(text, { subjectIt: true });
+  if (!body) return "fail";
+  if (where) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: m[4]!.replace(/^if [^]+? this turn, /, "") };
+  return { event: "permanentDealtExcess", body, excess: { filter: { ...filter, text: m[2]! }, ...(m[3] ? { noncombat: true as const } : {}), ...(oneOrMore ? { oneOrMore: true as const } : {}) }, ...(ifCond ? { ifCond } : {}) };
+}
+
+/**
  * "Whenever ~ deals combat damage to a creature, tap that creature and it doesn't untap during its controller's next
  * untap step": once for each creature it dealt damage to (CR 603.2c), which "that creature" and "it" mean.
  */
@@ -193,6 +224,13 @@ function parseDamagesCreatureTrigger(line: string): TriggeredAbility | "fail" | 
   const m = /^Whenever ~ deals (combat )?damage to a creature, (.+)$/.exec(line);
   if (!m) return null;
   let text = m[2]!;
+  // Overclocked Electromancer, after "if that creature was dealt excess damage this turn": the excess damage it has been
+  // dealt this turn (CR 120.10).
+  const excess = /^(.+), where X is that excess damage\.$/.exec(text);
+  if (excess) {
+    const body = parseBody(`${excess[1]}.`, { subjectIt: true });
+    return body ? { event: m[1] ? "selfDealsCombatDamageToCreature" : "selfDealsDamageToCreature", body: { ...replaceX(body, { count: { kind: "eventExcess" } }), text } } : "fail";
+  }
   const thatMuch = /\bthat (?:much|many)\b/.test(text);
   if (thatMuch) {
     if (/\bX\b/.test(text)) return "fail";
@@ -571,6 +609,8 @@ function parseSacrificeTrigger(line: string): TriggeredAbility | "fail" | null {
 function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   let m: RegExpExecArray | null;
   let toOpponent = false;
+  let orBattle = false;
+  let returnOne = false;
   let event: TriggerEvent;
   let phrase: string | undefined;
   let bodyText: string;
@@ -581,10 +621,20 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     bodyText = m[4]!;
     const n = m[2] ? num(m[2]) : 1;
     if (n > 1) min = n;
-  } else if ((m = /^Whenever one or more (.+?) you control deal combat damage to (a player|an opponent|one or more players), (.+)$/.exec(line))) {
+  } else if ((m = /^Whenever one or more (.+?) you control deal combat damage to (a player or battle|a player|an opponent|one or more players), (.+)$/.exec(line))) {
     event = "creaturesYouControlDealCombatDamageToPlayer";
     phrase = m[1];
     bodyText = m[3]!;
+    // "To a player or battle": "that player" isn't about a battle (CR 310).
+    orBattle = m[2] === "a player or battle";
+    if (orBattle && /\b(that player|defending player)\b/.test(bodyText)) return "fail";
+    // "You may return one of those Dragons to its owner's hand" (Zurgo and Ojutai): one of the creatures that dealt it,
+    // chosen as it resolves (rulings).
+    const back = /(?:^|\s)You may return one of those ([A-Z][a-z]+s|creatures) to its owner's hand\.$/.exec(bodyText);
+    if (back && singularWord(back[1]!) === singularWord(phrase!.split(/\s+/).pop()!)) {
+      returnOne = true;
+      bodyText = bodyText.slice(0, back.index).trim();
+    }
     // Combat damage to a player always goes to an opponent here: attacks only go to opponents. "That opponent" is that
     // player, "each other opponent" each opponent but them (Parapet Thrasher).
     toOpponent = m[2] === "an opponent";
@@ -592,7 +642,9 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   } else return null;
   // The attackers as a group aren't modeled. Mishra's meld sentence's "them" is Mishra and the other creature it names.
   const meldThem = /\bIf ~ and an? \w+ named [^.]+ are attacking, and you both own and control them, exile ~ and the attacking \w+ named .+, then meld them into .+$/;
-  if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(meldThem, "")) && !/that player/.test(bodyText)) return "fail";
+  // "Look at the top three cards of your library. Put one of them into your hand ..." is about those cards.
+  const lookAt = /\b[Ll]ook at the top (?:two|three|four|five) cards of your library\. Put (?:one|two) of them [^.]+\./;
+  if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(meldThem, "").replace(lookAt, "")) && !/that player/.test(bodyText)) return "fail";
   let group: TargetSpec | undefined;
   if (phrase && !/^creatures$/.test(phrase)) {
     const spec = parseTargetPhrase(phrase.split(/\s+/).map(singularWord).join(" "));
@@ -612,7 +664,11 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     const said = (b: AbilityBody): AbilityBody => ({ ...withOtherOpponents(b), text: withOtherOpponents(b).text.replaceAll("that player", "that opponent"), ...(b.modal ? { modal: { ...b.modal, modes: b.modal.modes.map(said) } } : {}) });
     body = said(body);
   }
-  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}), ...(toOpponent ? { toOpponent: true as const } : {}) };
+  if (returnOne) {
+    const filter: TargetSpec = group ?? { kind: "object", types: ["Creature"], text: "creature" };
+    body = { ...body, effects: [...body.effects, { type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "bounce", fromGroup: true }], text: `return one of those ${phrase} to its owner's hand` }], text: `${body.text} You may return one of those ${phrase} to its owner's hand.` };
+  }
+  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}), ...(toOpponent ? { toOpponent: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}) };
 }
 
 /** "Other creatures you control", "tokens you control", "artifacts and/or creatures you control": what a batch trigger counts. */
@@ -827,7 +883,7 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
 }
 
 /** The events that abilities of cards in graveyards see (fireEvent's `fromGraveyards`). */
-const YARD_EVENTS: TriggerEvent[] = ["castSpell", "youCommitCrime", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creaturesYouControlDealCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat"];
+const YARD_EVENTS: TriggerEvent[] = ["castSpell", "spellYouControlDealsDamage", "youCommitCrime", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creaturesYouControlDealCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat"];
 
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).
@@ -960,7 +1016,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "Whenever you cast a multicolored spell, you may return ~ from your graveyard to your hand": the effect moves the
   // card out of the graveyard, so the ability works only there (CR 113.6m). Only that one sentence: anything after it
   // would be about the card in its new zone. A trigger about ~ itself can't happen while it's in a graveyard.
-  const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:pay [^.]+\. If you do, )?return ~ from your graveyard to (?:your hand|the battlefield(?: tapped| attached to that creature)?))\.$/.exec(line);
+  // "... to the battlefield. It gains haste until end of turn." (Bloodfeather Phoenix): the card it returned.
+  const yard = /^((?:When|Whenever|At)\b.+?), ((?:you may )?(?:pay [^.]+\. If you do, )?return ~ from your graveyard to (?:your hand|the battlefield(?: tapped| attached to that creature)?(?:\. It gains haste until end of turn)?))\.$/.exec(line);
   // An Aura's "when enchanted creature dies, return ~ from your graveyard" (Screams from Within) is its battlefield trigger.
   if (yard && !/^(When|Whenever) ~ /.test(yard[1]!) && !/^When enchanted creature dies$/.test(yard[1]!)) {
     const t = parseTrigger(`${yard[1]}, draw a card.`);
@@ -990,6 +1047,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (also === null) return "fail";
     const t = parseTrigger(`${meldIf[1]}, ${meldIf[5]}`);
     return t && t !== "fail" && !t.ifCond ? { ...t, ifCond: also ? { kind: "allOf", conds: [also, meld] } : meld } : "fail";
+  }
+  const excess = parseExcessTrigger(line);
+  if (excess) return excess;
+  // "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix).
+  const spellDmg = /^Whenever an? (.+? spell) you control deals damage to an opponent( or battle)?, (.+)$/.exec(line);
+  if (spellDmg) {
+    const filter = parseTargetPhrase(spellDmg[1]!);
+    const body = filter?.kind === "spell" && !filter.controller ? parseBody(`${spellDmg[3]![0]!.toUpperCase()}${spellDmg[3]!.slice(1)}`) : null;
+    return body ? { event: "spellYouControlDealsDamage", spellDamage: { filter: filter!, ...(spellDmg[2] ? { orBattle: true as const } : {}) }, body } : "fail";
   }
   // "When ~ enters, if you attacked this turn, ...": an intervening "if" (CR 603.4) about the game. It's
   // checked as the ability would trigger and again as it resolves, so it can't be an ordinary effect.
@@ -1281,7 +1347,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         ifAlt = altPaid[1]!.toLowerCase() as "sneak" | "surge" | "spectacle";
         body0 = altPaid[2]!;
       }
-      let text = self ? body0.replace(/^(?:it|he|she) (?=(?:gets|gains|deals|has|becomes|fights|explores)\b)/, "~ ").replace(/^(?:it|he|she) and (?=other )/, "~ and ") : body0;
+      // "If a source would deal damage ..., it deals that much damage plus 2 instead" (Rankle and Torbran): that "that much"
+      // is the replaced damage's own, not the event's.
+      let text = (self ? body0.replace(/^(?:it|he|she) (?=(?:gets|gains|deals|has|becomes|fights|explores)\b)/, "~ ").replace(/^(?:it|he|she) and (?=other )/, "~ and ") : body0).replace(/(would deal [^.]*?damage[^.]*?, it deals )that much( damage)/g, "$1THAT_MUCH$2");
       // "You gain that much life", "put that many +1/+1 counters on it": the damage the event dealt, or the life gained or lost.
       const playerDealt = event === "youAreDealtDamage" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage";
       const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentLosesLife" || playerDealt;
@@ -1293,6 +1361,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         text = text.replace(/\bthat (?:much|many)\b/g, "X");
         if (damage) text = text.replace(/\bless than or equal to that damage\b/g, "less than or equal to X");
       }
+      text = text.replace(/THAT_MUCH/g, "that much");
       // "Put a +1/+1 counter on it", "untap it": in a trigger about the permanent itself, "it" is that
       // permanent, except after it left ("return it to your hand" means the card in the graveyard).
       const left = event === "selfDies" || event === "selfDiesOrExiled" || event === "selfToGraveyard" || event === "selfLeaves";

@@ -97,6 +97,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return ctx.x ?? 0;
     case "eventAmount":
       return ctx.event?.amount ?? 0;
+    case "eventExcess":
+      return ctx.event?.excess ?? 0;
     case "permanents": {
       let n = 0;
       const names = new Set<string>();
@@ -164,6 +166,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "tappedThisWay":
       return s.resolving?.tappedThisWay ?? s.resolving?.item.tapped ?? 0;
     case "excessThisWay":
+      if (c.target !== undefined) {
+        const t = s.resolving?.item.targets?.[c.target];
+        return t?.kind === "object" ? (s.resolving?.excessTo?.[t.id] ?? 0) : 0;
+      }
       return s.resolving?.excessDamage ?? 0;
     case "tookFromHand":
       return s.resolving?.tookFromHand ?? 0;

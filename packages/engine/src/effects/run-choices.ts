@@ -132,7 +132,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // ~ as it last existed on the battlefield, like the ability that created it (CR 608.2h, 113.7a).
         ...(item.lki ? { lki: item.lki } : {}),
         ...(item.event ? { event: item.event } : {}),
-        ...(item.x ? { x: item.x } : {}),
+        // "That amount of excess damage" (Unleash the Inferno): the excess this spell dealt, its X (CR 603.12).
+        ...(e.xExcess ? { x: s.resolving!.excessDamage ?? 0 } : item.x ? { x: item.x } : {}),
         ...(s.resolving!.rolled ? { rolled: s.resolving!.rolled.result } : {}),
         ...(s.resolving!.revealedFromHand !== undefined ? { revealed: s.resolving!.revealedFromHand } : {}),
         ...(s.resolving!.tappedThisWay !== undefined ? { tapped: s.resolving!.tappedThisWay } : {}),
@@ -220,7 +221,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "sacrificedThisWay"
             ? !!s.resolving!.sacrificedThisWay?.length
             : e.cond.kind === "excessDealt"
-            ? (s.resolving!.excessDamage ?? 0) > 0
+            ? (e.cond.target !== undefined ? (objects(s, { ref: "target", index: e.cond.target }, ctx).reduce((a, o) => a + (s.resolving!.excessTo?.[o.id] ?? 0), 0)) : e.cond.creature ? (s.resolving!.excessToCreatures ?? 0) : (s.resolving!.excessDamage ?? 0)) > 0
             : e.cond.kind === "rollIn"
             ? rollIn(e.cond, e.cond.event ? ctx.event?.amount : s.resolving!.rolled?.result)
             : e.cond.kind === "foretold"

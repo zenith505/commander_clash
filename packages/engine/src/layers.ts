@@ -320,9 +320,10 @@ function gather(s: GameState): Inst[] {
   }
   // Emblems' static abilities, with the emblems' timestamps (CR 114.4, 613.7a).
   for (const o of liveEmblems(s))
-    compileCard(defOf(s, o)).statics.forEach((st, i) =>
-      out.push({ key: `${o.id}#${i}`, timestamp: o.timestamp, order: order++, sourceId: o.id, sourceName: defOf(s, o).name, untilEndOfTurn: false, mods: st.mods, affects: st.affects, controller: o.controller, emblem: true }),
-    );
+    compileCard(defOf(s, o)).statics.forEach((st, i) => {
+      // A damage replacement's (Ajani Steadfast's emblem) is read in damage.ts.
+      if (st.affects.kind === "filter") out.push({ key: `${o.id}#${i}`, timestamp: o.timestamp, order: order++, sourceId: o.id, sourceName: defOf(s, o).name, untilEndOfTurn: false, mods: st.mods, affects: st.affects, controller: o.controller, emblem: true });
+    });
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
     const d = defOf(s, o);
@@ -412,7 +413,7 @@ function inWindow(s: GameState, w: TimingWindow): boolean {
   }
 }
 
-function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, chars: CharMap, eventPlayer?: PlayerId, eventAmount?: number, sourceZc?: number, subjectId?: ObjectId): boolean {
+function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, chars: CharMap, eventPlayer?: PlayerId, eventAmount?: number, sourceZc?: number, subjectId?: ObjectId, subjectZc?: number): boolean {
   const src = s.objects[sourceId]!;
   const yard = () => s.players[you]?.graveyard.map((id) => defOf(s, s.objects[id]!)) ?? [];
   switch (cond.kind) {
@@ -574,6 +575,13 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (s.turnLog?.damagedBy?.[you]?.length ?? 0) >= cond.n;
     case "damagedBySelfDied":
       return (s.turnLog?.diedDamaged ?? []).some((d) => d.by.includes(sourceId));
+    case "subjectDealtExcess":
+      return subjectId !== undefined && (s.turnLog?.excessDealt ?? []).some((e) => e.id === subjectId && e.zc === subjectZc);
+    case "opponentsDealtExcess":
+      // As the permanent was when it was dealt the damage, wherever it is now (Rith rulings).
+      return (s.turnLog?.excessDealt ?? []).some((e) => e.controller !== you && e.types.some((ty) => cond.types.includes(ty)));
+    case "subjectDamagedBy":
+      return (s.turnLog?.damageDealtTo?.[`${subjectId}@${subjectZc}`] ?? []).some((d) => d.controller === you && ((cond.spell && !!d.spell) || d.subtypes.some((st) => cond.subtypes.includes(st))));
     case "opponentGainedLife":
       return (s.turnLog?.gainedLife ?? []).some((p) => p !== you);
     case "opponentCardsToGraveyard":
@@ -703,14 +711,14 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       });
     }
     case "allOf":
-      return cond.conds.every((c) => conditionMet(s, c, sourceId, you, chars, eventPlayer, eventAmount, sourceZc, subjectId));
+      return cond.conds.every((c) => conditionMet(s, c, sourceId, you, chars, eventPlayer, eventAmount, sourceZc, subjectId, subjectZc));
   }
 }
 
 /** Is an "as long as" or "if" condition true right now, outside of working out characteristics? */
-export function staticConditionNow(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, eventPlayer?: PlayerId, eventAmount?: number, sourceZc?: number, subjectId?: ObjectId): boolean {
+export function staticConditionNow(s: GameState, cond: StaticCondition, sourceId: ObjectId, you: PlayerId, eventPlayer?: PlayerId, eventAmount?: number, sourceZc?: number, subjectId?: ObjectId, subjectZc?: number): boolean {
   const chars: CharMap = new Map(s.battlefield.map((id) => [id, characteristics(s, s.objects[id]!)]));
-  return conditionMet(s, cond, sourceId, you, chars, eventPlayer, eventAmount, sourceZc, subjectId);
+  return conditionMet(s, cond, sourceId, you, chars, eventPlayer, eventAmount, sourceZc, subjectId, subjectZc);
 }
 
 function controllerOfInst(e: Inst, chars: CharMap): PlayerId {
@@ -779,11 +787,16 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       // The new card types replace the old, but an instant or sorcery stays one (CR 205.1a). Subtypes of
       // card types it no longer has go too; those of types it keeps stay unless the effect sets that kind.
       const kept = c.types.filter((t) => t === "Instant" || t === "Sorcery");
+      // A planeswalker's subtypes (Sarkhan) and Siege are planeswalker and battle types (CR 205.3j, 205.3q).
+      const was = c.types;
+      const setOf = (st: string) => subtypeSet(st) ?? (st === "Siege" ? "Battle" : was.includes("Planeswalker") ? "Planeswalker" : null);
       c.types = [...m.types, ...kept.filter((t) => !m.types.includes(t))];
       const hasSet = (set: string | null) => set === null || (set === "Spell" ? c.types.includes("Instant") || c.types.includes("Sorcery") : c.types.includes(set));
-      c.subtypes = c.subtypes.filter((st) => hasSet(subtypeSet(st)));
+      c.subtypes = c.subtypes.filter((st) => hasSet(setOf(st)));
       if (!c.types.includes("Creature")) c.allCreatureTypes = false;
       setSubtypes(c, m.subtypes);
+      // "Becomes a legendary ... creature": it gains the supertype and keeps any others (CR 205.4b).
+      for (const t of m.supertypes ?? []) if (!c.supertypes.includes(t)) c.supertypes.push(t);
       return;
     }
     case "setSubtypes":

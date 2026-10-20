@@ -222,6 +222,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           body: { targets: [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." },
           turn: s.turn,
           ...(e.cascade ? { cascade: true as const } : {}),
+          ...(e.fromHand ? { fromHand: true as const } : {}),
         });
       return;
     }
@@ -418,6 +419,21 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (!o || o.zone !== "stack" || n <= 0) return;
       (o.extraCounters ??= {})[e.counter] = (o.extraCounters[e.counter] ?? 0) + n;
       log(s, `${defOf(s, o).name} will enter with ${n} more ${e.counter} counter${n === 1 ? "" : "s"}.`);
+      return;
+    }
+    case "spellGains": {
+      // The spell that was cast, while it's still that spell on the stack (CR 400.7); a copy becomes a token (CR 111.12).
+      const item = s.stack.find((x) => x.id === ctx.cause);
+      const o = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
+      if (!o || o.zone !== "stack") return;
+      // Rebound works as the spell resolves (CR 702.88a); the rest on the permanent it becomes.
+      const rebound = e.mods.some((x) => x.kind === "addKeywords" && x.keywords.includes("Rebound"));
+      if (rebound) {
+        o.reboundGained = true;
+        log(s, `${defOf(s, o).name} gains rebound.`);
+      }
+      const mods = e.mods.flatMap((x): Modification[] => (x.kind !== "addKeywords" ? [x] : x.keywords.some((k) => k !== "Rebound") ? [{ ...x, keywords: x.keywords.filter((k) => k !== "Rebound") }] : []));
+      if (mods.length) (o.spellGains ??= []).push({ mods, timestamp: s.nextTimestamp++, controller: ctx.controller, source: src });
       return;
     }
     case "counterSpell": {

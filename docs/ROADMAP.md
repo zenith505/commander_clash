@@ -1,6 +1,6 @@
 # Roadmap
 
-20,766 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
+20,813 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
 implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
@@ -24,13 +24,10 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
      you become the monarch" and "if there is no monarch", Cyclonus an additional beginning phase).
    - Transform: craft (702.167), "As ~ transforms into ~" (712.20: Curse of Leeches, Ludevic, Sephiroth, Zenos each
      need their own work).
-   - Other battle cards still out: Nahiri's Warcrafting ("look at the top X ..., you may exile one of those cards"),
-     Bloodfeather Phoenix (a graveyard trigger on spell damage), Bilbo, Unexpected Adventurer ("onto the battlefield
-     under its owner's control" from a graveyard), Rankle and Torbran (modes with a damage replacement), Zurgo and
-     Ojutai ("one or more Dragons ... return one of those Dragons"), Death Kiss ("whenever a creature an opponent
-     controls attacks one of your opponents", "becomes monstrous, goad up to X"). Bots don't aim
-     spells at battles (except Portent Tracker's counters and "each battle they protect") and attack only their own
-     Sieges.
+   - Other battle cards still out: Death Kiss ("whenever a creature an opponent controls attacks one of your
+     opponents", "becomes monstrous, goad up to X"). Bots don't aim spells at battles (except Portent Tracker's counters
+     and "each battle they protect") and attack only their own Sieges. Bots never return their own Dragon with Zurgo and
+     Ojutai.
    - Cast triggers left out: "a spell that has flash" (Slitherwisp: flash given by another effect isn't tracked on
      the spell) and "a spell with cascade" (cascade granted by Maelstrom Nexus and others isn't on the spell).
    - Rooms: 13 still out on their doors' own lines.
@@ -47,19 +44,19 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
    - Bots don't plan around day and night (casting two spells to make it day). Bots put lands on the bottom with
      Valakut Awakening only when they have five or more lands out, and spells that cost more than their lands plus two.
 1. Mechanics that appear on many cards but are blocked as a group (`BY_COUNT=1 npm run blockers`).
-   Left from round 87 (emblems, tap any number, excess damage, different names):
-   - Excess damage (CR 120.4a, 120.10) works for "excess damage dealt this way", "if excess damage was dealt this way"
-     and "is dealt to that creature's controller instead"; still out: "is dealt excess damage" triggers and "was dealt
-     excess damage this turn" (Aegar, Fall of Cair Andros, Maarika, Overclocked Electromancer, Rith), excess from a
-     fight (Rhino's Rampage, The Last Agni Kai), "When it deals excess damage this way" (Unleash the Inferno), "to a
-     creature this way" after any target (Vikya), and other lines (Archaic's Agony, Torch the Witness).
+   Left from rounds 87 and 88 (emblems, tap any number, excess damage, different names):
+   - Emblems still out: emblems with activated abilities (Ob Nixilis of the Black Oath, Karn, Living Legacy: they need
+     activating from the command zone and a button for it), Ral's storm on spells. Karn, Scion of Urza (an opponent
+     chooses, then silver counters in exile) and Karn, Living Legacy's "pay any amount of mana".
+   - Excess damage still out: Toralf ("any target other than that permanent"), Vikya ({Q} costs).
+   - "It" in a cast trigger is the spell only as the first instruction ("Whenever you cast an Elf spell, it gains
+     haste"); "untap ~. It gains ..." (Pristine Skywise, Bloodsky Berserker) is about the permanent and isn't parsed.
    - Tap any number still out: as an additional cost (Burn at the Stake, Explosive Singularity), "each player may tap"
      (Raiding Party), "If you do, ... each of those Vampires" (Urge to Feed). Bots tap every creature offered except,
      on their own turn before combat, ones that could still attack.
-   - "With different names" works for searches put into one zone; still out: an opponent choosing among them (Gifts
-     Ungiven, Realms Uncharted, Elemental Teachings, Emergent Ultimatum, Ecological Appreciation), returning from the
-     graveyard (Eerie Ultimatum, Behold the Sinister Six!), discard costs (Ormos), "and/or" kinds (Reach the
-     Horizon), "that each have mana value X" (Uncage the Menagerie).
+   - "With different names" still out: Emergent Ultimatum and Ecological Appreciation (an opponent chooses cards to
+     shuffle back, then casting or putting the rest), Burning-Rune Demon ("exactly two cards ... that have different
+     names"), discard costs (Ormos).
    Left from the power-up and mutate round (CR 702.193: Brave Brawler, Hulk, Wonder Man, Iron Fist; CR 702.140, 730:
    Gemrazer, Huntmaster Liger, Snapdax, Nethroi, Mindleecher):
    - Power-up still out: Kang (extra turn), Loki (short name), Quicksilver ("in your opening hand"), Stature and Viv
@@ -754,9 +751,10 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
   the creature it protects, and chains of redirection, are untested. Hazduhr (named by its short name), Captain's
   Maneuver ("creature, planeswalker, or player"), Personal Incarnation.
 - Planeswalkers: emblems (CR 114) work with static abilities, triggered abilities on the common events
-  (EMBLEM_EVENTS in oracle/grants.ts), cost changes and "no maximum hand size"; still out: emblems with activated
-  abilities (Karn, Ob Nixilis of the Black Oath), damage replacements (Ajani Steadfast), "can't cast" (Narset
-  Transcendent), extra draws (Sarkhan), granted keywords on spells (Ral's storm), Teferi, Temporal Archmage and Tyvar.
+  (EMBLEM_EVENTS in oracle/grants.ts), cost changes, "no maximum hand size", damage prevention (Ajani Steadfast),
+  "your opponents can't cast noncreature spells" (Narset), extra draws (Sarkhan), haste for a spell cast (Tyvar) and
+  loyalty abilities at instant speed (Teferi, Temporal Archmage); still out: emblems with activated abilities (Karn,
+  Ob Nixilis of the Black Oath), granted keywords on spells (Ral's storm).
   Emblems show as a chip in their owner's seat header. "+X" loyalty abilities, compleated, "X" loyalty, "add mana" loyalty abilities,
   "activate loyalty abilities any time you could cast an instant" (Jace's Machinations), "aren't put into graveyards
   for having 0 loyalty" (Sanctum Lurker), "whenever you activate a loyalty ability", "whenever you put loyalty

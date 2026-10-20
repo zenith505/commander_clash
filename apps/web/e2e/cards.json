@@ -2000,6 +2000,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "5674f6ae-ed5d-441e-a534-b5dd415165fd",
+  "name": "Eerie Ultimatum",
+  "manaCost": "{W}{W}{B}{B}{B}{G}{G}",
+  "cmc": 7,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Return any number of permanent cards with different names from your graveyard to the battlefield.",
+  "colors": [
+   "B",
+   "G",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "iko",
+  "releasedAt": "2020-04-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "05e6b243-48a6-4a42-bc5f-413441de9c33",
   "name": "Elspeth, Sun's Champion",
   "manaCost": "{4}{W}{W}",
@@ -3703,6 +3733,32 @@
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "3c9faba7-f2d3-4978-be94-020dc8003dc0",
+  "name": "Intuition",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Search your library for three cards and reveal them. Target opponent chooses one. Put that card into your hand and the rest into your graveyard. Then shuffle.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "tmp",
+  "releasedAt": "1997-10-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": true
  },
  {
   "oracleId": "8faa4330-07bb-4b65-810a-bbce29d3cd42",
@@ -5698,6 +5754,46 @@
   "gameChanger": false
  },
  {
+  "oracleId": "80d918b2-3a28-49ad-a485-496658bd7ac3",
+  "name": "Rankle and Torbran",
+  "manaCost": "{1}{B}{B}{R}{R}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Faerie Dwarf",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Faerie",
+   "Dwarf"
+  ],
+  "oracleText": "Flying, first strike, haste\nWhenever Rankle and Torbran deals combat damage to a player or battle, choose any number —\n• Each player creates a Treasure token.\n• Each player sacrifices a creature of their choice.\n• If a source would deal damage to a player or battle this turn, it deals that much damage plus 2 instead.",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [
+   "Flying",
+   "First strike",
+   "Treasure",
+   "Haste"
+  ],
+  "commanderLegal": "legal",
+  "set": "mom",
+  "releasedAt": "2023-04-21",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "1818324c-2738-42e2-a78b-63abf325d8e9",
   "name": "Razorgrass Screen",
   "manaCost": "{1}",
@@ -6939,6 +7035,37 @@
   "set": "atq",
   "releasedAt": "1994-03-04",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "07d0b06b-80cb-4518-92c9-84ea87a7e08a",
+  "name": "Teferi, Temporal Archmage",
+  "manaCost": "{4}{U}{U}",
+  "cmc": 6,
+  "typeLine": "Legendary Planeswalker — Teferi",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Teferi"
+  ],
+  "oracleText": "+1: Look at the top two cards of your library. Put one of them into your hand and the other on the bottom of your library.\n−1: Untap up to four target permanents.\n−10: You get an emblem with \"You may activate loyalty abilities of planeswalkers you control on any player's turn any time you could cast an instant.\"\nTeferi, Temporal Archmage can be your commander.",
+  "loyalty": "5",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c14",
+  "releasedAt": "2014-11-07",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

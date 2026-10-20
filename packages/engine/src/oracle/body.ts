@@ -1777,9 +1777,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
         si++;
         continue;
       }
+      // "You may sacrifice another creature. If you do, you gain X life and draw X cards, where X is that creature's power."
+      // (Disciple of Freyalise): the sacrificed creature as it last existed (CR 608.2h), its power and nothing else.
+      const sacPick = ifDid[1] === "do" && prev.effects.length === 1 && prev.effects[0]!.type === "pick" && prev.effects[0]!.action === "sacrifice";
+      const all = `${ifDid[2]!}${where ? `, where X is ${where[2]!}` : ""}`;
+      const sacIt = sacPick && /\b(?:that|the sacrificed) creature's (?:power|toughness|mana value)\b/.test(all) && !/\bthat creature(?!'s (?:power|toughness|mana value)\b)/.test(all) && !ctx.sacrificedIt;
+      if (sacIt) ctx.sacrificedIt = true;
       const inner = parseOne(ifDid[2]!.charAt(0).toUpperCase() + ifDid[2]!.slice(1), ctx);
-      if (!inner) return null;
-      effects.push(ifDid[1] === "do" ? { type: "if", cond: { kind: "youDid" }, effects: inner } : { type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner });
+      if (inner) effects.push(ifDid[1] === "do" ? { type: "if", cond: { kind: sacIt ? "sacrificedThisWay" : "youDid" }, effects: inner } : { type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner });
+      // Its own "where X is ..." (CR 107.3c).
+      const ok = !!inner && defineX();
+      if (sacIt) delete ctx.sacrificedIt;
+      if (!ok) return null;
       continue;
     }
     // "Create four Bear tokens instead if there are seven or more cards in your graveyard" (threshold) is

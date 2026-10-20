@@ -1972,6 +1972,15 @@ function checkCastingLinks(out: CompiledCard) {
       canSac = was;
       return;
     }
+    // "You may sacrifice another creature. If you do, ... that creature's power" (Disciple of Freyalise).
+    if (o.type === "if" && (o.cond as { kind?: string } | undefined)?.kind === "sacrificedThisWay") {
+      const was = canSac;
+      canSac = true;
+      visit(o.effects);
+      canSac = was;
+      visit(o.otherwise);
+      return;
+    }
     if ((o.ref === "sacrificed" || o.kind === "sacrificedSuspected") && !canSac) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
     if (typeof o.chosen === "string") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : needs.add("creatureType"));

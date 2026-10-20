@@ -299,6 +299,8 @@ export interface TargetSpec {
    * the Witch): ones that could have been declared as attackers this turn but weren't (rulings, GameObject.couldAttack).
    */
   combat?: "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | "couldButDidntAttack" | "attackingBattle";
+  /** "Each green creature that entered this turn" (Oran-Rief): this object came onto the battlefield this turn (CR 400.7). */
+  enteredThisTurn?: true;
   /** "With lesser power" than the ability's source (mentor, CR 702.134a). */
   lesserPowerThanSource?: boolean;
   /**
@@ -941,7 +943,7 @@ export type StaticCondition =
    * "If you control a commander" (CR 903.3): any player's commander you control (rulings on Fierce Guardianship);
    * `types`: "a commander that's a creature or planeswalker", one of them.
    */
-  | { kind: "controlCommander"; types?: string[] }
+  | { kind: "controlCommander"; types?: string[]; /** Lieutenant's "if you control your commander": one you own (CR 903.3). */ own?: true }
   /** "If you have a full party" (CR 700.8a): four creatures in your party. */
   | { kind: "fullParty" }
   /** "If you don't control a Ring-bearer" (CR 701.54e); `self`: "as long as ~ is your Ring-bearer". */
@@ -1557,7 +1559,8 @@ export type Effect =
   /** "Put its counters on target creature": as many of each kind (or of `only`) as the source had as it last existed. */
   | { type: "lastKnownCounters"; what: ObjRef; only?: CounterKind }
   /** "Move a +1/+1 counter from ~ onto that creature" (CR 122.5): nothing happens unless both parts can. */
-  | { type: "moveCounter"; counter: CounterKind; from: ObjRef; to: ObjRef }
+  /** `counter` "any": "move a counter" (Nesting Grounds), of a kind chosen as it resolves (rulings). */
+  | { type: "moveCounter"; counter: CounterKind | "any"; from: ObjRef; to: ObjRef }
   /** Cascade (CR 702.85a), resolving: exile until a cheaper nonland card, maybe cast it free, the rest to the bottom. */
   | { type: "cascade" }
   /**

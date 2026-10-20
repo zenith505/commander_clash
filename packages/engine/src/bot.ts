@@ -359,6 +359,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const best = pend.labels!.reduce((b, l, i) => (score(l) > score(pend.labels![b]!) ? i : b), 0);
       return [{ type: "chooseOption", player: pid, choice: pend.options[best]! }];
     }
+    // Which counter to move: a +1/+1 counter if it has one (moved onto our creature), else the first.
+    if (pend.kind === "chooseOption" && pend.what === "counterKind") return [{ type: "chooseOption", player: pid, choice: pend.options.includes("+1/+1") ? "+1/+1" : pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "either") {
       const i = pend.labels?.findIndex((l) => /Treasure/.test(l)) ?? -1;
       return [{ type: "chooseOption", player: pid, choice: pend.options[Math.max(0, i)]! }];

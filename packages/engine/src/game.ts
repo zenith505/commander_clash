@@ -4967,6 +4967,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "counterKind") {
+    if (!pend.options.includes(choice)) throw new RulesError("choose one of the kinds of counter it has");
+    (r.scratch ??= {}).counterKind = choice;
+    log(s, `${p.name} chooses a ${choice} counter (${pend.source}).`);
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "either") {
     (r.scratch ??= {}).either = Number(choice);
     log(s, `${p.name} chooses to ${(pend.labels?.[Number(choice)] ?? choice).replace(/^[A-Z](?=[a-z])/, (c) => c.toLowerCase())} (${pend.source}).`);

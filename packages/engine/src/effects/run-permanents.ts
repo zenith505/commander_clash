@@ -504,11 +504,25 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // Remove it from the first and put it on the second; if either can't happen, neither does (CR 122.5).
       const from = objects(s, e.from, ctx)[0];
       const to = objects(s, e.to, ctx)[0];
-      if (!from || !to || from.id === to.id || !(from.counters[e.counter] ?? 0)) return;
-      from.counters[e.counter]! -= 1;
-      const put = putCounters(s, to, e.counter, 1);
+      if (!from || !to || from.id === to.id) return;
+      let counter = e.counter;
+      if (counter === "any") {
+        // "Move a counter": a kind it has, chosen as it resolves (rulings on Nesting Grounds).
+        const kinds = Object.keys(from.counters).filter((k) => (from.counters[k] ?? 0) > 0);
+        const sc = (s.resolving!.scratch ??= {});
+        if (kinds.length > 1 && sc.counterKind === undefined) {
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "counterKind", options: kinds, labels: kinds.map((k) => `A ${k} counter`), prompt: `choose the kind of counter to move from ${characteristics(s, from).name} onto ${characteristics(s, to).name}` };
+          return "paused";
+        }
+        counter = sc.counterKind ?? kinds[0] ?? "";
+        sc.counterKind = undefined;
+      }
+      if (!(from.counters[counter] ?? 0)) return;
+      from.counters[counter]! -= 1;
+      const put = putCounters(s, to, counter, 1);
       invalidateCharacteristics(s);
-      log(s, `${characteristics(s, from).name} moves a ${e.counter} counter onto ${characteristics(s, to).name}${put > 1 ? ` (${put} counters are put on it)` : ""}.`);
+      log(s, `${characteristics(s, from).name} moves a ${counter} counter onto ${characteristics(s, to).name}${put > 1 ? ` (${put} counters are put on it)` : ""}.`);
+      if (!from.counters[counter]) fireEvent(s, { type: "lastCounterRemoved", id: from.id, counter });
       return;
     }
     case "removeCounters":

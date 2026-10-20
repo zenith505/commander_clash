@@ -398,6 +398,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^you have a full party$/.test(text)) return { kind: "fullParty" }; // CR 700.8a
   // CR 903.3: whoever's commander it is (rulings on Fierce Guardianship).
   if (/^you control a commander$/.test(text)) return { kind: "controlCommander" };
+  if (/^you control your commander$/.test(text)) return { kind: "controlCommander", own: true };
   if (/^you control a commander that's a creature or planeswalker$/.test(text)) return { kind: "controlCommander", types: ["Creature", "Planeswalker"] };
   if ((m = /^you (don't )?control a Ring-bearer$/.exec(text))) return { kind: "ringBearer", ...(m[1] ? { not: true as const } : {}) };
   if (/^~ is your Ring-bearer$/.test(text)) return { kind: "ringBearer", self: true };

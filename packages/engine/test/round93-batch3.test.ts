@@ -131,3 +131,33 @@ describe("Strionic Resonator", () => {
     expect(t.log.some((l) => /copies Flametongue Kavu/.test(l.text))).toBe(true);
   });
 });
+
+const reversal = card("Narset's Reversal", "Instant", "{U}{U}", { oracleText: "Copy target instant or sorcery spell, then return it to its owner's hand. You may choose new targets for the copy." });
+const shock = card("Shock", "Instant", "{R}", { oracleText: "Shock deals 2 damage to any target." });
+
+describe("Narset's Reversal", () => {
+  it("parse", () => expect(isFullySupported(reversal)).toBe(true));
+
+  it("copies the spell (new target allowed), then returns it to its owner's hand, not countered", () => {
+    const { s: s1, ap, opp } = setup([shock]);
+    // The opponent holds Narset's Reversal.
+    const nr = putOnBattlefield(s1, opp, reversal);
+    s1.battlefield.splice(s1.battlefield.indexOf(nr), 1);
+    s1.objects[nr]!.zone = "hand";
+    s1.players[opp]!.hand.push(nr);
+    for (const l of ["a", "b"]) putOnBattlefield(s1, opp, card(`Island ${l}`, "Basic Land — Island"));
+    const victim = putOnBattlefield(s1, opp, bear({ name: "Their Bear" }));
+    const shockId = s1.players[ap]!.hand.find((id) => s1.cards[s1.objects[id]!.cardId]!.name === "Shock")!;
+    let s = s1;
+    for (const x of planCast(s, ap, shockId, [target(victim)])!) s = act(s, x);
+    s = act(s, { type: "passPriority", player: ap });
+    expect(waitingOn(s)).toBe(opp);
+    for (const x of planCast(s, opp, nr, [{ kind: "stack", id: s.stack[0]!.id }])!) s = act(s, x);
+    for (let i = 0; i < 10 && s.pending?.kind !== "copyTargets"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending?.kind).toBe("copyTargets");
+    s = settle(act(s, { type: "copyTargets", player: opp, targets: [{ kind: "player", id: ap }] }));
+    expect(s.objects[shockId]!.zone).toBe("hand");
+    expect(s.objects[victim]!.zone).toBe("battlefield");
+    expect(s.players[ap]!.life).toBe(38);
+  });
+});

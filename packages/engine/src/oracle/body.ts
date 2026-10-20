@@ -1572,6 +1572,12 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
         for (const e of both) if (e.type === "copySpell") e.newTargets = true;
         continue;
       }
+      // Narset's Reversal: "Copy target ..., then return it to its owner's hand. You may choose new targets for the copy."
+      const before = prev?.type === "counterSpell" && prev.bounce ? effects[effects.length - 2] : undefined;
+      if (before?.type === "copySpell") {
+        before.newTargets = true;
+        continue;
+      }
       if (copy?.type !== "copySpell") return null;
       copy.newTargets = true;
       continue;

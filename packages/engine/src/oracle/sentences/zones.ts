@@ -29,6 +29,10 @@ export function parseEveryPlayerZonesSentence(s: string, ctx: Ctx): Effect[] | u
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
+  // Narset's Reversal: "Copy target instant or sorcery spell, then return it to its owner's hand": it leaves the stack
+  // without being countered, so even a spell that can't be countered goes (rulings).
+  if (/^(?:Then )?[Rr]eturn (?:it|that spell) to its owner's hand$/.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "spell")
+    return ctx.targets[ctx.lastObjectTarget]!.stackAbilities ? null : [{ type: "counterSpell", index: ctx.lastObjectTarget, bounce: true }];
   // Emry: "Choose target artifact card in your graveyard. You may cast that card this turn."
   // The one target so far is that card, in your graveyard.
   if (/^You may cast (?:that card|it) this turn$/.test(s) && ctx.targets.length === 1) {

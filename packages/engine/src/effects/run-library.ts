@@ -2,7 +2,7 @@ import type { Effect, PlayerRef, SearchDest } from "../abilities";
 import { cardIdOf, defOf } from "../cards";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
-import { gainLife, log, loseLife, moveObject, enterTogether, obj, opponents, player } from "../game";
+import { gainLife, log, loseLife, moveObject, enterTogether, obj, opponents, payableLife, player } from "../game";
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, printedMatches } from "./targeting";
@@ -336,6 +336,45 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // On the bottom the first pick goes lowest; on top it ends on top.
       for (const id of [...cards].reverse()) moveObject(s, id, "library", e.bottom ? {} : { top: true });
       log(s, `${p.name} puts ${cards.length === 1 ? "a card" : `${cards.length} cards`} from their hand on ${e.bottom ? "the bottom" : "top"} of their library.`);
+      return;
+    }
+    case "drawnPayOrTop": {
+      const p = player(s, ctx.controller);
+      const sc = (s.resolving!.scratch ??= {});
+      const drawnNow = (id: string) => {
+        const o = obj(s, id);
+        return o.zone === "hand" && o.drawn?.turn === s.turn && o.drawn.zc === (o.zoneChanges ?? 0);
+      };
+      if (!sc.found) {
+        const drawn = p.hand.filter(drawnNow);
+        const k = Math.min(e.n, drawn.length);
+        if (!k) return;
+        // No actions in between (rulings): the cards are chosen as it resolves.
+        if (drawn.length > k) {
+          s.pending = { kind: "searchLibrary", player: p.id, source: src, what: `${k === 1 ? "a card" : `${k} cards`} drawn this turn`, cards: drawn, min: k, max: k, dig: { looked: [...p.hand], to: `to pay ${e.life} life for or put back on top of your library`, rest: "stay in your hand" }, hand: p.id };
+          return "paused";
+        }
+        sc.found = drawn;
+      }
+      const chosen = sc.found;
+      const pt = (sc.payOrTop ??= { idx: 0 });
+      for (; pt.idx < chosen.length; pt.idx++, pt.answer = undefined) {
+        const id = chosen[pt.idx]!;
+        if (!drawnNow(id)) continue;
+        const name = defOf(s, obj(s, id)).name;
+        // Paying life needs that much life (CR 119.4); otherwise it goes back.
+        if (pt.answer === undefined && payableLife(s, p.id) >= e.life) {
+          s.pending = { kind: "chooseOption", player: p.id, source: src, what: "payOrTop", options: ["pay", "top"], labels: [`Pay ${e.life} life to keep ${name}`, `Put ${name} on top of your library`], about: id, prompt: `pay ${e.life} life or put ${name} back` };
+          return "paused";
+        }
+        if (pt.answer === "pay") {
+          loseLife(s, p.id, e.life);
+          log(s, `${p.name} pays ${e.life} life to keep a card (${src}).`);
+        } else {
+          moveObject(s, id, "library", { top: true });
+          log(s, `${p.name} puts a card back on top of their library (${src}).`);
+        }
+      }
       return;
     }
     case "shuffleIntoLibrary":

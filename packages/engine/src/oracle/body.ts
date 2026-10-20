@@ -462,6 +462,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // Search for Survivors: "An opponent chooses a card at random in your graveyard. If it's a creature card, put it onto the
   // battlefield. Otherwise, exile it." The choice is at random, so who makes it changes nothing: one instruction.
   text = text.replace(/An opponent chooses a card at random in your graveyard\. If it's a creature card, put it onto the battlefield\. Otherwise, exile it\./, "Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it.");
+  // Sylvan Library: "You may draw two additional cards. If you do, choose two cards in your hand drawn this turn. For each of
+  // those cards, pay 4 life or put the card on top of your library." Drawing and choosing with nothing in between (rulings).
+  const sylvan = /^[Yy]ou may draw (two|three) additional cards\. If you do, choose (two|three) cards in your hand drawn this turn\. For each of those cards, pay (\d+) life or put the card on top of your library\.$/.exec(text.trim());
+  if (sylvan && sylvan[1] === sylvan[2])
+    return { targets: [], effects: [{ type: "may", effects: [{ type: "draw", who: { ref: "you" }, n: num(sylvan[1]!) }, { type: "drawnPayOrTop", n: num(sylvan[2]!), life: Number(sylvan[3]) }], text: `draw ${sylvan[1]} additional cards` }], text };
   // Gamble: "Search your library for a card, put that card into your hand, discard a card at random, then shuffle." The
   // discard comes before the shuffle, but the discarded card goes to the graveyard, so the order changes nothing that can
   // be seen: the search, then the discard (at random from the whole hand, the found card included).

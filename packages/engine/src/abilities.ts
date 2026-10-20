@@ -1677,6 +1677,11 @@ export type Effect =
   /** "Put two cards from your hand on top of your library in any order" (Brainstorm): the controller's own hand. */
   /** `bottom`: "put a card from your hand on the bottom of your library" instead (Volcanic Spite). */
   | { type: "handToTop"; n: Amount; bottom?: true }
+  /**
+   * Sylvan Library: "choose two cards in your hand drawn this turn. For each of those cards, pay 4 life or put the card on
+   * top of your library." With fewer drawn cards still in hand, those (rulings); none, nothing happens.
+   */
+  | { type: "drawnPayOrTop"; n: number; life: number }
   /** Firebending's "add N {R}. Until end of combat, you don't lose this mana as steps and phases end" (CR 702.189a). */
   | { type: "addCombatMana"; n: Amount }
   /** "Add {B}{B}{B}" (Dark Ritual), "add one mana of any color" from an enters trigger: not a mana ability, so it uses the
@@ -2017,7 +2022,7 @@ export type ChoiceKind = "creatureType" | "color" | "basicLandType" | "keyword" 
 export type NamePurpose = "deny" | "theirs" | "find" | "guess" | "guessHand" | "own";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = "riot" | "unleash" | "copy" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector";
+export type EntersOption = "riot" | "unleash" | "copy" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead";
 
 /**
  * What mana was spent to cast a spell (CR 601.2h): at least so much of some colors ("if {U}{B} was spent", "at least three
@@ -3019,6 +3024,11 @@ export interface CompiledCard {
    * judged by the abilities it would have on the battlefield (614.12): under Humility it enters (rulings).
    */
   exileUnlessCastWithMana?: true;
+  /**
+   * Mox Diamond: "If ~ would enter, you may discard a land card instead. If you do, put ~ onto the battlefield. If you
+   * don't, put it into its owner's graveyard." (CR 614.1a): chosen as it would enter; if not, it never entered (rulings).
+   */
+  entersDiscardInstead?: TargetSpec;
   /** "As ~ enters, secretly choose an opponent" (Guardian Archon): see Chosen.secret. */
   entersChooseSecret?: true;
   /**

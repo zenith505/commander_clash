@@ -718,6 +718,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "surveil":
     case "orderTop":
     case "handToTop":
+    case "drawnPayOrTop":
     case "shuffle":
     case "shuffleIntoLibrary":
     case "shuffleSpell":

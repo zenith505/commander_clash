@@ -1133,6 +1133,14 @@ export function compile(d: CardDef): CompiledCard {
       out.youHave = youHave[1]!.startsWith("protection") ? "protection" : (youHave[1] as "hexproof" | "shroud");
       continue;
     }
+    const discardInstead = /^If ~ would enter, you may discard an? ([a-z]+ card) instead\. If you do, put ~ onto the battlefield\. If you don't, put it into its owner's graveyard\.$/.exec(line);
+    if (discardInstead && !out.entersDiscardInstead) {
+      const filter = parseSearchFilter(discardInstead[1]!);
+      if (filter) {
+        out.entersDiscardInstead = filter;
+        continue;
+      }
+    }
     if (line === "If ~ would enter and it wasn't cast or no mana was spent to cast it, exile it instead.") {
       out.exileUnlessCastWithMana = true;
       continue;

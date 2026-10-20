@@ -1013,7 +1013,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // Riot granted by another permanent ("Nontoken creatures you control have riot", Rhythm of the Wild) applies too: it has
   // it as it would exist on the battlefield (CR 614.12, rulings).
   const grantedRiot = characteristics(s, o).grantedAbilities.flatMap((t) => (compileGranted(t).entersOptions ?? []).filter((x) => x === "riot"));
-  const options: EntersOption[] = [...(saga && printed.readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot];
+  const options: EntersOption[] = [...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(saga && printed.readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot];
   options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
   if (!options.length) {
     const ev = { type: "enters" as const, id, ...(opts.x ? { x: opts.x } : {}) };
@@ -1676,6 +1676,8 @@ function drawOne(s: GameState, pid: PlayerId): boolean {
   }
   moveObject(s, top, "hand");
   s.resolving?.drawnThisWay?.push(top);
+  const drawnCard = obj(s, top);
+  if (drawnCard.zone === "hand") drawnCard.drawn = { turn: s.turn, zc: drawnCard.zoneChanges ?? 0 };
   // Every card drawn is its own draw (CR 121.2), and counts toward "your second card each turn".
   p.draws = p.draws?.turn === s.turn ? { turn: s.turn, n: p.draws.n + 1 } : { turn: s.turn, n: 1 };
   // "Except the first one they draw in each of their draw steps" (Orcish Bowmasters): a card actually drawn, so not a
@@ -4686,6 +4688,23 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       enterAsCopy(s, o, choice, entry?.enterOpts ?? {});
       return;
     }
+    if (pend.what === "discardInstead") {
+      if (!pend.options.includes(choice)) throw new RulesError("choose a card offered, or none");
+      if (choice !== "none" && obj(s, choice).zone === "hand") {
+        discardCards(s, p.id, [choice]);
+        log(s, `${pend.source} enters.`);
+        if (entry?.enters) fireEvent(s, { type: "enters", id: o.id, ...entry.enters });
+        return;
+      }
+      // It never entered (rulings): nothing sees it enter or leave.
+      log(s, `${p.name} doesn't discard a card, so ${pend.source} goes to its owner's graveyard instead.`);
+      s.entersChoices = (s.entersChoices ?? []).filter((c) => c.id !== o.id);
+      s.battlefield = s.battlefield.filter((x) => x !== o.id);
+      o.zone = "stack"; // in no zone list, so moving it isn't leaving the battlefield
+      moveObject(s, o.id, "graveyard");
+      invalidateCharacteristics(s);
+      return;
+    }
     if (pend.what === "tribute") {
       // Tribute (CR 702.104a): the chosen opponent decides next, still as it enters.
       o.tribute = { to: Number(choice) };
@@ -4749,7 +4768,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "copy" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "discardInstead" || pend.what === "copy" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector") throw new RulesError("nothing to choose");
   if (pend.what === "searchZones") {
     if (!pend.options.includes(choice)) throw new RulesError("choose both or the graveyard only");
     (r.scratch ??= {}).searchZones = choice;
@@ -4801,6 +4820,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     // An option's index, or "none" to take the penalty (see the punisher effect).
     const pu = r.scratch?.punish;
     if (pu) pu.picked[p.id] = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "payOrTop") {
+    const pt = r.scratch?.payOrTop;
+    if (!pt) throw new RulesError("nothing to choose");
+    pt.answer = choice;
     continueResolution(s);
     return;
   }
@@ -5008,6 +5034,14 @@ function askEntersChoice(s: GameState): boolean {
       }
       const siege = isSiege(s, o);
       s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "protector", options: options.map(String), labels: options.map((x) => player(s, x).name), objectId: o.id, prompt: siege ? "choose an opponent to protect it; you and the others can attack it" : "choose its protector" };
+      return true;
+    }
+    if (c.what === "discardInstead") {
+      // Mox Diamond (CR 614.1a): a land card from its controller's hand, or it goes to the graveyard instead.
+      const you = controllerOf(s, o);
+      const filter = compileCard(defOf(s, o)).entersDiscardInstead!;
+      const cards = player(s, you).hand.filter((id) => printedMatches(filter, defOf(s, obj(s, id))));
+      s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "discardInstead", options: [...cards, "none"], labels: [...cards.map((id) => `Discard ${nameOf(s, id)}`), "Don't (it goes to the graveyard)"], objectId: o.id, prompt: `discard a ${filter.text} for it to enter` };
       return true;
     }
     if (c.what === "anchor") {

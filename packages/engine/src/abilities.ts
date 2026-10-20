@@ -700,7 +700,8 @@ export interface DamageMod {
 export type Modification =
   | { kind: "control" } // layer 2: the effect's controller controls it
   /** Layer 4, "in addition to its other types"; `allCreatureTypes`: "with all creature types" (Mutavault). */
-  | { kind: "addTypes"; types: string[]; subtypes: string[]; supertypes?: string[]; allCreatureTypes?: true }
+  /** `chosenType`: also the creature type chosen as its source entered ("~ is the chosen type in addition to its other types"). */
+  | { kind: "addTypes"; types: string[]; subtypes: string[]; supertypes?: string[]; allCreatureTypes?: true; chosenType?: true }
   | { kind: "setTypes"; types: string[]; subtypes: string[]; /** "Becomes a legendary 4/4 red Dragon creature" (Sarkhan, the Dragonspeaker): it gains these supertypes and keeps its others (CR 205.4b). */ supertypes?: string[] } // layer 4, "becomes a 3/3 Elemental creature": new card types replace the old (CR 205.1a)
   | { kind: "setSubtypes"; subtypes: string[] } // layer 4, "becomes a Frog": replaces only subtypes of the same kind (CR 205.1a)
   /**

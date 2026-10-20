@@ -744,7 +744,9 @@ export function compile(d: CardDef): CompiledCard {
       const g = parseGroup(`each ${that ? `${that[1]} or ${that[2]} creature you control` : othersExtra[2]}`);
       const types = g?.filter.types ?? [];
       const couldBeSelf = !othersExtra[1] && d.types.some((ty) => types.includes(ty) || (!types.length && ty === "Creature"));
-      if (!g || g.other || couldBeSelf || g.filter.kind !== "object" || g.filter.controller !== "you" || g.filter.chosen) out.unsupported.push(raw);
+      // "Each other creature you control of the chosen type" (Metallic Mimic): the type chosen as it entered.
+      const chosenOk = !g?.filter.chosen || (g.filter.kind === "object" && g.filter.chosen === "type" && /^As ~ enters(?: the battlefield)?, choose a creature type\.$/m.test(normalizeSelf(d)));
+      if (!g || g.other || couldBeSelf || g.filter.kind !== "object" || g.filter.controller !== "you" || !chosenOk) out.unsupported.push(raw);
       else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(othersExtra[4]!), n: /^an?$/.test(othersExtra[3]!) ? 1 : num(othersExtra[3]!), text: line });
       continue;
     }
@@ -2186,6 +2188,12 @@ function triggersAgainLine(line: string): NonNullable<CompiledCard["triggersAgai
     return filter ? { by: { event, filter: filter.map((x) => x.filter) } } : null;
   }
   m = /^If a triggered ability of (?:an? )?(.+?) triggers, (?:that ability|it) triggers an additional time\.$/.exec(line);
+  // "Another creature you control of the chosen type" (Roaming Throne): the creature type chosen as it entered.
+  const ofChosen = m && /^(another )?(creature you control) of the chosen type$/.exec(m[1]!);
+  if (ofChosen) {
+    const of = kinds(ofChosen[2]!, !!ofChosen[1]);
+    return of?.length === 1 ? { of: [{ ...of[0]!, filter: { ...of[0]!.filter, chosen: "type", text: `${of[0]!.filter.text} of the chosen type` } }] } : null;
+  }
   if (m) {
     const all = /^another (.+ or .+ you control)$/.exec(m[1]!);
     const of = kinds(all ? all[1]! : m[1]!, !!all);

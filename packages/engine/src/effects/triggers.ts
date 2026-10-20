@@ -64,7 +64,8 @@ function triggersAgain(s: GameState, src: GameObject, controller: PlayerId, caus
   for (const { id, again } of statics)
     for (const a of again) {
       if (a.by && !(cause?.event === a.by.event && cause.objs.some((x) => !a.by!.filter || a.by!.filter.some((f) => objectMatches(s, f, x.o, controller, false, undefined, x.c) && (f.controller !== "you" || x.controller === controller))))) continue;
-      if (a.of && !a.of.some((k) => !(k.other && src.id === id) && ofMatches(k.filter))) continue;
+      // "Of the chosen type": the one chosen as that permanent entered (Roaming Throne).
+      if (a.of && !a.of.some((k) => !(k.other && src.id === id) && ((f) => !f.chosen && ofMatches(f))(bindChosen(k.filter, s.objects[id]?.chosen)))) continue;
       n++;
     }
   return n;

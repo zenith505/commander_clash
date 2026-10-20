@@ -590,6 +590,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     row = null;
     return true;
   };
+  let chosenCards: ObjRef | undefined;
   for (let si = 0; si < sentences.length; si++) {
     // "It" is the spell cast only as the first instruction: "Untap ~. It gains ..." is about ~ (Pristine Skywise).
     if (si > 0) delete ctx.spellIt;
@@ -598,6 +599,26 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // beginning of the next end step" (one instruction, no condition).
     const atNext = /^At the beginning of (the|your) next end step, ((?:sacrifice|exile|destroy|return) [^,]+)$/.exec(s);
     if (atNext && !/\b(?:if|unless|then|instead)\b| to the battlefield/.test(atNext[2]!)) s = `${atNext[2]!.charAt(0).toUpperCase()}${atNext[2]!.slice(1)} at the beginning of ${atNext[1]} next end step`;
+    // "Choose two target creature cards in your graveyard. Sacrifice a creature. If you do, return the chosen cards to the
+    // battlefield tapped." (Victimize): the targets, chosen as it's cast (CR 601.2c); "the chosen cards" are them.
+    const chooseCards = /^Choose ((?:two|three) target [a-z]+ cards) in your graveyard$/.exec(s);
+    if (chooseCards) {
+      const what = parseObject(`${chooseCards[1]} from your graveyard`, ctx, true);
+      if (what?.ref !== "target" || !what.n) return null;
+      chosenCards = what;
+      continue;
+    }
+    // "Sacrifice a creature. If you do, ...": only if one was sacrificed (you must if you can, rulings on Victimize).
+    const sacDo = /^If you do, (.+)$/.exec(s);
+    const sacPrev = effects[effects.length - 1];
+    if (sacDo && sacPrev?.type === "pick" && sacPrev.action === "sacrifice" && sacPrev.who.ref === "you" && sacPrev.n === 1 && !sacPrev.unless) {
+      const before = ctx.targets.length;
+      const back = /^return the chosen cards to the battlefield( tapped)?$/.exec(sacDo[1]!);
+      const inner: Effect[] | null = back ? (chosenCards ? [{ type: "putOntoBattlefield", what: chosenCards, ...(back[1] ? { tapped: true } : {}) }] : null) : parseOne(capital(sacDo[1]!), ctx);
+      if (!inner || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: inner });
+      continue;
+    }
     if (s.startsWith(ROW_MARK)) {
       // Rows only after the roll (CR 706.3b).
       if (payFirst || dig || !closeGate() || !closeRow() || !allEffects(effects).some((e) => e.type === "roll")) return null;

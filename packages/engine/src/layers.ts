@@ -789,12 +789,15 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "control":
       c.controller = controllerOfInst(e, chars);
       return;
-    case "addTypes":
+    case "addTypes": {
       for (const t of m.types) if (!c.types.includes(t)) c.types.push(t);
       for (const t of m.subtypes) if (!c.subtypes.includes(t)) c.subtypes.push(t);
+      const chosen = m.chosenType && e.sourceId ? s.objects[e.sourceId]?.chosen?.type : undefined;
+      if (chosen && !c.subtypes.includes(chosen)) c.subtypes.push(chosen);
       for (const t of m.supertypes ?? []) if (!c.supertypes.includes(t)) c.supertypes.push(t);
       if (m.allCreatureTypes) c.allCreatureTypes = true;
       return;
+    }
     case "setTypes": {
       // The new card types replace the old, but an instant or sorcery stays one (CR 205.1a). Subtypes of
       // card types it no longer has go too; those of types it keeps stay unless the effect sets that kind.

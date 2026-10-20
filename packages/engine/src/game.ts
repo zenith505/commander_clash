@@ -1231,7 +1231,11 @@ function othersAddCounters(s: GameState, o: GameObject): Record<string, number> 
     const rules = abilitiesOf(s, src).othersEnterWithCounters;
     if (!rules) continue;
     const you = controllerOf(s, src);
-    for (const r of rules) if (objectMatches(s, r.filter, o, you, false)) out[r.counter] = (out[r.counter] ?? 0) + r.n;
+    for (const r of rules) {
+      // "Of the chosen type": the one chosen as the source entered.
+      const filter = bindChosen(r.filter, src.chosen);
+      if (!filter.chosen && objectMatches(s, filter, o, you, false)) out[r.counter] = (out[r.counter] ?? 0) + r.n;
+    }
   }
   return out;
 }

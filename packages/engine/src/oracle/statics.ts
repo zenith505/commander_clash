@@ -928,6 +928,9 @@ function parseStaticLine(line: string): StaticAbility | null {
   // snow supertype added in the type-changing layer (CR 205.4a, 613.1d).
   const snow = { kind: "addTypes" as const, types: [], subtypes: [], supertypes: ["Snow"] };
   if (/^Enchanted (?:land|permanent) is snow$/.test(text)) return { affects: { kind: "attached" }, mods: [snow], text: line };
+  // "This creature is the chosen type in addition to its other types" (Metallic Mimic, Roaming Throne): the creature type
+  // chosen as it entered, added in the type-changing layer (CR 613.1d).
+  if (/^~ is the chosen type in addition to its other types$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "addTypes", types: [], subtypes: [], chosenType: true }], text: line };
   if (/^Permanents with ice counters on them are snow$/.test(text)) return { affects: { kind: "filter", types: [], spec: { kind: "object", counter: "ice", text: "permanent with an ice counter on it" } }, mods: [snow], text: line };
   // Null Rod: "Activated abilities of artifacts can't be activated", mana abilities too (CR 605.1a); only permanents'.
   const silenced = /^Activated abilities of (.+?) can't be activated( unless they're mana abilities)?$/.exec(text);

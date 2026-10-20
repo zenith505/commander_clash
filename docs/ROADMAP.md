@@ -1,13 +1,14 @@
 # Roadmap
 
-20,874 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 802 of 992 (80%), top 2,000: 1,459 of 1,989 (73%), top 5,000: 3,159 of 4,988 (63%).
+20,987 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 842 of 992 (84%), top 2,000: 1,504 of 1,989 (75%), top 5,000: 3,220 of 4,988 (64%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
 `data/popularity.json`; `npm run popularity` rebuilds it from the Scryfall extract). Each round starts at the top of that
-list and groups cards that share a mechanic. The plan is done when **all of the top 2,000 and 90% of the top 5,000**
-play. `npm run blockers` still shows how many cards each missing line blocks.
+list and groups cards that share a mechanic. There is no stopping point (Ken, Oct 20 2026: "Popular, no stop"): rounds
+go on in popularity order until every legal card plays. `npm run blockers` still shows how many cards each missing
+line blocks.
 
 ## Ken's standing instructions
 
@@ -21,18 +22,24 @@ play. `npm run blockers` still shows how many cards each missing line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 89, most played first: Urza's Saga (a chapter that grants
-   an ability with a quoted token ability), Victimize ("choose two target cards ... sacrifice ... return the chosen
-   cards"), Roaming Throne (extra triggers for the chosen type), Chrome Mox and Mox Amber (mana of the exiled card's /
-   legendary permanents' colors), Nykthos and Three Tree City (choose a color, then an amount), Sink into Stupor's
-   "spell or nonland permanent", Gemstone Caverns (opening hand), Tireless Provisioner (either-token choice), Rhythm of
-   the Wild (granting riot), Animate Dead, Mirkwood Bats ("create or sacrifice a token"), Gamble, Mox Diamond, Bloom
-   Tender, Sylvan Library, Orcish Bowmasters, Rakdos Charm ("each creature deals 1 damage to its controller"), Inspiring
-   Call ("those creatures"). Bots don't hold Teferi's Protection for anything but lethal combat damage or a board
-   wipe of their own permanents worth 12+ mana value.
-0. Cards with faces (CR 709, 710, 712, 715, 722): 481 of the 846 legal ones play now (`npm run faces` lists each
-   layout's support and the lines blocking it): 180 of 388 transforming double-faced (all 36 Invasion Sieges),
-   107 of 151 adventurer, 78 of 123 split (15 of 28 Rooms), 48 of 98 modal double-faced, 50 of 67 preparation, 18 of
+00. Most played first (`npm run popular`). Out after round 90, most played first: Victimize ("choose two target cards
+   ... sacrifice ... return the chosen cards"), Roaming Throne (extra triggers for the chosen type), Sink into Stupor's
+   "spell or nonland permanent" (also Venser, Shaper Savant and Unsubstantiate: a target that's a spell or a
+   permanent), Gemstone Caverns (opening hand), Syr Konrad, Academy Manufactor, Bolas's Citadel, Hullbreaker Horror,
+   Etali, Inspiring Call ("those creatures"), Ragavan, Braids, The Ozolith, Guardian Project, Rakdos Charm ("each
+   creature deals 1 damage to its controller"), Sevinne's Reclamation, Anger and Wonder (statics from the graveyard),
+   Goldspan Dragon, Pact of Negation, Arena of Glory, Mistrise Village, Spark Double, Underworld Breach. Smaller gaps
+   round 90 left: Simian and Elvish Spirit Guide (a mana ability activated from the hand: the UI, autopay and bots
+   would need it), Lion's Eye Diamond, Goreclaw ("creature spells with power 4 or greater cost less"), Puresteel
+   Paladin, Peregrin Took ("plus an additional Food token"), Essence Flux ("If it's a Spirit" after a flicker),
+   Tergrid ("sacrifices a nontoken permanent or discards a permanent card"), Zenith Chronicler ("each other player"
+   meaning other than the player who cast the spell; "each other player" is read as each opponent only where no other
+   player is in play). Bots don't hold Teferi's Protection for anything but lethal combat damage or a board wipe of
+   their own permanents worth 12+ mana value; bots only animate the biggest creature card with Animate Dead, and pay
+   Sylvan Library's life only with 30 or more.
+0. Cards with faces (CR 709, 710, 712, 715, 722): 486 of the 846 legal ones play now (`npm run faces` lists each
+   layout's support and the lines blocking it): 181 of 388 transforming double-faced (all 36 Invasion Sieges),
+   109 of 151 adventurer, 78 of 123 split (15 of 28 Rooms), 49 of 98 modal double-faced, 51 of 67 preparation, 18 of
    19 flip. All 14 meld cards play (CR 701.42). No line blocks two faced cards any more: each one left is out on a
    line of its own (`npm run faces`). Still out:
    - Transformers: only Goldbug of the 15 plays; the others each have a line of their own (Starscream needs "whenever

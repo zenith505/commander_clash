@@ -243,7 +243,7 @@ function spreadRefs<T>(x: T, i: number, n: number): T {
   // counterspell or redirect targets, Twincast's { target }.
   if (typeof o.index === "number" && (typeof o.ref === "string" || o.type === "counterSpell" || o.type === "changeTarget")) {
     if (o.index > i) copy.index = o.index + n - 1;
-    else if (o.index === i && (o.ref === "target" || o.ref === "anyTarget")) copy.n = n;
+    else if (o.index === i && (o.ref === "target" || o.ref === "anyTarget" || o.type === "counterSpell")) copy.n = n;
   }
   if (typeof o.target === "number" && Object.keys(o).length === 1 && o.target > i) copy.target = o.target + n - 1;
   return copy as T;

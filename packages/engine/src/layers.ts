@@ -616,6 +616,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (s.turnLog?.gainedLife ?? []).some((p) => p !== you);
     case "opponentCardsToGraveyard":
       return Object.entries(s.turnLog?.toGraveyard ?? {}).some(([p, k]) => Number(p) !== you && k >= cond.n);
+    case "opponentCastCount":
+      return s.turnOrder.some((p) => p !== you && (s.castThisTurn ?? []).filter((c) => c.player === p).length >= cond.n);
     case "opponentCast":
       return (s.castThisTurn ?? []).some((c) => c.player !== you && !!c.colors?.some((x) => cond.colors.includes(x)));
     case "noneInHand":

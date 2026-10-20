@@ -451,6 +451,14 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "counterSpell": {
       // The spell itself, if it's still on the stack (CR 701.6a).
       if (e.cause) return ctx.cause && s.stack.some((x) => x.id === ctx.cause) ? counterOnStack(s, ctx, ctx.cause, src) : undefined;
+      // "Exile any number of target spells" (Mindbreak Trap): each target still legal.
+      if (e.exileSpell) {
+        for (let k = e.index; k < e.index + (e.n ?? 1); k++) {
+          const t = ctx.targets[k];
+          if (ctx.legal[k] && t?.kind === "stack") counterOnStack(s, ctx, t.id, src, undefined, "exile", true);
+        }
+        return;
+      }
       const t = ctx.targets[e.index];
       if (!ctx.legal[e.index] || t?.kind !== "stack") return;
       // Disrupting Shoal: its mana value with the X chosen for it (CR 202.3e) against this spell's X.
@@ -492,10 +500,10 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
   if (!item) return; // it already left the stack
   const what = item.kind === "spell" ? item.description : `${item.description.split(":")[0]}'s ability`;
   if (bounce) {
-    // Returned, not countered (Reprieve). A copy of a spell ceases to exist (CR 707.10a).
+    // Returned or exiled, not countered (Reprieve, Mindbreak Trap). A copy of a spell ceases to exist (CR 707.10a).
     s.stack.splice(i, 1);
-    if (item.objectId) moveObject(s, item.objectId, "hand");
-    log(s, `${by} returns ${what} to its owner's hand.`);
+    if (item.objectId) moveObject(s, item.objectId, instead === "exile" ? "exile" : "hand");
+    log(s, instead === "exile" ? `${by} exiles ${what}.` : `${by} returns ${what} to its owner's hand.`);
     return;
   }
   if (item.objectId && cantBeCountered(s, item)) {

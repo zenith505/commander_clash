@@ -1004,6 +1004,8 @@ export type StaticCondition =
    * turn" (Veil of Summer): one of these colors, the spell's colors as it was cast.
    */
   | { kind: "opponentCast"; colors: Color[] }
+  /** "If an opponent cast three or more spells this turn" (Mindbreak Trap): one opponent, that many (rulings). */
+  | { kind: "opponentCastCount"; n: number }
   /** "If you have no land cards in hand" (Land Grant). */
   | { kind: "noneInHand"; filter: TargetSpec }
   /**
@@ -1792,6 +1794,10 @@ export type Effect =
        * (CR 101.2 doesn't apply); otherwise like Remand's.
        */
       bounce?: true;
+      /** "Exile any number of target spells" (Mindbreak Trap): not a counter either, so it exiles one that can't be countered (rulings). */
+      exileSpell?: true;
+      /** "Any number of target spells": the targets from `index`, this many (see TargetSpec.many, expandMany). */
+      n?: number;
       /** "Counter target spell if its mana value is X" (Disrupting Shoal): only then, checked as it resolves. */
       ifMvX?: true;
       /** "Counter target spell if it has the same name as that card" (Jester's Scepter): the card put into a graveyard to pay the cost. */

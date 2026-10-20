@@ -171,10 +171,10 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
       if (!sc.copies) {
-        const i = e.spell === "cause" || "epic" in e.spell ? -1 : e.spell.target;
+        const i = e.spell === "cause" || e.spell === "self" || "epic" in e.spell ? -1 : e.spell.target;
         const t = i >= 0 ? ctx.targets[i] : undefined;
-        const id = typeof e.spell === "object" && "epic" in e.spell ? e.spell.epic : i < 0 ? ctx.cause : t?.kind === "stack" && ctx.legal[i] ? t.id : undefined;
-        const orig = id ? (s.stack.find((x) => x.id === id) ?? s.castItems?.[id] ?? s.epics?.[id]) : undefined;
+        const id = e.spell === "self" ? r.item.id : typeof e.spell === "object" && "epic" in e.spell ? e.spell.epic : i < 0 ? ctx.cause : t?.kind === "stack" && ctx.legal[i] ? t.id : undefined;
+        const orig = e.spell === "self" ? r.item : id ? (s.stack.find((x) => x.id === id) ?? s.castItems?.[id] ?? s.epics?.[id]) : undefined;
         if (!orig || orig.kind !== "spell") return;
         const n = e.n === "storm" ? (orig.castNth ?? 0) : e.n === "kicked" ? (orig.kicked?.length ?? 0) : amountNow(s, e.n, ctx);
         if (n <= 0) return;
@@ -182,7 +182,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       const c = sc.copies;
       // As it is now, or as it was cast if it has left the stack.
-      const orig = s.stack.find((x) => x.id === c.of) ?? s.castItems?.[c.of] ?? s.epics?.[c.of];
+      const orig = s.stack.find((x) => x.id === c.of) ?? s.castItems?.[c.of] ?? s.epics?.[c.of] ?? (r.item.id === c.of ? r.item : undefined);
       const specs = orig?.body?.targets ?? [];
       while (orig && c.left > 0) {
         if (e.newTargets && specs.length && c.targets === undefined) {

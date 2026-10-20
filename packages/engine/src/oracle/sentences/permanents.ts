@@ -287,7 +287,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return what && !isGroup(what) ? [{ type: "removeAllCounters", what }] : null;
   }
   // "Move all counters from target creature onto another target creature" (CR 122.5).
-  if ((m = /^Move all counters from (target .+?) onto (another target .+)$/i.exec(s))) {
+  // The Ozolith: "move all counters from ~ onto target creature" (rulings: all of them or none).
+  if ((m = /^Move all counters from (target .+?|~) onto ((?:another )?target .+)$/i.exec(s)) && (m[1] === "~") === !/^another /i.test(m[2]!)) {
     const from = parseObject(m[1]!, ctx);
     const to = from && !isGroup(from) ? parseObject(m[2]!, ctx) : null;
     return from && to && !isGroup(to) ? [{ type: "moveAllCounters", from, to }] : null;
@@ -302,6 +303,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[3]!, ctx);
     return what && !isGroup(what) ? [{ type: "removeCounters", what, counter: counterKind(m[2]!), n: /^all$/i.test(m[1]!) ? "all" : amt(m[1]!) }] : null;
   }
+  // The Ozolith: "Whenever a creature you control leaves the battlefield, if it had counters on it, put those counters on
+  // ~": as many of each kind as that creature had as it last existed, put on (rulings: not moved).
+  if (/^Put those counters on ~$/i.test(s) && ctx.subjectLeft) return [{ type: "lastKnownCounters", what: { ref: "self" } }];
   // "When ~ dies, put its counters on target creature you control": as many of each kind as it had as it last
   // existed, put on, not moved (rulings on Dockworker Drone); "its +1/+1 counters" only that kind.
   if ((m = new RegExp(`^Put its (?:${COUNTER} )?counters on (.+)$`, "i").exec(s)) && ctx.selfCard) {

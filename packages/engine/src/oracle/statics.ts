@@ -471,6 +471,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Kosei, Penitent Warlord: "as long as ~ is enchanted, equipped, and has a counter on it": all three (any counter).
   if (/^~ is enchanted, equipped, and has a counter on it$/.test(text))
     return { kind: "allOf", conds: [{ kind: "self", is: "enchanted" }, { kind: "self", is: "equipped" }, { kind: "self", is: "hasCounter" }] };
+  // The Ozolith: "if ~ has counters on it" (any kind).
+  if (/^~ has (?:counters|a counter|one or more counters) on it$/.test(text)) return { kind: "self", is: "hasCounter" };
   // "If ~ is enchanted by two or more Auras, flip it" (Kitsune Mystic): the Auras attached to it.
   if ((m = new RegExp(`^~ is enchanted by ${NUM} or more Auras$`).exec(text))) return { kind: "amount", amount: { count: { kind: "attachedToSelf", subtypes: ["Aura"] } }, min: num(m[1]!) };
   // "When ~ has flying, flip it" (Student of Elements): one of its keywords.

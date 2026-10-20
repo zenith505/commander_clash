@@ -238,6 +238,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.foretold
             : e.cond.kind === "castInMain"
             ? !!s.resolving!.item.castInMain
+            : e.cond.kind === "castFromGraveyard"
+            ? !s.resolving!.item.copy && s.objects[s.resolving!.item.objectId ?? ""]?.castFrom === "graveyard"
             : e.cond.kind === "bargained"
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.bargained
             : e.cond.kind === "evidence"

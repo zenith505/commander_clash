@@ -10,6 +10,7 @@ import { parseSearch, parseSearchFilter } from "../search";
 import { parseDamageRecipient, parsePlayer, parseObject, parseTargetPhrase, pickFilter } from "../targets";
 import { parseSentence } from "../sentence";
 import type { Ctx } from "../body";
+import type { ManaType } from "../../types";
 import { parsePreventAll } from "../statics";
 import { emblemAbilityOk } from "../grants";
 
@@ -369,6 +370,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^[Aa]dd ((?:\{[WUBRGC]\})+) for each (.+)$/.exec(s))) {
     const times = parseCount(m[2]!, ctx, true);
     return times && [{ type: "addMana", mana: m[1]!, times }];
+  }
+  // "Add {B} or {G} for each permanent destroyed this way" (Culling Ritual): either color for each one, chosen as it
+  // resolves (rulings: "You aren't limited to one color").
+  if ((m = /^[Aa]dd \{([WUBRG])\} or \{([WUBRG])\} for each (.+)$/.exec(s)) && m[1] !== m[2]) {
+    const times = parseCount(m[3]!, ctx, true);
+    return times && [{ type: "addMana", split: [m[1] as ManaType, m[2] as ManaType], times }];
   }
   // "Add an amount of {R} equal to ~'s power" (Molten-Core Maestro): counted as it resolves.
   if ((m = /^[Aa]dd an amount of (\{[WUBRGC]\}) equal to (.+)$/.exec(s))) {

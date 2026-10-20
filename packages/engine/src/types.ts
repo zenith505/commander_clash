@@ -716,6 +716,8 @@ export interface StackItem {
   conspired?: boolean;
   /** A copy of a spell (CR 707.10), not cast. */
   copy?: boolean;
+  /** For a spell: cast during its controller's main phase (addendum, "if you cast this spell during your main phase"). */
+  castInMain?: true;
   /** A triggered ability (CR 603), not an activated one (CR 602). */
   triggered?: true;
 }

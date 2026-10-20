@@ -338,6 +338,23 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       const p = player(s, ctx.controller);
       const color = s.resolving?.chosen?.color;
+      if (e.split) {
+        // How many of the first color, the rest the second, chosen as it resolves (CR 608.2d).
+        const n = amountNow(s, e.times ?? 1, ctx);
+        const sc = (s.resolving!.scratch ??= {});
+        if (!n) return;
+        const mix = (k: number) => `{${e.split![0]}}`.repeat(k) + `{${e.split![1]}}`.repeat(n - k);
+        if (sc.either === undefined) {
+          const ks = Array.from({ length: n + 1 }, (_, i) => n - i);
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "either", options: ks.map(String), labels: ks.map((k) => `add ${mix(k)}`), prompt: "choose the mana" };
+          return "paused";
+        }
+        const k = Math.max(0, Math.min(n, sc.either));
+        delete sc.either;
+        for (const m of mix(k).matchAll(/\{([WUBRGC])\}/g)) addMana(s, p.id, [m[1] as ManaType], { from: manaSourceOrigins(s, ctx) });
+        log(s, `${p.name} adds ${mix(k)}.`);
+        return;
+      }
       let added = e.mana ? e.mana.repeat(e.times === undefined ? 1 : amountNow(s, e.times, ctx)) : color && e.chosen ? `{${color}}`.repeat(e.chosen) : "";
       // An activated mana ability with {T} in its cost taps its source for mana (CR 106.12): Mana Reflection's
       // replacement effect multiplies what it produces (106.12b).

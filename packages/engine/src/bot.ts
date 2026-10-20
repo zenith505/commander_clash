@@ -331,6 +331,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Sylvan Library: 4 life for a card only while well ahead on life; otherwise it goes back.
     if (pend.kind === "chooseOption" && pend.what === "payOrTop") return [{ type: "chooseOption", player: pid, choice: s.players[pid]!.life >= 30 ? "pay" : "top" }];
     // "A Food token or a Treasure token": the Treasure (mana now beats life later); otherwise the first.
+    // "Add {B} or {G} for each ..." (Culling Ritual): the split that best matches the colored symbols in the hand.
+    if (pend.kind === "chooseOption" && pend.what === "either" && pend.prompt === "choose the mana") {
+      const want = (sym: string) => s.players[pid]!.hand.reduce((n, id) => n + (defOf(s, obj(s, id)).manaCost.split(sym).length - 1), 0);
+      const score = (label: string) => [...new Set(label.match(/\{[WUBRG]\}/g) ?? [])].reduce((n, sym) => n + Math.min(label.split(sym).length - 1, want(sym)), 0);
+      const best = pend.labels!.reduce((b, l, i) => (score(l) > score(pend.labels![b]!) ? i : b), 0);
+      return [{ type: "chooseOption", player: pid, choice: pend.options[best]! }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "either") {
       const i = pend.labels?.findIndex((l) => /Treasure/.test(l)) ?? -1;
       return [{ type: "chooseOption", player: pid, choice: pend.options[Math.max(0, i)]! }];

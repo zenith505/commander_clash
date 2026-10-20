@@ -2180,6 +2180,8 @@ export function parsePayCost(text: string): PayCost | null {
 const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true; activatedOnly?: true; noTargets?: true }[] = [
   { re: "~ was bargained", cond: { kind: "bargained" }, spellOnly: true },
   { re: "~ was cast using teamwork", cond: { kind: "teamwork" }, spellOnly: true },
+  // Addendum (CR 207.2c). Not for targets: CastHow doesn't know when it's cast.
+  { re: "you cast ~ during your main phase", cond: { kind: "castInMain" }, spellOnly: true, noTargets: true },
   // In a spell, or its permanent's enters trigger (compile checks it's one of those).
   { re: "evidence was collected", cond: { kind: "evidence" } },
   { re: "the gift was promised", cond: { kind: "gift" } },
@@ -2355,7 +2357,19 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
   }
   t = t.replace(/^It deals /, "~ deals ");
   const before = ctx.targets.length;
-  const fx = parseOne(t, ctx);
+  // "If you cast this spell during your main phase, instead scry 3, then draw three cards" (Precognitive Perception).
+  // Under an "if" its instructions run one at a time, so any of them may wait on a choice (see the "if" effect).
+  const thenParts = (): Effect[] | null => {
+    const out: Effect[] = [];
+    const parts = t.split(/, then (?!shuffle)/);
+    for (const [i, p] of parts.entries()) {
+      const one = parseOne(i ? thenSubject(parts[0]!, p) : p, ctx);
+      if (!one) return null;
+      out.push(...one);
+    }
+    return out;
+  };
+  const fx = parseOne(t, ctx) ?? (/, then (?!shuffle)/.test(t) ? attempt(ctx, thenParts) : null);
   if (!fx || (!newTargets && ctx.targets.length !== before)) return null;
   // Under an "if", either branch's instructions run one at a time, so one may wait on a player (see the "if" effect).
   const done = instead ? insteadOfAffected(fx, previous) : fx;
@@ -2473,6 +2487,9 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     if (last?.type === "counters" && last.what.ref === "each") ctx.lastGroup = last.what;
     // "Double the power of each other creature you control until end of turn. Those creatures gain vigilance" (Rhonas).
     if (last?.type === "doublePT" && last.what.ref === "each") ctx.lastGroup = last.what;
+    // "Draw a card for each creature you control with a +1/+1 counter on it. Those creatures gain indestructible until end
+    // of turn" (Inspiring Call): the ones counted, as it resolves (CR 611.2c).
+    if (last?.type === "draw" && typeof last.n === "object" && "count" in last.n && last.n.count.kind === "permanents" && last.n.count.filter.kind === "object") ctx.lastGroup = { ref: "each", filter: last.n.count.filter };
   }
 }
 
@@ -2685,11 +2702,13 @@ function parseModal(count: string, bullets: string, text: string, opts: Paramete
 
 /** "X and Y" where each half is its own effect. */
 function parseConjunction(s: string, ctx: Ctx): Effect[] | null {
-  const parts = s.split(/,? and (?=(?:you|each|target|draw|~|its|create|put|return|exile|destroy|tap|untap|mill|suspect|convert|transform|after this phase)\b|get (?:\{E\}|\w+ \{E\}|an amount of \{E\}))/i);
+  const parts = s.split(/,? and (?=(?:you|each|target|draw|~|its|create|put|return|exile|destroy|tap|untap|mill|suspect|convert|transform|after this phase|they gain)\b|get (?:\{E\}|\w+ \{E\}|an amount of \{E\}))/i);
   if (parts.length < 2) return null;
   const out: Effect[] = [];
   for (const p of parts) {
-    const part = p.charAt(0).toUpperCase() + p.slice(1);
+    // "that player discards a card and you untap all lands you control" (Sword of Feast and Famine): "you untap" is
+    // "untap", done by the ability's controller.
+    const part = (p.charAt(0).toUpperCase() + p.slice(1)).replace(/^You (untap|tap|create|exile|destroy|return) /, (_, v: string) => `${capital(v)} `);
     // "Put a +1/+1 counter on ~ for each strength vote and create a 1/1 white Soldier creature token for each numbers vote"
     // (Lieutenants of the Guard): either part may count.
     const fx = attempt(ctx, () => parseSentence(part, ctx)) ?? attempt(ctx, () => parseForEach(part, ctx));

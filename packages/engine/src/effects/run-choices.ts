@@ -236,6 +236,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? rollIn(e.cond, e.cond.event ? ctx.event?.amount : s.resolving!.rolled?.result)
             : e.cond.kind === "foretold"
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.foretold
+            : e.cond.kind === "castInMain"
+            ? !!s.resolving!.item.castInMain
             : e.cond.kind === "bargained"
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.bargained
             : e.cond.kind === "evidence"

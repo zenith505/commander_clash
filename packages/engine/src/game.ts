@@ -3535,6 +3535,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Storm counts the spells cast before it (CR 702.40a); a copy of it made later copies it as it was cast (707.10).
   item.castNth = s.spellsCastThisTurn ?? 0;
   s.spellsCastThisTurn = item.castNth + 1;
+  if (isMainPhase(s) && s.activePlayer === p.id) item.castInMain = true;
   s.cards[d.oracleId] ??= d;
   (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors], from: castFrom, ...(paid.treasure ? { treasure: true as const } : {}) });
   (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv: spellManaValue(s, item) };

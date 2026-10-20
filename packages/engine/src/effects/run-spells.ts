@@ -37,7 +37,7 @@ function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId, targe
   o.gift = card.gift;
   const name = orig.description.replace(/ \(copy\)$/, "");
   const id = `s${s.nextId++}`;
-  const { castNth: _, ...rest } = structuredClone(orig);
+  const { castNth: _, castInMain: _main, ...rest } = structuredClone(orig);
   s.stack.push({ ...rest, id, objectId: o.id, controller, targets: stampTargets(s, targets), copy: true, description: `${name} (copy)` });
   log(s, `${player(s, controller).name} copies ${name}${describeTargets(s, targets ?? [])}.`);
   fireEvent(s, { type: "cast", stackId: id, controller, card: defOf(s, o), copy: true }); // magecraft: "cast or copy"

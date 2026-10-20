@@ -1717,6 +1717,8 @@ export type Effect =
       who?: PlayerRef;
       /** "Spend this mana only to cast instant and sorcery spells" after it (CR 106.6). */
       only?: ManaSpend;
+      /** "Add {B} or {G} for each ...": `times` mana, each of either color (chosen as it resolves). */
+      split?: [ManaType, ManaType];
     }
   /** "Creatures without flying can't block this turn" (Falter): a rule for the turn, not locked to the creatures there now,
    * since it doesn't change characteristics (CR 611.2c; Magmatic Chasm rulings). */
@@ -2108,6 +2110,8 @@ export type SpellCondition =
   | { kind: "foretold" }
   /** "If ~ was bargained" (CR 702.166b). */
   | { kind: "bargained" }
+  /** "If you cast this spell during your main phase" (addendum, CR 207.2c): a copy wasn't cast (CR 707.10). */
+  | { kind: "castInMain" }
   /** "If evidence was collected" (CR 701.59c): its "you may collect evidence N" additional cost was paid. */
   | { kind: "evidence" }
   /** "If mana from a Treasure was spent to cast ~" / "to activate this ability" (CR 106.3). */

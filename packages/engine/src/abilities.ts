@@ -3000,7 +3000,8 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
 /** "prototype" isn't an alternative cost (CR 702.160a), but is chosen as one here: cast prototyped, it pays that mana cost. */
 /** `wubrg`: Fist of Suns' "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast". */
 /** `evidence`: Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" (CompiledCard.payEvidence). */
-export type AltCostKind = "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle" | "convert";
+/** `citadel`: Bolas's Citadel's "pay life equal to its mana value rather than pay its mana cost" for the top card of your library. */
+export type AltCostKind = "citadel" | "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle" | "convert";
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
 /** `aftermath`: the half of a split card with aftermath (CR 702.127a), cast only from a graveyard. */
@@ -3538,4 +3539,9 @@ export interface FromTop {
   spells?: TargetSpec[] | "any";
   once?: true;
   if?: StaticCondition;
+  /**
+   * Bolas's Citadel: "If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost": a
+   * spell cast with this permission is cast for that alternative cost (AltCostKind "citadel", CR 118.9).
+   */
+  payLife?: true;
 }

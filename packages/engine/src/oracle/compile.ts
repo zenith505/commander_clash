@@ -1032,7 +1032,9 @@ export function compile(d: CardDef): CompiledCard {
       else (out.fromTop ??= []).push({ ...ifTop, if: cond });
       continue;
     }
-    const top = parseFromTop(line.replace(/\.$/, ""));
+    // Bolas's Citadel: "... If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost."
+    const lifeTop = /^(.+?)\. If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost\.$/.exec(line);
+    const top = lifeTop ? ((t) => (t?.spells ? { ...t, payLife: true as const } : t && null))(parseFromTop(lifeTop[1]!)) : parseFromTop(line.replace(/\.$/, ""));
     if (top !== undefined) {
       if (top === null) out.unsupported.push(raw);
       else (out.fromTop ??= []).push(top);

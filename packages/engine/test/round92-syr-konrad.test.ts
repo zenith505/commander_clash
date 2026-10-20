@@ -42,7 +42,6 @@ describe("Syr Konrad, the Grim", () => {
     if (!creature || !lands.length) throw new Error("bad hand");
     s0.players[opp]!.hand = [creature, lands[0]!];
     let s = cast(s0, ap, ids[0]!, [{ kind: "player", id: opp }]);
-    for (let i = 0; i < 6 && s.pending?.kind === "chooseDiscard"; i++) s = act(s, { type: "discard", player: opp, objectIds: [creature, lands[0]!] });
     s = settle(s);
     expect(s.players[opp]!.graveyard).toContain(creature);
     expect(lifeOf(s, ap)).toEqual([39, 39, 39]);

@@ -1043,7 +1043,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (o.zone === "hand" || o.zone === "command") return startCast(o.id);
     // Courser of Kruphix, Future Sight: play the top card of your library.
     if (o.zone === "library" && mayPlayFromTop(s, o, HUMAN)) {
-      if (!isLand(s, o.id)) return startCast(o.id);
+      // Bolas's Citadel: for life instead of its mana cost, a choice in the menu.
+      if (!isLand(s, o.id)) return altCostsFor(s, HUMAN, o).length ? setMenu(o.id) : startCast(o.id);
       if (entersRulesOf(s, HUMAN, o.id).entersTappedChoice) return setMenu(o.id);
       return dispatch([{ type: "playLand", player: HUMAN, objectId: o.id }]);
     }
@@ -1647,8 +1648,9 @@ function canUseFace(s: GameState, id: string) {
   return castableFaces(s, o).some((f) => canCastFace(s, id, f)) || landFaces(s, o).some((f) => f !== 0 && canPlayLand(s, id, f));
 }
 
-const ALT_NAMES: Record<AltCostKind, string> = { foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate", convert: "More Than Meets the Eye" };
+const ALT_NAMES: Record<AltCostKind, string> = { citadel: "Cast it:", foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate", convert: "More Than Meets the Eye" };
 const ALT_NOTES: Record<AltCostKind, string> = {
+  citadel: "from the top of your library, life equal to its mana value instead of its mana cost (Bolas's Citadel); X is 0",
   evoke: "it's sacrificed as it enters",
   dash: "haste, back to your hand at the end step",
   bestow: "an Aura on a creature; a creature again if it's ever unattached",
@@ -2501,7 +2503,7 @@ function Seat({
   const exilePlayableHere = !s.pending && p.exile.some((id) => exileOptions(s, id));
   // The top of a library is shown when it's revealed (CR 401.5), to you when you may look at it any time (Vizier of
   // the Menagerie), or when you may play it.
-  const topCanPlay = pid === HUMAN && !s.pending && topPlayable(s, HUMAN).some((id) => (isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id)));
+  const topCanPlay = pid === HUMAN && !s.pending && topPlayable(s, HUMAN).some((id) => (isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id) || altCostsFor(s, HUMAN, s.objects[id]!).some((a) => canCastAlt(s, id, a.kind))));
   const topShown = topVisible(s, pid, HUMAN) || (pid === HUMAN && topPlayable(s, HUMAN).length > 0);
   // Auras and Equipment sit with whatever they're attached to, even in another player's area; a Curse with the
   // player it enchants.

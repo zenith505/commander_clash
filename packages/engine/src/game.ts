@@ -2519,15 +2519,15 @@ export function mayPlayLandFromGraveyard(s: GameState, o: GameObject, pid: Playe
  * The top card of `pid`'s own library, which "you may play lands / cast creature spells from the top of your library"
  * lets them play (Courser of Kruphix, Future Sight), at its usual timing (CR 401.5, rulings).
  */
-export function mayPlayFromTop(s: GameState, o: GameObject, pid: PlayerId): boolean {
-  return !!topPermission(s, o, pid);
+export function mayPlayFromTop(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" | "life"): boolean {
+  return !!topPermission(s, o, pid, way);
 }
 
 /**
  * The permanent whose permission lets `pid` play `o` from the top of their library: one without "once each turn" if
  * there is one, so a once-a-turn permission is kept for later (Johann). "Of the chosen type" is the permanent's choice.
  */
-function topPermission(s: GameState, o: GameObject, pid: PlayerId): { by: GameObject; once?: true } | undefined {
+function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" | "life"): { by: GameObject; once?: true } | undefined {
   if (o.zone !== "library" || o.owner !== pid || player(s, pid).library[0] !== o.id) return undefined;
   const d = defOf(s, o);
   const land = isType(d, "Land");
@@ -2536,6 +2536,8 @@ function topPermission(s: GameState, o: GameObject, pid: PlayerId): { by: GameOb
     const src = obj(s, id);
     if (controllerOf(s, src) !== pid) continue;
     for (const top of abilitiesOf(s, src).fromTop ?? []) {
+      // Bolas's Citadel's spells are cast for life (`way` "life"); the other permissions' for their mana costs.
+      if (!land && way && !!top.payLife !== (way === "life")) continue;
       if ((top.if && !staticConditionNow(s, top.if, src.id, pid)) || !(land ? top.lands : top.spells === "any" || !!top.spells?.some((f) => printedMatches(bindChosen(f, src.chosen), d)))) continue;
       if (!top.once) return { by: src };
       if (src.topUsedTurn !== s.turn) once ??= src;
@@ -2843,12 +2845,16 @@ export function castProblem(
   if (!free && !via && !mayPlayFromExile(s, o, pid) && !mayPlayFromTop(s, o, pid) && (!(o.zone === "hand" || (fromCommand && o.isCommander)) || o.owner !== pid))
     return o.zone === "graveyard" && graveyardWays(s, o).length ? `choose how to cast ${d.name} from your graveyard` : "you can only cast spells from your hand or your commander";
   if (choices?.buyback && compileCard(d).buyback === undefined) return `${d.name} doesn't have buyback`;
+  // From the top of the library, a permission for this way of paying: Bolas's Citadel's spells for life (CR 118.9).
+  if (!free && !via && o.zone === "library" && !mayPlayFromTop(s, o, pid, choices?.alt === "citadel" ? "life" : "mana"))
+    return choices?.alt === "citadel" ? `nothing lets you pay life rather than ${d.name}'s mana cost` : `cast ${d.name} from the top of your library by paying life equal to its mana value`;
   if (choices?.alt) {
     if (choices.alt === "madness") return "madness is cast as its ability resolves";
     if (!altCost(d, choices.alt, s, pid))
       return choices.alt === "wubrg" ? "you don't control a permanent that lets you pay {W}{U}{B}{R}{G}" : choices.alt === "evidence" ? "you don't control a permanent that lets you collect evidence instead" : `${d.name} doesn't have ${choices.alt}`;
     // An alternative cost without X: X is 0 (CR 107.3, rulings on Fist of Suns).
     if (choices.alt === "wubrg" && x) return "X is 0 when you pay {W}{U}{B}{R}{G} rather than the mana cost";
+    if (choices.alt === "citadel" && o.zone !== "library") return "only the top card of your library is cast for life";
     // A foretell cost is paid only for a foretold card, after the turn it was foretold (CR 702.143a).
     if (choices.alt === "foretell" && !foretoldCast(s, pid, o)) return `only a card foretold on an earlier turn can be cast for its foretell cost`;
     // Freerunning (CR 702.173a): only after an Assassin or commander of yours dealt combat damage to a player this turn.
@@ -3192,6 +3198,13 @@ export function delveRoom(s: GameState, pid: PlayerId, id: ObjectId, choices: Co
 export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: PlayerId): NonNullable<CompiledCard["altCosts"]>[number] | undefined {
   if (alt === "foretell") return compileCard(d).foretell ? { kind: "foretell", mana: compileCard(d).foretell! } : undefined;
   if (alt === "wubrg") return s && pid !== undefined && controlsPayWUBRG(s, pid) ? { kind: "wubrg", mana: "{W}{U}{B}{R}{G}" } : undefined;
+  // Bolas's Citadel: the top card of the caster's library, for life equal to its mana value (X is 0, CR 107.3b).
+  if (alt === "citadel") {
+    const top = s && pid !== undefined ? s.objects[player(s, pid).library[0] ?? ""] : undefined;
+    if (!top || !mayPlayFromTop(s!, top, pid!, "life")) return undefined;
+    const n = manaValue(parseManaCost(d.manaCost));
+    return { kind: "citadel", mana: "", costs: [{ kind: "payLife", n }], text: `pay ${n} life` };
+  }
   if (alt === "evidence") {
     const n = s && pid !== undefined ? payEvidenceOf(s, pid) : undefined;
     return n === undefined ? undefined : { kind: "evidence", mana: "", costs: [{ kind: "collectEvidence", n }], text: `collect evidence ${n}` };
@@ -3227,7 +3240,7 @@ function payEvidenceOf(s: GameState, pid: PlayerId): number | undefined {
 export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): NonNullable<CompiledCard["altCosts"]> {
   const own = compileCard(defOf(s, o)).altCosts ?? [];
   if (isType(defOf(s, o), "Land")) return own;
-  return [...own, ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(["evidence" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? []))];
+  return [...own, ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(["evidence" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
 }
 
 /** Artifacts tapped for improvise: untapped artifacts you control, each once, not also tapped for convoke. */

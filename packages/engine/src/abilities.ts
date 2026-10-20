@@ -1481,7 +1481,8 @@ export type Effect =
   /** Warp's end-step trigger (CR 702.185a): exile the permanent; its owner may cast the card after this turn. */
   | { type: "warpExile" }
   /** "Exile the top two cards of your library. Until the end of your next turn, you may play those cards." */
-  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" | "yourNextEndStep" }
+  /** `who`: "the top card of that player's library" (Ragavan), not yours; `castOnly`: "you may cast that card", not play it. */
+  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" | "yourNextEndStep"; who?: PlayerRef; castOnly?: true }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
   /** "Remove a +1/+1 counter from it", "remove all -1/-1 counters from ~" (CR 122.8): as many as it has, at most. */
   /**

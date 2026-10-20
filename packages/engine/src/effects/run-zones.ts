@@ -1604,15 +1604,17 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "impulse": {
       // Exiled face up (CR 406.3); the permission belongs to this object only (CR 400.7).
       const p = player(s, ctx.controller);
-      const ids = p.library.slice(0, amountNow(s, e.n, ctx));
+      const from = e.who ? players(s, e.who, ctx)[0] : p.id;
+      if (from === undefined) return;
+      const ids = player(s, from).library.slice(0, amountNow(s, e.n, ctx));
       for (const id of ids) {
         moveObject(s, id, "exile");
         const o = obj(s, id);
-        o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn };
+        o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.castOnly ? { castOnly: true as const } : {}) };
       }
       if (ids.length === 1 && s.resolving) s.resolving.exiledTop = { id: ids[0]!, zc: s.objects[ids[0]!]!.zoneChanges ?? 0 };
       if (ids.length)
-        log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of their library and may play ${ids.length === 1 ? "it" : "them"}${e.until === "thisTurn" ? " this turn" : e.until === "nextTurn" ? " until the end of their next turn" : e.until === "yourNextEndStep" ? " until their next end step" : ""}.`);
+        log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of ${from === p.id ? "their" : `${player(s, from).name}'s`} library and may ${e.castOnly ? "cast" : "play"} ${ids.length === 1 ? "it" : "them"}${e.until === "thisTurn" ? " this turn" : e.until === "nextTurn" ? " until the end of their next turn" : e.until === "yourNextEndStep" ? " until their next end step" : ""}.`);
       return;
     }
   }

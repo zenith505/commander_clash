@@ -134,3 +134,19 @@ describe("Goldspan Dragon", () => {
     expect(manaAbilitiesOn(s, s.objects[t]!).map((m) => m.produces)).toContainEqual({ kind: "oneOf", options: ["W", "U", "B", "R", "G"], amount: 2 });
   });
 });
+
+describe("Ragavan, Nimble Pilferer", () => {
+  const ragavan = card("Ragavan, Nimble Pilferer", "Legendary Creature — Monkey Pirate", "{R}", { power: "2", toughness: "1", oracleText: "Whenever Ragavan deals combat damage to a player, create a Treasure token and exile the top card of that player's library. Until end of turn, you may cast that card.\nDash {1}{R} (You may cast this spell for its dash cost. If you do, it gains haste, and it's returned from the battlefield to its owner's hand at the beginning of the next end step.)" });
+  it("parse", () => expect(isFullySupported(ragavan)).toBe(true));
+
+  it("a Treasure, and the top card of that player's library, which you may cast this turn", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const r = putOnBattlefield(s0, ap, ragavan);
+    const top = s0.players[opp]!.library[0]!;
+    let s = attack(s0, ap, r, opp);
+    s = settle(passUntil(s, "combatDamage"));
+    expect(s.objects[top]!.zone).toBe("exile");
+    expect(s.objects[top]!.mayPlay).toMatchObject({ player: ap, until: "thisTurn", castOnly: true });
+    expect(s.battlefield.some((id) => s.cards[s.objects[id]!.cardId]!.name === "Treasure Token" && s.objects[id]!.controller === ap)).toBe(true);
+  });
+});

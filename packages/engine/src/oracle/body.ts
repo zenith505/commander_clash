@@ -499,6 +499,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // "Choose target battle. If an opponent protects it, remove a defense counter from it. Otherwise, put a defense counter
   // on it." (Portent Tracker) is one instruction about one battle.
   text = text.replace(/Choose target battle\. If an opponent protects it, remove (a|\w+) defense counters? from it\. Otherwise, put \1 defense counters? on it\./, (_, n: string) => `Remove ${n} defense counter${n === "a" ? "" : "s"} from target battle if an opponent protects it, otherwise put that many on it.`);
+  // "Create a Treasure token and exile the top card of that player's library. Until end of turn, you may cast that card."
+  // (Ragavan): two instructions, the second an impulse with its permission.
+  text = text.replace(/(^|\. )([Cc]reate an? [^.]+? token) and exile the top card of (your|that player's) library\. (?=(?:Until end of turn, )?[Yy]ou may (?:cast|play) that card)/, "$1$2. Exile the top card of $3 library. ");
   // "..., then shuffle and you gain 1 life" (Brokers Hideout): the search, then the life.
   text = text.replace(/, then shuffle and you gain (\d+) life\./g, ", then shuffle. You gain $1 life.");
   // "Destroy all creatures other than ~" (Magister of Worth) is "destroy all other creatures".
@@ -531,7 +534,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // Not after "If you do,": all of it depends on the payment ("If you do, choose a color, then ...").
     // Not after a leading condition either: "If you control a blue creature, draw a card, then discard a card" (Statute
     // of Denial) is all conditional.
-    .flatMap((x) => (/^If [^,]+, /.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then reveals the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|meld them into )/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
+    // Nor "you may exile target creature you control, then return that card to the battlefield" (Conjurer's Closet): one
+    // blink, all of it optional.
+    .flatMap((x) => (/^If [^,]+, /.test(x) || /^[Yy]ou may exile [^,]+, then return (?:it|that card) to the battlefield under (?:its owner's|your) control\.?$/.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then reveals the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|meld them into )/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
     // "Target opponent reveals their hand and you choose a nonland card from it": two instructions, in order.
     .flatMap((x) => x.split(/(?<=reveals (?:their|his or her) hand) and (?=you choose )/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p)))
     .flatMap(splitSpentPair)
@@ -780,6 +785,15 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const exEqualN = exEqual ? parseCount(exEqual[1]!, ctx) : null;
     if (exEqual && !exEqualN) return null;
     const exTop = exEqual ? (["", "X"] as unknown as RegExpExecArray) : new RegExp(`^[Ee]xile the top (?:card|${NUMX} cards) of your library$`).exec(impulseIf && !impulseIf.not ? impulseIf.text : s);
+    // "Exile the top card of that player's library. Until end of turn, you may cast that card." (Ragavan, after combat
+    // damage to a player): that player's card, cast only (no land play, rulings), paying its costs.
+    const theirTop = !exTop && !impulseIf && ctx.eventPlayer && /^[Ee]xile the top card of that player's library$/.test(s) ? /^(?:Until end of turn, you may cast that card|You may cast that card this turn)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (theirTop) {
+      effects.push({ type: "impulse", n: 1, until: "thisTurn", who: { ref: "eventPlayer" }, castOnly: true });
+      ctx.exiledTop = true;
+      si++;
+      continue;
+    }
     // With no duration (Dungeon of the Mad Mage's Runestone Caverns), for as long as each card stays exiled (CR 611.2a, 400.7).
     // "Until your next end step, you may play it" (Yasmin Khan, Wiccan, Ob Nixilis): over as your next end step begins.
     const playRe = /^(?:(Until the end of your next turn|Until end of turn|Until your next end step), you may play (?:that card|those cards|them|it)|You may play (?:that card|those cards|them|it)(?: (this turn|until the end of your next turn|until your next end step))?)$/;

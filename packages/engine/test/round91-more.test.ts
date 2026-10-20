@@ -122,3 +122,26 @@ describe("Chandra's Ignition", () => {
     expect(s.players[ap]!.life).toBe(life + 20);
   });
 });
+
+describe("Conjurer's Closet", () => {
+  const closet = card("Conjurer's Closet", "Artifact", "{5}", { oracleText: "At the beginning of your end step, you may exile target creature you control, then return that card to the battlefield under your control." });
+  it("parse", () => expect(isFullySupported(closet)).toBe(true));
+
+  it("you may blink a creature you control at your end step: it comes back as a new object", async () => {
+    const { passUntil } = await import("./helpers");
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, closet);
+    const b = putOnBattlefield(s0, ap, bear());
+    const zc = s0.objects[b]!.zoneChanges ?? 0;
+    let s = passUntil(s0, "end", ap);
+    for (let i = 0; i < 20 && s.step === "end"; i++) {
+      const p = s.pending;
+      if (p?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: b }] });
+      else if (p?.kind === "chooseMay") s = act(s, { type: "chooseMay", player: ap, yes: true });
+      else if (!s.stack.length && !s.triggerQueue.length) break;
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(s.objects[b]!.zone).toBe("battlefield");
+    expect(s.objects[b]!.zoneChanges ?? 0).toBeGreaterThan(zc);
+  });
+});

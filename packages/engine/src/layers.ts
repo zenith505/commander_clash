@@ -117,6 +117,8 @@ export interface Characteristics {
   untapsDuringOthers: boolean;
   /** Generic mana per creature attacking its controller (Ghostly Prison). */
   attackTax: number;
+  /** The same for attacking a planeswalker its controller controls (Sphere of Safety). */
+  attackTaxPlaneswalkers: number;
   /** Players it has to attack if able (encore). */
   mustAttack: PlayerId[];
   /** "Can't be blocked by creatures with power 2 or less", "by Walls" (CR 509.1b). */
@@ -214,6 +216,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     attacksIfAble: false,
     untapsDuringOthers: false,
     attackTax: 0,
+    attackTaxPlaneswalkers: 0,
     mustAttack: [],
     cantBeBlockedBy: [],
     cantBlockCreatures: [],
@@ -947,9 +950,12 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "untapsDuringOthers":
       c.untapsDuringOthers = true;
       return;
-    case "attackTax":
-      c.attackTax += m.n;
+    case "attackTax": {
+      const n = m.amount !== undefined ? Math.max(0, num(m.amount)) : m.n;
+      c.attackTax += n;
+      if (m.planeswalkers) c.attackTaxPlaneswalkers += n;
       return;
+    }
     case "blocksOnlyFlyers":
       c.blocksOnlyFlyers = true;
       return;
@@ -1175,6 +1181,7 @@ function countsSomething(st: StaticAbility): boolean {
   for (const m of st.mods) {
     if (m.kind === "definePT") return true;
     if ((m.kind === "modifyPT" || m.kind === "setPT") && (isCounted(m.power) || isCounted(m.toughness))) return true;
+    if (m.kind === "attackTax" && m.amount !== undefined && isCounted(m.amount)) return true;
   }
   return false;
 }

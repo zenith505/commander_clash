@@ -603,6 +603,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "putFromHand":
     case "revealFromHand":
     case "exileHand":
+    case "mayCastFromGraveyard":
     case "putInLibrary":
     case "putInGraveyard":
     case "exileGraveyard":

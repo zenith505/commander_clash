@@ -755,7 +755,8 @@ export type Modification =
    * Ghostly Prison: "Creatures can't attack you unless their controller pays {2} for each creature they control that's
    * attacking you" (CR 508.1g-h): generic mana per creature attacking its controller.
    */
-  | { kind: "attackTax"; n: number }
+  /** Ghostly Prison: {n} per attacker; Sphere of Safety: {X}, a count (`amount`), attacking your planeswalkers too. */
+  | { kind: "attackTax"; n: number; amount?: Amount; planeswalkers?: true }
   /** "Untap ~ during each other player's untap step" (CR 502.3). */
   | { kind: "untapsDuringOthers" }
   | { kind: "blocksOnlyFlyers" } // "can block only creatures with flying" (a blocking restriction, CR 509.1b)
@@ -1295,6 +1296,11 @@ export type Effect =
   | { type: "revealFromHand"; filter?: TargetSpec; bottom?: true }
   /** "Exile all cards from your hand" (face up); `until`, how long you may play them. How many is kept for "that many". */
   | { type: "exileHand"; until: "nextTurn" }
+  /**
+   * "Choose target artifact card in your graveyard. You may cast that card this turn." (Emry): a permission to cast it
+   * from there this turn, paying its costs and following the timing rules (CR 601.2, 601.3).
+   */
+  | { type: "mayCastFromGraveyard"; what: ObjRef }
   | { type: "putFromHand"; who?: PlayerRef; filter?: TargetSpec; tapped?: boolean; attacking?: boolean; may: boolean; any?: boolean; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand" }
   /**
    * "Return all land cards from your graveyard to the battlefield tapped" (CR 110.2a: under your control), "from all graveyards
@@ -2421,6 +2427,14 @@ export type TriggerEvent =
   | "enchantedPlayerAttacked"
   /** "Whenever you discard a card", "whenever a player cycles a card": see TriggeredAbility.discards. */
   | "playerDiscards"
+  /** "Whenever an opponent searches their library" (Archivist of Oghma): their own library, not another's (rulings). */
+  | "opponentSearchesLibrary"
+  /**
+   * "Whenever an opponent attacks you with two or more creatures" (Everett K. Ross), "Whenever an opponent attacks with
+   * creatures, if two or more of those creatures are attacking you and/or planeswalkers you control" (Mangara, Tomik): see
+   * TriggeredAbility.attacksYou. Once per declaration; "that opponent" is the event player.
+   */
+  | "opponentAttacksYou"
   /** "When you cycle ~" (CR 702.29c): it triggers from whatever zone the card went to, under its owner's control. */
   | "selfCycled"
   /**
@@ -2551,6 +2565,8 @@ export interface TriggeredAbility {
   damagesYou?: { by?: "you" | "opponent" | "any"; combat?: true };
   /** For "creaturesYouControlAttack": "Whenever you attack with two or more creatures", at least this many of them. */
   minAttackers?: number;
+  /** For "opponentAttacksYou": at least `min` attackers at you, or (`orPlaneswalkers`, an intervening if, CR 603.4) at your planeswalkers too. */
+  attacksYou?: { min: number; orPlaneswalkers?: true };
   /**
    * For "permanentEnters": what has to enter (the subject, "that creature"), relative to this permanent's
    * controller. "Another" leaves this permanent out; "~ or another" counts it whatever it is. Without

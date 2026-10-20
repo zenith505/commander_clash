@@ -13,7 +13,7 @@ import { abilitiesOf, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, ove
 import { MANA_ABILITY_OFFSET, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
 import { pickOptions, playerProtectedFrom, spellManaValue } from "./effects/targeting";
-import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, COLOR_NAMES } from "./effects";
+import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateTargets, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
 import { putCounters } from "./counters";
@@ -2283,7 +2283,10 @@ function resolveTop(s: GameState) {
   const item = s.stack.pop()!;
   if (item.kind === "ability") {
     const def = s.cards[item.sourceCardId!]!;
-    if (item.ifCond && item.sourceId && !staticConditionNow(s, item.ifCond, item.sourceId, item.controller, item.event?.player, item.event?.amount, item.sourceZc, item.subject?.id, item.subject?.zc)) {
+    // Mangara: those attackers still at you or your planeswalkers, or gone from the battlefield (as they last were, rulings).
+    const still = item.event?.attackingYou;
+    const atYou = still && (item.event!.group ?? []).filter((g) => { const a = s.objects[g.id]; return !a || a.zone !== "battlefield" || (a.zoneChanges ?? 0) !== g.zc || attackingYouNow(s, g.id, still.you, !!still.orPlaneswalkers); }).length;
+    if ((still && atYou! < still.min) || (item.ifCond && item.sourceId && !staticConditionNow(s, item.ifCond, item.sourceId, item.controller, item.event?.player, item.event?.amount, item.sourceZc, item.subject?.id, item.subject?.zc))) {
       log(s, `${def.name}'s ability does nothing (its "if" condition is no longer true).`); // CR 603.4
       return;
     }
@@ -3674,6 +3677,10 @@ export function graveyardWays(s: GameState, o: GameObject): CastFromGraveyard[] 
 function grantedWays(s: GameState, o: GameObject, d: CardDef): CastFromGraveyard[] {
   if (o.zone !== "graveyard") return [];
   const out: CastFromGraveyard[] = [];
+  // "You may cast that card this turn" (Emry): its owner, paying its mana cost; a card without one can't be cast.
+  const m = o.mayPlay;
+  if (m && m.player === o.owner && m.zc === (o.zoneChanges ?? 0) && m.until === "thisTurn" && m.turn === s.turn && d.manaCost && !compileCard(d).fromGraveyard?.some((w) => w.kind === "permission" && !w.costs.length))
+    out.push({ kind: "permission", mana: d.manaCost, costs: [], exile: false });
   for (const id of s.battlefield) {
     const p = obj(s, id);
     if (controllerOf(s, p) !== o.owner) continue;
@@ -5354,21 +5361,29 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
  */
 /**
  * What attacking `defender` costs for each creature (Ghostly Prison, Propaganda): generic mana, paid as attackers are
- * declared (CR 508.1g-h). Attacking their planeswalkers isn't attacking them.
+ * declared (CR 508.1g-h). Attacking their planeswalkers isn't attacking them, except for "you or planeswalkers you
+ * control" (Sphere of Safety); a battle they protect never is.
  */
-export function attackTaxPer(s: GameState, defender: PlayerId): number {
+export function attackTaxPer(s: GameState, defender: PlayerId, planeswalker = false): number {
   let n = 0;
   for (const id of s.battlefield) {
     const o = obj(s, id);
     const c = characteristics(s, o);
-    if (c.attackTax && c.controller === defender) n += c.attackTax;
+    if (c.controller === defender) n += planeswalker ? c.attackTaxPlaneswalkers : c.attackTax;
   }
   return n;
 }
 
+/** What one attack costs: at a player, or at a planeswalker or battle (`planeswalker`, the permanent attacked). */
+export function attackTaxOf(s: GameState, a: { defender: PlayerId; planeswalker?: ObjectId }): number {
+  if (a.planeswalker === undefined) return attackTaxPer(s, a.defender);
+  const pw = s.objects[a.planeswalker];
+  return pw && objIsType(s, pw, "Planeswalker") && controllerOf(s, pw) === a.defender ? attackTaxPer(s, a.defender, true) : 0;
+}
+
 /** The total attack tax for a declaration. */
 export function attackTax(s: GameState, attacks: { defender: PlayerId; planeswalker?: ObjectId }[]): number {
-  return attacks.reduce((n, a) => n + (a.planeswalker === undefined ? attackTaxPer(s, a.defender) : 0), 0);
+  return attacks.reduce((n, a) => n + attackTaxOf(s, a), 0);
 }
 
 export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, planeswalker = false): string | null {

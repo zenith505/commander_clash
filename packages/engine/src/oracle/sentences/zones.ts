@@ -29,6 +29,12 @@ export function parseEveryPlayerZonesSentence(s: string, ctx: Ctx): Effect[] | u
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
+  // Emry: "Choose target artifact card in your graveyard. You may cast that card this turn."
+  // The one target so far is that card, in your graveyard.
+  if (/^You may cast (?:that card|it) this turn$/.test(s) && ctx.targets.length === 1) {
+    const t = ctx.targets[0]!;
+    if (t.kind === "card" && t.owner === "you" && !t.many) return [{ type: "mayCastFromGraveyard", what: { ref: "target", index: 0 } }];
+  }
   // "Exile any number of target spells" (Mindbreak Trap): they leave the stack without being countered (rulings).
   if ((m = /^Exile (target spell|any number of target spells)$/i.exec(s))) {
     const spec: TargetSpec = { kind: "spell", types: [], notTypes: [], notColors: [], text: "target spell", ...(m[1] === "target spell" ? {} : { many: "any" as const }) };

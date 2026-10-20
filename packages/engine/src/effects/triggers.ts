@@ -183,6 +183,8 @@ export type TriggerSourceEvent =
   /** A spell or ability was just put on the stack with its targets: "becomes the target" (CR 601.2c, ward 702.21a). */
   /** `only`: its targets were changed (CR 115.7), and these are the new ones; that isn't a crime (CR 700.13). */
   | { type: "targeted"; stackId: string; only?: ObjectId[] }
+  /** A player searched their own library (CR 701.23). */
+  | { type: "searchedLibrary"; player: PlayerId }
   /** A player discarded a card (CR 701.9), `cycled` to pay a cycling cost (CR 702.29a). `id`: the card, in its new zone. */
   | { type: "discarded"; player: PlayerId; id: ObjectId; card: CardDef; cycled?: boolean }
   /** A card (or token) was put into a graveyard, from any zone. */
@@ -270,6 +272,15 @@ function trains(s: GameState, o: GameObject): boolean {
 /** The other creatures attacking along with it (battalion): those just declared as attackers with it. */
 function othersAttacking(s: GameState, o: GameObject, type?: string, tokens?: true): number {
   return s.battlefield.filter((id) => id !== o.id && s.objects[id]!.attacking !== undefined && objIsType(s, s.objects[id]!, "Creature") && (!tokens || s.objects[id]!.isToken) && (!type || characteristics(s, s.objects[id]!).subtypes.includes(type))).length;
+}
+
+/** Is this creature attacking `you`, or (`orPlaneswalkers`) a planeswalker `you` control? Not a battle (CR 506.2, 310). */
+export function attackingYouNow(s: GameState, id: ObjectId, you: PlayerId, orPlaneswalkers: boolean): boolean {
+  const a = s.objects[id];
+  if (!a || a.zone !== "battlefield" || a.attacking !== you) return false;
+  if (!a.attackingPermanent) return true;
+  const p = s.objects[a.attackingPermanent.id];
+  return orPlaneswalkers && !!p && p.zone === "battlefield" && (p.zoneChanges ?? 0) === a.attackingPermanent.zc && objIsType(s, p, "Planeswalker") && controllerOf(s, p) === you;
 }
 
 export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
@@ -818,6 +829,23 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     };
     for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === ev.controller) groupWatch(obj(s, id));
     fromGraveyards((o, owner) => owner === ev.controller && groupWatch(o));
+    // "Whenever an opponent attacks you with two or more creatures" (Mangara): each of the attacker's opponents counts
+    // the ones attacking them (and their planeswalkers, for Mangara).
+    if (ev.type === "groupAttack") {
+      for (const id of s.battlefield) {
+        const o = obj(s, id);
+        const you = controllerOf(s, o);
+        if (you === ev.controller) continue;
+        for (const t of abilitiesOf(s, o).triggers) {
+          if (t.event !== "opponentAttacksYou" || !t.attacksYou) continue;
+          const at = ev.ids.filter((x) => attackingYouNow(s, x, you, !!t.attacksYou!.orPlaneswalkers));
+          if (at.length < t.attacksYou.min) continue;
+          const group = at.map((x) => ({ id: x, zc: obj(s, x).zoneChanges ?? 0 }));
+          const info = { player: ev.controller, group, ...(t.attacksYou.orPlaneswalkers ? { attackingYou: { you, min: t.attacksYou.min, orPlaneswalkers: true as const } } : {}) };
+          add(o, you, (e, tt) => e === "opponentAttacksYou" && tt.body.text === t.body.text, undefined, undefined, undefined, undefined, undefined, undefined, info);
+        }
+      }
+    }
     // "Whenever enchanted player is attacked": once, however many creatures attack them; not for a planeswalker (rulings).
     if (ev.type === "groupAttack") {
       const attacked = new Set(ev.ids.map((x) => s.objects[x]).filter((a) => a?.attacking !== undefined && !a.attackingPermanent).map((a) => a!.attacking!));
@@ -1117,6 +1145,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (e !== "abilityActivated" || !a || ev.mana || (a.by === "opponent" && ev.player === you)) return false;
         return !a.of || (!!ev.source && objectMatches(s, a.of, ev.source.snapshot, you, false, undefined, ev.source.chars));
       }, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+    }
+  } else if (ev.type === "searchedLibrary") {
+    // Archivist of Oghma: it waits until the search's spell or ability has resolved, like any trigger (rulings).
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      const you = controllerOf(s, o);
+      if (you !== ev.player) add(o, you, (e) => e === "opponentSearchesLibrary", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
   } else if (ev.type === "draw") {
     for (const o of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)]) {

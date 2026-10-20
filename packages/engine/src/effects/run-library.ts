@@ -482,6 +482,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // They've searched, found something or not (Archive Trap rulings).
         const searched = ((s.turnLog ??= {}).searched ??= []);
         if (!yardOnly && !searched.includes(p.id)) searched.push(p.id);
+        if (!yardOnly && libOf(p.id) === p) fireEvent(s, { type: "searchedLibrary", player: p.id });
         let cards = [...(yardOnly ? [] : libOf(p.id).library), ...(e.orGraveyard ? p.graveyard : [])].filter(fits);
         // At most one of each name: cards with the same name in a library are alike, so one of each is offered.
         if (e.oneEach) cards = cards.filter((id, i) => cards.findIndex((x) => sameName(defOf(s, obj(s, x)).name, defOf(s, obj(s, id)).name)) === i);

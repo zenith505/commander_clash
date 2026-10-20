@@ -16,6 +16,7 @@ import {
   attackablePermanentProblem,
   attackProblem,
   attackTax,
+  attackTaxOf,
   attackTaxPer,
   blockProblem,
   cantBlockNow,
@@ -3312,10 +3313,10 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
       if (declared.length === 1 && characteristics(s, obj(s, declared[0]!.attacker)).cantAttackAlone) declared = [];
       return [...(declared.length ? taps : []), { type: "declareAttackers", player: pid, attacks: declared }];
     }
-    const taxed = declared.filter((a) => a.planeswalker === undefined && attackTaxPer(s, a.defender)).sort((a, b) => power(s, obj(s, a.attacker)) - power(s, obj(s, b.attacker)))[0]!;
+    const taxed = declared.filter((a) => attackTaxOf(s, a)).sort((a, b) => power(s, obj(s, a.attacker)) - power(s, obj(s, b.attacker)))[0]!;
     const o = obj(s, taxed.attacker);
     const elsewhere = opps.find((d) => !attackTaxPer(s, d) && !attackProblem(s, o, d) && !characteristics(s, o).goadedBy.includes(d));
-    declared = declared.flatMap((a) => (a !== taxed ? [a] : elsewhere !== undefined ? [{ ...a, defender: elsewhere }] : []));
+    declared = declared.flatMap((a) => (a !== taxed ? [a] : elsewhere !== undefined ? [{ attacker: a.attacker, defender: elsewhere }] : []));
   }
 }
 

@@ -1425,6 +1425,11 @@ export interface TriggerEventInfo {
   /** "Whenever one or more Dragons you control deal combat damage": those that did, as the objects they were ("one of those Dragons"). */
   group?: { id: ObjectId; zc: number }[];
   player?: PlayerId;
+  /**
+   * "If two or more of those creatures are attacking you and/or planeswalkers you control" (Mangara): checked again as it
+   * resolves (CR 603.4) with `group`, those attackers; one that left the battlefield counts as it last was (rulings).
+   */
+  attackingYou?: { you: PlayerId; min: number; orPlaneswalkers?: true };
   /** A permanent's enters trigger: the opponent its spell's gift was promised to (CR 702.174b). */
   gift?: PlayerId;
   /** A permanent's enters trigger: evidence was collected for its spell (CR 701.59c). */

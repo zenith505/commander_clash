@@ -1974,7 +1974,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "You may play the exiled card without paying its mana cost" asks as it plays it (see the playLinked effect).
     // "You may play an additional land this turn" is a permission, not a choice made now (CR 305.2a).
     // "You may draw a card unless that player pays {1}" (Rhystic Study): they decide first (see the punisher sentences).
-    const may = /^[Yy]ou may (?!play the exiled card |play (?:an|up to \w+) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast spells this turn as though they had flash$)(.+)$/.exec(s);
+    const may = /^[Yy]ou may (?!play the exiled card |play (?:an|up to \w+) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast spells this turn as though they had flash$|cast (?:that card|it) this turn$)(.+)$/.exec(s);
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
       // don't control": ~ does it, if you choose.

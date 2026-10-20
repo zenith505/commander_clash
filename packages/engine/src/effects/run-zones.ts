@@ -1142,6 +1142,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       log(s, shown.length ? `${p.name} reveals ${shown.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their hand.` : `${p.name} reveals no cards.`);
       return;
     }
+    case "mayCastFromGraveyard": {
+      // The permission is this object's only (CR 400.7), and ends with the turn (cleanup, like an exiled card's).
+      for (const o of objects(s, e.what, ctx)) {
+        if (o.zone !== "graveyard") continue;
+        o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, castOnly: true };
+        log(s, `${player(s, ctx.controller).name} may cast ${defOf(s, o).name} from their graveyard this turn.`);
+      }
+      return;
+    }
     case "exileHand": {
       const p = player(s, ctx.controller);
       const ids = [...p.hand];

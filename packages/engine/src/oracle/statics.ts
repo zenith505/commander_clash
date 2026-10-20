@@ -634,6 +634,8 @@ function parseAffected(subject: string): Affects | null {
   // Anything else a group can say: "Each creature you control with a +1/+1 counter on it", "Creatures of the chosen type";
   // "Creatures you control with +1/+1 counters on them" is the same group.
   // "Creatures with ice counters on them" (Rimescale Dragon) likewise.
+  // "Equipment you control have equip {0}" (Puresteel Paladin): the plural of Equipment is Equipment.
+  if ((m = /^(Other )?Equipment you control$/.exec(x))) return parseAffected(`Each ${m[1] ? "other " : ""}Equipment you control`);
   const plural = /^Creatures( you control)? with ([+-]1\/[+-]1|ice) counters on them$/.exec(x);
   const g = parseGroup(plural ? `Each creature${plural[1] ?? ""} with ${plural[2] === "ice" ? "an" : "a"} ${plural[2]} counter on it` : x, true);
   return g ? { kind: "filter", types: [], spec: g.filter, ...(g.other ? { other: true } : {}) } : null;
@@ -959,8 +961,14 @@ function parseStaticLine(line: string): StaticAbility | null {
   // "You control enchanted creature." (Mind Control)
   if (/^You control enchanted (creature|permanent|artifact|land)$/.test(text)) return { affects: { kind: "attached" }, mods: [{ kind: "control" }], text: line };
   // Ghostly Prison, Propaganda (CR 508.1g-h).
-  const tax = /^Creatures can't attack you unless their controller pays \{(\d+)\} for each creature they control that's attacking you$/.exec(text);
-  if (tax) return { affects: { kind: "self" }, mods: [{ kind: "attackTax", n: Number(tax[1]) }], text: line };
+  // Sphere of Safety: "you or planeswalkers you control ... {X} for each of those creatures, where X is ...", counted now.
+  const tax = /^Creatures can't attack you( or planeswalkers you control)? unless their controller pays \{(\d+|X)\} for each (?:creature they control that's attacking you|of those creatures)(?:, where X is (.+))?$/.exec(text);
+  if (tax) {
+    if ((tax[2] === "X") !== !!tax[3]) return null;
+    const amount = tax[3] ? parseCount(tax[3], null) : null;
+    if (tax[3] && !amount) return null;
+    return { affects: { kind: "self" }, mods: [{ kind: "attackTax", n: amount ? 0 : Number(tax[2]), ...(amount ? { amount } : {}), ...(tax[1] ? { planeswalkers: true as const } : {}) }], text: line };
+  }
   // "Untap ~ during each other player's untap step", "Untap all permanents you control during ..." (Seedborn Muse):
   // they untap with the active player's permanents (CR 502.3); "doesn't untap during your untap step" doesn't apply.
   const untaps = /^Untap (~|all (.+?) you control|each (.+? you control(?: with .+)?)) during each other player's untap step$/.exec(text);

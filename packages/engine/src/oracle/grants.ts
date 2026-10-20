@@ -19,7 +19,9 @@ export function compileGranted(text: string): CompiledCard {
     // A quoted ability inside the granted one is in single quotes ('... token with 'This token gets +1/+1 ...'', Urza's
     // Saga): double quotes once it's an ability of its own.
     const own = text.replace(/ with '([^']+?\.)'/g, ' with "$1"');
-    hit = compile({ name: "", oracleText: own, types: [], subtypes: [], supertypes: [], keywords: [], colors: [], colorIdentity: [], manaCost: "", cmc: 0, typeLine: "", oracleId: `granted:${text}` });
+    // An equip ability given to Equipment (Puresteel Paladin's "Equipment you control have equip {0}").
+    const subtypes = /^Equip \{\d+\}$/.test(text) ? ["Equipment"] : [];
+    hit = compile({ name: "", oracleText: own, types: [], subtypes, supertypes: [], keywords: [], colors: [], colorIdentity: [], manaCost: "", cmc: 0, typeLine: "", oracleId: `granted:${text}` });
     grantedCache.set(text, hit);
   }
   return hit;
@@ -152,6 +154,12 @@ export function parseGrants(text: string): Modification[] | null {
     const ward = /^ward ((?:\{(?:\d+|[WUBRGC])\})+)$/i.exec(w) ?? /^ward—pay (\d+) life$/i.exec(w);
     if (ward) {
       out.push({ kind: "addAbility", text: /life$/i.test(w) ? `Ward—Pay ${ward[1]} life` : `Ward ${ward[1]}` });
+      continue;
+    }
+    // "Equipment you control have equip {0}" (Puresteel Paladin): another equip ability (CR 702.6a, 702.6e).
+    const equip = /^equip (\{\d+\})$/i.exec(w);
+    if (equip) {
+      out.push({ kind: "addAbility", text: `Equip ${equip[1]}` });
       continue;
     }
     const k = parseKeywordList(w);

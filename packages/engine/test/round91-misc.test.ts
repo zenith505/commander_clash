@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, activate, bear, card, cast, passUntil, putOnBattlefield, setup } from "./helpers";
-import { botActions, isFullySupported, manaAbilitiesOn, planActivate, planCast, waitingOn, type GameState, type PlayerId } from "../src";
+import { botActions, compileCard, isFullySupported, manaAbilitiesOn, planActivate, planCast, waitingOn, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const sword = card("Sword of Feast and Famine", "Artifact — Equipment", "{3}", { oracleText: "Equipped creature gets +2/+2 and has protection from black and from green.\nWhenever equipped creature deals combat damage to a player, that player discards a card and you untap all lands you control.\nEquip {2}" });
@@ -178,5 +178,35 @@ describe("Talon Gates of Madara", () => {
     Object.assign(s.objects[ids[0]!]!, { zone: "graveyard", zoneChanges: (s.objects[ids[0]!]!.zoneChanges ?? 0) + 1 });
     s = settleAll(s);
     expect(s.objects[ids[0]!]!.zone).toBe("graveyard");
+  });
+});
+
+describe("Hullbreaker Horror", () => {
+  const horror = card("Hullbreaker Horror", "Creature — Kraken Horror", "{5}{U}{U}", { power: "7", toughness: "8", keywords: ["Flash"], oracleText: "Flash\nThis spell can't be countered.\nWhenever you cast a spell, choose up to one —\n• Return target spell you don't control to its owner's hand.\n• Return target nonland permanent to its owner's hand." });
+  it("parse", () => expect(isFullySupported(horror)).toBe(true));
+
+  it("whenever you cast a spell: up to one mode, bouncing a nonland permanent", () => {
+    const { s: s0, ap, ids, opp } = setup([bear()]);
+    putOnBattlefield(s0, ap, horror);
+    const theirs = putOnBattlefield(s0, opp, bear());
+    let s = s0;
+    for (const a of planCast(s, ap, ids[0]!)!) s = act(s, a);
+    for (let i = 0; i < 10 && s.pending; i++) {
+      const p = s.pending;
+      if (p.kind === "chooseModes") s = act(s, { type: "chooseModes", player: ap, modes: [1] });
+      else if (p.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: theirs }] });
+      else break;
+    }
+    s = settleAll(s);
+    expect(s.objects[theirs]!.zone).toBe("hand");
+    expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
+  });
+
+  it("a spell you don't control can be returned to its owner's hand", () => {
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, horror);
+    const spec = compileCard(horror).triggers[0]!.body.modal!.modes[0]!.targets[0]!;
+    expect(spec).toMatchObject({ kind: "spell", controller: "opponent" });
+    void s0; void opp;
   });
 });

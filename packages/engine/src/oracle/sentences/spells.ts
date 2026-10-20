@@ -307,7 +307,7 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return spec && [{ type: "counterSpell", index: addTarget(ctx, spec) }];
   }
   // "Return target spell to its owner's hand" (Reprieve): it leaves the stack without being countered.
-  if ((m = /^Return target (.*?spell) to its owner's hand$/i.exec(s))) {
+  if ((m = /^Return target (.*?spell(?: you don't control| an opponent controls)?) to its owner's hand$/i.exec(s))) {
     const spec = parseTargetPhrase(m[1]!);
     return spec?.kind === "spell" && !spec.xRange ? [{ type: "counterSpell", index: addTarget(ctx, spec), bounce: true }] : null;
   }

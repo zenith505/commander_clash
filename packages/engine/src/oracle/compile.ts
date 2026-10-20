@@ -8,7 +8,7 @@ import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
 import type { CardDef, PlayerId } from "../types";
 import type { CopyExcept } from "../copies";
-import { NUM, num, NUMX, COUNTER, counterKind, X, amt, parseSpentReq, plainMana, sacrificeSelf, SPENT, ROLL_ROW, COLOR_WORDS } from "./words";
+import { NUM, num, NUMX, COUNTER, counterKind, X, amt, parseSpentReq, plainMana, sacrificeSelf, SPENT, ROLL_ROW, COLOR_WORDS, capital } from "./words";
 import { parseManaAbility, parseManaTrigger } from "./mana-abilities";
 import { parseGraveyardKeyword, parseCostKeyword, parseAdditionalCost, keywordAbilities, textKeywords, isKeywordLine, firebending, rippleBody } from "./keyword-abilities";
 import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseCostChange, parseStatic, parseStaticCondition, parseOnlyClauses } from "./statics";
@@ -796,6 +796,14 @@ export function compile(d: CardDef): CompiledCard {
         const c = /^an? (creature type|color)(?: other than (\w+))?$/.exec(part)!;
         (out.entersChoose ??= []).push({ what: c[1] === "color" ? "color" : "creatureType", ...(c[2] ? { except: c[2] } : {}) });
       }
+      continue;
+    }
+    // "As this artifact enters, choose artifact, creature, enchantment, instant, or sorcery." (Cloud Key, CR 614.12): a
+    // card type, kept as Chosen.cardType.
+    const asCardType = /^As (?:~|it) enters, choose ((?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle)(?:, (?:or )?(?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle))+)\.$/.exec(line);
+    if (asCardType) {
+      if (out.entersChoose?.some((c) => c.what === "cardType")) out.unsupported.push(raw);
+      else (out.entersChoose ??= []).push({ what: "cardType", options: asCardType[1]!.split(/, (?:or )?/).map(capital) });
       continue;
     }
     // "As ~ enters, choose a nonland card name." (CR 614.12, 201.4): kept while it's on the battlefield, as Chosen.name.
@@ -1653,7 +1661,8 @@ export function compile(d: CardDef): CompiledCard {
     const cost = parseCostChange(line);
     if (cost) {
       if (cost === "fail") out.unsupported.push(raw);
-      else if ("costMod" in cost) out.costMods = [...(out.costMods ?? []), cost.costMod];
+      // "Spells you cast of the chosen type" after "choose artifact, creature, ..." (Cloud Key): the card type chosen.
+      else if ("costMod" in cost) out.costMods = [...(out.costMods ?? []), cost.costMod.filter.chosen === "type" && out.entersChoose?.some((c) => c.what === "cardType") ? { ...cost.costMod, filter: { ...cost.costMod.filter, chosen: "cardType" } } : cost.costMod];
       else if ("less" in cost) out.costLess = [...(out.costLess ?? []), cost.less];
       else if ("lessIfTargets" in cost) out.costLessIfTargets = [...(out.costLessIfTargets ?? []), cost.lessIfTargets];
       else if ("targetTax" in cost) out.targetTax = (out.targetTax ?? 0) + cost.targetTax;

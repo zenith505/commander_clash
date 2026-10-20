@@ -653,7 +653,7 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // "Protection from black and from red" is two protection abilities (CR 702.16g).
-    const kwLine = line.replace(/protection from (\w+) and from (\w+)/gi, "protection from $1, protection from $2");
+    const kwLine = line.replace(/(protection|hexproof) from (\w+) and from (\w+)/gi, "$1 from $2, $1 from $3");
     if (isKeywordLine(kwLine)) {
       out.textKeywords.push(...textKeywords(kwLine));
       continue;

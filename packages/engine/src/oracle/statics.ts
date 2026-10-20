@@ -437,7 +437,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^you've been dealt damage by ${NUM} or more creatures this turn$`).exec(text))) return { kind: "damagedByCreatures", n: num(m[1]!) };
   if (/^an opponent gained life this turn$/.test(text)) return { kind: "opponentGainedLife" };
   if ((m = new RegExp(`^an opponent had ${NUM} or more cards put into their graveyard from anywhere this turn$`).exec(text))) return { kind: "opponentCardsToGraveyard", n: num(m[1]!) };
-  if ((m = /^an opponent cast an? (white|blue|black|red|green) spell this turn$/.exec(text))) return { kind: "opponentCast", color: COLOR_WORDS[m[1]!]! };
+  if ((m = /^an opponent (?:has )?cast an? (white|blue|black|red|green)(?: or (white|blue|black|red|green))? spell this turn$/.exec(text)))
+    return { kind: "opponentCast", colors: [COLOR_WORDS[m[1]!]!, ...(m[2] ? [COLOR_WORDS[m[2]]!] : [])] };
   if ((m = /^you have no (land|creature|artifact|enchantment|instant|sorcery|planeswalker) cards in hand$/.exec(text))) return { kind: "noneInHand", filter: { kind: "card", types: [capital(m[1]!)], text: `${m[1]} card` } };
   if ((m = new RegExp(`^an opponent was dealt ${NUM} or more damage this turn$`).exec(text))) return { kind: "opponentDealtDamage", n: num(m[1]!) };
   if ((m = new RegExp(`^you attacked with ${NUM} or more creatures this turn$`).exec(text))) return { kind: "attackedWith", n: num(m[1]!) };

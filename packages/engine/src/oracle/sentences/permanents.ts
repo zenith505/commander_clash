@@ -416,14 +416,16 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // (Lazotep Plating), "You and target permanent you control each gain protection from the chosen player until end of
   // turn" (Guardian Archon), "you gain protection from the chosen color" (Seht's Tiger): the player gains it too (CR
   // 702.11d, 702.16b-e, 702.16k, 702.18d).
-  if ((m = /^You(?: and (.+?))?(?: each)? gains? (hexproof|shroud|protection from [a-z ]+?) until end of turn$/i.exec(s))) {
-    const k = canonicalKeyword(m[2]!);
-    if (!k || !/^(?:Hexproof|Shroud|Protection from )/.test(k)) return null;
-    const out: Effect[] = [{ type: "playerGains", keywords: [k] }];
+  // "You and permanents you control gain hexproof from blue and from black until end of turn" (Veil of Summer): two
+  // hexproof abilities (CR 702.11f).
+  if ((m = /^You(?: and (.+?))?(?: each)? gains? (hexproof(?: from [a-z]+(?: and from [a-z]+)?)?|shroud|protection from [a-z ]+?) until end of turn$/i.exec(s))) {
+    const keywords = m[2]!.replace(/^hexproof from (\w+) and from (\w+)$/i, "hexproof from $1|hexproof from $2").split("|").map(canonicalKeyword);
+    if (!keywords.every((k) => k && /^(?:Hexproof|Shroud|Protection from )/.test(k))) return null;
+    const out: Effect[] = [{ type: "playerGains", keywords: keywords as string[] }];
     if (m[1]) {
       const what = parseObject(m[1], ctx);
       if (!what) return null;
-      out.push({ type: "continuous", what, mods: [{ kind: "addKeywords", keywords: [k] }], duration: "endOfTurn" });
+      out.push({ type: "continuous", what, mods: [{ kind: "addKeywords", keywords: keywords as string[] }], duration: "endOfTurn" });
     }
     return out;
   }

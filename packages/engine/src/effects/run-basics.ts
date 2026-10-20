@@ -182,7 +182,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       return;
     case "turnRules":
       for (const rule of e.rules) (s.turnRules ??= []).push({ turn: s.turn, player: ctx.controller, rule });
-      log(s, `${player(s, ctx.controller).name}${e.rules.map((r) => (r === "cantLoseLife" ? " can't lose life" : r === "cantLoseGame" ? " can't lose the game" : "'s opponents can't win the game")).join(",")} this turn.`);
+      log(s, `${player(s, ctx.controller).name}${e.rules.map((r) => (r === "cantLoseLife" ? " can't lose life" : r === "cantLoseGame" ? " can't lose the game" : r === "flash" ? " may cast spells as though they had flash" : r === "spellsUncounterable" ? "'s spells can't be countered" : "'s opponents can't win the game")).join(",")} this turn.`);
       return;
     case "noLifeGain":
       (s.noLifeGain ??= []).push({ turn: s.turn, controller: ctx.controller, who: e.players });

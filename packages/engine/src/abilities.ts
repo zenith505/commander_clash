@@ -999,8 +999,11 @@ export type StaticCondition =
   | { kind: "opponentGainedLife" }
   /** "If an opponent had three or more cards put into their graveyard from anywhere this turn" (Ravenous Trap): cards, not tokens. */
   | { kind: "opponentCardsToGraveyard"; n: number }
-  /** "If an opponent cast a blue spell this turn" (Ricochet Trap): the spell's colors as it was cast. */
-  | { kind: "opponentCast"; color: Color }
+  /**
+   * "If an opponent cast a blue spell this turn" (Ricochet Trap), "if an opponent has cast a blue or black spell this
+   * turn" (Veil of Summer): one of these colors, the spell's colors as it was cast.
+   */
+  | { kind: "opponentCast"; colors: Color[] }
   /** "If you have no land cards in hand" (Land Grant). */
   | { kind: "noneInHand"; filter: TargetSpec }
   /**

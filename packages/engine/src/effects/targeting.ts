@@ -6,7 +6,7 @@ import { abilitiesOf, defOf, objHasKeyword, objIsType, power, toughness } from "
 import { attackedPlaneswalker, creatureTypesOf, livingPlayers, obj, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, type Characteristics } from "../layers";
 import { expandMany, expandPerOpponent, manySlot, modeCountProblem } from "../modes";
-import { CREATURE_TYPES, protectedFromPlayer, type SourceQuality } from "../keywords";
+import { CREATURE_TYPES, hexproofFrom, protectedFromPlayer, type SourceQuality } from "../keywords";
 import { protectedFrom } from "../damage";
 import type { CardDef, Chosen, Color, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
 import { COLOR_NAMES } from "./describe";
@@ -92,6 +92,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.status && !hasStatus(s, o, c, spec.status, view)) return false;
   if (spec.suspected && o.suspected === undefined) return false;
   if (targeting && c.controller !== controller && objHasKeyword(s, o, "Hexproof")) return false;
+  if (targeting && src && c.controller !== controller && hexproofFrom(c.keywords, src)) return false; // CR 702.11d
   if (targeting && objHasKeyword(s, o, "Shroud")) return false; // CR 702.18a: not even its controller can target it
   if (targeting && c.untargetable?.some((u) => untargetableBy(u, controller, src))) return false;
   // Protection from the source's color: it can't be targeted (CR 702.16b), enchanted or equipped (702.16c-d). From a
@@ -311,6 +312,8 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     const prot = playerProtection(s, t.id);
     if (prot === "shroud" || (prot === "hexproof" && t.id !== controller)) return false;
     if (playerProtectedFrom(s, t.id, controller, src)) return false; // CR 702.16b, 702.16k
+    // "You gain hexproof from blue and from black until end of turn" (Veil of Summer): as for a permanent (CR 702.11d).
+    if (src && t.id !== controller && hexproofFrom(gainedBy(s, t.id), src)) return false;
     if (spec.kind === "any") return !spec.opponent || t.id !== controller;
     if (spec.kind !== "player") return false;
     return !spec.opponent || t.id !== controller;

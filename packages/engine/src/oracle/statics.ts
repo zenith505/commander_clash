@@ -486,6 +486,12 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^(you|an opponent|defending player) controls? (.+)$/.exec(text))) {
     // "At least three other enchantments" (Ephara, Ever-Sheltering) is "three or more other enchantments".
     m[2] = m[2]!.replace(/^at least (\w+) /, "$1 or more ");
+    // "Seven or more lands with different names" (Field of the Dead): names counted once each.
+    const names = new RegExp(`^${NUM} or more (lands|creatures|artifacts) with different names$`).exec(m[2]!);
+    if (names && m[1] === "you") {
+      const filter = pickFilter(names[2]!);
+      return filter ? { kind: "control", who: "you", filter, min: num(names[1]!), differentNames: true } : null;
+    }
     const who = m[1] === "you" ? "you" : m[1] === "an opponent" ? "opponent" : "defending";
     // Each attacking creature has its own defending player (CR 506.2), so only the source's own is modeled.
     if (who === "defending" && st.affects.kind !== "self") return null;

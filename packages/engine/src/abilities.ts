@@ -1050,7 +1050,7 @@ export type StaticCondition =
    * "As long as you control three or more artifacts / another Wizard / no untapped lands", "as long as
    * an opponent controls an Island", "as long as defending player controls an artifact".
    */
-  | { kind: "control"; who: "you" | "opponent" | "defending"; filter: TargetSpec; min?: number; max?: number; other?: boolean; /** "Five other Mountains" after "Whenever a Mountain you control enters" (Valakut): other than the one that entered (rulings). */ otherThanSubject?: true }
+  | { kind: "control"; who: "you" | "opponent" | "defending"; filter: TargetSpec; min?: number; max?: number; other?: boolean; /** "Five other Mountains" after "Whenever a Mountain you control enters" (Valakut): other than the one that entered (rulings). */ otherThanSubject?: true; /** "Lands with different names" (Field of the Dead): each name counted once. */ differentNames?: true }
   /** "If an opponent controls an Island and you control a Mountain" (Mogg Salvage): all of them at once. */
   | { kind: "allOf"; conds: StaticCondition[] }
   /**

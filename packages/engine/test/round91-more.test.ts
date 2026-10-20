@@ -204,3 +204,20 @@ describe("Necropotence", () => {
     expect(s.objects[ids[0]!]!.zone).toBe("graveyard");
   });
 });
+
+describe("Field of the Dead", () => {
+  const field = card("Field of the Dead", "Land", "", { oracleText: "This land enters tapped.\n{T}: Add {C}.\nWhenever this land or another land you control enters, if you control seven or more lands with different names, create a 2/2 black Zombie creature token." });
+  const ruins = card("Old Ruins", "Land", "", { oracleText: "{T}: Add {C}." });
+  const zombies = (s: GameState, pid: PlayerId) => s.battlefield.filter((id) => s.objects[id]!.controller === pid && s.cards[s.objects[id]!.cardId]!.name === "Zombie Token").length;
+  it("parse", () => expect(isFullySupported(field)).toBe(true));
+
+  it("a Zombie only with seven or more land names", () => {
+    // setup's lands: Mountain, Island, Forest, Plains, Swamp (five names, many of each).
+    const { s: s0, ap, ids } = setup([field, ruins]);
+    let s = settle(act(s0, { type: "playLand", player: ap, objectId: ids[0]! }));
+    expect(zombies(s, ap)).toBe(0); // six names
+    s.players[ap]!.landsPlayedThisTurn = 0;
+    s = settle(act(s, { type: "playLand", player: ap, objectId: ids[1]! }));
+    expect(zombies(s, ap)).toBe(1); // seven names
+  });
+});

@@ -726,12 +726,17 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const whose = cond.who === "defending" ? (src.attacking !== undefined ? [src.attacking] : []) : cond.who === "opponent" ? s.turnOrder.filter((p) => p !== you && !s.players[p]!.lost) : [you];
       return whose.some((who) => {
         let n = 0;
+        // A face-down permanent has no name (CR 708.2), so it adds none.
+        const names = new Set<string>();
         for (const [id, c] of chars) {
           if (cond.other && id === sourceId) continue;
           if (cond.otherThanSubject && id === subjectId) continue;
           if (c.controller !== who) continue;
-          if (objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c, (x) => chars.get(x.id))) n++;
+          if (!objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c, (x) => chars.get(x.id))) continue;
+          if (!cond.differentNames) n++;
+          else if (!s.objects[id]!.faceDown) names.add(c.name);
         }
+        if (cond.differentNames) n = names.size;
         return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max);
       });
     }

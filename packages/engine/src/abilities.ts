@@ -257,6 +257,8 @@ export interface TargetSpec {
   doubleFaced?: true;
   /** "Transformed permanent" (CR 701.27g): a nonmodal double-faced permanent with its back face up, not melded or merged. */
   transformed?: true;
+  /** "Each with power greater than its base power" (Kutzil): see basePowerNow. */
+  powerAboveBase?: true;
   /** Excluded card types, e.g. "nonland permanent" -> ["Land"]. */
   notTypes?: string[];
   /** Excluded colors, e.g. "nonblack creature" -> ["B"]. */
@@ -909,7 +911,8 @@ export type StaticCondition =
   /** A trigger's "if its toughness is 3 or less" about its own source (Young Hero Role, CR 603.4): power or toughness now. */
   | { kind: "selfPT"; stat: "power" | "toughness"; min?: number; max?: number }
   /** "Draw a card if its power is 3 or greater" about a trigger's subject (Tribute to the World Tree): as it is now, or as it last existed (CR 608.2h). */
-  | { kind: "subjectPT"; stat: "power" | "toughness"; min?: number; max?: number }
+  /** `greatest`: "if its power is greater than each other creature's power" (Selvala, Heart of the Wilds), creatures on the battlefield now. */
+  | { kind: "subjectPT"; stat: "power" | "toughness"; min?: number; max?: number; greatest?: true }
   /** "Activate only if ~ entered this turn or if you control a basic land": either one. */
   | { kind: "anyOf"; conds: StaticCondition[] }
   /** Coven: "if you control three or more creatures with different powers" (three or more different power values). */
@@ -1516,6 +1519,12 @@ export type Effect =
   | { type: "exileSelfWithTime"; n: number }
   /** Warp's end-step trigger (CR 702.185a): exile the permanent; its owner may cast the card after this turn. */
   | { type: "warpExile" }
+  /**
+   * "Choose an exiled card an opponent owns with a void counter on it. You may play it this turn without paying its mana
+   * cost." (Dauthi Voidwalker): chosen as it resolves, not targeted; the permission is that card's while it stays
+   * exiled (CR 400.7), with the usual timing (rulings).
+   */
+  | { type: "playExiled"; counter: CounterKind; free?: true }
   /** "Exile the top two cards of your library. Until the end of your next turn, you may play those cards." */
   /** `who`: "the top card of that player's library" (Ragavan), not yours; `castOnly`: "you may cast that card", not play it. */
   | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" | "yourNextEndStep"; who?: PlayerRef; castOnly?: true }
@@ -2896,6 +2905,12 @@ export interface ManaAbility {
    * commanders' creature types as they are just after the spell is cast.
    */
   spentTrigger?: { body: AbilityBody; sharesCommanderType: true };
+  /**
+   * "If any of that mana is spent on a creature spell, it gains haste until end of turn." (Arena of Glory, Generator
+   * Servant), "If that mana is spent on a creature spell, it gains haste." (Hall of the Bandit Lord, which doesn't wear
+   * off): a creature spell any of it pays any part of the total cost of (rulings), and the creature it becomes.
+   */
+  spentHaste?: "endOfTurn" | "game";
   /** Depletion lands: "Put a depletion counter on ~." after the mana is added. */
   putCounter?: CounterKind;
   /** Depletion lands: "If there are no depletion counters on ~, sacrifice it." after the mana is added. */
@@ -3134,6 +3149,14 @@ export interface CompiledCard {
   shuffleInsteadOfGraveyard?: boolean;
   /** "If ~ would be put into a graveyard from anywhere, exile it instead" (a disturb card's back face, CR 614.1a). */
   exileInsteadOfGraveyard?: boolean;
+  /**
+   * "If a card or token would be put into a graveyard from anywhere, exile it instead." (Rest in Peace), "If a card would
+   * be put into an opponent's graveyard from anywhere, exile it instead." (Leyline of the Void), "..., instead exile it
+   * with a void counter on it." (Dauthi Voidwalker), "If an instant or sorcery card would be put into a graveyard from
+   * anywhere, ..." (Dryad Militant): a replacement effect of this permanent (CR 614.1a) on cards (and with `tokens`,
+   * tokens) going to the graveyards of `whose` (from this permanent's controller's view), its owner's (CR 404.2).
+   */
+  graveyardExile?: { whose: "any" | "opponents" | "yours"; tokens?: true; filter?: TargetSpec; counter?: CounterKind };
   /** "This creature enters prepared" (CR 722.3a): it becomes prepared as it enters. */
   entersPrepared?: boolean;
   /**

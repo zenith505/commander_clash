@@ -1624,6 +1624,27 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       log(s, `${player(s, ctx.controller).name} puts ${characteristics(s, o).name} onto the battlefield tapped${o.attacking !== undefined ? ` and attacking ${attackedName(s, o)}` : ""} (ninjutsu).`);
       return;
     }
+    case "playExiled": {
+      const sc = (s.resolving!.scratch ??= {});
+      const you = ctx.controller;
+      const ok = (id: ObjectId) => s.objects[id]?.zone === "exile" && obj(s, id).owner !== you && !obj(s, id).isToken && (obj(s, id).counters[e.counter] ?? 0) > 0;
+      if (!sc.found) {
+        const cards = s.turnOrder.flatMap((pid) => player(s, pid).exile).filter(ok);
+        if (!cards.length) {
+          log(s, `${player(s, you).name} has no exiled card with a ${e.counter} counter to choose.`);
+          return;
+        }
+        s.pending = { kind: "searchLibrary", player: you, source: src, what: `an exiled card an opponent owns with a ${e.counter} counter on it`, cards, min: 1, max: 1, exiled: true, dig: { looked: cards, to: `to play this turn${e.free ? " without paying its mana cost" : ""}`, rest: "stay in exile" } };
+        return "paused";
+      }
+      const id = sc.found.find(ok);
+      sc.found = undefined;
+      if (!id) return;
+      const o = obj(s, id);
+      o.mayPlay = { player: you, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, ...(e.free ? { free: true as const } : {}) };
+      log(s, `${player(s, you).name} chooses ${defOf(s, o).name} and may play it this turn${e.free ? " without paying its mana cost" : ""}.`);
+      return;
+    }
     case "warpExile":
       for (const o of objects(s, { ref: "subject" }, ctx)) {
         log(s, `${defOf(s, o).name} is exiled (warp). Its owner may cast it after this turn.`);

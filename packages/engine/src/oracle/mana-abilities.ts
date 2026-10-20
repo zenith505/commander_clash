@@ -20,7 +20,7 @@ export function parseManaAbility(line0: string): ManaAbility | null {
     .replace(/: For each color among permanents you control, add one mana of that color\./, ": Add one mana of each color among permanents you control.")
     .replace(/: Choose a color\. Add an amount of mana of that color equal to your devotion to that color\./, ": Add an amount of mana of the chosen color equal to your devotion to that color.")
     .replace(/: Choose a color\. Add an amount of mana of that color equal to (.+?)\./, ": Add X mana of any one color, where X is $1.");
-  const part = String.raw`\{[^}]+\}|Sacrifice ~|Discard your hand|Pay \d+ life|Pay (?:\{E\})+|Remove (?:a|an|one|two|three|four|five) [a-z]+ counters? from ~|Remove (?:any number of|X) [a-z]+ counters from ~|Tap (?:an|one|two|three) untapped [^,:]+? you control`;
+  const part = String.raw`\{[^}]+\}|Sacrifice ~|Exert ~|Discard your hand|Pay \d+ life|Pay (?:\{E\})+|Remove (?:a|an|one|two|three|four|five) [a-z]+ counters? from ~|Remove (?:any number of|X) [a-z]+ counters from ~|Tap (?:an|one|two|three) untapped [^,:]+? you control`;
   const m = new RegExp(`^((?:${part})(?:, (?:${part}))*): Add ([^.]+)\\.((?: [^.]+\\.)*)$`).exec(line);
   if (!m) return null;
   const costs = m[1]!.split(", ");
@@ -33,6 +33,7 @@ export function parseManaAbility(line0: string): ManaAbility | null {
   let tapCost: ManaAbility["tapCost"];
   let removeX: { counter: CounterKind; any: boolean } | undefined;
   let discardHand = false;
+  let exert = false;
   for (const c of costs) {
     const rc = removeCounterCost(c);
     const tc = new RegExp(`^Tap ${NUM} untapped (.+) you control$`).exec(c);
@@ -47,6 +48,8 @@ export function parseManaAbility(line0: string): ManaAbility | null {
     else if (c === "{T}") tap = true;
     else if (c === "Discard your hand" && !discardHand) discardHand = true;
     else if (c === "Sacrifice ~") sacrificeSelf = true;
+    // "Exert ~" (CR 701.43a): it won't untap during its controller's next untap step.
+    else if (c === "Exert ~" && !exert) exert = true;
     else if (/^Pay \d+ life$/.test(c)) lifeCost = Number(/\d+/.exec(c)![0]);
     else if (/^Pay (\{E\})+$/.test(c)) energyCost = energyIn(c);
     // "{W/U}, {T}: Add ..." (filter lands): hybrid symbols are paid with either color (CR 107.4e).
@@ -55,12 +58,13 @@ export function parseManaAbility(line0: string): ManaAbility | null {
   }
   const produces = removeX ? removedProduced(m[2]!, removeX.counter, removeX.any) : parseManaProduced(m[2]!);
   if (!produces || (removeCounters && removeX)) return null;
-  const out: ManaAbility = { text: line0, manaCost, tap, sacrificeSelf, produces, ...(lifeCost ? { lifeCost } : {}), ...(energyCost ? { energyCost } : {}), ...(removeCounters ? { removeCounters } : {}), ...(tapCost ? { tapCost } : {}), ...(discardHand ? { discardHand: true as const } : {}) };
+  const out: ManaAbility = { text: line0, manaCost, tap, sacrificeSelf, produces, ...(lifeCost ? { lifeCost } : {}), ...(energyCost ? { energyCost } : {}), ...(removeCounters ? { removeCounters } : {}), ...(tapCost ? { tapCost } : {}), ...(discardHand ? { discardHand: true as const } : {}), ...(exert ? { skipNextUntap: true } : {}) };
   let m2: RegExpExecArray | null;
   for (const extra of (m[3] ?? "").split(/(?<=\.) /).map((x) => x.trim()).filter(Boolean)) {
     const dmg = new RegExp(`^~ deals ${NUM} damage to you\\.$`).exec(extra);
     if (dmg) out.selfDamage = num(dmg[1]!);
     else if (extra === "~ doesn't untap during your next untap step.") out.skipNextUntap = true;
+    else if ((m2 = /^If (?:any of )?that mana is spent on a creature spell, it gains haste( until end of turn)?\.$/.exec(extra)) && !out.spentHaste) out.spentHaste = m2[1] ? "endOfTurn" : "game";
     // Depletion lands: "Put a depletion counter on ~.", "If there are no depletion counters on ~, sacrifice it."
     else if ((m2 = new RegExp(`^Put an? ${COUNTER} counter on ~\\.$`).exec(extra)) && !out.putCounter) out.putCounter = counterKind(m2[1]!);
     else if ((m2 = new RegExp(`^If there are no ${COUNTER} counters on ~, sacrifice it\\.$`).exec(extra)) && !out.sacrificeIfNo && removeCounters?.counter === counterKind(m2[1]!)) out.sacrificeIfNo = counterKind(m2[1]!);

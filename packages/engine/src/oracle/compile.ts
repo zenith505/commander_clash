@@ -1000,6 +1000,15 @@ export function compile(d: CardDef): CompiledCard {
       out.entersPrepared = true;
       continue;
     }
+    const yardExile = /^If an? (card or token|card|(.+?) card) would be put into (a|an opponent's|your) graveyard from anywhere, (?:exile (?:it|that card) instead|instead exile it with an? ([a-z]+) counter on it)\.$/.exec(line);
+    if (yardExile && !out.graveyardExile) {
+      // The card's own characteristics (read like a card in a graveyard's, its owner aside).
+      const card = yardExile[2] ? parseTargetPhrase(`${yardExile[2]} card in your graveyard`) : undefined;
+      const filter = card?.kind === "card" ? { ...card, owner: undefined, text: `${yardExile[2]} card` } : undefined;
+      if (yardExile[2] && !filter) out.unsupported.push(raw);
+      else out.graveyardExile = { whose: yardExile[3] === "a" ? "any" : yardExile[3] === "your" ? "yours" : "opponents", ...(yardExile[1] === "card or token" ? { tokens: true as const } : {}), ...(filter ? { filter } : {}), ...(yardExile[4] ? { counter: counterKind(yardExile[4]) } : {}) };
+      continue;
+    }
     if (line === "If ~ would be put into a graveyard from anywhere, exile it instead.") {
       out.exileInsteadOfGraveyard = true;
       continue;

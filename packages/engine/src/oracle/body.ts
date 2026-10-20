@@ -717,6 +717,15 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "Exile target nonland permanent. For as long as that card remains exiled, its owner may cast it" (Aerial
     // Extortionist, Release to the Wind's "without paying its mana cost", Soul Partition's "may play it"): a permission for
     // that card in exile (CR 400.7), its owner's; "A spell cast (by an opponent) this way costs {2} more to cast".
+    // "Choose an exiled card an opponent owns with a void counter on it. You may play it this turn without paying its
+    // mana cost." (Dauthi Voidwalker)
+    const voidPick = /^Choose an exiled card an opponent owns with an? ([a-z]+) counter on it$/.exec(s);
+    const voidPlay = voidPick && /^You may play (?:it|that card) this turn( without paying its mana cost)?$/.exec(sentences[si + 1] ?? "");
+    if (voidPick && voidPlay) {
+      effects.push({ type: "playExiled", counter: counterKind(voidPick[1]!), ...(voidPlay[1] ? { free: true as const } : {}) });
+      si++;
+      continue;
+    }
     const ownerMay =
       /^For as long as (?:that card|it) remains exiled, its owner may (cast|play) it( without paying its mana cost)?$/.exec(s) ??
       /^For each of those cards, its owner may (play|cast) it for as long as it remains exiled()$/.exec(s);

@@ -209,6 +209,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "searchLibrary", player: pid, found: pend.cards.filter((id) => { const n = defOf(s, obj(s, id)).name; return !names.has(n) && !!names.add(n); }) }];
     }
     if (pend.kind === "searchLibrary" && pend.fromHand) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, pend.max) }];
+    // Dauthi Voidwalker: the most expensive spell, to cast for free now (a land only if that's all there is).
+    if (pend.kind === "searchLibrary" && pend.exiled) {
+      const land = (id: string) => (isType(defOf(s, obj(s, id)), "Land") ? 1 : 0);
+      return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => land(a) - land(b) || mv(s, b) - mv(s, a)).slice(0, 1) }];
+    }
     // Hideaway: the most expensive card, to play for free later.
     if (pend.kind === "searchLibrary" && pend.dig && /hideaway/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, 1) }];
     if (pend.kind === "searchLibrary" && pend.dig && /face down/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: chooseManifest(s, pid, pend.cards, pend.max) }];
@@ -2407,7 +2412,10 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const flips = flipBranches(ab.body);
       // Necropotence's "Pay 1 life: ... into your hand at your next end step": a few cards a turn while life is plentiful.
       const necro = !!ab.lifeCost && ab.body.effects.some((e) => e.type === "exileFaceDown" && e.endStepHand) && player(s, pid).life >= 20 && (o.activatedThisTurn?.filter((n) => n === i).length ?? 0) < 3;
-      if ((ab.sacrificeSelf && !cashIn && !flips) || ab.exileSelf || (freeCost && !necro) || ab.station) continue;
+      // Dauthi Voidwalker: sacrificed in our main phase, with the stack empty, for an exiled spell with a void counter
+      // worth more than it (mana value 4 or more) to cast for free right away.
+      const voidPlay = ab.sacrificeSelf && ab.body.effects.some((e) => e.type === "playExiled") && s.activePlayer === pid && (s.step === "main1" || s.step === "main2") && !s.stack.length && voidSpells(s, pid, ab.body).some((c) => mv(s, c) >= 4);
+      if ((ab.sacrificeSelf && !cashIn && !flips && !voidPlay) || ab.exileSelf || (freeCost && !necro) || ab.station) continue;
       // "Pay half your life, rounded up" (Murderous Betrayal, Lurking Evil): only while that's a few life at most.
       if (halfLifeCost(s, pid, ab) > 3) continue;
       // Level up (CR 702.87a) past the last level symbol does nothing more.
@@ -2464,6 +2472,13 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
     }
   }
   return null;
+}
+
+/** The exiled nonland cards an opponent owns with the counter `body`'s playExiled looks for (Dauthi Voidwalker). */
+function voidSpells(s: GameState, pid: PlayerId, body: AbilityBody): ObjectId[] {
+  const e = body.effects.find((x) => x.type === "playExiled");
+  if (e?.type !== "playExiled") return [];
+  return s.turnOrder.flatMap((p) => player(s, p).exile).filter((id) => obj(s, id).owner !== pid && (obj(s, id).counters[e.counter] ?? 0) > 0 && !isType(defOf(s, obj(s, id)), "Land"));
 }
 
 /** What winning and losing a coin flip do (CR 705.2): "If you win the flip, ..." and "If you lose the flip, ..." Undefined without a loss branch. */

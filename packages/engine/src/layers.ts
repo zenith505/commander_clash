@@ -474,6 +474,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const c = here ? chars.get(subjectId!) : lk?.zc === subjectZc ? lk : undefined;
       if (!c) return false;
       const n = cond.stat === "power" ? c.power : c.toughness;
+      if (cond.greatest && s.battlefield.some((id) => id !== subjectId && chars.get(id)?.types.includes("Creature") && chars.get(id)!.power >= n)) return false;
       return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max);
     }
     case "yourTurn":

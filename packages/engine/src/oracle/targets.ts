@@ -616,6 +616,11 @@ export function parseTargetPhrase(
   }
   // "... with flying", "... without flying", "... with power 4 or greater", "... with mana value 3 or less"
   let m: RegExpExecArray | null;
+  // "Creatures you control each with power greater than its base power" (Kutzil).
+  if ((m = / (?:each )?with power greater than its? base power$/.exec(p))) {
+    extra.powerAboveBase = true;
+    p = p.slice(0, m.index);
+  }
   if ((m = /(?:^| )with (power|toughness|mana value) (\d+|x)(?: or (greater|less))?$/.exec(p))) {
     const key = m[1] === "mana value" ? "manaValue" : (m[1] as "power" | "toughness");
     // "With mana value 2" (Spell Snare): exactly that. With X, the X it's cast or activated with (TargetSpec.xRange).

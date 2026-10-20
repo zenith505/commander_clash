@@ -3169,7 +3169,7 @@ function LibrarySearch({
       <div className="modal search">
         <header>
           <strong>
-            {dig && (pending.hand !== undefined || pending.forPlayer !== undefined)
+            {dig && (pending.hand !== undefined || pending.forPlayer !== undefined || pending.exiled)
               ? `${pending.source}: choose ${pending.what} ${dig.to}`
               : dig
               ? `${pending.source}: put ${pending.what} ${dig.to}`
@@ -3193,7 +3193,7 @@ function LibrarySearch({
           </strong>
           <span className="muted">
             {" "}
-            {dig && (pending.hand !== undefined || pending.forPlayer !== undefined)
+            {dig && (pending.hand !== undefined || pending.forPlayer !== undefined || pending.exiled)
               ? `The rest ${dig.rest}.`
               : dig
               ? `The rest go ${dig.rest}.`
@@ -3238,7 +3238,7 @@ function LibrarySearch({
           )}
           {dig && (
             <>
-              <h4>{pending.hand !== undefined ? `${s.players[pending.hand]!.name}'s hand` : pending.forPlayer !== undefined ? `The cards ${s.players[pending.forPlayer]!.name} revealed` : "The top of your library"}</h4>
+              <h4>{pending.exiled ? "Exiled cards" : pending.hand !== undefined ? `${s.players[pending.hand]!.name}'s hand` : pending.forPlayer !== undefined ? `The cards ${s.players[pending.forPlayer]!.name} revealed` : "The top of your library"}</h4>
               <div className="modal-cards">
                 {dig.looked
                   .filter((id) => !found.includes(id))

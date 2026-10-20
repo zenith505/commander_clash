@@ -178,7 +178,8 @@ export type TriggerSourceEvent =
   /** A spell was just cast (CR 601.2i): "whenever you cast" abilities and prowess. */
   | { type: "cast"; stackId: string; controller: PlayerId; card: CardDef; /** A copy was put on the stack instead (magecraft's "or copy"). */ copy?: boolean; /** The mana spent to cast it (increment, CR 702.191a). */ manaSpent?: number; /** How much of it Treasures made (CR 106.3). */ treasureSpent?: number; /** What was spent, by type (CR 601.2h). */ spent?: SpentMana }
   /** A spell or ability was just put on the stack with its targets: "becomes the target" (CR 601.2c, ward 702.21a). */
-  | { type: "targeted"; stackId: string }
+  /** `only`: its targets were changed (CR 115.7), and these are the new ones; that isn't a crime (CR 700.13). */
+  | { type: "targeted"; stackId: string; only?: ObjectId[] }
   /** A player discarded a card (CR 701.9), `cycled` to pay a cycling cost (CR 702.29a). `id`: the card, in its new zone. */
   | { type: "discarded"; player: PlayerId; id: ObjectId; card: CardDef; cycled?: boolean }
   /** A card (or token) was put into a graveyard, from any zone. */
@@ -1006,7 +1007,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // Committing a crime (CR 700.13): casting a spell, activating an ability or putting a triggered ability on the stack
     // that targets an opponent, a permanent, spell or ability an opponent controls, or a card in an opponent's graveyard.
     // Once for the spell or ability, however many of its targets do.
-    if (item && isCrime(s, item)) {
+    if (item && !ev.only && isCrime(s, item)) {
       const criminal = item.controller;
       player(s, criminal).crimeTurn = s.turn;
       const that = { player: criminal };
@@ -1016,7 +1017,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
     const seen = new Set<ObjectId>();
     for (const t of item?.targets ?? []) {
-      if (t.kind !== "object" || seen.has(t.id)) continue;
+      if (t.kind !== "object" || seen.has(t.id) || (ev.only && !ev.only.includes(t.id))) continue;
       seen.add(t.id);
       const o = s.objects[t.id];
       if (!o || o.zone !== "battlefield") continue;

@@ -408,6 +408,11 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (!ctx.legal[e.index] || t?.kind !== "stack") return;
       return changeTarget(s, ctx, t.id, src, e.unless);
     }
+    case "newTargets": {
+      const t = ctx.targets[e.index];
+      if (!ctx.legal[e.index] || t?.kind !== "stack") return;
+      return newTargets(s, ctx, t.id, src);
+    }
     case "counterEach": {
       // Each spell on the stack it matches as it resolves, one at a time (CR 701.6a); this spell itself is excluded
       // since it isn't one it can counter (CR 608.2: it's resolving).
@@ -600,7 +605,39 @@ function changeTarget(s: GameState, ctx: ResolveCtx, stackId: string, by: string
   const next = amount !== undefined && (t.kind === "object" || t.kind === "player") ? { ...t, amount } : t;
   item.targets = item.targets!.map((x, i) => (i === j ? stampTargets(s, [next])![0]! : x));
   log(s, `${by} changes the target of ${item.description}${describeTargets(s, [next]).replace(/^ targeting/, " to")}.`);
-  fireEvent(s, { type: "targeted", stackId: item.id });
+  fireEvent(s, { type: "targeted", stackId: item.id, only: next.kind === "object" ? [next.id] : [] });
+}
+
+/**
+ * "You may choose new targets for target spell or ability" (CR 115.7d): its targets are chosen again as this resolves,
+ * keeping any, legal or not, and changing others to legal ones. Its new targets become targets of it ("becomes the
+ * target" triggers, ward); the ones it keeps don't again. With nothing it could change to, nothing is asked.
+ */
+function newTargets(s: GameState, ctx: ResolveCtx, stackId: string, by: string): "paused" | void {
+  const item = s.stack.find((x) => x.id === stackId);
+  const o = item?.objectId ? s.objects[item.objectId] : undefined;
+  if (!item || (item.kind === "spell" && !o)) return;
+  const current = item.targets ?? [];
+  const specs = item.body?.targets ?? (o ? spellTargetSpecs(defOf(s, o), item.modes) : []);
+  if (!current.some((t) => t.kind !== "none") || specs.length !== current.length) return;
+  const sc = (s.resolving!.scratch ??= {});
+  if (!sc.retargets) {
+    if (!current.some((t, j) => t.kind !== "none" && changeTargetOptions(s, item, specs[j]!, t).length)) {
+      log(s, `${item.description} has no other legal targets, so its targets stay the same.`);
+      return;
+    }
+    s.pending = { kind: "newTargets", player: ctx.controller, source: by, spell: item.description, stackId: item.id, controller: item.controller, specs, current };
+    return "paused";
+  }
+  const next = sc.retargets;
+  const changed = next.flatMap((t, j) => (t.kind !== "none" && !sameTarget(current[j], t) ? [t] : []));
+  if (!changed.length) {
+    log(s, `${player(s, ctx.controller).name} keeps the targets of ${item.description}.`);
+    return;
+  }
+  item.targets = next.map((t, j) => (t.kind !== "none" && !sameTarget(current[j], t) ? stampTargets(s, [t])![0]! : t));
+  log(s, `${by} changes the targets of ${item.description}${describeTargets(s, item.targets).replace(/^ targeting/, " to")}.`);
+  fireEvent(s, { type: "targeted", stackId: item.id, only: changed.flatMap((t) => (t.kind === "object" ? [t.id] : [])) });
 }
 
 /** The legal new targets for a spell's one target (see changeTarget). */

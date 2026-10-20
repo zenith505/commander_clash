@@ -703,6 +703,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "spellGains":
     case "counterEach":
     case "changeTarget":
+    case "newTargets":
       return runSpellsEffect(s, e, ctx, src);
     case "mill":
     case "exileTop":

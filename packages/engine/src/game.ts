@@ -398,6 +398,9 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "changeTarget":
       chooseNewTarget(s, p, action.target);
       break;
+    case "newTargets":
+      chooseNewTargets(s, p, action.targets);
+      break;
     case "payUnless":
       payUnless(s, p, action.pay);
       break;
@@ -4407,6 +4410,43 @@ function chooseCopyTargets(s: GameState, p: Player, targets?: TargetChoice[]) {
     targets = kept;
   }
   sc.targets = targets ?? pend.current;
+  s.pending = null;
+  continueResolution(s);
+}
+
+/** What a spell or ability on the stack is, for its targets: the spell's own characteristics, or its source's (CR 113.7a). */
+export function stackItemQuality(s: GameState, item: StackItem): SourceQuality | undefined {
+  const o = item.objectId ? s.objects[item.objectId] : undefined;
+  return o ? spellQuality(s, cardIdOf(o)) : sourceQuality(s, item.sourceId, item.sourceCardId);
+}
+
+/**
+ * New targets for a spell or ability (CR 115.7d): any kept may be illegal now; any changed must be legal for it, as its
+ * controller, and mustn't make a kept one illegal ("another target"). A divided amount stays as it was (rulings).
+ */
+function chooseNewTargets(s: GameState, p: Player, targets?: TargetChoice[]) {
+  const pend = s.pending;
+  const sc = s.resolving?.scratch ?? (s.resolving ? (s.resolving.scratch = {}) : undefined);
+  if (pend?.kind !== "newTargets" || pend.player !== p.id || !sc) throw new RulesError("no targets to choose");
+  const item = s.stack.find((x) => x.id === pend.stackId);
+  if (targets && item) {
+    if (targets.length !== pend.specs.length) throw new RulesError(`choose ${pend.specs.length} target${pend.specs.length === 1 ? "" : "s"}`);
+    const changed = targets.map((t, i) => (t.kind === "none" ? (pend.current[i]?.kind ?? "none") !== "none" : !sameTarget(pend.current[i], t)));
+    const part = (t: TargetChoice | undefined) => (t && (t.kind === "object" || t.kind === "player") ? t.amount : undefined);
+    if (targets.some((t, i) => changed[i] && (pend.specs[i]?.divided || part(pend.current[i]) !== undefined) && (t.kind === "none" || pend.current[i]?.kind === "none"))) throw new RulesError("the number of targets of a divided amount can't change");
+    const kept = targets.map((t, i) => (!changed[i] ? pend.current[i]! : part(pend.current[i]) !== undefined && (t.kind === "object" || t.kind === "player") ? { ...t, amount: part(pend.current[i]) } : t));
+    const q = stackItemQuality(s, item);
+    for (let i = 0; i < targets.length; i++) {
+      if (!changed[i]) continue;
+      const t = targets[i]!;
+      // Not itself (CR 115.5).
+      if ((t.kind === "stack" && t.id === item.id) || !canChooseTarget(s, pend.specs, kept, i, t, pend.controller, q, item.sourceId)) throw new RulesError("that isn't a legal new target");
+    }
+    for (let i = 0; i < kept.length; i++)
+      if ((pend.specs[i]?.distinctFrom ?? []).some((j) => (changed[i] || changed[j]) && kept[i]!.kind !== "none" && sameTarget(kept[j], kept[i]!))) throw new RulesError("those targets must be different");
+    targets = kept;
+  }
+  sc.retargets = targets ?? pend.current;
   s.pending = null;
   continueResolution(s);
 }

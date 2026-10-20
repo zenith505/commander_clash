@@ -5,7 +5,7 @@ import { chooseVote } from "./bot-votes";
 import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
-import { bindChosen, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
+import { bindChosen, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, manySlot, gateTargets, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
   livingPlayers,
@@ -67,6 +67,7 @@ import {
   linkedExileCards,
   MAX_HAND_SIZE,
   hasNoMaxHandSize,
+  stackItemQuality,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
@@ -106,6 +107,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "copyTargets", player: pid, ...(best ? { targets: best } : {}) }];
     }
     if (pend.kind === "changeTarget") return [{ type: "changeTarget", player: pid, target: newTargetFor(s, pid, pend) }];
+    if (pend.kind === "newTargets") {
+      const targets = newTargetsFor(s, pid, pend);
+      return [{ type: "newTargets", player: pid, ...(targets ? { targets } : {}) }];
+    }
     if (pend.kind === "castFree" && pend.how === "transformed") {
       // A defeated Siege: its back face, for free (CR 310.12b).
       const plan = asFace(s, obj(s, pend.objectId), 1, () => castPlan(s, pid, pend.objectId, true));
@@ -856,9 +861,9 @@ function chooseDeflection(s: GameState, pid: PlayerId): Action[] | null {
   if (!changeTargetOptions(s, top, spec, current).some((t) => t.kind !== "none" && !isMine(s, pid, t))) return null;
   for (const id of player(s, pid).hand) {
     const spell = compileCard(defOf(s, obj(s, id))).spell;
-    const e = spell?.effects.find((x) => x.type === "changeTarget");
-    if (!spell || e?.type !== "changeTarget" || spell.targets.length !== 1) continue;
-    if (e.unless && canPayUnless(s, top.controller, e.unless, pid, id, 0)) continue;
+    const e = spell?.effects.find((x) => x.type === "changeTarget" || x.type === "newTargets");
+    if (!spell || !e || spell.targets.length !== 1) continue;
+    if (e.type === "changeTarget" && e.unless && canPayUnless(s, top.controller, e.unless, pid, id, 0)) continue;
     const plan = planCast(s, pid, id, [{ kind: "stack", id: top.id }], undefined, "auto");
     if (plan && plan[plan.length - 1]!.type === "castSpell") return plan;
   }
@@ -878,6 +883,34 @@ function newTargetFor(s: GameState, pid: PlayerId, pend: Extract<PendingDecision
   const preferred = options.filter((t) => (harm ? !isMine(s, pid, t) : isMine(s, pid, t)));
   if (preferred.length) return best(s, pid, preferred, harm, body ? damageTo(body, pend.index, item?.x ?? 0) : 0);
   return options.find((t) => t.kind === "stack" && t.id === s.resolving?.item.id) ?? (harm ? worst(s, pid, options) : best(s, pid, options, false, 0));
+}
+
+/**
+ * New targets for a spell or ability as our spell lets us choose them (CR 115.7d): each harmful one aimed at us or ours
+ * goes to one of theirs, each helpful one aimed at theirs to ours; the rest stay. Undefined keeps them all.
+ */
+function newTargetsFor(s: GameState, pid: PlayerId, pend: Extract<PendingDecision, { kind: "newTargets" }>): TargetChoice[] | undefined {
+  const item = s.stack.find((x) => x.id === pend.stackId);
+  const o = item?.objectId ? s.objects[item.objectId] : undefined;
+  const body = item?.body ?? (o ? castingBody(defOf(s, o)) : undefined);
+  if (!item || !body) return undefined;
+  const harm = harmfulTargets(body);
+  const q = stackItemQuality(s, item);
+  const next = [...pend.current];
+  let changed = false;
+  for (let j = 0; j < next.length; j++) {
+    const t = next[j]!;
+    if (t.kind === "none" || (harm[j] ? !isMine(s, pid, t) : isMine(s, pid, t))) continue;
+    // Not one a kept "another target" names (CR 115.7d).
+    const clash = (x: ChosenTarget) => pend.specs.some((sp, k) => k !== j && sp.distinctFrom?.includes(j) && sameTarget(next[k], x));
+    const options = changeTargetOptions(s, item, pend.specs[j]!, t).filter(
+      (x): x is ChosenTarget => x.kind !== "none" && (harm[j] ? !isMine(s, pid, x) : isMine(s, pid, x)) && !(x.kind === "stack" && x.id === item.id) && !clash(x) && canChooseTarget(s, pend.specs, next, j, x, pend.controller, q, item.sourceId),
+    );
+    if (!options.length) continue;
+    next[j] = best(s, pid, options, !!harm[j], damageTo(body, j, item.x ?? 0));
+    changed = true;
+  }
+  return changed ? next : undefined;
 }
 
 /** Is this target ours: our permanent or spell, a card we own, or us? */

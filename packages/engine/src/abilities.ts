@@ -1738,6 +1738,11 @@ export type Effect =
    */
   | { type: "changeTarget"; index: number; unless?: UnlessPays }
   /**
+   * "You may choose new targets for target spell or ability" (CR 115.7d): as this resolves, its controller keeps any of
+   * that spell's targets, legal or not, and changes the rest to legal ones.
+   */
+  | { type: "newTargets"; index: number }
+  /**
    * Counter the spell or ability that triggered this unless its controller pays: ward (CR 702.21a),
    * "Whenever a player casts a spell, counter it unless that player pays {1}".
    */

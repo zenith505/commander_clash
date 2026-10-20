@@ -1013,6 +1013,11 @@ export type PendingDecision =
    * spell's description; `left` counts this copy and the ones after it.
    */
   | { kind: "copyTargets"; player: PlayerId; source: string; copyOf: string; specs: TargetSpec[]; current: TargetChoice[]; left: number }
+  /**
+   * "You may choose new targets for target spell or ability" (CR 115.7d): keep them all, or choose them again; any kept
+   * may be illegal, any changed must be legal for that spell, whose controller is `controller`.
+   */
+  | { kind: "newTargets"; player: PlayerId; source: string; spell: string; stackId: string; controller: PlayerId; specs: TargetSpec[]; current: TargetChoice[] }
   /** "Change the target of target spell" (CR 115.7a): pick the spell's new target among `options`, the legal ones. */
   | { kind: "changeTarget"; player: PlayerId; source: string; spell: string; stackId: string; index: number; spec: TargetSpec; current: TargetChoice; options: TargetChoice[] }
   /** A modal triggered ability is being put on the stack (CR 603.3c). `legal[i]`: mode i can be chosen (CR 700.2b). */
@@ -1530,6 +1535,7 @@ export interface Resolving {
     payQueue?: PlayerId[]; // "each opponent sacrifices ... unless they pay": players still to choose whether to pay, in APNAP order
     paidBy?: PlayerId[]; // and those who paid
     newTarget?: TargetChoice; // "change the target of target spell": the new one, chosen as this resolves (CR 115.7a)
+    retargets?: TargetChoice[]; // "you may choose new targets for target spell": its targets now (CR 115.7d)
     explored?: ObjectId; // the nonland card explore revealed, waiting on "graveyard or top?"
     cascade?: { exiled: ObjectId[]; hit?: ObjectId }; // cards cascade exiled, and the one it may cast
     untilNonland?: { hit?: ObjectId; caster: PlayerId }; // the nonland card exileUntilNonland found, and who may cast it
@@ -1620,6 +1626,8 @@ export type Action =
   | { type: "chooseTargets"; player: PlayerId; targets: TargetChoice[] }
   /** New targets for a spell copy, or none to keep the original's (CR 707.10c). */
   | { type: "copyTargets"; player: PlayerId; targets?: TargetChoice[] }
+  /** New targets for a spell or ability (see PendingDecision "newTargets"), or none to keep them. */
+  | { type: "newTargets"; player: PlayerId; targets?: TargetChoice[] }
   /** The new target for a spell whose target is being changed (see PendingDecision "changeTarget"). */
   | { type: "changeTarget"; player: PlayerId; target: TargetChoice }
   /** `planeswalker`: it attacks that planeswalker, controlled by `defender`, instead of the player (CR 508.1b). */

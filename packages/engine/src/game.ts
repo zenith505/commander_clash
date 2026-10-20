@@ -2681,6 +2681,7 @@ function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean, fac
   const from = o.zone === "exile" || o.zone === "graveyard" ? ` from ${o.zone === "exile" ? "exile" : "their graveyard"}` : "";
   moveObject(s, id, "battlefield", { untapped, ...(face !== undefined ? { face } : {}) });
   log(s, `${p.name} plays ${d.name}${from}${obj(s, id).tapped ? " (tapped)" : ""}.`);
+  fireEvent(s, { type: "landPlayed", player: p.id, id });
 }
 
 /** "Remove N counters from ~" paid as a cost (CR 602.2b); removing the last time counter triggers vanishing. */

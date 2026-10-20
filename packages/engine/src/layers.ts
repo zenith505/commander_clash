@@ -551,6 +551,12 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
         return n;
       };
       const mine = measure(you);
+      if (cond.subjectController) {
+        // As the land is now, or as it last existed (CR 608.2h).
+        const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
+        const that = sub && chars.has(sub.id) && (sub.zoneChanges ?? 0) === subjectZc ? chars.get(sub.id)!.controller : subjectId !== undefined && s.lastKnown?.[subjectId]?.zc === subjectZc ? s.lastKnown![subjectId]!.controller : undefined;
+        return that !== undefined && that !== you && !s.players[that]!.lost && measure(that) > mine;
+      }
       return s.turnOrder.some((p) => p !== you && !s.players[p]!.lost && measure(p) > mine);
     }
     case "attackingMostLife": {

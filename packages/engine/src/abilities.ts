@@ -921,7 +921,8 @@ export type StaticCondition =
    * "If an opponent controls more lands than you", "... more creatures than you", "an opponent has more life than you",
    * "... more cards in hand than you": any one opponent.
    */
-  | { kind: "opponentMore"; what: "lands" | "creatures" | "life" | "hand" }
+  /** `subjectController`: "if that player controls more lands than you", that player being the entering land's controller. */
+  | { kind: "opponentMore"; what: "lands" | "creatures" | "life" | "hand"; subjectController?: true }
   /** "As long as you have the city's blessing" (CR 702.131c). */
   | { kind: "citysBlessing"; /** "Unless you have the city's blessing". */ not?: true }
   /** "If it's your turn"; `not`: "if it's not your turn" (Force of Negation). */
@@ -2434,6 +2435,10 @@ export type TriggerEvent =
   /** "Whenever you commit a crime", "whenever an opponent commits a crime" (CR 700.13): once for each spell or ability. */
   | "youCommitCrime"
   | "opponentCommitsCrime"
+  /** Playing a land (CR 305.1): "whenever you play a land", "an opponent plays", "a player plays"; that player is the event's. */
+  | "youPlayLand"
+  | "opponentPlaysLand"
+  | "playerPlaysLand"
   /** "Whenever a creature attacks enchanted player" (not a planeswalker of theirs, rulings): that creature is the subject. */
   | "creatureAttacksEnchantedPlayer"
   /** "Whenever enchanted player is attacked": once as attackers are declared, if a creature attacks that player (rulings). */

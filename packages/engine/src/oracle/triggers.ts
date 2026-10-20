@@ -69,6 +69,10 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever an opponent commits a crime, (.+)$/, "opponentCommitsCrime"],
   [/^Whenever you choose a creature as your Ring-bearer, (.+)$/, "youChooseRingBearer"],
   [/^Whenever an opponent loses life, (.+)$/, "opponentLosesLife"],
+  // Playing a land (CR 305.1), not putting one onto the battlefield with an effect (rulings on Burgeoning).
+  [/^Whenever you play a land, (.+)$/, "youPlayLand"],
+  [/^Whenever an opponent plays a land, (.+)$/, "opponentPlaysLand"],
+  [/^Whenever a player plays a land, (.+)$/, "playerPlaysLand"],
   [/^Whenever you're dealt damage, (.+)$/, "youAreDealtDamage"],
   [/^Whenever an opponent is dealt damage, (.+)$/, "opponentIsDealtDamage"],
   [/^Whenever enchanted player is dealt damage, (.+)$/, "enchantedPlayerDealtDamage"],
@@ -1106,7 +1110,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "Whenever a nontoken creature you control enters, if it doesn't have the same name as another creature you control
   // or a creature card in your graveyard" (Guardian Project): about the creature that entered.
   const nameCond: StaticCondition | null = intervening && /^Whenever an? [^,]*creature you control enters$/.test(intervening[1]!) && intervening[2] === "it doesn't have the same name as another creature you control or a creature card in your graveyard" ? { kind: "subjectNameUnique" } : null;
-  const ifCond = nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
+  // "Whenever a land an opponent controls enters, if that player controls more lands than you" (Archaeomancer's Map):
+  // the entering land's controller, as it triggers and resolves (rulings).
+  const thatMore = intervening && /^Whenever an? [a-z]+ an opponent controls enters$/.test(intervening[1]!) ? /^that player controls more (lands|creatures) than you$/.exec(intervening[2]!) : null;
+  const moreCond: StaticCondition | null = thatMore && { kind: "opponentMore", what: thatMore[1] as "lands" | "creatures", subjectController: true };
+  const ifCond = moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
   // "That player" is the attacked player only in "Whenever ~ attacks a player".
   if (ifCond && ifCond.kind === "defenderMostLife" && !/^Whenever ~ attacks a player$/.test(intervening![1]!)) return "fail";
   if (intervening && ifCond) {
@@ -1420,7 +1428,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       if (event === "eachUpkeep" || event === "eachDrawStep") text = text.replace(/^~ deals (\d+) damage to them\.$/, "~ deals $1 damage to that player.");
       // "At the beginning of each postcombat main phase, the active player adds ..." (Belbe): that player is the active one.
       if (event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain") text = text.replace(/\bthe active player\b/g, "that player");
-      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || event === "opponentLosesLife" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", ownX: event === "selfEnters" || event === "selfCast" });
+      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || event === "opponentLosesLife" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", ownX: event === "selfEnters" || event === "selfCast" });
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
       const attacksPlayer = /^Whenever ~ attacks (?:a player|an opponent), /.test(line);
       const attacksBattle = /^Whenever ~ attacks a battle, /.test(line);

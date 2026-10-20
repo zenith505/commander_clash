@@ -1700,7 +1700,10 @@ export function compile(d: CardDef): CompiledCard {
       /^Whenever you (create or sacrifice) a token, (.+)$/.exec(line) ??
       /^When ~ enters and (whenever an opponent draws a card except the first one they draw in each of their draw steps), (.+)$/.exec(line) ??
       // "Whenever a creature you control of the chosen type enters or attacks, draw a card." (Kindred Discovery)
-      /^Whenever (an? [^,]+? you control(?: of the chosen type)?) enters or attacks, (.+)$/.exec(line);
+      /^Whenever (an? [^,]+? you control(?: of the chosen type)?) enters or attacks, (.+)$/.exec(line) ??
+      // Syr Konrad: "Whenever another creature dies, or a creature card is put into a graveyard from anywhere other than
+      // the battlefield, or a creature card leaves your graveyard, ...": no one event is two of them.
+      /^Whenever (another creature dies), or (a creature card is put into a graveyard from anywhere other than the battlefield), or (a creature card leaves your graveyard), (.+)$/.exec(line);
     if (twice && !/\bonly once\b/.test(line)) {
       const effect = twice[twice.length - 1]!;
       const events = /^When you cast/.test(line)
@@ -1719,6 +1722,8 @@ export function compile(d: CardDef): CompiledCard {
               ? [`When ~ enters, ${effect}`, `W${twice[1]!.slice(1)}, ${effect}`]
             : /^Whenever ~ attacks or becomes the target of a spell, /.test(line)
               ? [`Whenever ~ attacks, ${effect}`, `Whenever ~ becomes the target of a spell, ${effect}`]
+            : twice.length === 5
+              ? twice.slice(1, 4).map((e) => `Whenever ${e}, ${effect}`)
             : /^Whenever an? [^,]+? enters or attacks, /.test(line)
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} attacks, ${effect}`]
             : [`When ~ enters, ${effect}`, `${/^(?:attacks|deals)/.test(twice[1]!) ? "Whenever" : "When"} ~ ${twice[1]}, ${effect}`];

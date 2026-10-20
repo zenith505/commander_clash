@@ -2664,8 +2664,11 @@ export interface BatchTrigger {
   noneCastWithMana?: true;
   dies?: true;
   notDies?: true;
-  from?: "library" | "battlefield";
+  /** `notBattlefield`: "from anywhere other than the battlefield" (Syr Konrad). */
+  from?: "library" | "battlefield" | "notBattlefield";
   to?: "exile";
+  /** "Whenever a creature card leaves your graveyard" (not "one or more"): once for each card it moved (CR 603.2c). */
+  each?: true;
   /** "For the first time each turn": only the first such event this turn (counting the ones before this permanent was there). */
   first?: true;
 }

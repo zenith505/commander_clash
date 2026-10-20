@@ -1437,6 +1437,11 @@ function graveyardExileFor(s: GameState, o: GameObject, fromZone: ZoneName): { s
   return undefined;
 }
 
+/** Birgi: "Creatures you control can boast twice during each of your turns rather than once" (CR 702.142a). */
+function boastsTwice(s: GameState, pid: PlayerId): boolean {
+  return s.activePlayer === pid && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && !!abilitiesOf(s, obj(s, id)).boastTwice);
+}
+
 /** Does an "exile it instead" replacement effect apply to `o` dying: its own, or another permanent's about it? */
 function exiledInsteadOfDying(s: GameState, o: GameObject): boolean {
   if (abilitiesOf(s, o).exileInsteadOfDying?.self) return true;
@@ -2711,7 +2716,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   if (!manaChoices(s, o, ab).includes(mana)) throw new RulesError(`${name} can't produce {${mana}}`);
   // "Add {W}{W}, {W}{U}, or {U}{U}": one of the combinations, chosen as it resolves (CR 605.3b). A storage land's: how
   // many counters it removes, announced as it's activated (CR 107.3a), and how that mana is split.
-  const combos = manaCombos(o, ab);
+  const combos = manaCombos(s, o, ab);
   if (combos ? combo === undefined || !combos[combo] : combo !== undefined) throw new RulesError(combos ? `choose which mana ${name} adds` : `${name}'s ability has no combinations of mana to choose from`);
   // What it makes is worked out before the costs change anything ("for each creature you control").
   const adds = manaProduced(s, o, ab, mana, combo);
@@ -4225,7 +4230,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.sorcerySpeed && !canActAtSorcerySpeed(s, pid) && !((ab.loyalty !== undefined || ab.loyaltyX) && loyaltyAtInstantSpeed(s, pid))) return "activate only as a sorcery";
   if (ab.tap && o.tapped) return `${d.name} is tapped`;
   if (ab.tap && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${d.name} has summoning sickness`; // CR 602.5a
-  if (ab.oncePerTurn && o.activatedThisTurn?.includes(index)) return `${d.name}'s ability can be activated only once each turn`; // CR 602.5b
+  if (ab.oncePerTurn && (o.activatedThisTurn?.filter((n) => n === index).length ?? 0) >= (ab.keyword === "Boast" && boastsTwice(s, pid) ? 2 : 1)) return `${d.name}'s ability can be activated only ${ab.keyword === "Boast" && boastsTwice(s, pid) ? "twice" : "once"} each turn`; // CR 602.5b
   if (ab.onceEver && o.activatedEver?.includes(index) && !(ab.keyword === "Exhaust" && mayExhaustAgain(s, pid)) && !(ab.keyword === "Power-up" && o.activatedEver.filter((i) => i === index).length <= powerUpAgain(s, pid))) return `${d.name}'s ${ab.keyword === "Exhaust" ? "exhaust " : ""}ability can be activated only once`; // CR 702.177a-b, 602.5b
   // "Reveal the player you chose": not if no player was chosen as it entered (rulings on Guardian Archon).
   if (ab.revealChosen && o.chosen?.player === undefined) return `no player was chosen for ${d.name}`;
@@ -6781,7 +6786,7 @@ export function availableMana(s: GameState, pid: PlayerId): number {
     manaAbilitiesOn(s, o).forEach((ab, i) => {
       if (manaAbilityProblem(s, pid, o, i, true)) return;
       // A storage land as autopay uses it: one counter at a time.
-      const combos = manaCombos(o, ab);
+      const combos = manaCombos(s, o, ab);
       const most = ab.produces.kind === "removeX" ? Math.min(1, o.counters[ab.produces.counter] ?? 0) : combos ? Math.max(0, ...combos.map((c) => c.length)) : Math.max(0, ...manaChoices(s, o, ab).map((m) => manaProduced(s, o, ab, m).length));
       best = Math.max(best, most - manaValue(parseManaCost(ab.manaCost)));
     });

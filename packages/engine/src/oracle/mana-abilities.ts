@@ -202,6 +202,13 @@ function parseManaProduced(text: string): ManaProduce | null {
     const n = parseCount(amount[2]!, null);
     return n && { kind: "fixed", mana: [sym(amount[1]!)!], n };
   }
+  // "Two mana in any combination of colors", "X mana in any combination of colors, where X is ..." (Selvala).
+  const combo = new RegExp(`^(?:${NUM}|(X)) mana in any combination of colors(?:, where X is (.+))?$`).exec(text);
+  if (combo && !!combo[2] === !!combo[3]) {
+    if (!combo[2]) return num(combo[1]!) > 1 ? { kind: "anyColors", n: num(combo[1]!) } : null;
+    const n = parseCount(combo[3]!, null);
+    return n && { kind: "anyColors", n };
+  }
   const xAny = /^X mana of any one color, where X is (.+)$/.exec(text);
   if (xAny) {
     const n = parseCount(xAny[1]!, null);

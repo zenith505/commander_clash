@@ -541,7 +541,8 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "Exhaust — [Cost]: Add ..." is a mana ability that can be activated only once (CR 702.177a, 605.1a).
     const exhaust = /^Exhaust — (.+)$/.exec(line);
-    const manaAb = exhaust ? parseManaAbility(exhaust[1]!) : parseManaAbility(line);
+    // An ability word ("Domain — ") has no rules meaning (CR 207.2c).
+    const manaAb = exhaust ? parseManaAbility(exhaust[1]!) : parseManaAbility(stripAbilityWord(line));
     if (manaAb && exhaust) {
       if (manaAb.oncePerTurn) out.unsupported.push(raw);
       else out.mana.push({ ...manaAb, text: line, onceEver: true, exhaust: true });
@@ -1524,6 +1525,10 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "Your opponents can't cast spells from anywhere other than their hands.") {
       out.opponentsOnlyFromHand = true;
+      continue;
+    }
+    if (line === "Creatures you control can boast twice during each of your turns rather than once.") {
+      out.boastTwice = true;
       continue;
     }
     if (line === "Your opponents can't cast spells during your turn.") {

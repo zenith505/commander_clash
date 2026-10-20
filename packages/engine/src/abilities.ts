@@ -1639,7 +1639,8 @@ export type Effect =
   | { type: "unattachSelf" }
   /** "Create a token that's a copy of target creature you control[, except ...]" (CR 707.2, 707.9, 111.4). */
   /** `ofSource`: a copy of the card the ability came from, as it last existed (embalm, eternalize: exiled to pay the cost). */
-  | { type: "createTokenCopy"; who: PlayerRef; n: Amount; what: ObjRef; except?: CopyExcept; tapped?: boolean; attacking?: boolean; ofSource?: boolean }
+  /** `each`: "For each token you control, create a token that's a copy of that permanent" (Second Harvest): one copy of each object in the group `what`, as it is now. */
+  | { type: "createTokenCopy"; who: PlayerRef; n: Amount; what: ObjRef; except?: CopyExcept; tapped?: boolean; attacking?: boolean; ofSource?: boolean; each?: true }
   /**
    * "~ becomes a copy of target creature until end of turn, except it has this ability" (CR 707.4): each permanent
    * `what` refers to becomes a copy of `of`'s copiable values (as it last existed, if it's gone, CR 608.2h), with
@@ -2838,6 +2839,12 @@ export type ManaProduce =
   /** "Add {W}{W}, {W}{U}, or {U}{U}" (filter lands): one of these combinations, chosen as it resolves (CR 605.3b). */
   | { kind: "combos"; options: ManaType[][] }
   /**
+   * "Add two mana in any combination of colors", "Add X mana in any combination of colors, where X is the greatest power
+   * among creatures you control" (Selvala, Heart of the Wilds): `n` mana, each of any color, chosen as it resolves (CR
+   * 106.1b, 605.3b); X worked out then too. Each combination of colors is numbered as for "combos" (`colorCombos`).
+   */
+  | { kind: "anyColors"; n: number | AmountExpr }
+  /**
    * Storage lands: "Remove any number of storage counters from ~: Add {B} for each storage counter removed this way"
    * (`colors` one color, `min` 0), "Remove X storage counters from ~: Add X mana in any combination of {U} and/or {B}"
    * (two colors, `min` 1, as removing none adds nothing). How many are removed is chosen as it's activated (CR 107.3a,
@@ -3276,6 +3283,8 @@ export interface CompiledCard {
    * Abolisher): permanents on the battlefield only, mana abilities too (rulings); see abolisherBan.
    */
   opponentsCantActivateYourTurn?: true;
+  /** "Creatures you control can boast twice during each of your turns rather than once." (Birgi, CR 702.142a) */
+  boastTwice?: true;
   /**
    * "You may cast ~ as though it had flash if you pay {2} more to cast it.": cast any time a sorcery couldn't have been,
    * its total cost is this much more (CR 601.2f).

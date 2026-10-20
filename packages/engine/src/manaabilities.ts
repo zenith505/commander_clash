@@ -73,6 +73,7 @@ export function manaChoices(s: GameState, o: GameObject, ab: ManaAbility): ManaT
   // A combination is picked by its number (`combo`); these are the types it could make (CR 106.7).
   if (p.kind === "combos") return [...new Set(p.options.flat())];
   if (p.kind === "removeX") return p.colors;
+  if (p.kind === "anyColors") return [...COLORS];
   if (p.kind === "colorsAmong") return colorsAmong(s, o, p);
   // "For each color among permanents you control": all of them at once, whichever is named (none with no color).
   if (p.kind === "eachColorAmong") return eachColorAmong(s, o);
@@ -110,10 +111,22 @@ export function removeXCombos(o: GameObject, p: Extract<ManaProduce, { kind: "re
   return out;
 }
 
+/** Every combination of `n` mana of any colors (each multiset once, in WUBRG order): ManaProduce "anyColors". */
+export function colorCombos(n: number): ManaType[][] {
+  let out: Color[][] = [[]];
+  for (let i = 0; i < n; i++) out = out.flatMap((c) => COLORS.filter((x) => !c.length || COLORS.indexOf(x) >= COLORS.indexOf(c[c.length - 1]!)).map((x) => [...c, x]));
+  return out;
+}
+
+/** How much mana an "anyColors" ability adds now: X as it resolves, with the permanent as "~" and its controller as "you". */
+export function anyColorsCount(s: GameState, o: GameObject, p: Extract<ManaProduce, { kind: "anyColors" }>): number {
+  return typeof p.n === "number" ? p.n : Math.max(0, evalAmount(s, p.n, { controller: controllerOf(s, o), sourceId: o.id }));
+}
+
 /** The combinations an ability is activated with (ManaOption.combo), or null if it has none to choose from. */
-export function manaCombos(o: GameObject, ab: ManaAbility): ManaType[][] | null {
+export function manaCombos(s: GameState, o: GameObject, ab: ManaAbility): ManaType[][] | null {
   const p = ab.produces;
-  return p.kind === "combos" ? p.options : p.kind === "removeX" ? removeXCombos(o, p) : null;
+  return p.kind === "combos" ? p.options : p.kind === "removeX" ? removeXCombos(o, p) : p.kind === "anyColors" ? colorCombos(anyColorsCount(s, o, p)) : null;
 }
 
 /**
@@ -147,6 +160,7 @@ function baseManaProduced(s: GameState, o: GameObject, ab: ManaAbility, choice: 
   const p = ab.produces;
   if (p.kind === "combos") return p.options[combo ?? -1] ?? [];
   if (p.kind === "removeX") return removeXCombos(o, p)[combo ?? -1] ?? [];
+  if (p.kind === "anyColors") return colorCombos(anyColorsCount(s, o, p))[combo ?? -1] ?? [];
   if ((p.kind === "fixed" || p.kind === "oneOf") && p.n) {
     // CR 106.1: worked out as the ability resolves, with the permanent as "~" and its controller as "you".
     // "Of the chosen type" (Three Tree City): the type chosen for it as it entered.
@@ -248,8 +262,10 @@ export function manaOptions(s: GameState, o: GameObject): ManaOption[] {
   const pid = controllerOf(s, o);
   const sources = manaTriggerSources(s);
   return manaAbilitiesOn(s, o).flatMap((ab, ability) => {
-    const combos = manaCombos(o, ab);
-    const picks: { mana: ManaType; combo?: number }[] = combos ? combos.map((c, combo) => ({ mana: c[0] ?? manaChoices(s, o, ab)[0]!, combo })) : manaChoices(s, o, ab).map((mana) => ({ mana }));
+    const combos = manaCombos(s, o, ab);
+    // "X mana in any combination of colors" with a big X: for planning a payment, the ways using one or two colors.
+    const few = ab.produces.kind === "anyColors" && combos && combos.length > 126;
+    const picks: { mana: ManaType; combo?: number }[] = combos ? combos.flatMap((c, combo) => (few && new Set(c).size > 2 ? [] : [{ mana: c[0] ?? manaChoices(s, o, ab)[0]!, combo }])) : manaChoices(s, o, ab).map((mana) => ({ mana }));
     return picks.flatMap(({ mana, combo }) => {
       const adds = manaProduced(s, o, ab, mana, combo);
       const removed = ab.produces.kind === "removeX" ? { removes: combos![combo!]!.length } : {};
@@ -328,7 +344,7 @@ export function pickManaAbility(s: GameState, pid: PlayerId, o: GameObject, mana
   const abs = manaAbilitiesOn(s, o);
   return abs
     .map((ab, i) => ({ ab, i }))
-    .filter(({ ab, i }) => manaChoices(s, o, ab).includes(mana) && !manaAbilityProblem(s, pid, o, i) && !ab.tapCost && !manaCombos(o, ab))
+    .filter(({ ab, i }) => manaChoices(s, o, ab).includes(mana) && !manaAbilityProblem(s, pid, o, i) && !ab.tapCost && !manaCombos(s, o, ab))
     .sort((a, b) => manaPenalty(a.ab) - manaPenalty(b.ab))[0]?.i;
 }
 

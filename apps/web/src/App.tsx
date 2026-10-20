@@ -139,6 +139,10 @@ import {
   type TargetChoice,
   type TargetSpec,
   COLOR_NAMES,
+  COLORS,
+  anyColorsCount,
+  colorCombos,
+  type Color,
   FACE_DOWN,
   FACE_DOWN_WARD,
   faceDef,
@@ -455,6 +459,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const [menu, setMenu] = useState<string | null>(null); // permanent (or card in hand) whose abilities are shown
   const [tapPick, setTapPick] = useState<TapPick | null>(null);
   const [xPick, setXPick] = useState<XPick | null>(null);
+  const [mixPick, setMixPick] = useState<MixPick | null>(null);
   const [kickPick, setKickPick] = useState<KickPick | null>(null);
   const [buybackPick, setBuybackPick] = useState<BuybackPick | null>(null);
   const [giftPick, setGiftPick] = useState<GiftPick | null>(null);
@@ -1310,6 +1315,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               s={s}
               objectId={menu}
               onUse={useAbility}
+              onMix={(ability, n, extra) => {
+                setMenu(null);
+                setMixPick({ objectId: menu, ability, n, ...(extra ? { extra } : {}), label: cardOf(s, menu).name, counts: {} });
+              }}
               onMana={(x) => {
                 setMenu(null);
                 // "{T}, Tap an untapped creature you control: Add ...": pick what to tap first.
@@ -1426,6 +1435,21 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
             </div>
           )}
           {xPick && <XPickBar pick={xPick} onChange={(value) => setXPick({ ...xPick, value })} onDone={finishXPick} onCancel={() => setXPick(null)} />}
+          {mixPick && (
+            <ManaMixBar
+              pick={mixPick}
+              onChange={(counts) => setMixPick({ ...mixPick, counts })}
+              onCancel={() => setMixPick(null)}
+              onDone={() => {
+                setMixPick(null);
+                // The combination these counts are, numbered as the engine numbers them (ManaProduce "anyColors").
+                const want = COLORS.flatMap((c) => Array<Color>(mixPick.counts[c] ?? 0).fill(c));
+                const combo = colorCombos(mixPick.n).findIndex((c) => c.join() === want.join());
+                const plan = combo >= 0 ? planManaAbility(s, HUMAN, mixPick.objectId, mixPick.ability, want[0] ?? "W", undefined, mixPick.extra, combo) : null;
+                if (plan) dispatch(plan);
+              }}
+            />
+          )}
           {buybackPick && (
             <div className="targeting">
               <span>
@@ -1813,6 +1837,49 @@ function XPickBar({ pick, onChange, onDone, onCancel }: { pick: XPick; onChange:
         +
       </button>
       <button onClick={onDone}>X = {pick.value}</button>
+      <button className="ghost" onClick={onCancel}>
+        Cancel
+      </button>
+    </div>
+  );
+}
+
+/** "Add X mana in any combination of colors" (Selvala, Heart of the Wilds): how much of each color, `n` in all (CR 106.1b). */
+interface MixPick {
+  objectId: string;
+  ability: number;
+  n: number;
+  extra?: ManaType[];
+  label: string;
+  counts: Partial<Record<Color, number>>;
+}
+
+function ManaMixBar({ pick, onChange, onDone, onCancel }: { pick: MixPick; onChange: (counts: Partial<Record<Color, number>>) => void; onDone: () => void; onCancel: () => void }) {
+  const total = COLORS.reduce((a, c) => a + (pick.counts[c] ?? 0), 0);
+  const set = (c: Color, k: number) => onChange({ ...pick.counts, [c]: Math.max(0, k) });
+  return (
+    <div className="targeting mana-mix">
+      <span>
+        <strong>{pick.label}</strong>: add {pick.n} mana in any combination of colors ({pick.n - total} left)
+      </span>
+      {COLORS.map((c) => {
+        const k = pick.counts[c] ?? 0;
+        return (
+          <span key={c} className="divide" data-mix-color={c}>
+            <ManaCost cost={`{${c}}`} size="sm" />{" "}
+            <button className="ghost" disabled={k <= 0} onClick={() => set(c, k - 1)} aria-label={`${COLOR_NAMES[c]} minus one`}>
+              −
+            </button>
+            <strong>{k}</strong>
+            <button className="ghost" disabled={total >= pick.n} onClick={() => set(c, k + 1)} aria-label={`${COLOR_NAMES[c]} plus one`}>
+              +
+            </button>
+          </span>
+        );
+      })}
+      <button disabled={total !== pick.n} onClick={onDone}>
+        Add
+      </button>
       <button className="ghost" onClick={onCancel}>
         Cancel
       </button>
@@ -3399,6 +3466,7 @@ function AbilityMenu({
   objectId,
   onUse,
   onMana,
+  onMix,
   onPlay,
   onCastVia,
   onCastFace,
@@ -3417,6 +3485,8 @@ function AbilityMenu({
   objectId: string;
   onUse: (id: string, index: number, modes?: number[], x?: number, pick?: ManaPick) => void;
   onMana: (x: ManaOption) => void;
+  /** "Add X mana in any combination of colors" (Selvala): choose the colors (`n` mana in all). */
+  onMix: (ability: number, n: number, extra?: ManaType[]) => void;
   /** For a card in hand: cast it, or play it if it's a land (`untapped`: pay life or reveal so it enters untapped). */
   onPlay: (untapped?: boolean) => void;
   /** For a card in your graveyard: cast it with flashback, escape, ... */
@@ -3616,8 +3686,18 @@ function AbilityMenu({
         })}
       {!inHand &&
         !inYard &&
-        usableManaOptions(s, o).map((x) => {
+        usableManaOptions(s, o).map((x, i, all) => {
           const ab = manaAbilitiesOn(s, o)[x.ability]!;
+          // "In any combination of colors": one button, then a choice of how much of each color.
+          if (ab.produces.kind === "anyColors") {
+            if (all.findIndex((y) => y.ability === x.ability) !== i) return null;
+            const n = anyColorsCount(s, o, ab.produces);
+            return (
+              <button key={`mix-${x.ability}`} className="ghost" data-mix={x.ability} onClick={() => onMix(x.ability, n, x.extra)}>
+                <RulesText text={ab.text.slice(0, ab.text.indexOf(": Add")).replace(/~/g, "it")} />: add {n} mana in any combination of colors…
+              </button>
+            );
+          }
           // A storage land's: how many counters this button removes.
           const cost = ab.text
             .slice(0, ab.text.indexOf(": Add"))

@@ -3034,7 +3034,13 @@ export type AltCostKind = "citadel" | "evidence" | "evoke" | "dash" | "bestow" |
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
 /** `aftermath`: the half of a split card with aftermath (CR 702.127a), cast only from a graveyard. */
 /** `disturb`: a double-faced card cast transformed from a graveyard for its disturb cost (CR 702.146a). */
-export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem" | "harmonize" | "grantedFlashback" | "permission" | "aftermath" | "disturb";
+/** `grantedEscape`, `grantedRetrace`: escape or retrace a permanent gives the cards in your graveyard (Underworld Breach, Six), next to any of their own. */
+export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem" | "harmonize" | "grantedFlashback" | "grantedEscape" | "grantedRetrace" | "permission" | "aftermath" | "disturb";
+/** The costs beyond mana of escape and retrace a permanent gives (Underworld Breach's "exile three other cards", CR 702.81a's land card). */
+export const GRANTED_WAY_COSTS: Partial<Record<CastFromGraveyardKind, AdditionalCost[]>> = {
+  grantedEscape: [{ kind: "exileFromGraveyard", n: 3 }],
+  grantedRetrace: [{ kind: "discard", n: 1, filter: { kind: "card", types: ["Land"], text: "land card" } }],
+};
 export interface CastFromGraveyard {
   kind: CastFromGraveyardKind;
   /** A split card's half this way casts (graveyardWays): an aftermath half, or a half given flashback. */
@@ -3412,6 +3418,14 @@ export interface CompiledCard {
   extraLandsIf?: StaticCondition[];
   /** "You may play lands from your graveyard." (Crucible of Worlds): a permission; each still uses a land play (CR 305.2). */
   landsFromGraveyard?: boolean;
+  /**
+   * "Each nonland card in your graveyard has escape. The escape cost is equal to the card's mana cost plus exile three
+   * other cards from your graveyard." (Underworld Breach), "Each instant and sorcery card in your graveyard has flashback.
+   * The flashback cost is equal to that card's mana cost." (Lier), "During your turn, nonland permanent cards in your
+   * graveyard have retrace." (Six): a way to cast the matching cards in its controller's graveyard (CR 113.6, 702.34,
+   * 702.81, 702.138). `way.mana` left out: the card's own mana cost, so a card without one can't be cast this way (rulings).
+   */
+  graveyardGrants?: { filter: TargetSpec; way: CastFromGraveyard; yourTurn?: true }[];
   /**
    * "You may play cards exiled with ~, and you may spend mana as though it were mana of any color to cast those spells"
    * (Rogue Class): its controller may play the cards its linked exile took (CR 607.2a), with any mana (609.4b).

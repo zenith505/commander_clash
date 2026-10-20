@@ -1674,7 +1674,7 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   convert: "cast it converted: its back face is the spell, and it enters with that face up",
 };
 
-const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", grantedFlashback: "Flashback", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape", mayhem: "Mayhem", harmonize: "Harmonize", permission: "Cast from graveyard", aftermath: "Aftermath:", disturb: "Disturb:" };
+const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", grantedFlashback: "Flashback", grantedEscape: "Escape", grantedRetrace: "Retrace", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape", mayhem: "Mayhem", harmonize: "Harmonize", permission: "Cast from graveyard", aftermath: "Aftermath:", disturb: "Disturb:" };
 
 /** "discard a card", "pay 3 life", "exile two other cards from your graveyard". */
 function describeExtraCost(c: AdditionalCost): string {

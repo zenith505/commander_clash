@@ -8,6 +8,7 @@ import { meldResultsFor } from "./meld-results";
 import { asFace, castableFaces, defMv, hasName, isRoom, landFaces, layoutOf, registerRoom, restingDef, setFace, transformedFace } from "./faces";
 import { checkDayNight, dayNightUntapCheck } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
+import { GRANTED_WAY_COSTS } from "./abilities";
 import { abilitiesOf, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
@@ -684,7 +685,7 @@ export function moveObject(
     to = "command";
     log(s, `${defOf(s, o).name} goes to the command zone instead.`);
   }
-  const escaped = fromZone === "stack" && to === "battlefield" && o.castVia === "escape";
+  const escaped = fromZone === "stack" && to === "battlefield" && (o.castVia === "escape" || o.castVia === "grantedEscape");
   // The Myojin: "~ enters with a divinity counter on it if you cast it from your hand" (a commander cast from the command
   // zone wasn't, rulings).
   const castFromHand = fromZone === "stack" && o.castFrom === "hand" && !o.spellCopy;
@@ -3640,6 +3641,7 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
 
 /** The card's way of being cast from a graveyard of this kind, if it has one. */
 export function graveyardCast(d: CardDef, via?: CastFromGraveyardKind): CastFromGraveyard | undefined {
+  if (via && GRANTED_WAY_COSTS[via]) return { kind: via, costs: GRANTED_WAY_COSTS[via]!, exile: false };
   return via ? compileCard(d).fromGraveyard?.find((g) => g.kind === via) : undefined;
 }
 
@@ -3662,7 +3664,27 @@ export function graveyardWays(s: GameState, o: GameObject): CastFromGraveyard[] 
   // (702.127a), or flashback an effect gave the card, for that half's mana cost.
   if (o.face === undefined && layoutOf(s, o) === "split") return castableFaces(s, o).flatMap((f) => asFace(s, o, f, () => graveyardWays(s, o)).map((g) => ({ ...g, face: f })));
   const d = defOf(s, o);
-  return [...(compileCard(d).fromGraveyard ?? []), ...(hasGrantedFlashback(s, o) ? [{ kind: "grantedFlashback" as const, mana: d.manaCost, costs: [], exile: true }] : [])];
+  return [...(compileCard(d).fromGraveyard ?? []), ...(hasGrantedFlashback(s, o) ? [{ kind: "grantedFlashback" as const, mana: d.manaCost, costs: [], exile: true }] : []), ...grantedWays(s, o, d)];
+}
+
+/**
+ * Escape, flashback or retrace a permanent its owner controls gives this card in their graveyard (Underworld Breach,
+ * Lier, Six), one of each kind; the cost is the card's mana cost, so a card without one can't be cast this way (rulings).
+ */
+function grantedWays(s: GameState, o: GameObject, d: CardDef): CastFromGraveyard[] {
+  if (o.zone !== "graveyard") return [];
+  const out: CastFromGraveyard[] = [];
+  for (const id of s.battlefield) {
+    const p = obj(s, id);
+    if (controllerOf(s, p) !== o.owner) continue;
+    for (const g of abilitiesOf(s, p).graveyardGrants ?? []) {
+      if (g.yourTurn && s.activePlayer !== o.owner) continue;
+      if (!d.manaCost && !g.way.mana) continue;
+      if (!printedMatches(g.filter, d) || out.some((w) => w.kind === g.way.kind) || (g.way.kind === "grantedFlashback" && hasGrantedFlashback(s, o))) continue;
+      out.push({ ...g.way, mana: g.way.mana ?? d.manaCost });
+    }
+  }
+  return out;
 }
 
 /** One way to cast it from a graveyard, if it has it. */
@@ -3671,7 +3693,7 @@ export function graveyardWay(s: GameState, o: GameObject, via?: CastFromGraveyar
 }
 
 export function describeVia(via: CastFromGraveyardKind | FaceDownKind): string {
-  return via === "jumpStart" ? "jump-start" : via === "grantedFlashback" ? "flashback" : via === "permission" ? "a way to cast it from your graveyard" : via;
+  return via === "jumpStart" ? "jump-start" : via === "grantedFlashback" ? "flashback" : via === "grantedEscape" ? "escape" : via === "grantedRetrace" ? "retrace" : via === "permission" ? "a way to cast it from your graveyard" : via;
 }
 
 /** ", kicked", ", kicked twice", ", kicked with {1}{U}", for the log. */

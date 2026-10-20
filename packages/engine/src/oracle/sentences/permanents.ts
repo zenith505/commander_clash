@@ -2,7 +2,7 @@
 
 import type { Effect, ObjRef } from "../../abilities";
 import { NUM, NUMX, COUNTER, counterKind, amt, isGroup, num } from "../words";
-import { pickFilter, parseGroup, parseObject, parseTargetPhrase } from "../targets";
+import { pickFilter, parseGroup, parseObject, parsePlayer, parseTargetPhrase } from "../targets";
 import { addTarget } from "../body";
 import { parseCount } from "../counts";
 import { parseChanges, parseSentence } from "../sentence";
@@ -353,6 +353,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: m[2] ? "endOfTurn" : "game" }] : null;
   }
+  // "Target player gains control of target permanent you control" (Donate), "An opponent gains control of ~" (Wishclaw
+  // Talisman): an opponent you choose as it resolves (rulings). Layer 2, for the rest of the game.
+  if ((m = /^(Target player|Target opponent) gains control of (target .+)$/.exec(s))) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    const what = who && parseObject(m[2]!, ctx);
+    return who && what?.ref === "target" && !what.n ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: "game", giveTo: who }] : null;
+  }
+  if (/^An opponent(?: of your choice)? gains control of ~$/.test(s))
+    return [{ type: "choose", choice: "opponent" }, { type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "chosenPlayer" } }];
   // "Gain control of that Equipment until end of turn" (Stolen Uniform): a target an earlier sentence chose.
   if ((m = /^Gain control of (that Equipment)( until end of turn)?$/.exec(s)) && ctx.spell) {
     const what = parseObject(m[1]!, ctx);

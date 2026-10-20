@@ -2,7 +2,7 @@ import { ANY_COUNTER } from "../abilities";
 import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Modification, ObjRef, Range, TargetChoice, TargetSpec, Untargetable } from "../abilities";
 import { compileCard } from "../oracle";
 import { manaValue, parseManaCost, xCount } from "../mana";
-import { abilitiesOf, defOf, objHasKeyword, objIsType, power, toughness } from "../cards";
+import { abilitiesOf, basePowerNow, defOf, objHasKeyword, objIsType, power, toughness } from "../cards";
 import { attackedPlaneswalker, creatureTypesOf, livingPlayers, obj, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, type Characteristics } from "../layers";
 import { expandMany, expandPerOpponent, manySlot, modeCountProblem } from "../modes";
@@ -88,6 +88,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.dealtDamageThisTurn && !o.wasDealtDamage) return false;
   if (spec.token !== undefined && o.isToken !== spec.token) return false;
   if (spec.transformed && !isTransformed(s, o)) return false;
+  if (spec.powerAboveBase && !(c.types.includes("Creature") && power(s, o) > basePowerNow(s, o))) return false;
   if (spec.doubleFaced && !isDoubleFacedDef(s.cards[o.cardId] ?? defOf(s, o))) return false;
   if (spec.commander !== undefined && !!o.isCommander !== spec.commander) return false;
   if (spec.status && !hasStatus(s, o, c, spec.status, view)) return false;
@@ -220,7 +221,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.manaCostIn && !spec.manaCostIn.includes(d.manaCost)) return false;
   if (spec.named !== undefined && !hasName(d.name, spec.named)) return false;
   if (spec.doubleFaced && !isDoubleFacedDef(d)) return false;
-  if (spec.transformed) return false;
+  if (spec.transformed || spec.powerAboveBase) return false;
   return true;
 }
 

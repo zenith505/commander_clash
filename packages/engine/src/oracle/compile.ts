@@ -541,7 +541,9 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "Exhaust — [Cost]: Add ..." is a mana ability that can be activated only once (CR 702.177a, 605.1a).
     const exhaust = /^Exhaust — (.+)$/.exec(line);
-    const manaAb = exhaust ? parseManaAbility(exhaust[1]!) : parseManaAbility(line);
+    // An ability word ("Domain — ") has no rules meaning (CR 207.2c). One with an activation condition (Mox Opal's
+    // metalcraft) goes the activated ability's way, which reads the condition.
+    const manaAb = exhaust ? parseManaAbility(exhaust[1]!) : parseManaAbility(/Activate only/.test(line) ? line : stripAbilityWord(line));
     if (manaAb && exhaust) {
       if (manaAb.oncePerTurn) out.unsupported.push(raw);
       else out.mana.push({ ...manaAb, text: line, onceEver: true, exhaust: true });
@@ -998,6 +1000,15 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "~ enters prepared.") {
       out.entersPrepared = true;
+      continue;
+    }
+    const yardExile = /^If an? (card or token|card|(.+?) card) would be put into (a|an opponent's|your) graveyard from anywhere, (?:exile (?:it|that card) instead|instead exile it with an? ([a-z]+) counter on it)\.$/.exec(line);
+    if (yardExile && !out.graveyardExile) {
+      // The card's own characteristics (read like a card in a graveyard's, its owner aside).
+      const card = yardExile[2] ? parseTargetPhrase(`${yardExile[2]} card in your graveyard`) : undefined;
+      const filter = card?.kind === "card" ? { ...card, owner: undefined, text: `${yardExile[2]} card` } : undefined;
+      if (yardExile[2] && !filter) out.unsupported.push(raw);
+      else out.graveyardExile = { whose: yardExile[3] === "a" ? "any" : yardExile[3] === "your" ? "yours" : "opponents", ...(yardExile[1] === "card or token" ? { tokens: true as const } : {}), ...(filter ? { filter } : {}), ...(yardExile[4] ? { counter: counterKind(yardExile[4]) } : {}) };
       continue;
     }
     if (line === "If ~ would be put into a graveyard from anywhere, exile it instead.") {
@@ -1517,6 +1528,10 @@ export function compile(d: CardDef): CompiledCard {
       out.opponentsOnlyFromHand = true;
       continue;
     }
+    if (line === "Creatures you control can boast twice during each of your turns rather than once.") {
+      out.boastTwice = true;
+      continue;
+    }
     if (line === "Your opponents can't cast spells during your turn.") {
       out.opponentsCantCastYourTurn = true;
       continue;
@@ -1717,6 +1732,15 @@ export function compile(d: CardDef): CompiledCard {
     const st = parseStatic(line) ?? parseConditionalStatic(line);
     if (st) {
       out.statics.push(st);
+      continue;
+    }
+    // "Lieutenant — As long as you control your commander, ~ gets +2/+2 and creatures you control have vigilance"
+    // (Angelic Field Marshal), "... and other creatures you control get +2/+2 and have trample" (Thunderfoot Baloth):
+    // two effects of one static ability with one condition, each read as its own (CR 604.2, 611.3).
+    const twoGroups = /^(?:[A-Z][A-Za-z' -]+ — )?As long as ([^,]+), (~ (?:gets|has) .+?) and ((?:other )?creatures you control .+)\.$/.exec(line);
+    const parts = twoGroups && [parseConditionalStatic(`As long as ${twoGroups[1]}, ${twoGroups[2]}.`), parseConditionalStatic(`As long as ${twoGroups[1]}, ${twoGroups[3]}.`)];
+    if (parts?.every((p) => p)) {
+      for (const p of parts) out.statics.push({ ...p!, text: line });
       continue;
     }
     // A spell's "When you next cast ... this turn, ..." creates a delayed trigger as it resolves (CR 603.7); it isn't a triggered ability of the card.

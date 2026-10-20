@@ -1,7 +1,7 @@
 # Roadmap
 
-21,271 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 917 of 992 (92%), top 2,000: 1,590 of 1,989 (79%), top 5,000: 3,343 of 4,988 (67%).
+21,334 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 928 of 992 (93%), top 2,000: 1,606 of 1,989 (80%), top 5,000: 3,373 of 4,988 (67%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,16 +22,20 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 93, most played first: Arena of Glory, Dauthi Voidwalker,
-   Kutzil, Selvala ("X mana in any combination of colors"), Maskwood Nexus, Birgi, Second Harvest, Conduit of Worlds,
-   Return the Favor, Saw in Half, Opposition Agent, Tibalt's Trickery, Hydroelectric Specimen, Banner of Kinship,
-   Trouble in Pairs, Midnight Clock, Opal Palace, Innkeeper's Talent, Archaeomancer's Map, Springheart Nantuko, Fact or
-   Fiction, Hammer of Nazahn, Mockingbird, Spelunking ("Lands you control enter untapped" needs the player's choice of
-   order against "enters tapped", rulings), Veyran, Isochron Scepter, Bloodchief Ascension, Eldritch Evolution, Kaya's
-   Ghostform, Terrasymbiosis, Inkshield, High Tide, Coat of Arms (a bonus counted for each creature it affects).
-   From round 93: Angelic Field Marshal and Thunderfoot Baloth (one Lieutenant static about two groups), Iroh ("non-Lesson
-   instant or sorcery"), Master of Keys, Szarekh and Rick Jones (their filters). Bots never move Forgotten Ancient's
-   counters.
+00. Most played first (`npm run popular`). Out after round 94, most played first: Maskwood Nexus (and Arcane
+   Adaptation, Conspiracy, Leyline of Transformation, Xenograft: creature types for cards and spells off the
+   battlefield, which card filters can't see yet), Conduit of Worlds, Return the Favor, Saw in Half, Opposition Agent,
+   Tibalt's Trickery, Hydroelectric Specimen, Banner of Kinship, Trouble in Pairs, Midnight Clock ("when the twelfth
+   hour counter is put on ~"), Opal Palace, Innkeeper's Talent, Springheart Nantuko, Fact or Fiction (piles), Mockingbird,
+   Spelunking ("Lands you control enter untapped" needs the player's choice of order against "enters tapped", rulings),
+   Veyran, Isochron Scepter, Bloodchief Ascension, Eldritch Evolution, Kaya's Ghostform, Terrasymbiosis, Inkshield, High
+   Tide, Forsaken Monument and Caged Sun (extra mana when a permanent is tapped for mana), Bloodletter of Aclazotz,
+   Scrap Trawler ("with lesser mana value"), Cut a Deal ("each opponent who drew a card this way"), Grim Hireling
+   ("Sacrifice X Treasures"), Descent into Avernus, Excalibur, Coat of Arms (a bonus counted for each creature it
+   affects). Smaller gaps from round 94: "X mana in any combination of colors" with {X} in the cost (Wizard's Rockets)
+   or chosen among a few colors (Hazel of the Rootbloom); Triumph of Cruelty (a target in "... if you control the
+   creature with the greatest power"); Fastbond and the "you play a land or cast a spell" triggers (Cemetery
+   Protector, Infernal Sovereign); bots move Forgotten Ancient's counters only onto an evasive creature of theirs.
    Smaller gaps from round 91 still out: Chatterfang's "Sacrifice X Squirrels", Tail Swipe, Contractual Safeguard,
    Return to Dust (addendum targets), Essence Flux ("If it's a Spirit" after a flicker), Tergrid ("sacrifices a
    nontoken permanent or discards a permanent card"), Zenith Chronicler ("each other player" meaning other than the

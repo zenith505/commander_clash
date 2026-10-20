@@ -135,6 +135,19 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
     const head = parseSearchFilter(`${two[1]}card`);
     return head === null ? null : { ...(head ?? { kind: "card" }), colorCount: two[2] ? "notTwo" : "two", text: p };
   }
+  const plain = plainFilter(p);
+  if (plain) return plain;
+  // "An artifact creature card or Vehicle card" (Szarekh), "a Hero or enchantment card" (Rick Jones): either one.
+  const either = /^(.+ card) or (.+ card)$/.exec(p) ?? /^([A-Z][a-z]+) or ([a-z]+ card)$/.exec(p);
+  if (either && !/,| or /.test(either[1]!) && !/,| or /.test(either[2]!)) {
+    const subs = [either[1]!.replace(/^([A-Z][a-z]+)$/, "$1 card"), either[2]!].map((x) => plainFilter(x));
+    if (subs.some((x) => !x)) return null;
+    return { kind: "card", anyOf: subs as TargetSpec[], text: p };
+  }
+  return null;
+}
+
+function plainFilter(p: string): TargetSpec | null {
   // Only plain card qualities: "with different names", "with mana value X or less" and the like aren't modeled.
   if (/ with (different|the same)| X /.test(p) || !/card( with (mana value|power|toughness) \d+ or (less|greater)| with an? (even|odd) mana value| with mana cost \{\d+\}(?: or \{\d+\})?)?$/i.test(p)) return null;
   const spec = parseTargetPhrase(`${p} from your graveyard`);

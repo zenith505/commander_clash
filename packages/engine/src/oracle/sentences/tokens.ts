@@ -60,6 +60,14 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const token = parseToken(Number(m[3]), Number(m[4]), m[5]!, withText);
     return token && who ? [{ type: "createToken", who, n: 1, token: { ...token, name, named: true, legendary: true } }] : null;
   }
+  // "For each token you control, create a token that's a copy of that permanent" (Second Harvest), "For each creature
+  // target player controls, create a token that's a copy of that creature" (Clone Legion): one copy of each of them.
+  if ((m = /^[Ff]or each (.+?), create a token that's a copy of (?:that (?:creature|permanent|artifact|token)|it)(?:, except (.+))?$/.exec(s))) {
+    const what = parseObject(`each ${m[1]!}`, ctx);
+    const except = m[2] ? parseCopyExcept(m[2]) : undefined;
+    if (!what || what.ref !== "each" || except === null) return null;
+    return [{ type: "createTokenCopy", who: { ref: "you" }, n: 1, what, each: true, ...(except ? { except } : {}) }];
+  }
   // Token copies (CR 707.2, 111.4): "Create a token that's a copy of target creature you control, except it
   // isn't legendary", "create two tokens that are copies of ~", "its controller creates a token that's a copy of it".
   if ((m = new RegExp(`^(?:(.+?) creates|(?:You )?[Cc]reate) ${NUMX} (tapped (?:and attacking )?)?tokens? that(?:'s| are) (?:a copy|copies) of (.+?)(?:, except (.+))?$`, "i").exec(s))) {

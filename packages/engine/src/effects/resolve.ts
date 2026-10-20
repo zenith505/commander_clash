@@ -636,6 +636,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "exileSelfWithTime":
     case "exileSpell":
     case "warpExile":
+    case "playExiled":
+    case "forEachThisWay":
     case "commanderToHand":
       return runZonesEffect(s, e, ctx, src);
     case "tap":

@@ -125,6 +125,7 @@ export type TriggerSourceEvent =
   | { type: "playerDealtDamage"; player: PlayerId; amount: number }
   /** A player collected evidence (CR 701.59a), once for each time. */
   | { type: "evidenceCollected"; player: PlayerId }
+  | { type: "landPlayed"; player: PlayerId; id: ObjectId }
   | { type: "dungeonCompleted"; player: PlayerId }
   /** A player rolled dice (CR 706): each die that counts (706.6), its natural result and its result. */
   | { type: "diceRolled"; player: PlayerId; sides: number; dice: { natural: number; result: number }[]; result: number }
@@ -663,6 +664,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youCompleteDungeon", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+    }
+  } else if (ev.type === "landPlayed") {
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      const you = controllerOf(s, o);
+      add(o, you, (e) => e === "playerPlaysLand" || (e === "youPlayLand" && you === ev.player) || (e === "opponentPlaysLand" && you !== ev.player), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
   } else if (ev.type === "evidenceCollected") {
     for (const id of s.battlefield) {

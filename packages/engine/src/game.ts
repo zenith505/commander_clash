@@ -1,5 +1,5 @@
 import { kickerName } from "./abilities";
-import type { AbilityBody, ActivatedAbility, AdditionalCost, ManaAbility, AltCostKind, ChoiceKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
+import type { AbilityBody, ActivatedAbility, AdditionalCost, ManaAbility, AltCostKind, ChoiceKind, CounterKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { mergeSpell } from "./mutate";
 import { battleSBAs, isSiege, protectorOptions, setProtector } from "./battles";
 import { joinMeld } from "./meld";
@@ -666,6 +666,14 @@ export function moveObject(
   // elsewhere the card's. If an "exile it instead" effect also applies, its owner would choose the order (CR 616.1):
   // those were applied above, so the card goes to exile.
   // "If ~ would be put into a graveyard from anywhere, exile it instead" (a disturb card's back face): the same way.
+  // Rest in Peace, Leyline of the Void, Dauthi Voidwalker: "If a card would be put into an opponent's graveyard from
+  // anywhere, exile it instead" (CR 614.1a), from a permanent on the battlefield, or one leaving it at the same time
+  // (rulings on Rest in Peace: destroyed by a spell, it's exiled, and the spell goes to the graveyard).
+  const yardExile = to === "graveyard" ? graveyardExileFor(s, o, fromZone) : undefined;
+  if (yardExile) {
+    to = "exile";
+    log(s, `${defOf(s, o).name} is exiled instead of being put into a graveyard (${yardExile.source}).`);
+  }
   if (to === "graveyard" && (fromZone === "battlefield" ? abilitiesOf(s, o) : compileCard(defOf(s, o))).exileInsteadOfGraveyard) {
     to = "exile";
     log(s, `${defOf(s, o).name} is exiled instead of being put into a graveyard.`);
@@ -814,6 +822,8 @@ export function moveObject(
   if (to === "battlefield") o.mutations = undefined; // and for "the number of times ~ has mutated"
   o.counters = {};
   o.counterTimestamps = undefined;
+  // "Instead exile it with a void counter on it" (Dauthi Voidwalker).
+  if (yardExile?.counter && to === "exile") o.counters[yardExile.counter] = 1;
   o.controller = opts.controller ?? o.owner;
   o.seenController = undefined;
   o.attacking = undefined;
@@ -1403,6 +1413,33 @@ export function loseLife(s: GameState, pid: PlayerId, n: number) {
   const lost = ((s.turnLog ??= {}).lifeLost ??= {});
   lost[pid] = (lost[pid] ?? 0) + n;
   fireEvent(s, { type: "lifeLost", player: pid, amount: n });
+}
+
+/**
+ * The "If a card would be put into an opponent's graveyard from anywhere, exile it instead" effect (CompiledCard
+ * graveyardExile) that applies to `o` going to its owner's graveyard, if one does: the name of its source, and the
+ * counter it's exiled with.
+ */
+function graveyardExileFor(s: GameState, o: GameObject, fromZone: ZoneName): { source: string; counter?: CounterKind } | undefined {
+  const applies = (x: CompiledCard["graveyardExile"], controller: PlayerId) =>
+    !!x && (!o.isToken || !!x.tokens) && (x.whose === "any" || (x.whose === "yours") === (o.owner === controller)) && (!x.filter || printedMatches(x.filter, defOf(s, o)));
+  for (const id of s.battlefield) {
+    const p = obj(s, id);
+    const x = abilitiesOf(s, p).graveyardExile;
+    if (applies(x, controllerOf(s, p))) return { source: characteristics(s, p).name, ...(x!.counter ? { counter: x!.counter } : {}) };
+  }
+  if (fromZone !== "battlefield") return undefined;
+  for (const l of s.leftTogether ?? []) {
+    if (!l.hadAbilities || l.id === o.id) continue;
+    const x = withGranted(compileCard(defOf(s, obj(s, l.id))), l.granted ?? []).graveyardExile;
+    if (applies(x, l.controller)) return { source: defOf(s, obj(s, l.id)).name, ...(x!.counter ? { counter: x!.counter } : {}) };
+  }
+  return undefined;
+}
+
+/** Birgi: "Creatures you control can boast twice during each of your turns rather than once" (CR 702.142a). */
+function boastsTwice(s: GameState, pid: PlayerId): boolean {
+  return s.activePlayer === pid && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && !!abilitiesOf(s, obj(s, id)).boastTwice);
 }
 
 /** Does an "exile it instead" replacement effect apply to `o` dying: its own, or another permanent's about it? */
@@ -2365,12 +2402,19 @@ function resolvePermanentSpell(s: GameState, item: StackItem, o: GameObject, d: 
   o.sneak = undefined;
   const gains = o.copyGains;
   o.copyGains = undefined;
+  const haste = o.hasteCast;
+  o.hasteCast = undefined;
   moveObject(s, o.id, "battlefield", { controller: item.controller, ...(item.x ? { x: item.x } : {}), ...(sneak ? { tapped: true } : {}) });
   // Sneak: tapped and attacking whom the returned creature was attacking (CR 702.190b, 506.3a).
   if (sneak && o.zone === "battlefield" && objIsType(s, o, "Creature") && enterAttacking(s, o, sneak)) log(s, `${d.name} is attacking ${attackedName(s, o)}.`);
   if (gains && o.zone === "battlefield") {
     // "The copy gains haste and ...": the effect on the spell goes on applying to the token it became (CR 400.7a).
     s.effects.push({ id: `e${s.nextId++}`, timestamp: gains.timestamp, controller: gains.controller, sourceName: gains.source, duration: "game", affected: [o.id], mods: gains.mods });
+    invalidateCharacteristics(s);
+  }
+  if (haste && o.zone === "battlefield") {
+    // Mana spent on it gave the creature spell haste (Arena of Glory): the creature it became has it (rulings).
+    s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: item.controller, sourceName: d.name, duration: haste, affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
     invalidateCharacteristics(s);
   }
   if (o.zone === "battlefield" && o.castAlt === "dash") dashed(s, o, item.controller);
@@ -2637,6 +2681,7 @@ function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean, fac
   const from = o.zone === "exile" || o.zone === "graveyard" ? ` from ${o.zone === "exile" ? "exile" : "their graveyard"}` : "";
   moveObject(s, id, "battlefield", { untapped, ...(face !== undefined ? { face } : {}) });
   log(s, `${p.name} plays ${d.name}${from}${obj(s, id).tapped ? " (tapped)" : ""}.`);
+  fireEvent(s, { type: "landPlayed", player: p.id, id });
 }
 
 /** "Remove N counters from ~" paid as a cost (CR 602.2b); removing the last time counter triggers vanishing. */
@@ -2672,7 +2717,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   if (!manaChoices(s, o, ab).includes(mana)) throw new RulesError(`${name} can't produce {${mana}}`);
   // "Add {W}{W}, {W}{U}, or {U}{U}": one of the combinations, chosen as it resolves (CR 605.3b). A storage land's: how
   // many counters it removes, announced as it's activated (CR 107.3a), and how that mana is split.
-  const combos = manaCombos(o, ab);
+  const combos = manaCombos(s, o, ab);
   if (combos ? combo === undefined || !combos[combo] : combo !== undefined) throw new RulesError(combos ? `choose which mana ${name} adds` : `${name}'s ability has no combinations of mana to choose from`);
   // What it makes is worked out before the costs change anything ("for each creature you control").
   const adds = manaProduced(s, o, ab, mana, combo);
@@ -2708,7 +2753,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     moveObject(s, id, "graveyard", { sacrificed: true });
   }
   const spentTrigger = ab.spentTrigger && { sourceId: o.id, sourceCardId: cardIdOf(o), sourceZc: o.zoneChanges ?? 0, body: ab.spentTrigger.body, sharesCommanderType: true as const };
-  addMana(s, p.id, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}) });
+  addMana(s, p.id, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste } : {}) });
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
   addTriggeredMana(s, p.id, picked);
   if (ab.skipNextUntap && o.zone === "battlefield") o.skipNextUntap = true;
@@ -3436,6 +3481,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   o.treasureSpent = paid.treasure || undefined;
   // "Spend this mana only to cast a creature spell of the chosen type, and that spell can't be countered" (Cavern of Souls).
   o.uncounterableCast = paid.uncounterable;
+  // "If any of that mana is spent on a creature spell, it gains haste" (Arena of Glory): the spell and the creature it becomes.
+  o.hasteCast = paid.haste;
   // "When that mana is spent to cast a creature spell that shares a creature type with your commander" (Path of
   // Ancestry): one trigger for each such mana, its commanders' types checked now (rulings).
   if (paid.spentTriggers && isType(d, "Creature")) {
@@ -4184,7 +4231,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.sorcerySpeed && !canActAtSorcerySpeed(s, pid) && !((ab.loyalty !== undefined || ab.loyaltyX) && loyaltyAtInstantSpeed(s, pid))) return "activate only as a sorcery";
   if (ab.tap && o.tapped) return `${d.name} is tapped`;
   if (ab.tap && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${d.name} has summoning sickness`; // CR 602.5a
-  if (ab.oncePerTurn && o.activatedThisTurn?.includes(index)) return `${d.name}'s ability can be activated only once each turn`; // CR 602.5b
+  if (ab.oncePerTurn && (o.activatedThisTurn?.filter((n) => n === index).length ?? 0) >= (ab.keyword === "Boast" && boastsTwice(s, pid) ? 2 : 1)) return `${d.name}'s ability can be activated only ${ab.keyword === "Boast" && boastsTwice(s, pid) ? "twice" : "once"} each turn`; // CR 602.5b
   if (ab.onceEver && o.activatedEver?.includes(index) && !(ab.keyword === "Exhaust" && mayExhaustAgain(s, pid)) && !(ab.keyword === "Power-up" && o.activatedEver.filter((i) => i === index).length <= powerUpAgain(s, pid))) return `${d.name}'s ${ab.keyword === "Exhaust" ? "exhaust " : ""}ability can be activated only once`; // CR 702.177a-b, 602.5b
   // "Reveal the player you chose": not if no player was chosen as it entered (rulings on Guardian Archon).
   if (ab.revealChosen && o.chosen?.player === undefined) return `no player was chosen for ${d.name}`;
@@ -6740,7 +6787,7 @@ export function availableMana(s: GameState, pid: PlayerId): number {
     manaAbilitiesOn(s, o).forEach((ab, i) => {
       if (manaAbilityProblem(s, pid, o, i, true)) return;
       // A storage land as autopay uses it: one counter at a time.
-      const combos = manaCombos(o, ab);
+      const combos = manaCombos(s, o, ab);
       const most = ab.produces.kind === "removeX" ? Math.min(1, o.counters[ab.produces.counter] ?? 0) : combos ? Math.max(0, ...combos.map((c) => c.length)) : Math.max(0, ...manaChoices(s, o, ab).map((m) => manaProduced(s, o, ab, m).length));
       best = Math.max(best, most - manaValue(parseManaCost(ab.manaCost)));
     });

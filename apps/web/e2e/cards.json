@@ -1977,6 +1977,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f1c2dbe2-fbe0-4058-bdf1-91d1b1832786",
+  "name": "Dauthi Voidwalker",
+  "manaCost": "{B}{B}",
+  "cmc": 2,
+  "typeLine": "Creature — Dauthi Rogue",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dauthi",
+   "Rogue"
+  ],
+  "oracleText": "Shadow (This creature can block or be blocked by only creatures with shadow.)\nIf a card would be put into an opponent's graveyard from anywhere, instead exile it with a void counter on it.\n{T}, Sacrifice this creature: Choose an exiled card an opponent owns with a void counter on it. You may play it this turn without paying its mana cost.",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Shadow"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2024-09-30",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "70486bee-6ee7-41ea-b834-8caf4699302b",
   "name": "Daze",
   "manaCost": "{1}{U}",
@@ -6850,6 +6883,46 @@
   "set": "snc",
   "releasedAt": "2022-04-29",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1d725121-e50c-42f0-9128-56802f07c89e",
+  "name": "Selvala, Heart of the Wilds",
+  "manaCost": "{1}{G}{G}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Elf Scout",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Scout"
+  ],
+  "oracleText": "Whenever another creature enters, its controller may draw a card if its power is greater than each other creature's power.\n{G}, {T}: Add X mana in any combination of colors, where X is the greatest power among creatures you control.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "cn2",
+  "releasedAt": "2016-08-26",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

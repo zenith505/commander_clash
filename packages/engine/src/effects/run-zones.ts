@@ -7,7 +7,7 @@ import { putCounters } from "../counters";
 import { manaValue } from "../mana";
 import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, objectMatches, pickOptions, printedMatches } from "./targeting";
-import { ResolveCtx, apnap, objects, players, amountNow, amountCtx, amountFor } from "./resolve";
+import { ResolveCtx, apnap, objects, players, amountNow, amountCtx, amountFor, runEffect } from "./resolve";
 import { createToken, tokenCopies } from "./run-tokens";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle } from "../rng";
@@ -1622,6 +1622,40 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if ((o.zone as string) !== "battlefield") return;
       if (ctx.lki) enterAttacking(s, o, ctx.lki);
       log(s, `${player(s, ctx.controller).name} puts ${characteristics(s, o).name} onto the battlefield tapped${o.attacking !== undefined ? ` and attacking ${attackedName(s, o)}` : ""} (ninjutsu).`);
+      return;
+    }
+    case "forEachThisWay": {
+      // All of them left first (rulings on Rampage of the Clans); each player then gets theirs, in APNAP order, as many as
+      // they controlled (CR 608.2h). A destroyed one counts even if it went somewhere other than a graveyard (rulings).
+      const counts = new Map<PlayerId, number>();
+      for (const { o, ch } of s.resolving?.[e.which] ?? [])
+        if (objectMatches(s, e.filter, o, ctx.controller, false, undefined, ch)) counts.set(ch.controller, (counts.get(ch.controller) ?? 0) + 1);
+      for (const pid of apnap(s, [...counts.keys()])) {
+        if (player(s, pid).lost) continue;
+        const n = counts.get(pid)!;
+        for (const inner of e.effects) runEffect(s, inner.type === "createToken" || inner.type === "draw" ? { ...inner, n } : inner, { ...ctx, eachOne: pid });
+      }
+      return;
+    }
+    case "playExiled": {
+      const sc = (s.resolving!.scratch ??= {});
+      const you = ctx.controller;
+      const ok = (id: ObjectId) => s.objects[id]?.zone === "exile" && obj(s, id).owner !== you && !obj(s, id).isToken && (obj(s, id).counters[e.counter] ?? 0) > 0;
+      if (!sc.found) {
+        const cards = s.turnOrder.flatMap((pid) => player(s, pid).exile).filter(ok);
+        if (!cards.length) {
+          log(s, `${player(s, you).name} has no exiled card with a ${e.counter} counter to choose.`);
+          return;
+        }
+        s.pending = { kind: "searchLibrary", player: you, source: src, what: `an exiled card an opponent owns with a ${e.counter} counter on it`, cards, min: 1, max: 1, exiled: true, dig: { looked: cards, to: `to play this turn${e.free ? " without paying its mana cost" : ""}`, rest: "stay in exile" } };
+        return "paused";
+      }
+      const id = sc.found.find(ok);
+      sc.found = undefined;
+      if (!id) return;
+      const o = obj(s, id);
+      o.mayPlay = { player: you, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, ...(e.free ? { free: true as const } : {}) };
+      log(s, `${player(s, you).name} chooses ${defOf(s, o).name} and may play it this turn${e.free ? " without paying its mana cost" : ""}.`);
       return;
     }
     case "warpExile":

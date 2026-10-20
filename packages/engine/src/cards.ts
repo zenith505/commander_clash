@@ -195,6 +195,15 @@ export function baseToughness(d: CardDef): number {
 }
 /** Current power and toughness, after all continuous effects and counters (CR 613.4). */
 export const power = (s: GameState, o: GameObject) => characteristics(s, o).power;
+/**
+ * Its base power (rulings on Kutzil): printed, or from a characteristic-defining ability or an effect that sets it
+ * (CR 613.4a-b), whichever applied last; not changed by modifications or counters (613.4c).
+ */
+export function basePowerNow(s: GameState, o: GameObject): number {
+  const c = characteristics(s, o);
+  const set = [...c.pt].reverse().find((p) => p.kind === "set");
+  return set ? set.power : c.printedPower;
+}
 export const toughness = (s: GameState, o: GameObject) => characteristics(s, o).toughness;
 
 /** Is this object of card type `t` right now (after type-changing effects)? */

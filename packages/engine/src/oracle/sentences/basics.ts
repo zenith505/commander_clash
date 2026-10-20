@@ -107,6 +107,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (fx?.length !== 1 || fx[0]!.type !== "search") return null;
     return [{ type: "eachMay", who, text: `search their library for ${m[2]!}`, effects: [{ ...fx[0]!, who: { ref: "choseThisWay" } }] }];
   }
+  // "Its controller may draw a card if its power is greater than each other creature's power" (Selvala, Heart of the
+  // Wilds): the creature the trigger is about, its controller deciding; its power compared as it resolves, or as it last
+  // existed (rulings).
+  if ((ctx.subjectIt || ctx.subject) && (m = /^[Ii]ts controller may draw a card( if its power is greater than each other creature's power)?$/.exec(s))) {
+    const may: Effect = { type: "eachMay", who: { ref: "subjectController" }, text: "draw a card", effects: [{ type: "draw", who: { ref: "choseThisWay" }, n: 1 }] };
+    return m[1] ? [{ type: "if", cond: { kind: "state", cond: { kind: "subjectPT", stat: "power", greatest: true } }, effects: [may] }] : [may];
+  }
   // "Each player searches their library for a basic land card, puts it onto the battlefield, then shuffles" (Field of
   // Ruin, Avatar of Growth): each player chooses in APNAP order, then the cards go there at the same time (CR 101.4).
   if ((m = /^[Ee]ach player searches their library for (.+?), puts (it|them|that card|those cards) (onto the battlefield(?: tapped)?|into their hand), then shuffles$/.exec(s))) {

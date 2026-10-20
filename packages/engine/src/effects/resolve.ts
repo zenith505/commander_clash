@@ -531,6 +531,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
   const src = ctx.sourceDef.name;
   switch (e.type) {
     case "damage":
+    case "eachDealsDamage":
     case "preventNext":
     case "redirectNext":
     case "preventCombatDamage":

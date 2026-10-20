@@ -2,6 +2,7 @@
 // (CR 614.1a, 616.1): Doubling Season, Hardened Scales, Parallel Lives, Xorn.
 
 import type { CountMod, TokenSpec } from "./abilities";
+import { PREDEFINED_TOKENS } from "./oracle/tokens";
 import { abilitiesOf } from "./cards";
 import { controllerOf, characteristics, invalidateCharacteristics, keywordOfCounter } from "./layers";
 import type { GameObject, GameState, PlayerId } from "./types";
@@ -46,12 +47,67 @@ export function countersToPut(s: GameState, o: GameObject, kind: string, n: numb
   return apply(n, ops);
 }
 
-/** How many of this token `pid` really creates when an effect would create `n`. */
-export function tokensToCreate(s: GameState, pid: PlayerId, token: Pick<TokenSpec, "subtypes">, n: number): number {
-  const ops = modsInPlay(s)
-    .filter(({ mod, controller }) => mod.what === "tokens" && (mod.who === "any" || controller === pid) && (!mod.subtype || token.subtypes.includes(mod.subtype)))
-    .map(({ mod }) => mod.op);
-  return apply(n, ops);
+type TokenKind = Pick<TokenSpec, "types" | "subtypes">;
+/** What an effect creating tokens really creates: `same` of its own token, and `extra` other tokens replacements add. */
+export interface TokenBatch {
+  same: number;
+  extra: { token: TokenSpec; n: number }[];
+}
+
+/**
+ * What `pid` really creates when an effect would create `n` of this token (CR 614.1a). The player creating them orders
+ * the replacements (CR 616.1), each applying once to the event as it then is; this order gives the most tokens: the
+ * ones adding a token (Xorn, Peregrin Took), then a token for each of a kind (Bilbo), then Academy Manufactor's one of
+ * each (two Manufactors make three of each, rulings), then a token for each token (Chatterfang), then the doublers.
+ */
+export function tokenBatch(s: GameState, pid: PlayerId, token: TokenKind, n: number): TokenBatch {
+  const mods = modsInPlay(s).flatMap(({ mod, controller }) => (mod.what === "tokens" && (mod.who === "any" || controller === pid) ? [mod] : []));
+  if (n <= 0 || !mods.length) return { same: n, extra: [] };
+  // The original token is the entry with no `spec`.
+  const entries: { kind: TokenKind; spec?: TokenSpec; n: number }[] = [{ kind: token, n }];
+  const fits = (k: TokenKind, mod: CountMod) => (!("subtype" in mod) || !mod.subtype || k.subtypes.includes(mod.subtype)) && (!("type" in mod) || !mod.type || k.types.includes(mod.type));
+  const add = (spec: TokenSpec, k: number) => {
+    if (k <= 0) return;
+    const key = JSON.stringify(spec);
+    const e = entries.find((x) => x.spec && JSON.stringify(x.spec) === key);
+    if (e) e.n += k;
+    else entries.push({ kind: spec, spec, n: k });
+  };
+  const live = () => entries.filter((e) => e.n > 0);
+  // Those adding one token: one may make another apply (Peregrin Took's Food for Stridehangar Automaton).
+  const adders = mods.filter((m) => m.op === "plusOne" || m.op === "plusToken");
+  for (let changed = true; changed; ) {
+    changed = false;
+    for (const m of [...adders]) {
+      const at = live().find((e) => fits(e.kind, m));
+      if (!at) continue;
+      adders.splice(adders.indexOf(m), 1);
+      if (m.op === "plusToken") add(m.token, 1);
+      else at.n += 1;
+      changed = true;
+    }
+  }
+  for (const m of mods) if (m.op === "andEach") add(m.token, live().filter((e) => e.kind.subtypes.includes(m.subtype)).reduce((a, e) => a + e.n, 0));
+  for (const m of mods) {
+    if (m.op !== "oneOfEach") continue;
+    const of = live().filter((e) => m.subtypes.some((st) => e.kind.subtypes.includes(st)));
+    const k = of.reduce((a, e) => a + e.n, 0);
+    if (!k) continue;
+    for (const e of of) e.n = 0;
+    for (const st of m.subtypes) {
+      const own = of.find((e) => e.kind.subtypes.includes(st));
+      if (own) own.n = k;
+      else add(PREDEFINED_TOKENS[st]!, k);
+    }
+  }
+  for (const m of mods) if (m.op === "plusThatMany") add(m.token, live().reduce((a, e) => a + e.n, 0));
+  for (const m of mods) if (m.op === "double" || m.op === "triple") for (const e of live()) if (fits(e.kind, m)) e.n *= m.op === "double" ? 2 : 3;
+  return { same: entries[0]!.n, extra: entries.slice(1).flatMap((e) => (e.n > 0 ? [{ token: e.spec!, n: e.n }] : [])) };
+}
+
+/** How many of this token `pid` really creates when an effect would create `n` (without any other tokens added). */
+export function tokensToCreate(s: GameState, pid: PlayerId, token: TokenKind, n: number): number {
+  return tokenBatch(s, pid, token, n).same;
 }
 
 /** Put counters on a permanent through those replacement effects; returns how many were put on. */

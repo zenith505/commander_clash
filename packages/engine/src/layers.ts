@@ -284,6 +284,8 @@ interface Inst {
   granted?: true;
   /** An emblem's static ability (CR 114.4): its source is in the command zone, with `controller` its owner. */
   emblem?: true;
+  /** A static ability that works from its card's graveyard (StaticAbility.zone), with `controller` its owner. */
+  fromGraveyard?: true;
 }
 
 function gather(s: GameState): Inst[] {
@@ -324,6 +326,15 @@ function gather(s: GameState): Inst[] {
       // A damage replacement's (Ajani Steadfast's emblem) is read in damage.ts.
       if (st.affects.kind === "filter") out.push({ key: `${o.id}#${i}`, timestamp: o.timestamp, order: order++, sourceId: o.id, sourceName: defOf(s, o).name, untilEndOfTurn: false, mods: st.mods, affects: st.affects, controller: o.controller, emblem: true });
     });
+  // Static abilities that work from a graveyard (CR 113.6b), each with its card's timestamp there (CR 613.7d).
+  for (const pid of s.turnOrder)
+    for (const id of s.players[pid]!.graveyard) {
+      const o = s.objects[id]!;
+      const d = defOf(s, o);
+      compileCard(d).statics.forEach((st, i) => {
+        if (st.zone === "graveyard") out.push({ key: `${id}#${i}`, timestamp: o.timestamp, order: order++, sourceId: id, sourceName: d.name, untilEndOfTurn: false, mods: st.mods, affects: st.affects, condition: st.condition, controller: o.owner, fromGraveyard: true });
+      });
+    }
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
     const d = defOf(s, o);
@@ -341,7 +352,7 @@ function gather(s: GameState): Inst[] {
     if (o.attachedTo && compileCard(d).reconfigure)
       out.push({ key: `reconfigure:${id}`, timestamp: o.timestamp, order: order++, sourceName: d.name, untilEndOfTurn: false, mods: [{ kind: "loseTypes", types: ["Creature"] }], controller: o.controller, fixed: [id] });
     compileCard(d).statics.forEach((st, i) =>
-      out.push({
+      st.zone !== "graveyard" && out.push({
         key: `${id}#${i}`,
         timestamp: o.timestamp, // CR 613.7a
         order: order++,
@@ -361,6 +372,7 @@ const sameCI = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 
 /** Does a static ability's source still have it? It must be on the battlefield and not have lost its abilities. */
 function exists(s: GameState, e: Inst, chars: CharMap): boolean {
+  if (e.fromGraveyard) return !e.condition || conditionMet(s, e.condition, e.sourceId!, e.controller!, chars);
   if (!e.affects || e.emblem) return true;
   const src = chars.get(e.sourceId!);
   if (!src || (!src.hasPrintedAbilities && !e.granted)) return false;
@@ -1127,7 +1139,11 @@ function countsSomething(st: StaticAbility): boolean {
 
 /** Does any static ability on the battlefield count something? */
 function usesCounts(s: GameState): boolean {
-  return s.battlefield.some((id) => compileCard(defOf(s, s.objects[id]!)).statics.some(countsSomething)) || liveEmblems(s).some((o) => compileCard(defOf(s, o)).statics.some(countsSomething));
+  return (
+    s.battlefield.some((id) => compileCard(defOf(s, s.objects[id]!)).statics.some(countsSomething)) ||
+    liveEmblems(s).some((o) => compileCard(defOf(s, o)).statics.some(countsSomething)) ||
+    s.turnOrder.some((pid) => s.players[pid]!.graveyard.some((id) => compileCard(defOf(s, s.objects[id]!)).statics.some((st) => st.zone === "graveyard" && countsSomething(st))))
+  );
 }
 
 /** Turn the cache off to check that invalidation is complete (tests compare both ways). */

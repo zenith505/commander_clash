@@ -5151,7 +5151,7 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
   }
   (r.scratch ??= {}).may = yes;
   // The prompt speaks to the player ("discard your hand"); the log is about them.
-  if (!yes) log(s, `${p.name} chooses not to ${pend.prompt.replace(/\.$/, "").replace(/\byour\b/g, "their")}.`);
+  if (!yes) log(s, `${p.name} chooses not to ${pend.prompt.replace(/\.$/, "").replace(/ or lose the game$/, "").replace(/\byour\b/g, "their")}.`);
   s.pending = null;
   continueResolution(s);
 }

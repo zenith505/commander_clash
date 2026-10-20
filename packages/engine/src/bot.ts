@@ -146,7 +146,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // "You may pay {1}. If you do, ...": worth it when the rest is, and it leaves us some life.
       const { mana, life = 0 } = pend.pay;
       const taps = mana ? planMana(s, pid, parseManaCost(mana)) : [];
-      const ok = !!taps && player(s, pid).life > life + 5 && wantsMay(s, pid);
+      // A Pact's "If you don't, you lose the game": always pay when we can.
+      const e = s.resolving?.body.effects[s.resolving.next];
+      const orLose = e?.type === "may" && !!e.otherwise?.some((x) => x.type === "loseGame");
+      const ok = !!taps && (orLose || (player(s, pid).life > life + 5 && wantsMay(s, pid)));
       return ok ? [...taps!, { type: "chooseMay", player: pid, yes: true }] : [{ type: "chooseMay", player: pid, yes: false }];
     }
     // Clash (CR 701.30a): keep a card we'd like to draw on top, put the rest on the bottom.
@@ -1002,6 +1005,9 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   // Mox Diamond with no other land card to discard would only go to the graveyard.
   const discard = compileCard(d).entersDiscardInstead;
   if (discard && !player(s, pid).hand.some((c) => c !== id && printedMatches(discard, defOf(s, obj(s, c))))) return null;
+  // A Pact: only when our lands can pay its upkeep cost, and any other Pact's we still owe.
+  const pact = pactCost(compileCard(d).spell?.effects ?? []);
+  if (pact && pact + owedPacts(s, pid) > lands(s, pid)) return null;
   // A foretold card is cast for its foretell cost (CR 702.143a).
   if (!free && !via && alt === undefined && foretoldCast(s, pid, obj(s, id))) alt = "foretell";
   // Cast as madness or miracle resolves, for that cost (CR 702.35a, 702.94a): its X is paid then.
@@ -1823,6 +1829,16 @@ function chooseOptionalSacrifices(s: GameState, pid: PlayerId, pend: Extract<Pen
   return cheapest && (cheapest.isToken || worth(s, pid, cheapest) <= 3) ? [cheapest.id] : [];
 }
 
+/** What a Pact's "pay {2}{B}. If you don't, you lose the game" asks for at the next upkeep, as mana value. */
+function pactCost(effects: Effect[]): number {
+  for (const e of effects) {
+    const lose = e.type === "delayed" ? e.effects.find((x) => x.type === "may" && x.otherwise?.some((y) => y.type === "loseGame")) : undefined;
+    if (lose?.type === "may" && lose.pay?.mana) return manaValue(parseManaCost(lose.pay.mana));
+  }
+  return 0;
+}
+/** The Pacts this player still has to pay for. */
+const owedPacts = (s: GameState, pid: PlayerId) => (s.delayed ?? []).filter((d) => d.controller === pid).reduce((n, d) => n + pactCost([{ type: "delayed", when: "yourNextUpkeep", effects: d.body.effects, text: "" }]), 0);
 const lands = (s: GameState, pid: PlayerId) => s.battlefield.filter((x) => controllerOf(s, obj(s, x)) === pid && objIsType(s, obj(s, x), "Land")).length;
 
 /** Explore revealed a nonland card: keep it on top if we could cast it soon, otherwise mill it. */
@@ -2187,6 +2203,13 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
         const t = targets[i];
         if (t?.kind === "object") v += lethalDamage(s, obj(s, t.id)) <= estimate(e.amount) ? 8 : 0;
         else if (e.to.ref !== "each" && e.to.ref !== "eachPlayer") v += e.to.ref === "eachOpponent" ? 2 * estimate(e.amount) : estimate(e.amount);
+        break;
+      }
+      case "eachDealsDamage": {
+        // "Each creature deals 1 damage to its controller": life off each player, by how many of them they control.
+        if (e.what.ref !== "each") break;
+        const f = e.what.filter;
+        for (const id of s.battlefield) if (objectMatches(s, f, obj(s, id), pid, false)) v += (controllerOf(s, obj(s, id)) === pid ? -1 : 1) * estimate(e.amount);
         break;
       }
       case "draw":

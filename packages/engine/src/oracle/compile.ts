@@ -1669,7 +1669,8 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // A spell's "When you next cast ... this turn, ..." creates a delayed trigger as it resolves (CR 603.7); it isn't a triggered ability of the card.
-    if (isSpell && /^When you next cast /.test(line)) {
+    // So does a Pact's "At the beginning of your next upkeep, pay {2}{B}. If you don't, you lose the game." (CR 603.7a).
+    if (isSpell && (/^When you next cast /.test(line) || /^At the beginning of your next upkeep, pay (?:\{[^}]+\})+\. If you don't, you lose the game\.$/.test(line))) {
       spellLines.push(line);
       continue;
     }

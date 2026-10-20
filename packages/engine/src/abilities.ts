@@ -834,6 +834,11 @@ export interface StaticAbility {
   text: string;
   /** "As long as there are seven or more cards in your graveyard" (threshold): applies only while true. */
   condition?: StaticCondition;
+  /**
+   * "As long as ~ is in your graveyard and you control a Mountain, creatures you control have haste" (Anger): it works
+   * only while its card is in its owner's graveyard (CR 113.6b), controlled by its owner (CR 108.4a).
+   */
+  zone?: "graveyard";
 }
 
 /**
@@ -1096,6 +1101,11 @@ export type Effect =
       /** "Excess damage is dealt to that creature's controller instead" (Flame Spill): the damage beyond lethal goes there (CR 120.4a). */
       excessToController?: true;
     }
+  /**
+   * "Each creature deals 1 damage to its controller" (Rakdos Charm): each of those permanents is the source of its own
+   * damage, all dealt at the same time (CR 120.3, 120.4).
+   */
+  | { type: "eachDealsDamage"; what: ObjRef; amount: Amount; toController: true }
   | { type: "draw"; who: PlayerRef; n: Amount }
   /** "Its controller may draw up to two cards" (Arcane Denial): each player chooses how many, 0 to `n`, before drawing (rulings). */
   | { type: "drawUpTo"; who: PlayerRef; n: number }
@@ -1441,7 +1451,7 @@ export type Effect =
    * spell's) is its event player, "that spell's mana value" (Mana Drain) its event amount. `yourNextMain`: "at the
    * beginning of your next main phase", the next one that begins after it's made (rulings on Mana Drain).
    */
-  | { type: "delayed"; when: "nextTurnUpkeep" | "nextEndStep" | "yourNextEndStep" | "yourNextMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies"; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard"; of?: ObjRef; thisTurn?: true; event?: { player?: PlayerRef; amount?: Amount } }
+  | { type: "delayed"; when: "nextTurnUpkeep" | "yourNextUpkeep" | "nextEndStep" | "yourNextEndStep" | "yourNextMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies"; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard"; of?: ObjRef; thisTurn?: true; event?: { player?: PlayerRef; amount?: Amount } }
   /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
   | { type: "ninjutsu" }
   /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */
@@ -2986,7 +2996,20 @@ export interface CastFromGraveyard {
  * Doubling Season, Hardened Scales, Xorn. `who`: "you" = only for its controller's tokens / permanents.
  */
 export type CountMod =
-  | { what: "tokens"; who: "you" | "any"; op: "double" | "plusOne"; subtype?: string }
+  /**
+   * Token replacements (CR 614.1a): "twice that many of those tokens" (`double`), "three times that many" (`triple`), "those
+   * tokens plus an additional Treasure token" (`plusOne`, Xorn), only when the tokens include one with `subtype` or of
+   * card type `type` ("creature tokens").
+   */
+  | { what: "tokens"; who: "you" | "any"; op: "double" | "triple" | "plusOne"; subtype?: string; type?: string }
+  /** "Those tokens plus an additional Food token" (Peregrin Took), "... plus a 1/1 white Soldier creature token" (Queen Allenal): one more `token`, once. */
+  | { what: "tokens"; who: "you"; op: "plusToken"; token: TokenSpec; type?: string }
+  /** "Those tokens plus that many 1/1 green Squirrel creature tokens" (Chatterfang): one `token` for each token. */
+  | { what: "tokens"; who: "you"; op: "plusThatMany"; token: TokenSpec }
+  /** "If you would create a Food token, instead create a Food token and a Treasure token" (Bilbo): a `token` too for each one with `subtype`. */
+  | { what: "tokens"; who: "you"; op: "andEach"; subtype: string; token: TokenSpec }
+  /** "If you would create a Clue, Food, or Treasure token, instead create one of each" (Academy Manufactor): each of those is one of each of `subtypes`. */
+  | { what: "tokens"; who: "you"; op: "oneOfEach"; subtypes: string[] }
   | { what: "counters"; counter?: CounterKind; on: "creature" | "permanent" | "artifactOrCreature"; who: "you" | "any"; op: "double" | "plusOne" | "minusOne"; other?: boolean };
 
 /**

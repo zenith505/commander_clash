@@ -2073,6 +2073,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       last.loseAtEnd = true;
       continue;
     }
+    // The Pacts: "At the beginning of your next upkeep, pay {2}{B}. If you don't, you lose the game." A delayed trigger
+    // made as the spell resolves (CR 603.7a; none if it doesn't resolve, rulings). Paying is up to you; if you don't or
+    // can't, you lose (CR 104.3e).
+    const pact = /^At the beginning of your next upkeep, pay ((?:\{[^}]+\})+)$/.exec(s);
+    if (pact && opts.spell && sentences[si + 1] === "If you don't, you lose the game") {
+      const pay = parsePayCost(pact[1]!);
+      if (!pay) return null;
+      const text = `pay ${pact[1]} or lose the game`;
+      effects.push({ type: "delayed", when: "yourNextUpkeep", effects: [{ type: "may", effects: [], pay, otherwise: [{ type: "loseGame", who: { ref: "you" } }], text }], text });
+      si++;
+      continue;
+    }
     // "~ deals 4 damage to target creature. The damage can't be prevented." (CR 615.12)
     if (/^The damage can't be prevented$/.test(s)) {
       const last = effects[effects.length - 1];

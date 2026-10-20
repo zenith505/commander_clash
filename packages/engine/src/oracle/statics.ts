@@ -100,6 +100,15 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   // A type-changing effect (layer 4) whose condition looks at the permanent as the earlier effects in that layer left it.
   if ((m = /^As long as (?:enchanted|equipped) permanent is an? (Vehicle), it's a creature in addition to its other types$/.exec(text)))
     return { affects: { kind: "attached" }, mods: [{ kind: "addTypes", types: ["Creature"], subtypes: [] }], text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [m[1]!], text: m[1]! } } };
+  // The Incarnations: "As long as ~ is in your graveyard and you control a Mountain, creatures you control have haste"
+  // (Anger): it works only from its owner's graveyard (CR 113.6b).
+  if ((m = /^As long as ~ is in your graveyard(?: and (.+?))?, ((?:creatures|lands) you control (?:have|get) .+)$/.exec(text))) {
+    const st = parseStatic(`${capital(m[2]!)}.`);
+    if (!st || st.condition || st.affects.kind !== "filter") return null;
+    const condition = m[1] ? parseStaticCondition(m[1], st) : undefined;
+    if (m[1] && !condition) return null;
+    return { ...st, text: line, zone: "graveyard", ...(condition ? { condition } : {}) };
+  }
   if ((m = /^(.+?) as long as (.+)$/.exec(text))) [statement, cond] = [m[1], m[2]];
   else if ((m = /^As long as (~ is enchanted, equipped, and has a counter on it|[^,]+), (.+)$/.exec(text))) [cond, statement] = [m[1], m[2]];
   else if ((m = /^During your turn, (.+)$/.exec(text))) [cond, statement] = ["it's your turn", m[1]];

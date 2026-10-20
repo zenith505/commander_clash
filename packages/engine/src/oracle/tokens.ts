@@ -72,12 +72,41 @@ export function parseToken(power: number, toughness: number, desc: string, withT
   return { name: subtypes.join(" "), power, toughness, colors, types, subtypes, keywords, ...(quoted ? { abilities: quoted[2]! } : {}) };
 }
 
+/** "Food", "1/1 white Soldier creature", "1/1 colorless Thopter artifact creature with flying": one token. */
+function tokenPhrase(p: string, withText?: string): TokenSpec | null {
+  if (PREDEFINED_TOKENS[p]) return withText ? null : PREDEFINED_TOKENS[p]!;
+  const m = /^(\d+)\/(\d+) (.+?) creature$/.exec(p);
+  return m ? parseToken(Number(m[1]), Number(m[2]), m[3]!, withText) : null;
+}
+
 /** Token and counter doublers (CR 614.1a): Parallel Lives, Doubling Season, Hardened Scales, Xorn. */
 export function parseCountMod(line: string): CountMod | undefined {
   let m = /^If (?:an effect would create one or more tokens( under your control)?, it creates|one or more tokens would be created( under your control)?,) twice that many of those tokens(?: are created)? instead\.$/.exec(line);
   if (m) return { what: "tokens", who: m[1] || m[2] ? "you" : "any", op: "double" };
   m = /^If you would create one or more ([A-Z][a-z]+) tokens, instead create those tokens plus an additional \1 token\.$/.exec(line);
   if (m) return { what: "tokens", who: "you", op: "plusOne", subtype: m[1]! };
+  // Ojer Taq: "If one or more creature tokens would be created under your control, three times that many of those tokens
+  // are created instead."
+  m = /^If one or more (creature|artifact) tokens would be created under your control, (twice|three times) that many of those tokens are created instead\.$/.exec(line);
+  if (m) return { what: "tokens", who: "you", op: m[2] === "twice" ? "double" : "triple", type: capital(m[1]!) };
+  // Peregrin Took, Tippy-Toe, Donatello, Quina, Queen Allenal, Stridehangar Automaton, Worldwalker Helm.
+  m =
+    /^If one or more (creature |artifact )?tokens would be created under your control, those tokens plus (?:an additional |a )(.+?) token(?: with (.+?))? are created instead\.$/.exec(line) ??
+    /^If you would create one or more (artifact )?tokens, instead create those tokens plus (?:an additional |a )(.+?) token\.$/.exec(line);
+  if (m) {
+    const token = tokenPhrase(m[2]!, m[3]);
+    return token ? { what: "tokens", who: "you", op: "plusToken", token, ...(m[1] ? { type: capital(m[1].trim()) } : {}) } : undefined;
+  }
+  // Chatterfang: "those tokens plus that many 1/1 green Squirrel creature tokens".
+  m = /^If one or more tokens would be created under your control, those tokens plus that many (.+?) tokens are created instead\.$/.exec(line);
+  if (m) {
+    const token = tokenPhrase(m[1]!);
+    return token ? { what: "tokens", who: "you", op: "plusThatMany", token } : undefined;
+  }
+  // Bilbo: "If you would create a Food token, instead create a Food token and a Treasure token."
+  m = /^If you would create an? ([A-Z][a-z]+) token, instead create an? \1 token and an? ([A-Z][a-z]+) token\.$/.exec(line);
+  if (m && PREDEFINED_TOKENS[m[1]!] && PREDEFINED_TOKENS[m[2]!]) return { what: "tokens", who: "you", op: "andEach", subtype: m[1]!, token: PREDEFINED_TOKENS[m[2]!]! };
+  if (line === "If you would create a Clue, Food, or Treasure token, instead create one of each.") return { what: "tokens", who: "you", op: "oneOfEach", subtypes: ["Clue", "Food", "Treasure"] };
   // Kami of Whispered Hopes: "on a permanent you control".
   // Ozolith, the Shattered Spire: "on an artifact or creature you control".
   m = /^If one or more \+1\/\+1 counters would be put on (another|an?) (creature|permanent|artifact or creature)( you control)?, (twice that many|that many plus one) \+1\/\+1 counters are put on (?:it|that creature|that permanent) instead\.$/.exec(line);

@@ -2,14 +2,14 @@ import type { Effect, Modification, TokenSpec } from "../abilities";
 import { cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
 import { auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, log, moveObject, obj, opponents, player, removeFromCombat, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
-import { putCounters, tokensToCreate } from "../counters";
+import { putCounters, tokenBatch } from "../counters";
 import { compileCard } from "../oracle";
 import type { ContinuousEffect, GameObject, GameState, PlayerId } from "../types";
 import { setFace } from "../faces";
 import { becomePrepared } from "../prepare";
 import { objectMatches } from "./targeting";
 import { ResolveCtx, objects, amountNow, fixMods } from "./resolve";
-import { createToken } from "./run-tokens";
+import { createExtraTokens, createToken } from "./run-tokens";
 import { discardCards } from "./run-library";
 import { describeMods } from "./describe";
 import { evolves, fireEvent } from "./triggers";
@@ -305,7 +305,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (!armies().length) {
         const army: TokenSpec = { name: `${e.subtype} Army`, power: 0, toughness: 0, colors: ["B"], types: ["Creature"], subtypes: [e.subtype, "Army"], keywords: [] };
         enterTogether(s, () => {
-          for (let i = tokensToCreate(s, ctx.controller, army, 1); i > 0; i--) createToken(s, ctx.controller, army);
+          const { same, extra } = tokenBatch(s, ctx.controller, army, 1);
+          for (let i = same; i > 0; i--) createToken(s, ctx.controller, army);
+          createExtraTokens(s, ctx.controller, extra);
         });
       }
       const army = armies().sort((a, b) => (b.counters["+1/+1"] ?? 0) - (a.counters["+1/+1"] ?? 0))[0];
@@ -354,11 +356,12 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (e.type === "recruit") {
         if (!nonland) return;
         const soldier: TokenSpec = { name: "Human Soldier", power: 1, toughness: 1, colors: ["W"], types: ["Creature"], subtypes: ["Human", "Soldier"], keywords: [] };
-        const k = tokensToCreate(s, pid, soldier, 1);
+        const { same: k, extra } = tokenBatch(s, pid, soldier, 1);
         enterTogether(s, () => {
           for (let i = 0; i < k; i++) createToken(s, pid, soldier);
+          if (k) log(s, `${player(s, pid).name} creates ${k === 1 ? "a" : k} 1/1 Human Soldier token${k > 1 ? "s" : ""}.`);
+          createExtraTokens(s, pid, extra);
         });
-        if (k) log(s, `${player(s, pid).name} creates ${k === 1 ? "a" : k} 1/1 Human Soldier token${k > 1 ? "s" : ""}.`);
         return;
       }
       const o = id ? s.objects[id] : undefined;
@@ -475,9 +478,11 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const spirit: TokenSpec = { name: "Spirit", power: n, toughness: n, colors: ["W"], types: ["Creature"], subtypes: ["Spirit"], keywords: [] };
       if (s.resolving) s.resolving.created = [];
       enterTogether(s, () => {
-        for (let i = tokensToCreate(s, who, spirit, 1); i > 0; i--) createToken(s, who, spirit);
+        const { same, extra } = tokenBatch(s, who, spirit, 1);
+        for (let i = same; i > 0; i--) createToken(s, who, spirit);
+        log(s, `${src} endures ${n}: ${player(s, who).name} creates ${same === 1 ? "a" : same} ${n}/${n} Spirit token${same === 1 ? "" : "s"}.`);
+        createExtraTokens(s, who, extra);
       });
-      log(s, `${src} endures ${n}: ${player(s, who).name} creates a ${n}/${n} Spirit token.`);
       return;
     }
     case "moveCounter": {

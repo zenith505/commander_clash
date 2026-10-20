@@ -28,12 +28,12 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (sc.may === undefined && source?.triggeredThisTurn?.includes(key)) sc.may = false; // done already this turn (CR 603.2h)
       if (sc.may === undefined) {
         // Fabricate: with the permanent gone, the counters can't be put on it, so it's the tokens (rulings).
-        const onSelf = e.effects.every((x) => "what" in x && x.what?.ref === "self");
+        const onSelf = e.effects.every((x) => "what" in x && x.what?.ref === "self") && (e.effects.length > 0 || !!e.otherwise?.every((x) => "what" in x && x.what?.ref === "self"));
         if (e.otherwise && onSelf && !objects(s, { ref: "self" }, ctx).length) sc.may = false;
         else if (e.pay && !canPayNow(s, ctx.controller, e.pay)) sc.may = false; // can't pay, so can't do it
         else if (!canDoNow(s, e.effects, ctx)) sc.may = false; // nothing to discard: "if you do" can't happen
-        // Paying to untap what's already untapped gets nothing: not worth asking.
-        else if (e.pay && ctx.sourceId && doesNothingNow(s, ctx.sourceId, { targets: [], effects: e.effects, text: "" })) sc.may = false;
+        // Paying to untap what's already untapped gets nothing: not worth asking (unless not paying does something).
+        else if (e.pay && !e.otherwise?.length && ctx.sourceId && doesNothingNow(s, ctx.sourceId, { targets: [], effects: e.effects, text: "" })) sc.may = false;
         else if (e.effects.length === 1 && e.effects[0]!.type === "collectEvidence") {
           // "You may collect evidence N": picking the cards is the answer, none is "no" (CR 701.59a).
           s.pending = { kind: "collectEvidence", player: ctx.controller, n: e.effects[0]!.n, source: src };

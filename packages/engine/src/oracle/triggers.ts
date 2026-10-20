@@ -1025,6 +1025,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (!t || t === "fail" || t.zone !== "graveyard" || t.ifCond) return "fail";
     return { ...t, ifCond: { kind: "selfInGraveyard", ...(inYard[2] ? { creatureAbove: true as const } : {}) } };
   }
+  // "At the beginning of your upkeep, if ~ is in your graveyard, you may pay {2}{G}. If you do, return target creature
+  // card from your graveyard to your hand." (Genesis): the same, about other cards; its target may be the card itself.
+  const inYardOther = /^(At the beginning of your upkeep), if ~ is in your graveyard, (.+)$/.exec(line);
+  if (inYardOther && !/~|\bit\b/.test(inYardOther[2]!)) {
+    const t = parseTrigger(`${inYardOther[1]}, ${inYardOther[2]}`);
+    if (!t || t === "fail" || t.zone || t.ifCond || t.host) return "fail";
+    return { ...t, zone: "graveyard", ifCond: { kind: "selfInGraveyard" } };
+  }
   // "Whenever you cast a multicolored spell, you may return ~ from your graveyard to your hand": the effect moves the
   // card out of the graveyard, so the ability works only there (CR 113.6m). Only that one sentence: anything after it
   // would be about the card in its new zone. A trigger about ~ itself can't happen while it's in a graveyard.

@@ -1,7 +1,7 @@
 import type { Effect, TokenSpec } from "../abilities";
 import { defOf, power, toughness } from "../cards";
 import { auraHostOptions, enterTogether, livingPlayers, log, moveObject, nameOf, newObject, opponents, player } from "../game";
-import { tokensToCreate } from "../counters";
+import { tokenBatch, type TokenBatch } from "../counters";
 import { tokenCopyKey, type CopyExcept } from "../copies";
 import type { CardDef, GameObject, GameState, ObjectId, PlayerId } from "../types";
 import { ResolveCtx, apnap, objects, players, amountNow } from "./resolve";
@@ -17,7 +17,7 @@ import { controllerOf, invalidateCharacteristics } from "../layers";
 export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: number, ctx: ResolveCtx, opts: { except?: CopyExcept; tapped?: boolean; attacking?: boolean; defender?: PlayerId } = {}) {
   // A copy of a double-faced object is a double-faced token, with the same face up (CR 707.8a).
   const { key, face } = tokenCopyKey(s, base, opts.except);
-  const k = tokensToCreate(s, pid, s.cards[key]!, n);
+  const { same: k, extra } = tokenBatch(s, pid, s.cards[key]!, n);
   const defender = opts.defender ?? (opts.attacking ? attackDefault(s, pid, ctx.sourceId) : undefined);
   enterTogether(s, () => {
     for (let i = 0; i < k; i++) {
@@ -28,6 +28,7 @@ export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: numbe
       s.resolving?.created?.push(o.id);
       noteCreated(s, pid, o);
     }
+    createExtraTokens(s, pid, extra, { tapped: opts.tapped || opts.attacking, attacking: defender });
   });
   if (k) log(s, `${player(s, pid).name} creates ${k === 1 ? "a token that's a copy" : `${k} tokens that are copies`} of ${base.name}.`);
 }
@@ -107,7 +108,7 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (e.attackingEach && e.orPlaneswalker && inCombat(s) && s.activePlayer === ctx.controller) {
         const sc = (s.resolving!.scratch ??= {});
         const picks = (sc.attackEach ??= {});
-        const k = tokensToCreate(s, ctx.controller, e.token, n);
+        const k = tokenBatch(s, ctx.controller, e.token, n).same;
         for (const opp of apnap(s, opponents(s, ctx.controller))) {
           const options = attackChoices(s, ctx.controller, ctx.sourceId).filter((a) => a.player === opp);
           if (options.length < 2) continue;
@@ -148,7 +149,7 @@ function createTokensFor(s: GameState, e0: Extract<Effect, { type: "createToken"
     const pid = ctx.controller;
     const picks = s.resolving?.scratch?.attackEach ?? {};
     for (const opp of apnap(s, opponents(s, pid))) {
-      const k = tokensToCreate(s, pid, e.token, n);
+      const { same: k, extra } = tokenBatch(s, pid, e.token, n);
       const defender = inCombat(s) && s.activePlayer === pid ? opp : undefined;
       // The planeswalker chosen for each of this opponent's tokens, if it's still there (Adeline).
       const walkerFor = (i: number) => {
@@ -164,16 +165,19 @@ function createTokensFor(s: GameState, e0: Extract<Effect, { type: "createToken"
       }
       const whom = [...new Set(at)].join(" and ");
       if (k) log(s, `${src} creates ${k === 1 ? "a" : k} tapped${defender !== undefined ? " and attacking" : ""} ${e.token.power !== undefined ? `${e.token.power}/${e.token.toughness} ` : ""}${e.token.name} token${k > 1 ? "s" : ""}${defender !== undefined ? ` (attacking ${whom})` : ""}.`);
+      createExtraTokens(s, pid, extra, { tapped: true, attacking: defender });
     }
     return;
   }
   for (const pid of players(s, e.who, ctx)) {
-    const k = tokensToCreate(s, pid, e.token, n);
+    const { same: k, extra } = tokenBatch(s, pid, e.token, n);
     // "Tapped and attacking" (CR 508.4): put onto the battlefield attacking, never declared as attackers.
     const defender = e.attacking ? attackDefault(s, pid, ctx.sourceId) : undefined;
     const counters = e.counters ? { [e.counters.counter]: amountNow(s, e.counters.n, ctx) } : undefined;
-    for (let i = 0; i < k; i++) createToken(s, pid, e.token, { tapped: e.tapped || e.attacking, attacking: defender, ...(counters ? { counters } : {}) });
+    const opts = { tapped: e.tapped || e.attacking, attacking: defender, ...(counters ? { counters } : {}) };
+    for (let i = 0; i < k; i++) createToken(s, pid, e.token, opts);
     if (k) log(s, `${src} creates ${k === 1 ? "a" : k}${e.tapped || e.attacking ? " tapped" : ""}${defender !== undefined ? " and attacking" : ""} ${e.token.power !== undefined ? `${e.token.power}/${e.token.toughness} ` : ""}${e.token.name} token${k > 1 ? "s" : ""}${defender !== undefined && livingPlayers(s).length > 2 ? ` (attacking ${player(s, defender).name})` : ""}.`);
+    createExtraTokens(s, pid, extra, opts);
   }
 }
 
@@ -192,7 +196,9 @@ function attachedTokens(s: GameState, e: Extract<Effect, { type: "createToken" }
   for (const pid of players(s, e.who, ctx))
     for (const host of hosts) {
       if (s.objects[host]?.zone !== "battlefield") continue;
-      const k = tokensToCreate(s, pid, e.token, n);
+      const { same: k, extra } = tokenBatch(s, pid, e.token, n);
+      // The other tokens a replacement adds (Peregrin Took's Food) aren't Auras: they're just created.
+      createExtraTokens(s, pid, extra);
       let made = 0;
       for (let i = 0; i < k; i++) {
         const o = newObject(s, tokenDef(e.token), pid, "exile");
@@ -241,6 +247,18 @@ export function createToken(s: GameState, pid: PlayerId, t: TokenSpec, opts: { t
   s.resolving?.created?.push(o.id);
   noteCreated(s, pid, o);
   return o;
+}
+
+/**
+ * The other tokens a replacement adds (Peregrin Took's Food, Chatterfang's Squirrels, Academy Manufactor's), created at
+ * the same time. Anything else the effect says about its tokens (tapped, attacking, with counters, "exile it at end of
+ * combat") applies to these too (rulings on Peregrin Took and Chatterfang).
+ */
+export function createExtraTokens(s: GameState, pid: PlayerId, extra: TokenBatch["extra"], opts: { tapped?: boolean; attacking?: PlayerId; counters?: Record<string, number> } = {}) {
+  for (const { token, n } of extra) {
+    for (let i = 0; i < n; i++) createToken(s, pid, token, opts);
+    log(s, `${player(s, pid).name} also creates ${n === 1 ? "a" : n}${opts.tapped ? " tapped" : ""} ${token.power !== undefined ? `${token.power}/${token.toughness} ` : ""}${token.name} token${n > 1 ? "s" : ""}.`);
+  }
 }
 
 /** A token `pid` created (CR 111.2), for "the number of Treasure tokens you created this turn". */

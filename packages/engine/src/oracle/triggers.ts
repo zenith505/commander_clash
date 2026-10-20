@@ -62,6 +62,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever ~ attacks alone, (.+)$/, "selfAttacksAlone"],
   [/^Whenever ~ blocks, (.+)$/, "selfBlocks"],
   [/^Whenever you gain life, (.+)$/, "youGainLife"],
+  [/^Whenever you create a token, (.+)$/, "youCreateToken"], // once for each token (CR 111.2)
   [/^Whenever you collect evidence, (.+)$/, "youCollectEvidence"],
   [/^Whenever you complete a dungeon, (.+)$/, "youCompleteDungeon"],
   [/^Whenever you commit a crime, (.+)$/, "youCommitCrime"], // CR 700.13
@@ -811,13 +812,14 @@ function parseManaTapTrigger(line: string): TriggeredAbility | "fail" | null {
 }
 
 function parseDrawTrigger(line: string): TriggeredAbility | "fail" | null {
-  const m = /^Whenever (you|an opponent|a player|enchanted player|enchanted opponent) draws? (a card|your (first|second|third) card each turn), (.+)$/.exec(line);
+  const m = /^Whenever (you|an opponent|a player|enchanted player|enchanted opponent) draws? (a card(?: except the first one (?:they|you) draw in each of (?:their|your) draw steps)?|(?:your|their) (first|second|third) card each turn), (.+)$/.exec(line);
   if (!m) return null;
   const body = parseBody(theyAreThatPlayer(m[4]!), { eventPlayer: true });
   if (!body) return "fail";
   const by = m[1] === "you" ? "you" : m[1] === "an opponent" ? "opponent" : /^enchanted /.test(m[1]!) ? "enchanted" : "any";
   const nth = m[3] ? { first: 1, second: 2, third: 3 }[m[3] as "first"] : undefined;
-  return { event: "playerDraws", draws: { by, ...(nth ? { nth } : {}) }, body };
+  const except = / except the first one /.test(m[2]!);
+  return { event: "playerDraws", draws: { by, ...(nth ? { nth } : {}), ...(except ? { notFirstInDrawStep: true as const } : {}) }, body };
 }
 
 /**

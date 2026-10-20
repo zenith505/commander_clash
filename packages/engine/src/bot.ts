@@ -323,6 +323,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     if (pend.kind === "chooseOption" && pend.what === "tapOrUntap") return [{ type: "chooseOption", player: pid, choice: tapOrUntapChoice(s, pid, pend.options) }];
     if (pend.kind === "chooseOption" && pend.what === "endure") return [{ type: "chooseOption", player: pid, choice: "counters" }];
+    // "A Food token or a Treasure token": the Treasure (mana now beats life later); otherwise the first.
+    if (pend.kind === "chooseOption" && pend.what === "either") {
+      const i = pend.labels?.findIndex((l) => /Treasure/.test(l)) ?? -1;
+      return [{ type: "chooseOption", player: pid, choice: pend.options[Math.max(0, i)]! }];
+    }
     // Demonstrate: the opponent who also copies the spell is the one with the least on the battlefield.
     if (pend.kind === "chooseOption" && pend.what === "demonstrate") {
       const owned = (o: string) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === Number(o)).length;

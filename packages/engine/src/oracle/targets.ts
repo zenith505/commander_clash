@@ -618,6 +618,9 @@ export function parseTargetPhrase(
       extra[key] = m[3] === "greater" ? { min: n } : m[3] === "less" ? { max: n } : { min: n, max: n };
     }
     p = p.slice(0, m.index);
+  } else if ((m = / with mana cost ((?:\{[0-9WUBRGC]+\})+)(?: or ((?:\{[0-9WUBRGC]+\})+))?$/.exec(p))) {
+    extra.manaCostIn = [m[1]!, ...(m[2] ? [m[2]] : [])];
+    p = p.slice(0, m.index);
   } else if ((m = / with an? (even|odd) mana value$/.exec(p))) {
     // "Permanent ... with an even mana value" (Desecrate Reality; zero is even).
     extra.manaValue = { parity: m[1] as "even" | "odd" };

@@ -741,6 +741,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "chooseVotes":
       return runVotesEffect(s, e, ctx, src);
     case "may":
+    case "either":
     case "eachMay":
     case "punisher":
     case "cumulativeUpkeep":

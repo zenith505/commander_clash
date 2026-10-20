@@ -16,7 +16,10 @@ const grantedCache = new Map<string, CompiledCard>();
 export function compileGranted(text: string): CompiledCard {
   let hit = grantedCache.get(text);
   if (!hit) {
-    hit = compile({ name: "", oracleText: text, types: [], subtypes: [], supertypes: [], keywords: [], colors: [], colorIdentity: [], manaCost: "", cmc: 0, typeLine: "", oracleId: `granted:${text}` });
+    // A quoted ability inside the granted one is in single quotes ('... token with 'This token gets +1/+1 ...'', Urza's
+    // Saga): double quotes once it's an ability of its own.
+    const own = text.replace(/ with '([^']+?\.)'/g, ' with "$1"');
+    hit = compile({ name: "", oracleText: own, types: [], subtypes: [], supertypes: [], keywords: [], colors: [], colorIdentity: [], manaCost: "", cmc: 0, typeLine: "", oracleId: `granted:${text}` });
     grantedCache.set(text, hit);
   }
   return hit;
@@ -137,6 +140,12 @@ export function parseGrants(text: string): Modification[] | null {
     // Persist and undying are triggered abilities (CR 702.79a, 702.93a): it dies with them, so they look back (603.10a).
     if (/^(?:persist|undying)$/i.test(w)) {
       out.push({ kind: "addAbility", text: w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() });
+      continue;
+    }
+    // Riot is a replacement effect for how it enters (CR 702.136a), each instance on its own (702.136b): one granted by
+    // another permanent applies as the creature enters (CR 614.12, rulings on Rhythm of the Wild; see finishEntering).
+    if (/^riot$/i.test(w)) {
+      out.push({ kind: "addAbility", text: "Riot" });
       continue;
     }
     // Ward is a triggered ability too (CR 702.21a); several instances each trigger (CR 702.21b).

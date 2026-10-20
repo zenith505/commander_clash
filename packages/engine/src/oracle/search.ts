@@ -126,7 +126,7 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
     return head === null ? null : { ...(head ?? { kind: "card" }), colorCount: two[2] ? "notTwo" : "two", text: p };
   }
   // Only plain card qualities: "with different names", "with mana value X or less" and the like aren't modeled.
-  if (/ with (different|the same)| X /.test(p) || !/card( with (mana value|power|toughness) \d+ or (less|greater)| with an? (even|odd) mana value)?$/i.test(p)) return null;
+  if (/ with (different|the same)| X /.test(p) || !/card( with (mana value|power|toughness) \d+ or (less|greater)| with an? (even|odd) mana value| with mana cost \{\d+\}(?: or \{\d+\})?)?$/i.test(p)) return null;
   const spec = parseTargetPhrase(`${p} from your graveyard`);
   if (!spec || spec.kind !== "card") return null;
   const { owner: _owner, ...rest } = spec;

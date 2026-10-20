@@ -537,6 +537,7 @@ function parseAffected(subject: string): Affects | null {
     let tapped: boolean | undefined;
     let legendary: boolean | undefined;
     let status: TargetSpec["status"];
+    let nontoken = false;
     for (const w of words) {
       if (COLOR_WORDS[w.toLowerCase()]) colors.push(COLOR_WORDS[w.toLowerCase()]!);
       // "Artifact creatures you control get +1/+1", "Land creatures you control have vigilance": both card types.
@@ -551,9 +552,11 @@ function parseAffected(subject: string): Affects | null {
       else if (/^(non)?legendary$/i.test(w) && legendary === undefined) legendary = w.toLowerCase() === "legendary";
       // "Enchanted creatures you control get +1/+1", "Equipped creatures", "Modified creatures" (CR 700.9).
       else if (/^(enchanted|equipped|modified)$/i.test(w) && !status) status = w.toLowerCase() as TargetSpec["status"];
+      // "Nontoken creatures you control have riot" (Rhythm of the Wild).
+      else if (/^nontoken$/i.test(w) && !nontoken) nontoken = true;
       else return null;
     }
-    const specWords = [combat, colorless ? "colorless" : undefined, tapped === undefined ? undefined : tapped ? "tapped" : "untapped", legendary === undefined ? undefined : legendary ? "legendary" : "nonlegendary", status].filter(Boolean);
+    const specWords = [nontoken ? "nontoken" : undefined, combat, colorless ? "colorless" : undefined, tapped === undefined ? undefined : tapped ? "tapped" : "untapped", legendary === undefined ? undefined : legendary ? "legendary" : "nonlegendary", status].filter(Boolean);
     const spec: TargetSpec | undefined = specWords.length
       ? {
           kind: "object",
@@ -562,6 +565,7 @@ function parseAffected(subject: string): Affects | null {
           ...(tapped !== undefined ? { tapped } : {}),
           ...(legendary === true ? { supertypes: ["Legendary"] } : legendary === false ? { notSupertypes: ["Legendary"] } : {}),
           ...(status ? { status } : {}),
+          ...(nontoken ? { token: false } : {}),
           text: `${specWords.join(" ")} creature`,
         }
       : undefined;

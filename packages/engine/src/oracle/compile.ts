@@ -434,6 +434,8 @@ export function compile(d: CardDef): CompiledCard {
     // 714.2b) or a modal choice.
     const word = !isSpell ? /^([A-Z][^—•":{}]*?) — (?![{+•])/.exec(line) : null;
     if (word && !KEYWORD_WORDS.has(word[1]!.toLowerCase()) && !/^[IVX]+(?:, [IVX]+)*$/.test(word[1]!) && !/^(?:Choose\b|To solve$)/.test(word[1]!)) line = line.slice(word[0].length);
+    // "Vivid — {T}: For each color among permanents you control, add ..." (Bloom Tender): an ability word too.
+    else if (!isSpell && /^Vivid — \{/.test(line)) line = line.replace(/^Vivid — /, "");
     if (!line) continue;
     if (line === "Spree" && isSpell && !spree) {
       spree = { costs: [], texts: [], lines: [raw] };
@@ -1649,6 +1651,10 @@ export function compile(d: CardDef): CompiledCard {
       /^When(?:ever)? ~ enters or (attacks|dies|leaves the battlefield|the creature it haunts dies|deals combat damage to a player|transforms into ~), (.+)$/.exec(line) ??
       /^When ~ (transforms into ~) or dies, (.+)$/.exec(line) ??
       /^When ~ enters and whenever it (attacks while saddled), (.+)$/.exec(line) ??
+      // "Whenever you create or sacrifice a token, ..." (Mirkwood Bats); "When ~ enters and whenever an opponent draws a
+      // card except the first one they draw in each of their draw steps, ..." (Orcish Bowmasters).
+      /^Whenever you (create or sacrifice) a token, (.+)$/.exec(line) ??
+      /^When ~ enters and (whenever an opponent draws a card except the first one they draw in each of their draw steps), (.+)$/.exec(line) ??
       // "Whenever a creature you control of the chosen type enters or attacks, draw a card." (Kindred Discovery)
       /^Whenever (an? [^,]+? you control(?: of the chosen type)?) enters or attacks, (.+)$/.exec(line);
     if (twice && !/\bonly once\b/.test(line)) {
@@ -1663,6 +1669,10 @@ export function compile(d: CardDef): CompiledCard {
               ? [`When ~ enters, ${effect}`, `A${twice[1]!.slice(1)}, ${effect}`]
             : /^When ~ transforms into ~ or dies/.test(line)
               ? [`When ~ transforms into ~, ${effect}`, `When ~ dies, ${effect}`]
+            : twice[1] === "create or sacrifice"
+              ? [`Whenever you create a token, ${effect}`, `Whenever you sacrifice a token, ${effect}`]
+            : /^When ~ enters and whenever an opponent draws/.test(line)
+              ? [`When ~ enters, ${effect}`, `W${twice[1]!.slice(1)}, ${effect}`]
             : /^Whenever an? [^,]+? enters or attacks, /.test(line)
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} attacks, ${effect}`]
             : [`When ~ enters, ${effect}`, `${/^(?:attacks|deals)/.test(twice[1]!) ? "Whenever" : "When"} ~ ${twice[1]}, ${effect}`];
@@ -1862,6 +1872,13 @@ function bindThisAbility<T extends object>(ability: T, line: string): T {
  * the return gives back only what this object's own exile ability took. Needs exactly one exile to link to.
  */
 function linkExile(out: CompiledCard) {
+  // Imprint (an ability word, CR 207.2c): "{T}: Add one mana of any of the exiled card's colors" (Chrome Mox) is
+  // linked to the one ability that exiles it as it enters (CR 607.2a).
+  if (out.mana.some((m) => m.produces.kind === "colorsAmong" && m.produces.linked)) {
+    const imprints = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e) => e.type === "takeFromHand" && e.action === "exile");
+    if (imprints.length !== 1 || out.triggers.some((t) => allEffects(t.body.effects).some((e) => e.type === "returnLinked"))) out.unsupported.push("(its mana ability can't be linked to one imprint ability)");
+    else (imprints[0] as Extract<Effect, { type: "takeFromHand" }>).linked = true;
+  }
   const returns = out.triggers.filter((t) => allEffects(t.body.effects).some((e) => e.type === "returnLinked"));
   if (!returns.length) return;
   const exiles = [...out.triggers.filter((t) => t.event === "selfEnters").map((t) => t.body), ...out.activated.map((a) => a.body)]

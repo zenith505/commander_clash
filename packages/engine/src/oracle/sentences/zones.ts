@@ -302,6 +302,14 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     const filter = filter0 && lesser ? { ...filter0, text: m[3]! } : filter0;
     return [{ type: "putFromHand", ...(filter ? { filter } : {}), ...(m[4] ? { tapped: true } : {}), ...(m[5] ? { attacking: true } : {}), may: !!m[1] || m[2] === "any number of", ...(m[2] === "any number of" ? { any: true } : {}), ...(lesser ? { lesserPower: true as const } : {}), ...(m[6] ? { attackingEvent: true as const } : {}) }];
   }
+  // Imprint: "You may exile a nonartifact, nonland card from your hand" (Chrome Mox), "... an instant card with mana value 2
+  // or less ..." (Isochron Scepter): one card of your own hand, chosen as it resolves; linked to the ability that refers
+  // to "the exiled card" (CR 607.2a, compile.ts).
+  if ((m = /^(You may )?[Ee]xile (?:a|an) (.+? card) from your hand$/.exec(s)) && !ctx.spell) {
+    const filter = parseSearchFilter(m[2]!);
+    if (filter === null) return null;
+    return [{ type: "takeFromHand", who: { ref: "you" }, ...(filter ? { filter } : {}), action: "exile", ...(m[1] ? { optional: true as const } : {}) }];
+  }
   if ((m = /^Exile (target player's|target opponent's|each opponent's|all opponents'|all|any number of target players') graveyards?$/i.exec(s))) {
     const w = m[1]!.toLowerCase();
     const who: PlayerRef | null =

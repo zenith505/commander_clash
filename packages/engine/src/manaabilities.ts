@@ -4,7 +4,7 @@
 import { allEffects, type ActivatedAbility, type ManaAbility, type ManaProduce, type ManaTrigger } from "./abilities";
 import { abilitiesOf, basicLandManaAbility, defOf, objIsType } from "./cards";
 import { objectMatches } from "./effects";
-import { abilityProblem, obj, payableLife, player, tapAbilitySick, tapCostCandidates } from "./game";
+import { abilityProblem, linkedExileCards, obj, payableLife, player, tapAbilitySick, tapCostCandidates } from "./game";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { parseManaCost } from "./mana";
 import { evalAmount } from "./amounts";
@@ -72,7 +72,29 @@ export function manaChoices(s: GameState, o: GameObject, ab: ManaAbility): ManaT
   // A combination is picked by its number (`combo`); these are the types it could make (CR 106.7).
   if (p.kind === "combos") return [...new Set(p.options.flat())];
   if (p.kind === "removeX") return p.colors;
+  if (p.kind === "colorsAmong") return colorsAmong(s, o, p);
+  // "For each color among permanents you control": all of them at once, whichever is named (none with no color).
+  if (p.kind === "eachColorAmong") return eachColorAmong(s, o);
+  if (p.kind === "devotion") return [...COLORS];
   return commanderIdentity(s, controllerOf(s, o));
+}
+
+/**
+ * Colors among the permanents matching `p.filter` that its controller controls (Mox Amber), or of the card its linked
+ * imprint ability exiled (Chrome Mox, CR 607.2a): as they are now (CR 106.7, 605.3).
+ */
+function colorsAmong(s: GameState, o: GameObject, p: Extract<ManaProduce, { kind: "colorsAmong" }>): ManaType[] {
+  const pid = controllerOf(s, o);
+  const from = p.linked ? linkedExileCards(s, o) : s.battlefield.filter((id) => objectMatches(s, p.filter!, obj(s, id), pid, false));
+  const colors = new Set(from.flatMap((id) => characteristics(s, obj(s, id)).colors));
+  return COLORS.filter((c) => colors.has(c));
+}
+
+/** The colors among permanents `o`'s controller controls (CR 105.2): Bloom Tender itself counts if it has a color. */
+function eachColorAmong(s: GameState, o: GameObject): ManaType[] {
+  const pid = controllerOf(s, o);
+  const colors = new Set(s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid).flatMap((id) => characteristics(s, obj(s, id)).colors));
+  return COLORS.filter((c) => colors.has(c));
 }
 
 /**
@@ -126,11 +148,14 @@ function baseManaProduced(s: GameState, o: GameObject, ab: ManaAbility, choice: 
   if (p.kind === "removeX") return removeXCombos(o, p)[combo ?? -1] ?? [];
   if ((p.kind === "fixed" || p.kind === "oneOf") && p.n) {
     // CR 106.1: worked out as the ability resolves, with the permanent as "~" and its controller as "you".
-    const n = evalAmount(s, p.n, { controller: controllerOf(s, o), sourceId: o.id });
+    // "Of the chosen type" (Three Tree City): the type chosen for it as it entered.
+    const n = evalAmount(s, p.n, { controller: controllerOf(s, o), sourceId: o.id, ...(o.chosen ? { chosen: o.chosen } : {}) });
     return Array<ManaType>(n).fill(p.kind === "oneOf" ? choice : p.mana[0]!);
   }
   if (p.kind === "oneOf") return Array<ManaType>(p.amount).fill(choice);
-  if (p.kind === "commanderIdentity" || p.kind === "chosenColor" || p.kind === "landsCouldProduce") return [choice];
+  if (p.kind === "commanderIdentity" || p.kind === "chosenColor" || p.kind === "landsCouldProduce" || p.kind === "colorsAmong") return [choice];
+  if (p.kind === "eachColorAmong") return eachColorAmong(s, o);
+  if (p.kind === "devotion") return Array<ManaType>(evalAmount(s, { count: { kind: "devotion", colors: [choice as Color] } }, { controller: controllerOf(s, o), sourceId: o.id })).fill(choice);
   if (!p.count) return p.mana;
   const pid = controllerOf(s, o);
   const n = s.battlefield.filter((id) => objectMatches(s, p.count!, obj(s, id), pid, false)).length;

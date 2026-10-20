@@ -18,7 +18,7 @@ import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, prot
 import { putCounters } from "./counters";
 import { addCopyEffect, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
-import { compileCard, mutateTarget, spellTargetSpecs } from "./oracle";
+import { compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
 import { evalAmount, halve } from "./amounts";
 import { addMana, boundSpend, canPayFromPool, manaOriginsOf, poolFor, spendFromPool, type ManaUse } from "./spend";
@@ -1010,7 +1010,10 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   if (printed.entersChoosePlayer) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "player", ...(printed.entersChoosePlayer === "opponent" ? { except: "you" } : {}), ...(printed.entersChooseSecret ? { secret: true as const } : {}) });
   // Devour, riot and unleash: how many +1/+1 counters it has is part of how it enters (CR 614.12), so what it
   // triggers waits for that choice (evolve compares its power as it entered, CR 702.100a).
-  const options: EntersOption[] = [...(saga && printed.readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? [])];
+  // Riot granted by another permanent ("Nontoken creatures you control have riot", Rhythm of the Wild) applies too: it has
+  // it as it would exist on the battlefield (CR 614.12, rulings).
+  const grantedRiot = characteristics(s, o).grantedAbilities.flatMap((t) => (compileGranted(t).entersOptions ?? []).filter((x) => x === "riot"));
+  const options: EntersOption[] = [...(saga && printed.readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot];
   options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
   if (!options.length) {
     const ev = { type: "enters" as const, id, ...(opts.x ? { x: opts.x } : {}) };
@@ -1675,7 +1678,11 @@ function drawOne(s: GameState, pid: PlayerId): boolean {
   s.resolving?.drawnThisWay?.push(top);
   // Every card drawn is its own draw (CR 121.2), and counts toward "your second card each turn".
   p.draws = p.draws?.turn === s.turn ? { turn: s.turn, n: p.draws.n + 1 } : { turn: s.turn, n: 1 };
-  fireEvent(s, { type: "draw", player: pid, nth: p.draws.n });
+  // "Except the first one they draw in each of their draw steps" (Orcish Bowmasters): a card actually drawn, so not a
+  // draw that was replaced (CR 614.6).
+  const firstInDrawStep = s.step === "draw" && s.activePlayer === pid && p.drewInDrawStep !== s.turn;
+  if (firstInDrawStep) p.drewInDrawStep = s.turn;
+  fireEvent(s, { type: "draw", player: pid, nth: p.draws.n, ...(firstInDrawStep ? { firstInDrawStep: true as const } : {}) });
   // Miracle (CR 702.94a-b): the first card drawn this turn is revealed as it's drawn, and its trigger lets its owner cast
   // it for its miracle cost. It's always revealed here; whether to cast it is asked as the trigger resolves.
   const card = obj(s, top);
@@ -4794,6 +4801,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     // An option's index, or "none" to take the penalty (see the punisher effect).
     const pu = r.scratch?.punish;
     if (pu) pu.picked[p.id] = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "either") {
+    (r.scratch ??= {}).either = Number(choice);
+    log(s, `${p.name} chooses to ${pend.labels?.[Number(choice)] ?? choice} (${pend.source}).`);
     continueResolution(s);
     return;
   }

@@ -12,7 +12,14 @@ import { parseOnlyClauses, parseStaticCondition } from "./statics";
  * "{T}: Add {G} for each creature you control.", "Sacrifice ~: Add {C}." Null if the line isn't one
  * we can run (mana that can only be spent on some spells, "in any combination", ...).
  */
-export function parseManaAbility(line: string): ManaAbility | null {
+export function parseManaAbility(line0: string): ManaAbility | null {
+  // "{T}: For each color among permanents you control, add one mana of that color." (Bloom Tender), "{2}, {T}: Choose a
+  // color. Add an amount of mana of that color equal to ..." (Nykthos, Three Tree City: the color is chosen as it resolves,
+  // CR 605.3b, like "X mana of any one color").
+  const line = line0
+    .replace(/: For each color among permanents you control, add one mana of that color\./, ": Add one mana of each color among permanents you control.")
+    .replace(/: Choose a color\. Add an amount of mana of that color equal to your devotion to that color\./, ": Add an amount of mana of the chosen color equal to your devotion to that color.")
+    .replace(/: Choose a color\. Add an amount of mana of that color equal to (.+?)\./, ": Add X mana of any one color, where X is $1.");
   const part = String.raw`\{[^}]+\}|Sacrifice ~|Pay \d+ life|Pay (?:\{E\})+|Remove (?:a|an|one|two|three|four|five) [a-z]+ counters? from ~|Remove (?:any number of|X) [a-z]+ counters from ~|Tap (?:an|one|two|three) untapped [^,:]+? you control`;
   const m = new RegExp(`^((?:${part})(?:, (?:${part}))*): Add ([^.]+)\\.((?: [^.]+\\.)*)$`).exec(line);
   if (!m) return null;
@@ -46,7 +53,7 @@ export function parseManaAbility(line: string): ManaAbility | null {
   }
   const produces = removeX ? removedProduced(m[2]!, removeX.counter, removeX.any) : parseManaProduced(m[2]!);
   if (!produces || (removeCounters && removeX)) return null;
-  const out: ManaAbility = { text: line, manaCost, tap, sacrificeSelf, produces, ...(lifeCost ? { lifeCost } : {}), ...(energyCost ? { energyCost } : {}), ...(removeCounters ? { removeCounters } : {}), ...(tapCost ? { tapCost } : {}) };
+  const out: ManaAbility = { text: line0, manaCost, tap, sacrificeSelf, produces, ...(lifeCost ? { lifeCost } : {}), ...(energyCost ? { energyCost } : {}), ...(removeCounters ? { removeCounters } : {}), ...(tapCost ? { tapCost } : {}) };
   let m2: RegExpExecArray | null;
   for (const extra of (m[3] ?? "").split(/(?<=\.) /).map((x) => x.trim()).filter(Boolean)) {
     const dmg = new RegExp(`^~ deals ${NUM} damage to you\\.$`).exec(extra);
@@ -167,6 +174,19 @@ function parseManaProduced(text: string): ManaProduce | null {
     const n = parseCount(xAny[1]!, null);
     return n && { kind: "oneOf", options: ALL_COLORS, amount: 1, n };
   }
+  // "One mana of any color among legendary creatures and planeswalkers you control" (Mox Amber), "... among legendary
+  // permanents you control" (Plaza of Heroes); "one mana of any of the exiled card's colors" (Chrome Mox: the card its
+  // imprint ability exiled, linked in compile.ts).
+  if (text === "one mana of any of the exiled card's colors") return { kind: "colorsAmong", linked: true };
+  const among = /^one mana of any color among (legendary )?(.+?) you control$/.exec(text);
+  if (among) {
+    const words = among[2]!.split(/ and | or /).map((w) => singular(w));
+    const spec = parseTargetPhrase(`${words.join(" or ")} you control`);
+    if (spec?.kind !== "object" || spec.supertypes || spec.chosen) return null;
+    return { kind: "colorsAmong", filter: { ...spec, ...(among[1] ? { supertypes: ["Legendary"] } : {}), text: `${among[1] ?? ""}${among[2]} you control` } };
+  }
+  if (text === "one mana of each color among permanents you control") return { kind: "eachColorAmong" };
+  if (text === "an amount of mana of the chosen color equal to your devotion to that color") return { kind: "devotion" };
   const each = /^(\{[WUBRGC]\}) for each (.+) you control$/.exec(text);
   if (each) {
     const spec = parseTargetPhrase(each[2]!);

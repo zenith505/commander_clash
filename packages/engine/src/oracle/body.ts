@@ -462,6 +462,10 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // Search for Survivors: "An opponent chooses a card at random in your graveyard. If it's a creature card, put it onto the
   // battlefield. Otherwise, exile it." The choice is at random, so who makes it changes nothing: one instruction.
   text = text.replace(/An opponent chooses a card at random in your graveyard\. If it's a creature card, put it onto the battlefield\. Otherwise, exile it\./, "Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it.");
+  // Gamble: "Search your library for a card, put that card into your hand, discard a card at random, then shuffle." The
+  // discard comes before the shuffle, but the discarded card goes to the graveyard, so the order changes nothing that can
+  // be seen: the search, then the discard (at random from the whole hand, the found card included).
+  text = text.replace(/^Search your library for a card, put that card into your hand, discard a card at random, then shuffle\.$/, "Search your library for a card, put that card into your hand, then shuffle. Discard a card at random.");
   // "Put a +1/+1 counter on each creature you control and a loyalty counter on each other planeswalker you control"
   // (Ajani Steadfast): two kinds of counters on two groups, one after the other.
   text = text.replace(/(^|\. )Put (an?|one|two|three) ([^.]*?counters?) on (each [^.]+?) and (an?|one|two|three) ([^.]*?counters?) on (each [^.]+?)\./g, "$1Put $2 $3 on $4. Put $5 $6 on $7.");

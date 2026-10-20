@@ -278,6 +278,8 @@ export interface TargetSpec {
   power?: Range; // "with power 4 or greater"
   toughness?: Range;
   manaValue?: Range; // "with mana value 3 or less" (CR 202.3)
+  /** "With mana cost {0} or {1}" (Urza's Saga): its mana cost is exactly one of these (CR 202.1; not {X} or none, rulings). */
+  manaCostIn?: string[];
   /**
    * "Counter target spell with mana value X", "destroy target creature with power X or less": the X announced for the
    * spell or ability (CR 107.3a), made into that range of `key` as its targets are chosen (settleDivided). Until then,
@@ -1645,6 +1647,11 @@ export type Effect =
   | { type: "scry"; n: Amount } // CR 701.22, by the controller
   /** "~ endures N" (CR 701.63a): N +1/+1 counters on it, or an N/N white Spirit token, its controller's choice. */
   | { type: "endure"; what: ObjRef; n: Amount }
+  /**
+   * "Create a Food token or a Treasure token" (Tireless Provisioner): one of these, chosen by its controller as it
+   * resolves (CR 608.2d). `labels` name each for the choice.
+   */
+  | { type: "either"; options: Effect[][]; labels: string[] }
   /** "Clash with an opponent" (CR 701.30): for a following "If you win, ..." (see SpellCondition "wonClash"). */
   | { type: "clash" }
   /**
@@ -2124,7 +2131,7 @@ export type SpellCondition =
 
 /** Every effect, including the ones inside "you may" and "if", in order. */
 export const allEffects = (effects: Effect[]): Effect[] =>
-  effects.flatMap((e) => (e.type === "may" || e.type === "if" ? [e, ...allEffects(e.effects), ...allEffects(e.otherwise ?? [])] : [e]));
+  effects.flatMap((e) => (e.type === "may" || e.type === "if" ? [e, ...allEffects(e.effects), ...allEffects(e.otherwise ?? [])] : e.type === "either" ? [e, ...e.options.flatMap(allEffects)] : [e]));
 
 /** A sequence of effects with the targets they need, like a spell's text or one ability. */
 export interface AbilityBody {
@@ -2301,6 +2308,7 @@ export type TriggerEvent =
   /** "Whenever you roll a 4 or higher", "when you roll a natural 20": once per die that does (TriggeredAbility.rolls). */
   | "youRollDie"
   | "opponentLosesLife" // "Whenever an opponent loses life": once per life-loss event, damage and paying life included (CR 119.2, 119.4)
+  | "youCreateToken" // "Whenever you create a token": once for each token you create (CR 111.2), whoever ends up controlling it
   /**
    * "Whenever you're dealt damage", "whenever an opponent is dealt damage", "whenever enchanted player is dealt damage": once
    * for all the damage dealt to that player at the same time (rulings on Grievous Wound); the event amount is that damage.
@@ -2422,7 +2430,8 @@ export interface TriggeredAbility {
    */
   rolls?: { min?: number; natural?: number | "max" };
   /** For "playerDraws": who draws, and for "your second card each turn", which card of the turn it has to be. */
-  draws?: { by: "you" | "opponent" | "any" | "enchanted"; nth?: number };
+  /** `notFirstInDrawStep`: "except the first one they draw in each of their draw steps" (Orcish Bowmasters). */
+  draws?: { by: "you" | "opponent" | "any" | "enchanted"; nth?: number; notFirstInDrawStep?: true };
   /**
    * For "abilityActivated": who activated an ability that isn't a mana ability (CR 602, 605.1a), and `of`: what its
    * source had to be as it was activated, a permanent on the battlefield ("an ability of an artifact, creature, or land").
@@ -2716,7 +2725,20 @@ export type ManaProduce =
    * (two colors, `min` 1, as removing none adds nothing). How many are removed is chosen as it's activated (CR 107.3a,
    * 601.2b, 602.2b): each way to do it is a combination, numbered as for "combos" (`removeXCombos`).
    */
-  | { kind: "removeX"; counter: CounterKind; colors: ManaType[]; min: number };
+  | { kind: "removeX"; counter: CounterKind; colors: ManaType[]; min: number }
+  /**
+   * "One mana of any color among legendary creatures and planeswalkers you control" (Mox Amber, Plaza of Heroes: the
+   * colors of the permanents matching `filter` now), "one mana of any of the exiled card's colors" (Chrome Mox, `linked`:
+   * the card its linked imprint ability exiled, CR 607.2a). None if there's no such color (CR 106.5, rulings).
+   */
+  | { kind: "colorsAmong"; filter?: TargetSpec; linked?: true }
+  /** "For each color among permanents you control, add one mana of that color" (Bloom Tender, Faeburrow Elder). */
+  | { kind: "eachColorAmong" }
+  /**
+   * "Choose a color. Add an amount of mana of that color equal to your devotion to that color." (Nykthos, Shrine to Nyx,
+   * CR 700.5): the color chosen as it resolves, then the devotion to it.
+   */
+  | { kind: "devotion" };
 
 /**
  * A mana ability (CR 605.1a): no targets, adds mana, doesn't use the stack (CR 605.3a).

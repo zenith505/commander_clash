@@ -40,6 +40,12 @@ export interface CopyExcept {
   keepColors?: boolean;
   /** "It has this ability": the ability's own text, added to `text` when the card is compiled (CR 707.9a). */
   thisAbility?: boolean;
+  /**
+   * "Except it enters with an additional +1/+1 counter on it if it's a creature" (Spark Double, Littjara Mirrorlake): a
+   * replacement effect on its entering (CR 614.1c), not a copiable value, so it isn't part of the copy. `ifType`: only if
+   * it is that card type as it enters, as a copy (rulings).
+   */
+  enterCounters?: { counter: string; ifType?: string }[];
 }
 
 /** The copiable values of `o` now (CR 707.2): its definition as modified by copy effects, or face-down values. */
@@ -121,8 +127,11 @@ const isDfc = (d: CardDef | undefined): d is CardDef => !!d?.faces && d.faces.le
  * each face a copy of that face with the exceptions applied to both (rulings on Soul Separator), entering with the
  * same face up. Its back face, a copy of a back face, has mana value 0 (CR 202.3b). Anything else: copyKey.
  */
-export function tokenCopyKey(s: GameState, base: CardDef, except?: CopyExcept): { key: string; face?: number } {
+export function tokenCopyKey(s: GameState, base: CardDef, except0?: CopyExcept): { key: string; face?: number } {
   base = unroomed(s.cards, base);
+  // Counters it enters with aren't copiable values (see CopyExcept.enterCounters).
+  const { enterCounters: _c, ...rest } = except0 ?? {};
+  const except = except0 ? rest : undefined;
   const whole = base.faceOf ? s.cards[base.faceOf.oracleId] : base;
   if (!isDfc(whole) || (base.faceOf && !isDfc(s.cards[base.faceOf.oracleId]))) return { key: copyKey(s, base, except) };
   const face = base.faceOf?.face;
@@ -140,7 +149,7 @@ export function tokenCopyKey(s: GameState, base: CardDef, except?: CopyExcept): 
  */
 export function exceptFor(s: GameState, o: GameObject, except: CopyExcept | undefined, ownName: string): CopyExcept | undefined {
   if (!except) return undefined;
-  const { keepColors, thisAbility: _, ...rest } = except;
+  const { keepColors, thisAbility: _, enterCounters: _c, ...rest } = except;
   return { ...rest, ...(rest.name === "~" ? { name: ownName } : {}), ...(keepColors ? { colors: [...defOf(s, o).colors] } : {}) };
 }
 
@@ -166,4 +175,14 @@ export function endCopyEffects(s: GameState, ends: (e: CopyEffect) => boolean) {
     changed = true;
   }
   if (changed) invalidateCharacteristics(s);
+}
+
+/**
+ * The counters a copy enters with because of its exceptions (CopyExcept.enterCounters): "an additional +1/+1 counter on it
+ * if it's a creature", as it would exist on the battlefield (`isA`: whether it has that card type then).
+ */
+export function copyEnterCounters(except: CopyExcept | undefined, isA: (type: string) => boolean): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const c of except?.enterCounters ?? []) if (!c.ifType || isA(c.ifType)) out[c.counter] = (out[c.counter] ?? 0) + 1;
+  return out;
 }

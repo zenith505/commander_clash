@@ -1,8 +1,8 @@
 import type { Effect, TokenSpec } from "../abilities";
-import { defOf, power, toughness } from "../cards";
+import { defOf, isType, power, toughness } from "../cards";
 import { auraHostOptions, enterTogether, livingPlayers, log, moveObject, nameOf, newObject, opponents, player } from "../game";
 import { tokenBatch, type TokenBatch } from "../counters";
-import { tokenCopyKey, type CopyExcept } from "../copies";
+import { copyEnterCounters, tokenCopyKey, type CopyExcept } from "../copies";
 import type { CardDef, GameObject, GameState, ObjectId, PlayerId } from "../types";
 import { ResolveCtx, apnap, objects, players, amountNow } from "./resolve";
 import { inCombat, attackDefault, fireEvent } from "./triggers";
@@ -23,7 +23,9 @@ export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: numbe
     for (let i = 0; i < k; i++) {
       const o = newObject(s, s.cards[key]!, pid, "exile");
       o.isToken = true;
-      moveObject(s, o.id, "battlefield", { ...(opts.tapped || opts.attacking ? { tapped: true } : {}), ...(face !== undefined ? { face } : {}) });
+      // "Except it enters with an additional +1/+1 counter on it" (Littjara Mirrorlake).
+      const counters = copyEnterCounters(opts.except, (type) => isType(s.cards[key]!, type));
+      moveObject(s, o.id, "battlefield", { ...(opts.tapped || opts.attacking ? { tapped: true } : {}), ...(face !== undefined ? { face } : {}), ...(Object.keys(counters).length ? { counters } : {}) });
       if (defender !== undefined && o.zone === "battlefield") o.attacking = defender;
       s.resolving?.created?.push(o.id);
       noteCreated(s, pid, o);

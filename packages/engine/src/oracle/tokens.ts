@@ -137,6 +137,9 @@ export function parseCopyExcept(text: string): CopyExcept | null {
   for (const p of parts) {
     let m: RegExpExecArray | null;
     if (/^(?:isn't|aren't|is not|are not) legendary$/.test(p)) out.notLegendary = true;
+    // "Enters with an additional +1/+1 counter on it if it's a creature" (Spark Double), "... loyalty counter on it if it's
+    // a planeswalker", "enters with an additional +1/+1 counter on it" (Littjara Mirrorlake).
+    else if ((m = /^enters with an additional (\+1\/\+1|loyalty) counter on it(?: if it's an? (creature|planeswalker))?$/.exec(p))) (out.enterCounters ??= []).push({ counter: m[1]!, ...(m[2] ? { ifType: m[2] === "creature" ? "Creature" : "Planeswalker" } : {}) });
     else if (/^(?:'s|’s|is|are|'re) legendary$/.test(p) || /^(?:it's|they're|he's|she's) legendary$/.test(p)) out.legendary = true;
     // "It doesn't copy that creature's color": it keeps its own (CR 707.9c).
     else if (/^(?:doesn't|does not) copy that creature's colou?r$/.test(p)) out.keepColors = true;

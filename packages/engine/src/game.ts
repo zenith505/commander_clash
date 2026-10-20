@@ -16,7 +16,7 @@ import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarge
 import { describeCount, entwined, withModes, withSplices, gateTargets, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
 import { putCounters } from "./counters";
-import { addCopyEffect, copyKey, endCopyEffects, exceptFor } from "./copies";
+import { addCopyEffect, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
 import { compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
@@ -1051,6 +1051,13 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
     lockIfRoom(s, o);
     invalidateCharacteristics(s);
     log(s, `${realDefOf(s, o).name} enters as a copy of ${defOf(s, target).name}${own.untilEndOfTurn ? " until end of turn" : ""}.`);
+    // Spark Double: "an additional +1/+1 counter on it if it's a creature", judged as the copy (rulings).
+    const more = copyEnterCounters(own.except, (type) => objIsType(s, o, type));
+    if (Object.keys(more).length) {
+      const counters = { ...opts.counters };
+      for (const [k, n] of Object.entries(more)) counters[k] = (counters[k] ?? 0) + n;
+      opts = { ...opts, counters };
+    }
   }
   const printed = compileCard(defOf(s, o));
   // A Clone entering as a copy of Primeval Spawn has its "If ~ would enter and it wasn't cast or no mana was spent to cast

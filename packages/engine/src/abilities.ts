@@ -1526,6 +1526,12 @@ export type Effect =
    * exiled (CR 400.7), with the usual timing (rulings).
    */
   | { type: "playExiled"; counter: CounterKind; free?: true }
+  /**
+   * "For each creature exiled this way, its controller creates a 2/2 green Boar creature token" (Curse of the Swine), "...
+   * destroyed this way, its controller draws a card": `effects` (one token or one card, for PlayerRef "eachOne") once for
+   * each of them that the instructions before destroyed or exiled, by the player who controlled it as it last existed.
+   */
+  | { type: "forEachThisWay"; which: "destroyed" | "exiled"; filter: TargetSpec; effects: Effect[] }
   /** "Exile the top two cards of your library. Until the end of your next turn, you may play those cards." */
   /** `who`: "the top card of that player's library" (Ragavan), not yours; `castOnly`: "you may cast that card", not play it. */
   | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" | "yourNextEndStep"; who?: PlayerRef; castOnly?: true }

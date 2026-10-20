@@ -1,6 +1,6 @@
 import { allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose } from "../abilities";
 import { substituteX } from "../amounts";
-import { num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS } from "./words";
+import { num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS, singularWord } from "./words";
 import { CHOSEN_KEYWORD, CHOSEN_PROTECTION, THAT_PLAYER_PROTECTION } from "../keywords";
 import { parseStaticCondition } from "./statics";
 import { parseBoundCount, parseCount } from "./counts";
@@ -1688,6 +1688,19 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const inner = parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       effects.push({ type: "if", cond: { kind: "milledIs", filter }, effects: inner });
+      continue;
+    }
+    // "For each creature exiled this way, its controller creates a 2/2 green Boar creature token" (Curse of the Swine),
+    // "For each creature destroyed this way, its controller draws a card": after the destroy or exile instruction.
+    const perThisWay = /^For each (.+?) (destroyed|exiled) this way, its controller (creates an? .+ token(?: with [a-z ]+)?|draws a card)$/.exec(s);
+    if (perThisWay) {
+      const which = perThisWay[2] as "destroyed" | "exiled";
+      const prev = effects[effects.length - 1];
+      const spec = parseTargetPhrase(perThisWay[1]!.split(/\s+/).map(singularWord).join(" "), { chosen: true });
+      const inner = parseOne(capital(perThisWay[3]!.replace(/^creates/, "create").replace(/^draws/, "draw")), ctx);
+      const one = inner?.length === 1 ? inner[0]! : undefined;
+      if (prev?.type !== (which === "destroyed" ? "destroy" : "exile") || spec?.kind !== "object" || !one || (one.type !== "createToken" && one.type !== "draw") || one.n !== 1) return null;
+      effects.push({ type: "forEachThisWay", which, filter: { ...spec, text: perThisWay[1]! }, effects: [{ ...one, who: { ref: "eachOne" } }] });
       continue;
     }
     // "Mill three cards. You may put a land card from among them into your hand." (Six, Eerie Gravestone), "... from among

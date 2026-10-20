@@ -488,7 +488,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const max = Math.min(n, cards.length);
         const min = filter || e.upTo ? 0 : max;
         const kind = (filter?.text ?? "card").replace(/~/g, src);
-        const what = `${e.upTo ? "up to " : ""}${n === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${n >= 99 ? "any number of" : n} ${kind.replace(/\bcard\b/, "cards")}`}`;
+        const what = e.oneOfEach ? `up to a ${kind}` : `${e.upTo ? "up to " : ""}${n === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${n >= 99 ? "any number of" : n} ${kind.replace(/\bcard\b/, "cards")}`}`;
         s.pending = {
           kind: "searchLibrary",
           player: p.id,
@@ -499,6 +499,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           max,
           ...(e.others ? { firstTo: describeDest(e.dest), othersTo: describeDest(e.others) } : {}),
           ...(e.shareLandType ? { shareLandType: true as const } : {}),
+          ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}),
         };
         return "paused";
       }

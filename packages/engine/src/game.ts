@@ -1367,7 +1367,7 @@ const turnRule = (s: GameState, pid: PlayerId, rule: TurnRule["rule"]) => (s.tur
 
 /** Can this player lose life, or does "you can't lose life this turn" stop it (CR 119.8)? */
 export function canLoseLife(s: GameState, pid: PlayerId): boolean {
-  return !turnRule(s, pid, "cantLoseLife") && !player(s, pid).lifeCantChange;
+  return !turnRule(s, pid, "cantLoseLife") && !player(s, pid).lifeCantChange && player(s, pid).lifeCantChangeTurn !== s.turn;
 }
 
 /** An activated ability's "pay half your life, rounded up" right now: 0 with 0 or less life (rulings on Lurking Evil). */
@@ -1382,7 +1382,7 @@ export function payableLife(s: GameState, pid: PlayerId): number {
 
 /** Can this player gain life, or does a "can't gain life" effect stop it (CR 119.7)? */
 export function canGainLife(s: GameState, pid: PlayerId): boolean {
-  if (player(s, pid).lifeCantChange) return false;
+  if (player(s, pid).lifeCantChange || player(s, pid).lifeCantChangeTurn === s.turn) return false;
   const stops = (who: "all" | "opponents" | "enchanted" | undefined, controller: PlayerId, o?: GameObject) => who === "all" || (who === "opponents" && controller !== pid) || (who === "enchanted" && o?.attachedToPlayer === pid);
   if ((s.noLifeGain ?? []).some((e) => e.turn === s.turn && stops(e.who, e.controller))) return false;
   return !s.battlefield.some((id) => stops(abilitiesOf(s, obj(s, id)).cantGainLife, controllerOf(s, obj(s, id)), obj(s, id)));
@@ -4766,9 +4766,19 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
     throw new RulesError("choose cards with different mana values");
   if (pend.shareLandType && !shareLandType(found.map((id) => defOf(s, obj(s, id)))))
     throw new RulesError("choose cards that share a land type");
+  if (pend.oneOfEach && !oneOfEachFits(pend.oneOfEach, found.map((id) => defOf(s, obj(s, id)))))
+    throw new RulesError(`find one card for each: ${pend.oneOfEach.map((f) => f.text).join(", ")}`);
   r.scratch = { ...r.scratch, found };
   s.pending = null;
   continueResolution(s);
+}
+
+/** "A Forest card and a Plains card" (Krosan Verge): each card matches a different one of `specs` (a dual land is either). */
+export function oneOfEachFits(specs: TargetSpec[], defs: CardDef[]): boolean {
+  if (defs.length > specs.length) return false;
+  const [d, ...rest] = defs;
+  if (!d) return true;
+  return specs.some((f, i) => printedMatches(f, d) && oneOfEachFits(specs.filter((_, j) => j !== i), rest));
 }
 
 /** A creature type or color named for a permanent entering (CR 614.12) or a resolving spell. */

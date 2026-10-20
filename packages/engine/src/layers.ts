@@ -464,6 +464,15 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const n = cond.stat === "power" ? c.power : c.toughness;
       return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max);
     }
+    case "subjectPT": {
+      const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
+      const here = !!sub && chars.has(sub.id) && (sub.zoneChanges ?? 0) === subjectZc;
+      const lk = !here && subjectId !== undefined ? s.lastKnown?.[subjectId] : undefined;
+      const c = here ? chars.get(subjectId!) : lk?.zc === subjectZc ? lk : undefined;
+      if (!c) return false;
+      const n = cond.stat === "power" ? c.power : c.toughness;
+      return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max);
+    }
     case "yourTurn":
       return (s.activePlayer === you) !== !!cond.not;
     case "anyOf":

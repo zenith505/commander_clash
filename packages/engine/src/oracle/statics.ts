@@ -112,6 +112,8 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   if ((m = /^(.+?) as long as (.+)$/.exec(text))) [statement, cond] = [m[1], m[2]];
   else if ((m = /^As long as (~ is enchanted, equipped, and has a counter on it|[^,]+), (.+)$/.exec(text))) [cond, statement] = [m[1], m[2]];
   else if ((m = /^During your turn, (.+)$/.exec(text))) [cond, statement] = ["it's your turn", m[1]];
+  // Razorkin Needlehead: "~ has first strike during your turn".
+  else if ((m = /^(~ (?:has|gets) [^,]+?) during your turn$/.exec(text))) [statement, cond] = [m[1], "it's your turn"];
   // Wayward Swordtooth: "~ can't attack or block unless you have the city's blessing".
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless you have the city's blessing$/.exec(text))) [statement, cond] = [m[1], "you don't have the city's blessing"];
   // Flowering Lumberknot: "~ can't attack or block unless it's paired with a creature with soulbond".

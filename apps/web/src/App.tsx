@@ -144,6 +144,7 @@ import {
   faceDef,
   pickOptions,
   shareLandType,
+  oneOfEachFits,
 } from "@cc/engine";
 import { HUMAN, STOPPABLE, cardOf, seenCardOf, isCreature, isLand, loopReady, newGame, useGame, type DeckBundle, type LoopRecording, type PriorityMode } from "./useGame";
 import { Arrows, targetSelectors as baseSelectors, type ArrowSpec } from "./Arrows";
@@ -3156,7 +3157,8 @@ function LibrarySearch({
   // "Cards with different mana values" (Seasons Past): a card can't join one with the same mana value.
   const mvOf = (id: string) => manaValue(parseManaCost(cardOf(s, id).manaCost));
   // "Basic land cards that share a land type" (Myriad Landscape): a card joins only ones it shares a land type with.
-  const clashes = (id: string) => (!!pending.distinctManaValues && found.some((f) => mvOf(f) === mvOf(id))) || (!!pending.shareLandType && !shareLandType([...found, id].map((x) => cardOf(s, x))));
+  // "A Forest card and a Plains card" (Krosan Verge): a card joins only if each found card can still be a different one.
+  const clashes = (id: string) => (!!pending.distinctManaValues && found.some((f) => mvOf(f) === mvOf(id))) || (!!pending.shareLandType && !shareLandType([...found, id].map((x) => cardOf(s, x)))) || (!!pending.oneOfEach && !oneOfEachFits(pending.oneOfEach, [...found, id].map((x) => cardOf(s, x))));
   const add = (ids: string[]) => {
     const next = ids.find((id) => !found.includes(id) && !clashes(id));
     if (next && found.length < pending.max) setFound([...found, next]);
@@ -3205,6 +3207,8 @@ function LibrarySearch({
                   ? `Chosen ${found.length}. Each must have a different mana value.`
                   : pending.shareLandType
                   ? `Found ${found.length} of ${pending.max}. They must share a land type.`
+                  : pending.oneOfEach
+                  ? `Found ${found.length} of ${pending.max}: one for each of ${pending.oneOfEach.map((f) => f.text).join(" and ")}.`
                   : pending.also?.length
                     ? `Found ${found.length} of ${pending.max}. The ${pending.also.length} in the graveyard ${pending.also.length === 1 ? "is" : "are"} exiled too.`
                     : `Found ${found.length} of ${pending.max}.`}

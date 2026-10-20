@@ -68,6 +68,7 @@ import {
   MAX_HAND_SIZE,
   hasNoMaxHandSize,
   stackItemQuality,
+  oneOfEachFits,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
@@ -224,6 +225,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const groups = ranked.map((first) => [first, ...ranked.filter((id) => id !== first && shareLandType([defOf(s, obj(s, first)), defOf(s, obj(s, id))]))].slice(0, pend.max));
       const best = groups.reduce<string[]>((a, g) => (g.length > a.length ? g : a), []);
       return [{ type: "searchLibrary", player: pid, found: best }];
+    }
+    // "A Forest card and a Plains card" (Krosan Verge): the best-ranked cards that still fit one each.
+    if (pend.kind === "searchLibrary" && pend.oneOfEach) {
+      const found: string[] = [];
+      for (const id of chooseSearch(s, pid, pend.cards, pend.cards.length)) if (found.length < pend.max && oneOfEachFits(pend.oneOfEach, [...found, id].map((x) => defOf(s, obj(s, x))))) found.push(id);
+      return [{ type: "searchLibrary", player: pid, found }];
     }
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
     // Moving counters off its own permanent (Forgotten Ancient): bots keep them where they are.

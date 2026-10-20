@@ -1,7 +1,7 @@
 import type { Amount, AmountExpr, Modification, Effect, PlayerRef } from "../abilities";
 import { CHOSEN_LAND_TYPE, CHOSEN_TYPE, CREATURE_TYPES } from "../keywords";
 import type { Color } from "../types";
-import { num, PT, ptAmt, COLOR_WORDS, TYPE_WORDS, WHEEL, COUNTER, counterKind, X } from "./words";
+import { num, PT, ptAmt, COLOR_WORDS, TYPE_WORDS, WHEEL, COUNTER, counterKind, X, capital } from "./words";
 import { Ctx } from "./body";
 import { parseSearchFilter } from "./search";
 import { parseKeywordList, parseObject } from "./targets";
@@ -108,6 +108,14 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   }
   // "Then each player who drew a card this way gains 1 life" (Kwain): those who chose to.
   if (ctx.eachChose && (m = /^(?:Then )?[Ee]ach player who drew a card this way gains (\d+) life$/.exec(s))) return [{ type: "gainLife", who: { ref: "choseThisWay" }, n: Number(m[1]) }];
+  // Flare of Fortitude: "Until end of turn, your life total can't change, and permanents you control gain hexproof and
+  // indestructible" (CR 119.7-8).
+  // (The body reads a leading "Until end of turn," as a trailing one.)
+  if ((m = /^(?:Until end of turn, your life total can't change(?:,? and (.+))?|Your life total can't change(?:,? and (.+?))? until end of turn)$/.exec(s))) {
+    const more = m[1] ?? m[2];
+    const rest = more ? parseSentence(`${capital(more)} until end of turn`, ctx) : [];
+    return rest ? [{ type: "playerGains", keywords: [], lifeCantChangeThisTurn: true }, ...rest] : null;
+  }
   const whole = parseEveryPlayerZonesSentence(s, ctx);
   if (whole) return whole;
   const list = parseTargetList(s, ctx);

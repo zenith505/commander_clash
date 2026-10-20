@@ -1698,7 +1698,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const otherwise = /^Otherwise, (.+)$/.exec(s);
     if (otherwise) {
       const prev = effects[effects.length - 1];
-      if (prev?.type !== "if" || (prev.cond.kind !== "wonClash" && prev.cond.kind !== "suspected" && prev.cond.kind !== "milledIs" && prev.cond.kind !== "targetCardWas") || prev.otherwise) return null;
+      if (prev?.type !== "if" || (prev.cond.kind !== "wonClash" && prev.cond.kind !== "suspected" && prev.cond.kind !== "milledIs" && prev.cond.kind !== "targetCardWas" && !(prev.cond.kind === "state" && prev.cond.cond.kind === "subjectPT")) || prev.otherwise) return null;
       const inner = parseOne(otherwise[1]!.charAt(0).toUpperCase() + otherwise[1]!.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       prev.otherwise = inner;
@@ -1854,6 +1854,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "It deals that much damage to each other opponent if ~'s power is 7 or greater" (Vincent), "Then if ~'s power is 4
     // or greater, draw a card" (Jor Kadeen): ~'s power as the ability resolves, or as it last existed on the battlefield
     // once it has left (CR 608.2h; rulings on Vincent). "Its" is ~ only where "it" is.
+    // Tribute to the World Tree: "draw a card if its power is 3 or greater. Otherwise, put two +1/+1 counters on it": the
+    // trigger's subject as it resolves (CR 608.2c), or as it last existed.
+    const subjPT = ctx.subjectIt && !ctx.spell ? new RegExp(`^(.+) if its (power|toughness) is ${NUM} or (greater|less)$`).exec(s) : null;
+    if (subjPT && !/\binstead$/.test(subjPT[1]!) && !/\b(?:it|its|that creature)\b/.test(subjPT[1]!)) {
+      const inner = parseOne(capital(subjPT[1]!), ctx);
+      if (!inner) return null;
+      const n = num(subjPT[3]!);
+      effects.push({ type: "if", cond: { kind: "state", cond: { kind: "subjectPT", stat: subjPT[2] as "power" | "toughness", ...(subjPT[4] === "less" ? { max: n } : { min: n }) } }, effects: inner });
+      continue;
+    }
     const trailPT = !ctx.spell && !ctx.subjectIt ? new RegExp(`^(.+) if (~'s|its) (power|toughness) is ${NUM} or (greater|less)$`).exec(s) : null;
     const leadPT = !ctx.spell && !ctx.subjectIt && !trailPT ? new RegExp(`^If (~'s|its) (power|toughness) is ${NUM} or (greater|less), (.+)$`).exec(s) : null;
     const selfPTIf = trailPT ? { then: trailPT[1]!, whose: trailPT[2]!, stat: trailPT[3]!, n: trailPT[4]!, cmp: trailPT[5]! } : leadPT ? { then: leadPT[5]!, whose: leadPT[1]!, stat: leadPT[2]!, n: leadPT[3]!, cmp: leadPT[4]! } : null;

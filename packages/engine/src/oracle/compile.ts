@@ -1733,7 +1733,7 @@ export function compile(d: CardDef): CompiledCard {
       /^When you cast or cycle ~, (.+)$/.exec(line) ??
       /^When ~ enters and (at the beginning of (?:your upkeep|your end step|each upkeep|each end step)), (.+)$/.exec(line) ??
       /^When you cycle ~ and when ~ dies, (.+)$/.exec(line) ??
-      /^When(?:ever)? ~ enters or (attacks|dies|leaves the battlefield|the creature it haunts dies|deals combat damage to a player|transforms into ~), (.+)$/.exec(line) ??
+      /^When(?:ever)? ~ enters or (attacks|dies|is put into a graveyard from the battlefield|leaves the battlefield|the creature it haunts dies|deals combat damage to a player|transforms into ~), (.+)$/.exec(line) ??
       /^When ~ (transforms into ~) or dies, (.+)$/.exec(line) ??
       /^When ~ enters and whenever it (attacks while saddled), (.+)$/.exec(line) ??
       // "Whenever ~ attacks or becomes the target of a spell, create a Treasure token" (Goldspan Dragon).

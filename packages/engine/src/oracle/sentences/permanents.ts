@@ -1,7 +1,7 @@
 // Sentences that act on permanents: destroy, tap, connive, regenerate, counters, gaining control, continuous changes until end of turn.
 
 import type { Effect, ObjRef } from "../../abilities";
-import { NUM, NUMX, COUNTER, counterKind, amt, isGroup, num } from "../words";
+import { NUM, NUMX, COUNTER, counterKind, amt, isGroup, num, capital } from "../words";
 import { pickFilter, parseGroup, parseObject, parsePlayer, parseTargetPhrase } from "../targets";
 import { addTarget } from "../body";
 import { parseCount } from "../counts";

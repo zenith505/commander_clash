@@ -733,6 +733,10 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         p.lifeCantChange = true;
         log(s, `${p.name}'s life total can't change until their next turn.`);
       }
+      if (e.lifeCantChangeThisTurn) {
+        p.lifeCantChangeTurn = s.turn;
+        log(s, `${p.name}'s life total can't change this turn.`);
+      }
       if (!keywords.length) return;
       if (e.untilYourNextTurn) p.gainedUntilNextTurn = [...new Set([...(p.gainedUntilNextTurn ?? []), ...keywords])];
       else p.gained = [...new Set([...(p.gained ?? []), ...keywords])];

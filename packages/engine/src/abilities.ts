@@ -905,6 +905,8 @@ export type StaticCondition =
   | { kind: "selfIs"; filter: TargetSpec }
   /** A trigger's "if its toughness is 3 or less" about its own source (Young Hero Role, CR 603.4): power or toughness now. */
   | { kind: "selfPT"; stat: "power" | "toughness"; min?: number; max?: number }
+  /** "Draw a card if its power is 3 or greater" about a trigger's subject (Tribute to the World Tree): as it is now, or as it last existed (CR 608.2h). */
+  | { kind: "subjectPT"; stat: "power" | "toughness"; min?: number; max?: number }
   /** "Activate only if ~ entered this turn or if you control a basic land": either one. */
   | { kind: "anyOf"; conds: StaticCondition[] }
   /** Coven: "if you control three or more creatures with different powers" (three or more different power values). */
@@ -2003,7 +2005,7 @@ export type Effect =
    * (CR 701.23). `filter` unset = any card. Found cards go to `dest`; with `others`, only the first
    * does and the rest go there (Cultivate). The library is then shuffled (CR 701.20).
    */
-  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; reveal: boolean; /** Whose library: "its controller may search their library" (Path to Exile). Yours if left out. */ who?: PlayerRef; /** "Search target opponent's library" (Bribery): you search that player's library, which they then shuffle. */ library?: PlayerRef; /** "Search your library and/or graveyard ... If you search your library this way, shuffle" (Finale of Devastation): your graveyard, and your library too if you choose. */ orGraveyard?: boolean; /** "A card named A and/or a card named B" (Alpine Houndmaster), "cards with different names" (Three Dreams): at most one card of each name. */ oneEach?: true; /** "Up to two basic land cards that share a land type" (Myriad Landscape): the cards found all have a land type in common. */ shareLandType?: true; /** "Each player may search their library" (Veteran Explorer): each one, as their turn to search comes, chooses whether to (rulings); only those who did shuffle. */ may?: true; /** "Target opponent chooses two of those cards. Put the chosen cards into your graveyard and the rest into your hand" (Gifts Ungiven): `n` of the cards found, chosen by that opponent (by an opponent you choose as it resolves if left out), go `to`; the rest go to `dest`. */ split?: { chooser?: PlayerRef; n: number; to: SearchDest }; /** "Put it onto the battlefield tapped if it's a land card. Otherwise, put it into your hand." (Archdruid's Charm): where a land card found goes instead of `dest`. */ landTo?: SearchDest }
+  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; reveal: boolean; /** Whose library: "its controller may search their library" (Path to Exile). Yours if left out. */ who?: PlayerRef; /** "Search target opponent's library" (Bribery): you search that player's library, which they then shuffle. */ library?: PlayerRef; /** "Search your library and/or graveyard ... If you search your library this way, shuffle" (Finale of Devastation): your graveyard, and your library too if you choose. */ orGraveyard?: boolean; /** "A card named A and/or a card named B" (Alpine Houndmaster), "cards with different names" (Three Dreams): at most one card of each name. */ oneEach?: true; /** "Up to two basic land cards that share a land type" (Myriad Landscape): the cards found all have a land type in common. */ shareLandType?: true; /** "Each player may search their library" (Veteran Explorer): each one, as their turn to search comes, chooses whether to (rulings); only those who did shuffle. */ may?: true; /** "Target opponent chooses two of those cards. Put the chosen cards into your graveyard and the rest into your hand" (Gifts Ungiven): `n` of the cards found, chosen by that opponent (by an opponent you choose as it resolves if left out), go `to`; the rest go to `dest`. */ split?: { chooser?: PlayerRef; n: number; to: SearchDest }; /** "Put it onto the battlefield tapped if it's a land card. Otherwise, put it into your hand." (Archdruid's Charm): where a land card found goes instead of `dest`. */ landTo?: SearchDest; /** "A Forest card and a Plains card" (Krosan Verge): up to one card for each of these, each card found matching a different one. */ oneOfEach?: TargetSpec[] }
   /** "Reveal the top three cards of your library. An opponent chooses one of them. Put that card into your graveyard and the rest into your hand" (Murmurs from Beyond): the chooser (an opponent you choose as it resolves if left out) picks one revealed card (one that fits `filter`), which goes `to`; the rest go `rest`, or stay on top. */
   | { type: "revealPick"; n: Amount; chooser?: PlayerRef; filter?: TargetSpec; to: SearchDest; rest?: SearchDest }
   /**
@@ -2064,6 +2066,8 @@ export type Effect =
       untilYourNextTurn?: true;
       /** "Until your next turn, your life total can't change" (Teferi's Protection): see Player.lifeCantChange. */
       lifeCantChange?: true;
+      /** "Until end of turn, your life total can't change" (Flare of Fortitude): see Player.lifeCantChangeTurn. */
+      lifeCantChangeThisTurn?: true;
     }
   /**
    * "Starting with you, each player votes for death or taxes" (CR 701.38a): each player in turn order, from the

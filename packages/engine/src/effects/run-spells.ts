@@ -44,6 +44,18 @@ function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId, targe
   fireEvent(s, { type: "targeted", stackId: id });
 }
 
+/**
+ * A copy of an activated or triggered ability on the stack (CR 707.10): its source, choices and event are the original's,
+ * and the player copying it controls it (CR 707.10c). It wasn't activated, so nothing about activating triggers.
+ */
+function putAbilityCopy(s: GameState, orig: StackItem, controller: PlayerId, targets: TargetChoice[] | undefined) {
+  const id = `s${s.nextId++}`;
+  const name = orig.description.replace(/ \(copy\)$/, "");
+  s.stack.push({ ...structuredClone(orig), id, controller, targets: stampTargets(s, targets), copy: true, description: `${name} (copy)` });
+  log(s, `${player(s, controller).name} copies ${name}${describeTargets(s, targets ?? [])}.`);
+  fireEvent(s, { type: "targeted", stackId: id });
+}
+
 /** A copy of a card that wasn't cast ceases to exist (CR 704.5e). */
 function removeCopy(s: GameState, id: ObjectId) {
   const o = s.objects[id];
@@ -175,7 +187,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const t = i >= 0 ? ctx.targets[i] : undefined;
         const id = e.spell === "self" ? r.item.id : typeof e.spell === "object" && "epic" in e.spell ? e.spell.epic : i < 0 ? ctx.cause : t?.kind === "stack" && ctx.legal[i] ? t.id : undefined;
         const orig = e.spell === "self" ? r.item : id ? (s.stack.find((x) => x.id === id) ?? s.castItems?.[id] ?? s.epics?.[id]) : undefined;
-        if (!orig || orig.kind !== "spell") return;
+        if (!orig || (orig.kind !== "spell" && !(orig.kind === "ability" && orig.body))) return;
         const n = e.n === "storm" ? (orig.castNth ?? 0) : e.n === "kicked" ? (orig.kicked?.length ?? 0) : amountNow(s, e.n, ctx);
         if (n <= 0) return;
         sc.copies = { of: id!, left: n };
@@ -189,7 +201,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           s.pending = { kind: "copyTargets", player: ctx.controller, source: src, copyOf: orig.description, specs, current: orig.targets ?? [], left: c.left };
           return "paused";
         }
-        putSpellCopy(s, orig, ctx.controller, c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src });
+        if (orig.kind === "ability") putAbilityCopy(s, orig, ctx.controller, c.targets ?? orig.targets);
+        else putSpellCopy(s, orig, ctx.controller, c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src });
         c.targets = undefined;
         c.left--;
       }

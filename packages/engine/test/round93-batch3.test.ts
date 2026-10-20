@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, activate, bear, card, commander, passUntil, pt, putOnBattlefield, setup, target } from "./helpers";
-import { isFullySupported, objHasKeyword, waitingOn, type GameState } from "../src";
+import { isFullySupported, objHasKeyword, planCast, waitingOn, type GameState } from "../src";
 
 // Real oracle text (Scryfall).
 const apprentice = card("Loyal Apprentice", "Creature — Human Artificer", "{1}{R}", { power: "2", toughness: "1", keywords: ["Haste", "Lieutenant"], oracleText: "Haste\nLieutenant — At the beginning of combat on your turn, if you control your commander, create a 1/1 colorless Thopter artifact creature token with flying. That token gains haste until end of turn." });
@@ -98,5 +98,36 @@ describe("Nesting Grounds", () => {
     const s = settle(activate(s0, ap, n, 0, [target(from), target(to)]));
     expect(s.pending).toBeNull();
     expect(s.objects[to]!.counters["+1/+1"]).toBe(1);
+  });
+});
+
+const resonator = card("Strionic Resonator", "Artifact", "{2}", { oracleText: "{2}, {T}: Copy target triggered ability you control. You may choose new targets for the copy. (A triggered ability uses the words \"when,\" \"whenever,\" or \"at.\")" });
+const kavu = card("Flametongue Kavu", "Creature — Kavu", "{3}{R}", { power: "4", toughness: "2", oracleText: "When this creature enters, it deals 4 damage to target creature." });
+const lithoform = card("Lithoform Engine", "Legendary Artifact", "{4}", { oracleText: "{2}, {T}: Copy target activated or triggered ability you control. You may choose new targets for the copy.\n{3}, {T}: Copy target instant or sorcery spell you control. You may choose new targets for the copy.\n{4}, {T}: Copy target permanent spell you control. (The copy becomes a token.)" });
+
+describe("Strionic Resonator", () => {
+  it("parse", () => {
+    for (const d of [resonator, lithoform]) expect(isFullySupported(d), d.name).toBe(true);
+  });
+
+  it("copies a triggered ability you control, with a new target", () => {
+    const { s: s0, ap, ids, opp } = setup([kavu]);
+    const r = putOnBattlefield(s0, ap, resonator);
+    const a = putOnBattlefield(s0, opp, bear({ name: "Bear A" }));
+    const b = putOnBattlefield(s0, opp, card("Hill Giant", "Creature — Giant", "{3}{R}", { power: "3", toughness: "5" }));
+    // Cast the Kavu; its trigger goes on the stack targeting Bear A.
+    let t = s0;
+    for (const x of planCast(t, ap, ids[0]!)!) t = act(t, x);
+    for (let i = 0; i < 10 && !t.pending && !t.stack.some((x) => x.kind === "ability"); i++) t = act(t, { type: "passPriority", player: waitingOn(t)! });
+    if (t.pending?.kind === "chooseTargets") t = act(t, { type: "chooseTargets", player: ap, targets: [target(a)] });
+    const trig = t.stack.find((x) => x.kind === "ability")!;
+    expect(trig).toBeTruthy();
+    t = activate(t, ap, r, 0, [{ kind: "stack", id: trig.id }]);
+    for (let i = 0; i < 10 && t.pending?.kind !== "copyTargets"; i++) t = act(t, { type: "passPriority", player: waitingOn(t)! });
+    expect(t.pending?.kind).toBe("copyTargets");
+    t = settle(act(t, { type: "copyTargets", player: ap, targets: [target(b)] }));
+    expect(t.objects[a]!.zone).toBe("graveyard");
+    expect(t.objects[b]!.damage).toBe(4);
+    expect(t.log.some((l) => /copies Flametongue Kavu/.test(l.text))).toBe(true);
   });
 });

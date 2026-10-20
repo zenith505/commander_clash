@@ -280,6 +280,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const spec = parseTargetPhrase(m[1]!);
     return spec?.kind === "spell" ? [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n: 1, newTargets: false }] : null;
   }
+  // Copying an ability on the stack (CR 707.10, 707.10c): Strionic Resonator's "Copy target triggered ability you control.
+  // You may choose new targets for the copy." (the copy is controlled by you, its source the same, CR 113.7a).
+  if ((m = /^Copy target ((?:activated or )?triggered ability|activated ability) you control$/i.exec(s))) {
+    const spec: TargetSpec = { ...stackSpec(m[1]!), controller: "you", text: `target ${m[1]!.toLowerCase()} you control` };
+    return [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n: 1, newTargets: false }];
+  }
   // Sevinne's Reclamation: "you may copy ~ and may choose a new target for the copy", made as it resolves (rulings).
   if (ctx.spell && /^[Yy]ou may copy ~ and may choose a new target for the copy$/.test(s))
     return [{ type: "may", effects: [{ type: "copySpell", spell: "self", n: 1, newTargets: true }], text: "copy ~ (you may choose a new target for the copy)" }];

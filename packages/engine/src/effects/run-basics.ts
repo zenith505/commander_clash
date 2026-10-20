@@ -346,7 +346,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const mix = (k: number) => `{${e.split![0]}}`.repeat(k) + `{${e.split![1]}}`.repeat(n - k);
         if (sc.either === undefined) {
           const ks = Array.from({ length: n + 1 }, (_, i) => n - i);
-          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "either", options: ks.map(String), labels: ks.map((k) => `add ${mix(k)}`), prompt: "choose the mana" };
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "either", options: ks.map(String), labels: ks.map((k) => `Add ${mix(k)}`), prompt: "choose the mana" };
           return "paused";
         }
         const k = Math.max(0, Math.min(n, sc.either));

@@ -4867,7 +4867,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   if (pend.what === "either") {
     (r.scratch ??= {}).either = Number(choice);
-    log(s, `${p.name} chooses to ${pend.labels?.[Number(choice)] ?? choice} (${pend.source}).`);
+    log(s, `${p.name} chooses to ${(pend.labels?.[Number(choice)] ?? choice).replace(/^[A-Z](?=[a-z])/, (c) => c.toLowerCase())} (${pend.source}).`);
     continueResolution(s);
     return;
   }

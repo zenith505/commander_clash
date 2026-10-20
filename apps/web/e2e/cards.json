@@ -1774,6 +1774,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "15e5136e-ed15-49a8-b027-e09436673fb4",
+  "name": "Culling Ritual",
+  "manaCost": "{2}{B}{G}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Destroy each nonland permanent with mana value 2 or less. Add {B} or {G} for each permanent destroyed this way.",
+  "colors": [
+   "B",
+   "G"
+  ],
+  "colorIdentity": [
+   "B",
+   "G"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G"
+  ],
+  "commanderLegal": "legal",
+  "set": "stx",
+  "releasedAt": "2021-04-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5480f855-80b7-45c7-94a9-071c7b5d5ccf",
   "name": "Curse of the Bloody Tome",
   "manaCost": "{2}{U}",
@@ -5578,6 +5610,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "cf4959bf-92ae-4c9b-b631-724ce100cbb8",
+  "name": "Pact of the Titan",
+  "manaCost": "{0}",
+  "cmc": 0,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Create a 4/4 red Giant creature token.\nAt the beginning of your next upkeep, pay {4}{R}. If you don't, you lose the game.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fut",
+  "releasedAt": "2007-05-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4d819d35-5cd3-48f1-a77a-b7c3ff82c62e",
   "name": "Palace Siege",
   "manaCost": "{3}{B}{B}",
@@ -6712,6 +6770,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "44e0ffa3-8915-4c1f-8f1a-4aeea1365f07",
+  "name": "Simian Spirit Guide",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Ape Spirit",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Ape",
+   "Spirit"
+  ],
+  "oracleText": "Exile this card from your hand: Add {R}.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "tsr",
+  "releasedAt": "2021-03-19",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c43b616e-ef87-4c12-810b-a1a3260168fa",
   "name": "Skewer the Critics",
   "manaCost": "{2}{R}",
@@ -7281,6 +7373,38 @@
   "commanderLegal": "legal",
   "set": "neo",
   "releasedAt": "2022-02-18",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "8c45bf9d-a017-43bf-9e32-67810a8a217b",
+  "name": "Talon Gates of Madara",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land — Gate",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Gate"
+  ],
+  "oracleText": "When this land enters, up to one target creature phases out.\n{T}: Add {C}.\n{1}, {T}: Add one mana of any color.\n{4}: Put this card from your hand onto the battlefield.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "C",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "m3c",
+  "releasedAt": "2024-06-14",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

@@ -44,7 +44,7 @@ describe("round 91 one-offs", () => {
     let s = cast(s0, ap, ids[0]!);
     const pend = s.pending;
     if (pend?.kind !== "chooseOption") throw new Error("no choice");
-    expect(pend.labels).toEqual(["add {B}{B}{B}", "add {B}{B}{G}", "add {B}{G}{G}", "add {G}{G}{G}"]);
+    expect(pend.labels).toEqual(["Add {B}{B}{B}", "Add {B}{B}{G}", "Add {B}{G}{G}", "Add {G}{G}{G}"]);
     s = act(s, { type: "chooseOption", player: ap, choice: pend.options[2]! });
     expect(s.players[ap]!.manaPool.B).toBe(1);
     expect(s.players[ap]!.manaPool.G).toBe(2);

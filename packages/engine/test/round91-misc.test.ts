@@ -59,3 +59,23 @@ describe("round 91 one-offs", () => {
     expect(s.players[ap]!.manaPool.B + s.players[ap]!.manaPool.G).toBe(0);
   });
 });
+
+describe("Spirit Guides: a mana ability that works from the hand", () => {
+  const simian = card("Simian Spirit Guide", "Creature — Ape Spirit", "{2}{R}", { power: "2", toughness: "2", oracleText: "Exile this card from your hand: Add {R}." });
+  it("parse", () => expect(isFullySupported(simian)).toBe(true));
+
+  it("exiling it from your hand adds {R} right away, without the stack (CR 605.3b)", () => {
+    const { s: s0, ap, ids } = setup([simian]);
+    const s = act(s0, { type: "activateAbility", player: ap, objectId: ids[0]!, index: 0 });
+    expect(s.stack).toEqual([]);
+    expect(s.players[ap]!.manaPool.R).toBe(1);
+    expect(s.objects[ids[0]!]!.zone).toBe("exile");
+    expect(s.players[ap]!.hand).not.toContain(ids[0]!);
+  });
+
+  it("not from the battlefield", () => {
+    const { s, ap } = setup([]);
+    const g = putOnBattlefield(s, ap, simian);
+    expect(() => act(s, { type: "activateAbility", player: ap, objectId: g, index: 0 })).toThrow();
+  });
+});

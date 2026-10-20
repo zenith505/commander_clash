@@ -37,7 +37,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const keyword = word && /^(Exhaust|Boast|Power-up)$/.test(word[1]!) ? (word[1] as "Exhaust" | "Boast" | "Power-up") : undefined;
   const line = word && (keyword || ABILITY_WORDS.has(word[1]!.toLowerCase()) || !KEYWORD_NAMES.has(word[1]!.toLowerCase())) ? raw.slice(word[0].length) : raw;
   // Costs: mana symbols run together ("{1}{R}"), other parts are comma-separated ("{2}, {T}, Sacrifice ~").
-  const piece = String.raw`(?:\{[^}]+\})+|Reveal the player you chose|Sacrifice ~|Exert ~|Discard ~|Exile ~ from your graveyard|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay life equal to the number of colors in your commanders' color identity|Pay half your life, rounded (?:up|down)|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Put (?:a|one|two|three) cards? from your hand on top of your library|Put a card exiled with ~ into its owner's graveyard|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control|Collect evidence \d+|Mill (?:a card|\w+ cards)|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile (?:a|an|one|two|three|four|five) [^,:]*?cards? from your graveyard`;
+  const piece = String.raw`(?:\{[^}]+\})+|Reveal the player you chose|Sacrifice ~|Exert ~|Discard ~|Exile ~ from your graveyard|Exile ~ from your hand|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay life equal to the number of colors in your commanders' color identity|Pay half your life, rounded (?:up|down)|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Put (?:a|one|two|three) cards? from your hand on top of your library|Put a card exiled with ~ into its owner's graveyard|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control|Collect evidence \d+|Mill (?:a card|\w+ cards)|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile (?:a|an|one|two|three|four|five) [^,:]*?cards? from your graveyard`;
   const m = new RegExp(`^((?:${piece})(?:, (?:${piece}))*): (.+)$`).exec(line);
   if (!m) return null;
   // "Pay half your life, rounded up" (Murderous Betrayal) has a comma of its own: read it apart from the other costs.
@@ -175,6 +175,9 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // "{1}, Exile ~: Exile all graveyards. Draw a card." (Relic of Progenitus): exiling the permanent itself is part of the
   // cost, paid as it's activated (CR 602.2b, 601.2h), like sacrificing it but into exile.
   const exileOwn = costs.split(", ").includes("Exile ~");
+  // "Exile ~ from your hand: Add {R}" (Simian Spirit Guide): it works only while the card is in your hand (CR 113.6k),
+  // and exiling it is the whole cost. A mana ability all the same (CR 605.1a).
+  const exileFromHand = costs === "Exile ~ from your hand";
   if (exileOwn && (fromYard || fromHand || /Sacrifice ~/.test(costs))) return "fail";
   const manaCost = symbols
     .filter((x) => x !== "T")
@@ -190,6 +193,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // A cost that mills moves a card from a library: it uses the stack (CR 605.1a; Millikin rulings).
   const mana = extra.some((c) => c.kind === "mill") ? "stack" : manaAbilityKind(body);
   if (mana === "fail" || (mana === "mana" && (fromHand || exileOwn || keyword || halfLife))) return "fail";
+  if (exileFromHand && (mana !== "mana" || anyPlayer || sorcerySpeed || oncePerTurn || activateIf || extra.length)) return "fail";
   // X in the effect is the X paid in the cost (CR 107.3a); with none to pay, it isn't defined.
   if (usesX(body) && !symbols.includes("X")) return "fail";
   // Any player's: only costs any player can pay (mana, life, their own cards and permanents), not ones that tap,
@@ -208,6 +212,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     ...(fromYard ? { zone: "graveyard" as const, ...(returnsSelf || (inYard && !/Exile ~ from your graveyard/.test(costs)) ? {} : { exileSelf: true }) } : {}),
     ...(exileOwn ? { exileSelf: true } : {}),
     ...(fromHand ? { zone: "hand" as const, discardSelf: true } : {}),
+    ...(exileFromHand ? { zone: "hand" as const, exileSelf: true } : {}),
     ...(oncePerTurn ? { oncePerTurn } : {}),
     ...(onceEver ? { onceEver: true as const } : {}),
     ...(keyword ? { keyword } : {}),

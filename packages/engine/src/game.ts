@@ -1333,7 +1333,7 @@ const turnRule = (s: GameState, pid: PlayerId, rule: TurnRule["rule"]) => (s.tur
 
 /** Can this player lose life, or does "you can't lose life this turn" stop it (CR 119.8)? */
 export function canLoseLife(s: GameState, pid: PlayerId): boolean {
-  return !turnRule(s, pid, "cantLoseLife");
+  return !turnRule(s, pid, "cantLoseLife") && !player(s, pid).lifeCantChange;
 }
 
 /** An activated ability's "pay half your life, rounded up" right now: 0 with 0 or less life (rulings on Lurking Evil). */
@@ -1348,6 +1348,7 @@ export function payableLife(s: GameState, pid: PlayerId): number {
 
 /** Can this player gain life, or does a "can't gain life" effect stop it (CR 119.7)? */
 export function canGainLife(s: GameState, pid: PlayerId): boolean {
+  if (player(s, pid).lifeCantChange) return false;
   const stops = (who: "all" | "opponents" | "enchanted" | undefined, controller: PlayerId, o?: GameObject) => who === "all" || (who === "opponents" && controller !== pid) || (who === "enchanted" && o?.attachedToPlayer === pid);
   if ((s.noLifeGain ?? []).some((e) => e.turn === s.turn && stops(e.who, e.controller))) return false;
   return !s.battlefield.some((id) => stops(abilitiesOf(s, obj(s, id)).cantGainLife, controllerOf(s, obj(s, id)), obj(s, id)));
@@ -1908,7 +1909,11 @@ function startNextTurn(s: GameState, skipping = false) {
   s.floatingTriggers = s.floatingTriggers?.filter((f) => !(f.until === "yourNextTurn" && began.has(f.controller)));
   if (!s.floatingTriggers?.length) s.floatingTriggers = undefined;
   if (s.entersTappedUntil) s.entersTappedUntil = s.entersTappedUntil.filter((r) => !began.has(r.controller));
-  for (const p of s.players) if (began.has(p.id)) p.gainedUntilNextTurn = undefined;
+  for (const p of s.players)
+    if (began.has(p.id)) {
+      p.gainedUntilNextTurn = undefined;
+      p.lifeCantChange = undefined;
+    }
   if (s.namedBansUntil) s.namedBansUntil = s.namedBansUntil.filter((r) => !began.has(r.controller));
   if (!s.namedBansUntil?.length) s.namedBansUntil = undefined;
   if (!s.entersTappedUntil?.length) s.entersTappedUntil = undefined;

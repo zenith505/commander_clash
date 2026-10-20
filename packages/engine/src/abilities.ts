@@ -1972,7 +1972,14 @@ export type Effect =
    * "You gain shroud until end of turn", "You and permanents you control gain hexproof until end of turn" (the player's
    * half), "you gain protection from the chosen player": see Player.gained (CR 702.11d, 702.16b-e, 702.16k, 702.18d).
    */
-  | { type: "playerGains"; keywords: string[]; /** "Until your next turn" rather than until end of turn (Noble Heritage). */ untilYourNextTurn?: true }
+  | {
+      type: "playerGains";
+      keywords: string[];
+      /** "Until your next turn" rather than until end of turn (Noble Heritage). */
+      untilYourNextTurn?: true;
+      /** "Until your next turn, your life total can't change" (Teferi's Protection): see Player.lifeCantChange. */
+      lifeCantChange?: true;
+    }
   /**
    * "Starting with you, each player votes for death or taxes" (CR 701.38a): each player in turn order, from the
    * controller, votes for one of `options` (words with no rules meaning, 701.38b), or for one of the permanents or cards

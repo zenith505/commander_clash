@@ -379,6 +379,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "discard", player: pid, objectIds: hand.slice(0, pend.count) }];
     }
   }
+  const shield = chooseFullShield(s, pid);
+  if (shield) return shield;
   const deflect = chooseDeflection(s, pid);
   if (deflect) return deflect;
   // Respond to an opponent's spell with a counterspell if we have one: from hand, or an ability
@@ -842,6 +844,45 @@ function distributeCounters(s: GameState, pid: PlayerId, body: AbilityBody, firs
   const pick = mine.length ? best(s, pid, mine, false, 0) : forced && !upTo && all.length ? worst(s, pid, all) : undefined;
   if (!pick && !upTo) return null;
   return Array.from({ length: n }, (_, k): TargetChoice => (k === 0 && pick ? ({ ...pick, amount: total } as TargetChoice) : { kind: "none" }));
+}
+
+/**
+ * "Until your next turn, your life total can't change and you gain protection from everything. All permanents you
+ * control phase out" (Teferi's Protection): kept for when it saves the game, lethal combat damage coming at us once
+ * blockers are declared, or an opponent's spell destroying or exiling all of a lot of ours.
+ */
+function chooseFullShield(s: GameState, pid: PlayerId): Action[] | null {
+  const me = player(s, pid);
+  const shields = me.hand.filter((id) => {
+    const body = compileCard(defOf(s, obj(s, id))).spell;
+    return !!body && body.effects.some((e) => e.type === "playerGains" && (e.lifeCantChange || e.keywords.some((k) => /^protection from everything$/i.test(k))));
+  });
+  if (!shields.length) return null;
+  const top = s.stack[s.stack.length - 1];
+  let danger = false;
+  if (top && top.controller !== pid) {
+    const o = top.objectId ? s.objects[top.objectId] : undefined;
+    const body = top.body ?? (o ? castingBody(defOf(s, o)) : undefined);
+    let lost = 0;
+    for (const e of body ? allEffects(body.effects) : [])
+      if ((e.type === "destroy" || e.type === "exile" || e.type === "bounce") && e.what.ref === "each")
+        for (const id of s.battlefield) {
+          const x = obj(s, id);
+          if (controllerOf(s, x) === pid && objectMatches(s, e.what.filter, x, top.controller, false) && !(e.type === "destroy" && objHasKeyword(s, x, "Indestructible"))) lost += worth(s, pid, x);
+        }
+    danger = lost >= 12;
+  }
+  if (!danger && s.step === "declareBlockers" && s.activePlayer !== pid) {
+    const coming = s.battlefield.map((x) => obj(s, x)).filter((o) => o.attacking === pid && !o.attackingPermanent && !o.blockedBy?.length).reduce((n, o) => n + Math.max(0, power(s, o)), 0);
+    danger = coming >= me.life;
+  }
+  if (!danger) return null;
+  // Not through castPlan, which would see only the harm of phasing our own permanents out.
+  for (const id of shields) {
+    const plan = planCast(s, pid, id, undefined, undefined, "auto");
+    if (plan && plan[plan.length - 1]!.type === "castSpell") return plan;
+  }
+  return null;
 }
 
 /**

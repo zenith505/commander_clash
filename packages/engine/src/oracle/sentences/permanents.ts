@@ -427,6 +427,23 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     }
     return out;
   }
+  // "You gain protection from everything until your next turn" (The One Ring); "Until your next turn, your life total
+  // can't change and you gain protection from everything" (Teferi's Protection).
+  if ((m = /^You gain (hexproof|shroud|protection from [a-z ]+?) until your next turn$/i.exec(s)) || (m = /^Until your next turn, (.+)$/i.exec(s))) {
+    const parts = /^Until /i.test(s) ? m[1]!.split(/,? and /) : [`you gain ${m[1]!}`];
+    const keywords: string[] = [];
+    let lifeCantChange = false;
+    const ok = parts.every((p) => {
+      const g = /^you gain (hexproof|shroud|protection from [a-z ]+)$/i.exec(p);
+      const k = g && canonicalKeyword(g[1]!);
+      if (k && /^(?:Hexproof|Shroud|Protection from )/.test(k)) keywords.push(k);
+      else if (/^your life total can't change$/i.test(p)) lifeCantChange = true;
+      else return false;
+      return true;
+    });
+    // Anything else "until your next turn" is for the rules below.
+    if (ok) return [{ type: "playerGains", keywords, untilYourNextTurn: true, ...(lifeCantChange ? { lifeCantChange: true as const } : {}) }];
+  }
   if ((m = /^(.+?) ((?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) .+) until (end of turn|your next turn)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods = what && parseChanges(m[2]!);

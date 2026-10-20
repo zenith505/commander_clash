@@ -705,8 +705,12 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const mod = fixMods(s, [{ kind: "addKeywords", keywords: e.keywords }], ctx)[0];
       // "Protection from that player": the player this instruction is being done for (Noble Heritage).
       const keywords = (mod?.kind === "addKeywords" ? mod.keywords : []).flatMap((k) => (k !== THAT_PLAYER_PROTECTION ? [k] : ctx.eachOne !== undefined ? [protectionFromPlayer(ctx.eachOne)] : []));
-      if (!keywords.length) return;
       const p = player(s, ctx.controller);
+      if (e.lifeCantChange) {
+        p.lifeCantChange = true;
+        log(s, `${p.name}'s life total can't change until their next turn.`);
+      }
+      if (!keywords.length) return;
       if (e.untilYourNextTurn) p.gainedUntilNextTurn = [...new Set([...(p.gainedUntilNextTurn ?? []), ...keywords])];
       else p.gained = [...new Set([...(p.gained ?? []), ...keywords])];
       log(s, `${p.name} gains ${keywords.map((k) => keywordLabel(k, (x) => player(s, x).name).toLowerCase()).join(" and ")} ${e.untilYourNextTurn ? "until their next turn" : "until end of turn"}.`);

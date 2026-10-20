@@ -550,6 +550,8 @@ export interface Player {
   gained?: string[];
   /** The same, until this player's next turn ("you gain protection from that player until your next turn", CR 611.2b). */
   gainedUntilNextTurn?: string[];
+  /** "Until your next turn, your life total can't change" (Teferi's Protection): no life gained or lost (CR 119.7-8). */
+  lifeCantChange?: true;
   /** The turn this player last began to activate an exhaust ability (CR 702.177b, Elvish Refueler). */
   exhaustTurn?: number;
   /** Times each commander (by object id) has been cast from the command zone. CR 903.8 */

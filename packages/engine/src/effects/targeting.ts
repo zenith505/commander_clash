@@ -289,6 +289,8 @@ export function playerProtection(s: GameState, pid: PlayerId): "hexproof" | "shr
  */
 export function playerProtectedFrom(s: GameState, pid: PlayerId, from: PlayerId | undefined, src?: SourceQuality): boolean {
   const gained = gainedBy(s, pid);
+  // "Protection from everything" (CR 702.16j): from each object, its own controller's too.
+  if (gained.some((k) => /^protection from everything$/i.test(k))) return true;
   const holder = { controller: pid };
   if (src && protectedFrom(gained, src.controller === undefined && from !== undefined ? { ...src, controller: from } : src, holder)) return true;
   // "You have protection from the chosen card name" (Runed Halo): anything with that name, its own sources too.

@@ -613,6 +613,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "noCombatDamage":
     case "lookAtHand":
     case "sacrifice":
+    case "animateDead":
+    case "sacrificeAnimated":
     case "exploit":
     case "champion":
     case "returnChampioned":
@@ -718,6 +720,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "surveil":
     case "orderTop":
     case "handToTop":
+    case "drawnPayOrTop":
     case "shuffle":
     case "shuffleIntoLibrary":
     case "shuffleSpell":
@@ -741,6 +744,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "chooseVotes":
       return runVotesEffect(s, e, ctx, src);
     case "may":
+    case "either":
     case "eachMay":
     case "punisher":
     case "cumulativeUpkeep":

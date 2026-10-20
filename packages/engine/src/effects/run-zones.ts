@@ -1543,6 +1543,35 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "noCombatDamage":
       for (const o of objects(s, e.what, ctx)) if (o.zone === "battlefield") o.noCombatDamageTurn = s.turn;
       return;
+    case "animateDead": {
+      // Animate Dead (rulings): nothing happens unless the Aura is still on the battlefield as this resolves, attached to
+      // the card in the graveyard; the creature it becomes is a new object (CR 400.7), which the Aura is attached to.
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (!me || me.zone !== "battlefield" || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc)) return;
+      const link = me.enchantsCard;
+      const c = link && s.objects[link.id];
+      if (!c || c.zone !== "graveyard" || (c.zoneChanges ?? 0) !== link.zc) return;
+      log(s, `${src} returns ${defOf(s, c).name} to the battlefield${e.tapped ? " tapped" : ""} under ${player(s, ctx.controller).name}'s control.`);
+      moveObject(s, c.id, "battlefield", { controller: ctx.controller, ...(e.tapped ? { tapped: true } : {}) });
+      if ((c.zone as string) !== "battlefield") return;
+      (s.animated ??= {})[`${me.id}@${me.zoneChanges ?? 0}`] = { id: c.id, zc: c.zoneChanges ?? 0 };
+      // "Enchant creature put onto the battlefield with ~": if it can't enchant it (protection), it goes to the graveyard
+      // as a state-based action and the creature is sacrificed (rulings).
+      me.attachedTo = c.id;
+      me.enchantsCard = undefined;
+      invalidateCharacteristics(s);
+      return;
+    }
+    case "sacrificeAnimated": {
+      // "That creature's controller sacrifices it": the creature it put onto the battlefield, if it's still that object.
+      const zc = ctx.sourceZc ?? 0;
+      const link = s.animated?.[`${ctx.sourceId}@${zc}`] ?? s.animated?.[`${ctx.sourceId}@${zc - 1}`];
+      const c = link && s.objects[link.id];
+      if (!c || c.zone !== "battlefield" || (c.zoneChanges ?? 0) !== link.zc) return;
+      log(s, `${player(s, controllerOf(s, c)).name} sacrifices ${characteristics(s, c).name}.`);
+      moveObject(s, c.id, "graveyard", { sacrificed: true });
+      return;
+    }
     case "sacrifice":
       for (const o of objects(s, e.what, ctx)) {
         const by = controllerOf(s, o);

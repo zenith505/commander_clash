@@ -1,6 +1,6 @@
 import { allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose } from "../abilities";
 import { substituteX } from "../amounts";
-import { num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital } from "./words";
+import { num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS } from "./words";
 import { CHOSEN_KEYWORD, CHOSEN_PROTECTION, THAT_PLAYER_PROTECTION } from "../keywords";
 import { parseStaticCondition } from "./statics";
 import { parseBoundCount, parseCount } from "./counts";
@@ -462,6 +462,15 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // Search for Survivors: "An opponent chooses a card at random in your graveyard. If it's a creature card, put it onto the
   // battlefield. Otherwise, exile it." The choice is at random, so who makes it changes nothing: one instruction.
   text = text.replace(/An opponent chooses a card at random in your graveyard\. If it's a creature card, put it onto the battlefield\. Otherwise, exile it\./, "Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it.");
+  // Sylvan Library: "You may draw two additional cards. If you do, choose two cards in your hand drawn this turn. For each of
+  // those cards, pay 4 life or put the card on top of your library." Drawing and choosing with nothing in between (rulings).
+  const sylvan = /^[Yy]ou may draw (two|three) additional cards\. If you do, choose (two|three) cards in your hand drawn this turn\. For each of those cards, pay (\d+) life or put the card on top of your library\.$/.exec(text.trim());
+  if (sylvan && sylvan[1] === sylvan[2])
+    return { targets: [], effects: [{ type: "may", effects: [{ type: "draw", who: { ref: "you" }, n: num(sylvan[1]!) }, { type: "drawnPayOrTop", n: num(sylvan[2]!), life: Number(sylvan[3]) }], text: `draw ${sylvan[1]} additional cards` }], text };
+  // Gamble: "Search your library for a card, put that card into your hand, discard a card at random, then shuffle." The
+  // discard comes before the shuffle, but the discarded card goes to the graveyard, so the order changes nothing that can
+  // be seen: the search, then the discard (at random from the whole hand, the found card included).
+  text = text.replace(/^Search your library for a card, put that card into your hand, discard a card at random, then shuffle\.$/, "Search your library for a card, put that card into your hand, then shuffle. Discard a card at random.");
   // "Put a +1/+1 counter on each creature you control and a loyalty counter on each other planeswalker you control"
   // (Ajani Steadfast): two kinds of counters on two groups, one after the other.
   text = text.replace(/(^|\. )Put (an?|one|two|three) ([^.]*?counters?) on (each [^.]+?) and (an?|one|two|three) ([^.]*?counters?) on (each [^.]+?)\./g, "$1Put $2 $3 on $4. Put $5 $6 on $7.");
@@ -1124,6 +1133,15 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       digWhere = def ?? undefined;
       continue;
     }
+    // Thassa's Oracle: "If X is greater than or equal to the number of cards in your library, you win the game", X being
+    // the look's, counted again as it resolves (rulings).
+    const xVsLibrary = digWhere && !dig ? /^If X is greater than or equal to the number of cards in your library, (.+)$/.exec(s) : null;
+    if (xVsLibrary) {
+      const fx = parseOne(capital(xVsLibrary[1]!), ctx);
+      if (!fx) return null;
+      effects.push({ type: "if", cond: { kind: "amountsCompare", a: digWhere!, atLeast: { count: { kind: "cardsInLibrary", who: { ref: "you" } } } }, effects: fx });
+      continue;
+    }
     if (dig) {
       const done = parseDig(s, dig, ctx, digWhere);
       if (!done) return null;
@@ -1281,6 +1299,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const amount = parseCount(atMost[3]!, ctx);
       if (!amount || ctx.targets.length !== i + 1) return null;
       const filter: TargetSpec = { kind: t.kind, bound: { key, at: "most", amount }, text: `${atMost[2]} less than or equal to ${atMost[3]}` };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: fx });
+      continue;
+    }
+    // "Counter target spell if it's blue", "Destroy target permanent if it's blue" (Pyroblast): any spell or permanent can
+    // be targeted, and its color is checked as it resolves (rulings).
+    const ifColor = /^(.+) if it's (white|blue|black|red|green)$/.exec(s);
+    if (ifColor) {
+      const fx = parseOne(ifColor[1]!, ctx);
+      const i = ctx.targets.length - 1;
+      const t = ctx.targets[i];
+      if (!fx || i !== curTargets || !t || (t.kind !== "spell" && t.kind !== "object") || t.optional || t.many || t.divided || !fx.every((e) => mentionsTarget(e, i))) return null;
+      const filter: TargetSpec = { kind: t.kind, types: [], notTypes: [], notColors: [], colors: [COLOR_WORDS[ifColor[2]!]!], text: ifColor[2]! };
       effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: fx });
       continue;
     }
@@ -1824,7 +1854,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "You may play the exiled card without paying its mana cost" asks as it plays it (see the playLinked effect).
     // "You may play an additional land this turn" is a permission, not a choice made now (CR 305.2a).
     // "You may draw a card unless that player pays {1}" (Rhystic Study): they decide first (see the punisher sentences).
-    const may = /^[Yy]ou may (?!play the exiled card |play (?:an|up to \w+) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target )(.+)$/.exec(s);
+    const may = /^[Yy]ou may (?!play the exiled card |play (?:an|up to \w+) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast spells this turn as though they had flash$)(.+)$/.exec(s);
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
       // don't control": ~ does it, if you choose.
@@ -2062,11 +2092,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     }
     // "If that spell is countered this way, exile it instead of putting it into its owner's graveyard" (CR 701.6a),
     // "... put it on top of its owner's library instead of into that player's graveyard" (Memory Lapse).
-    const lapse = /^If that spell is countered this way, (?:(exile it) instead of putting it into its owner's graveyard|put it on top of its owner's library instead of into that player's graveyard)$/i.exec(s);
+    // Remand: "... put it into its owner's hand instead of into that player's graveyard".
+    const lapse = /^If that spell is countered this way, (?:(exile it) instead of putting it into its owner's graveyard|put it (on top of its owner's library|into its owner's hand) instead of into that player's graveyard)$/i.exec(s);
     if (lapse) {
       const last = effects[effects.length - 1];
-      if (last?.type !== "counterSpell") return null;
+      if (last?.type !== "counterSpell" || last.bounce) return null;
       if (lapse[1]) last.exile = true;
+      else if (lapse[2] === "into its owner's hand") last.hand = true;
       else last.top = true;
       continue;
     }
@@ -2273,6 +2305,14 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
     if (previous.length !== 1 || prev?.type !== "damage" || !prev.divided || prev.to.ref !== "anyTarget") return null;
     const { divided: _divided, ...rest } = prev;
     return { effects: [{ ...rest, amount: amt(each[1]!) }], instead };
+  }
+  // "Create a token that's a copy of target creature. If ~ was kicked, create five of those tokens instead" (Rite of
+  // Replication): more of the same copies.
+  const moreCopies = instead ? new RegExp(`^Create ${NUM} of those tokens$`).exec(t) : null;
+  if (moreCopies) {
+    const prev = previous[0];
+    if (previous.length !== 1 || prev?.type !== "createTokenCopy") return null;
+    return { effects: [{ ...prev, n: num(moreCopies[1]!) }], instead };
   }
   // "If {B}{R} was spent to cast ~, you choose the permanents for each player instead" (Mythos of Snapdax): the same
   // choices, all made by you, and still legal ones (rulings).

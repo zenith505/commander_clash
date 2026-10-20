@@ -62,6 +62,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever ~ attacks alone, (.+)$/, "selfAttacksAlone"],
   [/^Whenever ~ blocks, (.+)$/, "selfBlocks"],
   [/^Whenever you gain life, (.+)$/, "youGainLife"],
+  [/^Whenever you create a token, (.+)$/, "youCreateToken"], // once for each token (CR 111.2)
   [/^Whenever you collect evidence, (.+)$/, "youCollectEvidence"],
   [/^Whenever you complete a dungeon, (.+)$/, "youCompleteDungeon"],
   [/^Whenever you commit a crime, (.+)$/, "youCommitCrime"], // CR 700.13
@@ -306,7 +307,8 @@ function parseBlockTrigger(line: string): TriggeredAbility | "fail" | null {
  */
 // "Whenever you cast another spell that has convoke" (Kasla): the spell is on the stack, never the permanent or card
 // whose ability this is, so "another" changes nothing.
-const CAST_TRIGGER = /^When(?:ever)? (you|an opponent|another player|a player|enchanted player) casts? (or copy |or copies )?(an? .+?|another (?!player).+?)(?: spell)?, (.+)$/;
+// "An Aura, Equipment, or Vehicle spell" (Sram): a list, its commas before the spell's last word.
+const CAST_TRIGGER = /^When(?:ever)? (you|an opponent|another player|a player|enchanted player) casts? (or copy |or copies )?(an? (?:[A-Za-z]+, )+or [A-Za-z]+ spell|an? .+?|another (?!player).+?)(?: spell)?, (.+)$/;
 // "Another player" is any other player, all of them opponents in a free-for-all Commander game (CR 903.2, 800.4a).
 const CAST_BY = { you: "you", "an opponent": "opponent", "another player": "opponent", "a player": "any", "enchanted player": "enchanted" } as const;
 
@@ -585,17 +587,20 @@ function parseAttackerTrigger(line: string): TriggeredAbility | "fail" | null {
  * "It" and "that card" are the card where it went. "One or more" (once per batch) isn't modeled.
  */
 function parseSacrificeTrigger(line: string): TriggeredAbility | "fail" | null {
-  const m = /^Whenever you sacrifice (~ or another|another|an?) (.+?)( during your turn)?, (.+)$/.exec(line);
+  // "Whenever a player sacrifices a permanent" (Mayhem Devil), "whenever an opponent sacrifices ...": "that player" is the
+  // one who sacrificed it, its controller (CR 701.21a).
+  const any = /^Whenever (a player|an opponent) sacrifices (an?) (.+?), (.+)$/.exec(line);
+  const m = any ? [any[0], any[2], any[3], undefined, any[4]] : /^Whenever you sacrifice (~ or another|another|an?) (.+?)( during your turn)?, (.+)$/.exec(line);
   if (!m) return null;
   const phrase = m[2]!.replace(/ or (?=[a-z])/g, " or ");
   const filter = parseTargetPhrase(phrase);
   if (!filter || filter.kind !== "object" || filter.controller) return "fail";
-  const body = parseBody(m[4]!, { subjectIt: true, subjectLeft: true });
+  const body = parseBody(m[4]!, { subjectIt: true, subjectLeft: true, ...(any ? { eventPlayer: true } : {}) });
   if (!body) return "fail";
   const kind = m[1]!.toLowerCase();
   return {
     event: "youSacrifice",
-    sacrifices: { filter: { ...filter, text: phrase }, ...(kind === "another" ? { other: true } : {}), ...(kind === "~ or another" ? { orSelf: true } : {}) },
+    sacrifices: { filter: { ...filter, text: phrase }, ...(kind === "another" ? { other: true } : {}), ...(kind === "~ or another" ? { orSelf: true } : {}), ...(any ? { by: any[1] === "a player" ? ("any" as const) : ("opponent" as const) } : {}) },
     body,
     // Only while it's your turn: whether it triggers at all, not an intervening if.
     ...(m[3] ? { activeIf: { kind: "yourTurn" as const } } : {}),
@@ -811,13 +816,14 @@ function parseManaTapTrigger(line: string): TriggeredAbility | "fail" | null {
 }
 
 function parseDrawTrigger(line: string): TriggeredAbility | "fail" | null {
-  const m = /^Whenever (you|an opponent|a player|enchanted player|enchanted opponent) draws? (a card|your (first|second|third) card each turn), (.+)$/.exec(line);
+  const m = /^Whenever (you|an opponent|a player|enchanted player|enchanted opponent) draws? (a card(?: except the first one (?:they|you) draw in each of (?:their|your) draw steps)?|(?:your|their) (first|second|third) card each turn), (.+)$/.exec(line);
   if (!m) return null;
   const body = parseBody(theyAreThatPlayer(m[4]!), { eventPlayer: true });
   if (!body) return "fail";
   const by = m[1] === "you" ? "you" : m[1] === "an opponent" ? "opponent" : /^enchanted /.test(m[1]!) ? "enchanted" : "any";
   const nth = m[3] ? { first: 1, second: 2, third: 3 }[m[3] as "first"] : undefined;
-  return { event: "playerDraws", draws: { by, ...(nth ? { nth } : {}) }, body };
+  const except = / except the first one /.test(m[2]!);
+  return { event: "playerDraws", draws: { by, ...(nth ? { nth } : {}), ...(except ? { notFirstInDrawStep: true as const } : {}) }, body };
 }
 
 /**

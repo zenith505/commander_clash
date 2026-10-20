@@ -183,6 +183,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c0d8fef4-65f4-4769-982d-b397d2b7e977",
+  "name": "Animate Dead",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature card in a graveyard\nWhen this Aura enters, if it's on the battlefield, it loses \"enchant creature card in a graveyard\" and gains \"enchant creature put onto the battlefield with this Aura.\" Return enchanted creature card to the battlefield under your control and attach this Aura to it. When this Aura leaves the battlefield, that creature's controller sacrifices it.\nEnchanted creature gets -1/-0.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "ema",
+  "releasedAt": "2016-06-10",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5acc8b39-3c3e-4012-8cfd-ac3c2c4ca982",
   "name": "Arc Lightning",
   "manaCost": "{2}{R}",
@@ -4887,6 +4917,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "218d9277-c179-4de3-9c7f-79b5a6d4fa38",
+  "name": "Merfolk of the Pearl Trident",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Creature — Merfolk",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Merfolk"
+  ],
+  "oracleText": "",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2023-08-03",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3e7bd846-7295-4590-a419-c97cd2526bc1",
   "name": "Meteor Swarm",
   "manaCost": "{X}{R}{R}{R}",
@@ -5103,6 +5163,35 @@
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "f3c5978a-70fa-431f-933b-b954bd0db0ea",
+  "name": "Mox Diamond",
+  "manaCost": "{0}",
+  "cmc": 0,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "If this artifact would enter, you may discard a land card instead. If you do, put this artifact onto the battlefield. If you don't, put it into its owner's graveyard.\n{T}: Add one mana of any color.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "v10",
+  "releasedAt": "2010-08-27",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": true
  },
  {
   "oracleId": "de2440de-e948-4811-903c-0bbe376ff64d",
@@ -5759,6 +5848,32 @@
   "set": "brr",
   "releasedAt": "2022-11-18",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ecc435e2-deb1-420a-a79f-01dd08747314",
+  "name": "Pyroblast",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose one —\n• Counter target spell if it's blue.\n• Destroy target permanent if it's blue.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ss3",
+  "releasedAt": "2020-06-26",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -7076,6 +7191,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "92eed395-62ca-4293-882b-8565c40daab5",
+  "name": "Sylvan Library",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of your draw step, you may draw two additional cards. If you do, choose two cards in your hand drawn this turn. For each of those cards, pay 4 life or put the card on top of your library.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "cc1",
+  "releasedAt": "2020-12-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "22a93a6d-fe58-4135-8ac2-6b92e9bb75a3",
   "name": "Sylvia Brightspear",
   "manaCost": "{2}{W}",
@@ -7465,6 +7606,48 @@
     "artUrl": "https://cards.scryfall.io/art_crop/back/b/1/b1384d31-9772-41e9-b6f2-0e2d7961f868.jpg?1783924362"
    }
   ]
+ },
+ {
+  "oracleId": "ab8d5f5c-1976-4f77-8ed2-8d28ee666741",
+  "name": "Tireless Provisioner",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Creature — Elf Scout",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Scout"
+  ],
+  "oracleText": "Landfall — Whenever a land you control enters, create a Food token or a Treasure token. (Food is an artifact with \"{2}, {T}, Sacrifice this token: You gain 3 life.\" Treasure is an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Treasure",
+   "Food",
+   "Landfall"
+  ],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "mh2",
+  "releasedAt": "2021-06-18",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "986f510c-e2ec-423e-a443-51a169939558",

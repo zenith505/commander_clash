@@ -118,6 +118,8 @@ export type TriggerSourceEvent =
   | { type: "lifeGained"; player: PlayerId; amount: number }
   /** A player lost life: from damage, an effect, or paying life (one life-loss event, CR 119.2-119.4). */
   | { type: "lifeLost"; player: PlayerId; amount: number }
+  /** `player` created a token (CR 111.2), `id` (it may have left already: "whenever you create a token" still triggers). */
+  | { type: "tokenCreated"; player: PlayerId; id: ObjectId }
   /** All the damage dealt to a player at the same time (CR 120.3a): "whenever you're dealt damage". */
   | { type: "playerDealtDamage"; player: PlayerId; amount: number }
   /** A player collected evidence (CR 701.59a), once for each time. */
@@ -187,7 +189,7 @@ export type TriggerSourceEvent =
   /** A resolved instant or sorcery card was put into its owner's graveyard (CR 608.2n): haunt on a spell (702.55a). */
   | { type: "resolvedToGraveyard"; id: ObjectId }
   /** A player drew a card, their `nth` this turn (CR 121.2). */
-  | { type: "draw"; player: PlayerId; nth: number }
+  | { type: "draw"; player: PlayerId; nth: number; /** The first card they draw in their draw step. */ firstInDrawStep?: true }
   /** A player tapped this permanent for mana: activated its mana ability with {T} in the cost (CR 106.12). */
   | { type: "tappedForMana"; id: ObjectId; player: PlayerId }
   /** A player activated an ability that isn't a mana ability; its source as it was then, if it was a permanent. */
@@ -563,13 +565,16 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (ev.sacrificed && ev.snapshot && ev.chars) {
       const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) };
       const dying = { o: ev.snapshot, c: ev.chars };
-      const consider = (src: GameObject, triggers?: TriggeredAbility[]) =>
-        add(src, ev.controller, (e, t) => e === "youSacrifice" && !!t.sacrifices && diesMatches(s, t.sacrifices, src.id, undefined, dying, ev.controller), triggers, undefined, o, lki);
-      for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === ev.controller) consider(obj(s, id));
+      // "Whenever a player sacrifices", "whenever an opponent sacrifices": the other players' permanents too, each
+      // triggering for its own controller, "that player" being the one who sacrificed it.
+      const byOk = (by: "any" | "opponent" | undefined, watcher: PlayerId) => (watcher === ev.controller ? by !== "opponent" : by === "any" || (by === "opponent" && opponents(s, watcher).includes(ev.controller)));
+      const consider = (src: GameObject, watcher: PlayerId, triggers?: TriggeredAbility[]) =>
+        add(src, watcher, (e, t) => e === "youSacrifice" && !!t.sacrifices && byOk(t.sacrifices.by, watcher) && diesMatches(s, t.sacrifices, src.id, undefined, dying, ev.controller), triggers, undefined, o, lki, undefined, undefined, { player: ev.controller });
+      for (const id of s.battlefield) consider(obj(s, id), controllerOf(s, obj(s, id)));
       for (const left of s.leftTogether ?? []) {
         const src = s.objects[left.id];
-        if (!src || src.zone === "battlefield" || left.controller !== ev.controller) continue;
-        consider(src, withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
+        if (!src || src.zone === "battlefield") continue;
+        consider(src, left.controller, withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
       }
     }
   } else if (ev.type === "blocksDeclared") {
@@ -651,6 +656,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youCollectEvidence", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+    }
+  } else if (ev.type === "tokenCreated") {
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youCreateToken");
     }
   } else if (ev.type === "lifeLost") {
     // Every other player is an opponent (CR 102.3); "that player" is the one who lost life, "that much" how much.
@@ -1111,6 +1121,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (e !== "playerDraws" || !t.draws) return false;
         const by = t.draws.by;
         if ((by === "you" && ev.player !== you) || (by === "opponent" && ev.player === you) || (by === "enchanted" && o.attachedToPlayer !== ev.player)) return false;
+        if (t.draws.notFirstInDrawStep && ev.firstInDrawStep) return false;
         return t.draws.nth === undefined || t.draws.nth === ev.nth;
       }, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }

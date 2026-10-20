@@ -72,6 +72,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.power && (!c.types.includes("Creature") || !inRange(c.power, spec.power))) return false;
   if (spec.toughness && (!c.types.includes("Creature") || !inRange(c.toughness, spec.toughness))) return false;
   if (spec.manaValue && !inRange(defMv(defOf(s, o)), spec.manaValue)) return false;
+  if (spec.manaCostIn && !spec.manaCostIn.includes(defOf(s, o).manaCost)) return false;
   if (spec.combat === "attacking" && o.attacking === undefined) return false;
   if (spec.combat === "blocking" && !o.blocking) return false;
   if (spec.combat === "attackingOrBlocking" && o.attacking === undefined && !o.blocking) return false;
@@ -214,6 +215,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.power && (!creature || !inRange(Number.parseInt(d.power ?? "0", 10) || 0, spec.power))) return false;
   if (spec.toughness && (!creature || !inRange(Number.parseInt(d.toughness ?? "0", 10) || 0, spec.toughness))) return false;
   if (spec.manaValue && !inRange(defMv(d), spec.manaValue)) return false;
+  if (spec.manaCostIn && !spec.manaCostIn.includes(d.manaCost)) return false;
   if (spec.named !== undefined && !hasName(d.name, spec.named)) return false;
   if (spec.doubleFaced && !isDoubleFacedDef(d)) return false;
   if (spec.transformed) return false;

@@ -422,6 +422,7 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (/your opponents can't win the game this turn/i.test(s)) rules.push("opponentsCantWin");
     return [{ type: "turnRules", rules }];
   }
+  if (/^You may cast spells this turn as though they had flash$/i.test(s)) return [{ type: "turnRules", rules: ["flash"] }];
   if ((m = /^(Players|Your opponents) can't gain life this turn$/i.exec(s))) return [{ type: "noLifeGain", players: /^players$/i.test(m[1]!) ? "all" : "opponents" }];
   if (/^Damage can't be prevented this turn$/i.test(s)) return [{ type: "noPrevention" }];
   // "Your opponents can't cast spells this turn" (Silence), "Target player can't ..." (Orim's Chant), "Its controller

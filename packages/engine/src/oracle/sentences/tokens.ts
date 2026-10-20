@@ -13,6 +13,15 @@ import type { Ctx } from "../body";
 export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
 
+  // "Create a Food token or a Treasure token" (Tireless Provisioner): one of the two predefined tokens, chosen as it
+  // resolves (Effect "either").
+  if ((m = /^[Cc]reate (an? [A-Z][a-z]+ token) or (an? [A-Z][a-z]+ token)$/.exec(s))) {
+    const a = parseSentence(`Create ${m[1]}`, ctx);
+    const b = parseSentence(`Create ${m[2]}`, ctx);
+    if (!a || !b || a.length !== 1 || b.length !== 1 || a[0]!.type !== "createToken" || b[0]!.type !== "createToken") return null;
+    return [{ type: "either", options: [a, b], labels: [`Create ${m[1]}`, `Create ${m[2]}`] }];
+  }
+
   // Tokens, maybe "tapped and attacking" (CR 508.4): "Create a tapped and attacking 1/1 red Warrior creature
   // token", "Create two 1/1 white Soldier creature tokens with haste that are tapped and attacking".
   // Another player can create them: "Target opponent creates three 2/2 white Knight creature tokens", "each opponent

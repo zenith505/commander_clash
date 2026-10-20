@@ -18,7 +18,7 @@ import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, prot
 import { putCounters } from "./counters";
 import { addCopyEffect, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
-import { compileCard, mutateTarget, spellTargetSpecs } from "./oracle";
+import { compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
 import { evalAmount, halve } from "./amounts";
 import { addMana, boundSpend, canPayFromPool, manaOriginsOf, poolFor, spendFromPool, type ManaUse } from "./spend";
@@ -127,13 +127,15 @@ export function createGame(setup: PlayerSetup[], seed = Date.now() >>> 0, opts: 
     for (const card of p.deck) player.library.push(newObject(s, card, pid, "library").id);
     shuffleLibrary(s, player);
   });
-  s.players[s.activePlayer]!.turnBegan = s.turn;
   // The combined back faces its meld cards can meld into (CR 712.4): not in any deck, but part of the game's cards.
   for (const r of meldResultsFor(setup.flatMap((p) => [p.commander, ...(p.secondCommander ? [p.secondCommander] : []), ...p.deck]))) s.cards[r.oracleId] ??= r;
   // CR 103.1: randomly determine the starting player.
   const first = Math.floor(nextRandom(s) * setup.length);
   s.activePlayer = first;
   s.priority = first;
+  // The starting player's first turn (set after choosing them).
+  s.players[first]!.turnBegan = s.turn;
+  s.players[first]!.turnsTaken = 1;
   for (const p of s.players) draw(s, p.id, 7);
   // Opening hands are drawn before the first turn begins (CR 103.5, 103.8): they aren't draws "this turn".
   for (const p of s.players) delete p.draws;
@@ -816,6 +818,9 @@ export function moveObject(
   o.band = undefined;
   o.timestamp = s.nextTimestamp++; // CR 613.7d
   o.attachedTo = to === "battlefield" ? opts.attachTo : undefined;
+  // An Aura with "enchant creature card in a graveyard" (Animate Dead) attached to that card, as that object.
+  const card = to === "battlefield" && opts.attachTo ? s.objects[opts.attachTo] : undefined;
+  o.enchantsCard = card?.zone === "graveyard" ? { id: card.id, zc: card.zoneChanges ?? 0 } : undefined;
   o.attachedToPlayer = to === "battlefield" ? opts.attachToPlayer : undefined;
   if (fromZone === "battlefield") {
     // It's a new object now (CR 400.7): effects locked onto it end, and things attached to it
@@ -1010,7 +1015,10 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   if (printed.entersChoosePlayer) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "player", ...(printed.entersChoosePlayer === "opponent" ? { except: "you" } : {}), ...(printed.entersChooseSecret ? { secret: true as const } : {}) });
   // Devour, riot and unleash: how many +1/+1 counters it has is part of how it enters (CR 614.12), so what it
   // triggers waits for that choice (evolve compares its power as it entered, CR 702.100a).
-  const options: EntersOption[] = [...(saga && printed.readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? [])];
+  // Riot granted by another permanent ("Nontoken creatures you control have riot", Rhythm of the Wild) applies too: it has
+  // it as it would exist on the battlefield (CR 614.12, rulings).
+  const grantedRiot = characteristics(s, o).grantedAbilities.flatMap((t) => (compileGranted(t).entersOptions ?? []).filter((x) => x === "riot"));
+  const options: EntersOption[] = [...(printed.entersDiscardInstead ? (["discardInstead"] as const) : []), ...(saga && printed.readAhead ? (["readAhead"] as const) : []), ...(printed.devour ? (["devour"] as const) : []), ...(printed.amplify ? (["amplify"] as const) : []), ...(printed.entersOptions ?? []), ...grantedRiot];
   options.forEach((what, i) => (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what, ...(i === options.length - 1 ? { enters: opts.x ? { x: opts.x } : {} } : {}) }));
   if (!options.length) {
     const ev = { type: "enters" as const, id, ...(opts.x ? { x: opts.x } : {}) };
@@ -1176,6 +1184,8 @@ export function auraHostOptions(s: GameState, aura: GameObject, pid: PlayerId): 
   if (!enchant) return [];
   // "Enchant player", "enchant opponent" (CR 702.5d): a player still in the game.
   if (enchant.kind === "player") return (enchant.opponent ? opponents(s, pid) : livingPlayers(s)).map((p) => ({ attachToPlayer: p }));
+  // "Enchant creature card in a graveyard" (Animate Dead): such a card in any graveyard.
+  if (enchant.kind === "card") return graveyardCards(s, enchant).map((id) => ({ attachTo: id }));
   return s.battlefield.filter((id) => id !== aura.id && objectMatches(s, enchant, obj(s, id), pid, false, defOf(s, aura))).map((id) => ({ attachTo: id }));
 }
 
@@ -1183,7 +1193,12 @@ export function auraHostOptions(s: GameState, aura: GameObject, pid: PlayerId): 
 export const auraHostKey = (h: AuraHost) => ("attachTo" in h ? h.attachTo : `player:${h.attachToPlayer}`);
 export const auraHostOf = (key: string): AuraHost => (key.startsWith("player:") ? { attachToPlayer: Number(key.slice(7)) } : { attachTo: key });
 
+/** The cards in every living player's graveyard that match a card filter (Animate Dead's "creature card in a graveyard"). */
+const graveyardCards = (s: GameState, f: TargetSpec): ObjectId[] => livingPlayers(s).flatMap((p) => player(s, p).graveyard.filter((id) => printedMatches(f, defOf(s, obj(s, id)))));
+
 function auraObjectHost(s: GameState, aura: GameObject, pid: PlayerId, enchant: TargetSpec, among?: string[]): ObjectId | undefined {
+  // Animate Dead entering without being cast: the biggest creature card in a graveyard.
+  if (enchant.kind === "card") return graveyardCards(s, enchant).filter((id) => !among || among.includes(id)).sort((a, b) => defMv(defOf(s, obj(s, b))) - defMv(defOf(s, obj(s, a))))[0];
   const legal = s.battlefield.filter((id) => id !== aura.id && (!among || among.includes(id)) && objectMatches(s, enchant, obj(s, id), pid, false, defOf(s, aura)));
   const mine = (id: ObjectId) => controllerOf(s, obj(s, id)) === pid;
   const good = (m: Modification) =>
@@ -1245,6 +1260,9 @@ export function conditionHolds(s: GameState, cond: EntersCondition, you: PlayerI
       return livingPlayers(s).some((pid) => player(s, pid).life <= cond.n);
     case "opponents":
       return opponents(s, you).length >= cond.min;
+    // Starting Town: "unless it's your first, second, or third turn of the game".
+    case "ownTurnAtMost":
+      return s.activePlayer === you && (player(s, you).turnsTaken ?? 0) <= cond.n;
     case "control": {
       const n = s.battlefield.filter((id) => {
         if (id === self) return false;
@@ -1668,14 +1686,27 @@ function drawOne(s: GameState, pid: PlayerId): boolean {
   const p = player(s, pid);
   const top = p.library[0];
   if (!top) {
+    // Laboratory Maniac: the draw is replaced, so it isn't a draw from an empty library, even if the win is stopped
+    // (Platinum Angel) (CR 614.1a, 104.2b).
+    const maniac = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawEmptyWins);
+    if (maniac) {
+      winGame(s, pid, nameOf(s, maniac));
+      return false;
+    }
     p.drewFromEmptyLibrary = true; // CR 704.5b
     return false;
   }
   moveObject(s, top, "hand");
   s.resolving?.drawnThisWay?.push(top);
+  const drawnCard = obj(s, top);
+  if (drawnCard.zone === "hand") drawnCard.drawn = { turn: s.turn, zc: drawnCard.zoneChanges ?? 0 };
   // Every card drawn is its own draw (CR 121.2), and counts toward "your second card each turn".
   p.draws = p.draws?.turn === s.turn ? { turn: s.turn, n: p.draws.n + 1 } : { turn: s.turn, n: 1 };
-  fireEvent(s, { type: "draw", player: pid, nth: p.draws.n });
+  // "Except the first one they draw in each of their draw steps" (Orcish Bowmasters): a card actually drawn, so not a
+  // draw that was replaced (CR 614.6).
+  const firstInDrawStep = s.step === "draw" && s.activePlayer === pid && p.drewInDrawStep !== s.turn;
+  if (firstInDrawStep) p.drewInDrawStep = s.turn;
+  fireEvent(s, { type: "draw", player: pid, nth: p.draws.n, ...(firstInDrawStep ? { firstInDrawStep: true as const } : {}) });
   // Miracle (CR 702.94a-b): the first card drawn this turn is revealed as it's drawn, and its trigger lets its owner cast
   // it for its miracle cost. It's always revealed here; whether to cast it is asked as the trigger resolves.
   const card = obj(s, top);
@@ -1921,6 +1952,7 @@ function startNextTurn(s: GameState, skipping = false) {
   const ap = player(s, s.activePlayer);
   ap.lastTurnBegan = ap.turnBegan;
   ap.turnBegan = s.turn;
+  ap.turnsTaken = (ap.turnsTaken ?? 0) + 1;
   for (const p of s.players) {
     p.landsPlayedThisTurn = 0;
     // "Skips their next combat phase this turn" with that turn over.
@@ -2832,6 +2864,12 @@ export function castProblem(
   const proposedCost = parseManaCost(d.manaCost);
   const limit = castLimitProblem(s, pid, d, choices?.faceDown ? 0 : defMv(d) + (proposedCost.hasX ? (x ?? 0) * xCount(proposedCost) : 0));
   if (limit) return limit;
+  // Drannith Magistrate: "Your opponents can't cast spells from anywhere other than their hands", commanders from the
+  // command zone included (CR 101.2).
+  if (o.zone !== "hand") {
+    const magistrate = s.battlefield.map((b) => obj(s, b)).find((m) => abilitiesOf(s, m).opponentsOnlyFromHand && controllerOf(s, m) !== pid);
+    if (magistrate) return `${characteristics(s, magistrate).name}: opponents can't cast spells from anywhere other than their hands`;
+  }
   // "Cast this spell only if you've cast another spell this turn" (Illusory Angel), checked as it's proposed, before it
   // counts itself (CR 601.3); the other spell needn't have resolved (rulings). Face down it has no abilities (CR 708.2).
   if (compileCard(d).castOnlyAfterAnother && !choices?.faceDown && !(s.castThisTurn ?? []).some((c) => c.player === pid)) return `${d.name} can be cast only if you've cast another spell this turn`;
@@ -3252,6 +3290,7 @@ export function flashGranted(s: GameState, pid: PlayerId, d: CardDef): boolean {
   // "This spell has flash as long as you've committed a crime this turn" (CompiledCard.flashIf): about the player only.
   const own = compileCard(d).flashIf;
   if (own && staticConditionNow(s, own, "", pid)) return true;
+  if (turnRule(s, pid, "flash")) return true;
   return s.battlefield.some((id) => {
     const o = obj(s, id);
     return controllerOf(s, o) === pid && !!abilitiesOf(s, o).flashFor?.some((spec) => printedMatches(spec, d));
@@ -4679,6 +4718,23 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       enterAsCopy(s, o, choice, entry?.enterOpts ?? {});
       return;
     }
+    if (pend.what === "discardInstead") {
+      if (!pend.options.includes(choice)) throw new RulesError("choose a card offered, or none");
+      if (choice !== "none" && obj(s, choice).zone === "hand") {
+        discardCards(s, p.id, [choice]);
+        log(s, `${pend.source} enters.`);
+        if (entry?.enters) fireEvent(s, { type: "enters", id: o.id, ...entry.enters });
+        return;
+      }
+      // It never entered (rulings): nothing sees it enter or leave.
+      log(s, `${p.name} doesn't discard a card, so ${pend.source} goes to its owner's graveyard instead.`);
+      s.entersChoices = (s.entersChoices ?? []).filter((c) => c.id !== o.id);
+      s.battlefield = s.battlefield.filter((x) => x !== o.id);
+      o.zone = "stack"; // in no zone list, so moving it isn't leaving the battlefield
+      moveObject(s, o.id, "graveyard");
+      invalidateCharacteristics(s);
+      return;
+    }
     if (pend.what === "tribute") {
       // Tribute (CR 702.104a): the chosen opponent decides next, still as it enters.
       o.tribute = { to: Number(choice) };
@@ -4742,7 +4798,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "copy" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "discardInstead" || pend.what === "copy" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector") throw new RulesError("nothing to choose");
   if (pend.what === "searchZones") {
     if (!pend.options.includes(choice)) throw new RulesError("choose both or the graveyard only");
     (r.scratch ??= {}).searchZones = choice;
@@ -4794,6 +4850,19 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     // An option's index, or "none" to take the penalty (see the punisher effect).
     const pu = r.scratch?.punish;
     if (pu) pu.picked[p.id] = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "payOrTop") {
+    const pt = r.scratch?.payOrTop;
+    if (!pt) throw new RulesError("nothing to choose");
+    pt.answer = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "either") {
+    (r.scratch ??= {}).either = Number(choice);
+    log(s, `${p.name} chooses to ${pend.labels?.[Number(choice)] ?? choice} (${pend.source}).`);
     continueResolution(s);
     return;
   }
@@ -4995,6 +5064,14 @@ function askEntersChoice(s: GameState): boolean {
       }
       const siege = isSiege(s, o);
       s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "protector", options: options.map(String), labels: options.map((x) => player(s, x).name), objectId: o.id, prompt: siege ? "choose an opponent to protect it; you and the others can attack it" : "choose its protector" };
+      return true;
+    }
+    if (c.what === "discardInstead") {
+      // Mox Diamond (CR 614.1a): a land card from its controller's hand, or it goes to the graveyard instead.
+      const you = controllerOf(s, o);
+      const filter = compileCard(defOf(s, o)).entersDiscardInstead!;
+      const cards = player(s, you).hand.filter((id) => printedMatches(filter, defOf(s, obj(s, id))));
+      s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "discardInstead", options: [...cards, "none"], labels: [...cards.map((id) => `Discard ${nameOf(s, id)}`), "Don't (it goes to the graveyard)"], objectId: o.id, prompt: `discard a ${filter.text} for it to enter` };
       return true;
     }
     if (c.what === "anchor") {
@@ -5980,6 +6057,20 @@ function attachmentSBAs(s: GameState): boolean {
       const legal = p !== undefined && !o.attachedTo && !player(s, p).lost && (!enchant.opponent || opponents(s, c.controller).includes(p)) && !playerProtectedFrom(s, p, c.controller, c);
       if (!legal) {
         log(s, `${c.name} is put into the graveyard (not attached to a player it can enchant).`);
+        moveObject(s, id, "graveyard");
+        changed = true;
+      }
+    } else if (c.subtypes.includes("Aura") && compileCard(defOf(s, o)).animate) {
+      // Animate Dead: attached to the creature card in a graveyard it entered attached to, then to the creature it put
+      // onto the battlefield ("enchant creature put onto the battlefield with ~", rulings), which it can't leave for another.
+      const link = s.animated?.[`${o.id}@${o.zoneChanges ?? 0}`];
+      const card = o.enchantsCard;
+      const hc = host && host.zone === "battlefield" ? characteristics(s, host) : undefined;
+      const legal = link
+        ? !!host && host.id === link.id && (host.zoneChanges ?? 0) === link.zc && !!hc && hc.types.includes("Creature") && !protectedFrom(hc.keywords, c, protectionHolder(s, host))
+        : !!host && !!card && host.id === card.id && host.zone === "graveyard" && (host.zoneChanges ?? 0) === card.zc && printedMatches(compileCard(defOf(s, o)).enchant!, defOf(s, host));
+      if (!legal) {
+        log(s, `${c.name} is put into the graveyard (not attached to anything it can enchant).`);
         moveObject(s, id, "graveyard");
         changed = true;
       }

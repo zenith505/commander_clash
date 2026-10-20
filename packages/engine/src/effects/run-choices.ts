@@ -56,6 +56,16 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       for (const inner of e.effects) if (runEffect(s, inner, ctx) === "paused") return "paused";
       return;
     }
+    case "either": {
+      // The controller picks one as it resolves (CR 608.2d), and only that one happens.
+      const sc = (s.resolving!.scratch ??= {});
+      if (sc.either === undefined) {
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "either", options: e.labels.map((_, i) => String(i)), labels: e.labels, prompt: "choose one" };
+        return "paused";
+      }
+      for (const inner of e.options[sc.either] ?? []) if (runEffect(s, inner, ctx) === "paused") return "paused";
+      return;
+    }
     case "eachMay": {
       // Each player decides in APNAP order, seeing the earlier answers (CR 101.4); then it happens to those who chose to.
       const sc = (s.resolving!.scratch ??= {});
@@ -264,6 +274,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? voteWins(s, e.cond.option, !!e.cond.orTie)
             : e.cond.kind === "amountNow"
             ? ((n) => (e.cond.kind !== "amountNow" ? false : (e.cond.min === undefined || n >= e.cond.min) && (e.cond.max === undefined || n <= e.cond.max)))(amountNow(s, e.cond.amount, ctx))
+            : e.cond.kind === "amountsCompare"
+            ? amountNow(s, e.cond.a, ctx) >= amountNow(s, e.cond.atLeast, ctx)
             : e.cond.kind === "xAtLeast"
             ? (ctx.x ?? 0) >= e.cond.n
             : kickedMatches(ctx.kicked, e.cond);

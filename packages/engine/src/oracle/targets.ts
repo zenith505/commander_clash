@@ -13,7 +13,7 @@ HYPHENATED.set("time-lord", "Time Lord");
 
 /** Spell and enchantment subtypes a filter can name: "Spirit or Arcane spell", "a Cartouche you control" (CR 205.3h, 205.3k). */
 // Artifact subtypes (CR 205.3g) other than Vehicle, which "creature or Vehicle" handles: "a Food", "a Clue", "Equipment".
-const OTHER_SUBTYPES = ["Arcane", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure", "Gate", "Desert", "Cave", "Town"];
+const OTHER_SUBTYPES = ["Arcane", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Vehicle", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure", "Gate", "Desert", "Cave", "Town"];
 
 export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | null {
   if (/^any target$/i.test(p)) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", text: "any target" }) };
@@ -414,8 +414,9 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
  */
 function singularPhrase(p: string): string {
   const words = p.trim().replace(/ and\/or /g, " or ").replace(/ each (?=with )/, " ").split(" ");
-  const plural = (w: string) => /^(creatures|cards|permanents|artifacts|enchantments|lands|planeswalkers|battles)$/i.test(w);
-  if (words.some(plural)) words.forEach((w, i) => plural(w) && (words[i] = singular(w)));
+  // "Artifacts, creatures, and/or lands" (Ghostly Flicker): a comma after one.
+  const plural = (w: string) => /^(creatures|cards|permanents|artifacts|enchantments|lands|planeswalkers|battles),?$/i.test(w);
+  if (words.some(plural)) words.forEach((w, i) => plural(w) && (words[i] = w.endsWith(",") ? `${singular(w.slice(0, -1))},` : singular(w)));
   else {
     // A creature type: "two target Goblins", "up to two target Elves you control".
     const j = words.findIndex((w) => /^[A-Z]/.test(w) && CREATURE_TYPES.has(singular(w)) && w !== singular(w));
@@ -617,6 +618,9 @@ export function parseTargetPhrase(
       const n = Number(m[2]);
       extra[key] = m[3] === "greater" ? { min: n } : m[3] === "less" ? { max: n } : { min: n, max: n };
     }
+    p = p.slice(0, m.index);
+  } else if ((m = / with mana cost ((?:\{[0-9WUBRGC]+\})+)(?: or ((?:\{[0-9WUBRGC]+\})+))?$/.exec(p))) {
+    extra.manaCostIn = [m[1]!, ...(m[2] ? [m[2]] : [])];
     p = p.slice(0, m.index);
   } else if ((m = / with an? (even|odd) mana value$/.exec(p))) {
     // "Permanent ... with an even mana value" (Desecrate Reality; zero is even).

@@ -278,6 +278,8 @@ export interface TargetSpec {
   power?: Range; // "with power 4 or greater"
   toughness?: Range;
   manaValue?: Range; // "with mana value 3 or less" (CR 202.3)
+  /** "With mana cost {0} or {1}" (Urza's Saga): its mana cost is exactly one of these (CR 202.1; not {X} or none, rulings). */
+  manaCostIn?: string[];
   /**
    * "Counter target spell with mana value X", "destroy target creature with power X or less": the X announced for the
    * spell or ability (CR 107.3a), made into that range of `key` as its targets are chosen (settleDivided). Until then,
@@ -1645,6 +1647,11 @@ export type Effect =
   | { type: "scry"; n: Amount } // CR 701.22, by the controller
   /** "~ endures N" (CR 701.63a): N +1/+1 counters on it, or an N/N white Spirit token, its controller's choice. */
   | { type: "endure"; what: ObjRef; n: Amount }
+  /**
+   * "Create a Food token or a Treasure token" (Tireless Provisioner): one of these, chosen by its controller as it
+   * resolves (CR 608.2d). `labels` name each for the choice.
+   */
+  | { type: "either"; options: Effect[][]; labels: string[] }
   /** "Clash with an opponent" (CR 701.30): for a following "If you win, ..." (see SpellCondition "wonClash"). */
   | { type: "clash" }
   /**
@@ -1670,6 +1677,19 @@ export type Effect =
   /** "Put two cards from your hand on top of your library in any order" (Brainstorm): the controller's own hand. */
   /** `bottom`: "put a card from your hand on the bottom of your library" instead (Volcanic Spite). */
   | { type: "handToTop"; n: Amount; bottom?: true }
+  /**
+   * Sylvan Library: "choose two cards in your hand drawn this turn. For each of those cards, pay 4 life or put the card on
+   * top of your library." With fewer drawn cards still in hand, those (rulings); none, nothing happens.
+   */
+  | { type: "drawnPayOrTop"; n: number; life: number }
+  /**
+   * Animate Dead's enters trigger: "it loses 'enchant creature card in a graveyard' and gains 'enchant creature put onto
+   * the battlefield with ~.' Return enchanted creature card to the battlefield under your control and attach ~ to it."
+   * `tapped`: Dance of the Dead's "... to the battlefield tapped". Only while the Aura is on the battlefield (rulings).
+   */
+  | { type: "animateDead"; tapped?: true }
+  /** Its leaves trigger: "that creature's controller sacrifices it", the creature it put onto the battlefield. */
+  | { type: "sacrificeAnimated" }
   /** Firebending's "add N {R}. Until end of combat, you don't lose this mana as steps and phases end" (CR 702.189a). */
   | { type: "addCombatMana"; n: Amount }
   /** "Add {B}{B}{B}" (Dark Ritual), "add one mana of any color" from an enters trigger: not a mana ability, so it uses the
@@ -1727,6 +1747,13 @@ export type Effect =
       unless?: UnlessPays;
       exile?: boolean;
       top?: boolean;
+      /** Remand: "If that spell is countered this way, put it into its owner's hand instead of into that player's graveyard." */
+      hand?: true;
+      /**
+       * "Return target spell to its owner's hand" (Reprieve): not a counter, so a spell that can't be countered goes too
+       * (CR 101.2 doesn't apply); otherwise like Remand's.
+       */
+      bounce?: true;
       /** "Counter target spell if its mana value is X" (Disrupting Shoal): only then, checked as it resolves. */
       ifMvX?: true;
       /** "Counter target spell if it has the same name as that card" (Jester's Scepter): the card put into a graveyard to pay the cost. */
@@ -2010,7 +2037,7 @@ export type ChoiceKind = "creatureType" | "color" | "basicLandType" | "keyword" 
 export type NamePurpose = "deny" | "theirs" | "find" | "guess" | "guessHand" | "own";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = "riot" | "unleash" | "copy" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector";
+export type EntersOption = "riot" | "unleash" | "copy" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead";
 
 /**
  * What mana was spent to cast a spell (CR 601.2h): at least so much of some colors ("if {U}{B} was spent", "at least three
@@ -2095,6 +2122,8 @@ export type SpellCondition =
    * Graverobber): a number counted as it resolves, which may name its targets (CR 608.2c).
    */
   | { kind: "amountNow"; amount: Amount; min?: number; max?: number }
+  /** "If X is greater than or equal to the number of cards in your library" (Thassa's Oracle): both counted as it resolves. */
+  | { kind: "amountsCompare"; a: Amount; atLeast: Amount }
   /** "If it's a creature" about target `index` (Mythos of Nethroi): that permanent as it is now, still a legal target. */
   | { kind: "targetIs"; index: number; filter: TargetSpec }
   /**
@@ -2124,7 +2153,7 @@ export type SpellCondition =
 
 /** Every effect, including the ones inside "you may" and "if", in order. */
 export const allEffects = (effects: Effect[]): Effect[] =>
-  effects.flatMap((e) => (e.type === "may" || e.type === "if" ? [e, ...allEffects(e.effects), ...allEffects(e.otherwise ?? [])] : [e]));
+  effects.flatMap((e) => (e.type === "may" || e.type === "if" ? [e, ...allEffects(e.effects), ...allEffects(e.otherwise ?? [])] : e.type === "either" ? [e, ...e.options.flatMap(allEffects)] : [e]));
 
 /** A sequence of effects with the targets they need, like a spell's text or one ability. */
 export interface AbilityBody {
@@ -2301,6 +2330,7 @@ export type TriggerEvent =
   /** "Whenever you roll a 4 or higher", "when you roll a natural 20": once per die that does (TriggeredAbility.rolls). */
   | "youRollDie"
   | "opponentLosesLife" // "Whenever an opponent loses life": once per life-loss event, damage and paying life included (CR 119.2, 119.4)
+  | "youCreateToken" // "Whenever you create a token": once for each token you create (CR 111.2), whoever ends up controlling it
   /**
    * "Whenever you're dealt damage", "whenever an opponent is dealt damage", "whenever enchanted player is dealt damage": once
    * for all the damage dealt to that player at the same time (rulings on Grievous Wound); the event amount is that damage.
@@ -2422,7 +2452,8 @@ export interface TriggeredAbility {
    */
   rolls?: { min?: number; natural?: number | "max" };
   /** For "playerDraws": who draws, and for "your second card each turn", which card of the turn it has to be. */
-  draws?: { by: "you" | "opponent" | "any" | "enchanted"; nth?: number };
+  /** `notFirstInDrawStep`: "except the first one they draw in each of their draw steps" (Orcish Bowmasters). */
+  draws?: { by: "you" | "opponent" | "any" | "enchanted"; nth?: number; notFirstInDrawStep?: true };
   /**
    * For "abilityActivated": who activated an ability that isn't a mana ability (CR 602, 605.1a), and `of`: what its
    * source had to be as it was activated, a permanent on the battlefield ("an ability of an artifact, creature, or land").
@@ -2475,7 +2506,8 @@ export interface TriggeredAbility {
    * For "youSacrifice": what its controller sacrificed (CR 701.21a), as it last existed on the battlefield, wherever it
    * went. The card is the subject ("exile it").
    */
-  sacrifices?: { filter: TargetSpec; other?: boolean; orSelf?: boolean };
+  /** `by`: "whenever a player sacrifices" (any), "whenever an opponent sacrifices" (opponent); otherwise "whenever you sacrifice". */
+  sacrifices?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; by?: "any" | "opponent" };
   /** Persist/undying's "if it had no -1/-1 counters on it" (an intervening if, CR 603.4), from last known information; "any": "if it had no counters on it" (Unstoppable Slasher). */
   ifNoCounter?: "+1/+1" | "-1/-1" | "any";
   /** For "selfToGraveyard": "is put into your graveyard", so only if its controller owns it (rulings on Enigma Sphinx). */
@@ -2716,7 +2748,20 @@ export type ManaProduce =
    * (two colors, `min` 1, as removing none adds nothing). How many are removed is chosen as it's activated (CR 107.3a,
    * 601.2b, 602.2b): each way to do it is a combination, numbered as for "combos" (`removeXCombos`).
    */
-  | { kind: "removeX"; counter: CounterKind; colors: ManaType[]; min: number };
+  | { kind: "removeX"; counter: CounterKind; colors: ManaType[]; min: number }
+  /**
+   * "One mana of any color among legendary creatures and planeswalkers you control" (Mox Amber, Plaza of Heroes: the
+   * colors of the permanents matching `filter` now), "one mana of any of the exiled card's colors" (Chrome Mox, `linked`:
+   * the card its linked imprint ability exiled, CR 607.2a). None if there's no such color (CR 106.5, rulings).
+   */
+  | { kind: "colorsAmong"; filter?: TargetSpec; linked?: true }
+  /** "For each color among permanents you control, add one mana of that color" (Bloom Tender, Faeburrow Elder). */
+  | { kind: "eachColorAmong" }
+  /**
+   * "Choose a color. Add an amount of mana of that color equal to your devotion to that color." (Nykthos, Shrine to Nyx,
+   * CR 700.5): the color chosen as it resolves, then the devotion to it.
+   */
+  | { kind: "devotion" };
 
 /**
  * A mana ability (CR 605.1a): no targets, adds mana, doesn't use the stack (CR 605.3a).
@@ -2811,7 +2856,8 @@ export interface ManaSpend {
 export type EntersCondition =
   | { kind: "control"; who: "you" | "opponents"; types?: string[]; subtypes?: string[]; supertypes?: string[]; colors?: Color[]; other?: boolean; min?: number; max?: number }
   | { kind: "playerLifeAtMost"; n: number }
-  | { kind: "opponents"; min: number };
+  | { kind: "opponents"; min: number }
+  | { kind: "ownTurnAtMost"; n: number };
 
 /**
  * "As ~ enters, you may pay 2 life / reveal a Dragon card from your hand. If you don't, it enters
@@ -2941,7 +2987,7 @@ export interface CastFromGraveyard {
  */
 export type CountMod =
   | { what: "tokens"; who: "you" | "any"; op: "double" | "plusOne"; subtype?: string }
-  | { what: "counters"; counter?: CounterKind; on: "creature" | "permanent"; who: "you" | "any"; op: "double" | "plusOne" | "minusOne"; other?: boolean };
+  | { what: "counters"; counter?: CounterKind; on: "creature" | "permanent" | "artifactOrCreature"; who: "you" | "any"; op: "double" | "plusOne" | "minusOne"; other?: boolean };
 
 /**
  * What a gift gives the chosen opponent (CR 702.174d-i): "Gift a card" means they draw a card, "Gift a Food" that they
@@ -2997,6 +3043,16 @@ export interface CompiledCard {
    * judged by the abilities it would have on the battlefield (614.12): under Humility it enters (rulings).
    */
   exileUnlessCastWithMana?: true;
+  /**
+   * Mox Diamond: "If ~ would enter, you may discard a land card instead. If you do, put ~ onto the battlefield. If you
+   * don't, put it into its owner's graveyard." (CR 614.1a): chosen as it would enter; if not, it never entered (rulings).
+   */
+  entersDiscardInstead?: TargetSpec;
+  /**
+   * Animate Dead, Dance of the Dead: "Enchant creature card in a graveyard" with the trigger that returns that card and
+   * attaches the Aura to it (`enchant` is then a graveyard card filter). See Effect "animateDead".
+   */
+  animate?: true;
   /** "As ~ enters, secretly choose an opponent" (Guardian Archon): see Chosen.secret. */
   entersChooseSecret?: true;
   /**
@@ -3132,6 +3188,10 @@ export interface CompiledCard {
   lifeFloor?: number;
   /** "If you would draw a card except the first one you draw in each of your draw steps, draw two cards instead." */
   drawTwoInstead?: true;
+  /** "If you would draw a card while your library has no cards in it, you win the game instead." (Laboratory Maniac, CR 614.1a) */
+  drawEmptyWins?: true;
+  /** "Your opponents can't cast spells from anywhere other than their hands." (Drannith Magistrate) */
+  opponentsOnlyFromHand?: true;
   /**
    * "The first time you would draw a card each turn, instead look at the top two cards of your library. Put one of them
    * into your graveyard and the other back on top of your library. Then draw a card." (Scion of Halaster's grant).

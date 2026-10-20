@@ -5,7 +5,7 @@ import { chooseVote } from "./bot-votes";
 import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
-import { bindChosen, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
+import { bindChosen, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, manySlot, gateTargets, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
   livingPlayers,
@@ -322,7 +322,16 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "chooseOption", player: pid, choice: pick ?? (pend.options.includes("none") ? "none" : pend.options[0]!) }];
     }
     if (pend.kind === "chooseOption" && pend.what === "tapOrUntap") return [{ type: "chooseOption", player: pid, choice: tapOrUntapChoice(s, pid, pend.options) }];
+    // Mox Diamond: a land card if there is one.
+    if (pend.kind === "chooseOption" && pend.what === "discardInstead") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "endure") return [{ type: "chooseOption", player: pid, choice: "counters" }];
+    // Sylvan Library: 4 life for a card only while well ahead on life; otherwise it goes back.
+    if (pend.kind === "chooseOption" && pend.what === "payOrTop") return [{ type: "chooseOption", player: pid, choice: s.players[pid]!.life >= 30 ? "pay" : "top" }];
+    // "A Food token or a Treasure token": the Treasure (mana now beats life later); otherwise the first.
+    if (pend.kind === "chooseOption" && pend.what === "either") {
+      const i = pend.labels?.findIndex((l) => /Treasure/.test(l)) ?? -1;
+      return [{ type: "chooseOption", player: pid, choice: pend.options[Math.max(0, i)]! }];
+    }
     // Demonstrate: the opponent who also copies the spell is the one with the least on the battlefield.
     if (pend.kind === "chooseOption" && pend.what === "demonstrate") {
       const owned = (o: string) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === Number(o)).length;
@@ -705,8 +714,18 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     // Bots never pick the same thing twice, which also keeps "another target" apart.
     // "Remove all counters from", "move all counters from": only something with counters on it.
     const countersFrom = allEffects(body.effects).some((e) => (e.type === "removeAllCounters" && e.what.ref === "target" && refCovers(e.what, i)) || (e.type === "moveAllCounters" && e.from.ref === "target" && e.from.index === i));
+    // "Counter target spell if it's blue" (Pyroblast): when that's all it does, only a target it holds for now.
+    const onlyIf = body.effects.length > 0 && body.effects.every((e) => e.type === "if" && e.cond.kind === "targetIs" && e.cond.index === i && !e.cond.filter.bound && !e.otherwise?.length) ? (body.effects[0] as { cond: { filter: TargetSpec } }).cond.filter : undefined;
+    const holds = (t: TargetChoice) => {
+      if (!onlyIf) return true;
+      if (t.kind === "stack") {
+        const item = s.stack.find((x) => x.id === t.id);
+        return !!item && spellMatches(s, onlyIf, item);
+      }
+      return t.kind === "object" && !!s.objects[t.id] && objectMatches(s, { ...onlyIf, kind: "object" }, obj(s, t.id), pid, false);
+    };
     const all = legalTargets(s, spec, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).filter(
-      (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId) && totalOk(s, body.targets, out, i, t) && !namedLike(s, spec, out, t) && !(countersFrom && t.kind === "object" && !Object.values(obj(s, t.id).counters).some((n) => n > 0)),
+      (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId) && totalOk(s, body.targets, out, i, t) && !namedLike(s, spec, out, t) && !(countersFrom && t.kind === "object" && !Object.values(obj(s, t.id).counters).some((n) => n > 0)) && holds(t),
     );
     // Reanimating takes the best creature from any graveyard it may.
     const reanimators = allEffects(body.effects).filter((e): e is Extract<Effect, { type: "putOntoBattlefield" }> => e.type === "putOntoBattlefield" && e.what.ref === "target" && i >= e.what.index && i < e.what.index + (e.what.n ?? 1));
@@ -980,6 +999,9 @@ function targetIndexOf(e: Effect): number | undefined {
  */
 function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: CastFromGraveyardKind, alt?: AltCostKind): Action[] | null {
   const d = defOf(s, obj(s, id));
+  // Mox Diamond with no other land card to discard would only go to the graveyard.
+  const discard = compileCard(d).entersDiscardInstead;
+  if (discard && !player(s, pid).hand.some((c) => c !== id && printedMatches(discard, defOf(s, obj(s, c))))) return null;
   // A foretold card is cast for its foretell cost (CR 702.143a).
   if (!free && !via && alt === undefined && foretoldCast(s, pid, obj(s, id))) alt = "foretell";
   // Cast as madness or miracle resolves, for that cost (CR 702.35a, 702.94a): its X is paid then.

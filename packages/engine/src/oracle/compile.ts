@@ -251,6 +251,8 @@ export function castingBody(d: CardDef): AbilityBody | undefined {
   const c = compileCard(d);
   if (c.spell) return c.spell;
   if (!c.enchant) return undefined;
+  // Animate Dead: what it does to its target is reanimate it.
+  if (c.animate) return { targets: [c.enchant], effects: [{ type: "putOntoBattlefield", what: { ref: "target", index: 0 } }], text: d.oracleText };
   const effects: Effect[] = c.statics
     .filter((st) => st.affects.kind === "attached")
     .map((st) => ({ type: "continuous", what: { ref: "target", index: 0 }, mods: st.mods, duration: "game" }));
@@ -434,6 +436,8 @@ export function compile(d: CardDef): CompiledCard {
     // 714.2b) or a modal choice.
     const word = !isSpell ? /^([A-Z][^—•":{}]*?) — (?![{+•])/.exec(line) : null;
     if (word && !KEYWORD_WORDS.has(word[1]!.toLowerCase()) && !/^[IVX]+(?:, [IVX]+)*$/.test(word[1]!) && !/^(?:Choose\b|To solve$)/.test(word[1]!)) line = line.slice(word[0].length);
+    // "Vivid — {T}: For each color among permanents you control, add ..." (Bloom Tender): an ability word too.
+    else if (!isSpell && /^Vivid — \{/.test(line)) line = line.replace(/^Vivid — /, "");
     if (!line) continue;
     if (line === "Spree" && isSpell && !spree) {
       spree = { costs: [], texts: [], lines: [raw] };
@@ -1120,6 +1124,10 @@ export function compile(d: CardDef): CompiledCard {
       out.firstDrawLook = true;
       continue;
     }
+    if (line === "If you would draw a card while your library has no cards in it, you win the game instead.") {
+      out.drawEmptyWins = true;
+      continue;
+    }
     if (line === "If you would draw a card except the first one you draw in each of your draw steps, draw two cards instead.") {
       out.drawTwoInstead = true;
       continue;
@@ -1130,6 +1138,14 @@ export function compile(d: CardDef): CompiledCard {
     if (youHave && !out.youHave) {
       out.youHave = youHave[1]!.startsWith("protection") ? "protection" : (youHave[1] as "hexproof" | "shroud");
       continue;
+    }
+    const discardInstead = /^If ~ would enter, you may discard an? ([a-z]+ card) instead\. If you do, put ~ onto the battlefield\. If you don't, put it into its owner's graveyard\.$/.exec(line);
+    if (discardInstead && !out.entersDiscardInstead) {
+      const filter = parseSearchFilter(discardInstead[1]!);
+      if (filter) {
+        out.entersDiscardInstead = filter;
+        continue;
+      }
     }
     if (line === "If ~ would enter and it wasn't cast or no mana was spent to cast it, exile it instead.") {
       out.exileUnlessCastWithMana = true;
@@ -1303,7 +1319,8 @@ export function compile(d: CardDef): CompiledCard {
     }
     const flashFor = /^You may cast (.*?)spells as though they had flash\.$/.exec(line);
     if (flashFor) {
-      const spec = parseTargetPhrase(`${flashFor[1]}spell`);
+      // "Aura and Equipment spells" (Sigarda's Aid): each of them.
+      const spec = parseTargetPhrase(`${flashFor[1]!.replace(/ and /g, " or ")}spell`);
       if (spec?.kind === "spell" && !spec.controller) {
         (out.flashFor ??= []).push({ ...spec, text: `${flashFor[1]}spells` });
         continue;
@@ -1447,6 +1464,10 @@ export function compile(d: CardDef): CompiledCard {
       out.loyaltyAtInstantSpeed = true;
       continue;
     }
+    if (line === "Your opponents can't cast spells from anywhere other than their hands.") {
+      out.opponentsOnlyFromHand = true;
+      continue;
+    }
     if (line === "Your opponents can't cast spells during your turn.") {
       out.opponentsCantCastYourTurn = true;
       continue;
@@ -1506,6 +1527,20 @@ export function compile(d: CardDef): CompiledCard {
         out.entersWithCounters = { counter: counterKind(kind!), n, ...(cond ? { if: cond } : {}), ...(fromHand ? { castFromHand: true as const } : {}) };
         if (tapped) out.entersTapped = true;
       }
+      continue;
+    }
+    // Animate Dead, Dance of the Dead (CR 303.4a, rulings): the Aura spell targets a creature card in a graveyard and enters
+    // attached to it; its enters trigger returns the card and attaches the Aura to the creature it became (Effect
+    // "animateDead"), and its leaves trigger sacrifices that creature.
+    if (line === "Enchant creature card in a graveyard" && d.subtypes.includes("Aura") && !out.enchant) {
+      out.enchant = { kind: "card", types: ["Creature"], text: "creature card in a graveyard to enchant" };
+      out.animate = true;
+      continue;
+    }
+    const animate = out.animate && /^When ~ enters, if it's on the battlefield, it loses "enchant creature card in a graveyard" and gains "enchant creature put onto the battlefield with ⟪source⟫\." (?:Return enchanted creature card to the battlefield under your control|Put enchanted creature card onto the battlefield (tapped )?under your control) and attach ~ to it\. When ~ leaves the battlefield, that creature's controller sacrifices it\.$/.exec(line);
+    if (animate) {
+      out.triggers.push({ event: "selfEnters", body: { targets: [], effects: [{ type: "animateDead", ...(animate[1] ? { tapped: true as const } : {}) }], text: `Return enchanted creature card to the battlefield${animate[1] ? " tapped" : ""} under your control and attach ~ to it.` } });
+      out.triggers.push({ event: "selfLeaves", body: { targets: [], effects: [{ type: "sacrificeAnimated" }], text: "That creature's controller sacrifices it." } });
       continue;
     }
     const enchant = /^Enchant (.+)$/.exec(line);
@@ -1649,6 +1684,10 @@ export function compile(d: CardDef): CompiledCard {
       /^When(?:ever)? ~ enters or (attacks|dies|leaves the battlefield|the creature it haunts dies|deals combat damage to a player|transforms into ~), (.+)$/.exec(line) ??
       /^When ~ (transforms into ~) or dies, (.+)$/.exec(line) ??
       /^When ~ enters and whenever it (attacks while saddled), (.+)$/.exec(line) ??
+      // "Whenever you create or sacrifice a token, ..." (Mirkwood Bats); "When ~ enters and whenever an opponent draws a
+      // card except the first one they draw in each of their draw steps, ..." (Orcish Bowmasters).
+      /^Whenever you (create or sacrifice) a token, (.+)$/.exec(line) ??
+      /^When ~ enters and (whenever an opponent draws a card except the first one they draw in each of their draw steps), (.+)$/.exec(line) ??
       // "Whenever a creature you control of the chosen type enters or attacks, draw a card." (Kindred Discovery)
       /^Whenever (an? [^,]+? you control(?: of the chosen type)?) enters or attacks, (.+)$/.exec(line);
     if (twice && !/\bonly once\b/.test(line)) {
@@ -1663,6 +1702,10 @@ export function compile(d: CardDef): CompiledCard {
               ? [`When ~ enters, ${effect}`, `A${twice[1]!.slice(1)}, ${effect}`]
             : /^When ~ transforms into ~ or dies/.test(line)
               ? [`When ~ transforms into ~, ${effect}`, `When ~ dies, ${effect}`]
+            : twice[1] === "create or sacrifice"
+              ? [`Whenever you create a token, ${effect}`, `Whenever you sacrifice a token, ${effect}`]
+            : /^When ~ enters and whenever an opponent draws/.test(line)
+              ? [`When ~ enters, ${effect}`, `W${twice[1]!.slice(1)}, ${effect}`]
             : /^Whenever an? [^,]+? enters or attacks, /.test(line)
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} attacks, ${effect}`]
             : [`When ~ enters, ${effect}`, `${/^(?:attacks|deals)/.test(twice[1]!) ? "Whenever" : "When"} ~ ${twice[1]}, ${effect}`];
@@ -1862,6 +1905,13 @@ function bindThisAbility<T extends object>(ability: T, line: string): T {
  * the return gives back only what this object's own exile ability took. Needs exactly one exile to link to.
  */
 function linkExile(out: CompiledCard) {
+  // Imprint (an ability word, CR 207.2c): "{T}: Add one mana of any of the exiled card's colors" (Chrome Mox) is
+  // linked to the one ability that exiles it as it enters (CR 607.2a).
+  if (out.mana.some((m) => m.produces.kind === "colorsAmong" && m.produces.linked)) {
+    const imprints = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e) => e.type === "takeFromHand" && e.action === "exile");
+    if (imprints.length !== 1 || out.triggers.some((t) => allEffects(t.body.effects).some((e) => e.type === "returnLinked"))) out.unsupported.push("(its mana ability can't be linked to one imprint ability)");
+    else (imprints[0] as Extract<Effect, { type: "takeFromHand" }>).linked = true;
+  }
   const returns = out.triggers.filter((t) => allEffects(t.body.effects).some((e) => e.type === "returnLinked"));
   if (!returns.length) return;
   const exiles = [...out.triggers.filter((t) => t.event === "selfEnters").map((t) => t.body), ...out.activated.map((a) => a.body)]

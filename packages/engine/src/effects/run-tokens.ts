@@ -5,7 +5,7 @@ import { tokensToCreate } from "../counters";
 import { tokenCopyKey, type CopyExcept } from "../copies";
 import type { CardDef, GameObject, GameState, ObjectId, PlayerId } from "../types";
 import { ResolveCtx, apnap, objects, players, amountNow } from "./resolve";
-import { inCombat, attackDefault } from "./triggers";
+import { inCombat, attackDefault, fireEvent } from "./triggers";
 import { attackChoices } from "./run-zones";
 import { copiedValues } from "./run-copies";
 import { controllerOf, invalidateCharacteristics } from "../layers";
@@ -246,4 +246,6 @@ export function createToken(s: GameState, pid: PlayerId, t: TokenSpec, opts: { t
 /** A token `pid` created (CR 111.2), for "the number of Treasure tokens you created this turn". */
 function noteCreated(s: GameState, pid: PlayerId, o: GameObject) {
   ((s.turnLog ??= {}).tokensCreated ??= []).push({ player: pid, subtypes: [...defOf(s, o).subtypes] });
+  // "Whenever you create a token" (not a copy of a permanent spell becoming one, CR 111.12).
+  fireEvent(s, { type: "tokenCreated", player: pid, id: o.id });
 }

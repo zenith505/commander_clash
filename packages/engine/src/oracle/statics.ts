@@ -30,6 +30,7 @@ export function parseEntersCondition(text: string): EntersCondition | null {
   if ((m = new RegExp(`^your opponents control ${NUM} or more lands$`).exec(text))) return { kind: "control", who: "opponents", types: ["Land"], min: num(m[1]!) };
   if ((m = /^a player has (\d+) or less life$/.exec(text))) return { kind: "playerLifeAtMost", n: Number(m[1]) };
   if ((m = new RegExp(`^you have ${NUM} or more opponents$`).exec(text))) return { kind: "opponents", min: num(m[1]!) };
+  if (/^it's your first, second, or third turn of the game$/.test(text)) return { kind: "ownTurnAtMost", n: 3 };
   return null;
 }
 
@@ -75,6 +76,12 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     const st = parseStatic(`${capital(m[1]!)} creature ${m[3]} ${m[4]!.replace(/^an additional /, "")}.`);
     if (!st || st.condition || st.affects.kind !== "attached") return null;
     return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], subtypes: [m[2]!], text: `${m[2]} creature` } } };
+  }
+  // Champion's Helm: "As long as equipped creature is legendary, it has hexproof" (CR 205.4d).
+  if ((m = /^As long as (enchanted|equipped) creature is legendary, it (gets|has) (.+)$/.exec(text))) {
+    const st = parseStatic(`${capital(m[1]!)} creature ${m[2]} ${m[3]}.`);
+    if (!st || st.condition || st.affects.kind !== "attached") return null;
+    return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], supertypes: ["Legendary"], text: "legendary creature" } } };
   }
   // Solid Footing: "As long as enchanted creature has vigilance, it assigns combat damage equal to its toughness rather
   // than its power"; Warmonger's Chariot: "As long as equipped creature has defender, it can attack as though it didn't".
@@ -168,6 +175,9 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   }
   // "Creature spells you cast of the chosen type cost {1} less to cast" (Herald's Horn), "Creature spells of the chosen
   // type ..." (Urza's Incubator): the type chosen as the permanent entered.
+  // "Each spell you cast that's red or green costs {1} less to cast" (Goblin Anarchomancer): red or green spells you cast.
+  const thats = /^Each spell you cast that's ([a-z]+(?: or [a-z]+)?) costs (\{\d+\} (?:less|more) to cast)$/.exec(text);
+  if (thats) text = `${capital(thats[1]!)} spells you cast cost ${thats[2]}`;
   const ofChosen = / of the chosen type costs? \{/.test(text);
   if (ofChosen) text = text.replace(/ of the chosen type(?= costs? \{)/, "");
   m = /^(?:(During your turn|During turns other than yours), )?(.+?)( you cast| your opponents cast)?( with mana value \d+ or (?:greater|less))?( from your graveyard)? costs? (\{\d+\}) (less|more) to cast$/.exec(text);
@@ -458,6 +468,12 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (self && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: self[1] as "attacking" | "enchanted" | "equipped" | "modified" | "tapped" | "untapped" | "monstrous" };
   if ((m = new RegExp(`^(?:~|it) has an? ${COUNTER} counter on it$`).exec(text)) && (st.affects.kind === "self" || text.startsWith("~")))
     return { kind: "selfCounter", counter: counterKind(m[1]!) };
+  // Beastmaster Ascension: "as long as ~ has seven or more quest counters on it".
+  if ((m = new RegExp(`^~ has ${NUM} or more ${COUNTER} counters on it$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[2]!), min: num(m[1]!) };
+  // The Tron lands: "If you control an Urza's Mine and an Urza's Power-Plant" (CR 205.3i: "Urza's" and "Mine" are both
+  // land types, so one land with both; not Processing Plant, an Ulamog's Power-Plant), each of them.
+  if ((m = /^you control an Urza's (Mine|Power-Plant|Tower) and an Urza's (Mine|Power-Plant|Tower)$/.exec(text)) && m[1] !== m[2])
+    return { kind: "allOf", conds: [m[1]!, m[2]!].map((x) => ({ kind: "control" as const, who: "you" as const, filter: { kind: "object" as const, types: ["Land"], subtypes: ["Urza's"], anyOf: [{ kind: "object" as const, subtypes: [x], text: x }], text: `Urza's ${x}` }, min: 1 })) };
   if ((m = /^(you|an opponent|defending player) controls? (.+)$/.exec(text))) {
     // "At least three other enchantments" (Ephara, Ever-Sheltering) is "three or more other enchantments".
     m[2] = m[2]!.replace(/^at least (\w+) /, "$1 or more ");
@@ -537,6 +553,7 @@ function parseAffected(subject: string): Affects | null {
     let tapped: boolean | undefined;
     let legendary: boolean | undefined;
     let status: TargetSpec["status"];
+    let nontoken = false;
     for (const w of words) {
       if (COLOR_WORDS[w.toLowerCase()]) colors.push(COLOR_WORDS[w.toLowerCase()]!);
       // "Artifact creatures you control get +1/+1", "Land creatures you control have vigilance": both card types.
@@ -551,9 +568,11 @@ function parseAffected(subject: string): Affects | null {
       else if (/^(non)?legendary$/i.test(w) && legendary === undefined) legendary = w.toLowerCase() === "legendary";
       // "Enchanted creatures you control get +1/+1", "Equipped creatures", "Modified creatures" (CR 700.9).
       else if (/^(enchanted|equipped|modified)$/i.test(w) && !status) status = w.toLowerCase() as TargetSpec["status"];
+      // "Nontoken creatures you control have riot" (Rhythm of the Wild).
+      else if (/^nontoken$/i.test(w) && !nontoken) nontoken = true;
       else return null;
     }
-    const specWords = [combat, colorless ? "colorless" : undefined, tapped === undefined ? undefined : tapped ? "tapped" : "untapped", legendary === undefined ? undefined : legendary ? "legendary" : "nonlegendary", status].filter(Boolean);
+    const specWords = [nontoken ? "nontoken" : undefined, combat, colorless ? "colorless" : undefined, tapped === undefined ? undefined : tapped ? "tapped" : "untapped", legendary === undefined ? undefined : legendary ? "legendary" : "nonlegendary", status].filter(Boolean);
     const spec: TargetSpec | undefined = specWords.length
       ? {
           kind: "object",
@@ -562,6 +581,7 @@ function parseAffected(subject: string): Affects | null {
           ...(tapped !== undefined ? { tapped } : {}),
           ...(legendary === true ? { supertypes: ["Legendary"] } : legendary === false ? { notSupertypes: ["Legendary"] } : {}),
           ...(status ? { status } : {}),
+          ...(nontoken ? { token: false } : {}),
           text: `${specWords.join(" ")} creature`,
         }
       : undefined;
@@ -579,6 +599,8 @@ function parseAffected(subject: string): Affects | null {
   m = /^(Other )?([A-Z][a-z]+) you control$/.exec(x);
   if (m && CREATURE_TYPES.has(singular(m[2]!))) return { kind: "filter", types: ["Creature"], subtypes: [singular(m[2]!)], controller: "you", other: !!m[1] };
   if (/^(All creatures|Each creature)$/i.test(x)) return { kind: "filter", types: ["Creature"] };
+  // "Tokens you control have "{T}: Add {G}."" (Jaheira, Friend of the Forest): any permanent that's a token.
+  if (x === "Tokens you control") return { kind: "filter", types: [], spec: { kind: "object", token: true, text: "token" }, controller: "you" };
   // "Creature tokens get -1/-1" (Illness in the Ranks): everyone's; "creature tokens you control".
   if ((m = /^Creature tokens( you control| your opponents control)?$/.exec(x)))
     return { kind: "filter", types: ["Creature"], spec: { kind: "object", token: true, text: "creature token" }, ...(m[1] ? { controller: m[1] === " you control" ? ("you" as const) : ("opponent" as const) } : {}) };

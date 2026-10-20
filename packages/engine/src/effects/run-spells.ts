@@ -474,7 +474,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           return;
         }
       }
-      return counterOnStack(s, ctx, t.id, src, e.unless, e.exile ? "exile" : e.top ? "libraryTop" : undefined);
+      return counterOnStack(s, ctx, t.id, src, e.unless, e.exile ? "exile" : e.top ? "libraryTop" : e.hand || e.bounce ? "hand" : undefined, e.bounce);
     }
   }
 }
@@ -485,11 +485,18 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
  * (CR 605.3a). A spell that can't be countered stays, paid for or not (CR 101.2). A countered spell
  * goes to its owner's graveyard, or where "instead" says (CR 701.6a).
  */
-function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefined, by: string, unless?: UnlessPays, instead?: "exile" | "libraryTop"): "paused" | void {
+function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefined, by: string, unless?: UnlessPays, instead?: "exile" | "libraryTop" | "hand", bounce?: true): "paused" | void {
   const i = s.stack.findIndex((x) => x.id === stackId);
   const item = s.stack[i];
   if (!item) return; // it already left the stack
   const what = item.kind === "spell" ? item.description : `${item.description.split(":")[0]}'s ability`;
+  if (bounce) {
+    // Returned, not countered (Reprieve). A copy of a spell ceases to exist (CR 707.10a).
+    s.stack.splice(i, 1);
+    if (item.objectId) moveObject(s, item.objectId, "hand");
+    log(s, `${by} returns ${what} to its owner's hand.`);
+    return;
+  }
   if (item.objectId && cantBeCountered(s, item)) {
     log(s, `${item.description} can't be countered.`); // CR 101.2
     return;
@@ -501,11 +508,11 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
     if (paid) return;
   }
   s.stack.splice(i, 1);
-  if (item.objectId) moveObject(s, item.objectId, instead === "exile" ? "exile" : instead ? "library" : "graveyard", instead === "libraryTop" ? { top: true } : {});
+  if (item.objectId) moveObject(s, item.objectId, instead === "exile" ? "exile" : instead === "hand" ? "hand" : instead ? "library" : "graveyard", instead === "libraryTop" ? { top: true } : {});
   // "Discover X, where X is that spell's mana value" (Hurl into History): with the X chosen for it (CR 202.3e, rulings).
   const gone = item.objectId && s.objects[item.objectId];
   if (gone && item.x && s.resolving) (s.resolving.countered ??= {})[gone.id] = { zc: gone.zoneChanges ?? 0, x: item.x };
-  log(s, `${by} counters ${what}${!item.objectId ? "" : instead === "exile" ? " and exiles it" : instead ? " and puts it on top of its owner's library" : ""}.`);
+  log(s, `${by} counters ${what}${!item.objectId ? "" : instead === "exile" ? " and exiles it" : instead === "hand" ? " and returns it to its owner's hand" : instead ? " and puts it on top of its owner's library" : ""}.`);
 }
 
 /**

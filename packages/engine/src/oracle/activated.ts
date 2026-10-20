@@ -166,6 +166,10 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // it works only from your graveyard (CR 113.6j), where "~" is the card.
   const returnsSelf = /^(?:Return ~ from your graveyard to (?:your hand|the battlefield(?: tapped)?)|Put ~ from your graveyard into your library third from the top)\./.test(effectText);
   const fromYard = /Exile ~ from your graveyard/.test(costs) || returnsSelf || inYard;
+  // "{4}: Put this card from your hand onto the battlefield" (Talon Gates of Madara): it works only from your hand
+  // (CR 113.6k); not playing a land (CR 305.1), and nothing happens if the card has left your hand (rulings).
+  const putFromHand = effectText === "Put ~ from your hand onto the battlefield.";
+  if (putFromHand && (fromYard || tap || /~/.test(costs))) return "fail";
   if (fromYard && (tap || /Sacrifice ~|Remove /.test(costs))) return "fail";
   if (returnsSelf && /Exile ~ from your graveyard/.test(costs)) return "fail";
   // "{1}{G}, Discard this card: ..." (channel and the like): it works only while the card is in your hand, and
@@ -185,7 +189,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     .join("");
   // "Sacrifice ~: It deals damage equal to its power to ...", "Put two +1/+1 counters on ~. It deals 1 damage to any
   // target": "it" is the source, the only object named before it.
-  const body = parseBody(effectText.replace(/^It (?=deals\b)/, "~ ").replace(/^(Put [^.]+ counters? on ~\. )It (?=deals\b)/, "$1~ "), { activated: true, ...(returnsSelf || inYard ? { selfCard: true } : {}), ...(extra.some((c) => c.kind === "exileFromGraveyard" && c.linked) ? { costLinked: true } : {}) });
+  const body = putFromHand ? { targets: [], effects: [{ type: "putOntoBattlefield" as const, what: { ref: "selfCard" as const } }], text: effectText } : parseBody(effectText.replace(/^It (?=deals\b)/, "~ ").replace(/^(Put [^.]+ counters? on ~\. )It (?=deals\b)/, "$1~ "), { activated: true, ...(returnsSelf || inYard ? { selfCard: true } : {}), ...(extra.some((c) => c.kind === "exileFromGraveyard" && c.linked) ? { costLinked: true } : {}) });
   if (!body) return "fail";
   // An activated ability without a target that could add mana, and that moves no card to or from a library, is a mana
   // ability (CR 605.1a): it doesn't use the stack (605.3b). One whose other instructions aren't known to stay clear of
@@ -213,6 +217,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     ...(exileOwn ? { exileSelf: true } : {}),
     ...(fromHand ? { zone: "hand" as const, discardSelf: true } : {}),
     ...(exileFromHand ? { zone: "hand" as const, exileSelf: true } : {}),
+    ...(putFromHand ? { zone: "hand" as const } : {}),
     ...(oncePerTurn ? { oncePerTurn } : {}),
     ...(onceEver ? { onceEver: true as const } : {}),
     ...(keyword ? { keyword } : {}),

@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, activate, bear, card, cast, passUntil, putOnBattlefield, setup } from "./helpers";
-import { botActions, isFullySupported, manaAbilitiesOn, planCast, waitingOn, type GameState, type PlayerId } from "../src";
+import { botActions, isFullySupported, manaAbilitiesOn, planActivate, planCast, waitingOn, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const sword = card("Sword of Feast and Famine", "Artifact — Equipment", "{3}", { oracleText: "Equipped creature gets +2/+2 and has protection from black and from green.\nWhenever equipped creature deals combat damage to a player, that player discards a card and you untap all lands you control.\nEquip {2}" });
@@ -148,5 +148,35 @@ describe("Ragavan, Nimble Pilferer", () => {
     expect(s.objects[top]!.zone).toBe("exile");
     expect(s.objects[top]!.mayPlay).toMatchObject({ player: ap, until: "thisTurn", castOnly: true });
     expect(s.battlefield.some((id) => s.cards[s.objects[id]!.cardId]!.name === "Treasure Token" && s.objects[id]!.controller === ap)).toBe(true);
+  });
+});
+
+describe("Talon Gates of Madara", () => {
+  const gates = card("Talon Gates of Madara", "Land — Gate", "", { oracleText: "When this land enters, up to one target creature phases out.\n{T}: Add {C}.\n{1}, {T}: Add one mana of any color.\n{4}: Put this card from your hand onto the battlefield." });
+  it("parse", () => expect(isFullySupported(gates)).toBe(true));
+
+  it("{4} from your hand puts it onto the battlefield, using the stack, not a land play", () => {
+    const { s: s0, ap, ids } = setup([gates]);
+    const index = 0;
+    let s = s0;
+    for (const a of (planActivate(s, ap, ids[0]!, index) ?? [])) s = act(s, a);
+    expect(s.stack.length).toBe(1);
+    s = settleAll(s);
+    for (let i = 0; i < 5 && s.pending; i++) s = settleAll(act(s, botActions(s, s.pending.player)[0]!));
+    expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
+    expect(s.players[ap]!.landsPlayedThisTurn ?? 0).toBe(s0.players[ap]!.landsPlayedThisTurn ?? 0);
+  });
+
+  it("nothing happens if it has left your hand", () => {
+    const { s: s0, ap, ids } = setup([gates]);
+    let s = s0;
+    for (const a of planActivate(s, ap, ids[0]!, 0)!) s = act(s, a);
+    // It's discarded in response.
+    const p = s.players[ap]!;
+    p.hand.splice(p.hand.indexOf(ids[0]!), 1);
+    p.graveyard.push(ids[0]!);
+    Object.assign(s.objects[ids[0]!]!, { zone: "graveyard", zoneChanges: (s.objects[ids[0]!]!.zoneChanges ?? 0) + 1 });
+    s = settleAll(s);
+    expect(s.objects[ids[0]!]!.zone).toBe("graveyard");
   });
 });

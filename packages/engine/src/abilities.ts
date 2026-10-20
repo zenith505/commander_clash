@@ -397,6 +397,11 @@ export interface TargetSpec {
   stackAbilities?: "activated" | "triggered" | "both";
   noSpells?: true;
   /**
+   * For "spell" targets: a permanent matching this can be the target instead, "target spell or nonland permanent an
+   * opponent controls" (Sink into Stupor, Venser, Shaper Savant). One target, either kind (CR 115.1, 115.2).
+   */
+  orPermanent?: TargetSpec;
+  /**
    * "Target spell that targets a permanent you control", "... that targets you": a spell with at least one target that's
    * still that object on the battlefield and matches, or that is you (rulings on Rebuff the Wicked).
    */

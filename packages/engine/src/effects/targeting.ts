@@ -348,6 +348,8 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     const kinds = spec.types?.length ? spec.types : ["Creature", "Planeswalker", "Battle"];
     return o.zone === "battlefield" && kinds.some((k) => objIsType(s, o, k)) && objectMatches(s, { ...spec, types: [] }, o, controller, true, src);
   }
+  // "Target spell or nonland permanent": a permanent fits the permanent half.
+  if (spec.kind === "spell" && spec.orPermanent) return o.zone === "battlefield" && isLegalTarget(s, spec.orPermanent, t, controller, src);
   // A mutating creature spell's target has the same owner as the spell (CR 702.140a).
   if (spec.ownerIs !== undefined && o.owner !== spec.ownerIs) return false;
   return spec.kind === "object" && objectMatches(s, spec, o, controller, true, src);
@@ -396,7 +398,7 @@ export function legalTargets(s: GameState, spec0: TargetSpec, controller: Player
   const out: ChosenTarget[] = [];
   if (spec.kind === "player" || spec.kind === "any")
     for (const pid of livingPlayers(s)) out.push({ kind: "player", id: pid });
-  if (spec.kind === "object" || spec.kind === "any") for (const id of s.battlefield) out.push({ kind: "object", id });
+  if (spec.kind === "object" || spec.kind === "any" || spec.orPermanent) for (const id of s.battlefield) out.push({ kind: "object", id });
   if (spec.kind === "spell") for (const item of s.stack) if (item.id !== excludeStackId) out.push({ kind: "stack", id: item.id });
   if (spec.kind === "card") for (const pid of livingPlayers(s)) for (const id of player(s, pid).graveyard) out.push({ kind: "object", id });
   return out.filter((t) => isLegalTarget(s, spec, t, controller, src) && lesserPowerOk(s, spec, t, sourceId));

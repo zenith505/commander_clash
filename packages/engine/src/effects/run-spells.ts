@@ -154,6 +154,30 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       log(s, `The copy of ${defOf(s, card).name} can't be cast.`);
       return;
     }
+    case "castLinkedCopy": {
+      // Isochron Scepter: "You may copy the exiled card. If you do, you may cast the copy without paying its mana cost"
+      // (CR 707.12, 607.2a): the card exiled with this object, the same one (CR 400.7); a copy not cast ceases to exist.
+      const sc = (s.resolving!.scratch ??= {});
+      if (sc.linkedCopy !== undefined) {
+        if (s.objects[sc.linkedCopy]?.zone === "exile") removeCopy(s, sc.linkedCopy);
+        return;
+      }
+      const key = ctx.sourceId ? `${ctx.sourceId}@${ctx.sourceZc ?? 0}` : undefined;
+      const card = (key ? (s.linkedExile?.[key] ?? []) : []).map((l) => ({ o: s.objects[l.id], zc: l.zc })).find(({ o, zc }) => o?.zone === "exile" && (o.zoneChanges ?? 0) === zc)?.o;
+      if (!card) return;
+      const p = player(s, ctx.controller);
+      const copy = newObject(s, defOf(s, card), p.id, "exile");
+      copy.spellCopy = true;
+      p.exile.push(copy.id);
+      sc.linkedCopy = copy.id;
+      log(s, `${src} copies ${defOf(s, card).name}.`);
+      s.pending = { kind: "castFree", player: p.id, objectId: copy.id, source: src };
+      if (castProblem(s, p.id, copy.id) === null) return "paused";
+      s.pending = null;
+      removeCopy(s, copy.id);
+      log(s, `The copy of ${defOf(s, card).name} can't be cast.`);
+      return;
+    }
     case "castParadigm": {
       // "Create a copy of this object in exile. You may cast the copy without paying its mana cost" (CR 702.192a): one
       // not cast ceases to exist (704.5e; rulings).

@@ -580,7 +580,6 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "returnToBattlefield":
     case "unearth":
     case "castFromExileFree":
-    case "castLinkedCopy":
     case "castTargetFree":
     case "destroy":
     case "regenerate":
@@ -702,6 +701,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "delayed":
     case "castCipher":
     case "castParadigm":
+    case "castLinkedCopy":
     case "copySpell":
     case "nextCast":
     case "floatingTrigger":

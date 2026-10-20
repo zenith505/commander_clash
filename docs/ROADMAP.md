@@ -1,7 +1,7 @@
 # Roadmap
 
-21,354 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 937 of 992 (94%), top 2,000: 1,615 of 1,989 (81%), top 5,000: 3,384 of 4,988 (67%).
+21,390 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 949 of 992 (95%), top 2,000: 1,630 of 1,989 (81%), top 5,000: 3,403 of 4,988 (68%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,14 +22,20 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 95, most played first: Trouble in Pairs, Midnight Clock
-   ("when the twelfth hour counter is put on ~"), Opal Palace, Innkeeper's Talent, Springheart Nantuko, Mockingbird,
-   Spelunking ("Lands you control enter untapped" needs the player's choice of order against "enters tapped", rulings),
-   Veyran, Isochron Scepter, Bloodchief Ascension, Eldritch Evolution, Kaya's Ghostform, Terrasymbiosis, Inkshield, High
-   Tide, Forsaken Monument and Caged Sun (extra mana when a permanent is tapped for mana), Bloodletter of Aclazotz,
-   Scrap Trawler ("with lesser mana value"), Cut a Deal ("each opponent who drew a card this way"), Grim Hireling
-   ("Sacrifice X Treasures"), Descent into Avernus, Excalibur, Coat of Arms (a bonus counted for each creature it
-   affects). Smaller gaps from round 95: Spellskite and Muck Drubb ("change the target of target spell or ability",
+00. Most played first (`npm run popular`). Out after round 96, most played first: Terrasymbiosis ("Do this only once
+   each turn"), Inkshield, High Tide, Urza, Lord High Artificer, Etali, Primal Conqueror, Mizzix's Mastery, Ashaya,
+   Bloodletter of Aclazotz, Beseech the Mirror, Scrap Trawler ("with lesser mana value"), Breach the Multiverse,
+   Expressive Iteration, Tainted Pact, Tempt with Discovery, Loot, Exuberant Explorer, Forsaken Monument and Caged Sun
+   (extra mana when a permanent is tapped for mana), The Soul Stone, Throne of Eldraine, Descent into Avernus, Ripples
+   of Potential, Grim Hireling ("Sacrifice X Treasures"), Sword of Hearth and Home, Excalibur, Cut a Deal ("each
+   opponent who drew a card this way"), Coat of Arms (a bonus counted for each creature it affects). Smaller gaps from
+   round 96: Ugin's Nexus (its "would be put into a graveyard" line), Stranglehold ("can't search libraries"),
+   Gerrard's Hourglass Pendant, Gond Gate ("Gates you control"), Neoform ("with an additional +1/+1 counter"), Vivien
+   on the Hunt's +1, Elite Arcanist, Mizzix's Mastery, All Will Be One (now possible: counters know who puts them), the
+   Plans whose other lines are out (Claim the Kingdom, Political Triumph, Robot Domination, Rewrite History). Who puts
+   counters (Vorinclex, Innkeeper's Talent) is the effect's controller; for costs and "enters with" counters it's the
+   permanent's controller. With both a doubler and Vorinclex's halving on the same counters the order is picked
+   for the player (CR 616.1): halved first for -1/-1, stun and poison counters, doubled first for the rest. Smaller gaps from round 95: Spellskite and Muck Drubb ("change the target of target spell or ability",
    with a choice among several target slots), Kalitas ("its power is equal to that creature's power" tokens), Cinder
    Cloud, Intrude on the Mind (counting the cards put into the graveyard this way), face-down piles (Fortune's Favor,
    Riddles in the Dark, Curator of Destinies, Sauron's Ransom, Atris) and piles of permanents (Liliana of the Veil's

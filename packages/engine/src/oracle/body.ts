@@ -617,6 +617,14 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       chosenCards = what;
       continue;
     }
+    // "Each player sacrifices a creature or planeswalker of their choice. Each player who can't discards a card."
+    // (Plaguecrafter): those who had none to sacrifice, after the sacrifices (rulings).
+    const cant = /^Each (player|opponent) who can't discards (a card|two cards)$/.exec(s);
+    const pickPrev = effects[effects.length - 1];
+    if (cant && pickPrev?.type === "pick" && pickPrev.action === "sacrifice" && pickPrev.who.ref === (cant[1] === "player" ? "eachPlayer" : "eachOpponent") && !pickPrev.unless) {
+      effects.push({ type: "discard", who: { ref: "couldntPick" }, n: cant[2] === "a card" ? 1 : 2, random: false });
+      continue;
+    }
     // "Sacrifice a creature. If you do, ...": only if one was sacrificed (you must if you can, rulings on Victimize).
     const sacDo = /^If you do, (.+)$/.exec(s);
     const sacPrev = effects[effects.length - 1];

@@ -575,6 +575,8 @@ export type PlayerRef =
   | { ref: "notChoseThisWay"; opponents?: true }
   /** The players who did none of a punisher's options (see the punisher effect). */
   | { ref: "punished" }
+  /** "Each player who can't discards a card" (Plaguecrafter): those who had nothing to sacrifice for the "pick" before. */
+  | { ref: "couldntPick" }
   /** Gift's "the chosen player": the opponent the gift was promised to (CR 702.174a). */
   | { ref: "giftee" }
   /** "Players dealt damage this way" (Aurelia's Fury): by this spell's or ability's damage so far. */

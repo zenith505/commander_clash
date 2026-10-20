@@ -382,6 +382,8 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     }
     case "punished":
       return (s.resolving?.scratch?.punished ?? []).filter((p) => !player(s, p).lost);
+    case "couldntPick":
+      return (s.resolving?.couldntPick ?? []).filter((p) => !player(s, p).lost);
     case "damagedThisWay":
       return (s.resolving?.playersDamagedThisWay ?? []).filter((p) => !player(s, p).lost);
     case "giftee": {

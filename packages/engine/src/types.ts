@@ -1512,6 +1512,8 @@ export interface Resolving {
   did?: boolean;
   /** What its instructions sacrificed, as it last existed: "When you do, ~ deals damage equal to that creature's power". */
   sacrificedThisWay?: LastKnown[];
+  /** The players who had nothing to pick for its last "each player sacrifices ..." (PlayerRef "couldntPick"). */
+  couldntPick?: PlayerId[];
   /** The Army its amass instruction chose (CR 701.47c), for "the amassed Army". */
   amassed?: { id: ObjectId; zc: number };
   /** Whether its controller won its last clash (CR 701.30d), for "If you win, ...". */

@@ -73,6 +73,8 @@ export interface Ctx {
   lastPut?: boolean;
   /** The last sentence created tokens, any number: "Sacrifice them at the beginning of the next end step". */
   lastCreatedAny?: boolean;
+  /** The instruction before was "mill N cards" (yours): "those cards" in what follows can be the milled cards (Ripples of Undeath). */
+  afterMill?: boolean;
   /** An instant or sorcery: "other" can't mean other than its source, which isn't a permanent. */
   spell?: boolean;
   /** A "whenever a player casts a spell" trigger: "it" or "that spell" can be the spell cast. */
@@ -604,6 +606,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "It" is the spell cast only as the first instruction: "Untap ~. It gains ..." is about ~ (Pristine Skywise).
     if (si > 0) delete ctx.spellIt;
     let s = sentences[si]!.replace(/^Then,? (.)/, (_, c: string) => c.toUpperCase());
+    const last = effects[effects.length - 1];
+    ctx.afterMill = last?.type === "mill" && last.who.ref === "you";
     // "At the beginning of the next end step, sacrifice that creature" (Meek Attack) is "Sacrifice that creature at the
     // beginning of the next end step" (one instruction, no condition).
     const atNext = /^At the beginning of (the|your) next end step, ((?:sacrifice|exile|destroy|return) [^,]+)$/.exec(s);
@@ -1669,6 +1673,26 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const inner = parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       effects.push({ type: "if", cond: { kind: "milledIs", filter }, effects: inner });
+      continue;
+    }
+    // "Mill three cards. You may put a land card from among them into your hand." (Six, Eerie Gravestone), "... from among
+    // the cards milled this way ..." (Blanchwood Prowler), "You may put an instant or sorcery card milled this way into
+    // your hand" (Leyline Dowser): one of the cards your mill just put into your graveyard, if any matches.
+    const fromMilled =
+      /^[Yy]ou may put (an? .+?) from among (?:them|the cards milled this way|the milled cards|those cards) into your hand$/.exec(s) ?? /^[Yy]ou may put (an? .+?) milled this way into your hand$/.exec(s);
+    if (fromMilled) {
+      const prev = effects[effects.length - 1];
+      const filter = parseSearchFilter(fromMilled[1]!.replace(/^an? /, ""));
+      if (prev?.type !== "mill" || prev.who.ref !== "you" || filter === null) return null;
+      effects.push({ type: "chooseFromGraveyard", n: 1, upTo: true, milled: true, ...(filter ? { filter } : {}) });
+      // "If you don't, put a +1/+1 counter on this creature." (Ainok Wayfarer): no card was put into your hand.
+      const didnt = /^If you don't, (.+)$/.exec(sentences[si + 1] ?? "");
+      if (didnt) {
+        const inner = parseOne(capital(didnt[1]!), ctx);
+        if (!inner) return null;
+        effects.push({ type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner });
+        si++;
+      }
       continue;
     }
     const otherwise = /^Otherwise, (.+)$/.exec(s);

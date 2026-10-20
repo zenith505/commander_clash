@@ -1324,10 +1324,14 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // Only permanent cards can be put onto the battlefield (CR 110.4b).
         const mvMax = e.mvMax === undefined ? undefined : amountNow(s, e.mvMax, ctx);
         const filter = e.filter && mvMax !== undefined ? { ...e.filter, manaValue: { max: mvMax }, text: e.filter.text.replace(/ X or less$/, ` ${mvMax} or less`) } : e.filter;
-        const all = p.graveyard.filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (e.dest !== "battlefield" || isPermanentCard(defOf(s, obj(s, id)))));
+        // Only the cards milled just before, still in the graveyard (CR 400.7).
+        const milled = (id: ObjectId) => !e.milled || !!s.resolving!.milled?.some((m) => m.id === id && (obj(s, id).zoneChanges ?? 0) === m.zc);
+        const all = p.graveyard.filter((id) => milled(id) && (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (e.dest !== "battlefield" || isPermanentCard(defOf(s, obj(s, id)))));
         // "With different names": one card of each name is offered (cards of one name are alike).
         const cards = e.oneEach ? all.filter((id, i) => all.findIndex((x) => sameName(defOf(s, obj(s, x)).name, defOf(s, obj(s, id)).name)) === i) : all;
         const max = e.distinctManaValues ? new Set(cards.map((id) => defMv(defOf(s, obj(s, id))))).size : Math.min(e.n, cards.length);
+        // "If you don't" after a card from among the milled ones (Ainok Wayfarer): whether one was put into your hand.
+        if (e.milled) s.resolving!.did = false;
         if (!max) return;
         const kind = filter?.text ?? "card";
         const what = e.distinctManaValues
@@ -1353,6 +1357,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const names = found.map((id) => defOf(s, obj(s, id)).name).join(", ");
       if (found.length) log(s, e.dest === "exile" ? `${p.name} exiles ${names} from their graveyard.` : e.dest === "libraryTop" ? `${p.name} puts ${names} from their graveyard on top of their library.` : `${p.name} returns ${names} from their graveyard to their hand.`);
       for (const id of found) (e.dest === "libraryTop" ? moveObject(s, id, "library", { top: true }) : moveObject(s, id, e.dest ?? "hand"));
+      if (e.milled) s.resolving!.did = found.length > 0;
       return;
     }
     case "reorderGraveyard": {

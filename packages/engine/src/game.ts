@@ -2680,7 +2680,8 @@ function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean, fac
     log(s, `${p.name} reveals ${nameOf(s, shown)} so ${d.name} enters untapped.`);
   }
   const from = o.zone === "exile" || o.zone === "graveyard" ? ` from ${o.zone === "exile" ? "exile" : "their graveyard"}` : "";
-  moveObject(s, id, "battlefield", { untapped, ...(face !== undefined ? { face } : {}) });
+  // Under the control of the player who plays it (CR 305.1, 110.2), an opponent's card from exile too (Opposition Agent).
+  moveObject(s, id, "battlefield", { controller: p.id, untapped, ...(face !== undefined ? { face } : {}) });
   log(s, `${p.name} plays ${d.name}${from}${obj(s, id).tapped ? " (tapped)" : ""}.`);
   fireEvent(s, { type: "landPlayed", player: p.id, id });
 }

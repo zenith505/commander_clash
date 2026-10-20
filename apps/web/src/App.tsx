@@ -3256,6 +3256,8 @@ function LibrarySearch({
                   ? `${pending.source}: ${pending.min ? "return" : "you may return"} ${pending.what} from your graveyard to ${pending.fromGraveyard === "battlefield" ? "the battlefield" : "your hand"}`
                   : zones
                     ? `${pending.source}: search ${whose}'s graveyard, hand and library for ${pending.what} to exile`
+                    : pending.controlling !== undefined
+                    ? `${pending.source}: you control ${s.players[pending.controlling]!.name}'s search. Find ${pending.what} in their library`
                     : `${pending.source}: search your library for ${pending.what}`}
           </strong>
           <span className="muted">
@@ -3279,6 +3281,7 @@ function LibrarySearch({
                   : pending.also?.length
                     ? `Found ${found.length} of ${pending.max}. The ${pending.also.length} in the graveyard ${pending.also.length === 1 ? "is" : "are"} exiled too.`
                     : `Found ${found.length} of ${pending.max}.`}
+            {pending.foundExiled ? (pending.controlling !== undefined ? " They're exiled, and you may play them." : " They're exiled, and an opponent may play them.") : ""}
           </span>
           <button disabled={found.length < pending.min} onClick={() => onDone(found)}>
             {pending.reveal ? (found.length ? "Reveal" : "Reveal none") : pending.bottom ? (found.length ? "Put on bottom" : "Keep them all") : found.length || pending.min > 0 ? "Done" : dig || pending.fromHand || pending.fromGraveyard ? "Take none" : "Find nothing"}

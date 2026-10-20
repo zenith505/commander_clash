@@ -1531,6 +1531,14 @@ export function compile(d: CardDef): CompiledCard {
       out.opponentsOnlyFromHand = true;
       continue;
     }
+    if (line === "You control your opponents while they're searching their libraries.") {
+      out.controlsOpponentSearches = true;
+      continue;
+    }
+    if (line === "While an opponent is searching their library, they exile each card they find. You may play those cards for as long as they remain exiled, and you may spend mana as though it were mana of any color to cast them.") {
+      out.exilesOpponentFinds = true;
+      continue;
+    }
     if (line === "Creatures you control can boast twice during each of your turns rather than once.") {
       out.boastTwice = true;
       continue;

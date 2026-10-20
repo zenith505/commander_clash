@@ -3383,6 +3383,13 @@ export interface CompiledCard {
   drawEmptyWins?: true;
   /** "Your opponents can't cast spells from anywhere other than their hands." (Drannith Magistrate) */
   opponentsOnlyFromHand?: true;
+  /** Opposition Agent: "You control your opponents while they're searching their libraries." (CR 723.2) */
+  controlsOpponentSearches?: true;
+  /**
+   * Opposition Agent: "While an opponent is searching their library, they exile each card they find. You may play those
+   * cards for as long as they remain exiled, and you may spend mana as though it were mana of any color to cast them."
+   */
+  exilesOpponentFinds?: true;
   /**
    * "The first time you would draw a card each turn, instead look at the top two cards of your library. Put one of them
    * into your graveyard and the other back on top of your library. Then draw a card." (Scion of Halaster's grant).

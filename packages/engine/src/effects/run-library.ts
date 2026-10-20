@@ -1,5 +1,6 @@
 import type { Effect, PlayerRef, SearchDest } from "../abilities";
-import { cardIdOf, defOf, isType } from "../cards";
+import { abilitiesOf, cardIdOf, defOf, isType } from "../cards";
+import { controllerOf } from "../layers";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { gainLife, log, loseLife, moveObject, enterTogether, obj, opponents, payableLife, player } from "../game";
@@ -450,9 +451,10 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (e.library && theirs === undefined) return;
       const libOf = (pid: PlayerId) => player(s, theirs ?? pid);
       if (sc.found && queue.length) {
-        searchedBy.push({ pid: queue.shift()!, found: sc.found });
+        searchedBy.push({ pid: queue.shift()!, found: sc.found, ...(sc.searchExileFor !== undefined ? { exiledFor: sc.searchExileFor } : {}) });
         sc.found = undefined;
         sc.may = undefined;
+        sc.searchExileFor = undefined;
       }
       // "Each player may search": a player who declines doesn't search, or shuffle (rulings on Veteran Explorer).
       while (e.may && queue.length && sc.may !== true) {
@@ -488,17 +490,22 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (e.oneEach) cards = cards.filter((id, i) => cards.findIndex((x) => sameName(defOf(s, obj(s, x)).name, defOf(s, obj(s, id)).name)) === i);
         const max = Math.min(n, cards.length);
         const min = filter || e.upTo ? 0 : max;
+        // Opposition Agent: searching their own library, an opponent of its controller is controlled by them (CR 723.5).
+        const agent = !yardOnly && libOf(p.id) === p ? searchAgent(s, p.id) : undefined;
+        if (agent?.exileFor !== undefined) sc.searchExileFor = agent.exileFor;
         const kind = (filter?.text ?? "card").replace(/~/g, src);
         const what = e.oneOfEach ? `up to a ${kind}` : `${e.upTo ? "up to " : ""}${n === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${n >= 99 ? "any number of" : n} ${kind.replace(/\bcard\b/, "cards")}`}`;
         s.pending = {
           kind: "searchLibrary",
-          player: p.id,
+          player: agent?.controller ?? p.id,
           source: src,
           what,
           cards,
           min,
           max,
-          ...(e.others ? { firstTo: describeDest(e.dest), othersTo: describeDest(e.others) } : {}),
+          ...(agent?.controller !== undefined ? { controlling: p.id } : {}),
+          ...(agent?.exileFor !== undefined ? { foundExiled: true as const } : {}),
+          ...(e.others && agent?.exileFor === undefined ? { firstTo: describeDest(e.dest), othersTo: describeDest(e.others) } : {}),
           ...(e.shareLandType ? { shareLandType: true as const } : {}),
           ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}),
         };
@@ -509,13 +516,15 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const searchers = searchedBy.map((x) => x.pid);
       const foundBy = (pid: PlayerId) => searchedBy.find((x) => x.pid === pid)!.found;
       // "Target opponent chooses two of those cards" (Gifts Ungiven): from the revealed cards, before any is put anywhere.
+      const exiledFor = (pid: PlayerId) => searchedBy.find((x) => x.pid === pid)!.exiledFor;
       let picked: ObjectId[] = [];
-      if (e.split && searchers.length === 1) {
+      // Exiled by Opposition Agent, the found cards can't be seen by the rest of the effect (rulings).
+      if (e.split && searchers.length === 1 && exiledFor(searchers[0]!) === undefined) {
         const got = opponentPicks(s, ctx, src, e.split.chooser, searchers[0]!, foundBy(searchers[0]!), foundBy(searchers[0]!), e.split.n, e.split.to, e.dest);
         if (got === "paused") return "paused";
         picked = got;
       }
-      const dest = (pid: PlayerId, id: ObjectId) => (picked.includes(id) ? e.split!.to : foundBy(pid).indexOf(id) > 0 && e.others ? e.others : e.landTo && isType(defOf(s, obj(s, id)), "Land") ? e.landTo : e.dest);
+      const dest = (pid: PlayerId, id: ObjectId): SearchDest => (exiledFor(pid) !== undefined ? { zone: "exile" } : picked.includes(id) ? e.split!.to : foundBy(pid).indexOf(id) > 0 && e.others ? e.others : e.landTo && isType(defOf(s, obj(s, id)), "Land") ? e.landTo : e.dest);
       const onto = searchers.flatMap((pid) => foundBy(pid).filter((id) => dest(pid, id).zone === "battlefield").map((id) => ({ o: obj(s, id), under: pid })));
       const hosts = chooseAuraHosts(s, onto, src);
       if (hosts === "paused") return "paused";
@@ -527,11 +536,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         lib.library = lib.library.filter((id) => !found.includes(id));
         const names = found.map((id) => defOf(s, obj(s, id)).name);
         // Found cards aren't revealed unless the effect says so (CR 701.23e).
-        const shown = e.reveal || e.dest.zone === "battlefield" || e.dest.zone === "exile" ? ` (${names.join(", ")})` : "";
+        const shown = e.reveal || e.dest.zone === "battlefield" || e.dest.zone === "exile" || exiledFor(pid) !== undefined ? ` (${names.join(", ")})` : "";
         const whose = lib === p ? "their" : `${lib.name}'s`;
         const yardOnly = sc.searchZones === "graveyard";
         const where = yardOnly ? `${whose} graveyard` : e.orGraveyard ? `${whose} library and graveyard` : `${whose} library`;
-        log(s, `${p.name} searches ${where}${found.length ? `, finds ${found.length === 1 ? "a card" : `${found.length} cards`}${shown}` : " and finds nothing"}${searchers.length > 1 || yardOnly ? "" : lib === p ? ", and shuffles" : `, and ${lib.name} shuffles`}.`);
+        log(s, `${p.name} searches ${where}${found.length ? `, finds ${found.length === 1 ? "a card" : `${found.length} cards`}${shown}${exiledFor(pid) !== undefined ? ` and exiles ${found.length === 1 ? "it" : "them"} for ${player(s, exiledFor(pid)!).name} to play` : ""}` : " and finds nothing"}${searchers.length > 1 || yardOnly ? "" : lib === p ? ", and shuffles" : `, and ${lib.name} shuffles`}.`);
         for (const id of found) moves.push({ pid, id });
         if (searchers.length === 1 && !yardOnly) shuffleLibrary(s, lib);
       }
@@ -551,6 +560,12 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             moveObject(s, id, "battlefield", { controller: pid, ...(to.tapped ? { tapped: true } : {}), ...hosts.get(id), ...(extra ? { counters: { [to.counters!.counter]: extra } } : {}) });
             if (r.created && obj(s, id).zone === "battlefield") r.created.push(id);
           } else moveObject(s, id, to.zone);
+          // Opposition Agent: exiled face up (CR 406.3), its controller may play it for as long as it remains exiled, a land
+          // too (following the normal timing rules) and spend mana as though it were mana of any color to cast it (CR
+          // 609.4b: colored symbols paid with any mana).
+          const agentPid = exiledFor(pid);
+          const o = obj(s, id);
+          if (agentPid !== undefined && o.zone === "exile") o.mayPlay = { player: agentPid, zc: o.zoneChanges ?? 0, until: "exiled", turn: s.turn, anyType: true };
         }
       });
       // "Then shuffles": after the cards are put onto the battlefield, each player who searched (CR 701.23, 701.20).
@@ -740,6 +755,25 @@ function clashValue(s: GameState, id: ObjectId): number {
   return defOf(s, obj(s, id))
     .manaCost.split(" // ")
     .reduce((n, half) => n + manaValue(parseManaCost(half)), 0);
+}
+
+/**
+ * Opposition Agent, for a player about to search their own library: the controller of the one that entered the
+ * battlefield most recently among those controlled by that player's opponents controls them during the search (CR 723.2,
+ * rulings). Several Agents each try to exile what they find; the owner of the cards chooses which applies (CR 616.1), and
+ * that's the controlling player, who takes them for themselves.
+ */
+function searchAgent(s: GameState, pid: PlayerId): { controller?: PlayerId; exileFor?: PlayerId } | undefined {
+  const agents = s.battlefield
+    .map((id) => obj(s, id))
+    .filter((o) => controllerOf(s, o) !== pid && !player(s, controllerOf(s, o)).lost)
+    .sort((a, b) => b.timestamp - a.timestamp);
+  const controller = agents.find((o) => abilitiesOf(s, o).controlsOpponentSearches);
+  const exilers = agents.filter((o) => abilitiesOf(s, o).exilesOpponentFinds);
+  if (!controller && !exilers.length) return undefined;
+  const by = controller && controllerOf(s, controller);
+  const exiler = exilers.find((o) => controllerOf(s, o) === by) ?? exilers[0];
+  return { ...(by !== undefined ? { controller: by } : {}), ...(exiler ? { exileFor: controllerOf(s, exiler) } : {}) };
 }
 
 const DEST_RANK: Record<string, number> = { battlefield: 4, hand: 3, libraryTop: 2, graveyard: 1, exile: 0 };

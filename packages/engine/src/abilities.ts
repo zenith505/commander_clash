@@ -1747,6 +1747,13 @@ export type Effect =
       unless?: UnlessPays;
       exile?: boolean;
       top?: boolean;
+      /** Remand: "If that spell is countered this way, put it into its owner's hand instead of into that player's graveyard." */
+      hand?: true;
+      /**
+       * "Return target spell to its owner's hand" (Reprieve): not a counter, so a spell that can't be countered goes too
+       * (CR 101.2 doesn't apply); otherwise like Remand's.
+       */
+      bounce?: true;
       /** "Counter target spell if its mana value is X" (Disrupting Shoal): only then, checked as it resolves. */
       ifMvX?: true;
       /** "Counter target spell if it has the same name as that card" (Jester's Scepter): the card put into a graveyard to pay the cost. */
@@ -2979,7 +2986,7 @@ export interface CastFromGraveyard {
  */
 export type CountMod =
   | { what: "tokens"; who: "you" | "any"; op: "double" | "plusOne"; subtype?: string }
-  | { what: "counters"; counter?: CounterKind; on: "creature" | "permanent"; who: "you" | "any"; op: "double" | "plusOne" | "minusOne"; other?: boolean };
+  | { what: "counters"; counter?: CounterKind; on: "creature" | "permanent" | "artifactOrCreature"; who: "you" | "any"; op: "double" | "plusOne" | "minusOne"; other?: boolean };
 
 /**
  * What a gift gives the chosen opponent (CR 702.174d-i): "Gift a card" means they draw a card, "Gift a Food" that they

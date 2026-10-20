@@ -1854,7 +1854,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "You may play the exiled card without paying its mana cost" asks as it plays it (see the playLinked effect).
     // "You may play an additional land this turn" is a permission, not a choice made now (CR 305.2a).
     // "You may draw a card unless that player pays {1}" (Rhystic Study): they decide first (see the punisher sentences).
-    const may = /^[Yy]ou may (?!play the exiled card |play (?:an|up to \w+) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target )(.+)$/.exec(s);
+    const may = /^[Yy]ou may (?!play the exiled card |play (?:an|up to \w+) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast spells this turn as though they had flash$)(.+)$/.exec(s);
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
       // don't control": ~ does it, if you choose.
@@ -2092,11 +2092,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     }
     // "If that spell is countered this way, exile it instead of putting it into its owner's graveyard" (CR 701.6a),
     // "... put it on top of its owner's library instead of into that player's graveyard" (Memory Lapse).
-    const lapse = /^If that spell is countered this way, (?:(exile it) instead of putting it into its owner's graveyard|put it on top of its owner's library instead of into that player's graveyard)$/i.exec(s);
+    // Remand: "... put it into its owner's hand instead of into that player's graveyard".
+    const lapse = /^If that spell is countered this way, (?:(exile it) instead of putting it into its owner's graveyard|put it (on top of its owner's library|into its owner's hand) instead of into that player's graveyard)$/i.exec(s);
     if (lapse) {
       const last = effects[effects.length - 1];
-      if (last?.type !== "counterSpell") return null;
+      if (last?.type !== "counterSpell" || last.bounce) return null;
       if (lapse[1]) last.exile = true;
+      else if (lapse[2] === "into its owner's hand") last.hand = true;
       else last.top = true;
       continue;
     }

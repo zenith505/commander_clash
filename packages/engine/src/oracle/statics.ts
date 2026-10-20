@@ -76,6 +76,12 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     if (!st || st.condition || st.affects.kind !== "attached") return null;
     return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], subtypes: [m[2]!], text: `${m[2]} creature` } } };
   }
+  // Champion's Helm: "As long as equipped creature is legendary, it has hexproof" (CR 205.4d).
+  if ((m = /^As long as (enchanted|equipped) creature is legendary, it (gets|has) (.+)$/.exec(text))) {
+    const st = parseStatic(`${capital(m[1]!)} creature ${m[2]} ${m[3]}.`);
+    if (!st || st.condition || st.affects.kind !== "attached") return null;
+    return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], supertypes: ["Legendary"], text: "legendary creature" } } };
+  }
   // Solid Footing: "As long as enchanted creature has vigilance, it assigns combat damage equal to its toughness rather
   // than its power"; Warmonger's Chariot: "As long as equipped creature has defender, it can attack as though it didn't".
   if ((m = /^As long as (enchanted|equipped) creature has (\w+), it (assigns combat damage .+|can attack as though .+)$/.exec(text)) && (SUPPORTED_KEYWORDS as readonly string[]).includes(capital(m[2]!))) {

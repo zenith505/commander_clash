@@ -37,9 +37,11 @@ function apply(n: number, ops: CountMod["op"][]): number {
 export function countersToPut(s: GameState, o: GameObject, kind: string, n: number, entering = false): number {
   if (n <= 0 || o.zone !== "battlefield") return n;
   const owner = controllerOf(s, o);
-  const isCreature = characteristics(s, o).types.includes("Creature");
+  const types = characteristics(s, o).types;
+  const isCreature = types.includes("Creature");
+  const fits = (on: "creature" | "permanent" | "artifactOrCreature") => on === "permanent" || isCreature || (on === "artifactOrCreature" && types.includes("Artifact"));
   const ops = modsInPlay(s)
-    .filter(({ mod, controller, source }) => mod.what === "counters" && (mod.counter === undefined || mod.counter === kind) && (mod.on === "permanent" || isCreature) && (mod.who === "any" || controller === owner) && !((mod.other || entering) && source === o.id))
+    .filter(({ mod, controller, source }) => mod.what === "counters" && (mod.counter === undefined || mod.counter === kind) && fits(mod.on) && (mod.who === "any" || controller === owner) && !((mod.other || entering) && source === o.id))
     .map(({ mod }) => mod.op);
   return apply(n, ops);
 }

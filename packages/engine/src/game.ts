@@ -3278,6 +3278,7 @@ export function flashGranted(s: GameState, pid: PlayerId, d: CardDef): boolean {
   // "This spell has flash as long as you've committed a crime this turn" (CompiledCard.flashIf): about the player only.
   const own = compileCard(d).flashIf;
   if (own && staticConditionNow(s, own, "", pid)) return true;
+  if (turnRule(s, pid, "flash")) return true;
   return s.battlefield.some((id) => {
     const o = obj(s, id);
     return controllerOf(s, o) === pid && !!abilitiesOf(s, o).flashFor?.some((spec) => printedMatches(spec, d));

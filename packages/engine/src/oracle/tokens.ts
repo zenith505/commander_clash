@@ -79,8 +79,9 @@ export function parseCountMod(line: string): CountMod | undefined {
   m = /^If you would create one or more ([A-Z][a-z]+) tokens, instead create those tokens plus an additional \1 token\.$/.exec(line);
   if (m) return { what: "tokens", who: "you", op: "plusOne", subtype: m[1]! };
   // Kami of Whispered Hopes: "on a permanent you control".
-  m = /^If one or more \+1\/\+1 counters would be put on (another|a) (creature|permanent)( you control)?, (twice that many|that many plus one) \+1\/\+1 counters are put on (?:it|that creature|that permanent) instead\.$/.exec(line);
-  if (m) return { what: "counters", counter: "+1/+1", on: m[2] as "creature" | "permanent", who: m[3] ? "you" : "any", op: m[4] === "twice that many" ? "double" : "plusOne", ...(m[1] === "another" ? { other: true } : {}) };
+  // Ozolith, the Shattered Spire: "on an artifact or creature you control".
+  m = /^If one or more \+1\/\+1 counters would be put on (another|an?) (creature|permanent|artifact or creature)( you control)?, (twice that many|that many plus one) \+1\/\+1 counters are put on (?:it|that creature|that permanent) instead\.$/.exec(line);
+  if (m) return { what: "counters", counter: "+1/+1", on: m[2] === "artifact or creature" ? "artifactOrCreature" : (m[2] as "creature" | "permanent"), who: m[3] ? "you" : "any", op: m[4] === "twice that many" ? "double" : "plusOne", ...(m[1] === "another" ? { other: true } : {}) };
   // Vizier of Remedies.
   if (line === "If one or more -1/-1 counters would be put on a creature you control, that many -1/-1 counters minus one are put on it instead.")
     return { what: "counters", counter: "-1/-1", on: "creature", who: "you", op: "minusOne" };

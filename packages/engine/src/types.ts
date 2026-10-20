@@ -1401,7 +1401,8 @@ export interface Chosen {
 export interface TurnRule {
   turn: number;
   player: PlayerId;
-  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin";
+  /** "flash": "You may cast spells this turn as though they had flash" (Borne Upon a Wind, Emergence Zone; CR 702.8a). */
+  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "flash";
 }
 
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */

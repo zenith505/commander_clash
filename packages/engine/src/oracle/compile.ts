@@ -1319,7 +1319,8 @@ export function compile(d: CardDef): CompiledCard {
     }
     const flashFor = /^You may cast (.*?)spells as though they had flash\.$/.exec(line);
     if (flashFor) {
-      const spec = parseTargetPhrase(`${flashFor[1]}spell`);
+      // "Aura and Equipment spells" (Sigarda's Aid): each of them.
+      const spec = parseTargetPhrase(`${flashFor[1]!.replace(/ and /g, " or ")}spell`);
       if (spec?.kind === "spell" && !spec.controller) {
         (out.flashFor ??= []).push({ ...spec, text: `${flashFor[1]}spells` });
         continue;

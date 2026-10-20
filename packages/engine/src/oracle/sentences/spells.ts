@@ -290,6 +290,11 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const spec = mixedStackSpec(m[1]!);
     return spec && [{ type: "counterSpell", index: addTarget(ctx, spec) }];
   }
+  // "Return target spell to its owner's hand" (Reprieve): it leaves the stack without being countered.
+  if ((m = /^Return target (.*?spell) to its owner's hand$/i.exec(s))) {
+    const spec = parseTargetPhrase(m[1]!);
+    return spec?.kind === "spell" && !spec.xRange ? [{ type: "counterSpell", index: addTarget(ctx, spec), bounce: true }] : null;
+  }
   // "Counter target spell that targets a permanent you control" (Rebuff the Wicked), "... that targets you".
   if ((m = /^Counter target spell that targets (you|an? .+)$/i.exec(s))) {
     const what = m[1] === "you" ? "you" : parseTargetPhrase(m[1]!.replace(/^an? /, ""));

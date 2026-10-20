@@ -62,6 +62,10 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       if (m[2]) Object.assign(dig, restOf(m[2]));
     } else if (/^You may put one of (?:them|those cards) back on top of your library$/.test(s)) {
       Object.assign(dig, { count: 1, upTo: true, into: "libraryTop" });
+    } else if ((m = new RegExp(`^Put up to one of them on top of your library(?: and the rest ${REST})?$`).exec(s))) {
+      // Thassa's Oracle.
+      Object.assign(dig, { count: 1, upTo: true, into: "libraryTop" });
+      if (m[1]) Object.assign(dig, restOf(m[1]));
     } else return null;
     return dig.rest ? (dig as Extract<Effect, { type: "dig" }>) : "more";
   }

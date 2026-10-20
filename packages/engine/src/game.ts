@@ -1681,6 +1681,13 @@ function drawOne(s: GameState, pid: PlayerId): boolean {
   const p = player(s, pid);
   const top = p.library[0];
   if (!top) {
+    // Laboratory Maniac: the draw is replaced, so it isn't a draw from an empty library, even if the win is stopped
+    // (Platinum Angel) (CR 614.1a, 104.2b).
+    const maniac = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawEmptyWins);
+    if (maniac) {
+      winGame(s, pid, nameOf(s, maniac));
+      return false;
+    }
     p.drewFromEmptyLibrary = true; // CR 704.5b
     return false;
   }

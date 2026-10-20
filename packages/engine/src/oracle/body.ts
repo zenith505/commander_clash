@@ -1,6 +1,6 @@
 import { allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose } from "../abilities";
 import { substituteX } from "../amounts";
-import { num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital } from "./words";
+import { num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS } from "./words";
 import { CHOSEN_KEYWORD, CHOSEN_PROTECTION, THAT_PLAYER_PROTECTION } from "../keywords";
 import { parseStaticCondition } from "./statics";
 import { parseBoundCount, parseCount } from "./counts";
@@ -1133,6 +1133,15 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       digWhere = def ?? undefined;
       continue;
     }
+    // Thassa's Oracle: "If X is greater than or equal to the number of cards in your library, you win the game", X being
+    // the look's, counted again as it resolves (rulings).
+    const xVsLibrary = digWhere && !dig ? /^If X is greater than or equal to the number of cards in your library, (.+)$/.exec(s) : null;
+    if (xVsLibrary) {
+      const fx = parseOne(capital(xVsLibrary[1]!), ctx);
+      if (!fx) return null;
+      effects.push({ type: "if", cond: { kind: "amountsCompare", a: digWhere!, atLeast: { count: { kind: "cardsInLibrary", who: { ref: "you" } } } }, effects: fx });
+      continue;
+    }
     if (dig) {
       const done = parseDig(s, dig, ctx, digWhere);
       if (!done) return null;
@@ -1290,6 +1299,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const amount = parseCount(atMost[3]!, ctx);
       if (!amount || ctx.targets.length !== i + 1) return null;
       const filter: TargetSpec = { kind: t.kind, bound: { key, at: "most", amount }, text: `${atMost[2]} less than or equal to ${atMost[3]}` };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: fx });
+      continue;
+    }
+    // "Counter target spell if it's blue", "Destroy target permanent if it's blue" (Pyroblast): any spell or permanent can
+    // be targeted, and its color is checked as it resolves (rulings).
+    const ifColor = /^(.+) if it's (white|blue|black|red|green)$/.exec(s);
+    if (ifColor) {
+      const fx = parseOne(ifColor[1]!, ctx);
+      const i = ctx.targets.length - 1;
+      const t = ctx.targets[i];
+      if (!fx || i !== curTargets || !t || (t.kind !== "spell" && t.kind !== "object") || t.optional || t.many || t.divided || !fx.every((e) => mentionsTarget(e, i))) return null;
+      const filter: TargetSpec = { kind: t.kind, types: [], notTypes: [], notColors: [], colors: [COLOR_WORDS[ifColor[2]!]!], text: ifColor[2]! };
       effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: fx });
       continue;
     }

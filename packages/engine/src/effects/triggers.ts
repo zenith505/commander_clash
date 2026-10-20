@@ -565,13 +565,16 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (ev.sacrificed && ev.snapshot && ev.chars) {
       const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) };
       const dying = { o: ev.snapshot, c: ev.chars };
-      const consider = (src: GameObject, triggers?: TriggeredAbility[]) =>
-        add(src, ev.controller, (e, t) => e === "youSacrifice" && !!t.sacrifices && diesMatches(s, t.sacrifices, src.id, undefined, dying, ev.controller), triggers, undefined, o, lki);
-      for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === ev.controller) consider(obj(s, id));
+      // "Whenever a player sacrifices", "whenever an opponent sacrifices": the other players' permanents too, each
+      // triggering for its own controller, "that player" being the one who sacrificed it.
+      const byOk = (by: "any" | "opponent" | undefined, watcher: PlayerId) => (watcher === ev.controller ? by !== "opponent" : by === "any" || (by === "opponent" && opponents(s, watcher).includes(ev.controller)));
+      const consider = (src: GameObject, watcher: PlayerId, triggers?: TriggeredAbility[]) =>
+        add(src, watcher, (e, t) => e === "youSacrifice" && !!t.sacrifices && byOk(t.sacrifices.by, watcher) && diesMatches(s, t.sacrifices, src.id, undefined, dying, ev.controller), triggers, undefined, o, lki, undefined, undefined, { player: ev.controller });
+      for (const id of s.battlefield) consider(obj(s, id), controllerOf(s, obj(s, id)));
       for (const left of s.leftTogether ?? []) {
         const src = s.objects[left.id];
-        if (!src || src.zone === "battlefield" || left.controller !== ev.controller) continue;
-        consider(src, withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
+        if (!src || src.zone === "battlefield") continue;
+        consider(src, left.controller, withGranted(left.hadAbilities ? compileCard(left.card ? s.cards[left.card]! : defOf(s, src)) : NO_ABILITIES, left.granted ?? []).triggers);
       }
     }
   } else if (ev.type === "blocksDeclared") {

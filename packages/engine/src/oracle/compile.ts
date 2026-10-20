@@ -1124,6 +1124,10 @@ export function compile(d: CardDef): CompiledCard {
       out.firstDrawLook = true;
       continue;
     }
+    if (line === "If you would draw a card while your library has no cards in it, you win the game instead.") {
+      out.drawEmptyWins = true;
+      continue;
+    }
     if (line === "If you would draw a card except the first one you draw in each of your draw steps, draw two cards instead.") {
       out.drawTwoInstead = true;
       continue;

@@ -2115,6 +2115,8 @@ export type SpellCondition =
    * Graverobber): a number counted as it resolves, which may name its targets (CR 608.2c).
    */
   | { kind: "amountNow"; amount: Amount; min?: number; max?: number }
+  /** "If X is greater than or equal to the number of cards in your library" (Thassa's Oracle): both counted as it resolves. */
+  | { kind: "amountsCompare"; a: Amount; atLeast: Amount }
   /** "If it's a creature" about target `index` (Mythos of Nethroi): that permanent as it is now, still a legal target. */
   | { kind: "targetIs"; index: number; filter: TargetSpec }
   /**
@@ -2497,7 +2499,8 @@ export interface TriggeredAbility {
    * For "youSacrifice": what its controller sacrificed (CR 701.21a), as it last existed on the battlefield, wherever it
    * went. The card is the subject ("exile it").
    */
-  sacrifices?: { filter: TargetSpec; other?: boolean; orSelf?: boolean };
+  /** `by`: "whenever a player sacrifices" (any), "whenever an opponent sacrifices" (opponent); otherwise "whenever you sacrifice". */
+  sacrifices?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; by?: "any" | "opponent" };
   /** Persist/undying's "if it had no -1/-1 counters on it" (an intervening if, CR 603.4), from last known information; "any": "if it had no counters on it" (Unstoppable Slasher). */
   ifNoCounter?: "+1/+1" | "-1/-1" | "any";
   /** For "selfToGraveyard": "is put into your graveyard", so only if its controller owns it (rulings on Enigma Sphinx). */
@@ -3177,6 +3180,8 @@ export interface CompiledCard {
   lifeFloor?: number;
   /** "If you would draw a card except the first one you draw in each of your draw steps, draw two cards instead." */
   drawTwoInstead?: true;
+  /** "If you would draw a card while your library has no cards in it, you win the game instead." (Laboratory Maniac, CR 614.1a) */
+  drawEmptyWins?: true;
   /**
    * "The first time you would draw a card each turn, instead look at the top two cards of your library. Put one of them
    * into your graveyard and the other back on top of your library. Then draw a card." (Scion of Halaster's grant).

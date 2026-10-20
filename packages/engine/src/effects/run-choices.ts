@@ -274,6 +274,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? voteWins(s, e.cond.option, !!e.cond.orTie)
             : e.cond.kind === "amountNow"
             ? ((n) => (e.cond.kind !== "amountNow" ? false : (e.cond.min === undefined || n >= e.cond.min) && (e.cond.max === undefined || n <= e.cond.max)))(amountNow(s, e.cond.amount, ctx))
+            : e.cond.kind === "amountsCompare"
+            ? amountNow(s, e.cond.a, ctx) >= amountNow(s, e.cond.atLeast, ctx)
             : e.cond.kind === "xAtLeast"
             ? (ctx.x ?? 0) >= e.cond.n
             : kickedMatches(ctx.kicked, e.cond);

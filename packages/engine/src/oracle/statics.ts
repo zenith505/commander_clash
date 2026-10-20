@@ -411,6 +411,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^you didn't attack with a creature this turn$/.test(text)) return { kind: "attackedThisTurn", not: true };
   if (/^you've committed a crime this turn$/.test(text)) return { kind: "committedCrime" }; // CR 700.13
   if (/^you control three or more creatures with different powers$/.test(text)) return { kind: "coven" };
+  if ((m = /^you control the (creature|artifact) with the greatest (power|toughness|mana value) or tied for the greatest (power|toughness|mana value)$/.exec(text)) && m[2] === m[3])
+    return { kind: "controlGreatest", type: m[1] === "creature" ? "Creature" : "Artifact", stat: m[2] === "mana value" ? "manaValue" : (m[2] as "power" | "toughness") };
   if ((m = /^an opponent (?:controls more (lands|creatures)|has more (life|cards in hand)) than you$/.exec(text)))
     return { kind: "opponentMore", what: (m[1] ?? (m[2] === "life" ? "life" : "hand")) as "lands" | "creatures" | "life" | "hand" };
   if (/^~ is attached to a creature$/.test(text)) return { kind: "self", is: "attachedToCreature" };

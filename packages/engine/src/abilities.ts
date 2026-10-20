@@ -923,6 +923,8 @@ export type StaticCondition =
    */
   /** `subjectController`: "if that player controls more lands than you", that player being the entering land's controller. */
   | { kind: "opponentMore"; what: "lands" | "creatures" | "life" | "hand"; subjectController?: true }
+  /** "You control the creature with the greatest power or tied for the greatest power" (Triumph of Ferocity), "the artifact with the greatest mana value ..." (Padeem): among all on the battlefield. */
+  | { kind: "controlGreatest"; type: "Creature" | "Artifact"; stat: "power" | "toughness" | "manaValue" }
   /** "As long as you have the city's blessing" (CR 702.131c). */
   | { kind: "citysBlessing"; /** "Unless you have the city's blessing". */ not?: true }
   /** "If it's your turn"; `not`: "if it's not your turn" (Force of Negation). */

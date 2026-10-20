@@ -22,7 +22,7 @@ import { evalAmount, partySize } from "./amounts";
 import { bindChosen, objectMatches, printedMatches } from "./effects";
 import { basePower, baseToughness, defOf, pairedWith } from "./cards";
 import { meldPartnerName } from "./meld-results";
-import { sameName } from "./faces";
+import { defMv, sameName } from "./faces";
 import { liveEmblems } from "./emblems";
 import { bindChosenKeywords, IDENTITY_PROTECTION, subtypeSet } from "./keywords";
 import { compileCard, compileGranted } from "./oracle";
@@ -541,6 +541,18 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const powers = new Set<number>();
       for (const c of chars.values()) if (c.controller === you && c.types.includes("Creature")) powers.add(c.power);
       return powers.size >= 3;
+    }
+    case "controlGreatest": {
+      // Among permanents of that type only (rulings on Padeem); an {X} in a permanent's mana cost is 0 (CR 202.3e).
+      let mine = -Infinity;
+      let all = -Infinity;
+      for (const [id, c] of chars) {
+        if (!c.types.includes(cond.type)) continue;
+        const n = cond.stat === "power" ? c.power : cond.stat === "toughness" ? c.toughness : defMv(defOf(s, s.objects[id]!));
+        all = Math.max(all, n);
+        if (c.controller === you) mine = Math.max(mine, n);
+      }
+      return mine > -Infinity && mine >= all;
     }
     case "opponentMore": {
       const measure = (p: PlayerId) => {

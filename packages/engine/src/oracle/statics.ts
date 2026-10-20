@@ -190,12 +190,15 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   if (thats) text = `${capital(thats[1]!)} spells you cast cost ${thats[2]}`;
   const ofChosen = / of the chosen type costs? \{/.test(text);
   if (ofChosen) text = text.replace(/ of the chosen type(?= costs? \{)/, "");
-  m = /^(?:(During your turn|During turns other than yours), )?(.+?)( you cast| your opponents cast)?( with mana value \d+ or (?:greater|less))?( from your graveyard)? costs? (\{\d+\}) (less|more) to cast$/.exec(text);
+  m = /^(?:(During your turn|During turns other than yours), )?(.+?)( you cast| your opponents cast)?( with (?:mana value|power) \d+ or (?:greater|less))?( from your graveyard)? costs? (\{\d+\}) (less|more) to cast$/.exec(text);
   if (!m || !/spells?$/i.test(m[2]!)) return null;
   const words = m[2]!.replace(/ ?spells?$/i, "").replace(/ and /g, " or ").trim();
   // "Spells you cast", "Instant and sorcery spells", "Noncreature spells", "Dragon spells", "Blue spells"
-  const filter = words ? parseTargetPhrase(`${words} spell${m[4] ?? ""}`) : { kind: "spell" as const, text: "spell" };
-  if (!filter || filter.kind !== "spell") return "fail";
+  // "Creature spells you cast with power 4 or greater" (Goreclaw): the spell's power as it's cast (see costModsFor).
+  const pw = / with power (\d+) or (greater|less)$/.exec(m[4] ?? "");
+  const parsed = words ? parseTargetPhrase(`${words} spell${pw ? "" : (m[4] ?? "")}`) : { kind: "spell" as const, text: "spell" };
+  if (!parsed || parsed.kind !== "spell" || (pw && !parsed.types?.includes("Creature"))) return "fail";
+  const filter: TargetSpec = pw ? { ...parsed, power: pw[2] === "greater" ? { min: Number(pw[1]) } : { max: Number(pw[1]) } } : parsed;
   const who = m[3] === " you cast" ? "you" : m[3] === " your opponents cast" ? "opponents" : "all";
   if (m[5] && who !== "you") return "fail";
   const n = Number(/\d+/.exec(m[6]!)![0]) * (m[7] === "less" ? -1 : 1);

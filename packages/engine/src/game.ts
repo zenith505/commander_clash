@@ -3103,9 +3103,15 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
       if (m.fromGraveyard && o.zone !== "graveyard") continue;
       if (m.notOwned && o.owner === pid) continue;
       if (m.if && !staticConditionNow(s, m.if, src.id, c.controller)) continue;
-      const { manaValue: range, ...rest } = bindChosen(m.filter, src.chosen);
+      const { manaValue: range, power: pw, ...rest } = bindChosen(m.filter, src.chosen);
       if (!printedMatches(rest, d)) continue;
       if (range && !((range.min === undefined || mv >= range.min) && (range.max === undefined || mv <= range.max))) continue;
+      // "With power 4 or greater" (Goreclaw): the spell's own power, a "*" by its characteristic-defining ability (CR
+      // 604.3); not counters or effects it would have on the battlefield (rulings).
+      if (pw) {
+        const p = /^\d+$/.test(d.power ?? "") ? Number(d.power) : characteristics(s, o).power;
+        if ((pw.min !== undefined && p < pw.min) || (pw.max !== undefined && p > pw.max)) continue;
+      }
       // "The first creature spell you cast each turn": the creature spells you cast earlier this turn count, even before this permanent was on the battlefield (rulings).
       if (m.nth && (s.castThisTurn ?? []).filter((c) => c.player === pid && printedMatches(rest, s.cards[c.card]!)).length !== m.nth - 1) continue;
       if (m.n > 0) more += m.n;

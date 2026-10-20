@@ -81,8 +81,9 @@ const SENTENCE_PARSERS = [parseNamesSentence, parsePreventionSentence, parseCopi
 /** One sentence of an ability's text to effects, or null if it can't be compiled. */
 export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   // "Each other player sacrifices a creature" (Grave Pact): in a free-for-all game every other player is an opponent
-  // (CR 102.3, 903.2).
-  if (/^[Ee]ach other player /.test(s)) s = s.replace(/^[Ee]ach other player /, "Each opponent ");
+  // (CR 102.3, 903.2). Not where another player is in play ("Whenever a player casts ..., each other player draws a card",
+  // Zenith Chronicler: other than that player).
+  if (/^[Ee]ach other player /.test(s) && !ctx.eventPlayer) s = s.replace(/^[Ee]ach other player /, "Each opponent ");
   if (WHEEL.test(s)) return parseSpellsSentence(s, ctx) ?? null;
   const tapped = /^(?:For as long as ~ remains tapped, (.+)|(.+?) for as long as (you control ~ and )?~ remains tapped)$/i.exec(s);
   if (tapped) return parseWhileTapped((tapped[1] ?? tapped[2])!, !!tapped[3], ctx);

@@ -19,7 +19,7 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const a = parseSentence(`Create ${m[1]}`, ctx);
     const b = parseSentence(`Create ${m[2]}`, ctx);
     if (!a || !b || a.length !== 1 || b.length !== 1 || a[0]!.type !== "createToken" || b[0]!.type !== "createToken") return null;
-    return [{ type: "either", options: [a, b], labels: [`create ${m[1]}`, `create ${m[2]}`] }];
+    return [{ type: "either", options: [a, b], labels: [`Create ${m[1]}`, `Create ${m[2]}`] }];
   }
 
   // Tokens, maybe "tapped and attacking" (CR 508.4): "Create a tapped and attacking 1/1 red Warrior creature

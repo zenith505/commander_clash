@@ -113,7 +113,7 @@ describe("triggers from the most played cards", () => {
     const land = toHand(s, ap, forest);
     s = act(s, { type: "playLand", player: ap, objectId: land });
     for (let i = 0; i < 10 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
-    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "either", player: ap, labels: ["create a Food token", "create a Treasure token"] });
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "either", player: ap, labels: ["Create a Food token", "Create a Treasure token"] });
     s = settle(act(s, { type: "chooseOption", player: ap, choice: "1" }));
     const tokens = s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === ap).map((id) => s.cards[s.objects[id]!.cardId]!.name);
     expect(tokens).toEqual(["Treasure Token"]);

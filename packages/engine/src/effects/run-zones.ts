@@ -156,7 +156,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
       // As it last existed, for a reflexive trigger: "When you do, ~ deals damage equal to that creature's power" (CR 608.2h).
       if (e.action === "sacrifice" && s.resolving) {
         const ch = characteristics(s, o);
-        (s.resolving.sacrificedThisWay ??= []).push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), controller: pid });
+        (s.resolving.sacrificedThisWay ??= []).push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), controller: pid, types: [...ch.types] });
       }
       moveObject(s, id, e.action === "sacrifice" ? "graveyard" : "hand", e.action === "sacrifice" ? { sacrificed: true } : {});
     }

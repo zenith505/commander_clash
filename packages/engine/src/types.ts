@@ -814,6 +814,8 @@ export interface PendingTrigger {
 
 export interface LastKnown {
   counters?: Record<string, number>;
+  /** Its card types as it last existed (CR 608.2h): "a permanent that shares a card type with it" (Braids). */
+  types?: string[];
   power?: number;
   toughness?: number;
   manaValue?: number;

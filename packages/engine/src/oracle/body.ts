@@ -1764,6 +1764,19 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     if (ifDid) {
       const prev = effects[effects.length - 1];
       if (prev?.type !== "may" || prev.pay || !prev.effects.every(checkableMay)) return null;
+      // "You may sacrifice an artifact, creature, ... If you do, each opponent may sacrifice a permanent of their choice that
+      // shares a card type with it. For each opponent who doesn't, that player loses 2 life and you draw a card." (Braids,
+      // Arisen Nightmare): a punisher, its penalty once for each opponent who doesn't, "it" being what was sacrificed.
+      const oppNot = ifDid[1] === "do" && /^each opponent may sacrifice a permanent of their choice that shares a card type with it$/.test(ifDid[2]!) && prev.effects.length === 1 && prev.effects[0]!.type === "pick" && prev.effects[0]!.action === "sacrifice" ? /^For each opponent who doesn't, that player loses (\d+) life(?: and (you .+))?$/.exec(sentences[si + 1] ?? "") : null;
+      // "And you draw a card": once for each of them (the penalty runs once for all of them, see the punisher effect).
+      const rest0 = oppNot?.[2] ? parseOne(capital(oppNot[2]), ctx) : [];
+      const rest = rest0?.every((e) => e.type === "draw" && e.who.ref === "you" && typeof e.n === "number") ? rest0.map((e) => (e.type === "draw" ? { ...e, n: { count: { kind: "punished" as const }, times: e.n as number } } : e)) : null;
+      if (oppNot && rest) {
+        const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], sharesTypeWithSacrificed: true, text: "permanent that shares a card type with it" };
+        effects.push({ type: "if", cond: { kind: "youDid" }, effects: [{ type: "punisher", who: { ref: "eachOpponent" }, options: [{ sacrifice: filter }], effects: [{ type: "loseLife", who: { ref: "punished" }, n: Number(oppNot[1]) }, ...rest], thenText: `loses ${oppNot[1]} life${oppNot[2] ? ` and ${oppNot[2]}` : ""}` }] });
+        si++;
+        continue;
+      }
       const inner = parseOne(ifDid[2]!.charAt(0).toUpperCase() + ifDid[2]!.slice(1), ctx);
       if (!inner) return null;
       effects.push(ifDid[1] === "do" ? { type: "if", cond: { kind: "youDid" }, effects: inner } : { type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner });

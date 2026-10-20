@@ -344,6 +344,12 @@ export interface TargetSpec {
   distinctFrom?: number[];
   /** "Up to three target cards from a single graveyard": in the same graveyard as these targets of the group, if chosen. */
   sameGraveyardAs?: number[];
+  /**
+   * "Each opponent may sacrifice a permanent of their choice that shares a card type with it" (Braids, Arisen Nightmare):
+   * a card type of what this ability sacrificed, as it last existed (rulings: any one of them if it had several), made into
+   * `types` as the choice is made.
+   */
+  sharesTypeWithSacrificed?: true;
   /** "Two target creature cards that share a creature type": shares one with each of these targets of the group. */
   sharesCreatureTypeWith?: number[];
   /** "Up to six target creature cards with different names" (Behold the Sinister Six!): a name none of these targets of the group has (CR 601.2c). */

@@ -62,6 +62,15 @@ export function parseManaAbility(line0: string): ManaAbility | null {
     // Depletion lands: "Put a depletion counter on ~.", "If there are no depletion counters on ~, sacrifice it."
     else if ((m2 = new RegExp(`^Put an? ${COUNTER} counter on ~\\.$`).exec(extra)) && !out.putCounter) out.putCounter = counterKind(m2[1]!);
     else if ((m2 = new RegExp(`^If there are no ${COUNTER} counters on ~, sacrifice it\\.$`).exec(extra)) && !out.sacrificeIfNo && removeCounters?.counter === counterKind(m2[1]!)) out.sacrificeIfNo = counterKind(m2[1]!);
+    // "If you control an Urza's Mine and an Urza's Power-Plant, add {C}{C}{C} instead" (Urza's Tower): the symbols written out.
+    else if ((m2 = new RegExp(`^If ([^,]+), add ((?:\\{[WUBRGC]\\}){2,}) instead\\.$`).exec(extra)) && new Set(m2[2]!.match(/[WUBRGC]/g)).size === 1 && out.produces.kind === "fixed" && !out.produces.n && !out.produces.count) {
+      const p = out.produces;
+      const sym = m2[2]!.match(/[WUBRGC]/)![0];
+      const n = m2[2]!.match(/\{/g)!.length;
+      const cond = parseStaticCondition(m2[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      if (!cond || p.mana.some((x) => x !== sym) || n <= p.mana.length) return null;
+      out.produces = { kind: "fixed", mana: [p.mana[0]!], n: { count: { kind: "stateIf", cond }, times: n - p.mana.length, plus: p.mana.length } };
+    }
     else if ((m2 = new RegExp(`^If ([^,]+), add ${NUM} \\{([WUBRGC])\\} instead\\.$`).exec(extra)) && out.produces.kind === "fixed" && !out.produces.n && !out.produces.count) {
       // "Add {G}{G}. If you've completed a dungeon, add six {G} instead." (Undermountain Adventurer): as it resolves.
       const p = out.produces;

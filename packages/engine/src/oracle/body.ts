@@ -2306,6 +2306,14 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
     const { divided: _divided, ...rest } = prev;
     return { effects: [{ ...rest, amount: amt(each[1]!) }], instead };
   }
+  // "Create a token that's a copy of target creature. If ~ was kicked, create five of those tokens instead" (Rite of
+  // Replication): more of the same copies.
+  const moreCopies = instead ? new RegExp(`^Create ${NUM} of those tokens$`).exec(t) : null;
+  if (moreCopies) {
+    const prev = previous[0];
+    if (previous.length !== 1 || prev?.type !== "createTokenCopy") return null;
+    return { effects: [{ ...prev, n: num(moreCopies[1]!) }], instead };
+  }
   // "If {B}{R} was spent to cast ~, you choose the permanents for each player instead" (Mythos of Snapdax): the same
   // choices, all made by you, and still legal ones (rulings).
   if (instead && /^You choose the permanents for each player$/.test(t)) {

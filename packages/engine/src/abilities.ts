@@ -2856,7 +2856,8 @@ export interface ManaSpend {
 export type EntersCondition =
   | { kind: "control"; who: "you" | "opponents"; types?: string[]; subtypes?: string[]; supertypes?: string[]; colors?: Color[]; other?: boolean; min?: number; max?: number }
   | { kind: "playerLifeAtMost"; n: number }
-  | { kind: "opponents"; min: number };
+  | { kind: "opponents"; min: number }
+  | { kind: "ownTurnAtMost"; n: number };
 
 /**
  * "As ~ enters, you may pay 2 life / reveal a Dragon card from your hand. If you don't, it enters
@@ -3189,6 +3190,8 @@ export interface CompiledCard {
   drawTwoInstead?: true;
   /** "If you would draw a card while your library has no cards in it, you win the game instead." (Laboratory Maniac, CR 614.1a) */
   drawEmptyWins?: true;
+  /** "Your opponents can't cast spells from anywhere other than their hands." (Drannith Magistrate) */
+  opponentsOnlyFromHand?: true;
   /**
    * "The first time you would draw a card each turn, instead look at the top two cards of your library. Put one of them
    * into your graveyard and the other back on top of your library. Then draw a card." (Scion of Halaster's grant).

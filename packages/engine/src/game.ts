@@ -127,13 +127,15 @@ export function createGame(setup: PlayerSetup[], seed = Date.now() >>> 0, opts: 
     for (const card of p.deck) player.library.push(newObject(s, card, pid, "library").id);
     shuffleLibrary(s, player);
   });
-  s.players[s.activePlayer]!.turnBegan = s.turn;
   // The combined back faces its meld cards can meld into (CR 712.4): not in any deck, but part of the game's cards.
   for (const r of meldResultsFor(setup.flatMap((p) => [p.commander, ...(p.secondCommander ? [p.secondCommander] : []), ...p.deck]))) s.cards[r.oracleId] ??= r;
   // CR 103.1: randomly determine the starting player.
   const first = Math.floor(nextRandom(s) * setup.length);
   s.activePlayer = first;
   s.priority = first;
+  // The starting player's first turn (set after choosing them).
+  s.players[first]!.turnBegan = s.turn;
+  s.players[first]!.turnsTaken = 1;
   for (const p of s.players) draw(s, p.id, 7);
   // Opening hands are drawn before the first turn begins (CR 103.5, 103.8): they aren't draws "this turn".
   for (const p of s.players) delete p.draws;
@@ -1258,6 +1260,9 @@ export function conditionHolds(s: GameState, cond: EntersCondition, you: PlayerI
       return livingPlayers(s).some((pid) => player(s, pid).life <= cond.n);
     case "opponents":
       return opponents(s, you).length >= cond.min;
+    // Starting Town: "unless it's your first, second, or third turn of the game".
+    case "ownTurnAtMost":
+      return s.activePlayer === you && (player(s, you).turnsTaken ?? 0) <= cond.n;
     case "control": {
       const n = s.battlefield.filter((id) => {
         if (id === self) return false;
@@ -1947,6 +1952,7 @@ function startNextTurn(s: GameState, skipping = false) {
   const ap = player(s, s.activePlayer);
   ap.lastTurnBegan = ap.turnBegan;
   ap.turnBegan = s.turn;
+  ap.turnsTaken = (ap.turnsTaken ?? 0) + 1;
   for (const p of s.players) {
     p.landsPlayedThisTurn = 0;
     // "Skips their next combat phase this turn" with that turn over.
@@ -2858,6 +2864,12 @@ export function castProblem(
   const proposedCost = parseManaCost(d.manaCost);
   const limit = castLimitProblem(s, pid, d, choices?.faceDown ? 0 : defMv(d) + (proposedCost.hasX ? (x ?? 0) * xCount(proposedCost) : 0));
   if (limit) return limit;
+  // Drannith Magistrate: "Your opponents can't cast spells from anywhere other than their hands", commanders from the
+  // command zone included (CR 101.2).
+  if (o.zone !== "hand") {
+    const magistrate = s.battlefield.map((b) => obj(s, b)).find((m) => abilitiesOf(s, m).opponentsOnlyFromHand && controllerOf(s, m) !== pid);
+    if (magistrate) return `${characteristics(s, magistrate).name}: opponents can't cast spells from anywhere other than their hands`;
+  }
   // "Cast this spell only if you've cast another spell this turn" (Illusory Angel), checked as it's proposed, before it
   // counts itself (CR 601.3); the other spell needn't have resolved (rulings). Face down it has no abilities (CR 708.2).
   if (compileCard(d).castOnlyAfterAnother && !choices?.faceDown && !(s.castThisTurn ?? []).some((c) => c.player === pid)) return `${d.name} can be cast only if you've cast another spell this turn`;

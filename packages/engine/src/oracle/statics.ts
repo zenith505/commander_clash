@@ -30,6 +30,7 @@ export function parseEntersCondition(text: string): EntersCondition | null {
   if ((m = new RegExp(`^your opponents control ${NUM} or more lands$`).exec(text))) return { kind: "control", who: "opponents", types: ["Land"], min: num(m[1]!) };
   if ((m = /^a player has (\d+) or less life$/.exec(text))) return { kind: "playerLifeAtMost", n: Number(m[1]) };
   if ((m = new RegExp(`^you have ${NUM} or more opponents$`).exec(text))) return { kind: "opponents", min: num(m[1]!) };
+  if (/^it's your first, second, or third turn of the game$/.test(text)) return { kind: "ownTurnAtMost", n: 3 };
   return null;
 }
 
@@ -469,6 +470,10 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return { kind: "selfCounter", counter: counterKind(m[1]!) };
   // Beastmaster Ascension: "as long as ~ has seven or more quest counters on it".
   if ((m = new RegExp(`^~ has ${NUM} or more ${COUNTER} counters on it$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[2]!), min: num(m[1]!) };
+  // The Tron lands: "If you control an Urza's Mine and an Urza's Power-Plant" (CR 205.3i: "Urza's" and "Mine" are both
+  // land types, so one land with both; not Processing Plant, an Ulamog's Power-Plant), each of them.
+  if ((m = /^you control an Urza's (Mine|Power-Plant|Tower) and an Urza's (Mine|Power-Plant|Tower)$/.exec(text)) && m[1] !== m[2])
+    return { kind: "allOf", conds: [m[1]!, m[2]!].map((x) => ({ kind: "control" as const, who: "you" as const, filter: { kind: "object" as const, types: ["Land"], subtypes: ["Urza's"], anyOf: [{ kind: "object" as const, subtypes: [x], text: x }], text: `Urza's ${x}` }, min: 1 })) };
   if ((m = /^(you|an opponent|defending player) controls? (.+)$/.exec(text))) {
     // "At least three other enchantments" (Ephara, Ever-Sheltering) is "three or more other enchantments".
     m[2] = m[2]!.replace(/^at least (\w+) /, "$1 or more ");
@@ -594,6 +599,8 @@ function parseAffected(subject: string): Affects | null {
   m = /^(Other )?([A-Z][a-z]+) you control$/.exec(x);
   if (m && CREATURE_TYPES.has(singular(m[2]!))) return { kind: "filter", types: ["Creature"], subtypes: [singular(m[2]!)], controller: "you", other: !!m[1] };
   if (/^(All creatures|Each creature)$/i.test(x)) return { kind: "filter", types: ["Creature"] };
+  // "Tokens you control have "{T}: Add {G}."" (Jaheira, Friend of the Forest): any permanent that's a token.
+  if (x === "Tokens you control") return { kind: "filter", types: [], spec: { kind: "object", token: true, text: "token" }, controller: "you" };
   // "Creature tokens get -1/-1" (Illness in the Ranks): everyone's; "creature tokens you control".
   if ((m = /^Creature tokens( you control| your opponents control)?$/.exec(x)))
     return { kind: "filter", types: ["Creature"], spec: { kind: "object", token: true, text: "creature token" }, ...(m[1] ? { controller: m[1] === " you control" ? ("you" as const) : ("opponent" as const) } : {}) };

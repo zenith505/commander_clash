@@ -600,6 +600,8 @@ export interface Player {
   /** The turn this player was last dealt combat damage, and the turns their current and previous turns began (s.turn), for "if you haven't been dealt combat damage since your last turn". */
   combatDamagedTurn?: number;
   turnBegan?: number;
+  /** How many turns this player has begun this game, extra turns too ("your first, second, or third turn of the game"). */
+  turnsTaken?: number;
   lastTurnBegan?: number;
   /** The turn this player last attacked with a creature, for raid's "if you attacked this turn". */
   attackedTurn?: number;

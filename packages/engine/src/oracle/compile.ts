@@ -1464,6 +1464,10 @@ export function compile(d: CardDef): CompiledCard {
       out.loyaltyAtInstantSpeed = true;
       continue;
     }
+    if (line === "Your opponents can't cast spells from anywhere other than their hands.") {
+      out.opponentsOnlyFromHand = true;
+      continue;
+    }
     if (line === "Your opponents can't cast spells during your turn.") {
       out.opponentsCantCastYourTurn = true;
       continue;

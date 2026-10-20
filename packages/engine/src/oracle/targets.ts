@@ -414,8 +414,9 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
  */
 function singularPhrase(p: string): string {
   const words = p.trim().replace(/ and\/or /g, " or ").replace(/ each (?=with )/, " ").split(" ");
-  const plural = (w: string) => /^(creatures|cards|permanents|artifacts|enchantments|lands|planeswalkers|battles)$/i.test(w);
-  if (words.some(plural)) words.forEach((w, i) => plural(w) && (words[i] = singular(w)));
+  // "Artifacts, creatures, and/or lands" (Ghostly Flicker): a comma after one.
+  const plural = (w: string) => /^(creatures|cards|permanents|artifacts|enchantments|lands|planeswalkers|battles),?$/i.test(w);
+  if (words.some(plural)) words.forEach((w, i) => plural(w) && (words[i] = w.endsWith(",") ? `${singular(w.slice(0, -1))},` : singular(w)));
   else {
     // A creature type: "two target Goblins", "up to two target Elves you control".
     const j = words.findIndex((w) => /^[A-Z]/.test(w) && CREATURE_TYPES.has(singular(w)) && w !== singular(w));

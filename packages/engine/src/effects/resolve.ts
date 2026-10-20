@@ -1,4 +1,5 @@
 import type { AbilityBody, Amount, DamageRecipient, Effect, ManaAbility, Modification, ObjRef, PlayerRef, TargetChoice } from "../abilities";
+import { withPutter } from "../counters";
 import { cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
 import { addTriggeredMana, askAuraReturns, creatureTypesOf, draw, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics } from "../layers";
@@ -435,7 +436,8 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
 }
 
 export function runEffect(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | void {
-  const result = runEffectInner(s, e, ctx);
+  // Counters an effect puts on are put by the ability's controller (Vorinclex rulings).
+  const result = withPutter(ctx.controller, () => runEffectInner(s, e, ctx));
   invalidateCharacteristics(s);
   return result;
 }
@@ -578,6 +580,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "returnToBattlefield":
     case "unearth":
     case "castFromExileFree":
+    case "castLinkedCopy":
     case "castTargetFree":
     case "destroy":
     case "regenerate":

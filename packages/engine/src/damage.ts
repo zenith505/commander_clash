@@ -10,7 +10,7 @@ import { compileCard } from "./oracle";
 import { liveEmblems } from "./emblems";
 import { commanderOf } from "./mutate";
 import { evalAmount } from "./amounts";
-import { putCounters } from "./counters";
+import { playerCountersToPut, putCounters, withPutter } from "./counters";
 import { fireEvent } from "./effects";
 import { bindChosen, objectMatches, playerProtectedFrom } from "./effects/targeting";
 import { canPreventDamage, gainLife, log, loseLife, obj, player, syncControl, turnOrderFrom, useShieldCounter } from "./game";
@@ -110,7 +110,7 @@ export function dealDamage(
   src: DamageSource,
   to: { object: GameObject } | { player: PlayerId },
   n: number,
-  opts: { combat?: boolean; lifelink?: { n: number }; shielded?: boolean; witherCounters?: Map<ObjectId, number> } = {},
+  opts: { combat?: boolean; lifelink?: { n: number }; shielded?: boolean; witherCounters?: Map<string, number> } = {},
 ): number {
   if (n <= 0) return 0;
   if (opts.combat && s.preventCombatDamage && canPreventDamage(s) && !unpreventable(src, true)) return 0;
@@ -170,8 +170,10 @@ export function dealDamage(
       if (has(src, "Infect") || has(src, "Wither")) {
         // Infect and wither: -1/-1 counters instead of marked damage, but it's still damage dealt. They're put on with
         // the rest of the damage dealt at the same time, as one event for replacement effects (Vizier of Remedies rulings).
-        if (opts.witherCounters) opts.witherCounters.set(o.id, (opts.witherCounters.get(o.id) ?? 0) + n);
-        else putCounters(s, o, "-1/-1", n);
+        // Keyed by the permanent and the source's controller, who puts them on (rulings on Vorinclex, All Will Be One).
+        const key = `${o.id}|${src.controller}`;
+        if (opts.witherCounters) opts.witherCounters.set(key, (opts.witherCounters.get(key) ?? 0) + n);
+        else withPutter(src.controller, () => putCounters(s, o, "-1/-1", n));
         invalidateCharacteristics(s);
         log(s, `${src.name} deals ${n} damage to ${c.name} (as -1/-1 counters).`);
       } else {
@@ -194,8 +196,9 @@ export function dealDamage(
   } else {
     const p = player(s, to.player);
     if (has(src, "Infect")) {
-      p.poison = (p.poison ?? 0) + n;
-      log(s, `${src.name} deals ${n} damage to ${p.name} (${n} poison counter${n === 1 ? "" : "s"}).`);
+      const k = withPutter(src.controller, () => playerCountersToPut(s, p.id, "poison", n));
+      p.poison = (p.poison ?? 0) + k;
+      log(s, `${src.name} deals ${n} damage to ${p.name} (${k} poison counter${k === 1 ? "" : "s"}).`);
     } else {
       // "Damage that would reduce your life total to less than 1 reduces it to 1 instead" (Ali from Cairo): the damage is
       // all dealt, only the life lost changes; not if they're below 1 already (rulings).
@@ -225,7 +228,7 @@ export function dealDamage(
       // Freerunning (CR 702.173a): an Assassin creature or a commander, as it was when it dealt the damage, lets its
       // controller pay freerunning costs this turn.
       if (src.types.includes("Creature") && (src.subtypes.includes("Assassin") || src.commanderId) && !(s.freerunningThisTurn ??= []).includes(src.controller)) s.freerunningThisTurn.push(src.controller);
-      const toxic = toxicValue(src.keywords);
+      const toxic = withPutter(src.controller, () => playerCountersToPut(s, p.id, "poison", toxicValue(src.keywords)));
       if (toxic > 0) {
         p.poison = (p.poison ?? 0) + toxic;
         log(s, `${p.name} gets ${toxic} poison counter${toxic === 1 ? "" : "s"} (toxic).`);
@@ -1009,7 +1012,7 @@ export function dealDamageBatch(s: GameState, events: DamageEvent[], opts: { lif
 /** Commit a finished plan and deal its damage. `lifelink`: add the life up for the caller instead of gaining it per event. */
 export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: { n: number } | ((e: DamageEvent) => { n: number }) } = {}): (DamageEvent & { dealt: number })[] {
   const back = commitShields(s, plan);
-  const witherCounters = new Map<ObjectId, number>();
+  const witherCounters = new Map<string, number>();
   // What would be lethal for each permanent just before (CR 120.10): from a source with deathtouch, any 1 damage is
   // (CR 120.4a, rulings on Aegar).
   const lethal = new Map<ObjectId, number[]>();
@@ -1031,9 +1034,10 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
     const dealt = o && o.zone !== "battlefield" ? 0 : dealDamage(s, e.src, to, e.n, { combat: e.combat, lifelink, shielded: true, witherCounters });
     return { ...e, dealt };
   });
-  for (const [id, n] of witherCounters) {
+  for (const [key, n] of witherCounters) {
+    const [id, by] = key.split("|") as [ObjectId, PlayerId];
     const o = obj(s, id);
-    if (o.zone === "battlefield") putCounters(s, o, "-1/-1", n);
+    if (o.zone === "battlefield") withPutter(by, () => putCounters(s, o, "-1/-1", n));
   }
   if (witherCounters.size) invalidateCharacteristics(s);
   // "Whenever ~ is dealt damage": the damage dealt to a permanent at the same time is one event (rulings).

@@ -1,7 +1,7 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, isPermanentCard, isType, objIsType, power } from "../cards";
 import { nameLandBan } from "../names";
-import { attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
+import { attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters } from "../counters";
 import { manaValue } from "../mana";
@@ -628,6 +628,31 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       s.pending = null;
       log(s, `${defOf(s, o).name} can't be cast.`);
       return;
+    }
+    case "castLinkedCopy": {
+      const sc = (s.resolving!.scratch ??= {});
+      const gone = (id: ObjectId) => {
+        // A copy of a card that isn't cast ceases to exist (CR 704.5e).
+        const c = s.objects[id];
+        if (!c || c.zone !== "exile") return;
+        const ex = player(s, c.owner).exile;
+        if (ex.includes(id)) ex.splice(ex.indexOf(id), 1);
+        delete s.objects[id];
+      };
+      if (sc.linkedCopy !== undefined) return gone(sc.linkedCopy);
+      const key = ctx.sourceId ? `${ctx.sourceId}@${ctx.sourceZc ?? 0}` : undefined;
+      const card = (key ? (s.linkedExile?.[key] ?? []) : []).map((l) => ({ o: s.objects[l.id], zc: l.zc })).find(({ o, zc }) => o?.zone === "exile" && (o.zoneChanges ?? 0) === zc)?.o;
+      if (!card) return;
+      const copy = newObject(s, s.cards[card.cardId]!, ctx.controller, "exile");
+      copy.spellCopy = true; // not a card (CR 707.12)
+      player(s, ctx.controller).exile.push(copy.id);
+      sc.linkedCopy = copy.id;
+      log(s, `${src} copies ${defOf(s, card).name}.`);
+      s.pending = { kind: "castFree", player: ctx.controller, objectId: copy.id, source: src };
+      if (castProblem(s, ctx.controller, copy.id) === null) return "paused";
+      s.pending = null;
+      log(s, `The copy of ${defOf(s, card).name} can't be cast.`);
+      return gone(copy.id);
     }
     case "castFromExileFree": {
       // Rebound (CR 702.88a): the card has to still be in exile, the same object (CR 400.7).

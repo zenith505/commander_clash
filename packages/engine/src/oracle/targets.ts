@@ -595,10 +595,10 @@ export function parseTargetPhrase(
     p = p.slice(0, hurt.index);
   }
   // "creature with a +1/+1 counter on it", "creatures with ice counters on them", "creature you control with a counter on
-  // it" (any kind)
-  const counter = / with (?:an? ([+-]1\/[+-]1|ice) counter on it|([+-]1\/[+-]1|ice) counters on them|(a) counter on it|(one or more) counters on (?:it|them))/.exec(p);
+  // it", "permanents you control with counters on them" (any kind)
+  const counter = / with (?:an? ([+-]1\/[+-]1|ice) counter on it|([+-]1\/[+-]1|ice) counters on them|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
   if (counter) {
-    extra.counter = counter[3] || counter[4] ? ANY_COUNTER : (counter[1] ?? counter[2]!);
+    extra.counter = counter[1] ?? counter[2] ?? ANY_COUNTER;
     p = (p.slice(0, counter.index) + p.slice(counter.index + counter[0].length)).trim();
   }
   // "creature card from your graveyard", "card from a graveyard": a card in that zone (CR 109.2a).

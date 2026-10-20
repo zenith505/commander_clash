@@ -432,6 +432,8 @@ export interface GameObject {
   uncounterableCast?: true;
   /** A creature spell: mana that gives it haste was spent on it (Arena of Glory), and for how long the creature has it. */
   hasteCast?: "endOfTurn" | "game";
+  /** How much Opal Palace mana was spent to cast this commander (ManaAbility.spentCommanderCounters), until it enters. */
+  commanderCountersCast?: number;
   /** A spell: "that creature enters with an additional +1/+1 counter on it" (Boreal Outrider, CR 614.1c), as it resolves. */
   extraCounters?: Record<string, number>;
   /** A spell: "it gains haste until end of turn" from a cast trigger (Tyvar Kell's emblem), applying to the permanent it becomes (CR 400.7a). */
@@ -528,6 +530,8 @@ export interface ManaLot {
   spentTrigger?: ManaSpentTrigger;
   /** "If any of that mana is spent on a creature spell, it gains haste ...": see ManaAbility.spentHaste. */
   haste?: "endOfTurn" | "game";
+  /** Opal Palace's "if you spend this mana to cast your commander": see ManaAbility.spentCommanderCounters. */
+  commanderCounters?: true;
 }
 
 /** A mana's "when that mana is spent" ability: its source as it made the mana, and what it does. */
@@ -1654,6 +1658,8 @@ export interface Resolving {
     searchZones?: string;
     /** The card a "you may cast target card ... without paying its mana cost" offered (castTargetFree). */
     castingTarget?: ObjectId;
+    /** castLinkedCopy: the copy of the exiled card offered to be cast. */
+    linkedCopy?: ObjectId;
     damageSource?: string; // the source of damage chosen as it resolves (CR 609.7a): an object id, or "none" if there was none to choose
     /** "Roll two d8 and choose one result": the index of the die chosen (see runDiceEffect). */
     rollChoice?: string;

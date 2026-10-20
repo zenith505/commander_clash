@@ -2,7 +2,7 @@ import { allEffects, type Effect, type PayCost, type PunisherOption, type Target
 import { parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
-import { autoEvidence, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, moveObject, obj, opponents, payableLife, player, shareCreatureType } from "../game";
+import { autoEvidence, canLoseLife, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, moveObject, obj, opponents, payableLife, player, shareCreatureType } from "../game";
 import { cardIdOf, defOf } from "../cards";
 import { controllerOf, staticConditionNow } from "../layers";
 import type { GameState, PlayerId } from "../types";
@@ -252,6 +252,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? revealedIs(s, bindChosen(e.cond.filter, ctx.chosen)) !== !!e.cond.not
             : e.cond.kind === "revealedSharesCreatureType"
             ? revealedSharesType(s, ctx)
+            : e.cond.kind === "createdNone"
+            ? !s.resolving!.created?.length
+            : e.cond.kind === "putThisWayIs"
+            ? (s.resolving!.created ?? []).some((id) => s.objects[id]?.zone === "battlefield" && objectMatches(s, (e.cond as { filter: TargetSpec }).filter, s.objects[id]!, ctx.controller, false))
             : e.cond.kind === "milledIs"
             ? (s.resolving!.milled ?? []).some(({ id }) => printedMatches(bindChosen((e.cond as { filter: TargetSpec }).filter, ctx.chosen), defOf(s, s.objects[id]!)))
             : e.cond.kind === "targetIs"
@@ -438,6 +442,7 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "discard" && e.who.ref === "you" && !e.hand && !player(s, ctx.controller).hand.some((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))) return false;
     if (e.type === "draw" && e.who.ref === "you" && !player(s, ctx.controller).library.length) return false;
     if (e.type === "handToTop" && !player(s, ctx.controller).hand.length) return false;
+    if (e.type === "loseLife" && !players(s, e.who, ctx).some((pid) => !player(s, pid).lost && canLoseLife(s, pid))) return false;
     if (e.type === "sacrifice" && !objects(s, e.what, ctx).some((o) => e.byController || controllerOf(s, o) === ctx.controller)) return false;
     if (e.type === "exile" && e.what.ref === "selfCard" && !objects(s, e.what, ctx).length) return false;
     if (e.type === "tap" && e.what.ref === "self" && !objects(s, e.what, ctx).some((o) => !o.tapped)) return false;

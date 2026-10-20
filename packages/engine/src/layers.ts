@@ -607,6 +607,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (cond.min === undefined || life >= cond.min) && (cond.max === undefined || life <= cond.max);
     }
     case "opponentLostLife":
+      // Paid life counts too (CR 119.4); gaining life doesn't take any back (rulings on Bloodchief Ascension).
+      if (cond.n !== undefined) return Object.entries(s.turnLog?.lifeLost ?? {}).some(([p, v]) => Number(p) !== you && v >= cond.n!);
       return (s.lostLifeThisTurn ?? []).some((p) => p !== you);
     case "noCombatDamageSinceLastTurn": {
       const p = s.players[you];

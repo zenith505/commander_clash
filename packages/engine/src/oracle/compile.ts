@@ -742,6 +742,14 @@ export function compile(d: CardDef): CompiledCard {
         continue;
       }
     }
+    const othersUntapped = /^([A-Z][a-z]+) you control enter untapped\.$/.exec(line);
+    if (othersUntapped) {
+      const g = parseGroup(`${othersUntapped[1]} you control`, true);
+      if (g && !g.other) {
+        (out.othersEnterUntapped ??= []).push({ filter: g.filter, text: line });
+        continue;
+      }
+    }
     // "Each other creature you control enters with an additional +1/+1 counter on it" (Renata, Called to the Hunt): a
     // replacement effect on other permanents entering while this one is on the battlefield (CR 614.1c). Whether one
     // without "other" that could describe itself applies to itself isn't worked out, so that stays out.
@@ -1117,7 +1125,12 @@ export function compile(d: CardDef): CompiledCard {
       }
     }
     if (clone && !/graveyard|\bcard\b/.test(clone[1]!) && !(clone[2] && line.startsWith("You may"))) {
-      const filter = parseTargetPhrase(clone[1]!.replace(/ on the battlefield$/, ""));
+      // Mockingbird: "any creature on the battlefield with mana value less than or equal to the amount of mana spent to
+      // cast ~": the mana spent on the spell it was, all of it (rulings), as it enters.
+      const spentBound = / with mana value less than or equal to the amount of mana spent to cast ~$/.exec(clone[1]!);
+      const phrase = (spentBound ? clone[1]!.slice(0, spentBound.index) : clone[1]!).replace(/ on the battlefield( with |$)/, "$1");
+      const parsed = parseTargetPhrase(phrase);
+      const filter = parsed && spentBound ? { ...parsed, bound: { key: "manaValue" as const, at: "most" as const, amount: { count: { kind: "manaSpent" as const } } } } : parsed;
       const except = clone[3] ? parseCopyExcept(clone[3]) : undefined;
       if (filter?.kind === "object" && except !== null && !except?.thisAbility) {
         out.entersAsCopy = { filter: { ...filter, text: clone[1]! }, ...(except ? { except } : {}), ...(clone[2] ? { untilEndOfTurn: true } : {}) };
@@ -1136,6 +1149,11 @@ export function compile(d: CardDef): CompiledCard {
       const filter = limit[2] ? parseTargetPhrase(`${limit[2]} spell`) : undefined;
       if (filter === null || (filter && filter.kind !== "spell")) out.unsupported.push(raw);
       else (out.castLimits ??= []).push({ who: limit[1] === "You" ? "you" : limit[1] === "Enchanted player" ? "enchanted" : "each", ...(filter ? { filter: { ...filter, text: `${limit[2]} spell` } } : {}), text: line });
+      continue;
+    }
+    const skipExtra = /^If (a player|an opponent) would begin an extra turn, that player skips that turn instead\.$/.exec(line);
+    if (skipExtra) {
+      out.skipsExtraTurns = skipExtra[1] === "a player" ? "all" : "opponents";
       continue;
     }
     const noGain = /^(Players|Your opponents|Enchanted player) can't gain life\.$/.exec(line);
@@ -1781,7 +1799,10 @@ export function compile(d: CardDef): CompiledCard {
       /^Whenever (an? [^,]+? you control(?: of the chosen type)?) enters or attacks, (.+)$/.exec(line) ??
       // Syr Konrad: "Whenever another creature dies, or a creature card is put into a graveyard from anywhere other than
       // the battlefield, or a creature card leaves your graveyard, ...": no one event is two of them.
-      /^Whenever (another creature dies), or (a creature card is put into a graveyard from anywhere other than the battlefield), or (a creature card leaves your graveyard), (.+)$/.exec(line);
+      /^Whenever (another creature dies), or (a creature card is put into a graveyard from anywhere other than the battlefield), or (a creature card leaves your graveyard), (.+)$/.exec(line) ??
+      // Trouble in Pairs: "Whenever an opponent attacks you with two or more creatures, draws their second card each
+      // turn, or casts their second spell each turn, you draw a card": three triggers (rulings: each can trigger).
+      /^Whenever an opponent (attacks you with two or more creatures), (draws their second card each turn), or (casts their second spell each turn), (.+)$/.exec(line);
     if (twice && !/\bonly once\b/.test(line)) {
       const effect = twice[twice.length - 1]!;
       const events = /^When you cast/.test(line)
@@ -1801,7 +1822,7 @@ export function compile(d: CardDef): CompiledCard {
             : /^Whenever ~ attacks or becomes the target of a spell, /.test(line)
               ? [`Whenever ~ attacks, ${effect}`, `Whenever ~ becomes the target of a spell, ${effect}`]
             : twice.length === 5
-              ? twice.slice(1, 4).map((e) => `Whenever ${e}, ${effect}`)
+              ? twice.slice(1, 4).map((e) => `Whenever ${/^Whenever an opponent /.test(line) ? "an opponent " : ""}${e}, ${effect}`)
             : /^Whenever an? [^,]+? enters or attacks, /.test(line)
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} attacks, ${effect}`]
             : [`When ~ enters, ${effect}`, `${/^(?:attacks|deals)/.test(twice[1]!) ? "Whenever" : "When"} ~ ${twice[1]}, ${effect}`];
@@ -2006,6 +2027,13 @@ function linkExile(out: CompiledCard) {
   if (out.mana.some((m) => m.produces.kind === "colorsAmong" && m.produces.linked)) {
     const imprints = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e) => e.type === "takeFromHand" && e.action === "exile");
     if (imprints.length !== 1 || out.triggers.some((t) => allEffects(t.body.effects).some((e) => e.type === "returnLinked"))) out.unsupported.push("(its mana ability can't be linked to one imprint ability)");
+    else (imprints[0] as Extract<Effect, { type: "takeFromHand" }>).linked = true;
+  }
+  // Isochron Scepter: "copy the exiled card" is linked to the one ability that exiles a card from the hand as it enters.
+  const copies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)].some((b) => allEffects(b.effects).some((e) => e.type === "castLinkedCopy"));
+  if (copies) {
+    const imprints = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e) => e.type === "takeFromHand" && e.action === "exile");
+    if (imprints.length !== 1) out.unsupported.push("(copies an exiled card it can't link to one imprint ability)");
     else (imprints[0] as Extract<Effect, { type: "takeFromHand" }>).linked = true;
   }
   const returns = out.triggers.filter((t) => allEffects(t.body.effects).some((e) => e.type === "returnLinked"));
@@ -2291,6 +2319,8 @@ function triggersAgainLine(line: string): NonNullable<CompiledCard["triggersAgai
     const filter = kinds(m[1]!, false);
     return filter ? { by: { event, filter: filter.map((x) => x.filter) } } : null;
   }
+  // Veyran, Voice of Duality.
+  if (line === "If you casting or copying an instant or sorcery spell causes a triggered ability of a permanent you control to trigger, that ability triggers an additional time.") return { by: { event: "castOrCopy" } };
   m = /^If a triggered ability of (?:an? )?(.+?) triggers, (?:that ability|it) triggers an additional time\.$/.exec(line);
   // "Another creature you control of the chosen type" (Roaming Throne): the creature type chosen as it entered.
   const ofChosen = m && /^(another )?(creature you control) of the chosen type$/.exec(m[1]!);

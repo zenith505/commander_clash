@@ -12,7 +12,7 @@ import type { CardDef, Color, GameObject, GameState, ManaLot, ManaOrigin, ManaSp
  * What a payment is for: casting a spell (as it is on the stack: face down, bestowed), activating an ability of a
  * source, or anything else (a cost paid while something resolves, a special action, another player's spell).
  */
-export type ManaUse = { spell: CardDef; /** Security Rhox's "Spend only mana produced by Treasures to cast it this way". */ treasureOnly?: true } | { ability: GameObject } | "other";
+export type ManaUse = { spell: CardDef; /** Security Rhox's "Spend only mana produced by Treasures to cast it this way". */ treasureOnly?: true; /** The card being cast, for "to cast your commander" (Opal Palace). */ object?: GameObject } | { ability: GameObject } | "other";
 
 /** The mana of each type in `pid`'s pool that's in no lot: unrestricted, from a source that doesn't matter, not kept. */
 export function plainMana(s: GameState, pid: PlayerId): ManaPool {
@@ -98,7 +98,7 @@ export type SpentFrom = Record<"treasure" | "creature" | "artifact", number>;
  * (CR 601.2h): restricted mana it may be spent on first; then, on a spell or an ability, mana from a Treasure, a creature
  * or an artifact ("if mana from a Treasure was spent"), but on anything else the rest first; mana kept as steps end last.
  */
-export function spendFromPool(s: GameState, pid: PlayerId, cost: ParsedCost, use: ManaUse, extraGeneric = 0, life = Infinity, opts: { spreadColors?: boolean; want?: Partial<Record<Color, number>>; avoid?: Partial<Record<Color, number>>; wantSnow?: boolean } = {}): (Payment & { spent: ManaPool; treasure: number; from: SpentFrom; uncounterable?: true; spentTriggers?: ManaSpentTrigger[]; haste?: "endOfTurn" | "game" }) | null {
+export function spendFromPool(s: GameState, pid: PlayerId, cost: ParsedCost, use: ManaUse, extraGeneric = 0, life = Infinity, opts: { spreadColors?: boolean; want?: Partial<Record<Color, number>>; avoid?: Partial<Record<Color, number>>; wantSnow?: boolean } = {}): (Payment & { spent: ManaPool; treasure: number; from: SpentFrom; uncounterable?: true; spentTriggers?: ManaSpentTrigger[]; haste?: "endOfTurn" | "game"; commanderCounters?: number }) | null {
   const p = s.players[pid]!;
   const { pool, prefer, treasure, snow } = poolFor(s, pid, use);
   const first = { ...prefer };
@@ -112,10 +112,13 @@ export function spendFromPool(s: GameState, pid: PlayerId, cost: ParsedCost, use
   let uncounterable = false;
   const spentTriggers: ManaSpentTrigger[] = [];
   let haste: "endOfTurn" | "game" | undefined;
-  // Mana that gives a creature spell haste is spent on one first, and kept back from anything else.
+  let commanderCounters = 0;
+  // Mana that gives a creature spell haste is spent on one first, and kept back from anything else; Opal Palace's
+  // mana the same way for its controller's commander.
   const creatureSpell = use !== "other" && "spell" in use && isType(use.spell, "Creature");
+  const ownCommander = use !== "other" && "spell" in use && !!use.object?.isCommander && use.object.owner === pid;
   // Lower ranks are spent first; `plain` stands for the mana of that type in no lot.
-  const rank = (l: ManaLot, plain: boolean) => (l.keep ? 10 : 0) + (l.haste ? (creatureSpell ? -1 : 3) : 0) + (l.only ? 0 : plain === (use === "other") ? 1 : 2);
+  const rank = (l: ManaLot, plain: boolean) => (l.keep ? 10 : 0) + (l.haste ? (creatureSpell ? -1 : 3) : 0) + (l.commanderCounters ? (ownCommander ? -1 : 3) : 0) + (l.only ? 0 : plain === (use === "other") ? 1 : 2);
   for (const m of Object.keys(spent) as ManaType[]) {
     spent[m] = pool[m] - paid.pool[m];
     if (!spent[m]) continue;
@@ -128,6 +131,7 @@ export function spendFromPool(s: GameState, pid: PlayerId, cost: ParsedCost, use
         n -= k;
         if (k && l.only?.uncounterable) uncounterable = true;
         if (k && l.haste && creatureSpell && haste !== "game") haste = l.haste;
+        if (l.commanderCounters && ownCommander) commanderCounters += k;
         if (l.spentTrigger && use !== "other" && "spell" in use) for (let j = 0; j < k; j++) spentTriggers.push(l.spentTrigger);
         for (const f of l.from ?? []) if (f !== "snow") from[f] += k;
       }
@@ -138,7 +142,7 @@ export function spendFromPool(s: GameState, pid: PlayerId, cost: ParsedCost, use
   }
   if (p.manaLots) p.manaLots = p.manaLots.filter((l) => l.n > 0);
   if (!p.manaLots?.length) p.manaLots = undefined;
-  return { ...paid, pool: { ...p.manaPool }, spent, treasure: from.treasure, from, ...(uncounterable ? { uncounterable: true as const } : {}), ...(spentTriggers.length ? { spentTriggers } : {}), ...(haste ? { haste } : {}) };
+  return { ...paid, pool: { ...p.manaPool }, spent, treasure: from.treasure, from, ...(uncounterable ? { uncounterable: true as const } : {}), ...(spentTriggers.length ? { spentTriggers } : {}), ...(haste ? { haste } : {}), ...(commanderCounters ? { commanderCounters } : {}) };
 }
 
 /**
@@ -162,15 +166,15 @@ export function boundSpend(o: GameObject, only: ManaSpend | undefined): ManaSpen
  * Add mana to `pid`'s pool (CR 106.4): restricted if `only` says how it can be spent (106.6), `from` what its source was
  * (106.3), `keep` if it isn't lost as steps end (until end of turn, or until end of combat for firebending).
  */
-export function addMana(s: GameState, pid: PlayerId, mana: ManaType[], how: { only?: ManaSpend; from?: ManaOrigin[]; keep?: ManaLot["keep"]; spentTrigger?: ManaSpentTrigger; haste?: ManaLot["haste"] } = {}): void {
+export function addMana(s: GameState, pid: PlayerId, mana: ManaType[], how: { only?: ManaSpend; from?: ManaOrigin[]; keep?: ManaLot["keep"]; spentTrigger?: ManaSpentTrigger; haste?: ManaLot["haste"]; commanderCounters?: true } = {}): void {
   const p = s.players[pid]!;
   const from = how.from?.length ? [...new Set(how.from)].sort() : undefined;
   const trig = (t: ManaSpentTrigger | undefined) => (t ? `${t.sourceId}#${t.sourceZc}` : "");
   for (const m of mana) {
     p.manaPool[m]++;
-    if (!how.only && !from && !how.keep && !how.spentTrigger && !how.haste) continue;
-    const same = p.manaLots?.find((l) => l.mana === m && l.only?.text === how.only?.text && (l.from ?? []).join() === (from ?? []).join() && l.keep === how.keep && trig(l.spentTrigger) === trig(how.spentTrigger) && l.haste === how.haste);
+    if (!how.only && !from && !how.keep && !how.spentTrigger && !how.haste && !how.commanderCounters) continue;
+    const same = p.manaLots?.find((l) => l.mana === m && l.only?.text === how.only?.text && (l.from ?? []).join() === (from ?? []).join() && l.keep === how.keep && trig(l.spentTrigger) === trig(how.spentTrigger) && l.haste === how.haste && l.commanderCounters === how.commanderCounters);
     if (same) same.n++;
-    else (p.manaLots ??= []).push({ mana: m, n: 1, ...(how.only ? { only: how.only } : {}), ...(from ? { from } : {}), ...(how.keep ? { keep: how.keep } : {}), ...(how.spentTrigger ? { spentTrigger: how.spentTrigger } : {}), ...(how.haste ? { haste: how.haste } : {}) });
+    else (p.manaLots ??= []).push({ mana: m, n: 1, ...(how.only ? { only: how.only } : {}), ...(from ? { from } : {}), ...(how.keep ? { keep: how.keep } : {}), ...(how.spentTrigger ? { spentTrigger: how.spentTrigger } : {}), ...(how.haste ? { haste: how.haste } : {}), ...(how.commanderCounters ? { commanderCounters: true as const } : {}) });
   }
 }

@@ -114,6 +114,10 @@ export function parseCountMod(line: string): CountMod | undefined {
   // Vizier of Remedies.
   if (line === "If one or more -1/-1 counters would be put on a creature you control, that many -1/-1 counters minus one are put on it instead.")
     return { what: "counters", counter: "-1/-1", on: "creature", who: "you", op: "minusOne" };
+  if (line === "If you would put one or more counters on a permanent or player, put twice that many of each of those kinds of counters on that permanent or player instead.")
+    return { what: "counters", putter: "you", op: "double" };
+  if (line === "If an opponent would put one or more counters on a permanent or player, they put half that many of each of those kinds of counters on that permanent or player instead, rounded down.")
+    return { what: "counters", putter: "opponent", op: "halfDown" };
   m = /^If an effect would put one or more counters on a permanent you control, it puts twice that many of those counters on that permanent instead\.$/.exec(line);
   if (m) return { what: "counters", on: "permanent", who: "you", op: "double" };
   return undefined;

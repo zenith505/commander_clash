@@ -160,7 +160,11 @@ function startOpeningActions(s: GameState) {
 function nextOpeningAction(s: GameState) {
   while (s.openingActions?.length) {
     const pid = s.openingActions[0]!;
-    const cards = player(s, pid).hand.filter((id) => compileCard(defOf(s, obj(s, id))).beginOnBattlefield);
+    // Gemstone Caverns: not for the starting player (CR 103.1), who takes the first turn.
+    const cards = player(s, pid).hand.filter((id) => {
+      const begin = compileCard(defOf(s, obj(s, id))).beginOnBattlefield;
+      return begin === true || (!!begin && pid !== s.activePlayer);
+    });
     if (cards.length) {
       s.pending = { kind: "searchLibrary", player: pid, source: "Opening hand", what: "these cards", cards, min: 0, max: cards.length, fromHand: true, opening: true };
       return;
@@ -4663,10 +4667,33 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
   if (pend?.kind === "searchLibrary" && pend.opening && pend.player === p.id) {
     if (new Set(found).size !== found.length || found.some((id) => !pend.cards.includes(id))) throw new RulesError(`those cards aren't ${pend.what}`);
     s.pending = null;
-    for (const id of found) {
-      moveObject(s, id, "battlefield");
-      log(s, `${p.name} begins the game with ${nameOf(s, id)} on the battlefield.`);
+    if (pend.exile) {
+      // "If you do, exile a card from your hand" (Gemstone Caverns): one for each that began the game on the battlefield.
+      if (found.length !== pend.min) throw new RulesError(`exile ${pend.min} card${pend.min === 1 ? "" : "s"}`);
+      for (const id of found) {
+        log(s, `${p.name} exiles ${nameOf(s, id)} from their hand.`);
+        moveObject(s, id, "exile");
+      }
+    } else {
+      let exile = 0;
+      for (const id of found) {
+        const begin = compileCard(defOf(s, obj(s, id))).beginOnBattlefield;
+        moveObject(s, id, "battlefield");
+        // "With a luck counter on it": it begins the game with it, it doesn't enter with it (CR 103.6a).
+        if (typeof begin === "object") {
+          obj(s, id).counters[begin.counter] = (obj(s, id).counters[begin.counter] ?? 0) + 1;
+          exile++;
+        }
+        log(s, `${p.name} begins the game with ${nameOf(s, id)}${typeof begin === "object" ? ` on the battlefield with a ${begin.counter} counter on it` : " on the battlefield"}.`);
+      }
+      const n = Math.min(exile, p.hand.length);
+      if (n) {
+        invalidateCharacteristics(s);
+        s.pending = { kind: "searchLibrary", player: p.id, source: "Gemstone Caverns", what: n === 1 ? "a card" : `${n} cards`, cards: [...p.hand], min: n, max: n, fromHand: true, opening: true, exile: true };
+        return;
+      }
     }
+    invalidateCharacteristics(s);
     s.openingActions!.shift();
     nextOpeningAction(s);
     return;

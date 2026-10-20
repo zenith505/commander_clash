@@ -1168,6 +1168,12 @@ export function compile(d: CardDef): CompiledCard {
       out.beginOnBattlefield = true;
       continue;
     }
+    // Gemstone Caverns (CR 103.6a; the starting player is the one taking the first turn, 103.1).
+    const caverns = /^If ~ is in your opening hand and you're not the starting player, you may begin the game with ~ on the battlefield with an? ([a-z]+) counter on it\. If you do, exile a card from your hand\.$/.exec(line);
+    if (caverns) {
+      out.beginOnBattlefield = { notStarting: true, counter: caverns[1]!, exileFromHand: true };
+      continue;
+    }
     // Torpor Orb, Hushwing Gryff, Doorkeeper Thrull, Elesh Norn, Mother of Machines.
     const lock = /^(Creatures|Artifacts and creatures|Permanents) entering(?: the battlefield)? don't cause abilities( of permanents your opponents control)? to trigger\.$/.exec(line);
     if (lock) {

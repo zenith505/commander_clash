@@ -3172,6 +3172,8 @@ function LibrarySearch({
                 ? `${pending.source}: you may reveal ${pending.what} from your hand`
                 : pending.bottom
                 ? `${pending.source}: put ${pending.what} from your hand on the bottom of your library`
+                : pending.fromHand && pending.exile
+                ? `${pending.source}: exile ${pending.what} from your hand`
                 : pending.fromHand
                 ? `${pending.source}: ${pending.min ? "put" : "you may put"} ${pending.what} from your hand onto the battlefield`
                 : pending.fromGraveyard === "exile"

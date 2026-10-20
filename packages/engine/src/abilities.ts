@@ -2819,6 +2819,11 @@ export interface ManaAbility {
   exhaust?: true;
   /** It has the ability only while this is true: "Max speed — {T}: Add {R}{R}." (CR 702.178a). */
   activeIf?: StaticCondition;
+  /**
+   * "{T}: Add {C}. If ~ has a luck counter on it, instead add one mana of any color." (Gemstone Caverns): what it makes
+   * while `cond` is true (`manaAbilitiesOn` swaps it in), checked as it's activated and resolves (CR 605.3).
+   */
+  insteadIf?: { cond: StaticCondition; produces: ManaProduce };
   /** "Activate only if you control a Swamp." (CR 602.5b): it can't be activated otherwise, but it still could produce its mana (CR 106.7, rulings on Reflecting Pool). */
   activateIf?: StaticCondition;
   /** "Spend this mana only to cast a creature spell." (CR 106.6) */
@@ -3213,8 +3218,11 @@ export interface CompiledCard {
    * (CR 602.2b applies 601.2f), for sources matching `filter` (by name in any zone); mana abilities aren't taxed.
    */
   activationTaxes?: { filter?: TargetSpec; n: number; text: string }[];
-  /** The Leylines: "If ~ is in your opening hand, you may begin the game with it on the battlefield" (CR 103.6a). */
-  beginOnBattlefield?: boolean;
+  /**
+   * The Leylines: "If ~ is in your opening hand, you may begin the game with it on the battlefield" (CR 103.6a). Gemstone
+   * Caverns: only if you're not the starting player, with a counter on it, and "if you do, exile a card from your hand".
+   */
+  beginOnBattlefield?: true | { notStarting: true; counter: CounterKind; exileFromHand: true };
   /** "If you would gain life, you gain twice that much life instead" (a replacement effect, CR 614.1a). */
   doubleLifeGain?: boolean;
   /**

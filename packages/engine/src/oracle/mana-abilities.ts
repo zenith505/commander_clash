@@ -79,6 +79,13 @@ export function parseManaAbility(line0: string): ManaAbility | null {
       if (!cond || p.mana.some((x) => x !== m2![3]) || num(m2[2]!) <= p.mana.length) return null;
       out.produces = { kind: "fixed", mana: [p.mana[0]!], n: { count: { kind: "stateIf", cond }, times: num(m2[2]!) - p.mana.length, plus: p.mana.length } };
     }
+    else if ((m2 = /^If ([^,]+), instead add ([^.]+)\.$/.exec(extra)) && !out.insteadIf && out.produces.kind === "fixed" && !out.produces.n && !out.produces.count) {
+      // Gemstone Caverns: "If ~ has a luck counter on it, instead add one mana of any color."
+      const cond = parseStaticCondition(m2[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      const produces = parseManaProduced(m2[2]!);
+      if (!cond || !produces) return null;
+      out.insteadIf = { cond, produces };
+    }
     else if ((m2 = /^Activate only ([^.]+)\.$/.exec(extra)) && !out.activateIf && !out.oncePerTurn) {
       // "Activate only if you control a Swamp", "... only once each turn", "... only during an opponent's turn" (CR 602.5b).
       const clauses = parseOnlyClauses(m2[1]!);

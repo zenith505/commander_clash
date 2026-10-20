@@ -25,7 +25,8 @@ export function manaAbilitiesOn(s: GameState, o: GameObject): ManaAbility[] {
   const out = c.landAbilitiesLost ? [] : c.subtypes.map(basicLandManaAbility).filter((x): x is ManaAbility => x !== null);
   if (c.hasPrintedAbilities) out.push(...compileCard(defOf(s, o)).mana);
   for (const t of c.grantedAbilities) out.push(...compileGranted(t).mana); // 'Enchanted land has "{T}: Add ..."'
-  return out;
+  // "If ~ has a luck counter on it, instead add one mana of any color" (Gemstone Caverns): what it makes now.
+  return out.map((ab) => (ab.insteadIf && staticConditionNow(s, ab.insteadIf.cond, o.id, controllerOf(s, o)) ? { ...ab, produces: ab.insteadIf.produces } : ab));
 }
 
 /** Colors in the color identity of `pid`'s commander(s) (CR 903.4). */

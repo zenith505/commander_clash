@@ -153,8 +153,11 @@ const RING_TRIGGERS: TriggeredAbility[] = [
 
 const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII"];
 
-/** Card types/subtypes whose rules we don't model yet, whatever their text says. */
-const UNSUPPORTED_TYPES = ["Kindred", "Tribal", "Dungeon"];
+/**
+ * Card types/subtypes whose rules we don't model yet, whatever their text says. Kindred is modeled (CR 308): cast and
+ * resolved as its other card type, its subtypes creature types.
+ */
+const UNSUPPORTED_TYPES = ["Tribal", "Dungeon"];
 const UNSUPPORTED_SUBTYPES: string[] = [];
 
 const meldResults = new Map<string, boolean>();

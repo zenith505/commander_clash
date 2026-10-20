@@ -147,6 +147,17 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!who || who.ref === "you" || !options) return null;
     return [{ type: "punisher", who, options, effects: [{ type: "loseLife", who: { ref: "punished" }, n: amt(m[2]!) }] }];
   }
+  // "Draw a card unless that player pays {X}, where X is ~'s power" (Esper Sentinel), and "you may draw a card unless that
+  // player pays {1}" (Rhystic Study, through parseBody): that player decides whether to pay first, then you whether to
+  // draw (rulings on Rhystic Study). The draw is the penalty; its "may" is asked only if they didn't pay.
+  if ((m = new RegExp(`^(?:[Yy]ou )?(may )?[Dd]raw ${NUM} cards? unless (that player|they|he or she) (pays? .+)$`).exec(s))) {
+    const who = parsePlayer(m[3] === "he or she" ? "they" : m[3]!, ctx);
+    const options = parsePunisherOptions(m[4]!, ctx);
+    if (!who || who.ref === "you" || !options || options.some((o) => !("pay" in o))) return null;
+    const draw: Effect = { type: "draw", who: { ref: "you" }, n: num(m[2]!) };
+    const text = `draw ${m[2] === "a" || m[2] === "one" ? "a card" : `${m[2]} cards`}`;
+    return [{ type: "punisher", who, options, effects: [m[1] ? { type: "may", effects: [draw], text } : draw], thenText: m[1] ? `may ${text}` : text.replace(/^draw/, "draws") }];
+  }
   // "~ deals 5 damage to target opponent unless that player sacrifices a creature of their choice" (Demanding Dragon).
   if ((m = new RegExp(`^(?:~|It) deals ${NUMX} damage to (.+?) unless (?:they|that player|he or she) ((?:sacrifices?|discards?|pays?) .+)$`).exec(s))) {
     if (/^It /.test(s) && !ctx.selfIt) return null;

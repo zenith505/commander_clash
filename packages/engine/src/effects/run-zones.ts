@@ -550,6 +550,22 @@ function runMeld(s: GameState, e: Extract<Effect, { type: "meld" }>, ctx: Resolv
 
 export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
   switch (e.type) {
+    case "commanderToHand": {
+      // "Your commander" is a commander you own (CR 903.3); in the command zone as this resolves, or nothing happens.
+      const p = player(s, ctx.controller);
+      const mine = p.command.filter((id) => obj(s, id).isCommander && obj(s, id).owner === p.id);
+      if (!mine.length) return;
+      const sc = (s.resolving!.scratch ??= {});
+      if (mine.length > 1 && (sc.commander === undefined || !mine.includes(sc.commander))) {
+        s.pending = { kind: "chooseOption", player: p.id, source: src, what: "commander", options: mine, labels: mine.map((id) => defOf(s, obj(s, id)).name), prompt: "put which commander into your hand?" };
+        return "paused";
+      }
+      const id = mine.length > 1 ? sc.commander! : mine[0]!;
+      sc.commander = undefined;
+      log(s, `${p.name} puts ${defOf(s, obj(s, id)).name} into their hand from the command zone.`);
+      moveObject(s, id, "hand");
+      return;
+    }
     case "meld":
       return runMeld(s, e, ctx, src);
     case "exploit":

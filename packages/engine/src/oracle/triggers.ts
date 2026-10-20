@@ -336,11 +336,15 @@ function parseTargetedTrigger(line: string): TriggeredAbility | "fail" | null {
 }
 
 function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
-  // "Whenever you cast your second spell each turn", "Whenever an opponent casts their second spell each turn".
-  const nth = /^Whenever (you|an opponent|a player) casts? (?:your|their) second spell each turn, (.+)$/.exec(line);
+  // "Whenever you cast your second spell each turn", "Whenever an opponent casts their second spell each turn", "...
+  // their first noncreature spell each turn" (Esper Sentinel): counting only the spells of that kind they cast this turn.
+  const nth = /^Whenever (you|an opponent|a player) casts? (?:your|their) (first|second) (?:(.+?) )?spell each turn, (.+)$/.exec(line);
   if (nth) {
-    const body = parseBody(nth[2]!, { castSpell: true, eventPlayer: true });
-    return body ? { event: "castSpell", cast: { by: CAST_BY[nth[1] as keyof typeof CAST_BY], spell: { kind: "spell", text: "spell" }, nth: 2 }, body } : "fail";
+    const parsed = nth[3] ? parseTargetPhrase(`${nth[3]} spell`) : { kind: "spell" as const, text: "spell" };
+    const kind = parsed && { ...parsed, text: nth[3] ? `${nth[3]} spell` : "spell" };
+    if (kind?.kind !== "spell") return "fail";
+    const body = parseBody(nth[4]!, { castSpell: true, eventPlayer: true });
+    return body ? { event: "castSpell", cast: { by: CAST_BY[nth[1] as keyof typeof CAST_BY], spell: kind, nth: nth[2] === "first" ? 1 : 2, ...(nth[3] ? { nthOfKind: true as const } : {}) }, body } : "fail";
   }
   const m = CAST_TRIGGER.exec(line);
   if (!m) return null;
@@ -1238,6 +1242,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (fromYard) {
     const t = parseTrigger(`When ~ enters, ${fromYard[2]}`);
     return !t || t === "fail" || t.event !== "selfEnters" ? "fail" : { ...t, ifFromGraveyard: fromYard[1] === "a" ? "any" : "yours" };
+  }
+  // "When ~ enters untapped, ..." (Mystic Sanctuary): entering untapped is part of the trigger event.
+  const untapped = /^When(?:ever)? ~ enters untapped, (.+)$/.exec(line);
+  if (untapped) {
+    const t = parseTrigger(`When ~ enters, ${untapped[1]}`);
+    return !t || t === "fail" || t.event !== "selfEnters" ? "fail" : { ...t, ifEnteredUntapped: true };
   }
   for (const [re, event] of TRIGGERS) {
     const m = re.exec(line);

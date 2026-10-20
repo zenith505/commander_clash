@@ -5,6 +5,7 @@
 
 import { readFileSync } from "node:fs";
 import { compileCard, isFullySupported, registerMeldResults, type CardDef } from "../packages/engine/src";
+import { loadRanks, popularityLines } from "./popularity";
 
 type Card = CardDef & { commanderLegal?: string };
 const cards: Card[] = JSON.parse(readFileSync(new URL("../data/generated/cards.json", import.meta.url), "utf8"));
@@ -13,6 +14,12 @@ registerMeldResults(cards);
 const legal = cards.filter((c) => c.commanderLegal === "legal");
 const sup = legal.filter((c) => isFullySupported(c));
 console.log(`fully supported: ${sup.length} of ${legal.length} legal (${cards.length} total)`);
+// Among the most played cards (EDHREC rank, data/popularity.json): the roadmap's finish bar.
+const ranks = loadRanks();
+if (ranks) {
+  const supNames = new Set(sup.map((c) => c.name));
+  console.log(`most played: ${popularityLines(ranks, (n) => supNames.has(n)).join(", ")}`);
+}
 const by = (pred: (c: Card) => boolean) => sup.filter(pred).length;
 console.log("auras", by((c) => c.subtypes.includes("Aura")), "equipment", by((c) => c.subtypes.includes("Equipment")),
   "with statics", by((c) => compileCard(c).statics.length > 0));

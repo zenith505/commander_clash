@@ -25,6 +25,8 @@ export function parseEntersCondition(text: string): EntersCondition | null {
   if ((m = /^you control a legendary (white|blue|black|red|green) creature$/.exec(text))) return { kind: "control", who: "you", types: ["Creature"], supertypes: ["Legendary"], colors: [COLOR_WORDS[m[1]!]!], min: 1 };
   if ((m = /^you control an? (\w+)(?: or an? (\w+))?$/.exec(text)) && [m[1], m[2]].every((x) => x === undefined || BASIC_TYPES.includes(x)))
     return { kind: "control", who: "you", subtypes: [m[1]!, ...(m[2] ? [m[2]] : [])], min: 1 };
+  // "Unless you control three or more other Islands" (Mystic Sanctuary and the other Eldraine lands).
+  if ((m = new RegExp(`^you control ${NUM} or more other (Plains|Islands|Swamps|Mountains|Forests)$`).exec(text))) return { kind: "control", who: "you", subtypes: [m[2] === "Plains" ? "Plains" : m[2]!.replace(/s$/, "")], other: true, min: num(m[1]!) };
   if ((m = new RegExp(`^your opponents control ${NUM} or more lands$`).exec(text))) return { kind: "control", who: "opponents", types: ["Land"], min: num(m[1]!) };
   if ((m = /^a player has (\d+) or less life$/.exec(text))) return { kind: "playerLifeAtMost", n: Number(m[1]) };
   if ((m = new RegExp(`^you have ${NUM} or more opponents$`).exec(text))) return { kind: "opponents", min: num(m[1]!) };

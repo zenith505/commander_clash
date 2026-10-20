@@ -380,3 +380,9 @@ export function parseTypeLine(typeLine: string): Pick<CardDef, "supertypes" | "t
     subtypes: right.trim().replace(/\bTime Lord\b/g, "Time_Lord").split(/\s+/).filter(Boolean).map((w) => (w === "Time_Lord" ? "Time Lord" : w)),
   };
 }
+
+/** Do these cards all share a land type (CR 205.3i), each with every other? "Two basic land cards that share a land type" (Myriad Landscape). */
+export function shareLandType(defs: CardDef[]): boolean {
+  const types = (d: CardDef) => d.subtypes.filter((t) => subtypeSet(t) === "Land");
+  return defs.every((a, i) => defs.every((b, j) => i === j || types(a).some((t) => types(b).includes(t))));
+}

@@ -697,6 +697,19 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si++;
       continue;
     }
+    // "Whenever an opponent draws a card, that player may pay {2}. If the player doesn't, you create a Treasure token."
+    // (Smothering Tithe): a punisher whose only way out is the payment.
+    const thatMay = /^([Tt]hat player|[Tt]hey|[Tt]arget opponent|[Tt]arget player|[Ee]ach opponent) may pay (.+)$/.exec(s);
+    const thatThen = thatMay && /^If (?:the player|that player|they|he or she) (?:doesn't|don't), (you .+)$/.exec(sentences[si + 1] ?? "");
+    if (thatMay && thatThen) {
+      const who = parsePlayer(thatMay[1]!.toLowerCase(), ctx);
+      const options = parsePunisherOptions(`pays ${thatMay[2]!}`, ctx);
+      const then = options && parseOne(capital(thatThen[1]!), ctx);
+      if (!who || who.ref === "you" || !options || !then || then.some((e) => pauses(e))) return null;
+      effects.push({ type: "punisher", who, options, effects: then, thenText: thatThen[1]!.replace(/^you (\w+)/, (_, v: string) => `${v}s`) });
+      si++;
+      continue;
+    }
     // "Each player may scry 1" (Eager Construct), "then each opponent may scry 1" (Myr Custodian), "each player may draw a
     // card" (Kwain): each decides in turn order, knowing the earlier answers, then those who did each do it, in turn
     // order (rulings on Eager Construct and Kaya, Intangible Slayer).
@@ -1793,7 +1806,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "You may draw a card": optional, decided on resolution (CR 608.2d).
     // "You may play the exiled card without paying its mana cost" asks as it plays it (see the playLinked effect).
     // "You may play an additional land this turn" is a permission, not a choice made now (CR 305.2a).
-    const may = /^[Yy]ou may (?!play the exiled card |play (?:an|up to \w+) additional lands? this turn)(.+)$/.exec(s);
+    // "You may draw a card unless that player pays {1}" (Rhystic Study): they decide first (see the punisher sentences).
+    const may = /^[Yy]ou may (?!play the exiled card |play (?:an|up to \w+) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? )(.+)$/.exec(s);
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
       // don't control": ~ does it, if you choose.

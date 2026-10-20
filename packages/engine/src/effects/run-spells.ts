@@ -536,7 +536,7 @@ export function paidUnless(s: GameState, ctx: ResolveCtx, payer: PlayerId, unles
   if (sc.paid === undefined) {
     const p = player(s, payer);
     // The amount is fixed as the choice is offered (CR 608.2h).
-    const cost = unlessCost(unless.cost, unless.generic === undefined ? 0 : amountNow(s, unless.generic, ctx));
+    const cost = unlessCost(unless.cost, unless.generic === undefined ? 0 : Math.max(0, amountNow(s, unless.generic, ctx)));
     // "Pay life equal to this creature's power": its power now, or as it last existed (CR 608.2h). Paying 0 life is
     // allowed (CR 119.4).
     const life = unless.life ?? (unless.lifeAmount ? Math.max(0, amountNow(s, unless.lifeAmount, ctx)) : 0);

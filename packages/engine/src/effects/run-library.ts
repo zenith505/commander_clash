@@ -457,6 +457,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           min,
           max,
           ...(e.others ? { firstTo: describeDest(e.dest), othersTo: describeDest(e.others) } : {}),
+          ...(e.shareLandType ? { shareLandType: true as const } : {}),
         };
         return "paused";
       }

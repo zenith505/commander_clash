@@ -29,7 +29,7 @@ export function manaAbilitiesOn(s: GameState, o: GameObject): ManaAbility[] {
 }
 
 /** Colors in the color identity of `pid`'s commander(s) (CR 903.4). */
-function commanderIdentity(s: GameState, pid: PlayerId): ManaType[] {
+export function commanderIdentity(s: GameState, pid: PlayerId): ManaType[] {
   const ids = new Set<ManaType>();
   for (const o of Object.values(s.objects)) if (o.isCommander && o.owner === pid) s.cards[o.cardId]?.colorIdentity.forEach((c) => ids.add(c));
   return COLORS.filter((c) => ids.has(c));

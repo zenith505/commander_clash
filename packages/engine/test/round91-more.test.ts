@@ -102,3 +102,23 @@ describe("Commander's Plate", () => {
     expect(objHasKeyword(s, s.objects[b]!, "Protection from blue")).toBe(false);
   });
 });
+
+describe("Chandra's Ignition", () => {
+  const ignition = card("Chandra's Ignition", "Sorcery", "{3}{R}{R}", { oracleText: "Target creature you control deals damage equal to its power to each other creature and each opponent." });
+  it("parse", () => expect(isFullySupported(ignition)).toBe(true));
+
+  it("the creature deals damage equal to its power to each other creature and each opponent; lifelink is its own", () => {
+    const { s: s0, ap, ids, opp } = setup([ignition]);
+    const big = putOnBattlefield(s0, ap, card("Vampire Nighthawk Copy", "Creature — Vampire", "{1}{B}{B}", { power: "4", toughness: "4", keywords: ["Lifelink"] }));
+    const mine = putOnBattlefield(s0, ap, bear());
+    const theirs = putOnBattlefield(s0, opp, bear());
+    const life = s0.players[ap]!.life;
+    const s = cast(s0, ap, ids[0]!, [{ kind: "object", id: big }]);
+    expect(s.battlefield).toContain(big);
+    expect(s.battlefield).not.toContain(mine);
+    expect(s.battlefield).not.toContain(theirs);
+    for (const p of s.turnOrder.filter((p) => p !== ap)) expect(s.players[p]!.life).toBe(40 - 4);
+    // 4 to each of two creatures and three opponents, all from the lifelinker.
+    expect(s.players[ap]!.life).toBe(life + 20);
+  });
+});

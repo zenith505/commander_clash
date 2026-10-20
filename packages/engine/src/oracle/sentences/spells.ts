@@ -218,6 +218,16 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const b = a && parseObject(m[2]!, ctx);
     return a?.ref === "target" && a.n && b?.ref === "target" && !isGroup(b) && !isSeveral(b) ? [{ type: "bite", a, b }] : null;
   }
+  // "Target creature you control deals damage equal to its power to each other creature and each opponent" (Chandra's
+  // Ignition): that creature is the source (rulings), its power as this resolves; "other" is other than it.
+  if ((m = /^(Target creature(?: you control)?) deals damage equal to its power to (each other creature)(?: and (each opponent|each player))?$/.exec(s))) {
+    const a = parseObject(m[1]!.toLowerCase(), ctx);
+    if (a?.ref !== "target" || a.n) return null;
+    const to = parseDamageRecipient(m[2]!, ctx);
+    if (to?.ref !== "each" || !(to.other || to.otherThan === a.index)) return null;
+    const { other: _, ...rest } = to;
+    return [{ type: "damage", amount: { count: { kind: "power", of: a } }, to: { ...rest, otherThan: a.index }, ...(m[3] ? { also: [{ ref: m[3] === "each opponent" ? "eachOpponent" : "eachPlayer" }] } : {}), by: { target: a.index } }];
+  }
   if ((m = /^(.+?) deals damage equal to its power to (.+)$/i.exec(s))) {
     // The source dealing damage equal to its own power: damage from it, its power as it is or as it last
     // existed if it's gone, like after it's sacrificed to pay for this (CR 608.2h).

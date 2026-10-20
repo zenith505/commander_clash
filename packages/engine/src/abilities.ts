@@ -1103,7 +1103,8 @@ export type Effect =
       evenly?: true;
       /** "The damage can't be prevented." (CR 615.12) */ unpreventable?: true;
       /** "It deals ..." after "Whenever a commander you control deals combat damage" (Kediss): the trigger's creature deals it, as it last existed if it's gone (CR 608.2h). */
-      by?: "subject";
+      /** `target`: "Target creature you control deals damage equal to its power to each other creature" (Chandra's Ignition): that target, if still legal. */
+      by?: "subject" | { target: number };
       /** "Excess damage is dealt to that creature's controller instead" (Flame Spill): the damage beyond lethal goes there (CR 120.4a). */
       excessToController?: true;
     }

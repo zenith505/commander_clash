@@ -92,7 +92,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
             })
           : [{ ...damageRecipients(s, to, ctx), n: amount }];
       const all = [e.to, ...(e.also ?? [])].flatMap(parts);
-      const by = e.by === "subject" ? subjectSource(s, ctx) : ctxSource(s, ctx);
+      const by = e.by === "subject" ? subjectSource(s, ctx) : e.by ? targetSource(s, ctx, e.by.target) : ctxSource(s, ctx);
       if (!by) return;
       const from = { ...by, ...(e.unpreventable ? { unpreventable: "all" as const } : {}) };
       // All dealt at once: lifelink is one life-gain event (CR 119.10).
@@ -534,6 +534,12 @@ export function becomeMonarch(s: GameState, pid: PlayerId) {
  * it last existed there once it has left (CR 608.2h), with the lifelink or deathtouch it had then (rulings on Warstorm
  * Surge, Fiendlash).
  */
+/** A target permanent that deals the damage itself, while it's still a legal target (CR 608.2b). */
+function targetSource(s: GameState, ctx: ResolveCtx, index: number): DamageSource | undefined {
+  const o = ctx.legal[index] ? objects(s, { ref: "target", index }, ctx)[0] : undefined;
+  return o?.zone === "battlefield" ? objectSource(s, o) : undefined;
+}
+
 function subjectSource(s: GameState, ctx: ResolveCtx): DamageSource | undefined {
   const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
   if (!o) return undefined;

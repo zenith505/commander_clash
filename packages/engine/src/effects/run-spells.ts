@@ -2,7 +2,7 @@ import type { AbilityBody, Effect, Modification, SpellCondition, TargetChoice, T
 import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, cardIdOf, defOf, isType } from "../cards";
 import { controllerOf } from "../layers";
-import { shuffle, shuffleLibrary } from "../rng";
+import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { castProblem, describeTargets, log, moveObject, newObject, obj, opponents, player } from "../game";
 import { compileCard, spellTargetSpecs } from "../oracle";
 import type { DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
@@ -313,7 +313,16 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           shuffleLibrary(s, p);
           log(s, `${p.name} shuffles their library.`);
         }
-        const at = p.library.findIndex((id) => !isType(defOf(s, obj(s, id)), "Land"));
+        // Tibalt's Trickery: mill 1, 2 or 3, chosen at random (CR 701.13), first.
+        if (e.millFirst) {
+          const n = 1 + Math.floor(nextRandom(s) * e.millFirst);
+          const milled = p.library.slice(0, n);
+          for (const id of milled) moveObject(s, id, "graveyard");
+          log(s, `${n} is chosen at random: ${p.name} mills ${milled.length} card${milled.length === 1 ? "" : "s"}.`);
+        }
+        // "With a different name than that spell": the countered spell's name (CR 201.2).
+        const other = e.notNamedAs !== undefined ? spellNameOf(s, ctx, e.notNamedAs) : undefined;
+        const at = p.library.findIndex((id) => !isType(defOf(s, obj(s, id)), "Land") && (other === undefined || !sameName(defOf(s, obj(s, id)).name, other)));
         // No nonland card: every card is revealed or exiled (rulings on Stolen Goods and Treasure Hunt).
         const seen = p.library.slice(0, at < 0 ? p.library.length : at + 1);
         const hit = at < 0 ? undefined : p.library[at];
@@ -331,8 +340,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           for (const id of rest) moveObject(s, id, "library");
         } else for (const id of seen) moveObject(s, id, "exile");
         const caster = e.ownerCasts ? pid : ctx.controller;
-        sc.untilNonland = { ...(hit ? { hit } : {}), caster };
-        if (!hit) return;
+        sc.untilNonland = { ...(hit ? { hit } : {}), caster, ...(e.restBottom ? { seen } : {}) };
+        if (!hit) return bottomRest(s, sc.untilNonland.seen);
         if (e.then !== "castFree") {
           // "Until end of turn, you may cast that card (without paying its mana cost)": with its usual timing (rulings).
           const o = obj(s, hit);
@@ -345,7 +354,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         s.pending = null;
         log(s, `${defOf(s, obj(s, hit)).name} can't be cast.`);
       }
-      return;
+      return bottomRest(s, sc.untilNonland.seen);
     }
     case "discover": {
       // CR 701.57a: the mana value of the spell it would be is checked too (701.57a), the card's own for the cards we have.
@@ -420,7 +429,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "changeTarget": {
       const t = ctx.targets[e.index];
       if (!ctx.legal[e.index] || t?.kind !== "stack") return;
-      return changeTarget(s, ctx, t.id, src, e.unless);
+      return changeTarget(s, ctx, t.id, src, e.unless, e.toSelf);
     }
     case "newTargets": {
       const t = ctx.targets[e.index];
@@ -507,6 +516,27 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
  * (CR 605.3a). A spell that can't be countered stays, paid for or not (CR 101.2). A countered spell
  * goes to its owner's graveyard, or where "instead" says (CR 701.6a).
  */
+/** "Then they put the exiled cards on the bottom of their library in a random order": those still in exile. */
+function bottomRest(s: GameState, seen: ObjectId[] | undefined): void {
+  const rest = (seen ?? []).filter((id) => s.objects[id]?.zone === "exile");
+  if (!rest.length) return;
+  shuffle(s, rest);
+  for (const id of rest) moveObject(s, id, "library");
+  log(s, `${rest.length} exiled card${rest.length === 1 ? " goes" : "s go"} to the bottom of ${player(s, s.objects[rest[0]!]!.owner).name}'s library in a random order.`);
+}
+
+/**
+ * The name of target spell `index`: as it is on the stack, or its card once it has left (countered). A modal
+ * double-faced card cast as its back face has its front face's name once it's gone (CR 712.8a; Tibalt's Trickery's rulings
+ * want the back face's here, which isn't kept).
+ */
+function spellNameOf(s: GameState, ctx: ResolveCtx, index: number): string | undefined {
+  const t = ctx.targets[index];
+  const id = t?.kind === "stack" ? (s.stack.find((x) => x.id === t.id)?.objectId ?? ctx.spellObjects?.[index]) : undefined;
+  const o = id ? s.objects[id] : undefined;
+  return o && !o.faceDown ? defOf(s, o).name : undefined;
+}
+
 function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefined, by: string, unless?: UnlessPays, instead?: "exile" | "libraryTop" | "hand", bounce?: true): "paused" | void {
   const i = s.stack.findIndex((x) => x.id === stackId);
   const item = s.stack[i];
@@ -603,7 +633,7 @@ export function paidUnless(s: GameState, ctx: ResolveCtx, payer: PlayerId, unles
  * stack, CR 608.2n; the spell itself isn't, CR 115.5). With none, the target stays as it is, legal or not. Its new
  * target becomes a target of it ("becomes the target" triggers, ward).
  */
-function changeTarget(s: GameState, ctx: ResolveCtx, stackId: string, by: string, unless?: UnlessPays): "paused" | void {
+function changeTarget(s: GameState, ctx: ResolveCtx, stackId: string, by: string, unless?: UnlessPays, toSelf?: true): "paused" | void {
   const item = s.stack.find((x) => x.id === stackId);
   const o = item?.objectId ? s.objects[item.objectId] : undefined;
   if (!item || (item.kind === "spell" && !o)) return;
@@ -618,6 +648,17 @@ function changeTarget(s: GameState, ctx: ResolveCtx, stackId: string, by: string
   const sc = (s.resolving!.scratch ??= {});
   const spec = (item.body?.targets ?? (o ? spellTargetSpecs(defOf(s, o), item.modes) : []))[j];
   if (!spec) return;
+  if (toSelf) {
+    // To this ability's source, still on the battlefield as the same object, and only if it's a legal target for it.
+    const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+    const here = !!me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc);
+    const to = here ? changeTargetOptions(s, item, spec, current).find((t) => t.kind === "object" && t.id === me!.id) : undefined;
+    if (!to) {
+      log(s, `${by} can't become the target of ${item.description}, so its target stays the same.`);
+      return;
+    }
+    sc.newTarget = to;
+  }
   if (!sc.newTarget) {
     const options = changeTargetOptions(s, item, spec, current);
     if (!options.length) {

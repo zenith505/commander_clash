@@ -321,7 +321,17 @@ function parseFaceDownPlay(sentences: string[], at: number, ctx: Ctx): { effect:
  * Flourish's "If that permanent is destroyed this way, its controller exiles ..., then they may cast that card without
  * paying its mana cost". Null when it isn't one of these; any other use of the found card leaves the line unsupported.
  */
+const TIBALT = "Its controller mills one to three cards chosen at random and exiles cards from the top of their library until they exile a nonland card with a different name than that spell; they may cast that card without paying its mana cost and put the exiled cards on the bottom of their library in a random order";
+
 function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect: Effect; next: number } | null | "fail" {
+  // Tibalt's Trickery, after "Counter target spell": "Choose 1, 2, or 3 at random. Its controller mills that many cards,
+  // then exiles ... until they exile a nonland card with a different name than that spell. They may cast that card
+  // without paying its mana cost. Then they put the exiled cards on the bottom of their library in a random order."
+  if (sentences[at] === TIBALT) {
+    if (ctx.targets.length !== 1 || ctx.targets[0]!.kind !== "spell") return "fail";
+    const who = { ref: "targetController" as const, index: 0 };
+    return { effect: { type: "exileUntilNonland", who, then: "castFree", ownerCasts: true, millFirst: 3, notNamedAs: 0, restBottom: true }, next: at + 1 };
+  }
   // "Shuffle your library, then reveal ...", "..., then put all cards revealed this way ...": split at ", then" by now.
   const shuffleFirst = /^[Ss]huffle your library$/.test(sentences[at]!);
   const s = sentences[shuffleFirst ? at + 1 : at] ?? "";
@@ -464,6 +474,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // "... gains flashback until end of turn. The flashback cost is equal to its mana cost." is one instruction.
   // "Choose target artifact or enchantment. Its owner shuffles it into their library." (Deglamer) is one instruction.
   text = text.replace(/^Choose (target [^.]+?)\. Its owner shuffles it into their library\./, "The owner of $1 shuffles it into their library.");
+  // Tibalt's Trickery: one instruction about the countered spell's controller (read in parseUntilNonland).
+  text = text.replace(/Choose 1, 2, or 3 at random\. Its controller mills that many cards, then exiles cards from the top of their library until they exile a nonland card with a different name than that spell\. They may cast that card without paying its mana cost\. Then they put the exiled cards on the bottom of their library in a random order\./, `${TIBALT}.`);
+  text = text.replace(/If you haven't cast a spell this turn, you may cast that card\. If you do, you can't cast additional spells this turn\./, "If you haven't cast a spell this turn, you may cast that card, and if you do, you can't cast additional spells this turn.");
   text = text.replace(/ gains flashback until end of turn\. (?:The|Its) flashback cost is equal to (?:its|that card's) mana cost\./g, " gains flashback with its mana cost until end of turn.");
   // Search for Survivors: "An opponent chooses a card at random in your graveyard. If it's a creature card, put it onto the
   // battlefield. Otherwise, exile it." The choice is at random, so who makes it changes nothing: one instruction.
@@ -491,6 +504,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   text = text.replace(
     /\bReveal the top (\w+) cards of your library\. (Target opponent|An opponent) chooses (one of (?:them|those cards)|an? [a-z]+ card from among them)\. Put that card (into your hand|into your graveyard|onto the battlefield)(?: and the rest (into your hand|into your graveyard))?(\.|, then )/g,
     (_, n, who, which, to, rest, end) => `Reveal the top ${n} cards of your library; ${who.toLowerCase()} chooses ${which.replace(/ of (?:them|those cards)$/, "")}; put it ${to}${rest ? ` and the rest ${rest}` : ""}.${end === "." ? "" : " Then "}`,
+  );
+  // "Reveal the top five cards of your library. An opponent separates those cards into two piles. Put one pile into your
+  // hand and the other into your graveyard." (Fact or Fiction), "Reveal the top five cards of your library and separate
+  // them into two piles. An opponent chooses one of those piles. Put that pile into your hand and the other into your
+  // graveyard." (Steam Augury): one instruction each (CR 700.3).
+  text = text.replace(
+    /\b([Rr])eveal the top (\w+(?: plus one)?) cards of your library(, where X is [^.;]+)?\. An opponent separates (?:those cards|them) into two piles\. Put one pile into your hand and the other (into your graveyard|on the bottom of your library in any order)\./g,
+    (_, r, n, where, rest) => `${r}eveal the top ${n} cards of your library; an opponent separates them into two piles; put one pile into your hand and the other ${rest}${where ?? ""}.`,
+  );
+  text = text.replace(
+    /\b([Rr])eveal the top (\w+(?: plus one)?) cards of your library and separate them into two piles\. An opponent chooses one of those piles\. Put that pile into your hand and the other into your graveyard\./g,
+    (_, r, n) => `${r}eveal the top ${n} cards of your library; you separate them into two piles and an opponent chooses one; put one pile into your hand and the other into your graveyard.`,
   );
   // "Search your library, graveyard, and/or outside the game for an instant or sorcery card you own" (Invasion of
   // Arcavios): players here have no sideboard (CR 100.4: one is optional) and nothing else outside the game (as for
@@ -1630,6 +1655,19 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const inner = parseOne(ifVote[3]!.charAt(0).toUpperCase() + ifVote[3]!.slice(1), ctx);
       if (!inner) return null;
       effects.push({ type: "if", cond: { kind: "voteWins", option: ifVote[1]!, ...(ifVote[2] ? { orTie: true as const } : {}) }, effects: inner });
+      continue;
+    }
+    // "Destroy target creature. If that creature dies this way, ..." (Saw in Half, Kaervek's Purge): only if it was put
+    // into a graveyard, not if it survived or a replacement effect moved it elsewhere (CR 700.4, rulings).
+    const ifDies = /^If that creature dies this way, (.+)$/.exec(s);
+    if (ifDies) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "destroy" || prev.what.ref !== "target") return null;
+      // "The creature's power", "the creature's controller": that creature's.
+      const then = ifDies[1]!.replace(/\bthe creature's\b/g, "that creature's");
+      const inner = parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
+      if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
+      effects.push({ type: "if", cond: { kind: "destroyedThisWay", died: true }, effects: inner });
       continue;
     }
     // "Flip a coin. If you win the flip, ... If you lose the flip, ...": decided by that flip (CR 705.2); neither if it

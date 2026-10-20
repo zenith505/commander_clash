@@ -183,6 +183,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const rank = (id: string) => (s.objects[id]!.zone === "hand" ? 1 : 0);
       return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => rank(a) - rank(b)).slice(0, pend.max) }];
     }
+    // Separating cards into two piles (Fact or Fiction): as even as can be, by what the cards are worth in that player's
+    // hand. An opponent choosing for them takes the worse pile, they take the better one, so both ways the evener the better.
+    if (pend.kind === "searchLibrary" && pend.piles) return [{ type: "searchLibrary", player: pid, found: evenPiles(s, pend.forPlayer ?? pid, pend.cards) }];
     // Choosing among an opponent's revealed cards (Gifts Ungiven, Intuition): the ones they'd least like where the chosen
     // ones go, by how they'd rank them for themselves.
     if (pend.kind === "searchLibrary" && pend.forPlayer !== undefined) {
@@ -365,6 +368,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Which counter to move: a +1/+1 counter if it has one (moved onto our creature), else the first.
     if (pend.kind === "chooseOption" && pend.what === "counterKind") return [{ type: "chooseOption", player: pid, choice: pend.options.includes("+1/+1") ? "+1/+1" : pend.options[0]! }];
+    // Two piles: the better one for our own hand, the worse one for an opponent's.
+    if (pend.kind === "chooseOption" && pend.what === "pile" && pend.piles) {
+      const [a, b] = pend.piles.map((pile) => pile.reduce((n, id) => n + handWorth(s, id), 0));
+      const mine = pend.of === pid;
+      return [{ type: "chooseOption", player: pid, choice: (mine ? a! >= b! : a! <= b!) ? "0" : "1" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "either") {
       const i = pend.labels?.findIndex((l) => /Treasure/.test(l)) ?? -1;
       return [{ type: "chooseOption", player: pid, choice: pend.options[Math.max(0, i)]! }];
@@ -1937,6 +1946,15 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   if (e.effects.length === 1 && e.effects[0]!.type === "exileFaceDown" && e.effects[0]!.from === "hand") return linkedOwned(s, r.item.sourceId, pid) >= player(s, pid).hand.length;
   // Demonstrate: a copy for us and one for one opponent, ahead of the other two (CR 702.144a).
   if (e.effects.length === 1 && e.effects[0]!.type === "copySpell" && e.effects[0]!.demonstrate) return true;
+  // Hydroelectric Specimen: take an opponent's spell aimed at us or ours, not one of ours (or a helpful one) at theirs.
+  const toSelf = e.effects.find((x) => x.type === "changeTarget" && x.toSelf);
+  if (toSelf?.type === "changeTarget") {
+    const t = r.item.targets?.[toSelf.index];
+    const item = t?.kind === "stack" ? s.stack.find((x) => x.id === t.id) : undefined;
+    const current = item?.targets?.find((x) => x.kind !== "none");
+    const body = item?.body ?? (item?.objectId ? castingBody(defOf(s, obj(s, item.objectId))) : undefined);
+    return !!item && !!current && !!body && item.controller !== pid && isMine(s, pid, current) && !!harmfulTargets(body).some(Boolean);
+  }
   const provoke = e.effects.find((x) => x.type === "mustBlockSource");
   if (provoke?.type === "mustBlockSource" && provoke.what.ref === "target") {
     const t = r.item.targets?.[provoke.what.index];
@@ -3107,6 +3125,44 @@ function chooseStation(s: GameState, pid: PlayerId): Action[] | null {
  * What to find in a library search: as many as allowed. Lands of a basic type we have the fewest
  * of (for the colors), otherwise the biggest spell we could cast soon.
  */
+/** What a card is worth in a player's hand, for piles: a land a little, a spell more the more it costs. */
+function handWorth(s: GameState, id: string): number {
+  return isType(defOf(s, obj(s, id)), "Land") ? 1.5 : 1 + Math.min(mv(s, id), 7) * 0.5;
+}
+
+/** The first of two piles that splits `cards` as evenly as can be by handWorth (every split tried, up to 12 cards). */
+function evenPiles(s: GameState, pid: PlayerId, cards: string[]): string[] {
+  void pid;
+  const worth = cards.map((id) => handWorth(s, id));
+  const total = worth.reduce((a, b) => a + b, 0);
+  if (cards.length > 12) {
+    // Greedy: the most valuable cards first, each into the lighter pile.
+    const order = cards.map((id, i) => ({ id, w: worth[i]! })).sort((a, b) => b.w - a.w);
+    const one: string[] = [];
+    let w1 = 0;
+    let w2 = 0;
+    for (const c of order) {
+      if (w1 <= w2) {
+        one.push(c.id);
+        w1 += c.w;
+      } else w2 += c.w;
+    }
+    return one;
+  }
+  let best = 0;
+  let gap = Infinity;
+  for (let mask = 0; mask < 1 << cards.length; mask++) {
+    let w = 0;
+    for (let i = 0; i < cards.length; i++) if (mask & (1 << i)) w += worth[i]!;
+    const g = Math.abs(total - 2 * w);
+    if (g < gap) {
+      gap = g;
+      best = mask;
+    }
+  }
+  return cards.filter((_, i) => best & (1 << i));
+}
+
 function chooseSearch(s: GameState, pid: PlayerId, cards: string[], max: number): string[] {
   const mine = s.battlefield.map((x) => obj(s, x)).filter((o) => controllerOf(s, o) === pid);
   const lands = mine.filter((o) => objIsType(s, o, "Land")).length;

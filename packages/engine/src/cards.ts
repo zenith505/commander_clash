@@ -1,5 +1,5 @@
 import type { CompiledCard, ManaAbility, TargetSpec, TriggeredAbility } from "./abilities";
-import { characteristics, printedKeywords, type PTPart } from "./layers";
+import { characteristics, offFieldTyped, printedKeywords, type PTPart } from "./layers";
 import { compileCard, compileGranted, overloadedText } from "./oracle";
 import { COLORS, type CardDef, type Color, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
 import { manaValue, parseManaCost } from "./mana";
@@ -84,6 +84,16 @@ export const cardIdOf = (o: GameObject): string => (o.faceDown ? (withWard(o) ? 
 
 /** The card definition an object uses right now: its own, what it copies, or a face-down one (CR 613.2, 708.2). */
 export const defOf = (s: GameState, o: GameObject): CardDef => {
+  const out = ownDefOf(s, o);
+  // Outside the battlefield, effects like Maskwood Nexus's change a creature card's or spell's creature types.
+  return o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged" ? out : offFieldTyped(s, o, out);
+};
+
+/**
+ * Its definition without the type changes that work outside the battlefield (defOf): what a copy of it copies, since
+ * those aren't copiable values (CR 707.2).
+ */
+export const ownDefOf = (s: GameState, o: GameObject): CardDef => {
   if (o.faceDown) return withWard(o) ? FACE_DOWN_WARD : FACE_DOWN;
   const key = copiedId(o);
   // A face's definition is registered as the face is turned up (setFace); a game built by hand may not have done that.

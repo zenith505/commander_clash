@@ -2,7 +2,7 @@
 // own, registered in GameState.cards, so everything that reads an object's definition (its name, types,
 // power and toughness, abilities compiled from its rules text) sees the copied values (layer 1, CR 613.2).
 
-import { defOf, lockIfRoom } from "./cards";
+import { defOf, lockIfRoom, ownDefOf } from "./cards";
 import { unroomed } from "./faces";
 import { subtypeSet } from "./keywords";
 import { invalidateCharacteristics } from "./layers";
@@ -46,11 +46,17 @@ export interface CopyExcept {
    * it is that card type as it enters, as a copy (rulings).
    */
   enterCounters?: { counter: string; ifType?: string }[];
+  /**
+   * "Except their power is half that creature's power and their toughness is half that creature's toughness. Round up
+   * each time." (Saw in Half): base power and toughness, half the copied creature's as it last existed (rulings), worked
+   * out as the tokens are created (run-tokens.ts), then `pt`.
+   */
+  halfPT?: "up" | "down";
 }
 
 /** The copiable values of `o` now (CR 707.2): its definition as modified by copy effects, or face-down values. */
 export function copiableDef(s: GameState, o: GameObject): CardDef {
-  return defOf(s, o);
+  return ownDefOf(s, o);
 }
 
 /** Register the definition a copy of `base` with these exceptions has, and return its key in GameState.cards. */

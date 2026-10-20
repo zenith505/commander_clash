@@ -720,7 +720,8 @@ export type Modification =
   /** `chosenType`: also the creature type chosen as its source entered ("~ is the chosen type in addition to its other types"). */
   | { kind: "addTypes"; types: string[]; subtypes: string[]; supertypes?: string[]; allCreatureTypes?: true; chosenType?: true }
   | { kind: "setTypes"; types: string[]; subtypes: string[]; /** "Becomes a legendary 4/4 red Dragon creature" (Sarkhan, the Dragonspeaker): it gains these supertypes and keeps its others (CR 205.4b). */ supertypes?: string[] } // layer 4, "becomes a 3/3 Elemental creature": new card types replace the old (CR 205.1a)
-  | { kind: "setSubtypes"; subtypes: string[] } // layer 4, "becomes a Frog": replaces only subtypes of the same kind (CR 205.1a)
+  /** `chosenType`: the creature type chosen as its source entered instead ("creatures you control are the chosen type"). */
+  | { kind: "setSubtypes"; subtypes: string[]; chosenType?: true } // layer 4, "becomes a Frog": replaces only subtypes of the same kind (CR 205.1a)
   /**
    * Layer 4, "Nonbasic lands are Mountains", "enchanted land is an Island": the land's land types become these basic
    * ones, and it loses the abilities from its rules text, gaining each basic type's mana ability instead (CR 305.7).
@@ -861,6 +862,11 @@ export interface StaticAbility {
    * only while its card is in its owner's graveyard (CR 113.6b), controlled by its owner (CR 108.4a).
    */
   zone?: "graveyard";
+  /**
+   * "The same is true for creature spells you control and creature cards you own that aren't on the battlefield"
+   * (Maskwood Nexus, Conspiracy): its type change applies to those too (layers.ts offFieldTyped).
+   */
+  offField?: true;
 }
 
 /**
@@ -1309,6 +1315,13 @@ export type Effect =
    * from there this turn, paying its costs and following the timing rules (CR 601.2, 601.3).
    */
   | { type: "mayCastFromGraveyard"; what: ObjRef }
+  /**
+   * "You may cast that card" as this resolves (Conduit of Worlds), from your graveyard, paying its costs and ignoring
+   * timing (CR 608.2g, 601.2, rulings: not later in the turn). `thenNoMore`: "If you do, you can't cast additional spells
+   * this turn", even if another effect would let you (rulings, CR 101.2). `unlessCast`: "if you haven't cast a spell this
+   * turn", checked as it begins (spells cast earlier this turn count, even countered ones and the card with the ability).
+   */
+  | { type: "castNow"; what: ObjRef; thenNoMore?: true; unlessCast?: true }
   | { type: "putFromHand"; who?: PlayerRef; filter?: TargetSpec; tapped?: boolean; attacking?: boolean; may: boolean; any?: boolean; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand" }
   /**
    * "Return all land cards from your graveyard to the battlefield tapped" (CR 110.2a: under your control), "from all graveyards
@@ -1604,7 +1617,20 @@ export type Effect =
    * "hand", every revealed card into your hand (Treasure Hunt). A card not cast stays in exile, and so do the other
    * exiled cards.
    */
-  | { type: "exileUntilNonland"; who?: PlayerRef; reveal?: true; shuffleFirst?: true; then: "castFree" | "freeThisTurn" | "thisTurn" | "hand"; ownerCasts?: true }
+  | {
+      type: "exileUntilNonland";
+      who?: PlayerRef;
+      reveal?: true;
+      shuffleFirst?: true;
+      then: "castFree" | "freeThisTurn" | "thisTurn" | "hand";
+      ownerCasts?: true;
+      /** Tibalt's Trickery: "Choose 1, 2, or 3 at random. Its controller mills that many cards, then exiles ...". */
+      millFirst?: number;
+      /** "A nonland card with a different name than that spell": target `notNamedAs`'s name. */
+      notNamedAs?: number;
+      /** "Then they put the exiled cards on the bottom of their library in a random order": the card not cast too. */
+      restBottom?: true;
+    }
   /**
    * Discover N (CR 701.57a): exile cards from the top of your library until a nonland card with mana value N or less;
    * you may cast it without paying its mana cost, else it goes to your hand; the rest go on the bottom in a random order.
@@ -1850,7 +1876,8 @@ export type Effect =
    * "Change the target of target spell with a single target" (CR 115.7a): to another legal target, chosen as this
    * resolves, or it stays as it is if there's none; maybe unless that spell's controller pays (CR 118.12).
    */
-  | { type: "changeTarget"; index: number; unless?: UnlessPays }
+  /** `toSelf`: "change the target of target instant or sorcery spell with a single target to ~" (Hydroelectric Specimen): to this ability's source, only if it's a legal target for that spell (rulings). */
+  | { type: "changeTarget"; index: number; unless?: UnlessPays; toSelf?: true }
   /**
    * "You may choose new targets for target spell or ability" (CR 115.7d): as this resolves, its controller keeps any of
    * that spell's targets, legal or not, and changes the rest to legal ones.
@@ -2037,6 +2064,14 @@ export type Effect =
   /** "Reveal the top three cards of your library. An opponent chooses one of them. Put that card into your graveyard and the rest into your hand" (Murmurs from Beyond): the chooser (an opponent you choose as it resolves if left out) picks one revealed card (one that fits `filter`), which goes `to`; the rest go `rest`, or stay on top. */
   | { type: "revealPick"; n: Amount; chooser?: PlayerRef; filter?: TargetSpec; to: SearchDest; rest?: SearchDest }
   /**
+   * "Reveal the top five cards of your library. An opponent separates those cards into two piles. Put one pile into your
+   * hand and the other into your graveyard." (Fact or Fiction), or you separate them and an opponent chooses the pile
+   * (Steam Augury): the cards stay in the library while they're separated (CR 700.3c) and a pile may be empty. The
+   * opponent is one you choose as it resolves (rulings). `rest`: the other pile goes to the graveyard, or on the bottom
+   * of the library in any order (Jace, Architect of Thought).
+   */
+  | { type: "piles"; n: Amount; separator: "you" | "opponent"; rest: "graveyard" | "bottom" }
+  /**
    * "Look at the top four cards of your library. You may reveal a creature card from among them and put it
    * into your hand. Put the rest on the bottom of your library in a random order." Pick `count` of the top
    * `n` (matching `filter`; `upTo`: any number up to that), put them `into` there, and the others `rest`.
@@ -2166,7 +2201,8 @@ export type SpellCondition =
   /** "If you win the flip" (CR 705.2), `lost`: "if you lose the flip". Neither if no coin was flipped. */
   | { kind: "wonFlip"; lost?: true }
   /** "If that permanent is destroyed this way" (Transforming Flourish): this spell's or ability's destroy instructions destroyed something. */
-  | { kind: "destroyedThisWay" }
+  /** `died`: "if that creature dies this way" (Saw in Half): one it destroyed was put into a graveyard (CR 700.4, rulings). */
+  | { kind: "destroyedThisWay"; died?: true }
   /** "Sacrifice a creature. When you do, ..." (Tip the Scales): this ability's instructions sacrificed something. */
   | { kind: "sacrificedThisWay" }
   /** "If excess damage was dealt this way" (Orbital Plunge): this spell's or ability's damage dealt some (Count excessThisWay). */
@@ -3226,7 +3262,7 @@ export interface CompiledCard {
    */
   entersAsCopy?: { filter: TargetSpec; except?: CopyExcept; untilEndOfTurn?: boolean };
   /** "~ enters with N +1/+1 counters on it." (a replacement effect, CR 614.1c); modular N too (CR 702.43a). */
-  entersWithCounters?: { counter: CounterKind; n: Amount; /** Raid: "if you attacked this turn". */ if?: StaticCondition; /** "If you cast it from your hand" (the Myojin). */ castFromHand?: true; /** "If X is 5 or more, it enters with an additional X" (Apocalypse Hydra): twice as many. */ doubleIfXAtLeast?: number };
+  entersWithCounters?: { counter: CounterKind; n: Amount; /** Raid: "if you attacked this turn". */ if?: StaticCondition; /** "If you cast it from your hand" (the Myojin). */ castFromHand?: true; /** "If X is 5 or more, it enters with an additional X" (Apocalypse Hydra): twice as many. */ doubleIfXAtLeast?: number; /** "As ~ enters, choose a creature type. ~ enters with a fellowship counter on it for each creature you control of the chosen type" (Banner of Kinship): counted once that choice, part of how it enters, is made (CR 614.12). */ afterChoice?: ChoiceKind };
   /** Bloodthirst N (CR 702.54a): enters with N +1/+1 counters if an opponent was dealt damage this turn. */
   bloodthirst?: number;
   /**
@@ -3355,6 +3391,13 @@ export interface CompiledCard {
   drawEmptyWins?: true;
   /** "Your opponents can't cast spells from anywhere other than their hands." (Drannith Magistrate) */
   opponentsOnlyFromHand?: true;
+  /** Opposition Agent: "You control your opponents while they're searching their libraries." (CR 723.2) */
+  controlsOpponentSearches?: true;
+  /**
+   * Opposition Agent: "While an opponent is searching their library, they exile each card they find. You may play those
+   * cards for as long as they remain exiled, and you may spend mana as though it were mana of any color to cast them."
+   */
+  exilesOpponentFinds?: true;
   /**
    * "The first time you would draw a card each turn, instead look at the top two cards of your library. Put one of them
    * into your graveyard and the other back on top of your library. Then draw a card." (Scion of Halaster's grant).

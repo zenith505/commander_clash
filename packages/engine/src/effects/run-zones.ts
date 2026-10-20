@@ -890,7 +890,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       for (const o of objects(s, e.what, ctx)) {
         // As it last existed, for "for each creature destroyed this way" (CR 608.2h).
         const before = { o: structuredClone(o), ch: structuredClone(characteristics(s, o)) };
-        if (destroyPermanent(s, o, `${src} destroys ${defOf(s, o).name}.`, e.noRegen, ctx.controller) && s.resolving) (s.resolving.destroyed ??= []).push(before);
+        // "If that creature dies this way": it was put into a graveyard (CR 700.4), not exiled or moved elsewhere instead.
+        if (destroyPermanent(s, o, `${src} destroys ${defOf(s, o).name}.`, e.noRegen, ctx.controller) && s.resolving) (s.resolving.destroyed ??= []).push({ ...before, ...(s.objects[o.id]?.zone === "graveyard" ? { died: true as const } : {}) });
       }
       return;
     case "regenerate":
@@ -1140,6 +1141,31 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         return;
       }
       log(s, shown.length ? `${p.name} reveals ${shown.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their hand.` : `${p.name} reveals no cards.`);
+      return;
+    }
+    case "castNow": {
+      const sc = (s.resolving!.scratch ??= {});
+      if (sc.castNow === undefined) {
+        const o = objects(s, e.what, ctx)[0];
+        if (!o || o.zone !== "graveyard" || o.owner !== ctx.controller) return;
+        if (e.unlessCast && (s.castThisTurn ?? []).some((c) => c.player === ctx.controller)) return;
+        sc.castNow = { id: o.id };
+        s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src, how: "paid" };
+        // Mana abilities can still be activated to pay for it (CR 601.2g), so only the mana in the pool may be short.
+        const problem = castProblem(s, ctx.controller, o.id);
+        if (problem === null || /^not enough mana/.test(problem)) return "paused";
+        s.pending = null;
+        log(s, `${defOf(s, o).name} can't be cast.`);
+        return;
+      }
+      const was = sc.castNow;
+      const o = s.objects[was.id];
+      // Cast: it moved from the graveyard to the stack as this was paused (casting doesn't count as a zone change here).
+      const cast = !!o && o.zone === "stack";
+      if (cast && e.thenNoMore) {
+        (s.cantCastThisTurn ??= []).push({ player: ctx.controller, turn: s.turn, source: src });
+        log(s, `${player(s, ctx.controller).name} can't cast additional spells this turn.`);
+      }
       return;
     }
     case "mayCastFromGraveyard": {

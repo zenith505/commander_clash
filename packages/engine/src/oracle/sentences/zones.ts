@@ -39,6 +39,13 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     const t = ctx.targets[0]!;
     if (t.kind === "card" && t.owner === "you" && !t.many) return [{ type: "mayCastFromGraveyard", what: { ref: "target", index: 0 } }];
   }
+  // Conduit of Worlds: "Choose target nonland permanent card in your graveyard. If you haven't cast a spell this turn, you
+  // may cast that card. If you do, you can't cast additional spells this turn." (joined into one sentence in body.ts):
+  // cast as it resolves or not at all (rulings).
+  if (/^If you haven't cast a spell this turn, you may cast that card, and if you do, you can't cast additional spells this turn$/.test(s) && ctx.targets.length === 1) {
+    const t = ctx.targets[0]!;
+    if (t.kind === "card" && t.owner === "you" && !t.many) return [{ type: "castNow", what: { ref: "target", index: 0 }, unlessCast: true, thenNoMore: true }];
+  }
   // "Exile any number of target spells" (Mindbreak Trap): they leave the stack without being countered (rulings).
   if ((m = /^Exile (target spell|any number of target spells)$/i.exec(s))) {
     const spec: TargetSpec = { kind: "spell", types: [], notTypes: [], notColors: [], text: "target spell", ...(m[1] === "target spell" ? {} : { many: "any" as const }) };

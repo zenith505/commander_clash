@@ -286,6 +286,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const spec: TargetSpec = { ...stackSpec(m[1]!), controller: "you", text: `target ${m[1]!.toLowerCase()} you control` };
     return [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n: 1, newTargets: false }];
   }
+  // Return the Favor: "Copy target instant spell, sorcery spell, activated ability, or triggered ability": a spell or an
+  // ability on the stack (CR 707.10, 115.1c-d).
+  if ((m = /^Copy target (.+)$/i.exec(s)) && /\babilit/.test(m[1]!) && /\bspell\b/.test(m[1]!)) {
+    const spec = mixedStackSpec(m[1]!);
+    return spec && [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n: 1, newTargets: false }];
+  }
   // Sevinne's Reclamation: "you may copy ~ and may choose a new target for the copy", made as it resolves (rulings).
   if (ctx.spell && /^[Yy]ou may copy ~ and may choose a new target for the copy$/.test(s))
     return [{ type: "may", effects: [{ type: "copySpell", spell: "self", n: 1, newTargets: true }], text: "copy ~ (you may choose a new target for the copy)" }];
@@ -370,6 +376,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return filter?.kind === "spell" && filter.controller === "opponent" ? [{ type: "counterEach", filter: { ...filter, text: `each ${m[1]!}` } }] : null;
   }
   // Deflection: "Change the target of target spell with a single target" (CR 115.7a); Bolt Bend's "spell or ability".
+  // Hydroelectric Specimen: "... target instant or sorcery spell with a single target to ~".
+  if ((m = /^Change the target of target instant or sorcery spell with a single target to ~$/i.exec(s)))
+    return [{ type: "changeTarget", index: addTarget(ctx, { kind: "spell", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], singleTarget: true, text: "target instant or sorcery spell with a single target" }), toSelf: true }];
   if ((m = /^Change the target of target spell( or ability)? with a single target(?: unless that spell's controller pays (.+))?$/i.exec(s)) && !(m[1] && m[2])) {
     const unless = m[2] === undefined ? undefined : parseUnlessPays(m[2], ctx);
     if (unless === null) return null;

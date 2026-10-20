@@ -952,6 +952,17 @@ function parseStaticLine(line: string): StaticAbility | null {
   // "This creature is the chosen type in addition to its other types" (Metallic Mimic, Roaming Throne): the creature type
   // chosen as it entered, added in the type-changing layer (CR 613.1d).
   if (/^~ is the chosen type in addition to its other types$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "addTypes", types: [], subtypes: [], chosenType: true }], text: line };
+  // Maskwood Nexus ("Creatures you control are every creature type"), Arcane Adaptation and Xenograft ("... the chosen type
+  // in addition to their other types"), Conspiracy ("... the chosen type": it replaces their creature types, rulings):
+  // layer 4 (CR 613.1d, 205.1b). "The same is true for creature spells you control and creature cards you own that
+  // aren't on the battlefield" makes it apply there too (StaticAbility.offField).
+  const typing = /^(Creatures you control are|Each creature you control is|Slivers you control and nontoken creatures you control are) (every creature type|the chosen type( in addition to (?:their|its) other (?:creature )?types)?)(\. The same is true for creature spells you control and creature cards you own that aren't on the battlefield)?$/.exec(text);
+  if (typing) {
+    const mod: Modification = typing[2] === "every creature type" ? { kind: "addTypes", types: [], subtypes: [], allCreatureTypes: true } : typing[3] ? { kind: "addTypes", types: [], subtypes: [], chosenType: true } : { kind: "setSubtypes", subtypes: [], chosenType: true };
+    // Rukarumel: Slivers, and nontoken creatures (CR 205.3m: a Sliver is a creature type, so a Sliver permanent here is a creature).
+    const spec: TargetSpec | undefined = typing[1]!.startsWith("Slivers") ? { kind: "object", anyOf: [{ kind: "object", subtypes: ["Sliver"], text: "Sliver" }, { kind: "object", token: false, text: "nontoken creature" }], text: "Sliver or nontoken creature" } : undefined;
+    return { affects: { kind: "filter", types: ["Creature"], controller: "you", ...(spec ? { spec } : {}) }, mods: [mod], text: line, ...(typing[4] ? { offField: true as const } : {}) };
+  }
   if (/^Permanents with ice counters on them are snow$/.test(text)) return { affects: { kind: "filter", types: [], spec: { kind: "object", counter: "ice", text: "permanent with an ice counter on it" } }, mods: [snow], text: line };
   // Null Rod: "Activated abilities of artifacts can't be activated", mana abilities too (CR 605.1a); only permanents'.
   const silenced = /^Activated abilities of (.+?) can't be activated( unless they're mana abilities)?$/.exec(text);

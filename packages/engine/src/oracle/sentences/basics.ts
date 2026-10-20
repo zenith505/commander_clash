@@ -94,6 +94,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (filter === null || chooser === null) return null;
     return [{ type: "revealPick", n: num(revealPick[1]!), ...(chooser ? { chooser } : {}), ...(filter ? { filter } : {}), to: zoneOf(revealPick[5]!), ...(revealPick[6] ? { rest: zoneOf(revealPick[6]) } : {}) }];
   }
+  // Fact or Fiction, Steam Augury (as parseBody rewrites them): piles (CR 700.3).
+  const piles = /^[Rr]eveal the top (two|three|four|five|six|seven|X|X plus one) cards of your library; (an opponent separates them into two piles|you separate them into two piles and an opponent chooses one); put one pile into your hand and the other (into your graveyard|on the bottom of your library in any order)$/.exec(s);
+  if (piles) {
+    const n: Amount = piles[1] === "X plus one" ? { count: { kind: "x" }, plus: 1 } : amt(piles[1]!);
+    return [{ type: "piles", n, separator: piles[2]!.startsWith("an opponent") ? "opponent" : "you", rest: piles[3] === "into your graveyard" ? "graveyard" : "bottom" }];
+  }
   if (/^Search your library /i.test(s)) return parseSearch(s, (t) => parseBoundCount(t, ctx));
   // "Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then
   // shuffle" (Path to Exile): that player chooses whether to search, and doesn't shuffle if they don't (rulings). "That

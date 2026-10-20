@@ -4,7 +4,7 @@ import { compileCard } from "../oracle";
 import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, basePowerNow, defOf, objHasKeyword, objIsType, power, toughness } from "../cards";
 import { attackedPlaneswalker, creatureTypesOf, livingPlayers, obj, player, shareCreatureType } from "../game";
-import { characteristics, controllerOf, type Characteristics } from "../layers";
+import { characteristics, controllerOf, everyCreatureType, type Characteristics } from "../layers";
 import { expandMany, expandPerOpponent, manySlot, modeCountProblem } from "../modes";
 import { CREATURE_TYPES, hexproofFrom, protectedFromPlayer, type SourceQuality } from "../keywords";
 import { protectedFrom } from "../damage";
@@ -196,7 +196,7 @@ export const spellQuality = (s: GameState, cardId?: string): SourceQuality => ({
 /** Filters checked against a card's printed characteristics, for spells and cards in graveyards. */
 export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   // Changeling gives every creature type wherever the card is (CR 702.73a).
-  const hasSubtype = (st: string) => d.subtypes.includes(st) || (d.keywords.includes("Changeling") && CREATURE_TYPES.has(st));
+  const hasSubtype = (st: string) => d.subtypes.includes(st) || (everyCreatureType(d) && CREATURE_TYPES.has(st));
   if (spec.bound) return false; // not worked out yet (see objectMatches)
   if (spec.types?.length && !spec.types.some((ty) => d.types.includes(ty)) && !spec.orSubtypes?.some(hasSubtype)) return false;
   if (spec.allTypes?.some((ty) => !d.types.includes(ty))) return false;

@@ -126,8 +126,9 @@ const COPY_CARD_TYPES = new Set(["Artifact", "Creature", "Enchantment", "Land", 
  * types", "it's a 1/1 Spirit creature in addition to its other types", "it has haste", 'it has "..."', "its name
  * is ~" (~ being the copy's own name, see CopyExcept.name). Null if any part isn't understood.
  */
-export function parseCopyExcept(text: string): CopyExcept | null {
+export function parseCopyExcept(text: string, round?: "up" | "down"): CopyExcept | null {
   const out: CopyExcept = {};
+  if (/^their power is half that creature's power and their toughness is half that creature's toughness$/.test(text)) return round ? { halfPT: round } : null;
   // Quoted abilities first, so commas inside them don't split anything.
   const quoted: string[] = [];
   let t = text.replace(/"([^"]+)"/g, (_, q: string) => `\u0000${quoted.push(q) - 1}\u0000`);

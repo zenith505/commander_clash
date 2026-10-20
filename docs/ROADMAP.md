@@ -1,7 +1,7 @@
 # Roadmap
 
-21,334 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 928 of 992 (93%), top 2,000: 1,606 of 1,989 (80%), top 5,000: 3,373 of 4,988 (67%).
+21,354 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 937 of 992 (94%), top 2,000: 1,615 of 1,989 (81%), top 5,000: 3,384 of 4,988 (67%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,17 +22,22 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 94, most played first: Maskwood Nexus (and Arcane
-   Adaptation, Conspiracy, Leyline of Transformation, Xenograft: creature types for cards and spells off the
-   battlefield, which card filters can't see yet), Conduit of Worlds, Return the Favor, Saw in Half, Opposition Agent,
-   Tibalt's Trickery, Hydroelectric Specimen, Banner of Kinship, Trouble in Pairs, Midnight Clock ("when the twelfth
-   hour counter is put on ~"), Opal Palace, Innkeeper's Talent, Springheart Nantuko, Fact or Fiction (piles), Mockingbird,
+00. Most played first (`npm run popular`). Out after round 95, most played first: Trouble in Pairs, Midnight Clock
+   ("when the twelfth hour counter is put on ~"), Opal Palace, Innkeeper's Talent, Springheart Nantuko, Mockingbird,
    Spelunking ("Lands you control enter untapped" needs the player's choice of order against "enters tapped", rulings),
    Veyran, Isochron Scepter, Bloodchief Ascension, Eldritch Evolution, Kaya's Ghostform, Terrasymbiosis, Inkshield, High
    Tide, Forsaken Monument and Caged Sun (extra mana when a permanent is tapped for mana), Bloodletter of Aclazotz,
    Scrap Trawler ("with lesser mana value"), Cut a Deal ("each opponent who drew a card this way"), Grim Hireling
    ("Sacrifice X Treasures"), Descent into Avernus, Excalibur, Coat of Arms (a bonus counted for each creature it
-   affects). Smaller gaps from round 94: "X mana in any combination of colors" with {X} in the cost (Wizard's Rockets)
+   affects). Smaller gaps from round 95: Spellskite and Muck Drubb ("change the target of target spell or ability",
+   with a choice among several target slots), Kalitas ("its power is equal to that creature's power" tokens), Cinder
+   Cloud, Intrude on the Mind (counting the cards put into the graveyard this way), face-down piles (Fortune's Favor,
+   Riddles in the Dark, Curator of Destinies, Sauron's Ransom, Atris) and piles of permanents (Liliana of the Veil's
+   −6, Do or Die, Make an Example), Jace, Architect of Thought's +1 and −8; Tibalt's Trickery compares only the front
+   face's name of a modal double-faced spell; "cast this turn" filters (castThisTurn) read the printed card, so
+   Maskwood Nexus's creature types for cards off the battlefield don't count there; Conduit of Worlds casts for the
+   mana cost only (no alternative costs); bots never flash in Opposition Agent in response to a search, and "the one
+   that entered most recently" is read from the permanents' timestamps. Smaller gaps from round 94: "X mana in any combination of colors" with {X} in the cost (Wizard's Rockets)
    or chosen among a few colors (Hazel of the Rootbloom); Triumph of Cruelty (a target in "... if you control the
    creature with the greatest power"); Fastbond and the "you play a land or cast a spell" triggers (Cemetery
    Protector, Infernal Sovereign); bots move Forgotten Ancient's counters only onto an evasive creature of theirs.
@@ -437,7 +442,7 @@ line blocks.
      Vortex, Epic Experiment, Collected Conjuring).
    - Half an amount: "they lose half their life", "pay half your life" (rulings: 0 with 0 or less life), "Round up each
      time", each player's own half work; still out: Temporal Extortion ("any player may pay"), Heartless Hidetsugu
-     (per-recipient damage), Saw in Half, Aspect of Wolf, The Goose Mother, Banshee, Chainer's Torment, Doomsday, Death
+     (per-recipient damage), Aspect of Wolf, The Goose Mother, Banshee, Chainer's Torment, Doomsday, Death
      Wish, Contaminated Drink (rad
      counters), Contested Game Ball and War Elemental ("dealt combat damage", "its owner"). Split the Party works.
    - Damage amount replacements and per-source prevention work (double, triple, +N, half, "prevent N of that damage",
@@ -629,8 +634,7 @@ line blocks.
    - Spree modes that don't parse yet: "search for a basic land or Desert"
      and X/X tokens (Dance of the Tumbleweeds), "choose a creature you control. It gains" (Final Showdown),
      "if no other creature has greater power" (Getaway Glamer), "choose target opponent. Whenever ..." (Great Train
-     Heist), total mana value (Lively Dirge), "Mount or Vehicle" / "Aura or Equipment" (One Last Job), copying an
-     ability (Return the Favor), "half ... rounded up" (Rush of Dread), "exchange control of two target" (Shifting
+     Heist), total mana value (Lively Dirge), "Mount or Vehicle" / "Aura or Equipment" (One Last Job), "half ... rounded up" (Rush of Dread), "exchange control of two target" (Shifting
      Grift), Smuggler's Surprise.
    - Saddle: "the creature that saddled it this turn" (Giant Beaver, Rambling Possum, Calamity, Fortune, The Gitrog),
      effects that make a Mount saddled (Guidelight Matrix, Kolodin, Alacrian Armory), "is saddled" and "becomes

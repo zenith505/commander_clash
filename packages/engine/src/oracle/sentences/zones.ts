@@ -499,9 +499,13 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     return [{ type: "attach", what: { ref: "self" }, source: { ref: "target", index: ctx.lastObjectTarget } }];
   }
   // "When ~ enters, attach it to target creature you control." (CR 701.3)
-  if ((m = /^Attach (?:~|it) to (target .+)$/i.exec(s)) && !ctx.spell) {
-    const what = parseObject(m[1]!, ctx);
-    return what?.ref === "target" ? [{ type: "attach", what }] : null;
+  // "Whenever an Equipment you control enters, you may attach it to target creature you control" (Sigarda's Aid), "...
+  // ~ or another Equipment you control enters, you may attach that Equipment ..." (Hammer of Nazahn): the one that entered.
+  if ((m = /^Attach (~|it|that Equipment) to (target .+)$/i.exec(s)) && !ctx.spell) {
+    const what = parseObject(m[2]!, ctx);
+    const entered = m[1] !== "~" && (ctx.subject || ctx.subjectIt);
+    if (m[1] === "that Equipment" && !entered) return null;
+    return what?.ref === "target" ? [{ type: "attach", what, ...(entered ? { source: { ref: "subject" as const } } : {}) }] : null;
   }
   // "Target creature can't block this turn", "~ can't attack or block this turn", "~ can't be blocked this
   // turn": until the turn ends.

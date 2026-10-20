@@ -791,8 +791,11 @@ export type Modification =
   | { kind: "minBlockers"; n: number }
   /** "Can't attack unless defending player controls an Island": checked per defending player (CR 508.1c). */
   | { kind: "cantAttackUnless"; defenderControls: TargetSpec }
-  /** "Creatures with power less than ~'s power can't block it" (CR 509.1b). */
-  | { kind: "cantBeBlockedByLesserPower" }
+  /**
+   * "Creatures with power less than ~'s power can't block it" (CR 509.1b). `than: "source"`: less than the power of the
+   * permanent with this ability, not the attacker's ("... can't block creatures you control", Champion of Lambholt).
+   */
+  | { kind: "cantBeBlockedByLesserPower"; than?: "source" }
   /** The Ring-bearer: "can't be blocked by creatures with greater power" (CR 701.54c). */
   | { kind: "cantBeBlockedByGreaterPower" }
   /** "Can't attack alone", "can't block alone" (CR 506.5, 508.1c, 509.1b). */

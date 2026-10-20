@@ -147,6 +147,8 @@ export interface Characteristics {
   /** "Can't attack unless defending player controls ...": what the defending player has to control. */
   attackUnless: TargetSpec[];
   cantBeBlockedByLesserPower: boolean;
+  /** Can't be blocked by creatures with power less than these permanents' (Champion of Lambholt, CR 509.1b). */
+  cantBeBlockedByLesserPowerThan: ObjectId[];
   /** The Ring-bearer's (CR 701.54c). */
   cantBeBlockedByGreaterPower: boolean;
   cantAttackAlone: boolean;
@@ -219,6 +221,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     cantActivate: false,
     attackUnless: [],
     cantBeBlockedByLesserPower: false,
+    cantBeBlockedByLesserPowerThan: [],
     cantBeBlockedByGreaterPower: false,
     cantAttackAlone: false,
     cantBlockAlone: false,
@@ -984,6 +987,10 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.attackUnless.push(m.defenderControls);
       return;
     case "cantBeBlockedByLesserPower":
+      if (m.than === "source") {
+        if (e.sourceId && !c.cantBeBlockedByLesserPowerThan.includes(e.sourceId)) c.cantBeBlockedByLesserPowerThan.push(e.sourceId);
+      } else c.cantBeBlockedByLesserPower = true;
+      return;
     case "cantBeBlockedByGreaterPower":
     case "cantAttackAlone":
     case "cantBlockAlone":

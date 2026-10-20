@@ -1000,6 +1000,8 @@ function parseStaticLine(line: string): StaticAbility | null {
   if (where) text = where[1]!;
   // "Creatures with power less than ~'s power can't block it." "All creatures able to block ~ do so." (CR 509.1b-c)
   if (/^Creatures with power less than ~'s power can't block it$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "cantBeBlockedByLesserPower" }], text: line };
+  // "Creatures with power less than ~'s power can't block creatures you control." (Champion of Lambholt)
+  if (/^Creatures with power less than ~'s power can't block creatures you control$/.test(text)) return { affects: { kind: "filter", types: ["Creature"], controller: "you" }, mods: [{ kind: "cantBeBlockedByLesserPower", than: "source" }], text: line };
   if (/^All creatures able to block ~ do so$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "allMustBlock" }], text: line };
   if (/^All creatures able to block (enchanted|equipped) creature do so$/.test(text)) return { affects: { kind: "attached" }, mods: [{ kind: "allMustBlock" }], text: line };
   // "You may have ~ assign its combat damage as though it weren't blocked" (CR 510.1c-d; chosen as it assigns it).

@@ -5750,6 +5750,10 @@ export function blockProblem(s: GameState, blocker: GameObject, attacker: GameOb
   if (has(a, "Horsemanship") && !has(b, "Horsemanship")) return `${a.name} has horsemanship`; // CR 702.31b
   if (has(a, "Skulk") && b.power > a.power) return `${a.name} has skulk`; // CR 702.118b
   if (a.cantBeBlockedByLesserPower && b.power < a.power) return `creatures with power less than ${a.name}'s can't block it`; // CR 509.1b
+  for (const id of a.cantBeBlockedByLesserPowerThan) {
+    const src = s.objects[id];
+    if (src?.zone === "battlefield" && b.power < power(s, src)) return `creatures with power less than ${nameOf(s, id)}'s can't block ${a.name}`; // CR 509.1b
+  }
   if (a.cantBeBlockedByGreaterPower && b.power > a.power) return `creatures with power greater than ${a.name}'s can't block it`; // CR 701.54c, 509.1b
   for (const f of a.cantBeBlockedBy) if (objectMatches(s, f, blocker, b.controller, false)) return `${a.name} can't be blocked by ${f.text}`; // CR 509.1b
   for (const only of a.blockableOnlyBy ?? []) if (!only.filters.some((f) => objectMatches(s, f, blocker, b.controller, false))) return `${a.name} can't be blocked except by ${only.text}`; // CR 509.1b

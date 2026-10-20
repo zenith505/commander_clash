@@ -877,6 +877,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2bd111bb-ce02-414c-b5b7-e0e037d8d96b",
+  "name": "Bolas's Citadel",
+  "manaCost": "{3}{B}{B}{B}",
+  "cmc": 6,
+  "typeLine": "Legendary Artifact",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "You may look at the top card of your library any time.\nYou may play lands and cast spells from the top of your library. If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost.\n{T}, Sacrifice ten nonland permanents: Each opponent loses 10 life.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2022-11-28",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": true
+ },
+ {
   "oracleId": "bf1341dd-41a3-49f6-87ec-63170dde4324",
   "name": "Boseiju, Who Endures",
   "manaCost": "",
@@ -1336,6 +1364,28 @@
     ]
    }
   ]
+ },
+ {
+  "oracleId": "2a838818-d590-4374-9a63-d9e6381a0f0d",
+  "name": "Cloud Key",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "As this artifact enters, choose artifact, creature, enchantment, instant, or sorcery.\nSpells you cast of the chosen type cost {1} less to cast.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "eoc",
+  "releasedAt": "2025-08-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "2c6658c3-8c0e-46c9-8127-bc5b77eb0dab",
@@ -2993,6 +3043,38 @@
   "releasedAt": "2024-03-08",
   "rarity": "rare",
   "layout": "mutate",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c0adbddc-b070-4c5f-afe0-0474c72a9251",
+  "name": "Gemstone Caverns",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Legendary Land",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "If this card is in your opening hand and you're not the starting player, you may begin the game with Gemstone Caverns on the battlefield with a luck counter on it. If you do, exile a card from your hand.\n{T}: Add {C}. If Gemstone Caverns has a luck counter on it, instead add one mana of any color.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "C",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "eos",
+  "releasedAt": "2025-08-01",
+  "rarity": "mythic",
+  "layout": "normal",
   "gameChanger": false
  },
  {

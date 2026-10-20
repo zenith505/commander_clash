@@ -3262,7 +3262,7 @@ function LibrarySearch({
               const d = cardOf(s, ids[0]!);
               const can = left > 0 && found.length < pending.max && !clashes(ids[0]!);
               return (
-                <div key={name} className={`card big ${can ? "targetable" : "dim"}`} data-pick={ids[0]} onClick={() => can && add(ids)} {...hoverProps(d, onHover)} title={left > 0 && clashes(ids[0]!) ? "You already chose a card with this mana value" : undefined}>
+                <div key={name} className={`card big ${can ? "targetable" : "dim"}`} data-pick={ids[0]} onClick={() => can && add(ids)} {...hoverProps(d, onHover)} title={left > 0 && clashes(ids[0]!) ? (pending.oneOfEach ? "You already found a card of this kind" : pending.shareLandType ? "It doesn't share a land type with the cards you chose" : "You already chose a card with this mana value") : undefined}>
                   <CardFace d={d} />
                   {ids.length > 1 && <span className="zone-count">×{left}</span>}
                   {zones && <span className="muted small" data-zone={name}>in {name}</span>}

@@ -442,6 +442,11 @@ const PLURAL_TYPES: Record<string, string> = {
   swamps: "Swamp",
   mountains: "Mountain",
   forests: "Forest",
+  // Artifact types (CR 205.3g): "Treasures you control have ..." (Goldspan Dragon).
+  treasures: "Treasure",
+  clues: "Clue",
+  foods: "Food",
+  vehicles: "Vehicle",
 };
 
 /**

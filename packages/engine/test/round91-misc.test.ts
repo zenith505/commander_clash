@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, activate, bear, card, cast, passUntil, putOnBattlefield, setup } from "./helpers";
-import { botActions, isFullySupported, planCast, waitingOn, type GameState, type PlayerId } from "../src";
+import { botActions, isFullySupported, manaAbilitiesOn, planCast, waitingOn, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const sword = card("Sword of Feast and Famine", "Artifact — Equipment", "{3}", { oracleText: "Equipped creature gets +2/+2 and has protection from black and from green.\nWhenever equipped creature deals combat damage to a player, that player discards a card and you untap all lands you control.\nEquip {2}" });
@@ -114,3 +114,23 @@ function settleAll(s: GameState): GameState {
   for (let i = 0; i < 40 && !s.pending && s.stack.length; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
   return s;
 }
+
+describe("Goldspan Dragon", () => {
+  const goldspan = card("Goldspan Dragon", "Creature — Dragon", "{3}{R}{R}", { power: "4", toughness: "4", keywords: ["Flying", "Haste"], oracleText: "Flying, haste\nWhenever this creature attacks or becomes the target of a spell, create a Treasure token.\nTreasures you control have \"{T}, Sacrifice this artifact: Add two mana of any one color.\"" });
+  const giant = card("Giant Growth", "Instant", "{G}", { oracleText: "Target creature gets +3/+3 until end of turn." });
+  const treasures = (s: GameState, pid: PlayerId) => s.battlefield.filter((id) => s.objects[id]!.controller === pid && s.cards[s.objects[id]!.cardId]!.name === "Treasure Token");
+
+  it("parse", () => expect(isFullySupported(goldspan)).toBe(true));
+
+  it("a Treasure when it attacks and when a spell targets it; Treasures make two mana of one color", () => {
+    const { s: s0, ap, ids, opp } = setup([giant]);
+    const g = putOnBattlefield(s0, ap, goldspan);
+    let s = cast(s0, ap, ids[0]!, [{ kind: "object", id: g }]);
+    s = settleAll(s);
+    expect(treasures(s, ap).length).toBe(1);
+    s = attack(s, ap, g, opp);
+    expect(treasures(s, ap).length).toBe(2);
+    const t = treasures(s, ap)[0]!;
+    expect(manaAbilitiesOn(s, s.objects[t]!).map((m) => m.produces)).toContainEqual({ kind: "oneOf", options: ["W", "U", "B", "R", "G"], amount: 2 });
+  });
+});

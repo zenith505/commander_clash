@@ -376,6 +376,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return filter?.kind === "spell" && filter.controller === "opponent" ? [{ type: "counterEach", filter: { ...filter, text: `each ${m[1]!}` } }] : null;
   }
   // Deflection: "Change the target of target spell with a single target" (CR 115.7a); Bolt Bend's "spell or ability".
+  // Hydroelectric Specimen: "... target instant or sorcery spell with a single target to ~".
+  if ((m = /^Change the target of target instant or sorcery spell with a single target to ~$/i.exec(s)))
+    return [{ type: "changeTarget", index: addTarget(ctx, { kind: "spell", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], singleTarget: true, text: "target instant or sorcery spell with a single target" }), toSelf: true }];
   if ((m = /^Change the target of target spell( or ability)? with a single target(?: unless that spell's controller pays (.+))?$/i.exec(s)) && !(m[1] && m[2])) {
     const unless = m[2] === undefined ? undefined : parseUnlessPays(m[2], ctx);
     if (unless === null) return null;

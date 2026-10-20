@@ -1937,6 +1937,15 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   if (e.effects.length === 1 && e.effects[0]!.type === "exileFaceDown" && e.effects[0]!.from === "hand") return linkedOwned(s, r.item.sourceId, pid) >= player(s, pid).hand.length;
   // Demonstrate: a copy for us and one for one opponent, ahead of the other two (CR 702.144a).
   if (e.effects.length === 1 && e.effects[0]!.type === "copySpell" && e.effects[0]!.demonstrate) return true;
+  // Hydroelectric Specimen: take an opponent's spell aimed at us or ours, not one of ours (or a helpful one) at theirs.
+  const toSelf = e.effects.find((x) => x.type === "changeTarget" && x.toSelf);
+  if (toSelf?.type === "changeTarget") {
+    const t = r.item.targets?.[toSelf.index];
+    const item = t?.kind === "stack" ? s.stack.find((x) => x.id === t.id) : undefined;
+    const current = item?.targets?.find((x) => x.kind !== "none");
+    const body = item?.body ?? (item?.objectId ? castingBody(defOf(s, obj(s, item.objectId))) : undefined);
+    return !!item && !!current && !!body && item.controller !== pid && isMine(s, pid, current) && !!harmfulTargets(body).some(Boolean);
+  }
   const provoke = e.effects.find((x) => x.type === "mustBlockSource");
   if (provoke?.type === "mustBlockSource" && provoke.what.ref === "target") {
     const t = r.item.targets?.[provoke.what.index];

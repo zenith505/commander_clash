@@ -321,7 +321,17 @@ function parseFaceDownPlay(sentences: string[], at: number, ctx: Ctx): { effect:
  * Flourish's "If that permanent is destroyed this way, its controller exiles ..., then they may cast that card without
  * paying its mana cost". Null when it isn't one of these; any other use of the found card leaves the line unsupported.
  */
+const TIBALT = "Its controller mills one to three cards chosen at random and exiles cards from the top of their library until they exile a nonland card with a different name than that spell; they may cast that card without paying its mana cost and put the exiled cards on the bottom of their library in a random order";
+
 function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect: Effect; next: number } | null | "fail" {
+  // Tibalt's Trickery, after "Counter target spell": "Choose 1, 2, or 3 at random. Its controller mills that many cards,
+  // then exiles ... until they exile a nonland card with a different name than that spell. They may cast that card
+  // without paying its mana cost. Then they put the exiled cards on the bottom of their library in a random order."
+  if (sentences[at] === TIBALT) {
+    if (ctx.targets.length !== 1 || ctx.targets[0]!.kind !== "spell") return "fail";
+    const who = { ref: "targetController" as const, index: 0 };
+    return { effect: { type: "exileUntilNonland", who, then: "castFree", ownerCasts: true, millFirst: 3, notNamedAs: 0, restBottom: true }, next: at + 1 };
+  }
   // "Shuffle your library, then reveal ...", "..., then put all cards revealed this way ...": split at ", then" by now.
   const shuffleFirst = /^[Ss]huffle your library$/.test(sentences[at]!);
   const s = sentences[shuffleFirst ? at + 1 : at] ?? "";
@@ -464,6 +474,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // "... gains flashback until end of turn. The flashback cost is equal to its mana cost." is one instruction.
   // "Choose target artifact or enchantment. Its owner shuffles it into their library." (Deglamer) is one instruction.
   text = text.replace(/^Choose (target [^.]+?)\. Its owner shuffles it into their library\./, "The owner of $1 shuffles it into their library.");
+  // Tibalt's Trickery: one instruction about the countered spell's controller (read in parseUntilNonland).
+  text = text.replace(/Choose 1, 2, or 3 at random\. Its controller mills that many cards, then exiles cards from the top of their library until they exile a nonland card with a different name than that spell\. They may cast that card without paying its mana cost\. Then they put the exiled cards on the bottom of their library in a random order\./, `${TIBALT}.`);
   text = text.replace(/If you haven't cast a spell this turn, you may cast that card\. If you do, you can't cast additional spells this turn\./, "If you haven't cast a spell this turn, you may cast that card, and if you do, you can't cast additional spells this turn.");
   text = text.replace(/ gains flashback until end of turn\. (?:The|Its) flashback cost is equal to (?:its|that card's) mana cost\./g, " gains flashback with its mana cost until end of turn.");
   // Search for Survivors: "An opponent chooses a card at random in your graveyard. If it's a creature card, put it onto the

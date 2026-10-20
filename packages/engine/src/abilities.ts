@@ -1617,7 +1617,20 @@ export type Effect =
    * "hand", every revealed card into your hand (Treasure Hunt). A card not cast stays in exile, and so do the other
    * exiled cards.
    */
-  | { type: "exileUntilNonland"; who?: PlayerRef; reveal?: true; shuffleFirst?: true; then: "castFree" | "freeThisTurn" | "thisTurn" | "hand"; ownerCasts?: true }
+  | {
+      type: "exileUntilNonland";
+      who?: PlayerRef;
+      reveal?: true;
+      shuffleFirst?: true;
+      then: "castFree" | "freeThisTurn" | "thisTurn" | "hand";
+      ownerCasts?: true;
+      /** Tibalt's Trickery: "Choose 1, 2, or 3 at random. Its controller mills that many cards, then exiles ...". */
+      millFirst?: number;
+      /** "A nonland card with a different name than that spell": target `notNamedAs`'s name. */
+      notNamedAs?: number;
+      /** "Then they put the exiled cards on the bottom of their library in a random order": the card not cast too. */
+      restBottom?: true;
+    }
   /**
    * Discover N (CR 701.57a): exile cards from the top of your library until a nonland card with mana value N or less;
    * you may cast it without paying its mana cost, else it goes to your hand; the rest go on the bottom in a random order.
@@ -1863,7 +1876,8 @@ export type Effect =
    * "Change the target of target spell with a single target" (CR 115.7a): to another legal target, chosen as this
    * resolves, or it stays as it is if there's none; maybe unless that spell's controller pays (CR 118.12).
    */
-  | { type: "changeTarget"; index: number; unless?: UnlessPays }
+  /** `toSelf`: "change the target of target instant or sorcery spell with a single target to ~" (Hydroelectric Specimen): to this ability's source, only if it's a legal target for that spell (rulings). */
+  | { type: "changeTarget"; index: number; unless?: UnlessPays; toSelf?: true }
   /**
    * "You may choose new targets for target spell or ability" (CR 115.7d): as this resolves, its controller keeps any of
    * that spell's targets, legal or not, and changes the rest to legal ones.
@@ -3240,7 +3254,7 @@ export interface CompiledCard {
    */
   entersAsCopy?: { filter: TargetSpec; except?: CopyExcept; untilEndOfTurn?: boolean };
   /** "~ enters with N +1/+1 counters on it." (a replacement effect, CR 614.1c); modular N too (CR 702.43a). */
-  entersWithCounters?: { counter: CounterKind; n: Amount; /** Raid: "if you attacked this turn". */ if?: StaticCondition; /** "If you cast it from your hand" (the Myojin). */ castFromHand?: true; /** "If X is 5 or more, it enters with an additional X" (Apocalypse Hydra): twice as many. */ doubleIfXAtLeast?: number };
+  entersWithCounters?: { counter: CounterKind; n: Amount; /** Raid: "if you attacked this turn". */ if?: StaticCondition; /** "If you cast it from your hand" (the Myojin). */ castFromHand?: true; /** "If X is 5 or more, it enters with an additional X" (Apocalypse Hydra): twice as many. */ doubleIfXAtLeast?: number; /** "As ~ enters, choose a creature type. ~ enters with a fellowship counter on it for each creature you control of the chosen type" (Banner of Kinship): counted once that choice, part of how it enters, is made (CR 614.12). */ afterChoice?: ChoiceKind };
   /** Bloodthirst N (CR 702.54a): enters with N +1/+1 counters if an opponent was dealt damage this turn. */
   bloodthirst?: number;
   /**

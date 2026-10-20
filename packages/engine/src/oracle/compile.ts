@@ -394,6 +394,9 @@ export function compile(d: CardDef): CompiledCard {
   let cipher = false;
   const all = joinModes(
     normalizeSelf(d)
+      // "As ~ enters, choose a creature type. ~ enters with a fellowship counter on it for each ..." (Banner of Kinship):
+      // the choice, then the counters, two abilities in one paragraph.
+      .replace(/^(As ~ enters, choose a creature type\.) (~ enters with .+)$/m, "$1\n$2")
       .split("\n")
       .map((l) => {
         const same = /^Choose (one|two|three|four|five)\. You may choose the same mode more than once\.$/.exec(l.trim());
@@ -2094,10 +2097,12 @@ function checkCastingLinks(out: CompiledCard) {
   const snowIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"snowSpent"');
   if (out.triggers.some((t) => t.event !== "selfEnters" && snowIn(t.body)) || snowIn(out.statics) || snowIn(out.activated)) bad = true;
   if (JSON.stringify([out.spell, out.triggers.map((t) => ({ ...t, cast: undefined })), out.statics, out.activated, out.entersWithCounters]).includes('"snowOfColors"')) bad = true;
-  // "Enters with a counter for each creature of the chosen type" would be counted before the choice is made.
+  // "Enters with a counter for each creature of the chosen type": counted once its own "as ~ enters, choose" is answered
+  // (afterChoice), both part of how it enters (CR 614.12); with nothing chosen as it enters it can't be counted.
   needs.clear();
   visit(out.entersWithCounters);
-  if (needs.size) bad = true;
+  if (needs.size === 1 && out.entersWithCounters && out.entersChoose?.length === 1 && needs.has(out.entersChoose[0]!.what)) out.entersWithCounters.afterChoice = out.entersChoose[0]!.what;
+  else if (needs.size) bad = true;
   if (bad) out.unsupported.push("(text about how it was cast that this card's costs don't explain)");
 }
 

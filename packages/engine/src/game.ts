@@ -861,7 +861,8 @@ export function moveObject(
   // "Enters with N counters" is a replacement effect (CR 614.1c): N is counted before it's on the battlefield.
   const printedCounters = to === "battlefield" ? compileCard(defOf(s, o)).entersWithCounters : undefined;
   // Raid: "~ enters with a +1/+1 counter on it if you attacked this turn".
-  const withCounters = (printedCounters?.if && !staticConditionNow(s, printedCounters.if, id, o.controller)) || (printedCounters?.castFromHand && !castFromHand) ? undefined : printedCounters;
+  // Counted after its "as ~ enters, choose" is answered when it counts what's chosen (afterChoice, see chooseOption).
+  const withCounters = (printedCounters?.if && !staticConditionNow(s, printedCounters.if, id, o.controller)) || (printedCounters?.castFromHand && !castFromHand) || printedCounters?.afterChoice ? undefined : printedCounters;
   const counterN = withCounters ? Math.max(0, evalAmount(s, withCounters.n, { controller: o.controller, sourceId: id, x: opts.x, kicked: o.kicked, colorsSpent: o.colorsSpent?.length, manaSpent: o.manaSpent ?? 0, spent: o.spent })) * (withCounters.doubleIfXAtLeast !== undefined && (opts.x ?? 0) >= withCounters.doubleIfXAtLeast ? 2 : 1) : 0;
   const dest = zoneList(s, o);
   if (dest) opts.top || to === "battlefield" ? dest.unshift(id) : dest.push(id);
@@ -1081,7 +1082,7 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
     moveObject(s, o.id, "exile");
     return;
   }
-  const ewc = printed.entersWithCounters;
+  const ewc = printed.entersWithCounters?.afterChoice ? undefined : printed.entersWithCounters;
   const n = ewc && !(ewc.if && !staticConditionNow(s, ewc.if, o.id, o.controller)) ? Math.max(0, evalAmount(s, ewc.n, { controller: o.controller, sourceId: o.id, x: opts.x, manaSpent: o.manaSpent ?? 0, spent: o.spent })) * (ewc.doubleIfXAtLeast !== undefined && (opts.x ?? 0) >= ewc.doubleIfXAtLeast ? 2 : 1) : 0;
   finishEntering(s, o, printed, opts, ewc && n ? { counter: ewc.counter, n } : undefined);
 }
@@ -4947,6 +4948,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     } else {
       o.chosen = withChoice(o.chosen, pend.what as ChoiceKind, choice);
       log(s, `${p.name} chooses ${choice} for ${pend.source}.`);
+      // Banner of Kinship: "~ enters with a fellowship counter on it for each creature you control of the chosen type",
+      // counted with the choice made, as part of how it enters (CR 614.12), if it still has that ability as it is.
+      const ewc = compileCard(defOf(s, o)).entersWithCounters;
+      if (ewc?.afterChoice === pend.what && characteristics(s, o).hasPrintedAbilities) {
+        const n = Math.max(0, evalAmount(s, ewc.n, { controller: o.controller, sourceId: o.id, chosen: o.chosen }));
+        if (n) log(s, `${pend.source} enters with ${putCounters(s, o, ewc.counter, n, true)} ${ewc.counter} counter${n === 1 ? "" : "s"}.`);
+      }
     }
     invalidateCharacteristics(s);
     if (entry?.enters) fireEvent(s, { type: "enters", id: o.id, ...entry.enters });

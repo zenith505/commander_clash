@@ -1596,7 +1596,7 @@ export interface Resolving {
     retargets?: TargetChoice[]; // "you may choose new targets for target spell": its targets now (CR 115.7d)
     explored?: ObjectId; // the nonland card explore revealed, waiting on "graveyard or top?"
     cascade?: { exiled: ObjectId[]; hit?: ObjectId }; // cards cascade exiled, and the one it may cast
-    untilNonland?: { hit?: ObjectId; caster: PlayerId }; // the nonland card exileUntilNonland found, and who may cast it
+    untilNonland?: { hit?: ObjectId; caster: PlayerId; seen?: ObjectId[] }; // the nonland card exileUntilNonland found, and who may cast it
     n?: number; // an amount the effect worked out before waiting on a player (CR 608.2h)
     nFor?: Record<string, number>; // the same, for each player when it counts their own ("half the cards in their hand")
     distributed?: Record<ObjectId, number>; // how a "distribute" effect's counters were divided, as it resolves

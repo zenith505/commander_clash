@@ -2689,6 +2689,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   if (tap?.length) log(s, `${p.name} taps ${tap.map((t) => nameOf(s, t)).join(", ")} for ${name}'s mana ability.`);
   if (ab.lifeCost) loseLife(s, p.id, ab.lifeCost);
   if (ab.energyCost) p.energy = (p.energy ?? 0) - ab.energyCost;
+  if (ab.discardHand) discardCards(s, p.id, [...p.hand]); // Lion's Eye Diamond (CR 701.9a)
   if (ab.removeCounters) removeCountersCost(s, o, ab.removeCounters);
   if (ab.produces.kind === "removeX") {
     const n = combos![combo!]!.length;

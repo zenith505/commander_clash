@@ -350,6 +350,7 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Adding mana from a spell or a non-mana triggered ability (CR 605.5a: it uses the stack): "Add {B}{B}{B}" (Dark
   // Ritual), "add one mana of any color", "add three mana of any one color" (the color is chosen as it resolves).
   if ((m = /^[Aa]dd ((?:\{[WUBRGC]\})+)$/.exec(s))) return [{ type: "addMana", mana: m[1]! }];
+  if ((m = new RegExp(`^[Aa]dd ${NUM} (\\{[WUBRGC]\\})$`).exec(s)) && num(m[1]!) > 1) return [{ type: "addMana", mana: m[2]!.repeat(num(m[1]!)) }];
   // Another player adds the mana (CR 106.4): "target player adds two mana of any one color" (Bigger on the Inside), "that
   // player adds {G}{G}" (Eladamri's Vineyard), "the active player adds {C}{C} for each ..." (Belbe). The player who adds
   // it chooses its color (608.2d: the player doing the instruction).

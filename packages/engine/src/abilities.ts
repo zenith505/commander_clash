@@ -2776,7 +2776,7 @@ export type ManaProduce =
    * "One mana of any color that a land an opponent controls could produce" (Fellwar Stone, Exotic Orchard), "of any
    * type that a land you control could produce" (Reflecting Pool): what those lands' mana abilities would make (CR 106.7).
    */
-  | { kind: "landsCouldProduce"; whose: "you" | "opponent"; anyType?: boolean }
+  | { kind: "landsCouldProduce"; whose: "you" | "opponent"; anyType?: boolean; /** "Add three mana of that type instead" (Incubation Druid). */ n?: number }
   /** "Add {W}{W}, {W}{U}, or {U}{U}" (filter lands): one of these combinations, chosen as it resolves (CR 605.3b). */
   | { kind: "combos"; options: ManaType[][] }
   /**
@@ -2833,6 +2833,10 @@ export interface ManaAbility {
    * while `cond` is true (`manaAbilitiesOn` swaps it in), checked as it's activated and resolves (CR 605.3).
    */
   insteadIf?: { cond: StaticCondition; produces: ManaProduce };
+  /** "Discard your hand" as part of the cost (Lion's Eye Diamond, CR 701.9a): never used by automatic payment. */
+  discardHand?: true;
+  /** "Activate only as an instant" (Lion's Eye Diamond): only while its controller has priority (rulings), not while paying. */
+  instantOnly?: true;
   /** "Activate only if you control a Swamp." (CR 602.5b): it can't be activated otherwise, but it still could produce its mana (CR 106.7, rulings on Reflecting Pool). */
   activateIf?: StaticCondition;
   /** "Spend this mana only to cast a creature spell." (CR 106.6) */

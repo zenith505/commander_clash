@@ -61,7 +61,8 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
       const options = manaOptions(s, o)
         // Mana that can't be spent on this is no help (CR 106.6), nor mana a Treasure didn't make for Security Rhox's cost.
         // A storage land gives one counter's worth at a time, so a payment never takes more of them than it needs.
-        .filter((x) => x.adds.length > 0 && (x.removes ?? 1) === 1 && !manaAbilityProblem(s, pid, o, x.ability, true) && (!abs[x.ability]!.spendOnly || spendAllows(s, pid, boundSpend(o, abs[x.ability]!.spendOnly!), use)) && (!onlyTreasures || (treasure && !abs[x.ability]!.spendOnly)))
+        // Discarding a hand (Lion's Eye Diamond) is never an automatic choice: the player activates it.
+        .filter((x) => x.adds.length > 0 && (x.removes ?? 1) === 1 && !abs[x.ability]!.discardHand && !manaAbilityProblem(s, pid, o, x.ability, true) && (!abs[x.ability]!.spendOnly || spendAllows(s, pid, boundSpend(o, abs[x.ability]!.spendOnly!), use)) && (!onlyTreasures || (treasure && !abs[x.ability]!.spendOnly)))
         .map((x) => {
           const ab = abs[x.ability]!;
           const tapCost = ab.tapCost && { n: ab.tapCost.n, candidates: tapPreference(s, tapCostCandidates(s, pid, o, ab.tapCost).filter((id) => !exclude.includes(id))) };

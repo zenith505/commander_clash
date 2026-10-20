@@ -259,6 +259,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     }
     return out;
   }
+  // "The next spell you cast this turn can't be countered" (Mistrise Village), "the next creature spell ..." (Insist): the
+  // first such spell, as it's cast; each such effect is used up by it.
+  if ((m = /^[Tt]he next ((?:[a-z]+ |instant or sorcery )?spell) you cast this turn can't be countered$/.exec(s))) {
+    const filter = parseTargetPhrase(m[1]!);
+    return filter?.kind === "spell" ? [{ type: "nextCast", filter, effects: [], text: `the next ${m[1]} you cast this turn can't be countered`, uncounterable: true }] : null;
+  }
   // Copying spells (CR 707.10): "Copy target instant or sorcery spell", and in "when you cast" abilities "copy it".
   if ((m = /^Copy target (.*?spell(?: you control)?)$/i.exec(s))) {
     const spec = parseTargetPhrase(m[1]!);

@@ -1492,7 +1492,7 @@ export type Effect =
   /** "When you next cast an instant or sorcery spell this turn, ...": a delayed trigger on that cast (CR 603.7). */
   /** `cascade`: "the next noncreature spell you cast this turn has cascade" (Dark Apostle): that spell's own cascade. */
   /** `who`: "the next spell they cast": that player's (a target player), not the controller's. */
-  | { type: "nextCast"; filter: TargetSpec; effects: Effect[]; text: string; cascade?: true; who?: PlayerRef; /** "When you next cast an instant or sorcery spell from your hand this turn" (Narset Transcendent). */ fromHand?: true }
+  | { type: "nextCast"; filter: TargetSpec; effects: Effect[]; text: string; cascade?: true; who?: PlayerRef; /** "When you next cast an instant or sorcery spell from your hand this turn" (Narset Transcendent). */ fromHand?: true; /** "The next spell you cast this turn can't be countered" (Mistrise Village). */ uncounterable?: true }
   /**
    * "Until end of turn, whenever you cast a spell, ~ deals 2 damage to up to one target creature" (CR 603.7b): a delayed
    * triggered ability that triggers each time its event happens until `until` ends (see GameState.floatingTriggers).

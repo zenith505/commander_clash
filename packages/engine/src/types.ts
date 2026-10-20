@@ -1176,7 +1176,7 @@ export interface GameState {
   /** Cards in graveyards that gained flashback until end of turn (Snapcaster Mage), as they are there. */
   flashbackGrants?: { id: ObjectId; zc: number }[];
   /** "When you next cast an instant or sorcery spell this turn, copy that spell": delayed triggers on a cast (CR 603.7). */
-  nextCast?: { controller: PlayerId; filter: TargetSpec; sourceId: ObjectId; sourceCardId: string; body: AbilityBody; turn: number; cascade?: true; /** "From your hand" (Narset Transcendent): cast from there (CR 601.2a). */ fromHand?: true }[];
+  nextCast?: { controller: PlayerId; filter: TargetSpec; sourceId: ObjectId; sourceCardId: string; body: AbilityBody; turn: number; cascade?: true; /** "From your hand" (Narset Transcendent): cast from there (CR 601.2a). */ fromHand?: true; /** It can't be countered (Mistrise Village). */ uncounterable?: true }[];
   /**
    * "Until end of turn, whenever you cast a spell, ...": delayed triggered abilities with a stated duration, which trigger
    * every time their event happens until then (CR 603.7b). Their source is the spell or the source of the ability that made

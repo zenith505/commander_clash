@@ -2,8 +2,8 @@
 // Culling Ritual ("Add {B} or {G} for each permanent destroyed this way": either color for each one, rulings).
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, cast, passUntil, putOnBattlefield, setup } from "./helpers";
-import { botActions, isFullySupported, waitingOn, type GameState, type PlayerId } from "../src";
+import { act, activate, bear, card, cast, passUntil, putOnBattlefield, setup } from "./helpers";
+import { botActions, isFullySupported, planCast, waitingOn, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const sword = card("Sword of Feast and Famine", "Artifact — Equipment", "{3}", { oracleText: "Equipped creature gets +2/+2 and has protection from black and from green.\nWhenever equipped creature deals combat damage to a player, that player discards a card and you untap all lands you control.\nEquip {2}" });
@@ -79,3 +79,38 @@ describe("Spirit Guides: a mana ability that works from the hand", () => {
     expect(() => act(s, { type: "activateAbility", player: ap, objectId: g, index: 0 })).toThrow();
   });
 });
+
+describe("the next spell you cast this turn can't be countered", () => {
+  const village = card("Mistrise Village", "Land", "", { oracleText: "This land enters tapped unless you control a Mountain or a Forest.\n{T}: Add {U}.\n{U}, {T}: The next spell you cast this turn can't be countered." });
+  const insist = card("Insist", "Sorcery", "{G}", { oracleText: "The next creature spell you cast this turn can't be countered.\nDraw a card." });
+  const shock = card("Shock", "Instant", "{R}", { oracleText: "Shock deals 2 damage to any target." });
+
+  it("parse", () => {
+    for (const d of [village, insist]) expect(isFullySupported(d), d.name).toBe(true);
+  });
+
+  it("Mistrise Village: the next spell can't be countered, the one after can", () => {
+    const { s: s0, ap, ids } = setup([bear(), bear()]);
+    const v = putOnBattlefield(s0, ap, village);
+    let s = activate(s0, ap, v, 0);
+    for (const a of planCast(s, ap, ids[0]!)!) s = act(s, a);
+    expect(s.objects[ids[0]!]!.uncounterableCast).toBe(true);
+    s = cast(settleAll(s), ap, ids[1]!);
+    expect(s.objects[ids[1]!]!.uncounterableCast ?? false).toBe(false);
+  });
+
+  it("Insist: only a creature spell uses it up", () => {
+    const { s: s0, ap, ids, opp } = setup([insist, shock, bear()]);
+    let s = cast(s0, ap, ids[0]!);
+    for (const a of planCast(s, ap, ids[1]!, [{ kind: "player", id: opp }])!) s = act(s, a);
+    expect(s.objects[ids[1]!]!.uncounterableCast ?? false).toBe(false);
+    s = settleAll(s);
+    for (const a of planCast(s, ap, ids[2]!)!) s = act(s, a);
+    expect(s.objects[ids[2]!]!.uncounterableCast).toBe(true);
+  });
+});
+
+function settleAll(s: GameState): GameState {
+  for (let i = 0; i < 40 && !s.pending && s.stack.length; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  return s;
+}

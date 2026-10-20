@@ -973,7 +973,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (d.controller !== ev.controller || d.turn !== s.turn || !printedMatches(d.filter, ev.card) || (d.fromHand && spell?.castFrom !== "hand")) continue;
       s.nextCast = s.nextCast!.filter((x) => x !== d);
       // "Has cascade": the spell's own cascade ability triggers (CR 702.85a).
-      if (d.cascade && spell) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: CASCADE_BODY, cause: ev.stackId });
+      if (d.uncounterable) {
+        if (spell) spell.uncounterableCast = true;
+      } else if (d.cascade && spell) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: CASCADE_BODY, cause: ev.stackId });
       else if (!d.cascade) s.triggerQueue.push({ sourceId: d.sourceId, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, body: d.body, cause: ev.stackId });
     }
     // Casualty's copy only if its casualty cost was paid (CR 702.153a).

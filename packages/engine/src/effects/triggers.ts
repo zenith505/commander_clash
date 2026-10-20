@@ -1100,7 +1100,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if ((d.by === "you" && ev.player !== you) || (d.by === "opponent" && ev.player === you)) return false;
         if ((d.cycled && !ev.cycled) || (d.other && ev.id === o.id)) return false;
         return !d.filter || printedMatches(d.filter, ev.card);
-      }, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+        // The card as it is now, where it went ("exile that card from your graveyard").
+      }, undefined, undefined, card, undefined, undefined, undefined, { player: ev.player });
     }
     // "When you cycle ~" works from the zone the card went to (CR 702.29c), and its owner controls it (CR 113.8).
     if (ev.cycled && card && card.zone !== "battlefield") add(card, card.owner, (e) => e === "selfCycled", compileCard(defOf(s, card)).triggers);

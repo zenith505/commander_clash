@@ -1016,6 +1016,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           const source = until === "source" && ctx.sourceId ? { source: { id: ctx.sourceId, zc: ctx.sourceZc ?? 0 } } : {};
           o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until, turn: s.turn, ...how, ...source };
         }
+        if (e.endStepHand)
+          addDelayed(s, "yourNextEndStep", p.id, o, { targets: [], effects: [{ type: "bounce", what: { ref: "subjectCard" }, hidden: true }], text: "Put that card into your hand." }, ctx.sourceDef.oracleId);
         if (e.upkeepGraveyard)
           addDelayed(s, "yourNextUpkeep", p.id, o, { targets: [], effects: [{ type: "putInGraveyard", what: { ref: "subjectCard" } }], text: "Put that card, if you didn't play it, into its owner's graveyard." }, ctx.sourceDef.oracleId);
         done.push(id);
@@ -1093,7 +1095,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         return;
       }
       for (const o of objects(s, e.what, ctx)) {
-        log(s, `${src} returns ${defOf(s, o).name}${o.zone === "graveyard" ? " from the graveyard" : ""} to its owner's hand.`);
+        if (e.hidden) {
+          log(s, `${src} puts a card into ${player(s, o.owner).name}'s hand.`);
+          log(s, `It's ${defOf(s, o).name}.`, o.owner);
+        } else log(s, `${src} returns ${defOf(s, o).name}${o.zone === "graveyard" ? " from the graveyard" : ""} to its owner's hand.`);
         moveObject(s, o.id, "hand");
       }
       return;

@@ -485,7 +485,7 @@ export type ObjRef =
   /** "Each creature dealt damage this way" (Aurelia's Fury): `filter` for the kind of permanent. */
   | { ref: "damagedThisWay"; filter?: TargetSpec }
   /** The card a "whenever a creature dies" trigger was about, in the zone it went to, while it's still that object (CR 400.7). */
-  | { ref: "subjectCard" } // "a creature dealt damage this way": what this ability's damage hit
+  | { ref: "subjectCard"; /** Only while it's in this zone ("exile that card from your graveyard"). */ zone?: "graveyard" } // "a creature dealt damage this way": what this ability's damage hit
   | { ref: "subject" } // the object its trigger event was about: exalted's "that creature" (see PendingTrigger.subject)
   /**
    * After a leaves-the-battlefield trigger: the card in the zone it went to, if it's still that object ("return it to your
@@ -1174,7 +1174,7 @@ export type Effect =
    * library"); yours by default. `upkeepGraveyard`: "At the beginning of your next upkeep, put any of those cards you
    * didn't play into your graveyard" (Three Wishes).
    */
-  | { type: "exileFaceDown"; from: "top" | "hand" | "handCard"; n?: Amount; look?: true; who?: PlayerRef; play?: FaceDownPlay; upkeepGraveyard?: true }
+  | { type: "exileFaceDown"; from: "top" | "hand" | "handCard"; n?: Amount; look?: true; who?: PlayerRef; play?: FaceDownPlay; upkeepGraveyard?: true; /** "Put that card into your hand at the beginning of your next end step" (Necropotence). */ endStepHand?: true }
   /**
    * Cards exiled with ~ (CR 607.2a): "Put all cards exiled with ~ into their owner's graveyard", "Return a card you own
    * exiled with ~ to your hand" (`one`, `yours`), "put all other cards you own exiled with ~ into your hand" (`other`:
@@ -1244,7 +1244,8 @@ export type Effect =
       among: TargetSpec;
       youChoose?: true;
     }
-  | { type: "bounce"; what: ObjRef } // return to owner's hand (from the battlefield or a graveyard)
+  /** Return to owner's hand (from the battlefield or a graveyard). `hidden`: a face-down card, named only to its owner. */
+  | { type: "bounce"; what: ObjRef; hidden?: true }
   /** "Return target creature card from your graveyard to the battlefield": enters under the effect controller's control (CR 110.2a). */
   /**
    * "You may put a land card from your hand onto the battlefield": the player picks one (or, with `any`, any number) of

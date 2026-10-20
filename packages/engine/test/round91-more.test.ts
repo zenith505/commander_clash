@@ -145,3 +145,38 @@ describe("Conjurer's Closet", () => {
     expect(s.objects[b]!.zoneChanges ?? 0).toBeGreaterThan(zc);
   });
 });
+
+describe("Necropotence", () => {
+  const necro = card("Necropotence", "Enchantment", "{B}{B}{B}", { oracleText: "Skip your draw step.\nWhenever you discard a card, exile that card from your graveyard.\nPay 1 life: Exile the top card of your library face down. Put that card into your hand at the beginning of your next end step." });
+  it("parse", () => expect(isFullySupported(necro)).toBe(true));
+
+  it("Pay 1 life: the top card, face down, then into your hand at your next end step", async () => {
+    const { activate, passUntil } = await import("./helpers");
+    const { s: s0, ap } = setup([]);
+    const n = putOnBattlefield(s0, ap, necro);
+    const top = s0.players[ap]!.library[0]!;
+    const life = s0.players[ap]!.life;
+    let s = activate(s0, ap, n, 0);
+    s = settle(s);
+    expect(s.players[ap]!.life).toBe(life - 1);
+    expect(s.objects[top]!.zone).toBe("exile");
+    expect(s.objects[top]!.hiddenExile?.seen).toEqual([]);
+    s = settle(passUntil(s, "end", ap));
+    for (let i = 0; i < 10 && s.objects[top]!.zone !== "hand"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.objects[top]!.zone).toBe("hand");
+    // The log names it only to its owner.
+    expect(s.log.some((l) => /puts a card into/.test(l.text) && l.to === undefined)).toBe(true);
+    expect(s.log.some((l) => l.text === `It's ${s.cards[s.objects[top]!.cardId]!.name}.` && l.to === ap)).toBe(true);
+  });
+
+  it("a card you discard is exiled from your graveyard", () => {
+    const rummage = card("Rummage", "Sorcery", "{R}", { oracleText: "Discard a card." });
+    const { s: s0, ap, ids } = setup([rummage, bear()]);
+    putOnBattlefield(s0, ap, necro);
+    let s = cast(s0, ap, ids[0]!);
+    if (s.pending?.kind === "discard") s = act(s, { type: "discard", player: ap, objectIds: [ids[1]!] });
+    s = settle(s);
+    expect(s.objects[ids[1]!]!.zone).toBe("exile");
+    expect(s.objects[ids[0]!]!.zone).toBe("graveyard");
+  });
+});

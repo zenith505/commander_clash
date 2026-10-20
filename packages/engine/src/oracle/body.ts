@@ -275,6 +275,7 @@ function parseFaceDownPlay(sentences: string[], at: number, ctx: Ctx): { effect:
   let seen = false;
   let play: FaceDownPlay | undefined;
   let upkeepGraveyard = false;
+  let endStepHand = false;
   const ANY = "(?:mana of any type can be spent to cast (?:it|them|that spell|those spells)|you may spend mana as though it were mana of any type to cast (?:it|them|that spell|those spells))";
   for (;;) {
     const t = sentences[next];
@@ -293,15 +294,18 @@ function parseFaceDownPlay(sentences: string[], at: number, ctx: Ctx): { effect:
         if (play.until === "source" && ctx.spell) return "fail";
       } else if (play && /^(?:If you cast a spell this way, you may spend mana as though it were mana of any type to cast it|Mana of any type can be spent to cast (?:a spell this way|that spell|it))$/.test(t)) play.anyType = true;
       else if (play?.until === "yourNextTurn" && /^At the beginning of your next upkeep, put any of those cards you didn't play into your graveyard$/.test(t) && whose === "you") upkeepGraveyard = true;
+      // "Exile the top card of your library face down. Put that card into your hand at the beginning of your next end step."
+      // (Necropotence): a delayed trigger for the card (rulings), which nobody may look at until then.
+      else if (!play && !seen && !endStepHand && count === "card" && whose === "you" && t === "Put that card into your hand at the beginning of your next end step") endStepHand = true;
       else break;
     }
     next++;
   }
-  if (!play && !seen) return null;
+  if (!play && !seen && !endStepHand) return null;
   // A face-down card nobody may look at: Duplicity's, without the look (read as a plain sentence).
   const who = parsePlayer(whose, ctx);
   if (!who) return "fail";
-  const effect: Effect = { type: "exileFaceDown", from: "top", ...(n !== 1 ? { n } : {}), ...(who.ref !== "you" ? { who } : {}), ...(seen ? { look: true as const } : {}), ...(play ? { play } : {}), ...(upkeepGraveyard ? { upkeepGraveyard: true as const } : {}) };
+  const effect: Effect = { type: "exileFaceDown", from: "top", ...(n !== 1 ? { n } : {}), ...(who.ref !== "you" ? { who } : {}), ...(seen ? { look: true as const } : {}), ...(play ? { play } : {}), ...(upkeepGraveyard ? { upkeepGraveyard: true as const } : {}), ...(endStepHand ? { endStepHand: true as const } : {}) };
   return { effect, next };
 }
 

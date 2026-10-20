@@ -840,7 +840,10 @@ function parseDiscardTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!f || f.kind !== "card") return "fail";
     filter = f;
   }
-  const body = parseBody(m[5]!, { eventPlayer: true });
+  // "Exile that card from your graveyard" (Necropotence): the discarded card, if it's there (rulings: not if it went
+  // somewhere else, as with madness, or has left).
+  const exileIt = m[1] === "you" && m[2] === "discard" && m[3] === "a" && m[4] === "card" && m[5] === "exile that card from your graveyard.";
+  const body = exileIt ? { targets: [], effects: [{ type: "exile" as const, what: { ref: "subjectCard" as const, zone: "graveyard" as const } }], text: m[5]! } : parseBody(m[5]!, { eventPlayer: true });
   if (!body) return "fail";
   const by = m[1] === "you" ? "you" : m[1] === "an opponent" ? "opponent" : "any";
   return { event: "playerDiscards", discards: { by, ...(/^cycles?$/.test(m[2]!) ? { cycled: true as const } : {}), ...(m[3] === "another" ? { other: true as const } : {}), ...(filter ? { filter } : {}) }, body };

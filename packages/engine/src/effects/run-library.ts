@@ -1,5 +1,5 @@
 import type { Effect, PlayerRef, SearchDest } from "../abilities";
-import { cardIdOf, defOf } from "../cards";
+import { cardIdOf, defOf, isType } from "../cards";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { gainLife, log, loseLife, moveObject, enterTogether, obj, opponents, payableLife, player } from "../game";
@@ -513,7 +513,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (got === "paused") return "paused";
         picked = got;
       }
-      const dest = (pid: PlayerId, id: ObjectId) => (picked.includes(id) ? e.split!.to : foundBy(pid).indexOf(id) > 0 && e.others ? e.others : e.dest);
+      const dest = (pid: PlayerId, id: ObjectId) => (picked.includes(id) ? e.split!.to : foundBy(pid).indexOf(id) > 0 && e.others ? e.others : e.landTo && isType(defOf(s, obj(s, id)), "Land") ? e.landTo : e.dest);
       const onto = searchers.flatMap((pid) => foundBy(pid).filter((id) => dest(pid, id).zone === "battlefield").map((id) => ({ o: obj(s, id), under: pid })));
       const hosts = chooseAuraHosts(s, onto, src);
       if (hosts === "paused") return "paused";

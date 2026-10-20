@@ -625,6 +625,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "discard", who: { ref: "couldntPick" }, n: cant[2] === "a card" ? 1 : 2, random: false });
       continue;
     }
+    // "Search your library for a creature or land card and reveal it. Put it onto the battlefield tapped if it's a land
+    // card. Otherwise, put it into your hand. Then shuffle." (Archdruid's Charm): one search, the land card's own destination.
+    const searchReveal = /^Search your library for (an? [a-z ]+? card) and reveal it$/.exec(s);
+    if (searchReveal && sentences[si + 1] === "Put it onto the battlefield tapped if it's a land card" && sentences[si + 2] === "Otherwise, put it into your hand" && /^Then,? shuffle$/.test(sentences[si + 3] ?? "")) {
+      const fx = parseOne(`Search your library for ${searchReveal[1]}, reveal it, put it into your hand, then shuffle`, ctx);
+      if (fx?.length !== 1 || fx[0]!.type !== "search") return null;
+      effects.push({ ...fx[0]!, landTo: { zone: "battlefield", tapped: true } });
+      si += 3;
+      continue;
+    }
     // "Sacrifice a creature. If you do, ...": only if one was sacrificed (you must if you can, rulings on Victimize).
     const sacDo = /^If you do, (.+)$/.exec(s);
     const sacPrev = effects[effects.length - 1];

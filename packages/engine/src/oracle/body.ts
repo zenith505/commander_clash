@@ -456,6 +456,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // Search for Survivors: "An opponent chooses a card at random in your graveyard. If it's a creature card, put it onto the
   // battlefield. Otherwise, exile it." The choice is at random, so who makes it changes nothing: one instruction.
   text = text.replace(/An opponent chooses a card at random in your graveyard\. If it's a creature card, put it onto the battlefield\. Otherwise, exile it\./, "Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it.");
+  // "Put a +1/+1 counter on each creature you control and a loyalty counter on each other planeswalker you control"
+  // (Ajani Steadfast): two kinds of counters on two groups, one after the other.
+  text = text.replace(/(^|\. )Put (an?|one|two|three) ([^.]*?counters?) on (each [^.]+?) and (an?|one|two|three) ([^.]*?counters?) on (each [^.]+?)\./g, "$1Put $2 $3 on $4. Put $5 $6 on $7.");
   // "Search your library for up to four cards with different names and reveal them. Target opponent chooses two of those
   // cards. Put the chosen cards into your graveyard and the rest into your hand. Then shuffle." (Gifts Ungiven), and
   // "Reveal the top three cards of your library. An opponent chooses one of them. Put that card into your graveyard and
@@ -2541,7 +2544,7 @@ function parseEqualTo(s: string, ctx: Ctx): Effect[] | null {
 
 // "Choose one —" and its bulleted modes; "choose one that hasn't been chosen [this turn] —" (GameObject.modesChosen) and
 // "choose one at random —". Spree's "+ {cost} —" modes, escalate, pawprints and repeated modes are read in compile.ts.
-const MODAL = /^[Cc]hoose (one|two|three|one or both|one or more|up to one)( that hasn't been chosen(?: this turn)?| at random)? —\s*((?:•[^•]+)+)$/;
+const MODAL = /^[Cc]hoose (one|two|three|one or both|one or more|up to one|any number)( that hasn't been chosen(?: this turn)?| at random)? —\s*((?:•[^•]+)+)$/;
 
 /** How many modes each "Choose ..." allows (CR 700.2), given how many there are. */
 const MODE_COUNTS: Record<string, (n: number) => [number, number]> = {
@@ -2551,6 +2554,8 @@ const MODE_COUNTS: Record<string, (n: number) => [number, number]> = {
   "one or both": () => [1, 2],
   "one or more": (n) => [1, n],
   "up to one": () => [0, 1],
+  // "Choose any number —" (Rankle and Torbran): none, some or all, in the order printed (rulings).
+  "any number": (n) => [0, n],
 };
 
 function parseModal(count: string, bullets: string, text: string, opts: Parameters<typeof parseBody>[1] = {}): AbilityBody | null {
@@ -2562,6 +2567,8 @@ function parseModal(count: string, bullets: string, text: string, opts: Paramete
     if (!body) return null; // every mode has to work, or the card isn't supported
     modes.push(body);
   }
+  // Only a triggered ability's, whose modes may all be left out (CR 700.2b, 603.3c).
+  if (count === "any number" && (opts.spell || opts.activated)) return null;
   const [min, max] = MODE_COUNTS[count]!(modes.length);
   if (modes.length < 2 || max > modes.length) return null;
   return { targets: [], effects: [], text, modal: { min, max, modes } };

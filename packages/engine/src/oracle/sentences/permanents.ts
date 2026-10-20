@@ -9,6 +9,7 @@ import { parseChanges, parseSentence } from "../sentence";
 import { parseExtraBlocks, parseStaticMods } from "../statics";
 import type { Ctx } from "../body";
 import { canonicalKeyword } from "../../keywords";
+import { parseGrants } from "../grants";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
 export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
@@ -48,6 +49,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Outrider): the spell, as it resolves (CR 614.1c).
   if ((m = new RegExp(`^[Tt]hat creature enters with (an|${NUMX}) additional ${COUNTER} counters? on it$`).exec(s)))
     return ctx.castSpell && m[1] !== "X" ? [{ type: "spellEntersWith", counter: counterKind(m[m.length - 1]!), n: m[1] === "an" ? 1 : amt(m[1]!) }] : null;
+  // "It gains haste until end of turn" about the spell a cast trigger is about (Tyvar Kell's emblem): the permanent it
+  // becomes has it until end of turn (CR 400.7a, rulings on Tyvar Kell).
+  // "It gains rebound" (Narset Transcendent): as it resolves (CR 702.88a).
+  if (ctx.castSpell && (m = /^(?:[Ii]t|[Tt]hat spell) gains (.+?)( until end of turn)?$/.exec(s))) {
+    if (m[1] === "rebound" && !m[2]) return [{ type: "spellGains", mods: [{ kind: "addKeywords", keywords: ["Rebound"] }] }];
+    const mods = m[2] ? parseGrants(m[1]!) : null;
+    return mods?.length && mods.every((x) => x.kind === "addKeywords") ? [{ type: "spellGains", mods }] : null;
+  }
   // A class level bar's activated ability (CR 716.2a; see striations.ts): only in an activated ability of its own.
   if ((m = /^~'s level becomes (\d+)$/.exec(s))) return ctx.activated ? [{ type: "classLevel", n: Number(m[1]) }] : null;
   // A Case's "To solve" trigger (CR 719.3a; see compile.ts): "this Case becomes solved".

@@ -735,6 +735,8 @@ export function moveObject(
     o.evidence = undefined; // and whether evidence was collected for it (CR 701.59c)
     o.treasureSpent = undefined; // and the mana from Treasures spent to cast it
     o.extraCounters = undefined; // and the counters a spell will enter with
+    o.spellGains = undefined;
+    o.reboundGained = undefined;
     o.teamwork = undefined;
     o.gift = undefined; // and whom its gift was promised to (CR 702.174a)
     o.sneak = undefined;
@@ -863,6 +865,9 @@ export function moveObject(
     const counters = { ...opts.counters };
     for (const [k, n] of Object.entries(fromZone === "stack" ? (o.extraCounters ?? {}) : {})) counters[k] = (counters[k] ?? 0) + n;
     o.extraCounters = undefined;
+    // "It gains haste until end of turn" while it was a spell (Tyvar Kell's emblem): the permanent it becomes has it (CR 400.7a).
+    for (const g of fromZone === "stack" ? (o.spellGains ?? []) : []) s.effects.push({ id: `e${s.nextId++}`, timestamp: g.timestamp, controller: g.controller, sourceName: g.source, duration: "endOfTurn", affected: [o.id], mods: g.mods });
+    o.spellGains = undefined;
     const how: EnterOpts = { ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
     // "You may have ~ enter as a copy of ...": it becomes the copy as it enters (CR 707.5), so how it
     // enters and what it triggers wait for that choice.
@@ -3504,8 +3509,8 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
   // "Your opponents can't cast spells this turn" (Silence) and the like.
   for (const c of s.cantCastThisTurn ?? [])
     if (c.player === pid && c.turn === s.turn && (!c.filter || printedMatches(c.filter, d))) return `${c.source}: you can't cast ${c.filter ? `${c.filter.text.replace(/ spell$/, "")} ` : ""}spells this turn`;
-  for (const id of s.battlefield) {
-    const o = obj(s, id);
+  // Permanents, and emblems in the command zone (CR 114.4).
+  for (const o of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)]) {
     // "Your opponents can't cast spells during your turn" (Dragonlord Dromoka).
     if (abilitiesOf(s, o).opponentsCantCastYourTurn && controllerOf(s, o) === s.activePlayer && pid !== s.activePlayer)
       return `${characteristics(s, o).name}: opponents can't cast spells during ${player(s, s.activePlayer).name}'s turn`;
@@ -3516,6 +3521,8 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
       return `${characteristics(s, o).name}: opponents can't cast spells with mana value ${most} or less`;
     for (const f of abilitiesOf(s, o).youCantCast ?? [])
       if (controllerOf(s, o) === pid && printedMatches(f, d)) return `${characteristics(s, o).name}: you can't cast ${f.text.replace(/ spell$/, "")} spells`;
+    for (const f of abilitiesOf(s, o).opponentsCantCast ?? [])
+      if (controllerOf(s, o) !== pid && printedMatches(f, d)) return `${characteristics(s, o).name}: opponents can't cast ${f.text.replace(/ spell$/, "")} spells`;
     for (const l of abilitiesOf(s, o).castLimits ?? []) {
       if (l.who === "you" && controllerOf(s, o) !== pid) continue;
       if (l.who === "enchanted" && o.attachedToPlayer !== pid) continue;
@@ -4005,6 +4012,10 @@ export function describeTargets(s: GameState, targets?: TargetChoice[]): string 
  * Why this activated ability can't be activated right now, or null. Without `targets`, only
  * checks that legal targets exist; for a modal ability, without `modes` only that a mode can be chosen.
  */
+/** Teferi, Temporal Archmage's emblem: loyalty abilities any time you could cast an instant (you have priority). */
+const loyaltyAtInstantSpeed = (s: GameState, pid: PlayerId) =>
+  [...s.battlefield.map((x) => obj(s, x)).filter((x) => controllerOf(s, x) === pid), ...liveEmblems(s).filter((x) => x.owner === pid)].some((x) => abilitiesOf(s, x).loyaltyAtInstantSpeed);
+
 export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x?: number, costs?: CostChoices): string | null {
   const p = player(s, pid);
   const o = s.objects[id];
@@ -4029,7 +4040,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (s.priority !== pid || s.pending) return "you don't have priority";
     if (splitSecondOnStack(s)) return "a spell with split second is on the stack"; // CR 702.61a
   }
-  if (ab.sorcerySpeed && !canActAtSorcerySpeed(s, pid)) return "activate only as a sorcery";
+  if (ab.sorcerySpeed && !canActAtSorcerySpeed(s, pid) && !((ab.loyalty !== undefined || ab.loyaltyX) && loyaltyAtInstantSpeed(s, pid))) return "activate only as a sorcery";
   if (ab.tap && o.tapped) return `${d.name} is tapped`;
   if (ab.tap && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${d.name} has summoning sickness`; // CR 602.5a
   if (ab.oncePerTurn && o.activatedThisTurn?.includes(index)) return `${d.name}'s ability can be activated only once each turn`; // CR 602.5b
@@ -4039,7 +4050,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.maxPerTurn && (o.activatedThisTurn?.filter((n) => n === index).length ?? 0) >= ab.maxPerTurn) return `${d.name}'s ability can be activated no more than ${ab.maxPerTurn === 2 ? "twice" : `${ab.maxPerTurn} times`} each turn`;
   if (ab.loyalty !== undefined || ab.loyaltyX) {
     // Loyalty abilities: as a sorcery, one per permanent per turn (CR 606.3); a negative cost needs that many counters (CR 606.6).
-    if (!canActAtSorcerySpeed(s, pid)) return "loyalty abilities can be activated only as a sorcery";
+    if (!loyaltyAtInstantSpeed(s, pid) && !canActAtSorcerySpeed(s, pid)) return "loyalty abilities can be activated only as a sorcery";
     // Gained loyalty abilities count too, and stay counted if the effect that gave them ends (rulings).
     const used = o.activatedThisTurn?.filter((n) => n === LOYALTY_USED).length ?? 0;
     if (used >= loyaltyPerTurn(s, o)) return `${used === 1 ? "a loyalty ability" : "two loyalty abilities"} of ${d.name} ${used === 1 ? "was" : "were"} already activated this turn`;
@@ -5714,14 +5725,19 @@ function finishCombatDamage(s: GameState): boolean {
     else if (pw?.zone === "battlefield" && objIsType(s, pw, "Battle")) fireEvent(s, { type: "combatDamageToPlayer", id: key(e), player: pw.protector ?? controllerOf(s, pw), amount: e.dealt, battle: pw.id });
   }
   // "Whenever one or more creatures you control deal combat damage to a player": once per player dealt damage.
-  const groups = new Map<string, { controller: PlayerId; player: PlayerId; ids: ObjectId[]; amounts: number[] }>();
+  // "... to a player or battle" (Zurgo and Ojutai): once per battle dealt damage too (rulings).
+  const groups = new Map<string, { controller: PlayerId; player: PlayerId; ids: ObjectId[]; amounts: number[]; battle?: ObjectId }>();
   for (const e of done) {
-    if (!("player" in e.to) || !e.dealt) continue;
+    if (!e.dealt) continue;
+    const b = "object" in e.to ? s.objects[e.to.object] : undefined;
+    const battle = b?.zone === "battlefield" && objIsType(s, b, "Battle") ? b : undefined;
+    if (!("player" in e.to) && !battle) continue;
     const controller = e.src.controller;
-    const g = groups.get(`${controller}|${e.to.player}`) ?? { controller, player: e.to.player, ids: [], amounts: [] };
+    const k = battle ? `${controller}|b${battle.id}` : `${controller}|${"player" in e.to ? e.to.player : ""}`;
+    const g = groups.get(k) ?? { controller, player: battle ? (battle.protector ?? controllerOf(s, battle)) : (e.to as { player: PlayerId }).player, ids: [], amounts: [], ...(battle ? { battle: battle.id } : {}) };
     g.ids.push(key(e));
     g.amounts.push(e.dealt);
-    groups.set(`${controller}|${e.to.player}`, g);
+    groups.set(k, g);
   }
   for (const e of done) {
     const gained = lifelink.get(key(e));

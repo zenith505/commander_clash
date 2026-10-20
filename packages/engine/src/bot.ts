@@ -644,7 +644,10 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
       (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId) && totalOk(s, body.targets, out, i, t) && !(countersFrom && t.kind === "object" && !Object.values(obj(s, t.id).counters).some((n) => n > 0)),
     );
     // Reanimating takes the best creature from any graveyard it may.
-    const reanimate = allEffects(body.effects).some((e) => e.type === "putOntoBattlefield" && e.what.ref === "target" && i >= e.what.index && i < e.what.index + (e.what.n ?? 1));
+    const reanimators = allEffects(body.effects).filter((e): e is Extract<Effect, { type: "putOntoBattlefield" }> => e.type === "putOntoBattlefield" && e.what.ref === "target" && i >= e.what.index && i < e.what.index + (e.what.n ?? 1));
+    const reanimate = reanimators.length > 0;
+    // "Under its owner's control" (Bilbo): only our own cards do us good.
+    const forOwner = reanimators.some((e) => e.owner);
     // "Becomes a copy of target creature": the best one anywhere, but not a legendary one of ours (the legend rule
     // would cost us one of them) or the source itself; what becomes the copy is our weakest.
     const copies = allEffects(body.effects).filter((e): e is Extract<Effect, { type: "becomeCopy" }> => e.type === "becomeCopy");
@@ -657,7 +660,7 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
       : copied
       ? all.filter((t) => t.kind !== "object" || (t.id !== sourceId && !(isMine(s, pid, t) && objIsLegendary(s, t.id))))
       : reanimate
-        ? all
+        ? forOwner ? all.filter((t) => t.kind === "object" && obj(s, t.id).owner === pid) : all
         : all.filter((t) => (harm[i] ? !isMine(s, pid, t) : isMine(s, pid, t)) && !isBattleTarget(s, t));
     // Provoke: a creature ours kills without dying (wantsMay then says yes), else anything (and it says no).
     const provoke = allEffects(body.effects).some((e) => e.type === "mustBlockSource" && e.what.ref === "target" && e.what.index === i);

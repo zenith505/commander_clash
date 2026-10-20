@@ -321,6 +321,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // "That player draws an additional card" (Howling Mine): just another draw.
   if ((m = /^(.*?\b[Dd]raws?) an additional card$/.exec(s))) return parseSentence(`${m[1]} a card`, ctx);
+  // "Draw two additional cards" (Sarkhan, the Dragonspeaker's emblem, in your draw step): two more draws.
+  if ((m = /^(.*?\b[Dd]raws?) (two|three) additional cards$/.exec(s))) return parseSentence(`${m[1]} ${m[2]} cards`, ctx);
   // Poison counters on a player (CR 122.1f): "defending player gets a poison counter", "each opponent gets two".
   if ((m = new RegExp(`^(.+?) gets? (a|${NUMX}) poison counters?$`).exec(s))) {
     const who = parsePlayer(m[1]!, ctx);

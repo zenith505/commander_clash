@@ -420,6 +420,10 @@ export interface GameObject {
   treasureSpent?: number;
   /** A spell: "that creature enters with an additional +1/+1 counter on it" (Boreal Outrider, CR 614.1c), as it resolves. */
   extraCounters?: Record<string, number>;
+  /** A spell: "it gains haste until end of turn" from a cast trigger (Tyvar Kell's emblem), applying to the permanent it becomes (CR 400.7a). */
+  spellGains?: { mods: Modification[]; timestamp: number; controller: PlayerId; source: string }[];
+  /** A spell that gained rebound (Narset Transcendent), as it resolves (CR 702.88a). */
+  reboundGained?: true;
   /** Tribute (CR 702.104): the opponent chosen as it entered, and whether they put the +1/+1 counters on it. */
   tribute?: { to: PlayerId; paid?: true };
   /**
@@ -1134,7 +1138,7 @@ export interface GameState {
   /** Cards in graveyards that gained flashback until end of turn (Snapcaster Mage), as they are there. */
   flashbackGrants?: { id: ObjectId; zc: number }[];
   /** "When you next cast an instant or sorcery spell this turn, copy that spell": delayed triggers on a cast (CR 603.7). */
-  nextCast?: { controller: PlayerId; filter: TargetSpec; sourceId: ObjectId; sourceCardId: string; body: AbilityBody; turn: number; cascade?: true }[];
+  nextCast?: { controller: PlayerId; filter: TargetSpec; sourceId: ObjectId; sourceCardId: string; body: AbilityBody; turn: number; cascade?: true; /** "From your hand" (Narset Transcendent): cast from there (CR 601.2a). */ fromHand?: true }[];
   /**
    * "Until end of turn, whenever you cast a spell, ...": delayed triggered abilities with a stated duration, which trigger
    * every time their event happens until then (CR 603.7b). Their source is the spell or the source of the ability that made
@@ -1371,6 +1375,8 @@ export interface TriggerEventInfo {
   amount?: number;
   /** "Deals damage to a creature": the excess damage that creature has been dealt this turn (CR 120.10). */
   excess?: number;
+  /** "Whenever one or more Dragons you control deal combat damage": those that did, as the objects they were ("one of those Dragons"). */
+  group?: { id: ObjectId; zc: number }[];
   player?: PlayerId;
   /** A permanent's enters trigger: the opponent its spell's gift was promised to (CR 702.174b). */
   gift?: PlayerId;

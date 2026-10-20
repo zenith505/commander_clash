@@ -695,7 +695,7 @@ export type Modification =
   | { kind: "control" } // layer 2: the effect's controller controls it
   /** Layer 4, "in addition to its other types"; `allCreatureTypes`: "with all creature types" (Mutavault). */
   | { kind: "addTypes"; types: string[]; subtypes: string[]; supertypes?: string[]; allCreatureTypes?: true }
-  | { kind: "setTypes"; types: string[]; subtypes: string[] } // layer 4, "becomes a 3/3 Elemental creature": new card types replace the old (CR 205.1a)
+  | { kind: "setTypes"; types: string[]; subtypes: string[]; /** "Becomes a legendary 4/4 red Dragon creature" (Sarkhan, the Dragonspeaker): its supertypes are replaced too (CR 205.1b). */ supertypes?: string[] } // layer 4, "becomes a 3/3 Elemental creature": new card types replace the old (CR 205.1a)
   | { kind: "setSubtypes"; subtypes: string[] } // layer 4, "becomes a Frog": replaces only subtypes of the same kind (CR 205.1a)
   /**
    * Layer 4, "Nonbasic lands are Mountains", "enchanted land is an Island": the land's land types become these basic
@@ -1194,7 +1194,7 @@ export type Effect =
    */
   /** Empower Jace N (CR 701.71a): create a 0-loyalty Jace planeswalker token if you control none, then put N loyalty counters on a Jace planeswalker token you control. */
   | { type: "empowerJace"; n: Amount }
-  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** "Return half the creatures they control" (Split the Party): `who` picks among this player's permanents, not their own. */ among?: PlayerRef; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a). */ least?: "toughness"; /** "A creature with the greatest power among creatures they control", "a creature or planeswalker with the greatest mana value among creatures and planeswalkers they control": only those, or tied for it. */ greatest?: "power" | "manaValue"; /** "Unless they pay {3}": each player may pay to be left out. */ unless?: UnlessPays }
+  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** "Return half the creatures they control" (Split the Party): `who` picks among this player's permanents, not their own. */ among?: PlayerRef; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a). */ least?: "toughness"; /** "One of those Dragons" (Zurgo and Ojutai): only among the trigger's group (TriggerEventInfo.group), not targeted. */ fromGroup?: true; /** "A creature with the greatest power among creatures they control", "a creature or planeswalker with the greatest mana value among creatures and planeswalkers they control": only those, or tied for it. */ greatest?: "power" | "manaValue"; /** "Unless they pay {3}": each player may pay to be left out. */ unless?: UnlessPays }
   /**
    * "Sacrifice an artifact, a creature, and a land", "target player sacrifices an artifact and a land of their choice":
    * one permanent for each of `filters`, all different (a permanent sacrificed once can't be sacrificed again, like the
@@ -1466,7 +1466,7 @@ export type Effect =
   /** "When you next cast an instant or sorcery spell this turn, ...": a delayed trigger on that cast (CR 603.7). */
   /** `cascade`: "the next noncreature spell you cast this turn has cascade" (Dark Apostle): that spell's own cascade. */
   /** `who`: "the next spell they cast": that player's (a target player), not the controller's. */
-  | { type: "nextCast"; filter: TargetSpec; effects: Effect[]; text: string; cascade?: true; who?: PlayerRef }
+  | { type: "nextCast"; filter: TargetSpec; effects: Effect[]; text: string; cascade?: true; who?: PlayerRef; /** "When you next cast an instant or sorcery spell from your hand this turn" (Narset Transcendent). */ fromHand?: true }
   /**
    * "Until end of turn, whenever you cast a spell, ~ deals 2 damage to up to one target creature" (CR 603.7b): a delayed
    * triggered ability that triggers each time its event happens until `until` ends (see GameState.floatingTriggers).
@@ -1706,6 +1706,8 @@ export type Effect =
    * about, if it's still on the stack, enters with these too (CR 614.1c).
    */
   | { type: "spellEntersWith"; counter: CounterKind; n: Amount }
+  /** "It gains haste until end of turn" about the spell a cast trigger is about (Tyvar Kell's emblem): the permanent it becomes has it, until end of turn (CR 400.7a). */
+  | { type: "spellGains"; mods: Modification[] }
   | {
       type: "counterSpell";
       index: number;
@@ -2326,6 +2328,8 @@ export type TriggerEvent =
   | "creaturesYouControlAttack"
   /** "Whenever one or more creatures you control deal combat damage to a player": once per player dealt damage. */
   | "creaturesYouControlDealCombatDamageToPlayer"
+  /** "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix): see `spellDamage`; once for each one dealt damage. */
+  | "spellYouControlDealsDamage"
   /**
    * "Whenever one or more cards leave your graveyard", "one or more tokens you control enter", "one or more other creatures
    * die", "you discard one or more cards": once for each event that moves one or more matching objects (CR 603.2c), see
@@ -2385,6 +2389,8 @@ export interface TriggeredAbility {
    * more creatures ... are dealt" (once for each damage event).
    */
   excess?: { filter: TargetSpec; noncombat?: true; oneOrMore?: true };
+  /** For "spellYouControlDealsDamage": what spell, and dealt to an opponent (or a battle too, `orBattle`). */
+  spellDamage?: { filter: TargetSpec; orBattle?: true };
   /**
    * For "youRollDie": the die's result has to be at least `min` ("a 4 or higher"), or its natural result (CR 706.2) has
    * to be `natural` ("a natural 20"), or the die's highest one (`natural: "max"`).
@@ -3026,10 +3032,14 @@ export interface CompiledCard {
   uncounterable?: { filter: TargetSpec; anyone?: true }[];
   /** "Your opponents can't cast spells during your turn." (a "can't" that wins over any "can", CR 101.2) */
   opponentsCantCastYourTurn?: true;
+  /** "You may activate loyalty abilities of planeswalkers you control on any player's turn any time you could cast an instant." (Teferi, Temporal Archmage's emblem) */
+  loyaltyAtInstantSpeed?: true;
   /** "Your opponents can't cast spells with mana value 3 or less." (Brisela, Voice of Nightmares): this many or less. */
   opponentsCantCastMvAtMost?: number;
   /** "You can't cast creature spells." (Steel Golem), "You can't cast noncreature spells." (Nikya): its controller. */
   youCantCast?: TargetSpec[];
+  /** "Your opponents can't cast noncreature spells." (Narset Transcendent's emblem): each opponent of its controller. */
+  opponentsCantCast?: TargetSpec[];
   /**
    * "During your turn, your opponents can't ... activate abilities of artifacts, creatures, or enchantments" (Grand
    * Abolisher): permanents on the battlefield only, mana abilities too (rulings); see abolisherBan.

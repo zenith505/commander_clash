@@ -5,7 +5,9 @@
 // player into poison counters (CR 702.90b), toxic adds poison (CR 702.164c), and
 // deathtouch and lifelink apply (CR 702.2, 702.15).
 
-import { abilitiesOf, toughness } from "./cards";
+import { abilitiesOf, defOf, toughness } from "./cards";
+import { compileCard } from "./oracle";
+import { liveEmblems } from "./emblems";
 import { commanderOf } from "./mutate";
 import { evalAmount } from "./amounts";
 import { putCounters } from "./counters";
@@ -50,6 +52,12 @@ export function objectSource(s: GameState, o: GameObject): DamageSource {
   const c = characteristics(s, o);
   const zc = o.zone === "battlefield" ? (o.zoneChanges ?? 0) : (s.lastKnown?.[o.id]?.zc ?? o.zoneChanges ?? 0);
   return { name: c.name, controller: controllerOf(s, o), colors: c.colors, types: c.types, subtypes: c.subtypes, keywords: c.keywords, id: o.id, ref: { object: o.id, zc }, ...(o.isCommander ? { commanderId: commanderOf(s, o)?.id ?? o.id } : {}), ...(c.unpreventable ? { unpreventable: c.unpreventable } : {}) };
+}
+
+/** "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix). */
+function spellDealt(s: GameState, src: DamageSource, to: { player?: PlayerId; battle?: ObjectId }) {
+  const o = src.spell && src.ref ? s.objects[src.ref.object] : undefined;
+  if (o) fireEvent(s, { type: "spellDealtDamage", by: src.controller, card: defOf(s, o), ...to });
 }
 
 /** A spell, or an ability whose source is gone: the card's printed characteristics. */
@@ -156,6 +164,7 @@ export function dealDamage(
       invalidateCharacteristics(s);
       log(s, `${src.name} deals ${n} damage to ${c.name} (${removed} defense removed).`);
       if (removed && removed === had) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: "defense" });
+      spellDealt(s, src, { battle: o.id });
     }
     if ((!walker && !battle) || c.types.includes("Creature")) {
       if (has(src, "Infect") || has(src, "Wither")) {
@@ -209,6 +218,7 @@ export function dealDamage(
     else fireEvent(s, { type: "playerDealtDamage", player: p.id, amount: n });
     // "Whenever ~ deals damage to a player" (combat damage is all dealt before any of it triggers anything).
     fireEvent(s, { type: "damagedPlayer", source: src.id ?? "", by: src.controller, player: p.id, amount: n, combat: !!opts.combat });
+    spellDealt(s, src, { player: p.id });
     if (opts.combat) {
       p.combatDamagedTurn = s.turn;
       if (src.commanderId) p.commanderDamage[src.commanderId] = (p.commanderDamage[src.commanderId] ?? 0) + n;
@@ -402,6 +412,13 @@ function liveMods(s: GameState): LiveMod[] {
       out.push({ key: `mod:${id}:${i}`, mod, holder: o, card: from ? characteristics(s, from).name : characteristics(s, o).name });
     }
   }
+  // An emblem's (Ajani Steadfast's: "prevent all but 1 of that damage"), its owner's (CR 114.4).
+  for (const o of liveEmblems(s))
+    compileCard(defOf(s, o)).statics.forEach((st, i) =>
+      st.mods.forEach((m, j) => {
+        if (m.kind === "damageMod") out.push({ key: `mod:${o.id}:${i}:${j}`, mod: { ...m.mod, you: o.owner, from: o.id }, card: defOf(s, o).name });
+      }),
+    );
   // A resolved one lasts the turn, or until its controller's next turn begins (CR 611.2a).
   for (const r of s.damageMods ?? [])
     if (r.turn === s.turn || (r.until === "yourNextTurn" && !(s.activePlayer === r.you && s.turn > r.turn))) out.push({ key: `mod:${r.id}`, mod: { ...r.mod, you: r.you }, card: r.name, ...(r.mod.nextTime ? { once: r.id } : {}) });

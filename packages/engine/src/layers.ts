@@ -320,9 +320,10 @@ function gather(s: GameState): Inst[] {
   }
   // Emblems' static abilities, with the emblems' timestamps (CR 114.4, 613.7a).
   for (const o of liveEmblems(s))
-    compileCard(defOf(s, o)).statics.forEach((st, i) =>
-      out.push({ key: `${o.id}#${i}`, timestamp: o.timestamp, order: order++, sourceId: o.id, sourceName: defOf(s, o).name, untilEndOfTurn: false, mods: st.mods, affects: st.affects, controller: o.controller, emblem: true }),
-    );
+    compileCard(defOf(s, o)).statics.forEach((st, i) => {
+      // A damage replacement's (Ajani Steadfast's emblem) is read in damage.ts.
+      if (st.affects.kind === "filter") out.push({ key: `${o.id}#${i}`, timestamp: o.timestamp, order: order++, sourceId: o.id, sourceName: defOf(s, o).name, untilEndOfTurn: false, mods: st.mods, affects: st.affects, controller: o.controller, emblem: true });
+    });
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
     const d = defOf(s, o);
@@ -786,11 +787,15 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       // The new card types replace the old, but an instant or sorcery stays one (CR 205.1a). Subtypes of
       // card types it no longer has go too; those of types it keeps stay unless the effect sets that kind.
       const kept = c.types.filter((t) => t === "Instant" || t === "Sorcery");
+      // A planeswalker's subtypes (Sarkhan) and Siege are planeswalker and battle types (CR 205.3j, 205.3q).
+      const was = c.types;
+      const setOf = (st: string) => subtypeSet(st) ?? (st === "Siege" ? "Battle" : was.includes("Planeswalker") ? "Planeswalker" : null);
       c.types = [...m.types, ...kept.filter((t) => !m.types.includes(t))];
       const hasSet = (set: string | null) => set === null || (set === "Spell" ? c.types.includes("Instant") || c.types.includes("Sorcery") : c.types.includes(set));
-      c.subtypes = c.subtypes.filter((st) => hasSet(subtypeSet(st)));
+      c.subtypes = c.subtypes.filter((st) => hasSet(setOf(st)));
       if (!c.types.includes("Creature")) c.allCreatureTypes = false;
       setSubtypes(c, m.subtypes);
+      if (m.supertypes) c.supertypes = [...m.supertypes];
       return;
     }
     case "setSubtypes":

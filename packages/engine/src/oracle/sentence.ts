@@ -225,6 +225,12 @@ export function parseBecomes(text: string): Modification[] | null {
   if ((m = /^(\d+\/\d+ (?:[A-Z]\w* )*creature)s\b(.*)$/.exec(rest))) rest = `a ${m[1]}${m[2]}`;
   if (!(m = /^an? (.+)$/i.exec(rest))) return null;
   rest = m[1]!;
+  // "A legendary 4/4 red Dragon creature" (Sarkhan, the Dragonspeaker): a new supertype replaces the old ones (CR 205.1b).
+  let legendary = false;
+  if ((m = /^legendary (.+)$/.exec(rest))) {
+    legendary = true;
+    rest = m[1]!;
+  }
   // "A 2/2 creature with all creature types" (Mutavault), "with vigilance and all creature types" (Faceless Haven): every
   // creature type, like changeling (CR 702.73a), in the type-changing layer.
   let everyType = false;
@@ -276,9 +282,10 @@ export function parseBecomes(text: string): Modification[] | null {
     // creature" keeps them too, except that its creature types are replaced (CR 205.1b).
     out.push({ kind: "addTypes", types, subtypes: [] });
     if (subtypes.length) out.push({ kind: "setSubtypes", subtypes });
-  } else if (types.length) out.push(still ? { kind: "addTypes", types, subtypes } : { kind: "setTypes", types, subtypes });
+  } else if (types.length) out.push(still ? { kind: "addTypes", types, subtypes } : { kind: "setTypes", types, subtypes, ...(legendary ? { supertypes: ["Legendary"] } : {}) });
   else if (subtypes.length && !still) out.push({ kind: "setSubtypes", subtypes });
   else if (still) return null;
+  if (legendary && (still || addition || !types.length || types.join(" ") === "Artifact Creature")) return null;
   if (everyType) {
     if (!types.includes("Creature") || subtypes.length) return null;
     out.push({ kind: "addTypes", types: [], subtypes: [], allCreatureTypes: true });

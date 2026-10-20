@@ -178,11 +178,13 @@ export const EMBLEM_EVENTS = new Set<TriggeredAbility["event"]>([
 export function emblemAbilityOk(text: string): boolean {
   if (text.includes(QUOTED_SOURCE_NAME)) return false;
   const c = compileGranted(text);
-  const { triggers, activated, mana, statics, entersTapped, unsupported, textKeywords, costMods, noMaxHandSize, ...rest } = c;
+  const { triggers, activated, mana, statics, entersTapped, unsupported, textKeywords, costMods, noMaxHandSize, opponentsCantCast, loyaltyAtInstantSpeed, ...rest } = c;
   if (unsupported.length || textKeywords.length || entersTapped || activated.length || mana.length || Object.keys(rest).length) return false;
-  if (!triggers.length && !statics.length && !costMods?.length && noMaxHandSize !== true) return false;
+  if (!triggers.length && !statics.length && !costMods?.length && noMaxHandSize !== true && !opponentsCantCast && !loyaltyAtInstantSpeed) return false;
   if (noMaxHandSize === "all") return false;
   if (!triggers.every((t) => EMBLEM_EVENTS.has(t.event) && !t.host && !t.zone && !t.activeIf && !t.ifCond && !t.hostControllersUpkeep && !t.enchantedPlayersTurn)) return false;
-  if (!statics.every((st) => st.affects.kind === "filter" && !st.affects.other && !st.condition && st.affects.controller !== "enchanted")) return false;
+  // A damage replacement about you and what you control (Ajani Steadfast's), not about the emblem itself.
+  const damageMod = (st: (typeof statics)[number]) => st.affects.kind === "self" && !st.condition && st.mods.every((m) => m.kind === "damageMod" && !m.mod.by?.self && !m.mod.by?.other && !m.mod.to?.self && !m.mod.to?.other);
+  if (!statics.every((st) => damageMod(st) || (st.affects.kind === "filter" && !st.affects.other && !st.condition && st.affects.controller !== "enchanted"))) return false;
   return (costMods ?? []).every((m) => !m.if && m.who !== "enchanted");
 }

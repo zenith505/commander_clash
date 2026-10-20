@@ -721,6 +721,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const sc = (s.resolving!.scratch ??= {});
       const you = player(s, ctx.controller);
       if (!sc.castAmong) {
+        if (e.each) {
+          // Etali: the top card of each player's library, all exiled at once.
+          const ids = livingPlayers(s).flatMap((pid) => player(s, pid).library.slice(0, amountNow(s, e.n, ctx)));
+          for (const id of ids) moveObject(s, id, "exile");
+          log(s, ids.length ? `${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} exiled from the top of each library.` : "No library has a card to exile.");
+          sc.castAmong = { ids: ids.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
+        }
+      }
+      if (!sc.castAmong) {
         const whose = players(s, e.who, ctx)[0];
         if (whose === undefined) return;
         const lib = player(s, whose).library;

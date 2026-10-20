@@ -882,6 +882,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si += 3;
       continue;
     }
+    // Etali, Primal Storm: "exile the top card of each player's library, then you may cast any number of spells from
+    // among those cards without paying their mana costs". The cards not cast stay exiled (rulings).
+    if (/^[Ee]xile the top card of each player's library$/.test(s) && /^[Yy]ou may cast any number of spells from among those cards without paying their mana costs$/.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 1, each: true });
+      si++;
+      continue;
+    }
     if (untilMv && /^You may cast any number of spells from among them without paying their mana costs\.?$/.test(sentences[si + 1] ?? "")) {
       effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, untilMv: Number(untilMv[1]) });
       si++;

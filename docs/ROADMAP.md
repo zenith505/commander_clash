@@ -1,7 +1,13 @@
 # Roadmap
 
-20,813 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Each round takes the next item,
-implements it with tests, and updates this file. `npm run blockers` shows how many cards each missing line blocks.
+20,874 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 802 of 992 (80%), top 2,000: 1,459 of 1,989 (73%), top 5,000: 3,159 of 4,988 (63%).
+
+Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
+cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
+`data/popularity.json`; `npm run popularity` rebuilds it from the Scryfall extract). Each round starts at the top of that
+list and groups cards that share a mechanic. The plan is done when **all of the top 2,000 and 90% of the top 5,000**
+play. `npm run blockers` still shows how many cards each missing line blocks.
 
 ## Ken's standing instructions
 
@@ -15,6 +21,15 @@ implements it with tests, and updates this file. `npm run blockers` shows how ma
 
 ## Next rounds
 
+00. Most played first (`npm run popular`). Out after round 89, most played first: Urza's Saga (a chapter that grants
+   an ability with a quoted token ability), Victimize ("choose two target cards ... sacrifice ... return the chosen
+   cards"), Roaming Throne (extra triggers for the chosen type), Chrome Mox and Mox Amber (mana of the exiled card's /
+   legendary permanents' colors), Nykthos and Three Tree City (choose a color, then an amount), Sink into Stupor's
+   "spell or nonland permanent", Gemstone Caverns (opening hand), Tireless Provisioner (either-token choice), Rhythm of
+   the Wild (granting riot), Animate Dead, Mirkwood Bats ("create or sacrifice a token"), Gamble, Mox Diamond, Bloom
+   Tender, Sylvan Library, Orcish Bowmasters, Rakdos Charm ("each creature deals 1 damage to its controller"), Inspiring
+   Call ("those creatures"). Bots don't hold Teferi's Protection for anything but lethal combat damage or a board
+   wipe of their own permanents worth 12+ mana value.
 0. Cards with faces (CR 709, 710, 712, 715, 722): 481 of the 846 legal ones play now (`npm run faces` lists each
    layout's support and the lines blocking it): 180 of 388 transforming double-faced (all 36 Invasion Sieges),
    107 of 151 adventurer, 78 of 123 split (15 of 28 Rooms), 48 of 98 modal double-faced, 50 of 67 preparation, 18 of

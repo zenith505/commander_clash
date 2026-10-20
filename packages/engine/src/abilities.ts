@@ -155,6 +155,8 @@ export type Count =
   | { kind: "basicLandTypes" }
   /** Vivid: "the number of colors among permanents you control" (white, blue, black, red, green; colorless isn't one, CR 105.2c). */
   | { kind: "colorsAmongPermanents" }
+  /** "For each spell you've cast this turn" (Aetherflux Reservoir): the spells its controller cast this turn, copies not (CR 707.10). */
+  | { kind: "spellsCastThisTurn" }
   /** "The number of card types among cards in all graveyards" (Tarmogoyf): card types only, not subtypes or supertypes (CR 205.2a). */
   | { kind: "graveyardCardTypes"; who: PlayerRef }
   /**
@@ -1093,6 +1095,10 @@ export type Effect =
       excessToController?: true;
     }
   | { type: "draw"; who: PlayerRef; n: Amount }
+  /** "Its controller may draw up to two cards" (Arcane Denial): each player chooses how many, 0 to `n`, before drawing (rulings). */
+  | { type: "drawUpTo"; who: PlayerRef; n: number }
+  /** "Put your commander into your hand from the command zone" (Command Beacon): one of yours there, chosen with two (rulings). */
+  | { type: "commanderToHand" }
   | { type: "gainLife"; who: PlayerRef; n: Amount }
   /** `drain`: "You gain life equal to the life lost this way" (extort, CR 702.101a; Gray Merchant). */
   | { type: "loseLife"; who: PlayerRef; n: Amount; drain?: boolean }
@@ -1428,7 +1434,12 @@ export type Effect =
    */
   /** `lostControl`: "When you lose control of the creature, tap it" (Ray of Command), about `of` (CR 603.7). */
   /** `thisTurn`: "When you lose control of that Equipment this turn" (Stolen Uniform): only until the turn ends. */
-  | { type: "delayed"; when: "nextTurnUpkeep" | "nextEndStep" | "yourNextEndStep" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies"; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard"; of?: ObjRef; thisTurn?: true }
+  /**
+   * `event`: what it remembers from now, as its trigger event (CR 603.7c): "its controller" (Arcane Denial: the countered
+   * spell's) is its event player, "that spell's mana value" (Mana Drain) its event amount. `yourNextMain`: "at the
+   * beginning of your next main phase", the next one that begins after it's made (rulings on Mana Drain).
+   */
+  | { type: "delayed"; when: "nextTurnUpkeep" | "nextEndStep" | "yourNextEndStep" | "yourNextMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies"; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard"; of?: ObjRef; thisTurn?: true; event?: { player?: PlayerRef; amount?: Amount } }
   /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
   | { type: "ninjutsu" }
   /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */
@@ -1599,7 +1610,7 @@ export type Effect =
   | { type: "revealTopToHand"; life?: { who: PlayerRef; gain?: boolean } }
   /** "Reveal the top card of your library" (CR 701.20a): what follows ("If it's a creature card, put it into your hand") is about it (ObjRef "revealed"). */
   /** "Reveal the top card of your library" (CR 701.20a), or with `look` only look at it, for an "if it's a ... card" after it. */
-  | { type: "revealTop"; look?: true; /** "Reveal a card at random from your hand" (Cursed Scroll) instead. */ randomFromHand?: true }
+  | { type: "revealTop"; look?: true; /** "Reveal a card at random from your hand" (Cursed Scroll) instead. */ randomFromHand?: true; /** Whose library: "reveals the top card of their library" (Chaos Warp: the target's owner). Yours if left out. */ who?: PlayerRef }
   /** "Reveal it": the card "look at the top card" looked at (Frost Augur). */
   | { type: "revealRevealed" }
   /** "Put it into your graveyard": the revealed card, from the library (not milling, CR 701.17). */
@@ -1729,6 +1740,11 @@ export type Effect =
    */
   | { type: "changeTarget"; index: number; unless?: UnlessPays }
   /**
+   * "You may choose new targets for target spell or ability" (CR 115.7d): as this resolves, its controller keeps any of
+   * that spell's targets, legal or not, and changes the rest to legal ones.
+   */
+  | { type: "newTargets"; index: number }
+  /**
    * Counter the spell or ability that triggered this unless its controller pays: ward (CR 702.21a),
    * "Whenever a player casts a spell, counter it unless that player pays {1}".
    */
@@ -1768,7 +1784,7 @@ export type Effect =
    * damage to them. If no one does, ..." once if no one did ("ifNone"). Each player still chooses in turn order, knowing
    * the earlier choices, and the chosen actions happen together (rulings on Clackbridge Troll and Vexing Devil).
    */
-  | { type: "punisher"; who: PlayerRef; options: PunisherOption[]; effects: Effect[]; times?: Amount; picks?: Amount; mode?: "ifAny" | "ifNone"; /** What `effects` do, for the prompt. */ thenText?: string }
+  | { type: "punisher"; who: PlayerRef; options: PunisherOption[]; effects: Effect[]; times?: Amount; picks?: Amount; mode?: "ifAny" | "ifNone"; /** What `effects` do, for the prompt; without `mode`, what its controller does to those who don't ("may draw a card"). */ thenText?: string }
   /**
    * Cumulative upkeep (CR 702.24a): put an age counter on it, then you may pay the cost once for each
    * age counter on it; if you don't, sacrifice it.
@@ -1905,7 +1921,7 @@ export type Effect =
    * (CR 701.23). `filter` unset = any card. Found cards go to `dest`; with `others`, only the first
    * does and the rest go there (Cultivate). The library is then shuffled (CR 701.20).
    */
-  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; reveal: boolean; /** Whose library: "its controller may search their library" (Path to Exile). Yours if left out. */ who?: PlayerRef; /** "Search target opponent's library" (Bribery): you search that player's library, which they then shuffle. */ library?: PlayerRef; /** "Search your library and/or graveyard ... If you search your library this way, shuffle" (Finale of Devastation): your graveyard, and your library too if you choose. */ orGraveyard?: boolean; /** "A card named A and/or a card named B" (Alpine Houndmaster), "cards with different names" (Three Dreams): at most one card of each name. */ oneEach?: true; /** "Each player may search their library" (Veteran Explorer): each one, as their turn to search comes, chooses whether to (rulings); only those who did shuffle. */ may?: true; /** "Target opponent chooses two of those cards. Put the chosen cards into your graveyard and the rest into your hand" (Gifts Ungiven): `n` of the cards found, chosen by that opponent (by an opponent you choose as it resolves if left out), go `to`; the rest go to `dest`. */ split?: { chooser?: PlayerRef; n: number; to: SearchDest } }
+  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; reveal: boolean; /** Whose library: "its controller may search their library" (Path to Exile). Yours if left out. */ who?: PlayerRef; /** "Search target opponent's library" (Bribery): you search that player's library, which they then shuffle. */ library?: PlayerRef; /** "Search your library and/or graveyard ... If you search your library this way, shuffle" (Finale of Devastation): your graveyard, and your library too if you choose. */ orGraveyard?: boolean; /** "A card named A and/or a card named B" (Alpine Houndmaster), "cards with different names" (Three Dreams): at most one card of each name. */ oneEach?: true; /** "Up to two basic land cards that share a land type" (Myriad Landscape): the cards found all have a land type in common. */ shareLandType?: true; /** "Each player may search their library" (Veteran Explorer): each one, as their turn to search comes, chooses whether to (rulings); only those who did shuffle. */ may?: true; /** "Target opponent chooses two of those cards. Put the chosen cards into your graveyard and the rest into your hand" (Gifts Ungiven): `n` of the cards found, chosen by that opponent (by an opponent you choose as it resolves if left out), go `to`; the rest go to `dest`. */ split?: { chooser?: PlayerRef; n: number; to: SearchDest } }
   /** "Reveal the top three cards of your library. An opponent chooses one of them. Put that card into your graveyard and the rest into your hand" (Murmurs from Beyond): the chooser (an opponent you choose as it resolves if left out) picks one revealed card (one that fits `filter`), which goes `to`; the rest go `rest`, or stay on top. */
   | { type: "revealPick"; n: Amount; chooser?: PlayerRef; filter?: TargetSpec; to: SearchDest; rest?: SearchDest }
   /**
@@ -1958,7 +1974,14 @@ export type Effect =
    * "You gain shroud until end of turn", "You and permanents you control gain hexproof until end of turn" (the player's
    * half), "you gain protection from the chosen player": see Player.gained (CR 702.11d, 702.16b-e, 702.16k, 702.18d).
    */
-  | { type: "playerGains"; keywords: string[]; /** "Until your next turn" rather than until end of turn (Noble Heritage). */ untilYourNextTurn?: true }
+  | {
+      type: "playerGains";
+      keywords: string[];
+      /** "Until your next turn" rather than until end of turn (Noble Heritage). */
+      untilYourNextTurn?: true;
+      /** "Until your next turn, your life total can't change" (Teferi's Protection): see Player.lifeCantChange. */
+      lifeCantChange?: true;
+    }
   /**
    * "Starting with you, each player votes for death or taxes" (CR 701.38a): each player in turn order, from the
    * controller, votes for one of `options` (words with no rules meaning, 701.38b), or for one of the permanents or cards
@@ -2382,7 +2405,7 @@ export interface TriggeredAbility {
   /** `orCopy`: magecraft's "whenever you cast or copy" also triggers on a copy put on the stack. */
   /** `nth`: "whenever you cast your second spell each turn", counting the spells that player cast this turn (copies aren't cast). */
   /** `enchanted`: the player this Aura is attached to ("Whenever enchanted player casts a spell"). */
-  cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; nth?: number; /** "If mana from a Treasure was spent to cast it" (CR 106.3, 603.4). */ treasure?: true; /** "If at least four mana was spent to cast it", "if no mana was spent to cast it" (CR 603.4). */ spent?: SpentReq; /** Vazi: "casts a spell or activates an ability", any ability (mana abilities too), with `treasure`. */ orActivates?: true; /** "A spell that targets a creature you control", "... that targets an opponent or a creature an opponent controls": one of its targets as it was cast is one of these (rulings: it triggers once however many do). "You" and "you control" are this ability's controller. */ targets?: (TargetSpec | "you")[]; /** "From exile", "from anywhere other than your hand", "from your graveyard" (its caster's), "from a graveyard": the zone it was cast from (CR 601.2a). */ from?: "hand" | "notHand" | "exile" | "graveyard" | "ownGraveyard" | "ownLibrary"; /** "A spell that shares a creature type with ~" (Folk Hero). */ sharesTypeWithSelf?: true; /** "A spell that has convoke", "a creature spell with flying". */ keyword?: string };
+  cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; nth?: number; /** `nth` counts only its caster's spells this turn that match `spell` ("their first noncreature spell each turn"). */ nthOfKind?: true; /** "If mana from a Treasure was spent to cast it" (CR 106.3, 603.4). */ treasure?: true; /** "If at least four mana was spent to cast it", "if no mana was spent to cast it" (CR 603.4). */ spent?: SpentReq; /** Vazi: "casts a spell or activates an ability", any ability (mana abilities too), with `treasure`. */ orActivates?: true; /** "A spell that targets a creature you control", "... that targets an opponent or a creature an opponent controls": one of its targets as it was cast is one of these (rulings: it triggers once however many do). "You" and "you control" are this ability's controller. */ targets?: (TargetSpec | "you")[]; /** "From exile", "from anywhere other than your hand", "from your graveyard" (its caster's), "from a graveyard": the zone it was cast from (CR 601.2a). */ from?: "hand" | "notHand" | "exile" | "graveyard" | "ownGraveyard" | "ownLibrary"; /** "A spell that shares a creature type with ~" (Folk Hero). */ sharesTypeWithSelf?: true; /** "A spell that has convoke", "a creature spell with flying". */ keyword?: string };
   /** An intervening "if" (CR 603.4): "When ~ enters, if you attacked this turn, ...". Checked as it triggers and as it resolves. */
   ifCond?: StaticCondition;
   /**
@@ -2511,6 +2534,8 @@ export interface TriggeredAbility {
   ifCastFromHand?: boolean;
   /** "When ~ enters from a graveyard" / "from your graveyard" (its owner is its controller): part of the trigger event. */
   ifFromGraveyard?: "any" | "yours";
+  /** "When ~ enters untapped" (Mystic Sanctuary): only if it entered untapped, part of the trigger event. */
+  ifEnteredUntapped?: true;
   /** "When ~ enters, if you cast it, ..." (Geological Appraiser): it entered as a spell that resolved, not a copy. */
   ifCast?: true;
   /**
@@ -2627,6 +2652,8 @@ export interface ActivatedAbility {
   activateIf?: StaticCondition;
   /** "Pay 2 life" as part of the cost (CR 119.4: only with at least that much life). */
   lifeCost?: number;
+  /** "Pay life equal to the number of colors in your commanders' color identity" (War Room), on top of `lifeCost`. */
+  lifeCostIdentity?: true;
   /**
    * "Pay half your life, rounded up" as part of the cost (CR 119.4, 107.1a): half the life total as the cost is worked out
    * (CR 601.2f), 0 with 0 or less life (rulings on Lurking Evil).
@@ -2723,6 +2750,12 @@ export interface ManaAbility {
   activateIf?: StaticCondition;
   /** "Spend this mana only to cast a creature spell." (CR 106.6) */
   spendOnly?: ManaSpend;
+  /**
+   * "When that mana is spent to cast a creature spell that shares a creature type with your commander, scry 1." (Path
+   * of Ancestry): a triggered ability of its source, once for each of that mana spent so (rulings), with your
+   * commanders' creature types as they are just after the spell is cast.
+   */
+  spentTrigger?: { body: AbilityBody; sharesCommanderType: true };
   /** Depletion lands: "Put a depletion counter on ~." after the mana is added. */
   putCounter?: CounterKind;
   /** Depletion lands: "If there are no depletion counters on ~, sacrifice it." after the mana is added. */
@@ -2765,6 +2798,8 @@ export interface ManaSpend {
   anyZone?: boolean;
   /** Any other cost too: a Powerstone's mana "can't be spent to cast a nonartifact spell" (CR 111.10h). */
   other?: boolean;
+  /** "..., and that spell can't be countered" (Cavern of Souls): a spell this mana is spent on, on any of its costs. */
+  uncounterable?: true;
   text: string;
 }
 

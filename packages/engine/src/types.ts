@@ -418,6 +418,8 @@ export interface GameObject {
   evidence?: true;
   /** As a spell, and as the permanent it became: how much mana from Treasures was spent to cast it (CR 106.3). */
   treasureSpent?: number;
+  /** A spell: mana that makes it uncounterable was spent on it (Cavern of Souls, CR 106.6). */
+  uncounterableCast?: true;
   /** A spell: "that creature enters with an additional +1/+1 counter on it" (Boreal Outrider, CR 614.1c), as it resolves. */
   extraCounters?: Record<string, number>;
   /** A spell: "it gains haste until end of turn" from a cast trigger (Tyvar Kell's emblem), applying to the permanent it becomes (CR 400.7a). */
@@ -510,6 +512,17 @@ export interface ManaLot {
   /** Sorted, without repeats. */
   from?: ManaOrigin[];
   keep?: "turn" | "combat";
+  /** "When that mana is spent to cast a creature spell ..." (Path of Ancestry): see ManaAbility.spentTrigger. */
+  spentTrigger?: ManaSpentTrigger;
+}
+
+/** A mana's "when that mana is spent" ability: its source as it made the mana, and what it does. */
+export interface ManaSpentTrigger {
+  sourceId: ObjectId;
+  sourceCardId: string;
+  sourceZc: number;
+  body: AbilityBody;
+  sharesCommanderType: true;
 }
 
 export interface Player {
@@ -550,6 +563,8 @@ export interface Player {
   gained?: string[];
   /** The same, until this player's next turn ("you gain protection from that player until your next turn", CR 611.2b). */
   gainedUntilNextTurn?: string[];
+  /** "Until your next turn, your life total can't change" (Teferi's Protection): no life gained or lost (CR 119.7-8). */
+  lifeCantChange?: true;
   /** The turn this player last began to activate an exhaust ability (CR 702.177b, Elvish Refueler). */
   exhaustTurn?: number;
   /** Times each commander (by object id) has been cast from the command zone. CR 903.8 */
@@ -705,7 +720,9 @@ export interface DelayedTrigger {
   /** `leaves`: when the subject leaves the battlefield for one of the zones in `to` (earthbend's return, CR 701.66a). */
   /** `eachYourUpkeep`: at the beginning of each of its controller's upkeeps for the rest of the game (epic, CR 702.50a). */
   /** `lostControl`: when `controller` no longer controls the subject (Ray of Command), checked like a state trigger. */
-  when: "nextEndStep" | "yourNextEndStep" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "eachYourPrecombatMain" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl";
+  when: "nextEndStep" | "yourNextEndStep" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "eachYourPrecombatMain" | "yourNextMain" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl";
+  /** What it remembers as its trigger event: the player "its controller" was, the amount "that spell's mana value" was (see the delayed effect). */
+  event?: TriggerEventInfo;
   to?: ZoneName[];
   controller: PlayerId;
   sourceCardId: string;
@@ -988,13 +1005,13 @@ export type PendingDecision =
    * Searching your library (CR 701.23): `cards` are the ones that match; pick between `min` and
    * `max` of them. With `firstTo`, the first one picked goes there and the rest to `othersTo`.
    */
-  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; min: number; max: number; firstTo?: string; othersTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string }; /** Not a search: cards in the hand to put onto the battlefield, or with `reveal` to reveal, with `bottom` to put on the bottom of the library. */ fromHand?: boolean; reveal?: true; bottom?: true; /** Not a search: cards in the graveyard to return to the hand, to exile, or to put onto the battlefield. */ fromGraveyard?: "hand" | "exile" | "battlefield" | "libraryTop"; /** "Cards with different mana values" (Seasons Past): no two found may share a mana value. */ distinctManaValues?: true; /** The Leylines' "begin the game with it on the battlefield", before the first turn (CR 103.6a). */ opening?: true; /** Choosing from this player's revealed hand ("You choose a nonland card from it"); `dig.looked` is the whole hand. */ hand?: PlayerId; /** Searching this player's graveyard, hand and library (Memoricide): `cards` are in any of them; `also`, the graveyard's that are found anyway ("all cards"). */ zonesOf?: PlayerId; also?: ObjectId[]; /** An opponent choosing from this player's revealed cards (Gifts Ungiven, Intuition); `helps` when where the chosen ones go is better for that player than where the rest go. */ forPlayer?: PlayerId; helps?: true }
+  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; min: number; max: number; firstTo?: string; othersTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string }; /** Not a search: cards in the hand to put onto the battlefield, or with `reveal` to reveal, with `bottom` to put on the bottom of the library. */ fromHand?: boolean; reveal?: true; bottom?: true; /** Not a search: cards in the graveyard to return to the hand, to exile, or to put onto the battlefield. */ fromGraveyard?: "hand" | "exile" | "battlefield" | "libraryTop"; /** "Cards with different mana values" (Seasons Past): no two found may share a mana value. */ distinctManaValues?: true; /** "Basic land cards that share a land type" (Myriad Landscape): every card found shares a land type with each other one. */ shareLandType?: true; /** The Leylines' "begin the game with it on the battlefield", before the first turn (CR 103.6a). */ opening?: true; /** Choosing from this player's revealed hand ("You choose a nonland card from it"); `dig.looked` is the whole hand. */ hand?: PlayerId; /** Searching this player's graveyard, hand and library (Memoricide): `cards` are in any of them; `also`, the graveyard's that are found anyway ("all cards"). */ zonesOf?: PlayerId; also?: ObjectId[]; /** An opponent choosing from this player's revealed cards (Gifts Ungiven, Intuition); `helps` when where the chosen ones go is better for that player than where the rest go. */ forPlayer?: PlayerId; helps?: true }
   /**
    * Choosing a creature type or a color by name: as a permanent enters (`objectId`, CR 614.12) or
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom" | "searchZones" | "vote" | "mutate"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "commander" | "drawUpTo" | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom" | "searchZones" | "vote" | "mutate"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -1011,6 +1028,11 @@ export type PendingDecision =
    * spell's description; `left` counts this copy and the ones after it.
    */
   | { kind: "copyTargets"; player: PlayerId; source: string; copyOf: string; specs: TargetSpec[]; current: TargetChoice[]; left: number }
+  /**
+   * "You may choose new targets for target spell or ability" (CR 115.7d): keep them all, or choose them again; any kept
+   * may be illegal, any changed must be legal for that spell, whose controller is `controller`.
+   */
+  | { kind: "newTargets"; player: PlayerId; source: string; spell: string; stackId: string; controller: PlayerId; specs: TargetSpec[]; current: TargetChoice[] }
   /** "Change the target of target spell" (CR 115.7a): pick the spell's new target among `options`, the legal ones. */
   | { kind: "changeTarget"; player: PlayerId; source: string; spell: string; stackId: string; index: number; spec: TargetSpec; current: TargetChoice; options: TargetChoice[] }
   /** A modal triggered ability is being put on the stack (CR 603.3c). `legal[i]`: mode i can be chosen (CR 700.2b). */
@@ -1528,6 +1550,7 @@ export interface Resolving {
     payQueue?: PlayerId[]; // "each opponent sacrifices ... unless they pay": players still to choose whether to pay, in APNAP order
     paidBy?: PlayerId[]; // and those who paid
     newTarget?: TargetChoice; // "change the target of target spell": the new one, chosen as this resolves (CR 115.7a)
+    retargets?: TargetChoice[]; // "you may choose new targets for target spell": its targets now (CR 115.7d)
     explored?: ObjectId; // the nonland card explore revealed, waiting on "graveyard or top?"
     cascade?: { exiled: ObjectId[]; hit?: ObjectId }; // cards cascade exiled, and the one it may cast
     untilNonland?: { hit?: ObjectId; caster: PlayerId }; // the nonland card exileUntilNonland found, and who may cast it
@@ -1552,6 +1575,11 @@ export interface Resolving {
     /** A clash (CR 701.30): the opponent, the revealed cards, who still decides, who puts theirs on the bottom. */
     endure?: string; // "counters" or "token" (CR 701.63a)
     tapOrUntap?: string; // "tap", "untap" or "neither", for "tap or untap target permanent"
+    /** How many cards the player being asked chose to draw ("draw up to two cards"). */
+    drawUpTo?: string;
+    drawUpToQueue?: PlayerId[];
+    /** The commander chosen to put into the hand (Command Beacon with two commanders). */
+    commander?: ObjectId;
     /** "You may cast a spell ... from your hand without paying its mana cost": the card picked, "none", or "cast" once it's offered. */
     castFromHand?: string;
     /**
@@ -1613,6 +1641,8 @@ export type Action =
   | { type: "chooseTargets"; player: PlayerId; targets: TargetChoice[] }
   /** New targets for a spell copy, or none to keep the original's (CR 707.10c). */
   | { type: "copyTargets"; player: PlayerId; targets?: TargetChoice[] }
+  /** New targets for a spell or ability (see PendingDecision "newTargets"), or none to keep them. */
+  | { type: "newTargets"; player: PlayerId; targets?: TargetChoice[] }
   /** The new target for a spell whose target is being changed (see PendingDecision "changeTarget"). */
   | { type: "changeTarget"; player: PlayerId; target: TargetChoice }
   /** `planeswalker`: it attacks that planeswalker, controlled by `defender`, instead of the player (CR 508.1b). */

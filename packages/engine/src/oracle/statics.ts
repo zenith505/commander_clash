@@ -25,6 +25,8 @@ export function parseEntersCondition(text: string): EntersCondition | null {
   if ((m = /^you control a legendary (white|blue|black|red|green) creature$/.exec(text))) return { kind: "control", who: "you", types: ["Creature"], supertypes: ["Legendary"], colors: [COLOR_WORDS[m[1]!]!], min: 1 };
   if ((m = /^you control an? (\w+)(?: or an? (\w+))?$/.exec(text)) && [m[1], m[2]].every((x) => x === undefined || BASIC_TYPES.includes(x)))
     return { kind: "control", who: "you", subtypes: [m[1]!, ...(m[2] ? [m[2]] : [])], min: 1 };
+  // "Unless you control three or more other Islands" (Mystic Sanctuary and the other Eldraine lands).
+  if ((m = new RegExp(`^you control ${NUM} or more other (Plains|Islands|Swamps|Mountains|Forests)$`).exec(text))) return { kind: "control", who: "you", subtypes: [m[2] === "Plains" ? "Plains" : m[2]!.replace(/s$/, "")], other: true, min: num(m[1]!) };
   if ((m = new RegExp(`^your opponents control ${NUM} or more lands$`).exec(text))) return { kind: "control", who: "opponents", types: ["Land"], min: num(m[1]!) };
   if ((m = /^a player has (\d+) or less life$/.exec(text))) return { kind: "playerLifeAtMost", n: Number(m[1]) };
   if ((m = new RegExp(`^you have ${NUM} or more opponents$`).exec(text))) return { kind: "opponents", min: num(m[1]!) };
@@ -128,7 +130,7 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
  * mana: a reduction can't take colored mana off (CR 118.7a).
  */
 export function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition } } | { lessIfTargets: { n: number; filter: TargetSpec } } | { targetTax: number } | "fail" | null {
-  const text = line.replace(/^[A-Z][A-Za-z' -]+ — (?=~ costs|The second)/, "").replace(/\.$/, ""); // "Domain —" is an ability word
+  let text = line.replace(/^[A-Z][A-Za-z' -]+ — (?=~ costs|The second)/, "").replace(/\.$/, ""); // "Domain —" is an ability word
   let m: RegExpExecArray | null;
   if ((m = /^Spells your opponents cast that target ~ cost \{(\d+)\} more to cast$/.exec(text))) return { targetTax: Number(m[1]) };
   if ((m = /^~ costs \{(\d+)\} less to cast for each (.+)$/.exec(text))) {
@@ -164,6 +166,10 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     const who = m[1] ? "opponents" : m[2] === " you cast" ? "you" : m[2] ? "enchanted" : "all";
     return { costMod: { who, filter: { kind: "spell", chosen: "name", text: "spells with the chosen name" }, n: Number(m[3]) * (m[4] === "less" ? -1 : 1), text: line } };
   }
+  // "Creature spells you cast of the chosen type cost {1} less to cast" (Herald's Horn), "Creature spells of the chosen
+  // type ..." (Urza's Incubator): the type chosen as the permanent entered.
+  const ofChosen = / of the chosen type costs? \{/.test(text);
+  if (ofChosen) text = text.replace(/ of the chosen type(?= costs? \{)/, "");
   m = /^(?:(During your turn|During turns other than yours), )?(.+?)( you cast| your opponents cast)?( with mana value \d+ or (?:greater|less))?( from your graveyard)? costs? (\{\d+\}) (less|more) to cast$/.exec(text);
   if (!m || !/spells?$/i.test(m[2]!)) return null;
   const words = m[2]!.replace(/ ?spells?$/i, "").replace(/ and /g, " or ").trim();
@@ -176,7 +182,7 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   return {
     costMod: {
       who,
-      filter: { ...filter, text: `${words ? `${words.toLowerCase()} ` : ""}spells` },
+      filter: { ...filter, ...(ofChosen ? { chosen: "type" as const } : {}), text: `${words ? `${words.toLowerCase()} ` : ""}spells${ofChosen ? " of the chosen type" : ""}` },
       n,
       ...(m[1] ? { turn: m[1] === "During your turn" ? "yours" : "notYours" } : {}),
       ...(m[5] ? { fromGraveyard: true } : {}),
@@ -200,6 +206,8 @@ export function parseActivateCondition(text: string): StaticCondition | null {
     return conds.every((c): c is StaticCondition => !!c) ? { kind: "anyOf", conds } : null;
   }
   if (/^~ entered (?:the battlefield )?this turn$/.test(text)) return { kind: "self", is: "enteredThisTurn" };
+  // Idol of Oblivion: "Activate only if you created a token this turn."
+  if (/^you created a token this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "tokensCreatedThisTurn" } }, min: 1 };
   return parseStaticCondition(text, self);
 }
 
@@ -620,6 +628,12 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if ((m = new RegExp(`^(gets? ${PT}/${PT}), ${IS},? and ((?:has|have) .+)$`).exec(rest))) return typed(m[4]!, [m[1]!, m[5]!]);
   if ((m = new RegExp(`^(gets? ${PT}/${PT}), ((?:has|have) .+?),? and ${IS}$`).exec(rest))) return typed(m[5]!, [m[1]!, m[4]!]);
   if ((m = new RegExp(`^(.+?),? and ${IS}$`).exec(rest))) return typed(m[2]!, [m[1]!]);
+  // Whispersilk Cloak: "can't be blocked and has shroud" (CR 509.1b, 702.18a).
+  if ((m = /^(can't be blocked),? and ((?:has|have) .+)$/.exec(rest))) {
+    const first = parseStaticMods(m[1]!);
+    const second = parseStaticMods(m[2]!);
+    return first && second && [...first, ...second];
+  }
   // "Gets +4/+4 and has first strike, and all creatures able to block it do so" (a blocking requirement, CR 509.1c).
   if ((m = /^(.+?),? and all creatures able to block it do so$/.exec(rest))) {
     const first = parseStaticMods(m[1]!);

@@ -111,6 +111,12 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       const o = id ? s.objects[id] : undefined;
       if (o) addDelayed(s, e.when, ctx.controller, o, body);
+      // What it remembers from now (CR 603.7c, 608.2h): the countered spell's controller, its mana value.
+      if (o && e.event) {
+        const who = e.event.player ? players(s, e.event.player, ctx)[0] : undefined;
+        if (e.event.player && who === undefined) s.delayed!.pop();
+        else s.delayed![s.delayed!.length - 1]!.event = { ...(who !== undefined ? { player: who } : {}), ...(e.event.amount !== undefined ? { amount: amountNow(s, e.event.amount, ctx) } : {}) };
+      }
       return;
     }
     case "castCipher": {
@@ -402,6 +408,11 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (!ctx.legal[e.index] || t?.kind !== "stack") return;
       return changeTarget(s, ctx, t.id, src, e.unless);
     }
+    case "newTargets": {
+      const t = ctx.targets[e.index];
+      if (!ctx.legal[e.index] || t?.kind !== "stack") return;
+      return newTargets(s, ctx, t.id, src);
+    }
     case "counterEach": {
       // Each spell on the stack it matches as it resolves, one at a time (CR 701.6a); this spell itself is excluded
       // since it isn't one it can counter (CR 608.2: it's resolving).
@@ -505,7 +516,7 @@ export function cantBeCountered(s: GameState, item: StackItem): boolean {
   const o = item.objectId ? s.objects[item.objectId] : undefined;
   if (!o) return false;
   const d = defOf(s, o);
-  if (compileCard(d).cantBeCountered) return true;
+  if (compileCard(d).cantBeCountered || (o.uncounterableCast && !item.copy)) return true;
   return s.battlefield.some((id) => {
     const p = obj(s, id);
     return !!abilitiesOf(s, p).uncounterable?.some((u) => (u.anyone || controllerOf(s, p) === item.controller) && printedMatches(u.filter, d));
@@ -536,7 +547,7 @@ export function paidUnless(s: GameState, ctx: ResolveCtx, payer: PlayerId, unles
   if (sc.paid === undefined) {
     const p = player(s, payer);
     // The amount is fixed as the choice is offered (CR 608.2h).
-    const cost = unlessCost(unless.cost, unless.generic === undefined ? 0 : amountNow(s, unless.generic, ctx));
+    const cost = unlessCost(unless.cost, unless.generic === undefined ? 0 : Math.max(0, amountNow(s, unless.generic, ctx)));
     // "Pay life equal to this creature's power": its power now, or as it last existed (CR 608.2h). Paying 0 life is
     // allowed (CR 119.4).
     const life = unless.life ?? (unless.lifeAmount ? Math.max(0, amountNow(s, unless.lifeAmount, ctx)) : 0);
@@ -594,7 +605,39 @@ function changeTarget(s: GameState, ctx: ResolveCtx, stackId: string, by: string
   const next = amount !== undefined && (t.kind === "object" || t.kind === "player") ? { ...t, amount } : t;
   item.targets = item.targets!.map((x, i) => (i === j ? stampTargets(s, [next])![0]! : x));
   log(s, `${by} changes the target of ${item.description}${describeTargets(s, [next]).replace(/^ targeting/, " to")}.`);
-  fireEvent(s, { type: "targeted", stackId: item.id });
+  fireEvent(s, { type: "targeted", stackId: item.id, only: next.kind === "object" ? [next.id] : [] });
+}
+
+/**
+ * "You may choose new targets for target spell or ability" (CR 115.7d): its targets are chosen again as this resolves,
+ * keeping any, legal or not, and changing others to legal ones. Its new targets become targets of it ("becomes the
+ * target" triggers, ward); the ones it keeps don't again. With nothing it could change to, nothing is asked.
+ */
+function newTargets(s: GameState, ctx: ResolveCtx, stackId: string, by: string): "paused" | void {
+  const item = s.stack.find((x) => x.id === stackId);
+  const o = item?.objectId ? s.objects[item.objectId] : undefined;
+  if (!item || (item.kind === "spell" && !o)) return;
+  const current = item.targets ?? [];
+  const specs = item.body?.targets ?? (o ? spellTargetSpecs(defOf(s, o), item.modes) : []);
+  if (!current.some((t) => t.kind !== "none") || specs.length !== current.length) return;
+  const sc = (s.resolving!.scratch ??= {});
+  if (!sc.retargets) {
+    if (!current.some((t, j) => t.kind !== "none" && changeTargetOptions(s, item, specs[j]!, t).length)) {
+      log(s, `${item.description} has no other legal targets, so its targets stay the same.`);
+      return;
+    }
+    s.pending = { kind: "newTargets", player: ctx.controller, source: by, spell: item.description, stackId: item.id, controller: item.controller, specs, current };
+    return "paused";
+  }
+  const next = sc.retargets;
+  const changed = next.flatMap((t, j) => (t.kind !== "none" && !sameTarget(current[j], t) ? [t] : []));
+  if (!changed.length) {
+    log(s, `${player(s, ctx.controller).name} keeps the targets of ${item.description}.`);
+    return;
+  }
+  item.targets = next.map((t, j) => (t.kind !== "none" && !sameTarget(current[j], t) ? stampTargets(s, [t])![0]! : t));
+  log(s, `${by} changes the targets of ${item.description}${describeTargets(s, item.targets).replace(/^ targeting/, " to")}.`);
+  fireEvent(s, { type: "targeted", stackId: item.id, only: changed.flatMap((t) => (t.kind === "object" ? [t.id] : [])) });
 }
 
 /** The legal new targets for a spell's one target (see changeTarget). */

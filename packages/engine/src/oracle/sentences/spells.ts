@@ -264,6 +264,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const spec = parseTargetPhrase(m[1]!);
     return spec?.kind === "spell" ? [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n: 1, newTargets: false }] : null;
   }
+  // Wild Ricochet: "You may choose new targets for target instant or sorcery spell. Then copy that spell."
+  if (!ctx.castSpell && !ctx.selfCastSpell && /^(?:Then )?copy that spell$/i.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "spell" && !ctx.targets[ctx.lastObjectTarget]!.stackAbilities)
+    return [{ type: "copySpell", spell: { target: ctx.lastObjectTarget }, n: 1, newTargets: false }];
   // "When you cast this spell, any player may sacrifice a creature of their choice. If a player does, counter ~" (Brain Gorgers).
   if (ctx.selfCastSpell && /^[Cc]ounter (?:~|it|this spell)$/.test(s)) return [{ type: "counterSpell", index: -1, cause: true }];
   if ((ctx.castSpell || ctx.selfCastSpell) && (m = /^[Cc]opy (?:it|that spell|this spell)( twice)?$/.exec(s))) return [{ type: "copySpell", spell: "cause", n: m[1] ? 2 : 1, newTargets: false }];
@@ -331,6 +334,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (unless === null) return null;
     const spec = { ...(m[1] ? stackSpec("spell or ability") : { kind: "spell" as const, text: "target spell" }), singleTarget: true, text: `target spell${m[1] ?? ""} with a single target` };
     return [{ type: "changeTarget", index: addTarget(ctx, spec), ...(unless ? { unless } : {}) }];
+  }
+  // Deflecting Swat, Redirect: "You may choose new targets for target spell or ability" (CR 115.7d).
+  if ((m = /^You may choose new targets for target (spell or ability|(?:instant or sorcery )?spell)$/i.exec(s))) {
+    const spec = m[1] === "spell or ability" ? { ...stackSpec("spell or ability"), text: "target spell or ability" } : parseTargetPhrase(m[1]!);
+    if (spec?.kind !== "spell") return null;
+    return [{ type: "newTargets", index: addTarget(ctx, { ...spec, text: `target ${m[1]!}` }) }];
   }
   // "Whenever a player casts a spell, if no mana was spent to cast it, counter that spell." (Vexing Bauble)
   if (ctx.castSpell && /^Counter (?:it|that spell)$/i.test(s)) return [{ type: "counterCause" }];

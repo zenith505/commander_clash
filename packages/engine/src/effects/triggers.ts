@@ -2,7 +2,7 @@ import { restingDef } from "../faces";
 import { isSiege, siegeTrigger } from "../battles";
 import type { AbilityBody, BatchTrigger, CompiledCard, TargetChoice, TargetSpec, TriggeredAbility, TriggerEvent } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, power, toughness } from "../cards";
-import { checkAscend, creatureTypesOf, describeTargets, draw, hasConvoke, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType } from "../game";
+import { checkAscend, creatureTypesOf, describeTargets, draw, hasConvoke, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
 import { fitMany, withModes } from "../modes";
 import { compileCard } from "../oracle";
@@ -178,7 +178,8 @@ export type TriggerSourceEvent =
   /** A spell was just cast (CR 601.2i): "whenever you cast" abilities and prowess. */
   | { type: "cast"; stackId: string; controller: PlayerId; card: CardDef; /** A copy was put on the stack instead (magecraft's "or copy"). */ copy?: boolean; /** The mana spent to cast it (increment, CR 702.191a). */ manaSpent?: number; /** How much of it Treasures made (CR 106.3). */ treasureSpent?: number; /** What was spent, by type (CR 601.2h). */ spent?: SpentMana }
   /** A spell or ability was just put on the stack with its targets: "becomes the target" (CR 601.2c, ward 702.21a). */
-  | { type: "targeted"; stackId: string }
+  /** `only`: its targets were changed (CR 115.7), and these are the new ones; that isn't a crime (CR 700.13). */
+  | { type: "targeted"; stackId: string; only?: ObjectId[] }
   /** A player discarded a card (CR 701.9), `cycled` to pay a cycling cost (CR 702.29a). `id`: the card, in its new zone. */
   | { type: "discarded"; player: PlayerId; id: ObjectId; card: CardDef; cycled?: boolean }
   /** A card (or token) was put into a graveyard, from any zone. */
@@ -238,7 +239,8 @@ function entersMatches(s: GameState, en: NonNullable<TriggeredAbility["enters"]>
     if (en.orSelf) return true;
     if (en.other) return false;
   }
-  return objectMatches(s, bindEnchanted(en.filter, o), entering, you, false);
+  // "A creature you control of the chosen type" (Kindred Discovery): the type chosen for the watcher.
+  return objectMatches(s, bindChosen(bindEnchanted(en.filter, o), o.chosen), entering, you, false);
 }
 
 /** "A creature enchanted player controls": the player the watching Aura is attached to now. */
@@ -435,7 +437,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       entering,
       you,
       // Soulbond's intervening if: there's another unpaired creature to pair it with (CR 702.95a, 603.4).
-      (e, t) => e === "selfEnters" && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifX || (ev.x ?? 0) >= t.ifX) && (!t.ifEvoked || entering.castAlt === "evoke") && (!t.ifAlt || entering.castAlt === t.ifAlt) && (!t.ifBargained || !!entering.bargained) && (!t.ifEvidence || !!entering.evidence) && (!t.ifTreasure || (entering.treasureSpent ?? 0) > 0) && (!t.ifSpent || spentMeets(entering.spent, t.ifSpent)) && (t.ifCastFromHand === undefined || !!entering.castFromHand === t.ifCastFromHand) && (!t.ifCast || !!entering.wasCast) && (!t.ifFromGraveyard || (!!entering.enteredFromGraveyard && (t.ifFromGraveyard === "any" || entering.owner === you))) && (!t.ifGift || entering.gift !== undefined) && (!t.ifTributeUnpaid || !entering.tribute?.paid) && (!t.ifSoulbond || pairCandidates(s, entering, you).length > 0),
+      (e, t) => e === "selfEnters" && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifX || (ev.x ?? 0) >= t.ifX) && (!t.ifEvoked || entering.castAlt === "evoke") && (!t.ifAlt || entering.castAlt === t.ifAlt) && (!t.ifBargained || !!entering.bargained) && (!t.ifEvidence || !!entering.evidence) && (!t.ifTreasure || (entering.treasureSpent ?? 0) > 0) && (!t.ifSpent || spentMeets(entering.spent, t.ifSpent)) && (t.ifCastFromHand === undefined || !!entering.castFromHand === t.ifCastFromHand) && (!t.ifCast || !!entering.wasCast) && (!t.ifFromGraveyard || (!!entering.enteredFromGraveyard && (t.ifFromGraveyard === "any" || entering.owner === you))) && (!t.ifEnteredUntapped || !entering.tapped) && (!t.ifGift || entering.gift !== undefined) && (!t.ifTributeUnpaid || !entering.tribute?.paid) && (!t.ifSoulbond || pairCandidates(s, entering, you).length > 0),
       undefined,
       undefined,
       undefined,
@@ -772,7 +774,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever a creature attacks": anyone's, for the watcher's controller.
     const attackWatch = (w: GameObject, wc: PlayerId) => {
       const at = attackingYou(o, wc);
-      add(w, wc, (e, t) => e === "creatureYouControlAttacks" && !!t.attacker && (wc === by || !!t.attacker.anyone) && !(t.attacker.other && w.id === o.id) && (!t.attacker.attacksYou || at[t.attacker.attacksYou]) && objectMatches(s, t.attacker.filter, o, wc, false), undefined, undefined, o, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
+      add(w, wc, (e, t) => e === "creatureYouControlAttacks" && !!t.attacker && (wc === by || !!t.attacker.anyone) && !(t.attacker.other && w.id === o.id) && (!t.attacker.attacksYou || at[t.attacker.attacksYou]) && objectMatches(s, bindChosen(t.attacker.filter, w.chosen), o, wc, false), undefined, undefined, o, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
     };
     for (const id of s.battlefield) attackWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromEmblems(attackWatch);
@@ -973,7 +975,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const by = t.cast.by;
         if ((by === "you" && ev.controller !== you) || (by === "opponent" && ev.controller === you) || (by === "enchanted" && o.attachedToPlayer !== ev.controller)) return false;
         // Its caster's spells this turn, this one included (it was counted as it was cast).
-        if (t.cast.nth && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller).length !== t.cast.nth) return false;
+        if (t.cast.nth && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller && (!t.cast!.nthOfKind || (!!s.cards[c.card] && printedMatches(t.cast!.spell, s.cards[c.card]!)))).length !== t.cast.nth) return false;
         if (t.cast.treasure && !(ev.treasureSpent && !ev.copy)) return false;
         // "If at least four mana was spent to cast it" (CR 603.4): a copy wasn't cast, so nothing was spent on it.
         // "If {S} of any of that spell's colors was spent": its colors as it was cast.
@@ -1006,7 +1008,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // Committing a crime (CR 700.13): casting a spell, activating an ability or putting a triggered ability on the stack
     // that targets an opponent, a permanent, spell or ability an opponent controls, or a card in an opponent's graveyard.
     // Once for the spell or ability, however many of its targets do.
-    if (item && isCrime(s, item)) {
+    if (item && !ev.only && isCrime(s, item)) {
       const criminal = item.controller;
       player(s, criminal).crimeTurn = s.turn;
       const that = { player: criminal };
@@ -1016,7 +1018,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
     const seen = new Set<ObjectId>();
     for (const t of item?.targets ?? []) {
-      if (t.kind !== "object" || seen.has(t.id)) continue;
+      if (t.kind !== "object" || seen.has(t.id) || (ev.only && !ev.only.includes(t.id))) continue;
       seen.add(t.id);
       const o = s.objects[t.id];
       if (!o || o.zone !== "battlefield") continue;
@@ -1171,10 +1173,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
             ? ev.step === "endCombat" && !(d.turn === s.turn && d.step === "endCombat")
             : d.when === "eachYourPrecombatMain"
               ? ev.step === "main1" && ev.active === d.controller
+              : d.when === "yourNextMain"
+              ? (ev.step === "main1" || ev.step === "main2") && ev.active === d.controller && (d.turn < s.turn || STEP_ORDER.indexOf(d.step) < STEP_ORDER.indexOf(ev.step))
               : d.when !== "leaves" && d.when !== "lostControl" && ev.step === "upkeep" && (d.when === "nextTurnUpkeep" || ev.active === d.controller) && d.turn < s.turn;
       if (!due) continue;
       if (d.when !== "eachYourUpkeep" && d.when !== "eachYourPrecombatMain") s.delayed = s.delayed!.filter((x) => x !== d);
-      s.triggerQueue.push({ sourceId: d.subject.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, sourceZc: d.subject.zc, body: d.body, transformsAt: d.transforms ?? 0 });
+      s.triggerQueue.push({ sourceId: d.subject.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, sourceZc: d.subject.zc, body: d.body, transformsAt: d.transforms ?? 0, ...(d.event ? { event: d.event } : {}) });
     }
     // "At the beginning of the monarch's end step, that player draws a card" (CR 725.2).
     if (ev.step === "end" && s.monarch === ev.active) monarchTrigger(s, 0);

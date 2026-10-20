@@ -74,6 +74,9 @@ export function parseManaAbility(line: string): ManaAbility | null {
       const spells = spellFilter(m2[1]!);
       if (!spells || !spells.types?.length) return null;
       out.spendOnly = { spells, abilities: "any", other: true, text: extra };
+    } else if ((m2 = /^When that mana is spent to cast a creature spell that shares a creature type with your commander, scry (\d+)\.$/.exec(extra)) && !out.spentTrigger) {
+      const text = extra.replace(/^When that mana is spent to cast a creature spell that shares a creature type with your commander, /, "");
+      out.spentTrigger = { sharesCommanderType: true, body: { targets: [], effects: [{ type: "scry", n: Number(m2[1]) }], text: text[0]!.toUpperCase() + text.slice(1) } };
     } else if (/^Spend this mana only /.test(extra) && !out.spendOnly) {
       const only = parseManaSpend(extra);
       if (!only) return null;
@@ -179,33 +182,39 @@ function parseManaProduced(text: string): ManaProduce | null {
  * ("of the chosen type", "on costs that contain {X}", "and that spell can't be countered", "... source").
  */
 export function parseManaSpend(sentence: string): ManaSpend | null {
-  const m = /^Spend this mana only to (.+)\.$/.exec(sentence);
+  const m = /^Spend this mana only to (.+?)(, and that spell can't be countered)?\.$/.exec(sentence);
   if (!m) return null;
-  const only: ManaSpend = { text: sentence };
+  const only: ManaSpend = { text: sentence, ...(m[2] ? { uncounterable: true as const } : {}) };
+  // "Of the chosen type" (Unclaimed Territory): the type its source's controller chose for it (see spend.ts boundSpend).
   for (const part of m[1]!.split(/,? or (?=activate |cast )/)) {
     let x: RegExpExecArray | null;
-    if ((x = /^cast (?:an? )?(.+?) spells?$/.exec(part)) && !only.spells) {
+    if ((x = /^cast (?:an? )?(.+? spells? of the chosen type|.+?) spells?$/.exec(part) ?? /^cast (?:an? )?(.+? spells? of the chosen type)$/.exec(part)) && !only.spells) {
       const spec = spellFilter(x[1]!);
       if (!spec) return null;
       only.spells = spec;
     } else if (part === "cast spells" && !only.spells) only.spells = { kind: "spell", text: "spells" };
     else if ((part === "activate abilities" || part === "activate an ability") && !only.abilities) only.abilities = "any";
-    else if ((x = /^activate (?:abilities of|an ability of an?) (.+?)( sources?)?$/.exec(part)) && !only.abilities) {
+    else if ((x = /^activate (?:abilities of|an ability of an?) (.+?)( sources?)?( of the chosen type)?$/.exec(part)) && !only.abilities) {
       const words = x[1]!.split(" ");
       const spec = parseTargetPhrase([...words.slice(0, -1), singular(words[words.length - 1]!)].join(" "));
       if (spec?.kind !== "object" || spec.controller || spec.chosen || spec.counter || spec.tapped || spec.combat || spec.token) return null;
-      only.abilities = { ...spec, text: `${x[1]!}${x[2] ?? ""}` };
+      only.abilities = { ...spec, ...(x[3] ? { chosen: "type" as const } : {}), text: `${x[1]!}${x[2] ?? ""}${x[3] ?? ""}` };
       // "Abilities of artifacts" are of artifact permanents (CR 109.2); an "artifact source" can be anywhere.
       if (x[2]) only.anyZone = true;
     } else return null;
   }
+  // "That spell" is a spell this mana is spent on.
+  if (only.uncounterable && (!only.spells || only.abilities)) return null;
   return only;
 }
 
 /** "creature", "instant and sorcery", "noncreature", "Dragon": a filter on the spell's characteristics. */
-function spellFilter(words: string): TargetSpec | null {
-  if (words === "legendary") return { kind: "spell", supertypes: ["Legendary"], text: "legendary spells" };
+function spellFilter(words0: string): TargetSpec | null {
+  if (words0 === "legendary") return { kind: "spell", supertypes: ["Legendary"], text: "legendary spells" };
+  // "A creature spell of the chosen type" (Unclaimed Territory).
+  const chosen = / spells? of the chosen type$/.test(words0);
+  const words = words0.replace(/ spells? of the chosen type$/, "");
   const spec = parseTargetPhrase(`${words.replace(/ and(?:\/or)? /g, " or ")} spell`);
   if (spec?.kind !== "spell" || spec.chosen || spec.counter || spec.controller) return null;
-  return { ...spec, text: `${words} spells` };
+  return { ...spec, ...(chosen ? { chosen: "type" as const } : {}), text: chosen ? words0 : `${words0} spells` };
 }

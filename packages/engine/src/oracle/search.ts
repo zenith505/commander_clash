@@ -39,7 +39,11 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
   // "Up to X creature cards with different names that each have mana value X" (Uncage the Menagerie): the X it was cast
   // with; a card with {X} in its mana cost counts X as 0 in the library (CR 202.3e, rulings).
   const eachX = / that each have mana value X$/.exec(m[3]!);
-  const phrase = eachX ? m[3]!.slice(0, eachX.index) : m[3]!;
+  // "Up to two basic land cards that share a land type" (Myriad Landscape): every card found has a land type in common
+  // with each other one; one card alone is fine (rulings).
+  const share = / that share a land type$/.exec(m[3]!);
+  if (share && (n === 1 || eachX)) return null;
+  const phrase = eachX ? m[3]!.slice(0, eachX.index) : share ? m[3]!.slice(0, share.index) : m[3]!;
   const different = / with different names$/.exec(phrase);
   if ((different && n === 1) || (eachX && !different)) return null;
   const filter0 = parseSearchFilter(different ? phrase.slice(0, different.index) : phrase, count);
@@ -47,7 +51,7 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
   const filter = eachX ? { ...filter0!, bound: { key: "manaValue" as const, at: "exact" as const, amount: X }, text: `${filter0!.text} with mana value X` } : filter0;
   let r: RegExpExecArray | null;
   // An Aura put onto the battlefield this way: its controller chooses what it enchants as it enters (CR 303.4f).
-  const base = { type: "search" as const, ...(filter ? { filter: different ? { ...filter, text: `${filter.text} with different names` } : filter } : {}), n, upTo, reveal, ...(different ? { oneEach: true as const } : {}) };
+  const base = { type: "search" as const, ...(filter ? { filter: different ? { ...filter, text: `${filter.text} with different names` } : share ? { ...filter, text: `${filter.text} that share a land type` } : filter } : {}), n, upTo, reveal, ...(different ? { oneEach: true as const } : {}), ...(share ? { shareLandType: true as const } : {}) };
   if ((r = new RegExp(`^put ${SEARCH_PRONOUN} ${SEARCH_DEST}, then shuffle$`, "i").exec(rest))) return [{ ...base, dest: searchDest(r[1]!) }];
   if ((r = new RegExp(`^put one ${SEARCH_DEST} and the other ${SEARCH_DEST}, then shuffle$`, "i").exec(rest)) && n === 2)
     return [{ ...base, dest: searchDest(r[1]!), others: searchDest(r[2]!) }];

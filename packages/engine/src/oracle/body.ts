@@ -206,7 +206,10 @@ function namePurpose(rest: string): NamePurpose {
  * battlefield", "That creature gains haste [until end of turn]" and "Sacrifice it at the beginning of the next end step".
  * `next`: the sentence after the last one used.
  */
-function parseRevealedIf(sentences: string[], at: number, ctx: Ctx): { effect: Effect; next: number } | null {
+function parseRevealedIf(sentences0: string[], at: number, ctx: Ctx): { effect: Effect; next: number } | null {
+  // "If it's a creature card of the chosen type, ..." (Herald's Horn): the type chosen for its source.
+  const ofChosen = /^If (?:it's|that card is) an? [^,]+? card of the chosen type, /.test(sentences0[at] ?? "");
+  const sentences = ofChosen ? sentences0.map((x, i) => (i === at ? x.replace(/ card of the chosen type, /, " card, ") : x)) : sentences0;
   const first = /^If (?:it's|that card is) (not |)(an? .+?|snow) card, (.+)$/.exec(sentences[at] ?? "") ?? /^If it (isn't) (an? .+?) card, (.+)$/.exec(sentences[at] ?? "") ?? /^If that card is ()(snow), (.+)$/.exec(sentences[at] ?? "");
   // "If that card has the chosen name, sacrifice ~ and draw three cards" (Diviner's Lockbox), after "choose a card name".
   const named = !first && /^If (?:it|that card) has the chosen name, (.+)$/.exec(sentences[at] ?? "");
@@ -216,7 +219,8 @@ function parseRevealedIf(sentences: string[], at: number, ctx: Ctx): { effect: E
     return then && { effect: { type: "if", cond: { kind: "revealedIs", filter: { kind: "card", chosen: "name", text: "card with the chosen name" } }, effects: then }, next: at + 1 };
   }
   if (!first) return null;
-  const filter = parseSearchFilter(`${first[2]!.replace(/^an? /, "")} card`);
+  const filter0 = parseSearchFilter(`${first[2]!.replace(/^an? /, "")} card`);
+  const filter = filter0 && ofChosen ? { ...filter0, chosen: "type" as const, text: `${filter0.text} of the chosen type` } : filter0;
   const then = filter && revealedAction(first[3]!, ctx);
   if (!filter || !then) return null;
   let next = at + 1;
@@ -518,7 +522,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // Not after "If you do,": all of it depends on the payment ("If you do, choose a color, then ...").
     // Not after a leading condition either: "If you control a blue creature, draw a card, then discard a card" (Statute
     // of Denial) is all conditional.
-    .flatMap((x) => (/^If [^,]+, /.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) || LIVING_DEATH.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|meld them into )/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
+    .flatMap((x) => (/^If [^,]+, /.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then reveals the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|meld them into )/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
     // "Target opponent reveals their hand and you choose a nonland card from it": two instructions, in order.
     .flatMap((x) => x.split(/(?<=reveals (?:their|his or her) hand) and (?=you choose )/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p)))
     .flatMap(splitSpentPair)
@@ -694,6 +698,19 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       if (!options || !then) return null;
       if (noRegen) si++;
       effects.push({ type: "punisher", who: { ref: anyMay[1] === "player" ? "eachPlayer" : "eachOpponent" }, options, effects: then, mode: anyThen[1] === "a player does" ? "ifAny" : "ifNone", thenText: anyThen[2]! });
+      si++;
+      continue;
+    }
+    // "Whenever an opponent draws a card, that player may pay {2}. If the player doesn't, you create a Treasure token."
+    // (Smothering Tithe): a punisher whose only way out is the payment.
+    const thatMay = /^([Tt]hat player|[Tt]hey|[Tt]arget opponent|[Tt]arget player|[Ee]ach opponent) may pay (.+)$/.exec(s);
+    const thatThen = thatMay && /^If (?:the player|that player|they|he or she) (?:doesn't|don't), (you .+)$/.exec(sentences[si + 1] ?? "");
+    if (thatMay && thatThen) {
+      const who = parsePlayer(thatMay[1]!.toLowerCase(), ctx);
+      const options = parsePunisherOptions(`pays ${thatMay[2]!}`, ctx);
+      const then = options && parseOne(capital(thatThen[1]!), ctx);
+      if (!who || who.ref === "you" || !options || !then || then.some((e) => pauses(e))) return null;
+      effects.push({ type: "punisher", who, options, effects: then, thenText: thatThen[1]!.replace(/^you (\w+)/, (_, v: string) => `${v}s`) });
       si++;
       continue;
     }
@@ -942,6 +959,19 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // it stays in the library until an instruction moves it.
     // "Choose a card name, then reveal a card at random from your hand. If that card has the chosen name, ~ deals 2 damage to
     // any target." (Cursed Scroll): about that card, which stays in the hand.
+    // "The owner of target permanent shuffles it into their library, then reveals the top card of their library. If it's a
+    // permanent card, they put it onto the battlefield." (Chaos Warp): that owner's library, the card entering under their
+    // control; nothing is revealed if the target is illegal (rulings).
+    const warp = /^The owner of (target .+?) shuffles it into their library, then reveals the top card of their library$/.exec(s);
+    if (warp) {
+      const what = parseObject(warp[1]!, ctx);
+      const then = /^If it's an? (.+?) card, they put it onto the battlefield$/.exec(sentences[si + 1] ?? "");
+      const filter = then && parseSearchFilter(`${then[1]!} card`);
+      if (what?.ref !== "target" || what.n || !filter) return null;
+      effects.push({ type: "shuffleIntoLibrary", what }, { type: "revealTop", who: { ref: "targetOwner", index: what.index } }, { type: "if", cond: { kind: "revealedIs", filter }, effects: [{ type: "putOntoBattlefield", what: { ref: "revealed" }, owner: true }] });
+      si++;
+      continue;
+    }
     const atRandom = /^[Rr]eveal a card at random from your hand$/.test(s);
     if (/^[Rr]eveal the top card of your library$/.test(s) || (atRandom && /^If that card has the chosen name, /.test(sentences[si + 1] ?? ""))) {
       const r = parseRevealedIf(sentences, si + 1, ctx);
@@ -1793,7 +1823,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "You may draw a card": optional, decided on resolution (CR 608.2d).
     // "You may play the exiled card without paying its mana cost" asks as it plays it (see the playLinked effect).
     // "You may play an additional land this turn" is a permission, not a choice made now (CR 305.2a).
-    const may = /^[Yy]ou may (?!play the exiled card |play (?:an|up to \w+) additional lands? this turn)(.+)$/.exec(s);
+    // "You may draw a card unless that player pays {1}" (Rhystic Study): they decide first (see the punisher sentences).
+    const may = /^[Yy]ou may (?!play the exiled card |play (?:an|up to \w+) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target )(.+)$/.exec(s);
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
       // don't control": ~ does it, if you choose.

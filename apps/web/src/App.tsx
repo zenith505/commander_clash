@@ -48,6 +48,7 @@ import {
   sourceQuality,
   spellQuality,
   copyTargetQuality,
+  stackItemQuality,
   castHow,
   isSummoningSick,
   legalActions,
@@ -142,6 +143,7 @@ import {
   FACE_DOWN_WARD,
   faceDef,
   pickOptions,
+  shareLandType,
 } from "@cc/engine";
 import { HUMAN, STOPPABLE, cardOf, seenCardOf, isCreature, isLand, loopReady, newGame, useGame, type DeckBundle, type LoopRecording, type PriorityMode } from "./useGame";
 import { Arrows, targetSelectors as baseSelectors, type ArrowSpec } from "./Arrows";
@@ -249,13 +251,15 @@ type Targeting = (
   | { mode: "copy"; specs: TargetSpec[]; chosen: TargetChoice[]; label: string }
   /** The new target of a spell whose target a resolving spell changes (CR 115.7a): one of the pending options. */
   | { mode: "change"; specs: TargetSpec[]; chosen: TargetChoice[]; label: string }
+  /** New targets for a spell or ability a resolving spell lets us choose (CR 115.7d), or keep them. */
+  | { mode: "retarget"; specs: TargetSpec[]; chosen: TargetChoice[]; label: string }
 ) & {
   /** The picks so far in a run of per-opponent slots starting at the next one (see perOpponentRun), by slot. */
   ahead?: (TargetChoice | undefined)[];
 };
 
 /** Targeting the engine is waiting on, which can't be cancelled. */
-const answering = (t: Targeting | null | undefined) => t?.mode === "trigger" || t?.mode === "copy" || t?.mode === "change";
+const answering = (t: Targeting | null | undefined) => t?.mode === "trigger" || t?.mode === "copy" || t?.mode === "change" || t?.mode === "retarget";
 
 /** Targets chosen for damage "divided as you choose" (CR 601.2d): how much each gets, at least 1 each. */
 type Dividing = { targeting: Targeting; chosen: TargetChoice[] };
@@ -481,8 +485,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       setTargeting({ mode: "trigger", specs, chosen: skipped(specs, []), label: pending.description });
     } else if (pending?.kind === "copyTargets") setTargeting({ mode: "copy", specs: pending.specs, chosen: skipped(pending.specs, []), label: `${pending.source === pending.copyOf.replace(/ \(X=\d+\)$/, "") ? `${pending.copyOf} (copy)` : `${pending.source}: copy of ${pending.copyOf}`}${pending.left > 1 ? ` (${pending.left} copies left)` : ""}` });
     else if (pending?.kind === "changeTarget") setTargeting({ mode: "change", specs: [pending.spec], chosen: [], label: `${pending.source}: the new target of ${pending.spell}` });
+    else if (pending?.kind === "newTargets") setTargeting({ mode: "retarget", specs: pending.specs, chosen: skipped(pending.specs, []), label: `${pending.source}: new targets for ${pending.spell}` });
     else setTargeting((t) => (answering(t) ? null : t));
-  }, [pending?.kind, pending?.kind === "chooseTargets" ? pending.description : pending?.kind === "copyTargets" ? `${pending.copyOf}#${pending.left}` : pending?.kind === "changeTarget" ? pending.stackId : ""]);
+  }, [pending?.kind, pending?.kind === "chooseTargets" ? pending.description : pending?.kind === "copyTargets" ? `${pending.copyOf}#${pending.left}` : pending?.kind === "changeTarget" || pending?.kind === "newTargets" ? pending.stackId : ""]);
 
   const opps = useMemo(() => (s ? opponents(s, HUMAN) : []), [s]);
   // Who defends a permanent that can be attacked: a planeswalker's controller, a battle's protector (CR 506.2, 310.9b).
@@ -531,11 +536,14 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
 
   const nextSpec = targeting ? targeting.specs[targeting.chosen.length] : undefined;
   // "Another target creature" on a permanent's ability can't be that permanent.
-  const targetSource = targeting?.mode === "activate" ? targeting.objectId : targeting?.mode === "trigger" && pending?.kind === "chooseTargets" ? pending.sourceId : undefined;
+  // A spell or ability getting new targets: legal for it, as its controller (CR 115.7d).
+  const retargeted = targeting?.mode === "retarget" && pending?.kind === "newTargets" ? s?.stack.find((x) => x.id === pending.stackId) : undefined;
+  const targetController = retargeted?.controller ?? HUMAN;
+  const targetSource = targeting?.mode === "activate" ? targeting.objectId : targeting?.mode === "trigger" && pending?.kind === "chooseTargets" ? pending.sourceId : retargeted?.sourceId;
   // The spell's own colors, or the ability's source's, for protection and "can't be the target of black spells" (CR 115.4).
   const castObj = targeting?.mode === "cast" && s ? s.objects[targeting.draft.objectId] : undefined;
-  const targetQuality = !s ? undefined : castObj ? spellQuality(s, cardIdOf(castObj)) : targeting?.mode === "copy" ? copyTargetQuality(s) : targetSource ? sourceQuality(s, targetSource) : undefined;
-  const runEnd = targeting && targeting.mode !== "change" ? perOpponentRun(targeting.specs, targeting.chosen.length) : 0;
+  const targetQuality = !s ? undefined : castObj ? spellQuality(s, cardIdOf(castObj)) : targeting?.mode === "copy" ? copyTargetQuality(s) : retargeted ? stackItemQuality(s, retargeted) : targetSource ? sourceQuality(s, targetSource) : undefined;
+  const runEnd = targeting && targeting.mode !== "change" && targeting.mode !== "retarget" ? perOpponentRun(targeting.specs, targeting.chosen.length) : 0;
   const inRun = !!targeting && runEnd > targeting.chosen.length;
   /** In a run of per-opponent slots, the slot this target would fill: the one for its controller (CR 601.2c). */
   const runSlot = (c: TargetChoice) => {
@@ -543,7 +551,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const from = targeting.chosen.length;
     for (let j = from; j < runEnd; j++) {
       const before = [...targeting.chosen, ...Array.from({ length: j - from }, (_, k) => targeting.ahead?.[from + k] ?? NONE)];
-      if (canChooseTarget(s, targeting.specs, before, j, c, HUMAN, targetQuality, targetSource)) return j;
+      if (canChooseTarget(s, targeting.specs, before, j, c, targetController, targetQuality, targetSource)) return j;
     }
     return -1;
   };
@@ -553,9 +561,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     !!nextSpec &&
     (targeting.mode === "change"
       ? pending?.kind === "changeTarget" && pending.options.some((o) => sameTarget(o, c))
-      : inRun
-        ? runSlot(c) >= 0
-        : canChooseTarget(s, targeting.specs, targeting.chosen, targeting.chosen.length, c, HUMAN, targetQuality, targetSource));
+      : targeting.mode === "retarget" && pending?.kind === "newTargets" && sameTarget(pending.current[targeting.chosen.length], c)
+        ? true // kept, legal or not (CR 115.7d)
+        : inRun
+          ? runSlot(c) >= 0
+          : !(retargeted && c.kind === "stack" && c.id === retargeted.id) && canChooseTarget(s, targeting.specs, targeting.chosen, targeting.chosen.length, c, targetController, targetQuality, targetSource));
 
   function pickTarget(c: TargetChoice) {
     if (!s || !targeting || !nextSpec) return;
@@ -594,10 +604,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     setTargeting(null);
     setDividing(null);
     // Then how a divided amount is split among them (CR 601.2d); a copy keeps the division it has.
-    if (!divided && tg.mode !== "copy" && tg.mode !== "change" && tg.specs.some((x) => x.divided && !x.skip)) return setDividing({ targeting: tg, chosen: evenDivision(tg.specs, chosen) });
+    if (!divided && tg.mode !== "copy" && tg.mode !== "change" && tg.mode !== "retarget" && tg.specs.some((x) => x.divided && !x.skip)) return setDividing({ targeting: tg, chosen: evenDivision(tg.specs, chosen) });
     if (tg.mode === "trigger") return dispatch([{ type: "chooseTargets", player: HUMAN, targets: chosen }]);
     if (tg.mode === "copy") return dispatch([{ type: "copyTargets", player: HUMAN, targets: chosen }]);
     if (tg.mode === "change") return dispatch([{ type: "changeTarget", player: HUMAN, target: chosen[0]! }]);
+    if (tg.mode === "retarget") return dispatch([{ type: "newTargets", player: HUMAN, targets: chosen }]);
     if (tg.mode === "cast") return continueCast({ ...tg.draft, targets: chosen });
     continueActivate({ objectId: tg.objectId, index: tg.index, modes: tg.modes, x: tg.x, targets: chosen });
   }
@@ -1162,6 +1173,17 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                   onClick={() => {
                     setTargeting(null);
                     dispatch([{ type: "copyTargets", player: HUMAN }]);
+                  }}
+                >
+                  Keep {pending.current.length === 1 ? "target" : "targets"}
+                  {describeTargets(s, pending.current).replace(/^ targeting /, ": ")}
+                </button>
+              )}
+              {targeting.mode === "retarget" && pending?.kind === "newTargets" && (
+                <button
+                  onClick={() => {
+                    setTargeting(null);
+                    dispatch([{ type: "newTargets", player: HUMAN }]);
                   }}
                 >
                   Keep {pending.current.length === 1 ? "target" : "targets"}
@@ -3130,7 +3152,8 @@ function LibrarySearch({
   const whose = zones ? s.players[pending.zonesOf!]!.name : "";
   // "Cards with different mana values" (Seasons Past): a card can't join one with the same mana value.
   const mvOf = (id: string) => manaValue(parseManaCost(cardOf(s, id).manaCost));
-  const clashes = (id: string) => !!pending.distinctManaValues && found.some((f) => mvOf(f) === mvOf(id));
+  // "Basic land cards that share a land type" (Myriad Landscape): a card joins only ones it shares a land type with.
+  const clashes = (id: string) => (!!pending.distinctManaValues && found.some((f) => mvOf(f) === mvOf(id))) || (!!pending.shareLandType && !shareLandType([...found, id].map((x) => cardOf(s, x))));
   const add = (ids: string[]) => {
     const next = ids.find((id) => !found.includes(id) && !clashes(id));
     if (next && found.length < pending.max) setFound([...found, next]);
@@ -3175,6 +3198,8 @@ function LibrarySearch({
                 ? `Chosen ${found.length}; the first goes lowest.`
                 : pending.distinctManaValues
                   ? `Chosen ${found.length}. Each must have a different mana value.`
+                  : pending.shareLandType
+                  ? `Found ${found.length} of ${pending.max}. They must share a land type.`
                   : pending.also?.length
                     ? `Found ${found.length} of ${pending.max}. The ${pending.also.length} in the graveyard ${pending.also.length === 1 ? "is" : "are"} exiled too.`
                     : `Found ${found.length} of ${pending.max}.`}
@@ -3857,7 +3882,7 @@ function Controls({
         ))}
       </div>
     );
-  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "anchor" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate") && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "anchor" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>
@@ -4495,7 +4520,7 @@ function targetingArrows(s: GameState, targeting: Targeting | null, intent: Retu
     intent.targets.forEach((t, i) => out.push({ key: `intent:${i}`, from, to: targetSelectors(t), color: playerColor(intent.player), aiming: true }));
   }
   if (targeting) {
-    const sourceId = targeting.mode === "trigger" ? (s.pending?.kind === "chooseTargets" ? s.pending.sourceId : undefined) : targeting.mode === "copy" || targeting.mode === "change" ? undefined : targeting.mode === "cast" ? targeting.draft.objectId : targeting.objectId;
+    const sourceId = targeting.mode === "trigger" ? (s.pending?.kind === "chooseTargets" ? s.pending.sourceId : undefined) : targeting.mode === "copy" || targeting.mode === "change" || targeting.mode === "retarget" ? undefined : targeting.mode === "cast" ? targeting.draft.objectId : targeting.objectId;
     const from = [...(sourceId ? [`[data-obj="${sourceId}"]`] : []), `[data-player="${HUMAN}"]`];
     const color = playerColor(HUMAN);
     targeting.chosen.forEach((t, i) => out.push({ key: `mine:${i}`, from, to: targetSelectors(t), color }));

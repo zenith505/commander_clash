@@ -42,7 +42,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // "The greatest power among creatures you control" (0 with none), "among other creatures you control", "the greatest
   // toughness among Wurms you control", "among creatures they control" (that player's).
-  if (!each && (m = /^the greatest (power|toughness) among (other )?((?:attacking )?(?:creatures|[A-Z][a-z]+s)) (you control|on the battlefield|they control|that player controls|target player controls|target opponent controls)$/.exec(p.replace(/^The/, "the")))) {
+  if (!each && (m = /^the greatest (power|toughness) among (other )?((?:attacking )?(?:non-[A-Z][a-z]+ )?(?:creatures|[A-Z][a-z]+s)) (you control|on the battlefield|they control|that player controls|target player controls|target opponent controls)$/.exec(p.replace(/^The/, "the")))) {
     const words = m[3]!.split(/\s+/).map(singularWord).join(" ");
     const who = m[4]!;
     const spec = parseTargetPhrase(`${words}${who === "you control" ? " you control" : ""}`, { chosen: true });
@@ -165,6 +165,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^basic land types? among lands you control$/i.test(p)) return count({ kind: "basicLandTypes" });
   // Vivid: "the number of colors among permanents you control".
   if (/^colou?rs among permanents you control$/i.test(p)) return count({ kind: "colorsAmongPermanents" });
+  if (/^spells? you've cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn" });
   // "For each creature it devoured" (CR 702.82b): only the permanent's own abilities know what it devoured.
   if (/^creatures? (?:it|~) devoured$/i.test(p) && (ctx === null || ctx.selfIt)) return count({ kind: "devoured" });
   if (/^times ~ has mutated$/i.test(p)) return count({ kind: "mutations" });

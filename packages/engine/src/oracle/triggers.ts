@@ -336,11 +336,15 @@ function parseTargetedTrigger(line: string): TriggeredAbility | "fail" | null {
 }
 
 function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
-  // "Whenever you cast your second spell each turn", "Whenever an opponent casts their second spell each turn".
-  const nth = /^Whenever (you|an opponent|a player) casts? (?:your|their) second spell each turn, (.+)$/.exec(line);
+  // "Whenever you cast your second spell each turn", "Whenever an opponent casts their second spell each turn", "...
+  // their first noncreature spell each turn" (Esper Sentinel): counting only the spells of that kind they cast this turn.
+  const nth = /^Whenever (you|an opponent|a player) casts? (?:your|their) (first|second) (?:(.+?) )?spell each turn, (.+)$/.exec(line);
   if (nth) {
-    const body = parseBody(nth[2]!, { castSpell: true, eventPlayer: true });
-    return body ? { event: "castSpell", cast: { by: CAST_BY[nth[1] as keyof typeof CAST_BY], spell: { kind: "spell", text: "spell" }, nth: 2 }, body } : "fail";
+    const parsed = nth[3] ? parseTargetPhrase(`${nth[3]} spell`) : { kind: "spell" as const, text: "spell" };
+    const kind = parsed && { ...parsed, text: nth[3] ? `${nth[3]} spell` : "spell" };
+    if (kind?.kind !== "spell") return "fail";
+    const body = parseBody(nth[4]!, { castSpell: true, eventPlayer: true });
+    return body ? { event: "castSpell", cast: { by: CAST_BY[nth[1] as keyof typeof CAST_BY], spell: kind, nth: nth[2] === "first" ? 1 : 2, ...(nth[3] ? { nthOfKind: true as const } : {}) }, body } : "fail";
   }
   const m = CAST_TRIGGER.exec(line);
   if (!m) return null;
@@ -423,8 +427,8 @@ function parseEntersTrigger(line: string): TriggeredAbility | "fail" | null {
   let phrase = m[2]!;
   if (m[3]) phrase += m[3] === " under your control" ? " you control" : " an opponent controls";
   const ench = ENCHANTED_CONTROLS.test(phrase);
-  const filter = ench ? enchantedControls(phrase) : parseTargetPhrase(phrase);
-  if (!filter || filter.kind !== "object") return "fail";
+  const filter = ench ? enchantedControls(phrase) : parseTargetPhrase(phrase, { chosen: true });
+  if (!filter || filter.kind !== "object" || (filter.chosen && filter.chosen !== "type")) return "fail";
   // "That land's controller" (Zo-Zu), and "that player" after "a creature an opponent controls" (Suture Priest): the
   // entering permanent's controller.
   let bodyText = ench ? m[4]!.replace(/\bthat player\b/g, "enchanted player") : m[4]!.replace(/\bthat (?:land|artifact|creature|permanent|enchantment)'s controller\b/g, "its controller");
@@ -550,7 +554,7 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
  * the attacker; "defending player" is the player it's attacking (CR 508.5a).
  */
 function parseAttackerTrigger(line: string): TriggeredAbility | "fail" | null {
-  const m = /^Whenever (another|an?) (.+?) you control attacks, (.+)$/.exec(line);
+  const m = /^Whenever (another|an?) (.+? you control(?: of the chosen type)?) attacks, (.+)$/.exec(line);
   // "Whenever a creature attacks": anyone's, each one as it's declared as an attacker (Caltrops, Righteous Cause).
   const any = m ? null : /^Whenever (another|an?) ((?:[a-z]+ )?creature) attacks, (.+)$/.exec(line);
   // "Whenever a creature attacks you or a planeswalker you control" (Blood Reckoning, Isperia): one attacking this
@@ -565,12 +569,14 @@ function parseAttackerTrigger(line: string): TriggeredAbility | "fail" | null {
   }
   const w = m ?? any;
   if (!w) return null;
-  const filter = parseTargetPhrase(w[2]!);
-  if (!filter || filter.kind !== "object" || filter.controller || !(filter.types?.includes("Creature") || filter.subtypes?.length || filter.allTypes?.includes("Creature") || filter.commander)) return "fail";
+  // "A creature you control of the chosen type" (Kindred Discovery): the type chosen for this permanent.
+  const filter = m ? parseTargetPhrase(m[2]!.replace(/ you control(?= of the chosen type$|$)/, ""), { chosen: true }) : parseTargetPhrase(w[2]!);
+  if (m) w[2] = m[2]!.replace(/ you control(?= of the chosen type$|$)/, "");
+  if (!filter || filter.kind !== "object" || filter.controller || (filter.chosen && filter.chosen !== "type") || !(filter.types?.includes("Creature") || filter.subtypes?.length || filter.allTypes?.includes("Creature") || filter.commander)) return "fail";
   const body = parseBody(w[3]!.replace(/\bthat creature\b/g, "it"), { subjectIt: true, defending: true });
   if (!body) return "fail";
   if (any) return { event: "creatureYouControlAttacks", attacker: { filter: { ...filter, text: w[2]! }, anyone: true, ...(w[1] === "another" ? { other: true } : {}) }, body };
-  return { event: "creatureYouControlAttacks", attacker: { filter: { ...filter, controller: "you", text: `${w[2]} you control` }, ...(w[1] === "another" ? { other: true } : {}) }, body };
+  return { event: "creatureYouControlAttacks", attacker: { filter: { ...filter, controller: "you", text: filter.chosen ? `${w[2]!.replace(/ of the chosen type$/, "")} you control of the chosen type` : `${w[2]} you control` }, ...(w[1] === "another" ? { other: true } : {}) }, body };
 }
 
 /**
@@ -1238,6 +1244,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (fromYard) {
     const t = parseTrigger(`When ~ enters, ${fromYard[2]}`);
     return !t || t === "fail" || t.event !== "selfEnters" ? "fail" : { ...t, ifFromGraveyard: fromYard[1] === "a" ? "any" : "yours" };
+  }
+  // "When ~ enters untapped, ..." (Mystic Sanctuary): entering untapped is part of the trigger event.
+  const untapped = /^When(?:ever)? ~ enters untapped, (.+)$/.exec(line);
+  if (untapped) {
+    const t = parseTrigger(`When ~ enters, ${untapped[1]}`);
+    return !t || t === "fail" || t.event !== "selfEnters" ? "fail" : { ...t, ifEnteredUntapped: true };
   }
   for (const [re, event] of TRIGGERS) {
     const m = re.exec(line);

@@ -131,7 +131,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return of && !ctx.spell ? [{ type: "delayed", when: "dies", of, effects: [{ type: "flip", what: { ref: "self" } }], text: "flip ~", thisTurn: true }] : null;
   }
   // Removal and tapping
-  if ((m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+|all .+|each .+|~|it|that creature|that permanent|them|those creatures|those permanents|enchanted \w+|equipped \w+)$/i.exec(s))) {
+  if ((m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+|all .+|each .+|~|it|that creature|that permanent|that land|them|those creatures|those permanents|enchanted \w+|equipped \w+)$/i.exec(s))) {
     const what = parseObject(m[2]!, ctx);
     if (!what) return null;
     const type = ({ destroy: "destroy", exile: "exile", tap: "tap", untap: "untap" } as const)[m[1]!.toLowerCase() as "destroy" | "exile" | "tap" | "untap"];
@@ -426,6 +426,23 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
       out.push({ type: "continuous", what, mods: [{ kind: "addKeywords", keywords: [k] }], duration: "endOfTurn" });
     }
     return out;
+  }
+  // "You gain protection from everything until your next turn" (The One Ring); "Until your next turn, your life total
+  // can't change and you gain protection from everything" (Teferi's Protection).
+  if ((m = /^You gain (hexproof|shroud|protection from [a-z ]+?) until your next turn$/i.exec(s)) || (m = /^Until your next turn, (.+)$/i.exec(s))) {
+    const parts = /^Until /i.test(s) ? m[1]!.split(/,? and /) : [`you gain ${m[1]!}`];
+    const keywords: string[] = [];
+    let lifeCantChange = false;
+    const ok = parts.every((p) => {
+      const g = /^you gain (hexproof|shroud|protection from [a-z ]+)$/i.exec(p);
+      const k = g && canonicalKeyword(g[1]!);
+      if (k && /^(?:Hexproof|Shroud|Protection from )/.test(k)) keywords.push(k);
+      else if (/^your life total can't change$/i.test(p)) lifeCantChange = true;
+      else return false;
+      return true;
+    });
+    // Anything else "until your next turn" is for the rules below.
+    if (ok) return [{ type: "playerGains", keywords, untilYourNextTurn: true, ...(lifeCantChange ? { lifeCantChange: true as const } : {}) }];
   }
   if ((m = /^(.+?) ((?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) .+) until (end of turn|your next turn)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);

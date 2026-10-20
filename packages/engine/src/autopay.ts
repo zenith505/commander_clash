@@ -6,7 +6,7 @@ import { characteristics, controllerOf } from "./layers";
 import { abilityProblem, activationCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, unlockCost, unlockProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, foretellProblem, tapCostCandidates, turnFaceUpProblem } from "./game";
 import { compileCard } from "./oracle";
 import { hopeValues, spendPlan } from "./value";
-import { poolFor, spendAllows, type ManaUse } from "./spend";
+import { boundSpend, poolFor, spendAllows, type ManaUse } from "./spend";
 import type { SpentReq, TargetChoice } from "./abilities";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payFromPool, payGenericWith, splitGeneric, xCount, type ManaPool, type ParsedCost } from "./mana";
 import { COLORS, type Action, type CardDef, type Color, type CostChoices, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
@@ -61,7 +61,7 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
       const options = manaOptions(s, o)
         // Mana that can't be spent on this is no help (CR 106.6), nor mana a Treasure didn't make for Security Rhox's cost.
         // A storage land gives one counter's worth at a time, so a payment never takes more of them than it needs.
-        .filter((x) => x.adds.length > 0 && (x.removes ?? 1) === 1 && !manaAbilityProblem(s, pid, o, x.ability, true) && (!abs[x.ability]!.spendOnly || spendAllows(s, pid, abs[x.ability]!.spendOnly!, use)) && (!onlyTreasures || (treasure && !abs[x.ability]!.spendOnly)))
+        .filter((x) => x.adds.length > 0 && (x.removes ?? 1) === 1 && !manaAbilityProblem(s, pid, o, x.ability, true) && (!abs[x.ability]!.spendOnly || spendAllows(s, pid, boundSpend(o, abs[x.ability]!.spendOnly!), use)) && (!onlyTreasures || (treasure && !abs[x.ability]!.spendOnly)))
         .map((x) => {
           const ab = abs[x.ability]!;
           const tapCost = ab.tapCost && { n: ab.tapCost.n, candidates: tapPreference(s, tapCostCandidates(s, pid, o, ab.tapCost).filter((id) => !exclude.includes(id))) };

@@ -542,6 +542,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "damageMod":
     case "pumpPerBlocker":
     case "draw":
+    case "drawUpTo":
     case "getEnergy":
     case "poison":
     case "loseAllCounters":
@@ -628,6 +629,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "exileSelfWithTime":
     case "exileSpell":
     case "warpExile":
+    case "commanderToHand":
       return runZonesEffect(s, e, ctx, src);
     case "tap":
     case "suspect":
@@ -701,6 +703,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "spellGains":
     case "counterEach":
     case "changeTarget":
+    case "newTargets":
       return runSpellsEffect(s, e, ctx, src);
     case "mill":
     case "exileTop":

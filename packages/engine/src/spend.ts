@@ -3,10 +3,10 @@
 
 import type { ManaSpend } from "./abilities";
 import { defOf } from "./cards";
-import { objectMatches, printedMatches } from "./effects";
+import { bindChosen, objectMatches, printedMatches } from "./effects";
 import { emptyPool, payFromPool, type ManaPool, type ParsedCost, type Payment } from "./mana";
 import { characteristics } from "./layers";
-import type { CardDef, Color, GameObject, GameState, ManaLot, ManaOrigin, ManaType, PlayerId } from "./types";
+import type { CardDef, Color, GameObject, GameState, ManaLot, ManaOrigin, ManaSpentTrigger, ManaType, PlayerId } from "./types";
 
 /**
  * What a payment is for: casting a spell (as it is on the stack: face down, bestowed), activating an ability of a
@@ -98,7 +98,7 @@ export type SpentFrom = Record<"treasure" | "creature" | "artifact", number>;
  * (CR 601.2h): restricted mana it may be spent on first; then, on a spell or an ability, mana from a Treasure, a creature
  * or an artifact ("if mana from a Treasure was spent"), but on anything else the rest first; mana kept as steps end last.
  */
-export function spendFromPool(s: GameState, pid: PlayerId, cost: ParsedCost, use: ManaUse, extraGeneric = 0, life = Infinity, opts: { spreadColors?: boolean; want?: Partial<Record<Color, number>>; avoid?: Partial<Record<Color, number>>; wantSnow?: boolean } = {}): (Payment & { spent: ManaPool; treasure: number; from: SpentFrom }) | null {
+export function spendFromPool(s: GameState, pid: PlayerId, cost: ParsedCost, use: ManaUse, extraGeneric = 0, life = Infinity, opts: { spreadColors?: boolean; want?: Partial<Record<Color, number>>; avoid?: Partial<Record<Color, number>>; wantSnow?: boolean } = {}): (Payment & { spent: ManaPool; treasure: number; from: SpentFrom; uncounterable?: true; spentTriggers?: ManaSpentTrigger[] }) | null {
   const p = s.players[pid]!;
   const { pool, prefer, treasure, snow } = poolFor(s, pid, use);
   const first = { ...prefer };
@@ -109,6 +109,8 @@ export function spendFromPool(s: GameState, pid: PlayerId, cost: ParsedCost, use
   const plain = treasureOnly(use) ? emptyPool() : plainMana(s, pid);
   const spent = emptyPool();
   const from: SpentFrom = { treasure: 0, creature: 0, artifact: 0 };
+  let uncounterable = false;
+  const spentTriggers: ManaSpentTrigger[] = [];
   // Lower ranks are spent first; `plain` stands for the mana of that type in no lot.
   const rank = (l: ManaLot, plain: boolean) => (l.keep ? 10 : 0) + (l.only ? 0 : plain === (use === "other") ? 1 : 2);
   for (const m of Object.keys(spent) as ManaType[]) {
@@ -121,6 +123,8 @@ export function spendFromPool(s: GameState, pid: PlayerId, cost: ParsedCost, use
         const k = Math.min(n, l.n);
         l.n -= k;
         n -= k;
+        if (k && l.only?.uncounterable) uncounterable = true;
+        if (l.spentTrigger && use !== "other" && "spell" in use) for (let j = 0; j < k; j++) spentTriggers.push(l.spentTrigger);
         for (const f of l.from ?? []) if (f !== "snow") from[f] += k;
       }
     };
@@ -130,21 +134,39 @@ export function spendFromPool(s: GameState, pid: PlayerId, cost: ParsedCost, use
   }
   if (p.manaLots) p.manaLots = p.manaLots.filter((l) => l.n > 0);
   if (!p.manaLots?.length) p.manaLots = undefined;
-  return { ...paid, pool: { ...p.manaPool }, spent, treasure: from.treasure, from };
+  return { ...paid, pool: { ...p.manaPool }, spent, treasure: from.treasure, from, ...(uncounterable ? { uncounterable: true as const } : {}), ...(spentTriggers.length ? { spentTriggers } : {}) };
+}
+
+/**
+ * A mana ability's "spend this mana only ..." for the mana `o` makes now: "of the chosen type" is the type chosen for
+ * `o` (Unclaimed Territory), and mana of different types is kept apart. With none chosen, it can't be spent that way.
+ */
+export function boundSpend(o: GameObject, only: ManaSpend): ManaSpend;
+export function boundSpend(o: GameObject, only: ManaSpend | undefined): ManaSpend | undefined;
+export function boundSpend(o: GameObject, only: ManaSpend | undefined): ManaSpend | undefined {
+  const abilities = typeof only?.abilities === "object" ? only.abilities : undefined;
+  if (!only || (only.spells?.chosen !== "type" && abilities?.chosen !== "type")) return only;
+  return {
+    ...only,
+    ...(only.spells ? { spells: bindChosen(only.spells, o.chosen) } : {}),
+    ...(abilities ? { abilities: bindChosen(abilities, o.chosen) } : {}),
+    text: `${only.text.replace(/\.$/, "")} (${o.chosen?.type ?? "none chosen"}).`,
+  };
 }
 
 /**
  * Add mana to `pid`'s pool (CR 106.4): restricted if `only` says how it can be spent (106.6), `from` what its source was
  * (106.3), `keep` if it isn't lost as steps end (until end of turn, or until end of combat for firebending).
  */
-export function addMana(s: GameState, pid: PlayerId, mana: ManaType[], how: { only?: ManaSpend; from?: ManaOrigin[]; keep?: ManaLot["keep"] } = {}): void {
+export function addMana(s: GameState, pid: PlayerId, mana: ManaType[], how: { only?: ManaSpend; from?: ManaOrigin[]; keep?: ManaLot["keep"]; spentTrigger?: ManaSpentTrigger } = {}): void {
   const p = s.players[pid]!;
   const from = how.from?.length ? [...new Set(how.from)].sort() : undefined;
+  const trig = (t: ManaSpentTrigger | undefined) => (t ? `${t.sourceId}#${t.sourceZc}` : "");
   for (const m of mana) {
     p.manaPool[m]++;
-    if (!how.only && !from && !how.keep) continue;
-    const same = p.manaLots?.find((l) => l.mana === m && l.only?.text === how.only?.text && (l.from ?? []).join() === (from ?? []).join() && l.keep === how.keep);
+    if (!how.only && !from && !how.keep && !how.spentTrigger) continue;
+    const same = p.manaLots?.find((l) => l.mana === m && l.only?.text === how.only?.text && (l.from ?? []).join() === (from ?? []).join() && l.keep === how.keep && trig(l.spentTrigger) === trig(how.spentTrigger));
     if (same) same.n++;
-    else (p.manaLots ??= []).push({ mana: m, n: 1, ...(how.only ? { only: how.only } : {}), ...(from ? { from } : {}), ...(how.keep ? { keep: how.keep } : {}) });
+    else (p.manaLots ??= []).push({ mana: m, n: 1, ...(how.only ? { only: how.only } : {}), ...(from ? { from } : {}), ...(how.keep ? { keep: how.keep } : {}), ...(how.spentTrigger ? { spentTrigger: how.spentTrigger } : {}) });
   }
 }

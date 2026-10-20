@@ -3,9 +3,9 @@ import { allEffects, refCovers, timedCondition, type AbilityBody, type Activated
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
 import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
-import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, realDefOf, toughness } from "./cards";
+import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
-import { bindChosen, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
+import { bindChosen, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, manySlot, gateTargets, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
   livingPlayers,
@@ -67,6 +67,7 @@ import {
   linkedExileCards,
   MAX_HAND_SIZE,
   hasNoMaxHandSize,
+  stackItemQuality,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
@@ -106,6 +107,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "copyTargets", player: pid, ...(best ? { targets: best } : {}) }];
     }
     if (pend.kind === "changeTarget") return [{ type: "changeTarget", player: pid, target: newTargetFor(s, pid, pend) }];
+    if (pend.kind === "newTargets") {
+      const targets = newTargetsFor(s, pid, pend);
+      return [{ type: "newTargets", player: pid, ...(targets ? { targets } : {}) }];
+    }
     if (pend.kind === "castFree" && pend.how === "transformed") {
       // A defeated Siege: its back face, for free (CR 310.12b).
       const plan = asFace(s, obj(s, pend.objectId), 1, () => castPlan(s, pid, pend.objectId, true));
@@ -155,6 +160,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // and a sacrifice only with enough permanents that aren't our commander.
       if (pend.life && payableLife(s, pid) <= pend.life) return [{ type: "payUnless", player: pid, pay: false }];
       if (pend.sacrifice && pickOptions(s, pend.sacrifice, pid).filter((id) => !obj(s, id).isCommander).length < pend.sacrifice.n) return [{ type: "payUnless", player: pid, pay: false }];
+      // A tax whose penalty is only a card or a Treasure for its controller (Rhystic Study, Smothering Tithe, Mystic Remora):
+      // {1} is worth paying, more only with plenty of mana to spare.
+      const pu = s.resolving?.scratch?.punish;
+      const generic = [...pend.cost.matchAll(/\{(\d+)\}|\{[^}]+\}/g)].reduce((n, x) => n + (x[1] ? Number(x[1]) : 1), 0);
+      if (pu && pu.lose === undefined && generic >= 2 && !planMana(s, pid, parseManaCost(`{${generic + 3}}`))) return [{ type: "payUnless", player: pid, pay: false }];
       const taps = planMana(s, pid, parseManaCost(pend.cost));
       return taps ? [...taps, { type: "payUnless", player: pid, pay: true }] : [{ type: "payUnless", player: pid, pay: false }];
     }
@@ -192,6 +202,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "searchLibrary" && pend.distinctManaValues) {
       const ranked = chooseSearch(s, pid, pend.cards, pend.cards.length);
       return [{ type: "searchLibrary", player: pid, found: ranked.filter((id, i) => ranked.findIndex((x) => mv(s, x) === mv(s, id)) === i) }];
+    }
+    // "Basic land cards that share a land type" (Myriad Landscape): as many as we can of one type, the best-ranked first.
+    if (pend.kind === "searchLibrary" && pend.shareLandType) {
+      const ranked = chooseSearch(s, pid, pend.cards, pend.cards.length);
+      const groups = ranked.map((first) => [first, ...ranked.filter((id) => id !== first && shareLandType([defOf(s, obj(s, first)), defOf(s, obj(s, id))]))].slice(0, pend.max));
+      const best = groups.reduce<string[]>((a, g) => (g.length > a.length ? g : a), []);
+      return [{ type: "searchLibrary", player: pid, found: best }];
     }
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
     if (pend.kind === "distribute") return [{ type: "distribute", player: pid, parts: chooseDistribution(s, pid, pend.options, pend.total, pend.counter) }];
@@ -328,6 +345,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "chooseOption", player: pid, choice: key && pend.options.includes(key) ? key : pend.options[0]! }];
     }
     if (pend.kind === "chooseOption" && pend.what === "cardName") return [{ type: "chooseOption", player: pid, choice: chooseCardName(s, pid, pend) }];
+    // "Draw up to two cards": as many as we can without emptying our library.
+    if (pend.kind === "chooseOption" && pend.what === "drawUpTo") {
+      const left = player(s, pid).library.length;
+      return [{ type: "chooseOption", player: pid, choice: pend.options.find((o) => Number(o) < left) ?? "0" }];
+    }
+    // Command Beacon with two commanders: the one that costs the most to cast from the command zone.
+    if (pend.kind === "chooseOption" && pend.what === "commander")
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => mv(s, b) + 2 * (player(s, pid).commanderCasts[b] ?? 0) - mv(s, a) - 2 * (player(s, pid).commanderCasts[a] ?? 0))[0]! }];
     if (pend.kind === "chooseOption") {
       const card = pend.objectId ? defOf(s, obj(s, pend.objectId)) : s.resolving ? s.cards[s.resolving.item.sourceCardId ?? obj(s, s.resolving.item.objectId!).cardId]! : undefined;
       return [{ type: "chooseOption", player: pid, choice: chooseOption(s, pid, pend.what as ChoiceKind, card, pend.options) }];
@@ -354,6 +379,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "discard", player: pid, objectIds: hand.slice(0, pend.count) }];
     }
   }
+  const shield = chooseFullShield(s, pid);
+  if (shield) return shield;
   const deflect = chooseDeflection(s, pid);
   if (deflect) return deflect;
   // Respond to an opponent's spell with a counterspell if we have one: from hand, or an ability
@@ -406,6 +433,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   if (canActAtSorcerySpeed(s, pid)) {
     const land = chooseLand(s, pid);
     if (land) return [land];
+    const fetch = chooseFetch(s, pid);
+    if (fetch) return fetch;
     // Turn face-down creatures face up when we can pay for it (CR 702.37e).
     for (const id of s.battlefield) {
       const o = obj(s, id);
@@ -504,6 +533,35 @@ function chooseUnblocked(s: GameState, pid: PlayerId, ids: ObjectId[]): ObjectId
     const kills = (at.blockedBy ?? []).some((b) => s.objects[b]?.zone === "battlefield" && (objHasKeyword(s, at, "Deathtouch") || toughness(s, obj(s, b)) - obj(s, b).damage <= dmg));
     return controllerOf(s, at) === pid ? !kills || life <= dmg : kills && life > dmg + 5;
   });
+}
+
+/**
+ * Crack a land that sacrifices itself to find lands (Fabled Passage, Myriad Landscape, Evolving Wilds): a free one in
+ * our first main phase, one with a mana cost in the second, with mana left over. Command Beacon once our commander costs
+ * four or more extra to cast from the command zone.
+ */
+function chooseFetch(s: GameState, pid: PlayerId): Action[] | null {
+  const p = player(s, pid);
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid || !objIsType(s, o, "Land")) continue;
+    const abilities = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const ab = abilities[i]!;
+      if (!ab.sacrificeSelf || ab.body.targets.length || ab.costs?.length) continue;
+      const fetches = ab.body.effects.every((e) => (e.type === "search" && e.dest.zone === "battlefield" && !!e.filter?.types?.includes("Land") && !e.who && !e.library) || e.type === "if");
+      const lands = fetches && p.library.some((c) => { const d = defOf(s, obj(s, c)); return isType(d, "Land") && ab.body.effects.some((e) => e.type === "search" && printedMatches(e.filter!, d)); });
+      const beacon = ab.body.effects.length === 1 && ab.body.effects[0]!.type === "commanderToHand" && p.command.some((c) => obj(s, c).isCommander && obj(s, c).owner === pid && (p.commanderCasts[c] ?? 0) >= 2);
+      if (!lands && !beacon) continue;
+      const free = !manaValue(parseManaCost(ab.manaCost));
+      if (free ? s.step !== "main1" : s.step !== "main2") continue;
+      const problem = abilityProblem(s, pid, id, i);
+      if (problem && !/not enough mana/.test(problem)) continue;
+      const plan = planActivate(s, pid, id, i);
+      if (plan) return plan;
+    }
+  }
+  return null;
 }
 
 /**
@@ -789,6 +847,45 @@ function distributeCounters(s: GameState, pid: PlayerId, body: AbilityBody, firs
 }
 
 /**
+ * "Until your next turn, your life total can't change and you gain protection from everything. All permanents you
+ * control phase out" (Teferi's Protection): kept for when it saves the game, lethal combat damage coming at us once
+ * blockers are declared, or an opponent's spell destroying or exiling all of a lot of ours.
+ */
+function chooseFullShield(s: GameState, pid: PlayerId): Action[] | null {
+  const me = player(s, pid);
+  const shields = me.hand.filter((id) => {
+    const body = compileCard(defOf(s, obj(s, id))).spell;
+    return !!body && body.effects.some((e) => e.type === "playerGains" && (e.lifeCantChange || e.keywords.some((k) => /^protection from everything$/i.test(k))));
+  });
+  if (!shields.length) return null;
+  const top = s.stack[s.stack.length - 1];
+  let danger = false;
+  if (top && top.controller !== pid) {
+    const o = top.objectId ? s.objects[top.objectId] : undefined;
+    const body = top.body ?? (o ? castingBody(defOf(s, o)) : undefined);
+    let lost = 0;
+    for (const e of body ? allEffects(body.effects) : [])
+      if ((e.type === "destroy" || e.type === "exile" || e.type === "bounce") && e.what.ref === "each")
+        for (const id of s.battlefield) {
+          const x = obj(s, id);
+          if (controllerOf(s, x) === pid && objectMatches(s, e.what.filter, x, top.controller, false) && !(e.type === "destroy" && objHasKeyword(s, x, "Indestructible"))) lost += worth(s, pid, x);
+        }
+    danger = lost >= 12;
+  }
+  if (!danger && s.step === "declareBlockers" && s.activePlayer !== pid) {
+    const coming = s.battlefield.map((x) => obj(s, x)).filter((o) => o.attacking === pid && !o.attackingPermanent && !o.blockedBy?.length).reduce((n, o) => n + Math.max(0, power(s, o)), 0);
+    danger = coming >= me.life;
+  }
+  if (!danger) return null;
+  // Not through castPlan, which would see only the harm of phasing our own permanents out.
+  for (const id of shields) {
+    const plan = planCast(s, pid, id, undefined, undefined, "auto");
+    if (plan && plan[plan.length - 1]!.type === "castSpell") return plan;
+  }
+  return null;
+}
+
+/**
  * Turn an opponent's spell aimed at us or ours onto one of theirs (Deflection, CR 115.7a), when there's one it could
  * go to. "Unless that spell's controller pays" only if they can't.
  */
@@ -805,9 +902,9 @@ function chooseDeflection(s: GameState, pid: PlayerId): Action[] | null {
   if (!changeTargetOptions(s, top, spec, current).some((t) => t.kind !== "none" && !isMine(s, pid, t))) return null;
   for (const id of player(s, pid).hand) {
     const spell = compileCard(defOf(s, obj(s, id))).spell;
-    const e = spell?.effects.find((x) => x.type === "changeTarget");
-    if (!spell || e?.type !== "changeTarget" || spell.targets.length !== 1) continue;
-    if (e.unless && canPayUnless(s, top.controller, e.unless, pid, id, 0)) continue;
+    const e = spell?.effects.find((x) => x.type === "changeTarget" || x.type === "newTargets");
+    if (!spell || !e || spell.targets.length !== 1) continue;
+    if (e.type === "changeTarget" && e.unless && canPayUnless(s, top.controller, e.unless, pid, id, 0)) continue;
     const plan = planCast(s, pid, id, [{ kind: "stack", id: top.id }], undefined, "auto");
     if (plan && plan[plan.length - 1]!.type === "castSpell") return plan;
   }
@@ -827,6 +924,34 @@ function newTargetFor(s: GameState, pid: PlayerId, pend: Extract<PendingDecision
   const preferred = options.filter((t) => (harm ? !isMine(s, pid, t) : isMine(s, pid, t)));
   if (preferred.length) return best(s, pid, preferred, harm, body ? damageTo(body, pend.index, item?.x ?? 0) : 0);
   return options.find((t) => t.kind === "stack" && t.id === s.resolving?.item.id) ?? (harm ? worst(s, pid, options) : best(s, pid, options, false, 0));
+}
+
+/**
+ * New targets for a spell or ability as our spell lets us choose them (CR 115.7d): each harmful one aimed at us or ours
+ * goes to one of theirs, each helpful one aimed at theirs to ours; the rest stay. Undefined keeps them all.
+ */
+function newTargetsFor(s: GameState, pid: PlayerId, pend: Extract<PendingDecision, { kind: "newTargets" }>): TargetChoice[] | undefined {
+  const item = s.stack.find((x) => x.id === pend.stackId);
+  const o = item?.objectId ? s.objects[item.objectId] : undefined;
+  const body = item?.body ?? (o ? castingBody(defOf(s, o)) : undefined);
+  if (!item || !body) return undefined;
+  const harm = harmfulTargets(body);
+  const q = stackItemQuality(s, item);
+  const next = [...pend.current];
+  let changed = false;
+  for (let j = 0; j < next.length; j++) {
+    const t = next[j]!;
+    if (t.kind === "none" || (harm[j] ? !isMine(s, pid, t) : isMine(s, pid, t))) continue;
+    // Not one a kept "another target" names (CR 115.7d).
+    const clash = (x: ChosenTarget) => pend.specs.some((sp, k) => k !== j && sp.distinctFrom?.includes(j) && sameTarget(next[k], x));
+    const options = changeTargetOptions(s, item, pend.specs[j]!, t).filter(
+      (x): x is ChosenTarget => x.kind !== "none" && (harm[j] ? !isMine(s, pid, x) : isMine(s, pid, x)) && !(x.kind === "stack" && x.id === item.id) && !clash(x) && canChooseTarget(s, pend.specs, next, j, x, pend.controller, q, item.sourceId),
+    );
+    if (!options.length) continue;
+    next[j] = best(s, pid, options, !!harm[j], damageTo(body, j, item.x ?? 0));
+    changed = true;
+  }
+  return changed ? next : undefined;
 }
 
 /** Is this target ours: our permanent or spell, a card we own, or us? */

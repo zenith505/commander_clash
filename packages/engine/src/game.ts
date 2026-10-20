@@ -8,8 +8,8 @@ import { meldResultsFor } from "./meld-results";
 import { asFace, castableFaces, defMv, hasName, isRoom, landFaces, layoutOf, registerRoom, restingDef, setFace, transformedFace } from "./faces";
 import { checkDayNight, dayNightUntapCheck } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
-import { abilitiesOf, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, toughness, withGranted } from "./cards";
-import { MANA_ABILITY_OFFSET, abolisherBan, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
+import { abilitiesOf, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
+import { MANA_ABILITY_OFFSET, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
 import { pickOptions, playerProtectedFrom, spellManaValue } from "./effects/targeting";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, COLOR_NAMES } from "./effects";
@@ -21,7 +21,7 @@ import { characteristics, controllerOf, invalidateCharacteristics, staticConditi
 import { compileCard, mutateTarget, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
 import { evalAmount, halve } from "./amounts";
-import { addMana, canPayFromPool, manaOriginsOf, poolFor, spendFromPool, type ManaUse } from "./spend";
+import { addMana, boundSpend, canPayFromPool, manaOriginsOf, poolFor, spendFromPool, type ManaUse } from "./spend";
 import { nextRandom, shuffle, shuffleLibrary } from "./rng";
 import { watchForMandatoryLoop } from "./shortcuts";
 import { askGraveyardOrder, closeGraveyardBatch, noteMergedToLibrary, noteToGraveyard, orderGraveyard, orderLibrary, topGraveyardCards } from "./graveyard";
@@ -397,6 +397,9 @@ export function applyInPlace(s: GameState, action: Action): void {
       break;
     case "changeTarget":
       chooseNewTarget(s, p, action.target);
+      break;
+    case "newTargets":
+      chooseNewTargets(s, p, action.targets);
       break;
     case "payUnless":
       payUnless(s, p, action.pay);
@@ -1330,7 +1333,7 @@ const turnRule = (s: GameState, pid: PlayerId, rule: TurnRule["rule"]) => (s.tur
 
 /** Can this player lose life, or does "you can't lose life this turn" stop it (CR 119.8)? */
 export function canLoseLife(s: GameState, pid: PlayerId): boolean {
-  return !turnRule(s, pid, "cantLoseLife");
+  return !turnRule(s, pid, "cantLoseLife") && !player(s, pid).lifeCantChange;
 }
 
 /** An activated ability's "pay half your life, rounded up" right now: 0 with 0 or less life (rulings on Lurking Evil). */
@@ -1345,6 +1348,7 @@ export function payableLife(s: GameState, pid: PlayerId): number {
 
 /** Can this player gain life, or does a "can't gain life" effect stop it (CR 119.7)? */
 export function canGainLife(s: GameState, pid: PlayerId): boolean {
+  if (player(s, pid).lifeCantChange) return false;
   const stops = (who: "all" | "opponents" | "enchanted" | undefined, controller: PlayerId, o?: GameObject) => who === "all" || (who === "opponents" && controller !== pid) || (who === "enchanted" && o?.attachedToPlayer === pid);
   if ((s.noLifeGain ?? []).some((e) => e.turn === s.turn && stops(e.who, e.controller))) return false;
   return !s.battlefield.some((id) => stops(abilitiesOf(s, obj(s, id)).cantGainLife, controllerOf(s, obj(s, id)), obj(s, id)));
@@ -1733,7 +1737,7 @@ function chooseDredge(s: GameState, p: Player, id?: ObjectId) {
 // ---------------------------------------------------------------------------
 // Turn structure (CR 500-514)
 
-const STEP_ORDER: Step[] = [
+export const STEP_ORDER: Step[] = [
   "untap",
   "upkeep",
   "draw",
@@ -1905,7 +1909,11 @@ function startNextTurn(s: GameState, skipping = false) {
   s.floatingTriggers = s.floatingTriggers?.filter((f) => !(f.until === "yourNextTurn" && began.has(f.controller)));
   if (!s.floatingTriggers?.length) s.floatingTriggers = undefined;
   if (s.entersTappedUntil) s.entersTappedUntil = s.entersTappedUntil.filter((r) => !began.has(r.controller));
-  for (const p of s.players) if (began.has(p.id)) p.gainedUntilNextTurn = undefined;
+  for (const p of s.players)
+    if (began.has(p.id)) {
+      p.gainedUntilNextTurn = undefined;
+      p.lifeCantChange = undefined;
+    }
   if (s.namedBansUntil) s.namedBansUntil = s.namedBansUntil.filter((r) => !began.has(r.controller));
   if (!s.namedBansUntil?.length) s.namedBansUntil = undefined;
   if (!s.entersTappedUntil?.length) s.entersTappedUntil = undefined;
@@ -2645,7 +2653,8 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     log(s, `${p.name} sacrifices ${name} for mana.`);
     moveObject(s, id, "graveyard", { sacrificed: true });
   }
-  addMana(s, p.id, adds, { only: ab.spendOnly, from });
+  const spentTrigger = ab.spentTrigger && { sourceId: o.id, sourceCardId: cardIdOf(o), sourceZc: o.zoneChanges ?? 0, body: ab.spentTrigger.body, sharesCommanderType: true as const };
+  addMana(s, p.id, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}) });
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
   addTriggeredMana(s, p.id, picked);
   if (ab.skipNextUntap && o.zone === "battlefield") o.skipNextUntap = true;
@@ -2675,6 +2684,14 @@ export const isSnowSource = (s: GameState, o: GameObject) => o.zone === "battlef
  */
 export function addTriggeredMana(s: GameState, pid: PlayerId, picked: { adds: ManaType[]; from?: ManaOrigin[][] }): void {
   picked.adds.forEach((m, i) => addMana(s, pid, [m], { from: picked.from?.[i] ?? [] }));
+}
+
+/**
+ * The life an activated ability's cost asks for: "Pay 2 life", or "Pay life equal to the number of colors in your
+ * commanders' color identity" (War Room: set before the game, CR 903.4; none for a colorless one, rulings).
+ */
+export function activatedLifeCost(s: GameState, pid: PlayerId, ab: ActivatedAbility): number {
+  return (ab.lifeCost ?? 0) + (ab.lifeCostIdentity ? commanderIdentity(s, pid).length : 0);
 }
 
 export function commanderTax(p: Player, o: GameObject) {
@@ -3339,6 +3356,18 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   if (Object.keys(spentFrom).length) spent.from = spentFrom;
   o.spent = Object.keys(spent).length ? spent : undefined;
   o.treasureSpent = paid.treasure || undefined;
+  // "Spend this mana only to cast a creature spell of the chosen type, and that spell can't be countered" (Cavern of Souls).
+  o.uncounterableCast = paid.uncounterable;
+  // "When that mana is spent to cast a creature spell that shares a creature type with your commander" (Path of
+  // Ancestry): one trigger for each such mana, its commanders' types checked now (rulings).
+  if (paid.spentTriggers && isType(d, "Creature")) {
+    // Changeling is every creature type (CR 702.73a); a commander with no creature type shares none (rulings).
+    const kinds = (types: string[], all: boolean) => (all ? [...CREATURE_TYPES] : types.filter((t) => CREATURE_TYPES.has(t)));
+    const mine = kinds(d.subtypes, d.keywords.includes("Changeling"));
+    const theirs = Object.values(s.objects).flatMap((c) => (c.isCommander && c.owner === p.id ? kinds(characteristics(s, c).subtypes, characteristics(s, c).allCreatureTypes) : []));
+    if (mine.some((t) => theirs.includes(t)))
+      for (const t of paid.spentTriggers) s.triggerQueue.push({ sourceId: t.sourceId, sourceCardId: t.sourceCardId, sourceZc: t.sourceZc, controller: p.id, index: -1, body: t.body });
+  }
   if (fromCommand) p.commanderCasts[o.id] = (p.commanderCasts[o.id] ?? 0) + 1;
   const castFrom = o.zone;
   // A once-a-turn permission to cast from the top is used up (Johann).
@@ -4058,9 +4087,10 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (remove > (o.counters.loyalty ?? 0)) return `${d.name} doesn't have ${remove} loyalty to remove`;
   }
   if (ab.activateIf && !staticConditionNow(s, ab.activateIf, id, pid)) return `${d.name}'s ability can't be activated now`; // CR 602.5b
-  if (ab.lifeCost && payableLife(s, p.id) < ab.lifeCost) return `you can't pay ${ab.lifeCost} life`; // CR 119.4, 119.8
+  const lifeCost = activatedLifeCost(s, p.id, ab);
+  if (lifeCost && payableLife(s, p.id) < lifeCost) return `you can't pay ${lifeCost} life`; // CR 119.4, 119.8
   const half = halfLifeCost(s, p.id, ab);
-  if (half && payableLife(s, p.id) < half + (ab.lifeCost ?? 0)) return `you can't pay ${half} life`; // CR 119.4, 119.8
+  if (half && payableLife(s, p.id) < half + lifeCost) return `you can't pay ${half} life`; // CR 119.4, 119.8
   if (ab.removeCounters && (o.counters[ab.removeCounters.counter] ?? 0) < ab.removeCounters.n) return `${d.name} doesn't have ${ab.removeCounters.n} ${ab.removeCounters.counter} counter${ab.removeCounters.n === 1 ? "" : "s"} to remove`;
   if (ab.energyCost && (p.energy ?? 0) < ab.energyCost) return `you need ${ab.energyCost} energy`; // CR 107.14
   if (ab.crew !== undefined) {
@@ -4229,7 +4259,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const abCost = activationCost(s, p.id, o, ab, targets);
   // "Pay half your life, rounded up": worked out with the rest of the cost, before any of it is paid (CR 601.2f-h).
   const halfLife = halfLifeCost(s, p.id, ab);
-  const paid = spendFromPool(s, p.id, abCost, { ability: o }, ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), payableLife(s, p.id) - halfLife - (ab.lifeCost ?? 0))!;
+  const lifeCost = activatedLifeCost(s, p.id, ab);
+  const paid = spendFromPool(s, p.id, abCost, { ability: o }, ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), payableLife(s, p.id) - halfLife - lifeCost)!;
   // A Treasure's mana ability makes "mana from a Treasure" (CR 106.3), even though it's sacrificed as it's activated.
   const manaFrom = manaPick ? manaOriginsOf(s, o) : [];
   // The source as it is now, for "its power" after it's sacrificed as a cost (CR 608.2h).
@@ -4238,7 +4269,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     o.chosen = { ...o.chosen, secret: undefined };
     log(s, `${p.name} reveals the player chosen for ${d.name}: ${player(s, o.chosen.player!).name}.`);
   }
-  loseLife(s, p.id, paid.lifePaid + (ab.lifeCost ?? 0) + halfLife);
+  loseLife(s, p.id, paid.lifePaid + lifeCost + halfLife);
   if (halfLife) log(s, `${p.name} pays ${halfLife} life (half their life, rounded ${ab.halfLifeCost}).`);
   if (ab.energyCost) p.energy = (p.energy ?? 0) - ab.energyCost;
   if (ab.removeCounters) removeCountersCost(s, o, ab.removeCounters);
@@ -4397,6 +4428,43 @@ function chooseCopyTargets(s: GameState, p: Player, targets?: TargetChoice[]) {
     targets = kept;
   }
   sc.targets = targets ?? pend.current;
+  s.pending = null;
+  continueResolution(s);
+}
+
+/** What a spell or ability on the stack is, for its targets: the spell's own characteristics, or its source's (CR 113.7a). */
+export function stackItemQuality(s: GameState, item: StackItem): SourceQuality | undefined {
+  const o = item.objectId ? s.objects[item.objectId] : undefined;
+  return o ? spellQuality(s, cardIdOf(o)) : sourceQuality(s, item.sourceId, item.sourceCardId);
+}
+
+/**
+ * New targets for a spell or ability (CR 115.7d): any kept may be illegal now; any changed must be legal for it, as its
+ * controller, and mustn't make a kept one illegal ("another target"). A divided amount stays as it was (rulings).
+ */
+function chooseNewTargets(s: GameState, p: Player, targets?: TargetChoice[]) {
+  const pend = s.pending;
+  const sc = s.resolving?.scratch ?? (s.resolving ? (s.resolving.scratch = {}) : undefined);
+  if (pend?.kind !== "newTargets" || pend.player !== p.id || !sc) throw new RulesError("no targets to choose");
+  const item = s.stack.find((x) => x.id === pend.stackId);
+  if (targets && item) {
+    if (targets.length !== pend.specs.length) throw new RulesError(`choose ${pend.specs.length} target${pend.specs.length === 1 ? "" : "s"}`);
+    const changed = targets.map((t, i) => (t.kind === "none" ? (pend.current[i]?.kind ?? "none") !== "none" : !sameTarget(pend.current[i], t)));
+    const part = (t: TargetChoice | undefined) => (t && (t.kind === "object" || t.kind === "player") ? t.amount : undefined);
+    if (targets.some((t, i) => changed[i] && (pend.specs[i]?.divided || part(pend.current[i]) !== undefined) && (t.kind === "none" || pend.current[i]?.kind === "none"))) throw new RulesError("the number of targets of a divided amount can't change");
+    const kept = targets.map((t, i) => (!changed[i] ? pend.current[i]! : part(pend.current[i]) !== undefined && (t.kind === "object" || t.kind === "player") ? { ...t, amount: part(pend.current[i]) } : t));
+    const q = stackItemQuality(s, item);
+    for (let i = 0; i < targets.length; i++) {
+      if (!changed[i]) continue;
+      const t = targets[i]!;
+      // Not itself (CR 115.5).
+      if ((t.kind === "stack" && t.id === item.id) || !canChooseTarget(s, pend.specs, kept, i, t, pend.controller, q, item.sourceId)) throw new RulesError("that isn't a legal new target");
+    }
+    for (let i = 0; i < kept.length; i++)
+      if ((pend.specs[i]?.distinctFrom ?? []).some((j) => (changed[i] || changed[j]) && kept[i]!.kind !== "none" && sameTarget(kept[j], kept[i]!))) throw new RulesError("those targets must be different");
+    targets = kept;
+  }
+  sc.retargets = targets ?? pend.current;
   s.pending = null;
   continueResolution(s);
 }
@@ -4567,6 +4635,8 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
   if (found.length < pend.min) throw new RulesError(`find ${pend.min} card${pend.min === 1 ? "" : "s"}`);
   if (pend.distinctManaValues && new Set(found.map((id) => defMv(defOf(s, obj(s, id))))).size !== found.length)
     throw new RulesError("choose cards with different mana values");
+  if (pend.shareLandType && !shareLandType(found.map((id) => defOf(s, obj(s, id)))))
+    throw new RulesError("choose cards that share a land type");
   r.scratch = { ...r.scratch, found };
   s.pending = null;
   continueResolution(s);
@@ -4705,6 +4775,18 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   if (pend.what === "tapOrUntap") {
     (r.scratch ??= {}).tapOrUntap = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "drawUpTo") {
+    // "Draw up to two cards": how many (rulings on Arcane Denial).
+    (r.scratch ??= {}).drawUpTo = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "commander") {
+    // Command Beacon with two commanders: which one (rulings).
+    (r.scratch ??= {}).commander = choice;
     continueResolution(s);
     return;
   }

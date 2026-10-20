@@ -491,10 +491,10 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
           // Only a payment: its own prompt has "Don't pay".
           else if (!e.mode && can.length === 1 && e.options.length === 1 && "pay" in e.options[can[0]!]!) pu.picked[pid] = String(can[0]);
           else {
-            const penalty = e.mode ? "Don't" : describePenalty(e);
+            const penalty = e.mode ? "Don't" : describePenalty(s, e, ctx);
             const which = pu.picks > 1 ? ` (${made.length + 1} of ${pu.picks})` : "";
             const did = Object.values(pu.made).some((m) => m.some((x) => x !== "none"));
-            const prompt = !e.mode ? `${can.map((i) => punisherLabel(e.options[i]!).toLowerCase()).join(" or ")}, or ${penalty.toLowerCase()}?${which}` : `${can.map((i, k) => (k ? punisherLabel(e.options[i]!).toLowerCase() : punisherLabel(e.options[i]!))).join(" or ")}? ${e.mode === "ifAny" ? "If anyone does" : "If no one does"}, ${(e.thenText ?? "it happens").replace(/~/g, src)}${did ? " (someone already has)" : ""}.`;
+            const prompt = !e.mode ? `${can.map((i) => punisherLabel(e.options[i]!).toLowerCase()).join(" or ")}, or ${lowerFirst(penalty)}?${which}` : `${can.map((i, k) => (k ? punisherLabel(e.options[i]!).toLowerCase() : punisherLabel(e.options[i]!))).join(" or ")}? ${e.mode === "ifAny" ? "If anyone does" : "If no one does"}, ${(e.thenText ?? "it happens").replace(/~/g, src)}${did ? " (someone already has)" : ""}.`;
             s.pending = { kind: "chooseOption", player: pid, source: src, what: "punisher", options: [...can.map(String), "none"], labels: [...can.map((i) => punisherLabel(e.options[i]!)), penalty], prompt };
             return "paused";
           }
@@ -505,7 +505,7 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
           loseLife(s, pid, o.pay.life);
           log(s, `${p.name} pays ${o.pay.life} life.`);
         } else if (o && "pay" in o) {
-          const paid = e.mode ? paidUnless(s, ctx, pid, o.pay, src, "don't", "don't pay") : paidUnless(s, ctx, pid, o.pay, src, describePenalty(e).toLowerCase(), describePenalty(e).toLowerCase());
+          const paid = e.mode ? paidUnless(s, ctx, pid, o.pay, src, "don't", "don't pay") : paidUnless(s, ctx, pid, o.pay, src, lowerFirst(describePenalty(s, e, ctx)), lowerFirst(describePenalty(s, e, ctx)));
           if (paid === "paused") return "paused";
           if (!paid) pu.picked[pid] = "none";
           sc.paid = undefined;
@@ -612,6 +612,9 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
   }
 }
 
+/** "Lose 3 life" in the middle of a sentence, but not "Ana may draw a card". */
+const lowerFirst = (t: string) => (/^(?:Lose|Take) /.test(t) ? t.charAt(0).toLowerCase() + t.slice(1) : t);
+
 /** What the penalty costs the punished player, for the bots: life lost, or tokens made for its controller. */
 function punisherHarm(e: Extract<Effect, { type: "punisher" }>): { lose?: number; tokens?: number } {
   const [f] = e.effects;
@@ -622,8 +625,9 @@ function punisherHarm(e: Extract<Effect, { type: "punisher" }>): { lose?: number
   return {};
 }
 
-/** The penalty, for its button: "Lose 3 life". */
-function describePenalty(e: Extract<Effect, { type: "punisher" }>): string {
+/** The penalty, for its button: "Lose 3 life", "Ana may draw a card" (Rhystic Study). */
+function describePenalty(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: ResolveCtx): string {
+  if (e.thenText) return `${player(s, ctx.controller).name} ${e.thenText}`;
   const lose = e.effects.length === 1 && e.effects[0]!.type === "loseLife" ? e.effects[0]!.n : undefined;
   return typeof lose === "number" ? `Lose ${lose} life` : "Take the penalty";
 }

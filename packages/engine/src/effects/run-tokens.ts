@@ -1,8 +1,8 @@
-import type { Effect, TokenSpec } from "../abilities";
+import type { Effect, ObjRef, TokenSpec } from "../abilities";
 import { defOf, isType, power, toughness } from "../cards";
 import { auraHostOptions, enterTogether, livingPlayers, log, moveObject, nameOf, newObject, opponents, player } from "../game";
 import { tokenBatch, type TokenBatch } from "../counters";
-import { copyEnterCounters, tokenCopyKey, type CopyExcept } from "../copies";
+import { copiableDef, copyEnterCounters, tokenCopyKey, type CopyExcept } from "../copies";
 import type { CardDef, GameObject, GameState, ObjectId, PlayerId } from "../types";
 import { ResolveCtx, apnap, objects, players, amountNow } from "./resolve";
 import { inCombat, attackDefault, fireEvent } from "./triggers";
@@ -33,6 +33,17 @@ export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: numbe
     createExtraTokens(s, pid, extra, { tapped: opts.tapped || opts.attacking, attacking: defender });
   });
   if (k) log(s, `${player(s, pid).name} creates ${k === 1 ? "a token that's a copy" : `${k} tokens that are copies`} of ${base.name}.`);
+}
+
+/** The power and toughness of the object a token copy copies: now, or as it last existed on the battlefield. */
+function copiedPT(s: GameState, ref: ObjRef, ctx: ResolveCtx): [number, number] | undefined {
+  if (ref.ref !== "target") return undefined;
+  const t = ctx.targets[ref.index];
+  const o = t?.kind === "object" ? s.objects[t.id] : undefined;
+  if (!o || t?.kind !== "object") return undefined;
+  if (o.zone === "battlefield" && (t.zc === undefined || (o.zoneChanges ?? 0) === t.zc)) return [power(s, o), toughness(s, o)];
+  const lk = s.lastKnown?.[t.id];
+  return lk && (t.zc === undefined || lk.zc === t.zc) ? [lk.power, lk.toughness] : undefined;
 }
 
 /** Creating tokens and token copies, myriad. */
@@ -92,7 +103,7 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "createTokenCopy": {
       if (e.each) {
         // One copy of each of them, their copiable values as they are now (CR 707.2), all created at once.
-        const bases = objects(s, e.what, ctx).map((o) => defOf(s, o));
+        const bases = objects(s, e.what, ctx).map((o) => copiableDef(s, o));
         if (s.resolving) s.resolving.created = [];
         enterTogether(s, () => {
           for (const pid of players(s, e.who, ctx)) for (const base of bases) tokenCopies(s, pid, base, 1, ctx, e);
@@ -104,6 +115,19 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // (offspring and squad rulings).
       const base = e.ofSource ? ctx.sourceDef : copiedValues(s, e.what, ctx);
       if (!base) return;
+      if (e.except?.halfPT) {
+        // Half its power and toughness as it last existed on the battlefield (Saw in Half rulings, CR 608.2h).
+        const it = copiedPT(s, e.what, ctx);
+        if (!it) return;
+        const half = (n: number) => (e.except!.halfPT === "up" ? Math.ceil(n / 2) : Math.floor(n / 2));
+        const { halfPT: _, ...rest } = e.except;
+        const n = amountNow(s, e.n, ctx);
+        if (s.resolving) s.resolving.created = [];
+        enterTogether(s, () => {
+          for (const pid of players(s, e.who, ctx)) tokenCopies(s, pid, base, n, ctx, { ...e, except: { ...rest, pt: [half(it[0]), half(it[1])] } });
+        });
+        return;
+      }
       const n = amountNow(s, e.n, ctx);
       if (s.resolving) s.resolving.created = [];
       enterTogether(s, () => {

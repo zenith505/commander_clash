@@ -720,7 +720,8 @@ export type Modification =
   /** `chosenType`: also the creature type chosen as its source entered ("~ is the chosen type in addition to its other types"). */
   | { kind: "addTypes"; types: string[]; subtypes: string[]; supertypes?: string[]; allCreatureTypes?: true; chosenType?: true }
   | { kind: "setTypes"; types: string[]; subtypes: string[]; /** "Becomes a legendary 4/4 red Dragon creature" (Sarkhan, the Dragonspeaker): it gains these supertypes and keeps its others (CR 205.4b). */ supertypes?: string[] } // layer 4, "becomes a 3/3 Elemental creature": new card types replace the old (CR 205.1a)
-  | { kind: "setSubtypes"; subtypes: string[] } // layer 4, "becomes a Frog": replaces only subtypes of the same kind (CR 205.1a)
+  /** `chosenType`: the creature type chosen as its source entered instead ("creatures you control are the chosen type"). */
+  | { kind: "setSubtypes"; subtypes: string[]; chosenType?: true } // layer 4, "becomes a Frog": replaces only subtypes of the same kind (CR 205.1a)
   /**
    * Layer 4, "Nonbasic lands are Mountains", "enchanted land is an Island": the land's land types become these basic
    * ones, and it loses the abilities from its rules text, gaining each basic type's mana ability instead (CR 305.7).
@@ -861,6 +862,11 @@ export interface StaticAbility {
    * only while its card is in its owner's graveyard (CR 113.6b), controlled by its owner (CR 108.4a).
    */
   zone?: "graveyard";
+  /**
+   * "The same is true for creature spells you control and creature cards you own that aren't on the battlefield"
+   * (Maskwood Nexus, Conspiracy): its type change applies to those too (layers.ts offFieldTyped).
+   */
+  offField?: true;
 }
 
 /**
@@ -1309,6 +1315,13 @@ export type Effect =
    * from there this turn, paying its costs and following the timing rules (CR 601.2, 601.3).
    */
   | { type: "mayCastFromGraveyard"; what: ObjRef }
+  /**
+   * "You may cast that card" as this resolves (Conduit of Worlds), from your graveyard, paying its costs and ignoring
+   * timing (CR 608.2g, 601.2, rulings: not later in the turn). `thenNoMore`: "If you do, you can't cast additional spells
+   * this turn", even if another effect would let you (rulings, CR 101.2). `unlessCast`: "if you haven't cast a spell this
+   * turn", checked as it begins (spells cast earlier this turn count, even countered ones and the card with the ability).
+   */
+  | { type: "castNow"; what: ObjRef; thenNoMore?: true; unlessCast?: true }
   | { type: "putFromHand"; who?: PlayerRef; filter?: TargetSpec; tapped?: boolean; attacking?: boolean; may: boolean; any?: boolean; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand" }
   /**
    * "Return all land cards from your graveyard to the battlefield tapped" (CR 110.2a: under your control), "from all graveyards
@@ -2166,7 +2179,8 @@ export type SpellCondition =
   /** "If you win the flip" (CR 705.2), `lost`: "if you lose the flip". Neither if no coin was flipped. */
   | { kind: "wonFlip"; lost?: true }
   /** "If that permanent is destroyed this way" (Transforming Flourish): this spell's or ability's destroy instructions destroyed something. */
-  | { kind: "destroyedThisWay" }
+  /** `died`: "if that creature dies this way" (Saw in Half): one it destroyed was put into a graveyard (CR 700.4, rulings). */
+  | { kind: "destroyedThisWay"; died?: true }
   /** "Sacrifice a creature. When you do, ..." (Tip the Scales): this ability's instructions sacrificed something. */
   | { kind: "sacrificedThisWay" }
   /** "If excess damage was dealt this way" (Orbital Plunge): this spell's or ability's damage dealt some (Count excessThisWay). */

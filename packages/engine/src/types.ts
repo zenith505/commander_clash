@@ -90,6 +90,12 @@ export interface CardDef {
    * mutatingDef). Set only on the definition a mutating spell uses on the stack.
    */
   mutateOwner?: PlayerId;
+  /**
+   * Its creature types as an effect that works outside the battlefield made them (Maskwood Nexus, Conspiracy, see
+   * layers.ts offFieldTyped): true when it's every creature type, false when the effect replaced them (even for a card
+   * with changeling). Unset: every creature type exactly when it has changeling (CR 702.73a).
+   */
+  everyCreatureType?: boolean;
   imageUrl?: string;
   artUrl?: string;
   /** Scryfall's layout: "normal", "split", "flip", "transform", "modal_dfc", "meld", "adventure", "prepare", ... */
@@ -974,7 +980,7 @@ export type PendingDecision =
   | { kind: "assist"; player: PlayerId; caster: PlayerId; source: string; max: number; cast: Extract<Action, { type: "castSpell" }> }
   /** Assist: `helper` will pay `n`; now the caster may activate mana abilities and pay the rest, or not cast it. */
   | { kind: "assistCast"; player: PlayerId; helper: PlayerId; source: string; n: number; cast: Extract<Action, { type: "castSpell" }> }
-  | { kind: "castFree"; player: PlayerId; objectId: ObjectId; source: string; /** Madness: for its madness cost instead (CR 702.35a), miracle for its miracle cost (702.94a); suspend: free, and a creature gains haste (702.62a). */ how?: "madness" | "suspend" | "miracle" | /** Discover (CR 701.57a): if it isn't cast, it goes to the hand. */ "discover" | /** A defeated Siege: only transformed (CR 310.12b). */ "transformed" }
+  | { kind: "castFree"; player: PlayerId; objectId: ObjectId; source: string; /** Madness: for its madness cost instead (CR 702.35a), miracle for its miracle cost (702.94a); suspend: free, and a creature gains haste (702.62a). */ how?: "madness" | "suspend" | "miracle" | /** "You may cast that card" as it resolves (Conduit of Worlds): for its mana cost, timing ignored (CR 608.2g, 601.2). */ "paid" | /** Discover (CR 701.57a): if it isn't cast, it goes to the hand. */ "discover" | /** A defeated Siege: only transformed (CR 310.12b). */ "transformed" }
   /**
    * A draw that dredge could replace (CR 702.52a): dredge one of `options` (cards in the player's graveyard), or draw.
    * `left` counts this draw and the ones after it; `after`: the draw step's turn-based draw, whose triggers wait.
@@ -1475,7 +1481,7 @@ export interface Resolving {
    * battlefield ("for each creature destroyed this way"): one that went elsewhere instead of its owner's graveyard still
    * counts; one that wasn't destroyed (indestructible, regenerated) doesn't (rulings on Fumigate and Bane of Progress).
    */
-  destroyed?: { o: GameObject; ch: Characteristics }[];
+  destroyed?: { o: GameObject; ch: Characteristics; /** Put into a graveyard: it died (CR 700.4). */ died?: true }[];
   /** The permanents its exile instructions exiled so far while this resolves, as they last existed ("exiled this way"). */
   exiled?: { o: GameObject; ch: Characteristics }[];
   /** The cards exiled face down so far (exileFaceDown), for Duplicity's "all other cards you own exiled with ~". */
@@ -1546,6 +1552,7 @@ export interface Resolving {
     moved?: boolean; // a dig already moved the cards it took, and waits on the order of the rest (CR 401.4)
     ripple?: { revealed: ObjectId[]; queue: ObjectId[] }; // ripple's revealed cards, and those it may still cast (CR 702.60a)
     may?: boolean; // the answer to "you may ..."
+    castNow?: { id: ObjectId }; // the card "you may cast that card" offered (Effect castNow)
     /** A vote (Effect "vote"): players still to vote in turn order, the votes left for the one voting, and their pick. */
     vote?: { queue: PlayerId[]; left?: number; may?: number; pick?: string };
     mayQueue?: PlayerId[]; // "each player may ...": players still to decide, in APNAP order (CR 101.4)

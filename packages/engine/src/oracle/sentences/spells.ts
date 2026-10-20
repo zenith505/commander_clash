@@ -286,6 +286,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const spec: TargetSpec = { ...stackSpec(m[1]!), controller: "you", text: `target ${m[1]!.toLowerCase()} you control` };
     return [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n: 1, newTargets: false }];
   }
+  // Return the Favor: "Copy target instant spell, sorcery spell, activated ability, or triggered ability": a spell or an
+  // ability on the stack (CR 707.10, 115.1c-d).
+  if ((m = /^Copy target (.+)$/i.exec(s)) && /\babilit/.test(m[1]!) && /\bspell\b/.test(m[1]!)) {
+    const spec = mixedStackSpec(m[1]!);
+    return spec && [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n: 1, newTargets: false }];
+  }
   // Sevinne's Reclamation: "you may copy ~ and may choose a new target for the copy", made as it resolves (rulings).
   if (ctx.spell && /^[Yy]ou may copy ~ and may choose a new target for the copy$/.test(s))
     return [{ type: "may", effects: [{ type: "copySpell", spell: "self", n: 1, newTargets: true }], text: "copy ~ (you may choose a new target for the copy)" }];

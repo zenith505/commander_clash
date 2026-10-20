@@ -76,7 +76,7 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const cardTargets = ctx.targets.flatMap((t, i) => (t.kind === "card" && !t.many ? [i] : []));
     const ofCard = /^(?:it|that card)$/.test(m[4]!) && ctx.lastObjectTarget === undefined && !ctx.lastCreated && cardTargets.length === 1 && cardTargets[0] === ctx.targets.length - 1;
     const what = ofCard ? { ref: "target" as const, index: cardTargets[0]!, card: true as const } : parseObject(m[4]!, ctx, /\bcard\b/.test(m[4]!) && /^target /.test(m[4]!));
-    const except = m[5] ? parseCopyExcept(m[5]) : undefined;
+    const except = m[5] ? parseCopyExcept(m[5], ctx.halfRound) : undefined;
     if (!who || !what || except === null || isGroup(what)) return null;
     const state = { ...(m[3] ? { tapped: true } : {}), ...(m[3] && /attacking/.test(m[3]) ? { attacking: true } : {}) };
     return [{ type: "createTokenCopy", who, n: amt(m[2]!), what, ...(except ? { except } : {}), ...state }];

@@ -2,7 +2,7 @@ import type { Effect, ObjRef } from "../abilities";
 import { defOf } from "../cards";
 import { restingDef } from "../faces";
 import { log, player } from "../game";
-import { addCopyEffect, copyKey, exceptFor } from "../copies";
+import { addCopyEffect, copiableDef, copyKey, exceptFor } from "../copies";
 import type { CardDef, GameState } from "../types";
 import { ResolveCtx, objects } from "./resolve";
 
@@ -25,10 +25,10 @@ export function copiedValues(s: GameState, ref: ObjRef, ctx: ResolveCtx): CardDe
     // A permanent that left since (bounced earlier in the same spell): as it last existed there.
     const lk = s.lastKnown?.[t.id];
     if (t.zc !== undefined && (o.zoneChanges ?? 0) !== t.zc) return lk && lk.zc === t.zc ? key(lk.copyKey) : undefined;
-    return defOf(s, o);
+    return copiableDef(s, o);
   }
   const o = objects(s, ref, ctx)[0];
-  if (o) return defOf(s, o);
+  if (o) return copiableDef(s, o);
   return ref.ref === "self" ? ctx.sourceDef : undefined;
 }
 

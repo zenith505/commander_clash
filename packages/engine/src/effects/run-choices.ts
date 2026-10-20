@@ -227,7 +227,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "wonFlip"
             ? !!s.resolving!.flipped && s.resolving!.flipped.won !== !!e.cond.lost
             : e.cond.kind === "destroyedThisWay"
-            ? !!s.resolving!.destroyed?.length
+            ? !!s.resolving!.destroyed?.some((d) => !(e.cond as { died?: true }).died || d.died)
             : e.cond.kind === "sacrificedThisWay"
             ? !!s.resolving!.sacrificedThisWay?.length
             : e.cond.kind === "excessDealt"

@@ -194,7 +194,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     supertypes: [...d.supertypes],
     types: [...d.types],
     subtypes: [...d.subtypes],
-    allCreatureTypes: d.keywords.includes("Changeling"),
+    allCreatureTypes: everyCreatureType(d),
     // "~ is all colors" (CR 604.3) applies first in layer 5 (613.3). A copy whose colors an exception set doesn't have it (707.9d).
     colors: compileCard(d).allColors ? ["W", "U", "B", "R", "G"] : [...d.colors],
     keywords: printedKeywords(d),
@@ -295,6 +295,8 @@ interface Inst {
   emblem?: true;
   /** A static ability that works from its card's graveyard (StaticAbility.zone), with `controller` its owner. */
   fromGraveyard?: true;
+  /** Its type change applies outside the battlefield too (StaticAbility.offField). */
+  offField?: true;
 }
 
 function gather(s: GameState): Inst[] {
@@ -371,6 +373,7 @@ function gather(s: GameState): Inst[] {
         mods: st.mods,
         affects: st.affects,
         condition: st.condition,
+        ...(st.offField ? { offField: true as const } : {}),
       }),
     );
   }
@@ -870,9 +873,11 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       for (const t of m.supertypes ?? []) if (!c.supertypes.includes(t)) c.supertypes.push(t);
       return;
     }
-    case "setSubtypes":
-      setSubtypes(c, m.subtypes);
+    case "setSubtypes": {
+      const chosen = m.chosenType && e.sourceId ? s.objects[e.sourceId]?.chosen?.type : undefined;
+      setSubtypes(c, m.chosenType ? (chosen ? [chosen] : []) : m.subtypes);
       return;
+    }
     case "setLandTypes":
       // CR 305.7: its old land types go, and so do the abilities from its rules text (its keywords are all printed ones
       // this early, layer 6 grants come later). Its basic land types give it their mana abilities (manaAbilitiesOn).
@@ -1121,7 +1126,19 @@ function grantedStatics(s: GameState, chars: CharMap, order: number, counted: { 
   return out;
 }
 
-function computeAll(s: GameState, counted = { yes: false }): CharMap {
+function computeAll(s: GameState, counted = { yes: false }, grants: OffFieldGrant[] = []): CharMap {
+  // Cards and spells outside the battlefield read the off-battlefield type changes (offFieldTyped) while this runs: none
+  // until layer 4 is done, then those that applied in it, so counts in layer 7 see them (CR 613.1d, 613.4).
+  const outer = building;
+  building = { grants: [] };
+  try {
+    return computeLayers(s, counted, grants);
+  } finally {
+    building = outer;
+  }
+}
+
+function computeLayers(s: GameState, counted: { yes: boolean }, grants: OffFieldGrant[]): CharMap {
   const chars: CharMap = new Map();
   for (const id of s.battlefield) chars.set(id, printed(s, s.objects[id]!));
   let insts = gather(s).sort((a, b) => a.timestamp - b.timestamp || a.order - b.order);
@@ -1145,7 +1162,11 @@ function computeAll(s: GameState, counted = { yes: false }): CharMap {
       rem = rem.filter((e) => e !== pick);
       if (!pick.locked && !exists(s, pick, chars)) continue; // an earlier effect in this layer removed it
       applyInLayer(s, pick, layer, chars, true);
+      // Once it applies in layer 4 it keeps applying, even if its source loses the ability in layer 6 (CR 613.6).
+      if (pick.offField && layer === "4" && pick.sourceId)
+        grants.push({ sourceId: pick.sourceId, controller: chars.get(pick.sourceId)?.controller ?? s.objects[pick.sourceId]!.controller, timestamp: pick.timestamp, mods: modsIn(pick, "4"), chosen: s.objects[pick.sourceId]?.chosen?.type });
     }
+    if (layer === "4") building!.grants = grants;
     if (layer === "7c") {
       // Counters apply in 7c (CR 613.4c). Everything in 7c adds up, so order doesn't matter.
       for (const [id, c] of chars) {
@@ -1165,7 +1186,7 @@ function computeAll(s: GameState, counted = { yes: false }): CharMap {
 // Cache. Computing every permanent at once is needed (effects look at each other), so the
 // result is cached per state and thrown away whenever something that matters changes.
 
-const cache = new WeakMap<GameState, { map: CharMap; sig?: string }>();
+const cache = new WeakMap<GameState, { map: CharMap; sig?: string; grants: OffFieldGrant[] }>();
 let cacheEnabled = true;
 
 /**
@@ -1230,8 +1251,17 @@ export function characteristics(s: GameState, o: GameObject): Characteristics {
   if (hit?.sig !== undefined && hit.sig !== countSignature(s)) hit = undefined;
   if (!hit || !hit.map.has(o.id)) {
     const counted = { yes: false };
-    hit = { map: computeAll(s, counted), ...(counted.yes || usesCounts(s) ? { sig: countSignature(s) } : {}) };
+    const grants: OffFieldGrant[] = [];
+    hit = { map: computeAll(s, counted, grants), grants };
     if (cacheEnabled) cache.set(s, hit);
+    // Looking at the graveyard's cards reads their types, which these grants change.
+    const outer = building;
+    building = { grants };
+    try {
+      if (counted.yes || usesCounts(s)) hit.sig = countSignature(s);
+    } finally {
+      building = outer;
+    }
   }
   return hit.map.get(o.id) ?? printed(s, o);
 }
@@ -1252,6 +1282,78 @@ function withCounters(o: GameObject, c: Characteristics): Characteristics {
     c.pt.push({ source: "counters", kind: "counters", power: n, toughness: n, untilEndOfTurn: false });
   }
   return c;
+}
+
+// ---------------------------------------------------------------------------
+// Type changes outside the battlefield: "Creatures you control are every creature type. The same is true for creature
+// spells you control and creature cards you own that aren't on the battlefield" (Maskwood Nexus, Conspiracy, Arcane
+// Adaptation). Such a card's or spell's creature types are its card's, changed by these effects in timestamp order
+// (CR 613.1d, 613.7); the definition it reads through (defOf) carries them, so every filter on cards and spells sees
+// them. Changeling applies first, as a characteristic-defining ability (CR 613.3, Maskwood rulings).
+
+/** A static ability changing creature types outside the battlefield, as it applied in layer 4. */
+interface OffFieldGrant {
+  sourceId: ObjectId;
+  controller: PlayerId;
+  timestamp: number;
+  mods: Modification[];
+  /** The creature type chosen as its source entered. */
+  chosen?: string;
+}
+
+let building: { grants: OffFieldGrant[] } | undefined;
+
+/** Does anything on the battlefield have such an ability? (Cheap: compiled cards are cached.) */
+const offFieldSources = (s: GameState) => s.battlefield.some((id) => compileCard(defOf(s, s.objects[id]!)).statics.some((st) => st.offField));
+
+function offFieldGrants(s: GameState): OffFieldGrant[] {
+  if (building) return building.grants;
+  const hit = cacheEnabled ? cache.get(s) : undefined;
+  if (hit) return hit.grants;
+  if (!offFieldSources(s)) return [];
+  const first = s.battlefield[0];
+  if (first) characteristics(s, s.objects[first]!);
+  const after = cache.get(s);
+  if (after) return after.grants;
+  const grants: OffFieldGrant[] = [];
+  computeAll(s, { yes: false }, grants);
+  return grants;
+}
+
+/** Changeling (CR 702.73a), unless an effect outside the battlefield set the card's creature types. */
+export const everyCreatureType = (d: CardDef): boolean => d.everyCreatureType ?? d.keywords.includes("Changeling");
+
+const typedDefs = new Map<string, CardDef>();
+
+/**
+ * `d`, the definition of `o` (a card or spell outside the battlefield), with the creature types effects outside the
+ * battlefield give it: creature spells its controller controls, creature cards its owner owns (not tokens, which can't
+ * stay there, CR 111.7). Anything else is `d` itself.
+ */
+export function offFieldTyped(s: GameState, o: GameObject, d: CardDef): CardDef {
+  // A phased-out permanent and a merged permanent's other cards are still on the battlefield (CR 702.26d, 730.2).
+  if (o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged" || !d.types.includes("Creature")) return d;
+  const gs = offFieldGrants(s).filter((g) => (o.zone === "stack" ? o.controller === g.controller : o.owner === g.controller && !o.isToken));
+  if (!gs.length) return d;
+  let subtypes = [...d.subtypes];
+  let all = everyCreatureType(d);
+  for (const g of [...gs].sort((a, b) => a.timestamp - b.timestamp))
+    for (const m of g.mods) {
+      if (m.kind === "addTypes") {
+        if (m.allCreatureTypes) all = true;
+        for (const t of [...m.subtypes, ...(m.chosenType && g.chosen ? [g.chosen] : [])]) if (!subtypes.includes(t)) subtypes.push(t);
+      } else if (m.kind === "setSubtypes") {
+        const now = m.chosenType ? (g.chosen ? [g.chosen] : []) : m.subtypes;
+        if (!now.length) continue;
+        subtypes = [...subtypes.filter((t) => subtypeSet(t) !== "Creature"), ...now];
+        all = false;
+      }
+    }
+  if (all === everyCreatureType(d) && subtypes.length === d.subtypes.length && subtypes.every((t, i) => t === d.subtypes[i])) return d;
+  const key = `${d.oracleId}|${d.name}|${all}|${subtypes.join(",")}`;
+  let out = typedDefs.get(key);
+  if (!out) typedDefs.set(key, (out = { ...d, subtypes, everyCreatureType: all }));
+  return out;
 }
 
 /** Who controls this object right now (after control-changing effects). */

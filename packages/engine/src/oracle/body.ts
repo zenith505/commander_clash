@@ -464,6 +464,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // "... gains flashback until end of turn. The flashback cost is equal to its mana cost." is one instruction.
   // "Choose target artifact or enchantment. Its owner shuffles it into their library." (Deglamer) is one instruction.
   text = text.replace(/^Choose (target [^.]+?)\. Its owner shuffles it into their library\./, "The owner of $1 shuffles it into their library.");
+  text = text.replace(/If you haven't cast a spell this turn, you may cast that card\. If you do, you can't cast additional spells this turn\./, "If you haven't cast a spell this turn, you may cast that card, and if you do, you can't cast additional spells this turn.");
   text = text.replace(/ gains flashback until end of turn\. (?:The|Its) flashback cost is equal to (?:its|that card's) mana cost\./g, " gains flashback with its mana cost until end of turn.");
   // Search for Survivors: "An opponent chooses a card at random in your graveyard. If it's a creature card, put it onto the
   // battlefield. Otherwise, exile it." The choice is at random, so who makes it changes nothing: one instruction.
@@ -1630,6 +1631,19 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const inner = parseOne(ifVote[3]!.charAt(0).toUpperCase() + ifVote[3]!.slice(1), ctx);
       if (!inner) return null;
       effects.push({ type: "if", cond: { kind: "voteWins", option: ifVote[1]!, ...(ifVote[2] ? { orTie: true as const } : {}) }, effects: inner });
+      continue;
+    }
+    // "Destroy target creature. If that creature dies this way, ..." (Saw in Half, Kaervek's Purge): only if it was put
+    // into a graveyard, not if it survived or a replacement effect moved it elsewhere (CR 700.4, rulings).
+    const ifDies = /^If that creature dies this way, (.+)$/.exec(s);
+    if (ifDies) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "destroy" || prev.what.ref !== "target") return null;
+      // "The creature's power", "the creature's controller": that creature's.
+      const then = ifDies[1]!.replace(/\bthe creature's\b/g, "that creature's");
+      const inner = parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
+      if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
+      effects.push({ type: "if", cond: { kind: "destroyedThisWay", died: true }, effects: inner });
       continue;
     }
     // "Flip a coin. If you win the flip, ... If you lose the flip, ...": decided by that flip (CR 705.2); neither if it

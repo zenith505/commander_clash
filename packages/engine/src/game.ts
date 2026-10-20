@@ -18,7 +18,7 @@ import { describeCount, entwined, withModes, withSplices, gateTargets, hasGatedT
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
 import { putCounters } from "./counters";
 import { addCopyEffect, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
-import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
+import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, staticConditionNow } from "./layers";
 import { compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
 import { evalAmount, halve } from "./amounts";
@@ -500,8 +500,8 @@ export function freeCastOf(s: GameState, pid: PlayerId): ObjectId | undefined {
  */
 export function madnessCastOf(s: GameState, pid: PlayerId, id: ObjectId): string | undefined {
   const pend = s.pending;
-  if (pend?.kind !== "castFree" || pend.player !== pid || pend.objectId !== id || (pend.how !== "madness" && pend.how !== "miracle")) return undefined;
-  return pend.how === "miracle" ? compileCard(defOf(s, obj(s, id))).miracle : compileCard(defOf(s, obj(s, id))).madness;
+  if (pend?.kind !== "castFree" || pend.player !== pid || pend.objectId !== id || (pend.how !== "madness" && pend.how !== "miracle" && pend.how !== "paid")) return undefined;
+  return pend.how === "paid" ? defOf(s, obj(s, id)).manaCost : pend.how === "miracle" ? compileCard(defOf(s, obj(s, id))).miracle : compileCard(defOf(s, obj(s, id))).madness;
 }
 
 /**
@@ -512,7 +512,7 @@ export function madnessCastOf(s: GameState, pid: PlayerId, id: ObjectId): string
  */
 export function paysManaNow(s: GameState): boolean {
   const pd = s.pending;
-  return pd?.kind === "payUnless" || pd?.kind === "declareAttackers" || pd?.kind === "assist" || pd?.kind === "assistCast" || (pd?.kind === "chooseMay" && !!pd.pay?.mana) || (pd?.kind === "castFree" && (pd.how === "madness" || pd.how === "miracle"));
+  return pd?.kind === "payUnless" || pd?.kind === "declareAttackers" || pd?.kind === "assist" || pd?.kind === "assistCast" || (pd?.kind === "chooseMay" && !!pd.pay?.mana) || (pd?.kind === "castFree" && (pd.how === "madness" || pd.how === "miracle" || pd.how === "paid"));
 }
 
 function requireNoPending(s: GameState) {
@@ -3488,7 +3488,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   if (paid.spentTriggers && isType(d, "Creature")) {
     // Changeling is every creature type (CR 702.73a); a commander with no creature type shares none (rulings).
     const kinds = (types: string[], all: boolean) => (all ? [...CREATURE_TYPES] : types.filter((t) => CREATURE_TYPES.has(t)));
-    const mine = kinds(d.subtypes, d.keywords.includes("Changeling"));
+    const mine = kinds(d.subtypes, everyCreatureType(d));
     const theirs = Object.values(s.objects).flatMap((c) => (c.isCommander && c.owner === p.id ? kinds(characteristics(s, c).subtypes, characteristics(s, c).allCreatureTypes) : []));
     if (mine.some((t) => theirs.includes(t)))
       for (const t of paid.spentTriggers) s.triggerQueue.push({ sourceId: t.sourceId, sourceCardId: t.sourceCardId, sourceZc: t.sourceZc, controller: p.id, index: -1, body: t.body });
@@ -3512,7 +3512,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   o.castFrom = castFrom;
   o.castVia = via?.kind;
   o.buyback = choices.buyback || undefined;
-  o.castAlt = madness ? (s.pending?.kind === "castFree" && s.pending.how === "miracle" ? "miracle" : "madness") : choices.alt;
+  const paidHow = s.pending?.kind === "castFree" ? s.pending.how : undefined;
+  o.castAlt = madness && paidHow !== "paid" ? (paidHow === "miracle" ? "miracle" : "madness") : choices.alt;
   if (choices.alt === "warp") s.voidThisTurn = true; // a spell was warped this turn (CR 702.185c)
   // A creature spell cast with suspend gains haste until its caster loses control of it (CR 702.62a).
   if (suspended && isType(d, "Creature")) o.suspendHaste = p.id;
@@ -3557,7 +3558,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const howText =
     (via ? ` from their graveyard (${describeVia(via.kind)})` : castFrom === "exile" ? " from exile" : "") +
     (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt === "convert" ? " converted, for its More Than Meets the Eye cost" : choices.alt ? ` for its ${choices.alt} cost` : "") +
-    (madness ? " for its madness cost" : "") +
+    (madness && o.castAlt === "madness" ? " for its madness cost" : madness && o.castAlt === "miracle" ? " for its miracle cost" : "") +
     (choices.buyback ? ", paying buyback" : "") +
     (choices.splice?.length ? `, splicing ${choices.splice.map((c) => nameOf(s, c)).join(" and ")} onto it` : "") +
     (costOrMana(d, choices.costOr) ? `, paying ${costOrMana(d, choices.costOr)} more` : "") +
@@ -5119,7 +5120,7 @@ export function creatureTypesOf(s: GameState, o: GameObject): Set<string> | "all
     return c.allCreatureTypes ? "all" : new Set(c.subtypes.filter((t) => CREATURE_TYPES.has(t)));
   }
   const d = defOf(s, o);
-  return d.keywords.includes("Changeling") ? "all" : new Set(d.subtypes.filter((t) => CREATURE_TYPES.has(t)));
+  return everyCreatureType(d) ? "all" : new Set(d.subtypes.filter((t) => CREATURE_TYPES.has(t)));
 }
 export const shareCreatureType = (a: Set<string> | "all", b: Set<string> | "all") =>
   a === "all" ? b === "all" || b.size > 0 : b === "all" ? a.size > 0 : [...a].some((t) => b.has(t));

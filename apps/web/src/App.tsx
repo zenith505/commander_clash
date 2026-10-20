@@ -3784,6 +3784,10 @@ function Controls({
             <>
               <strong>Miracle:</strong> cast <strong>{d.name}</strong> for <ManaCost cost={madnessCastOf(s, HUMAN, pending.objectId) ?? ""} size="sm" />? If you don&apos;t, it stays in your hand.
             </>
+          ) : pending.how === "paid" ? (
+            <>
+              <strong>{pending.source}:</strong> cast <strong>{d.name}</strong> from your graveyard for <ManaCost cost={madnessCastOf(s, HUMAN, pending.objectId) ?? ""} size="sm" />? Only now, and then you can&apos;t cast other spells this turn.
+            </>
           ) : pending.how === "discover" ? (
             <>
               <strong>{pending.source}:</strong> discover. Cast <strong>{d.name}</strong> without paying its mana cost? If you don&apos;t, it goes to your hand.
@@ -3804,8 +3808,8 @@ function Controls({
         </span>
         {s.cards[o.cardId]?.layout !== "split" && !transformed && (
           <button
-            disabled={(pending.how === "madness" || pending.how === "miracle") && planCast(s, HUMAN, pending.objectId, undefined, undefined, "auto") === null}
-            title={pending.how === "madness" || pending.how === "miracle" ? (castProblem(s, HUMAN, pending.objectId) ?? "") : ""}
+            disabled={(pending.how === "madness" || pending.how === "miracle" || pending.how === "paid") && planCast(s, HUMAN, pending.objectId, undefined, undefined, "auto") === null}
+            title={pending.how === "madness" || pending.how === "miracle" || pending.how === "paid" ? (castProblem(s, HUMAN, pending.objectId) ?? "") : ""}
             onClick={() => onCastFree(pending.objectId)}
           >
             Cast it

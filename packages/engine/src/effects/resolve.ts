@@ -1,7 +1,7 @@
 import type { AbilityBody, Amount, DamageRecipient, Effect, ManaAbility, Modification, ObjRef, PlayerRef, TargetChoice } from "../abilities";
 import { cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
 import { addTriggeredMana, askAuraReturns, creatureTypesOf, draw, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
-import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
+import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics } from "../layers";
 import { compileCard } from "../oracle";
 import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, protectionFromPlayer } from "../keywords";
 import { evalAmount, type AmountCtx } from "../amounts";
@@ -604,6 +604,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "revealFromHand":
     case "exileHand":
     case "mayCastFromGraveyard":
+    case "castNow":
     case "putInLibrary":
     case "putInGraveyard":
     case "exileGraveyard":
@@ -864,5 +865,5 @@ export function sourceCreatureTypes(s: GameState, ctx: ResolveCtx): Set<string> 
   const lk = ctx.sourceId ? s.lastKnown?.[ctx.sourceId] : undefined;
   const last = lk?.creatureTypes && (ctx.sourceZc === undefined || lk.zc === ctx.sourceZc) ? lk.creatureTypes : undefined;
   if (last) return last === "all" ? "all" : new Set(last);
-  return ctx.sourceDef.keywords.includes("Changeling") ? "all" : new Set(ctx.sourceDef.subtypes.filter((t) => CREATURE_TYPES.has(t)));
+  return everyCreatureType(ctx.sourceDef) ? "all" : new Set(ctx.sourceDef.subtypes.filter((t) => CREATURE_TYPES.has(t)));
 }

@@ -317,6 +317,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7c521612-21c6-4c4b-b10e-66e70928609b",
+  "name": "Ardenn, Intrepid Archaeologist",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Kor Scout",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Kor",
+   "Scout"
+  ],
+  "oracleText": "At the beginning of combat on your turn, you may attach any number of Auras and Equipment you control to target permanent or player.\nPartner (You can have two commanders if both have partner.)",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Partner"
+  ],
+  "commanderLegal": "legal",
+  "set": "cmr",
+  "releasedAt": "2020-11-20",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f8aa1893-60e5-439e-9316-872a9f6b6c94",
   "name": "Argothian Wurm",
   "manaCost": "{3}{G}",
@@ -955,6 +990,32 @@
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": true
+ },
+ {
+  "oracleId": "452e3f5f-ce17-4682-966b-5cc100210aee",
+  "name": "Bonesplitter",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact — Equipment",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Equipment"
+  ],
+  "oracleText": "Equipped creature gets +2/+0.\nEquip {1}",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Equip"
+  ],
+  "commanderLegal": "legal",
+  "set": "pal03",
+  "releasedAt": "2003-01-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "bf1341dd-41a3-49f6-87ec-63170dde4324",
@@ -6726,6 +6787,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4669e8c7-fc37-4b97-9cb7-8d29b43d9176",
+  "name": "Overlord of the Hauntwoods",
+  "manaCost": "{3}{G}{G}",
+  "cmc": 5,
+  "typeLine": "Enchantment Creature — Avatar Horror",
+  "supertypes": [],
+  "types": [
+   "Enchantment",
+   "Creature"
+  ],
+  "subtypes": [
+   "Avatar",
+   "Horror"
+  ],
+  "oracleText": "Impending 4—{1}{G}{G} (If you cast this spell for its impending cost, it enters with four time counters and isn't a creature until the last is removed. At the beginning of your end step, remove a time counter from it.)\nWhenever this permanent enters or attacks, create a tapped colorless land token named Everywhere that is every basic land type.",
+  "power": "6",
+  "toughness": "5",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Impending"
+  ],
+  "commanderLegal": "legal",
+  "set": "dsk",
+  "releasedAt": "2024-09-27",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5f5e0b10-c8cf-450c-bfd3-bcb0528ec330",
   "name": "Pacifism",
   "manaCost": "{1}{W}",
@@ -9042,6 +9137,43 @@
   "set": "neo",
   "releasedAt": "2022-02-18",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a019e34d-00c4-4687-9d41-fe550bf1dbdc",
+  "name": "Talion, the Kindly Lord",
+  "manaCost": "{2}{U}{B}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Faerie Noble",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Faerie",
+   "Noble"
+  ],
+  "oracleText": "Flying\nAs Talion enters, choose a number between 1 and 10.\nWhenever an opponent casts a spell with mana value, power, or toughness equal to the chosen number, that player loses 2 life and you draw a card.",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "woe",
+  "releasedAt": "2023-09-08",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

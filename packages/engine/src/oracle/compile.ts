@@ -992,7 +992,7 @@ export function compile(d: CardDef): CompiledCard {
       const spec = parseTargetPhrase(plumb[1]!.split(" ").map(singularWord).join(" "));
       if (spec?.kind !== "object" || spec.controller || spec.combat || plumb[2] !== singularWord(plumb[1]!)) out.unsupported.push(raw);
       else {
-        (out.additionalCosts ??= []).push({ kind: "sacrifice", filter: { ...spec, text: plumb[1]! }, n: 0, x: true, optional: true });
+        (out.additionalCosts ??= []).push({ kind: "sacrifice", filter: { ...spec, text: plumb[2]! }, n: 0, x: true, optional: true });
         (out.triggers ??= []).push({ event: "selfCast", ifX: 1, body: { targets: [], effects: [{ type: "copySpell", spell: "cause", n: { count: { kind: "x" } }, newTargets: true }], text: `When you do, copy ~ for each ${plumb[2]} sacrificed this way.` } });
       }
       continue;

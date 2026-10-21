@@ -239,6 +239,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f1c26b25-371e-4fbf-a43d-7fd59a364d3a",
+  "name": "Arc Trail",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Arc Trail deals 2 damage to any target and 1 damage to any other target.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "som",
+  "releasedAt": "2010-10-01",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ab1cc360-b9de-48d9-9983-4dfe4a7d2a37",
   "name": "Arcane Denial",
   "manaCost": "{1}{U}",
@@ -5683,6 +5709,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "995c8dac-fd27-468a-abd4-02372cf0c850",
+  "name": "Mount Doom",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Legendary Land",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}, Pay 1 life: Add {B} or {R}.\n{1}{B}{R}, {T}: Mount Doom deals 1 damage to each opponent.\n{5}{B}{R}, {T}, Sacrifice Mount Doom and a legendary artifact: Choose up to two creatures, then destroy the rest. Activate only as a sorcery.",
+  "colors": [],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "hoc",
+  "releasedAt": "2026-08-14",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a3fb7228-e76b-4e96-a40e-20b5fed75685",
   "name": "Mountain",
   "manaCost": "",
@@ -5809,6 +5866,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e4625704-1d52-44e4-804f-2f45644d76ac",
+  "name": "Muldrotha, the Gravetide",
+  "manaCost": "{3}{B}{G}{U}",
+  "cmc": 6,
+  "typeLine": "Legendary Creature — Elemental Avatar",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental",
+   "Avatar"
+  ],
+  "oracleText": "During each of your turns, you may play a land and cast a permanent spell of each permanent type from your graveyard. (If a card has multiple permanent types, choose one as you play it.)",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "B",
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fdn",
+  "releasedAt": "2024-11-15",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "938b4e2c-88d9-4637-bc00-e228920c9a78",
   "name": "Murder",
   "manaCost": "{1}{B}{B}",
@@ -5903,6 +5997,33 @@
     ]
    }
   ]
+ },
+ {
+  "oracleId": "d07d3be3-f69d-4484-8467-cffd43871788",
+  "name": "Myr Retriever",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact Creature — Myr",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Myr"
+  ],
+  "oracleText": "When this creature dies, return another target artifact card from your graveyard to your hand.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mrd",
+  "releasedAt": "2003-10-02",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "2549bc57-9ffb-4053-9f10-f2a5f792b845",
@@ -6454,6 +6575,32 @@
   "set": "trk",
   "releasedAt": "2026-11-13",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "b099fc54-cdbc-46cb-b4e4-7c2ca77b115b",
+  "name": "Plumb the Forbidden",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, you may sacrifice one or more creatures. When you do, copy this spell for each creature sacrificed this way.\nYou draw a card and lose 1 life.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2026-08-17",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -7389,6 +7536,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8c0520fa-276b-4d21-b4a9-dce1fce59f6b",
+  "name": "Shark Typhoon",
+  "manaCost": "{5}{U}",
+  "cmc": 6,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever you cast a noncreature spell, create an X/X blue Shark creature token with flying, where X is that spell's mana value.\nCycling {X}{1}{U} ({X}{1}{U}, Discard this card: Draw a card.)\nWhen you cycle this card, create an X/X blue Shark creature token with flying.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Cycling"
+  ],
+  "commanderLegal": "legal",
+  "set": "iko",
+  "releasedAt": "2020-04-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f748b2fb-6c2a-400a-8e96-fa4e4a1dfe80",
   "name": "Shelldock Isle",
   "manaCost": "",
@@ -7836,6 +8011,36 @@
   "set": "m14",
   "releasedAt": "2013-07-19",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e0aa6ce0-ca31-433b-ac6c-32b8675cdb71",
+  "name": "Spellskite",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact Creature — Phyrexian Horror",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Phyrexian",
+   "Horror"
+  ],
+  "oracleText": "{U/P}: Change a target of target spell or ability to this creature. ({U/P} can be paid with either {U} or 2 life.)",
+  "power": "0",
+  "toughness": "4",
+  "colors": [],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2021-08-24",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -8328,6 +8533,32 @@
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "3aa83ed2-f48b-4ce6-a614-2c54ddf50538",
+  "name": "The One Ring",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Legendary Artifact",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Indestructible\nWhen The One Ring enters, if you cast it, you gain protection from everything until your next turn.\nAt the beginning of your upkeep, you lose 1 life for each burden counter on The One Ring.\n{T}: Put a burden counter on The One Ring, then draw a card for each burden counter on The One Ring.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Indestructible"
+  ],
+  "commanderLegal": "legal",
+  "set": "hoc",
+  "releasedAt": "2026-08-14",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": true
  },
  {
   "oracleId": "7d723a6f-854f-43df-9401-a4eb0c0f639f",

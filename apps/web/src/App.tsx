@@ -782,7 +782,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const max = maxX((n) => planCast(s, HUMAN, d.objectId, undefined, d.modes, d.convoke ?? "auto", n, kicks));
       // "You may sacrifice one or more creatures" (Plumb the Forbidden): X is how many, none unless you pick more.
       const optional = compiled.additionalCosts?.find((c) => c.kind === "sacrifice" && c.optional);
-      const extra = optional?.kind === "sacrifice" ? `sacrifice X ${optional.filter.text} (X can be 0)` : costX ? (/\b(?:pay|discard|sacrifice|return|exile) X [^.(]*/i.exec(card.oracleText)?.[0]?.trim().replace(/^./, (c) => c.toLowerCase()) ?? "its cost") : undefined;
+      const extra = optional?.kind === "sacrifice" ? `sacrifice X ${optional.filter.text.replace(/s?$/, "s")} (X can be 0)` : costX ? (/\b(?:pay|discard|sacrifice|return|exile) X [^.(]*/i.exec(card.oracleText)?.[0]?.trim().replace(/^./, (c) => c.toLowerCase()) ?? "its cost") : undefined;
       return setXPick({ mode: "cast", draft: d, label: card.name, cost: (free && madnessCastOf(s, HUMAN, d.objectId)) || (altX ? altMana! : card.manaCost), max, value: optional ? 0 : max, ...(extra ? { extra } : {}) });
     }
     // The optional costs announced so far decide which targets it has (CR 702.33g, 702.166d, 702.174m); bargain is

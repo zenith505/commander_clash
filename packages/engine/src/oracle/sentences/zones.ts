@@ -369,7 +369,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return what ? [{ type: "bounce", what }] : null;
   }
   // "... to the battlefield with an additional +1/+1 counter on it" (Cauldron's Gift): it enters with it (CR 614.1c).
-  if ((m = new RegExp(`^(Return|Put) ((?:(?:up to )?(?:one|two|three|four|five|six|\\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ (?:graveyard|exiled with ~)) (?:to|onto) the battlefield( tapped)?( under your control| under its owner's control)?(?: with (an additional|an?|two additional|three additional) (${COUNTER}) counters? on it)?$`, "i").exec(s))) {
+  if ((m = new RegExp(`^(Return|Put) ((?:(?:up to )?(?:one|two|three|four|five|six|\\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ (?:graveyard|exiled with ~)) (?:to|onto) the battlefield( tapped)?( under your control| under its owner's control)?(?: with (an additional|an?|two additional|three additional) (${COUNTER}) counters? on it)?( attached to enchanted creature)?$`, "i").exec(s))) {
     // Without "under your control", only your own cards: the card then enters under your control (CR 110.2a)
     // either way, but "return" text that reaches other graveyards always says whose control. "Under its owner's
     // control" (Bilbo, Unexpected Adventurer): a card from any graveyard, for its owner.
@@ -382,11 +382,15 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // Only permanent cards can be put onto the battlefield (CR 110.4b); an Aura's controller chooses what it enchants as it
     // enters (CR 303.4f).
     // "Target Equipment card" (Forge Anew), "Vehicle card": artifact subtypes, so permanent cards (CR 205.3g).
-    const artifactSub = !spec?.types?.length && !!spec?.subtypes?.length && spec.subtypes.every((st) => st === "Equipment" || st === "Vehicle");
+    // "Aura and/or Equipment cards ... attached to enchanted creature" (Mantle of the Ancients): an enchantment subtype too.
+    const attach = !!m[8];
+    const artifactSub = !spec?.types?.length && !!spec?.subtypes?.length && spec.subtypes.every((st) => st === "Equipment" || st === "Vehicle" || (attach && st === "Aura"));
     if (!what || !spec || (!artifactSub && (!spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty)))) || (m[6] && (what.ref !== "target" || what.n))) return null;
+    // Attached to the creature an Aura's own ability is about: only from an Aura (compile checks it enchants a creature).
+    if (attach && (!spec.subtypes?.length || spec.types?.length || m[3] || m[4] || m[6])) return null;
     // "With two additional +1/+1 counters on it" (The Darkness Crystal): it enters with them (CR 614.1c).
     const n = m[5] ? ({ "two additional": 2, "three additional": 3 } as Record<string, number>)[m[5].toLowerCase()] ?? 1 : 0;
-    return [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}), ...(owner ? { owner: true } : {}), ...(m[6] ? { counters: { [counterKind(m[6])]: n } } : {}) }];
+    return [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}), ...(owner ? { owner: true } : {}), ...(m[6] ? { counters: { [counterKind(m[6])]: n } } : {}), ...(attach ? { attachToEnchanted: true as const } : {}) }];
   }
   // "When this creature dies, return it to the battlefield under its owner's control and suspect it" (Presumed Dead's
   // granted ability): the card that went to the graveyard, if it's still there (CR 400.7), and then the permanent it

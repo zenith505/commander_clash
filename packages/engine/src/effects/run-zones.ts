@@ -1346,7 +1346,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // "Flipped": a flip card enters flipped (CR 710.1b); any other card enters as it is, the flip being impossible.
       const faceOf = (o: GameObject) => (e.transformed ? transformedFace(s, o) : e.flipped && s.cards[o.cardId]?.layout === "flip" && s.cards[o.cardId]!.faces?.length === 2 ? 1 : undefined);
       const entering = list.filter((o) => (e.transformed ? faceOf(o) !== undefined : isPermanentCard(defOf(s, o))));
-      const hosts = e.attachToSubject || e.attachToTarget !== undefined ? new Map<ObjectId, AuraHost>() : chooseAuraHosts(s, entering.map((o) => ({ o, under: under(o), face: faceOf(o) })), src);
+      const hosts = e.attachToSubject || e.attachToTarget !== undefined || e.attachToEnchanted ? new Map<ObjectId, AuraHost>() : chooseAuraHosts(s, entering.map((o) => ({ o, under: under(o), face: faceOf(o) })), src);
       if (hosts === "paused") return "paused";
       // "Put a +1/+1 counter on it": the permanents these cards became (CR 400.7), like tokens just created.
       if (s.resolving) s.resolving.created = [];
@@ -1366,6 +1366,30 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             }
             log(s, `${src} returns ${d.name} to the battlefield${face ? " transformed" : ""} attached to ${auraHostName(s, host)}.`);
             moveObject(s, o.id, "battlefield", { controller: under(o), ...(face ? { face } : {}), ...host });
+            continue;
+          }
+          if (e.attachToEnchanted) {
+            // "Attached to enchanted creature" (Mantle of the Ancients): what the source Aura is attached to now, or was
+            // last attached to if it has left (rulings). An Aura only to a permanent it could enchant (CR 303.4d, 303.4f),
+            // an Equipment only to a creature it could equip (CR 301.5c-d); otherwise it stays in the graveyard (rulings).
+            const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+            const here = !!me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc);
+            const lk = !here && ctx.sourceId ? s.lastKnown?.[ctx.sourceId] : undefined;
+            const was = lk && (ctx.sourceZc === undefined || lk.zc === ctx.sourceZc) ? lk.attachedTo : undefined;
+            const host = here ? (me!.attachedTo ? s.objects[me!.attachedTo] : undefined) : was && s.objects[was.id]?.zone === "battlefield" && (s.objects[was.id]!.zoneChanges ?? 0) === was.zc ? s.objects[was.id] : undefined;
+            const enchant = compileCard(d).enchant;
+            const ok =
+              !!host &&
+              host.zone === "battlefield" &&
+              (d.subtypes.includes("Aura")
+                ? enchant?.kind === "object" && objectMatches(s, enchant, host, ctx.controller, false, d)
+                : d.subtypes.includes("Equipment") && !isType(d, "Creature") && objectMatches(s, { kind: "object", types: ["Creature"], text: "creature" }, host, ctx.controller, false, d));
+            if (!ok) {
+              log(s, `${d.name} can't be attached to ${host ? defOf(s, host).name : "that creature"}, so it stays in the graveyard.`);
+              continue;
+            }
+            log(s, `${src} returns ${d.name} to the battlefield attached to ${defOf(s, host!).name}.`);
+            moveObject(s, o.id, "battlefield", { controller: ctx.controller, attachTo: host!.id });
             continue;
           }
           if (e.attachToSubject) {

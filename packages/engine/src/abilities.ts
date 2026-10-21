@@ -161,6 +161,8 @@ export type Count =
   | { kind: "devotion"; colors: Color[] }
   /** "For each Aura attached to it", "each Equipment attached to it". */
   | { kind: "attachedToSelf"; subtypes: string[] }
+  /** "Enchanted creature gets +1/+1 for each Aura and Equipment attached to it" (Mantle of the Ancients): attached to the permanent the static ability's effect is applied to. */
+  | { kind: "attachedToAffected"; subtypes: string[] }
   /** Domain: "basic land type among lands you control". */
   | { kind: "basicLandTypes" }
   /** Vivid: "the number of colors among permanents you control" (white, blue, black, red, green; colorless isn't one, CR 105.2c). */
@@ -1437,6 +1439,11 @@ export type Effect =
       attachToSubject?: boolean;
       /** An Aura "attached to target opponent" (Accursed Witch): this target, if the Aura could enchant it (CR 303.4f). */
       attachToTarget?: number;
+      /**
+       * "Attached to enchanted creature" (Mantle of the Ancients): the creature the source Aura is attached to as this
+       * resolves, or was last attached to if it has left (rulings); each card only if it could be attached to it.
+       */
+      attachToEnchanted?: true;
       /** The Enduring cycle's "It's an enchantment. (It's not a creature.)": its new card types as it enters. */
       becomes?: { types: string[]; subtypes: string[] };
       /** "That creature gains haste until end of turn" ("endOfTurn"), "It gains haste" ("game": for as long as it's that object). */

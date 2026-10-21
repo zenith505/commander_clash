@@ -358,6 +358,14 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         return o.attachedTo === me.id && (view(o)?.subtypes ?? []).some((st) => c.subtypes.includes(st));
       }).length;
     }
+    case "attachedToAffected": {
+      const me = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
+      if (!me) return 0;
+      return s.battlefield.filter((id) => {
+        const o = s.objects[id]!;
+        return o.attachedTo === me.id && (view(o)?.subtypes ?? []).some((st) => c.subtypes.includes(st));
+      }).length;
+    }
     case "graveyardCardTypes": {
       const types = new Set<string>();
       for (const pid of refPlayers(s, c.who, ctx)) for (const id of s.players[pid]!.graveyard) for (const t of defOf(s, s.objects[id]!).types) types.add(t);
@@ -534,6 +542,7 @@ function describeCount(c: Count): string {
     case "devotion":
       return "devotion";
     case "attachedToSelf":
+    case "attachedToAffected":
       return `#${c.subtypes.join("/")} attached`;
     case "basicLandTypes":
       return "#basic land types";

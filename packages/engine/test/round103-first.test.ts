@@ -2,7 +2,7 @@
 // too, once for each permanent or player, and toxic counters from several creatures at once are one event: rulings).
 
 import { describe, expect, it } from "vitest";
-import { act, card, passUntil, putOnBattlefield, setup, target } from "./helpers";
+import { act, activate, card, passUntil, pt, putOnBattlefield, setup, target } from "./helpers";
 import { isFullySupported, planCast, waitingOn, type GameState, type PlayerId, type TargetChoice } from "../src";
 
 // Real oracle text (Scryfall).
@@ -13,6 +13,13 @@ const energy = card("Glimmer of Genius", "Instant", "{3}{U}", { oracleText: "Scr
 
 const laezel = card("Lae'zel, Vlaakith's Champion", "Legendary Creature — Gith Warrior", "{2}{W}", { power: "3", toughness: "3", oracleText: "If you would put one or more counters on a creature or planeswalker you control or on yourself, put that many plus one of each of those kinds of counters on that permanent or player instead.\nChoose a Background (You can have a Background as a second commander.)" });
 const samson = card("Doc Samson, Super Psychiatrist", "Legendary Creature — Gamma Doctor Hero", "{4}{G}", { power: "5", toughness: "5", oracleText: "If you would put one or more counters on a permanent you control, put that many plus one of each of those kinds of counters on that permanent instead.\n{T}: Add X mana of any one color, where X is Doc Samson's power." });
+
+const cleric = card("Cleric Class", "Enchantment — Class", "{W}", { oracleText: "(Gain the next level as a sorcery to add its ability.)\nIf you would gain life, you gain that much life plus 1 instead.\n{3}{W}: Level 2\nWhenever you gain life, put a +1/+1 counter on target creature you control.\n{4}{W}: Level 3\nWhen this Class becomes level 3, return target creature card from your graveyard to the battlefield. You gain life equal to that creature's toughness." });
+
+const mantle = card("Mantle of the Ancients", "Enchantment — Aura", "{3}{W}{W}", { oracleText: "Enchant creature you control\nWhen this Aura enters, return any number of target Aura and/or Equipment cards from your graveyard to the battlefield attached to enchanted creature.\nEnchanted creature gets +1/+1 for each Aura and Equipment attached to it." });
+const rancor = card("Ancestral Mask Test", "Enchantment — Aura", "{G}", { oracleText: "Enchant creature\nEnchanted creature gets +2/+2." });
+const landAura = card("Utopia Sprawl", "Enchantment — Aura", "{G}", { oracleText: "Enchant Forest\nAs this Aura enters, choose a color.\nWhenever enchanted Forest is tapped for mana, its controller adds an additional one mana of the chosen color." });
+const sword = card("Bonesplitter", "Artifact — Equipment", "{1}", { oracleText: "Equipped creature gets +2/+0.\nEquip {1}" });
 
 const pass = (s: GameState) => act(s, { type: "passPriority", player: waitingOn(s)! });
 const settle = (s: GameState) => {
@@ -114,5 +121,58 @@ describe("round 103: Lae'zel and Doc Samson", () => {
     s = settle(s);
     if (s.pending?.kind === "arrangeTop") s = settle(act(s, { type: "arrangeTop", player: ap, top: s.pending.cards, away: [] }));
     expect(s.players[ap]!.energy).toBe(2);
+  });
+});
+
+describe("round 103: Cleric Class", () => {
+  it("parse", () => expect(isFullySupported(cleric)).toBe(true));
+
+  it("level 3 returns a creature card and gains life equal to its toughness on the battlefield, plus 1", () => {
+    const { s: s0, ap } = setup([]);
+    const c = putOnBattlefield(s0, ap, cleric);
+    s0.objects[c]!.classLevel = 2;
+    const dead = putOnBattlefield(s0, ap, card("Wall Thing", "Creature — Wall", "{2}{W}", { power: "1", toughness: "4" }));
+    s0.battlefield.splice(s0.battlefield.indexOf(dead), 1);
+    s0.objects[dead]!.zone = "graveyard";
+    s0.players[ap]!.graveyard.push(dead);
+    // An anthem: its toughness on the battlefield counts (rulings).
+    putOnBattlefield(s0, ap, card("Glorious Anthem", "Enchantment", "{1}{W}{W}", { oracleText: "Creatures you control get +1/+1." }));
+    let s = activate(s0, ap, c, 1);
+    s = settle(s);
+    expect(s.objects[c]!.classLevel).toBe(3);
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [target(dead)] }));
+    expect(s.objects[dead]!.zone).toBe("battlefield");
+    expect(s.players[ap]!.life).toBe(40 + 5 + 1);
+    // Level 2: a +1/+1 counter for the life gained.
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [target(dead)] }));
+    expect(s.objects[dead]!.counters["+1/+1"]).toBe(1);
+  });
+});
+
+describe("round 103: Mantle of the Ancients", () => {
+  it("parse", () => [mantle, rancor, sword].forEach((d) => expect(isFullySupported(d), d.name).toBe(true)));
+
+  it("returns Auras and Equipment attached to the enchanted creature; one that can't enchant it stays", () => {
+    const { s: s0, ap, ids } = setup([mantle]);
+    const b = putOnBattlefield(s0, ap, card("Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    const yard = [rancor, landAura, sword].map((d) => {
+      const id = putOnBattlefield(s0, ap, d);
+      s0.battlefield.splice(s0.battlefield.indexOf(id), 1);
+      s0.objects[id]!.zone = "graveyard";
+      s0.players[ap]!.graveyard.push(id);
+      return id;
+    });
+    let s = s0;
+    for (const a of planCast(s, ap, ids[0]!, [target(b)])!) s = act(s, a);
+    s = settle(s);
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: yard.map(target) }));
+    expect(s.objects[yard[0]!]!.attachedTo).toBe(b);
+    expect(s.objects[yard[2]!]!.attachedTo).toBe(b);
+    expect(s.objects[yard[1]!]!.zone).toBe("graveyard");
+    // 2/2, +2/+2 and +2/+0, and +1/+1 for each of the three attached.
+    expect(pt(s, b)).toBe("9/7");
   });
 });

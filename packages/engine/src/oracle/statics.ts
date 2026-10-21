@@ -1118,7 +1118,13 @@ function parseStaticLine(line: string): StaticAbility | null {
   const said = affects.kind === "self" ? m[2]!.replaceAll(QUOTED_SOURCE_NAME, "~") : m[2]!;
   let mods = parseStaticMods(each ? each[1]! : said);
   if (!mods) return null;
-  const counts = (c: AmountExpr | null) => c && staticCountOk(c, affects) ? c : null;
+  // "Enchanted creature gets +1/+1 for each Aura and Equipment attached to it": "it" is each permanent it affects.
+  // ("Attached to ~" is the source's own: Armament Master.)
+  const counts = (c0: AmountExpr | null, words = "") => {
+    const c = c0?.count.kind === "attachedToSelf" && / attached to it$/.test(words) && affects.kind !== "self" && affects.kind !== "paired" ? { ...c0, count: { kind: "attachedToAffected" as const, subtypes: c0.count.subtypes } } : c0;
+    if (c?.count.kind === "attachedToSelf" && / attached to ~$/.test(words)) return c;
+    return c && staticCountOk(c, affects) ? c : null;
+  };
   // "Gets +1/+1 for each enchantment you control and has first strike" (Ethereal Armor): the count, then what it has.
   const andHas = each && / and ((?:has|have) .+)$/.exec(each[4]!);
   const alsoHas = andHas ? parseStaticMods(andHas[1]!) : [];
@@ -1130,7 +1136,7 @@ function parseStaticLine(line: string): StaticAbility | null {
     const coat = /^other creature on the battlefield that shares at least one creature type with it$/.test(each[4]!) && affects.kind === "filter";
     // Moraug: "for each time it has attacked this turn", each creature it affects, counted for that one.
     const attacks = each[4] === "time it has attacked this turn" && affects.kind === "filter";
-    const per = coat ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], text: each[4]! }, sharesTypeWithAffected: true as const } } : attacks ? { count: { kind: "timesAffectedAttacked" as const } } : counts(parseCount(each[4]!, null, true));
+    const per = coat ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], text: each[4]! }, sharesTypeWithAffected: true as const } } : attacks ? { count: { kind: "timesAffectedAttacked" as const } } : counts(parseCount(each[4]!, null, true), each[4]!);
     const pt = mods[0];
     if (!per || mods.length !== 1 || pt?.kind !== "modifyPT") return null;
     const [p, t] = [scaleAmount(pt.power, per), scaleAmount(pt.toughness, per)];
@@ -1138,7 +1144,7 @@ function parseStaticLine(line: string): StaticAbility | null {
     mods = [{ kind: "modifyPT", power: p, toughness: t }, ...alsoHas];
   }
   if (where) {
-    const def = counts(parseCount(where[2]!, null));
+    const def = counts(parseCount(where[2]!, null), where[2]!);
     if (!def) return null;
     mods = replaceX(mods, def);
   }

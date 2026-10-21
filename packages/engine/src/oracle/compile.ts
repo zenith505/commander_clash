@@ -2185,6 +2185,10 @@ export function compile(d: CardDef): CompiledCard {
     if (!out.spell || v.unsupported.length || !v.spell || targets(v.spell)) out.unsupported.push(`Overload ${overload.mana}`);
   }
   linkExile(out);
+  // "Attached to enchanted creature" (Mantle of the Ancients): only an Aura that enchants a creature has one.
+  const bodies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])];
+  if (bodies.some((b) => allEffects(b.effects).some((e) => e.type === "putOntoBattlefield" && e.attachToEnchanted)) && !(d.subtypes.includes("Aura") && out.enchant?.kind === "object" && out.enchant.types?.includes("Creature")))
+    out.unsupported.push("(attached to enchanted creature, but it isn't an Aura enchanting a creature)");
   // An Aura put onto the battlefield needs a choice of what it enchants (CR 303.4f), which isn't modeled.
   if (d.subtypes.includes("Aura") && out.activated.some((ab) => ab.zone === "graveyard" && ab.body.effects.some((e) => e.type === "putOntoBattlefield"))) out.unsupported.push("(an Aura returning itself to the battlefield)");
   const json = JSON.stringify(out);

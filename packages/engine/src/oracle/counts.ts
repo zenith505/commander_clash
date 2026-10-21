@@ -219,8 +219,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return of && count({ kind: "counters", counter: counterKind(m[1]!), of });
   }
   // "Aura attached to it", "Equipment attached to ~": only the permanent's own.
-  if ((m = /^(Aura|Equipment)s? attached to (it|~)$/i.exec(p)) && (ctx === null || ctx.selfIt || /~/.test(m[2]!)))
-    return count({ kind: "attachedToSelf", subtypes: [capital(m[1]!.toLowerCase()) === "Aura" ? "Aura" : "Equipment"] });
+  // "Aura and Equipment attached to it" (Champion of the Flame): one of either.
+  if ((m = /^(Aura|Equipment|Aura and Equipment)s? attached to (it|~)$/i.exec(p)) && (ctx === null || ctx.selfIt || /~/.test(m[2]!)))
+    return count({ kind: "attachedToSelf", subtypes: /and/.test(m[1]!) ? ["Aura", "Equipment"] : [capital(m[1]!.toLowerCase()) === "Aura" ? "Aura" : "Equipment"] });
   // "Differently named lands you control" (Awakened Amalgam), "differently named artifact tokens you control" (Gimbal).
   if ((m = /^differently named (.+?) you control$/i.exec(p))) {
     const c = parseCount(`${m[1]} you control`, ctx, each);
@@ -327,6 +328,9 @@ function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
     if ((x === "that creature's" && ctx.subject) || ctx.subjectIt) return { ref: "subject" };
     // The permanent itself; after it left the battlefield, as it last existed (CR 608.2h).
     if (x === "its" && (ctx.selfIt || ctx.selfCard || ctx.activated)) return { ref: "self" };
+    // "Return target creature card from your graveyard to the battlefield. You gain life equal to that creature's
+    // toughness" (Cleric Class): the card targeted, as the permanent it became (rulings).
+    if (x === "that creature's" && ctx.targets.length === 1 && ctx.targets[0]!.kind === "card" && ctx.targets[0]!.types?.includes("Creature")) return { ref: "target", index: 0 };
   }
   return null;
 }

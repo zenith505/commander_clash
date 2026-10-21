@@ -1230,23 +1230,31 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // copy ~ and may choose a new target for that copy" (Chain of Vapor), "Then that permanent's controller may copy ~ and
     // may choose a new target for that copy" (Chain of Acid). That player, as it resolves, controls the copy (CR 707.10,
     // 707.10c); as if they were "you" (eachMay's each). Who it is when the permanent has left: its last controller (608.2h).
-    const chain = /^([Tt]hat (?:permanent|creature)'s controller) may (sacrifice a land of their choice|copy ~ and may choose a new target for that copy)$/.exec(s);
+    // "Then that player or that permanent's controller may pay {R}{R}. If the player does, they may copy ~ ..." (Chain
+    // Lightning), "... may discard a card ..." (Chain of Plasma), "That player may copy ~ ..." (Chain of Smog): the player
+    // targeted, or the targeted permanent's controller.
+    const chain = /^([Tt]hat (?:permanent|creature)'s controller|[Tt]hat player or that permanent's controller|[Tt]hat player) may (sacrifice a land of their choice|discard a card|pay ((?:\{[^}]+\})+)|copy ~ and may choose a new target for that copy)$/.exec(s);
     const chainCopy = /^(?:If the player does, )?they may copy ~ and may choose a new target for that copy$/;
     if (chain && ctx.spell && (chain[2]!.startsWith("copy") || chainCopy.test(sentences[si + 1]?.replace(/\.$/, "") ?? ""))) {
-      const who = parsePlayer(chain[1]!.toLowerCase(), ctx);
-      if (who?.ref !== "targetController") return null;
+      const last = ctx.targets.length - 1;
+      const who: PlayerRef | null = /or that permanent's/i.test(chain[1]!) ? (ctx.targets[last]?.kind === "any" && ctx.targets.length === 1 ? { ref: "targetOrController", index: last } : null) : parsePlayer(chain[1]!.toLowerCase(), ctx);
+      if (who?.ref !== "targetController" && who?.ref !== "targetOrController" && !(who?.ref === "target" && ctx.targets.length === 1 && ctx.targets[0]!.kind === "player")) return null;
       const copy: Effect = { type: "copySpell", spell: "self", n: 1, newTargets: true };
       const land: TargetSpec = { kind: "object", types: ["Land"], text: "land" };
-      const cost = chain[2] !== undefined && !chain[2].startsWith("copy");
+      const how = chain[2]!.startsWith("copy") ? "copy" : chain[2]!.startsWith("sacrifice") ? "land" : chain[2]!.startsWith("discard") ? "discard" : "pay";
+      const mayCopy: Effect = { type: "may", effects: [copy], text: "copy ~ and choose a new target for the copy" };
       effects.push({
         type: "eachMay",
         who,
         each: true,
         chain: true,
-        effects: cost ? [{ type: "pick", who: { ref: "you" }, filter: land, n: 1, action: "sacrifice" }, { type: "may", effects: [copy], text: "copy ~ and choose a new target for the copy" }] : [copy],
-        text: cost ? "sacrifice a land to copy ~" : "copy ~ and choose a new target for the copy",
-        ...(cost ? { need: { zone: "battlefield" as const, filter: { ...land, controller: "you" as const } } } : {}),
+        effects: how === "land" ? [{ type: "pick", who: { ref: "you" }, filter: land, n: 1, action: "sacrifice" }, mayCopy] : how === "discard" ? [{ type: "discard", who: { ref: "you" }, n: 1 }, mayCopy] : how === "pay" ? [mayCopy] : [copy],
+        text: how === "land" ? "sacrifice a land to copy ~" : how === "discard" ? "discard a card to copy ~" : how === "pay" ? `pay ${chain[3]} to copy ~` : "copy ~ and choose a new target for the copy",
+        ...(how === "land" ? { need: { zone: "battlefield" as const, filter: { ...land, controller: "you" as const } } } : {}),
+        ...(how === "discard" ? { need: { zone: "hand" as const, filter: { kind: "card" as const, text: "card" } } } : {}),
+        ...(how === "pay" ? { pay: { mana: chain[3]! } } : {}),
       });
+      const cost = how !== "copy";
       if (cost) si++;
       continue;
     }

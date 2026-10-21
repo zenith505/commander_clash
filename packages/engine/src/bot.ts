@@ -1968,6 +1968,13 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
     const cost = e.effects[0]?.type === "pick";
     const lands = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length;
     if (!spec || (cost && lands < 7)) return false;
+    // Chain of Plasma's discard: only with cards to spare.
+    if (e.effects[0]?.type === "discard" && player(s, pid).hand.length < 4) return false;
+    // Chain Lightning, Chain of Smog: an opponent can be the copy's target too.
+    // Chain of Smog's discard only at someone with cards left, so copying back and forth ends.
+    const damage = r.body.effects.some((x) => x.type === "damage");
+    const discard = r.body.effects.some((x) => x.type === "discard");
+    if ((damage || discard) && legalTargets(s, spec, pid).some((t) => t.kind === "player" && t.id !== pid && (!discard || player(s, t.id).hand.length > 0))) return true;
     return legalTargets(s, spec, pid).some((t) => t.kind === "object" && controllerOf(s, obj(s, t.id)) !== pid && (!cost || defMv(defOf(s, obj(s, t.id))) >= 3));
   }
   // "Target opponent may have you draw three cards. If the player doesn't, you mill three cards, then ~ deals damage to

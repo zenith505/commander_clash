@@ -92,10 +92,13 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // Someone who can't do it isn't asked (CR 101.3): "put two +1/+1 counters on a creature they control" with none.
         const need = e.need;
         const can = (pid: PlayerId) =>
-          !need ||
-          (need.zone === "battlefield"
-            ? s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, need.filter, obj(s, id), pid, false))
-            : player(s, pid).graveyard.some((id) => printedMatches(need.filter, defOf(s, obj(s, id)))));
+          (!e.pay || canPayNow(s, pid, e.pay)) &&
+          (!need ||
+            (need.zone === "battlefield"
+              ? s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, need.filter, obj(s, id), pid, false))
+              : need.zone === "hand"
+                ? player(s, pid).hand.length > 0
+                : player(s, pid).graveyard.some((id) => printedMatches(need.filter, defOf(s, obj(s, id))))));
         const sub = ctx.subject && s.objects[ctx.subject.id];
         const untapped = !e.untappedSubject || (!!sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === ctx.subject!.zc && !sub.tapped);
         sc.mayQueue = untapped ? apnap(s, players(s, e.who, ctx)).filter(can) : [];
@@ -104,7 +107,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       while (sc.mayQueue.length) {
         const pid = sc.mayQueue[0]!;
         if (sc.may === undefined) {
-          s.pending = { kind: "chooseMay", player: pid, prompt: e.text.replace(/~/g, src), source: src, ...(e.wheel !== undefined ? { wheel: e.wheel } : {}) };
+          s.pending = { kind: "chooseMay", player: pid, prompt: e.text.replace(/~/g, src), source: src, ...(e.wheel !== undefined ? { wheel: e.wheel } : {}), ...(e.pay ? { pay: e.pay } : {}) };
           return "paused";
         }
         if (sc.may) sc.mayers!.push(pid);

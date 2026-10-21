@@ -833,7 +833,7 @@ export type Modification =
    * dealt to and dealt by ~ this turn" (CR 615.1): `to` and/or `by` it; `combat` "only" or "non" (noncombat);
    * `fromTypes`: only damage from sources with all these card types ("by creatures", "by artifact sources").
    */
-  | { kind: "preventDamage"; to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[] }
+  | { kind: "preventDamage"; to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[]; /** "Put a +1/+1 counter on that creature for each 1 damage prevented this way" (Vigor, CR 615.5): the ability's controller puts them. */ plusOnes?: true }
   /** "If a source you control would deal damage ..., it deals double that damage instead" (a replacement effect, CR 614.1a). */
   | { kind: "damageMod"; mod: DamageMod }
   /** "Damage that would be dealt by ~ can't be prevented" (CR 615.12); `combat`: combat damage only (Questing Beast). */
@@ -2298,6 +2298,14 @@ export type Effect =
    */
   /** Illusion of Choice: "You choose how each player votes this turn" (GameState.votesChosenBy). */
   | { type: "chooseVotes" }
+  /**
+   * "Each player secretly chooses a number 0 or greater, then all players reveal those numbers simultaneously"
+   * (Wheel of Misfortune, Menacing Ogre): each one chooses without seeing the others' numbers, then what the card does
+   * with them. `wheel`: damage equal to the highest number to each player who chose it, then each player who didn't
+   * choose the lowest discards their hand and draws seven. `ogre`: each player with the highest number loses that much
+   * life, and two +1/+1 counters on the source if its controller is one of them.
+   */
+  | { type: "secretNumbers"; then: "wheel" | "ogre" }
   | { type: "vote"; options?: string[]; among?: TargetSpec; secret?: true; text: string }
   | { type: "choose"; choice: ChoiceKind; /** With "opponent": "a player with the most life or tied for most life" (The Black Gate), checked as it resolves; you can be one. */ mostLife?: true; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose };
 
@@ -2651,6 +2659,8 @@ export type TriggerEvent =
   | "youCollectEvidence"
   /** "Whenever you proliferate" (CR 701.27): once for each proliferate action, even with nothing chosen (rulings). */
   | "youProliferate"
+  /** "Whenever a spell or ability you control counters a spell" (Baral): once for each spell countered (CR 701.6a). */
+  | "youCounterSpell"
   /** "Whenever you complete a dungeon" (CR 309.7). */
   | "youCompleteDungeon"
   /** "Whenever you commit a crime", "whenever an opponent commits a crime" (CR 700.13): once for each spell or ability. */
@@ -2955,7 +2965,8 @@ export interface TriggeredAbility {
  * `whose`: who has to control the permanents (or own the cards) relative to this ability's controller.
  */
 export interface BatchTrigger {
-  what: "enters" | "leaves" | "leavesGraveyard" | "toGraveyard" | "discards";
+  /** `exiledFromLibraryOrGraveyard`: "cards are put into exile from your library and/or your graveyard" (Laelia). */
+  what: "enters" | "leaves" | "leavesGraveyard" | "toGraveyard" | "discards" | "exiledFromLibraryOrGraveyard";
   /** What each object has to be ("creature card", "nontoken creature"); unset, any. */
   filter?: TargetSpec;
   whose?: "you" | "opponent";
@@ -3571,6 +3582,8 @@ export interface CompiledCard {
   uncounterable?: { filter: TargetSpec; anyone?: true }[];
   /** "Your opponents can't cast spells during your turn." (a "can't" that wins over any "can", CR 101.2) */
   opponentsCantCastYourTurn?: true;
+  /** "As long as ~ is attached to a creature, your opponents can't cast spells during your turn" (Conqueror's Flail): only while this holds. */
+  opponentsCantCastYourTurnIf?: StaticCondition;
   /**
    * "Each opponent can cast spells only any time they could cast a sorcery." (Teferi, Time Raveler; CR 307.1): over any
    * permission to cast as though with flash (rulings), and not while something resolves (cascade).

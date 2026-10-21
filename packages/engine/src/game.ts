@@ -884,7 +884,7 @@ export function moveObject(
   if (dest) opts.top || to === "battlefield" ? dest.unshift(id) : dest.push(id);
   if (to === "graveyard") noteToGraveyard(s, o); // its owner may arrange cards put there at the same time (CR 404.3)
   // For "one or more" triggers, checked as the event ends (CR 603.2c).
-  if (fromZone === "battlefield" || fromZone === "graveyard" || to === "graveyard")
+  if (fromZone === "battlefield" || fromZone === "graveyard" || to === "graveyard" || (fromZone === "library" && to === "exile"))
     (s.zoneBatch ??= []).push({
       id,
       zc: o.zoneChanges,
@@ -3835,7 +3835,8 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
     if (abilitiesOf(s, o).opponentsSorceryTiming && controllerOf(s, o) !== pid && (s.resolving || !canActAtSorcerySpeed(s, pid)))
       return `${characteristics(s, o).name}: opponents can cast spells only any time they could cast a sorcery`;
     // "Your opponents can't cast spells during your turn" (Dragonlord Dromoka).
-    if (abilitiesOf(s, o).opponentsCantCastYourTurn && controllerOf(s, o) === s.activePlayer && pid !== s.activePlayer)
+    const cantCastIf = abilitiesOf(s, o).opponentsCantCastYourTurnIf;
+    if (abilitiesOf(s, o).opponentsCantCastYourTurn && controllerOf(s, o) === s.activePlayer && pid !== s.activePlayer && (!cantCastIf || (o.zone === "battlefield" && staticConditionNow(s, cantCastIf, o.id, controllerOf(s, o)))))
       return `${characteristics(s, o).name}: opponents can't cast spells during ${player(s, s.activePlayer).name}'s turn`;
     // "Your opponents can't cast spells with mana value 3 or less" (Brisela, Voice of Nightmares).
     const most = abilitiesOf(s, o).opponentsCantCastMvAtMost;
@@ -5140,8 +5141,17 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   const pend = s.pending;
   if (pend?.kind !== "chooseOption" || pend.player !== p.id) throw new RulesError("nothing to choose");
   if (pend.what === "devour" || pend.what === "amplify") throw new RulesError(`${pend.what} is chosen by picking cards`);
-  if (!pend.options.includes(choice)) throw new RulesError(`${choice} isn't ${pend.what === "color" ? "a color" : pend.what === "creatureType" ? "a creature type" : "an option"} you can choose`);
+  const inRange = pend.numberRange && /^\d+$/.test(choice) && Number(choice) >= pend.numberRange.min && Number(choice) <= pend.numberRange.max;
+  if (!pend.options.includes(choice) && !inRange) throw new RulesError(`${choice} isn't ${pend.what === "color" ? "a color" : pend.what === "creatureType" ? "a creature type" : pend.numberRange ? `a number from ${pend.numberRange.min} to ${pend.numberRange.max}` : "an option"} you can choose`);
   s.pending = null;
+  if (pend.what === "secretNumber") {
+    // Kept secret until all are revealed (Wheel of Misfortune): the log says only that it was chosen.
+    const st = s.resolving?.scratch?.numbers;
+    if (!st) throw new RulesError("nothing to choose a number for");
+    st.pick = Number(choice);
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "damageShield") {
     // Which damage a shield takes, or which shield applies first (CR 615.7, 616.1); combat damage waits for it.
     s.damageBatch!.answers.push(Number(choice));

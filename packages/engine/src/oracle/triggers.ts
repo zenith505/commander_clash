@@ -66,6 +66,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever you create a token, (.+)$/, "youCreateToken"], // once for each token (CR 111.2)
   [/^Whenever you collect evidence, (.+)$/, "youCollectEvidence"],
   [/^Whenever you proliferate, (.+)$/, "youProliferate"],
+  [/^Whenever a spell or ability you control counters a spell, (.+)$/, "youCounterSpell"],
   [/^Whenever you complete a dungeon, (.+)$/, "youCompleteDungeon"],
   [/^Whenever you commit a crime, (.+)$/, "youCommitCrime"], // CR 700.13
   [/^Whenever an opponent commits a crime, (.+)$/, "opponentCommitsCrime"],
@@ -755,6 +756,10 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     batch = { what: "leavesGraveyard", whose: "you", ...(filter ? { filter } : {}), ...(m[2] !== "leave your graveyard" ? { to: "exile" as const } : {}) };
     yourTurn = !!m[3];
     rest = m[4]!;
+  } else if ((m = /^Whenever one or more cards are put into exile from your library and\/or your graveyard, (.+)$/.exec(line))) {
+    // Laelia: cards exiled from either zone in one event, by anyone, for any reason (rulings).
+    batch = { what: "exiledFromLibraryOrGraveyard", whose: "you" };
+    rest = m[1]!;
   } else if ((m = /^Whenever one or more (?:(.+?) )?cards are put into your graveyard from (anywhere|your library)( during your turn)?, (.+)$/.exec(line))) {
     const filter = batchCards(m[1]);
     if (filter === null) return "fail";

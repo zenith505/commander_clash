@@ -283,6 +283,15 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "pickPermanents" && pend.action === "tap") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, "tap") }];
     if (pend.kind === "pickPermanents" && pend.min !== undefined && pend.action !== "keep") return [{ type: "pickPermanents", player: pid, ids: chooseOptionalSacrifices(s, pid, pend) }];
     if (pend.kind === "pickPermanents") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, pend.action, pend.counter) }];
+    // A secret number, without looking at the others' (Wheel of Misfortune): 1 to get a new hand when ours is nearly empty
+    // and we can take the damage, otherwise 0 (no damage, keep our hand). Menacing Ogre: its controller with plenty of
+    // life goes for the counters.
+    if (pend.kind === "chooseOption" && pend.what === "secretNumber") {
+      const sn = s.resolving ? allEffects(s.resolving.body.effects).find((x) => x.type === "secretNumbers") : undefined;
+      const me = player(s, pid);
+      const n = sn?.type === "secretNumbers" && sn.then === "ogre" ? (s.resolving?.item.controller === pid && me.life > 20 ? 3 : 0) : me.hand.length <= 2 && me.life > 10 ? 1 : 0;
+      return [{ type: "chooseOption", player: pid, choice: String(n) }];
+    }
     if (pend.kind === "chooseOption" && (pend.what === "riot" || pend.what === "unleash")) {
       // Riot: haste when it can still attack this turn, the counter otherwise. Unleash: the counter, unless we need blockers.
       const haste = pend.what === "riot" && s.activePlayer === pid && s.step === "main1";

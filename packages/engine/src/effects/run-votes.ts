@@ -1,9 +1,13 @@
 import type { Effect, TargetSpec } from "../abilities";
 import { abilitiesOf, defOf } from "../cards";
-import { log, obj, player } from "../game";
+import { draw, log, loseLife, obj, player } from "../game";
+import { invalidateCharacteristics } from "../layers";
+import { putCounters, withPutter } from "../counters";
+import { dealDamageBatch } from "../damage";
+import { discardCards } from "./run-library";
 import { controllerOf } from "../layers";
 import type { GameObject, GameState, PlayerId } from "../types";
-import { ResolveCtx } from "./resolve";
+import { ResolveCtx, apnap, ctxSource } from "./resolve";
 import { objectMatches, printedMatches } from "./targeting";
 
 /** Votes (CR 701.38): each player, starting with the controller and in turn order, votes for one of the choices. */
@@ -14,6 +18,65 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       s.votesChosenBy = { player: ctx.controller, turn: s.turn };
       log(s, `${player(s, ctx.controller).name} chooses how each player votes this turn.`);
       return;
+    case "secretNumbers": {
+      // Each player chooses in turn order, none seeing another's number until all are revealed at once (rulings).
+      const r = s.resolving!;
+      const sc = (r.scratch ??= {});
+      const st = (sc.numbers ??= { queue: turnOrderFrom(s, ctx.controller), chosen: {} });
+      while (st.queue.length && !st.step) {
+        const pid = st.queue[0]!;
+        if (player(s, pid).lost) {
+          st.queue.shift();
+          continue;
+        }
+        if (st.pick === undefined) {
+          s.pending = { kind: "chooseOption", player: pid, source: src, what: "secretNumber", options: ["0"], numberRange: { min: 0, max: 999 }, prompt: "secretly choose a number 0 or greater" };
+          return "paused";
+        }
+        st.chosen[pid] = st.pick;
+        st.pick = undefined;
+        st.queue.shift();
+        log(s, `${player(s, pid).name} secretly chooses a number.`);
+      }
+      const entries = Object.entries(st.chosen).map(([k, n]) => ({ pid: Number(k) as PlayerId, n }));
+      if (!entries.length) return;
+      const high = Math.max(...entries.map((x) => x.n));
+      const low = Math.min(...entries.map((x) => x.n));
+      const highest = entries.filter((x) => x.n === high).map((x) => x.pid);
+      if (!st.step) {
+        log(s, `The numbers are revealed: ${turnOrderFrom(s, ctx.controller).filter((p) => p in st.chosen).map((p) => `${player(s, p).name} ${st.chosen[p]}`).join(", ")}.`);
+        if (e.then === "ogre") {
+          // Menacing Ogre: each player with the highest number loses that much life; the counters if you're one of them.
+          for (const pid of apnap(s, highest)) if (high > 0) loseLife(s, pid, high);
+          const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+          if (highest.includes(ctx.controller) && o?.zone === "battlefield" && (ctx.sourceZc === undefined || (o.zoneChanges ?? 0) === ctx.sourceZc)) {
+            withPutter(ctx.controller, () => putCounters(s, o, "+1/+1", 2));
+            invalidateCharacteristics(s);
+          }
+          return;
+        }
+        // Wheel of Misfortune: the highest number as damage to each player who chose it, dealt at the same time.
+        if (high > 0) dealDamageBatch(s, highest.map((pid) => ({ src: ctxSource(s, ctx), to: { player: pid }, n: high })));
+        st.step = "discard";
+      }
+      if (st.step === "discard") {
+        // Each player who didn't choose the lowest number discards their hand, then they draw seven (CR 101.4).
+        const wheel = apnap(s, entries.filter((x) => x.n !== low).map((x) => x.pid)).filter((pid) => !player(s, pid).lost);
+        for (const pid of wheel) {
+          const hand = [...player(s, pid).hand];
+          if (hand.length) discardCards(s, pid, hand);
+        }
+        st.step = "draw";
+        st.draws = wheel;
+      }
+      while (st.draws?.length) {
+        const pid = st.draws.shift()!;
+        if (player(s, pid).lost) continue;
+        log(s, `${player(s, pid).name} draws 7 cards.`);
+        if (!draw(s, pid, 7)) return "paused";
+      }
+      return;
+    }
     case "vote": {
       const r = s.resolving!;
       const sc = (r.scratch ??= {});

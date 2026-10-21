@@ -1033,6 +1033,10 @@ function parseStaticLine(line: string): StaticAbility | null {
   }
   const damageMod = parseDamageMod(line);
   if (damageMod) return damageMod;
+  // Vigor: "If damage would be dealt to another creature you control, prevent that damage. Put a +1/+1 counter on that
+  // creature for each 1 damage prevented this way." A prevention effect with an additional effect (CR 615.5).
+  const vigor = /^If damage would be dealt to (another creature you control|other creatures you control), prevent that damage\. Put a \+1\/\+1 counter on that creature for each 1 damage prevented this way$/.exec(text);
+  if (vigor) return { affects: { kind: "filter", types: ["Creature"], controller: "you", other: true }, mods: [{ kind: "preventDamage", to: true, plusOnes: true }], text: line };
   const prevent = parsePreventAll(text);
   if (prevent) {
     const affects = prevent.subject === "~" ? ({ kind: "self" } as const) : parseAffected(prevent.subject.replace(/^./, (c) => c.toUpperCase()));

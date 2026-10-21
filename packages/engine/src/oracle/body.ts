@@ -130,7 +130,7 @@ const CARD_TYPE_WORD = "(?:artifact|battle|creature|enchantment|instant|land|pla
  * The events a delayed triggered ability with a duration can wait for (see GameState.floatingTriggers), and the parts of
  * a trigger it can have: an intervening "if" or a zone would need more about its source than it has.
  */
-const FLOATING_EVENTS = new Set<string>(["castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer"]);
+const FLOATING_EVENTS = new Set<string>(["castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "eachBeginCombat"]);
 const FLOATING_KEYS = new Set<string>(["event", "cast", "dies", "dealer", "toOpponent", "orPlaneswalker", "body"]);
 
 /**
@@ -155,6 +155,14 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx): Effect | null |
     if (!trigger || trigger === "fail" || trigger.event !== "creatureYouControlDealsCombatDamageToPlayer" || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
     const index = addTarget(ctx!, { kind: "player", opponent: true, text: "target opponent" });
     return { type: "floatingTrigger", trigger, until: "endOfTurn", aboutPlayer: index };
+  }
+  // "At the beginning of each combat this turn, untap all creatures that attacked this turn" (Full Throttle): a delayed
+  // trigger for each beginning of combat step this turn (CR 603.7b).
+  const combats = /^At the beginning of each combat this turn, (.+)$/.exec(s);
+  if (combats) {
+    const trigger = parseTrigger(`At the beginning of each combat, ${[combats[1]!, ...after.map((x) => x.replace(/\.$/, ""))].join(". ")}.`);
+    if (!trigger || trigger === "fail" || trigger.event !== "eachBeginCombat" || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
+    return { type: "floatingTrigger", trigger, until: "endOfTurn" };
   }
   const m = /^([Uu]ntil end of turn|[Tt]his turn|[Uu]ntil your next turn|[Uu]ntil the end of your next turn), ([Ww]henever .+)$/.exec(s);
   if (!m) return undefined;
@@ -525,6 +533,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       ],
       text,
     };
+  // Wheel of Misfortune, Menacing Ogre: numbers chosen secretly, revealed at once (Effect secretNumbers).
+  if (/^Each player secretly chooses a number 0 or greater, then all players reveal those numbers simultaneously and determine the highest and lowest numbers revealed this way\. ~ deals damage equal to the highest number to each player who chose that number\. Each player who didn't choose the lowest number discards their hand, then draws seven cards\.$/.test(text.trim()))
+    return { targets: [], effects: [{ type: "secretNumbers", then: "wheel" }], text };
+  if (/^[Ee]ach player secretly chooses a number\. Then those numbers are revealed\. Each player with the highest number loses that much life\. If you are one of those players, put two \+1\/\+1 counters on ~\.$/.test(text.trim()))
+    return { targets: [], effects: [{ type: "secretNumbers", then: "ogre" }], text };
   if (/^Exile the top card of your library\. You may put that card into your hand unless it has the same name as another card exiled this way\. Repeat this process until you put a card into your hand or you exile two cards with the same name, whichever comes first\.$/.test(text.trim()))
     return { targets: [], effects: [{ type: "taintedPact" }], text };
   // Tempt with Discovery: a tempting offer whose searches each end with their own shuffle here. A library is shuffled

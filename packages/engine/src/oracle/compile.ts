@@ -1741,6 +1741,17 @@ export function compile(d: CardDef): CompiledCard {
       out.opponentsCantCastYourTurn = true;
       continue;
     }
+    // Conqueror's Flail: only as long as it's attached to a creature.
+    const cantCastIf = /^As long as (~ is attached to a creature), your opponents can't cast spells during your turn\.$/.exec(line);
+    if (cantCastIf) {
+      const cond = parseStaticCondition(cantCastIf[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      if (!cond || out.opponentsCantCastYourTurn) out.unsupported.push(raw);
+      else {
+        out.opponentsCantCastYourTurn = true;
+        out.opponentsCantCastYourTurnIf = cond;
+      }
+      continue;
+    }
     if (line === "During your turn, your opponents can't cast spells or activate abilities of artifacts, creatures, or enchantments.") {
       out.opponentsCantCastYourTurn = true;
       out.opponentsCantActivateYourTurn = true;
@@ -1958,7 +1969,7 @@ export function compile(d: CardDef): CompiledCard {
     }
     // A spell's "When you next cast ... this turn, ..." creates a delayed trigger as it resolves (CR 603.7); it isn't a triggered ability of the card.
     // So does a Pact's "At the beginning of your next upkeep, pay {2}{B}. If you don't, you lose the game." (CR 603.7a).
-    if (isSpell && (/^When you next cast /.test(line) || /^At the beginning of your next upkeep, pay (?:\{[^}]+\})+\. If you don't, you lose the game\.$/.test(line))) {
+    if (isSpell && (/^When you next cast /.test(line) || /^At the beginning of each combat this turn, /.test(line) || /^At the beginning of your next upkeep, pay (?:\{[^}]+\})+\. If you don't, you lose the game\.$/.test(line))) {
       spellLines.push(line);
       continue;
     }

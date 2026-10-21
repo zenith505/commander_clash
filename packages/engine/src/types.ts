@@ -1552,6 +1552,8 @@ export interface Resolving {
   /** Its last roll (CR 706.2): each die's natural result that counts (not the ignored ones, 706.6), and the result. */
   rolled?: { sides: number; naturals: number[]; result: number; /** "The other result" (Effect roll's chooseOne). */ other?: number };
   scratch?: {
+    /** Tainted Pact: the names exiled so far, and the card the player is asked about. */
+    pact?: { names: string[]; asking?: ObjectId };
     queue?: PlayerId[]; // players still to choose, in APNAP order (CR 101.4)
     drawQueue?: PlayerId[]; // players still to draw: a draw can stop for dredge (CR 702.52a)
     chosen?: Record<string, ObjectId[]>; // cards each player chose to discard

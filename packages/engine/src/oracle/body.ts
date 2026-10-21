@@ -502,6 +502,15 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       ],
       text,
     };
+  if (/^Exile the top card of your library\. You may put that card into your hand unless it has the same name as another card exiled this way\. Repeat this process until you put a card into your hand or you exile two cards with the same name, whichever comes first\.$/.test(text.trim()))
+    return { targets: [], effects: [{ type: "taintedPact" }], text };
+  // Tempt with Discovery: a tempting offer whose searches each end with their own shuffle here. A library is shuffled
+  // after each search instead of once at the end; nothing between them depends on its order (the next search sees the
+  // whole library anyway), so it comes to the same.
+  if (/^Search your library for a land card and put it onto the battlefield\. Each opponent may search their library for a land card and put it onto the battlefield\. For each opponent who searches a library this way, search your library for a land card and put it onto the battlefield\. Then each player who searched a library this way shuffles\.$/.test(text.trim())) {
+    const land = (): Effect => ({ type: "search", filter: { kind: "card", types: ["Land"], notTypes: [], notColors: [], text: "land card" }, n: 1, upTo: false, reveal: false, dest: { zone: "battlefield" } });
+    return { targets: [], effects: [land(), { type: "eachMay", who: { ref: "eachOpponent" }, effects: [land()], text: "search your library for a land card and put it onto the battlefield", each: true, perAccepted: { effects: [land()], opponents: true } }], text };
+  }
   // Approach of the Second Sun (rulings): the other one only needs to have been cast, from anywhere, and a copy isn't cast.
   const approach = /^If ~ was cast from your hand and you've cast another spell named ~ this game, you win the game\. Otherwise, put ~ into its owner's library seventh from the top and you gain (\d+) life\.$/.exec(text.trim());
   if (approach && opts.spell)

@@ -737,6 +737,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "shuffle":
     case "shuffleIntoLibrary":
     case "shuffleSpell":
+    case "taintedPact":
     case "shuffleZones":
     case "search":
     case "revealPick":

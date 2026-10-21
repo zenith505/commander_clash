@@ -378,6 +378,38 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       return;
     }
+    case "taintedPact": {
+      const p = player(s, ctx.controller);
+      const sc = (s.resolving!.scratch ??= {});
+      const pact = (sc.pact ??= { names: [] });
+      for (;;) {
+        if (pact.asking !== undefined) {
+          const id = pact.asking;
+          const yes = sc.may;
+          pact.asking = undefined;
+          sc.may = undefined;
+          if (yes && s.objects[id]?.zone === "exile") {
+            log(s, `${p.name} puts ${defOf(s, obj(s, id)).name} into their hand.`);
+            moveObject(s, id, "hand");
+            return;
+          }
+        }
+        const top = p.library[0];
+        if (top === undefined) return;
+        moveObject(s, top, "exile");
+        const name = defOf(s, obj(s, top)).name;
+        log(s, `${src}: ${p.name} exiles ${name} from the top of their library.`);
+        if (pact.names.includes(name)) {
+          log(s, `${p.name} has exiled two cards named ${name}.`);
+          return;
+        }
+        pact.names.push(name);
+        if (obj(s, top).zone !== "exile") continue;
+        pact.asking = top;
+        s.pending = { kind: "chooseMay", player: p.id, prompt: `put ${name} into your hand (otherwise exile the next card)`, source: src, card: top };
+        return "paused";
+      }
+    }
     case "shuffleIntoLibrary":
     case "shuffleSpell": {
       // The owners whose libraries are shuffled, whether or not the card is still there (CR 701.24c).

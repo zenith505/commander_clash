@@ -2118,6 +2118,12 @@ export type Effect =
   | { type: "winGame"; who: PlayerRef }
   /** "Exile ~" in an instant or sorcery: it goes to exile as it resolves instead of its owner's graveyard (CR 608.2n). */
   | { type: "exileSpell" }
+  /**
+   * Tainted Pact: "Exile the top card of your library. You may put that card into your hand unless it has the same name as
+   * another card exiled this way. Repeat this process until you put a card into your hand or you exile two cards with the
+   * same name, whichever comes first." Or until the library is empty.
+   */
+  | { type: "taintedPact" }
   /** "You take the initiative" (CR 726). */
   | { type: "takeInitiative"; who: PlayerRef }
   /**

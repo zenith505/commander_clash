@@ -23,6 +23,8 @@ const narset = card("Narset, Parter of Veils", "Legendary Planeswalker — Narse
 const divination = card("Divination", "Sorcery", "{2}{U}", { oracleText: "Draw two cards." });
 const cutDeal = card("Cut a Deal", "Sorcery", "{2}{W}", { oracleText: "Each opponent draws a card, then you draw a card for each opponent who drew a card this way." });
 const approach = card("Approach of the Second Sun", "Sorcery", "{6}{W}", { oracleText: "If this spell was cast from your hand and you've cast another spell named Approach of the Second Sun this game, you win the game. Otherwise, put Approach of the Second Sun into its owner's library seventh from the top and you gain 7 life." });
+const pact = card("Tainted Pact", "Instant", "{1}{B}", { oracleText: "Exile the top card of your library. You may put that card into your hand unless it has the same name as another card exiled this way. Repeat this process until you put a card into your hand or you exile two cards with the same name, whichever comes first." });
+const temptDiscovery = card("Tempt with Discovery", "Sorcery", "{3}{G}", { keywords: ["Tempting offer"], oracleText: "Tempting offer — Search your library for a land card and put it onto the battlefield. Each opponent may search their library for a land card and put it onto the battlefield. For each opponent who searches a library this way, search your library for a land card and put it onto the battlefield. Then each player who searched a library this way shuffles." });
 const giant = card("Big Giant", "Creature — Giant", "{6}{R}{R}", { power: "8", toughness: "8" });
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -40,7 +42,7 @@ const tapFor = (s: GameState, pid: number, id: string, mana: ManaType): Action =
 
 describe("round 97, more cards", () => {
   it("parse", () => {
-    supported(bloodghast, omniscience, monument, cagedSun, vesuva, flux, iteration, coat, narset, cutDeal, approach);
+    supported(bloodghast, omniscience, monument, cagedSun, vesuva, flux, iteration, coat, narset, cutDeal, approach, pact, temptDiscovery);
     expect(compileCard(omniscience).castFromHandFree).toBe(true);
   });
 
@@ -219,5 +221,52 @@ describe("round 97, more cards", () => {
     s = settle(cast(s, ap, ids[0]!, []));
     expect(s.over).toBe(true);
     expect(s.winner).toBe(ap);
+  });
+
+  it("Tainted Pact: exile until you take one, or until two share a name", () => {
+    const { s: s0, ap, ids } = setup([pact, pact]);
+    const onTop = (def: CardDef) => {
+      const id = putOnBattlefield(s0, ap, def);
+      s0.battlefield.splice(s0.battlefield.indexOf(id), 1);
+      s0.objects[id]!.zone = "library";
+      s0.players[ap]!.library.unshift(id);
+      return id;
+    };
+    const a2 = onTop(card("Opt", "Instant", "{U}"));
+    const b = onTop(card("Shock", "Instant", "{R}"));
+    const a = onTop(card("Opt", "Instant", "{U}"));
+    let s = cast(s0, ap, ids[0]!, []);
+    for (let i = 0; i < 10 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseMay", card: a });
+    s = act(s, { type: "chooseMay", player: ap, yes: false });
+    expect(s.pending).toMatchObject({ kind: "chooseMay", card: b });
+    s = act(s, { type: "chooseMay", player: ap, yes: false });
+    // The third has the first one's name: it stops there.
+    s = settle(s);
+    expect(s.pending).toBeNull();
+    expect([a, b, a2].map((id) => s.objects[id!]!.zone)).toEqual(["exile", "exile", "exile"]);
+    // Taking one stops it.
+    const next = s.players[ap]!.library[0]!;
+    s = cast(s, ap, ids[1]!, []);
+    for (let i = 0; i < 10 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect(s.objects[next]!.zone).toBe("hand");
+    expect(s.objects[s.players[ap]!.library[0]!]!.zone).toBe("library");
+  });
+
+  it("Tempt with Discovery: you get a land, then one more for each opponent who searched", () => {
+    const { s: s0, ap, ids } = setup([temptDiscovery]);
+    const opps = s0.turnOrder.filter((p) => p !== ap);
+    const lands = (s: GameState, pid: number) => s.battlefield.filter((id) => s.objects[id]!.controller === pid && s.cards[s.objects[id]!.cardId]!.types.includes("Land")).length;
+    const before = [ap, ...opps].map((p) => lands(s0, p));
+    let s = cast(s0, ap, ids[0]!, []);
+    for (let i = 0; i < 60 && (s.stack.length || s.pending); i++) {
+      const p = s.pending;
+      if (p?.kind === "searchLibrary") s = act(s, { type: "searchLibrary", player: p.player, found: p.cards.slice(0, 1) });
+      else if (p?.kind === "chooseMay") s = act(s, { type: "chooseMay", player: p.player, yes: p.player === opps[0] });
+      else if (p) throw new Error(p.kind);
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect([ap, ...opps].map((p) => lands(s, p))).toEqual([before[0]! + 2, before[1]! + 1, before[2], before[3]]);
   });
 });

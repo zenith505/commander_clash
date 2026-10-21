@@ -204,6 +204,10 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       (s.handOnlyUntil ??= []).push({ controller: ctx.controller, source: src });
       log(s, `${src}: until ${player(s, ctx.controller).name}'s next turn, their opponents can't cast spells from anywhere other than their hands.`);
       return;
+    case "graveyardCastThisTurn":
+      (s.graveGrants ??= []).push({ key: `grant${s.nextId++}`, player: ctx.controller, turn: s.turn, filter: e.filter, source: src });
+      log(s, `${player(s, ctx.controller).name} may cast a ${e.filter.text.replace(/ card$/, "")} spell from their graveyard this turn (${src}).`);
+      return;
     case "noLifeGain":
       (s.noLifeGain ??= []).push({ turn: s.turn, controller: ctx.controller, who: e.players });
       log(s, `${src}: ${e.players === "all" ? "players" : `${player(s, ctx.controller).name}'s opponents`} can't gain life this turn.`);

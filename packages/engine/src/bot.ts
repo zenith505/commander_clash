@@ -2656,6 +2656,15 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // Phasing out our own permanents ("~ phases out") only takes them away for a turn cycle.
       if (allEffects(ab.body.effects).some((e) => e.type === "phaseOut" && e.what.ref !== "target")) continue;
       if (doesNothingNow(s, id, ab.body)) continue;
+      // Chainer, Nightmare Adept: a permission to cast from our graveyard only in our main phase, with none unused yet,
+      // for a card there we could pay for afterwards.
+      const yardCast = ab.body.effects.find((e) => e.type === "graveyardCastThisTurn");
+      if (yardCast?.type === "graveyardCastThisTurn") {
+        const unused = (s.graveGrants ?? []).some((g) => g.player === pid && g.turn === s.turn && !(s.turnLog?.gravePermits ?? []).includes(g.key));
+        const mana = availableMana(s, pid) - manaValue(parseManaCost(ab.manaCost)) - (ab.tap ? 1 : 0);
+        const worth = player(s, pid).graveyard.some((c) => { const d = defOf(s, obj(s, c)); return !!d.manaCost && printedMatches(yardCast.filter, d) && mv(s, c) >= 2 && mv(s, c) <= mana; });
+        if (unused || !worth || s.activePlayer !== pid || (s.step !== "main1" && s.step !== "main2") || s.stack.length) continue;
+      }
       // "~ becomes a Kithkin Spirit with base power and toughness 2/2" when it's that big already, or bigger (Figure of
       // Destiny after its later steps): it would only shrink.
       if (shrinksSelf(s, o, ab.body)) continue;

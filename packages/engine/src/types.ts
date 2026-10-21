@@ -1344,6 +1344,8 @@ export interface GameState {
   /** "Until your next turn, you may cast sorcery spells as though they had flash" (Teferi, Time Raveler): `controller` may. */
   flashUntil?: { controller: PlayerId; filter: TargetSpec }[];
   /** "Until your next turn, your opponents can't cast spells from anywhere other than their hands" (Avatar's Wrath): `controller`'s opponents. */
+  /** "You may cast a creature spell from your graveyard this turn" (Chainer): one cast each, used like TurnLog.gravePermits. */
+  graveGrants?: { key: string; player: PlayerId; turn: number; filter: TargetSpec; source: string }[];
   handOnlyUntil?: { controller: PlayerId; source: string }[];
   /** The turn a "damage can't be prevented this turn" effect was made in (CR 615.12). */
   noPreventionTurn?: number;

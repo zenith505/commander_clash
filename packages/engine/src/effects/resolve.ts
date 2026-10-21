@@ -608,6 +608,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "turnRules":
     case "flashUntilNextTurn":
     case "opponentsHandOnlyUntilNextTurn":
+    case "graveyardCastThisTurn":
     case "cantCast":
     case "cantPlayLands":
     case "noPrevention":

@@ -1195,7 +1195,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   const nameCond: StaticCondition | null = intervening && /^Whenever an? [^,]*creature you control enters$/.test(intervening[1]!) && intervening[2] === "it doesn't have the same name as another creature you control or a creature card in your graveyard" ? { kind: "subjectNameUnique" } : null;
   // "Whenever another permanent you control enters, if it wasn't put onto the battlefield with this ability" (Kodama of
   // the East Tree): what entered, as it triggers and resolves (CR 603.4).
-  const putCond: StaticCondition | null = intervening && /^Whenever (?:another|a) [^,]+ enters$/.test(intervening[1]!) && intervening[2] === "it wasn't put onto the battlefield with this ability" ? { kind: "subjectPutBySelf", not: true } : null;
+  const putCond: StaticCondition | null = intervening && /^Whenever (?:another|a) [^,]+ enters$/.test(intervening[1]!) && intervening[2] === "it wasn't put onto the battlefield with this ability" ? { kind: "subjectPutBySelf", not: true } : intervening && /^Whenever (?:another|an?) [^,]+ you control enters$/.test(intervening[1]!) && /^you (didn't )?cast it from your hand$/.test(intervening[2]!) ? { kind: "subjectCastFromHand", ...(/didn't/.test(intervening[2]!) ? { not: true as const } : {}) } : null;
   // "Whenever a land an opponent controls enters, if that player controls more lands than you" (Archaeomancer's Map):
   // the entering land's controller, as it triggers and resolves (rulings).
   const thatMore = intervening && /^Whenever an? [a-z]+ an opponent controls enters$/.test(intervening[1]!) ? /^that player controls more (lands|creatures) than you$/.exec(intervening[2]!) : null;

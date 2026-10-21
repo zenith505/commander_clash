@@ -669,6 +669,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const did = !!o?.triggeredThisTurn?.includes(`${sourceZc ?? o.zoneChanges ?? 0}|addedMana`);
       return cond.not ? !did : did;
     }
+    case "subjectCastFromHand": {
+      const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
+      const cast = !!sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc && !!sub.castFromHand;
+      return cond.not ? !cast : cast;
+    }
     case "subjectPutBySelf": {
       const by = subjectId !== undefined ? s.objects[subjectId]?.putBy : undefined;
       const put = !!by && by.id === sourceId && (s.objects[sourceId]?.zoneChanges ?? 0) === by.zc;

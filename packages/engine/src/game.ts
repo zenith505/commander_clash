@@ -1288,7 +1288,11 @@ function othersAddCounters(s: GameState, o: GameObject): Record<string, number> 
     for (const r of rules) {
       // "Of the chosen type": the one chosen as the source entered.
       const filter = bindChosen(r.filter, src.chosen);
-      if (!filter.chosen && objectMatches(s, filter, o, you, false)) out[r.counter] = (out[r.counter] ?? 0) + r.n;
+      if (!filter.chosen && objectMatches(s, filter, o, you, false)) {
+        // Giada: "for each Angel you already control", the entering one aside, Giada included (rulings).
+        const times = r.perControlled ? s.battlefield.filter((x) => x !== o.id && controllerOf(s, obj(s, x)) === you && objectMatches(s, r.perControlled!, obj(s, x), you, false)).length : 1;
+        if (times) out[r.counter] = (out[r.counter] ?? 0) + r.n * times;
+      }
     }
   }
   return out;
@@ -2154,6 +2158,7 @@ function startNextTurn(s: GameState, skipping = false) {
   if (!s.namedBansUntil?.length) s.namedBansUntil = undefined;
   if (s.flashUntil) s.flashUntil = s.flashUntil.filter((r) => !began.has(r.controller));
   if (!s.flashUntil?.length) s.flashUntil = undefined;
+  if (s.graveGrants) s.graveGrants = s.graveGrants.filter((g) => g.turn === s.turn).length ? s.graveGrants.filter((g) => g.turn === s.turn) : undefined;
   if (s.handOnlyUntil) s.handOnlyUntil = s.handOnlyUntil.filter((r) => !began.has(r.controller));
   if (!s.handOnlyUntil?.length) s.handOnlyUntil = undefined;
   if (!s.entersTappedUntil?.length) s.entersTappedUntil = undefined;
@@ -3770,7 +3775,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // A creature spell cast with suspend gains haste until its caster loses control of it (CR 702.62a).
   if (suspended && isType(d, "Creature")) o.suspendHaste = p.id;
   // CR 702.34a, 702.133a; an aftermath half cast from a graveyard any way (702.127a).
-  if (via?.exile || (castFrom === "graveyard" && compileCard(d).fromGraveyard?.some((g) => g.kind === "aftermath"))) o.exileIfLeaves = "stack";
+  // A once-each-turn permission's own "exile it instead" (Maestros Ascendancy), not another's it shares the way with.
+  const exiles = via?.kind === "turnPermission" ? !!choices.permit && permitExiles(s, choices.permit) : via?.exile;
+  if (exiles || (castFrom === "graveyard" && compileCard(d).fromGraveyard?.some((g) => g.kind === "aftermath"))) o.exileIfLeaves = "stack";
   o.controller = p.id;
   o.timestamp = s.nextTimestamp++;
   const chosen = spell?.modal ? modes : undefined;
@@ -4015,6 +4022,15 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef): CastFromGraveyard
       out.push({ ...g.way, mana: g.way.mana ?? d.manaCost });
     }
   }
+  // "You may cast a creature spell from your graveyard this turn" (Chainer, Nightmare Adept): one spell for each, with
+  // the once-each-turn permissions (rulings: each activation is a permission of its own).
+  const used = s.turnLog?.gravePermits ?? [];
+  const grants = d.manaCost ? (s.graveGrants ?? []).filter((g) => g.player === o.owner && g.turn === s.turn && !used.includes(g.key) && printedMatches(g.filter, d)).map((g) => g.key) : [];
+  if (grants.length) {
+    const had = out.find((w) => w.kind === "turnPermission");
+    if (had) had.permits = [...had.permits!, ...grants];
+    else out.push({ kind: "turnPermission", mana: d.manaCost, costs: [], exile: false, permits: grants });
+  }
   return out;
 }
 
@@ -4047,6 +4063,12 @@ export function pickPermit(s: GameState, o: GameObject, permits: string[], chose
  * A once-each-turn permission's own costs: Exploration Broodship's "by sacrificing a land in addition to paying its other
  * costs" (CR 601.2f-h).
  */
+/** Whether a once-each-turn permission exiles the spell instead of putting it into a graveyard (Maestros Ascendancy). */
+function permitExiles(s: GameState, key: string): boolean {
+  const src = s.objects[key.split("@")[0]!];
+  return !!(src && abilitiesOf(s, src).graveyardGrants?.find((g) => g.once)?.way.exile);
+}
+
 export function permitCosts(s: GameState, key: string): AdditionalCost[] {
   const src = s.objects[key.split("@")[0]!];
   return (src && abilitiesOf(s, src).graveyardGrants?.find((g) => g.once)?.way.costs) ?? [];
@@ -4062,6 +4084,8 @@ function castPermit(s: GameState, id: ObjectId | undefined, d: CardDef, x: numbe
 
 /** A permission's label: Muldrotha's slot ("creature"), or the permanent's name. */
 export function permitLabel(s: GameState, key: string): string {
+  const grant = s.graveGrants?.find((g) => g.key === key);
+  if (grant) return grant.source;
   const [ref, slot] = key.split(":");
   const src = s.objects[ref!.split("@")[0]!];
   return `${src ? characteristics(s, src).name : "a permanent"}${slot ? ` (${slot.toLowerCase()})` : ""}`;

@@ -855,6 +855,22 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const last = effects[effects.length - 1];
     ctx.afterMill = last?.type === "mill" && last.who.ref === "you";
     if (last?.type === "discard" && last.who.ref === "you" && last.n === 1) ctx.discardedOne = true;
+    // "You may cast a creature spell from your graveyard this turn" (Chainer, Nightmare Adept): a permission, not a choice.
+    const yardCast = /^You may cast an? (creature|artifact|instant|sorcery) spell from your graveyard this turn$/.exec(s.replace(/\.$/, ""));
+    if (yardCast) {
+      const type = yardCast[1]!.charAt(0).toUpperCase() + yardCast[1]!.slice(1);
+      effects.push({ type: "graveyardCastThisTurn", filter: { kind: "card", types: [type], notTypes: [], notColors: [], text: `${yardCast[1]} card` } });
+      continue;
+    }
+    // Cultivator Colossus: "you may put a land card from your hand onto the battlefield tapped. If you do, draw a card and
+    // repeat this process": until you decline or have none, all in this resolution (rulings).
+    if (/^If you do, draw a card and repeat this process\.?$/.test(s)) {
+      const may = effects[effects.length - 1];
+      const prev = may?.type === "may" && !may.pay && may.effects.length === 1 ? may.effects[0] : undefined;
+      if (effects.length !== 1 || prev?.type !== "putFromHand" || prev.any || prev.who || prev.attacking || si + 1 !== sentences.length) return null;
+      effects[0] = { ...prev, may: true, drawRepeat: true };
+      continue;
+    }
     // "Put them into their owner's graveyard, then ~ deals that much damage to each opponent" (Valakut Exploration): the
     // number of cards the move put there (rulings: one played in response isn't counted).
     if (last?.type === "moveLinked" && last.dest === "graveyard" && !last.one && /^~ deals that much damage to each opponent$/.test(s.replace(/\.$/, ""))) {

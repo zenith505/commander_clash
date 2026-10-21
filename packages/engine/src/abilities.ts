@@ -972,6 +972,8 @@ export type StaticCondition =
   | { kind: "subjectNameUnique" }
   /** "If it wasn't put onto the battlefield with this ability" (Kodama of the East Tree): the entering permanent (GameObject.putBy). */
   | { kind: "subjectPutBySelf"; not?: true }
+  /** Chainer: "if you didn't cast it from your hand", about the entering permanent (GameObject.castFromHand). */
+  | { kind: "subjectCastFromHand"; not?: true }
   /** Rith: "if a creature or planeswalker an opponent controlled was dealt excess damage this turn" (any of `types`). */
   | { kind: "opponentsDealtExcess"; types: string[] }
   /**
@@ -1430,7 +1432,7 @@ export type Effect =
    * turn", checked as it begins (spells cast earlier this turn count, even countered ones and the card with the ability).
    */
   | { type: "castNow"; what: ObjRef; thenNoMore?: true; unlessCast?: true }
-  | { type: "putFromHand"; who?: PlayerRef; filter?: TargetSpec; tapped?: boolean; attacking?: boolean; may: boolean; any?: boolean; /** With `any`: "up to seven" (Ugin, the Spirit Dragon). */ upTo?: number; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand" }
+  | { type: "putFromHand"; who?: PlayerRef; filter?: TargetSpec; tapped?: boolean; attacking?: boolean; may: boolean; any?: boolean; /** With `any`: "up to seven" (Ugin, the Spirit Dragon). */ upTo?: number; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand"; /** "If you do, draw a card and repeat this process" (Cultivator Colossus): after each card put, a draw, then again until you put none (rulings). */ drawRepeat?: true }
   /**
    * "Return all land cards from your graveyard to the battlefield tapped" (CR 110.2a: under your control), "from all graveyards
    * ... under their owners' control". All at once. Never Auras: those need a choice of what they enchant (CR 303.4f).
@@ -2229,6 +2231,8 @@ export type Effect =
   | { type: "weld"; artifact: number; card: number }
   /** "Until your next turn, your opponents can't cast spells from anywhere other than their hands" (Avatar's Wrath): see GameState.handOnlyUntil. */
   | { type: "opponentsHandOnlyUntilNextTurn" }
+  /** "You may cast a creature spell from your graveyard this turn" (Chainer, Nightmare Adept): one such cast (GameState.graveGrants). */
+  | { type: "graveyardCastThisTurn"; filter: TargetSpec }
   /** "Artifact, instant, and sorcery spells you cast this turn cost {2} less to cast" (Urza, Planeswalker): `mod`'s "you" is the ability's controller (CR 601.2f, 611.2a). */
   | { type: "costModThisTurn"; mod: CostMod }
   /**
@@ -3584,7 +3588,8 @@ export interface CompiledCard {
    */
   othersEnterUntapped?: { filter: TargetSpec; text: string }[];
   /** "Each other creature you control enters with an additional +1/+1 counter on it" (Renata): on other permanents entering. */
-  othersEnterWithCounters?: { filter: TargetSpec; counter: CounterKind; n: number; text: string }[];
+  /** `perControlled`: "for each Angel you already control" (Giada): `n` times the permanents matching it its controller controls, the entering one aside. */
+  othersEnterWithCounters?: { filter: TargetSpec; counter: CounterKind; n: number; perControlled?: TargetSpec; text: string }[];
   /** "This creature enters with an additional +1/+1 counter on it" (Master Chef's granted ability): on itself entering. */
   entersWithAdditional?: { counter: CounterKind; n: number }[];
   entersTappedUnless?: EntersCondition;

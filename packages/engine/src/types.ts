@@ -607,6 +607,8 @@ export interface Player {
   poison?: number;
   /** Energy counters (CR 107.14, 122.1). */
   energy?: number;
+  /** Experience counters (CR 122.1; Meren of Clan Nel Toth). */
+  experience?: number;
   /** The turns this player's current and previous upkeeps began, for echo's "since the beginning of your last upkeep" (CR 702.30a). */
   upkeepTurn?: number;
   lastUpkeepTurn?: number;

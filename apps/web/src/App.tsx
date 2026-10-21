@@ -2802,6 +2802,11 @@ function Seat({
             ⚡ {p.energy}
           </span>
         )}
+        {(p.experience ?? 0) > 0 && (
+          <span className="energy" title={`${p.experience} experience counter${p.experience === 1 ? "" : "s"}.`}>
+            ★ XP {p.experience}
+          </span>
+        )}
         {p.speed !== undefined && (
           <span className="energy" title={`Speed ${p.speed}${p.speed === 4 ? " (max speed)" : ""}: it increases once on each of their turns when an opponent loses life. Max speed is 4.`}>
             🏁 {p.speed === 4 ? "Max speed" : `Speed ${p.speed}`}

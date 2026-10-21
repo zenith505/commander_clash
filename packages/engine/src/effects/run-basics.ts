@@ -296,9 +296,10 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "loseAllCounters":
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
-        if (!p.poison && !p.energy) continue;
+        if (!p.poison && !p.energy && !p.experience) continue;
         p.poison = 0;
         p.energy = 0;
+        p.experience = 0;
         log(s, `${p.name} loses all counters.`);
       }
       return;
@@ -318,6 +319,12 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         if (n <= 0) continue;
         const p = player(s, pid);
         log(s, `${p.name} gets ${"{E}".repeat(Math.min(n, 10))}${n > 10 ? ` (${n})` : ""}.`);
+      }
+      return;
+    case "getExperience":
+      for (const pid of players(s, e.who, ctx)) {
+        const n = putPlayerCounters(s, pid, "experience", amountNow(s, e.n, ctx));
+        if (n > 0) log(s, `${player(s, pid).name} gets ${n === 1 ? "an experience counter" : `${n} experience counters`}.`);
       }
       return;
     case "ringTempts":

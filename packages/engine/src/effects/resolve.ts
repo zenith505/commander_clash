@@ -606,6 +606,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "draw":
     case "drawUpTo":
     case "getEnergy":
+    case "getExperience":
     case "poison":
     case "loseAllCounters":
     case "emblem":

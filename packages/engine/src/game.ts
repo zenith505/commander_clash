@@ -3333,8 +3333,9 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
       }
       // "The first creature spell you cast each turn": the creature spells you cast earlier this turn count, even before this permanent was on the battlefield (rulings).
       if (m.nth && (s.castThisTurn ?? []).filter((c) => c.player === pid && printedMatches(rest, s.cards[c.card]!)).length !== m.nth - 1) continue;
-      if (m.n > 0) more += m.n;
-      else less -= m.n;
+      const n = m.times ? m.n * Math.max(0, evalAmount(s, m.times, { controller: c.controller, sourceId: src.id })) : m.n;
+      if (n > 0) more += n;
+      else less -= n;
     }
   }
   // "Spells you cast this turn cost {2} less to cast" (Urza, Planeswalker): from resolved spells and abilities (CR 611.2a).

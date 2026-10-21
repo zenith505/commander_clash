@@ -1936,6 +1936,27 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "if", cond: { kind: "targetCardWas", index: i, filter }, effects: [{ type: "reflexive", body: reflexive }] });
       continue;
     }
+    // "Choose target creature card in your graveyard. If that card's mana value is less than or equal to the number of
+    // experience counters you have, return it to the battlefield. Otherwise, put it into your hand." (Meren of Clan Nel
+    // Toth): compared as it resolves; with it lower, it can't go to the hand instead (rulings).
+    const ifMv = /^If that card's mana value is less than or equal to (.+?), (.+)$/.exec(s);
+    const elseMv = ifMv && /^Otherwise, (.+)$/.exec(sentences[si + 1] ?? "");
+    if (ifMv && elseMv) {
+      const i = ctx.targets.length - 1;
+      const t = ctx.targets[i];
+      if (i !== prevTargets || i + 1 !== curTargets || !t || t.kind !== "card" || t.optional || t.many) return null;
+      const amount = parseCount(ifMv[1]!, ctx);
+      // The card targeted: "return it to the battlefield", "put it into your hand".
+      const move = (x: string): Effect[] | null =>
+        /^return it to the battlefield$/i.test(x) ? [{ type: "putOntoBattlefield", what: { ref: "target", index: i } }] : /^(?:put it into|return it to) your hand$/i.test(x) ? [{ type: "bounce", what: { ref: "target", index: i } }] : null;
+      const yes = amount && ctx.targets.length === i + 1 ? move(ifMv[2]!) : null;
+      const no = yes ? move(elseMv[1]!) : null;
+      if (!amount || !yes || !no || ctx.targets.length !== i + 1 || ![...yes, ...no].every((e) => mentionsTarget(e, i))) return null;
+      const filter: TargetSpec = { kind: "card", bound: { key: "manaValue", at: "most", amount }, text: `mana value less than or equal to ${ifMv[1]}` };
+      effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: yes, otherwise: no });
+      si++;
+      continue;
+    }
     const atMost = /^(.+) if (?:its|that creature's|that card's) (power|toughness|mana value) is less than or equal to (.+)$/.exec(s);
     if (atMost) {
       // "You may return target creature to its owner's hand if that creature's power is ..." (Nimbus Champion): asked only

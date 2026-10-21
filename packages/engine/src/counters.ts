@@ -112,10 +112,10 @@ export function batchPlayerCounters<T>(s: GameState, fn: () => T): T {
 }
 
 /**
- * Put `n` poison or energy counters on a player through Vorinclex-style mods (playerCountersToPut); returns how many were
+ * Put `n` poison, energy or experience counters on a player through Vorinclex-style mods (playerCountersToPut); returns how many were
  * put on. "Whenever you put one or more counters on a ... player" sees who put them (CR 122.6).
  */
-export function putPlayerCounters(s: GameState, pid: PlayerId, kind: "poison" | "energy", n: number): number {
+export function putPlayerCounters(s: GameState, pid: PlayerId, kind: "poison" | "energy" | "experience", n: number): number {
   const m = playerCountersToPut(s, pid, kind, n);
   if (m <= 0) return 0;
   const p = s.players.find((x) => x.id === pid)!;

@@ -15,6 +15,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   let p = text.trim().replace(/\.$/, "").replace(/ and\/or /g, " or ");
   let m: RegExpExecArray | null;
   if (ctx?.milledThisWay && /^the total mana value of those cards$/i.test(p)) return { count: { kind: "milledManaValue" } };
+  // "The number of experience counters you have", "for each experience counter you have" (CR 122.1).
+  if ((each && /^experience counter you have$/i.test(p)) || /^the number of experience counters you have$/i.test(p)) return { count: { kind: "experience", who: { ref: "you" } } };
   // Arithmetic around a count.
   if ((m = /^twice (.+)$/i.exec(p))) {
     const c = parseCount(m[1]!, ctx);

@@ -147,6 +147,8 @@ export type Count =
   /** "~'s power", "its toughness", "that creature's mana value": as it is now, or as it last existed (CR 608.2h). */
   | { kind: "power" | "toughness" | "manaValue"; of: ObjRef }
   | { kind: "life"; who: PlayerRef }
+  /** "The number of experience counters you have" (CR 122.1). */
+  | { kind: "experience"; who: PlayerRef }
   /** "Your speed": 0 if you have none (CR 702.179f). */
   | { kind: "speed" }
   /** "The number of creatures in your party" (CR 700.8): 0 to 4. */
@@ -2118,6 +2120,8 @@ export type Effect =
   | { type: "emblem"; who: PlayerRef; abilities: string[] }
   /** "You get {E}{E}" (CR 107.14): energy counters on a player (CR 122.1). */
   | { type: "getEnergy"; who: PlayerRef; n: Amount }
+  /** "You get an experience counter" (CR 122.1): a counter on the player, counted by other abilities. */
+  | { type: "getExperience"; who: PlayerRef; n: Amount }
   /** Unearth (CR 702.84a): return the source card from your graveyard to the battlefield with haste, exiled at the next end step or if it would leave. */
   | { type: "unearth" }
   /** Rebound's delayed trigger (CR 702.88a): "you may cast this card from exile without paying its mana cost". */
@@ -3313,6 +3317,8 @@ export interface CostMod {
   nth?: number;
   /** Only while this holds: a Class level's (CR 716.2a). */
   if?: StaticCondition;
+  /** "... for each experience counter you have" (Mizzix): `n` that many times, for the permanent's controller. */
+  times?: AmountExpr;
   text: string;
 }
 

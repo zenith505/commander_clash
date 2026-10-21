@@ -309,7 +309,11 @@ export function normalizeSelf(d: CardDef): string {
   if (short && short !== full) {
     const re = new RegExp(`\\b${esc(short)}\\b${ofThe ? "(?! (?:of|the) [A-Z])" : ""}`, "g");
     t = t.replace(/"[^"]*"/g, (q) => q.replace(re, QUOTED_SOURCE_NAME));
+    // A token's name is a name, not the card ("a 3/3 blue Serpent creature token named Koma's Coil").
+    const tokenNames: string[] = [];
+    t = t.replace(/(tokens? named )([A-Z][\w'-]*(?: (?:of |the )?[A-Z][\w'-]*)*)/g, (_, a: string, n: string) => `${a}\u0001${tokenNames.push(n) - 1}\u0001`);
     t = t.replace(re, "~");
+    t = t.replace(/\u0001(\d+)\u0001/g, (_, i: string) => tokenNames[Number(i)]!);
   }
   // A legendary character card refers to itself as "he" or "she" ("Put a +1/+1 counter on Hercules. He gains
   // vigilance", "his power", "attach up to one target Equipment to her"): the card itself, like "it" (CR 201.5). Not in

@@ -556,6 +556,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "continuous", what, mods: [{ kind: "cantAttack" }, { kind: "cantBlock" }, { kind: "cantActivate" }], duration: "yourNextTurn" }] : null;
   }
+  // "Tap target permanent. Its activated abilities can't be activated this turn." (Koma): mana abilities too (CR 605.1a).
+  if ((m = /^(Its|Their|.+?'s) activated abilities can't be activated (this turn|until your next turn)$/.exec(s))) {
+    const who = m[1]!;
+    const what = parseObject(who === "Its" ? "it" : who === "Their" ? "them" : who.replace(/'s$/, ""), ctx);
+    return what ? [{ type: "continuous", what, mods: [{ kind: "cantActivate" }], duration: m[2] === "this turn" ? "endOfTurn" : "yourNextTurn" }] : null;
+  }
   // "Until your next turn, those creatures can't block" (Taunt from the Rampart): the same, said first.
   const front = /^Until your next turn, (.+? can't (?:block|attack|attack or block|be blocked))$/.exec(s);
   if (front) s = `${front[1]} until your next turn`;

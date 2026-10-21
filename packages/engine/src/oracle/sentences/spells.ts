@@ -114,10 +114,14 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!who || (/^Discard$/i.test(m[1]!) && /your/.test(s) === false)) return null;
     const out: Effect[] = [{ type: "discard", who, n: 0, hand: true }];
     if (m[2] !== undefined) {
+      // Each player draws as many as they discarded themselves.
+      const own = who.ref === "eachPlayer" || who.ref === "eachOpponent" ? { who: { ref: "eachOne" } as const } : {};
       const k = new RegExp(`^${NUMX} cards?$`, "i").exec(m[2]);
       const n =
         k && !/^that many$/i.test(k[1]!) ? amt(k[1]!)
-        : /^that many cards$/i.test(m[2]) ? { count: { kind: "discardedThisWay" as const } }
+        : /^that many cards$/i.test(m[2]) ? { count: { kind: "discardedThisWay" as const, ...own } }
+        // Dark Deal: "that many cards minus one", none for a player who discarded one or none (rulings).
+        : /^that many cards minus one$/i.test(m[2]) ? { count: { kind: "discardedThisWay" as const, ...own }, plus: -1 }
         : /^cards equal to the greatest number of cards a player discarded this way$/i.test(m[2]) ? { count: { kind: "discardedThisWay" as const, greatest: true as const } }
         : null;
       if (!n) return null;

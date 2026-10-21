@@ -586,6 +586,47 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         if (had === n) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: e.counter });
       }
       return;
+    case "removeAnyCounters": {
+      // The counters are chosen one at a time as it resolves, any kinds (rulings on Glissa Sunslayer), then removed
+      // together; with fewer on it than that, all of them (rulings on Thornmantle Striker).
+      const o = objects(s, e.what, ctx)[0];
+      const sc = (s.resolving!.scratch ??= {});
+      const picked = (sc.countersPicked ??= {});
+      const n = o ? amountNow(s, e.n, ctx) : 0;
+      const left = (k: string) => (o!.counters[k] ?? 0) - (picked[k] ?? 0);
+      const count = () => Object.values(picked).reduce((a, b) => a + b, 0);
+      while (o && count() < n && !sc.countersDone) {
+        const kinds = Object.keys(o.counters).filter((k) => left(k) > 0);
+        if (!kinds.length) break;
+        if (sc.counterKind !== undefined) {
+          if (sc.counterKind === "done") sc.countersDone = true;
+          else if (left(sc.counterKind) > 0) picked[sc.counterKind] = (picked[sc.counterKind] ?? 0) + 1;
+          sc.counterKind = undefined;
+          continue;
+        }
+        if (kinds.length === 1 && !e.upTo) {
+          picked[kinds[0]!] = (picked[kinds[0]!] ?? 0) + Math.min(left(kinds[0]!), n - count());
+          break;
+        }
+        const name = characteristics(s, o).name;
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "removeCounter", about: o.id, options: [...kinds, ...(e.upTo ? ["done"] : [])], labels: [...kinds.map((k) => `A ${k} counter (${left(k)} left)`), ...(e.upTo ? [count() ? "That's all" : "None"] : [])], prompt: `choose a counter to remove from ${name} (${count() + 1} of ${n})` };
+        return "paused";
+      }
+      sc.countersPicked = undefined;
+      sc.countersDone = undefined;
+      if (!o) return;
+      // "For each counter removed this way" (Hex Parasite): only those actually removed (rulings).
+      if (s.resolving) s.resolving.countersRemoved = (s.resolving.countersRemoved ?? 0) + Object.values(picked).reduce((a, b) => a + Math.max(0, b), 0);
+      for (const [k, m] of Object.entries(picked)) {
+        if (m <= 0) continue;
+        const had = o.counters[k] ?? 0;
+        o.counters[k] = had - m;
+        invalidateCharacteristics(s);
+        log(s, `${characteristics(s, o).name} loses ${m} ${k} counter${m > 1 ? "s" : ""}.`);
+        if (had === m) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: k });
+      }
+      return;
+    }
     case "battleDefense":
       // Its protector is "who protects it" (CR 310.9e): an opponent's protection, defense counters off; else on.
       for (const o of objects(s, e.what, ctx)) {

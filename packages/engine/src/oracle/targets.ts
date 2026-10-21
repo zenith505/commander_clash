@@ -645,6 +645,11 @@ export function parseTargetPhrase(
     extra.counter = counter[1] ?? counter[2] ?? ANY_COUNTER;
     p = (p.slice(0, counter.index) + p.slice(counter.index + counter[0].length)).trim();
   }
+  const without = / without an? ([+-]1\/[+-]1) counters? on (?:it|them)/.exec(p);
+  if (without) {
+    extra.notCounter = without[1]!;
+    p = (p.slice(0, without.index) + p.slice(without.index + without[0].length)).trim();
+  }
   const none = / with no counters on (?:it|them)/.exec(p);
   if (none) {
     extra.noCounters = true;

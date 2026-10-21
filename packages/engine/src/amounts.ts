@@ -174,7 +174,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       // As they last existed on the battlefield (CR 608.2h).
       return (s.resolving?.[c.kind === "destroyedThisWay" ? "destroyed" : "exiled"] ?? []).filter(({ o, ch }) => objectMatches(s, c.filter, o, ctx.controller, false, undefined, ch)).length;
     case "discardedThisWay": {
-      const counts = Object.values(s.resolving?.discarded ?? {});
+      const counts = c.who ? refPlayers(s, c.who, ctx).map((pid) => s.resolving?.discarded?.[pid] ?? 0) : Object.values(s.resolving?.discarded ?? {});
       return c.greatest ? Math.max(0, ...counts) : counts.reduce((a, b) => a + b, 0);
     }
     case "exiledFromHandThisWay":

@@ -97,7 +97,7 @@ export type Count =
   | { kind: "timesAffectedAttacked" }
   | { kind: "cardsInLibrary"; who: PlayerRef }
   /** "That many cards" after discarding a hand (Tolarian Winds); `greatest`: "the greatest number of cards a player discarded this way" (Windfall). */
-  | { kind: "discardedThisWay"; greatest?: true }
+  | { kind: "discardedThisWay"; greatest?: true; /** Only these players' discards: "each player discards their hand, then draws that many cards" is each their own (Dark Deal). */ who?: PlayerRef }
   /** "The total mana value of those cards" after "you mill three cards" (Combustible Gearhulk): X counts 0 (CR 107.3). */
   | { kind: "milledManaValue" }
   /** "For each card exiled from their hand this way" (Lost Legacy): of the cards an exileNamed instruction exiled. */
@@ -410,6 +410,8 @@ export interface TargetSpec {
   counter?: CounterKind;
   /** "creatures with no counters on them" (Damning Verdict). */
   noCounters?: true;
+  /** "each creature without a +1/+1 counter on it" (Wave Goodbye). */
+  notCounter?: CounterKind;
   /**
    * "of the chosen type", "that aren't of the chosen type", "of the chosen color": the creature type
    * or color chosen for the source (see GameObject.chosen) or while the spell resolves. Before
@@ -1090,7 +1092,7 @@ export type StaticCondition =
   /** "As long as equipped creature is a Human": the permanent this is attached to matches. */
   | { kind: "attachedIs"; filter: TargetSpec }
   /** "If you have nine or more cards in hand" (Wiretapping). */
-  | { kind: "handAtLeast"; n: number }
+  | { kind: "handAtLeast"; n: number; /** "exactly thirteen cards in your hand" (Triskaidekaphile). */ exactly?: true }
   /** "If you control eight or more artifacts with the same name as one another" (Mechanized Production, CR 201.2a). */
   | { kind: "sameNamed"; types: string[]; n: number }
   /** "If each player has no cards in hand" (Howltooth Hollow). */
@@ -1654,6 +1656,8 @@ export type Effect =
   /** `self`: the spell that's resolving ("you may copy this spell", Sevinne's Reclamation), as it is on the stack. */
   | { type: "copySpell"; spell: "cause" | "self" | { target: number } | { epic: string }; n: Amount | "storm" | "kicked"; newTargets: boolean; /** Then an opponent you choose copies it too (CR 702.144a). */ demonstrate?: true; /** "If it's a permanent spell, the copy gains haste and "..."" (Nalfeshnee): what the token it becomes has (CR 400.7a, 608.3f). */ gains?: Modification[] }
   | { type: "removeCounters"; what: ObjRef; counter: CounterKind; n: Amount | "all" }
+  /** "Remove (up to) three counters from target permanent": of any kinds, chosen as it resolves (rulings on Glissa Sunslayer); fewer than that, all of them. */
+  | { type: "removeAnyCounters"; what: ObjRef; n: Amount; upTo?: true }
   /** "If an opponent protects it, remove N defense counters from it. Otherwise, put N defense counters on it." (CR 310.9e) */
   | { type: "battleDefense"; what: ObjRef; n: number }
   /** "Remove all counters from target permanent": every kind; how many were removed is counted ("this way"). */

@@ -93,7 +93,6 @@ describe("round 101: X spells, Endurance, evoke by exiling a card", () => {
     let s = run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, undefined, undefined, { alt: "evoke", exileFromHand: [ids[1]!] }));
     for (let i = 0; i < 4 && s.pending; i++) {
       if (s.pending.kind === "chooseTargets") s = settle(act(s, { type: "chooseTargets", player: ap, targets: [target(b)] }));
-      else if (s.pending.kind === "orderTriggers") s = settle(act(s, { type: "orderTriggers", player: ap, order: [...s.pending.triggers.keys()].reverse() }));
       else break;
     }
     expect(s.objects[ids[1]!]!.zone).toBe("exile");

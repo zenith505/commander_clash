@@ -617,6 +617,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   text = text.replace(/(^|\. )([Cc]reate an? [^.]+? token) and exile the top card of (your|that player's) library\. (?=(?:Until end of turn, )?[Yy]ou may (?:cast|play) that card)/, "$1$2. Exile the top card of $3 library. ");
   // "..., then shuffle and you gain 1 life" (Brokers Hideout): the search, then the life.
   text = text.replace(/, then shuffle and you gain (\d+) life\./g, ", then shuffle. You gain $1 life.");
+  // "Sacrifice ~, search your library for up to two creature cards, put those cards onto the battlefield, then shuffle"
+  // (Defense of the Heart): the sacrifice, then the search.
+  text = text.replace(/^([Ss])acrifice ~, search your library /, "$1acrifice ~. Search your library ");
+  // "Put a +1/+1 counter on ~ and add {R}" (Crime Novelist): two instructions, in that order.
+  text = text.replace(/^([Pp]ut an? [^.]+? counter on ~) and add ((?:\{[WUBRGC]\})+)\.$/, "$1. Add $2.");
+  // "That creature also gains trample until end of turn if you control a creature with power 4 or greater" (Temur Battle
+  // Rage): checked as it resolves (CR 608.2c).
+  text = text.replace(/(^|\. )That creature also gains ([^.]+?) until end of turn if (you control [^.,]+)\./, "$1If $3, that creature gains $2 until end of turn.");
+  // "Destroy all creatures you don't control and all planeswalkers you don't control" (In Garruk's Wake).
+  text = text.replace(/\ball creatures you don't control and all planeswalkers you don't control\b/g, "all creatures and planeswalkers you don't control");
   // "Destroy all creatures other than ~" (Magister of Worth) is "destroy all other creatures".
   text = text.replace(/\ball creatures other than ~/g, "all other creatures");
   // "Choose any number of target creatures you control. For each of them, create a token that's a copy of that creature,
@@ -2497,12 +2507,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       // "Create a Treasure token. If you've completed a dungeon, create three of those tokens instead" (Safana).
       const those = new RegExp(`^create ${NUMX} of those tokens$`, "i").exec(t);
       const prevToken = previous.length === 1 && previous[0]!.type === "createToken" ? previous[0]! : null;
-      const inner = those ? (prevToken ? [{ ...prevToken, n: amt(those[1]!) }] : null) : parseOne(t.charAt(0).toUpperCase() + t.slice(1), ctx);
+      // "Counter target noncreature spell unless its controller pays {1}. If you control a creature with power 4 or
+      // greater, counter that spell instead." (Stubborn Denial): the same spell, with no chance to pay.
+      const prevCounter = previous.length === 1 && previous[0]!.type === "counterSpell" && previous[0]!.unless ? previous[0]! : null;
+      const { unless: _unless, ...uncond } = (prevCounter ?? {}) as Extract<Effect, { type: "counterSpell" }>;
+      const inner = those ? (prevToken ? [{ ...prevToken, n: amt(those[1]!) }] : null) : t === "counter that spell" ? (prevCounter ? [uncond as Effect] : null) : parseOne(t.charAt(0).toUpperCase() + t.slice(1), ctx);
       // Only one of the two happens, so neither may wait on a choice or need targets of its own (one "you may"
       // instead would leave nothing done on a "no").
       // A punisher waits on its players but always does its whole process (Court of Ambition's "instead" one), and so do
       // sacrificing and discarding, which only wait on which ones (Vona's Hunger), and so does a search (Entish Restoration).
-      if (!inner || !previous.length || ctx.targets.length !== before || [...previous, ...inner].some((e) => pauses(e) && e.type !== "punisher" && !(e.type === "pick" && e.action === "sacrifice") && e.type !== "discard" && e.type !== "search")) return null;
+      if (!inner || !previous.length || ctx.targets.length !== before || [...previous, ...inner].some((e) => pauses(e) && e !== prevCounter && e.type !== "punisher" && !(e.type === "pick" && e.action === "sacrifice") && e.type !== "discard" && e.type !== "search")) return null;
       const done = insteadOfAffected(inner, previous);
       if (!done) return null;
       effects.splice(from, effects.length - from, { type: "if", cond: { kind: "state", cond: insteadOf }, effects: done, otherwise: previous });
@@ -2689,6 +2703,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // color is chosen as it resolves (CR 608.2d), after the target was chosen on casting.
     // "Target creature gains your choice of menace or lifelink until end of turn", "... flying, vigilance, deathtouch, or
     // haste": one of those keywords, chosen as it resolves (CR 608.2d).
+    // "Gains protection from colorless or from the color of your choice" (Giver of Runes): one of six, chosen as it resolves.
+    s = s.replace(/ (gains?) protection from colorless or from the color of your choice\b/, " $1 your choice of protection from colorless, protection from white, protection from blue, protection from black, protection from red, or protection from green");
     const choiceOf = / (gains?|gain) your choice of ((?:[a-z ]+, )*[a-z ]+,? or [a-z ]+?)(?= until end of turn\b| and |$)/.exec(s);
     if (choiceOf) {
       const options = choiceOf[2]!.split(/,? or |, /).map((w) => keywordOf(w));

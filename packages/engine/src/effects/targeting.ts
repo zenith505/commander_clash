@@ -64,6 +64,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   // A choice that was never made: "of the chosen type" matches nothing, "not of the chosen type" everything.
   if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name") return false;
   if (spec.noCounters && Object.values(o.counters).some((n) => (n ?? 0) > 0)) return false;
+  if (spec.notCounter && (o.counters[spec.notCounter] ?? 0) > 0) return false;
   if (spec.counter && !(spec.counter === ANY_COUNTER ? Object.values(o.counters).some((n) => (n ?? 0) > 0) : (o.counters[spec.counter] ?? 0))) return false;
   // "With the chosen name": its name now (a copy's is what it copies); a face-down one has none (CR 201.2a, 708.2a).
   if (spec.named !== undefined && (o.faceDown || !hasName(c.name, spec.named))) return false;

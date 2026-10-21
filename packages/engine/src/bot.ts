@@ -376,6 +376,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "chooseOption", player: pid, choice: pend.options[best]! }];
     }
     // Which counter to move: a +1/+1 counter if it has one (moved onto our creature), else the first.
+    if (pend.kind === "chooseOption" && pend.what === "removeCounter") {
+      // Off our own permanents the harmful kinds (-1/-1, stun), off others' the helpful ones (loyalty, +1/+1, ...).
+      const o = pend.about ? s.objects[pend.about] : undefined;
+      const mine = !!o && controllerOf(s, o) === pid;
+      const kinds = pend.options.filter((k) => k !== "done");
+      const good = kinds.filter((k) => harmfulCounter(k) === mine).sort((a, b) => Number(b === "loyalty") - Number(a === "loyalty") || Number(b === "+1/+1") - Number(a === "+1/+1"));
+      return [{ type: "chooseOption", player: pid, choice: good[0] ?? (pend.options.includes("done") ? "done" : kinds[0]!) }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "counterKind") return [{ type: "chooseOption", player: pid, choice: pend.options.includes("+1/+1") ? "+1/+1" : pend.options[0]! }];
     // Two piles: the better one for our own hand, the worse one for an opponent's.
     if (pend.kind === "chooseOption" && pend.what === "pile" && pend.piles) {
@@ -779,7 +787,9 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     // The source's colors matter for protection (CR 702.16b): a spell's card, or the ability's source.
     // Bots never pick the same thing twice, which also keeps "another target" apart.
     // "Remove all counters from", "move all counters from": only something with counters on it.
-    const countersFrom = allEffects(body.effects).some((e) => (e.type === "removeAllCounters" && e.what.ref === "target" && refCovers(e.what, i)) || (e.type === "moveAllCounters" && e.from.ref === "target" && e.from.index === i));
+    const countersFrom = allEffects(body.effects).some((e) => ((e.type === "removeAllCounters" || e.type === "removeAnyCounters") && e.what.ref === "target" && refCovers(e.what, i)) || (e.type === "moveAllCounters" && e.from.ref === "target" && e.from.index === i));
+    // "Remove up to three counters from" (Glissa Sunslayer): counters worth removing, harmful ones from our own.
+    const chosenCounters = allEffects(body.effects).some((e) => e.type === "removeAnyCounters" && e.what.ref === "target" && refCovers(e.what, i));
     // "Counter target spell if it's blue" (Pyroblast): when that's all it does, only a target it holds for now.
     const onlyIf = body.effects.length > 0 && body.effects.every((e) => e.type === "if" && e.cond.kind === "targetIs" && e.cond.index === i && !e.cond.filter.bound && !e.otherwise?.length) ? (body.effects[0] as { cond: { filter: TargetSpec } }).cond.filter : undefined;
     const holds = (t: TargetChoice) => {
@@ -791,7 +801,7 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
       return t.kind === "object" && !!s.objects[t.id] && objectMatches(s, { ...onlyIf, kind: "object" }, obj(s, t.id), pid, false);
     };
     const all = legalTargets(s, spec, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).filter(
-      (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId) && totalOk(s, body.targets, out, i, t) && !namedLike(s, spec, out, t) && !(countersFrom && t.kind === "object" && !Object.values(obj(s, t.id).counters).some((n) => n > 0)) && holds(t),
+      (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId) && totalOk(s, body.targets, out, i, t) && !namedLike(s, spec, out, t) && !(countersFrom && t.kind === "object" && !Object.entries(obj(s, t.id).counters).some(([k, n]) => n > 0 && (!chosenCounters || harmfulCounter(k) === (controllerOf(s, obj(s, t.id)) === pid)))) && holds(t),
     );
     // Reanimating takes the best creature from any graveyard it may.
     const reanimators = allEffects(body.effects).filter((e): e is Extract<Effect, { type: "putOntoBattlefield" }> => e.type === "putOntoBattlefield" && e.what.ref === "target" && i >= e.what.index && i < e.what.index + (e.what.n ?? 1));

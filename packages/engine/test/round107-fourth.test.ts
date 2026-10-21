@@ -211,7 +211,7 @@ describe("Massacre Girl", () => {
     s = settle(cast(s, ap, ids[0]!));
     // Enters: the 1/1 dies; its trigger kills the 2/2, whose trigger kills the 3/3. The 5/5 ends at 1/1; Massacre Girl
     // is never affected ("other").
-    for (const id of [one, two, three]) expect(s.objects[id]!.zone).toBe("graveyard");
+    for (const id of [one, two, three]) expect(s.objects[id!]!.zone).toBe("graveyard");
     expect(pt(s, five!)).toBe("1/1");
     expect(pt(s, ids[0]!)).toBe("4/4");
     // A creature dying later this turn still counts.

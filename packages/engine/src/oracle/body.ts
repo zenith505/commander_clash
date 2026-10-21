@@ -1865,6 +1865,20 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "if", cond: { kind: "targetCardWas", index: i, filter }, effects: inner });
       continue;
     }
+    // Agatha's Soul Cauldron: "Exile target card from a graveyard. When a creature card is exiled this way, put a +1/+1
+    // counter on target creature you control": a reflexive trigger (CR 603.12) if the card was a creature card.
+    const whenCard = /^When an? ((?:[a-z]+ )?[a-z]+) card is exiled this way, (.+)$/.exec(s);
+    if (whenCard) {
+      const i = ctx.targets.length - 1;
+      const t = ctx.targets[i];
+      const prev = effects[effects.length - 1];
+      const filter = parseSearchFilter(`${whenCard[1]!} card`);
+      if (!t || t.kind !== "card" || t.many || t.optional || prev?.type !== "exile" || prev.what.ref !== "target" || prev.what.index !== i || !filter || si + 1 !== sentences.length) return null;
+      const reflexive = reflexiveBody(whenCard[2]!, ctx);
+      if (!reflexive) return null;
+      effects.push({ type: "if", cond: { kind: "targetCardWas", index: i, filter }, effects: [{ type: "reflexive", body: reflexive }] });
+      continue;
+    }
     const atMost = /^(.+) if (?:its|that creature's|that card's) (power|toughness|mana value) is less than or equal to (.+)$/.exec(s);
     if (atMost) {
       // "You may return target creature to its owner's hand if that creature's power is ..." (Nimbus Champion): asked only

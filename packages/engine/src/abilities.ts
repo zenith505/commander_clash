@@ -3753,6 +3753,14 @@ export interface CompiledCard {
   lifeForBlack?: true;
   /** Chromatic Orrery: "You may spend mana as though it were mana of any color." (CR 609.4b), for its controller's costs. */
   spendAnyColor?: true;
+  /** Agatha's Soul Cauldron: "You may spend mana as though it were mana of any color to activate abilities of creatures you control" (CR 609.4b). */
+  spendAnyColorCreatureAbilities?: true;
+  /**
+   * Agatha's Soul Cauldron: "Creatures you control with +1/+1 counters on them have all activated abilities of all
+   * creature cards exiled with ~": the permanents matching `to` have the activated abilities (mana abilities too) of the
+   * cards matching `cards` linked to this object's exile ability (CR 607.2a). "~" in them is the creature (rulings).
+   */
+  lendsExiled?: { to: TargetSpec; cards: TargetSpec };
   /**
    * Tekuthal: "If you would proliferate, proliferate twice instead." A replacement effect (CR 614.1a); with two, each
    * applies to the proliferating the other made, so four times (as Thought Reflection's rulings do for draws).

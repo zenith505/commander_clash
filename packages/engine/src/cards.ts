@@ -247,7 +247,48 @@ export function abilitiesOf(s: GameState, o: GameObject): CompiledCard {
   // card and you may cast the copy without paying its mana cost" for as long as it's encoded (CR 702.99a, c).
   const encoded = o.zone === "battlefield" ? (o.encoded ?? []).filter((e) => s.objects[e.id]?.zone === "exile" && (s.objects[e.id]!.zoneChanges ?? 0) === e.zc) : [];
   if (encoded.length) own = { ...own, triggers: [...own.triggers, ...encoded.map((e) => cipherTrigger(defOf(s, s.objects[e.id]!).name, e))] };
+  const lent = o.zone === "battlefield" && c.hasPrintedAbilities ? exiledLentTo(s, o) : [];
+  if (lent.length) own = withLent(own, lent);
   return own.borrows && o.zone === "battlefield" && !borrowing ? withBorrowed(s, o, own) : own;
+}
+
+/**
+ * Agatha's Soul Cauldron (CompiledCard.lendsExiled): the cards whose activated abilities this permanent has now, from
+ * each permanent its controller controls that lends them to it (a creature of theirs with a +1/+1 counter on it): the
+ * creature cards still exiled with that permanent as the object it is now (CR 607.2a, 400.7).
+ */
+export function exiledLentTo(s: GameState, o: GameObject): CardDef[] {
+  // Only Agatha's Soul Cauldron lends them, to creatures with +1/+1 counters: nothing to look for without one.
+  if (o.zone !== "battlefield" || !s.linkedExile || !((o.counters["+1/+1"] ?? 0) > 0)) return [];
+  const out: CardDef[] = [];
+  const you = characteristics(s, o).controller;
+  for (const id of s.battlefield) {
+    const p = s.objects[id]!;
+    const pc = characteristics(s, p);
+    if (pc.controller !== you || !pc.hasPrintedAbilities) continue;
+    const lend = compileCard(defOf(s, p)).lendsExiled;
+    if (!lend || !objectMatches(s, lend.to, o, you, false)) continue;
+    for (const l of s.linkedExile[`${p.id}@${p.zoneChanges ?? 0}`] ?? []) {
+      const card = s.objects[l.id];
+      if (card?.zone === "exile" && (card.zoneChanges ?? 0) === l.zc && printedMatches(lend.cards, defOf(s, card))) out.push(defOf(s, card));
+    }
+  }
+  return out;
+}
+
+const lentCache = new WeakMap<CompiledCard, Map<string, CompiledCard>>();
+/** Its own abilities and the activated ones of these cards (not those that work only from another zone, nor equip or loyalty abilities). */
+function withLent(own: CompiledCard, cards: CardDef[]): CompiledCard {
+  const key = cards.map((d) => d.name).join("|");
+  let byKey = lentCache.get(own);
+  if (!byKey) lentCache.set(own, (byKey = new Map()));
+  let hit = byKey.get(key);
+  if (!hit) {
+    const usable = (a: CompiledCard["activated"][number]) => !a.zone && !a.equip && a.loyalty === undefined && !a.loyaltyX;
+    hit = { ...own, activated: [...own.activated, ...cards.flatMap((d) => compileCard(d).activated.filter(usable))] };
+    byKey.set(key, hit);
+  }
+  return hit;
 }
 
 /** While working out the abilities a permanent borrows: the lenders' own abilities, without what they borrow (no loops). */

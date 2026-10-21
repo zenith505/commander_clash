@@ -1523,6 +1523,18 @@ export function compile(d: CardDef): CompiledCard {
       out.spendAnyColor = true;
       continue;
     }
+    if (line === "You may spend mana as though it were mana of any color to activate abilities of creatures you control.") {
+      out.spendAnyColorCreatureAbilities = true;
+      continue;
+    }
+    // Agatha's Soul Cauldron (CompiledCard.lendsExiled), linked to its one exile ability below.
+    const lends = /^(Creatures you control with \+1\/\+1 counters on them) have all activated abilities of all creature cards exiled with ~\.$/.exec(line);
+    if (lends) {
+      const group = parseGroup(lends[1]!.toLowerCase());
+      if (!group || group.other || group.filter.kind !== "object" || group.filter.counter !== "+1/+1") out.unsupported.push(raw); // exiledLentTo looks only at those
+      else out.lendsExiled = { to: group.filter, cards: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature cards" } };
+      continue;
+    }
     if (/^For each \{B\} in a cost, you may pay 2 life rather than pay that mana\.$/.test(line)) {
       out.lifeForBlack = true;
       continue;
@@ -2246,6 +2258,12 @@ function linkExile(out: CompiledCard) {
     const imprints = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e) => e.type === "takeFromHand" && e.action === "exile");
     if (imprints.length !== 1) out.unsupported.push("(copies an exiled card it can't link to one imprint ability)");
     else (imprints[0] as Extract<Effect, { type: "takeFromHand" }>).linked = true;
+  }
+  // Agatha's Soul Cauldron: "creature cards exiled with ~" are the ones its one exile ability exiled (CR 607.2a).
+  if (out.lendsExiled) {
+    const exiles = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
+    if (exiles.length !== 1 || exiles[0]!.type !== "exile" || exiles[0]!.until) out.unsupported.push("(lends abilities of exiled cards it can't link to one exile ability)");
+    else exiles[0]!.linked = true;
   }
   // "Target creature card exiled with ~" (Dino DNA, The Darkness Crystal): linked to the one ability that exiles cards
   // (CR 607.2a), or to its replacement effect that exiles them (The Darkness Crystal's, already linked).

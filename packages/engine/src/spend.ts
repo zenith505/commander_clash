@@ -2,7 +2,7 @@
 // mana from sources that matter (106.3: snow, Treasures, creatures, artifacts) and mana kept as steps end.
 
 import type { ActivatedAbility, ManaSpend } from "./abilities";
-import { abilitiesOf, defOf, isType } from "./cards";
+import { abilitiesOf, defOf, isType, objIsType } from "./cards";
 import { bindChosen, objectMatches, printedMatches } from "./effects";
 import { blackForLife, emptyPool, payFromPool, type CostSymbol, type ManaPool, type ParsedCost, type Payment } from "./mana";
 import { characteristics, controllerOf } from "./layers";
@@ -97,10 +97,12 @@ export function poolFor(s: GameState, pid: PlayerId, use: ManaUse): { pool: Mana
  * How `pid` may pay this cost: with K'rrik's "for each {B} in a cost, you may pay 2 life rather than pay that mana", any
  * {B} with 2 life too. It applies to every cost its controller pays with mana: spells, abilities, special actions (rulings).
  */
-export function payableCost(s: GameState, pid: PlayerId, cost: ParsedCost): ParsedCost {
+export function payableCost(s: GameState, pid: PlayerId, cost: ParsedCost, use?: ManaUse): ParsedCost {
   const mine = s.battlefield.map((id) => s.objects[id]!).filter((o) => controllerOf(s, o) === pid);
   const krrik = mine.some((o) => !!abilitiesOf(s, o).lifeForBlack);
-  const orrery = mine.some((o) => !!abilitiesOf(s, o).spendAnyColor);
+  // Agatha's Soul Cauldron: "... to activate abilities of creatures you control".
+  const creatureAbility = !!use && use !== "other" && "ability" in use && use.ability.zone === "battlefield" && controllerOf(s, use.ability) === pid && objIsType(s, use.ability, "Creature");
+  const orrery = mine.some((o) => !!abilitiesOf(s, o).spendAnyColor || (creatureAbility && !!abilitiesOf(s, o).spendAnyColorCreatureAbilities));
   const c = krrik ? blackForLife(cost) : cost;
   return orrery ? anyColorPays(c) : c;
 }
@@ -125,7 +127,7 @@ function anyColorPays(cost: ParsedCost): ParsedCost {
 
 /** Could `pid` pay this from their pool for `use`? */
 export function canPayFromPool(s: GameState, pid: PlayerId, cost0: ParsedCost, use: ManaUse, extraGeneric = 0, life = Infinity): boolean {
-  const cost = payableCost(s, pid, cost0);
+  const cost = payableCost(s, pid, cost0, use);
   const { pool, snow } = poolFor(s, pid, use);
   return !!payFromPool(cost, pool, extraGeneric, life, { snow });
 }
@@ -141,7 +143,7 @@ export type SpentFrom = Record<"treasure" | "creature" | "artifact", number>;
  */
 export function spendFromPool(s: GameState, pid: PlayerId, cost0: ParsedCost, use: ManaUse, extraGeneric = 0, life = Infinity, opts: { spreadColors?: boolean; want?: Partial<Record<Color, number>>; avoid?: Partial<Record<Color, number>>; wantSnow?: boolean } = {}): (Payment & { spent: ManaPool; treasure: number; from: SpentFrom; uncounterable?: true; spentTriggers?: ManaSpentTrigger[]; haste?: "endOfTurn" | "game"; commanderCounters?: number }) | null {
   const p = s.players[pid]!;
-  const cost = payableCost(s, pid, cost0);
+  const cost = payableCost(s, pid, cost0, use);
   const { pool, prefer, treasure, snow } = poolFor(s, pid, use);
   const first = { ...prefer };
   if (use !== "other") for (const m of Object.keys(first) as ManaType[]) first[m] = Math.min(pool[m], first[m] + treasure[m]);

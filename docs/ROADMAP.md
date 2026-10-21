@@ -1,7 +1,7 @@
 # Roadmap
 
-22,307 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,964 of 1,989 (98%), top 5,000: 3,845 of 4,988 (77%).
+22,375 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,976 of 1,989 (99%), top 5,000: 3,875 of 4,988 (77%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,20 +22,21 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 108, most played first: Emrakul, the Promised End (needs
-   controlling another player's turn, CR 722, also Mindslaver, Sorin Markov's −7, Worst Fears), Archetype of
-   Imagination, Breena, the Demagogue, Urabrask, Gift of Immortality, As Foretold, Divine Visitation, Hellkite Courser,
-   Halo Fountain, Tree of Perdition, Commandeer, Hostage Taker, Aven Interrupter, Abundance, Sunbird's Invocation, Drana
-   and Linvala, For the Common Good, Norn's Annex, Winds of Abandon (each controller searches once per creature),
-   Wild Magic Surge, One with the Multiverse. Smaller gaps from round 108: Delina's copies attack the player Delina
-   attacks (no choice of defender); a permission to cast from the graveyard (Yawgmoth's Will, Forgotten Cellar) pays
-   the mana cost only, no alternative costs; bots choose fame when their best creature has power 2 or less, else
+00. Most played first (`npm run popular`). Out after round 109, most played first: Emrakul, the Promised End (needs
+   controlling another player's turn, CR 722, also Mindslaver, Sorin Markov's −7, Worst Fears), Urabrask and Sheoldred
+   // The True Scriptures (exile, then return transformed; casting from other players' graveyards), Monster Manual,
+   Commandeer, Aven Interrupter, Abundance, Sunbird's Invocation, Drana and Linvala, Norn's Annex (the attack tax is
+   paid in generic mana only, no {W/P}), Wild Magic Surge (an Aura or battle put onto the battlefield needs a host or
+   protector chosen), One with the Multiverse, Crystal Skull, Gix, Grist, Sunforger, Arixmethes, Eladamri, The Council
+   of Four. Smaller gaps from round 109: Halo Fountain's untap cost can't untap a creature you tapped for mana while
+   paying the same activation (the rulings allow it); a graveyard permission's alternative-cost buttons show only when
+   one permission applies; bots keep the legend with the most attachments and counters, then the non-token, then the
+   oldest. Smaller gaps from round 108: bots choose fame when their best creature has power 2 or less, else
    fortune; Witness Protection's new name counts in rules checks, but the card picture still shows the printed card.
    Smaller gaps from round 107: "Sacrifice A and
-   B" costs read only two different single-word types (Jarad); bots never use Jarad's graveyard ability (bots skip
-   graveyard abilities); "No more than one creature can attack ~ each combat" is checked for attacks on the planeswalker
+   B" costs read only two different single-word types (Jarad); "No more than one creature can attack ~ each combat" is checked for attacks on the planeswalker
    only, and bots move at most that many attackers onto it; "at the beginning of that player's next end step" works for
-   a single exiled card (The Eternal Wanderer); impending is read only as "Impending N—[mana cost]" on creature cards;
+   a single exiled card (The Eternal Wanderer; no legal card needs more); impending is read only as "Impending N—[mana cost]" on creature cards;
    number words go up to twenty plus thirty, forty and fifty. Smaller gaps from round 106: bots never
    exile cards for the Marches, and pay a Defiler's life only with 20 or more life to spare; bots never activate
    "Return ~ to its owner's hand" abilities (Shigeki, Recurring Nightmare, Krasis Incubation); mana Tecutlan made that's

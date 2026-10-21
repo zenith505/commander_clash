@@ -771,6 +771,12 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   text = text.replace(/\ball creatures you don't control and all planeswalkers you don't control\b/g, "all creatures and planeswalkers you don't control");
   // "Destroy all creatures other than ~" (Magister of Worth) is "destroy all other creatures".
   text = text.replace(/\ball creatures other than ~/g, "all other creatures");
+  // Insurrection: "Untap all creatures and gain control of them until end of turn. They gain haste until end of turn.":
+  // the same creatures throughout (rulings), those there as it resolves (CR 611.2c).
+  text = text.replace(/^Untap all creatures and gain control of them until end of turn\. They gain haste until end of turn\.$/, "Untap all creatures. Gain control of all creatures until end of turn. All creatures gain haste until end of turn.");
+  // "Until end of turn, target creature gains trample and gets +1/+0 for each card you've drawn this turn" (Fists of
+  // Flame): both until end of turn, the bonus counted as it resolves (rulings, CR 608.2h).
+  text = text.replace(/(^|\. )Until end of turn, target creature gains ([a-z]+) and gets ([+-]\d+\/[+-]\d+) for each ([^.]+)\./, "$1Target creature gains $2 until end of turn. It gets $3 until end of turn for each $4.");
   // "Each creature other than ~ gets -1/-1 until end of turn" (Massacre Girl) is "each other creature".
   text = text.replace(/\b([Ee])ach creature other than ~/g, "$1ach other creature");
   // "Choose any number of target creatures you control. For each of them, create a token that's a copy of that creature,

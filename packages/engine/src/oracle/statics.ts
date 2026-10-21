@@ -446,6 +446,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^no spells were cast last turn$/.test(text)) return { kind: "castLastTurn", none: true };
   if ((m = new RegExp(`^a player cast ${NUM} or more spells last turn$`).exec(text))) return { kind: "castLastTurn", onePlayer: num(m[1]!) };
   if (/^you(?:'ve)? gained life this turn$/.test(text)) return { kind: "lifeGainedThisTurn", n: 1 };
+  // "If you created a token this turn" (Bennie Bracks, Zoologist).
+  if (/^you created a token this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "tokensCreatedThisTurn" } }, min: 1 };
   // "If you gained 3 or more life this turn" (The Gaffer, Resplendent Angel).
   if ((m = /^you(?:'ve)? gained (\d+) or more life this turn$/.exec(text))) return { kind: "lifeGainedThisTurn", n: Number(m[1]) };
   if ((m = /^creatures you control have total power (\d+) or greater$/.exec(text))) return { kind: "totalPower", n: Number(m[1]) };
@@ -776,6 +778,12 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const grants = m[4] ? parseGrants(m[4]) : [];
     const more = / this turn$/.test(m[5]!) ? null : parseExtraBlocks(m[5]!);
     return first && grants && more ? [...first, ...grants, more] : null;
+  }
+  // "Gets +2/+2, has flying, and attacks each combat if able" (Dragon's Rage Channeler).
+  if ((m = new RegExp(`^gets? ${PT}/${PT}, (?:has|have) (.+?),? and (attacks? each combat if able|can't block)$`).exec(rest))) {
+    const grants = parseGrants(m[3]!);
+    const second = parseStaticMods(m[4]!);
+    return grants && second ? [{ kind: "modifyPT", power: ptAmt(m[1]!), toughness: ptAmt(m[2]!) }, ...grants, ...second] : null;
   }
   // "Gets +2/+2 and can't block" (Childhood Horror), "gets +1/+1 and attacks each combat if able".
   // "Gets +1/+1 and is goaded" (the Impetus Auras, CR 701.15), "gets -2/-0 and loses all abilities" (Mystic Subdual).

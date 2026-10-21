@@ -77,7 +77,9 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           (need.zone === "battlefield"
             ? s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, need.filter, obj(s, id), pid, false))
             : player(s, pid).graveyard.some((id) => printedMatches(need.filter, defOf(s, obj(s, id)))));
-        sc.mayQueue = apnap(s, players(s, e.who, ctx)).filter(can);
+        const sub = ctx.subject && s.objects[ctx.subject.id];
+        const untapped = !e.untappedSubject || (!!sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === ctx.subject!.zc && !sub.tapped);
+        sc.mayQueue = untapped ? apnap(s, players(s, e.who, ctx)).filter(can) : [];
         sc.mayers = [];
       }
       while (sc.mayQueue.length) {
@@ -93,6 +95,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // Who did, for the instructions after this one ("each player who drew a card this way gains 1 life").
       s.resolving!.choseThisWay = [...sc.mayers!];
       if (e.each) return eachAccepted(s, e, ctx);
+      // Nobody did: nothing happens ("target opponent may have you draw three cards", Combustible Gearhulk).
+      if (!sc.mayers!.length) return;
       // Each instruction once, also when one of them waits on a player (a draw that stops for dredge).
       for (sc.mayStep ??= 0; sc.mayStep < e.effects.length; sc.mayStep++) if (runEffect(s, e.effects[sc.mayStep]!, ctx) === "paused") return "paused";
       return;
@@ -218,6 +222,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const holds = held ? held.holds :
         e.cond.kind === "youDid"
           ? !!s.resolving!.did
+          : e.cond.kind === "theyChose"
+          ? !!s.resolving!.choseThisWay?.length !== !!e.cond.not
           : e.cond.kind === "selfHere"
           ? objects(s, { ref: "self" }, ctx).some((o) => !(e.cond as { yours?: true }).yours || controllerOf(s, o) === ctx.controller)
           : e.cond.kind === "libraryHas"

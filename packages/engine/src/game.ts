@@ -798,6 +798,7 @@ export function moveObject(
   o.renowned = undefined;
   o.monstrous = undefined;
   o.suspected = undefined; // CR 701.60a
+  o.putBy = undefined;
   o.classLevel = undefined; // CR 716.2b
   o.solved = undefined; // CR 719.3b
   o.harnessed = undefined; // CR 701.64b
@@ -2778,7 +2779,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // What its source was as it was activated, before it's sacrificed (CR 106.3): a Treasure, a snow permanent, ...
   const from = manaOriginsOf(s, o);
   // Pay the costs (CR 602.2b, 605.3a), then add the mana.
-  const manaPaid = ab.manaCost ? spendFromPool(s, p.id, parseManaCost(ab.manaCost), { ability: o }) : null;
+  const manaPaid = ab.manaCost ? spendFromPool(s, p.id, activationLessCost(s, o, parseManaCost(ab.manaCost)), { ability: o }) : null;
   if (ab.tap) tapPermanent(s, o);
   // Tapped for mana (CR 106.12): triggers that aren't mana abilities wait for the stack (CR 605.1b, 603.3). Only if it
   // makes mana (CR 106.12a): not a storage land tapped removing no counters (rulings on Bottomless Vault).
@@ -4366,7 +4367,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     const cp = extraCostProblem(s, pid, o, activatedCosts(ab, x), costs, `activate ${d.name}'s ability`);
     if (cp) return cp;
   }
-  const cost = activationCost(s, pid, o, ab, targets);
+  const cost = activationCost(s, pid, o, ab, targets, x);
   const xp = ab.loyaltyX || abilityCostsHaveX(ab) ? (x !== undefined && (!Number.isInteger(x) || x < 0) ? "X must be a whole number, 0 or more" : (x ?? 0) < (ab.xMin ?? 0) ? "X can't be 0" : null) : xProblem(cost, x);
   if (xp) return xp;
   if (!canPayFromPool(s, pid, cost, abilityUse(o, ab), ab.loyaltyX ? 0 : (x ?? 0) * xCount(cost), p.life)) return `not enough mana for ${d.name}'s ability`;
@@ -4377,7 +4378,39 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
  * An activated ability's mana cost as `pid` activates it, after "Equip abilities you activate cost {1} less to activate"
  * (CR 602.2b applies 601.2f): reductions only take off generic mana. Without `targets` chosen yet, as if the best one were.
  */
-export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets?: TargetChoice[]): ParsedCost {
+export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets?: TargetChoice[], x = 0): ParsedCost {
+  return activationLessCost(s, o, activationCostBefore(s, pid, o, ab, targets), x);
+}
+
+/**
+ * An activated ability's mana cost after "activated abilities of creatures you control cost {2} less to activate"
+ * (CompiledCard.activationLess; CR 602.2b applies 601.2f), the last change to it: generic mana only, the X chosen
+ * counting (its symbols become that much generic mana then), and not below one mana where the reduction says so (rulings
+ * on Training Grounds: a cost with no generic mana, {0} included, stays as it is). Only for a permanent on the battlefield.
+ */
+export function activationLessCost(s: GameState, o: GameObject, cost: ParsedCost, x = 0): ParsedCost {
+  if (o.zone !== "battlefield") return cost;
+  let less = 0;
+  let atLeastOne = false;
+  for (const id of s.battlefield) {
+    const src = obj(s, id);
+    for (const m of abilitiesOf(s, src).activationLess ?? []) {
+      if (!objectMatches(s, m.filter, o, controllerOf(s, src), false)) continue;
+      less += m.n;
+      if (m.atLeastOne) atLeastOne = true;
+    }
+  }
+  if (!less) return cost;
+  const xs = xCount(cost) * x;
+  const g = splitGeneric(cost, xs);
+  if (!g.extra) return cost;
+  const others = g.cost.symbols.filter((sym) => sym.kind !== "x");
+  const left = Math.max(atLeastOne && !others.length ? 1 : 0, g.extra - less);
+  // Still "with X" (CR 107.3): the X chosen is its value for the ability, now paid as generic mana.
+  return { ...g.cost, symbols: [...(left ? [{ kind: "generic" as const, amount: left }] : []), ...others] };
+}
+
+function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets?: TargetChoice[]): ParsedCost {
   const cost0 = parseManaCost(ab.manaCost);
   // "Activated abilities cost {2} more to activate unless they're mana abilities" (Suppression Field): increases first
   // (CR 602.2b applies 601.2f).
@@ -4495,7 +4528,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // The source as it was activated, for "whenever an opponent activates an ability of a creature".
   const activatedFrom = !ab.mana && o.zone === "battlefield" ? { snapshot: structuredClone(o), chars: characteristics(s, o) } : undefined;
   // Costs (CR 602.2b, 601.2g-h): mana, tapping, then sacrificing or discarding the card itself.
-  const abCost = activationCost(s, p.id, o, ab, targets);
+  const abCost = activationCost(s, p.id, o, ab, targets, x);
   // "Pay half your life, rounded up": worked out with the rest of the cost, before any of it is paid (CR 601.2f-h).
   const halfLife = halfLifeCost(s, p.id, ab);
   const lifeCost = activatedLifeCost(s, p.id, ab);
@@ -6263,12 +6296,15 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
     }
     // Legend rule (704.5j). TODO: let the controller choose; for now keep the newest.
     const seen = new Map<string, ObjectId>();
+    // "The "legend rule" doesn't apply to permanents you control" (Sakashima of a Thousand Faces).
+    const exempt = s.battlefield.flatMap((id) => (abilitiesOf(s, obj(s, id)).noLegendRule ?? []).map((filter) => ({ filter, you: controllerOf(s, obj(s, id)) })));
     for (const id of [...s.battlefield]) {
       const o = s.objects[id];
       if (!o || o.zone !== "battlefield") continue;
       const c = characteristics(s, o);
       const d = defOf(s, o);
       if (!c.supertypes.includes("Legendary")) continue;
+      if (exempt.some((x) => objectMatches(s, x.filter, o, x.you, false))) continue;
       const key = `${c.controller}:${c.name}`;
       if (seen.has(key)) {
         log(s, `${d.name} is put into the graveyard (legend rule).`);

@@ -1286,6 +1286,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             if (attack?.planeswalker) o.attackingPermanent = attackingPermanentOf(s, attack.planeswalker);
           }
           if (o.zone !== "battlefield") continue;
+          const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+          if (me) o.putBy = { id: me.id, zc: ctx.sourceZc ?? me.zoneChanges ?? 0 };
           s.resolving?.created?.push(o.id);
           if (e.haste) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: p.id, sourceName: src, duration: e.haste, affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
           if (e.atEndStep) {

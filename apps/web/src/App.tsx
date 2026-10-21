@@ -1327,9 +1327,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               s={s}
               objectId={menu}
               onUse={useAbility}
-              onMix={(ability, n, extra) => {
+              onMix={(ability, n, extra, colors) => {
                 setMenu(null);
-                setMixPick({ objectId: menu, ability, n, ...(extra ? { extra } : {}), label: cardOf(s, menu).name, counts: {} });
+                setMixPick({ objectId: menu, ability, n, ...(extra ? { extra } : {}), ...(colors ? { colors } : {}), label: cardOf(s, menu).name, counts: {} });
               }}
               onMana={(x) => {
                 setMenu(null);
@@ -1456,7 +1456,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 setMixPick(null);
                 // The combination these counts are, numbered as the engine numbers them (ManaProduce "anyColors").
                 const want = COLORS.flatMap((c) => Array<Color>(mixPick.counts[c] ?? 0).fill(c));
-                const combo = colorCombos(mixPick.n).findIndex((c) => c.join() === want.join());
+                const combo = colorCombos(mixPick.n, mixPick.colors).findIndex((c) => c.join() === want.join());
                 const plan = combo >= 0 ? planManaAbility(s, HUMAN, mixPick.objectId, mixPick.ability, want[0] ?? "W", undefined, mixPick.extra, combo) : null;
                 if (plan) dispatch(plan);
               }}
@@ -1865,6 +1865,8 @@ interface MixPick {
   extra?: ManaType[];
   label: string;
   counts: Partial<Record<Color, number>>;
+  /** "In any combination of {U} and/or {R}" (Vivi Ornitier): only these colors. */
+  colors?: Color[];
 }
 
 function ManaMixBar({ pick, onChange, onDone, onCancel }: { pick: MixPick; onChange: (counts: Partial<Record<Color, number>>) => void; onDone: () => void; onCancel: () => void }) {
@@ -1873,9 +1875,9 @@ function ManaMixBar({ pick, onChange, onDone, onCancel }: { pick: MixPick; onCha
   return (
     <div className="targeting mana-mix">
       <span>
-        <strong>{pick.label}</strong>: add {pick.n} mana in any combination of colors ({pick.n - total} left)
+        <strong>{pick.label}</strong>: add {pick.n} mana in any combination of {pick.colors ? pick.colors.map((c) => COLOR_NAMES[c].toLowerCase()).join(" and/or ") : "colors"} ({pick.n - total} left)
       </span>
-      {COLORS.map((c) => {
+      {COLORS.filter((c) => !pick.colors || pick.colors.includes(c)).map((c) => {
         const k = pick.counts[c] ?? 0;
         return (
           <span key={c} className="divide" data-mix-color={c}>
@@ -3551,7 +3553,7 @@ function AbilityMenu({
   onUse: (id: string, index: number, modes?: number[], x?: number, pick?: ManaPick) => void;
   onMana: (x: ManaOption) => void;
   /** "Add X mana in any combination of colors" (Selvala): choose the colors (`n` mana in all). */
-  onMix: (ability: number, n: number, extra?: ManaType[]) => void;
+  onMix: (ability: number, n: number, extra?: ManaType[], colors?: Color[]) => void;
   /** For a card in hand: cast it, or play it if it's a land (`untapped`: pay life or reveal so it enters untapped). */
   onPlay: (untapped?: boolean) => void;
   /** For a card in your graveyard: cast it with flashback, escape, ... */
@@ -3758,7 +3760,7 @@ function AbilityMenu({
             if (all.findIndex((y) => y.ability === x.ability) !== i) return null;
             const n = anyColorsCount(s, o, ab.produces);
             return (
-              <button key={`mix-${x.ability}`} className="ghost" data-mix={x.ability} onClick={() => onMix(x.ability, n, x.extra)}>
+              <button key={`mix-${x.ability}`} className="ghost" data-mix={x.ability} onClick={() => onMix(x.ability, n, x.extra, ab.produces.kind === "anyColors" ? ab.produces.colors : undefined)}>
                 <RulesText text={ab.text.slice(0, ab.text.indexOf(": Add")).replace(/~/g, "it")} />: add {n} mana in any combination of colors…
               </button>
             );

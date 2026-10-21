@@ -98,6 +98,8 @@ export type Count =
   | { kind: "cardsInLibrary"; who: PlayerRef }
   /** "That many cards" after discarding a hand (Tolarian Winds); `greatest`: "the greatest number of cards a player discarded this way" (Windfall). */
   | { kind: "discardedThisWay"; greatest?: true }
+  /** "The total mana value of those cards" after "you mill three cards" (Combustible Gearhulk): X counts 0 (CR 107.3). */
+  | { kind: "milledManaValue" }
   /** "For each card exiled from their hand this way" (Lost Legacy): of the cards an exileNamed instruction exiled. */
   | { kind: "exiledFromHandThisWay" }
   /** "For each card revealed this way", "the number of cards revealed this way" after revealFromHand, or in its reflexive trigger. */
@@ -786,8 +788,13 @@ export type Modification =
   | { kind: "untapsDuringOthers" }
   | { kind: "blocksOnlyFlyers" } // "can block only creatures with flying" (a blocking restriction, CR 509.1b)
   | { kind: "attacksIfAble" } // "attacks each combat if able" (an attack requirement, CR 508.1d)
-  /** Goaded by the effect's controller (CR 701.15b): it attacks each combat if able, and a player other than them if able. */
-  | { kind: "goad" }
+  /**
+   * Goaded by the effect's controller (CR 701.15b): it attacks each combat if able, and a player other than them if able.
+   * `notGoaded`: the same requirements without goading it (Kardur, Doomscourge; Maximum Carnage rulings).
+   */
+  | { kind: "goad"; notGoaded?: true }
+  /** "Can't have hexproof or shroud" (Arcane Lighthouse): no layer 6 effect gives them these, whatever its timestamp. */
+  | { kind: "cantHaveKeywords"; keywords: string[] }
   /** "Attacks that opponent this turn if able" (encore, CR 702.141a): a requirement to attack that player (CR 508.1d). */
   | { kind: "mustAttackPlayer"; player: PlayerId }
   /** "Can't be blocked by creatures with power 2 or less", "by Walls", "by blue creatures" (CR 509.1b). */
@@ -907,6 +914,8 @@ export type StaticCondition =
    * graveyard", about the creature that entered. A face-down creature has no name (CR 708.2), so it shares none (rulings).
    */
   | { kind: "subjectNameUnique" }
+  /** "If it wasn't put onto the battlefield with this ability" (Kodama of the East Tree): the entering permanent (GameObject.putBy). */
+  | { kind: "subjectPutBySelf"; not?: true }
   /** Rith: "if a creature or planeswalker an opponent controlled was dealt excess damage this turn" (any of `types`). */
   | { kind: "opponentsDealtExcess"; types: string[] }
   /**
@@ -957,6 +966,8 @@ export type StaticCondition =
   | { kind: "citysBlessing"; /** "Unless you have the city's blessing". */ not?: true }
   /** "If it's your turn"; `not`: "if it's not your turn" (Force of Negation). */
   | { kind: "yourTurn"; not?: true }
+  /** "If it isn't that player's turn" (Tataru Taru): the trigger's event player is (not) the active player. */
+  | { kind: "eventPlayersTurn"; not?: true }
   /**
    * "Activate only during your turn, before attackers are declared": your turn, before its declare attackers step
    * begins (rulings: before the first combat's declare attackers step; there's one combat a turn here).
@@ -1062,12 +1073,15 @@ export type StaticCondition =
   | { kind: "attachedIs"; filter: TargetSpec }
   /** "If you have nine or more cards in hand" (Wiretapping). */
   | { kind: "handAtLeast"; n: number }
+  /** "If you control eight or more artifacts with the same name as one another" (Mechanized Production, CR 201.2a). */
+  | { kind: "sameNamed"; types: string[]; n: number }
   /** "If each player has no cards in hand" (Howltooth Hollow). */
   | { kind: "handsEmpty" }
   /** "If creatures you control have total power 10 or greater" (Mosswort Bridge). */
   | { kind: "totalPower"; n: number }
   /** "If a library has twenty or fewer cards in it": any player's (Shelldock Isle). */
-  | { kind: "libraryAtMost"; n: number }
+  /** `yours`: "if your library has no cards in it" (Jace, Wielder of Mysteries): your library only. */
+  | { kind: "libraryAtMost"; n: number; yours?: true }
   /** Corrupted: "as long as an opponent has three or more poison counters" (CR 122.1f). */
   | { kind: "opponentPoison"; n: number }
   /** Raid: "if you attacked this turn" (with one or more creatures); `not`: "if you didn't attack with a creature this turn" (Curious Obsession). */
@@ -1602,7 +1616,8 @@ export type Effect =
    * "Until end of turn, whenever you cast a spell, ~ deals 2 damage to up to one target creature" (CR 603.7b): a delayed
    * triggered ability that triggers each time its event happens until `until` ends (see GameState.floatingTriggers).
    */
-  | { type: "floatingTrigger"; trigger: TriggeredAbility; until: TriggerDuration }
+  /** `about`: its "~" is this target (Hunter's Insight's "that creature"), the object it was as this resolved (CR 603.7c). */
+  | { type: "floatingTrigger"; trigger: TriggeredAbility; until: TriggerDuration; about?: number }
   /**
    * Copy a spell (CR 707.10): the one whose casting triggered this ("cause": storm, replicate, "copy that spell") or a
    * target. `n`: "storm" is the spells cast before it this turn, "kicked" the times its replicate cost was paid.
@@ -1683,6 +1698,12 @@ export type Effect =
    * `giveTo`: the effect is that player's, not the ability's controller's: "Target player gains control of target permanent
    * you control" (Donate), "An opponent gains control of ~" (Wishclaw Talisman), with a "control" modification (layer 2).
    */
+  /**
+   * "Until your next turn, creatures your opponents control attack each combat if able ..." (Kardur, Doomscourge): an
+   * effect that changes no characteristics, so it applies to whatever is in the group at any time, creatures that come
+   * under an opponent's control later too (CR 611.2c, rulings).
+   */
+  | { type: "groupRules"; affects: Affects; /** The group as the card says it, for the log. */ text: string; mods: Modification[]; duration: "endOfTurn" | "yourNextTurn" }
   | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game" | "yourNextTurn" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; giveTo?: PlayerRef; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind }
   /**
    * Attach the source (an Equipment or Aura) to `what`, CR 701.3; `source`: another Equipment instead ("Attach target
@@ -1941,7 +1962,8 @@ export type Effect =
    * for each player who did (only opponents with `opponents`), with that player as "that player" (PlayerRef "eachOne").
    */
   /** `chain`: the Chain cards' "that permanent's controller may copy ~" (Chain of Vapor), for the bots' answer. */
-  | { type: "eachMay"; who: PlayerRef; effects: Effect[]; text: string; wheel?: number; each?: true; chain?: true; need?: { zone: "battlefield" | "graveyard"; filter: TargetSpec }; perAccepted?: { effects: Effect[]; opponents?: true } }
+  /** `untappedSubject`: only while the trigger's subject is still there untapped (Charismatic Conqueror's "they may tap that permanent"). */
+  | { type: "eachMay"; who: PlayerRef; effects: Effect[]; text: string; wheel?: number; each?: true; chain?: true; need?: { zone: "battlefield" | "graveyard"; filter: TargetSpec }; untappedSubject?: true; perAccepted?: { effects: Effect[]; opponents?: true } }
   /**
    * A punisher: "Each opponent loses 3 life unless that player sacrifices a nonland permanent of their choice or discards
    * a card". Each player in APNAP order picks one of `options` they can do (or none) and, for a discard or a sacrifice,
@@ -2258,6 +2280,8 @@ export type SpellCondition =
   | { kind: "kicked"; which?: number; /** As written, before compile() turns it into `which`. */ cost?: string }
   /** "You may discard a card. If you do, draw a card.": whether the last "you may" was done (CR 608.2c). */
   | { kind: "youDid" }
+  /** "If the player doesn't" after "target opponent may have you draw three cards" (Combustible Gearhulk): whether that player chose to (eachMay's choseThisWay). */
+  | { kind: "theyChose"; not?: true }
   /**
    * The source is still on the battlefield as the same object (CR 400.7), with `yours` under your control: "Sacrifice ~.
    * When you do, ..." can be done (CR 701.21a).
@@ -2975,7 +2999,8 @@ export type ManaProduce =
    * among creatures you control" (Selvala, Heart of the Wilds): `n` mana, each of any color, chosen as it resolves (CR
    * 106.1b, 605.3b); X worked out then too. Each combination of colors is numbered as for "combos" (`colorCombos`).
    */
-  | { kind: "anyColors"; n: number | AmountExpr }
+  /** `colors`: "X mana in any combination of {U} and/or {R}" (Vivi Ornitier): only these. */
+  | { kind: "anyColors"; n: number | AmountExpr; colors?: Color[] }
   /**
    * Storage lands: "Remove any number of storage counters from ~: Add {B} for each storage counter removed this way"
    * (`colors` one color, `min` 0), "Remove X storage counters from ~: Add X mana in any combination of {U} and/or {B}"
@@ -3612,6 +3637,14 @@ export interface CompiledCard {
    * "Equip abilities you activate cost {1} less to activate" (CR 602.2b, 601.2f); `targetSelf`: "that target ~";
    * `otherEquipment`: "of other Equipment".
    */
+  /**
+   * "Activated abilities of creatures you control cost {2} less to activate. This effect can't reduce the mana in that cost
+   * to less than one mana." (Training Grounds, CR 602.2b applies 601.2f): only generic mana, X's too (rulings), of
+   * permanents like `filter` on the battlefield from the source's controller's view; `atLeastOne`, never below one mana.
+   */
+  activationLess?: { n: number; filter: TargetSpec; atLeastOne?: true }[];
+  /** "The "legend rule" doesn't apply to permanents you control" (CR 704.5j): to these, from the source's controller's view. */
+  noLegendRule?: TargetSpec[];
   /** "Power-up abilities of other creatures you control cost {3} less to activate." (Hulk, Gamma Goliath; CR 702.193) */
   powerUpLess?: number;
   /** "Each power-up ability of permanents you control can be activated an additional time." (Wonder Man; CR 702.193a) */

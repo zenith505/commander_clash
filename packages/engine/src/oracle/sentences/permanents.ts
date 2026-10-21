@@ -6,7 +6,7 @@ import { pickFilter, parseGroup, parseObject, parsePlayer, parseTargetPhrase } f
 import { addTarget } from "../body";
 import { parseCount } from "../counts";
 import { parseChanges, parseSentence } from "../sentence";
-import { parseExtraBlocks, parseStaticMods } from "../statics";
+import { parseAffected, parseExtraBlocks, parseStaticMods } from "../statics";
 import type { Ctx } from "../body";
 import { canonicalKeyword, CREATURE_TYPES } from "../../keywords";
 import { parseGrants } from "../grants";
@@ -511,6 +511,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const mods = what?.ref === "self" ? parseChanges(m[1]!) : null;
     if (what && mods) return [{ type: "continuous", what, mods, duration: "game" }];
   }
+  // "Until your next turn, creatures your opponents control attack each combat if able and attack a player other than you
+  // if able" (Kardur, Doomscourge), "until your next turn, each creature attacks ..." (Maximum Carnage): goad's
+  // requirements (CR 701.15b, 508.1d) without goading them, for every creature in the group at any time, those that
+  // enter later too (rulings; CR 611.2c is only for effects that change characteristics).
+  if ((m = /^[Uu]ntil your next turn, (creatures your opponents control|each creature) attacks? each combat if able and attacks? a player other than you if able$/.exec(s))) {
+    const affects = parseAffected(m[1] === "each creature" ? "Each creature" : "Creatures your opponents control");
+    return affects ? [{ type: "groupRules", affects, text: m[1]!, mods: [{ kind: "goad", notGoaded: true }], duration: "yourNextTurn" }] : null;
+  }
   // Goad (CR 701.15a): "until your next turn, that creature attacks each combat if able and attacks a player other than you if able".
   // "Goad all creatures you don't control" (Disrupt Decorum), "goad all suspected creatures" (Nelly Borca): the creatures
   // there as it resolves (CR 611.2c; Disrupt Decorum's ruling: creatures entering later aren't goaded).
@@ -520,7 +528,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // "Choose up to one target creature. If it's suspected, exile it. Otherwise, suspect it." (Agrus Kos): the target alone;
   // what follows says what happens to it.
-  if ((m = /^[Cc]hoose ((?:up to one )?target creature)$/.exec(s))) {
+  // "Choose target creature you control. Whenever that creature deals combat damage ... this turn, ..." (Hunter's Insight).
+  if ((m = /^[Cc]hoose ((?:up to one )?target creature(?: you control)?)$/.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [] : null;
   }

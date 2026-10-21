@@ -411,7 +411,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const ft of [...(s.floatingTriggers ?? [])]) {
       const o = s.objects[ft.sourceId];
       if (!o || player(s, ft.controller).lost) continue;
-      if (self && (o.id !== self.id || (o.zoneChanges ?? 0) !== ft.sourceZc)) continue;
+      if (self && (ft.about ? ft.about.id !== self.id || (self.zoneChanges ?? 0) !== ft.about.zc : o.id !== self.id || (o.zoneChanges ?? 0) !== ft.sourceZc)) continue;
       floating = ft;
       try {
         f(o, ft.controller, [ft.trigger]);
@@ -965,6 +965,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever ~ deals combat damage to a player or planeswalker": nothing else is about a planeswalker dealt it.
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e, t) => e === "selfDealsCombatDamageToPlayer" && !!t.orPlaneswalker, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
+    fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "selfDealsCombatDamageToPlayer" && !!t.orPlaneswalker, triggers, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount }), o);
   } else if (ev.type === "combatDamageToPlayer" && ev.battle) {
     // "Whenever ~ deals combat damage to a player or battle" (CR 310): only those are about a battle dealt it.
     const o = obj(s, ev.id);

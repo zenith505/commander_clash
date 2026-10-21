@@ -48,6 +48,7 @@ export function layerOf(m: Modification): Layer {
       return m.ability ? "6" : "rules";
     case "addKeywords":
     case "removeKeywords":
+    case "cantHaveKeywords":
     case "loseAllAbilities":
     case "addAbility":
     case "unblockedDamage":
@@ -144,8 +145,15 @@ export interface Characteristics {
   cantActivate: false | "all" | "nonMana";
   /** "Can't be blocked except by three or more creatures": the most such an ability asks for, 0 if none (CR 509.1b). */
   minBlockers: number;
-  /** The players who goaded it (CR 701.15): it attacks each combat if able, and a player other than them if able. */
+  /**
+   * The players who goaded it (CR 701.15), or whose effect asks the same of it without goading it (Kardur): it attacks
+   * each combat if able, and a player other than them if able.
+   */
   goadedBy: PlayerId[];
+  /** Keywords it can't have (Arcane Lighthouse), removed after all of layer 6. */
+  cantHave?: string[];
+  /** Goaded (CR 701.15): not by an effect that only asks the same (Kardur, Maximum Carnage rulings). */
+  goaded?: true;
   /** "Can't attack unless defending player controls ...": what the defending player has to control. */
   attackUnless: TargetSpec[];
   cantBeBlockedByLesserPower: boolean;
@@ -300,6 +308,8 @@ interface Inst {
   fromGraveyard?: true;
   /** Its type change applies outside the battlefield too (StaticAbility.offField). */
   offField?: true;
+  /** A stored effect for a group (ContinuousEffect.group): it needs no source. */
+  live?: true;
 }
 
 function gather(s: GameState): Inst[] {
@@ -315,8 +325,11 @@ function gather(s: GameState): Inst[] {
       untilEndOfTurn: e.duration === "endOfTurn",
       mods: e.mods,
       controller: e.controller,
-      // "For as long as it has a vow counter on it": only those that still do.
-      fixed: e.whileCounter ? e.affected.filter((id) => (s.objects[id]?.counters[e.whileCounter!] ?? 0) > 0) : e.affected,
+      // A group's rules effect: whatever is in the group now (Effect groupRules).
+      ...(e.group
+        ? { affects: e.group, live: true as const }
+        : // "For as long as it has a vow counter on it": only those that still do.
+          { fixed: e.whileCounter ? e.affected.filter((id) => (s.objects[id]?.counters[e.whileCounter!] ?? 0) > 0) : e.affected }),
     });
   // Each player's Ring: "Your Ring-bearer is legendary and can't be blocked by creatures with greater power"
   // (CR 701.54c), with the emblem's timestamp (CR 613.7a). Another player gaining control of it ends the designation.
@@ -389,7 +402,7 @@ const sameCI = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 /** Does a static ability's source still have it? It must be on the battlefield and not have lost its abilities. */
 function exists(s: GameState, e: Inst, chars: CharMap): boolean {
   if (e.fromGraveyard) return !e.condition || conditionMet(s, e.condition, e.sourceId!, e.controller!, chars);
-  if (!e.affects || e.emblem) return true;
+  if (!e.affects || e.emblem || e.live) return true;
   const src = chars.get(e.sourceId!);
   if (!src || (!src.hasPrintedAbilities && !e.granted)) return false;
   if (e.condition && !conditionMet(s, e.condition, e.sourceId!, src.controller, chars)) return false;
@@ -486,6 +499,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "yourTurn":
       return (s.activePlayer === you) !== !!cond.not;
+    case "eventPlayersTurn":
+      return eventPlayer !== undefined && (s.activePlayer === eventPlayer) !== !!cond.not;
     case "anyOf":
       return cond.conds.some((c) => conditionMet(s, c, sourceId, you, chars, eventPlayer, eventAmount, sourceZc));
     case "beforeAttackers":
@@ -641,6 +656,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "opponentsDealtExcess":
       // As the permanent was when it was dealt the damage, wherever it is now (Rith rulings).
       return (s.turnLog?.excessDealt ?? []).some((e) => e.controller !== you && e.types.some((ty) => cond.types.includes(ty)));
+    case "subjectPutBySelf": {
+      const by = subjectId !== undefined ? s.objects[subjectId]?.putBy : undefined;
+      const put = !!by && by.id === sourceId && (s.objects[sourceId]?.zoneChanges ?? 0) === by.zc;
+      return cond.not ? !put : put;
+    }
     case "subjectNameUnique": {
       // Checked as it triggers and as it resolves (CR 603.4): if the creature has left, the card (now maybe in your
       // graveyard) or the new object it became shares its name (rulings).
@@ -674,6 +694,13 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "handAtLeast":
       return (s.players[you]?.hand.length ?? 0) >= cond.n;
+    case "sameNamed": {
+      // An object with no name (face down) shares a name with nothing (CR 201.2a).
+      const byName = new Map<string, number>();
+      for (const [id, c] of chars)
+        if (c.controller === you && cond.types.every((t) => c.types.includes(t)) && c.name && !s.objects[id]!.faceDown) byName.set(c.name, (byName.get(c.name) ?? 0) + 1);
+      return [...byName.values()].some((n) => n >= cond.n);
+    }
     case "handsEmpty":
       return s.players.filter((p) => !p.lost).every((p) => p.hand.length === 0);
     case "totalPower": {
@@ -682,7 +709,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return n >= cond.n;
     }
     case "libraryAtMost":
-      return s.players.some((p) => !p.lost && p.library.length <= cond.n);
+      return cond.yours ? (s.players[you]?.library.length ?? 0) <= cond.n : s.players.some((p) => !p.lost && p.library.length <= cond.n);
     case "drawn": {
       const drew = (p: number) => {
         const d = s.players[p]?.draws;
@@ -923,6 +950,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.keywords = c.keywords.filter((x) => !m.keywords.some((k) => sameCI(x, k) || (sameCI(k, "Hexproof") && /^hexproof from /i.test(x))));
       for (const k of m.keywords) if (c.sparedBy) delete c.sparedBy[k.toLowerCase()];
       return;
+    case "cantHaveKeywords":
+      c.cantHave = [...new Set([...(c.cantHave ?? []), ...m.keywords])];
+      return;
     case "loseAllAbilities":
       // Abilities granted before this (earlier timestamps) go too; later ones stay (CR 613.7). So do the mana abilities
       // its basic land types give it (CR 305.6; Imprisoned in the Moon rulings).
@@ -1030,6 +1060,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "goad": {
       const by = controllerOfInst(e, chars);
       if (!c.goadedBy.includes(by)) c.goadedBy.push(by);
+      if (!m.notGoaded) c.goaded = true;
       c.attacksIfAble = true;
       return;
     }
@@ -1180,6 +1211,10 @@ function computeLayers(s: GameState, counted: { yes: boolean }, grants: OffField
       if (pick.offField && layer === "4" && pick.sourceId)
         grants.push({ sourceId: pick.sourceId, controller: chars.get(pick.sourceId)?.controller ?? s.objects[pick.sourceId]!.controller, timestamp: pick.timestamp, mods: modsIn(pick, "4"), chosen: s.objects[pick.sourceId]?.chosen?.type });
     }
+    // "Can't have hexproof or shroud": gone whatever gave them, after every layer 6 effect.
+    if (layer === "6")
+      for (const c of chars.values())
+        if (c.cantHave) c.keywords = c.keywords.filter((x) => !c.cantHave!.some((k) => sameCI(x, k) || (sameCI(k, "Hexproof") && /^hexproof from /i.test(x))));
     if (layer === "4") building!.grants = grants;
     if (layer === "7c") {
       // Counters apply in 7c (CR 613.4c). Everything in 7c adds up, so order doesn't matter.

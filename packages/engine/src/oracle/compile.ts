@@ -421,7 +421,8 @@ export function compile(d: CardDef): CompiledCard {
   const lines = striated && striated !== "fail" ? striated.base : all;
   // Spree (CR 702.172a): "Choose one or more modes. As an additional cost to cast this spell, pay the costs associated
   // with those modes." Each mode is a "+ [cost] — [effect]" line.
-  let spree: { costs: string[]; texts: string[]; lines: string[] } | undefined;
+  // Tiered (CR 702.183a): the same, but exactly one mode, its cost an additional cost: "• Cure — {0} — [effect]".
+  let spree: { costs: string[]; texts: string[]; lines: string[]; tiered?: true } | undefined;
   // Entwine (CR 702.42a): "You may choose all modes of this spell instead of just the number specified. If you do, you
   // pay an additional [cost]." Mana costs only.
   let entwine: { cost: string; raw: string } | undefined;
@@ -449,7 +450,11 @@ export function compile(d: CardDef): CompiledCard {
       spree = { costs: [], texts: [], lines: [raw] };
       continue;
     }
-    const spreeMode = spree && /^\+ ((?:\{[0-9WUBRGC]+\})+) — (.+)$/.exec(line);
+    if (line === "Tiered" && isSpell && !spree) {
+      spree = { costs: [], texts: [], lines: [raw], tiered: true };
+      continue;
+    }
+    const spreeMode = spree && (spree.tiered ? /^• [A-Z][^—•]*? — ((?:\{[0-9WUBRGC]+\})+) — (.+)$/ : /^\+ ((?:\{[0-9WUBRGC]+\})+) — (.+)$/).exec(line);
     if (spree && spreeMode) {
       spree.costs.push(spreeMode[1]!);
       spree.texts.push(spreeMode[2]!);
@@ -1137,14 +1142,26 @@ export function compile(d: CardDef): CompiledCard {
       // Mockingbird: "any creature on the battlefield with mana value less than or equal to the amount of mana spent to
       // cast ~": the mana spent on the spell it was, all of it (rulings), as it enters.
       const spentBound = / with mana value less than or equal to the amount of mana spent to cast ~$/.exec(clone[1]!);
-      const phrase = (spentBound ? clone[1]!.slice(0, spentBound.index) : clone[1]!).replace(/ on the battlefield( with |$)/, "$1");
+      // "Another creature you control" (Sakashima): it isn't on the battlefield yet, so any of them (rulings).
+      const phrase = (spentBound ? clone[1]!.slice(0, spentBound.index) : clone[1]!).replace(/ on the battlefield( with |$)/, "$1").replace(/^another /, "");
       const parsed = parseTargetPhrase(phrase);
       const filter = parsed && spentBound ? { ...parsed, bound: { key: "manaValue" as const, at: "most" as const, amount: { count: { kind: "manaSpent" as const } } } } : parsed;
-      const except = clone[3] ? parseCopyExcept(clone[3]) : undefined;
+      // "Except it has ~'s other abilities" (Sakashima of a Thousand Faces): the text of its other lines (CR 707.9a), as
+      // abilities of the copy, whose name "~" is then.
+      const others = clone[3] === "it has ~'s other abilities" ? lines.filter((_, i) => i !== li).map((l) => l.trim()) : undefined;
+      const except = others ? { text: others } : clone[3] ? parseCopyExcept(clone[3]) : undefined;
       if (filter?.kind === "object" && except !== null && !except?.thisAbility) {
         out.entersAsCopy = { filter: { ...filter, text: clone[1]! }, ...(except ? { except } : {}), ...(clone[2] ? { untilEndOfTurn: true } : {}), ...cloneTapped };
         continue;
       }
+    }
+    // "The "legend rule" doesn't apply to permanents you control" (Sakashima, Mirror Box), "... to Slivers you control",
+    // "The "legend rule" doesn't apply." (Mirror Gallery): CR 704.5j skips those.
+    const noLegend = /^The "legend rule" doesn't apply(?: to (.+?))?\.$/.exec(line);
+    const noLegendFilter = noLegend && (noLegend[1] ? parseGroup(noLegend[1], true)?.filter : ({ kind: "object", text: "permanent" } as TargetSpec));
+    if (noLegend && noLegendFilter && !/ this turn$/.test(noLegend[1] ?? "")) {
+      (out.noLegendRule ??= []).push(noLegendFilter);
+      continue;
     }
     const countMod = parseCountMod(line);
     if (countMod) {
@@ -1288,6 +1305,12 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "Each power-up ability of permanents you control can be activated an additional time.") {
       out.powerUpAgain = true;
+      continue;
+    }
+    const activationLess = /^Activated abilities of (creatures|artifacts|lands|artifact tokens)( you control)? cost \{(\d+)\} less to activate\.( This effect can't reduce the mana in that cost to less than one mana\.)?$/.exec(line);
+    const lessFilter = activationLess && parseTargetPhrase(`${activationLess[1]!.replace(/s$/, "")}${activationLess[2] ?? ""}`);
+    if (activationLess && lessFilter?.kind === "object") {
+      (out.activationLess ??= []).push({ n: Number(activationLess[3]), filter: { ...lessFilter, text: `${activationLess[1]}${activationLess[2] ?? ""}` }, ...(activationLess[4] ? { atLeastOne: true as const } : {}) });
       continue;
     }
     const powerUpLess = /^Power-up abilities of other creatures you control cost \{(\d+)\} less to activate\.$/.exec(line);
@@ -1889,7 +1912,7 @@ export function compile(d: CardDef): CompiledCard {
     const modes = spree.texts.map((t) => parseBody(t, { spell: true }));
     // Every mode has to work, and nothing else may be in the spell's text (it would be outside the modes).
     if (spellLines.length || spree.costs.length < 2 || ascendSpell || modes.some((m) => !m)) out.unsupported.push(...spree.lines, ...spellLines);
-    else out.spell = { targets: [], effects: [], text: spree.lines.join(" "), modal: { min: 1, max: modes.length, modes: modes as AbilityBody[], costs: spree.costs } };
+    else out.spell = { targets: [], effects: [], text: spree.lines.join(" "), modal: { min: 1, max: spree.tiered ? 1 : modes.length, modes: modes as AbilityBody[], costs: spree.costs } };
   } else if (isSpell) {
     // "Choose one — • Destroy all creatures. • Destroy all planeswalkers." then "Then return a creature ... card from your
     // graveyard to the battlefield ..." (Blood on the Snow): the paragraph after the modes is done whichever mode was

@@ -1962,6 +1962,20 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
     if (!spec || (cost && lands < 7)) return false;
     return legalTargets(s, spec, pid).some((t) => t.kind === "object" && controllerOf(s, obj(s, t.id)) !== pid && (!cost || defMv(defOf(s, obj(s, t.id))) >= 3));
   }
+  // "Target opponent may have you draw three cards. If the player doesn't, you mill three cards, then ~ deals damage to
+  // that player ..." (Combustible Gearhulk): the cards only when the other way could hurt too much; "defending player may
+  // have you draw a card. If they do, ... remove it from combat" (Shakedown Heavy): when the attack hurts.
+  const after = r?.body.effects[r.next + 1];
+  if (r && e?.type === "eachMay" && !e.each && after?.type === "if" && after.cond.kind === "theyChose") {
+    const life = player(s, pid).life;
+    if (!after.cond.not) return life <= 20;
+    // Charismatic Conqueror: tap what entered unless it's a creature that may need to block.
+    if (e.untappedSubject) {
+      const sub = r.item.subject && s.objects[r.item.subject.id];
+      return !!sub && !objIsType(s, sub, "Creature");
+    }
+    return allEffects(after.effects).some((x) => x.type === "damage" || x.type === "loseLife") ? life <= 15 : false;
+  }
   if (!r || e?.type !== "may") return true;
   // "Sacrifice it unless you discard a creature card", "discard two cards unless you discard an artifact card": the
   // smaller loss (only asked when it can be done).

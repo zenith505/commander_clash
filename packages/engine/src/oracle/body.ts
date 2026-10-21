@@ -37,6 +37,8 @@ export interface Ctx {
   sacrificedIt?: boolean;
   /** A revealFromHand instruction came before, here or in the ability whose reflexive trigger this is: "for each card revealed this way". */
   revealedFromHand?: boolean;
+  /** After "may have you ...": "you mill three cards, then ... the total mana value of those cards" (Combustible Gearhulk). */
+  milledThisWay?: boolean;
   /** A damage instruction came before: "the excess damage dealt this way" (CR 120.10). */
   excessDamage?: boolean;
   /** A tapAnyNumber instruction came before, here or in the ability whose reflexive trigger this is: "for each creature tapped this way". */
@@ -128,14 +130,22 @@ const CARD_TYPE_WORD = "(?:artifact|battle|creature|enchantment|instant|land|pla
  * a trigger it can have: an intervening "if" or a zone would need more about its source than it has.
  */
 const FLOATING_EVENTS = new Set<string>(["castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer"]);
-const FLOATING_KEYS = new Set<string>(["event", "cast", "dies", "dealer", "toOpponent", "body"]);
+const FLOATING_KEYS = new Set<string>(["event", "cast", "dies", "dealer", "toOpponent", "orPlaneswalker", "body"]);
 
 /**
  * "Until end of turn, whenever you cast a spell, copy it. You may choose new targets for the copy.": a delayed triggered
  * ability that triggers each time until then (CR 603.7b), the sentences after it its instructions. Undefined when `s`
  * isn't one, null when it can't be compiled.
  */
-function floatingTrigger(s: string, after: string[]): Effect | null | undefined {
+function floatingTrigger(s: string, after: string[], ctx?: Ctx): Effect | null | undefined {
+  // "Choose target creature you control. Whenever that creature deals combat damage to a player or planeswalker this
+  // turn, draw that many cards." (Hunter's Insight): a delayed trigger about that creature (CR 603.7b-c), this turn.
+  const that = ctx?.lastObjectTarget !== undefined ? /^Whenever (?:that creature|it) (deals combat damage to a player(?: or planeswalker)?) this turn, (.+)$/.exec(s) : null;
+  if (that) {
+    const trigger = parseTrigger(`Whenever ~ ${that[1]!}, ${[that[2]!, ...after.map((x) => x.replace(/\.$/, ""))].join(". ")}.`);
+    if (!trigger || trigger === "fail" || trigger.event !== "selfDealsCombatDamageToPlayer" || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
+    return { type: "floatingTrigger", trigger, until: "endOfTurn", about: ctx!.lastObjectTarget! };
+  }
   const m = /^([Uu]ntil end of turn|[Tt]his turn|[Uu]ntil your next turn|[Uu]ntil the end of your next turn), ([Ww]henever .+)$/.exec(s);
   if (!m) return undefined;
   const text = [m[2]!, ...after.map((x) => x.replace(/\.$/, ""))].join(". ");
@@ -861,6 +871,50 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       if (!options || !then) return null;
       if (noRegen) si++;
       effects.push({ type: "punisher", who: { ref: anyMay[1] === "player" ? "eachPlayer" : "eachOpponent" }, options, effects: then, mode: anyThen[1] === "a player does" ? "ifAny" : "ifNone", thenText: anyThen[2]! });
+      si++;
+      continue;
+    }
+    // "Target opponent may have you draw three cards. If the player doesn't, you mill three cards, then ~ deals damage to
+    // that player equal to the total mana value of those cards." (Combustible Gearhulk), "defending player may have you
+    // draw a card. If they do, untap ~ and remove it from combat" (Shakedown Heavy): that player decides as it resolves
+    // (CR 608.2d), and what happens either way is yours to do.
+    const haveYou = /^(?:Then )?([Tt]arget opponent|[Dd]efending player) may have you (.+)$/.exec(s);
+    const haveIf = haveYou && /^If (?:the player|that player|they) (doesn't|don't|does|do), (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (haveYou && haveIf) {
+      const who = parsePlayer(haveYou[1]!.toLowerCase(), ctx);
+      if (!who || who.ref === "you") return null;
+      const what = attempt(ctx, () => parseOne(`You ${haveYou[2]!}`, ctx));
+      if (!what || what.some((e) => pauses(e))) return null;
+      ctx.milledThisWay = true;
+      // "You mill X cards, where X is the number of influence counters on ~, and that player loses life equal to ..."
+      // (Palantír of Orthanc): two instructions.
+      const two = /^(you mill X cards, where X is [^,]+), and (that player .+)$/.exec(haveIf[2]!);
+      const one = (text: string): Effect[] | null => {
+        const where = /^(.+), where X is (.+)$/.exec(text);
+        if (!where) return attempt(ctx, () => parseOne(capital(text), ctx));
+        ctx.whereX = true;
+        const fx = attempt(ctx, () => parseOne(capital(where[1]!), ctx));
+        ctx.whereX = false;
+        const def = fx && parseCount(where[2]!.replace(/ counters on it$/, " counters on ~"), ctx);
+        return fx && def ? replaceX(fx, def) : null;
+      };
+      const then = two ? ((a, b) => (a && b ? [...a, ...b] : null))(one(two[1]!), one(two[2]!)) : one(haveIf[2]!);
+      ctx.milledThisWay = undefined;
+      if (!then) return null;
+      effects.push({ type: "eachMay", who, effects: what, text: `have ~'s controller ${haveYou[2]!}` }, { type: "if", cond: { kind: "theyChose", ...(/n't$/.test(haveIf[1]!) ? { not: true as const } : {}) }, effects: then });
+      si++;
+      continue;
+    }
+    // "Whenever an artifact or creature an opponent controls enters untapped, they may tap that permanent. If they don't,
+    // you create a 1/1 white Vampire creature token with lifelink." (Charismatic Conqueror): its controller decides as it
+    // resolves; one that's tapped or gone by then can't be tapped, so the token comes (rulings).
+    const tapThat = ctx.subject ? /^(?:[Tt]hey|[Tt]hat player) may tap that (permanent|creature|artifact)$/.exec(s) : null;
+    const tapIf = tapThat && /^If (?:they|that player|the player) (?:doesn't|don't), (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (tapThat && tapIf) {
+      const what = attempt(ctx, () => parseOne(`Tap that ${tapThat[1]!}`, ctx));
+      const then = what && attempt(ctx, () => parseOne(capital(tapIf[1]!), ctx));
+      if (!what || !then) return null;
+      effects.push({ type: "eachMay", who: { ref: "subjectController" }, effects: what, text: `tap that ${tapThat[1]!}`, untappedSubject: true }, { type: "if", cond: { kind: "theyChose", not: true }, effects: then });
       si++;
       continue;
     }
@@ -2384,7 +2438,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       continue;
     }
     // A delayed triggered ability with a duration (CR 603.7b): the rest of the paragraph is its instructions.
-    const floating = floatingTrigger(s, sentences.slice(si + 1));
+    const floating = floatingTrigger(s, sentences.slice(si + 1), ctx);
     if (floating !== undefined) {
       if (!floating) return null;
       effects.push(floating);
@@ -3117,7 +3171,7 @@ function parseModal(count: string, bullets: string, text: string, opts: Paramete
 
 /** "X and Y" where each half is its own effect. */
 function parseConjunction(s: string, ctx: Ctx): Effect[] | null {
-  const parts = s.split(/,? and (?=(?:you|each|target|draw|~|its|create|put|return|exile|destroy|tap|untap|mill|suspect|convert|transform|after this phase|they gain)\b|get (?:\{E\}|\w+ \{E\}|an amount of \{E\}))/i);
+  const parts = s.split(/,? and (?=(?:you|each|target|draw|~|its|create|put|return|exile|destroy|tap|untap|mill|suspect|convert|transform|after this phase|they gain|scry \d+$|surveil \d+$)\b|get (?:\{E\}|\w+ \{E\}|an amount of \{E\}))/i);
   if (parts.length < 2) return null;
   const out: Effect[] = [];
   for (const p of parts) {

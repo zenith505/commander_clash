@@ -1,4 +1,4 @@
-import type { AbilityBody, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CostMod, NamePurpose, CounterKind, DamageMod, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec, TokenSpec, ManaTrigger, TriggeredAbility, TriggerDuration } from "./abilities";
+import type { AbilityBody, Affects, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CostMod, NamePurpose, CounterKind, DamageMod, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec, TokenSpec, ManaTrigger, TriggeredAbility, TriggerDuration } from "./abilities";
 import type { DamageEvent } from "./damage";
 import type { Characteristics } from "./layers";
 
@@ -277,6 +277,11 @@ export interface GameObject {
    * them but not the designation (rulings).
    */
   suspected?: number;
+  /**
+   * The permanent whose ability put it onto the battlefield from a hand, as that object was (`zc`): "if it wasn't put
+   * onto the battlefield with this ability" (Kodama of the East Tree). Gone when it leaves (CR 400.7).
+   */
+  putBy?: { id: ObjectId; zc: number };
   /** A Class's level (CR 716.2a-b), a designation it keeps until it leaves the battlefield; unset is level 1 (716.2d). */
   classLevel?: number;
   /** A Case's solved designation (CR 719.3b), kept until it leaves the battlefield; not a copiable value. */
@@ -956,6 +961,8 @@ export interface ContinuousEffect {
   /** "For as long as it has a vow counter on it" (CR 611.2b): it applies only to those of `affected` with one (Promise of Loyalty). */
   whileCounter?: string;
   affected: ObjectId[];
+  /** Instead of `affected`: whatever is in this group from `controller`'s view, at any time (Effect groupRules). */
+  group?: Affects;
   mods: Modification[];
 }
 
@@ -1213,7 +1220,7 @@ export interface GameState {
    * them (603.7d-e), `sourceZc` as it was then: an ability about "~" is about that object only (603.7c, 400.7). `turn`: the
    * turn it was made, for "until the end of your next turn".
    */
-  floatingTriggers?: { id: string; controller: PlayerId; sourceId: ObjectId; sourceCardId: string; sourceZc: number; fromSpell?: true; trigger: TriggeredAbility; until: TriggerDuration; turn: number }[];
+  floatingTriggers?: { id: string; controller: PlayerId; sourceId: ObjectId; sourceCardId: string; sourceZc: number; fromSpell?: true; trigger: TriggeredAbility; until: TriggerDuration; turn: number; /** What its self events are about, if not its source (Effect floatingTrigger's `about`). */ about?: { id: ObjectId; zc: number } }[];
   /** Spells cast this turn, by anyone (storm, CR 702.40a). */
   spellsCastThisTurn?: number;
   /** Who cast each spell this turn, and its card (a key into `cards`) as it was cast: "can't cast more than one spell each turn". */

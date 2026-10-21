@@ -347,6 +347,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^an? (creature|planeswalker)(?: or (planeswalker))? an opponent controlled was dealt excess damage this turn$/.exec(text)))
     return { kind: "opponentsDealtExcess", types: [m[1], m[2]].filter(Boolean).map((x) => x!.charAt(0).toUpperCase() + x!.slice(1)) };
   if (/^it's your turn$/.test(text)) return { kind: "yourTurn" };
+  if (/^it isn't that player's turn$/.test(text)) return { kind: "eventPlayersTurn", not: true };
   if (/^it's not your turn$/.test(text)) return { kind: "yourTurn", not: true };
   // "If four or more creatures are attacking", "if exactly one creature is attacking", "if a white creature is attacking"
   // (the traps): attacking creatures, anyone's.
@@ -362,6 +363,10 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return g && !g.other ? { kind: "onBattlefield", filter: g.filter, min: num(m[1]!) } : null;
   }
   if ((m = new RegExp(`^you have ${NUM} or more cards in hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!) };
+  // "If you control eight or more artifacts with the same name as one another" (Mechanized Production): all of them
+  // artifacts (rulings).
+  if ((m = new RegExp(`^you control ${NUM} or more (artifacts|creatures|permanents) with the same name as one another$`).exec(text)))
+    return { kind: "sameNamed", types: m[2] === "permanents" ? [] : [capital(m[2]!.slice(0, -1))], n: num(m[1]!) };
   if (/^each player has no cards in hand$/.test(text)) return { kind: "handsEmpty" };
   if (/^you have no cards in hand$/.test(text)) return { kind: "noneInHand", filter: { kind: "card", text: "card" } };
   // The Cases' "To solve" conditions (CR 719.3a), about this turn.
@@ -390,6 +395,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^you(?:'ve)? gained life this turn$/.test(text)) return { kind: "lifeGainedThisTurn", n: 1 };
   if ((m = /^creatures you control have total power (\d+) or greater$/.exec(text))) return { kind: "totalPower", n: Number(m[1]) };
   if ((m = new RegExp(`^a library has ${NUM} or fewer cards in it$`).exec(text))) return { kind: "libraryAtMost", n: num(m[1]!) };
+  if (/^your library has no cards in it$/.test(text)) return { kind: "libraryAtMost", n: 0, yours: true };
   if (/^you're the monarch$/.test(text)) return { kind: "monarch" };
   if (/^you have the initiative$/.test(text)) return { kind: "initiative" }; // CR 726.1
   if (/^you've completed a dungeon$/.test(text)) return { kind: "completedDungeon" }; // CR 309.7
@@ -548,7 +554,7 @@ export function parsePreventAll(text: string): { subject: string; mod: Extract<M
  * The group a static ability talks about: "creatures you control", "other Elves you
  * control", "white creatures you control", "enchanted creature", "equipped creature", "~".
  */
-function parseAffected(subject: string): Affects | null {
+export function parseAffected(subject: string): Affects | null {
   const x = subject.trim();
   if (x === "~") return { kind: "self" };
   // "Creatures enchanted player controls" (an Aura with "enchant player", CR 702.5d): the group "you control" names,
@@ -1089,6 +1095,11 @@ function parseStaticLine(line: string): StaticAbility | null {
   let mods = parseStaticMods(each ? each[1]! : said);
   if (!mods) return null;
   const counts = (c: AmountExpr | null) => c && staticCountOk(c, affects) ? c : null;
+  // "Gets +1/+1 for each enchantment you control and has first strike" (Ethereal Armor): the count, then what it has.
+  const andHas = each && / and ((?:has|have) .+)$/.exec(each[4]!);
+  const alsoHas = andHas ? parseStaticMods(andHas[1]!) : [];
+  if (!alsoHas) return null;
+  if (each && andHas) each[4] = each[4]!.slice(0, andHas.index);
   if (each) {
     // Coat of Arms: "for each other creature on the battlefield that shares at least one creature type with it", "it"
     // each creature it affects, counted for that one.
@@ -1100,7 +1111,7 @@ function parseStaticLine(line: string): StaticAbility | null {
     if (!per || mods.length !== 1 || pt?.kind !== "modifyPT") return null;
     const [p, t] = [scaleAmount(pt.power, per), scaleAmount(pt.toughness, per)];
     if (p === null || t === null) return null;
-    mods = [{ kind: "modifyPT", power: p, toughness: t }];
+    mods = [{ kind: "modifyPT", power: p, toughness: t }, ...alsoHas];
   }
   if (where) {
     const def = counts(parseCount(where[2]!, null));

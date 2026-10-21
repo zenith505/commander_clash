@@ -43,6 +43,10 @@ export function describeMods(s: GameState, mods: Modification[], controller: Pla
       parts.push(`can't attack ${player(s, controller).name} or their planeswalkers`);
       continue;
     }
+    if (m.kind === "goad" && m.notGoaded) {
+      parts.push(`attack${plural ? "" : "s"} each combat if able and attack${plural ? "" : "s"} a player other than ${player(s, controller).name} if able`);
+      continue;
+    }
     if (m.kind === "goad") {
       parts.push(`${plural ? "are" : "is"} goaded by ${player(s, controller).name}`);
       continue;

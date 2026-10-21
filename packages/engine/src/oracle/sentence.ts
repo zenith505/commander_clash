@@ -5,7 +5,7 @@ import { num, PT, ptAmt, COLOR_WORDS, TYPE_WORDS, WHEEL, COUNTER, counterKind, X
 import { Ctx } from "./body";
 import { parseSearchFilter } from "./search";
 import { parseCount } from "./counts";
-import { parseKeywordList, parseObject } from "./targets";
+import { parseKeywordList, parseObject, parsePlayer } from "./targets";
 import { parseGrants } from "./grants";
 import { parseBasicsSentence } from "./sentences/basics";
 import { parseEveryPlayerZonesSentence, parseZonesSentence } from "./sentences/zones";
@@ -118,6 +118,12 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     const n = m[3] === "a card" ? 1 : num(m[3]!.replace(/ cards$/, ""));
     return Number.isInteger(n) ? [{ type: "draw", who, n }] : null;
   }
+  // "You draw a card and target opponent may draw a card" (Tataru Taru): that player decides as it resolves (CR 608.2d).
+  if ((m = /^(?:[Tt]arget opponent|[Tt]arget player|[Tt]hat player) may draw (a card|two cards|three cards)$/.exec(s))) {
+    const who = parsePlayer(s.slice(0, s.indexOf(" may ")).toLowerCase(), ctx);
+    if (!who || who.ref === "you") return null;
+    return [{ type: "eachMay", who, effects: [{ type: "draw", who: { ref: "you" }, n: m[1] === "a card" ? 1 : num(m[1]!.replace(/ cards$/, "")) }], text: `draw ${m[1]}`, each: true }];
+  }
   // "Then each player who drew a card this way gains 1 life" (Kwain): those who chose to.
   if (ctx.eachChose && (m = /^(?:Then )?[Ee]ach player who drew a card this way gains (\d+) life$/.exec(s))) return [{ type: "gainLife", who: { ref: "choseThisWay" }, n: Number(m[1]) }];
   // Flare of Fortitude: "Until end of turn, your life total can't change, and permanents you control gain hexproof and
@@ -188,7 +194,14 @@ export function parseChanges(text: string): Modification[] | null {
       if (!k) return null;
       out.push(...k);
     } else if (/^loses? all abilities$/i.test(p)) out.push({ kind: "loseAllAbilities" });
-    else if ((m = /^loses? (.+)$/i.exec(p))) {
+    // "Lose hexproof and shroud and can't have hexproof or shroud" (Arcane Lighthouse): effects with later timestamps
+    // can't give them back either (rulings).
+    else if ((m = /^loses? (.+?) and can't have (.+)$/i.exec(p))) {
+      const k = parseKeywordList(m[1]!);
+      const again = parseKeywordList(m[2]!.replace(/ or /g, " and "));
+      if (!k || !again || JSON.stringify([...k].sort()) !== JSON.stringify([...again].sort())) return null;
+      out.push({ kind: "removeKeywords", keywords: k }, { kind: "cantHaveKeywords", keywords: k });
+    } else if ((m = /^loses? (.+)$/i.exec(p))) {
       const k = parseKeywordList(m[1]!);
       if (!k) return null;
       out.push({ kind: "removeKeywords", keywords: k });

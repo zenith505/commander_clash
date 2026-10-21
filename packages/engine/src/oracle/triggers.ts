@@ -1127,7 +1127,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // checked as the ability would trigger and again as it resolves, so it can't be an ordinary effect.
   const intervening = /^((?:When|Whenever|At)\b[^,]*), if ([^,]+), (.+)$/.exec(line);
   // "If it's attacking" is about the source only in an ability about the source itself.
-  const aboutIt = intervening && /^(it|~)\b(?!'s (?:your|the first) )/.test(intervening[2]!) && !/^(When|Whenever) ~ /.test(intervening[1]!) && !/^~ is enchanted by /.test(intervening[2]!);
+  const aboutIt = intervening && /^(it|~)\b(?!'s (?:your|the first) | isn't that player's turn$)/.test(intervening[2]!) && !/^(When|Whenever) ~ /.test(intervening[1]!) && !/^~ is enchanted by /.test(intervening[2]!);
   // "At the beginning of each opponent's upkeep, if that player has two or fewer cards in hand": whose upkeep it is.
   const thatHand = intervening && /^At the beginning of each (?:opponent|player)'s (?:upkeep|draw step|end step)$/.test(intervening[1]!) ? new RegExp(`^that player has (no|${NUM} or (fewer|more)) cards in hand$`).exec(intervening[2]!) : null;
   const handCond = thatHand && (thatHand[1] === "no" ? { max: 0 } : thatHand[3] === "fewer" ? { max: num(thatHand[2]!) } : { min: num(thatHand[2]!) });
@@ -1141,11 +1141,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "Whenever a nontoken creature you control enters, if it doesn't have the same name as another creature you control
   // or a creature card in your graveyard" (Guardian Project): about the creature that entered.
   const nameCond: StaticCondition | null = intervening && /^Whenever an? [^,]*creature you control enters$/.test(intervening[1]!) && intervening[2] === "it doesn't have the same name as another creature you control or a creature card in your graveyard" ? { kind: "subjectNameUnique" } : null;
+  // "Whenever another permanent you control enters, if it wasn't put onto the battlefield with this ability" (Kodama of
+  // the East Tree): what entered, as it triggers and resolves (CR 603.4).
+  const putCond: StaticCondition | null = intervening && /^Whenever (?:another|a) [^,]+ enters$/.test(intervening[1]!) && intervening[2] === "it wasn't put onto the battlefield with this ability" ? { kind: "subjectPutBySelf", not: true } : null;
   // "Whenever a land an opponent controls enters, if that player controls more lands than you" (Archaeomancer's Map):
   // the entering land's controller, as it triggers and resolves (rulings).
   const thatMore = intervening && /^Whenever an? [a-z]+ an opponent controls enters$/.test(intervening[1]!) ? /^that player controls more (lands|creatures) than you$/.exec(intervening[2]!) : null;
   const moreCond: StaticCondition | null = thatMore && { kind: "opponentMore", what: thatMore[1] as "lands" | "creatures", subjectController: true };
-  const ifCond = moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
+  const ifCond = putCond ? putCond : moreCond ? moreCond : nameCond ? nameCond : typeCond ? typeCond : ptCond ? ptCond : handCond ? ({ kind: "eventPlayerHand", ...handCond } as const) : intervening && !aboutIt && parseStaticCondition(intervening[2]!, { affects: { kind: "self" }, mods: [], text: "" });
   // "That player" is the attacked player only in "Whenever ~ attacks a player".
   if (ifCond && ifCond.kind === "defenderMostLife" && !/^Whenever ~ attacks a player$/.test(intervening![1]!)) return "fail";
   if (intervening && ifCond) {
@@ -1336,6 +1339,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (fromYard) {
     const t = parseTrigger(`When ~ enters, ${fromYard[2]}`);
     return !t || t === "fail" || t.event !== "selfEnters" ? "fail" : { ...t, ifFromGraveyard: fromYard[1] === "a" ? "any" : "yours" };
+  }
+  // "Whenever an artifact or creature an opponent controls enters untapped" (Charismatic Conqueror), "whenever a
+  // permanent you control enters tapped" (Amulet of Vigor): how it entered is part of the trigger event.
+  const howEnters = /^Whenever (?!~ )(.+?) enters (tapped|untapped), (.+)$/.exec(line);
+  if (howEnters) {
+    const t = parseTrigger(`Whenever ${howEnters[1]} enters, ${howEnters[3]}`);
+    if (!t || t === "fail" || t.event !== "permanentEnters" || !t.enters || t.enters.filter.tapped !== undefined) return "fail";
+    return { ...t, enters: { ...t.enters, filter: { ...t.enters.filter, tapped: howEnters[2] === "tapped", text: `${t.enters.filter.text} that enters ${howEnters[2]}` } } };
   }
   // "When ~ enters untapped, ..." (Mystic Sanctuary): entering untapped is part of the trigger event.
   const untapped = /^When(?:ever)? ~ enters untapped, (.+)$/.exec(line);

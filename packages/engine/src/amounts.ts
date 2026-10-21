@@ -159,6 +159,14 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return Math.max(0, ...(s.resolving?.exiledPowers ?? []));
     case "countersRemovedThisWay":
       return s.resolving?.countersRemoved ?? 0;
+    case "linkedExiled": {
+      const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      return src ? (s.linkedExile?.[`${src.id}@${src.zoneChanges ?? 0}`] ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc).length : 0;
+    }
+    case "movedLinkedThisWay":
+      return s.resolving?.movedLinked ?? 0;
+    case "eventGroupPower":
+      return ctx.event?.groupPower ?? 0;
     case "lifeLostThisWay":
       return s.resolving?.exchanged?.lost[ctx.controller] ?? 0;
     case "exchangedLifeDifference": {
@@ -262,6 +270,14 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       if (c.lostLife) return s.turnOrder.filter((pid) => !(c.opponents && pid === ctx.controller) && (s.lostLifeThisTurn ?? []).includes(pid)).length;
       // Cut a Deal: each one that drew a card in the draw before, however many it drew (rulings).
       if (c.drewThisWay) return new Set((s.resolving?.drawnBefore ?? []).map((id) => s.objects[id]?.owner).filter((pid) => pid !== undefined && !(c.opponents && pid === ctx.controller))).size;
+      // Smuggler's Share: players still in the game, by what they did this turn.
+      if (c.drewAtLeast !== undefined || c.landsEnteredAtLeast !== undefined)
+        return s.turnOrder.filter((pid) => {
+          if (s.players[pid]!.lost || (c.opponents && pid === ctx.controller)) return false;
+          const drew = s.players[pid]!.draws?.turn === s.turn ? s.players[pid]!.draws!.n : 0;
+          const lands = (s.turnLog?.entered ?? []).filter((e) => e.controller === pid && e.types.includes("Land")).length;
+          return (c.drewAtLeast === undefined || drew >= c.drewAtLeast) && (c.landsEnteredAtLeast === undefined || lands >= c.landsEnteredAtLeast);
+        }).length;
       return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller)).length;
     case "opponentsAttacked": {
       const a = s.players[ctx.controller]?.attackedPlayers;
@@ -505,6 +521,12 @@ function describeCount(c: Count): string {
       return "the greatest power among creature cards exiled";
     case "countersRemovedThisWay":
       return "#counters removed";
+    case "linkedExiled":
+      return "#cards exiled with it";
+    case "movedLinkedThisWay":
+      return "#cards put into graveyards";
+    case "eventGroupPower":
+      return "the total power of those creatures";
     case "lifeLostThisWay":
       return "the life you lost";
     case "exchangedLifeDifference":
@@ -530,7 +552,7 @@ function describeCount(c: Count): string {
     case "stateIf":
       return "1 if the condition holds";
     case "players":
-      return `#${c.opponents ? "opponents" : "players"}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}`;
+      return `#${c.opponents ? "opponents" : "players"}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}`;
     case "diedThisTurn":
       return "#creatures that died this turn";
     case "tokensCreatedThisTurn":

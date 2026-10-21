@@ -4645,11 +4645,12 @@ function Controls({
       <div className="controls">
         <span>
           {pending.kind === "discard" ? <strong>{pending.source}: </strong> : "Hand size: "}
-          click {pending.count} {pending.kind === "discard" && pending.filter ? pending.filter.text.replace(/^(?:an? )/, "") : "card"}
+          click {pending.kind === "discard" && pending.upTo ? "up to " : ""}
+          {pending.count} {pending.kind === "discard" && pending.filter ? pending.filter.text.replace(/^(?:an? )/, "") : "card"}
           {pending.count === 1 ? "" : "s"} in your hand to {pending.kind === "discard" && pending.exile ? "exile" : "discard"}.
         </span>
         <button
-          disabled={discards.length !== pending.count || (pending.kind === "discard" && !!pending.filter && discards.some((id) => !printedMatches(pending.filter!, cardOf(s, id))))}
+          disabled={(pending.kind === "discard" && pending.upTo ? discards.length > pending.count : discards.length !== pending.count) || (pending.kind === "discard" && !!pending.filter && discards.some((id) => !printedMatches(pending.filter!, cardOf(s, id))))}
           onClick={() => dispatch([{ type: "discard", player: HUMAN, objectIds: discards }])}
         >
           {pending.kind === "discard" && pending.exile ? "Exile" : "Discard"}

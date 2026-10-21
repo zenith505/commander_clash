@@ -11,7 +11,7 @@ import { RulesError, type CardDef, type Chosen, type Color, type GameObject, typ
 import { manaTriggerResults } from "../manaabilities";
 import { askGraveyardOrder, closeGraveyardBatch, graveyardEnd } from "../graveyard";
 import type { ManaSpent } from "../mana";
-import { objectMatches, bindChosen, bindBound, targetingCtx, sourceQuality, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, checkTotals } from "./targeting";
+import { objectMatches, bindChosen, bindBound, targetingCtx, sourceQuality, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, checkTotals, relatedOk } from "./targeting";
 import { runPreventionEffect } from "./run-prevention";
 import { runBasicsEffect, becomeMonarch } from "./run-basics";
 import { runCoinEffect, runDiceEffect } from "./run-dice";
@@ -98,6 +98,11 @@ export function beginResolution(s: GameState, item: StackItem, body: AbilityBody
   const now: AmountCtx = { ...targetingCtx(s, item.controller, item.sourceId), ...(item.sourceZc !== undefined ? { sourceZc: item.sourceZc } : {}), ...(item.lki ? { lki: item.lki } : {}), x: item.x ?? 0 };
   const legal = body.targets.map((spec, i) => !!targets[i] && isLegalTarget(s, bindBound(s, spec, now), targets[i]!, item.controller, src) && lesserPowerOk(s, spec, targets[i]!, item.sourceId, item.sourceZc));
   checkTotals(s, body.targets, targets, legal);
+  // Requirements about the other targets, checked again too (CR 608.2b): "controlled by different players" (Run Away
+  // Together), "in that player's graveyard" (Goblin Welder).
+  body.targets.forEach((spec, i) => {
+    if (legal[i] && (spec.differentControllerFrom?.length || spec.inGraveyardOfControllerOf?.length) && !relatedOk(s, spec, targets, targets[i]!)) legal[i] = false;
+  });
   // With every target it chose now illegal, it doesn't resolve (CR 608.2b). One that chose none of its
   // "up to" targets isn't targeted at all, and resolves (CR 115.6).
   const chose = targets.some((t) => t.kind !== "none");
@@ -293,6 +298,10 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const a = s.resolving?.amassed ?? s.resolving?.item.amassed;
     const o = a && s.objects[a.id];
     return o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === a.zc ? [o] : [];
+  }
+  if (ref.ref === "discarded") {
+    const o = s.resolving?.discardedCards?.length === 1 ? s.objects[s.resolving.discardedCards[0]!.id] : undefined;
+    return o && o.zone === "graveyard" && (o.zoneChanges ?? 0) === s.resolving!.discardedCards![0]!.zc ? [o] : [];
   }
   if (ref.ref === "exiledTop") {
     const ex = s.resolving?.exiledTop;
@@ -598,6 +607,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "noLifeGain":
     case "turnRules":
     case "flashUntilNextTurn":
+    case "opponentsHandOnlyUntilNextTurn":
+    case "graveyardCastThisTurn":
     case "cantCast":
     case "cantPlayLands":
     case "noPrevention":
@@ -657,6 +668,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "keepDestroyRest":
     case "empowerJace":
     case "bounce":
+    case "weld":
     case "putOntoBattlefield":
     case "randomFromGraveyard":
     case "chooseFromGraveyard":
@@ -792,6 +804,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "newTargets":
       return runSpellsEffect(s, e, ctx, src);
     case "mill":
+    case "revealUntilLandToGraveyard":
     case "exileTop":
     case "revealTopToHand":
     case "revealTop":

@@ -6,6 +6,7 @@ import { parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
 import { CREATURE_TYPES } from "../keywords";
 import { parseSearchFilter } from "./search";
 import { parseCount } from "./counts";
+import { parseToken } from "./tokens";
 const capital = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
 
 const TRIGGERS: [RegExp, TriggerEvent][] = [
@@ -809,6 +810,13 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     yourTurn = !!m[4];
     rest = m[5]!;
   } else return null;
+  // Kotis, Celes: "if one or more of them entered from a graveyard or was cast from a graveyard" (an intervening if about
+  // the event, CR 603.4).
+  const fromYard = /^if one or more of them entered from a graveyard or was cast from a graveyard, (.+)$/.exec(rest);
+  if (fromYard && batch.what === "enters") {
+    batch.fromGraveyard = true;
+    rest = fromYard[1]!;
+  }
   // Kambal, Profiteering Mayor: "for each of them, create a tapped token that's a copy of it", those that entered.
   const eachCopy = /^for each of them, create an? (tapped )?token that's a copy of it\.?$/.exec(rest);
   if (eachCopy && batch.what === "enters" && !yourTurn) return { event: "batch", batch, body: { targets: [], effects: [{ type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "eventGroup" }, each: true, ...(eachCopy[1] ? { tapped: true } : {}) }], text: rest.replace(/\.$/, "") } };
@@ -817,6 +825,14 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
   const putThem = /^put them onto the battlefield( tapped)?\.?$/.exec(rest);
   if (putThem && batch.what === "toGraveyard" && batch.from === "library" && batch.filter && !yourTurn)
     return { event: "batch", batch, body: { targets: [], effects: [{ type: "putOntoBattlefield", what: { ref: "eventGroup" }, ...(putThem[1] ? { tapped: true } : {}) }], text: rest.replace(/\.$/, "") } };
+  // The Skullspore Nexus: "create a green Fungus Dinosaur creature token with base power and toughness each equal to the
+  // total power of those creatures", the ones that died, as they last existed (rulings, CR 608.2h).
+  const totalPower = /^create an? ([a-z]+(?: and [a-z]+)? (?:[A-Z][a-z]+ )+)creature token with base power and toughness each equal to the total power of those creatures\.?$/.exec(rest);
+  if (totalPower && batch.what === "leaves" && batch.dies && !yourTurn) {
+    const token = parseToken(0, 0, totalPower[1]!.trim());
+    if (!token) return "fail";
+    return { event: "batch", batch, body: { targets: [], effects: [{ type: "createToken", who: { ref: "you" }, n: 1, token, pt: { count: { kind: "eventGroupPower" } } }], text: rest.replace(/\.$/, "") } };
+  }
   // The objects as a group: not modeled.
   if (/\b(it|its|they|them|their|those|that card|that creature|that token|one of them|among them|this way)\b/i.test(rest)) return "fail";
   let text = rest;
@@ -1188,7 +1204,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   const nameCond: StaticCondition | null = intervening && /^Whenever an? [^,]*creature you control enters$/.test(intervening[1]!) && intervening[2] === "it doesn't have the same name as another creature you control or a creature card in your graveyard" ? { kind: "subjectNameUnique" } : null;
   // "Whenever another permanent you control enters, if it wasn't put onto the battlefield with this ability" (Kodama of
   // the East Tree): what entered, as it triggers and resolves (CR 603.4).
-  const putCond: StaticCondition | null = intervening && /^Whenever (?:another|a) [^,]+ enters$/.test(intervening[1]!) && intervening[2] === "it wasn't put onto the battlefield with this ability" ? { kind: "subjectPutBySelf", not: true } : null;
+  const putCond: StaticCondition | null = intervening && /^Whenever (?:another|a) [^,]+ enters$/.test(intervening[1]!) && intervening[2] === "it wasn't put onto the battlefield with this ability" ? { kind: "subjectPutBySelf", not: true } : intervening && /^Whenever (?:another|an?) [^,]+ you control enters$/.test(intervening[1]!) && /^you (didn't )?cast it from your hand$/.test(intervening[2]!) ? { kind: "subjectCastFromHand", ...(/didn't/.test(intervening[2]!) ? { not: true as const } : {}) } : null;
   // "Whenever a land an opponent controls enters, if that player controls more lands than you" (Archaeomancer's Map):
   // the entering land's controller, as it triggers and resolves (rulings).
   const thatMore = intervening && /^Whenever an? [a-z]+ an opponent controls enters$/.test(intervening[1]!) ? /^that player controls more (lands|creatures) than you$/.exec(intervening[2]!) : null;
@@ -1208,6 +1224,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       rest = rest.replace(/\byou gain that much life\b/g, `you gain life equal to ${died}`).replace(new RegExp(`\\bdistribute that many ${COUNTER} counters\\b`, "g"), `distribute a number of $1 counters equal to ${died}`).replace(/ and (distribute a number of)/, ". Distribute a number of");
       if (/\bthat (much|many)\b/.test(rest)) return "fail";
     }
+    // "If there are cards exiled with ~, put them into their owner's graveyard" (Valakut Exploration): those cards.
+    if (/^there are cards exiled with ~$/.test(intervening[2]!)) rest = rest.replace(/^put them into their owner's graveyard,/, "put all cards exiled with ~ into their owners' graveyards,");
     // "At the beginning of your upkeep, if ~ is tapped, put a storage counter on it" (Bottomless Vault): "it" is ~, the
     // only thing named.
     // So is every "it" of "sacrifice it" (Mad Dog) and "it deals 2 damage to you unless it came under your control this

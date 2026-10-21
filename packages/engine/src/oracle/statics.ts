@@ -71,6 +71,14 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     const mods = parseStaticMods(m[1]!);
     return mods ? { affects: { kind: "paired" }, mods, text: line } : null;
   }
+  // Sting, the Glinting Dagger: "Equipped creature has first strike as long as it's blocking or blocked by a Goblin or Orc":
+  // blocking one or blocked by one (CR 509.1g-h); one removed from combat no longer counts (CR 506.4).
+  if ((m = /^Equipped creature has ([a-z ]+) as long as it's blocking or blocked by an? ([A-Z][a-z]+)(?: or ([A-Z][a-z]+))?$/.exec(text)) && [m[2], m[3]].every((x) => !x || CREATURE_TYPES.has(x))) {
+    const st = parseStatic(`Equipped creature has ${m[1]}.`);
+    if (!st || st.condition || st.affects.kind !== "attached") return null;
+    const types = [m[2]!, ...(m[3] ? [m[3]] : [])];
+    return { ...st, text: line, condition: { kind: "attachedInCombatWith", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: types, text: types.join(" or ") } } };
+  }
   // "As long as equipped creature is a Human, it gets an additional +1/+1": a second bonus, only for a Human.
   if ((m = /^As long as (enchanted|equipped) creature is an? ([A-Z][a-z]+), it (gets|has) (.+)$/.exec(text)) && CREATURE_TYPES.has(m[2]!)) {
     const st = parseStatic(`${capital(m[1]!)} creature ${m[3]} ${m[4]!.replace(/^an additional /, "")}.`);
@@ -156,6 +164,15 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
 export function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition } } | { lessIfTargets: { n: number; filter: TargetSpec } } | { targetTax: number } | { targetLifeTax: number } | "fail" | null {
   let text = line.replace(/^[A-Z][A-Za-z' -]+ — (?=~ costs|The second)/, "").replace(/\.$/, ""); // "Domain —" is an ability word
   let m: RegExpExecArray | null;
+  // "Cleric spells you cast cost {W}{B} less to cast. This effect reduces only the amount of colored mana you pay." (Edgewalker),
+  // Morophon's "Spells of the chosen type you cast cost {W}{U}{B}{R}{G} less ...": colored mana only, never generic (CR 118.7).
+  if ((m = /^(.+ cost) ((?:\{[WUBRG]\})+) (less to cast)\. This effect reduces only the amount of colored mana you pay$/.exec(text))) {
+    const colors = [...m[2]!.matchAll(/[WUBRG]/g)].map((x) => x[0] as Color);
+    if (new Set(colors).size !== colors.length) return "fail";
+    const base = parseCostChange(`${m[1]!.replace(/^Spells of the chosen type you cast cost$/, "Spells you cast of the chosen type cost")} {1} ${m[3]!}`);
+    if (!base || base === "fail" || !("costMod" in base) || base.costMod.times || base.costMod.nth) return "fail";
+    return { costMod: { ...base.costMod, n: 0, colored: colors, text: line } };
+  }
   if ((m = /^Spells your opponents cast that target ~ cost \{(\d+)\} more to cast$/.exec(text))) return { targetTax: Number(m[1]) };
   if ((m = /^Spells your opponents cast that target ~ cost an additional (\d+) life to cast$/.exec(text))) return { targetLifeTax: Number(m[1]) };
   if ((m = /^~ costs \{(\d+)\} less to cast for each (.+)$/.exec(text))) {
@@ -369,6 +386,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // increment does it (CR 702.191a), the spell's mana spent being the event's amount.
   if (/^the amount of mana spent to cast that spell is greater than ~'s power$/.test(text)) return { kind: "increment", powerOnly: true };
   if (/^it's your turn$/.test(text)) return { kind: "yourTurn" };
+  // "If there are cards exiled with ~" (Valakut Exploration): the cards this object's linked exile took (CR 607.2a).
+  if (/^there are cards exiled with ~$/.test(text)) return { kind: "amount", amount: { count: { kind: "linkedExiled" } }, min: 1 };
   if (/^it isn't that player's turn$/.test(text)) return { kind: "eventPlayersTurn", not: true };
   if (/^it's not your turn$/.test(text)) return { kind: "yourTurn", not: true };
   // "If four or more creatures are attacking", "if exactly one creature is attacking", "if a white creature is attacking"

@@ -139,6 +139,12 @@ export function parseGrants(text: string): Modification[] | null {
       out.push({ kind: "addAbility", text: `Annihilator ${/\d+/.exec(w)![0]}` });
       continue;
     }
+    // Firebending N too (CR 702.189a): "gains firebending 4 until end of turn" (Fire Nation Palace), each instance
+    // triggering on its own (rulings).
+    if (/^firebending \d+$/i.test(w)) {
+      out.push({ kind: "addAbility", text: `Firebending ${/\d+/.exec(w)![0]}` });
+      continue;
+    }
     // Myriad too: several instances each trigger (CR 702.116b).
     if (/^myriad$/i.test(w)) {
       out.push({ kind: "addAbility", text: "Myriad" });

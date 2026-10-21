@@ -124,6 +124,12 @@ export type Count =
   | { kind: "discoveredBelow"; n: number }
   /** "For each counter removed this way" (Nexus Mentality). */
   | { kind: "countersRemovedThisWay" }
+  /** "Cards exiled with ~": those this object's linked exile took that are still there (CR 607.2a, 400.7). */
+  | { kind: "linkedExiled" }
+  /** "The total power of those creatures": the ones that died in a "one or more ... die" event, as they last existed (The Skullspore Nexus). */
+  | { kind: "eventGroupPower" }
+  /** How many cards the last "put all cards exiled with ~ into their owners' graveyards" moved (Valakut Exploration). */
+  | { kind: "movedLinkedThisWay" }
   /** "For each creature tapped this way", "the number of creatures tapped this way" after tapAnyNumber, or in its reflexive trigger. */
   | { kind: "tappedThisWay" }
   /**
@@ -245,7 +251,7 @@ export type Count =
   /** "For each player", "for each opponent (you have)": the players still in the game (CR 102.1, 800.4a). */
   /** `lostLife`: "for each of your opponents who lost life this turn" (Belbe): ones who lost the game since too (rulings). */
   /** `drewThisWay`: "for each opponent who drew a card this way" (Cut a Deal): those who drew a card in this resolution's draw before, once each. */
-  | { kind: "players"; opponents?: true; lostLife?: true; drewThisWay?: true }
+  | { kind: "players"; opponents?: true; lostLife?: true; drewThisWay?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
   | { kind: "counters"; counter: CounterKind; of: ObjRef }
   /** Station's "the tapped creature's power" (CR 702.184a): as the ability resolves, or as it last existed (rulings). */
@@ -375,6 +381,10 @@ export interface TargetSpec {
   distinctFrom?: number[];
   /** "Up to three target cards from a single graveyard": in the same graveyard as these targets of the group, if chosen. */
   sameGraveyardAs?: number[];
+  /** Goblin Welder's "target artifact card in that player's graveyard": owned by the controller of these permanent targets. */
+  inGraveyardOfControllerOf?: number[];
+  /** "Two target creatures controlled by different players": not controlled by the controller of these targets. */
+  differentControllerFrom?: number[];
   /**
    * "Each opponent may sacrifice a permanent of their choice that shares a card type with it" (Braids, Arisen Nightmare):
    * a card type of what this ability sacrificed, as it last existed (rulings: any one of them if it had several), made into
@@ -567,6 +577,8 @@ export type ObjRef =
   | { ref: "revealed" }
   /** The one card "exile the top card of your library" exiled, while it's still that card in exile (CR 400.7). */
   | { ref: "exiledTop" }
+  /** "The discarded card" (Malcolm): the one card this resolution's last discard put into a graveyard, while it's still that card there. */
+  | { ref: "discarded" }
   /**
    * "Creatures you control get +1/+1 until end of turn. Untap those creatures": the permanents this resolution's last
    * continuous effect changed, locked in as it began (CR 611.2c), while they're still those objects on the battlefield.
@@ -705,6 +717,8 @@ export interface TokenSpec {
    */
   named?: true;
   legendary?: true;
+  /** "Colorless snow artifact tokens named Replicated Ring" (Replicating Ring): the snow supertype (CR 205.4g). */
+  snow?: true;
 }
 
 /**
@@ -962,6 +976,8 @@ export type StaticCondition =
   | { kind: "subjectNameUnique" }
   /** "If it wasn't put onto the battlefield with this ability" (Kodama of the East Tree): the entering permanent (GameObject.putBy). */
   | { kind: "subjectPutBySelf"; not?: true }
+  /** Chainer: "if you didn't cast it from your hand", about the entering permanent (GameObject.castFromHand). */
+  | { kind: "subjectCastFromHand"; not?: true }
   /** Rith: "if a creature or planeswalker an opponent controlled was dealt excess damage this turn" (any of `types`). */
   | { kind: "opponentsDealtExcess"; types: string[] }
   /**
@@ -1117,6 +1133,8 @@ export type StaticCondition =
   | { kind: "life"; min?: number; max?: number; opponent?: true }
   /** "As long as equipped creature is a Human": the permanent this is attached to matches. */
   | { kind: "attachedIs"; filter: TargetSpec }
+  /** "As long as it's blocking or blocked by a Goblin or Orc" (Sting): the permanent this is attached to blocks one or is blocked by one. */
+  | { kind: "attachedInCombatWith"; filter: TargetSpec }
   /** "If you have nine or more cards in hand" (Wiretapping). */
   | { kind: "handAtLeast"; n: number; /** "exactly thirteen cards in your hand" (Triskaidekaphile). */ exactly?: true; /** "Fewer than seven cards in hand" (Kozilek): under `n`. */ fewer?: true }
   /** "If you control eight or more artifacts with the same name as one another" (Mechanized Production, CR 201.2a). */
@@ -1420,7 +1438,7 @@ export type Effect =
    * turn", checked as it begins (spells cast earlier this turn count, even countered ones and the card with the ability).
    */
   | { type: "castNow"; what: ObjRef; thenNoMore?: true; unlessCast?: true }
-  | { type: "putFromHand"; who?: PlayerRef; filter?: TargetSpec; tapped?: boolean; attacking?: boolean; may: boolean; any?: boolean; /** With `any`: "up to seven" (Ugin, the Spirit Dragon). */ upTo?: number; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand" }
+  | { type: "putFromHand"; who?: PlayerRef; filter?: TargetSpec; tapped?: boolean; attacking?: boolean; may: boolean; any?: boolean; /** With `any`: "up to seven" (Ugin, the Spirit Dragon). */ upTo?: number; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand"; /** "If you do, draw a card and repeat this process" (Cultivator Colossus): after each card put, a draw, then again until you put none (rulings). */ drawRepeat?: true }
   /**
    * "Return all land cards from your graveyard to the battlefield tapped" (CR 110.2a: under your control), "from all graveyards
    * ... under their owners' control". All at once. Never Auras: those need a choice of what they enchant (CR 303.4f).
@@ -1510,10 +1528,10 @@ export type Effect =
    */
   /** `transformed`: "return it to the battlefield transformed" (CR 712.14a). */
   /** `counterIf`: "If it's a Spirit, put a +1/+1 counter on it" (Essence Flux), each returned permanent that matches, once it's back. */
-  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; at?: "nextEndStep"; counter?: CounterKind; tapped?: true; transformed?: true; counterIf?: { counter: CounterKind; filter: TargetSpec }; /** Exiled now, returned by the search after it (Sword of Hearth and Home: "Put both cards onto the battlefield"), kept in Resolving.held. */ hold?: true }
+  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; at?: "nextEndStep"; /** With `at`: "If it entered under your control, put a +1/+1 counter on ~" (Phelia), on the source as it is then. */ selfCounterIfYours?: CounterKind; counter?: CounterKind; tapped?: true; transformed?: true; counterIf?: { counter: CounterKind; filter: TargetSpec }; /** Exiled now, returned by the search after it (Sword of Hearth and Home: "Put both cards onto the battlefield"), kept in Resolving.held. */ hold?: true }
   /** A delayed flicker's return: the exiled card, while it's still in exile as that object. */
   /** A delayed flicker's return: its subject, or with `cards` each of those cards, if still the same objects in exile. */
-  | { type: "returnExiled"; under: "owner" | "you"; counter?: CounterKind; tapped?: true; cards?: { id: ObjectId; zc: number }[] }
+  | { type: "returnExiled"; under: "owner" | "you"; counter?: CounterKind; tapped?: true; cards?: { id: ObjectId; zc: number }[]; /** Phelia: a counter on this permanent, while it's still that object, if one of them entered under this ability's controller's control. */ selfCounter?: { id: ObjectId; zc: number; counter: CounterKind } }
   /** Connive (CR 701.50): its controller draws N, discards N, and it gets a +1/+1 counter per nonland card discarded. */
   | { type: "connive"; what: ObjRef; n: Amount }
   /**
@@ -1656,7 +1674,7 @@ export type Effect =
   /** "Exile the top two cards of your library. Until the end of your next turn, you may play those cards." */
   /** `who`: "the top card of that player's library" (Ragavan), not yours; `castOnly`: "you may cast that card", not play it. */
   /** `free`: "you may play that card without paying its mana cost" (Urza, Lord High Artificer, CR 118.9). */
-  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" | "yourNextEndStep"; who?: PlayerRef; castOnly?: true; free?: true }
+  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" | "yourNextEndStep"; who?: PlayerRef; castOnly?: true; free?: true; /** The cards are "exiled with ~" for its other abilities (CR 607.2a). */ linked?: true }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
   /** "Remove a +1/+1 counter from it", "remove all -1/-1 counters from ~" (CR 122.8): as many as it has, at most. */
   /**
@@ -1691,7 +1709,11 @@ export type Effect =
   | { type: "copySpell"; spell: "cause" | "self" | { target: number } | { epic: string }; /** "stormInstantSorcery": the instant and sorcery spells its controller cast before it this turn (Thousand-Year Storm). */ n: Amount | "storm" | "kicked" | "stormInstantSorcery"; newTargets: boolean; /** Then an opponent you choose copies it too (CR 702.144a). */ demonstrate?: true; /** "If it's a permanent spell, the copy gains haste and "..."" (Nalfeshnee): what the token it becomes has (CR 400.7a, 608.3f). */ gains?: Modification[] }
   | { type: "removeCounters"; what: ObjRef; counter: CounterKind; n: Amount | "all" }
   /** "Remove (up to) three counters from target permanent": of any kinds, chosen as it resolves (rulings on Glissa Sunslayer); fewer than that, all of them. */
-  | { type: "removeAnyCounters"; what: ObjRef; n: Amount; upTo?: true }
+  /**
+   * `moveTo`: "Move any number of counters from target permanent you control onto a second target permanent you control"
+   * (Resourceful Defense): `n` is ignored, up to all of them, each removed and put on that one (CR 122.5).
+   */
+  | { type: "removeAnyCounters"; what: ObjRef; n: Amount; upTo?: true; moveTo?: ObjRef }
   /** "If an opponent protects it, remove N defense counters from it. Otherwise, put N defense counters on it." (CR 310.9e) */
   | { type: "battleDefense"; what: ObjRef; n: number }
   /** "Remove all counters from target permanent": every kind; how many were removed is counted ("this way"). */
@@ -1723,6 +1745,8 @@ export type Effect =
    * "Reveal cards from the top of your library until you reveal a creature card. Put that card onto the battlefield and the
    * rest on the bottom of your library in a random order" (`found` "battlefield", `rest` "bottom"), `tapped`.
    */
+  /** "Each opponent reveals cards from the top of their library until they reveal a land card, then puts those cards into their graveyard" (Consuming Aberration). */
+  | { type: "revealUntilLandToGraveyard"; who: PlayerRef }
   | { type: "revealUntil"; filter: TargetSpec; found: "hand" | "battlefield"; tapped?: true; rest: "exile" | "bottom"; lifePerRest?: true }
   /**
    * "Exile cards from the top of your library until you exile a nonland card", or "reveal ... until you reveal a nonland
@@ -1879,7 +1903,7 @@ export type Effect =
   /** `hand`: "discards their hand", every card in it (n is ignored). */
   /** `filter`: "discard a creature card" (only such cards can be chosen). */
   /** `exile`: "target opponent exiles a card from their hand": chosen the same way, but exiled, not discarded (no discard, CR 701.9a); `linked` as for "exile". */
-  | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean; hand?: true; filter?: TargetSpec; /** "Each player discards cards the same way" (Balancing Act): down to the fewest cards any of them has; `n` is unused. */ downToFewest?: true; exile?: true; linked?: boolean } // CR 701.9
+  | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean; hand?: true; /** "Discard any number of cards", "discard up to two cards": none to `n` (CR 107.1c), chosen as it resolves. */ upTo?: true; filter?: TargetSpec; /** "Each player discards cards the same way" (Balancing Act): down to the fewest cards any of them has; `n` is unused. */ downToFewest?: true; exile?: true; linked?: boolean } // CR 701.9
   | { type: "scry"; n: Amount } // CR 701.22, by the controller
   /** "~ endures N" (CR 701.63a): N +1/+1 counters on it, or an N/N white Spirit token, its controller's choice. */
   | { type: "endure"; what: ObjRef; n: Amount }
@@ -2208,6 +2232,15 @@ export type Effect =
   | { type: "turnRules"; rules: TurnRule["rule"][] }
   /** "Until your next turn, you may cast sorcery spells as though they had flash." (Teferi, Time Raveler; CR 702.8a) */
   | { type: "flashUntilNextTurn"; filter: TargetSpec }
+  /**
+   * Goblin Welder: "If both targets are still legal as this ability resolves, that player simultaneously sacrifices the
+   * artifact and returns the artifact card to the battlefield": targets `artifact` and `card` (rulings: neither if either is illegal).
+   */
+  | { type: "weld"; artifact: number; card: number }
+  /** "Until your next turn, your opponents can't cast spells from anywhere other than their hands" (Avatar's Wrath): see GameState.handOnlyUntil. */
+  | { type: "opponentsHandOnlyUntilNextTurn" }
+  /** "You may cast a creature spell from your graveyard this turn" (Chainer, Nightmare Adept): one such cast (GameState.graveGrants). */
+  | { type: "graveyardCastThisTurn"; filter: TargetSpec }
   /** "Artifact, instant, and sorcery spells you cast this turn cost {2} less to cast" (Urza, Planeswalker): `mod`'s "you" is the ability's controller (CR 601.2f, 611.2a). */
   | { type: "costModThisTurn"; mod: CostMod }
   /**
@@ -3032,6 +3065,8 @@ export interface BatchTrigger {
   orSelf?: true;
   /** Satoru: "if none of them were cast or no mana was spent to cast them" (an intervening if, CR 603.4). */
   noneCastWithMana?: true;
+  /** Kotis: "if one or more of them entered from a graveyard or was cast from a graveyard" (an intervening if, CR 603.4). */
+  fromGraveyard?: true;
   dies?: true;
   notDies?: true;
   /** `notBattlefield`: "from anywhere other than the battlefield" (Syr Konrad). */
@@ -3327,6 +3362,8 @@ export interface CostMod {
   if?: StaticCondition;
   /** "... for each experience counter you have" (Mizzix): `n` that many times, for the permanent's controller. */
   times?: AmountExpr;
+  /** "Cost {W}{U}{B}{R}{G} less to cast. This effect reduces only the amount of colored mana you pay" (Morophon): `n` is 0. */
+  colored?: Color[];
   text: string;
 }
 
@@ -3559,7 +3596,8 @@ export interface CompiledCard {
    */
   othersEnterUntapped?: { filter: TargetSpec; text: string }[];
   /** "Each other creature you control enters with an additional +1/+1 counter on it" (Renata): on other permanents entering. */
-  othersEnterWithCounters?: { filter: TargetSpec; counter: CounterKind; n: number; text: string }[];
+  /** `perControlled`: "for each Angel you already control" (Giada): `n` times the permanents matching it its controller controls, the entering one aside. */
+  othersEnterWithCounters?: { filter: TargetSpec; counter: CounterKind; n: number; perControlled?: TargetSpec; text: string }[];
   /** "This creature enters with an additional +1/+1 counter on it" (Master Chef's granted ability): on itself entering. */
   entersWithAdditional?: { counter: CounterKind; n: number }[];
   entersTappedUnless?: EntersCondition;
@@ -3673,6 +3711,10 @@ export interface CompiledCard {
   loyaltyAtInstantSpeed?: true;
   /** "Your opponents can't cast spells with mana value 3 or less." (Brisela, Voice of Nightmares): this many or less. */
   opponentsCantCastMvAtMost?: number;
+  /** "Your opponents can't cast spells with even mana values." (Void Winnower). */
+  opponentsCantCastEven?: true;
+  /** "Your opponents can't block with creatures with even mana values." (Void Winnower). */
+  opponentsCantBlockEven?: true;
   /** "You can't cast creature spells." (Steel Golem), "You can't cast noncreature spells." (Nikya): its controller. */
   youCantCast?: TargetSpec[];
   /** "Your opponents can't cast noncreature spells." (Narset Transcendent's emblem): each opponent of its controller. */
@@ -3968,6 +4010,8 @@ export interface CompiledCard {
     once?: string[];
     /** "A permanent spell with mana value 2 or less" (Lurrus): the spell's, its X counted (CR 202.3e), as it's cast. */
     maxMv?: number;
+    /** Only while this holds: a station symbol's (Exploration Broodship's 8+, CR 721.2a). */
+    if?: StaticCondition;
   }[];
   /** Muldrotha: "you may play a land ... from your graveyard" once during each of your turns. */
   landFromGraveyardOnce?: true;

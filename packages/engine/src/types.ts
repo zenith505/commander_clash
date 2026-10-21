@@ -422,6 +422,8 @@ export interface GameObject {
   castFrom?: ZoneName;
   /** On the battlefield: it entered as a spell cast from its owner's hand ("if you cast it from your hand"). */
   castFromHand?: true;
+  /** On the battlefield: it entered as a spell cast from a graveyard (Kotis: "was cast from a graveyard"). */
+  castFromGraveyard?: true;
   /** It entered from the stack as a resolving permanent spell (not a copy), for "when ~ enters, if you cast it". */
   wasCast?: true;
   /** On the battlefield: it entered from a graveyard, its owner's, for "when ~ enters from a graveyard" (CR 603.6a). */
@@ -986,7 +988,7 @@ export type PendingDecision =
   | { kind: "declareBlockers"; player: PlayerId; remaining: PlayerId[] }
   | { kind: "discardToHandSize"; player: PlayerId; count: number }
   /** A resolving spell or ability makes this player discard `count` cards of their choice (CR 701.9b). */
-  | { kind: "discard"; player: PlayerId; count: number; source: string; /** Only cards like this: "discard a creature card". */ filter?: TargetSpec; /** Exiled, not discarded ("exiles a card from their hand"). */ exile?: true }
+  | { kind: "discard"; player: PlayerId; count: number; source: string; /** Only cards like this: "discard a creature card". */ filter?: TargetSpec; /** Exiled, not discarded ("exiles a card from their hand"). */ exile?: true; /** Up to `count` ("discard any number of cards"), none too. */ upTo?: true }
   /** "Put two cards from your hand on top of your library in any order": which, and their order (first on top). */
   | { kind: "handToTop"; player: PlayerId; count: number; source: string; /** On the bottom instead, the first pick lowest. */ bottom?: true; /** Scroll Rack: any number up to `count`, exiled face down first and traded for as many from the top of the library. */ upTo?: true }
   /** Scry or surveil (CR 701.22, 701.25): `cards` are the top of their library, top first. */
@@ -1071,7 +1073,7 @@ export type PendingDecision =
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "commander" | "drawUpTo" | "payX" | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | "pile" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom" | "searchZones" | "vote" | "mutate" | "either" | "payOrTop" | "counterKind" | /** "Remove up to three counters": the next one to remove, or "done". */ "removeCounter" | /** Which target of a spell or ability becomes ~ (Spellskite). */ "targetSlot" | /** A number chosen secretly (Wheel of Misfortune): any whole number in `numberRange`. */ "secretNumber"; options: string[]; /** Any whole number from `min` to `max` may be chosen, not only `options`. */ numberRange?: { min: number; max: number }; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId; /** "pile": the two piles, the first then the second (Fact or Fiction); `of`, the player whose hand the chosen one goes to. */ piles?: [ObjectId[], ObjectId[]] }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "commander" | "drawUpTo" | "payX" | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | "pile" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom" | "searchZones" | "vote" | "mutate" | "either" | "payOrTop" | "counterKind" | /** "Remove up to three counters": the next one to remove, or "done". */ "removeCounter" | /** Which target of a spell or ability becomes ~ (Spellskite). */ "targetSlot" | /** A number chosen secretly (Wheel of Misfortune): any whole number in `numberRange`. */ "secretNumber"; options: string[]; /** Any whole number from `min` to `max` may be chosen, not only `options`. */ numberRange?: { min: number; max: number }; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** "removeCounter": the permanent the counters are moved onto (Resourceful Defense). */ onto?: ObjectId; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId; /** "pile": the two piles, the first then the second (Fact or Fiction); `of`, the player whose hand the chosen one goes to. */ piles?: [ObjectId[], ObjectId[]] }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -1341,6 +1343,10 @@ export interface GameState {
   namedBansUntil?: { name: string; players?: PlayerId[]; lands?: true; controller: PlayerId; source: string }[];
   /** "Until your next turn, you may cast sorcery spells as though they had flash" (Teferi, Time Raveler): `controller` may. */
   flashUntil?: { controller: PlayerId; filter: TargetSpec }[];
+  /** "Until your next turn, your opponents can't cast spells from anywhere other than their hands" (Avatar's Wrath): `controller`'s opponents. */
+  /** "You may cast a creature spell from your graveyard this turn" (Chainer): one cast each, used like TurnLog.gravePermits. */
+  graveGrants?: { key: string; player: PlayerId; turn: number; filter: TargetSpec; source: string }[];
+  handOnlyUntil?: { controller: PlayerId; source: string }[];
   /** The turn a "damage can't be prevented this turn" effect was made in (CR 615.12). */
   noPreventionTurn?: number;
   /** Damage amount replacements of resolved spells and abilities (Effect damageMod): made in `turn`, by `you`. */
@@ -1493,6 +1499,8 @@ export interface TriggerEventInfo {
   excess?: number;
   /** "Whenever one or more Dragons you control deal combat damage": those that did, as the objects they were ("one of those Dragons"). */
   group?: { id: ObjectId; zc: number }[];
+  /** The total power of the creatures a "one or more ... die" event was about, as they last existed (The Skullspore Nexus). */
+  groupPower?: number;
   player?: PlayerId;
   /**
    * "If two or more of those creatures are attacking you and/or planeswalkers you control" (Mangara): checked again as it
@@ -1535,6 +1543,8 @@ export interface Resolving {
   drawnBefore?: ObjectId[];
   /** How many cards each player discarded so far while this resolves ("draw that many cards"). */
   discarded?: Record<PlayerId, number>;
+  /** The cards the last discard while this resolves put into a graveyard, as those objects ("the discarded card", Malcolm). */
+  discardedCards?: { id: ObjectId; zc: number }[];
   /** The powers of the creature cards exiling graveyards exiled so far while this resolves ("exiled this way"). */
   exiledPowers?: number[];
   /**
@@ -1581,6 +1591,8 @@ export interface Resolving {
   discovered?: { id: ObjectId; mv: number };
   /** How many counters "remove all counters" removed so far while this resolves ("for each counter removed this way"). */
   countersRemoved?: number;
+  /** How many cards its "put all cards exiled with ~ into their owners' graveyards" moved. */
+  movedLinked?: number;
   /** The two players its exchangeLife instruction named (even one no longer a legal target), and the life each lost doing it. */
   exchanged?: { players: PlayerId[]; lost: Record<PlayerId, number> };
   /** "Choose a creature type / a color": what was chosen, for the rest of its instructions. */
@@ -1697,6 +1709,8 @@ export interface Resolving {
     /** Opposition Agent: the player whose search is under way exiles what they find, and this player may play it. */
     searchExileFor?: PlayerId;
     flickered?: { id: ObjectId; zc: number }[]; // cards a flicker exiled, to return once Auras' hosts are chosen
+    /** A delayed "return the exiled card" waiting on an Aura's host: the cards it returns (Phelia's "if it entered under your control"). */
+    returning?: { id: ObjectId; zc: number }[];
     playLinked?: true; // "you may play the exiled card" (or cast the cipher copy) was asked
     cipherCopy?: ObjectId; // the copy of an encoded card offered to cast (CR 702.99a)
     looked?: ObjectId[]; // the top cards a "look at the top N" effect is choosing from

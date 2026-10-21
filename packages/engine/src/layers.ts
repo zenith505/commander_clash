@@ -669,6 +669,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const did = !!o?.triggeredThisTurn?.includes(`${sourceZc ?? o.zoneChanges ?? 0}|addedMana`);
       return cond.not ? !did : did;
     }
+    case "subjectCastFromHand": {
+      const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
+      const cast = !!sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc && !!sub.castFromHand;
+      return cond.not ? !cast : cast;
+    }
     case "subjectPutBySelf": {
       const by = subjectId !== undefined ? s.objects[subjectId]?.putBy : undefined;
       const put = !!by && by.id === sourceId && (s.objects[sourceId]?.zoneChanges ?? 0) === by.zc;
@@ -746,6 +751,12 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const host = src.attachedTo ? s.objects[src.attachedTo] : undefined;
       const c = host && chars.get(host.id);
       return !!c && objectMatches(s, cond.filter, host, you, false, undefined, c, (x) => chars.get(x.id));
+    }
+    case "attachedInCombatWith": {
+      const host = src.attachedTo ? s.objects[src.attachedTo] : undefined;
+      if (host?.zone !== "battlefield") return false;
+      const other = [...(host.blocking ?? []), ...(host.blockedBy ?? [])].map((id) => s.objects[id]).filter((o): o is GameObject => o?.zone === "battlefield");
+      return other.some((o) => { const c = chars.get(o.id); return !!c && objectMatches(s, cond.filter, o, you, false, undefined, c, (x) => chars.get(x.id)); });
     }
     case "opponentPoison":
       return s.turnOrder.some((p) => p !== you && !s.players[p]!.lost && (s.players[p]!.poison ?? 0) >= cond.n);

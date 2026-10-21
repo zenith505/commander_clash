@@ -2,7 +2,7 @@ import { faceDef, hasFuse, isRoom, restingDef, roomDoorDefs } from "../faces";
 import { isMeldResult, meldPartnerName, meldResultDef } from "../meld-results";
 import { allEffects, GRANTED_WAY_COSTS } from "../abilities";
 import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq } from "../abilities";
-import { CHOSEN_HEXPROOF, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, stripReminder } from "../keywords";
+import { CHOSEN_HEXPROOF, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CREATURE_TYPES, stripReminder } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
@@ -782,7 +782,7 @@ export function compile(d: CardDef): CompiledCard {
     // "Each other creature you control enters with an additional +1/+1 counter on it" (Renata, Called to the Hunt): a
     // replacement effect on other permanents entering while this one is on the battlefield (CR 614.1c). Whether one
     // without "other" that could describe itself applies to itself isn't worked out, so that stays out.
-    const othersExtra = new RegExp(`^Each (other )?(.+? you control(?: [^,]+?)?) enters with (an|a|one|two|three) additional ${COUNTER} counters? on it\\.$`).exec(line);
+    const othersExtra = new RegExp(`^Each (other )?(.+? you control(?: [^,]+?)?) enters with (an|a|one|two|three) additional ${COUNTER} counters? on it( for each [A-Z][a-z]+ you already control)?\\.$`).exec(line);
     if (othersExtra) {
       // "Each creature you control that's a Wolf or a Werewolf" (Arlinn, Voice of the Pack) is "each Wolf or Werewolf creature".
       const that = /^creature you control that's an? ([A-Z]\w+) or an? ([A-Z]\w+)$/.exec(othersExtra[2]!);
@@ -792,7 +792,12 @@ export function compile(d: CardDef): CompiledCard {
       // "Each other creature you control of the chosen type" (Metallic Mimic): the type chosen as it entered.
       const chosenOk = !g?.filter.chosen || (g.filter.kind === "object" && g.filter.chosen === "type" && /^As ~ enters(?: the battlefield)?, choose a creature type\.$/m.test(normalizeSelf(d)));
       if (!g || g.other || couldBeSelf || g.filter.kind !== "object" || g.filter.controller !== "you" || !chosenOk) out.unsupported.push(raw);
-      else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(othersExtra[4]!), n: /^an?$/.test(othersExtra[3]!) ? 1 : num(othersExtra[3]!), text: line });
+      else {
+        // "For each Angel you already control" (Giada, Font of Hope): a creature type, counted as each one enters.
+        const per = othersExtra[5] ? / for each ([A-Z][a-z]+) you already control$/.exec(othersExtra[5])![1]! : undefined;
+        if (per && !CREATURE_TYPES.has(per)) out.unsupported.push(raw);
+        else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(othersExtra[4]!), n: /^an?$/.test(othersExtra[3]!) ? 1 : num(othersExtra[3]!), ...(per ? { perControlled: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [per], text: `${per} you control` } as TargetSpec } : {}), text: line });
+      }
       continue;
     }
     // Master Chef's granted "Other creatures you control enter with an additional +1/+1 counter on them": Renata's ability
@@ -1147,7 +1152,15 @@ export function compile(d: CardDef): CompiledCard {
     // permission used once each turn (rulings: the spell's costs are paid, its timing rules followed). Muldrotha: "During
     // each of your turns, you may play a land and cast a permanent spell of each permanent type from your graveyard."
     // Kess: "If a spell cast this way would be put into your graveyard, exile it instead."
-    const onceYard = /^Once during each of your turns, you may cast an? (.+?) spell( with mana value \d+ or less)? from your graveyard\.( If a spell cast this way would be put into your graveyard, exile it instead\.)?$/.exec(line);
+    // Exploration Broodship: "... from your graveyard by sacrificing a land in addition to paying its other costs": an
+    // additional cost of that permission (CR 601.2f-h), paid with the spell's other costs.
+    const onceYard = /^Once during each of your turns, you may cast an? (.+?) spell( with mana value \d+ or less)? from your graveyard( by (?:sacrificing|exiling|discarding|tapping) .+? in addition to paying its other costs)?\.( If a spell cast this way would be put into your graveyard, exile it instead\.)?$/.exec(line);
+    // Kotis: "exiling three other cards from your graveyard": other than the spell, which is on the stack by then (CR 601.2a).
+    const permitCost = onceYard?.[3] ? parseAdditionalCost(onceYard[3].replace(/^ by (\w+)ing /, (_, v: string) => `${v === "sacrific" ? "sacrifice" : v === "exil" ? "exile" : v} `).replace(/ in addition to paying its other costs$/, "").replace(/^exile (\w+) other cards from your graveyard$/, "exile $1 cards from your graveyard")) : undefined;
+    if (permitCost === null) {
+      out.unsupported.push(raw);
+      continue;
+    }
     if (onceYard || line === "During each of your turns, you may play a land and cast a permanent spell of each permanent type from your graveyard.") {
       const filter = parseTargetPhrase(`${onceYard ? onceYard[1]!.replace(/ and /g, " or ") : "permanent"} card${onceYard?.[2] ?? ""} from a graveyard`);
       // Lurrus: "a permanent spell with mana value 2 or less", the spell's mana value (Count X, CR 202.3e).
@@ -1156,7 +1169,7 @@ export function compile(d: CardDef): CompiledCard {
       else {
         const { owner: _, manaValue: _mv, ...f } = filter;
         const once = onceYard ? [""] : ["Artifact", "Creature", "Enchantment", "Planeswalker", "Battle"];
-        (out.graveyardGrants ??= []).push({ filter: { ...f, text: `${onceYard?.[1] ?? "permanent"} cards` }, way: { kind: "turnPermission", costs: [], exile: !!onceYard?.[3] }, yourTurn: true, once, ...(maxMv !== undefined ? { maxMv } : {}) });
+        (out.graveyardGrants ??= []).push({ filter: { ...f, text: `${onceYard?.[1] ?? "permanent"} cards` }, way: { kind: "turnPermission", costs: permitCost ? [permitCost] : [], exile: !!onceYard?.[4] }, yourTurn: true, once, ...(maxMv !== undefined ? { maxMv } : {}) });
         if (!onceYard) out.landFromGraveyardOnce = true;
       }
       continue;
@@ -1765,6 +1778,16 @@ export function compile(d: CardDef): CompiledCard {
       out.opponentsCantCastMvAtMost = num(mvBan[1]!);
       continue;
     }
+    // Void Winnower: "Your opponents can't cast spells with even mana values" (zero is even; X as chosen, a face-down
+    // spell's 0, rulings) and "can't block with creatures with even mana values" (X is 0 on the battlefield, CR 202.3b).
+    if (/^Your opponents can't cast spells with even mana values\.(?: \(Zero is even\.\))?$/.test(line)) {
+      out.opponentsCantCastEven = true;
+      continue;
+    }
+    if (line === "Your opponents can't block with creatures with even mana values.") {
+      out.opponentsCantBlockEven = true;
+      continue;
+    }
     // Teferi, Temporal Archmage's emblem: loyalty abilities when you could cast an instant, still one per permanent each
     // turn (CR 606.3, rulings).
     if (line === "You may activate loyalty abilities of planeswalkers you control on any player's turn any time you could cast an instant.") {
@@ -2321,6 +2344,14 @@ function linkExile(out: CompiledCard) {
     const others = bodies.flatMap((b) => allEffects(b.effects)).some((e) => (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
     if (others || out.spell || exiles.length + (out.exileInsteadOfDying?.linked ? 1 : 0) !== 1) out.unsupported.push("(targets a card exiled with it that it can't link to one exile ability)");
     else if (exiles[0]) exiles[0].linked = true;
+  }
+  // Valakut Exploration: "cards exiled with ~" are the ones its one impulse exiled (CR 607.2a).
+  const usesLinked = (b: AbilityBody) => allEffects(b.effects).some((e) => e.type === "moveLinked") || JSON.stringify(b).includes('"linkedExiled"');
+  const impulses = bodies.flatMap((b) => allEffects(b.effects)).filter((e): e is Extract<Effect, { type: "impulse" }> => e.type === "impulse");
+  if (impulses.length && (bodies.some(usesLinked) || out.triggers.some((t) => JSON.stringify(t.ifCond ?? null).includes('"linkedExiled"')))) {
+    const others = bodies.flatMap((b) => allEffects(b.effects)).some((e) => e.type === "exile" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
+    if (others || impulses.length !== 1) out.unsupported.push("(refers to cards exiled with it that it can't link to one exile ability)");
+    else impulses[0]!.linked = true;
   }
   const returns = out.triggers.filter((t) => allEffects(t.body.effects).some((e) => e.type === "returnLinked" || e.type === "linkedExileToken"));
   if (!returns.length) return;

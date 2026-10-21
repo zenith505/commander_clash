@@ -468,6 +468,7 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const filter = parseTargetPhrase(`${m[1]} spell`);
     return filter?.kind === "spell" ? [{ type: "flashUntilNextTurn", filter: { ...filter, text: `${m[1]} spells` } }] : null;
   }
+  if (/^Until your next turn, your opponents can't cast spells from anywhere other than their hands$/.test(s)) return [{ type: "opponentsHandOnlyUntilNextTurn" }];
   if (/^Spells you control can't be countered this turn$/i.test(s)) return [{ type: "turnRules", rules: ["spellsUncounterable"] }];
   if ((m = /^(Players|Your opponents) can't gain life this turn$/i.exec(s))) return [{ type: "noLifeGain", players: /^players$/i.test(m[1]!) ? "all" : "opponents" }];
   if (/^Damage can't be prevented this turn$/i.test(s)) return [{ type: "noPrevention" }];

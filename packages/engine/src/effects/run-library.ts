@@ -17,6 +17,18 @@ import { defMv, sameName } from "../faces";
 /** Libraries, hands and graveyards: mill, discard, scry, surveil, search, look at the top cards. */
 export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
   switch (e.type) {
+    case "revealUntilLandToGraveyard":
+      // Consuming Aberration: each one reveals until a land card, then puts all of them, that one too, into their
+      // graveyard; with no land card, the whole library (rulings). Revealing, not milling (CR 701.20a, 701.17a).
+      for (const pid of apnap(s, players(s, e.who, ctx))) {
+        const p = player(s, pid);
+        const at = p.library.findIndex((id) => isType(defOf(s, obj(s, id)), "Land"));
+        const ids = p.library.slice(0, at < 0 ? p.library.length : at + 1);
+        if (!ids.length) continue;
+        log(s, `${p.name} reveals ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} and puts ${ids.length === 1 ? "it" : "them"} into their graveyard.`);
+        for (const id of ids) moveObject(s, id, "graveyard");
+      }
+      return;
     case "mill":
       // Kept for "if a card with the chosen name was milled this way" (Predict).
       s.resolving!.milled = [];
@@ -125,6 +137,15 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           continue;
         }
         const n = nFor[pid] ?? 0;
+        if (e.upTo && !e.hand) {
+          if (hand.length && n > 0) {
+            s.pending = { kind: "discard", player: pid, count: Math.min(n, hand.length), source: src, upTo: true, ...(filter ? { filter } : {}), ...(e.exile ? { exile: true as const } : {}) };
+            return "paused";
+          }
+          sc.chosen![pid] = [];
+          sc.queue.shift();
+          continue;
+        }
         if (!e.hand && hand.length > n) {
           s.pending = { kind: "discard", player: pid, count: n, source: src, ...(filter ? { filter } : {}), ...(e.exile ? { exile: true as const } : {}) };
           return "paused";
@@ -920,6 +941,7 @@ export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how =
   }
   // They were discarded at the same time (CR 701.9b); each one triggers "whenever you discard a card" (CR 603.2c).
   ids.forEach((id, i) => fireEvent(s, { type: "discarded", player: pid, id, card: cards[i]!, ...(cycled ? { cycled: true } : {}), ...(cycledX ? { x: cycledX } : {}) }));
+  if (s.resolving) s.resolving.discardedCards = ids.flatMap((id) => (obj(s, id).zone === "graveyard" ? [{ id, zc: obj(s, id).zoneChanges ?? 0 }] : []));
 }
 
 /** A card's mana value in a library: a split card's halves together (CR 709.4a). */

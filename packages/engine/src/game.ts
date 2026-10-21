@@ -21,7 +21,7 @@ import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { addCopyEffect, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, staticConditionNow } from "./layers";
 import { compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
-import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
+import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, reduceColored, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
 import { evalAmount, halve } from "./amounts";
 import { abilityUse, addMana, boundSpend, canPayFromPool, manaOriginsOf, poolFor, spendFromPool, type ManaUse } from "./spend";
 import { nextRandom, shuffle, shuffleLibrary } from "./rng";
@@ -718,6 +718,7 @@ export function moveObject(
   // The Myojin: "~ enters with a divinity counter on it if you cast it from your hand" (a commander cast from the command
   // zone wasn't, rulings).
   const castFromHand = fromZone === "stack" && o.castFrom === "hand" && !o.spellCopy;
+  const castFromGraveyard = fromZone === "stack" && o.castFrom === "graveyard" && !o.spellCopy;
   o.discardedTurn = undefined;
   o.foretold = undefined; // a spell that was foretold is cast without moving it here; anywhere else it's a new object
   if (fromZone === "stack") {
@@ -876,6 +877,7 @@ export function moveObject(
   }
   if (to === "battlefield") [o.controlledSinceTurn, o.enteredTurn] = [s.turn, s.turn];
   o.castFromHand = to === "battlefield" && castFromHand ? true : undefined;
+  o.castFromGraveyard = to === "battlefield" && castFromGraveyard ? true : undefined;
   o.wasCast = to === "battlefield" && fromZone === "stack" && !o.spellCopy ? true : undefined;
   o.enteredFromGraveyard = to === "battlefield" && fromZone === "graveyard" ? true : undefined;
   if (to === "battlefield" && opts.faceDown) o.faceDown = opts.faceDown; // it enters as a face-down 2/2 (CR 701.40a)
@@ -1286,7 +1288,11 @@ function othersAddCounters(s: GameState, o: GameObject): Record<string, number> 
     for (const r of rules) {
       // "Of the chosen type": the one chosen as the source entered.
       const filter = bindChosen(r.filter, src.chosen);
-      if (!filter.chosen && objectMatches(s, filter, o, you, false)) out[r.counter] = (out[r.counter] ?? 0) + r.n;
+      if (!filter.chosen && objectMatches(s, filter, o, you, false)) {
+        // Giada: "for each Angel you already control", the entering one aside, Giada included (rulings).
+        const times = r.perControlled ? s.battlefield.filter((x) => x !== o.id && controllerOf(s, obj(s, x)) === you && objectMatches(s, r.perControlled!, obj(s, x), you, false)).length : 1;
+        if (times) out[r.counter] = (out[r.counter] ?? 0) + r.n * times;
+      }
     }
   }
   return out;
@@ -2152,6 +2158,9 @@ function startNextTurn(s: GameState, skipping = false) {
   if (!s.namedBansUntil?.length) s.namedBansUntil = undefined;
   if (s.flashUntil) s.flashUntil = s.flashUntil.filter((r) => !began.has(r.controller));
   if (!s.flashUntil?.length) s.flashUntil = undefined;
+  if (s.graveGrants) s.graveGrants = s.graveGrants.filter((g) => g.turn === s.turn).length ? s.graveGrants.filter((g) => g.turn === s.turn) : undefined;
+  if (s.handOnlyUntil) s.handOnlyUntil = s.handOnlyUntil.filter((r) => !began.has(r.controller));
+  if (!s.handOnlyUntil?.length) s.handOnlyUntil = undefined;
   if (!s.entersTappedUntil?.length) s.entersTappedUntil = undefined;
   s.turn++;
   const ap = player(s, s.activePlayer);
@@ -3150,6 +3159,9 @@ export function castProblem(
   if (o.zone !== "hand") {
     const magistrate = s.battlefield.map((b) => obj(s, b)).find((m) => abilitiesOf(s, m).opponentsOnlyFromHand && controllerOf(s, m) !== pid);
     if (magistrate) return `${characteristics(s, magistrate).name}: opponents can't cast spells from anywhere other than their hands`;
+    // Avatar's Wrath: the same until its caster's next turn.
+    const until = s.handOnlyUntil?.find((r) => r.controller !== pid);
+    if (until) return `${until.source}: opponents can't cast spells from anywhere other than their hands`;
   }
   // "Cast this spell only if you've cast another spell this turn" (Illusory Angel), checked as it's proposed, before it
   // counts itself (CR 601.3); the other spell needn't have resolved (rulings). Face down it has no abilities (CR 708.2).
@@ -3291,6 +3303,8 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast: a bestowed creature card is
   // an Aura spell (CR 702.103b, Hero of Iroas rulings).
   const mods = costModsFor(s, pid, o, how.alt === "bestow" && !o.bestowed && !how.faceDown ? bestowedDef(d) : d, x);
+  // Colored reductions (Morophon) after the costs are added up, on any of their colored mana (CR 601.2f, rulings).
+  const lessColored = (c: ParsedCost) => reduceColored(c, mods.lessColored);
   // "~ costs {2} less to cast if it's bargained" (a cost reduction, CR 601.2f).
   if (how.bargain && !how.faceDown) mods.less += compileCard(d).bargainReduction ?? 0;
   // "This spell costs {2} less to cast if evidence was collected" (CR 601.2f).
@@ -3311,7 +3325,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const freeFromExile = !!exiled?.free && !how.faceDown && !how.alt;
   // "A spell cast this way costs {2} more" (Soul Partition): an increase (CR 601.2f).
   if (exiled?.more && !madness && freeCastOf(s, pid) !== o.id) mods.more += exiled.more;
-  if ((freeCastOf(s, pid) === o.id && !madness) || (!how.faceDown && !how.alt && plottedCast(s, pid, o)) || freeFromExile) return { cost: anyType(parseManaCost(kickCost)), extra: Math.max(0, mods.more - mods.less) };
+  if ((freeCastOf(s, pid) === o.id && !madness) || (!how.faceDown && !how.alt && plottedCast(s, pid, o)) || freeFromExile) return { cost: anyType(lessColored(parseManaCost(kickCost))), extra: Math.max(0, mods.more - mods.less) };
   const tax = o.zone === "command" ? commanderTax(player(s, pid), o) : 0;
   // {X} is generic mana, paid once for each {X} (CR 107.4b); reductions can take it down too (CR 601.2f).
   // Flashback and escape pay their cost instead of the mana cost (an alternative cost, CR 118.9).
@@ -3319,7 +3333,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // Airbend's "{2} rather than its mana cost" (CR 701.65a), an alternative cost.
   const airbent = !how.faceDown && !how.alt && freeCastOf(s, pid) !== o.id ? exiled?.cost : undefined;
   const base = how.faceDown ? "{3}" : (madness ?? graveyardWay(s, o, how.via)?.mana ?? altCost(d, how.alt, s, pid)?.mana ?? airbent ?? d.manaCost);
-  const mana = anyType(parseManaCost(base + kickCost));
+  const mana = anyType(lessColored(parseManaCost(base + kickCost)));
   const total = splitGeneric(mana, tax + x * xCount(mana));
   let less = mods.less;
   for (const a of compileCard(d).costLess ?? []) less += Math.max(0, evalAmount(s, a, { controller: pid, sourceId: o.id }));
@@ -3347,8 +3361,9 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
  * spells you cast cost {1} less", "Noncreature spells cost {1} more" (CR 601.2f). The spell is checked
  * as it will be on the stack, X included in its mana value (CR 202.3e).
  */
-function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: number): { more: number; less: number } {
+function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: number): { more: number; less: number; lessColored: Color[] } {
   let [more, less] = [0, 0];
+  const lessColored: Color[] = [];
   const mv = defMv(d) + x * xCount(parseManaCost(d.manaCost));
   // Emblems' too, which work in the command zone (CR 114.4).
   for (const src of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)]) {
@@ -3373,6 +3388,10 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
       }
       // "The first creature spell you cast each turn": the creature spells you cast earlier this turn count, even before this permanent was on the battlefield (rulings).
       if (m.nth && (s.castThisTurn ?? []).filter((c) => c.player === pid && printedMatches(rest, s.cards[c.card]!)).length !== m.nth - 1) continue;
+      if (m.colored) {
+        lessColored.push(...m.colored);
+        continue;
+      }
       const n = m.times ? m.n * Math.max(0, evalAmount(s, m.times, { controller: c.controller, sourceId: src.id })) : m.n;
       if (n > 0) more += n;
       else less -= n;
@@ -3387,7 +3406,7 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
     if (m.n > 0) more += m.n;
     else less -= m.n;
   }
-  return { more, less };
+  return { more, less, lessColored };
 }
 
 /**
@@ -3659,7 +3678,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   if (problem) throw new RulesError(problem);
   // What pays a cost beyond mana (which creatures are sacrificed, which cards discarded) is chosen as it's cast (CR
   // 601.2h): a cast that doesn't say can't skip the cost. As for abilities (activateAbility).
-  const unpicked = castExtraCosts(d, { ...choices, ...(spell?.modal && modes ? { modes } : {}) }, x ?? 0, s, p.id).find((c) => "n" in c && c.n > 0 && costNeedsPick(c) && !choices[costPickKey(c)]?.length);
+  const unpicked = castExtraCosts(d, { ...choices, objectId: id, ...(spell?.modal && modes ? { modes } : {}) }, x ?? 0, s, p.id).find((c) => "n" in c && c.n > 0 && costNeedsPick(c) && !choices[costPickKey(c)]?.length);
   if (unpicked) throw new RulesError(`choose what to pay ${d.name}'s additional cost with`);
   // The targets it has, cast this way (CR 702.33g): copies of it have the same ones (CR 707.10).
   let body = spell ? settleDivided(s, gateBody(withModes(spell, modes), castHow(choices)), { controller: p.id, sourceId: id, x: x ?? 0 }) : undefined;
@@ -3737,6 +3756,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     const permit = pickPermit(s, o, permitsForMv(s, via.permits ?? [], defMv(d) + (x ?? 0) * xCount(parseManaCost(d.manaCost))), choices.permit)!;
     ((s.turnLog ??= {}).gravePermits ??= []).push(permit);
     log(s, `${p.name} uses ${permitLabel(s, permit)} to cast it from their graveyard.`);
+    choices = { ...choices, permit }; // its costs are paid below
   }
   const from = zoneList(s, o)!;
   from.splice(from.indexOf(id), 1);
@@ -3755,7 +3775,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // A creature spell cast with suspend gains haste until its caster loses control of it (CR 702.62a).
   if (suspended && isType(d, "Creature")) o.suspendHaste = p.id;
   // CR 702.34a, 702.133a; an aftermath half cast from a graveyard any way (702.127a).
-  if (via?.exile || (castFrom === "graveyard" && compileCard(d).fromGraveyard?.some((g) => g.kind === "aftermath"))) o.exileIfLeaves = "stack";
+  // A once-each-turn permission's own "exile it instead" (Maestros Ascendancy), not another's it shares the way with.
+  const exiles = via?.kind === "turnPermission" ? !!choices.permit && permitExiles(s, choices.permit) : via?.exile;
+  if (exiles || (castFrom === "graveyard" && compileCard(d).fromGraveyard?.some((g) => g.kind === "aftermath"))) o.exileIfLeaves = "stack";
   o.controller = p.id;
   o.timestamp = s.nextTimestamp++;
   const chosen = spell?.modal ? modes : undefined;
@@ -3920,6 +3942,8 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
     const value = mv ?? (parseManaCost(d.manaCost).hasX ? undefined : defMv(d));
     if (most !== undefined && controllerOf(s, o) !== pid && value !== undefined && value <= most)
       return `${characteristics(s, o).name}: opponents can't cast spells with mana value ${most} or less`;
+    if (abilitiesOf(s, o).opponentsCantCastEven && controllerOf(s, o) !== pid && value !== undefined && value % 2 === 0)
+      return `${characteristics(s, o).name}: opponents can't cast spells with even mana values`;
     for (const f of abilitiesOf(s, o).youCantCast ?? [])
       if (controllerOf(s, o) === pid && printedMatches(f, d)) return `${characteristics(s, o).name}: you can't cast ${f.text.replace(/ spell$/, "")} spells`;
     for (const f of abilitiesOf(s, o).opponentsCantCast ?? [])
@@ -3979,6 +4003,7 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef): CastFromGraveyard
     if (controllerOf(s, p) !== o.owner) continue;
     for (const g of abilitiesOf(s, p).graveyardGrants ?? []) {
       if (g.yourTurn && s.activePlayer !== o.owner) continue;
+      if (g.if && !staticConditionNow(s, g.if, p.id, o.owner)) continue;
       if (!d.manaCost && !g.way.mana) continue;
       if (!printedMatches(g.filter, d)) continue;
       // Lurrus: a card that can be cast with mana value that low (X counted as it's cast, see permitsForMv).
@@ -3996,6 +4021,15 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef): CastFromGraveyard
       if (out.some((w) => w.kind === g.way.kind) || (g.way.kind === "grantedFlashback" && hasGrantedFlashback(s, o))) continue;
       out.push({ ...g.way, mana: g.way.mana ?? d.manaCost });
     }
+  }
+  // "You may cast a creature spell from your graveyard this turn" (Chainer, Nightmare Adept): one spell for each, with
+  // the once-each-turn permissions (rulings: each activation is a permission of its own).
+  const used = s.turnLog?.gravePermits ?? [];
+  const grants = d.manaCost ? (s.graveGrants ?? []).filter((g) => g.player === o.owner && g.turn === s.turn && !used.includes(g.key) && printedMatches(g.filter, d)).map((g) => g.key) : [];
+  if (grants.length) {
+    const had = out.find((w) => w.kind === "turnPermission");
+    if (had) had.permits = [...had.permits!, ...grants];
+    else out.push({ kind: "turnPermission", mana: d.manaCost, costs: [], exile: false, permits: grants });
   }
   return out;
 }
@@ -4021,11 +4055,37 @@ export function pickPermit(s: GameState, o: GameObject, permits: string[], chose
   if (chosen !== undefined) return permits.includes(chosen) ? chosen : undefined;
   const others = player(s, o.owner).graveyard.filter((id) => id !== o.id);
   const demand = (k: string) => others.filter((id) => graveyardWays(s, obj(s, id)).some((w) => w.permits?.includes(k))).length;
-  return [...permits].sort((a, b) => demand(a) - demand(b))[0];
+  // One with no cost of its own first (Karador's before Exploration Broodship's sacrifice).
+  return [...permits].sort((a, b) => permitCosts(s, a).length - permitCosts(s, b).length || demand(a) - demand(b))[0];
+}
+
+/**
+ * A once-each-turn permission's own costs: Exploration Broodship's "by sacrificing a land in addition to paying its other
+ * costs" (CR 601.2f-h).
+ */
+/** Whether a once-each-turn permission exiles the spell instead of putting it into a graveyard (Maestros Ascendancy). */
+function permitExiles(s: GameState, key: string): boolean {
+  const src = s.objects[key.split("@")[0]!];
+  return !!(src && abilitiesOf(s, src).graveyardGrants?.find((g) => g.once)?.way.exile);
+}
+
+export function permitCosts(s: GameState, key: string): AdditionalCost[] {
+  const src = s.objects[key.split("@")[0]!];
+  return (src && abilitiesOf(s, src).graveyardGrants?.find((g) => g.once)?.way.costs) ?? [];
+}
+
+/** The permission a cast from this graveyard card uses: the one chosen, or the one pickPermit takes. */
+function castPermit(s: GameState, id: ObjectId | undefined, d: CardDef, x: number, chosen?: string): string | undefined {
+  if (chosen !== undefined) return chosen;
+  const o = id !== undefined ? s.objects[id] : undefined;
+  const via = o && graveyardWay(s, o, "turnPermission");
+  return o && via ? pickPermit(s, o, permitsForMv(s, via.permits ?? [], defMv(d) + x * xCount(parseManaCost(d.manaCost)))) : undefined;
 }
 
 /** A permission's label: Muldrotha's slot ("creature"), or the permanent's name. */
 export function permitLabel(s: GameState, key: string): string {
+  const grant = s.graveGrants?.find((g) => g.key === key);
+  if (grant) return grant.source;
   const [ref, slot] = key.split(":");
   const src = s.objects[ref!.split("@")[0]!];
   return `${src ? characteristics(s, src).name : "a permanent"}${slot ? ` (${slot.toLowerCase()})` : ""}`;
@@ -4221,11 +4281,11 @@ function casualtyProblem(s: GameState, pid: PlayerId, d: CardDef, choices?: Cost
 /** Can these additional costs be paid (CR 601.2b, 601.2f-h)? Without choices, just whether they could be. */
 function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choices?: CostChoices, x = 0, modes?: number[], targets?: TargetChoice[]): string | null {
   const d = defOf(s, o);
-  return extraCostProblem(s, pid, o, castExtraCosts(d, { ...choices, ...(modes ? { modes } : {}), ...(targets ? { targets } : {}) }, x, s, pid), choices, `cast ${d.name}`);
+  return extraCostProblem(s, pid, o, castExtraCosts(d, { ...choices, objectId: o.id, ...(modes ? { modes } : {}), ...(targets ? { targets } : {}) }, x, s, pid), choices, `cast ${d.name}`);
 }
 
 /** The costs beyond mana of casting it this way: additional costs, and those of a graveyard or alternative cost (CR 601.2f-h). */
-export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr" | "buyback"> & { modes?: number[]; targets?: TargetChoice[] }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
+export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr" | "buyback" | "permit"> & { modes?: number[]; targets?: TargetChoice[]; /** The card being cast, for the once-each-turn permission it would use. */ objectId?: ObjectId }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
   const or = choices?.costOr === undefined ? undefined : compileCard(d).costOr?.[choices.costOr]?.cost;
   // "Escalate—Discard a card": that cost once for each mode beyond the first (CR 702.120a).
   const esc = compileCard(d).spell?.modal?.escalate?.cost;
@@ -4239,7 +4299,8 @@ export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "
       const t = s.objects[id];
       if (t?.zone === "battlefield" && controllerOf(s, t) !== pid) lifeTax += abilitiesOf(s, t).targetLifeTax ?? 0;
     }
-  const costs = [...(compileCard(d).additionalCosts ?? []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : [])];
+  const permit = s && choices?.via === "turnPermission" ? castPermit(s, choices.objectId, d, x, choices.permit) : undefined;
+  const costs = [...(compileCard(d).additionalCosts ?? []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : [])];
   // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a); the Shoals' "a red card with mana value
   // X", that mana value.
   return costs.map((c) =>
@@ -5077,7 +5138,7 @@ function chooseDiscard(s: GameState, p: Player, ids: ObjectId[]) {
   const pend = s.pending;
   const r = s.resolving;
   if (pend?.kind !== "discard" || pend.player !== p.id || !r?.scratch?.queue) throw new RulesError("no discard pending");
-  if (new Set(ids).size !== pend.count || ids.some((id) => !p.hand.includes(id))) throw new RulesError(`choose exactly ${pend.count} card(s) from your hand`);
+  if ((pend.upTo ? new Set(ids).size !== ids.length || ids.length > pend.count : new Set(ids).size !== pend.count) || ids.some((id) => !p.hand.includes(id))) throw new RulesError(pend.upTo ? `choose up to ${pend.count} card(s) from your hand` : `choose exactly ${pend.count} card(s) from your hand`);
   if (pend.filter && ids.some((id) => !printedMatches(pend.filter!, defOf(s, obj(s, id))))) throw new RulesError(`choose ${pend.filter.text.replace(/^(?!an? )/, "a ")}`);
   r.scratch.chosen![p.id] = ids;
   r.scratch.queue.shift();
@@ -6357,7 +6418,10 @@ const SUPERTYPE_WALK: Record<string, { supertype: string; non?: true }> = { "Sno
 /** "Can't block": from its abilities, or from a rule for the turn like Falter's. */
 export function cantBlockNow(s: GameState, o: GameObject): boolean {
   // Decayed means "This creature can't block" (CR 702.147a).
-  return characteristics(s, o).cantBlock || objHasKeyword(s, o, "Decayed") || (s.cantBlockThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false));
+  if (characteristics(s, o).cantBlock || objHasKeyword(s, o, "Decayed") || (s.cantBlockThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false))) return true;
+  // Void Winnower: an opponent's creature with an even mana value (X is 0, CR 202.3b; a face-down one's is 0).
+  const you = controllerOf(s, o);
+  return defMv(defOf(s, o)) % 2 === 0 && s.battlefield.some((id) => controllerOf(s, s.objects[id]!) !== you && abilitiesOf(s, s.objects[id]!).opponentsCantBlockEven);
 }
 
 export function blockProblem(s: GameState, blocker: GameObject, attacker: GameObject, defender = attacker.attacking): string | null {

@@ -1,7 +1,7 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType, objIsType, power } from "../cards";
 import { nameLandBan } from "../names";
-import { attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
+import { attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters, withPutter } from "../counters";
 import { manaValue } from "../mana";
@@ -1125,6 +1125,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (e.dest === "hand") log(s, `${p.name} puts ${cards.length === 1 ? "a card" : `${cards.length} cards`} exiled with ${src} into their hand.`);
       else log(s, `${cards.map((c) => defOf(s, c).name).join(", ")} ${cards.length === 1 ? "goes" : "go"} from exile to ${cards.length === 1 ? "its owner's graveyard" : "their owners' graveyards"} (${src}).`);
       for (const c of cards) moveObject(s, c.id, e.dest);
+      s.resolving!.movedLinked = cards.length;
       if (s.linkedExile?.[key]) s.linkedExile[key] = s.linkedExile[key]!.filter((l) => !cards.some((c) => c.id === l.id));
       return;
     }
@@ -1330,6 +1331,26 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           }
         }
       });
+      // Cultivator Colossus: a card was put, so draw and go again (its triggers wait until this resolves, rulings).
+      if (e.drawRepeat && cards.some((o) => o.zone === "battlefield")) {
+        draw(s, p.id);
+        delete sc.found;
+        return runZonesEffect(s, e, ctx, src);
+      }
+      return;
+    }
+    case "weld": {
+      if (!ctx.legal[e.artifact] || !ctx.legal[e.card]) return;
+      const [ta, tc] = [ctx.targets[e.artifact], ctx.targets[e.card]];
+      const a = ta?.kind === "object" ? s.objects[ta.id] : undefined;
+      const c = tc?.kind === "object" ? s.objects[tc.id] : undefined;
+      if (a?.zone !== "battlefield" || c?.zone !== "graveyard") return;
+      // The card must still be in that player's graveyard: the artifact's controller now (a target still legal, CR 608.2b).
+      const pid = controllerOf(s, a);
+      if (c.owner !== pid) return;
+      log(s, `${player(s, pid).name} sacrifices ${defOf(s, a).name} and returns ${defOf(s, c).name} to the battlefield.`);
+      moveObject(s, a.id, "graveyard", { sacrificed: true });
+      enterTogether(s, () => moveObject(s, c.id, "battlefield", { controller: pid }));
       return;
     }
     case "putOntoBattlefield": {
@@ -1670,7 +1691,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           const names = later.map((l) => defOf(s, s.objects[l.id]!).name).join(", ");
           addDelayed(s, "nextEndStep", ctx.controller, first, {
             targets: [],
-            effects: [{ type: "returnExiled", under: e.under, ...(e.counter ? { counter: e.counter } : {}), ...(e.tapped ? { tapped: true as const } : {}), ...(later.length > 1 ? { cards: later } : {}) }],
+            effects: [{ type: "returnExiled", under: e.under, ...(e.counter ? { counter: e.counter } : {}), ...(e.tapped ? { tapped: true as const } : {}), ...(later.length > 1 ? { cards: later } : {}), ...(e.selfCounterIfYours && ctx.sourceId ? { selfCounter: { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0, counter: e.selfCounterIfYours } } : {}) }],
             text: `Return ${names} to the battlefield${e.tapped ? " tapped" : ""} under ${e.under === "owner" ? (later.length > 1 ? "their owners'" : "its owner's") : "your"} control.`,
           });
         }
@@ -1690,8 +1711,21 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "returnExiled": {
       const list = e.cards ?? (ctx.subject ? [ctx.subject] : []);
       const back = list.map((l) => s.objects[l.id]).filter((o, i): o is GameObject => o?.zone === "exile" && (o.zoneChanges ?? 0) === list[i]!.zc);
-      if (!back.length) return;
-      return returnFromExile(s, back, (c) => (e.under === "owner" ? c.owner : ctx.controller), src, e.counter, e.tapped);
+      const sc = (s.resolving!.scratch ??= {});
+      if (back.length && returnFromExile(s, back, (c) => (e.under === "owner" ? c.owner : ctx.controller), src, e.counter, e.tapped) === "paused") {
+        sc.returning ??= list.filter((l) => back.some((b) => b.id === l.id));
+        return "paused";
+      }
+      // Phelia: "If it entered under your control" (the card it became, CR 400.7), a counter on the source if it's still there.
+      const came = sc.returning ?? list.filter((l) => back.some((b) => b.id === l.id));
+      sc.returning = undefined;
+      const me = e.selfCounter && s.objects[e.selfCounter.id];
+      if (me && me.zone === "battlefield" && (me.zoneChanges ?? 0) === e.selfCounter!.zc && came.some((l) => { const c = s.objects[l.id]; return c?.zone === "battlefield" && (c.zoneChanges ?? 0) === l.zc + 1 && controllerOf(s, c) === ctx.controller; })) {
+        const put = putCounters(s, me, e.selfCounter!.counter, 1);
+        invalidateCharacteristics(s);
+        log(s, `${characteristics(s, me).name} gets ${put} ${e.selfCounter!.counter} counter${put > 1 ? "s" : ""}.`);
+      }
+      return;
     }
     case "exileIfLeaves":
       for (const o of objects(s, e.what, ctx)) if (o.zone === "battlefield") o.exileIfLeaves = "battlefield";
@@ -1828,6 +1862,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         moveObject(s, id, "exile");
         const o = obj(s, id);
         o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.castOnly ? { castOnly: true as const } : {}), ...(e.free ? { free: true as const } : {}) };
+        if (e.linked && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
       }
       if (ids.length === 1 && s.resolving) s.resolving.exiledTop = { id: ids[0]!, zc: s.objects[ids[0]!]!.zoneChanges ?? 0 };
       if (s.resolving) (s.resolving.impulsed ??= []).push(...ids);

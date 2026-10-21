@@ -2645,7 +2645,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // Dauthi Voidwalker: sacrificed in our main phase, with the stack empty, for an exiled spell with a void counter
       // worth more than it (mana value 4 or more) to cast for free right away.
       const voidPlay = ab.sacrificeSelf && ab.body.effects.some((e) => e.type === "playExiled") && s.activePlayer === pid && (s.step === "main1" || s.step === "main2") && !s.stack.length && voidSpells(s, pid, ab.body).some((c) => mv(s, c) >= 4);
-      if ((ab.sacrificeSelf && !cashIn && !flips && !voidPlay) || ab.exileSelf || (freeCost && !necro) || ab.station) continue;
+      if ((ab.sacrificeSelf && !cashIn && !flips && !voidPlay) || ab.exileSelf || ab.returnSelf || (freeCost && !necro) || ab.station) continue;
       // "Pay half your life, rounded up" (Murderous Betrayal, Lurking Evil): only while that's a few life at most.
       if (halfLifeCost(s, pid, ab) > 3) continue;
       // Level up (CR 702.87a) past the last level symbol does nothing more.

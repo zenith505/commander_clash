@@ -2944,6 +2944,8 @@ export interface TriggeredAbility {
   sacrifices?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; by?: "any" | "opponent" };
   /** Persist/undying's "if it had no -1/-1 counters on it" (an intervening if, CR 603.4), from last known information; "any": "if it had no counters on it" (Unstoppable Slasher). */
   ifNoCounter?: "+1/+1" | "-1/-1" | "any";
+  /** "When ~ dies, if it's not a token" (Vaultborn Tyrant): as it last existed (CR 603.4, 603.10a). */
+  ifNotToken?: true;
   /** For "selfToGraveyard": "is put into your graveyard", so only if its controller owns it (rulings on Enigma Sphinx). */
   ownGraveyard?: true;
   /**
@@ -3139,6 +3141,8 @@ export interface ActivatedAbility {
   energyCost?: number;
   /** "Exile this card from your graveyard" is part of the cost: scavenge (CR 702.97a); on the battlefield, "Exile ~" (Relic of Progenitus). */
   exileSelf?: boolean;
+  /** "Return ~ to its owner's hand" is part of the cost (Shigeki, Jukai Visionary; CR 602.2b). */
+  returnSelf?: true;
   /** "Sacrifice a creature", "Discard a card" as part of the cost (CR 602.2b, 601.2h). */
   costs?: AdditionalCost[];
   /** "Remove three spore counters from ~" as part of the cost (CR 602.2b). */

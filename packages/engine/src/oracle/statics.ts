@@ -514,6 +514,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^an opponent was dealt ${NUM} or more damage this turn$`).exec(text))) return { kind: "opponentDealtDamage", n: num(m[1]!) };
   if ((m = new RegExp(`^you attacked with ${NUM} or more creatures this turn$`).exec(text))) return { kind: "attackedWith", n: num(m[1]!) };
   if ((m = new RegExp(`^you've drawn ${NUM} or more cards this turn$`).exec(text))) return { kind: "drawn", n: num(m[1]!) };
+  // "If you've drawn more than one card this turn" (Proft's Eidetic Memory): two or more.
+  if ((m = new RegExp(`^you've drawn more than ${NUM} cards? this turn$`).exec(text))) return { kind: "drawn", n: num(m[1]!) + 1 };
   if ((m = new RegExp(`^an opponent drew ${NUM} or more cards this turn$`).exec(text))) return { kind: "drawn", n: num(m[1]!), opponent: true };
   if (/^you descended this turn$/.test(text)) return { kind: "descended" };
   if (/^a permanent left the battlefield under your control this turn$/.test(text)) return { kind: "revolt" };
@@ -812,6 +814,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^can't attack a player it has already attacked this turn$/.test(rest)) return [{ kind: "cantAttackSamePlayer" }];
   if (/^can't block alone$/.test(rest)) return [{ kind: "cantBlockAlone" }];
   if (/^must be blocked if able$/.test(rest)) return [{ kind: "mustBeBlocked" }];
+  // "Each nonland permanent you control is all colors" (Leyline of the Guildpact): layer 5 (CR 105.2, 613.1e).
+  if (/^(?:is|are) all colors$/.test(rest)) return [{ kind: "setColors", colors: ["W", "U", "B", "R", "G"] }];
   // "Can't attack unless defending player controls an Island" (Sea Serpent), "... a Swamp", "... a blue permanent".
   if ((m = /^can't attack unless defending player controls (an? .+)$/.exec(rest))) {
     const filter = parseTargetPhrase(m[1]!.replace(/^an? /, ""));
@@ -1149,7 +1153,7 @@ function parseStaticLine(line: string): StaticAbility | null {
   // greater is checked as it assigns combat damage, which comes to the same thing as a group that changes with it.
   const greater = /^(.+?) with toughness greater than (?:its|their) power (assigns? .+)$/.exec(text);
   if (greater) text = `${greater[1]} ${greater[2]}`;
-  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|can't .+|can block .+|can attack as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:, .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses all abilities)$/.exec(text);
+  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|(?:is|are) all colors|can't .+|can block .+|can attack as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:, .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses all abilities)$/.exec(text);
   if (!m) return null;
   const affects = parseAffected(m[1]!);
   if (!affects) return null;

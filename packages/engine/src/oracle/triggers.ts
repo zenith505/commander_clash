@@ -1542,6 +1542,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         ifNoCounters = true;
         body0 = noCounters[1]!;
       }
+      // "When ~ dies, if it's not a token, ..." (Vaultborn Tyrant): an intervening if (CR 603.4) on the creature as it last
+      // existed (CR 603.10a).
+      let ifNotToken = false;
+      const notToken = /^if it's not a token, (.+)$/i.exec(body0);
+      if (notToken) {
+        if (event !== "selfDies") return "fail" as const;
+        ifNotToken = true;
+        body0 = notToken[1]!;
+      }
       // "When ~ enters, if tribute wasn't paid, ..." (CR 702.104b).
       let ifTributeUnpaid = false;
       const tribute = /^if tribute wasn't paid, (.+)$/i.exec(body0);
@@ -1607,7 +1616,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // Enigma Sphinx).
       const ownGraveyard = event === "selfToGraveyard" && /^When(?:ever)? ~ is put into your graveyard/.test(line);
       return body
-        ? { event, body, ...(ownGraveyard ? { ownGraveyard } : {}), ...(ifNoCounters ? { ifNoCounter: "any" as const } : {}), ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifSpent ? { ifSpent } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifCast ? { ifCast } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(attacksBattle ? { attacksBattle } : {}), ...(orPlaneswalker ? { orPlaneswalker: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}), ...(onField ? { ifCond: { kind: "self" as const, is: "onBattlefield" as const } } : {}) }
+        ? { event, body, ...(ownGraveyard ? { ownGraveyard } : {}), ...(ifNoCounters ? { ifNoCounter: "any" as const } : {}), ...(ifNotToken ? { ifNotToken } : {}), ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifSpent ? { ifSpent } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifCast ? { ifCast } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(attacksBattle ? { attacksBattle } : {}), ...(orPlaneswalker ? { orPlaneswalker: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}), ...(onField ? { ifCond: { kind: "self" as const, is: "onBattlefield" as const } } : {}) }
         : ("fail" as const);
     }
   }

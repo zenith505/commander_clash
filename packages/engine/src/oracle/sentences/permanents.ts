@@ -455,6 +455,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
       { type: "untap", what: { ref: "self" } },
       { type: "counters", what: { ref: "self" }, counter: "+1/+1", n: m[1] === "a" ? 1 : m[1] === "two" ? 2 : 3, by: { ref: "eventPlayer" } },
     ];
+  // Humble Defector: "Target opponent gains control of ~", for the rest of the game (layer 2); if ~ has left the
+  // battlefield, nothing happens (rulings).
+  if ((m = /^(Target player|Target opponent) gains control of ~$/.exec(s)) && !ctx.spell) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    return who ? [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: who }] : null;
+  }
   if (/^An opponent(?: of your choice)? gains control of ~$/.test(s))
     return [{ type: "choose", choice: "opponent" }, { type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "chosenPlayer" } }];
   // "Gain control of that Equipment until end of turn" (Stolen Uniform): a target an earlier sentence chose.

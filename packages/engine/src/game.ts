@@ -4977,6 +4977,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling, undefined, ab.cycling ? x : undefined);
   // Scavenge (CR 702.97a) from the graveyard; "Exile ~" on the battlefield, if it's still the same object (CR 400.7).
   if (ab.exileSelf && (ab.zone !== undefined || (o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc))) moveObject(s, id, "exile");
+  if (ab.returnSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "hand");
   const stackId = `s${s.nextId++}`;
   const item: StackItem = {
     id: stackId,

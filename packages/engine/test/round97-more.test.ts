@@ -28,6 +28,7 @@ const temptDiscovery = card("Tempt with Discovery", "Sorcery", "{3}{G}", { keywo
 const loot = card("Loot, Exuberant Explorer", "Legendary Creature — Beast Noble", "{2}{G}", { power: "1", toughness: "4", oracleText: "You may play an additional land on each of your turns.\n{4}{G}{G}, {T}: Look at the top six cards of your library. You may reveal a creature card with mana value less than or equal to the number of lands you control from among them and put it onto the battlefield. Put the rest on the bottom in a random order." });
 const descent = card("Descent into Avernus", "Enchantment", "{2}{R}", { oracleText: "At the beginning of your upkeep, put two descent counters on this enchantment. Then each player creates X Treasure tokens and this enchantment deals X damage to each player, where X is the number of descent counters on this enchantment." });
 const statuary = card("Inspiring Statuary", "Artifact", "{3}", { oracleText: "Nonartifact spells you cast have improvise. (Your artifacts can help cast those spells. Each artifact you tap after you're done activating mana abilities pays for {1}.)" });
+const excalibur = card("Excalibur, Sword of Eden", "Legendary Artifact — Equipment", "{12}", { oracleText: "This spell costs {X} less to cast, where X is the total mana value of historic permanents you control. (Artifacts, legendaries, and Sagas are historic.)\nEquipped creature gets +10/+0 and has vigilance.\nEquip legendary creature {2}" });
 const giant = card("Big Giant", "Creature — Giant", "{6}{R}{R}", { power: "8", toughness: "8" });
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -45,7 +46,7 @@ const tapFor = (s: GameState, pid: number, id: string, mana: ManaType): Action =
 
 describe("round 97, more cards", () => {
   it("parse", () => {
-    supported(bloodghast, omniscience, monument, cagedSun, vesuva, flux, iteration, coat, narset, cutDeal, approach, pact, temptDiscovery, loot, descent, statuary);
+    supported(bloodghast, omniscience, monument, cagedSun, vesuva, flux, iteration, coat, narset, cutDeal, approach, pact, temptDiscovery, loot, descent, statuary, excalibur);
     expect(compileCard(omniscience).castFromHandFree).toBe(true);
   });
 
@@ -324,5 +325,20 @@ describe("round 97, more cards", () => {
     expect(planCast(s0, ap, ids[1]!, undefined, undefined, "auto")).toBeNull();
     const s = settle(run(s0, plan));
     expect(s.objects[ids[0]!]!.zone).toBe("graveyard");
+  });
+
+  it("Excalibur: costs {X} less, X the total mana value of your artifacts, legendaries and Sagas", () => {
+    const { s: s0, ap, ids } = setup([excalibur]);
+    putOnBattlefield(s0, ap, solRing); // 1
+    putOnBattlefield(s0, ap, card("Some Legend", "Legendary Creature — Human", "{2}{W}", { power: "2", toughness: "2" })); // 3
+    putOnBattlefield(s0, ap, card("Some Saga", "Enchantment — Saga", "{1}{G}")); // 2
+    putOnBattlefield(s0, ap, bear()); // not historic
+    const lands = s0.battlefield.filter((id) => s0.objects[id]!.controller === ap && s0.cards[s0.objects[id]!.cardId]!.types.includes("Land"));
+    for (const id of lands.slice(6)) s0.objects[id]!.tapped = true;
+    s0.objects[s0.battlefield.find((id) => s0.cards[s0.objects[id]!.cardId]!.name === "Sol Ring")!]!.tapped = true;
+    // {12} less 6: the six untapped lands pay for it.
+    expect(planCast(s0, ap, ids[0]!)).not.toBeNull();
+    s0.objects[lands[0]!]!.tapped = true;
+    expect(planCast(s0, ap, ids[0]!)).toBeNull();
   });
 });

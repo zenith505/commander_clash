@@ -1488,7 +1488,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const filter = e.filter && mvMax !== undefined ? { ...e.filter, manaValue: { max: mvMax }, text: e.filter.text.replace(/ X or less$/, ` ${mvMax} or less`) } : e.filter;
         // Only the cards milled just before, still in the graveyard (CR 400.7).
         const milled = (id: ObjectId) => !e.milled || !!s.resolving!.milled?.some((m) => m.id === id && (obj(s, id).zoneChanges ?? 0) === m.zc);
-        const all = p.graveyard.filter((id) => milled(id) && (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (e.dest !== "battlefield" || isPermanentCard(defOf(s, obj(s, id)))));
+        const all = p.graveyard.filter((id) => milled(id) && (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (e.dest !== "battlefield" || isPermanentCard(defOf(s, obj(s, id)))) && (e.totalMv === undefined || defMv(defOf(s, obj(s, id))) <= e.totalMv));
         // "With different names": one card of each name is offered (cards of one name are alike).
         const cards = e.oneEach ? all.filter((id, i) => all.findIndex((x) => sameName(defOf(s, obj(s, x)).name, defOf(s, obj(s, id)).name)) === i) : all;
         const max = e.distinctManaValues ? new Set(cards.map((id) => defMv(defOf(s, obj(s, id))))).size : Math.min(e.n, cards.length);
@@ -1502,8 +1502,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             ? `any number of ${kind.replace(/\bcard\b/, "cards")} with different names`
           : e.n === 1
             ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`
-            : `${e.upTo ? "up to " : ""}${e.n} ${kind.replace(/\bcard\b/, "cards")}`;
-        s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest ?? "hand", ...(e.distinctManaValues ? { distinctManaValues: true as const } : {}) };
+            : `${e.upTo ? "up to " : ""}${e.n} ${kind.replace(/\bcard\b/, "cards")}${e.totalMv !== undefined ? ` with total mana value ${e.totalMv} or less` : ""}`;
+        s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest ?? "hand", ...(e.distinctManaValues ? { distinctManaValues: true as const } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}) };
         return "paused";
       }
       const found = sc.found.filter((id) => p.graveyard.includes(id));
@@ -1861,7 +1861,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       for (const id of ids) {
         moveObject(s, id, "exile");
         const o = obj(s, id);
-        o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.castOnly ? { castOnly: true as const } : {}), ...(e.free ? { free: true as const } : {}) };
+        o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.castOnly ? { castOnly: true as const } : {}), ...(e.free ? { free: true as const } : {}), ...(e.anyType ? { anyType: true as const } : {}) };
         if (e.linked && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
       }
       if (ids.length === 1 && s.resolving) s.resolving.exiledTop = { id: ids[0]!, zc: s.objects[ids[0]!]!.zoneChanges ?? 0 };

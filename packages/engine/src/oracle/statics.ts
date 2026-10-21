@@ -173,6 +173,15 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     if (!base || base === "fail" || !("costMod" in base) || base.costMod.times || base.costMod.nth) return "fail";
     return { costMod: { ...base.costMod, n: 0, colored: colors, text: line } };
   }
+  // The Defilers: "As an additional cost to cast green permanent spells, you may pay 2 life. Those spells cost {G} less to
+  // cast if you paid life this way. This effect reduces only the amount of green mana you pay." An optional additional
+  // cost of each spell it applies to, once per spell (rulings, CR 601.2b), and a colored reduction if it was paid (601.2f).
+  if ((m = /^As an additional cost to cast (white|blue|black|red|green) permanent spells, you may pay (\d+) life\. Those spells cost \{([WUBRG])\} less to cast if you paid life this way\. This effect reduces only the amount of \1 mana you pay$/.exec(text))) {
+    const base = parseCostChange(`${m[1]!.charAt(0).toUpperCase()}${m[1]!.slice(1)} permanent spells you cast cost {1} less to cast`);
+    const color = ({ white: "W", blue: "U", black: "B", red: "R", green: "G" } as const)[m[1] as "white"];
+    if (!base || base === "fail" || !("costMod" in base) || color !== m[3]) return "fail";
+    return { costMod: { ...base.costMod, n: 0, colored: [color], payLife: Number(m[2]), text: line } };
+  }
   if ((m = /^Spells your opponents cast that target ~ cost \{(\d+)\} more to cast$/.exec(text))) return { targetTax: Number(m[1]) };
   if ((m = /^Spells your opponents cast that target ~ cost an additional (\d+) life to cast$/.exec(text))) return { targetLifeTax: Number(m[1]) };
   if ((m = /^~ costs \{(\d+)\} less to cast for each (.+)$/.exec(text))) {

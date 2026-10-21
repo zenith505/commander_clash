@@ -1,7 +1,7 @@
 import { faceDef, hasFuse, isRoom, restingDef, roomDoorDefs } from "../faces";
 import { isMeldResult, meldPartnerName, meldResultDef } from "../meld-results";
 import { allEffects, GRANTED_WAY_COSTS } from "../abilities";
-import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq } from "../abilities";
+import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq, StaticAbility, Affects } from "../abilities";
 import { CHOSEN_HEXPROOF, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CREATURE_TYPES, stripReminder } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
@@ -1004,6 +1004,24 @@ export function compile(d: CardDef): CompiledCard {
     const payEvidence = /^You may collect evidence (\d+) rather than pay the mana cost for spells you cast\.$/.exec(line);
     if (payEvidence) {
       out.payEvidence = Number(payEvidence[1]);
+      continue;
+    }
+    // Open the Way: a limit on the X announced as it's cast (CR 601.2b).
+    if (line === "X can't be greater than the number of players in the game." && isSpell && parseManaCost(d.manaCost).hasX) {
+      out.xMaxPlayers = true;
+      continue;
+    }
+    // The Marches: "As an additional cost to cast this spell, you may exile any number of blue cards from your hand. This
+    // spell costs {2} less to cast for each card exiled this way." Announced with the other costs (CR 601.2b), then a
+    // reduction of the total (601.2f), which can take {X} down too (rulings).
+    const march = /^As an additional cost to cast ~, you may exile any number of (.+?) cards from your hand\. ~ costs \{(\d+)\} less to cast for each card exiled this way\.$/.exec(line);
+    if (march) {
+      const filter = parseSearchFilter(`${march[1]} card`);
+      if (!filter || out.exiledReduction !== undefined) out.unsupported.push(raw);
+      else {
+        (out.additionalCosts ??= []).push({ kind: "exileFromHand", n: 0, filter, anyNumber: true });
+        out.exiledReduction = Number(march[2]);
+      }
       continue;
     }
     // Plumb the Forbidden: "you may sacrifice one or more creatures. When you do, copy this spell for each creature
@@ -2061,6 +2079,17 @@ export function compile(d: CardDef): CompiledCard {
       for (const p of parts) out.statics.push({ ...p!, text: line });
       continue;
     }
+    // Death Baron: "Skeletons you control and other Zombies you control get +1/+1 and have deathtouch." One group made of
+    // two: a creature that's both gets it once (rulings), so the Zombies are those that aren't also Skeletons; the source
+    // itself only as a Skeleton (rulings).
+    const twoTribes = /^([A-Z][a-z]+) you control and other ([A-Z][a-z]+) you control ((?:get|have) .+)$/.exec(line);
+    const tribes = twoTribes && [parseStatic(`${twoTribes[1]} you control ${twoTribes[3]}`), parseStatic(`Other ${twoTribes[2]} you control ${twoTribes[3]}`)];
+    if (tribes?.every((p) => p?.affects.kind === "filter" && !p.affects.spec && p.affects.subtypes?.length === 1)) {
+      const [a, b] = tribes as [StaticAbility, StaticAbility];
+      const skip = (a.affects as Extract<Affects, { kind: "filter" }>).subtypes!;
+      out.statics.push({ ...a, text: line }, { ...b, affects: { ...(b.affects as Extract<Affects, { kind: "filter" }>), spec: { kind: "object", notSubtypes: skip, text: `non-${skip[0]}` } }, text: line });
+      continue;
+    }
     // A spell's "When you next cast ... this turn, ..." creates a delayed trigger as it resolves (CR 603.7); it isn't a triggered ability of the card.
     // So does a Pact's "At the beginning of your next upkeep, pay {2}{B}. If you don't, you lose the game." (CR 603.7a).
     if (isSpell && (/^When you next cast /.test(line) || /^At the beginning of each combat this turn, /.test(line) || /^At the beginning of your next upkeep, pay (?:\{[^}]+\})+\. If you don't, you lose the game\.$/.test(line))) {
@@ -2087,6 +2116,8 @@ export function compile(d: CardDef): CompiledCard {
       /^When ~ enters and (whenever (?!it )[^,]+), (.+)$/.exec(line) ??
       // "Whenever a creature you control of the chosen type enters or attacks, draw a card." (Kindred Discovery)
       /^Whenever (an? [^,]+? you control(?: of the chosen type)?) enters or attacks, (.+)$/.exec(line) ??
+      // "Whenever another creature you control enters or dies, you gain 1 life." (Daxos, Blessed by the Sun)
+      /^Whenever ((?:another|an?) [^,]+? you control) enters or dies, (.+)$/.exec(line) ??
       // Syr Konrad: "Whenever another creature dies, or a creature card is put into a graveyard from anywhere other than
       // the battlefield, or a creature card leaves your graveyard, ...": no one event is two of them.
       /^Whenever (another creature dies), or (a creature card is put into a graveyard from anywhere other than the battlefield), or (a creature card leaves your graveyard), (.+)$/.exec(line) ??
@@ -2115,6 +2146,8 @@ export function compile(d: CardDef): CompiledCard {
               ? twice.slice(1, 4).map((e) => `Whenever ${/^Whenever an opponent /.test(line) ? "an opponent " : ""}${e}, ${effect}`)
             : /^Whenever an? [^,]+? enters or attacks, /.test(line)
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} attacks, ${effect}`]
+            : /^Whenever [^,]+? you control enters or dies, /.test(line)
+              ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} dies, ${effect}`]
             : [`When ~ enters, ${effect}`, `${/^(?:attacks|deals)/.test(twice[1]!) ? "Whenever" : "When"} ~ ${twice[1]}, ${effect}`];
       const both = events.map((l) => parseTrigger(l));
       if (both.some((t) => !t || t === "fail")) out.unsupported.push(raw);

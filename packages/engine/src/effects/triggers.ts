@@ -202,7 +202,7 @@ export type TriggerSourceEvent =
   | { type: "dealtDamage"; id: ObjectId; amount: number; combat: boolean }
   | { type: "step"; step: "upkeep" | "draw" | "main1" | "main2" | "end" | "beginCombat" | "endCombat" | "cleanup"; active: PlayerId }
   /** A spell was just cast (CR 601.2i): "whenever you cast" abilities and prowess. */
-  | { type: "cast"; stackId: string; controller: PlayerId; card: CardDef; /** A copy was put on the stack instead (magecraft's "or copy"). */ copy?: boolean; /** The mana spent to cast it (increment, CR 702.191a). */ manaSpent?: number; /** How much of it Treasures made (CR 106.3). */ treasureSpent?: number; /** What was spent, by type (CR 601.2h). */ spent?: SpentMana }
+  | { type: "cast"; stackId: string; controller: PlayerId; card: CardDef; /** A copy was put on the stack instead (magecraft's "or copy"). */ copy?: boolean; /** The mana spent to cast it (increment, CR 702.191a). */ manaSpent?: number; /** How much of it Treasures made (CR 106.3). */ treasureSpent?: number; /** What was spent, by type (CR 601.2h). */ spent?: SpentMana; /** The permanents whose kept-apart mana was spent on it ("id#zoneChanges", ManaLot.source). */ manaSources?: string[] }
   /** A spell or ability was just put on the stack with its targets: "becomes the target" (CR 601.2c, ward 702.21a). */
   /** `only`: its targets were changed (CR 115.7), and these are the new ones; that isn't a crime (CR 700.13). */
   | { type: "targeted"; stackId: string; only?: ObjectId[] }
@@ -1077,6 +1077,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Its caster's spells this turn, this one included (it was counted as it was cast).
         if (t.cast.nth && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller && (!t.cast!.nthOfKind || (!!s.cards[c.card] && printedMatches(t.cast!.spell, s.cards[c.card]!)))).length !== t.cast.nth) return false;
         if (t.cast.treasure && !(ev.treasureSpent && !ev.copy)) return false;
+        // "Using mana produced by Tecutlan": this permanent's mana, as this object (CR 400.7).
+        if (t.cast.manaFromSelf && !ev.manaSources?.includes(`${o.id}#${o.zoneChanges ?? 0}`)) return false;
         // "If at least four mana was spent to cast it" (CR 603.4): a copy wasn't cast, so nothing was spent on it.
         // "If {S} of any of that spell's colors was spent": its colors as it was cast.
         if (t.cast.spent && !spentMeets(ev.copy ? undefined : ev.spent, t.cast.spent, spell ? characteristics(s, spell).colors : ev.card.colors)) return false;
@@ -1206,6 +1208,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (e === "castSpell" && t.cast?.orActivates) return !!ev.treasure && (t.cast.by !== "opponent" || ev.player !== you) && (t.cast.by !== "you" || ev.player === you);
         const a = t.activates;
         if (e !== "abilityActivated" || !a || ev.mana || (a.by === "opponent" && ev.player === you) || (a.by === "you" && ev.player !== you)) return false;
+        if (a.equipped) {
+          const host = o.attachedTo === undefined ? undefined : s.objects[o.attachedTo];
+          if (!ev.source || !host || host.id !== ev.source.snapshot.id || host.zone !== "battlefield" || (host.zoneChanges ?? 0) !== (ev.source.snapshot.zoneChanges ?? 0)) return false;
+        }
         return !a.of || (!!ev.source && objectMatches(s, a.of, ev.source.snapshot, you, false, undefined, ev.source.chars));
       }, undefined, ev.stackId, undefined, undefined, undefined, undefined, { player: ev.player });
     }

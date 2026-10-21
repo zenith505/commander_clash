@@ -5,7 +5,7 @@ import { currentName } from "../names";
 import { shuffle, shuffleLibrary } from "../rng";
 import type { GameState, ObjectId } from "../types";
 import { bindChosen, printedMatches } from "./targeting";
-import { ResolveCtx, players } from "./resolve";
+import { ResolveCtx, amountNow, players } from "./resolve";
 
 /** Card names (CR 201): exiling the cards with a name from a player's graveyard, hand and library; revealing until one. */
 export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
@@ -56,12 +56,18 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // the whole library is revealed (rulings on Demonic Consultation).
       const p = player(s, ctx.controller);
       const filter = bindChosen(e.filter, ctx.chosen);
-      const at = filter.chosen === "name" && ctx.chosen?.name === undefined ? -1 : p.library.findIndex((id) => printedMatches(filter, defOf(s, obj(s, id))));
-      const seen = p.library.slice(0, at < 0 ? p.library.length : at + 1);
-      const hit = at < 0 ? undefined : p.library[at];
-      log(s, `${p.name} reveals ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${seen.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}${hit ? "" : `, finding no ${filter.text}`}.`);
-      if (hit) moveObject(s, hit, e.found, e.tapped ? { tapped: true } : {});
-      const rest = seen.filter((id) => id !== hit);
+      // "Until you reveal X land cards" (Open the Way): X of them, or as many as there are; with X = 0, none is revealed.
+      const want = e.n === undefined ? 1 : Math.max(0, amountNow(s, e.n, ctx));
+      const named = !(filter.chosen === "name" && ctx.chosen?.name === undefined);
+      const hits: ObjectId[] = [];
+      let end = want ? p.library.length : 0;
+      for (let i = 0; named && i < end; i++)
+        if (printedMatches(filter, defOf(s, obj(s, p.library[i]!))) && hits.push(p.library[i]!) === want) end = i + 1;
+      const seen = p.library.slice(0, end);
+      const hit = hits[0];
+      log(s, `${p.name} reveals ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${seen.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}${hit || !want ? "" : `, finding no ${filter.text}`}.`);
+      for (const id of hits) moveObject(s, id, e.found, e.tapped ? { tapped: true } : {});
+      const rest = seen.filter((id) => !hits.includes(id));
       if (e.rest === "bottom") {
         // "The rest on the bottom of your library in a random order" (CR 701.20a), every one of them if none was found.
         const order = [...rest];

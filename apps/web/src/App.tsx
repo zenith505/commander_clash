@@ -149,6 +149,8 @@ import {
   pickOptions,
   shareLandType,
   oneOfEachFits,
+  activatedCosts,
+  abilityCostsHaveX,
 } from "@cc/engine";
 import { HUMAN, STOPPABLE, cardOf, seenCardOf, isCreature, isLand, loopReady, newGame, useGame, type DeckBundle, type LoopRecording, type PriorityMode } from "./useGame";
 import { Arrows, targetSelectors as baseSelectors, type ArrowSpec } from "./Arrows";
@@ -400,7 +402,7 @@ type ManaPick = { mana?: ManaType; extra?: ManaType[] };
 type XPick =
   /** `extra`: an additional cost with X in it, "pay X life" (CR 107.3a). */
   | { mode: "cast"; draft: CastDraft; label: string; cost: string; max: number; value: number; extra?: string }
-  | { mode: "activate"; objectId: string; index: number; label: string; cost: string; max: number; value: number; modes?: number[] };
+  | { mode: "activate"; objectId: string; index: number; label: string; cost: string; max: number; value: number; modes?: number[]; extra?: string };
 
 /** The biggest X you can pay for (`plan(x)` is null when you can't), up to 99. */
 /** How many "up to" targets in a row start at `i`. */
@@ -637,6 +639,12 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const max = maxX((n) => planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, n));
       return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: max, modes });
     }
+    // "Sacrifice X Squirrels" (Chatterfang): X is announced first, up to how many you could sacrifice (CR 107.3a, 602.2b).
+    if (x === undefined && abilityCostsHaveX(ab)) {
+      const max = maxX((n) => planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, n));
+      const extra = (ab.costs ?? []).flatMap((c) => ("x" in c && c.x ? [`${c.kind === "sacrifice" ? "sacrifice" : c.kind} X ${c.kind === "sacrifice" ? c.filter.text.replace(/s?$/, "s") : ""}`.trim()] : [])).join(" and ");
+      return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: Math.min(max, Math.max(ab.xMin ?? 0, 1)), modes, extra });
+    }
     // −X loyalty abilities: X loyalty counters, up to how many it has (CR 606.6).
     if (x === undefined && ab.loyaltyX) {
       const max = s.objects[objectId]!.counters.loyalty ?? 0;
@@ -653,7 +661,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   function continueActivate(d: ActivateDraft) {
     if (!s) return;
     const ab = abilitiesOf(s, s.objects[d.objectId]!).activated[d.index]!;
-    for (const c of ab.costs ?? []) {
+    for (const c of activatedCosts(ab, d.x)) {
+      if ("x" in c && c.x && c.n === 0) continue; // X is 0: nothing to pick
       if (c.kind === "collectEvidence") {
         // "Collect evidence 3": click cards in your graveyard until their mana values add up (CR 701.59a).
         if (d.collect !== undefined) continue;
@@ -1676,7 +1685,7 @@ function canUseFace(s: GameState, id: string) {
   return castableFaces(s, o).some((f) => canCastFace(s, id, f)) || landFaces(s, o).some((f) => f !== 0 && canPlayLand(s, id, f));
 }
 
-const ALT_NAMES: Record<AltCostKind, string> = { citadel: "Cast it:", foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate", convert: "More Than Meets the Eye" };
+const ALT_NAMES: Record<AltCostKind, string> = { citadel: "Cast it:", foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate", convert: "More Than Meets the Eye", omniscience: "Cast it:" };
 const ALT_NOTES: Record<AltCostKind, string> = {
   citadel: "from the top of your library, life equal to its mana value instead of its mana cost (Bolas's Citadel); X is 0",
   evoke: "it's sacrificed as it enters",
@@ -1700,6 +1709,7 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   miracle: "",
   mutate: "target a non-Human creature you own: it merges with it, on top or underneath, and the merged creature has the abilities of both",
   convert: "cast it converted: its back face is the spell, and it enters with that face up",
+  omniscience: "from your hand, for nothing (Omniscience); X is 0",
 };
 
 const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", grantedFlashback: "Flashback", grantedEscape: "Escape", grantedRetrace: "Retrace", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape", mayhem: "Mayhem", harmonize: "Harmonize", permission: "Cast from graveyard", aftermath: "Aftermath:", disturb: "Disturb:" };
@@ -1821,7 +1831,7 @@ function XPickBar({ pick, onChange, onDone, onCancel }: { pick: XPick; onChange:
     <div className="targeting x-pick">
       <span>
         <strong>{pick.label}</strong> <ManaCost cost={pick.cost} size="sm" />
-        {pick.mode === "cast" && pick.extra ? ` and ${pick.extra}: choose X (up to ${pick.max})` : `: choose X (up to ${pick.max} with your mana)`}
+        {pick.extra ? ` and ${pick.extra}: choose X (up to ${pick.max})` : `: choose X (up to ${pick.max} with your mana)`}
       </span>
       <button className="ghost" disabled={pick.value <= 0} onClick={() => set(pick.value - 1)} aria-label="X minus one">
         −

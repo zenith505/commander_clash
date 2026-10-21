@@ -459,6 +459,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^a nonland permanent left the battlefield this turn or a spell was warped this turn$/.test(text)) return { kind: "void" };
   // Your life total (CR 119), against a number or your starting life total (CR 903.7).
   if ((m = /^you have (\d+) or (more|less) life$/.exec(text))) return { kind: "life", ...(m[2] === "more" ? { min: Number(m[1]) } : { max: Number(m[1]) }) };
+  // Bloodghast: "as long as an opponent has 10 or less life" (one still in the game).
+  if ((m = /^an opponent has (\d+) or less life$/.exec(text))) return { kind: "life", max: Number(m[1]), opponent: true };
   if ((m = /^you have at least (\d+) life more than your starting life total$/.exec(text))) return { kind: "life", min: STARTING_LIFE + Number(m[1]) };
   if ((m = /^your life total is (greater than or equal to|greater than|less than or equal to|less than) (half )?your starting life total$/.exec(text))) {
     const base = m[2] ? Math.floor(STARTING_LIFE / 2) : STARTING_LIFE;
@@ -964,6 +966,14 @@ function parseStaticLine(line: string): StaticAbility | null {
     const spec: TargetSpec | undefined = typing[1]!.startsWith("Slivers") ? { kind: "object", anyOf: [{ kind: "object", subtypes: ["Sliver"], text: "Sliver" }, { kind: "object", token: false, text: "nontoken creature" }], text: "Sliver or nontoken creature" } : undefined;
     return { affects: { kind: "filter", types: ["Creature"], controller: "you", ...(spec ? { spec } : {}) }, mods: [mod], text: line, ...(typing[4] ? { offField: true as const } : {}) };
   }
+  // Ashaya: "Nontoken creatures you control are Forest lands in addition to their other types" (layer 4, CR 613.1d): a
+  // Forest has "{T}: Add {G}" (CR 305.6), still affected by summoning sickness (CR 302.6). Toph: "Nontoken artifacts you
+  // control are lands in addition to their other types" (no land type, so no mana ability).
+  const becomeLands = /^Nontoken (creatures|artifacts) you control are (?:(Plains|Island|Swamp|Mountain|Forest) )?lands in addition to their other types$/.exec(text);
+  if (becomeLands) {
+    const type = becomeLands[1] === "creatures" ? "Creature" : "Artifact";
+    return { affects: { kind: "filter", types: [type], controller: "you", spec: { kind: "object", types: [type], token: false, text: `nontoken ${becomeLands[1]!.slice(0, -1)}` } }, mods: [{ kind: "addTypes", types: ["Land"], subtypes: becomeLands[2] ? [becomeLands[2]] : [] }], text: line };
+  }
   if (/^Permanents with ice counters on them are snow$/.test(text)) return { affects: { kind: "filter", types: [], spec: { kind: "object", counter: "ice", text: "permanent with an ice counter on it" } }, mods: [snow], text: line };
   // Null Rod: "Activated abilities of artifacts can't be activated", mana abilities too (CR 605.1a); only permanents'.
   const silenced = /^Activated abilities of (.+?) can't be activated( unless they're mana abilities)?$/.exec(text);
@@ -1080,7 +1090,10 @@ function parseStaticLine(line: string): StaticAbility | null {
   if (!mods) return null;
   const counts = (c: AmountExpr | null) => c && staticCountOk(c, affects) ? c : null;
   if (each) {
-    const per = counts(parseCount(each[4]!, null, true));
+    // Coat of Arms: "for each other creature on the battlefield that shares at least one creature type with it", "it"
+    // each creature it affects, counted for that one.
+    const coat = /^other creature on the battlefield that shares at least one creature type with it$/.test(each[4]!) && affects.kind === "filter";
+    const per = coat ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], text: each[4]! }, sharesTypeWithAffected: true as const } } : counts(parseCount(each[4]!, null, true));
     const pt = mods[0];
     if (!per || mods.length !== 1 || pt?.kind !== "modifyPT") return null;
     const [p, t] = [scaleAmount(pt.power, per), scaleAmount(pt.toughness, per)];

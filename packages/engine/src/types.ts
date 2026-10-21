@@ -1,4 +1,4 @@
-import type { AbilityBody, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CostMod, NamePurpose, CounterKind, DamageMod, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec, TriggeredAbility, TriggerDuration } from "./abilities";
+import type { AbilityBody, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CostMod, NamePurpose, CounterKind, DamageMod, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec, TokenSpec, ManaTrigger, TriggeredAbility, TriggerDuration } from "./abilities";
 import type { DamageEvent } from "./damage";
 import type { Characteristics } from "./layers";
 
@@ -44,6 +44,7 @@ export interface DamageRule {
   redirect?: { object: ObjectId; zc: number } | { player: PlayerId };
   gainLife?: { colors?: Color[] };
   dealBack?: { colors?: Color[] };
+  tokens?: TokenSpec;
 }
 
 /** Each player's starting life total in Commander (CR 903.7). */
@@ -607,6 +608,8 @@ export interface Player {
   drewFromEmptyLibrary: boolean;
   /** Cards drawn in turn `turn`, for "whenever you draw your second card each turn". */
   draws?: { turn: number; n: number };
+  /** How many spells of each English name this player has cast this game (copies aren't cast): Approach of the Second Sun. */
+  castNames?: Record<string, number>;
   /** The turn of their draw step in which they last drew (the first card drawn in it isn't doubled by Alhammarret's Archive). */
   firstDrawStepDraw?: number;
   /** The turn in whose draw step this player last drew a card: the first card they draw in each draw step (Orcish Bowmasters). */
@@ -1211,6 +1214,8 @@ export interface GameState {
   costModsThisTurn?: { player: PlayerId; mod: CostMod }[];
   /** "Until end of turn, you don't lose unspent red mana as steps and phases end" (CR 500.4): who, and which color (all if unset). */
   keepManaThisTurn?: { player: PlayerId; color?: ManaType }[];
+  /** High Tide's "until end of turn, whenever a player taps an Island for mana ...": `controller` is "you", `source` the card's name. */
+  manaTriggersThisTurn?: { controller: PlayerId; source: string; trigger: ManaTrigger }[];
   /** "Creatures without flying can't block this turn": matching creatures can't block, also ones that arrive later. */
   cantBlockThisTurn?: { filter: TargetSpec; controller: PlayerId }[];
   /** "Creatures can't attack this turn": matching creatures can't attack, also ones that arrive later. */
@@ -1476,6 +1481,8 @@ export interface Resolving {
   choseThisWay?: PlayerId[];
   /** The cards drawn so far while this resolves, for "you may cast one of them" (Dungeon of the Mad Mage's last room). */
   drawnThisWay?: ObjectId[];
+  /** The cards the draw instruction before this one drew ("each opponent who drew a card this way", Cut a Deal). */
+  drawnBefore?: ObjectId[];
   /** How many cards each player discarded so far while this resolves ("draw that many cards"). */
   discarded?: Record<PlayerId, number>;
   /** The powers of the creature cards exiling graveyards exiled so far while this resolves ("exiled this way"). */
@@ -1545,6 +1552,8 @@ export interface Resolving {
   /** Its last roll (CR 706.2): each die's natural result that counts (not the ignored ones, 706.6), and the result. */
   rolled?: { sides: number; naturals: number[]; result: number; /** "The other result" (Effect roll's chooseOne). */ other?: number };
   scratch?: {
+    /** Tainted Pact: the names exiled so far, and the card the player is asked about. */
+    pact?: { names: string[]; asking?: ObjectId };
     queue?: PlayerId[]; // players still to choose, in APNAP order (CR 101.4)
     drawQueue?: PlayerId[]; // players still to draw: a draw can stop for dredge (CR 702.52a)
     chosen?: Record<string, ObjectId[]>; // cards each player chose to discard
@@ -1648,7 +1657,7 @@ export interface Resolving {
     faceDownPick?: true;
     /** moveLinked with `one`: the card is being chosen. */
     linkedPick?: true;
-    castAmong?: { ids: { id: ObjectId; zc: number }[]; budget?: number; maxMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true; /** How many were cast. */ cast?: number; /** `untilHits`: the cards that qualified; `handPick`, choosing which goes to the hand. */ hits?: ObjectId[]; handPick?: true };
+    castAmong?: { ids: { id: ObjectId; zc: number }[]; budget?: number; maxMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true; /** How many were cast. */ cast?: number; /** `untilHits`: the cards that qualified; `handPick`, choosing which goes to the hand. */ hits?: ObjectId[]; handPick?: true; /** `copies`: the card the copy being cast is of. */ copyOf?: ObjectId };
     topOrBottom?: string; // the owner's choice: "top" or "bottom"
     /** The player a creature put onto the battlefield attacking attacks (CR 508.4), as a PlayerId string. */
     attackWhom?: string;

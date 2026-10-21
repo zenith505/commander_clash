@@ -90,7 +90,7 @@ export type Count =
    * "The number of creatures you control", "for each other Elf you control". `filter.controller` is from the ability's controller's view;
    * `whose`: "creatures target player controls", controlled by those players.
    */
-  | { kind: "permanents"; filter: TargetSpec; other?: boolean; whose?: PlayerRef; /** "Differently named lands you control": each English name once (rulings); a face-down permanent has no name (CR 708.2). */ differentNames?: true; /** "Each other attacking creature that shares a creature type with it" (Shared Animosity): not the trigger's subject, and sharing a type with it. */ sharesTypeWithSubject?: true }
+  | { kind: "permanents"; filter: TargetSpec; other?: boolean; whose?: PlayerRef; /** "Differently named lands you control": each English name once (rulings); a face-down permanent has no name (CR 708.2). */ differentNames?: true; /** "Each other attacking creature that shares a creature type with it" (Shared Animosity): not the trigger's subject, and sharing a type with it. */ sharesTypeWithSubject?: true; /** "Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it" (Coat of Arms): not the permanent the static effect is applied to, and sharing a type with it. */ sharesTypeWithAffected?: true }
   /** "The number of cards in your hand", "in that player's hand". */
   | { kind: "cardsInHand"; who: PlayerRef }
   | { kind: "cardsInLibrary"; who: PlayerRef }
@@ -173,7 +173,8 @@ export type Count =
       total?: true;
     }
   /** "The greatest mana value among permanents you control": 0 when there are none; X is 0 on the battlefield (CR 202.3, 107.3). */
-  | { kind: "greatestManaValue"; filter: TargetSpec }
+  /** `total`: "the total mana value of historic permanents you control" (Excalibur), the sum instead. */
+  | { kind: "greatestManaValue"; filter: TargetSpec; total?: true }
   /** How many times the spell (or the permanent it became) was kicked (CR 702.33d); `which` = with that kicker cost only. */
   | { kind: "kicked"; which?: number }
   /** 1 if it was kicked at all (or with kicker cost `which`), else 0. */
@@ -227,7 +228,8 @@ export type Count =
   | { kind: "opponentsAttacked" }
   /** "For each player", "for each opponent (you have)": the players still in the game (CR 102.1, 800.4a). */
   /** `lostLife`: "for each of your opponents who lost life this turn" (Belbe): ones who lost the game since too (rulings). */
-  | { kind: "players"; opponents?: true; lostLife?: true }
+  /** `drewThisWay`: "for each opponent who drew a card this way" (Cut a Deal): those who drew a card in this resolution's draw before, once each. */
+  | { kind: "players"; opponents?: true; lostLife?: true; drewThisWay?: true }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
   | { kind: "counters"; counter: CounterKind; of: ObjRef }
   /** Station's "the tapped creature's power" (CR 702.184a): as the ability resolves, or as it last existed (rulings). */
@@ -445,6 +447,8 @@ export interface TargetSpec {
 export interface SearchDest {
   zone: "hand" | "battlefield" | "libraryTop" | "graveyard" | "exile";
   tapped?: boolean;
+  /** "Exile it face down" (Beseech the Mirror): only its owner may look at it (CR 406.3); kept in Resolving.faceDownExiled. */
+  faceDown?: true;
   /** "Put that card third from the top" (Long-Term Plans), for "libraryTop". */
   third?: true;
   /** "Put it onto the battlefield with X additional +1/+1 counters on it" (Vision Quest, CR 614.1c). */
@@ -617,6 +621,8 @@ export interface DamageRuleSpec {
   gainLife?: { colors?: Color[] };
   /** "~ deals that much damage to that source's controller" (CR 615.5); `colors`: only for damage from a source of those colors. */
   dealBack?: { colors?: Color[] };
+  /** "For each 1 damage prevented this way, create a ... token" (Inkshield, CR 615.5): its controller creates them. */
+  tokens?: TokenSpec;
 }
 
 /** Does this reference cover target `i`? ("up to two target creatures" covers two in a row.) */
@@ -1032,7 +1038,8 @@ export type StaticCondition =
    * "As long as you have 25 or more life", fateful hour's "5 or less life", "at least 7 life more than your starting life
    * total", "your life total is greater than or equal to your starting life total" (CR 903.7: 40): your life total now.
    */
-  | { kind: "life"; min?: number; max?: number }
+  /** `opponent`: an opponent's life total instead (Bloodghast's "an opponent has 10 or less life"). */
+  | { kind: "life"; min?: number; max?: number; opponent?: true }
   /** "As long as equipped creature is a Human": the permanent this is attached to matches. */
   | { kind: "attachedIs"; filter: TargetSpec }
   /** "If you have nine or more cards in hand" (Wiretapping). */
@@ -1406,7 +1413,8 @@ export type Effect =
    * exiled together by one delayed trigger. `tapped`: "return it to the battlefield tapped".
    */
   /** `transformed`: "return it to the battlefield transformed" (CR 712.14a). */
-  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; at?: "nextEndStep"; counter?: CounterKind; tapped?: true; transformed?: true }
+  /** `counterIf`: "If it's a Spirit, put a +1/+1 counter on it" (Essence Flux), each returned permanent that matches, once it's back. */
+  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; at?: "nextEndStep"; counter?: CounterKind; tapped?: true; transformed?: true; counterIf?: { counter: CounterKind; filter: TargetSpec } }
   /** A delayed flicker's return: the exiled card, while it's still in exile as that object. */
   /** A delayed flicker's return: its subject, or with `cards` each of those cards, if still the same objects in exile. */
   | { type: "returnExiled"; under: "owner" | "you"; counter?: CounterKind; tapped?: true; cards?: { id: ObjectId; zc: number }[] }
@@ -1550,7 +1558,8 @@ export type Effect =
   | { type: "forEachThisWay"; which: "destroyed" | "exiled"; filter: TargetSpec; effects: Effect[] }
   /** "Exile the top two cards of your library. Until the end of your next turn, you may play those cards." */
   /** `who`: "the top card of that player's library" (Ragavan), not yours; `castOnly`: "you may cast that card", not play it. */
-  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" | "yourNextEndStep"; who?: PlayerRef; castOnly?: true }
+  /** `free`: "you may play that card without paying its mana cost" (Urza, Lord High Artificer, CR 118.9). */
+  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" | "yourNextEndStep"; who?: PlayerRef; castOnly?: true; free?: true }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
   /** "Remove a +1/+1 counter from it", "remove all -1/-1 counters from ~" (CR 122.8): as many as it has, at most. */
   /**
@@ -1827,7 +1836,7 @@ export type Effect =
    * instead of its owner's graveyard (CR 608.2n). The owner's library is shuffled even if the card is gone (CR 701.24c).
    */
   | { type: "shuffleIntoLibrary"; what: ObjRef }
-  | { type: "shuffleSpell"; /** "Put ~ on the bottom of its owner's library" (Seasons Past): there instead, with no shuffle. */ bottom?: true }
+  | { type: "shuffleSpell"; /** "Put ~ on the bottom of its owner's library" (Seasons Past): there instead, with no shuffle. */ bottom?: true; /** "Put ~ into its owner's library seventh from the top" (Approach of the Second Sun): no shuffle. */ nth?: number }
   /** "Target player shuffles their graveyard into their library", "Each player shuffles their hand and graveyard into their library". */
   | { type: "shuffleZones"; who: PlayerRef; hand?: true; graveyard?: true }
   | { type: "fight"; a: ObjRef; b: ObjRef } // CR 701.14: each deals damage equal to its power to the other
@@ -1948,6 +1957,8 @@ export type Effect =
   | { type: "reflexive"; body: AbilityBody; sacrificed?: true; about?: "created" | { target: number; attached?: true }; /** "When it deals excess damage this way, ... that amount of excess damage" (Unleash the Inferno): its X is the excess dealt (CR 603.12). */ xExcess?: true }
   /** "Until end of turn, you don't lose unspent red mana as steps and phases end" (The Last Agni Kai, CR 500.4). */
   | { type: "keepManaThisTurn"; color?: Color }
+  /** "Until end of turn, whenever a player taps an Island for mana, that player adds an additional {U}" (High Tide). */
+  | { type: "manaTriggerThisTurn"; trigger: ManaTrigger }
   /** "Defending player gets a poison counter", "each opponent gets two poison counters" (CR 122.1f; ten lose, 704.5c). */
   | { type: "poison"; who: PlayerRef; n: Amount }
   /** "Each opponent loses all counters" (CR 122.1): poison and energy, the player counters there are here. */
@@ -1974,6 +1985,12 @@ export type Effect =
    * never (CR 707.12, rulings); not if that card has left exile.
    */
   | { type: "castLinkedCopy" }
+  /**
+   * Beseech the Mirror: "If ~ was bargained, you may cast the exiled card without paying its mana cost if that spell's
+   * mana value is 4 or less. Put the exiled card into your hand if it wasn't cast this way." The card this resolution
+   * exiled face down (Resolving.faceDownExiled), cast as it resolves (CR 608.2g).
+   */
+  | { type: "castFaceDownExiled"; maxMv: number; ifBargained?: true; elseHand?: true }
   /**
    * "You may cast target instant card from your graveyard without paying its mana cost" (Torrential Gearhulk): as it
    * resolves, ignoring timing based on its type (CR 608.2g). `exileAfter`: "If that spell would be put into your
@@ -2083,7 +2100,7 @@ export type Effect =
    * into your hand. Put the rest on the bottom of your library in a random order." Pick `count` of the top
    * `n` (matching `filter`; `upTo`: any number up to that), put them `into` there, and the others `rest`.
    */
-  | { type: "dig"; n: Amount; count: number; upTo: boolean; filter?: TargetSpec; /** "manifest", "cloak": onto the battlefield face down (CR 701.40a, 701.58a). */ into: "hand" | "libraryTop" | "battlefield" | "manifest" | "cloak" | "exile"; /** Into exile: "You may play the exiled card this turn" (Nahiri's Warcrafting, Florian). */ play?: "thisTurn"; rest: "graveyard" | "bottom" | "shuffle" | "hand"; /** "On the bottom of your library in a random order"; otherwise its owner orders them (CR 401.4). */ random?: true; reveal: boolean; /** Whose library, who looks and who gets the permanents: "its controller manifests dread" (default: you). */ who?: PlayerRef; /** Not optional: "Put a creature card from among them onto the battlefield". */ required?: true; /** "With three +1/+1 counters on it" (onto the battlefield). */ counters?: { counter: CounterKind; n: number }; /** "Onto the battlefield tapped". */ tapped?: true }
+  | { type: "dig"; n: Amount; count: number; upTo: boolean; filter?: TargetSpec; /** "manifest", "cloak": onto the battlefield face down (CR 701.40a, 701.58a). */ into: "hand" | "libraryTop" | "battlefield" | "manifest" | "cloak" | "exile"; /** Into exile: "You may play the exiled card this turn" (Nahiri's Warcrafting, Florian). */ play?: "thisTurn"; /** "keep": the rest stay on top, in order, for the next instruction (Expressive Iteration). */ rest: "graveyard" | "bottom" | "shuffle" | "hand" | "keep"; /** Takes only while this many cards are left for the rest (Expressive Iteration's exile, after one goes to the bottom). */ minRest?: number; /** "On the bottom of your library in a random order"; otherwise its owner orders them (CR 401.4). */ random?: true; reveal: boolean; /** Whose library, who looks and who gets the permanents: "its controller manifests dread" (default: you). */ who?: PlayerRef; /** Not optional: "Put a creature card from among them onto the battlefield". */ required?: true; /** "With three +1/+1 counters on it" (onto the battlefield). */ counters?: { counter: CounterKind; n: number }; /** "Onto the battlefield tapped". */ tapped?: true }
   /** Venture into the dungeon (CR 701.49a-c), or into Undercity (701.49d). */
   | { type: "venture"; undercity?: true }
   /** "Take an extra turn after this one", "target player takes two extra turns after this one" (CR 500.7). */
@@ -2102,6 +2119,12 @@ export type Effect =
   | { type: "winGame"; who: PlayerRef }
   /** "Exile ~" in an instant or sorcery: it goes to exile as it resolves instead of its owner's graveyard (CR 608.2n). */
   | { type: "exileSpell" }
+  /**
+   * Tainted Pact: "Exile the top card of your library. You may put that card into your hand unless it has the same name as
+   * another card exiled this way. Repeat this process until you put a card into your hand or you exile two cards with the
+   * same name, whichever comes first." Or until the library is empty.
+   */
+  | { type: "taintedPact" }
   /** "You take the initiative" (CR 726). */
   | { type: "takeInitiative"; who: PlayerRef }
   /**
@@ -2124,7 +2147,12 @@ export type Effect =
    * hand": the one not cast, or your pick of the two (the other stays exiled), and only the others go to `rest`.
    */
   /** `each`: "exile the top card of each player's library, then you may cast any number of spells from among those cards" (Etali): `n` from every library. */
-  | { type: "castFromAmong"; who: PlayerRef; n: Amount; each?: true; maxMv?: Amount; totalMv?: Amount; untilMv?: number; untilHits?: { n: number; filter: TargetSpec }; hitToHand?: true; filter?: TargetSpec; max?: number; rest?: { dest: "graveyard" | "bottomRandom"; toHand?: boolean } }
+  /** `each`: the top `n` cards of each player's library (Etali, Primal Storm); with `untilNonland`, each player's cards until a nonland card (Etali, Primal Conqueror). */
+  /**
+   * `fromYard` and `copies` (Mizzix's Mastery): the cards are the target card or each card matching `filter` in your
+   * graveyard, exiled first; what's cast is a copy of each (CR 707.12), the cards staying exiled.
+   */
+  | { type: "castFromAmong"; who: PlayerRef; n: Amount; each?: true; untilNonland?: true; copies?: true; fromYard?: { target?: number; filter?: TargetSpec }; maxMv?: Amount; totalMv?: Amount; untilMv?: number; untilHits?: { n: number; filter: TargetSpec }; hitToHand?: true; filter?: TargetSpec; max?: number; rest?: { dest: "graveyard" | "bottomRandom"; toHand?: boolean } }
   /**
    * "You gain shroud until end of turn", "You and permanents you control gain hexproof until end of turn" (the player's
    * half), "you gain protection from the chosen player": see Player.gained (CR 702.11d, 702.16b-e, 702.16k, 702.18d).
@@ -2230,6 +2258,8 @@ export type SpellCondition =
   | { kind: "bargained" }
   /** "If this spell was cast from a graveyard" (Sevinne's Reclamation): a copy wasn't cast (rulings, CR 707.10). */
   | { kind: "castFromGraveyard" }
+  /** Approach of the Second Sun: "If ~ was cast from your hand and you've cast another spell named ~ this game". */
+  | { kind: "castFromHandAndAnotherNamed" }
   /** "If you cast this spell during your main phase" (addendum, CR 207.2c): a copy wasn't cast (CR 707.10). */
   | { kind: "castInMain" }
   /** "If evidence was collected" (CR 701.59c): its "you may collect evidence N" additional cost was paid. */
@@ -2575,6 +2605,8 @@ export interface TriggeredAbility {
   tappedFilter?: TargetSpec;
   /** For "selfCountersPut" / "permanentCountersPut": that kind of counter ("+1/+1 counters"); unset = any counters. */
   countersKind?: string;
+  /** For "selfCountersPut" / "permanentCountersPut": "whenever you put one or more counters on ...", only counters this ability's controller puts. */
+  countersByYou?: true;
   /** For "selfCountersPut": "when the twelfth hour counter is put on ~", only when the count goes from below this to at least it. */
   countersReach?: number;
   /**
@@ -2838,6 +2870,8 @@ export interface ActivatedAbility {
   keyword?: "Exhaust" | "Boast" | "Power-up";
   /** "Activate no more than twice each turn" (CR 602.5b). */
   maxPerTurn?: number;
+  /** "X can't be 0." for an X in its costs ("Sacrifice X artifacts", Ruthless Technomancer). */
+  xMin?: number;
   /** "Activate only if you have the city's blessing" (CR 602.5b). */
   activateIf?: StaticCondition;
   /** "Pay 2 life" as part of the cost (CR 119.4: only with at least that much life). */
@@ -3008,6 +3042,13 @@ export interface ManaTrigger {
   you?: true;
   /** "... is tapped for mana of the chosen color": only when it made mana of the color chosen for this permanent. */
   ofChosen?: true;
+  /** "Whenever you tap a permanent for {C}": only when it made one or more mana of this type. */
+  madeType?: ManaType;
+  /**
+   * "Whenever a land's ability causes you to add ..." (Caged Sun): any mana ability of it, not only ones with {T} in
+   * their cost.
+   */
+  anyAbility?: true;
   /**
    * What it adds: fixed mana ("an additional {G}"); `n` mana each of any color the player picks ("one mana of any
    * color", "two mana in any combination of colors"); one of the color chosen for this permanent; or "one mana of
@@ -3150,7 +3191,7 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
 /** `wubrg`: Fist of Suns' "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast". */
 /** `evidence`: Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" (CompiledCard.payEvidence). */
 /** `citadel`: Bolas's Citadel's "pay life equal to its mana value rather than pay its mana cost" for the top card of your library. */
-export type AltCostKind = "citadel" | "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle" | "convert";
+export type AltCostKind = "citadel" | "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle" | "convert" | "omniscience";
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
 /** `aftermath`: the half of a split card with aftermath (CR 702.127a), cast only from a graveyard. */
@@ -3292,7 +3333,7 @@ export interface CompiledCard {
    * "You may have ~ enter as a copy of any creature on the battlefield[, except ...]" (CR 707.5, 707.9). Cursed
    * Mirror's "as ~ enters, you may have it become a copy of ... until end of turn": the copy ends with the turn.
    */
-  entersAsCopy?: { filter: TargetSpec; except?: CopyExcept; untilEndOfTurn?: boolean };
+  entersAsCopy?: { filter: TargetSpec; except?: CopyExcept; untilEndOfTurn?: boolean; /** Vesuva: "enter tapped as a copy". */ tapped?: true };
   /** "~ enters with N +1/+1 counters on it." (a replacement effect, CR 614.1c); modular N too (CR 702.43a). */
   entersWithCounters?: { counter: CounterKind; n: Amount; /** Raid: "if you attacked this turn". */ if?: StaticCondition; /** "If you cast it from your hand" (the Myojin). */ castFromHand?: true; /** "If X is 5 or more, it enters with an additional X" (Apocalypse Hydra): twice as many. */ doubleIfXAtLeast?: number; /** "As ~ enters, choose a creature type. ~ enters with a fellowship counter on it for each creature you control of the chosen type" (Banner of Kinship): counted once that choice, part of how it enters, is made (CR 614.12). */ afterChoice?: ChoiceKind };
   /** Bloodthirst N (CR 702.54a): enters with N +1/+1 counters if an opponent was dealt damage this turn. */
@@ -3407,6 +3448,10 @@ export interface CompiledCard {
   beginOnBattlefield?: true | { notStarting: true; counter: CounterKind; exileFromHand: true };
   /** "If you would gain life, you gain twice that much life instead" (a replacement effect, CR 614.1a). */
   doubleLifeGain?: boolean;
+  /** "If an opponent would lose life during your turn, they lose twice that much life instead" (Bloodletter of Aclazotz). */
+  opponentsLoseDouble?: true;
+  /** "Each opponent can't draw more than one card each turn" (Narset, Parter of Veils). */
+  opponentsDrawOnce?: true;
   /**
    * "If you tap a permanent for mana, it produces twice as much of that mana instead" (Mana Reflection; three times,
    * Nyxbloom Ancient): a replacement effect on the mana a mana ability with {T} in its cost produces (CR 106.12b,
@@ -3511,6 +3556,8 @@ export interface CompiledCard {
    */
   /** "Noncreature spells you cast have convoke" (Caetus), "Multicolored spells you cast have convoke" (Fallaji Wayfarer), CR 702.51. */
   spellsHaveConvoke?: { filter: TargetSpec; text: string }[];
+  /** "Nonartifact spells you cast have improvise" (Inspiring Statuary), CR 702.126. */
+  spellsHaveImprovise?: { filter: TargetSpec; text: string }[];
   spellsHaveCascade?: { filter?: TargetSpec; from?: "hand" | "exile"; first?: true; treasure?: true; commander?: true; yourTurn?: true; maxMv?: Amount; text: string }[];
   /** Shadow the Hedgehog: "Each spell you cast has split second if mana from an artifact was spent to cast it" (CR 702.61a, 106.3). */
   splitSecondIfArtifactMana?: true;
@@ -3550,6 +3597,8 @@ export interface CompiledCard {
   triggersAgain?: { by?: { event: "enters" | "dies" | "attacks" | "combatDamage" | "castOrCopy"; filter?: TargetSpec[] }; of?: { filter: TargetSpec; other?: true }[] }[];
   /** Fist of Suns: "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast" (an alternative cost, CR 118.9). */
   payWUBRG?: true;
+  /** Omniscience: "You may cast spells from your hand without paying their mana costs" (AltCostKind "omniscience"). */
+  castFromHandFree?: true;
   /**
    * Obstinate Baloth: "If a spell or ability an opponent controls causes you to discard ~, put it onto the battlefield
    * instead of putting it into your graveyard" (a replacement effect, CR 614.1a). It's still discarded (rulings).

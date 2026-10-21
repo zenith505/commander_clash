@@ -3,7 +3,7 @@ import { liveEmblems } from "./emblems";
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
 import { payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaOptions, manaPenalty } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
-import { abilityProblem, activationCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, unlockCost, unlockProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, foretellProblem, tapCostCandidates, turnFaceUpProblem } from "./game";
+import { abilityProblem, activationCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, foretellProblem, tapCostCandidates, turnFaceUpProblem } from "./game";
 import { compileCard } from "./oracle";
 import { hopeValues, spendPlan } from "./value";
 import { boundSpend, poolFor, spendAllows, type ManaUse } from "./spend";
@@ -289,7 +289,7 @@ export function planCast(
     ({ cost, extra } = reduced);
   }
   const paid = Object.fromEntries(Object.entries(choices).filter(([, v]) => (Array.isArray(v) ? v.length : v !== undefined && v !== false))) as CostChoices;
-  const improvise = compileCard(d).improvise;
+  const improvise = hasImprovise(s, pid, obj(s, objectId));
   const cast = (taps: Action[], creatures?: ObjectId[], artifacts?: ObjectId[]): Action[] => [
     ...taps,
     { type: "castSpell", player: pid, objectId, targets, ...(modes ? { modes } : {}), ...(creatures?.length ? { convoke: creatures } : {}), ...(artifacts?.length ? { improvise: artifacts } : {}), ...(x ? { x } : {}), ...paid },

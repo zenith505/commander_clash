@@ -206,11 +206,14 @@ function snowPart(s: GameState, o: GameObject, adds: ManaType[], r: ManaTriggerR
 }
 
 /** The triggered mana abilities on the battlefield (CR 605.1b) and their sources. */
-function manaTriggerSources(s: GameState): { src: GameObject; t: ManaTrigger }[] {
-  return s.battlefield.flatMap((id) => {
+function manaTriggerSources(s: GameState): { src?: GameObject; controller: PlayerId; t: ManaTrigger }[] {
+  const out: { src?: GameObject; controller: PlayerId; t: ManaTrigger }[] = s.battlefield.flatMap((id) => {
     const src = obj(s, id);
-    return (abilitiesOf(s, src).manaTriggers ?? []).map((t) => ({ src, t }));
+    return (abilitiesOf(s, src).manaTriggers ?? []).map((t) => ({ src, controller: controllerOf(s, src), t }));
   });
+  // High Tide's, until end of turn: its source is the spell, gone by now, so its mana has no origins of its own (CR 106.3).
+  for (const x of s.manaTriggersThisTurn ?? []) out.push({ controller: x.controller, t: x.trigger });
+  return out;
 }
 
 /** What the triggered mana abilities add: the picks for their mana, the mana, and each mana's source (`from`, CR 106.3). */
@@ -228,12 +231,13 @@ export interface ManaTriggerResult {
  */
 export function manaTriggerResults(s: GameState, pid: PlayerId, o: GameObject, ab: ManaAbility, made: ManaType[], sources = manaTriggerSources(s)): ManaTriggerResult[] {
   let results: ManaTriggerResult[] = [{ extra: [], adds: [], from: [] }];
-  if (!ab.tap || !made.length) return results;
-  for (const { src, t } of sources) {
-    const ctl = controllerOf(s, src);
-    const chosen = src.chosen?.color;
+  if (!made.length) return results;
+  for (const { src, controller: ctl, t } of sources) {
+    if (!ab.tap && !t.anyAbility) continue;
+    if (t.madeType && !made.includes(t.madeType)) continue;
+    const chosen = src?.chosen?.color;
     if (t.you && ctl !== pid) continue;
-    if (t.attached && src.attachedTo !== o.id) continue;
+    if (t.attached && src?.attachedTo !== o.id) continue;
     if (t.filter && !objectMatches(s, t.filter, o, ctl, false)) continue;
     if ((t.ofChosen || t.adds.kind === "chosenColor") && !chosen) continue; // no color chosen: it never triggers (rulings on Gauntlet of Power)
     if (t.ofChosen && !made.includes(chosen!)) continue;
@@ -252,7 +256,7 @@ export function manaTriggerResults(s: GameState, pid: PlayerId, o: GameObject, a
       picks = combos.map((c) => ({ extra: c, adds: c }));
     }
     // Each mana's source is the triggered ability's source (CR 106.3), as it is now.
-    const from = manaOriginsOf(s, src);
+    const from = src ? manaOriginsOf(s, src) : [];
     results = results.flatMap((r) => picks.map((p) => ({ extra: [...r.extra, ...p.extra], adds: [...r.adds, ...p.adds], from: [...r.from, ...p.adds.map(() => from)] })));
   }
   return results;

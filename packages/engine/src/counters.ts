@@ -154,6 +154,9 @@ export function tokensToCreate(s: GameState, pid: PlayerId, token: TokenKind, n:
 
 /** Put counters on a permanent through those replacement effects; returns how many were put on. */
 export function putCounters(s: GameState, o: GameObject, kind: string, n: number, entering = false): number {
+  // A permanent entering with counters gets them from its controller, whoever's effect put it onto the battlefield
+  // (rulings on Generous Patron and Vorinclex, Monstrous Raider).
+  if (entering && putterNow !== undefined) return withPutter(undefined, () => putCounters(s, o, kind, n, entering));
   const m = countersToPut(s, o, kind, n, entering);
   if (m > 0) {
     o.counters[kind] = (o.counters[kind] ?? 0) + m;
@@ -162,7 +165,7 @@ export function putCounters(s: GameState, o: GameObject, kind: string, n: number
       (o.counterTimestamps ??= {})[kind] = s.nextTimestamp++;
       invalidateCharacteristics(s);
     }
-    fireEvent(s, { type: "countersPut", id: o.id, counter: kind, amount: m });
+    fireEvent(s, { type: "countersPut", id: o.id, counter: kind, amount: m, by: putterNow ?? controllerOf(s, o) });
   }
   return m;
 }

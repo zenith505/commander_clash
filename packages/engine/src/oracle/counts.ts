@@ -1,4 +1,4 @@
-import type { AmountExpr, Count, ObjRef, PlayerRef } from "../abilities";
+import type { AmountExpr, Count, ObjRef, PlayerRef, TargetSpec } from "../abilities";
 import { NUM, num, COUNTER, counterKind, COLOR_WORDS, capital, singularWord } from "./words";
 import { Ctx, addTarget } from "./body";
 import { parsePlayer, parseTargetPhrase } from "./targets";
@@ -82,6 +82,14 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     if (spec?.kind !== "object") return null;
     return { count: { kind: "greatestManaValue", filter: { ...spec, text: `${m[1]} you control` } } };
   }
+  // "The total mana value of historic permanents you control" (Excalibur, Sword of Eden): the sum, X counting 0 (CR 107.3).
+  if (!each && (m = /^the total mana value of (.+?) you control$/i.exec(p))) {
+    // Historic: legendary, an artifact, or a Saga (CR 700.6).
+    const historic: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", anyOf: [{ kind: "object", types: ["Artifact"], text: "artifact" }, { kind: "object", types: [], supertypes: ["Legendary"], text: "legendary permanent" }, { kind: "object", types: [], subtypes: ["Saga"], text: "Saga" }], text: "historic permanent you control" };
+    const spec = m[1] === "historic permanents" ? historic : parseTargetPhrase(`${m[1]!.split(/\s+/).map(singularWord).join(" ")} you control`, { chosen: true });
+    if (spec?.kind !== "object") return null;
+    return { count: { kind: "greatestManaValue", total: true, filter: { ...spec, text: `${m[1]} you control` } } };
+  }
   // "The greatest number of creatures a player controls" (Investigator's Journal), "... an opponent controls".
   if (!each && (m = /^the greatest number of (.+?) (a player|an opponent) controls$/i.exec(p))) {
     const spec = parseTargetPhrase(m[1]!.split(/\s+/).map(singularWord).join(" "), { chosen: true });
@@ -132,6 +140,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "For each opponent you have", "the number of opponents you have" (Inspired Sphinx).
   if (each && /^opponents?(?: you have)?$/i.test(p)) return count({ kind: "players", opponents: true });
   if (each && /^(?:of your opponents|opponent) who lost life this turn$/i.test(p)) return count({ kind: "players", opponents: true, lostLife: true });
+  if (each && /^opponent who drew a card this way$/i.test(p)) return count({ kind: "players", opponents: true, drewThisWay: true });
   if ((m = /^creatures? that died (under your control )?this turn$/i.exec(p))) return count({ kind: "diedThisTurn", ...(m[1] ? { yours: true as const } : {}) });
   if (/^creatures? that attacked this turn$/i.test(p)) return count({ kind: "attackersThisTurn" });
   if ((m = /^(?:([A-Z][a-z]+) )?tokens you created this turn$/.exec(p))) return count({ kind: "tokensCreatedThisTurn", ...(m[1] ? { subtype: m[1] } : {}) });

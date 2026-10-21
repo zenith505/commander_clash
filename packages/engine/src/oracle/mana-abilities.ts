@@ -140,11 +140,20 @@ export function parseManaTrigger(line: string): ManaTrigger | "fail" | null {
     what = m[2]!;
     if (m[3]) out.ofChosen = true;
     adds = m[4]!;
-  } else if ((m = /^Whenever (a player taps|you tap) an? (.+?) for mana, (that player adds|add) (?:an additional )?(.+)\.$/.exec(line))) {
-    if ((m[1] === "you tap") !== (m[3] === "add")) return "fail";
+  } else if ((m = /^Whenever (a player taps|you tap) an? (.+?) for (mana|\{[WUBRGC]\}), (that player adds|add) (?:an additional )?(.+)\.$/.exec(line))) {
+    if ((m[1] === "you tap") !== (m[4] === "add")) return "fail";
     if (m[1] === "you tap") out.you = true;
+    // "Whenever you tap a permanent for {C}" (Forsaken Monument): only when it made one or more {C}.
+    if (m[3] !== "mana") out.madeType = m[3]![1] as ManaType;
     what = m[2]!;
-    adds = m[4]!;
+    adds = m[5]!;
+  } else if ((m = /^Whenever a land's ability causes you to add one or more mana of the chosen color, (add an additional one mana of that color)\.$/.exec(line))) {
+    // Caged Sun: any ability of a land, {T} in its cost or not (rulings), and only for its controller.
+    out.you = true;
+    out.anyAbility = true;
+    out.ofChosen = true;
+    what = "land";
+    adds = "one mana of that color";
   } else return null;
   const filter = parseTargetPhrase(what);
   if (filter?.kind !== "object" || filter.controller || filter.chosen || filter.tapped || filter.combat) return "fail";

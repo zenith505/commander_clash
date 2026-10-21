@@ -469,6 +469,11 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // Kaya's Ghostform: "When enchanted permanent dies or is put into exile, ..." (from the battlefield, CR 603.6c).
   const attachedM = /^When(?:ever)? (equipped|enchanted) (creature|permanent) (dies|dies or is put into exile), (.+)$/.exec(line);
   const attached = attachedM && [attachedM[0], attachedM[1]!, attachedM[4]!];
+  // Scrap Trawler: "Whenever ~ dies or another artifact you control is put into a graveyard from the battlefield": ~ is an
+  // artifact, and dying is being put into a graveyard from the battlefield (CR 700.4), so the same as "~ or another".
+  const orDies = /^Whenever ~ dies or another (.+?) is put into a graveyard from the battlefield, (.+)$/.exec(line);
+  if (orDies && !/\bartifact\b/.test(orDies[1]!)) return "fail";
+  if (orDies) line = `Whenever ~ or another ${orDies[1]} dies, ${orDies[2]}`;
   const m = attached ? null : DIES_TRIGGER.exec(line);
   if (!attached && !m) return null;
   const ench = !attached && ENCHANTED_CONTROLS.test(m![2]!);
@@ -495,8 +500,17 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   const kw = hadKw ? parseKeywordList(hadKw[2]!) : null;
   if (hadKw && kw?.length !== 1) return "fail";
   if (hadKw) bodyText = hadKw[3]!;
-  const body = parseBody(bodyText, { subjectIt: true, subjectLeft: true, ...(attached?.[1] === "enchanted" ? { auraCard: true } : {}) });
+  // "Return to your hand target artifact card in your graveyard with lesser mana value" (Scrap Trawler, Orah, Havi): less
+  // than the one that died, as it last existed (rulings on Scrap Trawler); fixed as the target is chosen (TargetSpec.bound).
+  const lesser = !attached && / with lesser mana value\b/.test(bodyText);
+  if (lesser) bodyText = bodyText.replace(/ with lesser mana value\b/, "").replace(/^return to your hand (target [a-z ]+ card) in your graveyard\.$/, "return $1 from your graveyard to your hand.");
+  let body = parseBody(bodyText, { subjectIt: true, subjectLeft: true, ...(attached?.[1] === "enchanted" ? { auraCard: true } : {}) });
   if (!body) return "fail";
+  if (lesser) {
+    const [t, ...more] = body.targets;
+    if (!t || more.length || t.kind !== "card" || t.bound || t.manaValue) return "fail";
+    body = { ...body, targets: [{ ...t, bound: { key: "manaValue", at: "most", amount: { count: { kind: "manaValue", of: { ref: "subject" } }, plus: -1 } }, text: `${t.text} with lesser mana value` }] };
+  }
   if (attached) {
     // "Return this card to its owner's hand" (Angelic Destiny): the Aura's card, which went to a graveyard as its creature
     // died or just after (CR 704.5m), not the Aura on the battlefield it no longer is (CR 400.7).
@@ -1216,10 +1230,16 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   }
   // "Whenever one or more +1/+1 counters are put on ~ / on a creature you control" (CR 122.6: also as it enters with
   // them). "That many" is how many were put on it.
-  const put = /^Whenever one or more (\+1\/\+1 )?counters are put on (~|another creature you control|a creature you control), (.+)$/.exec(line);
+  // "Whenever you put one or more -1/-1 counters on a creature" (Hapatra, Nest of Scarabs; Terrasymbiosis): only counters
+  // its controller puts (CR 122.6 and the rulings on Generous Patron: the player whose spell or ability puts them, the
+  // controller of a wither or infect source, and for a permanent entering with counters its controller). It triggers
+  // once for each permanent they're put on at the same time (rulings on Hapatra).
+  const youPut = /^Whenever you put one or more ((?:\+1\/\+1|-1\/-1|loyalty|time|[a-z]+) )?counters on (~|this (?:creature|artifact|enchantment|permanent)|another creature you control|a creature you control|a creature you don't control|a creature|another creature|a permanent you control|a planeswalker|another [a-z]+ creature|an? [A-Z][a-z]+(?:, [A-Z][a-z]+,)? or [A-Z][a-z]+ you control), (.+)$/.exec(line);
+  const put = youPut ?? /^Whenever one or more (\+1\/\+1 )?counters are put on (~|another creature you control|a creature you control), (.+)$/.exec(line);
   if (put) {
-    const self = put[2] === "~";
-    let text = put[3]!;
+    const self = /^(?:~|this [a-z]+)$/.test(put[2]!);
+    const byYou = youPut ? { countersByYou: true as const } : {};
+    let text = put[3]!.replace(/\bthat (creature|permanent|planeswalker)\b/g, "it");
     const thatMuch = /\bthat (?:much|many)\b/.test(text);
     if (thatMuch) {
       if (/\bX\b/.test(text)) return "fail";
@@ -1228,11 +1248,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     let body = parseBody(self ? text.replace(/^it (?=(?:gets|gains|deals|has|becomes)\b)/, "~ ") : text, self ? { selfIt: true } : { subjectIt: true });
     if (!body) return "fail";
     if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, put[3]!) };
-    const kind = put[1] ? { countersKind: "+1/+1" } : {};
-    if (self) return { event: "selfCountersPut", body, ...kind };
-    const filter = parseTargetPhrase(put[2]!.replace(/^another /, "creature ").replace(/^a creature/, "creature"));
+    const kind = put[1] ? { countersKind: put[1].trim() } : {};
+    if (self) return { event: "selfCountersPut", body, ...kind, ...byYou };
+    const filter = parseTargetPhrase(put[2]!.replace(/^another (creature)?/, (_m, c) => (c ? "creature" : "")).replace(/^an? /, ""));
     if (filter?.kind !== "object") return "fail";
-    return { event: "permanentCountersPut", tappedFilter: { ...filter, ...(put[2]!.startsWith("another") ? { notSource: true } : {}) }, body, ...kind };
+    return { event: "permanentCountersPut", tappedFilter: { ...filter, ...(put[2]!.startsWith("another") ? { notSource: true } : {}) }, body, ...kind, ...byYou };
   }
   // "Whenever a Dwarf you control becomes tapped", "Whenever a creature an opponent controls becomes tapped", "Whenever a
   // permanent becomes untapped" (Mesmeric Orb: "that permanent's controller").

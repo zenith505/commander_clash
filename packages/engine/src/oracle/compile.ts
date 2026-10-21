@@ -1113,14 +1113,17 @@ export function compile(d: CardDef): CompiledCard {
     // Clones: "You may have ~ enter as a copy of any creature on the battlefield[, except ...]." (CR 707.5)
     // Cursed Mirror: "As ~ enters, you may have it become a copy of any creature on the battlefield until end of
     // turn, except it has haste" also becomes the copy as it enters (rulings), for the rest of the turn.
-    const clone = /^(?:You may have ~ enter as|As ~ enters, you may have it become) a copy of (?:any |an? )?(.+?)( until end of turn)?(?:, except (.+?))?\.?$/.exec(line);
+    // Vesuva: "You may have ~ enter tapped as a copy of any land on the battlefield": tapped only as a copy (rulings).
+    const clone = /^(?:You may have ~ enter( tapped)? as|As ~ enters, you may have it become) a copy of (?:any |an? )?(.+?)( until end of turn)?(?:, except (.+?))?\.?$/.exec(line);
+    if (clone) clone.splice(1, 1);
+    const cloneTapped = /^You may have ~ enter tapped as/.test(line) ? { tapped: true as const } : {};
     // "You may have this creature enter as a copy of any creature card in a graveyard, except ..." (Lazotep Convert): a
     // card in any graveyard, by its printed characteristics.
     const fromYard = clone && !clone[2] && /^creature card in a graveyard$/.exec(clone[1]!);
     if (clone && fromYard) {
       const except = clone[3] ? parseCopyExcept(clone[3]) : undefined;
       if (except !== null && !except?.thisAbility) {
-        out.entersAsCopy = { filter: { kind: "card", types: ["Creature"], text: clone[1]! }, ...(except ? { except } : {}) };
+        out.entersAsCopy = { filter: { kind: "card", types: ["Creature"], text: clone[1]! }, ...(except ? { except } : {}), ...cloneTapped };
         continue;
       }
     }
@@ -1133,7 +1136,7 @@ export function compile(d: CardDef): CompiledCard {
       const filter = parsed && spentBound ? { ...parsed, bound: { key: "manaValue" as const, at: "most" as const, amount: { count: { kind: "manaSpent" as const } } } } : parsed;
       const except = clone[3] ? parseCopyExcept(clone[3]) : undefined;
       if (filter?.kind === "object" && except !== null && !except?.thisAbility) {
-        out.entersAsCopy = { filter: { ...filter, text: clone[1]! }, ...(except ? { except } : {}), ...(clone[2] ? { untilEndOfTurn: true } : {}) };
+        out.entersAsCopy = { filter: { ...filter, text: clone[1]! }, ...(except ? { except } : {}), ...(clone[2] ? { untilEndOfTurn: true } : {}), ...cloneTapped };
         continue;
       }
     }
@@ -1163,6 +1166,16 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "Damage can't be prevented.") {
       out.damageCantBePrevented = true;
+      continue;
+    }
+    // Narset, Parter of Veils: draws past the first each turn don't happen, and can't be replaced (rulings).
+    if (line === "Each opponent can't draw more than one card each turn.") {
+      out.opponentsDrawOnce = true;
+      continue;
+    }
+    // Bloodletter of Aclazotz (CR 614.1a): life lost to damage too (CR 120.3a), and life paid (CR 119.4).
+    if (line === "If an opponent would lose life during your turn, they lose twice that much life instead.") {
+      out.opponentsLoseDouble = true;
       continue;
     }
     if (line === "If you would gain life, you gain twice that much life instead.") {
@@ -1258,6 +1271,11 @@ export function compile(d: CardDef): CompiledCard {
       (out.triggersAgain ??= []).push(again);
       continue;
     }
+    // Omniscience: an alternative cost of nothing for spells cast from your hand (CR 118.9).
+    if (line === "You may cast spells from your hand without paying their mana costs.") {
+      out.castFromHandFree = true;
+      continue;
+    }
     if (line === "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast.") {
       out.payWUBRG = true;
       continue;
@@ -1289,6 +1307,14 @@ export function compile(d: CardDef): CompiledCard {
       const f = parseTargetPhrase(`${giveConvoke[1]!.replace(/ and /g, " or ").toLowerCase()} spell`);
       if (f?.kind !== "spell") out.unsupported.push(raw);
       else (out.spellsHaveConvoke ??= []).push({ filter: f, text: line });
+      continue;
+    }
+    // "Nonartifact spells you cast have improvise" (Inspiring Statuary), CR 702.126a, as for convoke.
+    const giveImprovise = /^([A-Z][a-z]+) spells you cast have improvise\.$/.exec(line);
+    if (giveImprovise) {
+      const f = parseTargetPhrase(`${giveImprovise[1]!.toLowerCase()} spell`);
+      if (f?.kind !== "spell") out.unsupported.push(raw);
+      else (out.spellsHaveImprovise ??= []).push({ filter: f, text: line });
       continue;
     }
     // Cascade for the spells you cast (CR 702.85a): "Sliver spells you cast have cascade", "Instant and sorcery spells you

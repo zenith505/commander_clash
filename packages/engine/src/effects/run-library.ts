@@ -378,6 +378,38 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       return;
     }
+    case "taintedPact": {
+      const p = player(s, ctx.controller);
+      const sc = (s.resolving!.scratch ??= {});
+      const pact = (sc.pact ??= { names: [] });
+      for (;;) {
+        if (pact.asking !== undefined) {
+          const id = pact.asking;
+          const yes = sc.may;
+          pact.asking = undefined;
+          sc.may = undefined;
+          if (yes && s.objects[id]?.zone === "exile") {
+            log(s, `${p.name} puts ${defOf(s, obj(s, id)).name} into their hand.`);
+            moveObject(s, id, "hand");
+            return;
+          }
+        }
+        const top = p.library[0];
+        if (top === undefined) return;
+        moveObject(s, top, "exile");
+        const name = defOf(s, obj(s, top)).name;
+        log(s, `${src}: ${p.name} exiles ${name} from the top of their library.`);
+        if (pact.names.includes(name)) {
+          log(s, `${p.name} has exiled two cards named ${name}.`);
+          return;
+        }
+        pact.names.push(name);
+        if (obj(s, top).zone !== "exile") continue;
+        pact.asking = top;
+        s.pending = { kind: "chooseMay", player: p.id, prompt: `put ${name} into your hand (otherwise exile the next card)`, source: src, card: top };
+        return "paused";
+      }
+    }
     case "shuffleIntoLibrary":
     case "shuffleSpell": {
       // The owners whose libraries are shuffled, whether or not the card is still there (CR 701.24c).
@@ -386,6 +418,16 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const item = s.resolving?.item;
         const o = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
         if (!o) return;
+        if (e.nth) {
+          // Under the top six cards, or on the bottom with fewer (rulings on Approach of the Second Sun).
+          if (o.zone === "stack") {
+            log(s, `${defOf(s, o).name} is put into its owner's library ${["top", "second", "third", "fourth", "fifth", "sixth", "seventh"][e.nth - 1] ?? `${e.nth}th`} from the top.`);
+            moveObject(s, o.id, "library", { top: true });
+            const lib = player(s, o.owner).library;
+            if (s.objects[o.id]?.zone === "library" && lib[0] === o.id) lib.splice(Math.min(e.nth - 1, lib.length - 1), 0, lib.shift()!);
+          }
+          return;
+        }
         if (e.bottom) {
           if (o.zone === "stack") {
             log(s, `${defOf(s, o).name} is put on the bottom of its owner's library.`);
@@ -536,7 +578,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         lib.library = lib.library.filter((id) => !found.includes(id));
         const names = found.map((id) => defOf(s, obj(s, id)).name);
         // Found cards aren't revealed unless the effect says so (CR 701.23e).
-        const shown = e.reveal || e.dest.zone === "battlefield" || e.dest.zone === "exile" || exiledFor(pid) !== undefined ? ` (${names.join(", ")})` : "";
+        const shown = e.reveal || e.dest.zone === "battlefield" || (e.dest.zone === "exile" && !e.dest.faceDown) || exiledFor(pid) !== undefined ? ` (${names.join(", ")})` : "";
         const whose = lib === p ? "their" : `${lib.name}'s`;
         const yardOnly = sc.searchZones === "graveyard";
         const where = yardOnly ? `${whose} graveyard` : e.orGraveyard ? `${whose} library and graveyard` : `${whose} library`;
@@ -560,6 +602,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             moveObject(s, id, "battlefield", { controller: pid, ...(to.tapped ? { tapped: true } : {}), ...hosts.get(id), ...(extra ? { counters: { [to.counters!.counter]: extra } } : {}) });
             if (r.created && obj(s, id).zone === "battlefield") r.created.push(id);
           } else moveObject(s, id, to.zone);
+          // "Exile it face down" (Beseech the Mirror): only its owner sees it (CR 406.3), for the rest of the effect.
+          if (to.faceDown && to.zone === "exile" && obj(s, id).zone === "exile" && exiledFor(pid) === undefined) {
+            obj(s, id).hiddenExile = { by: ctx.sourceId ?? "", seen: [pid], label: "Face down" };
+            r.faceDownExiled = [...(r.faceDownExiled ?? []), id];
+          }
           // Opposition Agent: exiled face up (CR 406.3), its controller may play it for as long as it remains exiled, a land
           // too (following the normal timing rules) and spend mana as though it were mana of any color to cast it (CR
           // 609.4b: colored symbols paid with any mana).
@@ -662,7 +709,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const filter = e.filter?.xRange ? (({ xRange: _, ...r }) => ({ ...r, manaValue: { max: ctx.x ?? 0 } }))(e.filter) : e.filter && bindBound(s, e.filter, amountCtx(s, ctx));
         const mvMax = filter?.manaValue?.max ?? ctx.x ?? 0;
         const options = sc.looked.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
-        const max = Math.min(e.count, options.length);
+        const max = Math.max(0, Math.min(e.count, options.length, sc.looked.length - (e.minRest ?? 0)));
         const min = e.required ? max : e.upTo || e.filter ? 0 : max;
         log(s, `${p.name} ${e.reveal ? "reveals" : "looks at"} the top ${sc.looked.length === 1 ? "card" : `${sc.looked.length} cards`} of their library${e.reveal ? ` (${sc.looked.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}.`);
         if (max > 0 && !(min === max && options.length === max)) {
@@ -670,7 +717,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           // "Take none" says it's optional; "up to" only reads well with a number.
           const what = max === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${min < max ? "up to " : ""}${max} ${kind.replace(/\bcard\b/, "cards")}`;
           const to = e.into === "hand" ? "into your hand" : e.into === "exile" ? `into exile${e.play ? " (you may play it this turn)" : ""}` : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : "back on top of your library";
-          const rest = e.rest === "graveyard" ? "into your graveyard" : e.rest === "shuffle" ? "shuffled into your library" : e.rest === "hand" ? "into your hand" : "on the bottom of your library";
+          const rest = e.rest === "graveyard" ? "into your graveyard" : e.rest === "shuffle" ? "shuffled into your library" : e.rest === "hand" ? "into your hand" : e.rest === "keep" ? "left on top for now" : "on the bottom of your library";
           s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards: options, min, max, dig: { looked: sc.looked, to, rest } };
           return "paused";
         }
@@ -721,6 +768,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       } else if (e.rest === "graveyard") {
         if (rest.length) log(s, `${p.name} puts ${names(rest)} into their graveyard.`);
         for (const id of rest) moveObject(s, id, "graveyard");
+      } else if (e.rest === "keep") {
+        // They stay on top, in the order they were in.
       } else if (e.rest === "hand") {
         if (rest.length) log(s, `${p.name} puts ${rest.length === 1 ? "the other card" : `the other ${rest.length} cards`} into their hand.`);
         for (const id of rest) moveObject(s, id, "hand");

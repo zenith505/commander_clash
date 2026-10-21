@@ -160,6 +160,7 @@ export function runPreventionEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
   }
   if (spec.gainLife) rule.gainLife = spec.gainLife;
   if (spec.dealBack) rule.dealBack = spec.dealBack;
+  if (spec.tokens) rule.tokens = spec.tokens;
   (s.damageRules ??= []).push(rule);
   log(s, `${src}: ${describeRule(s, rule)}.`);
 }

@@ -603,8 +603,9 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (cond.max === undefined || n <= cond.max) && (cond.min === undefined || n >= cond.min);
     }
     case "life": {
-      const life = s.players[you]?.life ?? 0;
-      return (cond.min === undefined || life >= cond.min) && (cond.max === undefined || life <= cond.max);
+      const fits = (life: number) => (cond.min === undefined || life >= cond.min) && (cond.max === undefined || life <= cond.max);
+      if (cond.opponent) return s.players.some((p) => p.id !== you && !p.lost && fits(p.life));
+      return fits(s.players[you]?.life ?? 0);
     }
     case "opponentLostLife":
       // Paid life counts too (CR 119.4); gaining life doesn't take any back (rulings on Bloodchief Ascension).
@@ -842,10 +843,10 @@ function setSubtypes(c: Characteristics, subtypes: string[]) {
   if (sets.has("Creature")) c.allCreatureTypes = false;
 }
 
-function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, chars: CharMap) {
+function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, chars: CharMap, id: ObjectId) {
   // Numbers a static ability counts are counted now, with what the earlier layers did (CR 611.3a, 613.4).
   const num = (a: Amount) =>
-    evalAmount(s, a, { controller: controllerOfInst(e, chars), sourceId: e.sourceId, chosen: e.sourceId ? s.objects[e.sourceId]?.chosen : undefined, view: (o) => chars.get(o.id) });
+    evalAmount(s, a, { controller: controllerOfInst(e, chars), sourceId: e.sourceId, chosen: e.sourceId ? s.objects[e.sourceId]?.chosen : undefined, view: (o) => chars.get(o.id), affected: id });
   switch (m.kind) {
     case "control":
       c.controller = controllerOfInst(e, chars);
@@ -1066,7 +1067,7 @@ const modsIn = (e: Inst, layer: Layer) => e.mods.filter((m) => layerOf(m) === la
 function applyInLayer(s: GameState, e: Inst, layer: Layer, chars: CharMap, lock: boolean) {
   const ids = appliesTo(s, e, chars);
   if (lock && !e.locked) e.locked = ids;
-  for (const id of ids) for (const m of modsIn(e, layer)) applyMod(s, chars.get(id)!, m, e, chars);
+  for (const id of ids) for (const m of modsIn(e, layer)) applyMod(s, chars.get(id)!, m, e, chars, id);
 }
 
 /**

@@ -12,6 +12,7 @@ import { manaValue, parseManaCost, snowSpent, spentMeets, type ManaSpent } from 
 import type { Chosen, GameObject, GameState, LastKnown, ObjectId, PlayerId, TriggerEventInfo } from "./types";
 import { defMv } from "./faces";
 import { creatureTypesOf, shareCreatureType } from "./game";
+import { CREATURE_TYPES } from "./keywords";
 
 export interface AmountCtx {
   controller: PlayerId;
@@ -54,6 +55,8 @@ export interface AmountCtx {
    * values worked out so far (layers 1-6 are done by the time power and toughness are, CR 613.4).
    */
   view?: (o: GameObject) => Characteristics | undefined;
+  /** The permanent a static ability's effect is being applied to ("each creature gets +1/+1 for each other creature ... with it"). */
+  affected?: ObjectId;
 }
 
 export const isFixed = (a: Amount): a is number => typeof a === "number";
@@ -108,10 +111,16 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const subject = c.sharesTypeWithSubject ? ctx.objects?.({ ref: "subject" })[0] : undefined;
       if (c.sharesTypeWithSubject && !subject) return 0;
       const types = subject && creatureTypesOf(s, subject);
+      // Coat of Arms: the creature types of the permanent it's applied to, and of the others, as the layers have them so far.
+      const typesIn = (ch: Characteristics | undefined): Set<string> | "all" => (!ch ? new Set() : ch.allCreatureTypes ? "all" : new Set(ch.subtypes.filter((t) => CREATURE_TYPES.has(t))));
+      const affected = c.sharesTypeWithAffected && ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
+      if (c.sharesTypeWithAffected && !affected) return 0;
+      const affectedTypes = affected && typesIn(view(affected));
       for (const id of s.battlefield) {
         const o = s.objects[id]!;
         if (c.other && id === ctx.sourceId) continue;
         if (subject && (id === subject.id || !shareCreatureType(types!, creatureTypesOf(s, o)))) continue;
+        if (affected && (id === affected.id || !shareCreatureType(affectedTypes!, typesIn(view(o))))) continue;
         const ch = view(o);
         if (!ch || (whose && !whose.includes(ch.controller)) || !objectMatches(s, filter, o, ctx.controller, false, undefined, ch, ctx.view)) continue;
         if (!c.differentNames) n++;
@@ -236,6 +245,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return snowSpent(ctx.spent);
     case "players":
       if (c.lostLife) return s.turnOrder.filter((pid) => !(c.opponents && pid === ctx.controller) && (s.lostLifeThisTurn ?? []).includes(pid)).length;
+      // Cut a Deal: each one that drew a card in the draw before, however many it drew (rulings).
+      if (c.drewThisWay) return new Set((s.resolving?.drawnBefore ?? []).map((id) => s.objects[id]?.owner).filter((pid) => pid !== undefined && !(c.opponents && pid === ctx.controller))).size;
       return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller)).length;
     case "opponentsAttacked": {
       const a = s.players[ctx.controller]?.attackedPlayers;
@@ -359,7 +370,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       for (const id of s.battlefield) {
         const o = s.objects[id]!;
         const ch = view(o);
-        if (ch && objectMatches(s, c.filter, o, ctx.controller, false, undefined, ch, ctx.view)) best = Math.max(best, defMv(defOf(s, o)));
+        if (ch && objectMatches(s, c.filter, o, ctx.controller, false, undefined, ch, ctx.view)) best = c.total ? best + defMv(defOf(s, o)) : Math.max(best, defMv(defOf(s, o)));
       }
       return best;
     }
@@ -480,7 +491,7 @@ function describeCount(c: Count): string {
     case "stateIf":
       return "1 if the condition holds";
     case "players":
-      return `#${c.opponents ? "opponents" : "players"}${c.lostLife ? " who lost life this turn" : ""}`;
+      return `#${c.opponents ? "opponents" : "players"}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}`;
     case "diedThisTurn":
       return "#creatures that died this turn";
     case "tokensCreatedThisTurn":
@@ -510,7 +521,7 @@ function describeCount(c: Count): string {
     case "greatestPower":
       return `the ${c.total ? "total" : "greatest"} ${c.toughness ? "toughness" : "power"} ${c.total ? "of" : "among"} ${c.other ? "other " : ""}${c.filter.text}`;
     case "greatestManaValue":
-      return `the greatest mana value among ${c.filter.text}`;
+      return `the ${c.total ? "total mana value of" : "greatest mana value among"} ${c.filter.text}`;
     case "kicked":
       return "times kicked";
     case "wasKicked":

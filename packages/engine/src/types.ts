@@ -1117,6 +1117,8 @@ export interface TurnLog {
   destroyed?: { controller: PlayerId; by: PlayerId }[];
   /** For each player, the creatures (`id@zoneChanges`) that dealt them damage (Inferno Trap). */
   damagedBy?: Record<number, string[]>;
+  /** For each player, the sources (`id@zoneChanges`) that dealt them combat damage (Steel Hellkite). */
+  combatDamagedBy?: Record<number, string[]>;
   /** Players who gained life (Needlebite Trap). */
   gainedLife?: PlayerId[];
   /** How many cards were put into each player's graveyard, from anywhere (Ravenous Trap). */

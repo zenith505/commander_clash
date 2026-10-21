@@ -611,7 +611,9 @@ export type PlayerRef =
    */
   | { ref: "eachOne" }
   /** "Choose an opponent. That player ...": the opponent chosen as this resolves (ChoiceKind "opponent"). */
-  | { ref: "chosenPlayer" };
+  | { ref: "chosenPlayer" }
+  /** "Whose controller was dealt combat damage by ~ this turn" (Steel Hellkite): the players this object dealt combat damage to this turn. */
+  | { ref: "combatDamagedBySelf" };
 
 export type DamageRecipient =
   | ObjRef
@@ -1901,6 +1903,12 @@ export type Effect =
   /** "Target player shuffles their graveyard into their library", "Each player shuffles their hand and graveyard into their library". */
   | { type: "shuffleZones"; who: PlayerRef; hand?: true; graveyard?: true }
   | { type: "fight"; a: ObjRef; b: ObjRef } // CR 701.14: each deals damage equal to its power to the other
+  /**
+   * Ezuri's Predation, after "for each creature your opponents control, create a 4/4 ... token": "Each of those tokens
+   * fights a different one of those creatures" (`filter`), all at the same time; tokens beyond one each (a doubler's)
+   * don't fight (rulings). The tokens are all alike, so which fights which isn't asked.
+   */
+  | { type: "createdFightEach"; filter: TargetSpec }
   /**
    * a deals damage equal to its power to b. `excessIfTrample`: "If the creature you control has trample, excess damage is
    * dealt to that creature's controller instead" (Ram Through; CR 120.4a).
@@ -3561,6 +3569,11 @@ export interface CompiledCard {
   opponentsLoseDouble?: true;
   /** "Each opponent can't draw more than one card each turn" (Narset, Parter of Veils). */
   opponentsDrawOnce?: true;
+  /**
+   * Notion Thief: "If an opponent would draw a card except the first one they draw in each of their draw steps, instead
+   * that player skips that draw and you draw a card" (a replacement effect, CR 614.1a, 614.10).
+   */
+  stealsDraws?: true;
   /**
    * "If you tap a permanent for mana, it produces twice as much of that mana instead" (Mana Reflection; three times,
    * Nyxbloom Ancient): a replacement effect on the mana a mana ability with {T} in its cost produces (CR 106.12b,

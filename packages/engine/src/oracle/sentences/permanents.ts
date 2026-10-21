@@ -98,6 +98,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     if (!what || isGroup(what)) return null;
     return [...(m[1] ? [{ type: "untap" as const, what }] : []), { type: "removeFromCombat", what }];
   }
+  // Steel Hellkite: "Destroy each nonland permanent with mana value X whose controller was dealt combat damage by ~ this
+  // turn": whoever controls it now (rulings).
+  if ((m = /^Destroy (each .+?) whose controller was dealt combat damage by ~ this turn$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "each" && !what.of ? [{ type: "destroy", what: { ...what, of: { ref: "combatDamagedBySelf" } } }] : null;
+  }
   // "Destroy target nonblack creature and target land" (Plague Spores): two targets, each destroyed.
   if ((m = /^(Destroy|Exile) (target [^,]+?) and (target .+)$/i.exec(s)) && !/ and target /.test(m[3]!)) {
     const a = parseObject(m[2]!, ctx);

@@ -375,6 +375,11 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const p = s.resolving?.chosen?.player;
       return p !== undefined && !player(s, p).lost ? [p] : [];
     }
+    case "combatDamagedBySelf": {
+      // This object as the ability's source, the same one that dealt the damage (CR 400.7).
+      const key = ctx.sourceId !== undefined ? `${ctx.sourceId}@${ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0}` : undefined;
+      return s.turnOrder.filter((p) => !player(s, p).lost && !!key && !!s.turnLog?.combatDamagedBy?.[p]?.includes(key));
+    }
     case "choseThisWay":
       return (s.resolving?.scratch?.mayers ?? s.resolving?.choseThisWay ?? []).filter((p) => !player(s, p).lost);
     case "notChoseThisWay": {
@@ -573,6 +578,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "manaTriggerThisTurn":
     case "costModThisTurn":
     case "fight":
+    case "createdFightEach":
     case "bite":
     case "extraTurn":
     case "skip":

@@ -225,6 +225,11 @@ export function dealDamage(
     spellDealt(s, src, { player: p.id });
     if (opts.combat) {
       p.combatDamagedTurn = s.turn;
+      if (from) {
+        const zc = from.zone === "battlefield" ? (from.zoneChanges ?? 0) : (s.lastKnown?.[from.id]?.zc ?? from.zoneChanges ?? 0);
+        const by = (((s.turnLog ??= {}).combatDamagedBy ??= {})[p.id] ??= []);
+        if (!by.includes(`${from.id}@${zc}`)) by.push(`${from.id}@${zc}`);
+      }
       if (src.commanderId) p.commanderDamage[src.commanderId] = (p.commanderDamage[src.commanderId] ?? 0) + n;
       // Freerunning (CR 702.173a): an Assassin creature or a commander, as it was when it dealt the damage, lets its
       // controller pay freerunning costs this turn.

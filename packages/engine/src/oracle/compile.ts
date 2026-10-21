@@ -1204,6 +1204,10 @@ export function compile(d: CardDef): CompiledCard {
       out.damageCantBePrevented = true;
       continue;
     }
+    if (line === "If an opponent would draw a card except the first one they draw in each of their draw steps, instead that player skips that draw and you draw a card.") {
+      out.stealsDraws = true;
+      continue;
+    }
     // Narset, Parter of Veils: draws past the first each turn don't happen, and can't be replaced (rulings).
     if (line === "Each opponent can't draw more than one card each turn.") {
       out.opponentsDrawOnce = true;

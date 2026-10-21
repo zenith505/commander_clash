@@ -1656,6 +1656,14 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", mad
       log(s, `${player(s, pid).name} can't draw more than one card each turn (${nameOf(s, narset)}).`);
       break;
     }
+    // Notion Thief: this draw is skipped and its controller draws instead.
+    const thief = notionThief(s, pid);
+    if (thief) {
+      if (made.length) made.shift();
+      else n--;
+      stealDraw(s, pid, thief);
+      continue;
+    }
     let archives: number;
     if (!made.length) {
       n--;
@@ -1679,6 +1687,43 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", mad
     if (!drawOne(s, pid)) break;
   }
   return true;
+}
+
+/** The Notion Thieves that already replaced a draw in the chain of draws being made now (CR 614.5). */
+let notionUsed: ObjectId[] = [];
+
+/**
+ * Notion Thief (CR 614.1a): one controlled by an opponent of `pid` that applies to `pid`'s draw now, unless it's the first
+ * card `pid` draws in their own draw step (a card actually drawn, CR 614.6), and that hasn't replaced this chain of
+ * draws already (CR 614.5). With several, the first in turn order applies first (the drawing player's choice, CR 616.1,
+ * isn't asked); it applies before the player's own replacements (dredge, Alhammarret's Archive).
+ */
+function notionThief(s: GameState, pid: PlayerId): GameObject | undefined {
+  const p = player(s, pid);
+  if (s.step === "draw" && s.activePlayer === pid && p.drewInDrawStep !== s.turn) return undefined;
+  const thieves = s.battlefield.map((id) => obj(s, id)).filter((o) => !notionUsed.includes(o.id) && controllerOf(s, o) !== pid && !player(s, controllerOf(s, o)).lost && abilitiesOf(s, o).stealsDraws);
+  const seat = (o: GameObject) => (s.turnOrder.indexOf(controllerOf(s, o)) - s.turnOrder.indexOf(s.activePlayer) + s.turnOrder.length) % s.turnOrder.length;
+  return thieves.sort((a, b) => seat(a) - seat(b))[0];
+}
+
+/**
+ * "Instead that player skips that draw and you draw a card": the Thief's controller's draw, which their own replacement
+ * effects and other Notion Thieves can replace in turn; dredge and Scion of Halaster's look, which would ask them, aren't
+ * offered for it (the card is just drawn).
+ */
+function stealDraw(s: GameState, pid: PlayerId, thief: GameObject) {
+  const to = controllerOf(s, thief);
+  log(s, `${player(s, pid).name} skips that draw and ${player(s, to).name} draws a card instead (${nameOf(s, thief.id)}).`);
+  notionUsed.push(thief.id);
+  try {
+    const p = player(s, to);
+    const asks = dredgeOptions(s, to).length > 0 || (p.firstWouldDraw !== s.turn && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === to && abilitiesOf(s, obj(s, id)).firstDrawLook));
+    if (!asks) draw(s, to, 1);
+    else if (!notionThief(s, to)) drawOne(s, to);
+    else draw(s, to, 1);
+  } finally {
+    notionUsed = notionUsed.filter((x) => x !== thief.id);
+  }
 }
 
 /**

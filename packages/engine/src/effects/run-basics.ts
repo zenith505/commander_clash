@@ -10,6 +10,7 @@ import { addMana, manaOriginsOf } from "../spend";
 import { tapManaTimes, timesAsMuch } from "../manaabilities";
 import { ResolveCtx, apnap, objects, players, amountNow, runEffectInner, damageRecipients, ctxSource } from "./resolve";
 import { fireEvent } from "./triggers";
+import { objectMatches } from "./targeting";
 import { COLOR_NAMES } from "./describe";
 import { ringTempts } from "./run-ring";
 import { chooseDamageSource } from "./run-prevention";
@@ -470,6 +471,29 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         gainLife(s, ctx.controller, total);
         log(s, `${player(s, ctx.controller).name} gains ${total} life.`);
       }
+      return;
+    }
+    case "createdFightEach": {
+      // CR 701.14: each pair deals damage at the same time as the others (rulings), each to the other.
+      const created = new Set(s.resolving?.created ?? []);
+      const tokens = [...created].map((id) => s.objects[id]).filter((o): o is GameObject => o?.zone === "battlefield" && objIsType(s, o, "Creature"));
+      const prey = s.battlefield.map((id) => obj(s, id)).filter((o) => !created.has(o.id) && objIsType(s, o, "Creature") && objectMatches(s, e.filter, o, ctx.controller, false));
+      const pairs = tokens.slice(0, prey.length).map((a, i) => [a, prey[i]!] as const);
+      if (!pairs.length) return;
+      const events: DamageEvent[] = pairs.flatMap(([a, b]) => [
+        { src: objectSource(s, a), to: { object: b.id }, n: power(s, a) },
+        { src: objectSource(s, b), to: { object: a.id }, n: power(s, b) },
+      ]);
+      log(s, pairs.map(([a, b]) => `${characteristics(s, a).name} fights ${characteristics(s, b).name}`).join(", ") + ".");
+      const to = (x: DamageEvent) => ("object" in x.to ? x.to.object : "");
+      const lethal = new Map(events.map((x) => [`${x.src.id}>${to(x)}`, lethalAmounts(s, x.src, obj(s, to(x)))]));
+      const by = new Map<string, number>();
+      for (const d of dealDamageBatch(s, events)) {
+        if (!d.dealt || !d.src.id) continue;
+        by.set(d.src.id, (by.get(d.src.id) ?? 0) + d.dealt);
+        noteExcess(s, to(d), excessOver(lethal.get(`${d.src.id}>${to(d)}`)!, d.dealt), true);
+      }
+      for (const [id, amount] of by) fireEvent(s, { type: "dealtDamage", id, amount, combat: false });
       return;
     }
     case "fight":

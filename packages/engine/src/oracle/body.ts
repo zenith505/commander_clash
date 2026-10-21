@@ -2446,6 +2446,15 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     }
     // "Choose an opponent. That player ..." (Myrkul's Edict, the Offerings): chosen as it resolves (CR 608.2d), not
     // targeted. One per ability.
+    // Ezuri's Predation: "For each creature your opponents control, create a 4/4 ... token. Each of those tokens fights a
+    // different one of those creatures."
+    if (s === "Each of those tokens fights a different one of those creatures") {
+      const prev = effects[effects.length - 1];
+      const n = prev?.type === "createToken" && typeof prev.n === "object" && "count" in prev.n ? prev.n : undefined;
+      if (!n || n.count.kind !== "permanents" || (n.times ?? 1) !== 1 || prev?.type !== "createToken" || !prev.token.types.includes("Creature")) return null;
+      effects.push({ type: "createdFightEach", filter: n.count.filter });
+      continue;
+    }
     // The Black Gate: "Choose a player with the most life or tied for most life", any of them, you too.
     if (/^Choose (?:an opponent|a player with the most life or tied for most life)$/.test(s)) {
       if (ctx.chosenOpponent || ctx.eventPlayer || ctx.lastPlayerTarget !== undefined) return null;

@@ -1738,6 +1738,8 @@ export type Effect =
        */
       attachTo?: ObjRef;
     }
+  /** Two kinds of tokens made by one instruction (Wurmcoil Engine): they enter at the same time (CR 608.2f). */
+  | { type: "together"; effects: Effect[] }
   | { type: "mill"; who: PlayerRef; n: Amount }
   /** "That player exiles the top card of their library" (ingest, CR 702.115a): face up (CR 406.3), with no permission to play it. */
   | { type: "exileTop"; who: PlayerRef; n: Amount }
@@ -2354,7 +2356,7 @@ export type SpellCondition =
 
 /** Every effect, including the ones inside "you may" and "if", in order. */
 export const allEffects = (effects: Effect[]): Effect[] =>
-  effects.flatMap((e) => (e.type === "may" || e.type === "if" ? [e, ...allEffects(e.effects), ...allEffects(e.otherwise ?? [])] : e.type === "either" ? [e, ...e.options.flatMap(allEffects)] : [e]));
+  effects.flatMap((e) => (e.type === "may" || e.type === "if" ? [e, ...allEffects(e.effects), ...allEffects(e.otherwise ?? [])] : e.type === "either" ? [e, ...e.options.flatMap(allEffects)] : e.type === "together" ? [e, ...allEffects(e.effects)] : [e]));
 
 /** A sequence of effects with the targets they need, like a spell's text or one ability. */
 export interface AbilityBody {

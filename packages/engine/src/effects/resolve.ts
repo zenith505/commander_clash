@@ -1,7 +1,7 @@
 import type { AbilityBody, Amount, DamageRecipient, Effect, ManaAbility, Modification, ObjRef, PlayerRef, TargetChoice } from "../abilities";
 import { withPutter } from "../counters";
 import { cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
-import { addTriggeredMana, askAuraReturns, creatureTypesOf, draw, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
+import { addTriggeredMana, askAuraReturns, creatureTypesOf, draw, enterTogether, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics } from "../layers";
 import { compileCard } from "../oracle";
 import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, protectionFromPlayer } from "../keywords";
@@ -695,6 +695,12 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runPermanentsEffect(s, e, ctx, src);
     case "becomeCopy":
       return runCopiesEffect(s, e, ctx);
+    case "together":
+      // Each kind of token at the same time (CR 608.2f): entering together, each sees the others enter.
+      enterTogether(s, () => {
+        for (const x of e.effects) runEffect(s, x, ctx);
+      });
+      return;
     case "myriad":
     case "encore":
     case "createTokenCopy":

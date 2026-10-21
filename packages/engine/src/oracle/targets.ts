@@ -15,6 +15,9 @@ HYPHENATED.set("time-lord", "Time Lord");
 // Artifact subtypes (CR 205.3g) other than Vehicle, which "creature or Vehicle" handles: "a Food", "a Clue", "Equipment".
 const OTHER_SUBTYPES = ["Arcane", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Vehicle", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure", "Gate", "Desert", "Cave", "Town"];
 
+/** Historic: artifacts, legendaries and Sagas (CR 700.6). */
+const HISTORIC: TargetSpec[] = [{ kind: "object", types: ["Artifact"], text: "artifact" }, { kind: "object", types: [], supertypes: ["Legendary"], text: "legendary" }, { kind: "object", types: [], subtypes: ["Saga"], text: "Saga" }];
+
 export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | null {
   // "The player or planeswalker it's attacking" in an attack trigger about the source (Myr Battlesphere, Fathom Fleet
   // Swordjack), or about the creature that attacked (Hellrider, Mage Slayer): not targeted (CR 506.2).
@@ -545,6 +548,12 @@ export function parseTargetPhrase(
     extra.colorCount = two[1] ? "notTwo" : "two";
     p = p.slice(0, two.index) + p.slice(two.index + two[0].length);
   }
+  // "Historic spells", "a historic permanent": artifacts, legendaries and Sagas (CR 700.6), any of them (TargetSpec.anyOf).
+  if (/(?:^|\s)historic\s/.test(p)) {
+    if (extra.anyOf || / or |, /.test(p)) return null;
+    extra.anyOf = HISTORIC;
+    p = p.replace(/(^|\s)historic\s/, "$1");
+  }
   // "Permanents they control that are one or more colors" (All Is Dust): colored ones (CR 105.2c).
   const colored = / that(?:'s| is| are) one or more colors\b/.exec(p);
   if (colored && !extra.colorCount) {
@@ -834,7 +843,8 @@ export function parseTargetPhrase(
   }
   if (otherThanBasic) return null;
   if (owner && (isSpell || controller)) return null;
-  if (isSpell) return extra.keywords || extra.notKeywords || extra.anyOf || extra.power || extra.toughness || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status || supertypes.length ? null : { kind: "spell", ...filters, ...(controller ? { controller } : {}), text };
+  // A historic spell: its printed card types, supertypes and subtypes (printedMatches), which the stack doesn't change.
+  if (isSpell) return extra.keywords || extra.notKeywords || (extra.anyOf && extra.anyOf !== HISTORIC) || extra.power || extra.toughness || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status || supertypes.length ? null : { kind: "spell", ...filters, ...(controller ? { controller } : {}), text };
   return { kind: "object", ...filters, controller, ...(tapped !== undefined ? { tapped } : {}), ...(owner ? { owner } : {}), text };
 }
 

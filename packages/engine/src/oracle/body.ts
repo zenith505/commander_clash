@@ -618,6 +618,15 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       rowToken = /^Create an? ([^,.]+?) token$/.exec(fx)?.[1] ?? rowToken;
       return [`${ROW_MARK}${row[1]}|${row[2] ?? (row[3] || row[4] === "more" || row[4] === "higher" ? "+" : row[4] === "less" ? "-" : row[1])}`, fx];
     })
+    // "Target opponent sacrifices a creature or planeswalker of their choice, discards a card, and loses 3 life" (Archon of
+    // Cruelty): three instructions for that player, in the order listed (rulings).
+    .flatMap((x) => {
+      const verb = "(?:sacrifices|discards|loses|mills|draws|gains) [^,]+";
+      const three = new RegExp(`^([Tt]arget opponent|[Tt]arget player|[Ee]ach opponent|[Ee]ach player) (${verb}), (${verb}),? and (${verb})$`).exec(x);
+      if (!three) return [x];
+      const again = /^target/i.test(three[1]!) ? "That player" : capital(three[1]!);
+      return [`${three[1]} ${three[2]}`, `${again} ${three[3]}`, `${again} ${three[4]}`];
+    })
     // "Draw two cards, then discard a card": two instructions, in order.
     // A search's "then shuffle" is part of the search (CR 701.23): "you may search" covers it too.
     // Not before "meld them into": meld (CR 701.42a) is one instruction with the exile (sentences/zones.ts).
@@ -1176,6 +1185,12 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
         ...(cost ? { need: { zone: "battlefield" as const, filter: { ...land, controller: "you" as const } } } : {}),
       });
       if (cost) si++;
+      continue;
+    }
+    // Syphon Mind: "Each other player discards a card. You draw a card for each card discarded this way": the cards this
+    // spell's discard made them discard, all at once (rulings).
+    if (/^(?:You )?[Dd]raw a card for each card discarded this way$/.test(s) && effects[effects.length - 1]?.type === "discard") {
+      effects.push({ type: "draw", who: { ref: "you" }, n: { count: { kind: "discardedThisWay" } } });
       continue;
     }
     // Moraug: "there's an additional combat phase after this phase. At the beginning of that combat, untap all creatures
@@ -1868,6 +1883,20 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "if", cond: { kind: "destroyedThisWay", died: true }, effects: inner });
       continue;
     }
+    // "You may destroy another target creature. If a creature is destroyed this way, you gain life equal to its toughness"
+    // (Noxious Gearhulk): destroyed even if a replacement effect put it elsewhere, not if it survived (rulings); its
+    // toughness as it last existed (CR 608.2h).
+    const ifDestroyed = /^If a creature is destroyed this way, (.+)$/.exec(s);
+    if (ifDestroyed) {
+      const prev = effects[effects.length - 1];
+      const destroy = prev?.type === "may" && prev.effects.length === 1 ? prev.effects[0] : prev;
+      if (destroy?.type !== "destroy" || destroy.what.ref !== "target" || ctx.targets[destroy.what.index]?.types?.join() !== "Creature") return null;
+      const then = ifDestroyed[1]!.replace(/its/g, "that creature's");
+      const inner = parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
+      if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
+      effects.push({ type: "if", cond: { kind: "destroyedThisWay" }, effects: inner });
+      continue;
+    }
     // "Flip a coin. If you win the flip, ... If you lose the flip, ...": decided by that flip (CR 705.2); neither if it
     // wasn't flipped ("you may flip a coin").
     const ifFlip = /^If you (win|lose) the flip, (.+)$/.exec(s);
@@ -2069,7 +2098,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "Put target creature card from a graveyard onto the battlefield under your control. That creature is a black Zombie in
     // addition to its other colors and types." (Rise from the Grave, Liliana, Death's Majesty, Dread Slaver): an effect on
     // the permanent the card became, from then on (CR 611.2c, 400.7); a later color or type change overwrites it (rulings).
-    const isAlso = /^That creature is (an? .+ in addition to its other (?:colors and )?types)$/.exec(s);
+    // "It's a Phyrexian in addition to its other types" (Portal to Phyrexia): the same.
+    const isAlso = /^(?:That creature is|It's|It is) (an? .+ in addition to its other (?:colors and )?types)$/.exec(s);
     if (isAlso) {
       const prev = effects[effects.length - 1];
       const mods = parseBecomes(isAlso[1]!);

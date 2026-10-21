@@ -1559,7 +1559,8 @@ export function compile(d: CardDef): CompiledCard {
     const uncounterable = /^(.*?)[Ss]pells( you control)? can't be countered\.$/.exec(line);
     if (uncounterable && !/\b(this turn|by)\b/.test(line)) {
       const words = uncounterable[1]!.trim().toLowerCase();
-      const filter = words ? parseTargetPhrase(`${words} spell`) : { kind: "spell" as const, text: "spell" };
+      // "Creature and enchantment spells" (Destiny Spinner): each spell that's either.
+      const filter = words ? parseTargetPhrase(`${words.replace(/^([a-z]+) and ([a-z]+)$/, "$1 or $2")} spell`) : { kind: "spell" as const, text: "spell" };
       if (filter?.kind === "spell" && !filter.controller) (out.uncounterable ??= []).push({ filter: { ...filter, text: `${words ? `${words} ` : ""}spells` }, ...(uncounterable[2] ? {} : { anyone: true as const }) });
       else out.unsupported.push(raw);
       continue;

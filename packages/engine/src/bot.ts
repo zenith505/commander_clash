@@ -400,6 +400,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const o = pend.about ? s.objects[pend.about] : undefined;
       const mine = !!o && controllerOf(s, o) === pid;
       const kinds = pend.options.filter((k) => k !== "done");
+      // Moving between our own permanents (Resourceful Defense): nothing worth moving is known, so none.
+      const onto = pend.onto !== undefined ? s.objects[pend.onto] : undefined;
+      if (onto && mine && controllerOf(s, onto) === pid && pend.options.includes("done")) return [{ type: "chooseOption", player: pid, choice: "done" }];
       const good = kinds.filter((k) => harmfulCounter(k) === mine).sort((a, b) => Number(b === "loyalty") - Number(a === "loyalty") || Number(b === "+1/+1") - Number(a === "+1/+1"));
       return [{ type: "chooseOption", player: pid, choice: good[0] ?? (pend.options.includes("done") ? "done" : kinds[0]!) }];
     }
@@ -817,6 +820,8 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     const countersFrom = allEffects(body.effects).some((e) => ((e.type === "removeAllCounters" || e.type === "removeAnyCounters") && e.what.ref === "target" && refCovers(e.what, i)) || (e.type === "moveAllCounters" && e.from.ref === "target" && e.from.index === i));
     // "Remove up to three counters from" (Glissa Sunslayer): counters worth removing, harmful ones from our own.
     const chosenCounters = allEffects(body.effects).some((e) => e.type === "removeAnyCounters" && e.what.ref === "target" && refCovers(e.what, i));
+    // "Move any number of counters from target permanent ... onto a second target permanent" (Resourceful Defense): bots don't.
+    if (!forced && allEffects(body.effects).some((e) => e.type === "removeAnyCounters" && e.moveTo)) return null;
     // "Counter target spell if it's blue" (Pyroblast): when that's all it does, only a target it holds for now.
     const onlyIf = body.effects.length > 0 && body.effects.every((e) => e.type === "if" && e.cond.kind === "targetIs" && e.cond.index === i && !e.cond.filter.bound && !e.otherwise?.length) ? (body.effects[0] as { cond: { filter: TargetSpec } }).cond.filter : undefined;
     const holds = (t: TargetChoice) => {
@@ -1772,7 +1777,7 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
   const out: CostChoices = {};
   const targeted = new Set(targets.flatMap((t) => (t.kind === "none" ? [] : [t.id])));
   const d = defOf(s, obj(s, id));
-  for (const c of castExtraCosts(d, { via, alt, costOr, ...(modes ? { modes } : {}), ...(buyback ? { buyback } : {}) }, x, s, pid)) {
+  for (const c of castExtraCosts(d, { via, alt, costOr, objectId: id, ...(modes ? { modes } : {}), ...(buyback ? { buyback } : {}) }, x, s, pid)) {
     if (c.kind === "revealHand") continue; // nothing to choose
     if (c.kind === "giveLife") {
       // Invigorate: the opponent with the least life gets it (the least threat to us); "each other player": nothing to choose.

@@ -1147,7 +1147,15 @@ export function compile(d: CardDef): CompiledCard {
     // permission used once each turn (rulings: the spell's costs are paid, its timing rules followed). Muldrotha: "During
     // each of your turns, you may play a land and cast a permanent spell of each permanent type from your graveyard."
     // Kess: "If a spell cast this way would be put into your graveyard, exile it instead."
-    const onceYard = /^Once during each of your turns, you may cast an? (.+?) spell( with mana value \d+ or less)? from your graveyard\.( If a spell cast this way would be put into your graveyard, exile it instead\.)?$/.exec(line);
+    // Exploration Broodship: "... from your graveyard by sacrificing a land in addition to paying its other costs": an
+    // additional cost of that permission (CR 601.2f-h), paid with the spell's other costs.
+    const onceYard = /^Once during each of your turns, you may cast an? (.+?) spell( with mana value \d+ or less)? from your graveyard( by (?:sacrificing|exiling|discarding|tapping) .+? in addition to paying its other costs)?\.( If a spell cast this way would be put into your graveyard, exile it instead\.)?$/.exec(line);
+    // Kotis: "exiling three other cards from your graveyard": other than the spell, which is on the stack by then (CR 601.2a).
+    const permitCost = onceYard?.[3] ? parseAdditionalCost(onceYard[3].replace(/^ by (\w+)ing /, (_, v: string) => `${v === "sacrific" ? "sacrifice" : v === "exil" ? "exile" : v} `).replace(/ in addition to paying its other costs$/, "").replace(/^exile (\w+) other cards from your graveyard$/, "exile $1 cards from your graveyard")) : undefined;
+    if (permitCost === null) {
+      out.unsupported.push(raw);
+      continue;
+    }
     if (onceYard || line === "During each of your turns, you may play a land and cast a permanent spell of each permanent type from your graveyard.") {
       const filter = parseTargetPhrase(`${onceYard ? onceYard[1]!.replace(/ and /g, " or ") : "permanent"} card${onceYard?.[2] ?? ""} from a graveyard`);
       // Lurrus: "a permanent spell with mana value 2 or less", the spell's mana value (Count X, CR 202.3e).
@@ -1156,7 +1164,7 @@ export function compile(d: CardDef): CompiledCard {
       else {
         const { owner: _, manaValue: _mv, ...f } = filter;
         const once = onceYard ? [""] : ["Artifact", "Creature", "Enchantment", "Planeswalker", "Battle"];
-        (out.graveyardGrants ??= []).push({ filter: { ...f, text: `${onceYard?.[1] ?? "permanent"} cards` }, way: { kind: "turnPermission", costs: [], exile: !!onceYard?.[3] }, yourTurn: true, once, ...(maxMv !== undefined ? { maxMv } : {}) });
+        (out.graveyardGrants ??= []).push({ filter: { ...f, text: `${onceYard?.[1] ?? "permanent"} cards` }, way: { kind: "turnPermission", costs: permitCost ? [permitCost] : [], exile: !!onceYard?.[4] }, yourTurn: true, once, ...(maxMv !== undefined ? { maxMv } : {}) });
         if (!onceYard) out.landFromGraveyardOnce = true;
       }
       continue;

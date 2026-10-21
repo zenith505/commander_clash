@@ -294,6 +294,10 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const o = a && s.objects[a.id];
     return o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === a.zc ? [o] : [];
   }
+  if (ref.ref === "discarded") {
+    const o = s.resolving?.discardedCards?.length === 1 ? s.objects[s.resolving.discardedCards[0]!.id] : undefined;
+    return o && o.zone === "graveyard" && (o.zoneChanges ?? 0) === s.resolving!.discardedCards![0]!.zc ? [o] : [];
+  }
   if (ref.ref === "exiledTop") {
     const ex = s.resolving?.exiledTop;
     const o = ex && s.objects[ex.id];
@@ -598,6 +602,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "noLifeGain":
     case "turnRules":
     case "flashUntilNextTurn":
+    case "opponentsHandOnlyUntilNextTurn":
     case "cantCast":
     case "cantPlayLands":
     case "noPrevention":

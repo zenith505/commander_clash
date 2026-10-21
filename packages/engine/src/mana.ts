@@ -48,6 +48,45 @@ export function parseManaCost(cost: string): ParsedCost {
   };
 }
 
+/**
+ * Take colored mana off a cost, one symbol for each color listed at most: Morophon's "cost {W}{U}{B}{R}{G} less to cast.
+ * This effect reduces only the amount of colored mana you pay" (CR 118.7; never generic mana, so not 118.7b-c). Plain
+ * symbols of that color first, then Phyrexian ones of it (118.7f, CR 107.4f), then hybrid ones with it as a half, that
+ * half the one paid (rulings), as many as can be.
+ */
+export function reduceColored(cost: ParsedCost, colors: Color[]): ParsedCost {
+  if (!colors.length) return cost;
+  const symbols = [...cost.symbols];
+  const gone = new Set<number>();
+  let left = [...colors];
+  for (const kind of ["colored", "phyrexian"] as const)
+    left = left.filter((c) => {
+      const i = symbols.findIndex((y, j) => !gone.has(j) && y.kind === kind && y.color === c && !(y.kind === "phyrexian" && y.krrik));
+      if (i < 0) return true;
+      gone.add(i);
+      return false;
+    });
+  // Hybrid symbols: a matching of colors to symbols, as large as possible (augmenting paths).
+  const halves = (y: CostSymbol): Color[] => (y.kind === "hybrid" ? y.options : y.kind === "twoHybrid" ? [y.color] : []);
+  const hybrid = symbols.flatMap((y, j) => (!gone.has(j) && halves(y).length ? [j] : []));
+  const owner = new Map<number, number>(); // symbol index -> index in `left`
+  const tryColor = (ci: number, seen: Set<number>): boolean => {
+    for (const j of hybrid) {
+      if (seen.has(j) || !halves(symbols[j]!).includes(left[ci]!)) continue;
+      seen.add(j);
+      const was = owner.get(j);
+      if (was === undefined || tryColor(was, seen)) {
+        owner.set(j, ci);
+        return true;
+      }
+    }
+    return false;
+  };
+  left.forEach((_, ci) => tryColor(ci, new Set()));
+  for (const j of owner.keys()) gone.add(j);
+  return { ...cost, symbols: symbols.filter((_, j) => !gone.has(j)) };
+}
+
 export type ManaPool = Record<ManaType, number>;
 export const emptyPool = (): ManaPool => ({ W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 });
 export const poolTotal = (p: ManaPool) => Object.values(p).reduce((a, b) => a + b, 0);

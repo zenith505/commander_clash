@@ -487,6 +487,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if (/^You may cast a copy of the exiled card without paying its mana cost$/.test(s) && !ctx.spell) return [{ type: "castLinkedCopy" }];
   // Hideaway (CR 702.75a): "You may play the exiled card without paying its mana cost", the card its hideaway exiled;
   // "... if each player has no cards in hand": only if that's true as it resolves.
+  // Malcolm: "Draw a card, then discard a card. ... you may cast the discarded card without paying its mana cost": as this
+  // resolves (CR 608.2g), from the graveyard it went to; a land card can't be cast (CR 305.9).
+  if (/^[Yy]ou may cast the discarded card without paying its mana cost$/.test(s)) return ctx.discardedOne ? [{ type: "castTargetFree", what: { ref: "discarded" } }] : null;
   if ((m = /^You may play the exiled card without paying its mana cost(?: if (.+))?$/.exec(s)) && !ctx.spell) {
     if (!m[1]) return [{ type: "playLinked" }];
     const cond = parseStaticCondition(m[1], { affects: { kind: "self" }, mods: [], text: "" });

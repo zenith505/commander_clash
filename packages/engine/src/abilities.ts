@@ -567,6 +567,8 @@ export type ObjRef =
   | { ref: "revealed" }
   /** The one card "exile the top card of your library" exiled, while it's still that card in exile (CR 400.7). */
   | { ref: "exiledTop" }
+  /** "The discarded card" (Malcolm): the one card this resolution's last discard put into a graveyard, while it's still that card there. */
+  | { ref: "discarded" }
   /**
    * "Creatures you control get +1/+1 until end of turn. Untap those creatures": the permanents this resolution's last
    * continuous effect changed, locked in as it began (CR 611.2c), while they're still those objects on the battlefield.
@@ -1510,10 +1512,10 @@ export type Effect =
    */
   /** `transformed`: "return it to the battlefield transformed" (CR 712.14a). */
   /** `counterIf`: "If it's a Spirit, put a +1/+1 counter on it" (Essence Flux), each returned permanent that matches, once it's back. */
-  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; at?: "nextEndStep"; counter?: CounterKind; tapped?: true; transformed?: true; counterIf?: { counter: CounterKind; filter: TargetSpec }; /** Exiled now, returned by the search after it (Sword of Hearth and Home: "Put both cards onto the battlefield"), kept in Resolving.held. */ hold?: true }
+  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; at?: "nextEndStep"; /** With `at`: "If it entered under your control, put a +1/+1 counter on ~" (Phelia), on the source as it is then. */ selfCounterIfYours?: CounterKind; counter?: CounterKind; tapped?: true; transformed?: true; counterIf?: { counter: CounterKind; filter: TargetSpec }; /** Exiled now, returned by the search after it (Sword of Hearth and Home: "Put both cards onto the battlefield"), kept in Resolving.held. */ hold?: true }
   /** A delayed flicker's return: the exiled card, while it's still in exile as that object. */
   /** A delayed flicker's return: its subject, or with `cards` each of those cards, if still the same objects in exile. */
-  | { type: "returnExiled"; under: "owner" | "you"; counter?: CounterKind; tapped?: true; cards?: { id: ObjectId; zc: number }[] }
+  | { type: "returnExiled"; under: "owner" | "you"; counter?: CounterKind; tapped?: true; cards?: { id: ObjectId; zc: number }[]; /** Phelia: a counter on this permanent, while it's still that object, if one of them entered under this ability's controller's control. */ selfCounter?: { id: ObjectId; zc: number; counter: CounterKind } }
   /** Connive (CR 701.50): its controller draws N, discards N, and it gets a +1/+1 counter per nonland card discarded. */
   | { type: "connive"; what: ObjRef; n: Amount }
   /**
@@ -1691,7 +1693,11 @@ export type Effect =
   | { type: "copySpell"; spell: "cause" | "self" | { target: number } | { epic: string }; /** "stormInstantSorcery": the instant and sorcery spells its controller cast before it this turn (Thousand-Year Storm). */ n: Amount | "storm" | "kicked" | "stormInstantSorcery"; newTargets: boolean; /** Then an opponent you choose copies it too (CR 702.144a). */ demonstrate?: true; /** "If it's a permanent spell, the copy gains haste and "..."" (Nalfeshnee): what the token it becomes has (CR 400.7a, 608.3f). */ gains?: Modification[] }
   | { type: "removeCounters"; what: ObjRef; counter: CounterKind; n: Amount | "all" }
   /** "Remove (up to) three counters from target permanent": of any kinds, chosen as it resolves (rulings on Glissa Sunslayer); fewer than that, all of them. */
-  | { type: "removeAnyCounters"; what: ObjRef; n: Amount; upTo?: true }
+  /**
+   * `moveTo`: "Move any number of counters from target permanent you control onto a second target permanent you control"
+   * (Resourceful Defense): `n` is ignored, up to all of them, each removed and put on that one (CR 122.5).
+   */
+  | { type: "removeAnyCounters"; what: ObjRef; n: Amount; upTo?: true; moveTo?: ObjRef }
   /** "If an opponent protects it, remove N defense counters from it. Otherwise, put N defense counters on it." (CR 310.9e) */
   | { type: "battleDefense"; what: ObjRef; n: number }
   /** "Remove all counters from target permanent": every kind; how many were removed is counted ("this way"). */
@@ -2208,6 +2214,8 @@ export type Effect =
   | { type: "turnRules"; rules: TurnRule["rule"][] }
   /** "Until your next turn, you may cast sorcery spells as though they had flash." (Teferi, Time Raveler; CR 702.8a) */
   | { type: "flashUntilNextTurn"; filter: TargetSpec }
+  /** "Until your next turn, your opponents can't cast spells from anywhere other than their hands" (Avatar's Wrath): see GameState.handOnlyUntil. */
+  | { type: "opponentsHandOnlyUntilNextTurn" }
   /** "Artifact, instant, and sorcery spells you cast this turn cost {2} less to cast" (Urza, Planeswalker): `mod`'s "you" is the ability's controller (CR 601.2f, 611.2a). */
   | { type: "costModThisTurn"; mod: CostMod }
   /**
@@ -3327,6 +3335,8 @@ export interface CostMod {
   if?: StaticCondition;
   /** "... for each experience counter you have" (Mizzix): `n` that many times, for the permanent's controller. */
   times?: AmountExpr;
+  /** "Cost {W}{U}{B}{R}{G} less to cast. This effect reduces only the amount of colored mana you pay" (Morophon): `n` is 0. */
+  colored?: Color[];
   text: string;
 }
 
@@ -3968,6 +3978,8 @@ export interface CompiledCard {
     once?: string[];
     /** "A permanent spell with mana value 2 or less" (Lurrus): the spell's, its X counted (CR 202.3e), as it's cast. */
     maxMv?: number;
+    /** Only while this holds: a station symbol's (Exploration Broodship's 8+, CR 721.2a). */
+    if?: StaticCondition;
   }[];
   /** Muldrotha: "you may play a land ... from your graveyard" once during each of your turns. */
   landFromGraveyardOnce?: true;

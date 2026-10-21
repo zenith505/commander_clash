@@ -342,6 +342,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const to = from && !isGroup(from) ? parseObject(m[2]!, ctx) : null;
     return from && to && !isGroup(to) ? [{ type: "moveAllCounters", from, to }] : null;
   }
+  // Resourceful Defense: "Move any number of counters from target permanent you control onto a second target permanent
+  // you control": any kinds, chosen one at a time as it resolves (CR 122.5).
+  if ((m = /^Move any number of counters from (target .+?) onto (?:another|a second) (target .+)$/i.exec(s))) {
+    const from = parseObject(m[1]!, ctx);
+    const to = from && !isGroup(from) ? parseObject(m[2]!, ctx) : null;
+    return from && to && !isGroup(to) ? [{ type: "removeAnyCounters", what: from, n: 0, upTo: true, moveTo: to }] : null;
+  }
   // "Move a +1/+1 counter from target creature you control onto another target creature", Nesting Grounds' "move a
   // counter from target permanent you control onto a second target permanent" (a kind it has, chosen as it resolves).
   if ((m = new RegExp(`^Move (?:a|one) (?:(?<kind>${COUNTER}) )?counter from (?<from>target .+?) onto (?<to>another target .+|a second target .+)$`, "i").exec(s))) {
@@ -368,7 +375,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // The Ozolith: "Whenever a creature you control leaves the battlefield, if it had counters on it, put those counters on
   // ~": as many of each kind as that creature had as it last existed, put on (rulings: not moved).
-  if (/^Put those counters on ~$/i.test(s) && ctx.subjectLeft) return [{ type: "lastKnownCounters", what: { ref: "self" } }];
+  // Resourceful Defense: "... put those counters on target permanent you control", the same way.
+  if ((m = /^Put those counters on (~|target .+)$/i.exec(s)) && ctx.subjectLeft) {
+    const what = m[1] === "~" ? ({ ref: "self" } as const) : parseObject(m[1]!, ctx);
+    return what && !isGroup(what) ? [{ type: "lastKnownCounters", what }] : null;
+  }
   // "When ~ dies, put its counters on target creature you control": as many of each kind as it had as it last
   // existed, put on, not moved (rulings on Dockworker Drone); "its +1/+1 counters" only that kind.
   if ((m = new RegExp(`^Put its (?:${COUNTER} )?counters on (.+)$`, "i").exec(s)) && ctx.selfCard) {

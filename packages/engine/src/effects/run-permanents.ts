@@ -591,10 +591,13 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     case "removeAnyCounters": {
       // The counters are chosen one at a time as it resolves, any kinds (rulings on Glissa Sunslayer), then removed
       // together; with fewer on it than that, all of them (rulings on Thornmantle Striker).
-      const o = objects(s, e.what, ctx)[0];
+      const o0 = objects(s, e.what, ctx)[0];
+      // Moving: none if the other one is gone or is the same (CR 122.5).
+      const to = e.moveTo ? objects(s, e.moveTo, ctx)[0] : undefined;
+      const o = e.moveTo && (!to || to.id === o0?.id) ? undefined : o0;
       const sc = (s.resolving!.scratch ??= {});
       const picked = (sc.countersPicked ??= {});
-      const n = o ? amountNow(s, e.n, ctx) : 0;
+      const n = !o ? 0 : e.moveTo ? Object.values(o.counters).reduce((a, b) => a + Math.max(0, b), 0) : amountNow(s, e.n, ctx);
       const left = (k: string) => (o!.counters[k] ?? 0) - (picked[k] ?? 0);
       const count = () => Object.values(picked).reduce((a, b) => a + b, 0);
       while (o && count() < n && !sc.countersDone) {
@@ -611,12 +614,25 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
           break;
         }
         const name = characteristics(s, o).name;
-        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "removeCounter", about: o.id, options: [...kinds, ...(e.upTo ? ["done"] : [])], labels: [...kinds.map((k) => `A ${k} counter (${left(k)} left)`), ...(e.upTo ? [count() ? "That's all" : "None"] : [])], prompt: `choose a counter to remove from ${name} (${count() + 1} of ${n})` };
+        const prompt = to ? `choose a counter to move from ${name} onto ${characteristics(s, to).name} (${count()} so far)` : `choose a counter to remove from ${name} (${count() + 1} of ${n})`;
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "removeCounter", about: o.id, ...(to ? { onto: to.id } : {}), options: [...kinds, ...(e.upTo ? ["done"] : [])], labels: [...kinds.map((k) => `A ${k} counter (${left(k)} left)`), ...(e.upTo ? [count() ? "That's all" : "None"] : [])], prompt };
         return "paused";
       }
       sc.countersPicked = undefined;
       sc.countersDone = undefined;
       if (!o) return;
+      if (to) {
+        for (const [k, m] of Object.entries(picked)) {
+          if (m <= 0) continue;
+          const had = o.counters[k] ?? 0;
+          o.counters[k] = had - m;
+          const put = putCounters(s, to, k, m);
+          invalidateCharacteristics(s);
+          log(s, `${characteristics(s, o).name} moves ${m} ${k} counter${m > 1 ? "s" : ""} onto ${characteristics(s, to).name}${put !== m ? ` (${put} are put on it)` : ""}.`);
+          if (had === m) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: k });
+        }
+        return;
+      }
       // "For each counter removed this way" (Hex Parasite): only those actually removed (rulings).
       if (s.resolving) s.resolving.countersRemoved = (s.resolving.countersRemoved ?? 0) + Object.values(picked).reduce((a, b) => a + Math.max(0, b), 0);
       for (const [k, m] of Object.entries(picked)) {

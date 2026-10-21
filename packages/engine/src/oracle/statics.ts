@@ -156,6 +156,15 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
 export function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition } } | { lessIfTargets: { n: number; filter: TargetSpec } } | { targetTax: number } | { targetLifeTax: number } | "fail" | null {
   let text = line.replace(/^[A-Z][A-Za-z' -]+ — (?=~ costs|The second)/, "").replace(/\.$/, ""); // "Domain —" is an ability word
   let m: RegExpExecArray | null;
+  // "Cleric spells you cast cost {W}{B} less to cast. This effect reduces only the amount of colored mana you pay." (Edgewalker),
+  // Morophon's "Spells of the chosen type you cast cost {W}{U}{B}{R}{G} less ...": colored mana only, never generic (CR 118.7).
+  if ((m = /^(.+ cost) ((?:\{[WUBRG]\})+) (less to cast)\. This effect reduces only the amount of colored mana you pay$/.exec(text))) {
+    const colors = [...m[2]!.matchAll(/[WUBRG]/g)].map((x) => x[0] as Color);
+    if (new Set(colors).size !== colors.length) return "fail";
+    const base = parseCostChange(`${m[1]!.replace(/^Spells of the chosen type you cast cost$/, "Spells you cast of the chosen type cost")} {1} ${m[3]!}`);
+    if (!base || base === "fail" || !("costMod" in base) || base.costMod.times || base.costMod.nth) return "fail";
+    return { costMod: { ...base.costMod, n: 0, colored: colors, text: line } };
+  }
   if ((m = /^Spells your opponents cast that target ~ cost \{(\d+)\} more to cast$/.exec(text))) return { targetTax: Number(m[1]) };
   if ((m = /^Spells your opponents cast that target ~ cost an additional (\d+) life to cast$/.exec(text))) return { targetLifeTax: Number(m[1]) };
   if ((m = /^~ costs \{(\d+)\} less to cast for each (.+)$/.exec(text))) {

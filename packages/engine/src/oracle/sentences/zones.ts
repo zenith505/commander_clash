@@ -337,7 +337,7 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
   // Imprint: "You may exile a nonartifact, nonland card from your hand" (Chrome Mox), "... an instant card with mana value 2
   // or less ..." (Isochron Scepter): one card of your own hand, chosen as it resolves; linked to the ability that refers
   // to "the exiled card" (CR 607.2a, compile.ts).
-  if ((m = /^(You may )?[Ee]xile (?:a|an) (.+? card) from your hand$/.exec(s)) && !ctx.spell) {
+  if ((m = /^(You may )?[Ee]xile (?:a|an) (.+? card(?: with mana value \d+ or (?:less|greater))?) from your hand$/.exec(s)) && !ctx.spell) {
     const filter = parseSearchFilter(m[2]!);
     if (filter === null) return null;
     return [{ type: "takeFromHand", who: { ref: "you" }, ...(filter ? { filter } : {}), action: "exile", ...(m[1] ? { optional: true as const } : {}) }];
@@ -447,6 +447,9 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     return [{ type: "returnLinked", dest: m[1] === "the battlefield" ? "battlefield" : "hand" }];
   // Watcher for Tomorrow: "When ~ leaves the battlefield, put the exiled card into its owner's hand."
   if (/^Put the exiled card into its owner's hand$/i.test(s) && ctx.selfCard) return [{ type: "returnLinked", dest: "hand" }];
+  // Isochron Scepter: "You may copy the exiled card. If you do, you may cast the copy without paying its mana cost." (one
+  // sentence by then, body.ts): the card its imprint ability exiled (linked in compile.ts).
+  if (/^You may cast a copy of the exiled card without paying its mana cost$/.test(s) && !ctx.spell) return [{ type: "castLinkedCopy" }];
   // Hideaway (CR 702.75a): "You may play the exiled card without paying its mana cost", the card its hideaway exiled;
   // "... if each player has no cards in hand": only if that's true as it resolves.
   if ((m = /^You may play the exiled card without paying its mana cost(?: if (.+))?$/.exec(s)) && !ctx.spell) {

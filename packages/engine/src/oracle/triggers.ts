@@ -466,7 +466,9 @@ const DIES_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) (dies|is p
  * dies": "it" and "that card" are the card in the graveyard, "its power" as it last existed (CR 603.10a).
  */
 function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
-  const attached = /^When(?:ever)? (equipped|enchanted) creature dies, (.+)$/.exec(line);
+  // Kaya's Ghostform: "When enchanted permanent dies or is put into exile, ..." (from the battlefield, CR 603.6c).
+  const attachedM = /^When(?:ever)? (equipped|enchanted) (creature|permanent) (dies|dies or is put into exile), (.+)$/.exec(line);
+  const attached = attachedM && [attachedM[0], attachedM[1]!, attachedM[4]!];
   const m = attached ? null : DIES_TRIGGER.exec(line);
   if (!attached && !m) return null;
   const ench = !attached && ENCHANTED_CONTROLS.test(m![2]!);
@@ -499,7 +501,8 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
     // "Return this card to its owner's hand" (Angelic Destiny): the Aura's card, which went to a graveyard as its creature
     // died or just after (CR 704.5m), not the Aura on the battlefield it no longer is (CR 400.7).
     if (attached[1] === "enchanted") for (const e of allEffects(body.effects)) if ((e.type === "bounce" || e.type === "putOntoBattlefield") && e.what.ref === "self") e.what = { ref: "selfCard", moved: true };
-    return { event: "permanentDies", dies: { filter: { kind: "object", types: ["Creature"], text: "creature" }, attached: true }, body };
+    const filter: TargetSpec = attachedM![2] === "creature" ? { kind: "object", types: ["Creature"], text: "creature" } : { kind: "object", text: "permanent" };
+    return { event: "permanentDies", dies: { filter, attached: true, ...(attachedM![3] !== "dies" ? { leaves: true as const, toZones: ["graveyard", "exile"] as ("graveyard" | "exile")[] } : {}) }, body };
   }
   let phrase = m![2]!;
   const damaged = / dealt damage by ~ this turn$/.exec(phrase);
@@ -717,6 +720,7 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
   let batch: BatchTrigger;
   let rest: string;
   let yourTurn = false;
+  let eachOwner = false;
   if ((m = /^Whenever one or more (?:(.+?) )?cards (leave your graveyard|are put into exile from your graveyard)( during your turn)?, (.+)$/.exec(line))) {
     const filter = batchCards(m[1]);
     if (filter === null) return "fail";
@@ -729,14 +733,16 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     batch = { what: "toGraveyard", whose: "you", ...(filter ? { filter } : {}), ...(m[2] === "your library" ? { from: "library" as const } : {}) };
     yourTurn = !!m[3];
     rest = m[4]!;
-  } else if ((m = /^Whenever an? (?:(.+?) )?card (leaves your graveyard|is put into (?:a|your|an opponent's) graveyard from anywhere other than the battlefield), (.+)$/.exec(line))) {
+  } else if ((m = /^Whenever an? (?:(.+?) )?card (leaves your graveyard|is put into (?:a|your|an opponent's) graveyard from anywhere(?: other than the battlefield)?), (.+)$/.exec(line))) {
     // Syr Konrad: "a creature card is put into a graveyard from anywhere other than the battlefield", "a creature card
     // leaves your graveyard": once for each card (CR 603.2c).
     const filter = batchCards(m[1]);
     if (filter === null) return "fail";
     const whose = /^leaves|your graveyard/.test(m[2]!) ? ("you" as const) : /an opponent's/.test(m[2]!) ? ("opponent" as const) : undefined;
-    batch = { what: m[2]!.startsWith("leaves") ? "leavesGraveyard" : "toGraveyard", ...(whose ? { whose } : {}), ...(filter ? { filter } : {}), ...(m[2]!.startsWith("leaves") ? {} : { from: "notBattlefield" as const }), each: true };
+    // Bloodchief Ascension: "a card is put into an opponent's graveyard from anywhere", "that player" being its owner.
+    batch = { what: m[2]!.startsWith("leaves") ? "leavesGraveyard" : "toGraveyard", ...(whose ? { whose } : {}), ...(filter ? { filter } : {}), ...(/other than the battlefield$/.test(m[2]!) ? { from: "notBattlefield" as const } : {}), each: true };
     rest = m[3]!;
+    eachOwner = true;
   } else if ((m = /^Whenever (you|one or more players) discards? one or more (?:(.+?) )?cards( for the first time each turn)?, (.+)$/.exec(line))) {
     const filter = batchCards(m[2]);
     if (filter === null) return "fail";
@@ -778,7 +784,7 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     if (/\bX\b/.test(text)) return "fail";
     text = text.replace(/\bthat (?:much|many)\b/g, "X");
   }
-  let body = parseBody(text, {});
+  let body = parseBody(text, eachOwner ? { eventPlayer: true } : {});
   if (!body) return "fail";
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, rest) };
   return { event: "batch", batch, body, ...(yourTurn ? { activeIf: { kind: "yourTurn" as const } } : {}) };
@@ -916,6 +922,17 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).
   const line = raw.replace(/^[A-Z][A-Za-z' -]+ — (?=(When|Whenever|At)\b)/, "");
   if (!/^(When|Whenever|At)\b/.test(line)) return null;
+  // Springheart Nantuko: "Whenever a land you control enters, you may pay {1}{G} if ~ is attached to a creature you
+  // control. If you do, create a token that's a copy of that creature. If you didn't create a token this way, create a
+  // 1/1 green Insect creature token." Not paying, or not being attached then, makes the Insect (rulings).
+  const nantuko = /^(Whenever a land you control enters), you may pay (\{[^.]+\}) if ~ is attached to a creature you control\. If you do, create a token that's a copy of that creature\. If you didn't create a token this way, (create [^.]+ token)\.$/.exec(line);
+  if (nantuko) {
+    const t = parseTrigger(`${nantuko[1]}, you may pay ${nantuko[2]}. If you do, create a token that's a copy of enchanted creature.`);
+    const insect = parseBody(`${nantuko[3]!.charAt(0).toUpperCase()}${nantuko[3]!.slice(1)}.`, {});
+    if (!t || t === "fail" || !insect || insect.targets.length) return "fail";
+    const host: TargetSpec = { kind: "object", types: ["Creature"], controller: "you", text: "creature you control" };
+    return { ...t, body: { targets: [], effects: [{ type: "if", cond: { kind: "state", cond: { kind: "attachedIs", filter: host } }, effects: t.body.effects }, { type: "if", cond: { kind: "createdNone" }, effects: insect.effects }], text: line.replace(/^[^,]+, /, "") } };
+  }
   // "When this Class becomes level 2, draw two cards" (CR 716.2a).
   const level = /^When ~ becomes level (\d+), (.+)$/.exec(line);
   if (level) {
@@ -1189,6 +1206,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (cast) return cast;
   const batch = parseBatchTrigger(line);
   if (batch) return batch;
+  // Midnight Clock: "When the twelfth hour counter is put on ~, ...": it triggers when counters put on it take it from
+  // fewer than twelve to twelve or more (rulings), as a Saga's chapter does (CR 714.2b).
+  const nth = /^When the (second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth) ([a-z]+) counter is put on ~, (.+)$/.exec(line);
+  if (nth) {
+    const reach = ["second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth", "eleventh", "twelfth"].indexOf(nth[1]!) + 2;
+    const body = parseBody(nth[3]!, { selfIt: true });
+    return body ? { event: "selfCountersPut", countersKind: nth[2]!, countersReach: reach, body } : "fail";
+  }
   // "Whenever one or more +1/+1 counters are put on ~ / on a creature you control" (CR 122.6: also as it enters with
   // them). "That many" is how many were put on it.
   const put = /^Whenever one or more (\+1\/\+1 )?counters are put on (~|another creature you control|a creature you control), (.+)$/.exec(line);

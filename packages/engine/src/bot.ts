@@ -25,6 +25,7 @@ import {
   maxBlocks,
   blockersNeeded,
   canEnterUntapped,
+  othersMakeItEnterUntapped,
   entersRulesOf,
   conditionHolds,
   isSummoningSick,
@@ -630,8 +631,10 @@ function chooseLand(s: GameState, pid: PlayerId): Action | null {
     // A modal double-faced card's land face, as it would enter (CR 712.12).
     asFace(s, obj(s, a.objectId), a.face, () => {
       const c = entersRulesOf(s, pid, a.objectId); // under Blood Moon a nonbasic land has none of its abilities (CR 614.12)
-      const untapped = c.entersTappedChoice ? canEnterUntapped(s, pid, a.objectId) && (c.entersTappedChoice.kind === "reveal" || p.life >= 16) : undefined;
-      const tapped = c.entersTapped || (c.entersTappedUnless ? !conditionHolds(s, c.entersTappedUnless, pid) : c.entersTappedChoice ? !untapped : false);
+      // Spelunking: it enters untapped anyway, so no life is paid for it.
+      const free = othersMakeItEnterUntapped(s, obj(s, a.objectId));
+      const untapped = c.entersTappedChoice && !free ? canEnterUntapped(s, pid, a.objectId) && (c.entersTappedChoice.kind === "reveal" || p.life >= 16) : undefined;
+      const tapped = !free && (c.entersTapped || (c.entersTappedUnless ? !conditionHolds(s, c.entersTappedUnless, pid) : c.entersTappedChoice ? !untapped : false));
       return { action: { ...a, ...(untapped ? { untapped } : {}) }, tapped };
     }),
   );

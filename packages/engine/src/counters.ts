@@ -18,17 +18,44 @@ function modsInPlay(s: GameState): { mod: CountMod; controller: PlayerId; source
 }
 
 /**
+ * Who is putting counters on right now (Vorinclex's "if you would put ..."): the controller of the spell or ability
+ * whose effect it is (set while an effect runs) or of the source dealing wither, infect or toxic damage. Unset, it's the
+ * affected permanent's controller, as for a permanent entering with counters (rulings on Vorinclex, Monstrous Raider).
+ * Only set for the length of one synchronous call, never kept in the game state.
+ */
+let putterNow: PlayerId | undefined;
+export function withPutter<T>(pid: PlayerId | undefined, fn: () => T): T {
+  const was = putterNow;
+  putterNow = pid;
+  try {
+    return fn();
+  } finally {
+    putterNow = was;
+  }
+}
+
+/**
  * Applies "plus one" before "twice that many": the affected permanent's controller chooses the order
  * (CR 616.1, Hardened Scales rulings), and this order gives them the most. "Minus one" (Vizier of Remedies, on -1/-1
- * counters) goes first, which gives them the fewest.
+ * counters) goes first, which gives them the fewest. "Half that many, rounded down" (Vorinclex) goes last for counters
+ * they want and first for harmful ones (-1/-1, stun, poison), whichever gives them more or fewer.
  */
-function apply(n: number, ops: CountMod["op"][]): number {
+function apply(n: number, ops: CountMod["op"][], harmful = false): number {
   if (n <= 0) return n;
+  const half = () => {
+    for (const op of ops) if (op === "halfDown") n = Math.floor(n / 2);
+  };
+  if (harmful) half();
   for (const op of ops) if (op === "minusOne") n = Math.max(0, n - 1);
   for (const op of ops) if (op === "plusOne") n += 1;
   for (const op of ops) if (op === "double") n *= 2;
+  if (!harmful) half();
   return n;
 }
+
+/** Does a "putter" mod (Vorinclex) apply to counters put by `putter`, the mod's permanent controlled by `controller`? */
+const putterFits = (s: GameState, mod: CountMod, controller: PlayerId, putter: PlayerId) =>
+  mod.what === "counters" && "putter" in mod && (mod.putter === "you" ? putter === controller : putter !== controller && !s.players.find((p) => p.id === putter)?.lost);
 
 /**
  * How many `kind` counters an effect putting `n` on `o` really puts (o is on the battlefield). A permanent
@@ -38,13 +65,28 @@ function apply(n: number, ops: CountMod["op"][]): number {
 export function countersToPut(s: GameState, o: GameObject, kind: string, n: number, entering = false): number {
   if (n <= 0 || o.zone !== "battlefield") return n;
   const owner = controllerOf(s, o);
+  const putter = putterNow ?? owner;
   const types = characteristics(s, o).types;
   const isCreature = types.includes("Creature");
   const fits = (on: "creature" | "permanent" | "artifactOrCreature") => on === "permanent" || isCreature || (on === "artifactOrCreature" && types.includes("Artifact"));
   const ops = modsInPlay(s)
-    .filter(({ mod, controller, source }) => mod.what === "counters" && (mod.counter === undefined || mod.counter === kind) && fits(mod.on) && (mod.who === "any" || controller === owner) && !((mod.other || entering) && source === o.id))
+    .filter(({ mod, controller, source }) => {
+      if (mod.what !== "counters" || ((mod.other || entering) && source === o.id)) return false;
+      if ("putter" in mod && mod.putter) return putterFits(s, mod, controller, putter);
+      return (mod.counter === undefined || mod.counter === kind) && fits(mod.on!) && (mod.who === "any" || controller === owner);
+    })
     .map(({ mod }) => mod.op);
-  return apply(n, ops);
+  return apply(n, ops, kind === "-1/-1" || kind === "stun");
+}
+
+/** How many `kind` counters (poison, energy) a player really gets when `n` would be put on them: only Vorinclex-style mods apply. */
+export function playerCountersToPut(s: GameState, pid: PlayerId, kind: string, n: number): number {
+  if (n <= 0) return n;
+  const putter = putterNow ?? pid;
+  const ops = modsInPlay(s)
+    .filter(({ mod, controller }) => "putter" in mod && !!mod.putter && putterFits(s, mod, controller, putter))
+    .map(({ mod }) => mod.op);
+  return apply(n, ops, kind === "poison");
 }
 
 type TokenKind = Pick<TokenSpec, "types" | "subtypes">;

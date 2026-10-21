@@ -108,9 +108,15 @@ export function addStriation(part: Striation, out: CompiledCard, compileLine: (l
     const inner = compileLine(line);
     if (inner.unsupported.length) return false;
     // Static abilities kept in fields of their own, each made conditional the same way.
-    const { costMods, equipLess, fromTop, lookTop, playLinked, extraLands, ...others } = inner;
+    const { costMods, equipLess, fromTop, lookTop, playLinked, extraLands, countMods, ...others } = inner;
     if (rest(others as CompiledCard) !== rest(empty)) return false;
     if (costMods?.some((m) => m.if) || equipLess?.some((m) => m.if) || fromTop?.some((t) => t.if)) return false;
+    // A counter or token replacement (Innkeeper's Talent's level 3): an ability it has while the condition holds (layer 6).
+    if (countMods?.length) {
+      if (inner.statics.length || inner.triggers.length || inner.activated.length || inner.mana.length) return false;
+      statics.push({ affects: { kind: "self" }, mods: [{ kind: "addAbility", text: line.trim() }], condition: cond, text: `${part.header}: ${line.trim()}` });
+      continue;
+    }
     if (costMods) more.costMods.push(...costMods.map((m) => ({ ...m, if: cond })));
     if (equipLess) more.equipLess.push(...equipLess.map((m) => ({ ...m, if: cond })));
     if (fromTop) more.fromTop.push(...fromTop.map((t) => ({ ...t, if: cond })));

@@ -2,7 +2,7 @@ import type { Effect, Modification, TokenSpec } from "../abilities";
 import { cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
 import { auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, log, moveObject, obj, opponents, player, removeFromCombat, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
-import { putCounters, tokenBatch } from "../counters";
+import { playerCountersToPut, putCounters, tokenBatch } from "../counters";
 import { compileCard } from "../oracle";
 import type { ContinuousEffect, GameObject, GameState, PlayerId } from "../types";
 import { setFace } from "../faces";
@@ -94,8 +94,8 @@ export function proliferate(s: GameState, you: PlayerId, src: string) {
   for (const p of s.players) {
     if (p.lost) continue;
     if (p.id === you) {
-      if (p.energy) (p.energy += 1), names.push(`${p.name} (energy)`);
-    } else if (p.poison) (p.poison += 1), names.push(`${p.name} (poison)`);
+      if (p.energy) (p.energy += playerCountersToPut(s, p.id, "energy", 1)), names.push(`${p.name} (energy)`);
+    } else if (p.poison) (p.poison += playerCountersToPut(s, p.id, "poison", 1)), names.push(`${p.name} (poison)`);
   }
   log(s, `${src}: ${player(s, you).name} proliferates${names.length ? ` (${names.join(", ")})` : ""}.`);
 }

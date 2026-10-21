@@ -32,7 +32,7 @@ const STEP_TRIGGERS: Partial<Record<Extract<TriggerSourceEvent, { type: "step" }
 };
 
 /** See `causedBy` in fireEvent. */
-type Cause = { event: "enters" | "dies" | "attacks" | "combatDamage"; objs: { o: GameObject; c?: Characteristics; controller: PlayerId }[] };
+type Cause = { event: "enters" | "dies" | "attacks" | "combatDamage"; objs: { o: GameObject; c?: Characteristics; controller: PlayerId }[] } | { event: "castOrCopy"; caster: PlayerId; objs?: undefined };
 
 /**
  * How many more times a triggered ability of `src` triggers (CR 603.2d): one for each "triggers an additional time" effect
@@ -63,7 +63,10 @@ function triggersAgain(s: GameState, src: GameObject, controller: PlayerId, caus
   let n = 0;
   for (const { id, again } of statics)
     for (const a of again) {
-      if (a.by && !(cause?.event === a.by.event && cause.objs.some((x) => !a.by!.filter || a.by!.filter.some((f) => objectMatches(s, f, x.o, controller, false, undefined, x.c) && (f.controller !== "you" || x.controller === controller))))) continue;
+      // Veyran: "If you casting or copying an instant or sorcery spell causes ...": that player is this static's controller.
+      if (a.by?.event === "castOrCopy") {
+        if (cause?.event !== "castOrCopy" || cause.caster !== controller) continue;
+      } else if (a.by && !(cause?.event === a.by.event && cause.objs!.some((x) => !a.by!.filter || a.by!.filter.some((f) => objectMatches(s, f, x.o, controller, false, undefined, x.c) && (f.controller !== "you" || x.controller === controller))))) continue;
       // "Of the chosen type": the one chosen as that permanent entered (Roaming Throne).
       if (a.of && !a.of.some((k) => !(k.other && src.id === id) && ((f) => !f.chosen && ofMatches(f))(bindChosen(k.filter, s.objects[id]?.chosen)))) continue;
       n++;
@@ -555,7 +558,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) };
       const dying = { o: ev.snapshot, c: ev.chars };
       const hadCounter = Object.values(ev.counters).some((n) => n > 0);
-      const went = (d: NonNullable<TriggeredAbility["dies"]>) => (d.leaves ? !(d.notDies && ev.to === "graveyard") : ev.to === "graveyard") && (!d.hadCounter || hadCounter);
+      const went = (d: NonNullable<TriggeredAbility["dies"]>) => (d.leaves ? !(d.notDies && ev.to === "graveyard") && (!d.toZones || (d.toZones as string[]).includes(ev.to)) : ev.to === "graveyard") && (!d.hadCounter || hadCounter);
       const consider = (src: GameObject, ctrl: PlayerId, attachedTo: ObjectId | undefined, triggers?: TriggeredAbility[]) =>
         add(src, ctrl, (e, t) => e === "permanentDies" && !!t.dies && went(t.dies) && diesMatches(s, t.dies, src.id, attachedTo, dying, ctrl), triggers, undefined, o, lki);
       for (const id of s.battlefield) {
@@ -742,7 +745,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const o = obj(s, ev.id);
     const kindOk = (t: TriggeredAbility) => t.countersKind === undefined || t.countersKind === ev.counter;
     const info = { amount: ev.amount };
-    add(o, controllerOf(s, o), (e, t) => e === "selfCountersPut" && kindOk(t), undefined, undefined, undefined, undefined, undefined, undefined, info);
+    const after = o.counters[ev.counter] ?? 0;
+    const reached = (t: TriggeredAbility) => t.countersReach === undefined || (after - ev.amount < t.countersReach && after >= t.countersReach);
+    add(o, controllerOf(s, o), (e, t) => e === "selfCountersPut" && kindOk(t) && reached(t), undefined, undefined, undefined, undefined, undefined, undefined, info);
     // Chapter abilities: "if the number of lore counters on it was less than N and became at least N" (CR 714.2b).
     // With read ahead, the turn it entered only the chapter it has exactly that many lore counters for (CR 702.155a).
     if (ev.counter === "lore" && o.zone === "battlefield") {
@@ -1040,6 +1045,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const spec = bindChosen(t.cast.spell, o.chosen);
         return item?.objectId ? spellMatches(s, spec, item) : printedMatches(spec, ev.card);
       }, triggers, ev.stackId, undefined, spell ? { copyKey: cardIdOf(spell) } : undefined, undefined, undefined, { player: ev.controller, ...(ev.manaSpent !== undefined ? { amount: ev.manaSpent } : {}), ...(ev.treasureSpent ? { treasureSpent: ev.treasureSpent } : {}), ...(ev.spent && !ev.copy ? { spent: ev.spent } : {}) }); // "counter it unless" that player pays" acts on the spell cast
+    // Veyran (CR 603.2d): casting or copying an instant or sorcery spell, as the spell is.
+    const instantOrSorcery = spell ? characteristics(s, spell).types.some((t) => t === "Instant" || t === "Sorcery") : ev.card.types.some((t) => t === "Instant" || t === "Sorcery");
+    causedBy = instantOrSorcery ? { event: "castOrCopy", caster: ev.controller } : null;
     for (const id of s.battlefield) castWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(castWatch);
     fromFloating(castWatch);
@@ -1050,6 +1058,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = s.objects[id];
       if (o?.zone === "battlefield" && controllerOf(s, o) === ev.controller) add(o, ev.controller, (e) => e === "selfTargetedByYourSpell", undefined, ev.stackId);
     }
+    causedBy = null;
   } else if (ev.type === "targeted") {
     // Each permanent becomes the target once, however many of the item's targets name it.
     const item = s.stack.find((x) => x.id === ev.stackId);
@@ -1197,7 +1206,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
               ? { event: "dies", objs: died.map((m) => ({ o: m.snapshot!, c: m.chars!, controller: m.controller ?? m.owner })) }
               : null;
         // "Whenever a creature card leaves your graveyard": once for each of them (CR 603.2c).
-        for (let k = 0; k < (b.each ? n : 1); k++) add(w, you, (_, tt) => tt === t, triggers, undefined, undefined, undefined, undefined, undefined, { amount: b.each ? 1 : n, ...(b.whose === "you" ? { player: you } : {}) });
+        for (let k = 0; k < (b.each ? n : 1); k++) add(w, you, (_, tt) => tt === t, triggers, undefined, undefined, undefined, undefined, undefined, { amount: b.each ? 1 : n, ...(b.each ? { player: matched[k]!.owner } : b.whose === "you" ? { player: you } : {}) });
         causedBy = null;
       }
     };

@@ -12,7 +12,7 @@ import { GRANTED_WAY_COSTS } from "./abilities";
 import { abilitiesOf, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
-import { pickOptions, playerProtectedFrom, spellManaValue } from "./effects/targeting";
+import { bindBound, pickOptions, playerProtectedFrom, spellManaValue } from "./effects/targeting";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateTargets, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
@@ -988,7 +988,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // land entering under Blood Moon has lost them (CR 305.7, rulings), so it doesn't enter tapped.
   const printed = characteristics(s, o).hasPrintedAbilities ? compiled : NO_ABILITIES;
   if (!characteristics(s, o).hasPrintedAbilities) withCounters = undefined;
-  if (printed.entersTapped || opts.tapped || entersTappedNow(s, o, printed, opts.untapped) || othersMakeItEnterTapped(s, o)) o.tapped = true;
+  if (printed.entersTapped || opts.tapped || entersTappedNow(s, o, printed, opts.untapped) || othersMakeItEnterTapped(s, o)) o.tapped = !othersMakeItEnterUntapped(s, o);
   // A planeswalker enters with its printed loyalty in loyalty counters (CR 306.5b), its copiable values' if it's a copy.
   const loyalty = isType(defOf(s, o), "Planeswalker") ? Number.parseInt(defOf(s, o).loyalty ?? "", 10) : NaN;
   // The counters it enters with arrive at once (CR 614.1c): its own "enters with", a spell's "additional" ones (opts),
@@ -1049,7 +1049,9 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
 export function copyCandidates(s: GameState, o: GameObject, filter: TargetSpec): ObjectId[] {
   // A card in a graveyard (Lazotep Convert): by its printed characteristics there.
   if (filter.kind === "card") return livingPlayers(s).flatMap((pid) => player(s, pid).graveyard.filter((id) => id !== o.id && printedMatches(filter, defOf(s, obj(s, id)))));
-  return s.battlefield.filter((id) => id !== o.id && objectMatches(s, filter, obj(s, id), controllerOf(s, o), false));
+  // Mockingbird's "with mana value less than or equal to the amount of mana spent to cast ~": the spell it was.
+  const bound = filter.bound ? bindBound(s, filter, { controller: controllerOf(s, o), sourceId: o.id, manaSpent: o.manaSpent ?? 0 }) : filter;
+  return s.battlefield.filter((id) => id !== o.id && objectMatches(s, bound, obj(s, id), controllerOf(s, o), false));
 }
 
 /** It enters as a copy of `target`, or of nothing ("none"), then finishes entering as what it now is (CR 707.5). */
@@ -1261,6 +1263,18 @@ function othersAddCounters(s: GameState, o: GameObject): Record<string, number> 
     }
   }
   return out;
+}
+
+/** "Lands you control enter untapped" (Spelunking): a permanent already on the battlefield lets `o` enter untapped. */
+export function othersMakeItEnterUntapped(s: GameState, o: GameObject): boolean {
+  return s.battlefield.some((id) => {
+    if (id === o.id) return false;
+    const src = obj(s, id);
+    const rules = compileCard(defOf(s, src)).othersEnterUntapped;
+    if (!rules || !characteristics(s, src).hasPrintedAbilities) return false;
+    const you = controllerOf(s, src);
+    return rules.some((r) => objectMatches(s, r.filter, o, you, false));
+  });
 }
 
 function othersMakeItEnterTapped(s: GameState, o: GameObject): boolean {
@@ -1964,6 +1978,17 @@ function startNextTurn(s: GameState, skipping = false) {
     if (!s.extraTurn) s.rotation = prev;
     s.activePlayer = extra.player;
     began.add(extra.player);
+    // Trouble in Pairs, Ugin's Nexus: "If an opponent would begin an extra turn, that player skips that turn instead"
+    // (CR 614.10): the turn doesn't happen and the next one comes, from wherever the normal order was.
+    const skipper = s.battlefield.find((id) => {
+      const who = abilitiesOf(s, obj(s, id)).skipsExtraTurns;
+      return who === "all" || (who === "opponents" && controllerOf(s, obj(s, id)) !== extra!.player);
+    });
+    if (skipper) {
+      log(s, `${player(s, extra.player).name} skips their extra turn (${defOf(s, obj(s, skipper)).name}).`);
+      s.extraTurn = extra;
+      return startNextTurn(s, true);
+    }
     log(s, `${player(s, extra.player).name} takes an extra turn.`);
   } else {
     const from = s.rotation !== undefined && s.extraTurn ? s.rotation : prev;
@@ -2405,7 +2430,10 @@ function resolvePermanentSpell(s: GameState, item: StackItem, o: GameObject, d: 
   o.copyGains = undefined;
   const haste = o.hasteCast;
   o.hasteCast = undefined;
-  moveObject(s, o.id, "battlefield", { controller: item.controller, ...(item.x ? { x: item.x } : {}), ...(sneak ? { tapped: true } : {}) });
+  // Opal Palace: as many more +1/+1 counters as times it's been cast from the command zone, for each of its mana spent.
+  const opal = (o.commanderCountersCast ?? 0) * (player(s, o.owner).commanderCasts[o.id] ?? 0);
+  o.commanderCountersCast = undefined;
+  moveObject(s, o.id, "battlefield", { controller: item.controller, ...(item.x ? { x: item.x } : {}), ...(sneak ? { tapped: true } : {}), ...(opal ? { counters: { "+1/+1": opal } } : {}) });
   // Sneak: tapped and attacking whom the returned creature was attacking (CR 702.190b, 506.3a).
   if (sneak && o.zone === "battlefield" && objIsType(s, o, "Creature") && enterAttacking(s, o, sneak)) log(s, `${d.name} is attacking ${attackedName(s, o)}.`);
   if (gains && o.zone === "battlefield") {
@@ -2755,7 +2783,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     moveObject(s, id, "graveyard", { sacrificed: true });
   }
   const spentTrigger = ab.spentTrigger && { sourceId: o.id, sourceCardId: cardIdOf(o), sourceZc: o.zoneChanges ?? 0, body: ab.spentTrigger.body, sharesCommanderType: true as const };
-  addMana(s, p.id, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste } : {}) });
+  addMana(s, p.id, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}) });
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
   addTriggeredMana(s, p.id, picked);
   if (ab.skipNextUntap && o.zone === "battlefield") o.skipNextUntap = true;
@@ -3455,7 +3483,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Mana that can only be spent on spells like this one can pay any part of its total cost (CR 106.6).
   // Text hoping some color was spent to cast it: spent where that helps the caster, kept back where it hurts (CR 601.2h).
   const hopes = spendPlan(s, p.id, d, poolFor(s, p.id, spellUse(d, choices.alt)).pool);
-  const paid = spendFromPool(s, p.id, cost.cost, spellUse(d, choices.alt), cost.extra, payableLife(s, p.id), { spreadColors: sunburst, ...hopes, wantSnow: !!compileCard(d).wantSnow })!;
+  const paid = spendFromPool(s, p.id, cost.cost, { ...(spellUse(d, choices.alt) as Exclude<ManaUse, "other" | { ability: GameObject }>), object: o }, cost.extra, payableLife(s, p.id), { spreadColors: sunburst, ...hopes, wantSnow: !!compileCard(d).wantSnow })!;
   // Sunburst counts the colors of mana spent on its total cost, additional and alternative costs included (CR 702.44b).
   const colorsSpent = COLORS.filter((c) => paid.spent[c] > 0);
   loseLife(s, p.id, paid.lifePaid);
@@ -3485,6 +3513,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   o.uncounterableCast = paid.uncounterable;
   // "If any of that mana is spent on a creature spell, it gains haste" (Arena of Glory): the spell and the creature it becomes.
   o.hasteCast = paid.haste;
+  o.commanderCountersCast = paid.commanderCounters;
   // "When that mana is spent to cast a creature spell that shares a creature type with your commander" (Path of
   // Ancestry): one trigger for each such mana, its commanders' types checked now (rulings).
   if (paid.spentTriggers && isType(d, "Creature")) {

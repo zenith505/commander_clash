@@ -1,4 +1,5 @@
 import type { DamageRecipient, Effect, PlayerRef } from "../abilities";
+import { playerCountersToPut } from "../counters";
 import { cardIdOf, defOf, objHasKeyword, objIsType, power, toughness } from "../cards";
 import { addPhases, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, log, loseLife, obj, player, playerLoses, winGame } from "../game";
 import { MONARCH } from "../oracle";
@@ -268,7 +269,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     }
     case "poison":
       for (const pid of players(s, e.who, ctx)) {
-        const n = amountNow(s, e.n, ctx);
+        const n = playerCountersToPut(s, pid, "poison", amountNow(s, e.n, ctx));
         if (n <= 0) continue;
         const p = player(s, pid);
         p.poison = (p.poison ?? 0) + n;
@@ -296,7 +297,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     }
     case "getEnergy":
       for (const pid of players(s, e.who, ctx)) {
-        const n = amountNow(s, e.n, ctx);
+        const n = playerCountersToPut(s, pid, "energy", amountNow(s, e.n, ctx));
         if (n <= 0) continue;
         const p = player(s, pid);
         p.energy = (p.energy ?? 0) + n;

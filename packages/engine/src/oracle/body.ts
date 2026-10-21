@@ -165,6 +165,9 @@ const checkableMay = (e: Effect) =>
   // Moonveil Regent).
   (e.type === "discard" && e.who.ref === "you" && e.hand && !e.filter) ||
   (e.type === "draw" && e.who.ref === "you") ||
+  // "You may have that player lose 2 life. If you do, you gain 2 life." (Bloodchief Ascension): one player, who can lose
+  // life now (CR 119.8).
+  (e.type === "loseLife" && (e.who.ref === "eventPlayer" || (e.who.ref === "target" && !("n" in e.who && e.who.n))) && typeof e.n === "number" && e.n > 0) ||
   // "You may put a card from your hand on the bottom of your library. If you do, draw a card." (Volcanic Spite): only
   // with a card in hand.
   (e.type === "handToTop" && e.n === 1) ||
@@ -516,6 +519,15 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   text = text.replace(
     /\b([Rr])eveal the top (\w+(?: plus one)?) cards of your library and separate them into two piles\. An opponent chooses one of those piles\. Put that pile into your hand and the other into your graveyard\./g,
     (_, r, n) => `${r}eveal the top ${n} cards of your library; you separate them into two piles and an opponent chooses one; put one pile into your hand and the other into your graveyard.`,
+  );
+  // "You may copy the exiled card. If you do, you may cast the copy without paying its mana cost." (Isochron Scepter):
+  // copying without casting does nothing, so it's one choice.
+  text = text.replace(/\b[Yy]ou may copy the exiled card\. If you do, you may cast the copy without paying its mana cost\./g, "You may cast a copy of the exiled card without paying its mana cost.");
+  // "Search your library for a creature card with mana value X or less, where X is 2 plus the sacrificed creature's mana
+  // value. Put that card onto the battlefield, then shuffle." (Eldritch Evolution): one instruction, its X defined after it.
+  text = text.replace(
+    /\bSearch your library for (an? [^.,]+? with mana value X or less), where X is ([^.]+)\. Put that card (onto the battlefield|into your hand), then shuffle\./g,
+    (_, what, x, to) => `Search your library for ${what}, put it ${to}, then shuffle, where X is ${x}.`,
   );
   // "Search your library, graveyard, and/or outside the game for an instant or sorcery card you own" (Invasion of
   // Arcavios): players here have no sideboard (CR 100.4: one is optional) and nothing else outside the game (as for
@@ -1728,6 +1740,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "if", cond: { kind: "milledIs", filter }, effects: inner });
       continue;
     }
+    // "Then you may put a land card from your hand onto the battlefield. If you put a Cave onto the battlefield this way,
+    // you gain 4 life." (Spelunking): about the permanent it became.
+    const putThisWay = /^If you put an? ([A-Z][a-z]+|[a-z]+) onto the battlefield this way, (.+)$/.exec(s);
+    if (putThisWay) {
+      const last = effects[effects.length - 1];
+      const put = last?.type === "may" && last.effects.length === 1 ? last.effects[0] : last;
+      const filter = parseTargetPhrase(putThisWay[1]!);
+      const inner = parseOne(putThisWay[2]!.charAt(0).toUpperCase() + putThisWay[2]!.slice(1), ctx);
+      if (put?.type !== "putFromHand" || put.who || put.any || filter?.kind !== "object" || !inner || /(?:it|its|that)/.test(putThisWay[2]!)) return null;
+      effects.push({ type: "if", cond: { kind: "putThisWayIs", filter }, effects: inner });
+      continue;
+    }
     // "For each creature exiled this way, its controller creates a 2/2 green Boar creature token" (Curse of the Swine),
     // "For each creature destroyed this way, its controller draws a card": after the destroy or exile instruction.
     const perThisWay = /^For each (.+?) (destroyed|exiled) this way, its controller (creates an? .+ token(?: with [a-z ]+)?|draws a card)$/.exec(s);
@@ -2040,7 +2064,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "You may play the exiled card without paying its mana cost" asks as it plays it (see the playLinked effect).
     // "You may play an additional land this turn" is a permission, not a choice made now (CR 305.2a).
     // "You may draw a card unless that player pays {1}" (Rhystic Study): they decide first (see the punisher sentences).
-    const may = /^[Yy]ou may (?!play the exiled card |play (?:an|up to \w+) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast spells this turn as though they had flash$|cast (?:that card|it) this turn$)(.+)$/.exec(s);
+    const may = /^[Yy]ou may (?!play the exiled card |cast a copy of the exiled card |play (?:an|up to \w+) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast spells this turn as though they had flash$|cast (?:that card|it) this turn$)(.+)$/.exec(s);
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
       // don't control": ~ does it, if you choose.

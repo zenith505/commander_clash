@@ -977,7 +977,8 @@ export type StaticCondition =
    */
   | { kind: "onBattlefield"; filter: TargetSpec; max?: number; min?: number }
   /** "If an opponent lost life this turn". */
-  | { kind: "opponentLostLife" }
+  /** "If an opponent lost life this turn"; `n`: "lost 2 or more life this turn", one opponent alone (rulings on Bloodchief Ascension). */
+  | { kind: "opponentLostLife"; n?: number }
   /**
    * "If you haven't been dealt combat damage since your last turn" (Marchesa, Resolute Monarch): none from the start of
    * your previous turn (Player.lastTurnBegan; the whole game if you haven't had one) until now.
@@ -1968,6 +1969,12 @@ export type Effect =
   /** Rebound's delayed trigger (CR 702.88a): "you may cast this card from exile without paying its mana cost". */
   | { type: "castFromExileFree" }
   /**
+   * Isochron Scepter, Spellbinder: "You may copy the exiled card. If you do, you may cast the copy without paying its mana
+   * cost." A copy of the card its linked imprint ability exiled (CR 607.2a), made in exile and cast as this resolves or
+   * never (CR 707.12, rulings); not if that card has left exile.
+   */
+  | { type: "castLinkedCopy" }
+  /**
    * "You may cast target instant card from your graveyard without paying its mana cost" (Torrential Gearhulk): as it
    * resolves, ignoring timing based on its type (CR 608.2g). `exileAfter`: "If that spell would be put into your
    * graveyard, exile it instead" (GameObject.exileIfToGraveyard); "instantOrSorcery": "if an instant or sorcery spell cast
@@ -2272,6 +2279,10 @@ export type SpellCondition =
   | { kind: "revealedSharesCreatureType" }
   /** "If a card with the chosen name was milled this way" (Predict): any card the mill instruction before put there. */
   | { kind: "milledIs"; filter: TargetSpec }
+  /** "If you didn't create a token this way" (Springheart Nantuko): this resolution hasn't created any. */
+  | { kind: "createdNone" }
+  /** "If you put a Cave onto the battlefield this way" (Spelunking): a permanent the instruction before put there matches, as it is now. */
+  | { kind: "putThisWayIs"; filter: TargetSpec }
   /**
    * "If death gets more votes" (CR 701.38): that choice got more votes than each other one in this ability's vote.
    * `orTie`: "If taxes gets more votes or the vote is tied": also when two or more choices tie for the most (rulings on
@@ -2564,6 +2575,8 @@ export interface TriggeredAbility {
   tappedFilter?: TargetSpec;
   /** For "selfCountersPut" / "permanentCountersPut": that kind of counter ("+1/+1 counters"); unset = any counters. */
   countersKind?: string;
+  /** For "selfCountersPut": "when the twelfth hour counter is put on ~", only when the count goes from below this to at least it. */
+  countersReach?: number;
   /**
    * "Whenever you cast a multicolored spell, you may return ~ from your graveyard to your hand": an ability whose
    * effect moves the card out of a zone works only in that zone (CR 113.6m), and its owner controls it there.
@@ -2643,7 +2656,7 @@ export interface TriggeredAbility {
    * `leaves`: "leaves the battlefield", wherever it went, not only into a graveyard (CR 603.6c, 603.10a); `notDies` with it:
    * "without dying" (anywhere but a graveyard, CR 700.4).
    */
-  dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; attached?: boolean; damagedBySelf?: boolean; leaves?: true; notDies?: true; /** "If it had a counter on it" (Leader's Talent): any kind, as it last existed (CR 603.10a). */ hadCounter?: true };
+  dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; attached?: boolean; damagedBySelf?: boolean; leaves?: true; notDies?: true; /** With `leaves`: only when it went to one of these zones ("dies or is put into exile", Kaya's Ghostform). */ toZones?: ("graveyard" | "exile")[]; /** "If it had a counter on it" (Leader's Talent): any kind, as it last existed (CR 603.10a). */ hadCounter?: true };
   /**
    * For "youSacrifice": what its controller sacrificed (CR 701.21a), as it last existed on the battlefield, wherever it
    * went. The card is the subject ("exile it").
@@ -2967,6 +2980,12 @@ export interface ManaAbility {
    * off): a creature spell any of it pays any part of the total cost of (rulings), and the creature it becomes.
    */
   spentHaste?: "endOfTurn" | "game";
+  /**
+   * Opal Palace: "If you spend this mana to cast your commander, it enters with a number of additional +1/+1 counters on
+   * it equal to the number of times it's been cast from the command zone this game": that many for each such mana spent
+   * (rulings: two mana from it give two counters for each cast).
+   */
+  spentCommanderCounters?: true;
   /** Depletion lands: "Put a depletion counter on ~." after the mana is added. */
   putCounter?: CounterKind;
   /** Depletion lands: "If there are no depletion counters on ~, sacrifice it." after the mana is added. */
@@ -3173,7 +3192,14 @@ export type CountMod =
   | { what: "tokens"; who: "you"; op: "andEach"; subtype: string; token: TokenSpec }
   /** "If you would create a Clue, Food, or Treasure token, instead create one of each" (Academy Manufactor): each of those is one of each of `subtypes`. */
   | { what: "tokens"; who: "you"; op: "oneOfEach"; subtypes: string[] }
-  | { what: "counters"; counter?: CounterKind; on: "creature" | "permanent" | "artifactOrCreature"; who: "you" | "any"; op: "double" | "plusOne" | "minusOne"; other?: boolean };
+  | { what: "counters"; counter?: CounterKind; on: "creature" | "permanent" | "artifactOrCreature"; who: "you" | "any"; op: "double" | "plusOne" | "minusOne"; other?: boolean }
+  /**
+   * Vorinclex, Monstrous Raider and Innkeeper's Talent: "If you would put one or more counters on a permanent or player,
+   * put twice that many ..." (`putter` "you") and "If an opponent would put ..., they put half that many ..., rounded
+   * down" (`putter` "opponent", op `halfDown`): it matters who puts the counters, not who controls what gets them
+   * (rulings). On a player's counters too.
+   */
+  | { what: "counters"; putter: "you" | "opponent"; op: "double" | "halfDown"; counter?: undefined; on?: undefined; who?: undefined; other?: undefined };
 
 /**
  * What a gift gives the chosen opponent (CR 702.174d-i): "Gift a card" means they draw a card, "Gift a Food" that they
@@ -3220,6 +3246,12 @@ export interface CompiledCard {
    * permanents entering (CR 614.1c, 614.12), checked against them as they'd be on the battlefield.
    */
   othersEnterTapped?: { filter: TargetSpec; text: string }[];
+  /**
+   * "Lands you control enter untapped" (Spelunking, Horizon Explorer), "Gates you control enter untapped" (Gond Gate): a
+   * replacement effect on other permanents entering; against an "enters tapped" one, the permanent's controller orders them
+   * (CR 616.1) and has it enter untapped, without paying for a "pay 2 life" choice (rulings on Spelunking).
+   */
+  othersEnterUntapped?: { filter: TargetSpec; text: string }[];
   /** "Each other creature you control enters with an additional +1/+1 counter on it" (Renata): on other permanents entering. */
   othersEnterWithCounters?: { filter: TargetSpec; counter: CounterKind; n: number; text: string }[];
   /** "This creature enters with an additional +1/+1 counter on it" (Master Chef's granted ability): on itself entering. */
@@ -3408,6 +3440,12 @@ export interface CompiledCard {
   /** "Players can't gain life." / "Your opponents can't gain life." (CR 119.7) */
   cantGainLife?: "all" | "opponents" | "enchanted";
   /**
+   * "If an opponent would begin an extra turn, that player skips that turn instead" (Trouble in Pairs, Stranglehold), "If a
+   * player would ..." (Ugin's Nexus): a replacement effect skipping it as it would begin (CR 614.10, 500.7); one created
+   * while this is out but begun after it left is taken (rulings).
+   */
+  skipsExtraTurns?: "all" | "opponents";
+  /**
    * Cover of Winter: "If a creature would deal combat damage to you and/or one or more creatures you control, prevent X
    * of that damage, where X is the number of age counters on ~" (a prevention effect, CR 615.1a): X of each creature's
    * combat damage in each combat damage step, divided by this permanent's controller among those it would be dealt to
@@ -3509,7 +3547,7 @@ export interface CompiledCard {
    * judged by its controller as the static's); `of`: only abilities of permanents you control matching one of these.
    * Never delayed or reflexive triggers (603.2d).
    */
-  triggersAgain?: { by?: { event: "enters" | "dies" | "attacks" | "combatDamage"; filter?: TargetSpec[] }; of?: { filter: TargetSpec; other?: true }[] }[];
+  triggersAgain?: { by?: { event: "enters" | "dies" | "attacks" | "combatDamage" | "castOrCopy"; filter?: TargetSpec[] }; of?: { filter: TargetSpec; other?: true }[] }[];
   /** Fist of Suns: "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast" (an alternative cost, CR 118.9). */
   payWUBRG?: true;
   /**

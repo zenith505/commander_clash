@@ -1695,7 +1695,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           view={viewing}
           onClose={() => setViewing(null)}
           onHover={setHover}
-          canPick={(id) => !pending && viewing.zone !== "hand" && (viewing.zone === "graveyard" ? viewing.pid === HUMAN && graveyardOptions(s, id) : exileOptions(s, id))}
+          canPick={(id) => !pending && viewing.zone !== "hand" && (viewing.zone === "graveyard" ? (viewing.pid === HUMAN || castsFromAnyGraveyard(s)) && graveyardOptions(s, id) : exileOptions(s, id))}
           onPick={(id) => {
             setViewing(null);
             setMenu(id);
@@ -1827,12 +1827,15 @@ function exileOptions(s: GameState, id: string): boolean {
   return (isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id) || canCastAlt(s, id, "citadel")) || canUseFace(s, id);
 }
 
-/** Does this card in your graveyard have something you could do with it now (flashback, unearth, ...)? */
+/** You may cast spells from other players' graveyards this turn (The Great Work). */
+const castsFromAnyGraveyard = (s: GameState) => !!s.graveyardTurn?.some((g) => g.anyGraveyard && g.player === HUMAN && g.turn === s.turn);
+
+/** Does this card in your graveyard (or another's, with The Great Work) have something you could do with it now (flashback, unearth, ...)? */
 function graveyardOptions(s: GameState, id: string): boolean {
   const d = cardOf(s, id);
   if (mayPlayLandFromGraveyard(s, s.objects[id]!, HUMAN) && canPlayLand(s, id)) return true; // Crucible of Worlds
   const o = s.objects[id]!;
-  if (graveyardWays(s, o).some((g) => canCastFromGraveyard(s, id, g.kind, g.face) || (permissionWay(g) && altCostsFor(s, HUMAN, o).some((a) => canCastFromGraveyard(s, id, g.kind, undefined, a.kind))))) return true;
+  if (graveyardWays(s, o, HUMAN).some((g) => canCastFromGraveyard(s, id, g.kind, g.face) || (permissionWay(g) && altCostsFor(s, HUMAN, o).some((a) => canCastFromGraveyard(s, id, g.kind, undefined, a.kind))))) return true;
   return abilitiesOf(s, s.objects[id]!).activated.some((ab, i) => ab.zone === "graveyard" && planActivate(s, HUMAN, id, i) !== null);
 }
 
@@ -2751,7 +2754,7 @@ function Seat({
   cardProps: CardProps;
 }) {
   const p = s.players[pid]!;
-  const yardPlayable = pid === HUMAN && !s.pending && p.graveyard.some((id) => graveyardOptions(s, id));
+  const yardPlayable = (pid === HUMAN || castsFromAnyGraveyard(s)) && !s.pending && p.graveyard.some((id) => graveyardOptions(s, id));
   const exilePlayableHere = !s.pending && p.exile.some((id) => exileOptions(s, id));
   // The top of a library is shown when it's revealed (CR 401.5), to you when you may look at it any time (Vizier of
   // the Menagerie), or when you may play it.
@@ -3918,7 +3921,7 @@ function AbilityMenu({
         </button>
       ))}
       {inYard &&
-        graveyardWays(s, o).flatMap((g) => {
+        graveyardWays(s, o, HUMAN).flatMap((g) => {
           // Muldrotha: an artifact creature can use the artifact or the creature permission, the player's choice (rulings).
           if (g.kind === "turnPermission" && (g.permits?.length ?? 0) > 1)
             return g.permits!.map((permit) => {

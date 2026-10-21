@@ -1,7 +1,7 @@
 import type { AbilityBody, Effect, Modification, SpellCondition, TargetChoice, TargetSpec, UnlessPays } from "../abilities";
 import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, cardIdOf, defOf, isType } from "../cards";
-import { controllerOf } from "../layers";
+import { controllerOf, invalidateCharacteristics } from "../layers";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { castProblem, describeTargets, log, millCount, moveObject, newObject, obj, opponents, player } from "../game";
 import { compileCard, spellTargetSpecs } from "../oracle";
@@ -534,6 +534,17 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const t = ctx.targets[e.index];
       if (!ctx.legal[e.index] || t?.kind !== "stack") return;
       return e.anyOne ? changeATargetToSelf(s, ctx, t.id, src) : changeTarget(s, ctx, t.id, src, e.unless, e.toSelf);
+    }
+    case "controlSpell": {
+      const t = ctx.targets[e.index];
+      const item = t?.kind === "stack" && ctx.legal[e.index] ? s.stack.find((x) => x.id === t.id) : undefined;
+      if (!item || item.controller === ctx.controller) return;
+      item.controller = ctx.controller;
+      const o = item.objectId ? s.objects[item.objectId] : undefined;
+      if (o) o.controller = ctx.controller;
+      invalidateCharacteristics(s);
+      log(s, `${player(s, ctx.controller).name} gains control of ${item.description} (${src}).`);
+      return;
     }
     case "newTargets": {
       const t = ctx.targets[e.index];

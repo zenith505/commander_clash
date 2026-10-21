@@ -920,6 +920,12 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const last = effects[effects.length - 1];
     ctx.afterMill = last?.type === "mill" && last.who.ref === "you";
     if (last?.type === "discard" && last.who.ref === "you" && last.n === 1) ctx.discardedOne = true;
+    // "Gain control of target spell. You may choose new targets for it." (Commandeer): after the change of control, so
+    // its targets are chosen as its new controller's (rulings).
+    if (/^You may choose new targets for it$/.test(s) && effects[effects.length - 1]?.type === "controlSpell") {
+      effects.push({ type: "newTargets", index: (effects[effects.length - 1] as Extract<Effect, { type: "controlSpell" }>).index });
+      continue;
+    }
     // "You may cast a creature spell from your graveyard this turn" (Chainer, Nightmare Adept): a permission, not a choice.
     const yardCast = /^You may cast an? (creature|artifact|instant|sorcery) spell from your graveyard this turn$/.exec(s.replace(/\.$/, ""));
     if (yardCast) {
@@ -941,6 +947,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       if (kind && spec?.kind !== "card") return null;
       const cast: TargetSpec | undefined = !castsAny ? undefined : spec?.kind === "card" ? (({ owner: _, ...rest }) => ({ ...rest, text: `${kind} card` }))(spec) : { kind: "card", types: [], notTypes: ["Land"], notColors: [], text: "card" };
       effects.push({ type: "graveyardTurn", ...(cast ? { cast } : {}), ...(lands ? { lands: true as const } : {}) });
+      continue;
+    }
+    // "Until end of turn, you may cast instant and sorcery spells from any graveyard. If a spell cast this way would be put
+    // into a graveyard, exile it instead." (The Great Work)
+    const anyYard = /^Until end of turn, you may cast (instant and sorcery|instant|sorcery|creature) spells from any graveyard$/.exec(s);
+    if (anyYard) {
+      const spec = parseTargetPhrase(`${anyYard[1] === "instant and sorcery" ? "instant or sorcery" : anyYard[1]} card from a graveyard`);
+      if (spec?.kind !== "card") return null;
+      const { owner: _, ...rest } = spec;
+      const exileCast = sentences[si + 1] === "If a spell cast this way would be put into a graveyard, exile it instead";
+      effects.push({ type: "graveyardTurn", cast: { ...rest, text: `${anyYard[1]} card` }, anyGraveyard: true, ...(exileCast ? { exileCast: true as const } : {}) });
+      if (exileCast) si++;
       continue;
     }
     if (/^If a card would be put into your graveyard from anywhere this turn, exile (?:it|that card) instead$/.test(s)) {
@@ -2372,11 +2390,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       continue;
     }
     // "Exile this Saga, then return it to the battlefield transformed under your control": its back face up (CR 712.14a).
-    const now = /^(?:[Tt]hen )?[Rr]eturn (?:it|that card|them|those cards) to the battlefield( transformed)? under (its owner's|their owners'|your) control$/.exec(s);
+    // "Exile this Saga, then return it to the battlefield (front face up)" (The Great Work): under the control of the
+    // player who puts it there (CR 110.2a).
+    const now = /^(?:[Tt]hen )?[Rr]eturn (?:it|that card|them|those cards) to the battlefield( transformed)?(?: under (its owner's|their owners'|your) control)?$/.exec(s);
     if (now && effects[effects.length - 1]?.type === "exile") {
       const prev = effects[effects.length - 1] as Extract<Effect, { type: "exile" }>;
-      if (prev.until || prev.linked || isGroup(prev.what) || (now[1] && prev.what.ref !== "self")) return null;
-      effects[effects.length - 1] = { type: "flicker", what: prev.what, under: now[2] === "your" ? "you" : "owner", ...(now[1] ? { transformed: true as const } : {}) };
+      if (prev.until || prev.linked || isGroup(prev.what) || (now[1] && prev.what.ref !== "self") || (!now[2] && prev.what.ref !== "self")) return null;
+      effects[effects.length - 1] = { type: "flicker", what: prev.what, under: !now[2] || now[2] === "your" ? "you" : "owner", ...(now[1] ? { transformed: true as const } : {}) };
       continue;
     }
     // Which exile it returns: the last exile in this ability ("Exile X target creatures, then investigate X times. Return the
@@ -2708,6 +2728,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
         effects.push({ type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner });
         si++;
       }
+      continue;
+    }
+    // "Mill five cards, then return a creature card milled this way to your hand" (Zoological Study): one of them if
+    // any matches, not optional.
+    const returnMilled = /^[Rr]eturn an? (.+? card) milled this way to your hand$/.exec(s);
+    if (returnMilled) {
+      const prev = effects[effects.length - 1];
+      const filter = parseSearchFilter(returnMilled[1]!);
+      if (prev?.type !== "mill" || prev.who.ref !== "you" || filter === null) return null;
+      effects.push({ type: "chooseFromGraveyard", n: 1, milled: true, ...(filter ? { filter } : {}) });
       continue;
     }
     const otherwise = /^Otherwise, (.+)$/.exec(s);

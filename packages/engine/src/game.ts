@@ -3155,9 +3155,9 @@ export function castProblem(
   if (choices?.faceDown && (free || plotted || choices.via || choices.alt)) return "a face-down spell can't be cast that way";
   // An aftermath half can't be cast from any zone other than a graveyard (CR 702.127a).
   if (o.zone !== "graveyard" && compileCard(d).fromGraveyard?.some((g) => g.kind === "aftermath")) return `${d.name} can be cast only from a graveyard (aftermath)`;
-  const via = graveyardWay(s, o, choices?.via);
+  const via = graveyardWay(s, o, choices?.via, pid);
   if (choices?.via && !via) return `${d.name} doesn't have ${describeVia(choices.via)}`;
-  if (!free && via && (o.zone !== "graveyard" || o.owner !== pid)) return `${describeVia(via.kind)} works only from your graveyard`;
+  if (!free && via && (o.zone !== "graveyard" || (o.owner !== pid && !via.anyOwner))) return `${describeVia(via.kind)} works only from your graveyard`;
   if (via?.if && !staticConditionNow(s, via.if, o.id, pid)) return `you can't cast ${d.name} from your graveyard now`;
   if (via?.kind === "mayhem" && o.discardedTurn !== s.turn) return `mayhem works only if you discarded ${d.name} this turn`; // CR 702.187b
   if (choices?.permit !== undefined && (via?.kind !== "turnPermission" || !pickPermit(s, o, via.permits ?? [], choices.permit))) return `that permission doesn't let you cast ${d.name} now`;
@@ -3166,7 +3166,7 @@ export function castProblem(
   // Flashback and jump-start only if the resulting spell is an instant or sorcery (CR 702.34a, 702.133a).
   if (via && (via.kind === "flashback" || via.kind === "grantedFlashback" || via.kind === "jumpStart") && !isType(d, "Instant") && !isType(d, "Sorcery")) return `${d.name} isn't an instant or sorcery`;
   if (!free && !via && !mayPlayFromExile(s, o, pid) && !mayPlayFromTop(s, o, pid) && (!(o.zone === "hand" || (fromCommand && o.isCommander)) || o.owner !== pid))
-    return o.zone === "graveyard" && graveyardWays(s, o).length ? `choose how to cast ${d.name} from your graveyard` : "you can only cast spells from your hand or your commander";
+    return o.zone === "graveyard" && graveyardWays(s, o, pid).length ? `choose how to cast ${d.name} from ${o.owner === pid ? "your" : "a"} graveyard` : "you can only cast spells from your hand or your commander";
   if (choices?.buyback && compileCard(d).buyback === undefined) return `${d.name} doesn't have buyback`;
   // From the top of the library, a permission for this way of paying: Bolas's Citadel's spells for life (CR 118.9).
   // Valgavoth's exiled cards: for life equal to their mana value, and no other way (rulings).
@@ -3393,7 +3393,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // Airbend's "{2} rather than its mana cost" (CR 701.65a), an alternative cost.
   const airbent = !how.faceDown && !how.alt && freeCastOf(s, pid) !== o.id ? exiled?.cost : undefined;
   // From a graveyard with a permission that names no cost, an alternative cost replaces the mana cost (CastFromGraveyard).
-  const way = graveyardWay(s, o, how.via);
+  const way = graveyardWay(s, o, how.via, pid);
   const wayMana = way && !(how.alt && permissionWay(way)) ? way.mana : undefined;
   const base = how.faceDown ? "{3}" : (madness ?? wayMana ?? altCost(d, how.alt, s, pid)?.mana ?? airbent ?? d.manaCost);
   const mana = anyType(lessColored(parseManaCost(base + kickCost)));
@@ -3850,7 +3850,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     const how = topPermission(s, o, p.id);
     if (how?.once) how.by.topUsedTurn = s.turn;
   }
-  const via = graveyardWay(s, o, choices.via);
+  const via = graveyardWay(s, o, choices.via, p.id);
   // A once-each-turn permission is used up (Karador; Muldrotha's slot for one of the spell's types).
   if (via?.kind === "turnPermission") {
     const permit = pickPermit(s, o, permitsForMv(s, via.permits ?? [], defMv(d) + (x ?? 0) * xCount(parseManaCost(d.manaCost))), choices.permit)!;
@@ -3884,6 +3884,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // A once-each-turn permission's own "exile it instead" (Maestros Ascendancy), not another's it shares the way with.
   const exiles = via?.kind === "turnPermission" ? !!choices.permit && permitExiles(s, choices.permit) : via?.exile;
   if (exiles || (castFrom === "graveyard" && compileCard(d).fromGraveyard?.some((g) => g.kind === "aftermath"))) o.exileIfLeaves = "stack";
+  if (via?.exileIfToGraveyard) o.exileIfToGraveyard = true;
   o.controller = p.id;
   o.timestamp = s.nextTimestamp++;
   const chosen = spell?.modal ? modes : undefined;
@@ -4079,29 +4080,30 @@ export function graveyardCast(d: CardDef, via?: CastFromGraveyardKind): CastFrom
 export const hasGrantedFlashback = (s: GameState, o: GameObject) => o.zone === "graveyard" && !!s.flashbackGrants?.some((g) => g.id === o.id && g.zc === (o.zoneChanges ?? 0));
 
 /** The ways to cast this card from a graveyard: its own (flashback, escape, ...), and flashback an effect gave it. */
-export function graveyardWays(s: GameState, o: GameObject): CastFromGraveyard[] {
+/** `caster`: who would cast it, for a permission to cast from any graveyard (The Great Work); its owner if left out. */
+export function graveyardWays(s: GameState, o: GameObject, caster?: PlayerId): CastFromGraveyard[] {
   // Cast transformed (disturb): the front face's ability is considered too (CR 712.11d).
   if (o.face !== undefined && layoutOf(s, o) === "transform") {
     const face = o.face;
     o.face = undefined;
     try {
-      return graveyardWays(s, o).filter((g) => g.face === face);
+      return graveyardWays(s, o, caster).filter((g) => g.face === face);
     } finally {
       o.face = face;
     }
   }
   // A split card in a graveyard is cast as one of its halves (CR 709.3): each half's ways, aftermath's among them
   // (702.127a), or flashback an effect gave the card, for that half's mana cost.
-  if (o.face === undefined && layoutOf(s, o) === "split") return castableFaces(s, o).flatMap((f) => asFace(s, o, f, () => graveyardWays(s, o)).map((g) => ({ ...g, face: f })));
+  if (o.face === undefined && layoutOf(s, o) === "split") return castableFaces(s, o).flatMap((f) => asFace(s, o, f, () => graveyardWays(s, o, caster)).map((g) => ({ ...g, face: f })));
   const d = defOf(s, o);
-  return [...(compileCard(d).fromGraveyard ?? []), ...(hasGrantedFlashback(s, o) ? [{ kind: "grantedFlashback" as const, mana: d.manaCost, costs: [], exile: true }] : []), ...grantedWays(s, o, d)];
+  return [...(compileCard(d).fromGraveyard ?? []), ...(hasGrantedFlashback(s, o) ? [{ kind: "grantedFlashback" as const, mana: d.manaCost, costs: [], exile: true }] : []), ...grantedWays(s, o, d, caster ?? o.owner)];
 }
 
 /**
  * Escape, flashback or retrace a permanent its owner controls gives this card in their graveyard (Underworld Breach,
  * Lier, Six), one of each kind; the cost is the card's mana cost, so a card without one can't be cast this way (rulings).
  */
-function grantedWays(s: GameState, o: GameObject, d: CardDef): CastFromGraveyard[] {
+function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId): CastFromGraveyard[] {
   if (o.zone !== "graveyard") return [];
   const out: CastFromGraveyard[] = [];
   // "You may cast that card this turn" (Emry): its owner, paying its mana cost; a card without one can't be cast.
@@ -4134,8 +4136,12 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef): CastFromGraveyard
   }
   // "You may cast spells from your graveyard this turn" (Forgotten Cellar, Yawgmoth's Will): any number of them, paying
   // their mana costs (rulings), for the rest of the turn.
-  if (d.manaCost && s.graveyardTurn?.some((g) => g.player === o.owner && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) && !out.some((w) => w.kind === "permission"))
+  if (d.manaCost && s.graveyardTurn?.some((g) => !g.anyGraveyard && g.player === o.owner && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) && !out.some((w) => w.kind === "permission"))
     out.push({ kind: "permission", mana: d.manaCost, costs: [], exile: false });
+  // "Until end of turn, you may cast instant and sorcery spells from any graveyard" (The Great Work): for the player it
+  // gave the permission, whoever owns the card; "if a spell cast this way would be put into a graveyard, exile it instead".
+  const any = d.manaCost ? s.graveyardTurn?.find((g) => g.anyGraveyard && g.player === caster && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) : undefined;
+  if (any && !out.some((w) => w.kind === "permission")) out.push({ kind: "permission", mana: d.manaCost, costs: [], exile: false, anyOwner: true, ...(any.exileCast ? { exileIfToGraveyard: true as const } : {}) });
   // "You may cast a creature spell from your graveyard this turn" (Chainer, Nightmare Adept): one spell for each, with
   // the once-each-turn permissions (rulings: each activation is a permission of its own).
   const used = s.turnLog?.gravePermits ?? [];
@@ -4212,8 +4218,8 @@ export function permitLabel(s: GameState, key: string): string {
 export const permissionWay = (g: CastFromGraveyard) => g.kind === "permission" || g.kind === "turnPermission";
 
 /** One way to cast it from a graveyard, if it has it. */
-export function graveyardWay(s: GameState, o: GameObject, via?: CastFromGraveyardKind): CastFromGraveyard | undefined {
-  return via ? graveyardWays(s, o).find((g) => g.kind === via) : undefined;
+export function graveyardWay(s: GameState, o: GameObject, via?: CastFromGraveyardKind, caster?: PlayerId): CastFromGraveyard | undefined {
+  return via ? graveyardWays(s, o, caster).find((g) => g.kind === via) : undefined;
 }
 
 export function describeVia(via: CastFromGraveyardKind | FaceDownKind): string {

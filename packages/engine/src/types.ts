@@ -1371,7 +1371,7 @@ export interface GameState {
    * "if a card would be put into your graveyard from anywhere this turn, exile it instead" (Yawgmoth's Will, Forgotten
    * Cellar): what `player` may do with their graveyard during `turn` (Effect graveyardTurn).
    */
-  graveyardTurn?: { player: PlayerId; turn: number; cast?: TargetSpec; lands?: true; exileInstead?: true; source: string }[];
+  graveyardTurn?: { player: PlayerId; turn: number; cast?: TargetSpec; lands?: true; exileInstead?: true; /** From any graveyard, not only `player`'s (The Great Work). */ anyGraveyard?: true; exileCast?: true; source: string }[];
   handOnlyUntil?: { controller: PlayerId; source: string }[];
   /** The turn a "damage can't be prevented this turn" effect was made in (CR 615.12). */
   noPreventionTurn?: number;

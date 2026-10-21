@@ -583,7 +583,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       }
     }
     const p = player(s, pid);
-    const fromYard = p.graveyard.filter((id) => graveyardWays(s, obj(s, id)).length);
+    // With The Great Work, any graveyard's instants and sorceries.
+    const anyYard = s.graveyardTurn?.some((g) => g.anyGraveyard && g.player === pid && g.turn === s.turn);
+    const fromYard = (anyYard ? s.players.flatMap((q) => q.graveyard) : p.graveyard).filter((id) => graveyardWays(s, obj(s, id), pid).length);
     // Cards exiled with "you may play them until ..." first: they won't wait (impulse draw).
     const options = [...exilePlayable(s, pid), ...topPlayable(s, pid), ...p.command, ...p.hand, ...fromYard]
       // A land with an Adventure can still go on its adventure (CR 715.3).
@@ -1203,7 +1205,7 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   if (!free && !via && alt === undefined && foretoldCast(s, pid, obj(s, id))) alt = "foretell";
   // Cast as madness or miracle resolves, for that cost (CR 702.35a, 702.94a): its X is paid then.
   const paidAs = free ? madnessCastOf(s, pid, id) : undefined;
-  const cost = parseManaCost(paidAs ?? graveyardWay(s, obj(s, id), via)?.mana ?? altCost(d, alt)?.mana ?? d.manaCost);
+  const cost = parseManaCost(paidAs ?? graveyardWay(s, obj(s, id), via, pid)?.mana ?? altCost(d, alt)?.mana ?? d.manaCost);
   // X spells: as big an X as we can pay for. Cast for free, X is 0 (CR 107.3b), which is rarely worth it.
   if (cost.hasX && free && !paidAs) return null;
   // A ritual, a spell that only adds mana (Dark Ritual): worth it when what it nets lets us cast a card we can't yet.
@@ -1569,7 +1571,7 @@ function payTribute(s: GameState, id: ObjectId): boolean {
 
 /** Casting a card from our graveyard (flashback, escape, ...): the first way that works. */
 function graveyardCastPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
-  for (const g of graveyardWays(s, obj(s, id))) {
+  for (const g of graveyardWays(s, obj(s, id), pid)) {
     // A split card's half (an aftermath half): cast as that face.
     const plan = asFace(s, obj(s, id), g.face, () => castPlan(s, pid, id, false, g.kind));
     if (plan) return g.face === undefined ? plan : plan.map((a) => (a.type === "castSpell" && a.objectId === id ? { ...a, face: g.face } : a));

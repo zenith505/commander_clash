@@ -441,7 +441,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return filter ? { kind: "castCount", n: 1, filter } : null;
   }
   if ((m = new RegExp(`^you've cast ${NUM} or more (.+) spells this turn$`).exec(text))) {
-    const filter = parseSearchFilter(`${m[2]!.replace(/ and /g, " or ")} card`);
+    const filter = parseSearchFilter(`${m[2]!.replace(/ and\/or /g, " or ").replace(/ and /g, " or ")} card`);
     return filter ? { kind: "castCount", n: num(m[1]!), filter } : null;
   }
   if ((m = new RegExp(`^there are ${NUM} colors among permanents you control$`).exec(text))) return { kind: "colorsAmong", n: num(m[1]!) };

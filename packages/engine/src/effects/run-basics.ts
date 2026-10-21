@@ -217,9 +217,9 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       return;
     case "graveyardTurn": {
       const list = (s.graveyardTurn = (s.graveyardTurn ?? []).filter((g) => g.turn === s.turn));
-      list.push({ player: ctx.controller, turn: s.turn, ...(e.cast ? { cast: e.cast } : {}), ...(e.lands ? { lands: true as const } : {}), ...(e.exileInstead ? { exileInstead: true as const } : {}), source: src });
+      list.push({ player: ctx.controller, turn: s.turn, ...(e.cast ? { cast: e.cast } : {}), ...(e.lands ? { lands: true as const } : {}), ...(e.exileInstead ? { exileInstead: true as const } : {}), ...(e.anyGraveyard ? { anyGraveyard: true as const } : {}), ...(e.exileCast ? { exileCast: true as const } : {}), source: src });
       const may = [e.lands ? "play lands" : "", e.cast ? `cast ${e.cast.text.replace(/ cards?$/, "")} spells` : ""].filter(Boolean).join(" and ");
-      if (may) log(s, `${player(s, ctx.controller).name} may ${may} from their graveyard this turn (${src}).`);
+      if (may) log(s, `${player(s, ctx.controller).name} may ${may} from ${e.anyGraveyard ? "any graveyard" : "their graveyard"} this turn (${src}).`);
       if (e.exileInstead) log(s, `${src}: cards that would be put into ${player(s, ctx.controller).name}'s graveyard this turn are exiled instead.`);
       return;
     }

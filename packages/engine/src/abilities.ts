@@ -2135,6 +2135,11 @@ export type Effect =
    */
   | { type: "newTargets"; index: number }
   /**
+   * "Gain control of target spell" (Commandeer): its controller becomes this ability's controller; a permanent spell
+   * becomes a permanent under their control (CR 110.2b). An instant or sorcery still goes to its owner's graveyard.
+   */
+  | { type: "controlSpell"; index: number }
+  /**
    * Counter the spell or ability that triggered this unless its controller pays: ward (CR 702.21a),
    * "Whenever a player casts a spell, counter it unless that player pays {1}".
    */
@@ -2324,7 +2329,7 @@ export type Effect =
    * a land is still their land play, CR 305.2); `exileInstead`: "if a card would be put into your graveyard from anywhere
    * this turn, exile it instead" (CR 614.1a), not a token (rulings).
    */
-  | { type: "graveyardTurn"; cast?: TargetSpec; lands?: true; exileInstead?: true }
+  | { type: "graveyardTurn"; cast?: TargetSpec; lands?: true; exileInstead?: true; /** "From any graveyard" (The Great Work). */ anyGraveyard?: true; /** "If a spell cast this way would be put into a graveyard, exile it instead." */ exileCast?: true }
   /** "Artifact, instant, and sorcery spells you cast this turn cost {2} less to cast" (Urza, Planeswalker): `mod`'s "you" is the ability's controller (CR 601.2f, 611.2a). */
   | { type: "costModThisTurn"; mod: CostMod }
   /**
@@ -3599,6 +3604,10 @@ export interface CastFromGraveyard {
   if?: StaticCondition;
   /** `turnPermission`: the unused once-each-turn permissions that cover the card (`id@zoneChanges:slot`, TurnLog.gravePermits). */
   permits?: string[];
+  /** A permission to cast it from any graveyard (The Great Work): not only its owner may. */
+  anyOwner?: true;
+  /** "If a spell cast this way would be put into a graveyard, exile it instead" (CR 614.1a). */
+  exileIfToGraveyard?: true;
 }
 
 /**

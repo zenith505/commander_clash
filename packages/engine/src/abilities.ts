@@ -522,6 +522,8 @@ export type ObjRef =
   /** The card a "whenever a creature dies" trigger was about, in the zone it went to, while it's still that object (CR 400.7). */
   | { ref: "subjectCard"; /** Only while it's in this zone ("exile that card from your graveyard"). */ zone?: "graveyard" } // "a creature dealt damage this way": what this ability's damage hit
   | { ref: "subject" } // the object its trigger event was about: exalted's "that creature" (see PendingTrigger.subject)
+  /** "Whenever one or more tokens your opponents control enter, for each of them, ..." (Kambal): those that entered, while on the battlefield. */
+  | { ref: "eventGroup" }
   /**
    * After a leaves-the-battlefield trigger: the card in the zone it went to, if it's still that object ("return it to your
    * hand"). `moved`: an Aura's "when enchanted creature dies, return this card ..." (Angelic Destiny), the Aura card in a
@@ -3379,7 +3381,16 @@ export interface CompiledCard {
    * "If ~ would die, exile it instead" (`self`), "If a creature an opponent controls would die, exile it instead",
    * "If another creature would die, ..." (`filter`, from this permanent's controller's view): replacement effects (CR 614.1a).
    */
-  exileInsteadOfDying?: { self?: true; filter?: TargetSpec; other?: true };
+  exileInsteadOfDying?: {
+    self?: true;
+    filter?: TargetSpec;
+    other?: true;
+    /** "Instead exile it and you gain 2 life" (The Darkness Crystal); the card is linked to the permanent (CR 607.2a). */
+    gainLife?: number;
+    /** "Instead exile that card and create a 2/2 black Zombie creature token" (Kalitas). */
+    token?: TokenSpec;
+    linked?: true;
+  };
   /** "If ~ would be put into a graveyard from anywhere, reveal ~ and shuffle it into its owner's library instead." */
   shuffleInsteadOfGraveyard?: boolean;
   /** "If ~ would be put into a graveyard from anywhere, exile it instead" (a disturb card's back face, CR 614.1a). */
@@ -3715,6 +3726,10 @@ export interface CompiledCard {
   /** "Each power-up ability of permanents you control can be activated an additional time." (Wonder Man; CR 702.193a) */
   powerUpAgain?: true;
   equipLess?: { n: number; targetSelf?: true; otherEquipment?: true; /** Only while this holds (a Class level's). */ if?: StaticCondition }[];
+  /** "You may activate equip abilities any time you could cast an instant" (Leonin Shikari); Forge Anew's "During your turn, ...". */
+  equipAtInstantSpeed?: "always" | "yourTurn";
+  /** Forge Anew: "You may pay {0} rather than pay the equip cost of the first equip ability you activate during each of your turns." */
+  firstEquipFree?: true;
   /**
    * Torpor Orb: "Creatures entering don't cause abilities to trigger" (`types`: the entering permanent's, as it is on the
    * battlefield); Elesh Norn's "... abilities of permanents your opponents control" (`opponents`).

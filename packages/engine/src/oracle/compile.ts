@@ -1032,6 +1032,20 @@ export function compile(d: CardDef): CompiledCard {
       out.exileWhatItDamaged = kumano[1] === "~" ? "self" : "attached";
       continue;
     }
+    // The Darkness Crystal: "If a nontoken creature an opponent controls would die, instead exile it and you gain 2 life."
+    // Kalitas: "... instead exile that card and create a 2/2 black Zombie creature token." One replacement (CR 614.1a);
+    // the card is exiled with it, linked to its other ability (CR 607.2a).
+    const insteadAnd = /^If a nontoken creature an opponent controls would die, instead exile (?:it|that card) and (.+)\.$/.exec(line);
+    if (insteadAnd) {
+      const filter = parseTargetPhrase("nontoken creature an opponent controls");
+      const life = /^you gain (\d+) life$/.exec(insteadAnd[1]!);
+      const made = life ? null : parseBody(`${capital(insteadAnd[1]!)}.`, {});
+      const e = made?.targets.length === 0 && made.effects.length === 1 ? made.effects[0]! : undefined;
+      const token = e?.type === "createToken" && e.n === 1 && e.who.ref === "you" && Object.keys(e).every((k) => ["type", "n", "who", "token"].includes(k)) ? e.token : undefined;
+      if (filter?.kind !== "object" || (!life && !token)) out.unsupported.push(raw);
+      else out.exileInsteadOfDying = { filter, linked: true, ...(life ? { gainLife: Number(life[1]) } : {}), ...(token ? { token } : {}) };
+      continue;
+    }
     // "If ~ would die, exile it instead." "If a creature an opponent controls would die, exile it instead." (CR 614.1a)
     const exileDies = /^If (~|a|an|another) (.+? )?would die, exile it instead\.$/.exec(line);
     if (exileDies) {
@@ -1061,6 +1075,17 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "If ~ would be put into a graveyard from anywhere, exile it instead.") {
       out.exileInsteadOfGraveyard = true;
+      continue;
+    }
+    // Leonin Shikari, Forge Anew: equip abilities at instant speed (CR 702.6a's "only as a sorcery" set aside), and Forge
+    // Anew's alternative cost of {0} for the first one each of your turns (CR 118.9).
+    const equipFast = /^(During your turn, )?[Yy]ou may activate equip abilities any time you could cast an instant\.$/.exec(line);
+    if (equipFast) {
+      out.equipAtInstantSpeed = equipFast[1] ? "yourTurn" : "always";
+      continue;
+    }
+    if (line === "You may pay {0} rather than pay the equip cost of the first equip ability you activate during each of your turns.") {
+      out.firstEquipFree = true;
       continue;
     }
     if (line === "You may play lands from your graveyard.") {

@@ -377,7 +377,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const spec = ctx.targets[i];
     // Only permanent cards can be put onto the battlefield (CR 110.4b); an Aura's controller chooses what it enchants as it
     // enters (CR 303.4f).
-    if (!what || !spec || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty)) || (m[5] && (what.ref !== "target" || what.n))) return null;
+    // "Target Equipment card" (Forge Anew), "Vehicle card": artifact subtypes, so permanent cards (CR 205.3g).
+    const artifactSub = !spec?.types?.length && !!spec?.subtypes?.length && spec.subtypes.every((st) => st === "Equipment" || st === "Vehicle");
+    if (!what || !spec || (!artifactSub && (!spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty)))) || (m[5] && (what.ref !== "target" || what.n))) return null;
     return [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}), ...(owner ? { owner: true } : {}), ...(m[5] ? { counters: { [counterKind(m[5])]: 1 } } : {}) }];
   }
   // "When this creature dies, return it to the battlefield under its owner's control and suspect it" (Presumed Dead's

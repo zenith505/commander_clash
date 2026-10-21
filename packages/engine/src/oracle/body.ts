@@ -667,6 +667,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const m = /^If /.test(x) ? null : /^(.*\b(?:counters? on ~|[Ss]acrifice ~)) and it ((?:gains|gets|can't|deals) .+)$/.exec(x);
       return m ? [m[1]!, `~ ${m[2]!}`] : [x];
     })
+    // Legion Leadership: "Until end of turn, double target creature's power and it gains first strike": two instructions.
+    .flatMap((x) => {
+      const m = /^Until end of turn, double target creature's power and it gains ([a-z ]+)\.?$/.exec(x);
+      return m ? ["Double target creature's power until end of turn", `It gains ${m[1]} until end of turn`] : [x];
+    })
     // "You draw that many cards and ~ deals that much damage to each other opponent" (Kosei): two instructions, in order.
     .flatMap((x) => {
       const m = /^If /.test(x) ? null : /^([Yy]ou draw [^,]+?) and (~ deals .+)$/.exec(x);
@@ -1420,6 +1425,26 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       if (filter?.kind !== "object") return null;
       effects[effects.length - 1] = { ...prev, counterIf: { counter: "+1/+1", filter: { ...filter, text: fluxIf[1]! } } };
       continue;
+    }
+    // Tezzeret, Cruel Captain: "Untap target artifact or creature. If it's an artifact creature, put a +1/+1 counter on
+    // it." "Put three +1/+1 counters on target artifact you control. If it's not a creature, it becomes a 0/0 Robot
+    // artifact creature." The target still on the battlefield, checked as it resolves (CR 608.2c).
+    const ifIts = /^If it's (not )?an? ([a-z]+(?: [a-z]+)?), (.+)$/.exec(s);
+    if (ifIts) {
+      const i = ctx.targets.length - 1;
+      const t = ctx.targets[i];
+      const prev = effects[effects.length - 1];
+      const typed = parseTargetPhrase(ifIts[2]!);
+      const known = typed?.kind === "object" && Object.entries(typed).every(([k, v]) => v === undefined || ["kind", "types", "allTypes", "notTypes", "notColors", "text"].includes(k));
+      const types = typed?.kind === "object" ? [...(typed.types ?? []), ...(typed.allTypes ?? [])] : [];
+      // Anything else is left to the readings below (Carbonize's "If it's a creature, it can't be regenerated ...").
+      if (t?.kind === "object" && !t.optional && !t.many && known && prev && ["untap", "tap", "counters", "continuous"].includes(prev.type) && mentionsTarget(prev, i) && (!ifIts[1] || types.length === 1) && !/,/.test(ifIts[3]!)) {
+        const fx = parseOne(ifIts[3]!.charAt(0).toUpperCase() + ifIts[3]!.slice(1), ctx);
+        if (!fx || ctx.targets.length !== i + 1 || !fx.every((e) => mentionsTarget(e, i))) return null;
+        const filter: TargetSpec = ifIts[1] ? { kind: "object", types: [], notTypes: types, notColors: [], text: `not ${ifIts[2]}` } : { ...typed, text: ifIts[2]! };
+        effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: fx });
+        continue;
+      }
     }
     // "You gain life equal to the damage prevented this way": part of the prevention effect before it (CR 615.5).
     // Inkshield: "For each 1 damage prevented this way, create a 2/1 ... token": also part of the prevention (CR 615.5).

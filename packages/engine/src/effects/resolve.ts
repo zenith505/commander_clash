@@ -253,6 +253,7 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     if (ref.zone) return o && o.zone === ref.zone && (o.zoneChanges ?? 0) === ctx.subject!.zc ? [o] : [];
     return [...(o && o.zone !== "battlefield" && (o.zoneChanges ?? 0) === ctx.subject!.zc ? [o] : []), ...foundWith(s, ctx.lki, ctx.subject?.id)];
   }
+  if (ref.ref === "eventGroup") return (ctx.event?.group ?? []).flatMap((g) => (s.objects[g.id]?.zone === "battlefield" && (s.objects[g.id]!.zoneChanges ?? 0) === g.zc ? [s.objects[g.id]!] : []));
   if (ref.ref === "pairedWithTarget") {
     const t = objects(s, { ref: "target", index: ref.index }, ctx)[0];
     const other = t && pairedWith(s, t);

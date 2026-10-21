@@ -1126,6 +1126,8 @@ export interface TurnLog {
    * each permanent type": the permissions used, `id@zoneChanges:slot` (a new object gets a new one, rulings).
    */
   gravePermits?: string[];
+  /** Players who activated an equip ability this turn (Forge Anew's "the first equip ability you activate"). */
+  equipped?: PlayerId[];
   /** Players who gained life (Needlebite Trap). */
   gainedLife?: PlayerId[];
   /** How many cards were put into each player's graveyard, from anywhere (Ravenous Trap). */

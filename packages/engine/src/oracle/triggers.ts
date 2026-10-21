@@ -711,7 +711,9 @@ function batchPermanents(phrase: string): { filter: TargetSpec; other: boolean }
   const p = phrase.replace(/^other /, "");
   const group = parseGroup(p, true);
   if (group) return { filter: group.filter, other };
-  const one = p.replace(/,? and\/or /g, (x) => x.replace("and/or", "or")).replace(/ your opponents control\b/, " an opponent controls").split(/(\s+|,)/).map((w) => (/^[\s,]*$/.test(w) ? w : singularWord(w))).join("");
+  // "Tokens your opponents control" (Kambal): each one "an opponent controls", the verb left as it is.
+  const opp = / your opponents control$/.test(p);
+  const one = p.replace(/,? and\/or /g, (x) => x.replace("and/or", "or")).replace(/ your opponents control$/, "").split(/(\s+|,)/).map((w) => (/^[\s,]*$/.test(w) ? w : singularWord(w))).join("") + (opp ? " an opponent controls" : "");
   const spec = parseTargetPhrase(one);
   return spec?.kind === "object" ? { filter: { ...spec, text: phrase }, other } : null;
 }
@@ -792,6 +794,9 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     yourTurn = !!m[4];
     rest = m[5]!;
   } else return null;
+  // Kambal, Profiteering Mayor: "for each of them, create a tapped token that's a copy of it", those that entered.
+  const eachCopy = /^for each of them, create an? (tapped )?token that's a copy of it\.?$/.exec(rest);
+  if (eachCopy && batch.what === "enters" && !yourTurn) return { event: "batch", batch, body: { targets: [], effects: [{ type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "eventGroup" }, each: true, ...(eachCopy[1] ? { tapped: true } : {}) }], text: rest.replace(/\.$/, "") } };
   // The objects as a group: not modeled.
   if (/\b(it|its|they|them|their|those|that card|that creature|that token|one of them|among them|this way)\b/i.test(rest)) return "fail";
   let text = rest;

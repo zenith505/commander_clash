@@ -694,6 +694,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   text = text.replace(/(^|\. )([Cc]reate an? [^.]+? token) and exile the top card of (your|that player's) library\. (?=(?:Until end of turn, )?[Yy]ou may (?:cast|play) that card)/, "$1$2. Exile the top card of $3 library. ");
   // "..., then shuffle and you gain 1 life" (Brokers Hideout): the search, then the life.
   text = text.replace(/, then shuffle and you gain (\d+) life\./g, ", then shuffle. You gain $1 life.");
+  // "You gain 7 life, draw seven cards, then put up to seven ..." (Ugin, the Spirit Dragon): three instructions in order.
+  text = text.replace(/^You gain (\d+) life, draw (\w+) cards?, then /, "You gain $1 life. Draw $2 cards, then ");
   // "Sacrifice ~, search your library for up to two creature cards, put those cards onto the battlefield, then shuffle"
   // (Defense of the Heart): the sacrifice, then the search.
   text = text.replace(/^([Ss])acrifice ~, search your library /, "$1acrifice ~. Search your library ");
@@ -2403,12 +2405,14 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // the cards milled this way ..." (Blanchwood Prowler), "You may put an instant or sorcery card milled this way into
     // your hand" (Leyline Dowser): one of the cards your mill just put into your graveyard, if any matches.
     const fromMilled =
-      /^[Yy]ou may put (an? .+?) from among (?:them|the cards milled this way|the milled cards|those cards) into your hand$/.exec(s) ?? /^[Yy]ou may put (an? .+?) milled this way into your hand$/.exec(s);
+      /^[Yy]ou may put (an? .+?|up to (?:one|two|three|four|five) .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) into your hand$/.exec(s) ?? /^[Yy]ou may put (an? .+?) milled this way into your hand$/.exec(s);
     if (fromMilled) {
       const prev = effects[effects.length - 1];
-      const filter = parseSearchFilter(fromMilled[1]!.replace(/^an? /, ""));
+      // "Up to two creature and/or land cards from among the milled cards" (Smuggler's Surprise).
+      const upTo = /^up to (\w+) (.+) cards$/.exec(fromMilled[1]!);
+      const filter = parseSearchFilter(upTo ? `${upTo[2]!.replace(/ and\/or /g, " or ")} card` : fromMilled[1]!.replace(/^an? /, ""));
       if (prev?.type !== "mill" || prev.who.ref !== "you" || filter === null) return null;
-      effects.push({ type: "chooseFromGraveyard", n: 1, upTo: true, milled: true, ...(filter ? { filter } : {}) });
+      effects.push({ type: "chooseFromGraveyard", n: upTo ? num(upTo[1]!) : 1, upTo: true, milled: true, ...(filter ? { filter } : {}) });
       // "If you don't, put a +1/+1 counter on this creature." (Ainok Wayfarer): no card was put into your hand.
       const didnt = /^If you don't, (.+)$/.exec(sentences[si + 1] ?? "");
       if (didnt) {

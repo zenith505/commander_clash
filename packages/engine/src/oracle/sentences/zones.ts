@@ -337,6 +337,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // "You may put a creature card with mana value X or less from your hand onto the battlefield tapped and attacking"
   // (Kinscaer Sentry): one card, attacking a player its controller chooses (CR 508.4).
+  // "Put up to seven permanent cards from your hand onto the battlefield" (Ugin, the Spirit Dragon), "you may put up to
+  // two creature cards ..." (Smuggler's Surprise): any number of them up to that many.
+  if ((m = /^(?:You may )?[Pp]ut up to (two|three|four|five|six|seven) (.+?) cards from your hand onto the battlefield$/.exec(s))) {
+    const filter = parseSearchFilter(`${m[2]!} card`);
+    if (filter === null) return null;
+    return [{ type: "putFromHand", ...(filter ? { filter } : {}), may: true, any: true, upTo: num(m[1]!) }];
+  }
   if ((m = /^(You may )?[Pp]ut (a|an|any number of) (.+?) from your hand onto the battlefield( tapped)?( and attacking( that opponent)?)?$/.exec(s))) {
     if (m[5] && m[2] === "any number of") return null;
     // "Tapped and attacking that opponent" (Kaalia of the Vast): the player the trigger's creature attacked.

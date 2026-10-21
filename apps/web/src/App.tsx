@@ -1776,7 +1776,8 @@ function canCastFromGraveyard(s: GameState, id: string, via: CastFromGraveyardKi
 function exileOptions(s: GameState, id: string): boolean {
   if (!mayPlayFromExile(s, s.objects[id]!, HUMAN)) return false;
   if (foretoldCast(s, HUMAN, s.objects[id]!)) return canCastAlt(s, id, "foretell");
-  return (isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id)) || canUseFace(s, id);
+  // Valgavoth's cards: only for life (its "pay life equal to its mana value").
+  return (isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id) || canCastAlt(s, id, "citadel")) || canUseFace(s, id);
 }
 
 /** Does this card in your graveyard have something you could do with it now (flashback, unearth, ...)? */

@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
-import { botActions, characteristics, graveyardWays, isFullySupported, planActivate, planCast, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
+import { attackCost, botActions, characteristics, graveyardWays, isFullySupported, planActivate, planCast, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const urabrask = scry("transform", [
@@ -68,6 +68,9 @@ const interrupter = card("Aven Interrupter", "Creature — Bird Rogue", "{1}{W}{
 const abundance = card("Abundance", "Enchantment", "{2}{G}{G}", {
   oracleText:
     "If you would draw a card, you may instead choose land or nonland and reveal cards from the top of your library until you reveal a card of the chosen kind. Put that card into your hand and put all other cards revealed this way on the bottom of your library in any order.",
+});
+const annex = card("Norn's Annex", "Artifact", "{3}{W/P}{W/P}", {
+  oracleText: "({W/P} can be paid with either {W} or 2 life.)\nCreatures can't attack you or planeswalkers you control unless their controller pays {W/P} for each of those creatures.",
 });
 // Test cards.
 const shock = card("Test Shock", "Instant", "{R}", { oracleText: "Test Shock deals 2 damage to any target." });
@@ -354,6 +357,57 @@ describe("Abundance", () => {
     for (const id of lands.slice(2)) s.battlefield.splice(s.battlefield.indexOf(id), 1);
     s.players[ap]!.hand = s.players[ap]!.hand.filter((id) => !isLand(id));
     expect(botActions(s, ap)).toEqual([{ type: "dredge", player: ap, abundance: "land" }]);
+  });
+});
+
+describe("Norn's Annex", () => {
+  const bears = (s: GameState, pid: PlayerId, n: number) => Array.from({ length: n }, (_, i) => putOnBattlefield(s, pid, card(`Bear ${i}`, "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" })));
+
+  it("{W/P} for each creature attacking its controller or their planeswalker: {W} from the pool, otherwise 2 life (CR 107.4f, 508.1g-h)", () => {
+    supported(annex);
+    const { s: s0, ap } = setup([]);
+    const opp = next(s0, ap);
+    const third = next(s0, opp);
+    putOnBattlefield(s0, opp, annex);
+    const pw = putOnBattlefield(s0, opp, card("Test Walker", "Legendary Planeswalker — Test", "{3}", { loyalty: "5" }));
+    s0.objects[pw]!.counters.loyalty = 5;
+    const [b1, b2, b3, b4] = bears(s0, ap, 4) as [string, string, string, string];
+    let s = passUntil(s0, "declareAttackers", ap);
+    const attacks = [
+      { attacker: b1, defender: opp },
+      { attacker: b2, defender: opp, planeswalker: pw },
+      { attacker: b3, defender: opp },
+      { attacker: b4, defender: third },
+    ];
+    expect(attackCost(s, attacks)).toBe("{W/P}{W/P}{W/P}");
+    // One {W} floating: it pays one symbol, life pays the other two.
+    s.players[ap]!.manaPool.W = 1;
+    const life = s.players[ap]!.life;
+    s = act(s, { type: "declareAttackers", player: ap, attacks });
+    expect(s.players[ap]!.life).toBe(life - 4);
+    expect(s.players[ap]!.manaPool.W).toBe(0);
+    expect(s.objects[b2]!.attacking).toBe(opp);
+  });
+
+  it("can't be paid with life you don't have (CR 119.4)", () => {
+    const { s: s0, ap } = setup([]);
+    const opp = next(s0, ap);
+    putOnBattlefield(s0, opp, annex);
+    const [b1, b2] = bears(s0, ap, 2) as [string, string];
+    const s = passUntil(s0, "declareAttackers", ap);
+    s.players[ap]!.life = 3;
+    expect(() => act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: b1, defender: opp }, { attacker: b2, defender: opp }] })).toThrow(/costs \{W\/P\}\{W\/P\}/);
+  });
+
+  it("a bot pays life while it has plenty, and sends its creatures elsewhere when low", () => {
+    const { s: s0, ap } = setup([]);
+    for (const p of s0.turnOrder.filter((x) => x !== ap)) putOnBattlefield(s0, p, annex);
+    bears(s0, ap, 3);
+    const s = passUntil(s0, "declareAttackers", ap);
+    const decl = (st: GameState) => botActions(st, ap).at(-1) as Extract<ReturnType<typeof botActions>[number], { type: "declareAttackers" }>;
+    expect(decl(s).attacks.length).toBeGreaterThan(0);
+    s.players[ap]!.life = 11;
+    expect(decl(s).attacks).toEqual([]);
   });
 });
 

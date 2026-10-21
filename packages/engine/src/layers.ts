@@ -126,6 +126,9 @@ export interface Characteristics {
   attackTax: number;
   /** The same for attacking a planeswalker its controller controls (Sphere of Safety). */
   attackTaxPlaneswalkers: number;
+  /** Other mana symbols per creature attacking its controller, and its controller's planeswalkers ("{W/P}", Norn's Annex). */
+  attackTaxMana: string[];
+  attackTaxManaPlaneswalkers: string[];
   /** Players it has to attack if able (encore). */
   mustAttack: PlayerId[];
   /** "Can't be blocked by creatures with power 2 or less", "by Walls" (CR 509.1b). */
@@ -237,6 +240,8 @@ function printed(s: GameState, o: GameObject): Characteristics {
     untapsDuringOthers: false,
     attackTax: 0,
     attackTaxPlaneswalkers: 0,
+    attackTaxMana: [],
+    attackTaxManaPlaneswalkers: [],
     mustAttack: [],
     cantBeBlockedBy: [],
     cantBlockCreatures: [],
@@ -1092,6 +1097,8 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       const n = m.amount !== undefined ? Math.max(0, num(m.amount)) : m.n;
       c.attackTax += n;
       if (m.planeswalkers) c.attackTaxPlaneswalkers += n;
+      if (m.mana) c.attackTaxMana = [...c.attackTaxMana, m.mana];
+      if (m.mana && m.planeswalkers) c.attackTaxManaPlaneswalkers = [...c.attackTaxManaPlaneswalkers, m.mana];
       return;
     }
     case "blocksOnlyFlyers":

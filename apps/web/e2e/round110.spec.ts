@@ -57,3 +57,20 @@ test("Abundance: Divination's first draw reveals until a land, the others go to 
   expect(after.players[0]!.library.slice(-2)).toEqual(start);
   expect(pageErrors(page)).toEqual([]);
 });
+
+test("Norn's Annex: attacking Ana costs {W/P} for each creature; with no {W} floating, you pay 2 life", async ({ page }) => {
+  const s = scene({ board: ["Grizzly Bears"] }, [{ board: ["Norn's Annex"] }]);
+  const bears = one(s, "Grizzly Bears");
+  await open(page, s);
+  await resolveUntil(page, (st) => st.pending?.kind === "declareAttackers" && st.pending.player === 0);
+  await expect(controls(page)).toContainText("Click a creature, then the player it attacks");
+  await page.locator(`[data-obj="${bears}"]`).click();
+  await clickPlayer(page, 1);
+  const button = controls(page).getByRole("button", { name: "Attack with 1 (pay {W/P})" });
+  await expect(button).toHaveAttribute("title", /otherwise 2 life each/);
+  await button.click();
+  const after = await resolveUntil(page, (st) => st.step === "main2" || st.turn > s.turn);
+  expect(after.players[0]!.life).toBe(38);
+  expect(after.players[1]!.life).toBe(38);
+  expect(pageErrors(page)).toEqual([]);
+});

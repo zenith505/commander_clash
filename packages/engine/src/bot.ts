@@ -15,7 +15,7 @@ import {
   returnCandidates,
   attackablePermanentProblem,
   attackProblem,
-  attackTax,
+  attackCost,
   attackTaxOf,
   attackYouLimit,
   combatLimit,
@@ -3794,8 +3794,10 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   // Ghostly Prison: pay what attacking costs if we can (CR 508.1g-i); otherwise send the weakest taxed attacker at
   // someone it costs nothing to attack, or keep it home. Nothing obliges paying for a requirement (CR 508.1d).
   for (;;) {
-    const tax = attackTax(s, declared);
-    const taps = tax ? planMana(s, pid, parseManaCost(`{${tax}}`)) : [];
+    const tax = attackCost(s, declared);
+    // Phyrexian symbols the pool can't pay take 2 life each (Norn's Annex): not down to 10 or less.
+    const symbols = parseManaCost(tax).symbols.filter((x) => x.kind === "phyrexian").length;
+    const taps = tax && !(symbols && player(s, pid).life - 2 * symbols <= 10) ? planMana(s, pid, parseManaCost(tax)) : tax ? null : [];
     if (taps) {
       if (declared.length === 1 && characteristics(s, obj(s, declared[0]!.attacker)).cantAttackAlone) declared = [];
       return [...(declared.length ? taps : []), { type: "declareAttackers", player: pid, attacks: declared }];

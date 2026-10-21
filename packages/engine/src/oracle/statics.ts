@@ -1114,6 +1114,9 @@ function parseStaticLine(line: string): StaticAbility | null {
     if (tax[3] && !amount) return null;
     return { affects: { kind: "self" }, mods: [{ kind: "attackTax", n: amount ? 0 : Number(tax[2]), ...(amount ? { amount } : {}), ...(tax[1] ? { planeswalkers: true as const } : {}) }], text: line };
   }
+  // Norn's Annex: a Phyrexian symbol per creature, its color or 2 life (CR 107.4f).
+  const phyTax = /^Creatures can't attack you( or planeswalkers you control)? unless their controller pays (\{[WUBRG]\/P\}) for each of those creatures$/.exec(text);
+  if (phyTax) return { affects: { kind: "self" }, mods: [{ kind: "attackTax", n: 0, mana: phyTax[2]!, ...(phyTax[1] ? { planeswalkers: true as const } : {}) }], text: line };
   // "Untap ~ during each other player's untap step", "Untap all permanents you control during ..." (Seedborn Muse):
   // they untap with the active player's permanents (CR 502.3); "doesn't untap during your untap step" doesn't apply.
   const untaps = /^Untap (~|all (.+?) you control|each (.+? you control(?: with .+)?)) during each other player's untap step$/.exec(text);

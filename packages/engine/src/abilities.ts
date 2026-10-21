@@ -867,7 +867,7 @@ export type Modification =
    * attacking you" (CR 508.1g-h): generic mana per creature attacking its controller.
    */
   /** Ghostly Prison: {n} per attacker; Sphere of Safety: {X}, a count (`amount`), attacking your planeswalkers too. */
-  | { kind: "attackTax"; n: number; amount?: Amount; planeswalkers?: true }
+  | { kind: "attackTax"; n: number; amount?: Amount; planeswalkers?: true; /** A symbol other than generic mana per creature, "{W/P}" (Norn's Annex). */ mana?: string }
   /** "Untap ~ during each other player's untap step" (CR 502.3). */
   | { kind: "untapsDuringOthers" }
   | { kind: "blocksOnlyFlyers" } // "can block only creatures with flying" (a blocking restriction, CR 509.1b)

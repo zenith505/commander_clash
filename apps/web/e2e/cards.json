@@ -6828,6 +6828,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9a1fbe72-4a17-42be-8e23-d7d30a5e59c1",
+  "name": "Norn's Annex",
+  "manaCost": "{3}{W/P}{W/P}",
+  "cmc": 5,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "({W/P} can be paid with either {W} or 2 life.)\nCreatures can't attack you or planeswalkers you control unless their controller pays {W/P} for each of those creatures.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "nph",
+  "releasedAt": "2011-05-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "730e39e6-c61d-48b5-8827-bfd952bf1be7",
   "name": "Omniscience",
   "manaCost": "{7}{U}{U}{U}",

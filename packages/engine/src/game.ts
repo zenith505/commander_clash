@@ -6158,13 +6158,21 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
  * control" (Sphere of Safety); a battle they protect never is.
  */
 export function attackTaxPer(s: GameState, defender: PlayerId, planeswalker = false): number {
-  let n = 0;
+  const { generic, mana } = attackTaxParts(s, defender, planeswalker);
+  return generic + mana.length;
+}
+
+/** The generic mana and the other symbols ({W/P}, Norn's Annex) attacking `defender` costs for each creature. */
+function attackTaxParts(s: GameState, defender: PlayerId, planeswalker: boolean): { generic: number; mana: string[] } {
+  let generic = 0;
+  const mana: string[] = [];
   for (const id of s.battlefield) {
-    const o = obj(s, id);
-    const c = characteristics(s, o);
-    if (c.controller === defender) n += planeswalker ? c.attackTaxPlaneswalkers : c.attackTax;
+    const c = characteristics(s, obj(s, id));
+    if (c.controller !== defender) continue;
+    generic += planeswalker ? c.attackTaxPlaneswalkers : c.attackTax;
+    mana.push(...(planeswalker ? c.attackTaxManaPlaneswalkers : c.attackTaxMana));
   }
-  return n;
+  return { generic, mana };
 }
 
 /** What one attack costs: at a player, or at a planeswalker or battle (`planeswalker`, the permanent attacked). */
@@ -6174,9 +6182,22 @@ export function attackTaxOf(s: GameState, a: { defender: PlayerId; planeswalker?
   return pw && objIsType(s, pw, "Planeswalker") && controllerOf(s, pw) === a.defender ? attackTaxPer(s, a.defender, true) : 0;
 }
 
-/** The total attack tax for a declaration. */
+/** The total attack tax for a declaration: how many mana symbols (generic mana, and {W/P} each for Norn's Annex). */
 export function attackTax(s: GameState, attacks: { defender: PlayerId; planeswalker?: ObjectId }[]): number {
   return attacks.reduce((n, a) => n + attackTaxOf(s, a), 0);
+}
+
+/** The total attack cost of a declaration as a mana cost, "{4}{W/P}{W/P}" ("" when attacking is free). */
+export function attackCost(s: GameState, attacks: { defender: PlayerId; planeswalker?: ObjectId }[]): string {
+  let generic = 0;
+  const mana: string[] = [];
+  for (const a of attacks) {
+    if (!attackTaxOf(s, a)) continue;
+    const parts = attackTaxParts(s, a.defender, a.planeswalker !== undefined);
+    generic += parts.generic;
+    mana.push(...parts.mana);
+  }
+  return `${generic ? `{${generic}}` : ""}${mana.join("")}`;
 }
 
 export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, planeswalker = false, /** The planeswalker or battle attacked. */ attacked?: ObjectId): string | null {
@@ -6344,10 +6365,13 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     if (!a || a.planeswalker !== undefined || !able.includes(a.defender)) throw new RulesError(`${defOf(s, o).name} must attack ${able.map((d) => player(s, d).name).join(" or ")} if able`);
   }
   // Attack costs are totalled and paid, with mana abilities activated first (CR 508.1g-i).
-  const tax = attackTax(s, attacks);
+  // A Phyrexian symbol is paid with its color's mana from the pool, otherwise 2 life (CR 107.4f, 119.4).
+  const tax = attackCost(s, attacks);
   if (tax) {
-    if (!spendFromPool(s, p.id, parseManaCost(`{${tax}}`), "other")) throw new RulesError(`attacking these players costs {${tax}}: add the mana first`);
-    log(s, `${p.name} pays {${tax}} to attack.`);
+    const paid = spendFromPool(s, p.id, parseManaCost(tax), "other", 0, payableLife(s, p.id));
+    if (!paid) throw new RulesError(`attacking these players costs ${tax}: add the mana first`);
+    loseLife(s, p.id, paid.lifePaid);
+    log(s, `${p.name} pays ${tax}${paid.lifePaid ? ` (${paid.lifePaid} life)` : ""} to attack.`);
   }
   for (const a of attacks) {
     const o = obj(s, a.attacker);

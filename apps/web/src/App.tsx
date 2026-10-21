@@ -67,7 +67,7 @@ import {
   doesNothingNow,
   attackablePermanentProblem,
   attackProblem,
-  attackTax,
+  attackCost,
   attackTaxPer,
   blockProblem,
   blockRequirementProblem,
@@ -4179,8 +4179,8 @@ function Controls({
     const ids = Object.keys(attacks);
     // Ghostly Prison and the like: what attacking costs, paid from your lands as you declare (CR 508.1g-i).
     const declared = Object.entries(attacks).map(([attacker, a]) => ({ attacker, defender: a.defender, ...(a.planeswalker ? { planeswalker: a.planeswalker } : {}) }));
-    const tax = attackTax(s, declared);
-    const taxTaps = tax ? planMana(s, HUMAN, parseManaCost(`{${tax}}`)) : [];
+    const tax = attackCost(s, declared);
+    const taxTaps = tax ? planMana(s, HUMAN, parseManaCost(tax)) : [];
     const alone = ids.length === 1 && characteristics(s, s.objects[ids[0]!]!).cantAttackAlone ? `${cardOf(s, ids[0]!).name} can't attack alone.` : null;
     return (
       <div className="controls">
@@ -4199,10 +4199,10 @@ function Controls({
         </span>
         <button
           disabled={must.length > 0 || bound.length > 0 || !!alone || !taxTaps}
-          title={tax && !taxTaps ? `Attacking costs {${tax}} and you can't pay it` : undefined}
+          title={tax && !taxTaps ? `Attacking costs ${tax} and you can't pay it` : tax.includes("/P}") ? "Phyrexian mana: paid with mana in your pool, otherwise 2 life each" : undefined}
           onClick={() => dispatch([...(taxTaps ?? []), { type: "declareAttackers", player: HUMAN, attacks: declared }])}
         >
-          {Object.keys(attacks).length ? `Attack with ${Object.keys(attacks).length}${tax ? ` (pay {${tax}})` : ""}` : "No attacks"}
+          {Object.keys(attacks).length ? `Attack with ${Object.keys(attacks).length}${tax ? ` (pay ${tax})` : ""}` : "No attacks"}
         </button>
       </div>
     );

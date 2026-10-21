@@ -1387,6 +1387,44 @@
   "gameChanger": false
  },
  {
+  "oracleId": "aea8345a-191d-4c62-8d15-a716a9934b66",
+  "name": "Celes, Rune Knight",
+  "manaCost": "{1}{R}{W}{B}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Wizard Knight",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard",
+   "Knight"
+  ],
+  "oracleText": "When Celes enters, discard any number of cards, then draw that many cards plus one.\nWhenever one or more other creatures you control enter, if one or more of them entered from a graveyard or was cast from a graveyard, put a +1/+1 counter on each creature you control.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "R",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8785f42f-87b9-4a0a-89ce-ea423649ba9c",
   "name": "Chain Lightning",
   "manaCost": "{R}",
@@ -1435,6 +1473,41 @@
   "set": "c16",
   "releasedAt": "2016-11-11",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "14f6fcb0-bed4-4a38-b7df-1e438d81bedb",
+  "name": "Chainer, Nightmare Adept",
+  "manaCost": "{2}{B}{R}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Minion",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Minion"
+  ],
+  "oracleText": "Discard a card: You may cast a creature spell from your graveyard this turn. Activate only once each turn.\nWhenever a nontoken creature you control enters, if you didn't cast it from your hand, it gains haste until your next turn.",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c19",
+  "releasedAt": "2019-08-23",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -2135,6 +2208,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4d8505d3-c8a1-4850-95d4-5ddb8ad49770",
+  "name": "Cultivator Colossus",
+  "manaCost": "{4}{G}{G}{G}",
+  "cmc": 7,
+  "typeLine": "Creature — Plant Beast",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Plant",
+   "Beast"
+  ],
+  "oracleText": "Trample\nCultivator Colossus's power and toughness are each equal to the number of lands you control.\nWhen this creature enters, you may put a land card from your hand onto the battlefield tapped. If you do, draw a card and repeat this process.",
+  "power": "*",
+  "toughness": "*",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "dbl",
+  "releasedAt": "2022-01-28",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5480f855-80b7-45c7-94a9-071c7b5d5ccf",
   "name": "Curse of the Bloody Tome",
   "manaCost": "{2}{U}",
@@ -2746,6 +2852,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a75445d3-1303-4bb5-89ad-26ea93fecd48",
+  "name": "Evolving Wilds",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}, Sacrifice this land: Search your library for a basic land card, put it onto the battlefield tapped, then shuffle.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "bcd3e6a1-7b76-408d-9236-3791c3e1064a",
   "name": "Excavation Technique",
   "manaCost": "{3}{W}",
@@ -2770,6 +2898,38 @@
   "commanderLegal": "legal",
   "set": "c21",
   "releasedAt": "2021-04-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "8a83ecee-092b-456c-803f-a9aaa17c4da9",
+  "name": "Exploration Broodship",
+  "manaCost": "{G}",
+  "cmc": 1,
+  "typeLine": "Artifact — Spacecraft",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Spacecraft"
+  ],
+  "oracleText": "Station (Tap another creature you control: Put charge counters equal to its power on this Spacecraft. Station only as a sorcery. It's an artifact creature at 8+.)\n3+ | You may play an additional land on each of your turns.\n8+ | Flying\nOnce during each of your turns, you may cast a permanent spell from your graveyard by sacrificing a land in addition to paying its other costs.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Station"
+  ],
+  "commanderLegal": "legal",
+  "set": "eoc",
+  "releasedAt": "2025-08-01",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -7209,6 +7369,32 @@
   "commanderLegal": "legal",
   "set": "uds",
   "releasedAt": "1999-06-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "83e78565-e61f-4bbc-b834-f47941f7e3ec",
+  "name": "Resourceful Defense",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever a permanent you control leaves the battlefield, if it had counters on it, put those counters on target permanent you control.\n{4}{W}: Move any number of counters from target permanent you control onto a second target permanent you control.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

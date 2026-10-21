@@ -2976,7 +2976,10 @@ function chooseUnearth(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbility
       // Scavenge needs a creature to grow (CR 702.97a).
       const targets = ab.body.targets.length ? chooseTargets(s, pid, ab.body, false, id) : undefined;
       if (ab.body.targets.length && !targets) continue;
-      const plan = planActivate(s, pid, id, i, targets ?? undefined);
+      // Jarad, Golgari Lich Lord's "Sacrifice a Swamp and a Forest": spare lands only (abilityCosts).
+      const costs = abilityCosts(s, pid, obj(s, id), ab, targets ?? []);
+      if (costs === null) continue;
+      const plan = planActivate(s, pid, id, i, targets ?? undefined, undefined, undefined, undefined, costs);
       if (plan) return plan;
     }
   }
@@ -3005,6 +3008,17 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
         .filter((x) => objectMatches(s, c.filter, x, pid, false))
         .filter((x) => (objIsType(s, x, "Land") ? lands(s, pid) >= 8 : x.isToken && worth(s, pid, x) <= 3))
         .sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
+      // "Sacrifice a Swamp and a Forest" (Jarad): one for each, the least valuable that fits.
+      if (c.oneOfEach) {
+        const picks: ObjectId[] = [];
+        for (const f of c.oneOfEach) {
+          const x = pool.find((y) => !picks.includes(y.id) && objectMatches(s, f, y, pid, false));
+          if (!x) return null;
+          picks.push(x.id);
+        }
+        out.sacrifice = [...(out.sacrifice ?? []), ...picks];
+        continue;
+      }
       if (pool.length < c.n) return null;
       out.sacrifice = [...(out.sacrifice ?? []), ...pool.slice(0, c.n).map((x) => x.id)];
     } else if (c.kind === "tap") {
@@ -3554,7 +3568,10 @@ function chooseCycling(s: GameState, pid: PlayerId): Action[] | null {
       // Channel and the like aim at something: only with a good target (an opponent's permanent to destroy).
       const targets = ab.body.targets.length ? chooseTargets(s, pid, ab.body, false, id) : undefined;
       if (ab.body.targets.length && !targets) continue;
-      const plan = planActivate(s, pid, id, i, targets ?? undefined);
+      // Jarad, Golgari Lich Lord's "Sacrifice a Swamp and a Forest": spare lands only (abilityCosts).
+      const costs = abilityCosts(s, pid, obj(s, id), ab, targets ?? []);
+      if (costs === null) continue;
+      const plan = planActivate(s, pid, id, i, targets ?? undefined, undefined, undefined, undefined, costs);
       if (plan) return plan;
     }
   }

@@ -1,6 +1,7 @@
 // Round 109, earlier gaps: Delina, Wild Mage's tokens attack the player or planeswalker you choose as each is created
 // (CR 508.4, rulings: not necessarily what Delina attacks); a permission to cast spells from your graveyard that names
-// no cost (Yawgmoth's Will) lets you pay an alternative cost instead (CR 118.9, rulings on Muldrotha, Lurrus, Emry).
+// no cost (Yawgmoth's Will) lets you pay an alternative cost instead (CR 118.9, rulings on Muldrotha, Lurrus, Emry); bots
+// return Jarad, Golgari Lich Lord from their graveyard by sacrificing spare lands.
 
 import { describe, expect, it } from "vitest";
 import { act, card, cast, passUntil, putOnBattlefield, setup, target } from "./helpers";
@@ -128,5 +129,51 @@ describe("Casting from the graveyard for an alternative cost", () => {
     s = settle(cast(s, ap, ids[0]!));
     expect(castProblem(s, ap, f, undefined, undefined, undefined, undefined, undefined, { via: "flashback", alt: "overload" })).toMatch(/can't be cast for its overload cost this way/);
     expect(planCast(s, ap, m, undefined, undefined, "auto", undefined, { via: "permission", alt: "evoke" })).not.toBeNull();
+  });
+});
+
+const jarad = card("Jarad, Golgari Lich Lord", "Legendary Creature — Zombie Elf", "{B}{B}{G}{G}", {
+  power: "2",
+  toughness: "2",
+  oracleText:
+    "Jarad gets +1/+1 for each creature card in your graveyard.\n{1}{B}{G}, Sacrifice another creature: Each opponent loses life equal to the sacrificed creature's power.\nSacrifice a Swamp and a Forest: Return this card from your graveyard to your hand.",
+});
+
+describe("Bots and Jarad's graveyard ability", () => {
+  const start = (keepLands: number) => {
+    const { s, ap } = setup([]);
+    const p = s.players[ap]!;
+    p.command = []; // nothing else to cast
+    for (const id of p.hand.splice(0)) {
+      s.objects[id]!.zone = "library";
+      p.library.push(id);
+    }
+    const j = putOnBattlefield(s, ap, jarad);
+    s.battlefield.splice(s.battlefield.indexOf(j), 1);
+    s.objects[j]!.zone = "graveyard";
+    p.graveyard.push(j);
+    // Only Swamps, Forests and Islands, `keepLands` of them.
+    const mine = s.battlefield.filter((id) => s.objects[id]!.controller === ap);
+    for (const id of mine.filter((id) => !/Swamp|Forest/.test(s.cards[s.objects[id]!.cardId]!.name)).slice(0, Math.max(0, mine.length - keepLands))) {
+      s.battlefield.splice(s.battlefield.indexOf(id), 1);
+      delete s.objects[id];
+    }
+    return { s, ap, j };
+  };
+
+  it("with plenty of lands, a bot sacrifices a Swamp and a Forest in its main phase to get Jarad back", () => {
+    expect(isFullySupported(jarad)).toBe(true);
+    const { s: s0, ap, j } = start(10);
+    let s = s0;
+    const lands = s.battlefield.filter((id) => s.objects[id]!.controller === ap).length;
+    s = settle(botActions(s, ap).reduce((x, a) => act(x, a), s));
+    expect(s.objects[j]!.zone).toBe("hand");
+    expect(s.battlefield.filter((id) => s.objects[id]!.controller === ap)).toHaveLength(lands - 2);
+  });
+
+  it("not when it would leave it short of lands", () => {
+    const { s, ap, j } = start(7);
+    const acts = botActions(s, ap);
+    expect(acts.some((a) => a.type === "activateAbility" && a.objectId === j)).toBe(false);
   });
 });

@@ -301,7 +301,13 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const id = spell ? item.objectId : ctx.sourceId;
       const o = id ? s.objects[id] : undefined;
       if (!id || !o) return;
+      const about = e.about !== undefined ? objects(s, { ref: "target", index: e.about }, ctx).find((x) => x.zone === "battlefield") : undefined;
+      if (e.about !== undefined && !about) return;
+      const toPlayer = e.aboutPlayer !== undefined ? players(s, { ref: "target", index: e.aboutPlayer }, ctx)[0] : undefined;
+      if (e.aboutPlayer !== undefined && toPlayer === undefined) return;
       (s.floatingTriggers ??= []).push({
+        ...(about ? { about: { id: about.id, zc: about.zoneChanges ?? 0 } } : {}),
+        ...(toPlayer !== undefined ? { toPlayer } : {}),
         id: `f${s.nextId++}`,
         controller: ctx.controller,
         sourceId: id,

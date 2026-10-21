@@ -3,7 +3,7 @@ import { liveEmblems } from "./emblems";
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
 import { payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaOptions, manaPenalty } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
-import { abilityProblem, activationCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, foretellProblem, tapCostCandidates, turnFaceUpProblem } from "./game";
+import { abilityProblem, activationCost, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, foretellProblem, tapCostCandidates, turnFaceUpProblem } from "./game";
 import { compileCard } from "./oracle";
 import { hopeValues, spendPlan } from "./value";
 import { abilityUse, boundSpend, poolFor, spendAllows, usableTypes, type ManaUse } from "./spend";
@@ -68,7 +68,7 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
         .map((x) => {
           const ab = abs[x.ability]!;
           const tapCost = ab.tapCost && { n: ab.tapCost.n, candidates: tapPreference(s, tapCostCandidates(s, pid, o, ab.tapCost).filter((id) => !exclude.includes(id))) };
-          return { id: o.id, ...x, cost: ab.manaCost ? parseManaCost(ab.manaCost) : null, penalty: manaPenalty(ab) + (ab.tap ? tapRider : 0), ...(tapCost ? { tapCost } : {}), ...(ab.spendOnly ? { restricted: true } : {}) };
+          return { id: o.id, ...x, cost: ab.manaCost ? activationLessCost(s, o, parseManaCost(ab.manaCost)) : null, penalty: manaPenalty(ab) + (ab.tap ? tapRider : 0), ...(tapCost ? { tapCost } : {}), ...(ab.spendOnly ? { restricted: true } : {}) };
         });
       if (!onlyTreasures || treasure) options.push(...activatedOptions(s, pid, o));
       const makes = [...new Set(options.filter((x) => !x.cost).flatMap((x) => x.adds))];
@@ -82,7 +82,7 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
 /** The activated mana abilities (CR 605.1a) a payment can use, as options. */
 function activatedOptions(s: GameState, pid: PlayerId, o: GameObject): Option[] {
   return payableActivatedMana(s, pid, o).flatMap(({ ab, options, penalty }) => {
-    const cost = ab.manaCost ? parseManaCost(ab.manaCost) : null;
+    const cost = ab.manaCost ? activationLessCost(s, o, parseManaCost(ab.manaCost)) : null;
     return options.filter((x) => x.adds.length > 0).map((x) => ({ id: o.id, ...x, cost, penalty, activated: true as const }));
   });
 }
@@ -497,7 +497,7 @@ export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, in
   const problem = abilityProblem(s, pid, objectId, index, targets, modes, tapCreatures, x, costs);
   if (problem && !/not enough mana/.test(problem)) return null;
   const ab = abilitiesOf(s, obj(s, objectId)).activated[index]!;
-  const cost = activationCost(s, pid, obj(s, objectId), ab, targets);
+  const cost = activationCost(s, pid, obj(s, objectId), ab, targets, x);
   // Don't tap the source for mana if the ability itself needs {T}, nor creatures tapped to crew.
   // Don't tap for mana what's about to be sacrificed either.
   const taps = planMana(s, pid, cost, (x ?? 0) * xCount(cost), ab.tap ? objectId : undefined, [...(tapCreatures ?? []), ...(costs?.sacrifice ?? []), ...(costs?.tap ?? []), ...sacrificedTargets(s, targets)], abilityUse(obj(s, objectId), ab));
@@ -577,7 +577,7 @@ export function planManaAbility(s: GameState, pid: PlayerId, objectId: ObjectId,
   const ab = manaAbilitiesOn(s, o)[ability]!;
   // "Tap an untapped creature you control": what's given, or the best to tap.
   const tapped = ab.tapCost ? (tap ?? tapPreference(s, tapCostCandidates(s, pid, o, ab.tapCost)).slice(0, ab.tapCost.n)) : undefined;
-  const taps = ab.manaCost ? planMana(s, pid, parseManaCost(ab.manaCost), 0, objectId, tapped, { ability: o }) : [];
+  const taps = ab.manaCost ? planMana(s, pid, activationLessCost(s, o, parseManaCost(ab.manaCost)), 0, objectId, tapped, { ability: o }) : [];
   return taps ? [...taps, { type: "activateMana", player: pid, objectId, mana, ability, ...(combo !== undefined ? { combo } : {}), ...(tapped ? { tap: tapped } : {}), ...(extra?.length ? { extra } : {}) }] : null;
 }
 

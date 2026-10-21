@@ -4,7 +4,7 @@
 import { allEffects, type ActivatedAbility, type ManaAbility, type ManaProduce, type ManaTrigger } from "./abilities";
 import { abilitiesOf, basicLandManaAbility, defOf, objIsType } from "./cards";
 import { objectMatches } from "./effects";
-import { abilityProblem, linkedExileCards, obj, payableLife, player, tapAbilitySick, tapCostCandidates } from "./game";
+import { abilityProblem, activationLessCost, linkedExileCards, obj, payableLife, player, tapAbilitySick, tapCostCandidates } from "./game";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { parseManaCost } from "./mana";
 import { evalAmount } from "./amounts";
@@ -73,7 +73,7 @@ export function manaChoices(s: GameState, o: GameObject, ab: ManaAbility): ManaT
   // A combination is picked by its number (`combo`); these are the types it could make (CR 106.7).
   if (p.kind === "combos") return [...new Set(p.options.flat())];
   if (p.kind === "removeX") return p.colors;
-  if (p.kind === "anyColors") return [...COLORS];
+  if (p.kind === "anyColors") return [...(p.colors ?? COLORS)];
   if (p.kind === "colorsAmong") return colorsAmong(s, o, p);
   // "For each color among permanents you control": all of them at once, whichever is named (none with no color).
   if (p.kind === "eachColorAmong") return eachColorAmong(s, o);
@@ -112,9 +112,10 @@ export function removeXCombos(o: GameObject, p: Extract<ManaProduce, { kind: "re
 }
 
 /** Every combination of `n` mana of any colors (each multiset once, in WUBRG order): ManaProduce "anyColors". */
-export function colorCombos(n: number): ManaType[][] {
+export function colorCombos(n: number, colors: readonly Color[] = COLORS): ManaType[][] {
+  const among = COLORS.filter((x) => colors.includes(x));
   let out: Color[][] = [[]];
-  for (let i = 0; i < n; i++) out = out.flatMap((c) => COLORS.filter((x) => !c.length || COLORS.indexOf(x) >= COLORS.indexOf(c[c.length - 1]!)).map((x) => [...c, x]));
+  for (let i = 0; i < n; i++) out = out.flatMap((c) => among.filter((x) => !c.length || COLORS.indexOf(x) >= COLORS.indexOf(c[c.length - 1]!)).map((x) => [...c, x]));
   return out;
 }
 
@@ -126,7 +127,7 @@ export function anyColorsCount(s: GameState, o: GameObject, p: Extract<ManaProdu
 /** The combinations an ability is activated with (ManaOption.combo), or null if it has none to choose from. */
 export function manaCombos(s: GameState, o: GameObject, ab: ManaAbility): ManaType[][] | null {
   const p = ab.produces;
-  return p.kind === "combos" ? p.options : p.kind === "removeX" ? removeXCombos(o, p) : p.kind === "anyColors" ? colorCombos(anyColorsCount(s, o, p)) : null;
+  return p.kind === "combos" ? p.options : p.kind === "removeX" ? removeXCombos(o, p) : p.kind === "anyColors" ? colorCombos(anyColorsCount(s, o, p), p.colors) : null;
 }
 
 /**
@@ -160,7 +161,7 @@ function baseManaProduced(s: GameState, o: GameObject, ab: ManaAbility, choice: 
   const p = ab.produces;
   if (p.kind === "combos") return p.options[combo ?? -1] ?? [];
   if (p.kind === "removeX") return removeXCombos(o, p)[combo ?? -1] ?? [];
-  if (p.kind === "anyColors") return colorCombos(anyColorsCount(s, o, p))[combo ?? -1] ?? [];
+  if (p.kind === "anyColors") return colorCombos(anyColorsCount(s, o, p), p.colors)[combo ?? -1] ?? [];
   if ((p.kind === "fixed" || p.kind === "oneOf") && p.n) {
     // CR 106.1: worked out as the ability resolves, with the permanent as "~" and its controller as "you".
     // "Of the chosen type" (Three Tree City): the type chosen for it as it entered.
@@ -324,7 +325,7 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   if (ab.energyCost && (p.energy ?? 0) < ab.energyCost) return `you need ${ab.energyCost} energy`; // CR 107.14
   if (ab.removeCounters && (o.counters[ab.removeCounters.counter] ?? 0) < ab.removeCounters.n) return `${name} doesn't have enough ${ab.removeCounters.counter} counters`;
   if (ab.produces.kind === "removeX" && (o.counters[ab.produces.counter] ?? 0) < ab.produces.min) return `${name} has no ${ab.produces.counter} counters`;
-  if (!ignorePool && ab.manaCost && !canPayFromPool(s, pid, parseManaCost(ab.manaCost), { ability: o })) return "not enough mana";
+  if (!ignorePool && ab.manaCost && !canPayFromPool(s, pid, activationLessCost(s, o, parseManaCost(ab.manaCost)), { ability: o })) return "not enough mana";
   // "Tap an untapped creature you control" (CR 602.2b): without a choice, whether there's enough to tap.
   if (ab.tapCost) {
     const can = tapCostCandidates(s, pid, o, ab.tapCost);

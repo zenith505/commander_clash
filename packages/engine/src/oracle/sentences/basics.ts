@@ -444,6 +444,10 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: "turnRules", rules }];
   }
   if (/^You may cast spells this turn as though they had flash$/i.test(s)) return [{ type: "turnRules", rules: ["flash"] }];
+  if ((m = /^Until your next turn, you may cast (sorcery|creature|artifact|enchantment) spells as though they had flash$/.exec(s))) {
+    const filter = parseTargetPhrase(`${m[1]} spell`);
+    return filter?.kind === "spell" ? [{ type: "flashUntilNextTurn", filter: { ...filter, text: `${m[1]} spells` } }] : null;
+  }
   if (/^Spells you control can't be countered this turn$/i.test(s)) return [{ type: "turnRules", rules: ["spellsUncounterable"] }];
   if ((m = /^(Players|Your opponents) can't gain life this turn$/i.exec(s))) return [{ type: "noLifeGain", players: /^players$/i.test(m[1]!) ? "all" : "opponents" }];
   if (/^Damage can't be prevented this turn$/i.test(s)) return [{ type: "noPrevention" }];
@@ -466,8 +470,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Prevent all combat damage that would be dealt to and dealt by that creature this turn" (Maze of Ith), "Prevent all
   // damage target creature would deal this turn": a prevention effect on that creature until the turn ends (CR 615.1).
-  if ((m = /^(Prevent all .+) this turn$/i.exec(s)) || (m = /^Prevent all (combat )?damage (.+?) would deal this turn$/i.exec(s))) {
-    const p = m.length === 2 ? parsePreventAll(m[1]!) : { subject: m[2]!, mod: { kind: "preventDamage" as const, by: true as const, ...(m[1] ? { combat: "only" as const } : {}) } };
+  const wouldDeal = /^Prevent all (combat )?damage (.+?) would deal this turn$/i.exec(s);
+  if (((m = /^(Prevent all .+) this turn$/i.exec(s)) && parsePreventAll(m[1]!)) || (m = wouldDeal)) {
+    const p = m !== wouldDeal ? parsePreventAll(m[1]!) : { subject: m[2]!, mod: { kind: "preventDamage" as const, by: true as const, ...(m[1] ? { combat: "only" as const } : {}) } };
     const what = p && /^(~|it|that creature|target .+)$/i.test(p.subject) ? parseObject(p.subject, ctx) : null;
     return p && what ? [{ type: "continuous", what, mods: [p.mod], duration: "endOfTurn" }] : null;
   }
@@ -524,12 +529,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (d?.type !== "damage" || typeof d.amount === "number" || d.amount.count.kind !== "x" || d.amount.plus || d.amount.times) return null;
     return [{ ...d, amount: { ...d.amount, plus: Number(m[2]) } }];
   }
-  // "~ deals twice X damage to target creature" (Torch the Witness): X times 2.
-  if ((m = /^(~|it|that creature) deals twice X damage to (.+)$/i.exec(s))) {
-    const fx = parseSentence(`${m[1]} deals X damage to ${m[2]}`, ctx);
+  // "~ deals twice X damage to target creature" (Torch the Witness): X times 2; "five times X damage to each of up to X
+  // targets" (Crackle with Power).
+  if ((m = /^(~|it|that creature) deals (twice|three times|four times|five times) X damage to (.+)$/i.exec(s))) {
+    const fx = parseSentence(`${m[1]} deals X damage to ${m[3]}`, ctx);
     const d = fx?.length === 1 ? fx[0] : undefined;
     if (d?.type !== "damage" || typeof d.amount === "number" || d.amount.count.kind !== "x" || d.amount.plus || d.amount.times) return null;
-    return [{ ...d, amount: { ...d.amount, times: 2 } }];
+    return [{ ...d, amount: { ...d.amount, times: m[2] === "twice" ? 2 : num(m[2]!.replace(/ times$/, "")) } }];
   }
   // Damage: "~ deals 3 damage to any target"; "it deals that much damage to each other opponent" after "Whenever a
   // commander you control deals combat damage to an opponent" (Kediss): that creature deals it.

@@ -37,6 +37,8 @@ export interface Ctx {
   sacrificedIt?: boolean;
   /** A revealFromHand instruction came before, here or in the ability whose reflexive trigger this is: "for each card revealed this way". */
   revealedFromHand?: boolean;
+  /** After "may have you ...": "you mill three cards, then ... the total mana value of those cards" (Combustible Gearhulk). */
+  milledThisWay?: boolean;
   /** A damage instruction came before: "the excess damage dealt this way" (CR 120.10). */
   excessDamage?: boolean;
   /** A tapAnyNumber instruction came before, here or in the ability whose reflexive trigger this is: "for each creature tapped this way". */
@@ -128,14 +130,31 @@ const CARD_TYPE_WORD = "(?:artifact|battle|creature|enchantment|instant|land|pla
  * a trigger it can have: an intervening "if" or a zone would need more about its source than it has.
  */
 const FLOATING_EVENTS = new Set<string>(["castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer"]);
-const FLOATING_KEYS = new Set<string>(["event", "cast", "dies", "dealer", "toOpponent", "body"]);
+const FLOATING_KEYS = new Set<string>(["event", "cast", "dies", "dealer", "toOpponent", "orPlaneswalker", "body"]);
 
 /**
  * "Until end of turn, whenever you cast a spell, copy it. You may choose new targets for the copy.": a delayed triggered
  * ability that triggers each time until then (CR 603.7b), the sentences after it its instructions. Undefined when `s`
  * isn't one, null when it can't be compiled.
  */
-function floatingTrigger(s: string, after: string[]): Effect | null | undefined {
+function floatingTrigger(s: string, after: string[], ctx?: Ctx): Effect | null | undefined {
+  // "Choose target creature you control. Whenever that creature deals combat damage to a player or planeswalker this
+  // turn, draw that many cards." (Hunter's Insight): a delayed trigger about that creature (CR 603.7b-c), this turn.
+  const that = ctx?.lastObjectTarget !== undefined ? /^Whenever (?:that creature|it) (deals combat damage to a player(?: or planeswalker)?) this turn, (.+)$/.exec(s) : null;
+  if (that) {
+    const trigger = parseTrigger(`Whenever ~ ${that[1]!}, ${[that[2]!, ...after.map((x) => x.replace(/\.$/, ""))].join(". ")}.`);
+    if (!trigger || trigger === "fail" || trigger.event !== "selfDealsCombatDamageToPlayer" || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
+    return { type: "floatingTrigger", trigger, until: "endOfTurn", about: ctx!.lastObjectTarget! };
+  }
+  // "Choose target opponent. Whenever a creature you control deals combat damage to that player this turn, create a tapped
+  // Treasure token." (Great Train Heist): a delayed trigger this turn, only for combat damage to that player.
+  const toThem = ctx && /^Choose target opponent$/.test(s) ? /^Whenever (a creature you control) deals combat damage to that player this turn, (.+)$/.exec(after[0] ?? "") : null;
+  if (toThem) {
+    const trigger = parseTrigger(`Whenever ${toThem[1]!} deals combat damage to a player, ${[toThem[2]!.replace(/\.$/, ""), ...after.slice(1).map((x) => x.replace(/\.$/, ""))].join(". ")}.`);
+    if (!trigger || trigger === "fail" || trigger.event !== "creatureYouControlDealsCombatDamageToPlayer" || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
+    const index = addTarget(ctx!, { kind: "player", opponent: true, text: "target opponent" });
+    return { type: "floatingTrigger", trigger, until: "endOfTurn", aboutPlayer: index };
+  }
   const m = /^([Uu]ntil end of turn|[Tt]his turn|[Uu]ntil your next turn|[Uu]ntil the end of your next turn), ([Ww]henever .+)$/.exec(s);
   if (!m) return undefined;
   const text = [m[2]!, ...after.map((x) => x.replace(/\.$/, ""))].join(". ");
@@ -666,7 +685,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   let prevTargets = 0;
   let curTargets = 0;
   // "You may pay {2}" waits for the sentence after: "If you do, draw a card."
-  let payFirst: { pay: PayCost; text: string } | null = null;
+  let payFirst: { pay: PayCost; text: string; payX?: { max?: Amount } } | null = null;
   // "Look at the top four cards of your library" waits for what to do with them (see parseDig).
   let dig: Partial<Extract<Effect, { type: "dig" }>> | null = null;
   // The look's own "where X is ...", for "with mana value X or less" after it (Hatchery Spider).
@@ -861,6 +880,50 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       if (!options || !then) return null;
       if (noRegen) si++;
       effects.push({ type: "punisher", who: { ref: anyMay[1] === "player" ? "eachPlayer" : "eachOpponent" }, options, effects: then, mode: anyThen[1] === "a player does" ? "ifAny" : "ifNone", thenText: anyThen[2]! });
+      si++;
+      continue;
+    }
+    // "Target opponent may have you draw three cards. If the player doesn't, you mill three cards, then ~ deals damage to
+    // that player equal to the total mana value of those cards." (Combustible Gearhulk), "defending player may have you
+    // draw a card. If they do, untap ~ and remove it from combat" (Shakedown Heavy): that player decides as it resolves
+    // (CR 608.2d), and what happens either way is yours to do.
+    const haveYou = /^(?:Then )?([Tt]arget opponent|[Dd]efending player) may have you (.+)$/.exec(s);
+    const haveIf = haveYou && /^If (?:the player|that player|they) (doesn't|don't|does|do), (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (haveYou && haveIf) {
+      const who = parsePlayer(haveYou[1]!.toLowerCase(), ctx);
+      if (!who || who.ref === "you") return null;
+      const what = attempt(ctx, () => parseOne(`You ${haveYou[2]!}`, ctx));
+      if (!what || what.some((e) => pauses(e))) return null;
+      ctx.milledThisWay = true;
+      // "You mill X cards, where X is the number of influence counters on ~, and that player loses life equal to ..."
+      // (Palantír of Orthanc): two instructions.
+      const two = /^(you mill X cards, where X is [^,]+), and (that player .+)$/.exec(haveIf[2]!);
+      const one = (text: string): Effect[] | null => {
+        const where = /^(.+), where X is (.+)$/.exec(text);
+        if (!where) return attempt(ctx, () => parseOne(capital(text), ctx));
+        ctx.whereX = true;
+        const fx = attempt(ctx, () => parseOne(capital(where[1]!), ctx));
+        ctx.whereX = false;
+        const def = fx && parseCount(where[2]!.replace(/ counters on it$/, " counters on ~"), ctx);
+        return fx && def ? replaceX(fx, def) : null;
+      };
+      const then = two ? ((a, b) => (a && b ? [...a, ...b] : null))(one(two[1]!), one(two[2]!)) : one(haveIf[2]!);
+      ctx.milledThisWay = undefined;
+      if (!then) return null;
+      effects.push({ type: "eachMay", who, effects: what, text: `have ~'s controller ${haveYou[2]!}` }, { type: "if", cond: { kind: "theyChose", ...(/n't$/.test(haveIf[1]!) ? { not: true as const } : {}) }, effects: then });
+      si++;
+      continue;
+    }
+    // "Whenever an artifact or creature an opponent controls enters untapped, they may tap that permanent. If they don't,
+    // you create a 1/1 white Vampire creature token with lifelink." (Charismatic Conqueror): its controller decides as it
+    // resolves; one that's tapped or gone by then can't be tapped, so the token comes (rulings).
+    const tapThat = ctx.subject ? /^(?:[Tt]hey|[Tt]hat player) may tap that (permanent|creature|artifact)$/.exec(s) : null;
+    const tapIf = tapThat && /^If (?:they|that player|the player) (?:doesn't|don't), (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (tapThat && tapIf) {
+      const what = attempt(ctx, () => parseOne(`Tap that ${tapThat[1]!}`, ctx));
+      const then = what && attempt(ctx, () => parseOne(capital(tapIf[1]!), ctx));
+      if (!what || !then) return null;
+      effects.push({ type: "eachMay", who: { ref: "subjectController" }, effects: what, text: `tap that ${tapThat[1]!}`, untappedSubject: true }, { type: "if", cond: { kind: "theyChose", not: true }, effects: then });
       si++;
       continue;
     }
@@ -1167,23 +1230,31 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // copy ~ and may choose a new target for that copy" (Chain of Vapor), "Then that permanent's controller may copy ~ and
     // may choose a new target for that copy" (Chain of Acid). That player, as it resolves, controls the copy (CR 707.10,
     // 707.10c); as if they were "you" (eachMay's each). Who it is when the permanent has left: its last controller (608.2h).
-    const chain = /^([Tt]hat (?:permanent|creature)'s controller) may (sacrifice a land of their choice|copy ~ and may choose a new target for that copy)$/.exec(s);
+    // "Then that player or that permanent's controller may pay {R}{R}. If the player does, they may copy ~ ..." (Chain
+    // Lightning), "... may discard a card ..." (Chain of Plasma), "That player may copy ~ ..." (Chain of Smog): the player
+    // targeted, or the targeted permanent's controller.
+    const chain = /^([Tt]hat (?:permanent|creature)'s controller|[Tt]hat player or that permanent's controller|[Tt]hat player) may (sacrifice a land of their choice|discard a card|pay ((?:\{[^}]+\})+)|copy ~ and may choose a new target for that copy)$/.exec(s);
     const chainCopy = /^(?:If the player does, )?they may copy ~ and may choose a new target for that copy$/;
     if (chain && ctx.spell && (chain[2]!.startsWith("copy") || chainCopy.test(sentences[si + 1]?.replace(/\.$/, "") ?? ""))) {
-      const who = parsePlayer(chain[1]!.toLowerCase(), ctx);
-      if (who?.ref !== "targetController") return null;
+      const last = ctx.targets.length - 1;
+      const who: PlayerRef | null = /or that permanent's/i.test(chain[1]!) ? (ctx.targets[last]?.kind === "any" && ctx.targets.length === 1 ? { ref: "targetOrController", index: last } : null) : parsePlayer(chain[1]!.toLowerCase(), ctx);
+      if (who?.ref !== "targetController" && who?.ref !== "targetOrController" && !(who?.ref === "target" && ctx.targets.length === 1 && ctx.targets[0]!.kind === "player")) return null;
       const copy: Effect = { type: "copySpell", spell: "self", n: 1, newTargets: true };
       const land: TargetSpec = { kind: "object", types: ["Land"], text: "land" };
-      const cost = chain[2] !== undefined && !chain[2].startsWith("copy");
+      const how = chain[2]!.startsWith("copy") ? "copy" : chain[2]!.startsWith("sacrifice") ? "land" : chain[2]!.startsWith("discard") ? "discard" : "pay";
+      const mayCopy: Effect = { type: "may", effects: [copy], text: "copy ~ and choose a new target for the copy" };
       effects.push({
         type: "eachMay",
         who,
         each: true,
         chain: true,
-        effects: cost ? [{ type: "pick", who: { ref: "you" }, filter: land, n: 1, action: "sacrifice" }, { type: "may", effects: [copy], text: "copy ~ and choose a new target for the copy" }] : [copy],
-        text: cost ? "sacrifice a land to copy ~" : "copy ~ and choose a new target for the copy",
-        ...(cost ? { need: { zone: "battlefield" as const, filter: { ...land, controller: "you" as const } } } : {}),
+        effects: how === "land" ? [{ type: "pick", who: { ref: "you" }, filter: land, n: 1, action: "sacrifice" }, mayCopy] : how === "discard" ? [{ type: "discard", who: { ref: "you" }, n: 1 }, mayCopy] : how === "pay" ? [mayCopy] : [copy],
+        text: how === "land" ? "sacrifice a land to copy ~" : how === "discard" ? "discard a card to copy ~" : how === "pay" ? `pay ${chain[3]} to copy ~` : "copy ~ and choose a new target for the copy",
+        ...(how === "land" ? { need: { zone: "battlefield" as const, filter: { ...land, controller: "you" as const } } } : {}),
+        ...(how === "discard" ? { need: { zone: "hand" as const, filter: { kind: "card" as const, text: "card" } } } : {}),
+        ...(how === "pay" ? { pay: { mana: chain[3]! } } : {}),
       });
+      const cost = how !== "copy";
       if (cost) si++;
       continue;
     }
@@ -1256,7 +1327,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si += 2;
       continue;
     }
-    if (lookTop && si === sentences.length - 1) {
+    // "Look at the top card of target player's library. Draw a card at the beginning of the next turn's upkeep." (Mishra's
+    // Bauble): a draw after it doesn't refer to the card either.
+    if (lookTop && (si === sentences.length - 1 || (si === sentences.length - 2 && /^Draw a card(?: at the beginning of the next turn's upkeep)?$/.test(sentences[si + 1]!)))) {
       const who = parsePlayer(lookTop[1] === "your" ? "you" : lookTop[1]!.replace(/'s$/, ""), ctx);
       if (!who) return null;
       effects.push({ type: "orderTop", who, n: 1 });
@@ -1291,9 +1364,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // Dark Confidant: "Reveal the top card of your library and put that card into your hand. You lose life equal to
     // its mana value."
     if (/^[Rr]eveal the top card of your library and put (?:that card|it) into your hand$/.test(s)) {
-      const life = /^(You|Each opponent) (?:loses?|(gains?)) life equal to (?:its|that card's|the card's) mana value$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
-      effects.push({ type: "revealTopToHand", ...(life ? { life: { who: life[1] === "You" ? { ref: "you" } : { ref: "eachOpponent" }, ...(life[2] ? { gain: true } : {}) } } : {}) });
-      if (life) si++;
+      const next = sentences[si + 1]?.replace(/\.$/, "") ?? "";
+      const life = /^(You|Each opponent) (?:loses?|(gains?)) life equal to (?:its|that card's|the card's) mana value$/.exec(next);
+      const drain = /^Each opponent loses X life and you gain X life, where X is (?:its|that card's|the card's) mana value$/.test(next);
+      effects.push({ type: "revealTopToHand", ...(drain ? { life: { who: { ref: "eachOpponent" }, drain: true } } : life ? { life: { who: life[1] === "You" ? { ref: "you" } : { ref: "eachOpponent" }, ...(life[2] ? { gain: true } : {}) } } : {}) });
+      if (life || drain) si++;
       continue;
     }
     // "Repeat this process once" after a punisher (Remorseless Punishment); "Repeat the following process X times" before
@@ -1471,6 +1546,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       // "You may pay {2}{W}. When you do, tap target creature." (Thousand Moons Crackshot): paying triggers a reflexive
       // ability with targets of its own, chosen as it's put on the stack (CR 603.12; rulings). The rest of the ability is its.
       const whenPaid = /^When you do, (.+)$/.exec(s);
+      if (whenPaid && payFirst.payX) return null;
       if (whenPaid) {
         const reflexive = reflexiveBody([whenPaid[1]!, ...sentences.slice(si + 1)].join(". "), ctx);
         if (!reflexive) return null;
@@ -1481,9 +1557,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       }
       const then = /^If you do, (.+)$/.exec(s);
       if (!then) return null;
+      // "Whenever ~ attacks, you may pay {X}{R}. If you do, it deals X damage to any target." (Flameblast Dragon): "it" is ~.
+      if (ctx.selfIt && !ctx.subjectIt) then[1] = then[1]!.replace(/^it deals /, "~ deals ");
       // "You may pay {1}. If you do, look at the top two cards of your library. Put one of them into your hand and the
       // other into your graveyard." (Marchesa): the whole look depends on the payment.
       const lookPaid = new RegExp(`^look at the top ${NUMX} cards? of your library$`).exec(then[1]!);
+      if (payFirst.payX && !/\bX\b/.test(then[1]!)) return null;
+      if (lookPaid && payFirst.payX) return null;
       if (lookPaid) {
         dig = { type: "dig", n: amt(lookPaid[1]!), reveal: false };
         digPaid = { pay: payFirst.pay, text: `${payFirst.text}. If you do, ${then[1]}` };
@@ -1493,7 +1573,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
       // "You may pay {R}{G}{W}{U}. If you do, until end of turn, whenever he deals combat damage to an opponent, ..."
       // (Human Torch): the delayed triggered ability, and the rest of the paragraph its instructions, if paid.
-      const floatingPaid = floatingTrigger(then[1]!, sentences.slice(si + 1));
+      const floatingPaid = payFirst.payX ? undefined : floatingTrigger(then[1]!, sentences.slice(si + 1));
       if (floatingPaid !== undefined) {
         if (!floatingPaid) return null;
         effects.push({ type: "may", effects: [floatingPaid], pay: payFirst.pay, text: `${payFirst.text}. If you do, ${[then[1]!, ...sentences.slice(si + 1)].join(". ")}` });
@@ -1503,7 +1583,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       }
       // "You may pay {2}{U}. If you do, exile the top card of your library face down. You may look at that card ... You
       // may play that card ..." (Intet): the exile and its permissions depend on the payment.
-      const paidFaceDown = parseFaceDownPlay([cap(then[1]!), ...sentences.slice(si + 1)], 0, ctx);
+      const paidFaceDown = payFirst.payX ? null : parseFaceDownPlay([cap(then[1]!), ...sentences.slice(si + 1)], 0, ctx);
       if (paidFaceDown === "fail") return null;
       if (paidFaceDown) {
         effects.push({ type: "may", effects: [paidFaceDown.effect], pay: payFirst.pay, text: `${payFirst.text}. If you do, ${sentences.slice(si, si + paidFaceDown.next).join(". ").replace(/^If you do, /, "")}` });
@@ -1527,8 +1607,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
           return all;
         });
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
-      effects.push({ type: "may", effects: inner, pay: payFirst.pay, text: `${payFirst.text}. If you do, ${then[1]}` });
+      effects.push({ type: "may", effects: inner, pay: payFirst.pay, text: `${payFirst.text}. If you do, ${then[1]}`, ...(payFirst.payX ? { payX: payFirst.payX } : {}) });
       payFirst = null;
+      continue;
+    }
+    // "You may pay {X}. If you do, ..." (Decree of Justice), "... {X}{R} ..." (Flameblast Dragon), "you may pay {X}, where
+    // X is less than or equal to the amount of life you gained" (Well of Lost Dreams): X chosen as it resolves.
+    const mayPayX = /^[Yy]ou may pay (\{X\}(?:\{(?:\d+|[WUBRGC])\})*)(?:, where X is less than or equal to (.+))?$/.exec(s);
+    if (mayPayX) {
+      // "The amount of life you gained": what the "whenever you gain life" event gave (CR 119.9).
+      const max = mayPayX[2] === "the amount of life you gained" ? { count: { kind: "eventAmount" as const } } : mayPayX[2] !== undefined ? parseCount(mayPayX[2]!, ctx) : undefined;
+      if (max === null) return null;
+      payFirst = { pay: { mana: mayPayX[1]! }, text: `pay ${mayPayX[1]}`, payX: max ? { max } : {} };
       continue;
     }
     const mayPay = /^[Yy]ou may pay (.+)$/.exec(s);
@@ -2384,7 +2474,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       continue;
     }
     // A delayed triggered ability with a duration (CR 603.7b): the rest of the paragraph is its instructions.
-    const floating = floatingTrigger(s, sentences.slice(si + 1));
+    const floating = floatingTrigger(s, sentences.slice(si + 1), ctx);
     if (floating !== undefined) {
       if (!floating) return null;
       effects.push(floating);
@@ -2965,6 +3055,8 @@ export function usesX(v: unknown): boolean {
     const o = v as Record<string, unknown>;
     // A reflexive trigger whose X is its own (Unleash the Inferno's excess damage).
     if (o.type === "reflexive" && o.xExcess) return false;
+    // "You may pay {X}. If you do, ...": the X paid (Decree of Justice).
+    if (o.type === "may" && o.payX) return usesX(o.otherwise);
     if (o.count && (o.count as Count).kind === "x") return true;
     if (o.many === "x" || o.many === "exactX") return true; // "X target creatures"
     if (o.xRange || (o.total as TargetSpec["total"])?.x || o.kind === "xAtLeast") return true; // "with mana value X or less", "if X is 5 or more"
@@ -3117,7 +3209,7 @@ function parseModal(count: string, bullets: string, text: string, opts: Paramete
 
 /** "X and Y" where each half is its own effect. */
 function parseConjunction(s: string, ctx: Ctx): Effect[] | null {
-  const parts = s.split(/,? and (?=(?:you|each|target|draw|~|its|create|put|return|exile|destroy|tap|untap|mill|suspect|convert|transform|after this phase|they gain)\b|get (?:\{E\}|\w+ \{E\}|an amount of \{E\}))/i);
+  const parts = s.split(/,? and (?=(?:you|each|target|draw|~|its|create|put|return|exile|destroy|tap|untap|mill|suspect|convert|transform|after this phase|they gain|scry \d+$|surveil \d+$)\b|get (?:\{E\}|\w+ \{E\}|an amount of \{E\}))/i);
   if (parts.length < 2) return null;
   const out: Effect[] = [];
   for (const p of parts) {

@@ -332,11 +332,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // "A creature card with lesser power" (Shadowfax): than the source's power (rulings).
     const lesser = / with lesser power$/.exec(m[3]!);
     if (lesser && (ctx.spell || !(ctx.selfIt || ctx.activated))) return null;
-    const phrase = lesser ? m[3]!.slice(0, lesser.index) : m[3]!;
+    // "A permanent card with equal or lesser mana value" (Kodama of the East Tree): than the permanent that entered.
+    const equal = / with equal or lesser mana value$/.exec(m[3]!);
+    if (equal && !ctx.subjectIt) return null;
+    const phrase = lesser ? m[3]!.slice(0, lesser.index) : equal ? `${m[3]!.slice(0, equal.index)} with mana value less than or equal to that permanent's mana value` : m[3]!;
     // "A permanent card with mana value less than or equal to that damage" (Covert Technician): counted as it resolves.
     const filter0 = parseSearchFilter(phrase, (t) => parseBoundCount(t, ctx));
     if (filter0 === null) return null;
-    const filter = filter0 && lesser ? { ...filter0, text: m[3]! } : filter0;
+    const filter = filter0 && (lesser || equal) ? { ...filter0, text: m[3]! } : filter0;
     return [{ type: "putFromHand", ...(filter ? { filter } : {}), ...(m[4] ? { tapped: true } : {}), ...(m[5] ? { attacking: true } : {}), may: !!m[1] || m[2] === "any number of", ...(m[2] === "any number of" ? { any: true } : {}), ...(lesser ? { lesserPower: true as const } : {}), ...(m[6] ? { attackingEvent: true as const } : {}) }];
   }
   // Imprint: "You may exile a nonartifact, nonland card from your hand" (Chrome Mox), "... an instant card with mana value 2

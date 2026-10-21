@@ -769,6 +769,12 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, mods, ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : e.duration === "whileTapped" ? ` for as long as ${src} remains tapped` : e.duration === "whileControlled" ? ` for as long as ${player(s, ctx.controller).name} controls ${src}` : ""}.`);
       return;
     }
+    case "groupRules": {
+      s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, sourceId: ctx.sourceId, duration: e.duration, ...(e.duration === "yourNextTurn" ? { turnOf: ctx.controller } : {}), affected: [], group: e.affects, mods: e.mods });
+      invalidateCharacteristics(s);
+      log(s, `Until ${e.duration === "endOfTurn" ? "end of turn" : `${player(s, ctx.controller).name}'s next turn`}, ${e.text} ${describeMods(s, e.mods, ctx.controller, true)}.`);
+      return;
+    }
     case "playerGains": {
       // The chosen color or player filled in now (CR 608.2h); until end of turn (CR 514.2).
       const mod = fixMods(s, [{ kind: "addKeywords", keywords: e.keywords }], ctx)[0];

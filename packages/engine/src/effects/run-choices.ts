@@ -1,8 +1,8 @@
 import { allEffects, type Effect, type PayCost, type PunisherOption, type TargetSpec } from "../abilities";
-import { parseManaCost, spentMeets, type ManaSpent } from "../mana";
+import { manaValue, parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
-import { autoEvidence, canLoseLife, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, moveObject, obj, opponents, payableLife, player, shareCreatureType } from "../game";
+import { autoEvidence, availableMana, canLoseLife, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, moveObject, obj, opponents, payableLife, player, shareCreatureType } from "../game";
 import { cardIdOf, defOf } from "../cards";
 import { controllerOf, staticConditionNow } from "../layers";
 import type { GameState, PlayerId } from "../types";
@@ -26,6 +26,24 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const source = e.once && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       const key = `${ctx.sourceZc ?? source?.zoneChanges ?? 0}|do:${e.text}`;
       if (sc.may === undefined && source?.triggeredThisTurn?.includes(key)) sc.may = false; // done already this turn (CR 603.2h)
+      // "You may pay {X}": X first (CR 107.1c), at most what the player could pay, then the payment with that X.
+      if (e.payX && e.pay?.mana && sc.may === undefined) {
+        if (sc.payX === undefined) {
+          const rest = manaValue(parseManaCost(e.pay.mana.replace("{X}", "")));
+          const cap = Math.min(availableMana(s, ctx.controller) - rest, e.payX.max ? amountNow(s, e.payX.max, ctx) : Infinity);
+          if (cap < 0) sc.may = false;
+          else {
+            const options = ["none", ...Array.from({ length: Math.min(cap, 40) + 1 }, (_, i) => String(i))];
+            s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "payX", options, labels: options.map((o) => (o === "none" ? "Don't pay" : `X = ${o}`)), prompt: `${e.text.replace(/~/g, src)}: choose X` };
+            return "paused";
+          }
+        } else if (sc.payX === "none") sc.may = false;
+        else {
+          const pay = { ...e.pay, mana: e.pay.mana.replace("{X}", `{${sc.payX}}`) };
+          s.pending = { kind: "chooseMay", player: ctx.controller, prompt: `pay ${describePay(pay)}`, source: src, pay };
+          return "paused";
+        }
+      }
       if (sc.may === undefined) {
         // Fabricate: with the permanent gone, the counters can't be put on it, so it's the tokens (rulings).
         const onSelf = e.effects.every((x) => "what" in x && x.what?.ref === "self") && (e.effects.length > 0 || !!e.otherwise?.every((x) => "what" in x && x.what?.ref === "self"));
@@ -53,7 +71,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         return;
       }
       if (source && !source.triggeredThisTurn?.includes(key)) (source.triggeredThisTurn ??= []).push(key);
-      for (const inner of e.effects) if (runEffect(s, inner, ctx) === "paused") return "paused";
+      const xctx = e.payX ? { ...ctx, x: Number(sc.payX) } : ctx;
+      for (const inner of e.effects) if (runEffect(s, inner, xctx) === "paused") return "paused";
       return;
     }
     case "either": {
@@ -73,17 +92,22 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // Someone who can't do it isn't asked (CR 101.3): "put two +1/+1 counters on a creature they control" with none.
         const need = e.need;
         const can = (pid: PlayerId) =>
-          !need ||
-          (need.zone === "battlefield"
-            ? s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, need.filter, obj(s, id), pid, false))
-            : player(s, pid).graveyard.some((id) => printedMatches(need.filter, defOf(s, obj(s, id)))));
-        sc.mayQueue = apnap(s, players(s, e.who, ctx)).filter(can);
+          (!e.pay || canPayNow(s, pid, e.pay)) &&
+          (!need ||
+            (need.zone === "battlefield"
+              ? s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, need.filter, obj(s, id), pid, false))
+              : need.zone === "hand"
+                ? player(s, pid).hand.length > 0
+                : player(s, pid).graveyard.some((id) => printedMatches(need.filter, defOf(s, obj(s, id))))));
+        const sub = ctx.subject && s.objects[ctx.subject.id];
+        const untapped = !e.untappedSubject || (!!sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === ctx.subject!.zc && !sub.tapped);
+        sc.mayQueue = untapped ? apnap(s, players(s, e.who, ctx)).filter(can) : [];
         sc.mayers = [];
       }
       while (sc.mayQueue.length) {
         const pid = sc.mayQueue[0]!;
         if (sc.may === undefined) {
-          s.pending = { kind: "chooseMay", player: pid, prompt: e.text.replace(/~/g, src), source: src, ...(e.wheel !== undefined ? { wheel: e.wheel } : {}) };
+          s.pending = { kind: "chooseMay", player: pid, prompt: e.text.replace(/~/g, src), source: src, ...(e.wheel !== undefined ? { wheel: e.wheel } : {}), ...(e.pay ? { pay: e.pay } : {}) };
           return "paused";
         }
         if (sc.may) sc.mayers!.push(pid);
@@ -93,6 +117,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // Who did, for the instructions after this one ("each player who drew a card this way gains 1 life").
       s.resolving!.choseThisWay = [...sc.mayers!];
       if (e.each) return eachAccepted(s, e, ctx);
+      // Nobody did: nothing happens ("target opponent may have you draw three cards", Combustible Gearhulk).
+      if (!sc.mayers!.length) return;
       // Each instruction once, also when one of them waits on a player (a draw that stops for dredge).
       for (sc.mayStep ??= 0; sc.mayStep < e.effects.length; sc.mayStep++) if (runEffect(s, e.effects[sc.mayStep]!, ctx) === "paused") return "paused";
       return;
@@ -218,6 +244,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const holds = held ? held.holds :
         e.cond.kind === "youDid"
           ? !!s.resolving!.did
+          : e.cond.kind === "theyChose"
+          ? !!s.resolving!.choseThisWay?.length !== !!e.cond.not
           : e.cond.kind === "selfHere"
           ? objects(s, { ref: "self" }, ctx).some((o) => !(e.cond as { yours?: true }).yours || controllerOf(s, o) === ctx.controller)
           : e.cond.kind === "libraryHas"

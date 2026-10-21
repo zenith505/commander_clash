@@ -1,5 +1,5 @@
 import type { CounterKind, ManaAbility, ManaProduce, ManaSpend, ManaTrigger, TargetSpec } from "../abilities";
-import type { ManaType } from "../types";
+import type { Color, ManaType } from "../types";
 import { NUM, num, COUNTER, counterKind, ALL_COLORS, sacrificeSelf, singular } from "./words";
 import { energyIn } from "./activated";
 import { parseTargetPhrase, pickFilter } from "./targets";
@@ -221,6 +221,12 @@ function parseManaProduced(text: string): ManaProduce | null {
     if (!combo[2]) return num(combo[1]!) > 1 ? { kind: "anyColors", n: num(combo[1]!) } : null;
     const n = parseCount(combo[3]!, null);
     return n && { kind: "anyColors", n };
+  }
+  // "X mana in any combination of {U} and/or {R}, where X is ~'s power" (Vivi Ornitier).
+  const two = /^X mana in any combination of \{([WUBRG])\} and\/or \{([WUBRG])\}, where X is (.+)$/.exec(text);
+  if (two && two[1] !== two[2]) {
+    const n = parseCount(two[3]!, null);
+    return n && { kind: "anyColors", n, colors: [two[1] as Color, two[2] as Color] };
   }
   const xAny = /^X mana of any one color, where X is (.+)$/.exec(text);
   if (xAny) {

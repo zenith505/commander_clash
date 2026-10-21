@@ -1,4 +1,4 @@
-import type { AbilityBody, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CostMod, NamePurpose, CounterKind, DamageMod, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec, TokenSpec, ManaTrigger, TriggeredAbility, TriggerDuration } from "./abilities";
+import type { AbilityBody, Affects, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CostMod, NamePurpose, CounterKind, DamageMod, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec, TokenSpec, ManaTrigger, TriggeredAbility, TriggerDuration } from "./abilities";
 import type { DamageEvent } from "./damage";
 import type { Characteristics } from "./layers";
 
@@ -277,6 +277,11 @@ export interface GameObject {
    * them but not the designation (rulings).
    */
   suspected?: number;
+  /**
+   * The permanent whose ability put it onto the battlefield from a hand, as that object was (`zc`): "if it wasn't put
+   * onto the battlefield with this ability" (Kodama of the East Tree). Gone when it leaves (CR 400.7).
+   */
+  putBy?: { id: ObjectId; zc: number };
   /** A Class's level (CR 716.2a-b), a designation it keeps until it leaves the battlefield; unset is level 1 (716.2d). */
   classLevel?: number;
   /** A Case's solved designation (CR 719.3b), kept until it leaves the battlefield; not a copiable value. */
@@ -956,6 +961,8 @@ export interface ContinuousEffect {
   /** "For as long as it has a vow counter on it" (CR 611.2b): it applies only to those of `affected` with one (Promise of Loyalty). */
   whileCounter?: string;
   affected: ObjectId[];
+  /** Instead of `affected`: whatever is in this group from `controller`'s view, at any time (Effect groupRules). */
+  group?: Affects;
   mods: Modification[];
 }
 
@@ -1050,7 +1057,7 @@ export type PendingDecision =
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "commander" | "drawUpTo" | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | "pile" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom" | "searchZones" | "vote" | "mutate" | "either" | "payOrTop" | "counterKind"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId; /** "pile": the two piles, the first then the second (Fact or Fiction); `of`, the player whose hand the chosen one goes to. */ piles?: [ObjectId[], ObjectId[]] }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "commander" | "drawUpTo" | "payX" | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | "pile" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom" | "searchZones" | "vote" | "mutate" | "either" | "payOrTop" | "counterKind"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId; /** "pile": the two piles, the first then the second (Fact or Fiction); `of`, the player whose hand the chosen one goes to. */ piles?: [ObjectId[], ObjectId[]] }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -1213,7 +1220,7 @@ export interface GameState {
    * them (603.7d-e), `sourceZc` as it was then: an ability about "~" is about that object only (603.7c, 400.7). `turn`: the
    * turn it was made, for "until the end of your next turn".
    */
-  floatingTriggers?: { id: string; controller: PlayerId; sourceId: ObjectId; sourceCardId: string; sourceZc: number; fromSpell?: true; trigger: TriggeredAbility; until: TriggerDuration; turn: number }[];
+  floatingTriggers?: { id: string; controller: PlayerId; sourceId: ObjectId; sourceCardId: string; sourceZc: number; fromSpell?: true; trigger: TriggeredAbility; until: TriggerDuration; turn: number; /** What its self events are about, if not its source (Effect floatingTrigger's `about`). */ about?: { id: ObjectId; zc: number }; /** Only for combat damage dealt to this player (`aboutPlayer`). */ toPlayer?: PlayerId }[];
   /** Spells cast this turn, by anyone (storm, CR 702.40a). */
   spellsCastThisTurn?: number;
   /** Who cast each spell this turn, and its card (a key into `cards`) as it was cast: "can't cast more than one spell each turn". */
@@ -1305,6 +1312,8 @@ export interface GameState {
   /** Illusion of Choice: "You choose how each player votes this turn" (the last one to resolve, rulings). */
   votesChosenBy?: { player: PlayerId; turn: number };
   namedBansUntil?: { name: string; players?: PlayerId[]; lands?: true; controller: PlayerId; source: string }[];
+  /** "Until your next turn, you may cast sorcery spells as though they had flash" (Teferi, Time Raveler): `controller` may. */
+  flashUntil?: { controller: PlayerId; filter: TargetSpec }[];
   /** The turn a "damage can't be prevented this turn" effect was made in (CR 615.12). */
   noPreventionTurn?: number;
   /** Damage amount replacements of resolved spells and abilities (Effect damageMod): made in `turn`, by `you`. */
@@ -1659,6 +1668,8 @@ export interface Resolving {
     /** How many cards the player being asked chose to draw ("draw up to two cards"). */
     drawUpTo?: string;
     drawUpToQueue?: PlayerId[];
+    /** "You may pay {X}": the X chosen, or "none". */
+    payX?: string;
     /** The commander chosen to put into the hand (Command Beacon with two commanders). */
     commander?: ObjectId;
     /** "You may cast a spell ... from your hand without paying its mana cost": the card picked, "none", or "cast" once it's offered. */

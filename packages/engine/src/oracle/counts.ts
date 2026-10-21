@@ -13,6 +13,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "For each artifact and/or enchantment you control" (All That Glitters): each that's one or the other, counted once.
   let p = text.trim().replace(/\.$/, "").replace(/ and\/or /g, " or ");
   let m: RegExpExecArray | null;
+  if (ctx?.milledThisWay && /^the total mana value of those cards$/i.test(p)) return { count: { kind: "milledManaValue" } };
   // Arithmetic around a count.
   if ((m = /^twice (.+)$/i.exec(p))) {
     const c = parseCount(m[1]!, ctx);

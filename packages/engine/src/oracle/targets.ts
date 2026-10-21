@@ -13,6 +13,8 @@ HYPHENATED.set("time-lord", "Time Lord");
 
 /** Spell and enchantment subtypes a filter can name: "Spirit or Arcane spell", "a Cartouche you control" (CR 205.3h, 205.3k). */
 // Artifact subtypes (CR 205.3g) other than Vehicle, which "creature or Vehicle" handles: "a Food", "a Clue", "Equipment".
+/** Planeswalker types (CR 205.3j), read only before the word "planeswalker": "Ugin planeswalker card". */
+const PLANESWALKER_TYPES = new Set("Ajani,Aminatou,Angrath,Arlinn,Ashiok,Bahamut,Basri,Bolas,Calix,Chandra,Dack,Dakkon,Daretti,Davriel,Dihada,Domri,Dovin,Ellywick,Elminster,Elspeth,Estrid,Freyalise,Garruk,Gideon,Grist,Guff,Huatli,Jace,Jared,Jaya,Kaito,Karn,Kasmina,Kaya,Kiora,Koth,Liliana,Lolth,Lukka,Minsc,Mordenkainen,Nahiri,Narset,Niko,Nissa,Nixilis,Oko,Quintorius,Ral,Rowan,Saheeli,Samut,Sarkhan,Serra,Sivitri,Sorin,Szat,Tamiyo,Tasha,Teferi,Teyo,Tezzeret,Tibalt,Tyvar,Ugin,Urza,Venser,Vivien,Vraska,Will,Windgrace,Wrenn,Xenagos,Yanggu,Yanling,Zariel".split(","));
 const OTHER_SUBTYPES = ["Arcane", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Vehicle", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure", "Gate", "Desert", "Cave", "Town"];
 
 /** Historic: artifacts, legendaries and Sagas (CR 700.6). */
@@ -51,17 +53,23 @@ export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | nul
     return { ref: "anyTarget", index: addTarget(ctx, spec) };
   }
   let several: RegExpExecArray | null;
-  if ((several = /^each of (up to )?(two|three|four|one or two) targets$/i.exec(p))) {
+  // "... and 3 damage to each of up to two other targets" (Drakuseth, Maw of Flames): none of the targets before either.
+  if ((several = /^each of (up to )?(two|three|four|one or two)( other)? targets$/i.exec(p))) {
     const [required, n] = several[2] === "one or two" ? [1, 2] : several[1] ? [0, num(several[2]!)] : [num(several[2]!), num(several[2]!)];
     const first = ctx.targets.length;
-    for (let k = 0; k < n; k++)
-      addTarget(ctx, { kind: "any", text: "any target", ...(k >= required ? { optional: true } : {}), ...(k ? { distinctFrom: Array.from({ length: k }, (_, j) => first + j) } : {}) });
+    const before = several[3] ? ctx.targets.flatMap((t, i) => (t.kind === "object" || t.kind === "any" || t.kind === "player" ? [i] : [])) : [];
+    if (several[3] && !before.length) return null;
+    for (let k = 0; k < n; k++) {
+      const distinct = [...before, ...Array.from({ length: k }, (_, j) => first + j)];
+      addTarget(ctx, { kind: "any", text: several[3] ? "any other target" : "any target", ...(k >= required ? { optional: true } : {}), ...(distinct.length ? { distinctFrom: distinct } : {}) });
+    }
     return { ref: "anyTarget", index: first, n };
   }
-  // "Each of X targets" (Firestorm, Meteor Blast): exactly the spell's X targets, all different (CR 115.3, 601.2c).
-  if (/^each of X targets$/i.test(p)) {
+  // "Each of X targets" (Firestorm, Meteor Blast): exactly the spell's X targets, all different (CR 115.3, 601.2c); "each
+  // of up to X targets" (Crackle with Power): up to X of them.
+  if (/^each of (?:up to )?X targets$/i.test(p)) {
     if (!ctx.spell || ctx.targets.some((t) => t.many)) return null;
-    const index = addTarget(ctx, { kind: "any", text: "any target", many: "exactX" });
+    const index = addTarget(ctx, { kind: "any", text: "any target", many: /up to/i.test(p) ? "x" : "exactX" });
     ctx.lastObjectTarget = undefined;
     ctx.lastTargets = { index, n: 2 };
     return { ref: "anyTarget", index, n: 2 };
@@ -622,6 +630,11 @@ export function parseTargetPhrase(
     extra.counter = counter[1] ?? counter[2] ?? ANY_COUNTER;
     p = (p.slice(0, counter.index) + p.slice(counter.index + counter[0].length)).trim();
   }
+  const none = / with no counters on (?:it|them)/.exec(p);
+  if (none) {
+    extra.noCounters = true;
+    p = (p.slice(0, none.index) + p.slice(none.index + none[0].length)).trim();
+  }
   // "creature card from your graveyard", "card from a graveyard": a card in that zone (CR 109.2a).
   let inGraveyard = false;
   let owner: TargetSpec["owner"];
@@ -629,6 +642,8 @@ export function parseTargetPhrase(
   if (gy) {
     p = p.slice(0, gy.index);
     owner = gy[1] === "your" ? "you" : gy[1] === "a" ? undefined : "opponent";
+    // "Dragon creature card or Ugin planeswalker card" (Haven of the Spirit Dragon): either.
+    if (/^[^,]+ card or [^,]+ card$/.test(p)) p = p.replace(/ card or /, " or ");
     // The word "card" comes before any "with ..." qualifier: "creature card with mana value 3 or less".
     const card = /(^| )card(?= with |$)/.exec(p);
     if (!card) return null;
@@ -746,8 +761,8 @@ export function parseTargetPhrase(
   // A quality only on the first one ("nontoken artifact or creature") may be meant for them all, so that isn't read this way.
   const quality = (a: string) => a.trim().split(/\s+/).some((w) => !TYPE_WORDS[w]);
   const leading = quality(alts[0] ?? "") && !alts.slice(1).every(quality);
-  if (alts.length > 1 && typeWords.every((n) => n === 1) && alts.some(quality) && !leading && !inGraveyard && !isSpell && !extra.token && !extra.status && extra.commander === undefined) {
-    if (extra.anyOf) return null;
+  if (alts.length > 1 && typeWords.every((n) => n === 1) && alts.some(quality) && !leading && !isSpell && !extra.token && !extra.status && extra.commander === undefined) {
+    if (extra.anyOf || (inGraveyard && Object.keys(extra).length)) return null;
     const anyOf: TargetSpec[] = [];
     for (const alt of alts) {
       const sub = parseTargetPhrase(alt);
@@ -755,6 +770,8 @@ export function parseTargetPhrase(
       anyOf.push(sub);
     }
     const types = [...new Set(anyOf.flatMap((a) => a.types ?? []))];
+    // A card in a graveyard (Haven of the Spirit Dragon), matched by its printed characteristics.
+    if (inGraveyard) return { kind: "card", types, notTypes: [], notColors: [], anyOf, ...(owner ? { owner } : {}), text };
     return { kind: "object", types, notTypes: [], notColors: [], anyOf, ...extra, controller, ...(tapped !== undefined ? { tapped } : {}), text };
   }
   let outlaw = false;
@@ -802,6 +819,7 @@ export function parseTargetPhrase(
       // "Nonlegendary attacking creature": attacking after a supertype.
       else if ((w === "attacking" || w === "blocking") && alts.length === 1 && !extra.combat) extra.combat = w;
       else if (CREATURE_TYPES.has(capital(w)) || BASIC_TYPES.includes(capital(w)) || OTHER_SUBTYPES.includes(capital(w))) subtypes.push(capital(w));
+      else if (PLANESWALKER_TYPES.has(capital(w)) && words[i + 1] === "planeswalker") subtypes.push(capital(w));
       // A hyphenated creature type: "Assembly-Worker".
       else if (w.includes("-") && HYPHENATED.has(w)) subtypes.push(HYPHENATED.get(w)!);
       else if (COLOR_WORDS[w]) colors.push(COLOR_WORDS[w]!);

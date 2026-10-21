@@ -798,6 +798,7 @@ export function moveObject(
   o.renowned = undefined;
   o.monstrous = undefined;
   o.suspected = undefined; // CR 701.60a
+  o.putBy = undefined;
   o.classLevel = undefined; // CR 716.2b
   o.solved = undefined; // CR 719.3b
   o.harnessed = undefined; // CR 701.64b
@@ -2044,6 +2045,8 @@ function startNextTurn(s: GameState, skipping = false) {
     }
   if (s.namedBansUntil) s.namedBansUntil = s.namedBansUntil.filter((r) => !began.has(r.controller));
   if (!s.namedBansUntil?.length) s.namedBansUntil = undefined;
+  if (s.flashUntil) s.flashUntil = s.flashUntil.filter((r) => !began.has(r.controller));
+  if (!s.flashUntil?.length) s.flashUntil = undefined;
   if (!s.entersTappedUntil?.length) s.entersTappedUntil = undefined;
   s.turn++;
   const ap = player(s, s.activePlayer);
@@ -2778,7 +2781,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // What its source was as it was activated, before it's sacrificed (CR 106.3): a Treasure, a snow permanent, ...
   const from = manaOriginsOf(s, o);
   // Pay the costs (CR 602.2b, 605.3a), then add the mana.
-  const manaPaid = ab.manaCost ? spendFromPool(s, p.id, parseManaCost(ab.manaCost), { ability: o }) : null;
+  const manaPaid = ab.manaCost ? spendFromPool(s, p.id, activationLessCost(s, o, parseManaCost(ab.manaCost)), { ability: o }) : null;
   if (ab.tap) tapPermanent(s, o);
   // Tapped for mana (CR 106.12): triggers that aren't mana abilities wait for the stack (CR 605.1b, 603.3). Only if it
   // makes mana (CR 106.12a): not a storage land tapped removing no counters (rulings on Bottomless Vault).
@@ -3438,6 +3441,7 @@ export function flashGranted(s: GameState, pid: PlayerId, d: CardDef): boolean {
   const own = compileCard(d).flashIf;
   if (own && staticConditionNow(s, own, "", pid)) return true;
   if (turnRule(s, pid, "flash")) return true;
+  if (s.flashUntil?.some((r) => r.controller === pid && printedMatches(r.filter, d))) return true;
   return s.battlefield.some((id) => {
     const o = obj(s, id);
     return controllerOf(s, o) === pid && !!abilitiesOf(s, o).flashFor?.some((spec) => printedMatches(spec, d));
@@ -3733,6 +3737,9 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
     if (c.player === pid && c.turn === s.turn && (!c.filter || printedMatches(c.filter, d))) return `${c.source}: you can't cast ${c.filter ? `${c.filter.text.replace(/ spell$/, "")} ` : ""}spells this turn`;
   // Permanents, and emblems in the command zone (CR 114.4).
   for (const o of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)]) {
+    // "Each opponent can cast spells only any time they could cast a sorcery" (Teferi, Time Raveler).
+    if (abilitiesOf(s, o).opponentsSorceryTiming && controllerOf(s, o) !== pid && (s.resolving || !canActAtSorcerySpeed(s, pid)))
+      return `${characteristics(s, o).name}: opponents can cast spells only any time they could cast a sorcery`;
     // "Your opponents can't cast spells during your turn" (Dragonlord Dromoka).
     if (abilitiesOf(s, o).opponentsCantCastYourTurn && controllerOf(s, o) === s.activePlayer && pid !== s.activePlayer)
       return `${characteristics(s, o).name}: opponents can't cast spells during ${player(s, s.activePlayer).name}'s turn`;
@@ -4366,7 +4373,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     const cp = extraCostProblem(s, pid, o, activatedCosts(ab, x), costs, `activate ${d.name}'s ability`);
     if (cp) return cp;
   }
-  const cost = activationCost(s, pid, o, ab, targets);
+  const cost = activationCost(s, pid, o, ab, targets, x);
   const xp = ab.loyaltyX || abilityCostsHaveX(ab) ? (x !== undefined && (!Number.isInteger(x) || x < 0) ? "X must be a whole number, 0 or more" : (x ?? 0) < (ab.xMin ?? 0) ? "X can't be 0" : null) : xProblem(cost, x);
   if (xp) return xp;
   if (!canPayFromPool(s, pid, cost, abilityUse(o, ab), ab.loyaltyX ? 0 : (x ?? 0) * xCount(cost), p.life)) return `not enough mana for ${d.name}'s ability`;
@@ -4377,7 +4384,39 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
  * An activated ability's mana cost as `pid` activates it, after "Equip abilities you activate cost {1} less to activate"
  * (CR 602.2b applies 601.2f): reductions only take off generic mana. Without `targets` chosen yet, as if the best one were.
  */
-export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets?: TargetChoice[]): ParsedCost {
+export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets?: TargetChoice[], x = 0): ParsedCost {
+  return activationLessCost(s, o, activationCostBefore(s, pid, o, ab, targets), x);
+}
+
+/**
+ * An activated ability's mana cost after "activated abilities of creatures you control cost {2} less to activate"
+ * (CompiledCard.activationLess; CR 602.2b applies 601.2f), the last change to it: generic mana only, the X chosen
+ * counting (its symbols become that much generic mana then), and not below one mana where the reduction says so (rulings
+ * on Training Grounds: a cost with no generic mana, {0} included, stays as it is). Only for a permanent on the battlefield.
+ */
+export function activationLessCost(s: GameState, o: GameObject, cost: ParsedCost, x = 0): ParsedCost {
+  if (o.zone !== "battlefield") return cost;
+  let less = 0;
+  let atLeastOne = false;
+  for (const id of s.battlefield) {
+    const src = obj(s, id);
+    for (const m of abilitiesOf(s, src).activationLess ?? []) {
+      if (!objectMatches(s, m.filter, o, controllerOf(s, src), false)) continue;
+      less += m.n;
+      if (m.atLeastOne) atLeastOne = true;
+    }
+  }
+  if (!less) return cost;
+  const xs = xCount(cost) * x;
+  const g = splitGeneric(cost, xs);
+  if (!g.extra) return cost;
+  const others = g.cost.symbols.filter((sym) => sym.kind !== "x");
+  const left = Math.max(atLeastOne && !others.length ? 1 : 0, g.extra - less);
+  // Still "with X" (CR 107.3): the X chosen is its value for the ability, now paid as generic mana.
+  return { ...g.cost, symbols: [...(left ? [{ kind: "generic" as const, amount: left }] : []), ...others] };
+}
+
+function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets?: TargetChoice[]): ParsedCost {
   const cost0 = parseManaCost(ab.manaCost);
   // "Activated abilities cost {2} more to activate unless they're mana abilities" (Suppression Field): increases first
   // (CR 602.2b applies 601.2f).
@@ -4495,7 +4534,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // The source as it was activated, for "whenever an opponent activates an ability of a creature".
   const activatedFrom = !ab.mana && o.zone === "battlefield" ? { snapshot: structuredClone(o), chars: characteristics(s, o) } : undefined;
   // Costs (CR 602.2b, 601.2g-h): mana, tapping, then sacrificing or discarding the card itself.
-  const abCost = activationCost(s, p.id, o, ab, targets);
+  const abCost = activationCost(s, p.id, o, ab, targets, x);
   // "Pay half your life, rounded up": worked out with the rest of the cost, before any of it is paid (CR 601.2f-h).
   const halfLife = halfLifeCost(s, p.id, ab);
   const lifeCost = activatedLifeCost(s, p.id, ab);
@@ -5084,6 +5123,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "payX") {
+    // "You may pay {X}": the X chosen (CR 107.1c), paid next.
+    (r.scratch ??= {}).payX = choice;
+    log(s, choice === "none" ? `${p.name} doesn't pay for ${pend.source}.` : `${p.name} chooses X = ${choice} for ${pend.source}.`);
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "drawUpTo") {
     // "Draw up to two cards": how many (rulings on Arcane Denial).
     (r.scratch ??= {}).drawUpTo = choice;
@@ -5609,6 +5655,16 @@ export function attackedName(s: GameState, o: GameObject): string {
   return pw ? `${player(s, controllerOf(s, pw)).name}'s ${characteristics(s, pw).name}` : o.attacking !== undefined ? player(s, o.attacking).name : "nothing";
 }
 
+/** The most creatures that can attack, or block, each combat (Silent Arbiter): Infinity with no such rule. */
+export function combatLimit(s: GameState, what: "attack" | "block"): number {
+  let n = Infinity;
+  for (const id of s.battlefield) {
+    const m = abilitiesOf(s, obj(s, id)).combatLimit?.[what];
+    if (m !== undefined) n = Math.min(n, m);
+  }
+  return n;
+}
+
 function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId; defender: PlayerId; planeswalker?: ObjectId }[]) {
   if (s.pending?.kind !== "declareAttackers" || s.pending.player !== p.id) throw new RulesError("not declaring attackers now");
   const legal = new Set(potentialAttackers(s, p.id).map((o) => o.id));
@@ -5633,10 +5689,17 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   // unless that would break a restriction: one that can't attack alone needn't attack by itself.
   // A requirement that would need a cost paid to obey (Ghostly Prison) doesn't oblige anyone to pay it (CR 508.1d).
   const free = (o: GameObject, d: PlayerId) => !attackProblem(s, o, d) && !attackTaxPer(s, d);
+  // "No more than one creature can attack each combat" (Silent Arbiter): a restriction, which requirements can't break;
+  // as many of the creatures that have to attack as the limit allows do (CR 508.1c-d).
+  const limit = combatLimit(s, "attack");
+  if (attacks.length > limit) throw new RulesError(`no more than ${limit === 1 ? "one creature" : `${limit} creatures`} can attack each combat`);
   const shirking = potentialAttackers(s, p.id).find(
     (o) => characteristics(s, o).attacksIfAble && !seen.has(o.id) && !(characteristics(s, o).cantAttackAlone && attacks.length === 0) && opps.some((d) => free(o, d)),
   );
-  if (shirking && opps.length) throw new RulesError(`${defOf(s, shirking).name} attacks each combat if able`);
+  const required = potentialAttackers(s, p.id).filter((o) => characteristics(s, o).attacksIfAble && opps.some((d) => free(o, d)));
+  if (attacks.length >= limit) {
+    if (attacks.filter((a) => required.some((o) => o.id === a.attacker)).length < Math.min(limit, required.length)) throw new RulesError(`${defOf(s, shirking!).name} attacks each combat if able`);
+  } else if (shirking && opps.length) throw new RulesError(`${defOf(s, shirking).name} attacks each combat if able`);
   // Goaded: it attacks a player other than the ones who goaded it, if it can (CR 701.15b, 508.1d). Each goad is a
   // requirement, and the attack must obey as many as it can: attacking a planeswalker obeys none of them (rulings).
   for (const a of attacks) {
@@ -5850,7 +5913,15 @@ function declareBlockers(s: GameState, p: Player, blocks: { blocker: ObjectId; a
   // "Can't block alone": the only creature declared as a blocker this combat blocks alone (CR 506.5).
   const earlier = s.battlefield.filter((id) => obj(s, id).blocking !== undefined).length;
   if (seen.size === 1 && !earlier && characteristics(s, obj(s, blocks[0]!.blocker)).cantBlockAlone) throw new RulesError(`${nameOf(s, blocks[0]!.blocker)} can't block alone`);
-  const req = blockRequirementProblem(s, p.id, blocks);
+  // "No more than one creature can block each combat" (Silent Arbiter), counting every defending player's blockers
+  // (CR 509.1b). At the limit, a block that obeys a requirement obeys as many as can be (509.1c).
+  const limit = combatLimit(s, "block");
+  if (earlier + seen.size > limit) throw new RulesError(`no more than ${limit === 1 ? "one creature" : `${limit} creatures`} can block each combat`);
+  const obeys = (b: { blocker: ObjectId; attacker: ObjectId }) => {
+    const at = characteristics(s, obj(s, b.attacker));
+    return at.allMustBlock || at.mustBeBlocked || characteristics(s, obj(s, b.blocker)).mustBlock || provokerOf(s, obj(s, b.blocker))?.id === b.attacker;
+  };
+  const req = earlier + seen.size >= limit && blocks.some(obeys) ? null : blockRequirementProblem(s, p.id, blocks);
   if (req) throw new RulesError(req);
   for (const b of blocks) {
     const bl = obj(s, b.blocker);
@@ -6263,12 +6334,15 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
     }
     // Legend rule (704.5j). TODO: let the controller choose; for now keep the newest.
     const seen = new Map<string, ObjectId>();
+    // "The "legend rule" doesn't apply to permanents you control" (Sakashima of a Thousand Faces).
+    const exempt = s.battlefield.flatMap((id) => (abilitiesOf(s, obj(s, id)).noLegendRule ?? []).map((filter) => ({ filter, you: controllerOf(s, obj(s, id)) })));
     for (const id of [...s.battlefield]) {
       const o = s.objects[id];
       if (!o || o.zone !== "battlefield") continue;
       const c = characteristics(s, o);
       const d = defOf(s, o);
       if (!c.supertypes.includes("Legendary")) continue;
+      if (exempt.some((x) => objectMatches(s, x.filter, o, x.you, false))) continue;
       const key = `${c.controller}:${c.name}`;
       if (seen.has(key)) {
         log(s, `${d.name} is put into the graveyard (legend rule).`);

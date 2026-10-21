@@ -542,6 +542,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "preventCombatDamage":
     case "noLifeGain":
     case "turnRules":
+    case "flashUntilNextTurn":
     case "cantCast":
     case "cantPlayLands":
     case "noPrevention":
@@ -686,6 +687,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "explore":
     case "doublePT":
     case "continuous":
+    case "groupRules":
     case "playerGains":
     case "attach":
     case "attachElsewhere":

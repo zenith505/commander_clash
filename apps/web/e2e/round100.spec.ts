@@ -85,7 +85,7 @@ test("Mount Doom: sacrifice it and a legendary artifact, keep your Hill Giant an
   await page.locator(`[data-obj="${bears}"]`).click();
   await bar.getByRole("button", { name: "Keep 2" }).click();
   const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending);
-  expect([doom, ring, giant, elves, bears, dreadmaw].map((id) => after.objects[id]!.zone)).toEqual(["graveyard", "graveyard", "battlefield", "graveyard", "battlefield", "graveyard"]);
+  expect([doom, ring, giant, elves, bears, dreadmaw].map((id) => after.objects[id!]!.zone)).toEqual(["graveyard", "graveyard", "battlefield", "graveyard", "battlefield", "graveyard"]);
   expect(pageErrors(page)).toEqual([]);
 });
 

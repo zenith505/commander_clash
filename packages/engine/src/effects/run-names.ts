@@ -56,13 +56,22 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // the whole library is revealed (rulings on Demonic Consultation).
       const p = player(s, ctx.controller);
       const filter = bindChosen(e.filter, ctx.chosen);
-      const at = ctx.chosen?.name === undefined ? -1 : p.library.findIndex((id) => printedMatches(filter, defOf(s, obj(s, id))));
+      const at = filter.chosen === "name" && ctx.chosen?.name === undefined ? -1 : p.library.findIndex((id) => printedMatches(filter, defOf(s, obj(s, id))));
       const seen = p.library.slice(0, at < 0 ? p.library.length : at + 1);
       const hit = at < 0 ? undefined : p.library[at];
       log(s, `${p.name} reveals ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${seen.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}${hit ? "" : `, finding no ${filter.text}`}.`);
-      if (hit) moveObject(s, hit, "hand");
+      if (hit) moveObject(s, hit, e.found, e.tapped ? { tapped: true } : {});
       const rest = seen.filter((id) => id !== hit);
-      for (const id of rest) moveObject(s, id, "exile");
+      if (e.rest === "bottom") {
+        // "The rest on the bottom of your library in a random order" (CR 701.20a), every one of them if none was found.
+        const order = [...rest];
+        shuffle(s, order);
+        for (const id of order) {
+          p.library.splice(p.library.indexOf(id), 1);
+          p.library.push(id);
+        }
+        if (order.length) log(s, `${p.name} puts ${order.length} card${order.length === 1 ? "" : "s"} on the bottom of their library in a random order.`);
+      } else for (const id of rest) moveObject(s, id, "exile");
       if (e.lifePerRest && rest.length) {
         loseLife(s, p.id, rest.length);
         log(s, `${p.name} loses ${rest.length} life.`);

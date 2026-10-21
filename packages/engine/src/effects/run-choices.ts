@@ -253,6 +253,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           ? objects(s, { ref: "self" }, ctx).some((o) => !(e.cond as { yours?: true }).yours || controllerOf(s, o) === ctx.controller)
           : e.cond.kind === "libraryHas"
           ? player(s, ctx.controller).library.length >= e.cond.n
+          : e.cond.kind === "resolvedNth"
+          ? e.cond.n.includes(s.resolving!.nth ?? 0) !== !!e.cond.not
           : e.cond.kind === "wonClash"
             ? !!s.resolving!.wonClash
             : e.cond.kind === "wonFlip"

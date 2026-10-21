@@ -8,7 +8,7 @@ import type { ContinuousEffect, GameObject, GameState, ObjectId, PlayerId } from
 import { setFace } from "../faces";
 import { becomePrepared } from "../prepare";
 import { objectMatches } from "./targeting";
-import { ResolveCtx, objects, amountNow, fixMods, players } from "./resolve";
+import { ResolveCtx, objects, amountNow, fixMods, players, runEffect } from "./resolve";
 import { createExtraTokens, createToken } from "./run-tokens";
 import { discardCards } from "./run-library";
 import { describeMods } from "./describe";
@@ -33,6 +33,12 @@ export function transformPermanent(s: GameState, o: GameObject, byDayNight = fal
   o.transforms = (o.transforms ?? 0) + 1;
   invalidateCharacteristics(s);
   log(s, `${was} ${convert ? "converts" : "transforms"} into ${defOf(s, o).name}.`);
+  // "As this creature transforms into ~, you get an emblem with ..." (CR 712.20): part of transforming.
+  const as = compileCard(defOf(s, o)).asTransforms;
+  if (as) {
+    const ctx: ResolveCtx = { controller: controllerOf(s, o), sourceId: o.id, sourceZc: o.zoneChanges ?? 0, sourceDef: defOf(s, o), targets: [], legal: [] };
+    for (const e of as.effects) runEffect(s, e, ctx);
+  }
   fireEvent(s, { type: "transformed", id: o.id, face: to });
   return true;
 }

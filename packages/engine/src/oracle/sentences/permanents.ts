@@ -399,6 +399,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = who && parseObject(m[2]!, ctx);
     return who && what?.ref === "target" && !what.n ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: "game", giveTo: who }] : null;
   }
+  // "That player gains control of ~" (Coveted Jewel): the trigger's player, for the rest of the game (layer 2).
+  if (/^That player gains control of ~$/.test(s) && ctx.eventPlayer) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "eventPlayer" } }];
   if (/^An opponent(?: of your choice)? gains control of ~$/.test(s))
     return [{ type: "choose", choice: "opponent" }, { type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "chosenPlayer" } }];
   // "Gain control of that Equipment until end of turn" (Stolen Uniform): a target an earlier sentence chose.

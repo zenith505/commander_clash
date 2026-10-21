@@ -102,6 +102,8 @@ export type Count =
   | { kind: "milledManaValue" }
   /** "For each card exiled from their hand this way" (Lost Legacy): of the cards an exileNamed instruction exiled. */
   | { kind: "exiledFromHandThisWay" }
+  /** "Draw that many cards" after "sacrifice any number of other creatures": how many its instructions sacrificed. */
+  | { kind: "sacrificedThisWayCount" }
   /** "For each card revealed this way", "the number of cards revealed this way" after revealFromHand, or in its reflexive trigger. */
   | { kind: "revealedFromHand" }
   | { kind: "bottomedFromHand" }
@@ -306,7 +308,8 @@ export interface TargetSpec {
    * `couldButDidntAttack`: "creatures that didn't attack this turn, except for creatures that couldn't attack" (Season of
    * the Witch): ones that could have been declared as attackers this turn but weren't (rulings, GameObject.couldAttack).
    */
-  combat?: "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | "couldButDidntAttack" | "attackingBattle";
+  /** `attackingYou`: "creatures attacking you", attacking that player and not a planeswalker or battle (CR 506.3, 508.1b). */
+  combat?: "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | "couldButDidntAttack" | "attackingBattle" | "attackingYou";
   /** "Each green creature that entered this turn" (Oran-Rief): this object came onto the battlefield this turn (CR 400.7). */
   enteredThisTurn?: true;
   /** "With lesser power" than the ability's source (mentor, CR 702.134a). */
@@ -1251,6 +1254,12 @@ export type Effect =
   /** "Return the exiled card to the battlefield under its owner's control": the cards this object's linked exile took (CR 607.2a). */
   | { type: "returnLinked"; dest: "battlefield" | "hand" }
   /**
+   * "The exiled card's owner creates an X/X blue Illusion creature token, where X is the mana value of the exiled card"
+   * (Skyclave Apparition): the cards this object's linked exile took (CR 607.2a) that are still in exile. Each of their
+   * owners creates one token, X the total mana value of all of them (rulings).
+   */
+  | { type: "linkedExileToken"; token: TokenSpec }
+  /**
    * Cards exiled face down, linked to the source (CR 406.3, 607.2a): `top`, the top `n` of your library (Duplicity);
    * `hand`, all cards from your hand; `handCard`, one card you choose from your hand (Gustha's Scepter). `look`: its
    * controller may look at them while they remain exiled; otherwise nobody may (Duplicity rulings).
@@ -1308,7 +1317,7 @@ export type Effect =
    */
   /** Empower Jace N (CR 701.71a): create a 0-loyalty Jace planeswalker token if you control none, then put N loyalty counters on a Jace planeswalker token you control. */
   | { type: "empowerJace"; n: Amount }
-  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** "Return half the creatures they control" (Split the Party): `who` picks among this player's permanents, not their own. */ among?: PlayerRef; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a). */ least?: "toughness"; /** "One of those Dragons" (Zurgo and Ojutai): only among the trigger's group (TriggerEventInfo.group), not targeted. */ fromGroup?: true; /** "A creature with the greatest power among creatures they control", "a creature or planeswalker with the greatest mana value among creatures and planeswalkers they control": only those, or tied for it. */ greatest?: "power" | "manaValue"; /** "Unless they pay {3}": each player may pay to be left out. */ unless?: UnlessPays }
+  | { type: "pick"; who: PlayerRef; filter: TargetSpec; n: Amount; action: PickAction; /** "Sacrifice any number of other creatures" (God-Eternal Bontu): as many as they like, none too; `n` is ignored. */ anyNumber?: true; /** "Return half the creatures they control" (Split the Party): `who` picks among this player's permanents, not their own. */ among?: PlayerRef; /** For "counters": "put two +1/+1 counters on a creature you control". */ counter?: { kind: CounterKind; n: Amount }; /** Bolster: only among those with the least toughness (CR 701.39a). */ least?: "toughness"; /** "One of those Dragons" (Zurgo and Ojutai): only among the trigger's group (TriggerEventInfo.group), not targeted. */ fromGroup?: true; /** "A creature with the greatest power among creatures they control", "a creature or planeswalker with the greatest mana value among creatures and planeswalkers they control": only those, or tied for it. */ greatest?: "power" | "manaValue"; /** "Unless they pay {3}": each player may pay to be left out. */ unless?: UnlessPays }
   /**
    * "Sacrifice an artifact, a creature, and a land", "target player sacrifices an artifact and a land of their choice":
    * one permanent for each of `filters`, all different (a permanent sacrificed once can't be sacrificed again, like the
@@ -1666,7 +1675,11 @@ export type Effect =
    * 701.20a): `found`, where that card goes; `rest`, where the other revealed cards go (all of them when none is found);
    * `lifePerRest`: "you lose 1 life for each of the exiled cards" (Spoils of the Vault).
    */
-  | { type: "revealUntil"; filter: TargetSpec; found: "hand"; rest: "exile"; lifePerRest?: true }
+  /**
+   * "Reveal cards from the top of your library until you reveal a creature card. Put that card onto the battlefield and the
+   * rest on the bottom of your library in a random order" (`found` "battlefield", `rest` "bottom"), `tapped`.
+   */
+  | { type: "revealUntil"; filter: TargetSpec; found: "hand" | "battlefield"; tapped?: true; rest: "exile" | "bottom"; lifePerRest?: true }
   /**
    * "Exile cards from the top of your library until you exile a nonland card", or "reveal ... until you reveal a nonland
    * card" (then that card is exiled and the rest go on the bottom in a random order, or all of them go into your hand):
@@ -2330,6 +2343,12 @@ export type SpellCondition =
   | { kind: "selfHere"; yours?: true }
   /** Your library has at least `n` cards, so "mill n cards" mills them all ("Mill three cards. When you do, ..."). */
   | { kind: "libraryHas"; n: number }
+  /**
+   * "If this is the second time this ability has resolved this turn" (Omnath, Locus of Creation): how many times this
+   * ability of this object has resolved this turn, this time included; `not`: "Otherwise" (none of `n`). A new object
+   * starts over (CR 400.7); one that doesn't resolve (all its targets illegal, CR 608.2b) isn't counted.
+   */
+  | { kind: "resolvedNth"; n: number[]; not?: true }
   /** "Clash with an opponent. If you win, ...": whether you won the last clash (CR 701.30d). */
   | { kind: "wonClash" }
   /** "If you win the flip" (CR 705.2), `lost`: "if you lose the flip". Neither if no coin was flipped. */
@@ -2639,6 +2658,12 @@ export type TriggerEvent =
    * TriggeredAbility.attacksYou. Once per declaration; "that opponent" is the event player.
    */
   | "opponentAttacksYou"
+  /**
+   * "Whenever one or more creatures an opponent controls attack you and aren't blocked" (Coveted Jewel): once blockers are
+   * declared, for each opponent with an unblocked creature attacking you (not your planeswalkers, rulings); "that player"
+   * is that opponent.
+   */
+  | "opponentCreaturesUnblocked"
   /** "When you cycle ~" (CR 702.29c): it triggers from whatever zone the card went to, under its owner's control. */
   | "selfCycled"
   /**
@@ -2773,6 +2798,8 @@ export interface TriggeredAbility {
   damagesYou?: { by?: "you" | "opponent" | "any"; combat?: true };
   /** For "creaturesYouControlAttack": "Whenever you attack with two or more creatures", at least this many of them. */
   minAttackers?: number;
+  /** For "creaturesYouControlAttack": "Whenever one or more creatures attack" (Duelist's Heritage), any player's, not only its controller's. */
+  anyoneAttacks?: true;
   /** For "opponentAttacksYou": at least `min` attackers at you, or (`orPlaneswalkers`, an intervening if, CR 603.4) at your planeswalkers too. */
   attacksYou?: { min: number; orPlaneswalkers?: true };
   /**
@@ -3369,6 +3396,11 @@ export interface CompiledCard {
    */
   borrows?: { filter: TargetSpec; other?: boolean; notSameName?: true; graveyard?: true; yours?: true; noMana?: true };
   spell?: AbilityBody; // instants and sorceries
+  /**
+   * "As this creature transforms into Sephiroth, One-Winged Angel, you get an emblem with ..." (a back face's): done while
+   * it transforms, not afterwards (CR 712.20), and not if it enters with that face up (rulings).
+   */
+  asTransforms?: AbilityBody;
   triggers: TriggeredAbility[];
   activated: ActivatedAbility[];
   /** Mana abilities (CR 605), kept apart from the others since they don't use the stack. */
@@ -3605,6 +3637,8 @@ export interface CompiledCard {
   drawEmptyWins?: true;
   /** "Your opponents can't cast spells from anywhere other than their hands." (Drannith Magistrate) */
   opponentsOnlyFromHand?: true;
+  /** Aven Mindcensor: "If an opponent would search a library, that player searches the top four cards of that library instead." (CR 614.1a) */
+  opponentsSearchTop?: number;
   /** Opposition Agent: "You control your opponents while they're searching their libraries." (CR 723.2) */
   controlsOpponentSearches?: true;
   /**
@@ -3663,6 +3697,8 @@ export interface CompiledCard {
   noMaxHandSize?: boolean | "all";
   /** K'rrik: "For each {B} in a cost, you may pay 2 life rather than pay that mana" (see blackForLife), for its controller. */
   lifeForBlack?: true;
+  /** Chromatic Orrery: "You may spend mana as though it were mana of any color." (CR 609.4b), for its controller's costs. */
+  spendAnyColor?: true;
   /**
    * "You may activate the loyalty abilities of ~ twice each turn rather than only once" (Urza, Planeswalker), "... of
    * planeswalkers you control ..." (Oath of Teferi): two loyalty abilities of that permanent each turn, the same one
@@ -3745,7 +3781,8 @@ export interface CompiledCard {
    * judged by its controller as the static's); `of`: only abilities of permanents you control matching one of these.
    * Never delayed or reflexive triggers (603.2d).
    */
-  triggersAgain?: { by?: { event: "enters" | "dies" | "attacks" | "combatDamage" | "castOrCopy"; filter?: TargetSpec[] }; of?: { filter: TargetSpec; other?: true }[] }[];
+  /** `anchor`: only while that anchor word was chosen as it entered (Windcrag Siege's "• Mardu —", CR 614.12b). */
+  triggersAgain?: { by?: { event: "enters" | "dies" | "attacks" | "combatDamage" | "castOrCopy"; filter?: TargetSpec[] }; of?: { filter: TargetSpec; other?: true }[]; anchor?: string }[];
   /** Fist of Suns: "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast" (an alternative cost, CR 118.9). */
   payWUBRG?: true;
   /** Omniscience: "You may cast spells from your hand without paying their mana costs" (AltCostKind "omniscience"). */

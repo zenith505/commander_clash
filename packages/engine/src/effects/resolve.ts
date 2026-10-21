@@ -1,4 +1,4 @@
-import type { AbilityBody, Amount, DamageRecipient, Effect, ManaAbility, Modification, ObjRef, PlayerRef, TargetChoice } from "../abilities";
+import { allEffects, type AbilityBody, type Amount, type DamageRecipient, type Effect, type ManaAbility, type Modification, type ObjRef, type PlayerRef, type TargetChoice } from "../abilities";
 import { withPutter } from "../counters";
 import { cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
 import { addTriggeredMana, askAuraReturns, creatureTypesOf, draw, enterTogether, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
@@ -104,6 +104,9 @@ export function beginResolution(s: GameState, item: StackItem, body: AbilityBody
   if (body.targets.length && chose && !legal.some(Boolean)) return "fizzled";
   const spellControllers = targets.map((t) => (t.kind === "stack" ? (s.stack.find((x) => x.id === t.id)?.controller ?? null) : null));
   const spellObjects = targets.map((t) => (t.kind === "stack" ? (s.stack.find((x) => x.id === t.id)?.objectId ?? null) : null));
+  // "If this is the second time this ability has resolved this turn": counted as it resolves, for this object's ability
+  // only (a new object's start over, CR 400.7).
+  const nth = item.kind === "ability" && item.sourceId && asksResolutions(body) ? countResolution(s, `${item.sourceId}@${item.sourceZc ?? 0}|${body.text ?? item.description}`) : undefined;
   s.resolving = {
     item,
     body,
@@ -111,8 +114,18 @@ export function beginResolution(s: GameState, item: StackItem, body: AbilityBody
     next: 0,
     ...(spellControllers.some((c) => c !== null) ? { spellControllers } : {}),
     ...(spellObjects.some((c) => c !== null) ? { spellObjects } : {}),
+    ...(nth !== undefined ? { nth } : {}),
   };
   return continueResolution(s);
+}
+
+function asksResolutions(body: AbilityBody): boolean {
+  return allEffects(body.effects).some((e) => e.type === "if" && e.cond.kind === "resolvedNth");
+}
+
+function countResolution(s: GameState, key: string): number {
+  if (s.resolutionCounts?.turn !== s.turn) s.resolutionCounts = { turn: s.turn, counts: {} };
+  return (s.resolutionCounts.counts[key] = (s.resolutionCounts.counts[key] ?? 0) + 1);
 }
 
 /**
@@ -723,6 +736,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "encore":
     case "createTokenCopy":
     case "createToken":
+    case "linkedExileToken":
       return runTokensEffect(s, e, ctx, src);
     case "delayed":
     case "castCipher":

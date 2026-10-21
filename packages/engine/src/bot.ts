@@ -1953,6 +1953,15 @@ function chooseOptionalSacrifices(s: GameState, pid: PlayerId, pend: Extract<Pen
     const per = typeof n === "number" ? n : 2;
     return ok.filter((o) => o.isToken && worth(s, pid, o) <= 2 * per).map((o) => o.id).slice(0, pend.count);
   }
+  // "Sacrifice any number of ...": for Scapeshift's "search for up to that many land cards", the tapped lands (they come
+  // back tapped, as better lands); to draw that many (Sephiroth, Bontu), the cheap tokens.
+  const r = s.resolving;
+  const here = r?.body.effects[r.next];
+  if (here?.type === "pick" && here.anyNumber) {
+    const next = r!.body.effects[r!.next + 1];
+    if (next?.type === "search" && next.filter?.types?.includes("Land")) return pend.options.filter((id) => objIsType(s, obj(s, id), "Land") && obj(s, id).tapped);
+    return ok.filter((o) => o.isToken && worth(s, pid, o) <= 2).map((o) => o.id);
+  }
   const cheapest = ok.sort((a, b) => worth(s, pid, a) - worth(s, pid, b))[0];
   return cheapest && (cheapest.isToken || worth(s, pid, cheapest) <= 3) ? [cheapest.id] : [];
 }

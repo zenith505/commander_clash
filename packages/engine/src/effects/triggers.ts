@@ -63,6 +63,7 @@ function triggersAgain(s: GameState, src: GameObject, controller: PlayerId, caus
   let n = 0;
   for (const { id, again } of statics)
     for (const a of again) {
+      if (a.anchor !== undefined && s.objects[id]?.chosen?.anchor !== a.anchor) continue;
       // Veyran: "If you casting or copying an instant or sorcery spell causes ...": that player is this static's controller.
       if (a.by?.event === "castOrCopy") {
         if (cause?.event !== "castOrCopy" || cause.caster !== controller) continue;
@@ -606,6 +607,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const event = o.blocking ? "creatureBlocks" : o.attacking !== undefined && o.blockedBy?.length ? "creatureBecomesBlocked" : undefined;
       if (event) for (const w of watchers) add(w, controllerOf(s, w), (e, t) => e === event && fits(t, o, controllerOf(s, w)), undefined, undefined, o);
     }
+    // "Whenever one or more creatures an opponent controls attack you and aren't blocked" (Coveted Jewel): for each such
+    // opponent (rulings), whoever controls the watcher now.
+    for (const w of watchers) {
+      const you = controllerOf(s, w);
+      const by = new Set(s.battlefield.map((id) => obj(s, id)).filter((a) => a.attacking === you && !a.attackingPermanent && !a.blockedBy?.length && opponents(s, you).includes(controllerOf(s, a))).map((a) => controllerOf(s, a)));
+      for (const pid of by) add(w, you, (e) => e === "opponentCreaturesUnblocked", undefined, undefined, undefined, undefined, undefined, undefined, { player: pid });
+    }
     for (const id of s.battlefield) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
@@ -826,22 +834,24 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "groupAttack" || ev.type === "groupCombatDamage") {
     const want = ev.type === "groupAttack" ? "creaturesYouControlAttack" : "creaturesYouControlDealCombatDamageToPlayer";
     causedBy = { event: ev.type === "groupAttack" ? "attacks" : "combatDamage", objs: ev.ids.filter((x) => s.objects[x]).map((x) => ({ o: obj(s, x), controller: ev.controller })) };
-    const groupWatch = (o: GameObject) => {
+    const groupWatch = (o: GameObject, anyone = false) => {
       // Only the creatures that match count ("one or more Rogues you control"): "that much" is what they dealt.
       const fits = (t: TriggeredAbility) => ev.ids.map((x, i) => [x, i] as const).filter(([x]) => s.objects[x] && (!t.group || objectMatches(s, t.group, obj(s, x), ev.controller, false)));
       for (const t of abilitiesOf(s, o).triggers) {
-        if (t.event !== want) continue;
+        if (t.event !== want || !!t.anyoneAttacks !== anyone) continue;
         // "To a player or battle": only those are about a battle dealt it (CR 310).
         if (ev.type === "groupCombatDamage" && ev.battle !== undefined && !t.orBattle) continue;
         const hit = fits(t);
         if (hit.length < (t.minAttackers ?? 1)) continue;
         const amount = ev.type === "groupCombatDamage" ? hit.reduce((n, [, i]) => n + ev.amounts[i]!, 0) : undefined;
-        const same = (tt: TriggeredAbility) => tt.event === want && tt.body.text === t.body.text && JSON.stringify(tt.group) === JSON.stringify(t.group) && tt.minAttackers === t.minAttackers;
+        const same = (tt: TriggeredAbility) => tt.event === want && tt.body.text === t.body.text && JSON.stringify(tt.group) === JSON.stringify(t.group) && tt.minAttackers === t.minAttackers && !!tt.anyoneAttacks === anyone;
         const group = hit.map(([x]) => ({ id: x, zc: obj(s, x).zoneChanges ?? 0 }));
-        add(o, ev.controller, (_, tt) => same(tt) && !(ev.type === "groupCombatDamage" && ev.battle !== undefined && !tt.orBattle), undefined, undefined, undefined, undefined, undefined, undefined, ev.type === "groupCombatDamage" ? { player: ev.player, amount, group } : undefined);
+        add(o, anyone ? controllerOf(s, o) : ev.controller, (_, tt) => same(tt) && !(ev.type === "groupCombatDamage" && ev.battle !== undefined && !tt.orBattle), undefined, undefined, undefined, undefined, undefined, undefined, ev.type === "groupCombatDamage" ? { player: ev.player, amount, group } : undefined);
       }
     };
     for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === ev.controller) groupWatch(obj(s, id));
+    // "Whenever one or more creatures attack" (Duelist's Heritage): every permanent's, whoever attacked.
+    if (ev.type === "groupAttack") for (const id of s.battlefield) groupWatch(obj(s, id), true);
     fromGraveyards((o, owner) => owner === ev.controller && groupWatch(o));
     // "Whenever an opponent attacks you with two or more creatures" (Mangara): each of the attacker's opponents counts
     // the ones attacking them (and their planeswalkers, for Mangara).

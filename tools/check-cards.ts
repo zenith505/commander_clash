@@ -2,7 +2,7 @@
 // With GREP=text, every card whose rules text contains that text instead.
 
 import { readFileSync } from "node:fs";
-import { compileCard, isFullySupported, registerMeldResults, type CardDef } from "../packages/engine/src";
+import { compileCard, faceDef, isFullySupported, registerMeldResults, type CardDef } from "../packages/engine/src";
 
 const cards: CardDef[] = JSON.parse(readFileSync(new URL("../data/generated/cards.json", import.meta.url), "utf8"));
 registerMeldResults(cards);
@@ -12,5 +12,9 @@ for (const c of picked) {
   if (!c) continue;
   const ok = isFullySupported(c);
   console.log(`${ok ? "OK " : "-- "} ${c.name}`);
-  if (!ok) for (const l of compileCard(c).unsupported) console.log(`\t${l.replaceAll(c.name, "~")}`);
+  if (!ok) {
+    // A card with faces: the lines of each face (its front's are the card's own).
+    const lines = c.faces?.length ? [...new Set(c.faces.flatMap((f, i) => compileCard(faceDef(c, i)).unsupported.map((l) => l.replaceAll(f.name, "~"))))] : compileCard(c).unsupported;
+    for (const l of lines) console.log(`\t${l.replaceAll(c.name, "~")}`);
+  }
 }

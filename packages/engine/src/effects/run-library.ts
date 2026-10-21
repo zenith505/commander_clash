@@ -531,7 +531,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const searched = ((s.turnLog ??= {}).searched ??= []);
         if (!yardOnly && !searched.includes(p.id)) searched.push(p.id);
         if (!yardOnly && libOf(p.id) === p) fireEvent(s, { type: "searchedLibrary", player: p.id });
-        let cards = [...(yardOnly ? [] : libOf(p.id).library), ...(e.orGraveyard ? p.graveyard : [])].filter(fits);
+        // Aven Mindcensor: an opponent of its controller searches only the top N cards of the library (the whole of it is
+        // still shuffled after, rulings); the same top cards for the whole search.
+        const top = searchTop(s, p.id);
+        const lib = libOf(p.id).library;
+        let cards = [...(yardOnly ? [] : top === undefined ? lib : lib.slice(0, top)), ...(e.orGraveyard ? p.graveyard : [])].filter(fits);
         // At most one of each name: cards with the same name in a library are alike, so one of each is offered.
         if (e.oneEach) cards = cards.filter((id, i) => cards.findIndex((x) => sameName(defOf(s, obj(s, x)).name, defOf(s, obj(s, id)).name)) === i);
         const max = Math.min(n, cards.length);
@@ -892,6 +896,12 @@ function chooseAnOpponent(s: GameState, ctx: ResolveCtx, src: string, prompt: st
  * rulings). Several Agents each try to exile what they find; the owner of the cards chooses which applies (CR 616.1), and
  * that's the controlling player, who takes them for themselves.
  */
+/** The fewest top cards an opponent's Aven Mindcensor lets this player search, if any does. */
+function searchTop(s: GameState, pid: PlayerId): number | undefined {
+  const ns = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) !== pid && !player(s, controllerOf(s, o)).lost).map((o) => abilitiesOf(s, o).opponentsSearchTop).filter((n): n is number => n !== undefined);
+  return ns.length ? Math.min(...ns) : undefined;
+}
+
 function searchAgent(s: GameState, pid: PlayerId): { controller?: PlayerId; exileFor?: PlayerId } | undefined {
   const agents = s.battlefield
     .map((id) => obj(s, id))

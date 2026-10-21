@@ -232,6 +232,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     if (whose === null) return null;
     return count({ kind: "permanents", filter: { ...spec, text: `${m[1] ?? ""}${m[2]} ${m[3]}` }, ...(m[1] ? { other: true } : {}), ...(whose ? { whose } : {}) });
   }
+  // "The number of creatures attacking you" (Arachnogenesis): attacking you, not your planeswalkers (CR 506.3).
+  if (/^creatures? attacking you$/i.test(p)) return count({ kind: "permanents", filter: { kind: "object", types: ["Creature"], combat: "attackingYou", text: p } });
   // "attacking creature", "tapped creature": any controller.
   if ((m = /^(attacking|blocking|tapped) (creatures?)$/i.exec(p))) {
     const spec = parseTargetPhrase(`${m[1]} creature`);

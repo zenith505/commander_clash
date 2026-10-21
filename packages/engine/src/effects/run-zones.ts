@@ -117,6 +117,16 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
     // "One of those Dragons" (Zurgo and Ojutai): those still on the battlefield as the objects they were, whoever controls them now.
     const group = e.fromGroup ? (ctx.event?.group ?? []).filter((g) => s.objects[g.id]?.zone === "battlefield" && (obj(s, g.id).zoneChanges ?? 0) === g.zc).map((g) => g.id) : undefined;
     const options = group ?? (e.among ? (among === undefined ? [] : pickOptions(s, e, among, ctx.sourceId)) : pickOptions(s, e, pid, ctx.sourceId));
+    // "Sacrifice any number of other creatures": as many as they like, asked even with only one.
+    if (e.anyNumber) {
+      if (!options.length) {
+        sc.chosen![pid] = [];
+        sc.queue.shift();
+        continue;
+      }
+      s.pending = { kind: "pickPermanents", player: pid, source: src, action: e.action, what: e.filter.text, options, count: options.length, min: 0 };
+      return "paused";
+    }
     if (!n) {
       sc.chosen![pid] = [];
       sc.queue.shift();

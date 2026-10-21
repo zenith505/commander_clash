@@ -1213,6 +1213,8 @@ export interface GameState {
   /** Groups of two or more cards that went to one graveyard at the same time, waiting for their owner to arrange them. */
   /** `library`: a merged permanent's cards put into its owner's library together (CR 730.3a), unless it's shuffled since (`shuffles`, Player.shuffles then). */
   graveyardOrders?: { owner: PlayerId; cards: { id: ObjectId; zc: number }[]; library?: { bottom: boolean; shuffles: number } }[];
+  /** How many times abilities that ask ("if this is the second time this ability has resolved this turn") resolved this turn, by source object and ability. */
+  resolutionCounts?: { turn: number; counts: Record<string, number> };
   /** Cards exiled by a permanent's linked exile ability (CR 607.2a), by `${source id}@${its zone changes}`. */
   linkedExile?: Record<string, { id: ObjectId; zc: number }[]>;
   /**
@@ -1581,6 +1583,8 @@ export interface Resolving {
   amassed?: { id: ObjectId; zc: number };
   /** Whether its controller won its last clash (CR 701.30d), for "If you win, ...". */
   wonClash?: boolean;
+  /** For an ability that asks: how many times this ability of its source has resolved this turn, this time included (SpellCondition "resolvedNth"). */
+  nth?: number;
   /** Its last coin flip (CR 705.2): won or lost, and how many were won ("flip a coin until you lose a flip"). */
   flipped?: { won: boolean; wins: number };
   /** Its last roll (CR 706.2): each die's natural result that counts (not the ignored ones, 706.6), and the result. */

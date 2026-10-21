@@ -805,6 +805,15 @@ export function compile(d: CardDef): CompiledCard {
       (out.entersWithAdditional ??= []).push({ counter: counterKind(selfExtra[2]!), n: /^an?$/.test(selfExtra[1]!) ? 1 : num(selfExtra[1]!) });
       continue;
     }
+    // "As this creature transforms into Sephiroth, One-Winged Angel, you get an emblem with ..." (CR 712.20): instructions
+    // with no targets, done as it transforms.
+    const asTransforms = /^As ~ transforms into ~, (.+)$/.exec(line);
+    if (asTransforms) {
+      const body = parseBody(capital(asTransforms[1]!), {});
+      if (!body || body.targets.length || out.asTransforms || allEffects(body.effects).some((e) => e.type !== "emblem")) out.unsupported.push(raw);
+      else out.asTransforms = body;
+      continue;
+    }
     // "As ~ enters, choose a player." (CR 614.12): True-Name Nemesis's "the chosen player". "Secretly choose an opponent"
     // (Guardian Archon): the same, but only its controller knows who until it's revealed.
     const choosePlayer = /^As (?:~|it) enters, (secretly )?choose (a player|an opponent)\.$/.exec(line);
@@ -822,7 +831,10 @@ export function compile(d: CardDef): CompiledCard {
     }
     const anchored = out.entersAnchor && /^• ([A-Z]\w+) — (.+)$/.exec(line);
     if (anchored) {
-      if (!out.entersAnchor!.includes(anchored[1]!) || !conditionalAbility(d, anchored[2]!, out, { kind: "anchor", word: anchored[1]! })) out.unsupported.push(raw);
+      // "• Mardu — If a creature attacking causes a triggered ability ... triggers an additional time" (Windcrag Siege).
+      const again = out.entersAnchor!.includes(anchored[1]!) ? triggersAgainLine(anchored[2]!) : null;
+      if (again) (out.triggersAgain ??= []).push({ ...again, anchor: anchored[1]! });
+      else if (!out.entersAnchor!.includes(anchored[1]!) || !conditionalAbility(d, anchored[2]!, out, { kind: "anchor", word: anchored[1]! })) out.unsupported.push(raw);
       continue;
     }
     // "As ~ enters, choose a creature type." (CR 614.12), "~ enters tapped. As it enters, choose a color."
@@ -1492,6 +1504,10 @@ export function compile(d: CardDef): CompiledCard {
       out.loyaltyTwice = loyaltyTwice[1] === "~" ? "self" : "yours";
       continue;
     }
+    if (line === "You may spend mana as though it were mana of any color.") {
+      out.spendAnyColor = true;
+      continue;
+    }
     if (/^For each \{B\} in a cost, you may pay 2 life rather than pay that mana\.$/.test(line)) {
       out.lifeForBlack = true;
       continue;
@@ -1689,6 +1705,11 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "Your opponents can't cast spells from anywhere other than their hands.") {
       out.opponentsOnlyFromHand = true;
+      continue;
+    }
+    const mindcensor = new RegExp(`^If an opponent would search a library, that player searches the top ${NUM} cards of that library instead\\.$`).exec(line);
+    if (mindcensor) {
+      out.opponentsSearchTop = num(mindcensor[1]!);
       continue;
     }
     if (line === "You control your opponents while they're searching their libraries.") {
@@ -2196,7 +2217,7 @@ function linkExile(out: CompiledCard) {
     if (imprints.length !== 1) out.unsupported.push("(copies an exiled card it can't link to one imprint ability)");
     else (imprints[0] as Extract<Effect, { type: "takeFromHand" }>).linked = true;
   }
-  const returns = out.triggers.filter((t) => allEffects(t.body.effects).some((e) => e.type === "returnLinked"));
+  const returns = out.triggers.filter((t) => allEffects(t.body.effects).some((e) => e.type === "returnLinked" || e.type === "linkedExileToken"));
   if (!returns.length) return;
   const exiles = [...out.triggers.filter((t) => t.event === "selfEnters").map((t) => t.body), ...out.activated.map((a) => a.body)]
     .flatMap((b) => allEffects(b.effects))

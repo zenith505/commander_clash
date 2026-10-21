@@ -76,6 +76,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.manaValue && !inRange(defMv(defOf(s, o)), spec.manaValue)) return false;
   if (spec.manaCostIn && !spec.manaCostIn.includes(defOf(s, o).manaCost)) return false;
   if (spec.combat === "attacking" && o.attacking === undefined) return false;
+  if (spec.combat === "attackingYou" && (o.attacking !== controller || o.attackingPermanent)) return false;
   if (spec.combat === "blocking" && !o.blocking) return false;
   if (spec.combat === "attackingOrBlocking" && o.attacking === undefined && !o.blocking) return false;
   if (spec.combat === "attackedThisTurn" && o.attacked?.turn !== s.turn) return false;

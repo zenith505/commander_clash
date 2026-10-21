@@ -7,10 +7,11 @@ import { parseBoundCount, parseCount } from "./counts";
 import { parseBecomes, parseDig, parseSentence } from "./sentence";
 import { parsePreventionRider } from "./sentences/prevention";
 import { compileQuoted, parseGrants } from "./grants";
-import { boundAtTargeting, parseCardTarget, parseDamageRecipient, parseObject, parsePlayer, parseTargetPhrase, PERMANENT_TYPES } from "./targets";
+import { boundAtTargeting, parseCardTarget, parseDamageRecipient, parseObject, parsePlayer, parseTargetPhrase, pickFilter, PERMANENT_TYPES } from "./targets";
 import { parseCardNameChoice, parseSearchFilter } from "./search";
 import { parseManaSpend, parseManaTrigger } from "./mana-abilities";
 import { parseTrigger } from "./triggers";
+import { parseToken } from "./tokens";
 import { parsePunisherOptions } from "./sentences/basics";
 
 export interface Ctx {
@@ -729,6 +730,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     return true;
   };
   let chosenCards: ObjRef | undefined;
+  // The counts "if this is the Nth time this ability has resolved this turn" sentences named so far.
+  const nthSeen: number[] = [];
   for (let si = 0; si < sentences.length; si++) {
     // "It" is the spell cast only as the first instruction: "Untap ~. It gains ..." is about ~ (Pristine Skywise).
     if (si > 0) delete ctx.spellIt;
@@ -739,6 +742,23 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // beginning of the next end step" (one instruction, no condition).
     const atNext = /^At the beginning of (the|your) next end step, ((?:sacrifice|exile|destroy|return) [^,]+)$/.exec(s);
     if (atNext && !/\b(?:if|unless|then|instead)\b| to the battlefield/.test(atNext[2]!)) s = `${atNext[2]!.charAt(0).toUpperCase()}${atNext[2]!.slice(1)} at the beginning of ${atNext[1]} next end step`;
+    // "Sacrifice any number of other permanents, then draw that many cards" (God-Eternal Bontu), "you may sacrifice any
+    // number of other creatures. If you do, draw that many cards" (Sephiroth): any number, none too (CR 107.1c), picked
+    // as it resolves; "that many" is how many were sacrificed (none: nothing to draw).
+    // "Sacrifice any number of lands. Search your library for up to that many land cards, put them onto the battlefield
+    // tapped, then shuffle." (Scapeshift): the same count.
+    const anySac = /^(?:[Yy]ou may )?[Ss]acrifice any number of (other )?(.+)$/.exec(s);
+    const thatMany = sentences[si + 1]?.replace(/\.$/, "").replace(/^If you do, /, "") ?? "";
+    if (anySac && /\bthat many\b/.test(thatMany) && !/\bthat many\b.*\bthat many\b/.test(thatMany)) {
+      const filter = pickFilter(anySac[2]!);
+      if (!filter) return null;
+      const before = ctx.targets.length;
+      const next = parseOne(capital(thatMany.replace(/\bthat many\b/, "X")), ctx);
+      if (!next || ctx.targets.length !== before) return null;
+      effects.push({ type: "pick", who: { ref: "you" }, filter: anySac[1] ? { ...filter, notSource: true, text: `other ${filter.text}` } : filter, n: 1, action: "sacrifice", anyNumber: true }, ...replaceX(next, { count: { kind: "sacrificedThisWayCount" } }));
+      si++;
+      continue;
+    }
     // "Choose two target creature cards in your graveyard. Sacrifice a creature. If you do, return the chosen cards to the
     // battlefield tapped." (Victimize): the targets, chosen as it's cast (CR 601.2c); "the chosen cards" are them.
     const chooseCards = /^Choose ((?:two|three) target [a-z]+ cards) in your graveyard$/.exec(s);
@@ -1663,6 +1683,43 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       payFirst = { pay, text: `pay ${mayPay[1]}` };
       continue;
     }
+    // "If this is the second time this ability has resolved this turn, draw a card" (South Pole Voyager), "..., draw a card
+    // instead" (Rumor Gatherer); "You gain 4 life if this is the first time this ability has resolved this turn. If it's
+    // the second time, add {R}{G}{W}{U}. If it's the third time, ..." (Omnath); "Otherwise, ...": checked as it resolves,
+    // counting this time (SpellCondition "resolvedNth"). Each such sentence is about itself only, so none may come after
+    // them that isn't one (a second sentence under "If it's the third time" would read as unconditional).
+    const ORDINAL: Record<string, number> = { first: 1, second: 2, third: 3, fourth: 4, fifth: 5 };
+    const ORD = "(first|second|third|fourth|fifth)(?: or (second|third|fourth|fifth))?";
+    const nthIf = new RegExp(`^If (?:this is the ${ORD} time this ability has resolved this turn|it's the ${ORD} time), (.+)$`).exec(s);
+    const nthAfter = new RegExp(`^(.+?),? if this is the ${ORD} time this ability has resolved this turn$`).exec(s);
+    const nthOtherwise = nthSeen.length ? /^Otherwise, (.+)$/.exec(s) : null;
+    if (nthSeen.length && !nthIf && !nthAfter && !nthOtherwise) return null;
+    if (nthIf && (nthIf[1] || nthSeen.length)) {
+      const ns = [nthIf[1] ?? nthIf[3]!, nthIf[2] ?? nthIf[4]].filter((x): x is string => !!x).map((w) => ORDINAL[w]!);
+      const cond: SpellCondition = { kind: "resolvedNth", n: ns };
+      const fx = parseKicked(nthIf[5]!, effects.slice(prevStart), ctx);
+      if (!fx || (fx.instead && nthSeen.length)) return null;
+      nthSeen.push(...ns);
+      if (fx.instead) effects.splice(prevStart, effects.length - prevStart, { type: "if", cond, effects: fx.effects, otherwise: effects.slice(prevStart) });
+      else effects.push({ type: "if", cond, effects: fx.effects });
+      continue;
+    }
+    if (nthAfter && !nthSeen.length) {
+      const ns = [nthAfter[2]!, nthAfter[3]].filter((x): x is string => !!x).map((w) => ORDINAL[w]!);
+      const before = ctx.targets.length;
+      const fx = parseOne(nthAfter[1]!.charAt(0).toUpperCase() + nthAfter[1]!.slice(1), ctx);
+      if (!fx || ctx.targets.length !== before) return null;
+      nthSeen.push(...ns);
+      effects.push({ type: "if", cond: { kind: "resolvedNth", n: ns }, effects: fx });
+      continue;
+    }
+    if (nthOtherwise) {
+      const fx = parseKicked(nthOtherwise[1]!, [], ctx);
+      if (!fx || fx.instead) return null;
+      effects.push({ type: "if", cond: { kind: "resolvedNth", n: [...nthSeen], not: true }, effects: fx.effects });
+      nthSeen.push(0); // nothing may follow "Otherwise"
+      continue;
+    }
     // "If ~ was kicked, draw a card." / "If ~ was kicked, it deals 5 damage instead." (CR 702.33e)
     const kicked = /^If (?:~|it) was kicked(?: with its ((?:\{[^}]+\})+) kicker)?, (.+)$/.exec(s);
     if (kicked) {
@@ -1821,6 +1878,15 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "..., where X is the number of creatures you control": X is defined by the text (CR 107.3c).
     // It's read after the rest of the sentence, which may name what it counts ("that player's hand").
     // Not one inside a quoted ability ('You get an emblem with "..., where X is ..."'), which is that ability's own.
+    // Skyclave Apparition: "the exiled card's owner creates an X/X blue Illusion creature token, where X is the mana value
+    // of the exiled card": the card its own exile ability took (linked in compile.ts, CR 607.2a).
+    const skyclave = ctx.selfCard ? /^[Tt]he exiled card's owner creates an X\/X (.+?) creature token, where X is the mana value of the exiled card$/.exec(s) : null;
+    if (skyclave) {
+      const token = parseToken(0, 0, skyclave[1]!);
+      if (!token) return null;
+      effects.push({ type: "linkedExileToken", token });
+      continue;
+    }
     const where = /^(.+), where X is ([^"]+)$/.exec(s);
     if (where) s = where[1]!;
     ctx.whereX = !!where;
@@ -2478,6 +2544,23 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
         continue;
       }
       return null;
+    }
+    // "Reveal cards from the top of your library until you reveal a creature card. Put that card onto the battlefield and
+    // the rest on the bottom of your library in a random order." (Nissa, Leyline Tamer), "... into your hand ...", "...
+    // a land card. Put that card onto the battlefield tapped ...". Onto the battlefield only cards that need no choice
+    // as they enter there (not Auras, CR 303.4f).
+    const until = /^[Rr]eveal cards from the top of your library until you reveal (?:an? )?(.+? card)$/.exec(s);
+    const untilPut = /^Put that card (into your hand|onto the battlefield( tapped)?) and the rest on the bottom of your library in a random order$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (until && untilPut && !/\b(?:named|chosen|that name)\b/.test(until[1]!)) {
+      const filter = parseSearchFilter(until[1]!);
+      if (!filter || filter.kind !== "card") return null;
+      const onto = untilPut[1] !== "into your hand";
+      const safe = !!filter.types?.length && filter.types.every((x) => x === "Creature" || x === "Artifact" || x === "Land") && !filter.anyOf;
+      const tribal = !filter.types?.length && !!filter.subtypes?.length && filter.subtypes.every((x) => CREATURE_TYPES.has(x));
+      if (onto && !safe && !tribal) return null;
+      effects.push({ type: "revealUntil", filter, found: onto ? "battlefield" : "hand", rest: "bottom", ...(untilPut[2] ? { tapped: true as const } : {}) });
+      si++;
+      continue;
     }
     // "Choose an opponent. That player ..." (Myrkul's Edict, the Offerings): chosen as it resolves (CR 608.2d), not
     // targeted. One per ability.

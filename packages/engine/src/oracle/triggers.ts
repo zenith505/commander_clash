@@ -651,12 +651,18 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   let phrase: string | undefined;
   let bodyText: string;
   let min: number | undefined;
+  let anyone = false;
   if ((m = /^Whenever (?:one or more (.+?) you control attack|you attack with (one|two|three|four|five) or more (.+?)|you attack)(?: a player)?, (.+)$/.exec(line))) {
     event = "creaturesYouControlAttack";
     phrase = m[1] ?? m[3];
     bodyText = m[4]!;
     const n = m[2] ? num(m[2]) : 1;
     if (n > 1) min = n;
+  } else if ((m = /^Whenever one or more creatures attack, (.+)$/.exec(line))) {
+    // Duelist's Heritage: whoever attacks (rulings), once for each declaration (CR 508.1, 603.2c).
+    event = "creaturesYouControlAttack";
+    bodyText = m[1]!;
+    anyone = true;
   } else if ((m = /^Whenever one or more (.+?) you control deal combat damage to (a player or battle|a player|an opponent|one or more players), (.+)$/.exec(line.replace(/^(Whenever one or more creatures) (you control) (each with power greater than its base power) deals /, "$1 $3 $2 deal ")))) {
     event = "creaturesYouControlDealCombatDamageToPlayer";
     phrase = m[1];
@@ -704,7 +710,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     const filter: TargetSpec = group ?? { kind: "object", types: ["Creature"], text: "creature" };
     body = { ...body, effects: [...body.effects, { type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "bounce", fromGroup: true }], text: `return one of those ${phrase} to its owner's hand` }], text: `${body.text} You may return one of those ${phrase} to its owner's hand.` };
   }
-  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}), ...(toOpponent ? { toOpponent: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}) };
+  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}), ...(toOpponent ? { toOpponent: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(anyone ? { anyoneAttacks: true as const } : {}) };
 }
 
 /** "Other creatures you control", "tokens you control", "artifacts and/or creatures you control": what a batch trigger counts. */
@@ -1294,6 +1300,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(attacked[1]!.replace(/\bthat opponent\b/g, "that player"), { eventPlayer: true });
     if (!body) return "fail";
     return { event: "opponentAttacksYou", attacksYou: { min: 2, ...(/planeswalkers you control/.test(line) ? { orPlaneswalkers: true as const } : {}) }, body: { ...body, text: attacked[1]! } };
+  }
+  // Coveted Jewel: "that player draws three cards and gains control of ~. Untap it." (two instructions for that player, then
+  // untapping ~).
+  const unblocked = /^Whenever one or more creatures an opponent controls attack you and aren't blocked, (.+)$/.exec(line);
+  if (unblocked) {
+    const text = unblocked[1]!.replace(/^that player (draws [a-z]+ cards?) and (gains control of ~)\. Untap it\.$/, "That player $1. That player $2. Untap ~.");
+    const body = parseBody(text, { eventPlayer: true });
+    return body ? { event: "opponentCreaturesUnblocked", body: { ...body, text: unblocked[1]! } } : "fail";
   }
   const searches = /^Whenever an opponent searches their library, (.+)$/.exec(line);
   if (searches) {

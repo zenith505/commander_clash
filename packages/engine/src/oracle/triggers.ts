@@ -5,6 +5,7 @@ import { parseBody, replaceX } from "./body";
 import { parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
 import { CREATURE_TYPES } from "../keywords";
 import { parseSearchFilter } from "./search";
+import { parseCount } from "./counts";
 const capital = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
 
 const TRIGGERS: [RegExp, TriggerEvent][] = [
@@ -396,7 +397,8 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   const kwM = !pw ? / (?:with|that has) (convoke|flying|infect)$/.exec(what) : null;
   if (kwM) what = what.slice(0, kwM.index);
   // "a spell of the chosen color", "a creature spell of the chosen type": the choice made as this permanent entered.
-  const parsed = /^spell$/.test(what) ? { kind: "spell" as const, text: "spell" } : parseTargetPhrase(/\bspell\b/.test(what) ? what : `${what} spell`, { chosen: true });
+  // "A noncreature spell with mana value less than ~'s power" (Pollywog Prodigy): worked out as it's cast (TargetSpec.bound).
+  const parsed = /^spell$/.test(what) ? { kind: "spell" as const, text: "spell" } : parseTargetPhrase(/\bspell\b/.test(what) ? what : `${what} spell`, { chosen: true, count: (t) => (t === "~'s power" ? parseCount(t, null) : null) });
   if (!parsed || parsed.kind !== "spell" || (pw && !parsed.types?.includes("Creature"))) return "fail";
   const range = pw && (pw[3] === "greater" ? { min: Number(pw[2]) } : { max: Number(pw[2]) });
   const spell = range ? { ...parsed, [pw![1] as "power" | "toughness"]: range } : parsed;
@@ -711,7 +713,9 @@ function batchPermanents(phrase: string): { filter: TargetSpec; other: boolean }
   const p = phrase.replace(/^other /, "");
   const group = parseGroup(p, true);
   if (group) return { filter: group.filter, other };
-  const one = p.replace(/,? and\/or /g, (x) => x.replace("and/or", "or")).replace(/ your opponents control\b/, " an opponent controls").split(/(\s+|,)/).map((w) => (/^[\s,]*$/.test(w) ? w : singularWord(w))).join("");
+  // "Tokens your opponents control" (Kambal): each one "an opponent controls", the verb left as it is.
+  const opp = / your opponents control$/.test(p);
+  const one = p.replace(/,? and\/or /g, (x) => x.replace("and/or", "or")).replace(/ your opponents control$/, "").split(/(\s+|,)/).map((w) => (/^[\s,]*$/.test(w) ? w : singularWord(w))).join("") + (opp ? " an opponent controls" : "");
   const spec = parseTargetPhrase(one);
   return spec?.kind === "object" ? { filter: { ...spec, text: phrase }, other } : null;
 }
@@ -792,6 +796,14 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     yourTurn = !!m[4];
     rest = m[5]!;
   } else return null;
+  // Kambal, Profiteering Mayor: "for each of them, create a tapped token that's a copy of it", those that entered.
+  const eachCopy = /^for each of them, create an? (tapped )?token that's a copy of it\.?$/.exec(rest);
+  if (eachCopy && batch.what === "enters" && !yourTurn) return { event: "batch", batch, body: { targets: [], effects: [{ type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "eventGroup" }, each: true, ...(eachCopy[1] ? { tapped: true } : {}) }], text: rest.replace(/\.$/, "") } };
+  // Hedge Shredder: "Whenever one or more land cards are put into your graveyard from your library, put them onto the
+  // battlefield tapped": those cards, if still in the graveyard (CR 400.7).
+  const putThem = /^put them onto the battlefield( tapped)?\.?$/.exec(rest);
+  if (putThem && batch.what === "toGraveyard" && batch.from === "library" && batch.filter && !yourTurn)
+    return { event: "batch", batch, body: { targets: [], effects: [{ type: "putOntoBattlefield", what: { ref: "eventGroup" }, ...(putThem[1] ? { tapped: true } : {}) }], text: rest.replace(/\.$/, "") } };
   // The objects as a group: not modeled.
   if (/\b(it|its|they|them|their|those|that card|that creature|that token|one of them|among them|this way)\b/i.test(rest)) return "fail";
   let text = rest;

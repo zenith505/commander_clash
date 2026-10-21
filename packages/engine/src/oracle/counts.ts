@@ -84,6 +84,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return { count: { kind: "greatestManaValue", filter: { ...spec, text: `${m[1]} you control` } } };
   }
   // "The total mana value of historic permanents you control" (Excalibur, Sword of Eden): the sum, X counting 0 (CR 107.3).
+  // Summon: Bahamut: "the total mana value of other permanents you control", the source left out.
+  if (!each && (m = /^the total mana value of other (.+?) you control$/i.exec(p))) {
+    const spec = parseTargetPhrase(`${m[1]!.split(/\s+/).map(singularWord).join(" ")} you control`, { chosen: true });
+    if (spec?.kind !== "object") return null;
+    return { count: { kind: "greatestManaValue", total: true, other: true, filter: { ...spec, text: `${m[1]} you control` } } };
+  }
   if (!each && (m = /^the total mana value of (.+?) you control$/i.exec(p))) {
     // Historic: legendary, an artifact, or a Saga (CR 700.6).
     const historic: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], controller: "you", anyOf: [{ kind: "object", types: ["Artifact"], text: "artifact" }, { kind: "object", types: [], supertypes: ["Legendary"], text: "legendary permanent" }, { kind: "object", types: [], subtypes: ["Saga"], text: "Saga" }], text: "historic permanent you control" };

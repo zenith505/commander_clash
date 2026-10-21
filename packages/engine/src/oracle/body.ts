@@ -286,6 +286,9 @@ function parseFaceDownPlay(sentences: string[], at: number, ctx: Ctx): { effect:
   const head =
     new RegExp(`^[Ee]xile the top (card|${NUMX} cards) of ${LIB} library face down$`).exec(s) ??
     new RegExp(`^(?:[Ll]ook at the top (card|${NUMX} cards) of ${LIB} library and exile (?:it|that card|those cards) face down)$`).exec(s);
+  // "Exile the top card of your library face down and look at it" (Ugin, the Ineffable).
+  const andLook = /^Exile the top (card) of (your) library face down and look at it$/.exec(s);
+  if (andLook) return { effect: { type: "exileFaceDown", from: "top", look: true }, next: at + 1 };
   const look = !head && new RegExp(`^[Ll]ook at the top (card|${NUMX} cards) of ${LIB} library$`).exec(s);
   const lookThen = look && /^Exile (?:it|that card|those cards|them) face down$/.test(sentences[at + 1] ?? "");
   const they = new RegExp(`^(Target opponent|Target player|That player|Each opponent) exiles? the top (card|${NUMX} cards) of their library face down$`).exec(s);
@@ -615,6 +618,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   text = text.replace(/, then shuffle and you gain (\d+) life\./g, ", then shuffle. You gain $1 life.");
   // "Destroy all creatures other than ~" (Magister of Worth) is "destroy all other creatures".
   text = text.replace(/\ball creatures other than ~/g, "all other creatures");
+  // "Choose any number of target creatures you control. For each of them, create a token that's a copy of that creature,
+  // except it has haste." (Twinflame): a copy of each of them.
+  text = text.replace(/^Choose any number of target ([^.]+?)\. For each of them, create a token that's a copy of that (?:creature|permanent)(, except [^.]+)?\./, "Create a token that's a copy of each of any number of target $1$2.");
+  // "Target creature you control other than ~" (Rosie Cotton) is "another target creature you control"; "each creature you
+  // control other than ~" (Dawnstrike Vanguard) is "each other creature you control".
+  text = text.replace(/\b([Tt])arget (creature|permanent) you control other than ~/g, (_, t: string, w: string) => `${t === "T" ? "A" : "a"}nother target ${w} you control`);
+  text = text.replace(/\beach (creature|permanent) you control other than ~/g, "each other $1 you control");
   // "Each player secretly votes for truth or consequences, then those votes are revealed" is one instruction (a vote whose
   // votes nobody sees until all are made), not two.
   text = text.replace(/\b(secretly votes for [^.]+?), then those votes are revealed\./g, "$1.");
@@ -654,7 +664,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // of Denial) is all conditional.
     // Nor "you may exile target creature you control, then return that card to the battlefield" (Conjurer's Closet): one
     // blink, all of it optional.
-    .flatMap((x) => (/^If [^,]+, /.test(x) || /^[Yy]ou may exile [^,]+, then return (?:it|that card) to the battlefield under (?:its owner's|your) control\.?$/.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then reveals the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|meld them into )/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
+    .flatMap((x) => (/^If [^,]+, /.test(x) || /^[Yy]ou may exile [^,]+, then return (?:it|that card) to the battlefield under (?:its owner's|your) control\.?$/.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then reveals the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|destroy the rest$|meld them into )/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
     // "Target opponent reveals their hand and you choose a nonland card from it": two instructions, in order.
     .flatMap((x) => x.split(/(?<=reveals (?:their|his or her) hand) and (?=you choose )/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p)))
     .flatMap(splitSpentPair)
@@ -663,6 +673,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       // Not under a leading condition ("If you do, put ... and it gains menace"): the condition is for both.
       const m = /^If /.test(x) ? null : /^(.*\b(?:counters? on ~|[Ss]acrifice ~)) and it ((?:gains|gets|can't|deals) .+)$/.exec(x);
       return m ? [m[1]!, `~ ${m[2]!}`] : [x];
+    })
+    // Legion Leadership: "Until end of turn, double target creature's power and it gains first strike": two instructions.
+    .flatMap((x) => {
+      const m = /^Until end of turn, double target creature's power and it gains ([a-z ]+)\.?$/.exec(x);
+      return m ? ["Double target creature's power until end of turn", `It gains ${m[1]} until end of turn`] : [x];
     })
     // "You draw that many cards and ~ deals that much damage to each other opponent" (Kosei): two instructions, in order.
     .flatMap((x) => {
@@ -1418,6 +1433,26 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects[effects.length - 1] = { ...prev, counterIf: { counter: "+1/+1", filter: { ...filter, text: fluxIf[1]! } } };
       continue;
     }
+    // Tezzeret, Cruel Captain: "Untap target artifact or creature. If it's an artifact creature, put a +1/+1 counter on
+    // it." "Put three +1/+1 counters on target artifact you control. If it's not a creature, it becomes a 0/0 Robot
+    // artifact creature." The target still on the battlefield, checked as it resolves (CR 608.2c).
+    const ifIts = /^If it's (not )?an? ([a-z]+(?: [a-z]+)?), (.+)$/.exec(s);
+    if (ifIts) {
+      const i = ctx.targets.length - 1;
+      const t = ctx.targets[i];
+      const prev = effects[effects.length - 1];
+      const typed = parseTargetPhrase(ifIts[2]!);
+      const known = typed?.kind === "object" && Object.entries(typed).every(([k, v]) => v === undefined || ["kind", "types", "allTypes", "notTypes", "notColors", "text"].includes(k));
+      const types = typed?.kind === "object" ? [...(typed.types ?? []), ...(typed.allTypes ?? [])] : [];
+      // Anything else is left to the readings below (Carbonize's "If it's a creature, it can't be regenerated ...").
+      if (t?.kind === "object" && !t.optional && !t.many && known && prev && ["untap", "tap", "counters", "continuous"].includes(prev.type) && mentionsTarget(prev, i) && (!ifIts[1] || types.length === 1) && !/,/.test(ifIts[3]!)) {
+        const fx = parseOne(ifIts[3]!.charAt(0).toUpperCase() + ifIts[3]!.slice(1), ctx);
+        if (!fx || ctx.targets.length !== i + 1 || !fx.every((e) => mentionsTarget(e, i))) return null;
+        const filter: TargetSpec = ifIts[1] ? { kind: "object", types: [], notTypes: types, notColors: [], text: `not ${ifIts[2]}` } : { ...typed, text: ifIts[2]! };
+        effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: fx });
+        continue;
+      }
+    }
     // "You gain life equal to the damage prevented this way": part of the prevention effect before it (CR 615.5).
     // Inkshield: "For each 1 damage prevented this way, create a 2/1 ... token": also part of the prevention (CR 615.5).
     const perDamage = /^For each 1 damage prevented this way, (create an? [^.]+ token(?: with [a-z ]+)?)$/.exec(s);
@@ -1546,11 +1581,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       // "You may pay {2}{W}. When you do, tap target creature." (Thousand Moons Crackshot): paying triggers a reflexive
       // ability with targets of its own, chosen as it's put on the stack (CR 603.12; rulings). The rest of the ability is its.
       const whenPaid = /^When you do, (.+)$/.exec(s);
-      if (whenPaid && payFirst.payX) return null;
       if (whenPaid) {
+        // "You may pay {X}. When you do, ~ deals X damage to target player" (Electro): the reflexive ability's X is the X paid.
         const reflexive = reflexiveBody([whenPaid[1]!, ...sentences.slice(si + 1)].join(". "), ctx);
         if (!reflexive) return null;
-        effects.push({ type: "may", effects: [{ type: "reflexive", body: reflexive }], pay: payFirst.pay, text: `${payFirst.text}. When you do, ${[whenPaid[1]!, ...sentences.slice(si + 1)].join(". ")}` });
+        effects.push({ type: "may", effects: [{ type: "reflexive", body: reflexive }], pay: payFirst.pay, ...(payFirst.payX ? { payX: payFirst.payX } : {}), text: `${payFirst.text}. When you do, ${[whenPaid[1]!, ...sentences.slice(si + 1)].join(". ")}` });
         payFirst = null;
         si = sentences.length;
         continue;
@@ -2446,9 +2481,19 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     }
     // "Choose an opponent. That player ..." (Myrkul's Edict, the Offerings): chosen as it resolves (CR 608.2d), not
     // targeted. One per ability.
-    if (/^Choose an opponent$/.test(s)) {
+    // Ezuri's Predation: "For each creature your opponents control, create a 4/4 ... token. Each of those tokens fights a
+    // different one of those creatures."
+    if (s === "Each of those tokens fights a different one of those creatures") {
+      const prev = effects[effects.length - 1];
+      const n = prev?.type === "createToken" && typeof prev.n === "object" && "count" in prev.n ? prev.n : undefined;
+      if (!n || n.count.kind !== "permanents" || (n.times ?? 1) !== 1 || prev?.type !== "createToken" || !prev.token.types.includes("Creature")) return null;
+      effects.push({ type: "createdFightEach", filter: n.count.filter });
+      continue;
+    }
+    // The Black Gate: "Choose a player with the most life or tied for most life", any of them, you too.
+    if (/^Choose (?:an opponent|a player with the most life or tied for most life)$/.test(s)) {
       if (ctx.chosenOpponent || ctx.eventPlayer || ctx.lastPlayerTarget !== undefined) return null;
-      effects.push({ type: "choose", choice: "opponent" });
+      effects.push({ type: "choose", choice: "opponent", ...(/most life/.test(s) ? { mostLife: true as const } : {}) });
       ctx.chosenOpponent = true;
       continue;
     }
@@ -2481,6 +2526,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si = sentences.length;
       continue;
     }
+    // Ugin, the Ineffable: "Exile the top card of your library face down and look at it. Create a 2/2 colorless Spirit
+    // creature token. When that token leaves the battlefield, put the exiled card into your hand." A delayed trigger for
+    // each token made (rulings: with two tokens, the first to leave brings the card back), about the card exiled.
+    if (s === "When that token leaves the battlefield, put the exiled card into your hand") {
+      const [made, faceDown] = [effects[effects.length - 1], effects[effects.length - 2]];
+      if (made?.type !== "createToken" || faceDown?.type !== "exileFaceDown" || faceDown.from !== "top" || faceDown.n !== undefined || faceDown.play) return null;
+      effects.push({ type: "delayed", when: "leaves", each: "created", effects: [{ type: "returnFaceDownExiled" }], text: "put the exiled card into your hand" });
+      continue;
+    }
+    // "Choose a color. Another target creature you control gains ... hexproof from that color until end of turn. It can't
+    // be blocked by creatures of that color this turn." (Skrelv): the color chosen as it resolved (CR 608.2d).
+    if (effects.some((x) => x.type === "choose" && x.choice === "color")) s = s.replace(/\b(from|of) that color\b/g, "$1 the chosen color");
     // "Until end of turn, X ..." reads the same as "X ... until end of turn".
     if (/^[Uu]ntil end of turn, /.test(s)) s = `${s.replace(/^[Uu]ntil end of turn, /, "").replace(/^./, (c) => c.toUpperCase())} until end of turn`;
     // "Target creature you control gains protection from the color of your choice until end of turn": the

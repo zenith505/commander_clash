@@ -2,10 +2,10 @@
 // mana from sources that matter (106.3: snow, Treasures, creatures, artifacts) and mana kept as steps end.
 
 import type { ActivatedAbility, ManaSpend } from "./abilities";
-import { defOf, isType } from "./cards";
+import { abilitiesOf, defOf, isType } from "./cards";
 import { bindChosen, objectMatches, printedMatches } from "./effects";
-import { emptyPool, payFromPool, type ManaPool, type ParsedCost, type Payment } from "./mana";
-import { characteristics } from "./layers";
+import { blackForLife, emptyPool, payFromPool, type ManaPool, type ParsedCost, type Payment } from "./mana";
+import { characteristics, controllerOf } from "./layers";
 import type { CardDef, Color, GameObject, GameState, ManaLot, ManaOrigin, ManaSpentTrigger, ManaType, PlayerId } from "./types";
 
 /**
@@ -93,8 +93,21 @@ export function poolFor(s: GameState, pid: PlayerId, use: ManaUse): { pool: Mana
   return { pool, prefer, treasure, snow };
 }
 
+/**
+ * How `pid` may pay this cost: with K'rrik's "for each {B} in a cost, you may pay 2 life rather than pay that mana", any
+ * {B} with 2 life too. It applies to every cost its controller pays with mana: spells, abilities, special actions (rulings).
+ */
+export function payableCost(s: GameState, pid: PlayerId, cost: ParsedCost): ParsedCost {
+  const krrik = s.battlefield.some((id) => {
+    const o = s.objects[id]!;
+    return !!abilitiesOf(s, o).lifeForBlack && controllerOf(s, o) === pid;
+  });
+  return krrik ? blackForLife(cost) : cost;
+}
+
 /** Could `pid` pay this from their pool for `use`? */
-export function canPayFromPool(s: GameState, pid: PlayerId, cost: ParsedCost, use: ManaUse, extraGeneric = 0, life = Infinity): boolean {
+export function canPayFromPool(s: GameState, pid: PlayerId, cost0: ParsedCost, use: ManaUse, extraGeneric = 0, life = Infinity): boolean {
+  const cost = payableCost(s, pid, cost0);
   const { pool, snow } = poolFor(s, pid, use);
   return !!payFromPool(cost, pool, extraGeneric, life, { snow });
 }
@@ -108,8 +121,9 @@ export type SpentFrom = Record<"treasure" | "creature" | "artifact", number>;
  * (CR 601.2h): restricted mana it may be spent on first; then, on a spell or an ability, mana from a Treasure, a creature
  * or an artifact ("if mana from a Treasure was spent"), but on anything else the rest first; mana kept as steps end last.
  */
-export function spendFromPool(s: GameState, pid: PlayerId, cost: ParsedCost, use: ManaUse, extraGeneric = 0, life = Infinity, opts: { spreadColors?: boolean; want?: Partial<Record<Color, number>>; avoid?: Partial<Record<Color, number>>; wantSnow?: boolean } = {}): (Payment & { spent: ManaPool; treasure: number; from: SpentFrom; uncounterable?: true; spentTriggers?: ManaSpentTrigger[]; haste?: "endOfTurn" | "game"; commanderCounters?: number }) | null {
+export function spendFromPool(s: GameState, pid: PlayerId, cost0: ParsedCost, use: ManaUse, extraGeneric = 0, life = Infinity, opts: { spreadColors?: boolean; want?: Partial<Record<Color, number>>; avoid?: Partial<Record<Color, number>>; wantSnow?: boolean } = {}): (Payment & { spent: ManaPool; treasure: number; from: SpentFrom; uncounterable?: true; spentTriggers?: ManaSpentTrigger[]; haste?: "endOfTurn" | "game"; commanderCounters?: number }) | null {
   const p = s.players[pid]!;
+  const cost = payableCost(s, pid, cost0);
   const { pool, prefer, treasure, snow } = poolFor(s, pid, use);
   const first = { ...prefer };
   if (use !== "other") for (const m of Object.keys(first) as ManaType[]) first[m] = Math.min(pool[m], first[m] + treasure[m]);

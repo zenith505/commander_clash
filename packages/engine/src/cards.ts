@@ -3,7 +3,8 @@ import { characteristics, offFieldTyped, printedKeywords, type PTPart } from "./
 import { compileCard, compileGranted, overloadedText } from "./oracle";
 import { COLORS, type CardDef, type Color, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
 import { manaValue, parseManaCost } from "./mana";
-import { faceKey, isRoom, registerFace, registerRoom, restingDef, roomKey } from "./faces";
+import { faceKey, isRoom, registerFace, registerRoom, restingDef, roomKey, sameName } from "./faces";
+import { objectMatches, printedMatches } from "./effects/targeting";
 
 /** The creature this one is paired with (CR 702.95b), if the pair still stands. See checkPairs for when it breaks. */
 export function pairedWith(s: GameState, o: GameObject): GameObject | undefined {
@@ -240,8 +241,74 @@ export function abilitiesOf(s: GameState, o: GameObject): CompiledCard {
   // Each card encoded on it gives it "Whenever this creature deals combat damage to a player, you may copy the encoded
   // card and you may cast the copy without paying its mana cost" for as long as it's encoded (CR 702.99a, c).
   const encoded = o.zone === "battlefield" ? (o.encoded ?? []).filter((e) => s.objects[e.id]?.zone === "exile" && (s.objects[e.id]!.zoneChanges ?? 0) === e.zc) : [];
-  if (!encoded.length) return own;
-  return { ...own, triggers: [...own.triggers, ...encoded.map((e) => cipherTrigger(defOf(s, s.objects[e.id]!).name, e))] };
+  if (encoded.length) own = { ...own, triggers: [...own.triggers, ...encoded.map((e) => cipherTrigger(defOf(s, s.objects[e.id]!).name, e))] };
+  return own.borrows && o.zone === "battlefield" && !borrowing ? withBorrowed(s, o, own) : own;
+}
+
+/** While working out the abilities a permanent borrows: the lenders' own abilities, without what they borrow (no loops). */
+let borrowing = false;
+const ids = new WeakMap<CompiledCard, number>();
+let nextCompiledId = 1;
+const idOf = (c: CompiledCard) => ids.get(c) ?? (ids.set(c, nextCompiledId), nextCompiledId++);
+const borrowed = new WeakMap<CompiledCard, Map<string, CompiledCard>>();
+
+/**
+ * What a permanent with "~ has all activated abilities of ..." (CompiledCard.borrows) borrows from now: the permanents
+ * (`objects`) or graveyard cards (`cards`) matching it. A lender's own borrowing isn't followed (no loops).
+ */
+export function lendersOf(s: GameState, o: GameObject, b: NonNullable<CompiledCard["borrows"]>): { objects: GameObject[]; cards: CardDef[] } {
+  const out = { objects: [] as GameObject[], cards: [] as CardDef[] };
+  if (o.zone !== "battlefield" || borrowing) return out;
+  const c = characteristics(s, o);
+  borrowing = true;
+  try {
+    if (b.graveyard) {
+      for (const pid of s.turnOrder)
+        if (!b.yours || pid === c.controller)
+          for (const id of s.players[pid]!.graveyard) {
+            const d = defOf(s, s.objects[id]!);
+            if (printedMatches(b.filter, d)) out.cards.push(d);
+          }
+    } else
+      for (const id of s.battlefield) {
+        const x = s.objects[id]!;
+        if (b.other && x.id === o.id) continue;
+        if (!objectMatches(s, b.filter, x, c.controller, false)) continue;
+        if (b.notSameName && sameName(characteristics(s, x).name, c.name)) continue;
+        out.objects.push(x);
+      }
+  } finally {
+    borrowing = false;
+  }
+  return out;
+}
+
+/**
+ * "~ has all activated abilities of ..." (CompiledCard.borrows): its own abilities, then the activated abilities of each
+ * permanent or graveyard card it borrows from, as that object has them now (CR 613.1f: after layer 6 for permanents; a
+ * card in a graveyard has its printed ones). "~" in them is this object (rulings). Its mana abilities are borrowed in
+ * manaAbilitiesOn.
+ */
+function withBorrowed(s: GameState, o: GameObject, own: CompiledCard): CompiledCard {
+  const found = lendersOf(s, o, own.borrows!);
+  borrowing = true;
+  let lenders: CompiledCard[];
+  try {
+    lenders = [...found.objects.map((x) => abilitiesOf(s, x)), ...found.cards.map((d) => compileCard(d))];
+  } finally {
+    borrowing = false;
+  }
+  if (!lenders.length) return own;
+  const key = lenders.map(idOf).join(",");
+  let byKey = borrowed.get(own);
+  if (!byKey) borrowed.set(own, (byKey = new Map()));
+  let hit = byKey.get(key);
+  if (!hit) {
+    const usable = (a: CompiledCard["activated"][number]) => !a.zone && !a.equip && a.loyalty === undefined && !a.loyaltyX;
+    hit = { ...own, activated: [...own.activated, ...lenders.flatMap((l) => l.activated.filter(usable))] };
+    byKey.set(key, hit);
+  }
+  return hit;
 }
 
 /** The cards in exile haunting this permanent (CR 702.55b), for showing it. */

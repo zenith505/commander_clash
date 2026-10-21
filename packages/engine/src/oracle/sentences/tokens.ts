@@ -97,7 +97,10 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const except = m[5] ? parseCopyExcept(m[5], ctx.halfRound) : undefined;
     if (!who || !what || except === null || isGroup(what)) return null;
     const state = { ...(m[3] ? { tapped: true } : {}), ...(m[3] && /attacking/.test(m[3]) ? { attacking: true } : {}) };
-    return [{ type: "createTokenCopy", who, n: amt(m[2]!), what, ...(except ? { except } : {}), ...state }];
+    // "A copy of each of any number of target creatures" (Twinflame): one of each of them.
+    const each = what.ref === "target" && what.n !== undefined && !what.card;
+    if (each && amt(m[2]!) !== 1) return null;
+    return [{ type: "createTokenCopy", who, n: amt(m[2]!), what, ...(each ? { each: true as const } : {}), ...(except ? { except } : {}), ...state }];
   }
   // "Whenever ~ attacks a player, for each other opponent, create a token that's a copy of ~ tapped and attacking that
   // player, except it isn't legendary" (Shredder): myriad's tokens (CR 702.116a), each opponent but the defending player,

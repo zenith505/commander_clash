@@ -16,7 +16,8 @@ import { bindBound, pickOptions, playerProtectedFrom, spellManaValue } from "./e
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateTargets, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
-import { putCounters } from "./counters";
+import { putCounters, tokenBatch } from "./counters";
+import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { addCopyEffect, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, staticConditionNow } from "./layers";
 import { compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
@@ -657,9 +658,21 @@ export function moveObject(
   }
   // "If ~ would die, exile it instead", "If a creature an opponent controls would die, exile it instead" (CR 614.1a): from
   // the permanent itself or another one on the battlefield, as the creature would leave (CR 603.10a-style look back).
-  if (fromZone === "battlefield" && to === "graveyard" && objIsType(s, o, "Creature") && exiledInsteadOfDying(s, o)) {
+  const insteadOfDying = fromZone === "battlefield" && to === "graveyard" && objIsType(s, o, "Creature") ? exiledInsteadOfDying(s, o) : null;
+  if (insteadOfDying) {
     to = "exile";
     log(s, `${defOf(s, o).name} is exiled instead of dying.`);
+    const { id: by, controller: you, x } = insteadOfDying;
+    // "Exiled with ~" while that permanent is still on the battlefield (CR 607.2a): the card as it will be in exile.
+    const src = s.objects[by];
+    if (x.linked && src?.zone === "battlefield" && by !== o.id) ((s.linkedExile ??= {})[`${by}@${src.zoneChanges ?? 0}`] ??= []).push({ id, zc: (o.zoneChanges ?? 0) + 1 });
+    if (x.gainLife) gainLife(s, you, x.gainLife);
+    if (x.token) {
+      const { same, extra } = tokenBatch(s, you, x.token, 1);
+      for (let i = 0; i < same; i++) createToken(s, you, x.token);
+      createExtraTokens(s, you, extra);
+      if (same) log(s, `${player(s, you).name} creates ${same === 1 ? "a" : same} ${x.token.name} token${same > 1 ? "s" : ""}.`);
+    }
   }
   // Darksteel Colossus: "If ~ would be put into a graveyard from anywhere, reveal ~ and shuffle it into its owner's
   // library instead" (CR 614.1a). On the battlefield it's the permanent's ability now (it could have lost it);
@@ -1466,13 +1479,25 @@ function boastsTwice(s: GameState, pid: PlayerId): boolean {
   return s.activePlayer === pid && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && !!abilitiesOf(s, obj(s, id)).boastTwice);
 }
 
-/** Does an "exile it instead" replacement effect apply to `o` dying: its own, or another permanent's about it? */
-function exiledInsteadOfDying(s: GameState, o: GameObject): boolean {
-  if (abilitiesOf(s, o).exileInsteadOfDying?.self) return true;
+/**
+ * Does an "exile it instead" replacement effect apply to `o` dying: its own, or another permanent's about it? Which
+ * permanent's, for "instead exile it and you gain 2 life" (The Darkness Crystal) and "... and create a 2/2 black Zombie
+ * creature token" (Kalitas).
+ */
+function exiledInsteadOfDying(s: GameState, o: GameObject): { id: ObjectId; controller: PlayerId; x: NonNullable<CompiledCard["exileInsteadOfDying"]> } | null {
+  const own = abilitiesOf(s, o).exileInsteadOfDying;
+  if (own?.self) return { id: o.id, controller: controllerOf(s, o), x: own };
   const applies = (id: ObjectId, x: CompiledCard["exileInsteadOfDying"], controller: PlayerId) => !!x?.filter && !(x.other && id === o.id) && objectMatches(s, x.filter, o, controller, false);
-  if (s.battlefield.some((id) => applies(id, abilitiesOf(s, obj(s, id)).exileInsteadOfDying, controllerOf(s, obj(s, id))))) return true;
+  for (const id of s.battlefield) {
+    const x = abilitiesOf(s, obj(s, id)).exileInsteadOfDying;
+    if (applies(id, x, controllerOf(s, obj(s, id)))) return { id, controller: controllerOf(s, obj(s, id)), x: x! };
+  }
   // One leaving the battlefield at the same time still applies (rulings on Kalitas, Traitor of Ghet).
-  return (s.leftTogether ?? []).some((l) => l.hadAbilities && applies(l.id, withGranted(compileCard(defOf(s, obj(s, l.id))), l.granted ?? []).exileInsteadOfDying, l.controller));
+  for (const l of s.leftTogether ?? []) {
+    const x = l.hadAbilities ? withGranted(compileCard(defOf(s, obj(s, l.id))), l.granted ?? []).exileInsteadOfDying : undefined;
+    if (applies(l.id, x, l.controller)) return { id: l.id, controller: l.controller, x: x! };
+  }
+  return null;
 }
 
 /** Is a permanent that dealt `o` damage this turn one that exiles it instead of letting it die (Kumano)? */
@@ -1656,6 +1681,14 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", mad
       log(s, `${player(s, pid).name} can't draw more than one card each turn (${nameOf(s, narset)}).`);
       break;
     }
+    // Notion Thief: this draw is skipped and its controller draws instead.
+    const thief = notionThief(s, pid);
+    if (thief) {
+      if (made.length) made.shift();
+      else n--;
+      stealDraw(s, pid, thief);
+      continue;
+    }
     let archives: number;
     if (!made.length) {
       n--;
@@ -1679,6 +1712,43 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", mad
     if (!drawOne(s, pid)) break;
   }
   return true;
+}
+
+/** The Notion Thieves that already replaced a draw in the chain of draws being made now (CR 614.5). */
+let notionUsed: ObjectId[] = [];
+
+/**
+ * Notion Thief (CR 614.1a): one controlled by an opponent of `pid` that applies to `pid`'s draw now, unless it's the first
+ * card `pid` draws in their own draw step (a card actually drawn, CR 614.6), and that hasn't replaced this chain of
+ * draws already (CR 614.5). With several, the first in turn order applies first (the drawing player's choice, CR 616.1,
+ * isn't asked); it applies before the player's own replacements (dredge, Alhammarret's Archive).
+ */
+function notionThief(s: GameState, pid: PlayerId): GameObject | undefined {
+  const p = player(s, pid);
+  if (s.step === "draw" && s.activePlayer === pid && p.drewInDrawStep !== s.turn) return undefined;
+  const thieves = s.battlefield.map((id) => obj(s, id)).filter((o) => !notionUsed.includes(o.id) && controllerOf(s, o) !== pid && !player(s, controllerOf(s, o)).lost && abilitiesOf(s, o).stealsDraws);
+  const seat = (o: GameObject) => (s.turnOrder.indexOf(controllerOf(s, o)) - s.turnOrder.indexOf(s.activePlayer) + s.turnOrder.length) % s.turnOrder.length;
+  return thieves.sort((a, b) => seat(a) - seat(b))[0];
+}
+
+/**
+ * "Instead that player skips that draw and you draw a card": the Thief's controller's draw, which their own replacement
+ * effects and other Notion Thieves can replace in turn; dredge and Scion of Halaster's look, which would ask them, aren't
+ * offered for it (the card is just drawn).
+ */
+function stealDraw(s: GameState, pid: PlayerId, thief: GameObject) {
+  const to = controllerOf(s, thief);
+  log(s, `${player(s, pid).name} skips that draw and ${player(s, to).name} draws a card instead (${nameOf(s, thief.id)}).`);
+  notionUsed.push(thief.id);
+  try {
+    const p = player(s, to);
+    const asks = dredgeOptions(s, to).length > 0 || (p.firstWouldDraw !== s.turn && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === to && abilitiesOf(s, obj(s, id)).firstDrawLook));
+    if (!asks) draw(s, to, 1);
+    else if (!notionThief(s, to)) drawOne(s, to);
+    else draw(s, to, 1);
+  } finally {
+    notionUsed = notionUsed.filter((x) => x !== thief.id);
+  }
 }
 
 /**
@@ -2618,7 +2688,20 @@ export function plottedCast(s: GameState, pid: PlayerId, o: GameObject): boolean
  */
 export function mayPlayLandFromGraveyard(s: GameState, o: GameObject, pid: PlayerId): boolean {
   if (o.zone !== "graveyard" || o.owner !== pid || !isType(defOf(s, o), "Land")) return false;
-  return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).landsFromGraveyard);
+  return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).landsFromGraveyard) || !!landPermit(s, pid);
+}
+
+/** Muldrotha's "you may play a land ... from your graveyard" during each of your turns, if one isn't used yet this turn. */
+function landPermit(s: GameState, pid: PlayerId): string | undefined {
+  if (s.activePlayer !== pid) return undefined;
+  const used = s.turnLog?.gravePermits ?? [];
+  for (const id of s.battlefield) {
+    const p = obj(s, id);
+    if (controllerOf(s, p) !== pid || !abilitiesOf(s, p).landFromGraveyardOnce) continue;
+    const key = `${p.id}@${p.zoneChanges ?? 0}:Land`;
+    if (!used.includes(key)) return key;
+  }
+  return undefined;
 }
 
 /**
@@ -2729,6 +2812,8 @@ function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean, fac
     const shown = p.hand.find((x) => x !== id && printedMatches(choice.filter, defOf(s, obj(s, x))))!;
     log(s, `${p.name} reveals ${nameOf(s, shown)} so ${d.name} enters untapped.`);
   }
+  // Muldrotha's land from the graveyard is used up, unless something lets every land be played from there (Crucible).
+  if (o.zone === "graveyard" && !s.battlefield.some((x) => controllerOf(s, obj(s, x)) === p.id && abilitiesOf(s, obj(s, x)).landsFromGraveyard)) ((s.turnLog ??= {}).gravePermits ??= []).push(landPermit(s, p.id)!);
   const from = o.zone === "exile" || o.zone === "graveyard" ? ` from ${o.zone === "exile" ? "exile" : "their graveyard"}` : "";
   // Under the control of the player who plays it (CR 305.1, 110.2), an opponent's card from exile too (Opposition Agent).
   moveObject(s, id, "battlefield", { controller: p.id, untapped, ...(face !== undefined ? { face } : {}) });
@@ -2949,6 +3034,7 @@ export function castProblem(
   if (!free && via && (o.zone !== "graveyard" || o.owner !== pid)) return `${describeVia(via.kind)} works only from your graveyard`;
   if (via?.if && !staticConditionNow(s, via.if, o.id, pid)) return `you can't cast ${d.name} from your graveyard now`;
   if (via?.kind === "mayhem" && o.discardedTurn !== s.turn) return `mayhem works only if you discarded ${d.name} this turn`; // CR 702.187b
+  if (choices?.permit !== undefined && (via?.kind !== "turnPermission" || !pickPermit(s, o, via.permits ?? [], choices.permit))) return `that permission doesn't let you cast ${d.name} now`;
   // Flashback and jump-start only if the resulting spell is an instant or sorcery (CR 702.34a, 702.133a).
   if (via && (via.kind === "flashback" || via.kind === "grantedFlashback" || via.kind === "jumpStart") && !isType(d, "Instant") && !isType(d, "Sorcery")) return `${d.name} isn't an instant or sorcery`;
   if (!free && !via && !mayPlayFromExile(s, o, pid) && !mayPlayFromTop(s, o, pid) && (!(o.zone === "hand" || (fromCommand && o.isCommander)) || o.owner !== pid))
@@ -3569,6 +3655,12 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     if (how?.once) how.by.topUsedTurn = s.turn;
   }
   const via = graveyardWay(s, o, choices.via);
+  // A once-each-turn permission is used up (Karador; Muldrotha's slot for one of the spell's types).
+  if (via?.kind === "turnPermission") {
+    const permit = pickPermit(s, o, via.permits ?? [], choices.permit)!;
+    ((s.turnLog ??= {}).gravePermits ??= []).push(permit);
+    log(s, `${p.name} uses ${permitLabel(s, permit)} to cast it from their graveyard.`);
+  }
   const from = zoneList(s, o)!;
   from.splice(from.indexOf(id), 1);
   o.zone = "stack";
@@ -3808,11 +3900,41 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef): CastFromGraveyard
     for (const g of abilitiesOf(s, p).graveyardGrants ?? []) {
       if (g.yourTurn && s.activePlayer !== o.owner) continue;
       if (!d.manaCost && !g.way.mana) continue;
-      if (!printedMatches(g.filter, d) || out.some((w) => w.kind === g.way.kind) || (g.way.kind === "grantedFlashback" && hasGrantedFlashback(s, o))) continue;
+      if (!printedMatches(g.filter, d)) continue;
+      // Once each turn (Karador, Muldrotha's permanent types): the permissions not used yet, from every such permanent.
+      if (g.once) {
+        const used = s.turnLog?.gravePermits ?? [];
+        const permits = g.once.filter((slot) => slot === "" || d.types.includes(slot)).map((slot) => `${p.id}@${p.zoneChanges ?? 0}:${slot}`).filter((k) => !used.includes(k));
+        if (!permits.length) continue;
+        const had = out.find((w) => w.kind === "turnPermission");
+        if (had) had.permits = [...had.permits!, ...permits];
+        else out.push({ ...g.way, mana: d.manaCost, permits });
+        continue;
+      }
+      if (out.some((w) => w.kind === g.way.kind) || (g.way.kind === "grantedFlashback" && hasGrantedFlashback(s, o))) continue;
       out.push({ ...g.way, mana: g.way.mana ?? d.manaCost });
     }
   }
   return out;
+}
+
+/**
+ * Which once-each-turn permission casting this card from a graveyard uses (TurnLog.gravePermits): the one chosen, or the
+ * one fewest other cards in that graveyard could use (an artifact creature takes Muldrotha's artifact slot when no other
+ * artifact card is there to cast, rulings).
+ */
+export function pickPermit(s: GameState, o: GameObject, permits: string[], chosen?: string): string | undefined {
+  if (chosen !== undefined) return permits.includes(chosen) ? chosen : undefined;
+  const others = player(s, o.owner).graveyard.filter((id) => id !== o.id);
+  const demand = (k: string) => others.filter((id) => graveyardWays(s, obj(s, id)).some((w) => w.permits?.includes(k))).length;
+  return [...permits].sort((a, b) => demand(a) - demand(b))[0];
+}
+
+/** A permission's label: Muldrotha's slot ("creature"), or the permanent's name. */
+export function permitLabel(s: GameState, key: string): string {
+  const [ref, slot] = key.split(":");
+  const src = s.objects[ref!.split("@")[0]!];
+  return `${src ? characteristics(s, src).name : "a permanent"}${slot ? ` (${slot.toLowerCase()})` : ""}`;
 }
 
 /** One way to cast it from a graveyard, if it has it. */
@@ -3821,7 +3943,7 @@ export function graveyardWay(s: GameState, o: GameObject, via?: CastFromGraveyar
 }
 
 export function describeVia(via: CastFromGraveyardKind | FaceDownKind): string {
-  return via === "jumpStart" ? "jump-start" : via === "grantedFlashback" ? "flashback" : via === "grantedEscape" ? "escape" : via === "grantedRetrace" ? "retrace" : via === "permission" ? "a way to cast it from your graveyard" : via;
+  return via === "jumpStart" ? "jump-start" : via === "grantedFlashback" ? "flashback" : via === "grantedEscape" ? "escape" : via === "grantedRetrace" ? "retrace" : via === "permission" ? "a way to cast it from your graveyard" : via === "turnPermission" ? "a once-each-turn permission" : via;
 }
 
 /** ", kicked", ", kicked twice", ", kicked with {1}{U}", for the log. */
@@ -4150,7 +4272,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     const fits = (id: ObjectId) => !oneOf || printedMatches(oneOf, defOf(s, obj(s, id)));
     const full = oneOf ? `${/^[aeiou]/i.test(oneOf.text) ? "an" : "a"} ${oneOf.text} and ${c.n === 2 ? "another card" : `${c.n - 1} other cards`}` : what;
     if (!chosen) {
-      if (pool.length < c.n || !pool.some(fits)) return `you need to ${verb} ${full} to ${doing}`;
+      if (c.n > 0 && (pool.length < c.n || !pool.some(fits))) return `you need to ${verb} ${full} to ${doing}`;
       continue;
     }
     if (chosen.length !== c.n || new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id)) || !chosen.some(fits)) return `choose ${full} to ${verb}`;
@@ -4315,7 +4437,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (s.priority !== pid || s.pending) return "you don't have priority";
     if (splitSecondOnStack(s)) return "a spell with split second is on the stack"; // CR 702.61a
   }
-  if (ab.sorcerySpeed && !canActAtSorcerySpeed(s, pid) && !((ab.loyalty !== undefined || ab.loyaltyX) && loyaltyAtInstantSpeed(s, pid))) return "activate only as a sorcery";
+  if (ab.sorcerySpeed && !canActAtSorcerySpeed(s, pid) && !((ab.loyalty !== undefined || ab.loyaltyX) && loyaltyAtInstantSpeed(s, pid)) && !(ab.equip && equipAtInstantSpeed(s, pid))) return "activate only as a sorcery";
   if (ab.tap && o.tapped) return `${d.name} is tapped`;
   if (ab.tap && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${d.name} has summoning sickness`; // CR 602.5a
   if (ab.oncePerTurn && (o.activatedThisTurn?.filter((n) => n === index).length ?? 0) >= (ab.keyword === "Boast" && boastsTwice(s, pid) ? 2 : 1)) return `${d.name}'s ability can be activated only ${ab.keyword === "Boast" && boastsTwice(s, pid) ? "twice" : "once"} each turn`; // CR 602.5b
@@ -4416,8 +4538,26 @@ export function activationLessCost(s: GameState, o: GameObject, cost: ParsedCost
   return { ...g.cost, symbols: [...(left ? [{ kind: "generic" as const, amount: left }] : []), ...others] };
 }
 
+/** Leonin Shikari, Forge Anew (during your turn): `pid` may activate equip abilities any time they could cast an instant. */
+function equipAtInstantSpeed(s: GameState, pid: PlayerId): boolean {
+  return s.battlefield.some((id) => {
+    const o = obj(s, id);
+    const w = controllerOf(s, o) === pid ? abilitiesOf(s, o).equipAtInstantSpeed : undefined;
+    return w === "always" || (w === "yourTurn" && s.activePlayer === pid);
+  });
+}
+
+/**
+ * Forge Anew: {0} rather than the equip cost of the first equip ability `pid` activates during each of their turns (CR
+ * 118.9; increases still apply, 601.2f). Taken whenever it applies, and only for an equip cost that's all mana.
+ */
+export function freeEquip(s: GameState, pid: PlayerId, ab: ActivatedAbility): boolean {
+  if (!ab.equip || ab.costs?.length || ab.tap || s.activePlayer !== pid || s.turnLog?.equipped?.includes(pid)) return false;
+  return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && !!abilitiesOf(s, obj(s, id)).firstEquipFree);
+}
+
 function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets?: TargetChoice[]): ParsedCost {
-  const cost0 = parseManaCost(ab.manaCost);
+  const cost0 = parseManaCost(freeEquip(s, pid, ab) ? "{0}" : ab.manaCost);
   // "Activated abilities cost {2} more to activate unless they're mana abilities" (Suppression Field): increases first
   // (CR 602.2b applies 601.2f).
   const more = ab.mana ? 0 : activationTax(s, o);
@@ -4567,6 +4707,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     if (change > 0) fireEvent(s, { type: "countersPut", id: o.id, counter: "loyalty", amount: change, by: p.id });
   }
   (o.activatedThisTurn ??= []).push(index); // "once each turn" (CR 602.5b); bots also count repeats (bot.ts)
+  if (ab.equip && !s.turnLog?.equipped?.includes(p.id)) ((s.turnLog ??= {}).equipped ??= []).push(p.id);
   if (ab.onceEver) (o.activatedEver ??= []).push(index); // exhaust (CR 702.177a)
   if (ab.keyword === "Exhaust") p.exhaustTurn = s.turn; // CR 702.177b
   // "Choose one that hasn't been chosen" (Three Bowls of Porridge): chosen as it's activated.
@@ -4584,7 +4725,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const costCardNames: string[] = [];
   const sacrificed = ab.costs?.length ? payExtraCosts(s, p, activatedCosts(ab, x), costs ?? {}, lki, costCardNames) : [];
   if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard", { sacrificed: true });
-  if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling);
+  if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling, undefined, ab.cycling ? x : undefined);
   // Scavenge (CR 702.97a) from the graveyard; "Exile ~" on the battlefield, if it's still the same object (CR 400.7).
   if (ab.exileSelf && (ab.zone !== undefined || (o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc))) moveObject(s, id, "exile");
   const stackId = `s${s.nextId++}`;
@@ -5084,6 +5225,11 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "searchZones") {
     if (!pend.options.includes(choice)) throw new RulesError("choose both or the graveyard only");
     (r.scratch ??= {}).searchZones = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "targetSlot") {
+    (r.scratch ??= {}).targetSlot = Number(choice);
     continueResolution(s);
     return;
   }

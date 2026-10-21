@@ -540,11 +540,17 @@ export function parseTargetPhrase(
   // "Card with mana value less than or equal to ~'s power from your graveyard", "creature with power less than or equal to the
   // number of Islands you control": the amount as written, read first since it may hold words of its own (TargetSpec.bound).
   // Wishing Well: "with mana value equal to the number of coin counters on ~".
-  const bound = / with (power|toughness|mana value) (?:(less|greater) than or )?equal to (.+)$/i.exec(phrase.trim());
+  // Pollywog Prodigy: "with mana value less than ~'s power", strictly less: one less at most (CR 107.1).
+  // A strict comparison the count doesn't read ("greater than its base power", Kutzil) is left to the readings below.
+  const bound0 = / with (power|toughness|mana value) (?:(less|greater) than( or equal to)?|equal to) (.+)$/i.exec(phrase.trim());
+  const from0 = bound0 && / from (?:your|a|an opponent's) graveyard$/i.exec(bound0[4]!);
+  const amount0 = bound0 ? opts.count?.(from0 ? bound0[4]!.slice(0, from0.index) : bound0[4]!) : null;
+  const bound = bound0 && (amount0 || !bound0[2] || bound0[3]) ? bound0 : null;
   if (bound) {
-    const from = / from (?:your|a|an opponent's) graveyard$/i.exec(bound[3]!);
-    const amount = opts.count?.(from ? bound[3]!.slice(0, from.index) : bound[3]!);
-    if (!amount) return null;
+    const from = from0;
+    if (!amount0) return null;
+    const strict = !!bound[2] && !bound[3];
+    const amount = strict ? { ...amount0, plus: (amount0.plus ?? 0) + (bound[2]!.toLowerCase() === "less" ? -1 : 1) } : amount0;
     extra.bound = { key: bound[1]!.toLowerCase() === "mana value" ? "manaValue" : (bound[1]!.toLowerCase() as "power" | "toughness"), at: !bound[2] ? "exact" : bound[2].toLowerCase() === "less" ? "most" : "least", amount };
     p = `${phrase.trim().slice(0, bound.index)}${from ? from[0] : ""}`.toLowerCase();
   }
@@ -662,8 +668,9 @@ export function parseTargetPhrase(
     // "With mana value 2" (Spell Snare): exactly that. With X, the X it's cast or activated with (TargetSpec.xRange).
     // "Destroy all creatures with mana value X or less", "search your library for a creature card with mana value X or
     // less": compared as it resolves (TargetSpec.bound), where the amount reader takes X.
-    const xBound = m[2] === "x" && !opts.x && m[3] ? opts.count?.("X") : undefined;
-    if (xBound) extra.bound = { key, at: m[3] === "greater" ? "least" : "most", amount: xBound };
+    // "Destroy each nonland permanent with mana value X" (Steel Hellkite): exactly X, the same way.
+    const xBound = m[2] === "x" && !opts.x ? opts.count?.("X") : undefined;
+    if (xBound) extra.bound = { key, at: m[3] === "greater" ? "least" : m[3] === "less" ? "most" : "exact", amount: xBound };
     else if (m[2] === "x" && !opts.x) return null;
     else if (m[2] === "x") extra.xRange = { key, at: m[3] === "greater" ? "least" : m[3] === "less" ? "most" : "exact" };
     else {

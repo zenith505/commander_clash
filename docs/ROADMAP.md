@@ -1,7 +1,7 @@
 # Roadmap
 
-21,682 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,721 of 1,989 (86%), top 5,000: 3,522 of 4,988 (70%).
+21,788 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,750 of 1,989 (87%), top 5,000: 3,558 of 4,988 (71%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,11 +22,22 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 99, most played first: Spellskite, Necromancy, K'rrik,
-   Marvin, Ugin, the Ineffable, Muldrotha, Skrelv, Plumb the Forbidden, The Darkness Crystal, Kambal, The Black Gate,
-   Steel Hellkite, Tezzeret, Cruel Captain, Homeward Path, Tekuthal, Siren Stormtamer, Ezuri's Predation, Notion Thief,
-   Forge Anew. Smaller gaps from round 99: "creature cards you own that aren't on the battlefield have flash" (Teferi,
-   Mage of Zhalfir, Druid of Argoth); Herald of War, Depala, Azor's other line, Electro (a reflexive trigger with X),
+00. Most played first (`npm run popular`). Out after round 100, most played first: The Darkness Crystal (a target
+   "creature card exiled with ~": cards in exile as targets), Tekuthal (a "remove three counters from among ..." cost,
+   and proliferating twice), Wheel of Misfortune (secret numbers chosen at once), Skyclave Apparition, Arachnogenesis,
+   Sephiroth, Windcrag Siege, Aven Mindcensor, Chromatic Orrery, Coveted Jewel, Lethal Scheme, Duelist's Heritage,
+   Alexios, Wandering Archaic, Scapeshift, Keeper of the Accord, Vraska, Betrayal's Sting, Valgavoth, Defense of the
+   Heart. Smaller gaps from round 100: Muck Drubb ("a spell that targets only a single creature"); Lurrus (companion,
+   and its mana value bound); once-each-turn graveyard permissions with extra costs (Kotis, Maestros Ascendancy,
+   Exploration Broodship); Forge Anew's free equip only for equip costs that are all mana, and always taken when it
+   applies; Kambal copies only the tokens still on the battlefield as its trigger resolves; two grants of "Toxic 1" may
+   count once; K'rrik gives no explicit choice to pay life with lands untapped (autopay prefers mana); Notion Thief's
+   order against the player's own draw replacements, and several Thieves at once; Trostani Discordant, Not of This
+   World; Webstrike Elite and Rampaging War Mammoth (an X from the cycling cost in their targets); the other "you may
+   pay {X}. When you do" cards (Halo Forager, Isareth, Rose Room Treasurer, Tester of the Tangential); "can't attack
+   unless you control more creatures than defending player" (Goblin Goon, Mogg Toady, Monstrous Hound); Kaboom!,
+   Soulfire Eruption ("choose any number of targets. For each of them, ..."). Smaller gaps from round 99: "creature cards you own that aren't on the battlefield have flash" (Teferi,
+   Mage of Zhalfir, Druid of Argoth); Herald of War, Depala, Azor's other line,
    Bane's and Biomancer's Familiar's other lines, Cadric, The Master, Sliver Gravemother, Spider-Verse and Mirror
    Box (Mirror Gallery and Council of Reeds play: the legend rule doesn't apply); the other tiered cards (Cloud, Ice,
    Tifa, Vincent); Archetypes; "can't attack you" limits by count (Crawlspace, Judoon). With Silent Arbiter's "no more
@@ -48,8 +59,7 @@ line blocks.
    Plans whose other lines are out (Claim the Kingdom, Political Triumph, Robot Domination, Rewrite History). Who puts
    counters (Vorinclex, Innkeeper's Talent) is the effect's controller; for costs and "enters with" counters it's the
    permanent's controller. With both a doubler and Vorinclex's halving on the same counters the order is picked
-   for the player (CR 616.1): halved first for -1/-1, stun and poison counters, doubled first for the rest. Smaller gaps from round 95: Spellskite and Muck Drubb ("change the target of target spell or ability",
-   with a choice among several target slots), Kalitas ("its power is equal to that creature's power" tokens), Cinder
+   for the player (CR 616.1): halved first for -1/-1, stun and poison counters, doubled first for the rest. Smaller gaps from round 95: Cinder
    Cloud, Intrude on the Mind (counting the cards put into the graveyard this way), face-down piles (Fortune's Favor,
    Riddles in the Dark, Curator of Destinies, Sauron's Ransom, Atris) and piles of permanents (Liliana of the Veil's
    −6, Do or Die, Make an Example), Jace, Architect of Thought's +1 and −8; Tibalt's Trickery compares only the front
@@ -505,8 +515,7 @@ line blocks.
      (CR 603.7 has one for all; no supported card can tell); a flicker's return is one trigger for all the cards.
    Left from the reflexive triggers round ("When you do" after a payment, a sacrifice, a may, a mill, a roll, a count
    or a token, CR 603.12; named tokens; "that artifact gains haste" after putting it onto the battlefield):
-   - Reflexive triggers still out: "pay {X}. When you do" (Electro,
-     Isareth, Halo Forager, Numa, Wildborn Preserver, Rose Room Treasurer); "remove a counter from" any kind (Slumbering
+   - Reflexive triggers still out: "pay {X}. When you do" (Isareth, Halo Forager, Numa, Rose Room Treasurer); "remove a counter from" any kind (Slumbering
      Walker); "exile N cards from your graveyard. When you do" (Kroxa, Young Necromancer, Kishla Trawlers); Wick's
      Patrol ("the greatest mana value among cards in your graveyard");
      Red Hulk, Hylda, Ziatora, Tiger-Tribe Hunter, Surtland Flinger, Bolg, Edgar's Awakening, Leyline Tyrant ("any
@@ -739,12 +748,10 @@ line blocks.
 - Vorinclex (counters on players, halving), Academy Manufactor.
 - "If ~ attacked or blocked this combat", "until end of combat", myriad attacking planeswalkers, "at the beginning
   of combat on each opponent's turn".
-- "Copy target activated or triggered ability" (Strionic Resonator). Changing the target of a spell with more than one
-  target; Mirrorshell Crab's channel ability.
+- "Copy target activated or triggered ability" (Strionic Resonator). Mirrorshell Crab's channel ability.
 - "Activate only during your turn, before attackers are declared" with additional combats: it's allowed in each
   combat's beginning of combat step but not in an added main phase; check the rulings before relying on it. Random
-  discards as a cost: bots use them only with spare cards in hand. "Exile it instead" with something else ("create a
-  2/2 black Zombie", Kalitas).
+  discards as a cost: bots use them only with spare cards in hand.
 - "Skip your next draw step" (Fatigue) and other one-time skips; Ad Nauseam's repeat.
 - Champion triggers about the championed card (Mistbind Clique's "when a Faerie is championed"); reinforce X;
   Dodecapod's "with two +1/+1 counters". Prototype can't be chosen for free casts ("without paying its mana

@@ -377,7 +377,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const spec = ctx.targets[i];
     // Only permanent cards can be put onto the battlefield (CR 110.4b); an Aura's controller chooses what it enchants as it
     // enters (CR 303.4f).
-    if (!what || !spec || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty)) || (m[5] && (what.ref !== "target" || what.n))) return null;
+    // "Target Equipment card" (Forge Anew), "Vehicle card": artifact subtypes, so permanent cards (CR 205.3g).
+    const artifactSub = !spec?.types?.length && !!spec?.subtypes?.length && spec.subtypes.every((st) => st === "Equipment" || st === "Vehicle");
+    if (!what || !spec || (!artifactSub && (!spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty)))) || (m[5] && (what.ref !== "target" || what.n))) return null;
     return [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}), ...(owner ? { owner: true } : {}), ...(m[5] ? { counters: { [counterKind(m[5])]: 1 } } : {}) }];
   }
   // "When this creature dies, return it to the battlefield under its owner's control and suspect it" (Presumed Dead's
@@ -557,6 +559,15 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // static ability's evasion (CR 509.1b), until end of turn.
   if ((m = /^(.+?) can't be blocked (this turn except by .+|by .+? this turn)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
+    // The Black Gate: "... by creatures that player controls this turn", the player chosen as it resolves.
+    if (m[2] === "by creatures that player controls this turn")
+      return what && ctx.chosenOpponent ? [{ type: "continuous", what, mods: [{ kind: "cantBeBlockedBy", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "chosenPlayer", text: "creatures that player controls" } }], duration: "endOfTurn" }] : null;
+    // Skrelv: "... by creatures of the chosen color this turn", the color chosen as it resolves.
+    const ofChosen = /^by (.+?) of the chosen color this turn$/.exec(m[2]!);
+    if (ofChosen) {
+      const filter = parseTargetPhrase(ofChosen[1]!.split(" ").map(singularWord).join(" "));
+      return what && filter?.kind === "object" && !filter.controller && !filter.colors?.length ? [{ type: "continuous", what, mods: [{ kind: "cantBeBlockedBy", filter: { ...filter, chosen: "color", text: `${ofChosen[1]} of the chosen color` } }], duration: "endOfTurn" }] : null;
+    }
     const mods = what && parseStaticMods(`can't be blocked ${m[2]!.replace(/^this turn (except by .+)$/, "$1").replace(/ this turn$/, "")}`);
     return what && mods ? [{ type: "continuous", what, mods, duration: "endOfTurn" }] : null;
   }

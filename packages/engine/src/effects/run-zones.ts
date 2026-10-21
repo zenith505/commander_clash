@@ -1142,6 +1142,25 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return sacrificeEach(s, e, ctx, src);
     case "keepRest":
       return keepRest(s, e, ctx, src);
+    case "keepDestroyRest": {
+      // Mount Doom: chosen as it resolves (CR 608.2d), then the rest destroyed at once.
+      const sc = (s.resolving!.scratch ??= {});
+      const all = () => s.battlefield.filter((id) => objectMatches(s, e.filter, obj(s, id), ctx.controller, false));
+      if (!sc.chosen?.[ctx.controller]) {
+        const options = all();
+        if (!options.length) return;
+        sc.queue = [ctx.controller];
+        sc.chosen = {};
+        s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "keep", what: e.filter.text, options, count: Math.min(e.n, options.length), min: 0, destroy: true };
+        return "paused";
+      }
+      const kept = new Set(sc.chosen[ctx.controller]!);
+      sc.chosen = undefined;
+      sc.queue = undefined;
+      if (kept.size) log(s, `${player(s, ctx.controller).name} chooses ${[...kept].map((id) => nameOf(s, id)).join(", ")}.`);
+      for (const id of all().filter((x) => !kept.has(x))) destroyPermanent(s, obj(s, id), `${src} destroys ${nameOf(s, id)}.`, false, ctx.controller);
+      return;
+    }
     case "empowerJace":
       return empowerJace(s, e.n, ctx, src);
     case "bounce": {
@@ -1663,10 +1682,16 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // the card in the graveyard; the creature it becomes is a new object (CR 400.7), which the Aura is attached to.
       const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       if (!me || me.zone !== "battlefield" || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc)) return;
-      const link = me.enchantsCard;
+      const t = e.target !== undefined ? ctx.targets[e.target] : undefined;
+      const link = e.target !== undefined ? (ctx.legal[e.target] && t?.kind === "object" ? { id: t.id, zc: s.objects[t.id]?.zoneChanges ?? 0 } : undefined) : me.enchantsCard;
       const c = link && s.objects[link.id];
       if (!c || c.zone !== "graveyard" || (c.zoneChanges ?? 0) !== link.zc) return;
-      log(s, `${src} returns ${defOf(s, c).name} to the battlefield${e.tapped ? " tapped" : ""} under ${player(s, ctx.controller).name}'s control.`);
+      if (e.target !== undefined) {
+        // Necromancy becomes an Aura with "enchant creature put onto the battlefield with ~" (rulings).
+        s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, sourceId: me.id, duration: "game", affected: [me.id], mods: [{ kind: "addTypes", types: [], subtypes: ["Aura"] }] });
+        log(s, `${src} becomes an Aura.`);
+      }
+      log(s, `${src} ${e.target !== undefined ? "puts" : "returns"} ${defOf(s, c).name} ${e.target !== undefined ? "onto" : "to"} the battlefield${e.tapped ? " tapped" : ""} under ${player(s, ctx.controller).name}'s control.`);
       moveObject(s, c.id, "battlefield", { controller: ctx.controller, ...(e.tapped ? { tapped: true } : {}) });
       if ((c.zone as string) !== "battlefield") return;
       (s.animated ??= {})[`${me.id}@${me.zoneChanges ?? 0}`] = { id: c.id, zc: c.zoneChanges ?? 0 };

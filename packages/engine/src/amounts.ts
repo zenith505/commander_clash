@@ -375,6 +375,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       // From its mana cost (copy and face-down values included, CR 202.3, 708.2); X is 0 on the battlefield (CR 107.3).
       let best = 0;
       for (const id of s.battlefield) {
+        if (c.other && id === ctx.sourceId) continue;
         const o = s.objects[id]!;
         const ch = view(o);
         if (ch && objectMatches(s, c.filter, o, ctx.controller, false, undefined, ch, ctx.view)) best = c.total ? best + defMv(defOf(s, o)) : Math.max(best, defMv(defOf(s, o)));
@@ -532,7 +533,7 @@ function describeCount(c: Count): string {
     case "greatestPower":
       return `the ${c.total ? "total" : "greatest"} ${c.toughness ? "toughness" : "power"} ${c.total ? "of" : "among"} ${c.other ? "other " : ""}${c.filter.text}`;
     case "greatestManaValue":
-      return `the ${c.total ? "total mana value of" : "greatest mana value among"} ${c.filter.text}`;
+      return `the ${c.total ? "total mana value of" : "greatest mana value among"} ${c.other ? "other " : ""}${c.filter.text}`;
     case "kicked":
       return "times kicked";
     case "wasKicked":

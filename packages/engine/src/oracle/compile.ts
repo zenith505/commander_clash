@@ -2,13 +2,13 @@ import { faceDef, hasFuse, isRoom, restingDef, roomDoorDefs } from "../faces";
 import { isMeldResult, meldPartnerName, meldResultDef } from "../meld-results";
 import { allEffects, GRANTED_WAY_COSTS } from "../abilities";
 import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq } from "../abilities";
-import { CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, stripReminder } from "../keywords";
+import { CHOSEN_HEXPROOF, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, stripReminder } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
 import type { CardDef, PlayerId } from "../types";
 import type { CopyExcept } from "../copies";
-import { NUM, num, NUMX, COUNTER, counterKind, X, amt, parseSpentReq, plainMana, sacrificeSelf, SPENT, ROLL_ROW, COLOR_WORDS, capital } from "./words";
+import { NUM, num, NUMX, COUNTER, counterKind, X, amt, parseSpentReq, plainMana, sacrificeSelf, SPENT, ROLL_ROW, COLOR_WORDS, capital, singularWord } from "./words";
 import { parseManaAbility, parseManaTrigger } from "./mana-abilities";
 import { parseGraveyardKeyword, parseCostKeyword, parseAdditionalCost, keywordAbilities, textKeywords, isKeywordLine, firebending, rippleBody } from "./keyword-abilities";
 import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseCostChange, parseStatic, parseStaticCondition, parseOnlyClauses } from "./statics";
@@ -446,6 +446,19 @@ export function compile(d: CardDef): CompiledCard {
     // "Vivid — {T}: For each color among permanents you control, add ..." (Bloom Tender): an ability word too.
     else if (!isSpell && /^Vivid — \{/.test(line)) line = line.replace(/^Vivid — /, "");
     if (!line) continue;
+    // "~ has all activated abilities of ..." (CompiledCard.borrows).
+    const borrow = /^(?:As long as ~ is on the battlefield, it|~) has all activated abilities of (.+?)( except mana abilities)?\.$/.exec(line);
+    if (borrow && !out.borrows) {
+      const yard = /^all (.+?) cards in (all graveyards|your graveyard)$/.exec(borrow[1]!);
+      const what = yard ? parseTargetPhrase(yard[1]!) : null;
+      const same = / that don't have the same name as ~$/.exec(borrow[1]!);
+      const group = yard ? null : parseGroup(same ? borrow[1]!.slice(0, same.index) : borrow[1]!);
+      if (yard && what?.kind === "object" && !what.controller && Object.entries(what).every(([k, v]) => v === undefined || ["kind", "types", "notTypes", "notColors", "subtypes", "text"].includes(k)))
+        out.borrows = { filter: { ...what, text: `${yard[1]} cards` }, graveyard: true, ...(yard[2] === "your graveyard" ? { yours: true as const } : {}), ...(borrow[2] ? { noMana: true as const } : {}) };
+      else if (group && group.filter.controller !== "enchanted") out.borrows = { filter: group.filter, ...(group.other ? { other: true } : {}), ...(same ? { notSameName: true as const } : {}), ...(borrow[2] ? { noMana: true as const } : {}) };
+      else out.unsupported.push(raw);
+      continue;
+    }
     if (line === "Spree" && isSpell && !spree) {
       spree = { costs: [], texts: [], lines: [raw] };
       continue;
@@ -971,6 +984,19 @@ export function compile(d: CardDef): CompiledCard {
       out.payEvidence = Number(payEvidence[1]);
       continue;
     }
+    // Plumb the Forbidden: "you may sacrifice one or more creatures. When you do, copy this spell for each creature
+    // sacrificed this way." An additional cost with an X of 0 or more (CR 601.2b, 107.3a), and a reflexive trigger as
+    // it's cast (CR 603.12) copying it that many times.
+    const plumb = /^As an additional cost to cast ~, you may sacrifice one or more (.+?)\. When you do, copy ~ for each (.+?) sacrificed this way\.$/.exec(line);
+    if (plumb) {
+      const spec = parseTargetPhrase(plumb[1]!.split(" ").map(singularWord).join(" "));
+      if (spec?.kind !== "object" || spec.controller || spec.combat || plumb[2] !== singularWord(plumb[1]!)) out.unsupported.push(raw);
+      else {
+        (out.additionalCosts ??= []).push({ kind: "sacrifice", filter: { ...spec, text: plumb[2]! }, n: 0, x: true, optional: true });
+        (out.triggers ??= []).push({ event: "selfCast", ifX: 1, body: { targets: [], effects: [{ type: "copySpell", spell: "cause", n: { count: { kind: "x" } }, newTargets: true }], text: `When you do, copy ~ for each ${plumb[2]} sacrificed this way.` } });
+      }
+      continue;
+    }
     // "As an additional cost to cast this spell, sacrifice a creature." (CR 601.2b, 601.2f-h)
     const extra = /^As an additional cost to cast (?:this spell|~), (.+)\.$/.exec(line);
     if (extra) {
@@ -1006,6 +1032,20 @@ export function compile(d: CardDef): CompiledCard {
       out.exileWhatItDamaged = kumano[1] === "~" ? "self" : "attached";
       continue;
     }
+    // The Darkness Crystal: "If a nontoken creature an opponent controls would die, instead exile it and you gain 2 life."
+    // Kalitas: "... instead exile that card and create a 2/2 black Zombie creature token." One replacement (CR 614.1a);
+    // the card is exiled with it, linked to its other ability (CR 607.2a).
+    const insteadAnd = /^If a nontoken creature an opponent controls would die, instead exile (?:it|that card) and (.+)\.$/.exec(line);
+    if (insteadAnd) {
+      const filter = parseTargetPhrase("nontoken creature an opponent controls");
+      const life = /^you gain (\d+) life$/.exec(insteadAnd[1]!);
+      const made = life ? null : parseBody(`${capital(insteadAnd[1]!)}.`, {});
+      const e = made?.targets.length === 0 && made.effects.length === 1 ? made.effects[0]! : undefined;
+      const token = e?.type === "createToken" && e.n === 1 && e.who.ref === "you" && Object.keys(e).every((k) => ["type", "n", "who", "token"].includes(k)) ? e.token : undefined;
+      if (filter?.kind !== "object" || (!life && !token)) out.unsupported.push(raw);
+      else out.exileInsteadOfDying = { filter, linked: true, ...(life ? { gainLife: Number(life[1]) } : {}), ...(token ? { token } : {}) };
+      continue;
+    }
     // "If ~ would die, exile it instead." "If a creature an opponent controls would die, exile it instead." (CR 614.1a)
     const exileDies = /^If (~|a|an|another) (.+? )?would die, exile it instead\.$/.exec(line);
     if (exileDies) {
@@ -1037,6 +1077,17 @@ export function compile(d: CardDef): CompiledCard {
       out.exileInsteadOfGraveyard = true;
       continue;
     }
+    // Leonin Shikari, Forge Anew: equip abilities at instant speed (CR 702.6a's "only as a sorcery" set aside), and Forge
+    // Anew's alternative cost of {0} for the first one each of your turns (CR 118.9).
+    const equipFast = /^(During your turn, )?[Yy]ou may activate equip abilities any time you could cast an instant\.$/.exec(line);
+    if (equipFast) {
+      out.equipAtInstantSpeed = equipFast[1] ? "yourTurn" : "always";
+      continue;
+    }
+    if (line === "You may pay {0} rather than pay the equip cost of the first equip ability you activate during each of your turns.") {
+      out.firstEquipFree = true;
+      continue;
+    }
     if (line === "You may play lands from your graveyard.") {
       out.landsFromGraveyard = true;
       continue;
@@ -1066,6 +1117,22 @@ export function compile(d: CardDef): CompiledCard {
               ? { kind: "grantedFlashback", ...(mana ? { mana } : {}), costs: [], exile: true }
               : { kind: "grantedRetrace", costs: GRANTED_WAY_COSTS.grantedRetrace!, exile: false };
         (out.graveyardGrants ??= []).push({ filter: { ...f, text: `${grant[2]} cards` }, way, ...(grant[1] ? { yourTurn: true as const } : {}) });
+      }
+      continue;
+    }
+    // "Once during each of your turns, you may cast a creature spell from your graveyard" (Karador, Gisa and Geralf): a
+    // permission used once each turn (rulings: the spell's costs are paid, its timing rules followed). Muldrotha: "During
+    // each of your turns, you may play a land and cast a permanent spell of each permanent type from your graveyard."
+    // Kess: "If a spell cast this way would be put into your graveyard, exile it instead."
+    const onceYard = /^Once during each of your turns, you may cast an? (.+?) spell from your graveyard\.( If a spell cast this way would be put into your graveyard, exile it instead\.)?$/.exec(line);
+    if (onceYard || line === "During each of your turns, you may play a land and cast a permanent spell of each permanent type from your graveyard.") {
+      const filter = parseTargetPhrase(`${onceYard ? onceYard[1]!.replace(/ and /g, " or ") : "permanent"} card from a graveyard`);
+      if (filter?.kind !== "card" || filter.manaValue || filter.bound) out.unsupported.push(raw);
+      else {
+        const { owner: _, ...f } = filter;
+        const once = onceYard ? [""] : ["Artifact", "Creature", "Enchantment", "Planeswalker", "Battle"];
+        (out.graveyardGrants ??= []).push({ filter: { ...f, text: `${onceYard?.[1] ?? "permanent"} cards` }, way: { kind: "turnPermission", costs: [], exile: !!onceYard?.[2] }, yourTurn: true, once });
+        if (!onceYard) out.landFromGraveyardOnce = true;
       }
       continue;
     }
@@ -1189,6 +1256,10 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "Damage can't be prevented.") {
       out.damageCantBePrevented = true;
+      continue;
+    }
+    if (line === "If an opponent would draw a card except the first one they draw in each of their draw steps, instead that player skips that draw and you draw a card.") {
+      out.stealsDraws = true;
       continue;
     }
     // Narset, Parter of Veils: draws past the first each turn don't happen, and can't be replaced (rulings).
@@ -1421,6 +1492,10 @@ export function compile(d: CardDef): CompiledCard {
       out.loyaltyTwice = loyaltyTwice[1] === "~" ? "self" : "yours";
       continue;
     }
+    if (/^For each \{B\} in a cost, you may pay 2 life rather than pay that mana\.$/.test(line)) {
+      out.lifeForBlack = true;
+      continue;
+    }
     if (/^You have no maximum hand size\.$/.test(line)) {
       out.noMaxHandSize = out.noMaxHandSize || true;
       continue;
@@ -1465,9 +1540,11 @@ export function compile(d: CardDef): CompiledCard {
     const flashFor = /^You may cast (.*?)spells as though they had flash\.$/.exec(line);
     if (flashFor) {
       // "Aura and Equipment spells" (Sigarda's Aid): each of them.
-      const spec = parseTargetPhrase(`${flashFor[1]!.replace(/ and /g, " or ")}spell`);
-      if (spec?.kind === "spell" && !spec.controller) {
-        (out.flashFor ??= []).push({ ...spec, text: `${flashFor[1]}spells` });
+      // "Colorless spells and artifact spells" (Liberator): either kind.
+      const parts = flashFor[1]!.split(/ spells and /).map((x, i, all) => (i < all.length - 1 ? `${x} ` : x));
+      const specs = parts.map((part) => parseTargetPhrase(`${part.replace(/ and /g, " or ")}spell`));
+      if (specs.every((spec) => spec?.kind === "spell" && !spec.controller)) {
+        specs.forEach((spec, i) => (out.flashFor ??= []).push({ ...spec!, text: `${parts[i]}spells` } as typeof spec & {}));
         continue;
       }
     }
@@ -1707,6 +1784,14 @@ export function compile(d: CardDef): CompiledCard {
     const animate = out.animate && /^When ~ enters, if it's on the battlefield, it loses "enchant creature card in a graveyard" and gains "enchant creature put onto the battlefield with ⟪source⟫\." (?:Return enchanted creature card to the battlefield under your control|Put enchanted creature card onto the battlefield (tapped )?under your control) and attach ~ to it\. When ~ leaves the battlefield, that creature's controller sacrifices it\.$/.exec(line);
     if (animate) {
       out.triggers.push({ event: "selfEnters", body: { targets: [], effects: [{ type: "animateDead", ...(animate[1] ? { tapped: true as const } : {}) }], text: `Return enchanted creature card to the battlefield${animate[1] ? " tapped" : ""} under your control and attach ~ to it.` } });
+      out.triggers.push({ event: "selfLeaves", body: { targets: [], effects: [{ type: "sacrificeAnimated" }], text: "That creature's controller sacrifices it." } });
+      continue;
+    }
+    // Necromancy (rulings): an enchantment that becomes an Aura as its enters trigger resolves, if it's still on the
+    // battlefield, and attaches to the creature it put onto the battlefield; it follows the rules for Auras from then on.
+    if (/^When ~ enters, if it's on the battlefield, it becomes an Aura with "enchant creature put onto the battlefield with ⟪source⟫\." Put target creature card from a graveyard onto the battlefield under your control and attach ~ to it\. When ~ leaves the battlefield, that creature's controller sacrifices it\.$/.test(line) && !d.subtypes.includes("Aura") && !out.enchant) {
+      out.animate = true;
+      out.triggers.push({ event: "selfEnters", body: { targets: [{ kind: "card", types: ["Creature"], text: "target creature card from a graveyard" }], effects: [{ type: "animateDead", target: 0 }], text: "Put target creature card from a graveyard onto the battlefield under your control and attach ~ to it." } });
       out.triggers.push({ event: "selfLeaves", body: { targets: [], effects: [{ type: "sacrificeAnimated" }], text: "That creature's controller sacrifices it." } });
       continue;
     }
@@ -2165,7 +2250,7 @@ function checkCastingLinks(out: CompiledCard) {
     if (typeof o.chosen === "string") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : needs.add("creatureType"));
     if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen)) needs.add("color");
     if (o.kind === "setLandTypes" && (o.subtypes as string[]).includes(CHOSEN_LAND_TYPE)) needs.add("basicLandType");
-    if (o.kind === "addKeywords" && (o.keywords as string[]).includes(CHOSEN_PROTECTION)) needs.add("color");
+    if (o.kind === "addKeywords" && ((o.keywords as string[]).includes(CHOSEN_PROTECTION) || (o.keywords as string[]).includes(CHOSEN_HEXPROOF))) needs.add("color");
     if (o.kind === "addKeywords" && (o.keywords as string[]).includes(CHOSEN_PLAYER_PROTECTION) && !out.entersChoosePlayer) bad = true;
     if (o.type === "choose") choices.add(o.choice as ChoiceKind);
     Object.values(o).forEach(visit);
@@ -2236,9 +2321,11 @@ function checkX(d: CardDef, out: CompiledCard) {
   }
   // "Monstrosity X" (CR 701.37c): "when ~ becomes monstrous" abilities use the X it became monstrous with.
   const monstrousX = out.activated.some((a) => allEffects(a.body.effects).some((e) => e.type === "monstrosity" && usesX(e.n)));
+  // "When you cycle this card" uses the X of an {X} in the cycling cost (Shark Typhoon, rulings).
+  const cyclingX = out.activated.some((a) => a.cycling && /\{X\}/.test(a.manaCost));
   out.triggers = out.triggers.filter((tr) => {
     // A "when you cast this spell" ability uses the X the spell was cast with (CR 107.3a, 601.2b; rulings on Hydroid Krasis).
-    if (!usesX(tr.body) || ((tr.event === "selfEnters" || tr.event === "selfCast") && cardX) || (tr.event === "selfBecomesMonstrous" && monstrousX)) return true;
+    if (!usesX(tr.body) || ((tr.event === "selfEnters" || tr.event === "selfCast") && cardX) || (tr.event === "selfBecomesMonstrous" && monstrousX) || (tr.event === "selfCycled" && cyclingX)) return true;
     bad(tr.body.text);
     return false;
   });

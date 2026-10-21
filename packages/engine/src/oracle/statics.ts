@@ -109,6 +109,7 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     if (m[1] && !condition) return null;
     return { ...st, text: line, zone: "graveyard", ...(condition ? { condition } : {}) };
   }
+  let negate = false;
   if ((m = /^(.+?) as long as (.+)$/.exec(text))) [statement, cond] = [m[1], m[2]];
   else if ((m = /^As long as (~ is enchanted, equipped, and has a counter on it|[^,]+), (.+)$/.exec(text))) [cond, statement] = [m[1], m[2]];
   else if ((m = /^During your turn, (.+)$/.exec(text))) [cond, statement] = ["it's your turn", m[1]];
@@ -116,6 +117,9 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   else if ((m = /^(~ (?:has|gets) [^,]+?) during your turn$/.exec(text))) [statement, cond] = [m[1], "it's your turn"];
   // Wayward Swordtooth: "~ can't attack or block unless you have the city's blessing".
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless you have the city's blessing$/.exec(text))) [statement, cond] = [m[1], "you don't have the city's blessing"];
+  // Topiary Stomper: "~ can't attack or block unless you control seven or more lands", Desperate Castaways "... unless you
+  // control an artifact": the restriction applies while the "you control" condition is false (negated below).
+  else if ((m = /^(~ can't (?:attack or block|attack|block)) unless (you control (?!more )[^,]+)$/.exec(text))) [statement, cond, negate] = [m[1], m[2], true];
   // Flowering Lumberknot: "~ can't attack or block unless it's paired with a creature with soulbond".
   else if ((m = /^(~ can't (?:attack or block|attack|block)) unless it's paired with a creature with soulbond$/.exec(text))) [statement, cond] = [m[1], "it's not paired with a creature with soulbond"];
   // Hellkite Hatchling: "~ has flying and trample if it devoured a creature" (CR 702.82b).
@@ -136,7 +140,9 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
   if (!st || st.condition) return null;
   // "This spell has flash as long as ...": it works from your hand, which a static ability of a permanent can't.
   if (st.mods.some((x) => x.kind === "addKeywords" && x.keywords.includes("Flash"))) return null;
-  const condition = parseStaticCondition(cond, st);
+  const condition0 = parseStaticCondition(cond, st);
+  // "Unless you control N or more X" is "as long as you control N-1 or fewer X".
+  const condition = !negate ? condition0 : condition0?.kind === "control" && condition0.min !== undefined && condition0.max === undefined && !condition0.differentNames && !condition0.otherThanSubject ? (({ min, ...rest }) => ({ ...rest, max: min! - 1 }))(condition0) : null;
   return condition ? { ...st, text: line, condition } : null;
 }
 
@@ -349,6 +355,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^that creature was dealt excess damage this turn$/.test(text)) return { kind: "subjectDealtExcess" };
   if ((m = /^an? (creature|planeswalker)(?: or (planeswalker))? an opponent controlled was dealt excess damage this turn$/.exec(text)))
     return { kind: "opponentsDealtExcess", types: [m[1], m[2]].filter(Boolean).map((x) => x!.charAt(0).toUpperCase() + x!.slice(1)) };
+  // Liberator, Urza's Battlethopter: "if the amount of mana spent to cast that spell is greater than ~'s power", as
+  // increment does it (CR 702.191a), the spell's mana spent being the event's amount.
+  if (/^the amount of mana spent to cast that spell is greater than ~'s power$/.test(text)) return { kind: "increment", powerOnly: true };
   if (/^it's your turn$/.test(text)) return { kind: "yourTurn" };
   if (/^it isn't that player's turn$/.test(text)) return { kind: "eventPlayersTurn", not: true };
   if (/^it's not your turn$/.test(text)) return { kind: "yourTurn", not: true };

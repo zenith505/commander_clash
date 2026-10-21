@@ -4,7 +4,7 @@ import { cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../car
 import { addTriggeredMana, askAuraReturns, creatureTypesOf, draw, enterTogether, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics } from "../layers";
 import { compileCard } from "../oracle";
-import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, protectionFromPlayer } from "../keywords";
+import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LAND_TYPE, CHOSEN_HEXPROOF, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, protectionFromPlayer } from "../keywords";
 import { evalAmount, type AmountCtx } from "../amounts";
 import { cardSource, objectSource, type DamageSource } from "../damage";
 import { RulesError, type CardDef, type Chosen, type Color, type GameObject, type GameState, type LastKnown, type ManaType, type ObjectId, type PlayerId, type StackItem, type TriggerEventInfo } from "../types";
@@ -253,6 +253,8 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     if (ref.zone) return o && o.zone === ref.zone && (o.zoneChanges ?? 0) === ctx.subject!.zc ? [o] : [];
     return [...(o && o.zone !== "battlefield" && (o.zoneChanges ?? 0) === ctx.subject!.zc ? [o] : []), ...foundWith(s, ctx.lki, ctx.subject?.id)];
   }
+  // The objects a batch trigger was about, still where they went (CR 400.7): permanents that entered, cards put into a graveyard.
+  if (ref.ref === "eventGroup") return (ctx.event?.group ?? []).flatMap((g) => (s.objects[g.id] && (s.objects[g.id]!.zoneChanges ?? 0) === g.zc ? [s.objects[g.id]!] : []));
   if (ref.ref === "pairedWithTarget") {
     const t = objects(s, { ref: "target", index: ref.index }, ctx)[0];
     const other = t && pairedWith(s, t);
@@ -374,6 +376,11 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     case "chosenPlayer": {
       const p = s.resolving?.chosen?.player;
       return p !== undefined && !player(s, p).lost ? [p] : [];
+    }
+    case "combatDamagedBySelf": {
+      // This object as the ability's source, the same one that dealt the damage (CR 400.7).
+      const key = ctx.sourceId !== undefined ? `${ctx.sourceId}@${ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0}` : undefined;
+      return s.turnOrder.filter((p) => !player(s, p).lost && !!key && !!s.turnLog?.combatDamagedBy?.[p]?.includes(key));
     }
     case "choseThisWay":
       return (s.resolving?.scratch?.mayers ?? s.resolving?.choseThisWay ?? []).filter((p) => !player(s, p).lost);
@@ -512,7 +519,7 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx): Mo
     m.kind === "modifyPT" || m.kind === "setPT"
       ? { ...m, power: evalAmount(s, m.power, c), toughness: evalAmount(s, m.toughness, c) }
       : // "Gains protection from the color of your choice": the color chosen as it resolved.
-        m.kind === "addKeywords" && m.keywords.includes(CHOSEN_PROTECTION)
+        m.kind === "addKeywords" && (m.keywords.includes(CHOSEN_PROTECTION) || m.keywords.includes(CHOSEN_HEXPROOF))
         ? { ...m, keywords: bindChosenKeywords(m.keywords, s.resolving?.chosen?.color) }
         : // "Gains protection from the chosen player" (Guardian Archon): the player chosen for its source.
           m.kind === "addKeywords" && m.keywords.includes(CHOSEN_PLAYER_PROTECTION)
@@ -524,7 +531,13 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx): Mo
           (m.kind === "setSubtypes" || m.kind === "addTypes") && m.subtypes.includes(CHOSEN_TYPE)
           ? { ...m, subtypes: m.subtypes.flatMap((st) => (st !== CHOSEN_TYPE ? [st] : s.resolving?.chosen?.type ? [s.resolving.chosen.type] : [])) }
           : // "Becomes the basic land type of your choice", "becomes the color of your choice".
-            m.kind === "setLandTypes" && m.subtypes.includes(CHOSEN_LAND_TYPE)
+            // "Can't be blocked by creatures that player controls" (The Black Gate): the player chosen as it resolved.
+            m.kind === "cantBeBlockedBy" && m.filter.controller === "chosenPlayer"
+            ? { ...m, filter: (({ controller: _, ...rest }) => ({ ...rest, controlledBy: s.resolving?.chosen?.player ?? -1 }))(m.filter) }
+            : // "Can't be blocked by creatures of that color this turn" (Skrelv): the color chosen as it resolved.
+              m.kind === "cantBeBlockedBy" && m.filter.chosen === "color"
+            ? { ...m, filter: (({ chosen: _, ...rest }) => (s.resolving?.chosen?.color ? { ...rest, colors: [s.resolving.chosen.color] } : { ...rest, controlledBy: -1 }))(m.filter) }
+            : m.kind === "setLandTypes" && m.subtypes.includes(CHOSEN_LAND_TYPE)
             ? { ...m, subtypes: m.subtypes.flatMap((st) => (st !== CHOSEN_LAND_TYPE ? [st] : s.resolving?.chosen?.landType ? [s.resolving.chosen.landType] : [])) }
             : m.kind === "setColors" && m.chosen
               ? { kind: "setColors", colors: s.resolving?.chosen?.color ? [s.resolving.chosen.color] : [] }
@@ -570,6 +583,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "manaTriggerThisTurn":
     case "costModThisTurn":
     case "fight":
+    case "createdFightEach":
     case "bite":
     case "extraTurn":
     case "skip":
@@ -597,6 +611,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "meld":
     case "sacrificeEach":
     case "keepRest":
+    case "keepDestroyRest":
     case "empowerJace":
     case "bounce":
     case "putOntoBattlefield":
@@ -688,6 +703,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "doublePT":
     case "continuous":
     case "groupRules":
+    case "ownersGainControl":
     case "playerGains":
     case "attach":
     case "attachElsewhere":

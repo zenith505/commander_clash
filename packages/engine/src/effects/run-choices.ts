@@ -169,7 +169,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         ...(item.lki ? { lki: item.lki } : {}),
         ...(item.event ? { event: item.event } : {}),
         // "That amount of excess damage" (Unleash the Inferno): the excess this spell dealt, its X (CR 603.12).
-        ...(e.xExcess ? { x: s.resolving!.excessDamage ?? 0 } : item.x ? { x: item.x } : {}),
+        // "You may pay {X}. When you do, ..." (Electro): the X paid, which the "may" put in ctx.
+        ...(e.xExcess ? { x: s.resolving!.excessDamage ?? 0 } : ctx.x || item.x ? { x: ctx.x || item.x } : {}),
         ...(s.resolving!.rolled ? { rolled: s.resolving!.rolled.result } : {}),
         ...(s.resolving!.revealedFromHand !== undefined ? { revealed: s.resolving!.revealedFromHand } : {}),
         ...(s.resolving!.tappedThisWay !== undefined ? { tapped: s.resolving!.tappedThisWay } : {}),
@@ -197,13 +198,15 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (e.choice === "opponent") {
         // "Choose an opponent" (CR 608.2d): one still in the game (CR 800.4a); with one, there's nothing to ask.
         if (r.chosen?.player !== undefined) return;
-        const opps = opponents(s, ctx.controller);
+        const living = apnap(s, s.turnOrder).filter((x) => !player(s, x).lost);
+        const most = Math.max(...living.map((x) => player(s, x).life));
+        const opps = e.mostLife ? living.filter((x) => player(s, x).life === most) : opponents(s, ctx.controller);
         if (opps.length === 1) {
           r.chosen = { ...r.chosen, player: opps[0]! };
           log(s, `${player(s, ctx.controller).name} chooses ${player(s, opps[0]!).name} for ${src}.`);
         }
         if (opps.length <= 1) return;
-        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "opponent", options: opps.map(String), labels: opps.map((x) => player(s, x).name), prompt: "choose an opponent" };
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "opponent", options: opps.map(String), labels: opps.map((x) => player(s, x).name), prompt: e.mostLife ? "choose a player with the most life" : "choose an opponent" };
         return "paused";
       }
       if (e.choice === "cardType") {

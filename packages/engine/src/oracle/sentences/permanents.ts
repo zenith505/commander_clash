@@ -98,12 +98,33 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     if (!what || isGroup(what)) return null;
     return [...(m[1] ? [{ type: "untap" as const, what }] : []), { type: "removeFromCombat", what }];
   }
+  // Mount Doom: "Choose up to two creatures, then destroy the rest": any players' (not targeted), chosen as it resolves.
+  if ((m = new RegExp(`^Choose up to ${NUM} (creatures|permanents|nonland permanents|artifacts), then destroy the rest$`).exec(s))) {
+    const filter = pickFilter(m[2]!.replace(/s$/, ""));
+    return filter ? [{ type: "keepDestroyRest", filter: { ...filter, text: m[2]!.replace(/s$/, "") }, n: num(m[1]!) }] : null;
+  }
+  // Steel Hellkite: "Destroy each nonland permanent with mana value X whose controller was dealt combat damage by ~ this
+  // turn": whoever controls it now (rulings).
+  if ((m = /^Destroy (each .+?) whose controller was dealt combat damage by ~ this turn$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "each" && !what.of ? [{ type: "destroy", what: { ...what, of: { ref: "combatDamagedBySelf" } } }] : null;
+  }
   // "Destroy target nonblack creature and target land" (Plague Spores): two targets, each destroyed.
   if ((m = /^(Destroy|Exile) (target [^,]+?) and (target .+)$/i.exec(s)) && !/ and target /.test(m[3]!)) {
     const a = parseObject(m[2]!, ctx);
     const b = a && parseObject(m[3]!, ctx);
     const type = m[1]!.toLowerCase() as "destroy" | "exile";
     return a?.ref === "target" && b?.ref === "target" ? [{ type, what: a }, { type, what: b }] : null;
+  }
+  // Homeward Path: "Each player gains control of all creatures they own"; Brooding Saurian's "nontoken permanents".
+  if ((m = /^Each player gains control of all (.+) they own$/i.exec(s))) {
+    const g = parseGroup(`all ${m[1]!}`);
+    return g && !g.other && !g.filter.controller ? [{ type: "ownersGainControl", filter: g.filter }] : null;
+  }
+  // Aura Thief: "You gain control of all enchantments", for as long as each stays on the battlefield (CR 611.2c).
+  if ((m = /^You gain control of all (.+)$/i.exec(s))) {
+    const g = parseGroup(`all ${m[1]!}`);
+    return g && !g.other ? [{ type: "continuous", what: { ref: "each", filter: g.filter }, mods: [{ kind: "control" }], duration: "game" }] : null;
   }
   // Threaten: "Untap target creature and gain control of it until end of turn" (Spinal Embrace without a duration: for as
   // long as it stays on the battlefield, CR 611.2a).

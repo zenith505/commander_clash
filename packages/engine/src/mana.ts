@@ -4,8 +4,9 @@ import { COLORS, type Color, type ManaType, type SpentMana } from "./types";
 export type CostSymbol =
   | { kind: "generic"; amount: number }
   | { kind: "colored"; color: ManaType } // includes {C}
-  | { kind: "hybrid"; options: Color[] } // {W/U}
-  | { kind: "twoHybrid"; color: Color } // {2/W}
+  /** `life`: may be paid with 2 life instead, as {B} may with K'rrik (paying it as its black half). */
+  | { kind: "hybrid"; options: Color[]; life?: true } // {W/U}
+  | { kind: "twoHybrid"; color: Color; life?: true } // {2/W}
   | { kind: "phyrexian"; color: Color } // {W/P}
   | { kind: "x" }
   /** {S}: one mana of any type produced by a snow source (CR 107.4h). Not generic for cost reductions (118.7g). */
@@ -60,6 +61,11 @@ export interface Payment {
  */
 export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, life = Infinity, opts: { spreadColors?: boolean; prefer?: ManaPool; want?: Partial<Record<Color, number>>; avoid?: Partial<Record<Color, number>>; snow?: ManaPool; wantSnow?: boolean } = {}): Payment | null {
   if (!cost.supported) return null;
+  // {2/B} that may be paid with 2 life as {B} (K'rrik): as two generic mana, or else as {B} or 2 life.
+  if (cost.symbols.some((x) => x.kind === "twoHybrid" && x.life)) {
+    const as = (life: boolean): ParsedCost => ({ ...cost, symbols: cost.symbols.map((x) => (x.kind === "twoHybrid" && x.life ? (life ? { kind: "phyrexian", color: x.color } : { kind: "twoHybrid", color: x.color }) : x)) });
+    return payFromPool(as(false), pool, extraGeneric, life, opts) ?? payFromPool(as(true), pool, extraGeneric, life, opts);
+  }
   const p = { ...pool };
   // `prefer`: mana to spend before the rest where there's a choice (mana that can only be spent on this, CR 106.6).
   const pref = { ...(opts.prefer ?? emptyPool()) };
@@ -79,7 +85,7 @@ export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, 
   };
   let generic = extraGeneric;
   let lifePaid = 0;
-  const hybrids: Color[][] = [];
+  const hybrids: { options: Color[]; life?: true }[] = [];
   const twoHybrids: Color[] = [];
   const phyrexian: Color[] = [];
   // {S} first, each from the snow mana the rest of the cost needs least: restricted mana that may be spent on this, {C},
@@ -99,7 +105,7 @@ export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, 
     else if (s.kind === "colored") {
       if (p[s.color] <= 0) return null;
       spend(s.color);
-    } else if (s.kind === "hybrid") hybrids.push(s.options);
+    } else if (s.kind === "hybrid") hybrids.push(s);
     else if (s.kind === "twoHybrid") twoHybrids.push(s.color);
     else if (s.kind === "phyrexian") phyrexian.push(s.color);
     // X is chosen as 0 for now.
@@ -110,8 +116,12 @@ export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, 
   // `avoid`: what spending each color would cost the caster (Rolling Spoil's "if {B} was spent", hurting them now): kept
   // for last, the least costly first.
   const harm = (c: ManaType) => (c === "C" ? 0 : (opts.avoid?.[c] ?? 0));
-  for (const opts of hybrids) {
+  for (const { options: opts, life: orLife } of hybrids) {
     const best = opts.filter((c) => p[c] > 0).sort((a, b) => Number(wanting(b)) - Number(wanting(a)) || harm(a) - harm(b) || pref[b] - pref[a] || p[b] - p[a])[0];
+    if (!best && orLife && life - lifePaid >= 2) {
+      lifePaid += 2;
+      continue;
+    }
     if (!best) return null;
     spend(best);
   }
@@ -140,6 +150,22 @@ export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, 
     generic--;
   }
   return { pool: p, lifePaid, snow: snowUsed };
+}
+
+/**
+ * K'rrik, Son of Yawgmoth: "For each {B} in a cost, you may pay 2 life rather than pay that mana." Each {B} becomes a
+ * Phyrexian {B/P}, and a hybrid symbol with black, {B/R} or {2/B}, may be paid with 2 life as its {B} (rulings). What it
+ * costs doesn't change, only how it may be paid.
+ */
+export function blackForLife(cost: ParsedCost): ParsedCost {
+  return {
+    ...cost,
+    symbols: cost.symbols.map((x): CostSymbol => {
+      if (x.kind === "colored" && x.color === "B") return { kind: "phyrexian", color: "B" };
+      if ((x.kind === "hybrid" && x.options.includes("B")) || (x.kind === "twoHybrid" && x.color === "B")) return { ...x, life: true };
+      return x;
+    }),
+  };
 }
 
 /** How many {X} a cost has: {X}{X} means paying X twice (CR 107.3). */

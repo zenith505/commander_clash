@@ -936,6 +936,33 @@
   "gameChanger": false
  },
  {
+  "oracleId": "54b5e429-7a44-480d-bea4-4f8eeb7449b5",
+  "name": "Bottle Gnomes",
+  "manaCost": "{3}",
+  "cmc": 3,
+  "typeLine": "Artifact Creature — Gnome",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Gnome"
+  ],
+  "oracleText": "Sacrifice this creature: You gain 3 life.",
+  "power": "1",
+  "toughness": "3",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mrd",
+  "releasedAt": "2003-10-02",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b9ac4856-5cdb-479f-b0f5-7fa0b232a5ff",
   "name": "Bottomless Pool // Locker Room",
   "manaCost": "{U} // {4}{U}",
@@ -1304,6 +1331,32 @@
   "set": "m20",
   "releasedAt": "2019-07-12",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "8785f42f-87b9-4a0a-89ce-ea423649ba9c",
+  "name": "Chain Lightning",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Chain Lightning deals 3 damage to any target. Then that player or that permanent's controller may pay {R}{R}. If the player does, they may copy this spell and may choose a new target for that copy.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2025-04-28",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -6783,6 +6836,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ddbe0d17-5cac-417c-afc0-e4aebae83205",
+  "name": "Restoration Magic",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Tiered (Choose one additional cost.)\n• Cure — {0} — Target permanent gains hexproof and indestructible until end of turn.\n• Cura — {1} — Target permanent gains hexproof and indestructible until end of turn. You gain 3 life.\n• Curaga — {3}{W} — Permanents you control gain hexproof and indestructible until end of turn. You gain 6 life.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Curaga",
+   "Cura",
+   "Tiered",
+   "Cure"
+  ],
+  "commanderLegal": "legal",
+  "set": "fin",
+  "releasedAt": "2025-06-13",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "53236dd7-845a-444c-96d5-f41ed7325d8f",
   "name": "Rhystic Study",
   "manaCost": "{2}{U}",
@@ -9019,6 +9103,44 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0452be2a-e97a-4269-a9e3-b616265ecb2e",
+  "name": "Vivi Ornitier",
+  "manaCost": "{1}{U}{R}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Wizard"
+  ],
+  "oracleText": "{0}: Add X mana in any combination of {U} and/or {R}, where X is Vivi Ornitier's power. Activate only during your turn and only once each turn.\nWhenever you cast a noncreature spell, put a +1/+1 counter on Vivi Ornitier and it deals 1 damage to each opponent.",
+  "power": "0",
+  "toughness": "3",
+  "colors": [
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "R",
+   "U"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "R",
+   "U"
+  ],
+  "commanderLegal": "legal",
+  "set": "fin",
+  "releasedAt": "2025-06-13",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "10426070-2e6f-47a5-bc8d-16dcfb058b26",
   "name": "Volcanic Spite",
   "manaCost": "{1}{R}",
@@ -9160,6 +9282,28 @@
     ]
    }
   ]
+ },
+ {
+  "oracleId": "b0394cf2-12a0-4d4f-87e0-fe8937e6faff",
+  "name": "Well of Lost Dreams",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever you gain life, you may pay {X}, where X is less than or equal to the amount of life you gained. If you do, draw X cards.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2022-12-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "2df30a75-4957-4eab-8b0b-4c973f00642d",

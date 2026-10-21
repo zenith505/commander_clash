@@ -1,7 +1,7 @@
 # Roadmap
 
-21,543 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 989 of 992 (99%), top 2,000: 1,689 of 1,989 (84%), top 5,000: 3,483 of 4,988 (69%).
+21,682 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,721 of 1,989 (86%), top 5,000: 3,522 of 4,988 (70%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,15 +22,19 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 98, most played first: Mechanized Production ("eight or more
-   artifacts with the same name"), Kardur ("attack a player other than you if able"), Kodama of the East Tree,
-   Spellskite, Necromancy, Combustible Gearhulk, Arcane Lighthouse, Training Grounds, Charismatic Conqueror, Tataru
-   Taru, Hunter's Insight, Sakashima of a Thousand Faces, K'rrik, Restoration Magic (Tiered), Jace, Wielder of
-   Mysteries, Marvin, Ugin, the Ineffable, Muldrotha, Ethereal Armor, Vivi Ornitier, Mishra's Bauble, Drakuseth, Great
-   Train Heist, Up the Beanstalk. Smaller gaps from round 98: Chain Lightning, Chain Stasis and Chain of Plasma (a
-   cost to pay inside "that player may ... If the player does, they may copy ~"), Chain of Smog (bots copying back
-   and forth needs a loop shortcut), Chain of Silence's first sentence, World at War ("after the second main phase");
-   bots answer Chain of Vapor's copy only with 7+ lands and a target an opponent controls. Smaller gaps from round 97: the other "whenever you put counters" triggers (Orah,
+00. Most played first (`npm run popular`). Out after round 99, most played first: Spellskite, Necromancy, K'rrik,
+   Marvin, Ugin, the Ineffable, Muldrotha, Skrelv, Plumb the Forbidden, The Darkness Crystal, Kambal, The Black Gate,
+   Steel Hellkite, Tezzeret, Cruel Captain, Homeward Path, Tekuthal, Siren Stormtamer, Ezuri's Predation, Notion Thief,
+   Forge Anew. Smaller gaps from round 99: "creature cards you own that aren't on the battlefield have flash" (Teferi,
+   Mage of Zhalfir, Druid of Argoth); Herald of War, Depala, Azor's other line, Electro (a reflexive trigger with X),
+   Bane's and Biomancer's Familiar's other lines, Cadric, The Master, Sliver Gravemother, Spider-Verse and Mirror
+   Box (Mirror Gallery and Council of Reeds play: the legend rule doesn't apply); the other tiered cards (Cloud, Ice,
+   Tifa, Vincent); Archetypes; "can't attack you" limits by count (Crawlspace, Judoon). With Silent Arbiter's "no more
+   than one creature can block" the requirement check only compares blocks that keep to the limit; bots trim attacks
+   and blocks to a combat limit (requirements first, then the biggest). "You may pay {X}" offers X up to 40. Chain of
+   Smog between bots stops when a hand runs out (bots copy discard Chains only at an opponent with cards in hand, and
+   discard for Chain of Plasma only with four or more cards). Smaller gaps from round 98: World at War ("after the
+   second main phase"); bots answer Chain of Vapor's copy only with 7+ lands and a target an opponent controls. Smaller gaps from round 97: the other "whenever you put counters" triggers (Orah,
    Kros, Rikku, Captain Marvel, Defiant Greatmaw, Aragorn, Invisible Woman, Riveteers Ascendancy, Kate Stewart's second
    line); "Sacrifice X" in a mana ability (Springjack Pasture), in a spell's text (Nahiri's Lithoforming, Empty the
    Laboratory) or with "reveals the top X" (Lonis), Champion of Stray Souls' graveyard ability; bots never use "Sacrifice

@@ -2429,7 +2429,7 @@ export type SpellCondition =
   /** "If the gift was promised" (CR 702.174b, k). */
   | { kind: "gift" }
   /** "If this spell's surge cost was paid" (CR 702.117a), "if ~'s spectacle cost was paid" (702.137a): in the spell, or its permanent's enters trigger. */
-  | { kind: "altPaid"; alt: "surge" | "spectacle" | "awaken" }
+  | { kind: "altPaid"; alt: "surge" | "spectacle" | "awaken" | "alternative" | "madness" }
   /** "If you attacked this turn, ...": a fact about the game, checked as the spell or ability resolves (CR 608.2c). */
   | { kind: "state"; cond: StaticCondition }
   /** "If X is 10 or more" (Finale of Devastation): the X this spell was cast with (CR 107.3a). */

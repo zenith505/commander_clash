@@ -2992,6 +2992,9 @@ const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true
   // (CR 601.2c, 601.2h), so no target can depend on it.
   { re: "the sacrificed creature was suspected", cond: { kind: "sacrificedSuspected" }, noTargets: true },
   { re: "~'s surge cost was paid", cond: { kind: "altPaid", alt: "surge" } },
+  // The Masteries: "If the {1}{B} cost was paid" (compile checks it's the card's "rather than pay" cost).
+  { re: "the (?:\\{[^}]+\\})+ cost was paid", cond: { kind: "altPaid", alt: "alternative" }, spellOnly: true },
+  { re: "~'s madness cost was paid", cond: { kind: "altPaid", alt: "madness" }, spellOnly: true },
   { re: "~'s spectacle cost was paid", cond: { kind: "altPaid", alt: "spectacle" } },
   // Mana from a Treasure (CR 106.3) is spent after the targets are chosen (CR 601.2c, 601.2h), so no target can depend on it.
   { re: "mana from a Treasure was spent to cast ~", cond: { kind: "treasure" }, spellOnly: true, noTargets: true },

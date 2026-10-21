@@ -575,6 +575,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Drawing
   if ((m = new RegExp(`^(?:You )?[Dd]raw ${NUMX} cards?$`).exec(s))) return [{ type: "draw", who: { ref: "you" }, n: amt(m[1]!) }];
+  // "An opponent draws a card" (Baleful Mastery): one its controller chooses as it resolves (rulings).
+  if ((m = new RegExp(`^[Aa]n opponent draws ${NUMX} cards?$`).exec(s))) return [{ type: "choose", choice: "opponent" }, { type: "draw", who: { ref: "chosenPlayer" }, n: amt(m[1]!) }];
   // "Draw half X cards, rounded down" (Wan Shi Tong), "you gain half X life and draw half X cards. Round down each time."
   // (Hydroid Krasis, CR 107.1a).
   if ((m = /^(?:(.+?) )?(draws?|gains?|loses?) half X (cards|life)(?:, rounded (up|down))?$/i.exec(s)) && /^draw/i.test(m[2]!) === (m[3] === "cards")) {

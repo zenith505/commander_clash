@@ -3,10 +3,11 @@
 // hand traded for as many from the top of the library, not drawn: rulings). Thousand-Year Storm (a copy for each
 // instant and sorcery spell you cast before it this turn). Crawlspace (no more than two creatures can attack you).
 // Delayed Blast Fireball ("each opponent and each creature they control"; "if ~ was cast from exile"). Rings of
-// Brighthearth (copying an activated ability, even once it's countered: rulings).
+// Brighthearth (copying an activated ability, even once it's countered: rulings). Baleful Mastery ("if the {1}{B} cost
+// was paid, an opponent draws a card": one chosen as it resolves, rulings).
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
+import { act, bear, card, passUntil, putOnBattlefield, setup, target } from "./helpers";
 import { defOf, isFullySupported, planActivate, planCast, waitingOn, type GameState } from "../src";
 import { defMv } from "../src/faces";
 
@@ -26,6 +27,8 @@ const fireball = card("Delayed Blast Fireball", "Instant", "{1}{R}{R}", { keywor
 
 const rings = card("Rings of Brighthearth", "Artifact", "{3}", { oracleText: "Whenever you activate an ability, if it isn't a mana ability, you may pay {2}. If you do, copy that ability. You may choose new targets for the copy." });
 const pyromancer = card("Prodigal Pyromancer", "Creature — Human Wizard", "{2}{R}", { power: "1", toughness: "1", oracleText: "{T}: This creature deals 1 damage to any target." });
+
+const mastery = card("Baleful Mastery", "Instant", "{3}{B}", { oracleText: "You may pay {1}{B} rather than pay this spell's mana cost.\nIf the {1}{B} cost was paid, an opponent draws a card.\nExile target creature or planeswalker." });
 
 const pass = (s: GameState) => act(s, { type: "passPriority", player: waitingOn(s)! });
 const settle = (s: GameState) => {
@@ -183,6 +186,28 @@ describe("round 102: Rings of Brighthearth", () => {
       }
       expect(s.players[opp]!.life).toBe(pay ? 38 : 39);
       expect(s.players[ap]!.manaPool.C).toBe(pay ? 0 : 2);
+    }
+  });
+});
+
+describe("round 102: Baleful Mastery", () => {
+  it("parse", () => expect(isFullySupported(mastery)).toBe(true));
+
+  it("for {1}{B}: an opponent of the caster's choice draws; for its mana cost, nobody", () => {
+    for (const alt of [true, false]) {
+      const { s: s0, ap, opp, ids } = setup([mastery]);
+      const g = putOnBattlefield(s0, opp, bear());
+      const other = s0.turnOrder.find((p) => p !== ap && p !== opp)!;
+      const hands = s0.turnOrder.map((p) => s0.players[p]!.hand.length);
+      let s = planCast(s0, ap, ids[0]!, [target(g)], undefined, undefined, undefined, alt ? { alt: "alternative" } : undefined)!.reduce((x, y) => act(x, y), s0);
+      for (let i = 0; i < 100 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+        const p = s.pending;
+        if (p?.kind === "chooseOption" && p.what === "opponent") s = act(s, { type: "chooseOption", player: ap, choice: String(other) });
+        else if (p) throw new Error(`unexpected ${p.kind}`);
+        else s = pass(s);
+      }
+      expect(s.objects[g]!.zone).toBe("exile");
+      expect(s.turnOrder.map((p) => s.players[p]!.hand.length)).toEqual(s.turnOrder.map((p, i) => hands[i]! - (p === ap ? 1 : 0) + (alt && p === other ? 1 : 0)));
     }
   });
 });

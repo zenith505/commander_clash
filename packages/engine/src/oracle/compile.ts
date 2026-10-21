@@ -2352,9 +2352,12 @@ function checkCastingLinks(out: CompiledCard) {
   if (out.triggers.some((t) => t.event !== "selfEnters" && evidenceIn(t.body)) || evidenceIn(out.activated) || evidenceIn(out.statics)) bad = true;
   // "If this spell's surge cost was paid" needs that alternative cost (CR 702.117a, 702.137a): in the spell, or its
   // permanent's enters trigger.
-  for (const alt of ["surge", "spectacle"] as const) {
+  // "If the {1}{B} cost was paid": the card's one "rather than pay" cost, that mana (Baleful Mastery).
+  const masteryMana = /\bIf the ((?:\{[^}]+\})+) cost was paid\b/.exec(out.spell?.text ?? "")?.[1];
+  for (const alt of ["surge", "spectacle", "alternative", "madness"] as const) {
     const altIn = (v: unknown) => JSON.stringify(v ?? null).includes(`"kind":"altPaid","alt":"${alt}"`);
-    const linked = !!out.altCosts?.some((a) => a.kind === alt);
+    const alts = out.altCosts?.filter((a) => a.kind === alt) ?? [];
+    const linked = alt === "alternative" ? alts.length === 1 && alts[0]!.mana === masteryMana && !alts[0]!.costs?.length : alts.length > 0;
     if ((altIn(out.spell) || out.triggers.some((t) => t.ifAlt === alt || altIn(t.body))) && !linked) bad = true;
     if (out.triggers.some((t) => t.event !== "selfEnters" && altIn(t.body)) || altIn(out.activated) || altIn(out.statics)) bad = true;
   }

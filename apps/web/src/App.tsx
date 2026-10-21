@@ -705,7 +705,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           : s.players[HUMAN]!.hand.filter((id) => id !== d.objectId && (!c.filter || printedMatches(c.filter, cardOf(s, id))));
       const what = c.kind === "sacrifice" ? c.filter.text : (c.filter?.text ?? "card");
       const article = c.kind === "sacrifice" && c.other ? "another" : /^[aeiou]/i.test(what) ? "an" : "a";
-      return setCostPick({ activate: d, kind: c.kind, label: cardOf(s, d.objectId).name, what: `${c.kind} ${c.n === 1 ? article : c.n} ${what}${c.n > 1 ? "s" : ""}`, n: c.n, candidates, chosen: [] });
+      return setCostPick({ activate: d, kind: c.kind, label: cardOf(s, d.objectId).name, what: `${c.kind === "sacrifice" && c.exile ? "exile" : c.kind} ${c.n === 1 ? article : c.n} ${what}${c.n > 1 ? "s" : ""}`, n: c.n, candidates, chosen: [] });
     }
     const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}), ...(d.tap?.length ? { tap: d.tap } : {}), ...(d.exileFromHand?.length ? { exileFromHand: d.exileFromHand } : {}), ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}), ...(d.collect ? { collect: d.collect } : {}) };
     dispatch(
@@ -832,7 +832,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       if (c.kind === "discard" && c.oneOf)
         return setCostPick({ draft: d, kind: "discard", label: card.name, what: `discard ${/^[aeiou]/i.test(c.oneOf.text) ? "an" : "a"} ${c.oneOf.text} and another card`, n: c.n, candidates: me.hand.filter((id) => id !== d.objectId), chosen: [], oneOf: c.oneOf });
       const what = c.kind === "sacrifice" ? c.filter.text : c.kind === "discard" || c.kind === "reveal" || c.kind === "exileFromHand" ? (c.filter?.text ?? "card") : (c.filter?.text ?? (d.via === "escape" ? "other card" : "card"));
-      const verb = c.kind === "sacrifice" ? "sacrifice" : c.kind === "discard" ? "discard" : c.kind === "reveal" ? "reveal" : c.kind === "exileFromHand" ? (c.toLibrary ? "put on top of your library" : "exile from your hand") : "exile from your graveyard";
+      const verb = c.kind === "sacrifice" ? (c.exile ? "exile" : "sacrifice") : c.kind === "discard" ? "discard" : c.kind === "reveal" ? "reveal" : c.kind === "exileFromHand" ? (c.toLibrary ? "put on top of your library" : "exile from your hand") : "exile from your graveyard";
       return setCostPick({ draft: d, kind: key, label: card.name, what: `${verb} ${c.n === 1 ? (/^[aeiou]/i.test(what) ? "an" : "a") : c.n} ${what}${c.n > 1 ? "s" : ""}`, n: c.n, candidates, chosen: [] });
     }
     // Casualty N: you may sacrifice a creature with power N or greater as you cast it (CR 702.153a).
@@ -1718,7 +1718,7 @@ const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback
 function describeExtraCost(c: AdditionalCost): string {
   const n = (k: number, what: string) => (k === 1 ? `${/^[aeiou]/i.test(what) ? "an" : "a"} ${what}` : `${k} ${what}s`);
   if (c.kind === "payLife") return `pay ${c.n} life`;
-  if (c.kind === "sacrifice") return `sacrifice ${n(c.n, c.filter.text)}`;
+  if (c.kind === "sacrifice") return `${c.exile ? "exile" : "sacrifice"} ${n(c.n, c.filter.text)}${c.exile ? " you control" : ""}`;
   if (c.kind === "discard") return `discard ${n(c.n, c.filter?.text ?? "card")}${c.random ? " at random" : ""}`;
   if (c.kind === "returnToHand") return `return ${n(c.n, c.filter.text)} to hand`;
   if (c.kind === "revealHand") return "reveal your hand";
@@ -4096,6 +4096,8 @@ function Controls({
                 ? `tap any number of ${pending.what}: click them, then tap them. Each one tapped counts for what comes next.`
                 : pending.action === "untap"
                 ? `click up to ${pending.count} tapped land${pending.count === 1 ? "" : "s"} to untap (any player's), then untap them.`
+                : pending.action === "phaseOut"
+                ? `choose any number of ${pending.what} to phase out: click them, then phase them out. They're treated as though they don't exist until your next untap step.`
                 : pending.action === "keepTapped"
                 ? `click the permanents you want to keep tapped (anything "for as long as it remains tapped" keeps going); the rest untap.`
                 : pending.action === "exert"
@@ -4115,7 +4117,7 @@ function Controls({
                 : `click ${what} ${theirs ? `${theirs} controls` : "of yours"} to ${verb}.`}
         </span>
         <button disabled={!ok} onClick={() => dispatch([{ type: "pickPermanents", player: HUMAN, ids: discards }])}>
-          {pending.action === "keep" ? (n ? `Keep ${n}` : "Keep none") : pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "encode" ? (n ? "Encode" : "Don't encode") : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "keepTapped" ? (n ? `Keep ${n} tapped` : "Untap all") : pending.action === "untap" ? (n ? `Untap ${n}` : "Untap none") : pending.action === "tap" ? (n ? `Tap ${n}` : "Tap none") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : pending.action === "choose" ? "Choose" : pending.action === "meld" ? "Meld" : "Return"}
+          {pending.action === "keep" ? (n ? `Keep ${n}` : "Keep none") : pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "encode" ? (n ? "Encode" : "Don't encode") : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "keepTapped" ? (n ? `Keep ${n} tapped` : "Untap all") : pending.action === "phaseOut" ? (n ? `Phase out ${n}` : "Phase out none") : pending.action === "untap" ? (n ? `Untap ${n}` : "Untap none") : pending.action === "tap" ? (n ? `Tap ${n}` : "Tap none") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : pending.action === "choose" ? "Choose" : pending.action === "meld" ? "Meld" : "Return"}
         </button>
       </div>
     );

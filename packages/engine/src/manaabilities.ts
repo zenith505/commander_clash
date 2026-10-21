@@ -169,7 +169,8 @@ function baseManaProduced(s: GameState, o: GameObject, ab: ManaAbility, choice: 
   }
   if (p.kind === "oneOf") return Array<ManaType>(p.amount).fill(choice);
   if (p.kind === "landsCouldProduce") return Array<ManaType>(p.n ?? 1).fill(choice);
-  if (p.kind === "commanderIdentity" || p.kind === "chosenColor" || p.kind === "colorsAmong") return [choice];
+  if (p.kind === "chosenColor") return Array<ManaType>(p.n ?? 1).fill(choice);
+  if (p.kind === "commanderIdentity" || p.kind === "colorsAmong") return [choice];
   if (p.kind === "eachColorAmong") return eachColorAmong(s, o);
   if (p.kind === "devotion") return Array<ManaType>(evalAmount(s, { count: { kind: "devotion", colors: [choice as Color] } }, { controller: controllerOf(s, o), sourceId: o.id })).fill(choice);
   if (!p.count) return p.mana;

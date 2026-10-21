@@ -271,6 +271,10 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       return;
     }
+    case "nextSpellImprovise":
+      player(s, ctx.controller).nextSpellImprovise = s.turn;
+      log(s, `${src}: the next spell ${player(s, ctx.controller).name} casts this turn has improvise.`);
+      return;
     case "nextCast": {
       const item = s.resolving?.item;
       const id = item?.kind === "spell" ? item.objectId : ctx.sourceId;

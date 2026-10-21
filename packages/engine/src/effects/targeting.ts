@@ -14,7 +14,7 @@ import { evalAmount, type AmountCtx } from "../amounts";
 import { defMv, hasName, isDoubleFacedDef, isTransformed, sameName } from "../faces";
 
 /** Multicolored: two or more colors (CR 105.4); monocolored: exactly one; colorless: none (CR 105.2c). */
-const colorCountIs = (want: NonNullable<TargetSpec["colorCount"]>, n: number) => (want === "multicolored" ? n >= 2 : want === "monocolored" ? n === 1 : want === "two" ? n === 2 : want === "notTwo" ? n !== 2 : n === 0);
+const colorCountIs = (want: NonNullable<TargetSpec["colorCount"]>, n: number) => (want === "multicolored" ? n >= 2 : want === "monocolored" ? n === 1 : want === "two" ? n === 2 : want === "notTwo" ? n !== 2 : want === "colored" ? n >= 1 : n === 0);
 
 /**
  * Does this permanent fit `spec` from `controller`'s point of view, using its current
@@ -53,6 +53,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.colorCount && !colorCountIs(spec.colorCount, c.colors.length)) return false;
   if (spec.supertypes?.some((t) => !c.supertypes.includes(t))) return false;
   if (spec.notSupertypes?.some((t) => c.supertypes.includes(t))) return false;
+  if (spec.owner === "you" && o.owner !== controller) return false;
   if (spec.anyOf && !spec.anyOf.some((a) => objectMatches(s, a, o, controller, false, src, chars, view))) return false;
   if (spec.subtypes?.length && !spec.subtypes.some(hasSubtype)) return false;
   if (spec.notSubtypes?.some(hasSubtype)) return false;
@@ -542,6 +543,7 @@ function relatedOk(s: GameState, spec: TargetSpec, chosen: TargetChoice[], t: Ta
   const o = obj(s, t.id);
   if (others(spec.sameGraveyardAs).some((x) => x.owner !== o.owner)) return false;
   if (others(spec.differentNameFrom).some((x) => sameName(defOf(s, x).name, defOf(s, o).name))) return false;
+  if (others(spec.differentManaValueFrom).some((x) => defMv(defOf(s, x)) === defMv(defOf(s, o)))) return false;
   return others(spec.sharesCreatureTypeWith).every((x) => shareCreatureType(creatureTypesOf(s, x), creatureTypesOf(s, o)));
 }
 
@@ -598,7 +600,7 @@ export function hasLegalTargets(s: GameState, specs: TargetSpec[], controller: P
   const free = (spec: TargetSpec) => spec.optional || spec.skip || !!spec.many;
   const options = specs.map((spec, i) => (free(spec) ? [] : legalTargets(s, spec, controller, undefined, src, sourceId).filter((t) => canChooseTarget(s, specs, [], i, t, controller, src, sourceId))));
   if (options.some((o, i) => !free(specs[i]!) && !o.length)) return false;
-  if (!specs.some((spec) => spec.distinctFrom?.length || spec.sharesCreatureTypeWith?.length || spec.sameGraveyardAs?.length || spec.differentNameFrom?.length || spec.total)) return true;
+  if (!specs.some((spec) => spec.distinctFrom?.length || spec.sharesCreatureTypeWith?.length || spec.sameGraveyardAs?.length || spec.differentNameFrom?.length || spec.differentManaValueFrom?.length || spec.total)) return true;
   // Some targets must differ from each other: look for one way to choose them all.
   const chosen: TargetChoice[] = [];
   const fill = (i: number): boolean => {

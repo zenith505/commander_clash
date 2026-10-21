@@ -8,7 +8,7 @@ import { parseCount } from "../counts";
 import { parseChanges, parseSentence } from "../sentence";
 import { parseExtraBlocks, parseStaticMods } from "../statics";
 import type { Ctx } from "../body";
-import { canonicalKeyword } from "../../keywords";
+import { canonicalKeyword, CREATURE_TYPES } from "../../keywords";
 import { parseGrants } from "../grants";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
@@ -61,6 +61,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = /^~'s level becomes (\d+)$/.exec(s))) return ctx.activated ? [{ type: "classLevel", n: Number(m[1]) }] : null;
   // A Case's "To solve" trigger (CR 719.3a; see compile.ts): "this Case becomes solved".
   if (s === "~ becomes solved") return [{ type: "solve" }];
+  if (s === "Harness ~") return [{ type: "harness" }];
+  if (s === "The next spell you cast this turn has improvise") return [{ type: "nextSpellImprovise" }];
   // "Transform ~" (CR 701.27a).
   if (/^[Tt]ransform ~$/.test(s)) return [{ type: "transform", what: { ref: "self" } }];
   // "Transform up to one target Incubator token you control" (Attentive Skywarden), "transform target Werewolf you
@@ -491,6 +493,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     const mods = what?.ref === "target" && parseChanges(`becomes ${m[2]!}`);
     return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;
+  }
+  // "Target legendary creature becomes a God in addition to its other types" (Tyrite Sanctum), "That creature becomes a
+  // Vampire in addition to its other types" (Olivia Voldaren), "each creature you control becomes a Phyrexian in addition
+  // to its other types" (Breach the Multiverse): no duration, so for as long as each stays on the battlefield (CR 611.2a,
+  // 400.7), and only the creatures there as it resolves (CR 611.2c). A creature type, which goes if the permanent stops
+  // being a creature (CR 205.3d, rulings).
+  if ((m = /^([Tt]arget .+?|That creature|It|[Ee]ach creature you control) becomes an? ([A-Z][a-z]+) in addition to its other types$/.exec(s)) && CREATURE_TYPES.has(m[2]!)) {
+    const what = parseObject(m[1]!.replace(/^It$/, "it").replace(/^Each/, "each"), ctx);
+    if (what && (what.ref === "target" || what.ref === "each")) return [{ type: "continuous", what, mods: [{ kind: "addTypes", types: [], subtypes: [m[2]!] }], duration: "game" }];
   }
   // "~ becomes a Kithkin Spirit with base power and toughness 2/2" (Figure of Destiny), '~ gains "Whenever ~ deals combat
   // damage to a player, draw a card."' (Ascendant Spirit): no duration, so for as long as it stays on the battlefield

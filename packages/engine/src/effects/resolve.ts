@@ -1,7 +1,7 @@
 import type { AbilityBody, Amount, DamageRecipient, Effect, ManaAbility, Modification, ObjRef, PlayerRef, TargetChoice } from "../abilities";
 import { withPutter } from "../counters";
 import { cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
-import { addTriggeredMana, askAuraReturns, creatureTypesOf, draw, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
+import { addTriggeredMana, askAuraReturns, creatureTypesOf, draw, enterTogether, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics } from "../layers";
 import { compileCard } from "../oracle";
 import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, protectionFromPlayer } from "../keywords";
@@ -653,6 +653,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "becomeSaddled":
     case "classLevel":
     case "solve":
+    case "harness":
     case "transform":
     case "becomePrepared":
     case "flip":
@@ -694,6 +695,12 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runPermanentsEffect(s, e, ctx, src);
     case "becomeCopy":
       return runCopiesEffect(s, e, ctx);
+    case "together":
+      // Each kind of token at the same time (CR 608.2f): entering together, each sees the others enter.
+      enterTogether(s, () => {
+        for (const x of e.effects) runEffect(s, x, ctx);
+      });
+      return;
     case "myriad":
     case "encore":
     case "createTokenCopy":
@@ -705,6 +712,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "castLinkedCopy":
     case "copySpell":
     case "nextCast":
+    case "nextSpellImprovise":
     case "floatingTrigger":
     case "cascade":
     case "exileUntilNonland":
@@ -827,6 +835,23 @@ function finishSpell(s: GameState, id: ObjectId, item: StackItem) {
 }
 
 export function damageRecipients(s: GameState, to: DamageRecipient, ctx: ResolveCtx): { objs: GameObject[]; pids: PlayerId[] } {
+  if (to.ref === "attackedBySelf") {
+    // What it's attacking as this resolves, or what it was attacking as it last existed on the battlefield (rulings on
+    // Myr Battlesphere). A planeswalker removed from combat leaves it attacking nothing (CR 506.4c); a battle isn't a
+    // player or planeswalker.
+    // "It" is the creature that attacked in a trigger about another creature (Hellrider; Mage Slayer's equipped creature).
+    const who = to.subject ? ctx.subject : ctx.sourceId ? { id: ctx.sourceId, zc: ctx.sourceZc } : undefined;
+    const o = who ? s.objects[who.id] : undefined;
+    const here = !!o && o.zone === "battlefield" && (who!.zc === undefined || (o.zoneChanges ?? 0) === who!.zc);
+    const lk = !here && who ? s.lastKnown?.[who.id] : undefined;
+    const at = here ? o : lk && (who!.zc === undefined || lk.zc === who!.zc) ? lk : undefined;
+    if (at?.attackingPermanent) {
+      const pw = s.objects[at.attackingPermanent.id];
+      const still = !at.attackingPermanent.battleController && pw?.zone === "battlefield" && (pw.zoneChanges ?? 0) === at.attackingPermanent.zc;
+      return { objs: still ? [pw!] : [], pids: [] };
+    }
+    return { objs: [], pids: at?.attacking !== undefined && !s.players[at.attacking]?.lost ? [at.attacking] : [] };
+  }
   if (to.ref === "anyTarget") {
     const out: { objs: GameObject[]; pids: PlayerId[] } = { objs: [], pids: [] };
     for (let i = to.index; i < to.index + (to.n ?? 1); i++) {

@@ -36,9 +36,9 @@ const toUntap = (s: GameState, pid: PlayerId) => passUntil(act(s, { type: "passP
 const pool = (s: GameState, pid: PlayerId) => s.players[pid]!.manaPool;
 
 describe("storage lands", () => {
-  it("parses; Crucible's any combination of colors and City of Shadows' exile cost stay unsupported", () => {
-    for (const d of [vault, pools, fountain, woodlot, landCap]) expect(isFullySupported(d), d.name).toBe(true);
-    for (const d of [crucible, city]) expect(isFullySupported(d), d.name).toBe(false);
+  it("parses; Crucible's any combination of colors stays unsupported (City of Shadows' exile cost is supported since round 98)", () => {
+    for (const d of [vault, pools, fountain, woodlot, landCap, city]) expect(isFullySupported(d), d.name).toBe(true);
+    expect(isFullySupported(crucible), crucible.name).toBe(false);
   });
 
   it("removes as many storage counters as you choose, for that much mana", () => {

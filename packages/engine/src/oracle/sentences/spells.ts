@@ -22,6 +22,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     // "It" in a trigger about another permanent (Grafted Wargear's "sacrifice that permanent"): only if you control it (CR 701.21a).
     return what?.ref === "self" || what?.ref === "subject" ? [{ type: "sacrifice", what }] : null;
   }
+  // "Sacrifice all creatures you control" (CR 701.21a), "Each player sacrifices all permanents they control that are one or
+  // more colors" (All Is Dust): every one of them, each by its controller (rulings: all at the same time).
+  if ((m = /^(Sacrifice|Each player sacrifices) all (.+?) (you|they) control( that .+)?$/.exec(s)) && (m[1] === "Sacrifice") === (m[3] === "you")) {
+    const what = parseObject(`all ${m[2]}${m[3] === "you" ? " you control" : ""}${m[4] ?? ""}`, ctx);
+    if (what?.ref !== "each" || what.filter.kind !== "object" || (m[3] === "they" && what.filter.controller)) return null;
+    return [{ type: "sacrifice", what, ...(m[3] === "they" ? { byController: true as const } : {}) }];
+  }
   // "Artifact, instant, and sorcery spells you cast this turn cost {2} less to cast" (Urza, Planeswalker): a cost change
   // for the spells its controller casts later this turn (CR 601.2f, 611.2a). Only generic mana comes off (CR 118.7a).
   if ((m = /^(.+? spells) you cast this turn cost (\{\d+\}) less to cast$/.exec(s)) && !/\bwith\b|\bfrom\b/.test(m[1]!)) {

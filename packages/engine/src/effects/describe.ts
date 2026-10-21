@@ -39,6 +39,10 @@ export function describeMods(s: GameState, mods: Modification[], controller: Pla
       parts.push("can't be blocked");
       continue;
     }
+    if (m.kind === "cantAttackYou") {
+      parts.push(`can't attack ${player(s, controller).name} or their planeswalkers`);
+      continue;
+    }
     if (m.kind === "goad") {
       parts.push(`${plural ? "are" : "is"} goaded by ${player(s, controller).name}`);
       continue;

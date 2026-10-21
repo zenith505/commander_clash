@@ -1079,6 +1079,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ebbd5b9c-07ff-4b42-81c2-ba09539f3a42",
+  "name": "Breach the Multiverse",
+  "manaCost": "{5}{B}{B}",
+  "cmc": 7,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Each player mills ten cards. For each player, choose a creature or planeswalker card in that player's graveyard. Put those cards onto the battlefield under your control. Then each creature you control becomes a Phyrexian in addition to its other types.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2026-09-28",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "6d194882-ca37-49bb-ac9f-a751c53850a8",
   "name": "Bribery",
   "manaCost": "{3}{U}{U}",
@@ -1276,6 +1304,32 @@
   "set": "m20",
   "releasedAt": "2019-07-12",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2167ac25-d042-4b48-b770-8b94acc1a965",
+  "name": "Chain of Vapor",
+  "manaCost": "{U}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Return target nonland permanent to its owner's hand. Then that permanent's controller may sacrifice a land of their choice. If the player does, they may copy this spell and may choose a new target for that copy.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c16",
+  "releasedAt": "2016-11-11",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -6753,6 +6807,34 @@
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": true
+ },
+ {
+  "oracleId": "45bcebd0-5e93-4433-b92f-b4c161d04bd6",
+  "name": "Ripples of Potential",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Proliferate, then choose any number of permanents you control that had a counter put on them this way. Those permanents phase out. (To proliferate, choose any number of permanents and/or players, then give each another counter of each kind already there. Treat phased-out permanents and anything attached to them as though they don't exist until their controller's next turn.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Proliferate"
+  ],
+  "commanderLegal": "legal",
+  "set": "lcc",
+  "releasedAt": "2023-11-17",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "147e0e74-f76b-4f0a-951f-d39afdd72c02",

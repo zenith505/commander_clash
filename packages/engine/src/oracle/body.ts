@@ -1,13 +1,13 @@
 import { allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose } from "../abilities";
 import { substituteX } from "../amounts";
 import { num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS, singularWord } from "./words";
-import { CHOSEN_KEYWORD, CHOSEN_PROTECTION, THAT_PLAYER_PROTECTION } from "../keywords";
+import { CHOSEN_KEYWORD, CHOSEN_PROTECTION, CREATURE_TYPES, THAT_PLAYER_PROTECTION } from "../keywords";
 import { parseStaticCondition } from "./statics";
 import { parseBoundCount, parseCount } from "./counts";
 import { parseBecomes, parseDig, parseSentence } from "./sentence";
 import { parsePreventionRider } from "./sentences/prevention";
 import { compileQuoted, parseGrants } from "./grants";
-import { boundAtTargeting, parseCardTarget, parseObject, parsePlayer, parseTargetPhrase, PERMANENT_TYPES } from "./targets";
+import { boundAtTargeting, parseCardTarget, parseDamageRecipient, parseObject, parsePlayer, parseTargetPhrase, PERMANENT_TYPES } from "./targets";
 import { parseCardNameChoice, parseSearchFilter } from "./search";
 import { parseManaSpend, parseManaTrigger } from "./mana-abilities";
 import { parseTrigger } from "./triggers";
@@ -618,6 +618,15 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       rowToken = /^Create an? ([^,.]+?) token$/.exec(fx)?.[1] ?? rowToken;
       return [`${ROW_MARK}${row[1]}|${row[2] ?? (row[3] || row[4] === "more" || row[4] === "higher" ? "+" : row[4] === "less" ? "-" : row[1])}`, fx];
     })
+    // "Target opponent sacrifices a creature or planeswalker of their choice, discards a card, and loses 3 life" (Archon of
+    // Cruelty): three instructions for that player, in the order listed (rulings).
+    .flatMap((x) => {
+      const verb = "(?:sacrifices|discards|loses|mills|draws|gains) [^,]+";
+      const three = new RegExp(`^([Tt]arget opponent|[Tt]arget player|[Ee]ach opponent|[Ee]ach player) (${verb}), (${verb}),? and (${verb})$`).exec(x);
+      if (!three) return [x];
+      const again = /^target/i.test(three[1]!) ? "That player" : capital(three[1]!);
+      return [`${three[1]} ${three[2]}`, `${again} ${three[3]}`, `${again} ${three[4]}`];
+    })
     // "Draw two cards, then discard a card": two instructions, in order.
     // A search's "then shuffle" is part of the search (CR 701.23): "you may search" covers it too.
     // Not before "meld them into": meld (CR 701.42a) is one instruction with the exile (sentences/zones.ts).
@@ -1097,6 +1106,109 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const filter = parseSearchFilter(yardPick[1]!);
       if (filter === null || (filter?.types ?? []).some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
       effects.push({ type: "chooseFromGraveyard", n: 1, upTo: true, dest: "battlefield", ...(filter ? { filter } : {}), ...(yardBack[1] ? { counters: { [counterKind(yardBack[1])]: 1 } } : {}) });
+      si++;
+      continue;
+    }
+    // "For each player, choose a creature or planeswalker card in that player's graveyard. Put those cards onto the
+    // battlefield under your control." (Breach the Multiverse): not targeted, so chosen as it resolves (CR 608.2c), one in
+    // each graveyard, then all enter at the same time under your control (CR 110.2a). Only permanent card types, so no
+    // Aura needs something to enchant.
+    // Ripples of Potential: "Proliferate, then choose any number of permanents you control that had a counter put on them
+    // this way. Those permanents phase out." Chosen after proliferating, all phasing out at once (CR 702.26).
+    if (/^Proliferate$/i.test(s) && /^[Cc]hoose any number of permanents you control that had a counter put on them this way$/.test(sentences[si + 1] ?? "") && /^Those permanents phase out$/.test(sentences[si + 2]?.replace(/\.$/, "") ?? "")) {
+      effects.push({ type: "proliferate", thenPhaseOut: true });
+      si += 2;
+      continue;
+    }
+    // Sword of Hearth and Home: "exile up to one target creature you own, then search your library for a basic land card.
+    // Put both cards onto the battlefield under your control, then shuffle." Both enter at the same time (rulings).
+    const holdExile = /^[Ee]xile (up to one target creature you own)$/.exec(s);
+    if (holdExile && /^[Ss]earch your library for a basic land card$/.test(sentences[si + 1] ?? "") && /^Put both cards onto the battlefield under your control, then shuffle$/.test(sentences[si + 2]?.replace(/\.$/, "") ?? "")) {
+      const what = parseObject(holdExile[1]!, ctx);
+      if (what?.ref !== "target") return null;
+      effects.push({ type: "flicker", what, under: "you", hold: true });
+      effects.push({ type: "search", filter: { kind: "card", types: ["Land"], supertypes: ["Basic"], text: "basic land card" }, n: 1, upTo: false, dest: { zone: "battlefield" }, reveal: false, withHeld: true });
+      si += 2;
+      continue;
+    }
+    // Myr Battlesphere: "you may tap X untapped Myr you control. If you do, ~ gets +X/+0 until end of turn and deals X
+    // damage to the player or planeswalker it's attacking." X is chosen as it resolves, no more than the untapped Myr you
+    // control, and they can be tapped even after ~ has left the battlefield (rulings); X = 0 does nothing.
+    const tapX = /^[Yy]ou may tap X untapped ([A-Z][a-z]+) you control$/.exec(s);
+    const tapXThen = tapX && CREATURE_TYPES.has(tapX[1]!) ? /^If you do, ~ gets \+X\/\+0 until end of turn and deals X damage to (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (tapX && tapXThen) {
+      const to = parseDamageRecipient(tapXThen[1]!, ctx);
+      if (!to) return null;
+      const x: AmountExpr = { count: { kind: "tappedThisWay" } };
+      effects.push(
+        { type: "tapAnyNumber", filter: { kind: "object", subtypes: [tapX[1]!], controller: "you", text: `${tapX[1]} you control` } },
+        { type: "continuous", what: { ref: "self" }, mods: [{ kind: "modifyPT", power: x, toughness: 0 }], duration: "endOfTurn" },
+        { type: "damage", amount: x, to },
+      );
+      si++;
+      continue;
+    }
+    // Promise of Loyalty: "Each player puts a vow counter on a creature they control and sacrifices the rest. Each of those
+    // creatures can't attack you or planeswalkers you control for as long as it has a vow counter on it." Each must put
+    // one if able (rulings); the counter staying is what keeps the restriction (CR 611.2b), whoever controls it later.
+    const vow = new RegExp(`^Each player puts an? (${COUNTER}) counter on a creature they control and sacrifices the rest$`).exec(s);
+    const vowThen = vow && new RegExp(`^Each of those creatures can't attack you or planeswalkers you control for as long as it has an? ${vow[1]!.replace(/[+/]/g, "\\$&")} counter on it$`).exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (vow && vowThen) {
+      const creature: TargetSpec = { kind: "object", types: ["Creature"], text: "creature" };
+      const counter = counterKind(vow[1]!);
+      effects.push(
+        { type: "keepRest", who: { ref: "eachPlayer" }, keep: [{ filter: creature, n: 1 }], among: creature, counter },
+        { type: "continuous", what: { ref: "created" }, mods: [{ kind: "cantAttackYou" }], duration: "game", whileCounter: counter },
+      );
+      si++;
+      continue;
+    }
+    // The Chain cards: "Then that permanent's controller may sacrifice a land of their choice. If the player does, they may
+    // copy ~ and may choose a new target for that copy" (Chain of Vapor), "Then that permanent's controller may copy ~ and
+    // may choose a new target for that copy" (Chain of Acid). That player, as it resolves, controls the copy (CR 707.10,
+    // 707.10c); as if they were "you" (eachMay's each). Who it is when the permanent has left: its last controller (608.2h).
+    const chain = /^([Tt]hat (?:permanent|creature)'s controller) may (sacrifice a land of their choice|copy ~ and may choose a new target for that copy)$/.exec(s);
+    const chainCopy = /^(?:If the player does, )?they may copy ~ and may choose a new target for that copy$/;
+    if (chain && ctx.spell && (chain[2]!.startsWith("copy") || chainCopy.test(sentences[si + 1]?.replace(/\.$/, "") ?? ""))) {
+      const who = parsePlayer(chain[1]!.toLowerCase(), ctx);
+      if (who?.ref !== "targetController") return null;
+      const copy: Effect = { type: "copySpell", spell: "self", n: 1, newTargets: true };
+      const land: TargetSpec = { kind: "object", types: ["Land"], text: "land" };
+      const cost = chain[2] !== undefined && !chain[2].startsWith("copy");
+      effects.push({
+        type: "eachMay",
+        who,
+        each: true,
+        chain: true,
+        effects: cost ? [{ type: "pick", who: { ref: "you" }, filter: land, n: 1, action: "sacrifice" }, { type: "may", effects: [copy], text: "copy ~ and choose a new target for the copy" }] : [copy],
+        text: cost ? "sacrifice a land to copy ~" : "copy ~ and choose a new target for the copy",
+        ...(cost ? { need: { zone: "battlefield" as const, filter: { ...land, controller: "you" as const } } } : {}),
+      });
+      if (cost) si++;
+      continue;
+    }
+    // Syphon Mind: "Each other player discards a card. You draw a card for each card discarded this way": the cards this
+    // spell's discard made them discard, all at once (rulings).
+    if (/^(?:You )?[Dd]raw a card for each card discarded this way$/.test(s) && effects[effects.length - 1]?.type === "discard") {
+      effects.push({ type: "draw", who: { ref: "you" }, n: { count: { kind: "discardedThisWay" } } });
+      continue;
+    }
+    // Moraug: "there's an additional combat phase after this phase. At the beginning of that combat, untap all creatures
+    // you control." The delayed trigger is for that combat phase only (rulings: not the turn's regular combat).
+    const thatCombat = /^(?:[Tt]here(?:'s| is) an additional combat phase after this phase|[Aa]fter this phase, there is an additional combat phase)$/.test(s) ? /^At the beginning of that combat, (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (thatCombat) {
+      const before = ctx.targets.length;
+      const inner = parseSentence(capital(thatCombat[1]!), ctx);
+      if (!inner || ctx.targets.length !== before) return null;
+      effects.push({ type: "addPhases", phases: ["combat"], thatCombat: { effects: inner, text: `${capital(thatCombat[1]!)}.` } });
+      si++;
+      continue;
+    }
+    const eachYard = /^For each player, choose an? (.+? card) in that player's graveyard$/.exec(s);
+    if (eachYard && /^Put those cards onto the battlefield under your control$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      const filter = parseSearchFilter(eachYard[1]!);
+      if (!filter?.types?.length || filter.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
+      effects.push({ type: "chooseFromGraveyard", n: 1, dest: "battlefield", filter, who: { ref: "eachPlayer" }, youChoose: true });
       si++;
       continue;
     }
@@ -1771,6 +1883,20 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "if", cond: { kind: "destroyedThisWay", died: true }, effects: inner });
       continue;
     }
+    // "You may destroy another target creature. If a creature is destroyed this way, you gain life equal to its toughness"
+    // (Noxious Gearhulk): destroyed even if a replacement effect put it elsewhere, not if it survived (rulings); its
+    // toughness as it last existed (CR 608.2h).
+    const ifDestroyed = /^If a creature is destroyed this way, (.+)$/.exec(s);
+    if (ifDestroyed) {
+      const prev = effects[effects.length - 1];
+      const destroy = prev?.type === "may" && prev.effects.length === 1 ? prev.effects[0] : prev;
+      if (destroy?.type !== "destroy" || destroy.what.ref !== "target" || ctx.targets[destroy.what.index]?.types?.join() !== "Creature") return null;
+      const then = ifDestroyed[1]!.replace(/its/g, "that creature's");
+      const inner = parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
+      if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
+      effects.push({ type: "if", cond: { kind: "destroyedThisWay" }, effects: inner });
+      continue;
+    }
     // "Flip a coin. If you win the flip, ... If you lose the flip, ...": decided by that flip (CR 705.2); neither if it
     // wasn't flipped ("you may flip a coin").
     const ifFlip = /^If you (win|lose) the flip, (.+)$/.exec(s);
@@ -1972,7 +2098,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "Put target creature card from a graveyard onto the battlefield under your control. That creature is a black Zombie in
     // addition to its other colors and types." (Rise from the Grave, Liliana, Death's Majesty, Dread Slaver): an effect on
     // the permanent the card became, from then on (CR 611.2c, 400.7); a later color or type change overwrites it (rulings).
-    const isAlso = /^That creature is (an? .+ in addition to its other (?:colors and )?types)$/.exec(s);
+    // "It's a Phyrexian in addition to its other types" (Portal to Phyrexia): the same.
+    const isAlso = /^(?:That creature is|It's|It is) (an? .+ in addition to its other (?:colors and )?types)$/.exec(s);
     if (isAlso) {
       const prev = effects[effects.length - 1];
       const mods = parseBecomes(isAlso[1]!);

@@ -103,6 +103,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return ctx.event?.amount ?? 0;
     case "eventExcess":
       return ctx.event?.excess ?? 0;
+    case "timesAffectedAttacked": {
+      // Counted for this object only (CR 400.7), even times before the static ability's source was on the battlefield (rulings on Moraug).
+      const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
+      return o?.attacked?.turn === s.turn ? o.attacked.n : 0;
+    }
     case "permanents": {
       let n = 0;
       const names = new Set<string>();
@@ -448,6 +453,8 @@ function describeCount(c: Count): string {
       return `#${c.differentNames ? "differently named " : ""}${c.other ? "other " : ""}${c.filter.text.replace(/^target /, "")}`;
     case "cardsInHand":
       return "#cards in hand";
+    case "timesAffectedAttacked":
+      return "#times it attacked this turn";
     case "cardsInLibrary":
       return "#cards in library";
     case "discardedThisWay":

@@ -15,7 +15,14 @@ HYPHENATED.set("time-lord", "Time Lord");
 // Artifact subtypes (CR 205.3g) other than Vehicle, which "creature or Vehicle" handles: "a Food", "a Clue", "Equipment".
 const OTHER_SUBTYPES = ["Arcane", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Vehicle", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure", "Gate", "Desert", "Cave", "Town"];
 
+/** Historic: artifacts, legendaries and Sagas (CR 700.6). */
+const HISTORIC: TargetSpec[] = [{ kind: "object", types: ["Artifact"], text: "artifact" }, { kind: "object", types: [], supertypes: ["Legendary"], text: "legendary" }, { kind: "object", types: [], subtypes: ["Saga"], text: "Saga" }];
+
 export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | null {
+  // "The player or planeswalker it's attacking" in an attack trigger about the source (Myr Battlesphere, Fathom Fleet
+  // Swordjack), or about the creature that attacked (Hellrider, Mage Slayer): not targeted (CR 506.2).
+  const attacked = /^the player or planeswalker (it's|~'s) attacking$/i.exec(p);
+  if (attacked) return !ctx.defending ? null : attacked[1] === "it's" && ctx.subjectIt ? { ref: "attackedBySelf", subject: true } : attacked[1] === "~'s" || !ctx.subject ? { ref: "attackedBySelf" } : null;
   if (/^any target$/i.test(p)) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", text: "any target" }) };
   // "target player or planeswalker", "target opponent or planeswalker" (Lava Axe): a player, or a planeswalker permanent.
   const pw = /^target (player|opponent) or planeswalker$/i.exec(p);
@@ -356,12 +363,14 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   const share = (n > 1 || !!many) && / that share a creature type(?= from |$)/.test(mine0);
   // "Up to six target creature cards with different names" (Behold the Sinister Six!): each a name the others don't have.
   const differ = n > 1 && !many && / with different names(?= from |$)/.test(mine0);
+  // "Any number of target creature cards that each have a different mana value X or less" (Agadeem's Awakening).
+  const differMv = many === "any" ? / that each have a different mana value (\d+|X) or less(?= from |$)/.exec(mine0) : null;
   // "With total mana value 6 or less" (TargetSpec.total): the group together, X being the one announced (CR 107.3a).
   const totalM = n > 1 || many ? / with total (mana value|power) (\d+|X) or less(?= from | in |$)/.exec(mine0) : null;
   if (totalM && totalM[2] === "X" && (!(ctx.spell || ctx.activated || ctx.ownX) || ctx.whereX)) return null;
   const total: TargetSpec["total"] | undefined = totalM ? { key: totalM[1] === "power" ? "power" : "manaValue", ...(totalM[2] === "X" ? { x: true as const } : { max: Number(totalM[2]) }) } : undefined;
-  const mine = mine0.replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "").replace(/ with different names(?= from |$)/, "").replace(/ with total (?:mana value|power) (?:\d+|X) or less(?= from | in |$)/, "");
-  const parsed = n > 1 || many ? parseTargetPhrase(singularPhrase(mine)) : parseTargetPhrase(mine, { x: true, count: boundCount(ctx) });
+  const mine = mine0.replace(/ that each have a different mana value (\d+|X) or less(?= from |$)/, " with mana value $1 or less").replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "").replace(/ with different names(?= from |$)/, "").replace(/ with total (?:mana value|power) (?:\d+|X) or less(?= from | in |$)/, "");
+  const parsed = differMv ? parseTargetPhrase(singularPhrase(mine), { x: true }) : n > 1 || many ? parseTargetPhrase(singularPhrase(mine)) : parseTargetPhrase(mine, { x: true, count: boundCount(ctx) });
   if (!parsed || parsed.kind === "player" || parsed.kind === "spell" || (parsed.kind === "card") !== cards || (theirs && (parsed.kind !== "object" || parsed.controller))) return null;
   // "Up to one target creature card with mana value X or less": as for one target (see parseTarget).
   if (parsed.xRange && !ctx.whereX && !ctx.spell && !ctx.activated && !ctx.ownX) return null;
@@ -381,7 +390,7 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   const first = ctx.targets.length;
   if (many) {
     if (single || share || ctx.targets.some((t) => t.many)) return null;
-    addTarget(ctx, { ...spec, ...(notSource ? { notSource } : {}), ...(other && before.length ? { distinctFrom: before } : {}), many });
+    addTarget(ctx, { ...spec, ...(notSource ? { notSource } : {}), ...(other && before.length ? { distinctFrom: before } : {}), ...(differMv ? { differentManaValues: true as const, text: spec.text.replace(" with mana value ", " with a different mana value ") } : {}), many });
     // "It" can't mean one of them; "they", "those creatures" means all of them, however many.
     ctx.lastObjectTarget = undefined;
     ctx.lastTargets = { index: first, n: 2 };
@@ -539,6 +548,18 @@ export function parseTargetPhrase(
     extra.colorCount = two[1] ? "notTwo" : "two";
     p = p.slice(0, two.index) + p.slice(two.index + two[0].length);
   }
+  // "Historic spells", "a historic permanent": artifacts, legendaries and Sagas (CR 700.6), any of them (TargetSpec.anyOf).
+  if (/(?:^|\s)historic\s/.test(p)) {
+    if (extra.anyOf || / or |, /.test(p)) return null;
+    extra.anyOf = HISTORIC;
+    p = p.replace(/(^|\s)historic\s/, "$1");
+  }
+  // "Permanents they control that are one or more colors" (All Is Dust): colored ones (CR 105.2c).
+  const colored = / that(?:'s| is| are) one or more colors\b/.exec(p);
+  if (colored && !extra.colorCount) {
+    extra.colorCount = "colored";
+    p = p.slice(0, colored.index) + p.slice(colored.index + colored[0].length);
+  }
   // "Target card in a graveyard other than a basic land card" (Surgical Extraction): every card but the basic lands, the
   // only cards with the basic supertype (CR 205.4c). Only for a card in a graveyard.
   const otherThanBasic = / other than a basic land card\b/.test(p);
@@ -660,6 +681,11 @@ export function parseTargetPhrase(
     p = p.slice(m[0].length);
   }
   let controller: TargetSpec["controller"];
+  // "Target creature you own" (Sword of Hearth and Home): a permanent you own, whoever controls it (CR 108.3).
+  if (!inGraveyard && / you own$/.test(p)) {
+    owner = "you";
+    p = p.replace(/ you own$/, "");
+  }
   if (/ (an opponent controls|you don't control)$/.test(p)) {
     controller = "opponent";
     p = p.replace(/ (an opponent controls|you don't control)$/, "");
@@ -779,7 +805,7 @@ export function parseTargetPhrase(
       // A hyphenated creature type: "Assembly-Worker".
       else if (w.includes("-") && HYPHENATED.has(w)) subtypes.push(HYPHENATED.get(w)!);
       else if (COLOR_WORDS[w]) colors.push(COLOR_WORDS[w]!);
-      else if ((w === "multicolored" || w === "monocolored" || w === "colorless") && alts.length === 1 && !extra.colorCount) extra.colorCount = w;
+      else if ((w === "multicolored" || w === "monocolored" || w === "colorless" || w === "colored") && alts.length === 1 && !extra.colorCount) extra.colorCount = w;
       else if (SUPERTYPE_WORDS[w]) supertypes.push(SUPERTYPE_WORDS[w]!);
       else if (w === "permanent" && inGraveyard) types.push(...PERMANENT_TYPES); // "permanent card" (CR 110.4b)
       else if (w === "permanent" || w === "") continue;
@@ -816,8 +842,10 @@ export function parseTargetPhrase(
     return { kind: "card", ...filters, ...(otherThanBasic ? { notSupertypes: [...(filters.notSupertypes ?? []), "Basic"] } : {}), ...(owner ? { owner } : {}), text };
   }
   if (otherThanBasic) return null;
-  if (isSpell) return extra.keywords || extra.notKeywords || extra.anyOf || extra.power || extra.toughness || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status || supertypes.length ? null : { kind: "spell", ...filters, ...(controller ? { controller } : {}), text };
-  return { kind: "object", ...filters, controller, ...(tapped !== undefined ? { tapped } : {}), text };
+  if (owner && (isSpell || controller)) return null;
+  // A historic spell: its printed card types, supertypes and subtypes (printedMatches), which the stack doesn't change.
+  if (isSpell) return extra.keywords || extra.notKeywords || (extra.anyOf && extra.anyOf !== HISTORIC) || extra.power || extra.toughness || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status || supertypes.length ? null : { kind: "spell", ...filters, ...(controller ? { controller } : {}), text };
+  return { kind: "object", ...filters, controller, ...(tapped !== undefined ? { tapped } : {}), ...(owner ? { owner } : {}), text };
 }
 
 export function parseKeywordList(text: string): string[] | null {

@@ -516,6 +516,12 @@ export function compile(d: CardDef): CompiledCard {
       if (!conditionalAbility(d, maxSpeed[1]!, out, { kind: "maxSpeed" })) out.unsupported.push(raw);
       continue;
     }
+    // "∞ — [Ability]": "As long as this permanent is harnessed, it has [ability]" (CR 702.186b).
+    const infinity = /^∞ — (.+)$/.exec(line);
+    if (infinity) {
+      if (!conditionalAbility(d, infinity[1]!, out, { kind: "harnessed" })) out.unsupported.push(raw);
+      continue;
+    }
     // Cases (CR 719.3): "To solve — [Condition]" means "At the beginning of your end step, if [condition] and this Case is
     // not solved, this Case becomes solved", checked as it triggers and as it resolves (603.4, rulings); "Solved —
     // [Ability]" is that ability only while it's solved (702.169).
@@ -1553,7 +1559,8 @@ export function compile(d: CardDef): CompiledCard {
     const uncounterable = /^(.*?)[Ss]pells( you control)? can't be countered\.$/.exec(line);
     if (uncounterable && !/\b(this turn|by)\b/.test(line)) {
       const words = uncounterable[1]!.trim().toLowerCase();
-      const filter = words ? parseTargetPhrase(`${words} spell`) : { kind: "spell" as const, text: "spell" };
+      // "Creature and enchantment spells" (Destiny Spinner): each spell that's either.
+      const filter = words ? parseTargetPhrase(`${words.replace(/^([a-z]+) and ([a-z]+)$/, "$1 or $2")} spell`) : { kind: "spell" as const, text: "spell" };
       if (filter?.kind === "spell" && !filter.controller) (out.uncounterable ??= []).push({ filter: { ...filter, text: `${words ? `${words} ` : ""}spells` }, ...(uncounterable[2] ? {} : { anyone: true as const }) });
       else out.unsupported.push(raw);
       continue;

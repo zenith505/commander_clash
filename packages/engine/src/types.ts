@@ -281,6 +281,8 @@ export interface GameObject {
   classLevel?: number;
   /** A Case's solved designation (CR 719.3b), kept until it leaves the battlefield; not a copiable value. */
   solved?: true;
+  /** Harnessed (CR 701.64b): a designation kept until it leaves the battlefield; not a copiable value. */
+  harnessed?: true;
   /** How many times it has transformed on the battlefield (CR 701.27f). */
   transforms?: number;
   /**
@@ -574,6 +576,8 @@ export interface Player {
   extraLands?: { turn: number; n: number };
   /** Speed (CR 702.179): none until a rule sets it, then 1 to 4. `speedTurn`: the turn its inherent ability last triggered. */
   speed?: number;
+  /** "The next spell you cast this turn has improvise" (Archway of Innovation): the turn it was made in, until a spell is cast. */
+  nextSpellImprovise?: number;
   speedTurn?: number;
   /**
    * What this player gained until end of turn ("You gain shroud until end of turn", "you gain protection from the chosen
@@ -749,7 +753,9 @@ export interface DelayedTrigger {
   /** `leaves`: when the subject leaves the battlefield for one of the zones in `to` (earthbend's return, CR 701.66a). */
   /** `eachYourUpkeep`: at the beginning of each of its controller's upkeeps for the rest of the game (epic, CR 702.50a). */
   /** `lostControl`: when `controller` no longer controls the subject (Ray of Command), checked like a state trigger. */
-  when: "nextEndStep" | "yourNextEndStep" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "eachYourPrecombatMain" | "yourNextMain" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl";
+  /** `thatCombat`: at the beginning of the added combat phase `combat` (GameState.addedPhases), this turn only. */
+  when: "nextEndStep" | "yourNextEndStep" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "eachYourPrecombatMain" | "yourNextMain" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl" | "thatCombat";
+  combat?: number;
   /** What it remembers as its trigger event: the player "its controller" was, the amount "that spell's mana value" was (see the delayed effect). */
   event?: TriggerEventInfo;
   to?: ZoneName[];
@@ -947,6 +953,8 @@ export interface ContinuousEffect {
    * on Dragonlord Silumgar, Aegis Angel).
    */
   whileControlled?: { id: ObjectId; zc: number; controller: PlayerId };
+  /** "For as long as it has a vow counter on it" (CR 611.2b): it applies only to those of `affected` with one (Promise of Loyalty). */
+  whileCounter?: string;
   affected: ObjectId[];
   mods: Modification[];
 }
@@ -1268,7 +1276,11 @@ export interface GameState {
    * Phases added to this turn that come directly after the current phase, in order: the most recently created first
    * (CR 500.8). An additional main phase is a postcombat main phase (CR 505.1a), so it's run as "main2".
    */
-  addedPhases?: ("combat" | "main")[];
+  /** Phases added after the current one (CR 500.8); `{ combat: key }` is a combat phase a delayed trigger waits for ("at the beginning of that combat"). */
+  addedPhases?: ("combat" | "main" | { combat: number })[];
+  /** The key of the added combat phase going on now (see addedPhases), and the last key given out. */
+  thatCombat?: number;
+  combatKeys?: number;
   /** While added phases run: the step the turn's own order goes on with once they're done (CR 500.8). */
   resumeStep?: Step;
   /** "Your opponents can't cast spells this turn" (Silence): who can't cast what, until that turn ends (CR 101.2). */
@@ -1340,7 +1352,7 @@ export interface GameState {
   /** The player who has the initiative (CR 726), once someone has taken it. */
   initiative?: PlayerId;
   /** How permanents were as they last existed on the battlefield (CR 608.2h); `attachedTo` with that permanent's zoneChanges then. */
-  lastKnown?: Record<ObjectId, { zc: number; power: number; toughness: number; controller: PlayerId; attachedTo?: { id: ObjectId; zc: number }; attachedToPlayer?: PlayerId; /** Its copiable values (CR 707.2), a key into `cards`. */ copyKey?: string; counters?: Record<string, number>; /** Its creature types ("all" for changeling-like), for kinship once it's gone. */ creatureTypes?: string[] | "all"; /** What it was as a source of damage, for "it deals damage" once it's gone (CR 608.2h): its lifelink, deathtouch, colors, and a "can't be prevented" that applied to it (Questing Beast). */ source?: { name: string; colors: Color[]; types: string[]; subtypes: string[]; keywords: string[]; unpreventable?: "all" | "combat" } }>;
+  lastKnown?: Record<ObjectId, { zc: number; power: number; toughness: number; controller: PlayerId; attachedTo?: { id: ObjectId; zc: number }; attachedToPlayer?: PlayerId; /** Its copiable values (CR 707.2), a key into `cards`. */ copyKey?: string; counters?: Record<string, number>; /** Its creature types ("all" for changeling-like), for kinship once it's gone. */ creatureTypes?: string[] | "all"; /** What it was attacking (Myr Battlesphere's "the player or planeswalker it's attacking"). */ attacking?: PlayerId; attackingPermanent?: { id: ObjectId; zc: number; battleController?: PlayerId }; /** What it was as a source of damage, for "it deals damage" once it's gone (CR 608.2h): its lifelink, deathtouch, colors, and a "can't be prevented" that applied to it (Questing Beast). */ source?: { name: string; colors: Color[]; types: string[]; subtypes: string[]; keywords: string[]; unpreventable?: "all" | "combat" } }>;
   nextTimestamp: number;
   /** Something happened during the cleanup step, so players get priority and then there's another one (CR 514.3a). */
   cleanupAgain?: boolean;
@@ -1503,6 +1515,8 @@ export interface Resolving {
   revealed?: { id: ObjectId; zc: number };
   /** The one card an "exile the top card of your library" exiled, for "that card's mana value" (Tavern Brawler). */
   exiledTop?: { id: ObjectId; zc: number };
+  /** The cards its "hold" flicker exiled, for the search after it to put onto the battlefield with what it finds. */
+  held?: { id: ObjectId; zc: number }[];
   /** The cards its mill instructions milled, as they are in the graveyard ("if a card with the chosen name was milled this way"). */
   milled?: { id: ObjectId; zc: number }[];
   /** How many cards its exileNamed instruction exiled from the hand ("for each card exiled from their hand this way"). */

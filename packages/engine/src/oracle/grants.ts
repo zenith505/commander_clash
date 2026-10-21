@@ -162,6 +162,12 @@ export function parseGrants(text: string): Modification[] | null {
       out.push({ kind: "addAbility", text: `Equip ${equip[1]}` });
       continue;
     }
+    // "Gain all creature types" (Mirror Entity): layer 4, in addition to its other types (CR 205.3d, 613.1d); a
+    // noncreature keeps none (layers.ts).
+    if (/^all creature types$/i.test(w)) {
+      out.push({ kind: "addTypes", types: [], subtypes: [], allCreatureTypes: true });
+      continue;
+    }
     const k = parseKeywordList(w);
     if (!k) return null;
     kws.push(...k);

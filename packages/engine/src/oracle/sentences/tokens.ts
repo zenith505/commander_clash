@@ -13,6 +13,24 @@ import type { Ctx } from "../body";
 export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
 
+  // "Create twice X 1/1 black and green Pest creature tokens" (Pest Infestation): 2X of them (X counting 0 off the stack,
+  // CR 107.3).
+  if ((m = /^Create twice X (.+ tokens?(?: with .+)?)$/.exec(s))) {
+    const fx = parseSentence(`Create X ${m[1]}`, ctx);
+    const tok = fx?.length === 1 ? fx[0] : undefined;
+    if (tok?.type !== "createToken" || typeof tok.n !== "object" || !("count" in tok.n) || tok.n.count.kind !== "x" || tok.n.times !== undefined) return null;
+    return [{ ...tok, n: { count: { kind: "x" }, times: 2 } }];
+  }
+  // "Create a 3/3 colorless Phyrexian Wurm artifact creature token with deathtouch and a 3/3 colorless Phyrexian Wurm
+  // artifact creature token with lifelink" (Wurmcoil Engine): each of them, entering at the same time (CR 608.2f).
+  if ((m = /^[Cc]reate (.+)$/.exec(s))) {
+    const parts = m[1]!.split(/ and (?=(?:an?|one|two|three|four|five) \d+\/\d+ )/);
+    if (parts.length === 2 && parts.every((x) => / tokens?(?: with .+)?$/.test(x))) {
+      const fx = parts.map((x) => parseSentence(`Create ${x}`, ctx));
+      if (fx.some((x) => x?.length !== 1 || x[0]!.type !== "createToken" || x[0]!.attacking || x[0]!.attackingEach || x[0]!.attachTo)) return null;
+      return [{ type: "together", effects: fx.map((x) => x![0]!) }];
+    }
+  }
   // "Create a Food token or a Treasure token" (Tireless Provisioner): one of the two predefined tokens, chosen as it
   // resolves (Effect "either").
   if ((m = /^[Cc]reate (an? [A-Z][a-z]+ token) or (an? [A-Z][a-z]+ token)$/.exec(s))) {

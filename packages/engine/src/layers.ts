@@ -475,7 +475,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "selfCounter": // unleash (CR 702.98a)
       return (src.counters[cond.counter] ?? 0) > 0;
     case "selfCounters": {
-      const n = src.counters[cond.counter] ?? 0;
+      // "*": counters of every kind together (Twenty-Toed Toad).
+      const n = cond.counter === "*" ? Object.values(src.counters).reduce((a, b) => a + (b ?? 0), 0) : (src.counters[cond.counter] ?? 0);
       return n >= cond.min && (cond.max === undefined || n <= cond.max);
     }
     case "classLevel": {

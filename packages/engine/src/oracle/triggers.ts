@@ -1279,6 +1279,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(nth[3]!, { selfIt: true });
     return body ? { event: "selfCountersPut", countersKind: nth[2]!, countersReach: reach, body } : "fail";
   }
+  // "Whenever a +1/+1 counter is put on ~" (Fathom Mage): once for each counter put on it (rulings).
+  const each = /^Whenever an? ((?:\+1\/\+1|-1\/-1|[a-z]+) )counter is put on ~, (.+)$/.exec(line);
+  if (each) {
+    const body = parseBody(each[2]!.replace(/^it (?=(?:gets|gains|deals|has|becomes)\b)/, "~ "), { selfIt: true });
+    return body ? { event: "selfCountersPut", countersKind: each[1]!.trim(), countersEach: true, body } : "fail";
+  }
   // "Whenever one or more +1/+1 counters are put on ~ / on a creature you control" (CR 122.6: also as it enters with
   // them). "That many" is how many were put on it.
   // "Whenever you put one or more -1/-1 counters on a creature" (Hapatra, Nest of Scarabs; Terrasymbiosis): only counters

@@ -347,7 +347,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^there are ${NUM} or more card types among cards in your graveyard$`).exec(text))) return { kind: "graveyardTypes", n: num(m[1]!) };
   if ((m = new RegExp(`^there are ${NUM} or more permanent cards in your graveyard$`).exec(text))) return { kind: "graveyardPermanents", n: num(m[1]!) };
   // "If there are four or more land cards in your graveyard" (Titania, Voice of Gaea).
-  if ((m = new RegExp(`^there are ${NUM} or more (\\w+) cards in your graveyard$`).exec(text))) {
+  // "If you have four or more creature cards in your graveyard" (Oversold Cemetery): the same.
+  if ((m = new RegExp(`^(?:there are|you have) ${NUM} or more (\\w+) cards in your graveyard$`).exec(text))) {
     const amount = parseCount(`the number of ${m[2]} cards in your graveyard`, null);
     return amount ? { kind: "amount", amount, min: num(m[1]!) } : null;
   }
@@ -417,6 +418,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^no spells were cast last turn$/.test(text)) return { kind: "castLastTurn", none: true };
   if ((m = new RegExp(`^a player cast ${NUM} or more spells last turn$`).exec(text))) return { kind: "castLastTurn", onePlayer: num(m[1]!) };
   if (/^you(?:'ve)? gained life this turn$/.test(text)) return { kind: "lifeGainedThisTurn", n: 1 };
+  // "If you gained 3 or more life this turn" (The Gaffer, Resplendent Angel).
+  if ((m = /^you(?:'ve)? gained (\d+) or more life this turn$/.exec(text))) return { kind: "lifeGainedThisTurn", n: Number(m[1]) };
   if ((m = /^creatures you control have total power (\d+) or greater$/.exec(text))) return { kind: "totalPower", n: Number(m[1]) };
   if ((m = new RegExp(`^a library has ${NUM} or fewer cards in it$`).exec(text))) return { kind: "libraryAtMost", n: num(m[1]!) };
   if (/^your library has no cards in it$/.test(text)) return { kind: "libraryAtMost", n: 0, yours: true };
@@ -526,6 +529,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Dark Depths: "When ~ has no ice counters on it" (a state trigger, CR 603.8).
   if ((m = new RegExp(`^~ has no ${COUNTER} counters on it$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[1]!), min: 0, max: 0 };
   // Beastmaster Ascension: "as long as ~ has seven or more quest counters on it".
+  // "If ~ has fewer than three +1/+1 counters on it" (Runaway Steam-Kin).
+  if ((m = new RegExp(`^~ has fewer than ${NUM} ${COUNTER} counters on it$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[2]!), min: 0, max: num(m[1]!) - 1 };
   if ((m = new RegExp(`^~ has ${NUM} or more ${COUNTER} counters on it$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[2]!), min: num(m[1]!) };
   // The Tron lands: "If you control an Urza's Mine and an Urza's Power-Plant" (CR 205.3i: "Urza's" and "Mine" are both
   // land types, so one land with both; not Processing Plant, an Ulamog's Power-Plant), each of them.

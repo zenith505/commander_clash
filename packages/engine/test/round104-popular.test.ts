@@ -79,7 +79,7 @@ describe("round 104: popular cards", () => {
     const pcard = s.players[opp]!.hand[0]!;
     s.players[opp]!.hand = [pcard];
     s = settle(run(s, planCast(s, ap, ids[1]!, [{ kind: "player", id: opp }])));
-    if (s.pending?.kind === "discard" || s.pending?.kind === "chooseDiscard") s = settle(act(s, { type: "discard", player: opp, objectIds: [pcard] } as never));
+    if (s.pending?.kind === "discard") s = settle(act(s, { type: "discard", player: opp, objectIds: [pcard] }));
     s = answerMay(s, true);
     expect(s.objects[pcard]!.zone).toBe("battlefield");
     expect(s.objects[pcard]!.controller).toBe(ap);

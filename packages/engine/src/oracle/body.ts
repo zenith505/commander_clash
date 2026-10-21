@@ -465,7 +465,8 @@ function splitSentences(text: string): string[] {
 }
 
 export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean } = {}): AbilityBody | null {
-  text = differenceInHand(text);
+  // "Put a +1/+1 counter on ~ and untap it" (Gwenna): "it" is ~, the one thing named.
+  text = differenceInHand(text).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~");
   const modal = MODAL.exec(text.trim());
   if (modal) {
     const body = parseModal(modal[1]!, modal[3]!, text.trim(), opts);
@@ -2598,6 +2599,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       if (!inner) return null;
       const n = num(selfPTIf.n);
       effects.push({ type: "if", cond: { kind: "state", cond: { kind: "selfPT", stat: selfPTIf.stat as "power" | "toughness", ...(selfPTIf.cmp === "less" ? { max: n } : { min: n }) } }, effects: inner });
+      continue;
+    }
+    // Twenty-Toed Toad: "you win the game if there are twenty or more counters on it or you have twenty or more cards in
+    // hand": counters of any kind on it, or the hand, as it resolves.
+    const toad = !ctx.spell ? new RegExp(`^[Yy]ou win the game if there are ${NUM} or more counters on (?:it|~) or you have ${NUM} or more cards in hand$`).exec(s) : null;
+    if (toad) {
+      effects.push({ type: "if", cond: { kind: "state", cond: { kind: "anyOf", conds: [{ kind: "selfCounters", counter: "*", min: num(toad[1]!) }, { kind: "handAtLeast", n: num(toad[2]!) }] } }, effects: [{ type: "winGame", who: { ref: "you" } }] });
       continue;
     }
     // "If ~ is a Warrior, put a flying counter on it and it becomes a ..." (Figure of Destiny, Ascendant Spirit): its

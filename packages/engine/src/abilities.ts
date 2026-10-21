@@ -979,7 +979,7 @@ export type StaticCondition =
   | { kind: "graveyardPermanents"; n: number }
   | { kind: "selfCounter"; counter: CounterKind }
   /** A level symbol's "at least N1 and no more than N2 level counters" (CR 711.2), a station symbol's "N or more charge counters" (CR 721.2). */
-  | { kind: "selfCounters"; counter: CounterKind; min: number; max?: number }
+  | { kind: "selfCounters"; /** "*": all kinds together. */ counter: CounterKind; min: number; max?: number }
   /** A Class's level (CR 716.2a): at least `min`, at most `max`; a permanent without a level is level 1 (716.2d). */
   | { kind: "classLevel"; min: number; max?: number }
   /** "As long as it's attacking", "it's enchanted / equipped", "it's modified" (CR 700.9), "if it devoured a creature" (CR 702.82b). */
@@ -2815,6 +2815,8 @@ export interface TriggeredAbility {
   countersOrPlayer?: true;
   /** For "selfCountersPut": "when the twelfth hour counter is put on ~", only when the count goes from below this to at least it. */
   countersReach?: number;
+  /** For "selfCountersPut": "whenever a +1/+1 counter is put on ~" (Fathom Mage), once for each counter. */
+  countersEach?: true;
   /**
    * "Whenever you cast a multicolored spell, you may return ~ from your graveyard to your hand": an ability whose
    * effect moves the card out of a zone works only in that zone (CR 113.6m), and its owner controls it there.

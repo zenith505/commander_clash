@@ -115,6 +115,10 @@ export function canonicalKeyword(text: string): string | undefined {
   // "Hexproof from blue" (CR 702.11d): from a color, or from all of them, one or more than one.
   const hx = /^hexproof from (white|blue|black|red|green|each color|monocolored|multicolored)$/.exec(p);
   if (hx) return `Hexproof from ${hx[1]}`;
+  if (p === "hexproof from the chosen color") return CHOSEN_HEXPROOF;
+  // "Gains toxic 1" (Skrelv): a keyword with a number (CR 702.164a).
+  const tox = /^toxic (\d+)$/.exec(p);
+  if (tox) return `Toxic ${tox[1]}`;
   const m = /^protection from (.+)$/.exec(p);
   if (!m) return undefined;
   const q = m[1]!;
@@ -148,6 +152,8 @@ const PLAYER_PROTECTION = /^Protection from player #(\d+)$/;
 export const keywordLabel = (k: string, name: (pid: number) => string) => k.replace(PLAYER_PROTECTION, (_, n: string) => `Protection from ${name(Number(n))}`);
 /** "Protection from the chosen color": filled in with the color chosen as it resolved or entered. */
 export const CHOSEN_PROTECTION = "Protection from the chosen color";
+/** "Hexproof from that color" after "Choose a color" (Skrelv): filled in with the color chosen as it resolved (CR 702.11d). */
+export const CHOSEN_HEXPROOF = "Hexproof from the chosen color";
 const COLOR_WORD: Record<string, string> = { W: "white", U: "blue", B: "black", R: "red", G: "green" };
 /**
  * "Protection from each color that's not in your commander's color identity" (Commander's Plate): filled in with the
@@ -161,8 +167,8 @@ export const IDENTITY_PROTECTION = "Protection from each color not in your comma
  */
 export const bindChosenKeywords = (keywords: readonly string[], color: string | undefined, identity?: readonly string[]) =>
   keywords.flatMap((k) =>
-    k === CHOSEN_PROTECTION
-      ? color && COLOR_WORD[color] ? [`Protection from ${COLOR_WORD[color]}`] : []
+    k === CHOSEN_PROTECTION || k === CHOSEN_HEXPROOF
+      ? color && COLOR_WORD[color] ? [`${k === CHOSEN_HEXPROOF ? "Hexproof" : "Protection"} from ${COLOR_WORD[color]}`] : []
       : k === IDENTITY_PROTECTION
         ? identity ? Object.keys(COLOR_WORD).filter((c) => !identity.includes(c)).map((c) => `Protection from ${COLOR_WORD[c]}`) : []
         : [k],

@@ -560,6 +560,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // The Black Gate: "... by creatures that player controls this turn", the player chosen as it resolves.
     if (m[2] === "by creatures that player controls this turn")
       return what && ctx.chosenOpponent ? [{ type: "continuous", what, mods: [{ kind: "cantBeBlockedBy", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "chosenPlayer", text: "creatures that player controls" } }], duration: "endOfTurn" }] : null;
+    // Skrelv: "... by creatures of the chosen color this turn", the color chosen as it resolves.
+    const ofChosen = /^by (.+?) of the chosen color this turn$/.exec(m[2]!);
+    if (ofChosen) {
+      const filter = parseTargetPhrase(ofChosen[1]!.split(" ").map(singularWord).join(" "));
+      return what && filter?.kind === "object" && !filter.controller && !filter.colors?.length ? [{ type: "continuous", what, mods: [{ kind: "cantBeBlockedBy", filter: { ...filter, chosen: "color", text: `${ofChosen[1]} of the chosen color` } }], duration: "endOfTurn" }] : null;
+    }
     const mods = what && parseStaticMods(`can't be blocked ${m[2]!.replace(/^this turn (except by .+)$/, "$1").replace(/ this turn$/, "")}`);
     return what && mods ? [{ type: "continuous", what, mods, duration: "endOfTurn" }] : null;
   }

@@ -104,7 +104,12 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         return;
       }
       if (e.each === "created") {
-        for (const t of s.resolving?.created ?? []) if (s.objects[t]?.zone === "battlefield") addDelayed(s, e.when, ctx.controller, s.objects[t]!, body);
+        for (const t of s.resolving?.created ?? [])
+          if (s.objects[t]?.zone === "battlefield") {
+            addDelayed(s, e.when, ctx.controller, s.objects[t]!, body);
+            // "When that token leaves the battlefield" (Ugin, the Ineffable): for whatever zone it goes to (CR 603.6c).
+            if (e.when === "leaves") s.delayed![s.delayed!.length - 1]!.to = ["graveyard", "exile", "hand", "library", "command"];
+          }
         return;
       }
       // A merged permanent's cards each (CR 730.3c): one delayed trigger for each.

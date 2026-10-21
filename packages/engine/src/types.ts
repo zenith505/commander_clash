@@ -902,6 +902,8 @@ export interface CostChoices {
   returnToHand?: ObjectId[];
   /** The creature sacrificed for casualty (CR 702.153a), if any. */
   casualty?: ObjectId;
+  /** Cast with a once-each-turn graveyard permission (CastFromGraveyard.permits): which one (Muldrotha's slot for the spell). */
+  permit?: string;
   /** The artifact, enchantment, or token sacrificed for bargain (CR 702.166a), if any. */
   bargain?: ObjectId;
   /** "As an additional cost to cast this spell, you may collect evidence N": the cards exiled for it, if it's paid (CR 701.59a). */
@@ -1119,6 +1121,11 @@ export interface TurnLog {
   damagedBy?: Record<number, string[]>;
   /** For each player, the sources (`id@zoneChanges`) that dealt them combat damage (Steel Hellkite). */
   combatDamagedBy?: Record<number, string[]>;
+  /**
+   * "Once during each of your turns, you may cast ... from your graveyard" (Karador), Muldrotha's "a permanent spell of
+   * each permanent type": the permissions used, `id@zoneChanges:slot` (a new object gets a new one, rulings).
+   */
+  gravePermits?: string[];
   /** Players who gained life (Needlebite Trap). */
   gainedLife?: PlayerId[];
   /** How many cards were put into each player's graveyard, from anywhere (Ravenous Trap). */

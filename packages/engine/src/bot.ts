@@ -80,7 +80,7 @@ import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { castingBody, compileCard } from "./oracle";
 import type { Action, CardDef, Chosen, Color, CostChoices, GameObject, GameState, ObjectId, PendingDecision, PlayerId, StackItem } from "./types";
 import { evalAmount } from "./amounts";
-import { CHOSEN_PROTECTION } from "./keywords";
+import { CHOSEN_HEXPROOF, CHOSEN_PROTECTION } from "./keywords";
 import { groupValue, ofPlayerPick, ofPlayerTargets, worth } from "./value";
 import { damageEstimate } from "./damage";
 
@@ -1129,6 +1129,8 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   if (costsHaveX(d, { via, alt })) {
     const most = costXRoom(s, pid, id, castExtraCosts(d, { via, alt }));
     xs = cost.hasX ? xs.filter((x) => x! <= most) : xChoices(most, 1);
+    // "You may sacrifice one or more creatures" (Plumb the Forbidden): none is fine too.
+    if (castExtraCosts(d, { via, alt }).some((c) => c.kind === "sacrifice" && c.optional)) xs.push(0);
   }
   for (const x of xs) {
     const plan = castPlanWithX(s, pid, id, free, x, via, alt);
@@ -1505,7 +1507,7 @@ function costXRoom(s: GameState, pid: PlayerId, id: string, costs: AdditionalCos
           : c.kind === "exileFromGraveyard"
             ? p.graveyard.filter((x) => x !== id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x))))).length
             : c.kind === "sacrifice"
-              ? sacrificePool(s, pid, c, new Set()).length
+              ? sacrificePool(s, pid, c, new Set()).filter((o) => !c.optional || o.isToken).length
               : returnCandidates(s, pid, c).length;
     most = Math.min(most, room);
   }
@@ -2247,7 +2249,7 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
   }
   // Protection from the chosen color is against what opponents have, above all the spell or ability
   // that's about to resolve against us.
-  const protects = !!c && what === "color" && JSON.stringify(c).includes(CHOSEN_PROTECTION);
+  const protects = !!c && what === "color" && (JSON.stringify(c).includes(CHOSEN_PROTECTION) || JSON.stringify(c).includes(CHOSEN_HEXPROOF));
   const hurts = protects || (c ? choiceHurts(c) : false);
   const tally = new Map<string, number>();
   const count = (name: string, n = 1) => options.includes(name) && tally.set(name, (tally.get(name) ?? 0) + n);

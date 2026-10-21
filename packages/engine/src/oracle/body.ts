@@ -286,6 +286,9 @@ function parseFaceDownPlay(sentences: string[], at: number, ctx: Ctx): { effect:
   const head =
     new RegExp(`^[Ee]xile the top (card|${NUMX} cards) of ${LIB} library face down$`).exec(s) ??
     new RegExp(`^(?:[Ll]ook at the top (card|${NUMX} cards) of ${LIB} library and exile (?:it|that card|those cards) face down)$`).exec(s);
+  // "Exile the top card of your library face down and look at it" (Ugin, the Ineffable).
+  const andLook = /^Exile the top (card) of (your) library face down and look at it$/.exec(s);
+  if (andLook) return { effect: { type: "exileFaceDown", from: "top", look: true }, next: at + 1 };
   const look = !head && new RegExp(`^[Ll]ook at the top (card|${NUMX} cards) of ${LIB} library$`).exec(s);
   const lookThen = look && /^Exile (?:it|that card|those cards|them) face down$/.test(sentences[at + 1] ?? "");
   const they = new RegExp(`^(Target opponent|Target player|That player|Each opponent) exiles? the top (card|${NUMX} cards) of their library face down$`).exec(s);
@@ -2491,6 +2494,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si = sentences.length;
       continue;
     }
+    // Ugin, the Ineffable: "Exile the top card of your library face down and look at it. Create a 2/2 colorless Spirit
+    // creature token. When that token leaves the battlefield, put the exiled card into your hand." A delayed trigger for
+    // each token made (rulings: with two tokens, the first to leave brings the card back), about the card exiled.
+    if (s === "When that token leaves the battlefield, put the exiled card into your hand") {
+      const [made, faceDown] = [effects[effects.length - 1], effects[effects.length - 2]];
+      if (made?.type !== "createToken" || faceDown?.type !== "exileFaceDown" || faceDown.from !== "top" || faceDown.n !== undefined || faceDown.play) return null;
+      effects.push({ type: "delayed", when: "leaves", each: "created", effects: [{ type: "returnFaceDownExiled" }], text: "put the exiled card into your hand" });
+      continue;
+    }
+    // "Choose a color. Another target creature you control gains ... hexproof from that color until end of turn. It can't
+    // be blocked by creatures of that color this turn." (Skrelv): the color chosen as it resolved (CR 608.2d).
+    if (effects.some((x) => x.type === "choose" && x.choice === "color")) s = s.replace(/\b(from|of) that color\b/g, "$1 the chosen color");
     // "Until end of turn, X ..." reads the same as "X ... until end of turn".
     if (/^[Uu]ntil end of turn, /.test(s)) s = `${s.replace(/^[Uu]ntil end of turn, /, "").replace(/^./, (c) => c.toUpperCase())} until end of turn`;
     // "Target creature you control gains protection from the color of your choice until end of turn": the

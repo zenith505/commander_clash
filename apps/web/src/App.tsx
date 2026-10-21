@@ -21,6 +21,7 @@ import {
   delveRoom,
   graveyardCast,
   graveyardWays,
+  permitLabel,
   castExtraCosts,
   costsHaveX,
   mayPlayFromExile,
@@ -304,6 +305,8 @@ type TapPick =
  */
 type CastDraft = {
   objectId: string;
+  /** Which once-each-turn graveyard permission it's cast with (Muldrotha's artifact or creature slot). */
+  permit?: string;
   /** The face of a card with several it's cast as: a split card's half, an Adventure, a modal double-faced card's back. */
   face?: number;
   convoke?: string[];
@@ -746,7 +749,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const card = cardOf(s, d.objectId);
     const compiled = compileCard(card);
     const free = freeCastOf(s, HUMAN) === d.objectId;
-    const how = { ...(d.face !== undefined ? { face: d.face } : {}), ...(d.via ? { via: d.via } : {}), ...(d.buyback ? { buyback: true } : {}), ...(d.splice?.length ? { splice: d.splice } : {}), ...(d.alt ? { alt: d.alt } : {}), ...(d.costOr !== undefined ? { costOr: d.costOr } : {}), ...(d.teamwork?.length ? { teamwork: d.teamwork } : {}), ...(d.harmonize ? { harmonize: d.harmonize } : {}) };
+    const how = { ...(d.face !== undefined ? { face: d.face } : {}), ...(d.via ? { via: d.via } : {}), ...(d.buyback ? { buyback: true } : {}), ...(d.splice?.length ? { splice: d.splice } : {}), ...(d.alt ? { alt: d.alt } : {}), ...(d.costOr !== undefined ? { costOr: d.costOr } : {}), ...(d.teamwork?.length ? { teamwork: d.teamwork } : {}), ...(d.harmonize ? { harmonize: d.harmonize } : {}), ...(d.permit ? { permit: d.permit } : {}) };
     const kicks = { ...how, ...(d.kicks?.length ? { kicks: d.kicks } : {}) };
     // Harmonize: which creature to tap is chosen as the cost is (CR 702.180b), first of all.
     if (d.via === "harmonize" && d.harmonize === undefined) {
@@ -777,8 +780,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const altX = !!altMana && parseManaCost(altMana).hasX;
     if (d.x === undefined && ((parseManaCost(card.manaCost).hasX && (!free || parseManaCost(madnessCastOf(s, HUMAN, d.objectId) ?? "").hasX) && !d.via && !d.alt) || altX || costX)) {
       const max = maxX((n) => planCast(s, HUMAN, d.objectId, undefined, d.modes, d.convoke ?? "auto", n, kicks));
-      const extra = costX ? (/\b(?:pay|discard|sacrifice|return|exile) X [^.(]*/i.exec(card.oracleText)?.[0]?.trim().replace(/^./, (c) => c.toLowerCase()) ?? "its cost") : undefined;
-      return setXPick({ mode: "cast", draft: d, label: card.name, cost: (free && madnessCastOf(s, HUMAN, d.objectId)) || (altX ? altMana! : card.manaCost), max, value: max, ...(extra ? { extra } : {}) });
+      // "You may sacrifice one or more creatures" (Plumb the Forbidden): X is how many, none unless you pick more.
+      const optional = compiled.additionalCosts?.find((c) => c.kind === "sacrifice" && c.optional);
+      const extra = optional?.kind === "sacrifice" ? `sacrifice X ${optional.filter.text} (X can be 0)` : costX ? (/\b(?:pay|discard|sacrifice|return|exile) X [^.(]*/i.exec(card.oracleText)?.[0]?.trim().replace(/^./, (c) => c.toLowerCase()) ?? "its cost") : undefined;
+      return setXPick({ mode: "cast", draft: d, label: card.name, cost: (free && madnessCastOf(s, HUMAN, d.objectId)) || (altX ? altMana! : card.manaCost), max, value: optional ? 0 : max, ...(extra ? { extra } : {}) });
     }
     // The optional costs announced so far decide which targets it has (CR 702.33g, 702.166d, 702.174m); bargain is
     // asked before them when a target depends on it.
@@ -1347,9 +1352,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 if (isLand(s, menu)) dispatch([{ type: "playLand", player: HUMAN, objectId: menu, ...(untapped ? { untapped } : {}) }]);
                 else startCast(menu);
               }}
-              onCastVia={(via, face) => {
+              onCastVia={(via, face, permit) => {
                 setMenu(null);
-                startCast(menu, undefined, via, undefined, undefined, face);
+                if (permit) continueCast({ objectId: menu, via, permit });
+                else startCast(menu, undefined, via, undefined, undefined, face);
               }}
               onCastFace={(face) => {
                 setMenu(null);
@@ -1712,7 +1718,7 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   omniscience: "from your hand, for nothing (Omniscience); X is 0",
 };
 
-const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", grantedFlashback: "Flashback", grantedEscape: "Escape", grantedRetrace: "Retrace", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape", mayhem: "Mayhem", harmonize: "Harmonize", permission: "Cast from graveyard", aftermath: "Aftermath:", disturb: "Disturb:" };
+const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", grantedFlashback: "Flashback", grantedEscape: "Escape", grantedRetrace: "Retrace", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape", mayhem: "Mayhem", harmonize: "Harmonize", permission: "Cast from graveyard", turnPermission: "Cast from graveyard", aftermath: "Aftermath:", disturb: "Disturb:" };
 
 /** "discard a card", "pay 3 life", "exile two other cards from your graveyard". */
 function describeExtraCost(c: AdditionalCost): string {
@@ -3558,7 +3564,7 @@ function AbilityMenu({
   onPlay: (untapped?: boolean) => void;
   /** For a card in your graveyard: cast it with flashback, escape, ... */
   /** `face`: the split card's half cast this way (an aftermath half). */
-  onCastVia: (via: CastFromGraveyardKind, face?: number) => void;
+  onCastVia: (via: CastFromGraveyardKind, face?: number, permit?: string) => void;
   /** For a card with several faces: cast it as this one (a split card's half, an Adventure, a modal double-faced card's back). */
   onCastFace: (face: number) => void;
   /** For a modal double-faced card: play it as this land face (`untapped`: pay life or reveal so it enters untapped). */
@@ -3739,7 +3745,18 @@ function AbilityMenu({
         </button>
       ))}
       {inYard &&
-        graveyardWays(s, o).map((g) => {
+        graveyardWays(s, o).flatMap((g) => {
+          // Muldrotha: an artifact creature can use the artifact or the creature permission, the player's choice (rulings).
+          if (g.kind === "turnPermission" && (g.permits?.length ?? 0) > 1)
+            return g.permits!.map((permit) => {
+              const problem = castProblem(s, HUMAN, objectId, undefined, undefined, undefined, undefined, undefined, { via: g.kind, permit });
+              const ok = !problem || (/not enough mana/.test(problem) && planCast(s, HUMAN, objectId, undefined, undefined, "auto", undefined, { via: g.kind, permit }) !== null);
+              return (
+                <button key={`permit-${permit}`} data-permit={permit} disabled={!ok} title={problem ?? ""} onClick={() => onCastVia(g.kind, undefined, permit)}>
+                  Cast from graveyard with {permitLabel(s, permit)} <ManaCost cost={g.mana ?? d.manaCost} size="sm" />
+                </button>
+              );
+            });
           const ok = canCastFromGraveyard(s, objectId, g.kind, g.face);
           const problem = ok ? "" : (castProblem(s, HUMAN, objectId, undefined, undefined, undefined, undefined, undefined, { via: g.kind, face: g.face }) ?? "");
           const half = g.face !== undefined ? s.cards[registerFace(s, o, g.face)]! : undefined;

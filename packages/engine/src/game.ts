@@ -2663,7 +2663,20 @@ export function plottedCast(s: GameState, pid: PlayerId, o: GameObject): boolean
  */
 export function mayPlayLandFromGraveyard(s: GameState, o: GameObject, pid: PlayerId): boolean {
   if (o.zone !== "graveyard" || o.owner !== pid || !isType(defOf(s, o), "Land")) return false;
-  return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).landsFromGraveyard);
+  return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).landsFromGraveyard) || !!landPermit(s, pid);
+}
+
+/** Muldrotha's "you may play a land ... from your graveyard" during each of your turns, if one isn't used yet this turn. */
+function landPermit(s: GameState, pid: PlayerId): string | undefined {
+  if (s.activePlayer !== pid) return undefined;
+  const used = s.turnLog?.gravePermits ?? [];
+  for (const id of s.battlefield) {
+    const p = obj(s, id);
+    if (controllerOf(s, p) !== pid || !abilitiesOf(s, p).landFromGraveyardOnce) continue;
+    const key = `${p.id}@${p.zoneChanges ?? 0}:Land`;
+    if (!used.includes(key)) return key;
+  }
+  return undefined;
 }
 
 /**
@@ -2774,6 +2787,8 @@ function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean, fac
     const shown = p.hand.find((x) => x !== id && printedMatches(choice.filter, defOf(s, obj(s, x))))!;
     log(s, `${p.name} reveals ${nameOf(s, shown)} so ${d.name} enters untapped.`);
   }
+  // Muldrotha's land from the graveyard is used up, unless something lets every land be played from there (Crucible).
+  if (o.zone === "graveyard" && !s.battlefield.some((x) => controllerOf(s, obj(s, x)) === p.id && abilitiesOf(s, obj(s, x)).landsFromGraveyard)) ((s.turnLog ??= {}).gravePermits ??= []).push(landPermit(s, p.id)!);
   const from = o.zone === "exile" || o.zone === "graveyard" ? ` from ${o.zone === "exile" ? "exile" : "their graveyard"}` : "";
   // Under the control of the player who plays it (CR 305.1, 110.2), an opponent's card from exile too (Opposition Agent).
   moveObject(s, id, "battlefield", { controller: p.id, untapped, ...(face !== undefined ? { face } : {}) });
@@ -2994,6 +3009,7 @@ export function castProblem(
   if (!free && via && (o.zone !== "graveyard" || o.owner !== pid)) return `${describeVia(via.kind)} works only from your graveyard`;
   if (via?.if && !staticConditionNow(s, via.if, o.id, pid)) return `you can't cast ${d.name} from your graveyard now`;
   if (via?.kind === "mayhem" && o.discardedTurn !== s.turn) return `mayhem works only if you discarded ${d.name} this turn`; // CR 702.187b
+  if (choices?.permit !== undefined && (via?.kind !== "turnPermission" || !pickPermit(s, o, via.permits ?? [], choices.permit))) return `that permission doesn't let you cast ${d.name} now`;
   // Flashback and jump-start only if the resulting spell is an instant or sorcery (CR 702.34a, 702.133a).
   if (via && (via.kind === "flashback" || via.kind === "grantedFlashback" || via.kind === "jumpStart") && !isType(d, "Instant") && !isType(d, "Sorcery")) return `${d.name} isn't an instant or sorcery`;
   if (!free && !via && !mayPlayFromExile(s, o, pid) && !mayPlayFromTop(s, o, pid) && (!(o.zone === "hand" || (fromCommand && o.isCommander)) || o.owner !== pid))
@@ -3614,6 +3630,12 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     if (how?.once) how.by.topUsedTurn = s.turn;
   }
   const via = graveyardWay(s, o, choices.via);
+  // A once-each-turn permission is used up (Karador; Muldrotha's slot for one of the spell's types).
+  if (via?.kind === "turnPermission") {
+    const permit = pickPermit(s, o, via.permits ?? [], choices.permit)!;
+    ((s.turnLog ??= {}).gravePermits ??= []).push(permit);
+    log(s, `${p.name} uses ${permitLabel(s, permit)} to cast it from their graveyard.`);
+  }
   const from = zoneList(s, o)!;
   from.splice(from.indexOf(id), 1);
   o.zone = "stack";
@@ -3853,11 +3875,41 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef): CastFromGraveyard
     for (const g of abilitiesOf(s, p).graveyardGrants ?? []) {
       if (g.yourTurn && s.activePlayer !== o.owner) continue;
       if (!d.manaCost && !g.way.mana) continue;
-      if (!printedMatches(g.filter, d) || out.some((w) => w.kind === g.way.kind) || (g.way.kind === "grantedFlashback" && hasGrantedFlashback(s, o))) continue;
+      if (!printedMatches(g.filter, d)) continue;
+      // Once each turn (Karador, Muldrotha's permanent types): the permissions not used yet, from every such permanent.
+      if (g.once) {
+        const used = s.turnLog?.gravePermits ?? [];
+        const permits = g.once.filter((slot) => slot === "" || d.types.includes(slot)).map((slot) => `${p.id}@${p.zoneChanges ?? 0}:${slot}`).filter((k) => !used.includes(k));
+        if (!permits.length) continue;
+        const had = out.find((w) => w.kind === "turnPermission");
+        if (had) had.permits = [...had.permits!, ...permits];
+        else out.push({ ...g.way, mana: d.manaCost, permits });
+        continue;
+      }
+      if (out.some((w) => w.kind === g.way.kind) || (g.way.kind === "grantedFlashback" && hasGrantedFlashback(s, o))) continue;
       out.push({ ...g.way, mana: g.way.mana ?? d.manaCost });
     }
   }
   return out;
+}
+
+/**
+ * Which once-each-turn permission casting this card from a graveyard uses (TurnLog.gravePermits): the one chosen, or the
+ * one fewest other cards in that graveyard could use (an artifact creature takes Muldrotha's artifact slot when no other
+ * artifact card is there to cast, rulings).
+ */
+export function pickPermit(s: GameState, o: GameObject, permits: string[], chosen?: string): string | undefined {
+  if (chosen !== undefined) return permits.includes(chosen) ? chosen : undefined;
+  const others = player(s, o.owner).graveyard.filter((id) => id !== o.id);
+  const demand = (k: string) => others.filter((id) => graveyardWays(s, obj(s, id)).some((w) => w.permits?.includes(k))).length;
+  return [...permits].sort((a, b) => demand(a) - demand(b))[0];
+}
+
+/** A permission's label: Muldrotha's slot ("creature"), or the permanent's name. */
+export function permitLabel(s: GameState, key: string): string {
+  const [ref, slot] = key.split(":");
+  const src = s.objects[ref!.split("@")[0]!];
+  return `${src ? characteristics(s, src).name : "a permanent"}${slot ? ` (${slot.toLowerCase()})` : ""}`;
 }
 
 /** One way to cast it from a graveyard, if it has it. */
@@ -3866,7 +3918,7 @@ export function graveyardWay(s: GameState, o: GameObject, via?: CastFromGraveyar
 }
 
 export function describeVia(via: CastFromGraveyardKind | FaceDownKind): string {
-  return via === "jumpStart" ? "jump-start" : via === "grantedFlashback" ? "flashback" : via === "grantedEscape" ? "escape" : via === "grantedRetrace" ? "retrace" : via === "permission" ? "a way to cast it from your graveyard" : via;
+  return via === "jumpStart" ? "jump-start" : via === "grantedFlashback" ? "flashback" : via === "grantedEscape" ? "escape" : via === "grantedRetrace" ? "retrace" : via === "permission" ? "a way to cast it from your graveyard" : via === "turnPermission" ? "a once-each-turn permission" : via;
 }
 
 /** ", kicked", ", kicked twice", ", kicked with {1}{U}", for the log. */
@@ -4195,7 +4247,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     const fits = (id: ObjectId) => !oneOf || printedMatches(oneOf, defOf(s, obj(s, id)));
     const full = oneOf ? `${/^[aeiou]/i.test(oneOf.text) ? "an" : "a"} ${oneOf.text} and ${c.n === 2 ? "another card" : `${c.n - 1} other cards`}` : what;
     if (!chosen) {
-      if (pool.length < c.n || !pool.some(fits)) return `you need to ${verb} ${full} to ${doing}`;
+      if (c.n > 0 && (pool.length < c.n || !pool.some(fits))) return `you need to ${verb} ${full} to ${doing}`;
       continue;
     }
     if (chosen.length !== c.n || new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id)) || !chosen.some(fits)) return `choose ${full} to ${verb}`;

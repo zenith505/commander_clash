@@ -2,13 +2,13 @@ import { faceDef, hasFuse, isRoom, restingDef, roomDoorDefs } from "../faces";
 import { isMeldResult, meldPartnerName, meldResultDef } from "../meld-results";
 import { allEffects, GRANTED_WAY_COSTS } from "../abilities";
 import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq } from "../abilities";
-import { CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, stripReminder } from "../keywords";
+import { CHOSEN_HEXPROOF, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, stripReminder } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
 import type { CardDef, PlayerId } from "../types";
 import type { CopyExcept } from "../copies";
-import { NUM, num, NUMX, COUNTER, counterKind, X, amt, parseSpentReq, plainMana, sacrificeSelf, SPENT, ROLL_ROW, COLOR_WORDS, capital } from "./words";
+import { NUM, num, NUMX, COUNTER, counterKind, X, amt, parseSpentReq, plainMana, sacrificeSelf, SPENT, ROLL_ROW, COLOR_WORDS, capital, singularWord } from "./words";
 import { parseManaAbility, parseManaTrigger } from "./mana-abilities";
 import { parseGraveyardKeyword, parseCostKeyword, parseAdditionalCost, keywordAbilities, textKeywords, isKeywordLine, firebending, rippleBody } from "./keyword-abilities";
 import { parseEntersCondition, parseEntersChoice, parseConditionalStatic, parseCostChange, parseStatic, parseStaticCondition, parseOnlyClauses } from "./statics";
@@ -984,6 +984,19 @@ export function compile(d: CardDef): CompiledCard {
       out.payEvidence = Number(payEvidence[1]);
       continue;
     }
+    // Plumb the Forbidden: "you may sacrifice one or more creatures. When you do, copy this spell for each creature
+    // sacrificed this way." An additional cost with an X of 0 or more (CR 601.2b, 107.3a), and a reflexive trigger as
+    // it's cast (CR 603.12) copying it that many times.
+    const plumb = /^As an additional cost to cast ~, you may sacrifice one or more (.+?)\. When you do, copy ~ for each (.+?) sacrificed this way\.$/.exec(line);
+    if (plumb) {
+      const spec = parseTargetPhrase(plumb[1]!.split(" ").map(singularWord).join(" "));
+      if (spec?.kind !== "object" || spec.controller || spec.combat || plumb[2] !== singularWord(plumb[1]!)) out.unsupported.push(raw);
+      else {
+        (out.additionalCosts ??= []).push({ kind: "sacrifice", filter: { ...spec, text: plumb[1]! }, n: 0, x: true, optional: true });
+        (out.triggers ??= []).push({ event: "selfCast", ifX: 1, body: { targets: [], effects: [{ type: "copySpell", spell: "cause", n: { count: { kind: "x" } }, newTargets: true }], text: `When you do, copy ~ for each ${plumb[2]} sacrificed this way.` } });
+      }
+      continue;
+    }
     // "As an additional cost to cast this spell, sacrifice a creature." (CR 601.2b, 601.2f-h)
     const extra = /^As an additional cost to cast (?:this spell|~), (.+)\.$/.exec(line);
     if (extra) {
@@ -1079,6 +1092,22 @@ export function compile(d: CardDef): CompiledCard {
               ? { kind: "grantedFlashback", ...(mana ? { mana } : {}), costs: [], exile: true }
               : { kind: "grantedRetrace", costs: GRANTED_WAY_COSTS.grantedRetrace!, exile: false };
         (out.graveyardGrants ??= []).push({ filter: { ...f, text: `${grant[2]} cards` }, way, ...(grant[1] ? { yourTurn: true as const } : {}) });
+      }
+      continue;
+    }
+    // "Once during each of your turns, you may cast a creature spell from your graveyard" (Karador, Gisa and Geralf): a
+    // permission used once each turn (rulings: the spell's costs are paid, its timing rules followed). Muldrotha: "During
+    // each of your turns, you may play a land and cast a permanent spell of each permanent type from your graveyard."
+    // Kess: "If a spell cast this way would be put into your graveyard, exile it instead."
+    const onceYard = /^Once during each of your turns, you may cast an? (.+?) spell from your graveyard\.( If a spell cast this way would be put into your graveyard, exile it instead\.)?$/.exec(line);
+    if (onceYard || line === "During each of your turns, you may play a land and cast a permanent spell of each permanent type from your graveyard.") {
+      const filter = parseTargetPhrase(`${onceYard ? onceYard[1]!.replace(/ and /g, " or ") : "permanent"} card from a graveyard`);
+      if (filter?.kind !== "card" || filter.manaValue || filter.bound) out.unsupported.push(raw);
+      else {
+        const { owner: _, ...f } = filter;
+        const once = onceYard ? [""] : ["Artifact", "Creature", "Enchantment", "Planeswalker", "Battle"];
+        (out.graveyardGrants ??= []).push({ filter: { ...f, text: `${onceYard?.[1] ?? "permanent"} cards` }, way: { kind: "turnPermission", costs: [], exile: !!onceYard?.[2] }, yourTurn: true, once });
+        if (!onceYard) out.landFromGraveyardOnce = true;
       }
       continue;
     }
@@ -2194,7 +2223,7 @@ function checkCastingLinks(out: CompiledCard) {
     if (typeof o.chosen === "string") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : needs.add("creatureType"));
     if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen)) needs.add("color");
     if (o.kind === "setLandTypes" && (o.subtypes as string[]).includes(CHOSEN_LAND_TYPE)) needs.add("basicLandType");
-    if (o.kind === "addKeywords" && (o.keywords as string[]).includes(CHOSEN_PROTECTION)) needs.add("color");
+    if (o.kind === "addKeywords" && ((o.keywords as string[]).includes(CHOSEN_PROTECTION) || (o.keywords as string[]).includes(CHOSEN_HEXPROOF))) needs.add("color");
     if (o.kind === "addKeywords" && (o.keywords as string[]).includes(CHOSEN_PLAYER_PROTECTION) && !out.entersChoosePlayer) bad = true;
     if (o.type === "choose") choices.add(o.choice as ChoiceKind);
     Object.values(o).forEach(visit);

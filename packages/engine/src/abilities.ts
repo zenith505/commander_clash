@@ -1564,7 +1564,7 @@ export type Effect =
    * spell's) is its event player, "that spell's mana value" (Mana Drain) its event amount. `yourNextMain`: "at the
    * beginning of your next main phase", the next one that begins after it's made (rulings on Mana Drain).
    */
-  | { type: "delayed"; when: "nextTurnUpkeep" | "yourNextUpkeep" | "nextEndStep" | "yourNextEndStep" | "yourNextMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies"; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard"; of?: ObjRef; thisTurn?: true; event?: { player?: PlayerRef; amount?: Amount } }
+  | { type: "delayed"; when: "nextTurnUpkeep" | "yourNextUpkeep" | "nextEndStep" | "yourNextEndStep" | "yourNextMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies" | "leaves"; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard"; of?: ObjRef; thisTurn?: true; event?: { player?: PlayerRef; amount?: Amount } }
   /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
   | { type: "ninjutsu" }
   /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */
@@ -3222,7 +3222,7 @@ export interface CostMod {
  */
 export type AdditionalCost =
   /** `other`: "sacrifice another creature", not the ability's source. */
-  | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean; /** With `other`: the source itself may be sacrificed if it's one of these ("another creature or an artifact"). */ selfIf?: TargetSpec; x?: true; /** "Sacrifice half the lands you control, rounded up" (Tectonic Split): `n` is worked out as the cost is (CR 601.2f). */ half?: "up"; /** "Exile a creature you control" (The Soul Stone): chosen the same way, but exiled, not sacrificed (CR 701.21a doesn't apply). */ exile?: true }
+  | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean; /** With `other`: the source itself may be sacrificed if it's one of these ("another creature or an artifact"). */ selfIf?: TargetSpec; x?: true; /** "Sacrifice half the lands you control, rounded up" (Tectonic Split): `n` is worked out as the cost is (CR 601.2f). */ half?: "up"; /** "Exile a creature you control" (The Soul Stone): chosen the same way, but exiled, not sacrificed (CR 701.21a doesn't apply). */ exile?: true; /** "You may sacrifice one or more creatures" (Plumb the Forbidden): X may be 0, and is how many. */ optional?: true }
   /** "discard a land card" (retrace); `random`: "discard a card at random", chosen by the game as it's paid (CR 701.9b). */
   | { kind: "discard"; n: number; filter?: TargetSpec; random?: true; x?: true; /** "Discard an Island card and another card" (Foil): at least one of the `n` matches this. */ oneOf?: TargetSpec }
   | { kind: "payLife"; n: number; x?: true }
@@ -3297,7 +3297,7 @@ export type AltCostKind = "citadel" | "evidence" | "evoke" | "dash" | "bestow" |
 /** `aftermath`: the half of a split card with aftermath (CR 702.127a), cast only from a graveyard. */
 /** `disturb`: a double-faced card cast transformed from a graveyard for its disturb cost (CR 702.146a). */
 /** `grantedEscape`, `grantedRetrace`: escape or retrace a permanent gives the cards in your graveyard (Underworld Breach, Six), next to any of their own. */
-export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem" | "harmonize" | "grantedFlashback" | "grantedEscape" | "grantedRetrace" | "permission" | "aftermath" | "disturb";
+export type CastFromGraveyardKind = "flashback" | "jumpStart" | "retrace" | "escape" | "mayhem" | "harmonize" | "grantedFlashback" | "grantedEscape" | "grantedRetrace" | "permission" | "turnPermission" | "aftermath" | "disturb";
 /** The costs beyond mana of escape and retrace a permanent gives (Underworld Breach's "exile three other cards", CR 702.81a's land card). */
 export const GRANTED_WAY_COSTS: Partial<Record<CastFromGraveyardKind, AdditionalCost[]>> = {
   grantedEscape: [{ kind: "exileFromGraveyard", n: 3 }],
@@ -3312,6 +3312,8 @@ export interface CastFromGraveyard {
   exile: boolean;
   /** "You may cast this card from your graveyard as long as you control a Zombie" (Gravecrawler). */
   if?: StaticCondition;
+  /** `turnPermission`: the unused once-each-turn permissions that cover the card (`id@zoneChanges:slot`, TurnLog.gravePermits). */
+  permits?: string[];
 }
 
 /**
@@ -3763,7 +3765,18 @@ export interface CompiledCard {
    * graveyard have retrace." (Six): a way to cast the matching cards in its controller's graveyard (CR 113.6, 702.34,
    * 702.81, 702.138). `way.mana` left out: the card's own mana cost, so a card without one can't be cast this way (rulings).
    */
-  graveyardGrants?: { filter: TargetSpec; way: CastFromGraveyard; yourTurn?: true }[];
+  graveyardGrants?: {
+    filter: TargetSpec;
+    way: CastFromGraveyard;
+    yourTurn?: true;
+    /**
+     * "Once during each of your turns, you may cast a creature spell from your graveyard" (Karador): one use each turn per
+     * slot, "" for one; Muldrotha's are the permanent types, a spell using one of its own types (rulings).
+     */
+    once?: string[];
+  }[];
+  /** Muldrotha: "you may play a land ... from your graveyard" once during each of your turns. */
+  landFromGraveyardOnce?: true;
   /**
    * "You may play cards exiled with ~, and you may spend mana as though it were mana of any color to cast those spells"
    * (Rogue Class): its controller may play the cards its linked exile took (CR 607.2a), with any mana (609.4b).

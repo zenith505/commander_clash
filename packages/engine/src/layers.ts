@@ -593,6 +593,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
         const that = sub && chars.has(sub.id) && (sub.zoneChanges ?? 0) === subjectZc ? chars.get(sub.id)!.controller : subjectId !== undefined && s.lastKnown?.[subjectId]?.zc === subjectZc ? s.lastKnown![subjectId]!.controller : undefined;
         return that !== undefined && that !== you && !s.players[that]!.lost && measure(that) > mine;
       }
+      if (cond.activePlayer) return s.activePlayer !== you && !s.players[s.activePlayer]!.lost && measure(s.activePlayer) > mine;
       return s.turnOrder.some((p) => p !== you && !s.players[p]!.lost && measure(p) > mine);
     }
     case "attackingMostLife": {
@@ -692,8 +693,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const w = s.players[you]?.attackedWith;
       return w?.turn === s.turn && w.keys.length >= cond.n;
     }
-    case "handAtLeast":
-      return (s.players[you]?.hand.length ?? 0) >= cond.n;
+    case "handAtLeast": {
+      const n = s.players[you]?.hand.length ?? 0;
+      return cond.exactly ? n === cond.n : n >= cond.n;
+    }
     case "sameNamed": {
       // An object with no name (face down) shares a name with nothing (CR 201.2a).
       const byName = new Map<string, number>();

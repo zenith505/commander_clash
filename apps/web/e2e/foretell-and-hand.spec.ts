@@ -1,6 +1,6 @@
 // PR #23: foretell and casting the foretold card on a later turn, Brainstorm's hand picker, emerge and freerunning.
 import { expect, test } from "@playwright/test";
-import { LANDS, one, open, pageErrors, scene, state } from "./scene";
+import { LANDS, one, open, pageErrors, playUntil, scene, state } from "./scene";
 import { attack, card, controls, menu, modal, passTo, resolveUntil, seat } from "./ui";
 
 test("Foretell: exile it face down for {2}, then cast it from exile for its foretell cost on your next turn", async ({ page }) => {
@@ -14,7 +14,8 @@ test("Foretell: exile it face down for {2}, then cast it from exile for its fore
   expect(now.battlefield.filter((id) => now.objects[id]!.tapped)).toHaveLength(2);
   // Not this turn (CR 702.143a): the exile pile has nothing to cast yet.
   await expect(seat(page, 0).locator(".zone", { hasText: "Exile" }).locator(".zone-title")).toHaveText("Exile");
-  await passTo(page, "main1", s.turn + 4);
+  // On to your next turn's main phase, in the engine (for speed).
+  await open(page, playUntil(now, (st) => st.step === "main1" && st.activePlayer === 0 && st.turn === s.turn + 4 && !st.stack.length && !st.pending));
   const exile = seat(page, 0).locator(".zone", { hasText: "Exile" });
   await expect(exile.locator(".zone-title")).toHaveText("Exile ✦");
   await exile.click();

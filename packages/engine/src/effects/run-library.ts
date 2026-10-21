@@ -3,7 +3,7 @@ import { abilitiesOf, cardIdOf, defOf, isPermanentCard, isType } from "../cards"
 import { controllerOf } from "../layers";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
-import { gainLife, log, loseLife, moveObject, enterTogether, obj, opponents, payableLife, player } from "../game";
+import { gainLife, log, loseLife, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, printedMatches } from "./targeting";
@@ -467,6 +467,13 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
         const ids = [...(e.hand ? p.hand : []), ...(e.graveyard ? p.graveyard : [])];
+        if (e.bottom) {
+          // Endurance: "puts all the cards from their graveyard on the bottom of their library in a random order".
+          shuffle(s, ids);
+          for (const id of ids) moveObject(s, id, "library"); // to the bottom
+          log(s, `${p.name} puts ${ids.length === 1 ? "the card" : `all ${ids.length} cards`} from their graveyard on the bottom of their library in a random order.`);
+          continue;
+        }
         for (const id of ids) moveObject(s, id, "library");
         shuffleLibrary(s, p);
         log(s, `${p.name} shuffles their ${e.hand && e.graveyard ? "hand and graveyard" : e.hand ? "hand" : "graveyard"} into their library.`);
@@ -531,7 +538,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const searched = ((s.turnLog ??= {}).searched ??= []);
         if (!yardOnly && !searched.includes(p.id)) searched.push(p.id);
         if (!yardOnly && libOf(p.id) === p) fireEvent(s, { type: "searchedLibrary", player: p.id });
-        let cards = [...(yardOnly ? [] : libOf(p.id).library), ...(e.orGraveyard ? p.graveyard : [])].filter(fits);
+        // Aven Mindcensor: an opponent of its controller searches only the top N cards of the library (the whole of it is
+        // still shuffled after, rulings); the same top cards for the whole search.
+        const top = searchTop(s, p.id);
+        const lib = libOf(p.id).library;
+        let cards = [...(yardOnly ? [] : top === undefined ? lib : lib.slice(0, top)), ...(e.orGraveyard ? p.graveyard : [])].filter(fits);
         // At most one of each name: cards with the same name in a library are alike, so one of each is offered.
         if (e.oneEach) cards = cards.filter((id, i) => cards.findIndex((x) => sameName(defOf(s, obj(s, x)).name, defOf(s, obj(s, id)).name)) === i);
         const max = Math.min(n, cards.length);
@@ -708,8 +719,30 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       return;
     }
     case "dig": {
+      if (e.each) {
+        // "Each player looks at the top five cards of their library and may reveal ..." (Explore the Vastlands): one after
+        // another in APNAP order, each seeing what the ones before took (CR 101.4).
+        const sc = (s.resolving!.scratch ??= {});
+        sc.digQueue ??= apnap(s, players(s, { ref: "eachPlayer" }, ctx));
+        while (sc.digQueue.length) {
+          if (dig(s, e, ctx, src, sc.digQueue[0]!) === "paused") return "paused";
+          const r = s.resolving!.scratch!;
+          r.looked = r.found = r.moved = r.arranged = undefined;
+          r.digQueue!.shift();
+        }
+        s.resolving!.scratch!.digQueue = undefined;
+        return;
+      }
       const pid = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
-      if (pid === undefined || player(s, pid).lost) return;
+      return pid === undefined ? undefined : dig(s, e, ctx, src, pid);
+    }
+  }
+}
+
+/** "Look at the top N cards of your library": `pid` looks at them, takes some, and the rest go where they go. */
+function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx, src: string, pid: PlayerId): "paused" | undefined {
+    {
+      if (player(s, pid).lost) return;
       const p = player(s, pid);
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
@@ -727,13 +760,14 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (max > 0 && !(min === max && options.length === max)) {
           const kind = (e.filter?.text ?? "card").replace(/~/g, src).replace(/ X or less$/, ` ${mvMax} or less`);
           // "Take none" says it's optional; "up to" only reads well with a number.
-          const what = max === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${min < max ? "up to " : ""}${max} ${kind.replace(/\bcard\b/, "cards")}`;
+          const what = e.oneOfEach ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : max === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${min < max ? "up to " : ""}${max} ${kind.replace(/\bcard\b/, "cards")}`;
           const to = e.into === "hand" ? "into your hand" : e.into === "exile" ? `into exile${e.play ? " (you may play it this turn)" : ""}` : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : "back on top of your library";
           const rest = e.rest === "graveyard" ? "into your graveyard" : e.rest === "shuffle" ? "shuffled into your library" : e.rest === "hand" ? "into your hand" : e.rest === "keep" ? "left on top for now" : "on the bottom of your library";
-          s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards: options, min, max, dig: { looked: sc.looked, to, rest } };
+          s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards: options, min, max, dig: { looked: sc.looked, to, rest }, ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}) };
           return "paused";
         }
-        sc.found = options.slice(0, max);
+        // Nothing to choose: all of them, or (one for each) as many as fit.
+        sc.found = e.oneOfEach ? options.reduce<ObjectId[]>((a, id) => (oneOfEachFits(e.oneOfEach!, [...a, id].map((x) => defOf(s, obj(s, x)))) ? [...a, id] : a), []) : options.slice(0, max);
       }
       const looked = sc.looked;
       let found = (sc.found ?? []).filter((id) => looked.includes(id));
@@ -791,7 +825,6 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       return;
     }
-  }
 }
 
 /**
@@ -892,6 +925,12 @@ function chooseAnOpponent(s: GameState, ctx: ResolveCtx, src: string, prompt: st
  * rulings). Several Agents each try to exile what they find; the owner of the cards chooses which applies (CR 616.1), and
  * that's the controlling player, who takes them for themselves.
  */
+/** The fewest top cards an opponent's Aven Mindcensor lets this player search, if any does. */
+function searchTop(s: GameState, pid: PlayerId): number | undefined {
+  const ns = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) !== pid && !player(s, controllerOf(s, o)).lost).map((o) => abilitiesOf(s, o).opponentsSearchTop).filter((n): n is number => n !== undefined);
+  return ns.length ? Math.min(...ns) : undefined;
+}
+
 function searchAgent(s: GameState, pid: PlayerId): { controller?: PlayerId; exileFor?: PlayerId } | undefined {
   const agents = s.battlefield
     .map((id) => obj(s, id))

@@ -1,5 +1,5 @@
 import type { Effect, Modification, TokenSpec } from "../abilities";
-import { cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
+import { abilitiesOf, cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
 import { auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, log, moveObject, obj, opponents, player, removeFromCombat, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { playerCountersToPut, putCounters, tokenBatch } from "../counters";
@@ -8,7 +8,7 @@ import type { ContinuousEffect, GameObject, GameState, ObjectId, PlayerId } from
 import { setFace } from "../faces";
 import { becomePrepared } from "../prepare";
 import { objectMatches } from "./targeting";
-import { ResolveCtx, objects, amountNow, fixMods, players } from "./resolve";
+import { ResolveCtx, convokedFor, objects, amountNow, fixMods, players, runEffect } from "./resolve";
 import { createExtraTokens, createToken } from "./run-tokens";
 import { discardCards } from "./run-library";
 import { describeMods } from "./describe";
@@ -33,6 +33,12 @@ export function transformPermanent(s: GameState, o: GameObject, byDayNight = fal
   o.transforms = (o.transforms ?? 0) + 1;
   invalidateCharacteristics(s);
   log(s, `${was} ${convert ? "converts" : "transforms"} into ${defOf(s, o).name}.`);
+  // "As this creature transforms into ~, you get an emblem with ..." (CR 712.20): part of transforming.
+  const as = compileCard(defOf(s, o)).asTransforms;
+  if (as) {
+    const ctx: ResolveCtx = { controller: controllerOf(s, o), sourceId: o.id, sourceZc: o.zoneChanges ?? 0, sourceDef: defOf(s, o), targets: [], legal: [] };
+    for (const e of as.effects) runEffect(s, e, ctx);
+  }
   fireEvent(s, { type: "transformed", id: o.id, face: to });
   return true;
 }
@@ -99,7 +105,17 @@ export function proliferate(s: GameState, you: PlayerId, src: string): ObjectId[
     } else if (p.poison) (p.poison += playerCountersToPut(s, p.id, "poison", 1)), names.push(`${p.name} (poison)`);
   }
   log(s, `${src}: ${player(s, you).name} proliferates${names.length ? ` (${names.join(", ")})` : ""}.`);
+  fireEvent(s, { type: "proliferated", player: you });
   return got;
+}
+
+/**
+ * How many times a player proliferates for one instruction to (`n`): twice as many for each Tekuthal they control, each
+ * one's replacement applying to the proliferating another made (CR 614.1a, 616.1).
+ */
+export function proliferateTimes(s: GameState, you: PlayerId, n: number): number {
+  const doublers = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === you && abilitiesOf(s, obj(s, id)).proliferateTwice).length;
+  return n * 2 ** doublers;
 }
 
 /** Counters that hurt the permanent they're on: -1/-1 shrinks it, stun keeps it from untapping (CR 122.1d). */
@@ -307,15 +323,16 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       return;
     }
     case "proliferate": {
+      const times = proliferateTimes(s, ctx.controller, e.twice ? 2 : 1);
       if (!e.thenPhaseOut) {
-        proliferate(s, ctx.controller, src);
+        for (let i = 0; i < times; i++) proliferate(s, ctx.controller, src);
         return;
       }
       // Ripples of Potential: then any number of your permanents that got a counter this way phase out (CR 702.26), chosen
       // after proliferating; none is fine (rulings: "any number" includes zero).
       const sc = (s.resolving!.scratch ??= {});
       if (!sc.chosen?.[ctx.controller]) {
-        const got = proliferate(s, ctx.controller, src).filter((id) => s.objects[id]?.zone === "battlefield" && controllerOf(s, obj(s, id)) === ctx.controller);
+        const got = [...new Set(Array.from({ length: times }, () => proliferate(s, ctx.controller, src)).flat())].filter((id) => s.objects[id]?.zone === "battlefield" && controllerOf(s, obj(s, id)) === ctx.controller);
         if (!got.length) return;
         sc.queue = [ctx.controller];
         sc.chosen = {};
@@ -359,6 +376,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
       if (!sc.connive) {
+        // "Each creature that convoked ~ connives": each one that did, gone or not (rulings), one at a time.
+        if (e.type === "connive" && e.what.ref === "convoker" && !convokedFor(s, ctx)[e.what.index]) return;
         const o = e.type === "connive" ? objects(s, e.what, ctx)[0] : undefined;
         const pid = o ? controllerOf(s, o) : ctx.controller;
         const n = (sc.n = e.type === "connive" ? amountNow(s, e.n, ctx) : 1);
@@ -567,6 +586,47 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         if (had === n) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: e.counter });
       }
       return;
+    case "removeAnyCounters": {
+      // The counters are chosen one at a time as it resolves, any kinds (rulings on Glissa Sunslayer), then removed
+      // together; with fewer on it than that, all of them (rulings on Thornmantle Striker).
+      const o = objects(s, e.what, ctx)[0];
+      const sc = (s.resolving!.scratch ??= {});
+      const picked = (sc.countersPicked ??= {});
+      const n = o ? amountNow(s, e.n, ctx) : 0;
+      const left = (k: string) => (o!.counters[k] ?? 0) - (picked[k] ?? 0);
+      const count = () => Object.values(picked).reduce((a, b) => a + b, 0);
+      while (o && count() < n && !sc.countersDone) {
+        const kinds = Object.keys(o.counters).filter((k) => left(k) > 0);
+        if (!kinds.length) break;
+        if (sc.counterKind !== undefined) {
+          if (sc.counterKind === "done") sc.countersDone = true;
+          else if (left(sc.counterKind) > 0) picked[sc.counterKind] = (picked[sc.counterKind] ?? 0) + 1;
+          sc.counterKind = undefined;
+          continue;
+        }
+        if (kinds.length === 1 && !e.upTo) {
+          picked[kinds[0]!] = (picked[kinds[0]!] ?? 0) + Math.min(left(kinds[0]!), n - count());
+          break;
+        }
+        const name = characteristics(s, o).name;
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "removeCounter", about: o.id, options: [...kinds, ...(e.upTo ? ["done"] : [])], labels: [...kinds.map((k) => `A ${k} counter (${left(k)} left)`), ...(e.upTo ? [count() ? "That's all" : "None"] : [])], prompt: `choose a counter to remove from ${name} (${count() + 1} of ${n})` };
+        return "paused";
+      }
+      sc.countersPicked = undefined;
+      sc.countersDone = undefined;
+      if (!o) return;
+      // "For each counter removed this way" (Hex Parasite): only those actually removed (rulings).
+      if (s.resolving) s.resolving.countersRemoved = (s.resolving.countersRemoved ?? 0) + Object.values(picked).reduce((a, b) => a + Math.max(0, b), 0);
+      for (const [k, m] of Object.entries(picked)) {
+        if (m <= 0) continue;
+        const had = o.counters[k] ?? 0;
+        o.counters[k] = had - m;
+        invalidateCharacteristics(s);
+        log(s, `${characteristics(s, o).name} loses ${m} ${k} counter${m > 1 ? "s" : ""}.`);
+        if (had === m) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: k });
+      }
+      return;
+    }
     case "battleDefense":
       // Its protector is "who protects it" (CR 310.9e): an opponent's protection, defense counters off; else on.
       for (const o of objects(s, e.what, ctx)) {

@@ -213,7 +213,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Timetwister: "Each player shuffles their hand and graveyard into their library, then draws seven cards." Reminisce:
   // "Target player shuffles their graveyard into their library."
-  if ((m = /^(?:(Target player|Each player|Target opponent) shuffles their|[Ss]huffle your) (hand and graveyard|graveyard|hand) into (?:their|your) library(?:, then (?:draws|draw) (\w+) cards?)?$/.exec(s))) {
+  // Endurance: "up to one target player puts all the cards from their graveyard on the bottom of their library in a random
+  // order" (no shuffle).
+  if ((m = /^((?:[Uu]p to one t|[Tt])arget player|[Ee]ach player) puts all the cards from their graveyard on the bottom of their library in a random order$/.exec(s))) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    return who ? [{ type: "shuffleZones", who, graveyard: true, bottom: true }] : null;
+  }
+  if ((m = /^(?:([Tt]arget player|[Ee]ach player|[Tt]arget opponent) shuffles their|[Ss]huffle your) (hand and graveyard|graveyard|hand) into (?:their|your) library(?:, then (?:draws|draw) (\w+) cards?)?$/.exec(s))) {
     const who: PlayerRef | null = m[1] ? parsePlayer(m[1].toLowerCase(), ctx) : { ref: "you" };
     if (!who) return null;
     const out: Effect[] = [{ type: "shuffleZones", who, ...(m[2] !== "graveyard" ? { hand: true as const } : {}), ...(m[2] !== "hand" ? { graveyard: true as const } : {}) }];

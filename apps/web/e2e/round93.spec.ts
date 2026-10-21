@@ -2,7 +2,7 @@
 // "move any number of counters" bar, Krosan Verge's "a Forest card and a Plains card" search, Nesting Grounds' choice of
 // counter kind, and Emry's "you may cast that card this turn" from the graveyard.
 import { expect, test } from "@playwright/test";
-import { LANDS, idsOf, one, open, pageErrors, scene, state } from "./scene";
+import { LANDS, idsOf, one, open, pageErrors, playUntil, scene, state } from "./scene";
 import { card, controls, menu, modal, resolveUntil } from "./ui";
 
 test("Underworld Breach: escape a sorcery from your graveyard, exiling three other cards", async ({ page }) => {
@@ -28,9 +28,8 @@ test("Forgotten Ancient: at your upkeep, move some of its +1/+1 counters onto ot
   const s = scene({ board: ["Forgotten Ancient", "Grizzly Bears"] }, [{ board: ["Hill Giant"] }]);
   const [ancient, bears, giant] = [one(s, "Forgotten Ancient"), one(s, "Grizzly Bears"), one(s, "Hill Giant")];
   s.objects[ancient]!.counters["+1/+1"] = 3;
-  await open(page, s);
-  // Through the opponents' turns to your next upkeep.
-  await resolveUntil(page, (st) => st.pending?.kind === "chooseMay" && st.pending.player === 0 && st.activePlayer === 0, 300);
+  // Through the opponents' turns to your next upkeep, in the engine (for speed).
+  await open(page, playUntil(s, (st) => st.pending?.kind === "chooseMay" && st.pending.player === 0 && st.activePlayer === 0));
   await controls(page).getByRole("button", { name: "Yes" }).click();
   const bar = controls(page);
   await expect(bar).toContainText("move up to 3 +1/+1 counters from it onto other creatures, if you want (3 left)");

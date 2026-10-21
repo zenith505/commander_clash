@@ -1,4 +1,4 @@
-import type { AbilityBody, Amount, DamageRecipient, Effect, ManaAbility, Modification, ObjRef, PlayerRef, TargetChoice } from "../abilities";
+import { allEffects, type AbilityBody, type Amount, type DamageRecipient, type Effect, type ManaAbility, type Modification, type ObjRef, type PlayerRef, type TargetChoice } from "../abilities";
 import { withPutter } from "../counters";
 import { cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
 import { addTriggeredMana, askAuraReturns, creatureTypesOf, draw, enterTogether, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
@@ -96,7 +96,7 @@ export function beginResolution(s: GameState, item: StackItem, body: AbilityBody
   // An amount bound ("with power less than or equal to ~'s power") is worked out again now (CR 608.2b), with the source as
   // it last existed if it has left (608.2h).
   const now: AmountCtx = { ...targetingCtx(s, item.controller, item.sourceId), ...(item.sourceZc !== undefined ? { sourceZc: item.sourceZc } : {}), ...(item.lki ? { lki: item.lki } : {}), x: item.x ?? 0 };
-  const legal = body.targets.map((spec, i) => !!targets[i] && isLegalTarget(s, bindBound(s, spec, now), targets[i]!, item.controller, src) && lesserPowerOk(s, spec, targets[i]!, item.sourceId));
+  const legal = body.targets.map((spec, i) => !!targets[i] && isLegalTarget(s, bindBound(s, spec, now), targets[i]!, item.controller, src) && lesserPowerOk(s, spec, targets[i]!, item.sourceId, item.sourceZc));
   checkTotals(s, body.targets, targets, legal);
   // With every target it chose now illegal, it doesn't resolve (CR 608.2b). One that chose none of its
   // "up to" targets isn't targeted at all, and resolves (CR 115.6).
@@ -104,6 +104,9 @@ export function beginResolution(s: GameState, item: StackItem, body: AbilityBody
   if (body.targets.length && chose && !legal.some(Boolean)) return "fizzled";
   const spellControllers = targets.map((t) => (t.kind === "stack" ? (s.stack.find((x) => x.id === t.id)?.controller ?? null) : null));
   const spellObjects = targets.map((t) => (t.kind === "stack" ? (s.stack.find((x) => x.id === t.id)?.objectId ?? null) : null));
+  // "If this is the second time this ability has resolved this turn": counted as it resolves, for this object's ability
+  // only (a new object's start over, CR 400.7).
+  const nth = item.kind === "ability" && item.sourceId && asksResolutions(body) ? countResolution(s, `${item.sourceId}@${item.sourceZc ?? 0}|${body.text ?? item.description}`) : undefined;
   s.resolving = {
     item,
     body,
@@ -111,8 +114,18 @@ export function beginResolution(s: GameState, item: StackItem, body: AbilityBody
     next: 0,
     ...(spellControllers.some((c) => c !== null) ? { spellControllers } : {}),
     ...(spellObjects.some((c) => c !== null) ? { spellObjects } : {}),
+    ...(nth !== undefined ? { nth } : {}),
   };
   return continueResolution(s);
+}
+
+function asksResolutions(body: AbilityBody): boolean {
+  return allEffects(body.effects).some((e) => e.type === "if" && e.cond.kind === "resolvedNth");
+}
+
+function countResolution(s: GameState, key: string): number {
+  if (s.resolutionCounts?.turn !== s.turn) s.resolutionCounts = { turn: s.turn, counts: {} };
+  return (s.resolutionCounts.counts[key] = (s.resolutionCounts.counts[key] ?? 0) + 1);
 }
 
 /**
@@ -221,9 +234,23 @@ export function apnap(s: GameState, pids: PlayerId[]): PlayerId[] {
   return order.filter((p) => pids.includes(p));
 }
 
+/** The creatures that convoked the resolving spell, or for an ability (an enters trigger), its source's spell (CR 702.51a). */
+export function convokedFor(s: GameState, ctx: ResolveCtx): { id: ObjectId; zc: number }[] {
+  const item = s.resolving?.item;
+  const o = item?.kind === "spell" ? s.objects[item.objectId ?? ""] : ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+  return o?.convoked ?? [];
+}
+
 export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[] {
   if (ref.ref === "castSpell") return []; // only counted (amounts.ts)
   if (ref.ref === "voted") return votedObjects(s);
+  if (ref.ref === "convoker" || ref.ref === "convokers") {
+    const list = convokedFor(s, ctx);
+    return (ref.ref === "convoker" ? list.slice(ref.index, ref.index + 1) : list).flatMap((c) => {
+      const o = s.objects[c.id];
+      return o?.zone === "battlefield" && (o.zoneChanges ?? 0) === c.zc ? [o] : [];
+    });
+  }
   if (ref.ref === "self") {
     const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
     // If it left the battlefield (even if it came back), it's a different object now (CR 400.7).
@@ -327,7 +354,8 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const except = t?.kind === "object" ? t.id : ref.other ? ctx.sourceId : undefined;
     const whose = ref.of && players(s, ref.of, ctx);
     const mine = ref.sharesTypeWithSelf ? sourceCreatureTypes(s, ctx) : undefined;
-    const others = s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== except && (!whose || whose.includes(controllerOf(s, o))) && objectMatches(s, filter, o, ctx.controller, false) && (!mine || shareCreatureType(mine, creatureTypesOf(s, o))));
+    const made = ref.notCreated ? (s.resolving?.created ?? []) : [];
+    const others = s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== except && !made.includes(o.id) && (!whose || whose.includes(controllerOf(s, o))) && objectMatches(s, filter, o, ctx.controller, false) && (!mine || shareCreatureType(mine, creatureTypesOf(s, o))));
     if (!ref.andSelf) return others;
     const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
     const here = me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc);
@@ -691,6 +719,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "endure":
     case "moveCounter":
     case "removeCounters":
+    case "removeAnyCounters":
     case "battleDefense":
     case "removeAllCounters":
     case "moveAllCounters":
@@ -723,6 +752,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "encore":
     case "createTokenCopy":
     case "createToken":
+    case "linkedExileToken":
       return runTokensEffect(s, e, ctx, src);
     case "delayed":
     case "castCipher":

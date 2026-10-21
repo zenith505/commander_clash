@@ -4,7 +4,7 @@
 import type { ActivatedAbility, ManaSpend } from "./abilities";
 import { abilitiesOf, defOf, isType } from "./cards";
 import { bindChosen, objectMatches, printedMatches } from "./effects";
-import { blackForLife, emptyPool, payFromPool, type ManaPool, type ParsedCost, type Payment } from "./mana";
+import { blackForLife, emptyPool, payFromPool, type CostSymbol, type ManaPool, type ParsedCost, type Payment } from "./mana";
 import { characteristics, controllerOf } from "./layers";
 import type { CardDef, Color, GameObject, GameState, ManaLot, ManaOrigin, ManaSpentTrigger, ManaType, PlayerId } from "./types";
 
@@ -98,11 +98,20 @@ export function poolFor(s: GameState, pid: PlayerId, use: ManaUse): { pool: Mana
  * {B} with 2 life too. It applies to every cost its controller pays with mana: spells, abilities, special actions (rulings).
  */
 export function payableCost(s: GameState, pid: PlayerId, cost: ParsedCost): ParsedCost {
-  const krrik = s.battlefield.some((id) => {
-    const o = s.objects[id]!;
-    return !!abilitiesOf(s, o).lifeForBlack && controllerOf(s, o) === pid;
-  });
-  return krrik ? blackForLife(cost) : cost;
+  const mine = s.battlefield.map((id) => s.objects[id]!).filter((o) => controllerOf(s, o) === pid);
+  const krrik = mine.some((o) => !!abilitiesOf(s, o).lifeForBlack);
+  const orrery = mine.some((o) => !!abilitiesOf(s, o).spendAnyColor);
+  const c = krrik ? blackForLife(cost) : cost;
+  return orrery ? anyColorPays(c) : c;
+}
+
+/**
+ * Chromatic Orrery: "You may spend mana as though it were mana of any color" (CR 609.4b): any mana pays a colored symbol
+ * (one mana for {2/W}), so they're generic for paying; {C} still needs colorless mana, and a Phyrexian symbol (K'rrik's
+ * {B} too) still needs its color or 2 life. What's spent stays what it was.
+ */
+function anyColorPays(cost: ParsedCost): ParsedCost {
+  return { ...cost, symbols: cost.symbols.map((x): CostSymbol => ((x.kind === "colored" && x.color !== "C") || ((x.kind === "hybrid" || x.kind === "twoHybrid") && !x.life) ? { kind: "generic", amount: 1 } : x)) };
 }
 
 /** Could `pid` pay this from their pool for `use`? */

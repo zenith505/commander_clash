@@ -147,6 +147,13 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
     ctx.lastPlayerTarget = index;
     return { ref: "target", index };
   }
+  // "Up to one target player" (Endurance): it may be chosen or not (CR 115.6); with none, nobody does it.
+  const upTo = /^up to one target (player|opponent)$/.exec(x);
+  if (upTo) {
+    const index = addTarget(ctx, { kind: "player", opponent: upTo[1] === "opponent", optional: true, text: `target ${upTo[1]}` });
+    ctx.lastPlayerTarget = index;
+    return { ref: "target", index };
+  }
   return null;
 }
 
@@ -162,6 +169,8 @@ export function parseObject(p: string, ctx: Ctx, cards = false): ObjRef | null {
 }
 
 function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
+  // "Each creature that convoked it" (Venerated Loxodon, CR 702.51a): the creatures tapped to cast it.
+  if (/^each creature that convoked (?:it|~)$/i.test(p.trim())) return { ref: "convokers" };
   // "Put a +1/+1 counter on each of up to two target creatures", "Up to two target creatures each get +1/+1"
   const x = /\btarget\b/i.test(p) ? p.trim().replace(/^each of /i, "").replace(/ each$/i, "") : p.trim();
   // "They", "those creatures": the targets of an earlier "up to two target creatures".
@@ -636,6 +645,11 @@ export function parseTargetPhrase(
     extra.counter = counter[1] ?? counter[2] ?? ANY_COUNTER;
     p = (p.slice(0, counter.index) + p.slice(counter.index + counter[0].length)).trim();
   }
+  const without = / without an? ([+-]1\/[+-]1) counters? on (?:it|them)/.exec(p);
+  if (without) {
+    extra.notCounter = without[1]!;
+    p = (p.slice(0, without.index) + p.slice(without.index + without[0].length)).trim();
+  }
   const none = / with no counters on (?:it|them)/.exec(p);
   if (none) {
     extra.noCounters = true;
@@ -644,10 +658,13 @@ export function parseTargetPhrase(
   // "creature card from your graveyard", "card from a graveyard": a card in that zone (CR 109.2a).
   let inGraveyard = false;
   let owner: TargetSpec["owner"];
-  const gy = / (?:from|in) (your|a|an opponent's) graveyard$/.exec(p);
+  // "Target creature card exiled with ~" (The Darkness Crystal): a card in exile linked to the source (CR 607.2a).
+  let linkedExile = false;
+  const gy = / (?:from|in) (your|a|an opponent's) graveyard$/.exec(p) ?? / exiled with (?:~|it)$/.exec(p);
   if (gy) {
     p = p.slice(0, gy.index);
-    owner = gy[1] === "your" ? "you" : gy[1] === "a" ? undefined : "opponent";
+    linkedExile = !gy[1];
+    owner = gy[1] === "your" ? "you" : gy[1] === "a" || !gy[1] ? undefined : "opponent";
     // "Dragon creature card or Ugin planeswalker card" (Haven of the Spirit Dragon): either.
     if (/^[^,]+ card or [^,]+ card$/.test(p)) p = p.replace(/ card or /, " or ");
     // The word "card" comes before any "with ..." qualifier: "creature card with mana value 3 or less".
@@ -685,7 +702,7 @@ export function parseTargetPhrase(
     // "Permanent ... with an even mana value" (Desecrate Reality; zero is even).
     extra.manaValue = { parity: m[1] as "even" | "odd" };
     p = p.slice(0, m.index);
-  } else if ((m = / (with|without) ([a-z ]+?)( you control| you don't control| an opponent controls)?$/.exec(p))) {
+  } else if ((m = /(?:^| )(with|without) ([a-z ]+?)( you control| you don't control| an opponent controls)?$/.exec(p))) {
     // "Creature you control with flash or haste" (Shadow the Hedgehog): one of them is enough.
     const either = m[1] === "with" ? /^([a-z]+) or ([a-z]+)$/.exec(m[2]!) : null;
     const kws = either ? [either[1]!, either[2]!].map((k) => keywordOf(k)) : parseKeywordList(m[2]!);
@@ -778,7 +795,7 @@ export function parseTargetPhrase(
     }
     const types = [...new Set(anyOf.flatMap((a) => a.types ?? []))];
     // A card in a graveyard (Haven of the Spirit Dragon), matched by its printed characteristics.
-    if (inGraveyard) return { kind: "card", types, notTypes: [], notColors: [], anyOf, ...(owner ? { owner } : {}), text };
+    if (inGraveyard) return { kind: "card", types, notTypes: [], notColors: [], anyOf, ...(owner ? { owner } : {}), ...(linkedExile ? { linkedExile: true as const } : {}), text };
     return { kind: "object", types, notTypes: [], notColors: [], anyOf, ...extra, controller, ...(tapped !== undefined ? { tapped } : {}), text };
   }
   let outlaw = false;
@@ -864,7 +881,7 @@ export function parseTargetPhrase(
   };
   if (inGraveyard) {
     if (isSpell || tapped !== undefined || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status) return null;
-    return { kind: "card", ...filters, ...(otherThanBasic ? { notSupertypes: [...(filters.notSupertypes ?? []), "Basic"] } : {}), ...(owner ? { owner } : {}), text };
+    return { kind: "card", ...filters, ...(otherThanBasic ? { notSupertypes: [...(filters.notSupertypes ?? []), "Basic"] } : {}), ...(owner ? { owner } : {}), ...(linkedExile ? { linkedExile: true as const } : {}), text };
   }
   if (otherThanBasic) return null;
   if (owner && (isSpell || controller)) return null;

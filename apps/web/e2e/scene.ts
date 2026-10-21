@@ -2,7 +2,7 @@
 
 import { readFileSync } from "node:fs";
 import { expect, type Page } from "@playwright/test";
-import { applyAction, createGame, meldResultsFor, registerMeldResults, invalidateCharacteristics, newObject, PREDEFINED_TOKENS, tokenDef, waitingOn, type CardDef, type GameState, type PlayerId, type Step, type ZoneName } from "@cc/engine";
+import { applyAction, botActions, createGame, meldResultsFor, registerMeldResults, invalidateCharacteristics, newObject, PREDEFINED_TOKENS, tokenDef, waitingOn, type CardDef, type GameState, type PlayerId, type Step, type ZoneName } from "@cc/engine";
 
 /** Real card definitions, written by `npm run e2e:cards` from every card name quoted in these files. */
 const CARDS: CardDef[] = JSON.parse(readFileSync(new URL("./cards.json", import.meta.url), "utf8"));
@@ -97,6 +97,27 @@ function passUntil(s: GameState, step: Step, active: PlayerId): GameState {
     else s = applyAction(s, { type: "passPriority", player: pid });
   }
   throw new Error(`never reached ${step}`);
+}
+
+/**
+ * Plays on in the engine until `done`: everyone passes and declares no attacks or blocks, bots answer their other
+ * prompts as in a game. A test that waits for something round the table (your next upkeep) skips the trip in the page
+ * this way, then opens the page again on the state it reached. Any other prompt for you stops it with an error.
+ */
+export function playUntil(s: GameState, done: (s: GameState) => boolean, max = 3000): GameState {
+  for (let i = 0; i < max; i++) {
+    if (done(s)) return s;
+    const pid = waitingOn(s);
+    if (pid === undefined || pid === null) break;
+    const pend = s.pending;
+    if (pend?.kind === "declareAttackers") s = applyAction(s, { type: "declareAttackers", player: pid, attacks: [] });
+    else if (pend?.kind === "declareBlockers") s = applyAction(s, { type: "declareBlockers", player: pid, blocks: [] });
+    else if (pend?.kind === "discardToHandSize") s = applyAction(s, { type: "discard", player: pid, objectIds: s.players[pid]!.hand.slice(0, pend.count) });
+    else if (!pend) s = applyAction(s, { type: "passPriority", player: pid });
+    else if (pid !== 0) s = applyAction(s, botActions(s, pid)[0]!);
+    else throw new Error(`playUntil: a prompt for you (${pend.kind})`);
+  }
+  throw new Error("playUntil: never got there");
 }
 
 /** Opens the app on `s`. Bots act as in a real game; the human always holds priority ("hold" mode). */

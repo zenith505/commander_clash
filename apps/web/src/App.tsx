@@ -119,6 +119,7 @@ import {
   returnCandidates,
   linkedExileCards,
   tapCostCandidates,
+  counterCostCandidates,
   ringBearer,
   power,
   toughness,
@@ -362,6 +363,8 @@ type CastDraft = {
  * Picking cards in your graveyard with total mana value `n` or more to collect evidence (CR 701.59a): as you cast a
  * spell (its optional additional cost, or Conspiracy Unraveler's alternative cost), or activate an ability.
  */
+/** "Remove three counters from among ... you control" (Tekuthal): which counters, as the ability is activated. */
+type CounterPick = { activate: ActivateDraft; label: string; what: string; n: number; candidates: { id: string; kind: string; n: number }[] };
 type EvidencePick = { label: string; n: number; candidates: string[]; optional: boolean } & ({ draft: CastDraft; key: "evidence" | "collect"; activate?: undefined } | { activate: ActivateDraft; draft?: undefined; key?: undefined });
 
 /** Choosing how to pay "sacrifice a creature or pay {3}{B}" (CR 601.2b). */
@@ -398,7 +401,7 @@ type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined } | 
 
 /** An activated ability being activated, in the order of CR 602.2b: modes, X, targets, then costs. */
 /** `pick`: for a mana ability, the mana chosen in the menu ("one mana of any color", Fertile Ground's extra). */
-type ActivateDraft = { objectId: string; index: number; modes?: number[]; x?: number; targets?: TargetChoice[]; sacrifice?: string[]; discard?: string[]; returnToHand?: string[]; tap?: string[]; exileFromHand?: string[]; exileCards?: string[]; collect?: string[]; pick?: ManaPick };
+type ActivateDraft = { objectId: string; index: number; modes?: number[]; x?: number; targets?: TargetChoice[]; sacrifice?: string[]; discard?: string[]; returnToHand?: string[]; tap?: string[]; exileFromHand?: string[]; exileCards?: string[]; collect?: string[]; counters?: { id: string; kind: string }[]; pick?: ManaPick };
 type ManaPick = { mana?: ManaType; extra?: ManaType[] };
 
 /** Announcing X for a spell or activated ability with {X} in its cost (CR 107.3a, 601.2b, 602.2b). */
@@ -472,6 +475,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const [costPick, setCostPick] = useState<CostPick | null>(null);
   const [delvePick, setDelvePick] = useState<DelvePick | null>(null);
   const [evidencePick, setEvidencePick] = useState<EvidencePick | null>(null);
+  const [counterPick, setCounterPick] = useState<CounterPick | null>(null);
   const [stackHidden, setStackHidden] = useState(false);
   const [handMinimized, toggleHand] = useHandTucked();
 
@@ -671,6 +675,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         if (d.collect !== undefined) continue;
         return setEvidencePick({ activate: d, label: cardOf(s, d.objectId).name, n: c.n, candidates: evidenceCandidates(s, HUMAN), optional: false });
       }
+      if (c.kind === "removeCounters") {
+        // "Remove three counters from among other artifacts, creatures, and planeswalkers you control": pick them (CR 602.2b).
+        if (d.counters !== undefined) continue;
+        return setCounterPick({ activate: d, label: cardOf(s, d.objectId).name, what: `remove ${c.n} ${c.counter ? `${c.counter} ` : ""}counter${c.n === 1 ? "" : "s"} from among ${c.filter.text}`, n: c.n, candidates: counterCostCandidates(s, HUMAN, s.objects[d.objectId]!, c) });
+      }
       if (c.kind === "returnToHand") {
         // Ninjutsu: click the unblocked attacker to return (CR 702.49a).
         if (d.returnToHand !== undefined) continue;
@@ -710,7 +719,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const article = c.kind === "sacrifice" && c.other ? "another" : /^[aeiou]/i.test(what) ? "an" : "a";
       return setCostPick({ activate: d, kind: c.kind, label: cardOf(s, d.objectId).name, what: `${c.kind === "sacrifice" && c.exile ? "exile" : c.kind} ${c.n === 1 ? article : c.n} ${what}${c.n > 1 ? "s" : ""}`, n: c.n, candidates, chosen: [] });
     }
-    const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}), ...(d.tap?.length ? { tap: d.tap } : {}), ...(d.exileFromHand?.length ? { exileFromHand: d.exileFromHand } : {}), ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}), ...(d.collect ? { collect: d.collect } : {}) };
+    const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}), ...(d.tap?.length ? { tap: d.tap } : {}), ...(d.exileFromHand?.length ? { exileFromHand: d.exileFromHand } : {}), ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}), ...(d.collect ? { collect: d.collect } : {}), ...(d.counters?.length ? { counters: d.counters } : {}) };
     dispatch(
       planActivate(s, HUMAN, d.objectId, d.index, d.targets, d.modes, undefined, d.x, costs, d.pick) ?? [
         { type: "activateAbility", player: HUMAN, objectId: d.objectId, index: d.index, targets: d.targets, modes: d.modes, ...(d.x ? { x: d.x } : {}), costs, ...d.pick },
@@ -813,6 +822,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       }
       if (!c.n) continue; // "sacrifice X creatures" with X = 0
       if (c.kind === "exileFromGraveyard" && c.top) continue; // "the top three black cards of your graveyard": no choice
+      if (c.kind === "removeCounters") continue; // only activated abilities have this cost so far (oracle/activated.ts)
       const key = c.kind === "exileFromGraveyard" ? "exileCards" : c.kind;
       if (d[key] !== undefined) continue;
       if (c.kind === "returnToHand")
@@ -1556,6 +1566,21 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onCancel={() => setDelvePick(null)}
             />
           )}
+          {counterPick && (
+            <CounterChoice
+              key={`${counterPick.label}:${counterPick.n}`}
+              s={s}
+              title={`${counterPick.label}: ${counterPick.what}`}
+              n={counterPick.n}
+              candidates={counterPick.candidates}
+              onHover={setHover}
+              onDone={(counters) => {
+                setCounterPick(null);
+                continueActivate({ ...counterPick.activate, counters });
+              }}
+              onCancel={() => setCounterPick(null)}
+            />
+          )}
           {evidencePick && (
             <EvidenceChoice
               key={`${evidencePick.label}:${evidencePick.n}:${evidencePick.key ?? "ability"}`}
@@ -2098,6 +2123,71 @@ function DistributeChoice({
       <button disabled={pending.move ? left < 0 : left !== 0} onClick={() => dispatch([{ type: "distribute", player: HUMAN, parts }])}>
         Done
       </button>
+    </div>
+  );
+}
+
+/** Which counters pay "Remove three counters from among ... you control": a count for each kind on each permanent. */
+function CounterChoice({
+  s,
+  title,
+  n,
+  candidates,
+  onHover,
+  onDone,
+  onCancel,
+}: {
+  s: GameState;
+  title: string;
+  n: number;
+  candidates: { id: string; kind: string; n: number }[];
+  onHover: (d: CardDef | null) => void;
+  onDone: (counters: { id: string; kind: string }[]) => void;
+  onCancel: () => void;
+}) {
+  const [taken, setTaken] = useState<number[]>(() => candidates.map(() => 0));
+  const total = taken.reduce((a, b) => a + b, 0);
+  const set = (i: number, v: number) => setTaken(taken.map((t, j) => (j === i ? v : t)));
+  return (
+    <div className="modal-backdrop">
+      <div className="modal counter-pick">
+        <header>
+          <strong>{title}</strong>
+          <span className="muted">
+            {" "}
+            {total} of {n} chosen
+          </span>
+          <button disabled={total !== n} onClick={() => onDone(candidates.flatMap((c, i) => Array.from({ length: taken[i]! }, () => ({ id: c.id, kind: c.kind }))))}>
+            Done
+          </button>
+          <button className="ghost" onClick={onCancel}>
+            Cancel
+          </button>
+        </header>
+        <div className="modal-cards">
+          {candidates.map((c, i) => {
+            const d = cardOf(s, c.id);
+            return (
+              <div key={`${c.id}:${c.kind}`} className="counter-row" data-counter={`${c.id}:${c.kind}`}>
+                <div className={`card big ${taken[i] ? "selected" : "targetable"}`} onClick={() => set(i, taken[i]! < c.n && total < n ? taken[i]! + 1 : 0)} {...hoverProps(d, onHover)}>
+                  <CardFace d={d} />
+                </div>
+                <span>
+                  <button className="ghost" disabled={!taken[i]} onClick={() => set(i, taken[i]! - 1)}>
+                    −
+                  </button>
+                  <strong>
+                    {taken[i]} / {c.n} {c.kind}
+                  </strong>
+                  <button className="ghost" disabled={taken[i]! >= c.n || total >= n} onClick={() => set(i, taken[i]! + 1)}>
+                    +
+                  </button>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -2867,7 +2957,8 @@ function ZoneViewer({
 
 /**
  * Choosing a target card in a graveyard ("target creature card from your graveyard",
- * CR 109.2a). Only the legal choices are shown, grouped by whose graveyard they're in.
+ * CR 109.2a), or in exile linked to the source ("target creature card exiled with ~", CR 607.2a). Only the legal
+ * choices are shown, grouped by whose graveyard (or cards) they are.
  */
 function GraveyardPicker({
   s,
@@ -2914,7 +3005,7 @@ function GraveyardPicker({
         <div className="modal-body">
           {owners.map((pid) => (
             <div key={pid}>
-              <h4>{pid === HUMAN ? "Your graveyard" : `${s.players[pid]!.name}'s graveyard`}</h4>
+              <h4>{spec.linkedExile ? (pid === HUMAN ? "Your cards in exile" : `${s.players[pid]!.name}'s cards in exile`) : pid === HUMAN ? "Your graveyard" : `${s.players[pid]!.name}'s graveyard`}</h4>
               <div className="modal-cards">
                 {legal
                   .filter((id) => s.objects[id]!.owner === pid)
@@ -3384,9 +3475,9 @@ function LibrarySearch({
                   .filter((id) => !found.includes(id))
                   .map((id) => {
                     const d = cardOf(s, id);
-                    const can = pending.cards.includes(id) && found.length < pending.max;
+                    const can = pending.cards.includes(id) && found.length < pending.max && !clashes(id);
                     return (
-                      <div key={id} className={`card big ${can ? "targetable" : "dim"}`} data-pick={id} onClick={() => can && setFound([...found, id])} {...hoverProps(d, onHover)}>
+                      <div key={id} className={`card big ${can ? "targetable" : "dim"}`} data-pick={id} onClick={() => can && setFound([...found, id])} {...hoverProps(d, onHover)} title={pending.cards.includes(id) && clashes(id) && pending.oneOfEach ? "You already took a card of this kind" : undefined}>
                         <CardFace d={d} />
                       </div>
                     );
@@ -3685,7 +3776,9 @@ function AbilityMenu({
           return (
             <button key={a.kind} disabled={!ok} title={problem || ALT_NOTES[a.kind]} onClick={() => onCastAlt(a.kind)}>
               {a.text && !a.mana ? (
-                <>Cast it: {a.text}</>
+                <>
+                  {a.kind === "evoke" ? "Evoke:" : "Cast it:"} {a.text}
+                </>
               ) : (
                 <>
                   {ALT_NAMES[a.kind]} <ManaCost cost={a.mana} size="sm" />
@@ -4059,7 +4152,7 @@ function Controls({
         ))}
       </div>
     );
-  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "anchor" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "counterKind" || pending.what === "targetSlot") && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "anchor" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>
@@ -4094,7 +4187,7 @@ function Controls({
     // "other creature" reads "another creature".
     const an = /^other /.test(pending.what) ? `an${pending.what}` : `${/^[aeiou]/i.test(pending.what) ? "an" : "a"} ${pending.what}`;
     // Devour: any number of them; exploit: none or one (pending.min).
-    const what = pending.objectId ? `any number of ${pending.what} permanents` : pending.min !== undefined && pending.count === 1 ? `${an}, if you want,` : pending.count === 1 ? an : `${pending.count} (${pending.what})`;
+    const what = pending.objectId ? `any number of ${pending.what} permanents` : pending.anyNumber ? `any number of ${pending.what.replace(/y$/, "ie")}s` : pending.min !== undefined && pending.count === 1 ? `${an}, if you want,` : pending.count === 1 ? an : `${pending.count} (${pending.what})`;
     const n = discards.length;
     const ok = (pending.min !== undefined ? n >= pending.min && n <= pending.count : n === pending.count) && !(pending.action === "band" && n === 1);
     return (

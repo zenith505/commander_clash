@@ -251,6 +251,16 @@ export function parseCostKeyword(
     if (m[1] === "Blitz") return d.types.includes("Creature") ? { alt: { kind: "blitz", mana } } : "fail";
     return d.types.some((ty) => ["Creature", "Artifact", "Enchantment", "Planeswalker", "Battle"].includes(ty)) ? { alt: { kind: "warp", mana } } : "fail";
   }
+  // "Evoke—Exile a white card from your hand" (Solitude): an evoke cost that isn't mana (CR 702.74a), paid instead of the
+  // mana cost; the card being cast is on the stack by then, so it can't pay for itself (CR 601.2a).
+  if ((m = /^Evoke—(Exile an? [a-z]+ card from your hand)\.?$/.exec(line))) {
+    const cost = parseAdditionalCost(m[1]!);
+    if (cost?.kind !== "exileFromHand") return "fail";
+    return {
+      alt: { kind: "evoke", mana: "", costs: [cost], text: m[1]!.replace(/^E/, "e") },
+      trigger: { event: "selfEnters", ifEvoked: true, body: { targets: [], effects: [sacrificeSelf], text: "When ~ enters, if its evoke cost was paid, its controller sacrifices it." } },
+    };
+  }
   if ((m = /^(Evoke|Dash) ((?:\{[^}]+\})+)$/.exec(line))) {
     const mana = m[2]!;
     if (!plainMana(mana)) return "fail";

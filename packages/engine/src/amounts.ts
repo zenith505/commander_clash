@@ -5,6 +5,7 @@
 // a static ability's numbers are worked out again whenever characteristics are (CR 611.3a).
 
 import type { Amount, AmountExpr, Count, ObjRef, PlayerRef } from "./abilities";
+import { ANY_COUNTER } from "./abilities";
 import { defOf } from "./cards";
 import { bindChosen, objectMatches, printedMatches, spellManaValue } from "./effects";
 import { characteristics, staticConditionNow, type Characteristics } from "./layers";
@@ -174,11 +175,13 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       // As they last existed on the battlefield (CR 608.2h).
       return (s.resolving?.[c.kind === "destroyedThisWay" ? "destroyed" : "exiled"] ?? []).filter(({ o, ch }) => objectMatches(s, c.filter, o, ctx.controller, false, undefined, ch)).length;
     case "discardedThisWay": {
-      const counts = Object.values(s.resolving?.discarded ?? {});
+      const counts = c.who ? refPlayers(s, c.who, ctx).map((pid) => s.resolving?.discarded?.[pid] ?? 0) : Object.values(s.resolving?.discarded ?? {});
       return c.greatest ? Math.max(0, ...counts) : counts.reduce((a, b) => a + b, 0);
     }
     case "exiledFromHandThisWay":
       return s.resolving?.exiledFromHand ?? 0;
+    case "sacrificedThisWayCount":
+      return s.resolving?.sacrificedThisWay?.length ?? 0;
     case "milledManaValue":
       return (s.resolving?.milled ?? []).reduce((a, { id }) => a + defMv(defOf(s, s.objects[id]!)), 0);
     case "revealedFromHand":
@@ -186,6 +189,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.revealedFromHand ?? s.resolving?.item.revealed ?? 0;
     case "tappedThisWay":
       return s.resolving?.tappedThisWay ?? s.resolving?.item.tapped ?? 0;
+    case "damageThisWay":
+      return s.resolving?.damageThisWay ?? 0;
     case "excessThisWay":
       if (c.target !== undefined) {
         const t = s.resolving?.item.targets?.[c.target];
@@ -321,12 +326,14 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return ch?.[c.kind] ?? 0;
     }
     case "counters": {
+      // "For each counter on ~" (Twitching Doll): of every kind.
+      const of = (counters: Record<string, number> | undefined) => (c.counter === ANY_COUNTER ? Object.values(counters ?? {}).reduce((a, b) => a + Math.max(0, b ?? 0), 0) : (counters?.[c.counter] ?? 0));
       const o = refObjects(s, c.of, ctx)[0];
-      if (o?.zone === "battlefield") return o.counters[c.counter] ?? 0;
+      if (o?.zone === "battlefield") return of(o.counters);
       // "For each blight counter on it" after it left: as it last existed on the battlefield (CR 608.2h).
       const lk = c.of.ref === "self" && !ctx.lki && ctx.sourceId && ctx.sourceZc !== undefined ? s.lastKnown?.[ctx.sourceId] : undefined;
-      if (lk && lk.zc === ctx.sourceZc) return lk.counters?.[c.counter] ?? 0;
-      return c.of.ref === "self" || c.of.ref === "subject" ? (ctx.lki?.counters?.[c.counter] ?? 0) : 0;
+      if (lk && lk.zc === ctx.sourceZc) return of(lk.counters);
+      return c.of.ref === "self" || c.of.ref === "subject" ? of(ctx.lki?.counters) : 0;
     }
     case "devotion": {
       // Each mana symbol of that color among the mana costs of permanents you control; a hybrid
@@ -464,6 +471,8 @@ function describeCount(c: Count): string {
       return c.greatest ? "the most cards discarded" : "#cards discarded";
     case "exiledFromHandThisWay":
       return "#cards exiled from hand";
+    case "sacrificedThisWayCount":
+      return "#sacrificed";
     case "milledManaValue":
       return "the total mana value of the milled cards";
     case "revealedFromHand":
@@ -474,6 +483,8 @@ function describeCount(c: Count): string {
       return "#cards chosen";
     case "tappedThisWay":
       return "#tapped";
+    case "damageThisWay":
+      return "the damage dealt";
     case "excessThisWay":
       return "the excess damage";
     case "greatestPowerExiled":

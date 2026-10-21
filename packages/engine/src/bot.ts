@@ -23,6 +23,7 @@ import {
   cantBlockNow,
   provokerOf,
   tapCostCandidates,
+  counterCostCandidates,
   maxBlocks,
   blockersNeeded,
   canEnterUntapped,
@@ -375,6 +376,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "chooseOption", player: pid, choice: pend.options[best]! }];
     }
     // Which counter to move: a +1/+1 counter if it has one (moved onto our creature), else the first.
+    if (pend.kind === "chooseOption" && pend.what === "removeCounter") {
+      // Off our own permanents the harmful kinds (-1/-1, stun), off others' the helpful ones (loyalty, +1/+1, ...).
+      const o = pend.about ? s.objects[pend.about] : undefined;
+      const mine = !!o && controllerOf(s, o) === pid;
+      const kinds = pend.options.filter((k) => k !== "done");
+      const good = kinds.filter((k) => harmfulCounter(k) === mine).sort((a, b) => Number(b === "loyalty") - Number(a === "loyalty") || Number(b === "+1/+1") - Number(a === "+1/+1"));
+      return [{ type: "chooseOption", player: pid, choice: good[0] ?? (pend.options.includes("done") ? "done" : kinds[0]!) }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "counterKind") return [{ type: "chooseOption", player: pid, choice: pend.options.includes("+1/+1") ? "+1/+1" : pend.options[0]! }];
     // Two piles: the better one for our own hand, the worse one for an opponent's.
     if (pend.kind === "chooseOption" && pend.what === "pile" && pend.piles) {
@@ -778,7 +787,9 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     // The source's colors matter for protection (CR 702.16b): a spell's card, or the ability's source.
     // Bots never pick the same thing twice, which also keeps "another target" apart.
     // "Remove all counters from", "move all counters from": only something with counters on it.
-    const countersFrom = allEffects(body.effects).some((e) => (e.type === "removeAllCounters" && e.what.ref === "target" && refCovers(e.what, i)) || (e.type === "moveAllCounters" && e.from.ref === "target" && e.from.index === i));
+    const countersFrom = allEffects(body.effects).some((e) => ((e.type === "removeAllCounters" || e.type === "removeAnyCounters") && e.what.ref === "target" && refCovers(e.what, i)) || (e.type === "moveAllCounters" && e.from.ref === "target" && e.from.index === i));
+    // "Remove up to three counters from" (Glissa Sunslayer): counters worth removing, harmful ones from our own.
+    const chosenCounters = allEffects(body.effects).some((e) => e.type === "removeAnyCounters" && e.what.ref === "target" && refCovers(e.what, i));
     // "Counter target spell if it's blue" (Pyroblast): when that's all it does, only a target it holds for now.
     const onlyIf = body.effects.length > 0 && body.effects.every((e) => e.type === "if" && e.cond.kind === "targetIs" && e.cond.index === i && !e.cond.filter.bound && !e.otherwise?.length) ? (body.effects[0] as { cond: { filter: TargetSpec } }).cond.filter : undefined;
     const holds = (t: TargetChoice) => {
@@ -790,7 +801,7 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
       return t.kind === "object" && !!s.objects[t.id] && objectMatches(s, { ...onlyIf, kind: "object" }, obj(s, t.id), pid, false);
     };
     const all = legalTargets(s, spec, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).filter(
-      (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId) && totalOk(s, body.targets, out, i, t) && !namedLike(s, spec, out, t) && !(countersFrom && t.kind === "object" && !Object.values(obj(s, t.id).counters).some((n) => n > 0)) && holds(t),
+      (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId) && totalOk(s, body.targets, out, i, t) && !namedLike(s, spec, out, t) && !(countersFrom && t.kind === "object" && !Object.entries(obj(s, t.id).counters).some(([k, n]) => n > 0 && (!chosenCounters || harmfulCounter(k) === (controllerOf(s, obj(s, t.id)) === pid)))) && holds(t),
     );
     // Reanimating takes the best creature from any graveyard it may.
     const reanimators = allEffects(body.effects).filter((e): e is Extract<Effect, { type: "putOntoBattlefield" }> => e.type === "putOntoBattlefield" && e.what.ref === "target" && i >= e.what.index && i < e.what.index + (e.what.n ?? 1));
@@ -1815,6 +1826,10 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
       if (topGraveyardCards(s, pid, c.n, c.filter).length < c.n) return null;
     } else if (c.kind === "mill") {
       if (player(s, pid).library.length < c.n + 10) return null;
+    } else if (c.kind === "removeCounters") {
+      const picks = spareCounters(s, pid, obj(s, id), c);
+      if (!picks) return null;
+      out.counters = picks;
     } else {
       const pool = player(s, pid).graveyard.filter((x) => x !== id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x)))));
       if (pool.length < c.n) return null;
@@ -1953,6 +1968,15 @@ function chooseOptionalSacrifices(s: GameState, pid: PlayerId, pend: Extract<Pen
     const per = typeof n === "number" ? n : 2;
     return ok.filter((o) => o.isToken && worth(s, pid, o) <= 2 * per).map((o) => o.id).slice(0, pend.count);
   }
+  // "Sacrifice any number of ...": for Scapeshift's "search for up to that many land cards", the tapped lands (they come
+  // back tapped, as better lands); to draw that many (Sephiroth, Bontu), the cheap tokens.
+  const r = s.resolving;
+  const here = r?.body.effects[r.next];
+  if (here?.type === "pick" && here.anyNumber) {
+    const next = r!.body.effects[r!.next + 1];
+    if (next?.type === "search" && next.filter?.types?.includes("Land")) return pend.options.filter((id) => objIsType(s, obj(s, id), "Land") && obj(s, id).tapped);
+    return ok.filter((o) => o.isToken && worth(s, pid, o) <= 2).map((o) => o.id);
+  }
   const cheapest = ok.sort((a, b) => worth(s, pid, a) - worth(s, pid, b))[0];
   return cheapest && (cheapest.isToken || worth(s, pid, cheapest) <= 3) ? [cheapest.id] : [];
 }
@@ -2030,6 +2054,8 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   if (r && e?.type === "eachMay" && !e.each && after?.type === "if" && after.cond.kind === "theyChose") {
     const life = player(s, pid).life;
     if (!after.cond.not) return life <= 20;
+    // Wandering Archaic: "they may pay {2}. If they don't, you may copy that spell": pay, so it isn't copied.
+    if (e.pay && !e.effects.length && allEffects(after.effects).some((x) => x.type === "copySpell")) return true;
     // Charismatic Conqueror: tap what entered unless it's a creature that may need to block.
     if (e.untappedSubject) {
       const sub = r.item.subject && s.objects[r.item.subject.id];
@@ -2091,9 +2117,11 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
       v -= options.length ? Math.min(...options.map(cost)) : 10;
     }
     else if (inner.type === "moveCounter") {
-      // Graft: only onto our own creatures.
+      // Graft: only onto our own creatures, and never the counter a 0/0 graft creature lives on (CR 704.5f).
       const to = r.item.subject && s.objects[r.item.subject.id];
+      const from = r.item.sourceId ? s.objects[r.item.sourceId] : undefined;
       if (!to || controllerOf(s, to) !== pid) v -= 2;
+      else if (from?.zone === "battlefield" && objIsType(s, from, "Creature") && toughness(s, from) - from.damage <= 1) v -= 2;
     }
     else v += 1;
   }
@@ -2831,9 +2859,28 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
     } else if (c.kind === "mill") {
       // Mill only with plenty of library left: not toward decking ourselves.
       if (player(s, pid).library.length < c.n + 10) return null;
+    } else if (c.kind === "removeCounters") {
+      const picks = spareCounters(s, pid, o, c);
+      if (!picks) return null;
+      out.counters = picks;
     } else return null;
   }
   return out;
+}
+
+/**
+ * Counters to remove for "Remove three counters from among ... you control" (Tekuthal), or null if we'd rather not: the
+ * -1/-1 and stun counters on our permanents first (good riddance), then other counters that do nothing by being there
+ * (not lore, loyalty, time, or ones a permanent leaves without, CR 122.1), then +1/+1 counters from creatures with
+ * several. Never a planeswalker's last loyalty.
+ */
+function spareCounters(s: GameState, pid: PlayerId, source: GameObject, c: Extract<AdditionalCost, { kind: "removeCounters" }>): { id: ObjectId; kind: string }[] | null {
+  const rank = (k: string) => (harmfulCounter(k) ? 0 : k === "+1/+1" ? 2 : ["loyalty", "lore", "time", "fade", "age", "defense"].includes(k) ? 9 : 1);
+  const pool = counterCostCandidates(s, pid, source, c)
+    .filter((x) => rank(x.kind) < 9)
+    .flatMap((x) => Array.from({ length: x.kind === "+1/+1" ? x.n - 1 : x.n }, () => ({ id: x.id, kind: x.kind })))
+    .sort((a, b) => rank(a.kind) - rank(b.kind));
+  return pool.length < c.n ? null : pool.slice(0, c.n);
 }
 
 /**

@@ -9,6 +9,7 @@ import { inCombat, attackDefault, fireEvent } from "./triggers";
 import { attackChoices } from "./run-zones";
 import { copiedValues } from "./run-copies";
 import { controllerOf, invalidateCharacteristics } from "../layers";
+import { defMv } from "../faces";
 
 /**
  * Create `n` tokens that are copies of `base` for this player (CR 707.2), doubled by token doublers (CR 614.1a). They
@@ -132,6 +133,26 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (s.resolving) s.resolving.created = [];
       enterTogether(s, () => {
         for (const pid of players(s, e.who, ctx)) tokenCopies(s, pid, base, n, ctx, e);
+      });
+      return;
+    }
+    case "linkedExileToken": {
+      // Skyclave Apparition: the leaves ability triggered after the source moved, so the object its exile ability belongs
+      // to is the one before (CR 400.7, 607.2a). No exiled card, no token (rulings).
+      const key = `${ctx.sourceId}@${(ctx.sourceZc ?? 1) - 1}`;
+      const cards = (s.linkedExile?.[key] ?? []).map((l) => ({ o: s.objects[l.id], zc: l.zc })).filter(({ o, zc }) => o?.zone === "exile" && (o.zoneChanges ?? 0) === zc).map(({ o }) => o!);
+      if (!cards.length) return;
+      // Each owner creates one token, X the total mana value of all the exiled cards (rulings).
+      const x = cards.reduce((sum, c) => sum + defMv(defOf(s, c)), 0);
+      const token = { ...e.token, power: x, toughness: x };
+      if (s.resolving) s.resolving.created = [];
+      enterTogether(s, () => {
+        for (const pid of apnap(s, [...new Set(cards.map((c) => c.owner))]).filter((pid) => !player(s, pid).lost)) {
+          const { same: k, extra } = tokenBatch(s, pid, token, 1);
+          for (let i = 0; i < k; i++) createToken(s, pid, token);
+          if (k) log(s, `${player(s, pid).name} creates ${k === 1 ? "a" : k} ${x}/${x} ${token.name} token${k > 1 ? "s" : ""} (${src}).`);
+          createExtraTokens(s, pid, extra);
+        }
       });
       return;
     }

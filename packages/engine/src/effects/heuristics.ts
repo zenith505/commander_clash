@@ -61,7 +61,7 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
     if ((e.type === "discard" || e.type === "takeFromHand" || (e.type === "lookAtHand" && e.reveal)) && e.who.ref === "target") mark(e.who.index, e.who.n);
     if ((e.type === "fight" || e.type === "bite") && e.b.ref === "target") mark(e.b.index);
     // Removing all counters (loyalty, +1/+1) is aimed at others' permanents, unless it can only be your own.
-    if (e.type === "removeAllCounters" && e.what.ref === "target" && body.targets[e.what.index]?.controller !== "you") mark(e.what.index, e.what.n);
+    if ((e.type === "removeAllCounters" || e.type === "removeAnyCounters") && e.what.ref === "target" && body.targets[e.what.index]?.controller !== "you") mark(e.what.index, e.what.n);
   }
   // Target players whose permanents are counted ("X is the number of creatures those opponents control", Call the
   // Coppercoats): opponents, who have the most of them.

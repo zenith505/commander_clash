@@ -124,7 +124,7 @@ describe("round 98, more cards", () => {
     putOnBattlefield(s0, ap, moraug);
     const b = putOnBattlefield(s0, ap, bear());
     s0.objects[b]!.tapped = true;
-    s0.players[ap]!.landsPlayed = 0;
+    s0.players[ap]!.landsPlayedThisTurn = 0;
     let s = settle(act(s0, { type: "playLand", player: ap, objectId: ids[0]! }));
     expect(s.addedPhases).toEqual([{ combat: 1 }]);
     // The added combat: its beginning untaps the Bear.

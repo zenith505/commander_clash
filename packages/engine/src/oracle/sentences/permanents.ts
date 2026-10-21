@@ -398,6 +398,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: m[2] ? "endOfTurn" : "game" }] : null;
   }
+  // Treasure Nabber: "gain control of that artifact until the end of your next turn", the trigger's subject; ends in the
+  // cleanup step of your next turn (CR 514.2, 611.2a).
+  if ((m = /^[Gg]ain control of it( until end of turn| until the end of your next turn)?$/.exec(s)) && ctx.subjectIt)
+    return [{ type: "continuous", what: { ref: "subject" }, mods: [{ kind: "control" }], duration: m[1] === " until end of turn" ? "endOfTurn" : m[1] ? "endOfYourNextTurn" : "game" }];
   // "Target player gains control of target permanent you control" (Donate), "An opponent gains control of ~" (Wishclaw
   // Talisman): an opponent you choose as it resolves (rulings). Layer 2, for the rest of the game.
   if ((m = /^(Target player|Target opponent) gains control of (target .+)$/.exec(s))) {

@@ -12,6 +12,9 @@ const bearCard = card("Grizzly Bears", "Creature — Bear", "{1}{G}", { power: "
 
 const comet = card("Comet Storm", "Instant", "{X}{R}{R}", { keywords: ["Multikicker"], oracleText: "Multikicker {1} (You may pay an additional {1} any number of times as you cast this spell.)\nChoose any target, then choose another target for each time this spell was kicked. Comet Storm deals X damage to each of them." });
 
+const loch = card("Drown in the Loch", "Instant", "{U}{B}", { oracleText: "Choose one —\n• Counter target spell with mana value less than or equal to the number of cards in its controller's graveyard.\n• Destroy target creature with mana value less than or equal to the number of cards in its controller's graveyard." });
+const ogre = card("Hill Giant", "Creature — Giant", "{3}{R}", { power: "3", toughness: "3" });
+
 const run = (s: GameState, plan: ReturnType<typeof planCast> | ReturnType<typeof planActivate>) => plan!.reduce((x, a) => act(x, a), s);
 const settle = (s: GameState) => {
   for (let i = 0; i < 40 && (s.stack.length || s.triggerQueue.length) && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
@@ -69,5 +72,49 @@ describe("round 103: Comet Storm", () => {
     expect(planCast(s0, ap, ids[0]!, [{ kind: "player", id: opp }, { kind: "player", id: ap }], undefined, undefined, 2)).toBeNull();
     const s = settle(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "player", id: opp }, { kind: "none" }], undefined, undefined, 2)));
     expect(s.players[opp]!.life).toBe(38);
+  });
+});
+
+describe("round 103: Drown in the Loch", () => {
+  it("parse", () => expect(isFullySupported(loch)).toBe(true));
+
+  it("a creature whose mana value is at most the cards in its controller's graveyard", () => {
+    const { s: s0, ap, ids, opp } = setup([loch]);
+    const g = putOnBattlefield(s0, opp, ogre);
+    const t = { kind: "object" as const, id: g };
+    // Their graveyard has 3 cards: too few for a mana value of 4; your own graveyard doesn't count.
+    const toYard = (pid: number, n: number) => {
+      for (let i = 0; i < n; i++) {
+        const id = s0.players[pid]!.library.shift()!;
+        s0.objects[id]!.zone = "graveyard";
+        s0.players[pid]!.graveyard.push(id);
+      }
+    };
+    toYard(opp, 3);
+    toYard(ap, 6);
+    expect(planCast(s0, ap, ids[0]!, [t], [1])).toBeNull();
+    toYard(opp, 1);
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [t], [1])));
+    expect(s.objects[g]!.zone).toBe("graveyard");
+  });
+
+  it("a spell, against its controller's graveyard", () => {
+    const { s: s0, ap, ids, opp } = setup([loch]);
+    // The opponent casts a 4-mana spell with 4 cards in their graveyard.
+    let s = s0;
+    for (let i = 0; i < 4; i++) {
+      const id = s.players[opp]!.library.shift()!;
+      s.objects[id]!.zone = "graveyard";
+      s.players[opp]!.graveyard.push(id);
+    }
+    const g = putOnBattlefield(s, opp, ogre);
+    s.battlefield.splice(s.battlefield.indexOf(g), 1);
+    s.objects[g]!.zone = "stack";
+    s.stack.push({ id: `st${s.nextId++}`, kind: "spell", objectId: g, controller: opp, sourceId: g, targets: [] } as never);
+    const item = s.stack[s.stack.length - 1]!;
+    const plan = planCast(s, ap, ids[0]!, [{ kind: "stack", id: item.id }], [0]);
+    expect(plan).not.toBeNull();
+    s = settle(run(s, plan));
+    expect(s.objects[g]!.zone).toBe("graveyard");
   });
 });

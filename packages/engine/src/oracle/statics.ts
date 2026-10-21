@@ -512,6 +512,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (self && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: self[1] as "attacking" | "enchanted" | "equipped" | "modified" | "tapped" | "untapped" | "monstrous" };
   if ((m = new RegExp(`^(?:~|it) has an? ${COUNTER} counter on it$`).exec(text)) && (st.affects.kind === "self" || text.startsWith("~")))
     return { kind: "selfCounter", counter: counterKind(m[1]!) };
+  // Dark Depths: "When ~ has no ice counters on it" (a state trigger, CR 603.8).
+  if ((m = new RegExp(`^~ has no ${COUNTER} counters on it$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[1]!), min: 0, max: 0 };
   // Beastmaster Ascension: "as long as ~ has seven or more quest counters on it".
   if ((m = new RegExp(`^~ has ${NUM} or more ${COUNTER} counters on it$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[2]!), min: num(m[1]!) };
   // The Tron lands: "If you control an Urza's Mine and an Urza's Power-Plant" (CR 205.3i: "Urza's" and "Mine" are both

@@ -867,7 +867,8 @@ function parseManaTapTrigger(line: string): TriggeredAbility | "fail" | null {
     filter = { ...f, text: other[2]! };
   }
   // Zhur-Taa Druid: "it deals 1 damage to each opponent", "it" being ~.
-  const text = self ? self[1]!.replace(/^it deals /, "~ deals ") : other![3]!;
+  // Treasure Nabber: "gain control of that artifact", the permanent tapped.
+  const text = self ? self[1]!.replace(/^it deals /, "~ deals ") : other![3]!.replace(/\bthat (artifact|land|permanent|creature)\b/g, "it");
   const body = parseBody(theyAreThatPlayer(text), self ? { eventPlayer: true, selfIt: true } : { eventPlayer: true, subjectIt: true });
   if (!body || allEffects(body.effects).some((e) => e.type === "addMana")) return "fail";
   const by = self || other![1] === "you" ? "you" : other![1] === "an opponent" ? "opponent" : "any";

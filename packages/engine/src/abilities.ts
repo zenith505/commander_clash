@@ -312,6 +312,11 @@ export interface TargetSpec {
    */
   bound?: { key: "power" | "toughness" | "manaValue"; at: "most" | "least" | "exact"; amount: AmountExpr };
   /**
+   * "With mana value less than or equal to the number of cards in its controller's graveyard" (Drown in the Loch): each
+   * candidate against its own controller's graveyard, as it's chosen and as it resolves (CR 601.2c, 608.2b).
+   */
+  mvAtMostControllersGraveyard?: true;
+  /**
    * `attackedThisTurn`: "creatures that attacked this turn" (declared as attackers this turn, CR 508.1).
    * `couldButDidntAttack`: "creatures that didn't attack this turn, except for creatures that couldn't attack" (Season of
    * the Witch): ones that could have been declared as attackers this turn but weren't (rulings, GameObject.couldAttack).
@@ -1762,7 +1767,7 @@ export type Effect =
    */
   | { type: "ownersGainControl"; filter: TargetSpec }
   | { type: "groupRules"; affects: Affects; /** The group as the card says it, for the log. */ text: string; mods: Modification[]; duration: "endOfTurn" | "yourNextTurn" }
-  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game" | "yourNextTurn" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; giveTo?: PlayerRef; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind }
+  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game" | "yourNextTurn" | "endOfYourNextTurn" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; giveTo?: PlayerRef; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind }
   /**
    * Attach the source (an Equipment or Aura) to `what`, CR 701.3; `source`: another Equipment instead ("Attach target
    * Equipment you control to target creature you control", Brass Squire).

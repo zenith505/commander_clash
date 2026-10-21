@@ -550,6 +550,13 @@ export function parseTargetPhrase(
   let p = phrase.trim().toLowerCase();
   const text = `target ${p}`;
   const extra: Partial<TargetSpec> = {};
+  // Drown in the Loch: each candidate's own controller's graveyard.
+  const loch = / with mana value less than or equal to the number of cards in its controller's graveyard$/i.exec(p);
+  if (loch) {
+    extra.mvAtMostControllersGraveyard = true;
+    p = p.slice(0, loch.index);
+    phrase = phrase.trim().slice(0, loch.index);
+  }
   // "Card with mana value less than or equal to ~'s power from your graveyard", "creature with power less than or equal to the
   // number of Islands you control": the amount as written, read first since it may hold words of its own (TargetSpec.bound).
   // Wishing Well: "with mana value equal to the number of coin counters on ~".

@@ -2376,7 +2376,9 @@ export const hasNoMaxHandSize = (s: GameState, pid: PlayerId) =>
 
 function finishCleanup(s: GameState) {
   closeZoneBatch(s); // discarding to hand size (CR 514.1) triggers "whenever you discard one or more cards"
-  s.effects = s.effects.filter((e) => e.duration !== "endOfTurn"); // CR 514.2
+  // "Until the end of your next turn": in the cleanup step of that player's next turn (CR 514.2), or once they've left
+  // the game (CR 800.4m).
+  s.effects = s.effects.filter((e) => e.duration !== "endOfTurn" && !(e.duration === "endOfYourNextTurn" && ((s.activePlayer === e.turnOf && s.turn > (e.sinceTurn ?? 0)) || (e.turnOf !== undefined && player(s, e.turnOf).lost)))); // CR 514.2
   // Delayed triggered abilities lasting "until end of turn", or "until the end of your next turn" in that turn (CR 603.7b).
   s.floatingTriggers = s.floatingTriggers?.filter((f) => !(f.until === "endOfTurn" || (f.until === "endOfYourNextTurn" && s.activePlayer === f.controller && s.turn > f.turn)));
   if (!s.floatingTriggers?.length) s.floatingTriggers = undefined;

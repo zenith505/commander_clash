@@ -1751,7 +1751,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const by = controllerOf(s, o);
         if (by !== ctx.controller && !e.byController) continue; // only your own permanents (CR 701.21a)
         log(s, `${player(s, by).name} sacrifices ${characteristics(s, o).name}.`);
+        const ch = characteristics(s, o);
+        const last = { power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), controller: by, types: [...ch.types] };
         moveObject(s, o.id, "graveyard", { sacrificed: true });
+        // "If you do" (Dark Depths): it was sacrificed (CR 701.21a).
+        if (s.resolving && o.zone !== "battlefield") (s.resolving.sacrificedThisWay ??= []).push(last);
       }
       return;
     case "ninjutsu": {

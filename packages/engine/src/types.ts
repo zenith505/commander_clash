@@ -953,10 +953,12 @@ export interface ContinuousEffect {
   sourceId?: ObjectId;
   /**
    * "endOfTurn" ends in the cleanup step (CR 514.2); "game" lasts until the game ends (CR 611.2a); "yourNextTurn" ends
-   * as `turnOf`'s next turn begins (CR 611.2b), or when it would have for a player who left (CR 800.4m).
+   * as `turnOf`'s next turn begins (CR 611.2b), or when it would have for a player who left (CR 800.4m);
+   * "endOfYourNextTurn" in the cleanup step of `turnOf`'s next turn after `sinceTurn` (CR 514.2).
    */
-  duration: "endOfTurn" | "game" | "yourNextTurn" | "whileTapped" | "whileControlled";
+  duration: "endOfTurn" | "game" | "yourNextTurn" | "endOfYourNextTurn" | "whileTapped" | "whileControlled";
   turnOf?: PlayerId;
+  sinceTurn?: number;
   /**
    * "For as long as ~ remains tapped" (CR 611.2b): it ends when that object (`zc` as it was) untaps, leaves the
    * battlefield or phases out (CR 702.26f); `controller`: "for as long as you control ~" too.

@@ -819,7 +819,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         sourceName: src,
         sourceId: ctx.sourceId,
         duration: e.duration,
-        ...(e.duration === "yourNextTurn" ? { turnOf: ctx.controller } : {}),
+        ...(e.duration === "yourNextTurn" ? { turnOf: ctx.controller } : e.duration === "endOfYourNextTurn" ? { turnOf: ctx.controller, sinceTurn: s.turn } : {}),
         ...(whileTapped ? { whileTapped } : {}),
         ...(whileControlled ? { whileControlled } : {}),
         ...(e.whileCounter ? { whileCounter: e.whileCounter } : {}),
@@ -827,7 +827,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         mods,
       });
       const names = affected.map((id) => defOf(s, obj(s, id)).name);
-      log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, mods, ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : e.duration === "whileTapped" ? ` for as long as ${src} remains tapped` : e.duration === "whileControlled" ? ` for as long as ${player(s, ctx.controller).name} controls ${src}` : ""}.`);
+      log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, mods, ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : e.duration === "endOfYourNextTurn" ? ` until the end of ${player(s, ctx.controller).name}'s next turn` : e.duration === "whileTapped" ? ` for as long as ${src} remains tapped` : e.duration === "whileControlled" ? ` for as long as ${player(s, ctx.controller).name} controls ${src}` : ""}.`);
       return;
     }
     case "ownersGainControl": {

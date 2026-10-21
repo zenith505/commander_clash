@@ -857,7 +857,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "Sacrifice a creature. If you do, ...": only if one was sacrificed (you must if you can, rulings on Victimize).
     const sacDo = /^If you do, (.+)$/.exec(s);
     const sacPrev = effects[effects.length - 1];
-    if (sacDo && !/, where X is /.test(s) && sacPrev?.type === "pick" && sacPrev.action === "sacrifice" && sacPrev.who.ref === "you" && sacPrev.n === 1 && !sacPrev.unless) {
+    // "Sacrifice ~. If you do, create Marit Lage ..." (Dark Depths): only if it was sacrificed (it may have left already,
+    // or be one that can't be sacrificed).
+    if (sacDo && !/, where X is /.test(s) && ((sacPrev?.type === "pick" && sacPrev.action === "sacrifice" && sacPrev.who.ref === "you" && sacPrev.n === 1 && !sacPrev.unless) || (sacPrev?.type === "sacrifice" && sacPrev.what.ref === "self" && !sacPrev.byController))) {
       const before = ctx.targets.length;
       const back = /^return the chosen cards to the battlefield( tapped)?$/.exec(sacDo[1]!);
       const inner: Effect[] | null = back ? (chosenCards ? [{ type: "putOntoBattlefield", what: chosenCards, ...(back[1] ? { tapped: true } : {}) }] : null) : parseOne(capital(sacDo[1]!), ctx);

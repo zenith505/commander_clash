@@ -1439,6 +1439,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "12cc800c-c7be-4811-8207-fd01a99cc892",
+  "name": "Chandra, Torch of Defiance",
+  "manaCost": "{2}{R}{R}",
+  "cmc": 4,
+  "typeLine": "Legendary Planeswalker — Chandra",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Chandra"
+  ],
+  "oracleText": "+1: Exile the top card of your library. You may cast that card. If you don't, Chandra deals 2 damage to each opponent.\n+1: Add {R}{R}.\n−3: Chandra deals 4 damage to target creature.\n−7: You get an emblem with \"Whenever you cast a spell, this emblem deals 5 damage to any target.\"",
+  "loyalty": "4",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "fra",
+  "releasedAt": "2026-10-02",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "df2738fe-9cd1-4347-8808-105fcfde1190",
   "name": "Circle of Protection: Red",
   "manaCost": "{1}{W}",
@@ -1689,6 +1723,34 @@
   "commanderLegal": "legal",
   "set": "akh",
   "releasedAt": "2017-04-28",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9c2b262b-53c0-41a1-8f1a-0c336453d4bf",
+  "name": "Comet Storm",
+  "manaCost": "{X}{R}{R}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Multikicker {1} (You may pay an additional {1} any number of times as you cast this spell.)\nChoose any target, then choose another target for each time this spell was kicked. Comet Storm deals X damage to each of them.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Multikicker"
+  ],
+  "commanderLegal": "legal",
+  "set": "wwk",
+  "releasedAt": "2010-02-05",
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
@@ -6638,6 +6700,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b368121b-9984-4a01-8d35-d1e4a8a87539",
+  "name": "Planar Genesis",
+  "manaCost": "{G}{U}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Look at the top four cards of your library. You may put a land card from among them onto the battlefield tapped. If you don't, put a card from among them into your hand. Put the rest on the bottom of your library in a random order.",
+  "colors": [
+   "G",
+   "U"
+  ],
+  "colorIdentity": [
+   "G",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mh3",
+  "releasedAt": "2024-06-14",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b099fc54-cdbc-46cb-b4e4-7c2ca77b115b",
   "name": "Plumb the Forbidden",
   "manaCost": "{1}{B}",
@@ -7721,6 +7811,67 @@
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "78301998-fd9b-4cd5-afad-dbcb43cac2a7",
+  "name": "Shatterskull Smashing // Shatterskull, the Hammer Pass",
+  "manaCost": "{X}{R}{R}",
+  "cmc": 2,
+  "typeLine": "Sorcery // Land",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Shatterskull Smashing deals X damage divided as you choose among up to two target creatures and/or planeswalkers. If X is 6 or more, Shatterskull Smashing deals twice X damage divided as you choose among them instead.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "znr",
+  "releasedAt": "2020-09-25",
+  "rarity": "mythic",
+  "layout": "modal_dfc",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Shatterskull Smashing",
+    "manaCost": "{X}{R}{R}",
+    "typeLine": "Sorcery",
+    "supertypes": [],
+    "types": [
+     "Sorcery"
+    ],
+    "subtypes": [],
+    "oracleText": "Shatterskull Smashing deals X damage divided as you choose among up to two target creatures and/or planeswalkers. If X is 6 or more, Shatterskull Smashing deals twice X damage divided as you choose among them instead.",
+    "colors": [
+     "R"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/b/c/bc7239ea-f8aa-4a6f-87bd-c35359635673.jpg?1783929355",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/b/c/bc7239ea-f8aa-4a6f-87bd-c35359635673.jpg?1783929355"
+   },
+   {
+    "name": "Shatterskull, the Hammer Pass",
+    "manaCost": "",
+    "typeLine": "Land",
+    "supertypes": [],
+    "types": [
+     "Land"
+    ],
+    "subtypes": [],
+    "oracleText": "As this land enters, you may pay 3 life. If you don't, it enters tapped.\n{T}: Add {R}.",
+    "colors": [],
+    "imageUrl": "https://cards.scryfall.io/normal/back/b/c/bc7239ea-f8aa-4a6f-87bd-c35359635673.jpg?1783929355",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/b/c/bc7239ea-f8aa-4a6f-87bd-c35359635673.jpg?1783929355"
+   }
+  ]
  },
  {
   "oracleId": "f748b2fb-6c2a-400a-8e96-fa4e4a1dfe80",

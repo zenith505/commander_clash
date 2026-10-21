@@ -1,7 +1,7 @@
 # Roadmap
 
-21,447 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 975 of 992 (98%), top 2,000: 1,661 of 1,989 (83%), top 5,000: 3,445 of 4,988 (69%).
+21,543 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 989 of 992 (99%), top 2,000: 1,689 of 1,989 (84%), top 5,000: 3,483 of 4,988 (69%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,18 +22,21 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 97, most played first: Breach the Multiverse, The Soul
-   Stone (harness, the ∞ ability), Throne of Eldraine ("spend this mana only to cast monocolored spells of that color",
-   "spend only mana of the chosen color to activate this ability"), Ripples of Potential, Sword of Hearth and Home,
-   Archway of Innovation ("the next spell you cast this turn has improvise"), Myr Battlesphere ("tap X untapped Myr"),
-   Promise of Loyalty, Dusk // Dawn, Agadeem's Awakening ("each have a different mana value"), Moraug, All Is Dust,
-   Chain of Vapor, Mechanized Production, Kardur, Kodama of the East Tree, Mirror Entity, Noxious Gearhulk, Destiny
-   Spinner, Spellskite, Necromancy. Smaller gaps from round 97: the other "whenever you put counters" triggers (Orah,
+00. Most played first (`npm run popular`). Out after round 98, most played first: Mechanized Production ("eight or more
+   artifacts with the same name"), Kardur ("attack a player other than you if able"), Kodama of the East Tree,
+   Spellskite, Necromancy, Combustible Gearhulk, Arcane Lighthouse, Training Grounds, Charismatic Conqueror, Tataru
+   Taru, Hunter's Insight, Sakashima of a Thousand Faces, K'rrik, Restoration Magic (Tiered), Jace, Wielder of
+   Mysteries, Marvin, Ugin, the Ineffable, Muldrotha, Ethereal Armor, Vivi Ornitier, Mishra's Bauble, Drakuseth, Great
+   Train Heist, Up the Beanstalk. Smaller gaps from round 98: Chain Lightning, Chain Stasis and Chain of Plasma (a
+   cost to pay inside "that player may ... If the player does, they may copy ~"), Chain of Smog (bots copying back
+   and forth needs a loop shortcut), Chain of Silence's first sentence, World at War ("after the second main phase");
+   bots answer Chain of Vapor's copy only with 7+ lands and a target an opponent controls. Smaller gaps from round 97: the other "whenever you put counters" triggers (Orah,
    Kros, Rikku, Captain Marvel, Defiant Greatmaw, Aragorn, Invisible Woman, Riveteers Ascendancy, Kate Stewart's second
    line); "Sacrifice X" in a mana ability (Springjack Pasture), in a spell's text (Nahiri's Lithoforming, Empty the
    Laboratory) or with "reveals the top X" (Lonis), Champion of Stray Souls' graveyard ability; bots never use "Sacrifice
    X" abilities, and always take Tainted Pact's first card; with Narset, Parter of Veils an optional draw is still
-   offered (it then draws nothing); "historic" is read only in Excalibur's count (the other 56 historic cards are out);
+   offered (it then draws nothing); "historic" is read for targets, spells and costs since round 98, but "historic" in
+   an "or" list (", historic or ...") is still out;
    Tempt with Discovery shuffles each library after each search instead of once at the end (the same result). Smaller gaps from
    round 96: Ugin's Nexus (its "would be put into a graveyard" line), Stranglehold ("can't search libraries"),
    Gerrard's Hourglass Pendant, Gond Gate ("Gates you control"), Neoform ("with an additional +1/+1 counter"), Vivien

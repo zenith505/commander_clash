@@ -2283,15 +2283,19 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     }
     // "For each creature exiled this way, its controller creates a 2/2 green Boar creature token" (Curse of the Swine),
     // "For each creature destroyed this way, its controller draws a card": after the destroy or exile instruction.
-    const perThisWay = /^For each (.+?) (destroyed|exiled) this way, its controller (creates an? .+ token(?: with [a-z ]+)?|draws a card)$/.exec(s);
+    const perThisWay = /^For each (.+?) (destroyed|exiled|put into a graveyard) this way, its controller (creates an? .+ token(?: with [a-z ]+)?|draws a card)$/.exec(s);
     if (perThisWay) {
-      const which = perThisWay[2] as "destroyed" | "exiled";
-      const prev = effects[effects.length - 1];
+      const graveyard = perThisWay[2] === "put into a graveyard";
+      const which = graveyard ? "destroyed" : (perThisWay[2] as "destroyed" | "exiled");
+      // Terastodon: "You may destroy up to three target noncreature permanents. For each permanent put into a graveyard
+      // this way, ...": after the "you may".
+      const last = effects[effects.length - 1];
+      const prev = graveyard && last?.type === "may" && !last.pay && !last.otherwise && last.effects.length === 1 ? last.effects[0] : last;
       const spec = parseTargetPhrase(perThisWay[1]!.split(/\s+/).map(singularWord).join(" "), { chosen: true });
       const inner = parseOne(capital(perThisWay[3]!.replace(/^creates/, "create").replace(/^draws/, "draw")), ctx);
       const one = inner?.length === 1 ? inner[0]! : undefined;
       if (prev?.type !== (which === "destroyed" ? "destroy" : "exile") || spec?.kind !== "object" || !one || (one.type !== "createToken" && one.type !== "draw") || one.n !== 1) return null;
-      effects.push({ type: "forEachThisWay", which, filter: { ...spec, text: perThisWay[1]! }, effects: [{ ...one, who: { ref: "eachOne" } }] });
+      effects.push({ type: "forEachThisWay", which, ...(graveyard ? { graveyard: true as const } : {}), filter: { ...spec, text: perThisWay[1]! }, effects: [{ ...one, who: { ref: "eachOne" } }] });
       continue;
     }
     // "Mill three cards. You may put a land card from among them into your hand." (Six, Eerie Gravestone), "... from among

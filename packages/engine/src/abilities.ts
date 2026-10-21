@@ -1626,7 +1626,8 @@ export type Effect =
    * destroyed this way, its controller draws a card": `effects` (one token or one card, for PlayerRef "eachOne") once for
    * each of them that the instructions before destroyed or exiled, by the player who controlled it as it last existed.
    */
-  | { type: "forEachThisWay"; which: "destroyed" | "exiled"; filter: TargetSpec; effects: Effect[] }
+  /** `graveyard`: "for each permanent put into a graveyard this way" (Terastodon): only the destroyed ones that went there. */
+  | { type: "forEachThisWay"; which: "destroyed" | "exiled"; graveyard?: true; filter: TargetSpec; effects: Effect[] }
   /** "Exile the top two cards of your library. Until the end of your next turn, you may play those cards." */
   /** `who`: "the top card of that player's library" (Ragavan), not yours; `castOnly`: "you may cast that card", not play it. */
   /** `free`: "you may play that card without paying its mana cost" (Urza, Lord High Artificer, CR 118.9). */

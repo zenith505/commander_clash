@@ -1747,8 +1747,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // All of them left first (rulings on Rampage of the Clans); each player then gets theirs, in APNAP order, as many as
       // they controlled (CR 608.2h). A destroyed one counts even if it went somewhere other than a graveyard (rulings).
       const counts = new Map<PlayerId, number>();
-      for (const { o, ch } of s.resolving?.[e.which] ?? [])
-        if (objectMatches(s, e.filter, o, ctx.controller, false, undefined, ch)) counts.set(ch.controller, (counts.get(ch.controller) ?? 0) + 1);
+      for (const x of s.resolving?.[e.which] ?? [])
+        if ((!e.graveyard || ("died" in x && x.died)) && objectMatches(s, e.filter, x.o, ctx.controller, false, undefined, x.ch)) counts.set(x.ch.controller, (counts.get(x.ch.controller) ?? 0) + 1);
       for (const pid of apnap(s, [...counts.keys()])) {
         if (player(s, pid).lost) continue;
         const n = counts.get(pid)!;

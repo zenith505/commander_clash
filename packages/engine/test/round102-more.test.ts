@@ -4,7 +4,8 @@
 // instant and sorcery spell you cast before it this turn). Crawlspace (no more than two creatures can attack you).
 // Delayed Blast Fireball ("each opponent and each creature they control"; "if ~ was cast from exile"). Rings of
 // Brighthearth (copying an activated ability, even once it's countered: rulings). Baleful Mastery ("if the {1}{B} cost
-// was paid, an opponent draws a card": one chosen as it resolves, rulings).
+// was paid, an opponent draws a card": one chosen as it resolves, rulings). Terastodon (a token for each permanent put
+// into a graveyard this way, not one that survived).
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, setup, target } from "./helpers";
@@ -29,6 +30,9 @@ const rings = card("Rings of Brighthearth", "Artifact", "{3}", { oracleText: "Wh
 const pyromancer = card("Prodigal Pyromancer", "Creature — Human Wizard", "{2}{R}", { power: "1", toughness: "1", oracleText: "{T}: This creature deals 1 damage to any target." });
 
 const mastery = card("Baleful Mastery", "Instant", "{3}{B}", { oracleText: "You may pay {1}{B} rather than pay this spell's mana cost.\nIf the {1}{B} cost was paid, an opponent draws a card.\nExile target creature or planeswalker." });
+
+const terastodon = card("Terastodon", "Creature — Elephant", "{6}{G}{G}", { power: "9", toughness: "9", oracleText: "When this creature enters, you may destroy up to three target noncreature permanents. For each permanent put into a graveyard this way, its controller creates a 3/3 green Elephant creature token." });
+const relic = card("Darksteel Relic", "Artifact", "{0}", { keywords: ["Indestructible"], oracleText: "Indestructible" });
 
 const pass = (s: GameState) => act(s, { type: "passPriority", player: waitingOn(s)! });
 const settle = (s: GameState) => {
@@ -209,5 +213,30 @@ describe("round 102: Baleful Mastery", () => {
       expect(s.objects[g]!.zone).toBe("exile");
       expect(s.turnOrder.map((p) => s.players[p]!.hand.length)).toEqual(s.turnOrder.map((p, i) => hands[i]! - (p === ap ? 1 : 0) + (alt && p === other ? 1 : 0)));
     }
+  });
+});
+
+describe("round 102: Terastodon", () => {
+  it("parse", () => expect(isFullySupported(terastodon)).toBe(true));
+
+  it("an Elephant for each permanent put into a graveyard this way, for its controller", () => {
+    const { s: s0, ap, opp, ids } = setup([terastodon]);
+    const l1 = putOnBattlefield(s0, opp, card("Wastes", "Basic Land"));
+    const l2 = putOnBattlefield(s0, opp, card("Wastes", "Basic Land"));
+    const r = putOnBattlefield(s0, ap, relic);
+    s0.players[ap]!.manaPool.G = 8;
+    let s = planCast(s0, ap, ids[0]!)!.reduce((x, y) => act(x, y), s0);
+    for (let i = 0; i < 100 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+      const p = s.pending;
+      if (p?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [target(l1), target(l2), target(r)] });
+      else if (p?.kind === "chooseMay") s = act(s, { type: "chooseMay", player: ap, yes: true });
+      else if (p) throw new Error(`unexpected ${p.kind}`);
+      else s = pass(s);
+    }
+    expect(s.objects[l1]!.zone).toBe("graveyard");
+    expect(s.objects[r]!.zone).toBe("battlefield");
+    const elephants = (pid: number) => s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === pid).length;
+    expect(elephants(opp)).toBe(2);
+    expect(elephants(ap)).toBe(0);
   });
 });

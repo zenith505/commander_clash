@@ -67,6 +67,14 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       const filter = pickFilter(c[1]!);
       if (!filter) return "fail";
       extra.push({ kind: "sacrifice", filter: { ...filter, text: c[1]! }, n: 1, other: true });
+    } else if ((c = /^Sacrifice an? ([A-Z]\w+) and an? ([A-Z]\w+)$/.exec(part)) && c[1] !== c[2]) {
+      // "Sacrifice a Swamp and a Forest" (Jarad, Golgari Lich Lord): two permanents, one of each; a land that's both
+      // counts as only one of them (rulings, CR 602.2b).
+      const a = pickFilter(c[1]!);
+      const b = pickFilter(c[2]!);
+      const both = pickFilter(`${c[1]} or ${c[2]}`);
+      if (!a || !b || !both || a.kind !== "object" || b.kind !== "object") return "fail";
+      extra.push({ kind: "sacrifice", filter: { ...both, text: `${c[1]} and a ${c[2]}` }, n: 2, oneOfEach: [a, b] });
     } else if ((c = /^Sacrifice another (\w+) or an? (\w+)$/.exec(part))) {
       // "Sacrifice another creature or an artifact" (Street Urchin): this permanent too if it's an artifact (rulings).
       const filter = pickFilter(`${c[1]} or ${c[2]}`);

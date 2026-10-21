@@ -168,6 +168,10 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx): Effect | null |
     if (!trigger || trigger === "fail" || trigger.event !== "eachBeginCombat" || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
     return { type: "floatingTrigger", trigger, until: "endOfTurn" };
   }
+  // "Whenever a creature dies this turn, each creature other than ~ gets -1/-1 until end of turn" (Massacre Girl): the
+  // same as "This turn, whenever a creature dies, ..." (CR 603.7b).
+  const dies = /^Whenever (an?(?: [a-z]+)? creature(?: you control| an opponent controls)?) dies this turn, (.+)$/.exec(s);
+  if (dies) return floatingTrigger(`This turn, whenever ${dies[1]!} dies, ${dies[2]!}`, after, ctx);
   const m = /^([Uu]ntil end of turn|[Tt]his turn|[Uu]ntil your next turn|[Uu]ntil the end of your next turn), ([Ww]henever .+)$/.exec(s);
   if (!m) return undefined;
   const text = [m[2]!, ...after.map((x) => x.replace(/\.$/, ""))].join(". ");
@@ -759,12 +763,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   text = text.replace(/(^|\. )You add ((?:\{[WUBRGC]\})+)(?= and |\.)/, "$1Add $2");
   // "~ deals 2 damage to each other player" (Syphon Soul): with no teams, every other player is an opponent (CR 102.3).
   text = text.replace(/\b(deals \w+ damage to) each other player\b/g, "$1 each opponent");
+  // "~ deals 3 damage to each of your opponents" (Aurelia, the Law Above) is "each opponent".
+  text = text.replace(/\b(deals \w+ damage to) each of your opponents\b/g, "$1 each opponent");
   // "~ deals 4 damage to target creature and you gain life equal to the damage dealt this way" (Enter the God-Eternals).
   text = text.replace(/^(~ deals [^.]+? damage to [^.]+?) and you gain life equal to the damage dealt this way\./, "$1. You gain life equal to the damage dealt this way.");
   // "Destroy all creatures you don't control and all planeswalkers you don't control" (In Garruk's Wake).
   text = text.replace(/\ball creatures you don't control and all planeswalkers you don't control\b/g, "all creatures and planeswalkers you don't control");
   // "Destroy all creatures other than ~" (Magister of Worth) is "destroy all other creatures".
   text = text.replace(/\ball creatures other than ~/g, "all other creatures");
+  // "Each creature other than ~ gets -1/-1 until end of turn" (Massacre Girl) is "each other creature".
+  text = text.replace(/\b([Ee])ach creature other than ~/g, "$1ach other creature");
   // "Choose any number of target creatures you control. For each of them, create a token that's a copy of that creature,
   // except it has haste." (Twinflame): a copy of each of them.
   text = text.replace(/^Choose any number of target ([^.]+?)\. For each of them, create a token that's a copy of that (?:creature|permanent)(, except [^.]+)?\./, "Create a token that's a copy of each of any number of target $1$2.");
@@ -2676,7 +2684,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // creature an opponent controls gets -4/-4 until end of turn if you gained life this turn" (Poisoner's Apprentice):
     // the target is chosen either way, and the condition checked as it resolves (rulings). Only a
     // condition about the game (one the static parser reads), not about "it".
-    const trailIf = !insteadIf ? /^((?:[Dd]raw|[Cc]reate|[Yy]ou gain|[Ee]ach opponent loses|[Pp]ut|[Tt]arget [^,]+ gets) .+) if ((?!it\b|~|that\b|they\b|able\b)[^,]+)$/.exec(s) : null;
+    const trailIf = !insteadIf ? /^((?:[Dd]raw|(?:[Yy]ou )?[Cc]reate|[Yy]ou gain|[Ee]ach opponent loses|[Pp]ut|[Tt]arget [^,]+ gets) .+) if ((?!it\b|~|that\b(?! player (?:has|controls) more [a-z ]+ than each other player$)|they\b|able\b)[^,]+)$/.exec(s) : null;
     if (trailIf && parseStaticCondition(trailIf[2]!, { affects: { kind: "self" }, mods: [], text: "" }))
       s = `If ${trailIf[2]}, ${trailIf[1]!.charAt(0).toLowerCase()}${trailIf[1]!.slice(1)}`;
     // "It deals that much damage to each other opponent if ~'s power is 7 or greater" (Vincent), "Then if ~'s power is 4

@@ -425,6 +425,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "spellsCastThisTurn":
       return (s.castThisTurn ?? []).filter((x) => x.player === ctx.controller).length;
+    case "manaValueCastThisTurn": {
+      // The resolving spell's own cast is its castNth'th; a copy wasn't cast, so it has none (CR 707.10).
+      const self = c.other && s.resolving?.item.kind === "spell" ? s.resolving.item.castNth : undefined;
+      return (s.castThisTurn ?? []).reduce((n, x, i) => n + (x.player === ctx.controller && i !== self ? (x.mv ?? 0) : 0), 0);
+    }
     case "colorsAmongPermanents": {
       const colors = new Set<string>();
       for (const id of s.battlefield) {

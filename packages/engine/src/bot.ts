@@ -1869,6 +1869,18 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
     }
     else if (c.kind === "payLife") {
       if (player(s, pid).life < c.n + 15) return null;
+    } else if (c.kind === "sacrifice" && c.oneOfEach) {
+      // "A Swamp and a Forest" (Jarad): for each in turn, the cheapest that fits it and as few of the others as can be
+      // (a plain Swamp before an Overgrown Tomb), each a different permanent.
+      const pool = sacrificePool(s, pid, c, targeted, alt);
+      const picked: ObjectId[] = [];
+      for (const [i, f] of c.oneOfEach.entries()) {
+        const later = (x: GameObject) => c.oneOfEach!.slice(i + 1).filter((g) => objectMatches(s, g, x, pid, false)).length;
+        const o = pool.filter((x) => !picked.includes(x.id) && objectMatches(s, f, x, pid, false)).sort((a, b) => later(a) - later(b))[0];
+        if (!o) return null;
+        picked.push(o.id);
+      }
+      out.sacrifice = picked;
     } else if (c.kind === "sacrifice") {
       const pool = sacrificePool(s, pid, c, targeted, alt);
       if (pool.length < c.n) return null;

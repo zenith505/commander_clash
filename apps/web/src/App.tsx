@@ -730,7 +730,9 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           : s.players[HUMAN]!.hand.filter((id) => id !== d.objectId && (!c.filter || printedMatches(c.filter, cardOf(s, id))));
       const what = c.kind === "sacrifice" ? c.filter.text : (c.filter?.text ?? "card");
       const article = c.kind === "sacrifice" && c.other ? "another" : /^[aeiou]/i.test(what) ? "an" : "a";
-      return setCostPick({ activate: d, kind: c.kind, label: cardOf(s, d.objectId).name, what: `${c.kind === "sacrifice" && c.exile ? "exile" : c.kind} ${c.n === 1 ? article : c.n} ${what}${c.n > 1 ? "s" : ""}`, n: c.n, candidates, chosen: [] });
+      // "Sacrifice a Swamp and a Forest" (Jarad): its text names both.
+      const many = c.kind === "sacrifice" && c.oneOfEach ? `a ${what}` : `${c.n === 1 ? article : c.n} ${what}${c.n > 1 ? "s" : ""}`;
+      return setCostPick({ activate: d, kind: c.kind, label: cardOf(s, d.objectId).name, what: `${c.kind === "sacrifice" && c.exile ? "exile" : c.kind} ${many}`, n: c.n, candidates, chosen: [] });
     }
     const costs = { ...(d.sacrifice?.length ? { sacrifice: d.sacrifice } : {}), ...(d.discard?.length ? { discard: d.discard } : {}), ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}), ...(d.tap?.length ? { tap: d.tap } : {}), ...(d.exileFromHand?.length ? { exileFromHand: d.exileFromHand } : {}), ...(d.exileCards?.length ? { exileCards: d.exileCards } : {}), ...(d.collect ? { collect: d.collect } : {}), ...(d.counters?.length ? { counters: d.counters } : {}) };
     dispatch(
@@ -1776,7 +1778,7 @@ const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback
 function describeExtraCost(c: AdditionalCost): string {
   const n = (k: number, what: string) => (k === 1 ? `${/^[aeiou]/i.test(what) ? "an" : "a"} ${what}` : `${k} ${what}s`);
   if (c.kind === "payLife") return `pay ${c.n} life`;
-  if (c.kind === "sacrifice") return `${c.exile ? "exile" : "sacrifice"} ${n(c.n, c.filter.text)}${c.exile ? " you control" : ""}`;
+  if (c.kind === "sacrifice") return `${c.exile ? "exile" : "sacrifice"} ${c.oneOfEach ? `a ${c.filter.text}` : n(c.n, c.filter.text)}${c.exile ? " you control" : ""}`;
   if (c.kind === "discard") return `discard ${n(c.n, c.filter?.text ?? "card")}${c.random ? " at random" : ""}`;
   if (c.kind === "returnToHand") return `return ${n(c.n, c.filter.text)} to hand`;
   if (c.kind === "revealHand") return "reveal your hand";

@@ -589,6 +589,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       }
       return mine > -Infinity && mine >= all;
     }
+    case "eventPlayerMost":
     case "opponentMore": {
       const measure = (p: PlayerId) => {
         if (cond.what === "life") return s.players[p]!.life;
@@ -597,6 +598,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
         for (const c of chars.values()) if (c.controller === p && c.types.includes(cond.what === "lands" ? "Land" : "Creature")) n++;
         return n;
       };
+      if (cond.kind === "eventPlayerMost") {
+        if (eventPlayer === undefined || s.players[eventPlayer]!.lost) return false;
+        const theirs = measure(eventPlayer);
+        return s.turnOrder.every((p) => p === eventPlayer || s.players[p]!.lost || measure(p) < theirs);
+      }
       const mine = measure(you);
       if (cond.subjectController) {
         // As the land is now, or as it last existed (CR 608.2h).

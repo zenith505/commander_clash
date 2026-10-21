@@ -476,6 +476,10 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return { kind: "controlGreatest", type: m[1] === "creature" ? "Creature" : "Artifact", stat: m[2] === "mana value" ? "manaValue" : (m[2] as "power" | "toughness") };
   if ((m = /^an opponent (?:controls more (lands|creatures)|has more (life|cards in hand)) than you$/.exec(text)))
     return { kind: "opponentMore", what: (m[1] ?? (m[2] === "life" ? "life" : "hand")) as "lands" | "creatures" | "life" | "hand" };
+  // "If that player has more cards in hand than each other player" (Battle Angels of Tyr): the trigger's player, strictly
+  // more than every other player still in the game (CR 800.4a), you included.
+  if ((m = /^that player (?:controls more (lands|creatures)|has more (life|cards in hand)) than each other player$/.exec(text)))
+    return { kind: "eventPlayerMost", what: (m[1] ?? (m[2] === "life" ? "life" : "hand")) as "lands" | "creatures" | "life" | "hand" };
   if (/^~ is attached to a creature$/.test(text)) return { kind: "self", is: "attachedToCreature" };
   if (/^~ attacked this turn$/.test(text)) return { kind: "self", is: "attackedThisTurn" };
   // "~ has indestructible as long as it attacked a battle this turn" (War Historian), "~ has hexproof as long as it

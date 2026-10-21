@@ -672,11 +672,14 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     bodyText = m[4]!;
     const n = m[2] ? num(m[2]) : 1;
     if (n > 1) min = n;
-  } else if ((m = /^Whenever one or more creatures attack, (.+)$/.exec(line))) {
-    // Duelist's Heritage: whoever attacks (rulings), once for each declaration (CR 508.1, 603.2c).
+  } else if ((m = /^Whenever (?:one or more creatures attack|a player attacks with (two|three|four|five) or more creatures), (.+)$/.exec(line))) {
+    // Duelist's Heritage: whoever attacks (rulings), once for each declaration (CR 508.1, 603.2c). "Whenever a player
+    // attacks with three or more creatures" (Aurelia, the Law Above): any player's attack, counting all their attackers.
     event = "creaturesYouControlAttack";
-    bodyText = m[1]!;
+    bodyText = m[2]!;
     anyone = true;
+    if (m[1]) min = num(m[1]);
+    if (/\bthat player\b/.test(bodyText)) return "fail";
   } else if ((m = /^Whenever one or more (.+?) you control deal combat damage to (a player or battle|a player|an opponent|one or more players), (.+)$/.exec(line.replace(/^(Whenever one or more creatures) (you control) (each with power greater than its base power) deals /, "$1 $3 $2 deal ")))) {
     event = "creaturesYouControlDealCombatDamageToPlayer";
     phrase = m[1];

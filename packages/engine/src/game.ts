@@ -3912,8 +3912,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   if (isMainPhase(s) && s.activePlayer === p.id) item.castInMain = true;
   s.cards[d.oracleId] ??= d;
   (p.castNames ??= {})[d.name] = (p.castNames[d.name] ?? 0) + 1;
-  (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors], from: castFrom, ...(paid.treasure ? { treasure: true as const } : {}) });
-  (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv: spellManaValue(s, item) };
+  const castMv = spellManaValue(s, item);
+  (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors], from: castFrom, ...(paid.treasure ? { treasure: true as const } : {}), mv: castMv });
+  (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv };
   // A copy of a prepare spell: its permanent stops being prepared as it becomes cast (CR 722.3c, 601.2i).
   if (o.preparedFrom) unprepareFor(s, o);
   // Once it's cast, "whenever you cast" and "becomes the target" abilities trigger (CR 601.2i).
@@ -4480,6 +4481,20 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     if (c.kind === "discard" && c.random) {
       if (chosen?.length) return `${d.name}'s discard is at random`;
       if (pool.length < c.n) return `you need to ${verb} ${what} to ${doing}`;
+      continue;
+    }
+    // "Sacrifice a Swamp and a Forest" (Jarad): one permanent for each, a land that's both being only one (rulings).
+    const each = c.kind === "sacrifice" ? c.oneOfEach : undefined;
+    if (each) {
+      const fitEach = (specs: TargetSpec[], ids: ObjectId[]): boolean => {
+        const [f, ...rest] = specs;
+        return !f || ids.some((id) => objectMatches(s, f, obj(s, id), pid, false) && fitEach(rest, ids.filter((x) => x !== id)));
+      };
+      if (!chosen) {
+        if (!fitEach(each, pool)) return `you need to ${verb} ${what} to ${doing}`;
+        continue;
+      }
+      if (chosen.length !== c.n || new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id)) || !fitEach(each, chosen)) return `choose ${what} to ${verb}`;
       continue;
     }
     // "Discard an Island card and another card" (Foil): one of them an Island card.

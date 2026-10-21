@@ -123,7 +123,8 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
   }
   // "A snow permanent card, a legendary card, or a Saga card" (Search for Glory): a card that fits any one of them.
   const parts = p.split(/,? or an? |, an? /);
-  if (parts.length > 1 && parts.every((x) => / card$/.test(x))) {
+  // "An instant card or a card with flash" (Waterlogged Teachings).
+  if (parts.length > 1 && parts.every((x) => / card$|^card with [a-z]+$/.test(x))) {
     const subs = parts.map((x) => parseSearchFilter(x));
     if (subs.some((x) => !x)) return null;
     return { kind: "card", anyOf: subs as TargetSpec[], text: p.replace(/\bcard\b(?=,| or )/g, "card") };
@@ -151,7 +152,7 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
 
 function plainFilter(p: string): TargetSpec | null {
   // Only plain card qualities: "with different names", "with mana value X or less" and the like aren't modeled.
-  if (/ with (different|the same)| X /.test(p) || !/card( with (mana value|power|toughness) \d+ or (less|greater)| with an? (even|odd) mana value| with mana cost \{\d+\}(?: or \{\d+\})?)?$/i.test(p)) return null;
+  if (/ with (different|the same)| X /.test(p) || !/card( with (mana value|power|toughness) \d+ or (less|greater)| with an? (even|odd) mana value| with mana cost \{\d+\}(?: or \{\d+\})?| with (?!the |a |an |different )[a-z]+(?: strike)?)?$/i.test(p)) return null;
   const spec = parseTargetPhrase(`${p} from your graveyard`);
   if (!spec || spec.kind !== "card") return null;
   const { owner: _owner, ...rest } = spec;

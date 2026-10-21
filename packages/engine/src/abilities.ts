@@ -128,6 +128,8 @@ export type Count =
    * "The amount of excess damage dealt to that creature this way" (Hell to Pay), "that excess damage": what this spell's or
    * ability's damage dealt to permanents beyond lethal damage, their loyalty or their defense (CR 120.4a, 120.10).
    */
+  /** "You gain life equal to the damage dealt this way" (Syphon Soul): all the damage the instructions before dealt, after prevention. */
+  | { kind: "damageThisWay" }
   | { kind: "excessThisWay"; /** Only that target's (The Last Agni Kai's "add that much {R}"). */ target?: number }
   /** "If you lost life this way, draw that many cards" after exchanging life totals (Mister Negative): the life you lost doing it. */
   | { kind: "lifeLostThisWay" }
@@ -2437,6 +2439,8 @@ export type SpellCondition =
   | { kind: "revealedSharesCreatureType" }
   /** "If a card with the chosen name was milled this way" (Predict): any card the mill instruction before put there. */
   | { kind: "milledIs"; filter: TargetSpec }
+  /** "If you exiled a land card this way" after exiling the top cards to play (Bonehoard Dracosaur): one of them is. */
+  | { kind: "impulsedIs"; filter: TargetSpec }
   /** "If you didn't create a token this way" (Springheart Nantuko): this resolution hasn't created any. */
   | { kind: "createdNone" }
   /** "If you put a Cave onto the battlefield this way" (Spelunking): a permanent the instruction before put there matches, as it is now. */

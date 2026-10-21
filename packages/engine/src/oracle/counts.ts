@@ -1,4 +1,5 @@
 import type { AmountExpr, Count, ObjRef, PlayerRef, TargetSpec } from "../abilities";
+import { ANY_COUNTER } from "../abilities";
 import { NUM, num, COUNTER, counterKind, COLOR_WORDS, capital, singularWord } from "./words";
 import { Ctx, addTarget } from "./body";
 import { parsePlayer, parseTargetPhrase } from "./targets";
@@ -136,6 +137,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (ctx?.revealedFromHand && /^(?:the number of )?cards? revealed this way$/i.test(p)) return { count: { kind: "revealedFromHand" } };
   // "The amount of excess damage dealt to that creature this way" (Hell to Pay), "that excess damage" (Contest of Claws):
   // after a damage instruction (CR 120.10).
+  if (ctx?.excessDamage && /^the damage dealt this way$/i.test(p)) return { count: { kind: "damageThisWay" } };
   if (ctx?.excessDamage && /^(?:the )?(?:amount of )?excess damage dealt(?: to (?:that creature|that permanent))? this way$|^that excess damage$/i.test(p)) return { count: { kind: "excessThisWay" } };
   // "For each creature tapped this way", "the number of creatures tapped this way" after "tap any number of untapped
   // creatures you control" (Harmony of Nature), or in its reflexive trigger (Teferi Akosa of Zhalfir).
@@ -205,6 +207,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const kind = m[2]!.toLowerCase() === "mana value" ? "manaValue" : (m[2]!.toLowerCase() as "power" | "toughness");
     if (of?.ref === "castSpell" && kind !== "manaValue") return null;
     return of && count({ kind, of });
+  }
+  // "For each counter on ~" (Twitching Doll): every kind.
+  if ((m = /^counters? on (~|it)$/.exec(p))) {
+    const of = whoseObject(m[1] === "~" ? "~'s" : "its", ctx);
+    return of && count({ kind: "counters", counter: ANY_COUNTER, of });
   }
   // "Charge counter on ~", "+1/+1 counters on it".
   if ((m = new RegExp(`^${COUNTER} counters? on (~|it|that creature)$`).exec(p))) {

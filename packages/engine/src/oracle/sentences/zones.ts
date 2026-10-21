@@ -125,6 +125,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // with suspend, it's suspended again (Arc Blade). If it doesn't resolve, it isn't exiled.
   if ((m = new RegExp(`^Exile ~ with ${NUM} time counters? on it$`, "i").exec(s))) return ctx.spell ? [{ type: "exileSelfWithTime", n: num(m[1]!) }] : null;
   if (/^Exile ~$/i.test(s) && ctx.spell) return [{ type: "exileSpell" }];
+  // Elixir of Immortality: "Shuffle ~ and your graveyard into their owner's library": the permanent into its owner's
+  // library if it's still on the battlefield, your graveyard into yours (rulings).
+  if (/^Shuffle ~ and your graveyard into their owner's library$/.test(s) && !ctx.spell)
+    return [{ type: "shuffleIntoLibrary", what: { ref: "self" } }, { type: "shuffleZones", who: { ref: "you" }, graveyard: true }];
   // Black Sun's Zenith: "Shuffle ~ into its owner's library" as it resolves (CR 608.2n, 701.24c).
   if (/^Shuffle ~ into its owner's library$/i.test(s) && ctx.spell) return [{ type: "shuffleSpell" }];
   // Seasons Past: "Put ~ on the bottom of its owner's library", likewise the resolving spell itself (CR 608.2n).

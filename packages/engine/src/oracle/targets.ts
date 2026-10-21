@@ -702,7 +702,7 @@ export function parseTargetPhrase(
     // "Permanent ... with an even mana value" (Desecrate Reality; zero is even).
     extra.manaValue = { parity: m[1] as "even" | "odd" };
     p = p.slice(0, m.index);
-  } else if ((m = / (with|without) ([a-z ]+?)( you control| you don't control| an opponent controls)?$/.exec(p))) {
+  } else if ((m = /(?:^| )(with|without) ([a-z ]+?)( you control| you don't control| an opponent controls)?$/.exec(p))) {
     // "Creature you control with flash or haste" (Shadow the Hedgehog): one of them is enough.
     const either = m[1] === "with" ? /^([a-z]+) or ([a-z]+)$/.exec(m[2]!) : null;
     const kws = either ? [either[1]!, either[2]!].map((k) => keywordOf(k)) : parseKeywordList(m[2]!);

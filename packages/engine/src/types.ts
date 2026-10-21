@@ -1541,6 +1541,8 @@ export interface Resolving {
   revealed?: { id: ObjectId; zc: number };
   /** The one card an "exile the top card of your library" exiled, for "that card's mana value" (Tavern Brawler). */
   exiledTop?: { id: ObjectId; zc: number };
+  /** The cards "exile the top two cards of your library. You may play them" exiled (Bonehoard Dracosaur). */
+  impulsed?: ObjectId[];
   /** The cards its "hold" flicker exiled, for the search after it to put onto the battlefield with what it finds. */
   held?: { id: ObjectId; zc: number }[];
   /** The cards its mill instructions milled, as they are in the graveyard ("if a card with the chosen name was milled this way"). */
@@ -1551,6 +1553,8 @@ export interface Resolving {
   revealedFromHand?: number;
   /** The excess damage its damage instructions dealt to permanents (CR 120.10): "the excess damage dealt this way". */
   excessDamage?: number;
+  /** "The damage dealt this way": all of it, so far in this resolution. */
+  damageThisWay?: number;
   /** That excess damage by the permanent dealt it (a fight's "the creature the opponent controls"). */
   excessTo?: Record<ObjectId, number>;
   /** The part of it dealt to creatures ("if excess damage was dealt to a creature this way", Vikya). */

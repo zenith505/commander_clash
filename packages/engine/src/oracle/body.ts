@@ -1476,6 +1476,14 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects[effects.length - 1] = { ...prev, times: 2 };
       continue;
     }
+    // Ad Nauseam: "Reveal the top card of your library and put that card into your hand. You lose life equal to its mana
+    // value. You may repeat this process any number of times."
+    if (/^You may repeat this process any number of times$/.test(s)) {
+      const prev = effects[0];
+      if (effects.length !== 1 || prev?.type !== "revealTopToHand" || !prev.life || prev.life.gain || prev.life.who.ref !== "you" || si + 1 !== sentences.length) return null;
+      effects[0] = { type: "repeatMay", effects: [prev], text: "reveal the top card of your library and put it into your hand, losing life equal to its mana value" };
+      continue;
+    }
     const repeat = new RegExp(`^Repeat the following process ${NUMX} times$`).exec(s);
     if (repeat) {
       const next = sentences[si + 1] ? attempt(ctx, () => parseOne(sentences[si + 1]!.replace(/\.$/, ""), ctx)) : null;

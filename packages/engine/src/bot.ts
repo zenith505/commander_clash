@@ -161,6 +161,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Clash (CR 701.30a): keep a card we'd like to draw on top, put the rest on the bottom.
     if (pend.kind === "chooseMay" && pend.clash) return [{ type: "chooseMay", player: pid, yes: !wantOnTop(s, pid, pend.card!) }];
     // "Each player may discard their hand and draw five cards": when that's more cards than we'd throw away.
+    // Ad Nauseam: another card while there's life to spare (a loss is a state-based action once it stops, CR 704.5a).
+    if (pend.kind === "chooseMay" && pend.repeat) return [{ type: "chooseMay", player: pid, yes: player(s, pid).life > 15 && player(s, pid).hand.length < 12 }];
     if (pend.kind === "chooseMay" && pend.wheel !== undefined) return [{ type: "chooseMay", player: pid, yes: player(s, pid).hand.length < pend.wheel }];
     if (pend.kind === "chooseMay") return [{ type: "chooseMay", player: pid, yes: pend.card ? (revealedMay(s, pend.card) ?? millExplored(s, pid, pend.card)) : wantsMay(s, pid) }];
     if (pend.kind === "payUnless" && pend.discard) return [{ type: "payUnless", player: pid, pay: player(s, pid).hand.length >= pend.discard }];

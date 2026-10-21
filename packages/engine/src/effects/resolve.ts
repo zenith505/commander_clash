@@ -816,6 +816,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "secretNumbers":
       return runVotesEffect(s, e, ctx, src);
     case "may":
+    case "repeatMay":
     case "either":
     case "eachMay":
     case "punisher":

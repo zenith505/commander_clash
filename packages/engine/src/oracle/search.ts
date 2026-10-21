@@ -138,9 +138,10 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
   const plain = plainFilter(p);
   if (plain) return plain;
   // "An artifact creature card or Vehicle card" (Szarekh), "a Hero or enchantment card" (Rick Jones): either one.
-  const either = /^(.+ card) or (.+ card)$/.exec(p) ?? /^([A-Z][a-z]+) or ([a-z]+ card)$/.exec(p);
+  // "An artifact or Dragon card" (Magda, Brazen Outlaw).
+  const either = /^(.+ card) or (.+ card)$/.exec(p) ?? /^([A-Z][a-z]+) or ([a-z]+ card)$/.exec(p) ?? /^([a-z]+) or ([A-Z][a-z]+ card)$/.exec(p);
   if (either && !/,| or /.test(either[1]!) && !/,| or /.test(either[2]!)) {
-    const subs = [either[1]!.replace(/^([A-Z][a-z]+)$/, "$1 card"), either[2]!].map((x) => plainFilter(x));
+    const subs = [either[1]!.replace(/^([A-Za-z]+)$/, "$1 card"), either[2]!].map((x) => plainFilter(x));
     if (subs.some((x) => !x)) return null;
     return { kind: "card", anyOf: subs as TargetSpec[], text: p };
   }

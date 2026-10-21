@@ -1142,6 +1142,25 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return sacrificeEach(s, e, ctx, src);
     case "keepRest":
       return keepRest(s, e, ctx, src);
+    case "keepDestroyRest": {
+      // Mount Doom: chosen as it resolves (CR 608.2d), then the rest destroyed at once.
+      const sc = (s.resolving!.scratch ??= {});
+      const all = () => s.battlefield.filter((id) => objectMatches(s, e.filter, obj(s, id), ctx.controller, false));
+      if (!sc.chosen?.[ctx.controller]) {
+        const options = all();
+        if (!options.length) return;
+        sc.queue = [ctx.controller];
+        sc.chosen = {};
+        s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "keep", what: e.filter.text, options, count: Math.min(e.n, options.length), min: 0, destroy: true };
+        return "paused";
+      }
+      const kept = new Set(sc.chosen[ctx.controller]!);
+      sc.chosen = undefined;
+      sc.queue = undefined;
+      if (kept.size) log(s, `${player(s, ctx.controller).name} chooses ${[...kept].map((id) => nameOf(s, id)).join(", ")}.`);
+      for (const id of all().filter((x) => !kept.has(x))) destroyPermanent(s, obj(s, id), `${src} destroys ${nameOf(s, id)}.`, false, ctx.controller);
+      return;
+    }
     case "empowerJace":
       return empowerJace(s, e.n, ctx, src);
     case "bounce": {

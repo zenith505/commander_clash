@@ -1917,6 +1917,9 @@ function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: nu
   // "Choose ..., then sacrifice the rest": keep our best permanents, and choosing for another player (Mythos of Snapdax),
   // leave them their least useful ones.
   if (action === "keep") {
+    // Mount Doom: every player's are among them; ours, best first.
+    if (options.some((id) => controllerOf(s, obj(s, id)) !== pid) && options.some((id) => controllerOf(s, obj(s, id)) === pid))
+      return options.filter((id) => controllerOf(s, obj(s, id)) === pid).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
     const mine = options.every((id) => controllerOf(s, obj(s, id)) === pid);
     return [...options].sort((a, b) => (mine ? 1 : -1) * (worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)))).slice(0, count);
   }

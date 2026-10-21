@@ -2408,7 +2408,8 @@ export type SpellCondition =
   /** "If ~ was bargained" (CR 702.166b). */
   | { kind: "bargained" }
   /** "If this spell was cast from a graveyard" (Sevinne's Reclamation): a copy wasn't cast (rulings, CR 707.10). */
-  | { kind: "castFromGraveyard" }
+  /** `exile`: "if ~ was cast from exile" (Delayed Blast Fireball) instead. A copy wasn't cast (CR 707.10). */
+  | { kind: "castFromGraveyard"; exile?: true }
   /** Approach of the Second Sun: "If ~ was cast from your hand and you've cast another spell named ~ this game". */
   | { kind: "castFromHandAndAnotherNamed" }
   /** "If you cast this spell during your main phase" (addendum, CR 207.2c): a copy wasn't cast (CR 707.10). */

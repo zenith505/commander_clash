@@ -2976,6 +2976,7 @@ export function parsePayCost(text: string): PayCost | null {
 const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true; activatedOnly?: true; noTargets?: true }[] = [
   { re: "~ was bargained", cond: { kind: "bargained" }, spellOnly: true },
   { re: "~ was cast from a graveyard", cond: { kind: "castFromGraveyard" }, spellOnly: true, noTargets: true },
+  { re: "~ was cast from exile", cond: { kind: "castFromGraveyard", exile: true }, spellOnly: true, noTargets: true },
   { re: "~ was cast using teamwork", cond: { kind: "teamwork" }, spellOnly: true },
   // Addendum (CR 207.2c). Not for targets: CastHow doesn't know when it's cast.
   { re: "you cast ~ during your main phase", cond: { kind: "castInMain" }, spellOnly: true, noTargets: true },

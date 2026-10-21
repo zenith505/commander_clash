@@ -2,6 +2,7 @@
 // go to 0 or less meanwhile, the loss waits for state-based actions, CR 704.3, 704.5a). Scroll Rack (cards from the
 // hand traded for as many from the top of the library, not drawn: rulings). Thousand-Year Storm (a copy for each
 // instant and sorcery spell you cast before it this turn). Crawlspace (no more than two creatures can attack you).
+// Delayed Blast Fireball ("each opponent and each creature they control"; "if ~ was cast from exile").
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
@@ -19,6 +20,8 @@ const bolt = card("Lightning Bolt", "Instant", "{R}", { oracleText: "Lightning B
 const grizzly = card("Runeclaw Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" });
 
 const crawlspace = card("Crawlspace", "Artifact", "{3}", { oracleText: "No more than two creatures can attack you each combat." });
+
+const fireball = card("Delayed Blast Fireball", "Instant", "{1}{R}{R}", { keywords: ["Foretell"], oracleText: "Delayed Blast Fireball deals 2 damage to each opponent and each creature they control. If this spell was cast from exile, it deals 5 damage to each opponent and each creature they control instead.\nForetell {4}{R}{R} (During your turn, you may pay {2} and exile this card from your hand face down. Cast it on a later turn for its foretell cost.)" });
 
 const pass = (s: GameState) => act(s, { type: "passPriority", player: waitingOn(s)! });
 const settle = (s: GameState) => {
@@ -131,5 +134,25 @@ describe("round 102: Crawlspace", () => {
     expect(() => act(s, { type: "declareAttackers", player: ap, attacks: bs.map((b) => ({ attacker: b, defender: opp })) })).toThrow(/no more than 2 creatures can attack/);
     const ok = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: bs[0]!, defender: opp }, { attacker: bs[1]!, defender: opp }, { attacker: bs[2]!, defender: third }] });
     expect(bs.map((b) => ok.objects[b]!.attacking)).toEqual([opp, opp, third]);
+  });
+});
+
+describe("round 102: Delayed Blast Fireball", () => {
+  it("parse", () => expect(isFullySupported(fireball)).toBe(true));
+
+  it("2 damage to each opponent and their creatures, 5 if cast from exile; not to you or yours", () => {
+    for (const fromExile of [false, true]) {
+      const { s: s0, ap, opp, ids } = setup([fireball]);
+      const theirs = putOnBattlefield(s0, opp, card("Big Test", "Creature — Giant", "{4}", { power: "4", toughness: "4" }));
+      const mine = putOnBattlefield(s0, ap, bear());
+      let s = planCast(s0, ap, ids[0]!)!.reduce((x, y) => act(x, y), s0);
+      if (fromExile) s.objects[ids[0]!]!.castFrom = "exile";
+      s = settle(s);
+      const n = fromExile ? 5 : 2;
+      for (const p of s.turnOrder) expect(s.players[p]!.life).toBe(p === ap ? 40 : 40 - n);
+      expect(s.objects[theirs]!.zone).toBe(fromExile ? "graveyard" : "battlefield");
+      expect(s.objects[mine]!.zone).toBe("battlefield");
+      expect(s.objects[mine]!.damage ?? 0).toBe(0);
+    }
   });
 });

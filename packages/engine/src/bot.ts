@@ -3,7 +3,7 @@ import { allEffects, refCovers, timedCondition, type AbilityBody, type Activated
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
 import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
-import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
+import { abilitiesOf, basePower, baseToughness, canBeSacrificed, defOf, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
 import { bindChosen, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, manySlot, gateTargets, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
@@ -17,6 +17,7 @@ import {
   attackProblem,
   attackTax,
   attackTaxOf,
+  attackYouLimit,
   combatLimit,
   attackTaxPer,
   blockProblem,
@@ -161,6 +162,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Clash (CR 701.30a): keep a card we'd like to draw on top, put the rest on the bottom.
     if (pend.kind === "chooseMay" && pend.clash) return [{ type: "chooseMay", player: pid, yes: !wantOnTop(s, pid, pend.card!) }];
     // "Each player may discard their hand and draw five cards": when that's more cards than we'd throw away.
+    // Ad Nauseam: another card while there's life to spare (a loss is a state-based action once it stops, CR 704.5a).
+    if (pend.kind === "chooseMay" && pend.repeat) return [{ type: "chooseMay", player: pid, yes: player(s, pid).life > 15 && player(s, pid).hand.length < 12 }];
     if (pend.kind === "chooseMay" && pend.wheel !== undefined) return [{ type: "chooseMay", player: pid, yes: player(s, pid).hand.length < pend.wheel }];
     if (pend.kind === "chooseMay") return [{ type: "chooseMay", player: pid, yes: pend.card ? (revealedMay(s, pend.card) ?? millExplored(s, pid, pend.card)) : wantsMay(s, pid) }];
     if (pend.kind === "payUnless" && pend.discard) return [{ type: "payUnless", player: pid, pay: player(s, pid).hand.length >= pend.discard }];
@@ -179,6 +182,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     if (pend.kind === "discard") return [{ type: "discard", player: pid, objectIds: chooseDiscards(s, pid, pend.count, undefined, pend.filter) }];
     // Brainstorm: back go the cards we'd most readily discard, the better of them on top.
+    // Scroll Rack: the lands we don't need, traded for fresh cards (a library short of cards trades fewer).
+    if (pend.kind === "handToTop" && pend.upTo) {
+      const hand = player(s, pid).hand;
+      const landsInHand = hand.filter((id) => isType(defOf(s, obj(s, id)), "Land")).length;
+      const spare = Math.max(0, landsInHand - (lands(s, pid) >= 5 ? 0 : 1));
+      const k = Math.min(spare, player(s, pid).library.length);
+      return [{ type: "handToTop", player: pid, objectIds: k ? chooseDiscards(s, pid, k).reverse() : [] }];
+    }
     if (pend.kind === "handToTop") return [{ type: "handToTop", player: pid, objectIds: chooseDiscards(s, pid, pend.count).reverse() }];
     // Free from the hand: the most expensive card is the best deal.
     // From an opponent's revealed hand: take their most expensive card.
@@ -283,6 +294,15 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "pickPermanents" && pend.action === "tap") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, "tap") }];
     if (pend.kind === "pickPermanents" && pend.min !== undefined && pend.action !== "keep") return [{ type: "pickPermanents", player: pid, ids: chooseOptionalSacrifices(s, pid, pend) }];
     if (pend.kind === "pickPermanents") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, pend.action, pend.counter) }];
+    // A secret number, without looking at the others' (Wheel of Misfortune): 1 to get a new hand when ours is nearly empty
+    // and we can take the damage, otherwise 0 (no damage, keep our hand). Menacing Ogre: its controller with plenty of
+    // life goes for the counters.
+    if (pend.kind === "chooseOption" && pend.what === "secretNumber") {
+      const sn = s.resolving ? allEffects(s.resolving.body.effects).find((x) => x.type === "secretNumbers") : undefined;
+      const me = player(s, pid);
+      const n = sn?.type === "secretNumbers" && sn.then === "ogre" ? (s.resolving?.item.controller === pid && me.life > 20 ? 3 : 0) : me.hand.length <= 2 && me.life > 10 ? 1 : 0;
+      return [{ type: "chooseOption", player: pid, choice: String(n) }];
+    }
     if (pend.kind === "chooseOption" && (pend.what === "riot" || pend.what === "unleash")) {
       // Riot: haste when it can still attack this turn, the counter otherwise. Unleash: the counter, unless we need blockers.
       const haste = pend.what === "riot" && s.activePlayer === pid && s.step === "main1";
@@ -1848,7 +1868,7 @@ function sacrificePool(s: GameState, pid: PlayerId, c: Extract<AdditionalCost, {
   const value = (o: GameObject) => (o.isToken ? 0 : 1 + mv(s, o.id));
   return s.battlefield
     .map((x) => obj(s, x))
-    .filter((o) => controllerOf(s, o) === pid && !o.isCommander && !targeted.has(o.id) && objectMatches(s, c.filter, o, pid, false))
+    .filter((o) => controllerOf(s, o) === pid && !o.isCommander && !targeted.has(o.id) && objectMatches(s, c.filter, o, pid, false) && (c.exile || canBeSacrificed(s, o)))
     .filter((o) => (alt === "emerge" ? o.isToken || power(s, o) <= 3 : value(o) <= 3 || (objIsType(s, o, "Land") && lands(s, pid) >= 7)))
     .sort((a, b) => (alt === "emerge" ? mv(s, b.id) - mv(s, a.id) : value(a) - value(b)));
 }
@@ -3545,6 +3565,21 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   if (declared.length > cap) {
     const must = (a: { attacker: string }) => (characteristics(s, obj(s, a.attacker)).attacksIfAble ? 1 : 0);
     declared = [...declared].sort((a, b) => must(b) - must(a) || power(s, obj(s, b.attacker)) - power(s, obj(s, a.attacker))).slice(0, cap);
+  }
+  // Crawlspace: no more than its limit at that player; the ones that have to attack and the strongest stay, the rest go at
+  // another opponent with room, or stay home.
+  for (const d of opps) {
+    const room = attackYouLimit(s, d);
+    const at = declared.filter((a) => a.defender === d && a.planeswalker === undefined);
+    if (at.length <= room) continue;
+    const must = (a: { attacker: string }) => (characteristics(s, obj(s, a.attacker)).attacksIfAble ? 1 : 0);
+    const extra = [...at].sort((a, b) => must(b) - must(a) || power(s, obj(s, b.attacker)) - power(s, obj(s, a.attacker))).slice(room);
+    declared = declared.flatMap((a) => {
+      if (!extra.includes(a)) return [a];
+      const o = obj(s, a.attacker);
+      const other = opps.find((x) => x !== d && !attackProblem(s, o, x) && !attackTaxPer(s, x) && declared.filter((y) => y.defender === x && y.planeswalker === undefined).length < attackYouLimit(s, x));
+      return other === undefined ? [] : [{ attacker: a.attacker, defender: other }];
+    });
   }
   // Ghostly Prison: pay what attacking costs if we can (CR 508.1g-i); otherwise send the weakest taxed attacker at
   // someone it costs nothing to attack, or keep it home. Nothing obliges paying for a requirement (CR 508.1d).

@@ -82,6 +82,8 @@ export interface Ctx {
   spell?: boolean;
   /** A "whenever a player casts a spell" trigger: "it" or "that spell" can be the spell cast. */
   castSpell?: boolean;
+  /** A "whenever you activate an ability" trigger: "that ability" is the ability activated (Rings of Brighthearth). */
+  activatedAbility?: boolean;
   /** A cast trigger's first instruction: "it gains haste" (Tyvar Kell's emblem) is the spell cast. */
   spellIt?: boolean;
   /** In a "when you cast this spell" ability: "copy it" is the spell itself. */
@@ -130,7 +132,7 @@ const CARD_TYPE_WORD = "(?:artifact|battle|creature|enchantment|instant|land|pla
  * The events a delayed triggered ability with a duration can wait for (see GameState.floatingTriggers), and the parts of
  * a trigger it can have: an intervening "if" or a zone would need more about its source than it has.
  */
-const FLOATING_EVENTS = new Set<string>(["castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer"]);
+const FLOATING_EVENTS = new Set<string>(["castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "eachBeginCombat"]);
 const FLOATING_KEYS = new Set<string>(["event", "cast", "dies", "dealer", "toOpponent", "orPlaneswalker", "body"]);
 
 /**
@@ -155,6 +157,14 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx): Effect | null |
     if (!trigger || trigger === "fail" || trigger.event !== "creatureYouControlDealsCombatDamageToPlayer" || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
     const index = addTarget(ctx!, { kind: "player", opponent: true, text: "target opponent" });
     return { type: "floatingTrigger", trigger, until: "endOfTurn", aboutPlayer: index };
+  }
+  // "At the beginning of each combat this turn, untap all creatures that attacked this turn" (Full Throttle): a delayed
+  // trigger for each beginning of combat step this turn (CR 603.7b).
+  const combats = /^At the beginning of each combat this turn, (.+)$/.exec(s);
+  if (combats) {
+    const trigger = parseTrigger(`At the beginning of each combat, ${[combats[1]!, ...after.map((x) => x.replace(/\.$/, ""))].join(". ")}.`);
+    if (!trigger || trigger === "fail" || trigger.event !== "eachBeginCombat" || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
+    return { type: "floatingTrigger", trigger, until: "endOfTurn" };
   }
   const m = /^([Uu]ntil end of turn|[Tt]his turn|[Uu]ntil your next turn|[Uu]ntil the end of your next turn), ([Ww]henever .+)$/.exec(s);
   if (!m) return undefined;
@@ -454,7 +464,7 @@ function splitSentences(text: string): string[] {
   return out;
 }
 
-export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean } = {}): AbilityBody | null {
+export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean } = {}): AbilityBody | null {
   const modal = MODAL.exec(text.trim());
   if (modal) {
     const body = parseModal(modal[1]!, modal[3]!, text.trim(), opts);
@@ -480,6 +490,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     ...(opts.costLinked ? { costLinked: true } : {}),
     ...(opts.spell ? { spell: true } : {}),
     ...(opts.castSpell ? { castSpell: true, spellIt: true } : {}),
+    ...(opts.activatedAbility ? { activatedAbility: true } : {}),
     ...(opts.eventPlayer ? { eventPlayer: true } : {}),
     ...(opts.defending ? { defending: true } : {}),
     ...(opts.selfCastSpell ? { selfCastSpell: true } : {}),
@@ -525,6 +536,14 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       ],
       text,
     };
+  // Scroll Rack: cards from the hand traded for as many from the top of the library (not a draw, rulings).
+  if (text === "Exile any number of cards from your hand face down. Put that many cards from the top of your library into your hand. Then look at the exiled cards and put them on top of your library in any order.")
+    return { targets: [], effects: [{ type: "scrollRack" }], text };
+  // Wheel of Misfortune, Menacing Ogre: numbers chosen secretly, revealed at once (Effect secretNumbers).
+  if (/^Each player secretly chooses a number 0 or greater, then all players reveal those numbers simultaneously and determine the highest and lowest numbers revealed this way\. ~ deals damage equal to the highest number to each player who chose that number\. Each player who didn't choose the lowest number discards their hand, then draws seven cards\.$/.test(text.trim()))
+    return { targets: [], effects: [{ type: "secretNumbers", then: "wheel" }], text };
+  if (/^[Ee]ach player secretly chooses a number\. Then those numbers are revealed\. Each player with the highest number loses that much life\. If you are one of those players, put two \+1\/\+1 counters on ~\.$/.test(text.trim()))
+    return { targets: [], effects: [{ type: "secretNumbers", then: "ogre" }], text };
   if (/^Exile the top card of your library\. You may put that card into your hand unless it has the same name as another card exiled this way\. Repeat this process until you put a card into your hand or you exile two cards with the same name, whichever comes first\.$/.test(text.trim()))
     return { targets: [], effects: [{ type: "taintedPact" }], text };
   // Tempt with Discovery: a tempting offer whose searches each end with their own shuffle here. A library is shuffled
@@ -1463,6 +1482,14 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects[effects.length - 1] = { ...prev, times: 2 };
       continue;
     }
+    // Ad Nauseam: "Reveal the top card of your library and put that card into your hand. You lose life equal to its mana
+    // value. You may repeat this process any number of times."
+    if (/^You may repeat this process any number of times$/.test(s)) {
+      const prev = effects[0];
+      if (effects.length !== 1 || prev?.type !== "revealTopToHand" || !prev.life || prev.life.gain || prev.life.who.ref !== "you" || si + 1 !== sentences.length) return null;
+      effects[0] = { type: "repeatMay", effects: [prev], text: "reveal the top card of your library and put it into your hand, losing life equal to its mana value" };
+      continue;
+    }
     const repeat = new RegExp(`^Repeat the following process ${NUMX} times$`).exec(s);
     if (repeat) {
       const next = sentences[si + 1] ? attempt(ctx, () => parseOne(sentences[si + 1]!.replace(/\.$/, ""), ctx)) : null;
@@ -1841,6 +1868,20 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "if", cond: { kind: "targetCardWas", index: i, filter }, effects: inner });
       continue;
     }
+    // Agatha's Soul Cauldron: "Exile target card from a graveyard. When a creature card is exiled this way, put a +1/+1
+    // counter on target creature you control": a reflexive trigger (CR 603.12) if the card was a creature card.
+    const whenCard = /^When an? ((?:[a-z]+ )?[a-z]+) card is exiled this way, (.+)$/.exec(s);
+    if (whenCard) {
+      const i = ctx.targets.length - 1;
+      const t = ctx.targets[i];
+      const prev = effects[effects.length - 1];
+      const filter = parseSearchFilter(`${whenCard[1]!} card`);
+      if (!t || t.kind !== "card" || t.many || t.optional || prev?.type !== "exile" || prev.what.ref !== "target" || prev.what.index !== i || !filter || si + 1 !== sentences.length) return null;
+      const reflexive = reflexiveBody(whenCard[2]!, ctx);
+      if (!reflexive) return null;
+      effects.push({ type: "if", cond: { kind: "targetCardWas", index: i, filter }, effects: [{ type: "reflexive", body: reflexive }] });
+      continue;
+    }
     const atMost = /^(.+) if (?:its|that creature's|that card's) (power|toughness|mana value) is less than or equal to (.+)$/.exec(s);
     if (atMost) {
       // "You may return target creature to its owner's hand if that creature's power is ..." (Nimbus Champion): asked only
@@ -2063,7 +2104,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     if (/^You may choose new targets for the cop(?:y|ies)$/i.test(s)) {
       const prev = effects[effects.length - 1];
       // "You may copy that spell. You may choose new targets for the copy." (Invocation of the Founders): the copy it may make.
-      const copy = prev?.type === "nextCast" ? prev.effects[prev.effects.length - 1] : prev?.type === "may" && !prev.pay && prev.effects.length === 1 ? prev.effects[0] : prev;
+      // "You may pay {2}. If you do, copy that ability" (Rings of Brighthearth): the copy paying makes.
+      const copy = prev?.type === "nextCast" ? prev.effects[prev.effects.length - 1] : prev?.type === "may" && (!prev.pay || prev.effects[0]?.type === "copySpell") && prev.effects.length === 1 ? prev.effects[0] : prev;
       // "Copy it. If you've completed a dungeon, copy that spell twice instead. You may choose new targets for the
       // copies" (Tomb of Horrors Adventurer): the copies either way.
       const both = prev?.type === "if" ? [...prev.effects, ...(prev.otherwise ?? [])] : [];
@@ -2241,15 +2283,19 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     }
     // "For each creature exiled this way, its controller creates a 2/2 green Boar creature token" (Curse of the Swine),
     // "For each creature destroyed this way, its controller draws a card": after the destroy or exile instruction.
-    const perThisWay = /^For each (.+?) (destroyed|exiled) this way, its controller (creates an? .+ token(?: with [a-z ]+)?|draws a card)$/.exec(s);
+    const perThisWay = /^For each (.+?) (destroyed|exiled|put into a graveyard) this way, its controller (creates an? .+ token(?: with [a-z ]+)?|draws a card)$/.exec(s);
     if (perThisWay) {
-      const which = perThisWay[2] as "destroyed" | "exiled";
-      const prev = effects[effects.length - 1];
+      const graveyard = perThisWay[2] === "put into a graveyard";
+      const which = graveyard ? "destroyed" : (perThisWay[2] as "destroyed" | "exiled");
+      // Terastodon: "You may destroy up to three target noncreature permanents. For each permanent put into a graveyard
+      // this way, ...": after the "you may".
+      const last = effects[effects.length - 1];
+      const prev = graveyard && last?.type === "may" && !last.pay && !last.otherwise && last.effects.length === 1 ? last.effects[0] : last;
       const spec = parseTargetPhrase(perThisWay[1]!.split(/\s+/).map(singularWord).join(" "), { chosen: true });
       const inner = parseOne(capital(perThisWay[3]!.replace(/^creates/, "create").replace(/^draws/, "draw")), ctx);
       const one = inner?.length === 1 ? inner[0]! : undefined;
       if (prev?.type !== (which === "destroyed" ? "destroy" : "exile") || spec?.kind !== "object" || !one || (one.type !== "createToken" && one.type !== "draw") || one.n !== 1) return null;
-      effects.push({ type: "forEachThisWay", which, filter: { ...spec, text: perThisWay[1]! }, effects: [{ ...one, who: { ref: "eachOne" } }] });
+      effects.push({ type: "forEachThisWay", which, ...(graveyard ? { graveyard: true as const } : {}), filter: { ...spec, text: perThisWay[1]! }, effects: [{ ...one, who: { ref: "eachOne" } }] });
       continue;
     }
     // "Mill three cards. You may put a land card from among them into your hand." (Six, Eerie Gravestone), "... from among
@@ -2938,6 +2984,7 @@ export function parsePayCost(text: string): PayCost | null {
 const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true; activatedOnly?: true; noTargets?: true }[] = [
   { re: "~ was bargained", cond: { kind: "bargained" }, spellOnly: true },
   { re: "~ was cast from a graveyard", cond: { kind: "castFromGraveyard" }, spellOnly: true, noTargets: true },
+  { re: "~ was cast from exile", cond: { kind: "castFromGraveyard", exile: true }, spellOnly: true, noTargets: true },
   { re: "~ was cast using teamwork", cond: { kind: "teamwork" }, spellOnly: true },
   // Addendum (CR 207.2c). Not for targets: CastHow doesn't know when it's cast.
   { re: "you cast ~ during your main phase", cond: { kind: "castInMain" }, spellOnly: true, noTargets: true },
@@ -2949,6 +2996,9 @@ const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true
   // (CR 601.2c, 601.2h), so no target can depend on it.
   { re: "the sacrificed creature was suspected", cond: { kind: "sacrificedSuspected" }, noTargets: true },
   { re: "~'s surge cost was paid", cond: { kind: "altPaid", alt: "surge" } },
+  // The Masteries: "If the {1}{B} cost was paid" (compile checks it's the card's "rather than pay" cost).
+  { re: "the (?:\\{[^}]+\\})+ cost was paid", cond: { kind: "altPaid", alt: "alternative" }, spellOnly: true },
+  { re: "~'s madness cost was paid", cond: { kind: "altPaid", alt: "madness" }, spellOnly: true },
   { re: "~'s spectacle cost was paid", cond: { kind: "altPaid", alt: "spectacle" } },
   // Mana from a Treasure (CR 106.3) is spent after the targets are chosen (CR 601.2c, 601.2h), so no target can depend on it.
   { re: "mana from a Treasure was spent to cast ~", cond: { kind: "treasure" }, spellOnly: true, noTargets: true },

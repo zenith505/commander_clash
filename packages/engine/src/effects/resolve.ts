@@ -789,6 +789,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "surveil":
     case "orderTop":
     case "handToTop":
+    case "scrollRack":
     case "drawnPayOrTop":
     case "shuffle":
     case "shuffleIntoLibrary":
@@ -813,8 +814,10 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runCoinEffect(s, e, ctx, src);
     case "vote":
     case "chooseVotes":
+    case "secretNumbers":
       return runVotesEffect(s, e, ctx, src);
     case "may":
+    case "repeatMay":
     case "either":
     case "eachMay":
     case "punisher":

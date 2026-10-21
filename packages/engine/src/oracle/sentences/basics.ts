@@ -366,6 +366,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who && [{ type: "poison", who, n: m[2] === "a" ? 1 : amt(m[2]!) }];
   }
+  // Vraska, Betrayal's Sting: "If target player has fewer than nine poison counters, they get a number of poison counters
+  // equal to the difference": worked out as it resolves; replacement effects can still change how many (rulings).
+  if ((m = /^If (target player|target opponent) has fewer than (nine|ten) poison counters, they get a number of poison counters equal to the difference$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who && [{ type: "poison", who, n: 0, upTo: m[2] === "nine" ? 9 : 10 }];
+  }
   // Adding mana from a spell or a non-mana triggered ability (CR 605.5a: it uses the stack): "Add {B}{B}{B}" (Dark
   // Ritual), "add one mana of any color", "add three mana of any one color" (the color is chosen as it resolves).
   if ((m = /^[Aa]dd ((?:\{[WUBRGC]\})+)$/.exec(s))) return [{ type: "addMana", mana: m[1]! }];
@@ -552,6 +558,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     // "To target creature and each other creature with the same name as that creature" is one recipient.
     for (const part of /with the same name as that/i.test(m[2]!) ? [m[2]!] : m[2]!.split(/,? and (?=each )/i)) {
       // "Each opponent and each battle they protect" (Joyful Stormsculptor): the battles any opponent protects (CR 310.9).
+      // "Each opponent and each creature they control" (Delayed Blast Fireball): the creatures any opponent controls.
+      if (/^each creature they control$/i.test(part) && tos.length === 1 && tos[0]!.ref === "eachOpponent") {
+        tos.push({ ref: "each", filter: { kind: "object", types: ["Creature"], controller: "opponent", text: "each creature they control" } });
+        continue;
+      }
       if (/^each battle they protect$/i.test(part) && tos.length === 1 && tos[0]!.ref === "eachOpponent") {
         tos.push({ ref: "each", filter: { kind: "object", types: ["Battle"], protector: "opponent", text: "each battle they protect" } });
         continue;
@@ -564,6 +575,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Drawing
   if ((m = new RegExp(`^(?:You )?[Dd]raw ${NUMX} cards?$`).exec(s))) return [{ type: "draw", who: { ref: "you" }, n: amt(m[1]!) }];
+  // "An opponent draws a card" (Baleful Mastery): one its controller chooses as it resolves (rulings).
+  if ((m = new RegExp(`^[Aa]n opponent draws ${NUMX} cards?$`).exec(s))) return [{ type: "choose", choice: "opponent" }, { type: "draw", who: { ref: "chosenPlayer" }, n: amt(m[1]!) }];
   // "Draw half X cards, rounded down" (Wan Shi Tong), "you gain half X life and draw half X cards. Round down each time."
   // (Hydroid Krasis, CR 107.1a).
   if ((m = /^(?:(.+?) )?(draws?|gains?|loses?) half X (cards|life)(?:, rounded (up|down))?$/i.exec(s)) && /^draw/i.test(m[2]!) === (m[3] === "cards")) {

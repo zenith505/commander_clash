@@ -274,7 +274,7 @@ const srcKey = (src: DamageSource) => src.id ?? `spell:${src.name}`;
 
 type ShieldOp =
   | { kind: "protection"; srcName: string; toName: string }
-  | { kind: "preventAll"; srcName: string; toName: string; /** A damage rule's, with what's prevented for its additional effect. */ rule?: string; n?: number; src?: DamageSource }
+  | { kind: "preventAll"; srcName: string; toName: string; /** A damage rule's, with what's prevented for its additional effect. */ rule?: string; n?: number; src?: DamageSource; /** Vigor's +1/+1 counters, one for each 1 damage prevented, put by `by`. */ plusOnes?: { id: ObjectId; n: number; by: PlayerId; card: string } }
   | { kind: "shieldCounter"; id: ObjectId; srcName: string }
   | { kind: "prevent"; to: Rec; n: number; srcName: string; toName: string; rule?: string; src?: DamageSource; card?: string }
   | { kind: "redirect"; to: Rec; shield: string; n: number; srcName: string; fromName: string; toName: string; card: string; rule?: boolean }
@@ -628,7 +628,17 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         continue;
       }
       if (prev(e) && preventedAll(s, e)) {
-        ops.push({ kind: "preventAll", srcName: e.src.name, toName });
+        // Vigor: a +1/+1 counter for each 1 damage prevented (CR 615.5). The creature's controller (the one choosing,
+        // CR 616.1) applies the amount replacements first, as the most it can be.
+        const vigor = "object" in to ? characteristics(s, obj(s, to.object)).preventDamage?.find((p) => p.plusOnes && p.to && (!p.combat || (p.combat === "only") === !!e.combat)) : undefined;
+        if (vigor && "object" in to) {
+          let n = e.n;
+          const boost = allMods.filter((m) => !m.mod.prevent && modApplies(s, m, e, true));
+          if (boost.length && boost.length <= 6 && vigor.you === chooserOf(to))
+            for (const order of permutations(boost)) n = Math.max(n, order.reduce((a, m) => (a > 0 ? modAmount(s, m, a) : 0), e.n));
+          const src = vigor.from ? s.objects[vigor.from] : undefined;
+          ops.push({ kind: "preventAll", srcName: e.src.name, toName, plusOnes: { id: to.object, n, by: vigor.you!, card: src ? (s.cards[src.cardId]?.name ?? "") : "" } });
+        } else ops.push({ kind: "preventAll", srcName: e.src.name, toName });
         continue;
       }
       if (prev(e) && "player" in to && playerProtectedFrom(s, to.player, e.src.controller, e.src)) {
@@ -934,6 +944,8 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
     if (colorsOk(r.gainLife, src)) gains.set(r.id, { pid: r.controller, n: (gains.get(r.id)?.n ?? 0) + n });
     if (r.tokens) madeLater.set(r.id, { r, n: (madeLater.get(r.id)?.n ?? 0) + n });
   };
+  // Vigor's +1/+1 counters, put once the damage is prevented.
+  const plusOnesLater: { id: ObjectId; n: number; by: PlayerId }[] = [];
   // Inkshield's tokens, one for each 1 damage each rule prevented, created together once the damage is prevented.
   const madeLater = new Map<string, { r: DamageRule; n: number }>();
   const ruleUsed = (id: string, n: number, src?: DamageSource, prevented = false) => {
@@ -949,7 +961,8 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
     if (op.kind === "protection") log(s, `Damage from ${op.srcName} to ${op.toName} is prevented (protection).`);
     else if (op.kind === "preventAll") {
       const r = op.rule ? s.damageRules?.find((x) => x.id === op.rule) : undefined;
-      log(s, `Damage from ${op.srcName} to ${op.toName} is prevented${r ? ` (${cardName(s, r)})` : ""}.`);
+      log(s, `Damage from ${op.srcName} to ${op.toName} is prevented${r ? ` (${cardName(s, r)})` : op.plusOnes?.card ? ` (${op.plusOnes.card})` : ""}.`);
+      if (op.plusOnes) plusOnesLater.push(op.plusOnes);
       if (r && op.n && op.src) {
         gainLater(r, op.n, op.src);
         if (colorsOk(r.dealBack, op.src)) back.push({ cardId: r.cardId, controller: r.controller, to: op.src.controller, n: op.n });
@@ -990,6 +1003,11 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
     }
   }
   for (const { pid, n } of gains.values()) if (n > 0) gainLife(s, pid, n);
+  for (const { id, n, by } of plusOnesLater) {
+    const o = obj(s, id);
+    if (n > 0 && o.zone === "battlefield") withPutter(by, () => putCounters(s, o, "+1/+1", n));
+  }
+  if (plusOnesLater.length) invalidateCharacteristics(s);
   if (madeLater.size)
     enterTogether(s, () => {
       for (const { r, n } of madeLater.values()) {

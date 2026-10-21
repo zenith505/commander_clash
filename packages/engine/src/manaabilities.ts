@@ -2,7 +2,7 @@
 // whether it can be activated, and which one to use for a given mana.
 
 import { allEffects, type ActivatedAbility, type ManaAbility, type ManaProduce, type ManaTrigger } from "./abilities";
-import { abilitiesOf, basicLandManaAbility, defOf, lendersOf, objIsType } from "./cards";
+import { abilitiesOf, basicLandManaAbility, canBeSacrificed, exiledLentTo, defOf, lendersOf, objIsType } from "./cards";
 import { objectMatches } from "./effects";
 import { abilityProblem, activationLessCost, linkedExileCards, obj, payableLife, player, tapAbilitySick, tapCostCandidates } from "./game";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
@@ -41,6 +41,8 @@ export function manaAbilitiesOn(s: GameState, o: GameObject): ManaAbility[] {
     }
     for (const d of cards) out.push(...d.subtypes.map(basicLandManaAbility).filter((x): x is ManaAbility => x !== null), ...compileCard(d).mana);
   }
+  // Agatha's Soul Cauldron: the exiled creature cards' mana abilities too.
+  if (c.hasPrintedAbilities) for (const d of exiledLentTo(s, o)) out.push(...compileCard(d).mana);
   // "If ~ has a luck counter on it, instead add one mana of any color" (Gemstone Caverns): what it makes now.
   return out.map((ab) => (ab.insteadIf && staticConditionNow(s, ab.insteadIf.cond, o.id, controllerOf(s, o)) ? { ...ab, produces: ab.insteadIf.produces } : ab));
 }
@@ -330,6 +332,7 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   if (banned) return banned;
   if (ab.tap && o.tapped) return `${name} is tapped`;
   if (ab.tap && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${name} has summoning sickness`; // CR 302.6
+  if (ab.sacrificeSelf && !canBeSacrificed(s, o)) return `${name} can't be sacrificed`; // CR 701.21, 602.2b
   if (ab.oncePerTurn && o.activatedThisTurn?.includes(MANA_ABILITY_OFFSET + index)) return `${name}'s ability can be activated only once each turn`;
   if (ab.onceEver && o.activatedEver?.includes(MANA_ABILITY_OFFSET + index) && !(ab.exhaust && mayExhaustAgain(s, pid))) return `${name}'s exhaust ability can be activated only once`; // CR 702.177a
   if (ab.activeIf && !staticConditionNow(s, ab.activeIf, o.id, pid)) return `${name} doesn't have that ability now`; // max speed (CR 702.178a)

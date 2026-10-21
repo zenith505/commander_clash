@@ -66,6 +66,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever you create a token, (.+)$/, "youCreateToken"], // once for each token (CR 111.2)
   [/^Whenever you collect evidence, (.+)$/, "youCollectEvidence"],
   [/^Whenever you proliferate, (.+)$/, "youProliferate"],
+  [/^Whenever a spell or ability you control counters a spell, (.+)$/, "youCounterSpell"],
   [/^Whenever you complete a dungeon, (.+)$/, "youCompleteDungeon"],
   [/^Whenever you commit a crime, (.+)$/, "youCommitCrime"], // CR 700.13
   [/^Whenever an opponent commits a crime, (.+)$/, "opponentCommitsCrime"],
@@ -755,6 +756,10 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     batch = { what: "leavesGraveyard", whose: "you", ...(filter ? { filter } : {}), ...(m[2] !== "leave your graveyard" ? { to: "exile" as const } : {}) };
     yourTurn = !!m[3];
     rest = m[4]!;
+  } else if ((m = /^Whenever one or more cards are put into exile from your library and\/or your graveyard, (.+)$/.exec(line))) {
+    // Laelia: cards exiled from either zone in one event, by anyone, for any reason (rulings).
+    batch = { what: "exiledFromLibraryOrGraveyard", whose: "you" };
+    rest = m[1]!;
   } else if ((m = /^Whenever one or more (?:(.+?) )?cards are put into your graveyard from (anywhere|your library)( during your turn)?, (.+)$/.exec(line))) {
     const filter = batchCards(m[1]);
     if (filter === null) return "fail";
@@ -832,7 +837,7 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
  * battlefield, if it isn't a mana ability" (Harsh Mentor). One that mana abilities trigger too isn't modeled.
  */
 function parseActivatesTrigger(line: string): TriggeredAbility | "fail" | null {
-  const m = /^Whenever (a player|an opponent) activates an ability( of (?:an?|another) (.+?)(?: on the battlefield)?)?(?: that isn't a mana ability|, if it isn't a mana ability), (.+)$/.exec(line);
+  const m = /^Whenever (a player|an opponent|you) activates? an ability( of (?:an?|another) (.+?)(?: on the battlefield)?)?(?: that isn't a mana ability|, if it isn't a mana ability), (.+)$/.exec(line);
   if (!m) return /^Whenever (a player|an opponent|you) activates an? /.test(line) ? "fail" : null;
   let of: TargetSpec | undefined;
   if (m[2]) {
@@ -840,9 +845,9 @@ function parseActivatesTrigger(line: string): TriggeredAbility | "fail" | null {
     if (f?.kind !== "object") return "fail";
     of = f;
   }
-  const body = parseBody(theyAreThatPlayer(m[4]!), { eventPlayer: true });
+  const body = parseBody(theyAreThatPlayer(m[4]!), { eventPlayer: true, activatedAbility: true });
   if (!body) return "fail";
-  return { event: "abilityActivated", activates: { by: m[1] === "an opponent" ? "opponent" : "any", ...(of ? { of } : {}) }, body };
+  return { event: "abilityActivated", activates: { by: m[1] === "an opponent" ? "opponent" : m[1] === "you" ? "you" : "any", ...(of ? { of } : {}) }, body };
 }
 
 /**
@@ -968,6 +973,23 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (!t || t === "fail" || !insect || insect.targets.length) return "fail";
     const host: TargetSpec = { kind: "object", types: ["Creature"], controller: "you", text: "creature you control" };
     return { ...t, body: { targets: [], effects: [{ type: "if", cond: { kind: "state", cond: { kind: "attachedIs", filter: host } }, effects: t.body.effects }, { type: "if", cond: { kind: "createdNone" }, effects: insect.effects }], text: line.replace(/^[^,]+, /, "") } };
+  }
+  // Carpet of Flowers: "At the beginning of each of your main phases, if you haven't added mana with this ability this
+  // turn, you may add X mana of any one color, where X is the number of Islands target opponent controls." Not a mana
+  // ability (rulings; CR 605.1b: it has a target), so it uses the stack; X is counted as it resolves.
+  const carpet = /^At the beginning of each of your main phases, if you haven't added mana with this ability this turn, you may add X mana of any one color, where X is the number of (Islands|Swamps|Mountains|Forests|Plains) target opponent controls\.$/.exec(line);
+  if (carpet) {
+    const land = carpet[1] === "Plains" ? "Plains" : carpet[1]!.replace(/s$/, "");
+    const islands: TargetSpec = { kind: "object", types: ["Land"], subtypes: [land], text: land };
+    return {
+      event: "yourMain",
+      ifCond: { kind: "addedManaThisTurn", not: true },
+      body: {
+        targets: [{ kind: "player", opponent: true, text: "target opponent" }],
+        effects: [{ type: "may", effects: [{ type: "choose", choice: "color" }, { type: "addMana", chosen: 1, times: { count: { kind: "permanents", filter: islands, whose: { ref: "target", index: 0 } } }, markSource: true }], text: `add X mana of any one color, where X is the number of ${carpet[1]} target opponent controls` }],
+        text: line.replace(/^[^,]+, /, ""),
+      },
+    };
   }
   // "When this Class becomes level 2, draw two cards" (CR 716.2a).
   const level = /^When ~ becomes level (\d+), (.+)$/.exec(line);
@@ -1517,6 +1539,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       if (event === "eachUpkeep" || event === "eachDrawStep") text = text.replace(/^~ deals (\d+) damage to them\.$/, "~ deals $1 damage to that player.");
       // "At the beginning of each postcombat main phase, the active player adds ..." (Belbe): that player is the active one.
       if (event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain") text = text.replace(/\bthe active player\b/g, "that player");
+      // Alexios: "that player gains control of ~, untaps it, .... It gains haste until end of turn": "it" is still ~.
+      if (event === "eachUpkeep") text = text.replace(/^(that player gains control of ~[^.]*\.) It gains /, "$1 ~ gains ");
       let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || event === "opponentLosesLife" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", ownX: event === "selfEnters" || event === "selfCast" });
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
       const attacksPlayer = /^Whenever ~ attacks (?:a player|an opponent), /.test(line);

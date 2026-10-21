@@ -2,7 +2,7 @@ import type { Effect, Modification, TokenSpec } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
 import { auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, log, moveObject, obj, opponents, player, removeFromCombat, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
-import { playerCountersToPut, putCounters, tokenBatch } from "../counters";
+import { playerCountersToPut, putCounters, tokenBatch, withPutter } from "../counters";
 import { compileCard } from "../oracle";
 import type { ContinuousEffect, GameObject, GameState, ObjectId, PlayerId } from "../types";
 import { setFace } from "../faces";
@@ -465,9 +465,10 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const base = amountNow(s, e.n, ctx);
       const n = e.perLastKnownCounter ? base * (ctx.lki?.counters?.[e.perLastKnownCounter] ?? 0) : base;
       if (n <= 0) return;
+      const by = e.by && players(s, e.by, ctx)[0];
       for (const o of objects(s, e.what, ctx)) {
         invalidateCharacteristics(s);
-        const put = putCounters(s, o, e.counter, n);
+        const put = by !== undefined ? withPutter(by, () => putCounters(s, o, e.counter, n)) : putCounters(s, o, e.counter, n);
         log(s, `${defOf(s, o).name} gets ${put} ${e.counter} counter${put > 1 ? "s" : ""}.`);
       }
       return;

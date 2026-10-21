@@ -5,9 +5,13 @@ export type CostSymbol =
   | { kind: "generic"; amount: number }
   | { kind: "colored"; color: ManaType } // includes {C}
   /** `life`: may be paid with 2 life instead, as {B} may with K'rrik (paying it as its black half). */
-  | { kind: "hybrid"; options: Color[]; life?: true } // {W/U}
+  | { kind: "hybrid"; options: Color[]; life?: true; /** A hybrid Phyrexian symbol, {G/W/P} (CR 107.4f). */ phyrexian?: true } // {W/U}
   | { kind: "twoHybrid"; color: Color; life?: true } // {2/W}
-  | { kind: "phyrexian"; color: Color } // {W/P}
+  /**
+   * {W/P}. `krrik`: a {B} that K'rrik lets be paid with 2 life, not a Phyrexian symbol (compleated doesn't count it).
+   * `any`: any type of mana pays it (Chromatic Orrery's "as though it were mana of any color", CR 609.4b).
+   */
+  | { kind: "phyrexian"; color: Color; krrik?: true; any?: true }
   | { kind: "x" }
   /** {S}: one mana of any type produced by a snow source (CR 107.4h). Not generic for cost reductions (118.7g). */
   | { kind: "snow" }
@@ -33,6 +37,8 @@ export function parseManaCost(cost: string): ParsedCost {
     else if (parts.length === 2 && parts[1] === "P" && isColor(parts[0]!)) symbols.push({ kind: "phyrexian", color: parts[0] });
     else if (parts.length === 2 && parts[0] === "2" && isColor(parts[1]!)) symbols.push({ kind: "twoHybrid", color: parts[1] });
     else if (parts.length === 2 && isColor(parts[0]!) && isColor(parts[1]!)) symbols.push({ kind: "hybrid", options: [parts[0], parts[1]] });
+    // Hybrid Phyrexian {G/W/P}: either color or 2 life (CR 107.4f).
+    else if (parts.length === 3 && parts[2] === "P" && isColor(parts[0]!) && isColor(parts[1]!)) symbols.push({ kind: "hybrid", options: [parts[0], parts[1]], life: true, phyrexian: true });
     else symbols.push({ kind: "unsupported", raw });
   }
   return {
@@ -49,6 +55,8 @@ export const poolTotal = (p: ManaPool) => Object.values(p).reduce((a, b) => a + 
 export interface Payment {
   pool: ManaPool; // pool after paying
   lifePaid: number;
+  /** How many Phyrexian mana symbols were paid with 2 life (compleated, CR 702.150a). */
+  phyrexianLife?: number;
   /** The mana from snow sources it spent, by type (CR 107.4h). */
   snow: ManaPool;
 }
@@ -85,9 +93,10 @@ export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, 
   };
   let generic = extraGeneric;
   let lifePaid = 0;
-  const hybrids: { options: Color[]; life?: true }[] = [];
+  const hybrids: { options: Color[]; life?: true; phyrexian?: true }[] = [];
   const twoHybrids: Color[] = [];
-  const phyrexian: Color[] = [];
+  const phyrexian: Extract<CostSymbol, { kind: "phyrexian" }>[] = [];
+  let phyrexianLife = 0;
   // {S} first, each from the snow mana the rest of the cost needs least: restricted mana that may be spent on this, {C},
   // then the color there's most of to spare.
   const named = emptyPool();
@@ -107,7 +116,7 @@ export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, 
       spend(s.color);
     } else if (s.kind === "hybrid") hybrids.push(s);
     else if (s.kind === "twoHybrid") twoHybrids.push(s.color);
-    else if (s.kind === "phyrexian") phyrexian.push(s.color);
+    else if (s.kind === "phyrexian") phyrexian.push(s);
     // X is chosen as 0 for now.
   }
   // `want`: how much of each color the spell hopes was spent on it ("if {U} was spent to cast ~", adamant): the caster
@@ -116,19 +125,25 @@ export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, 
   // `avoid`: what spending each color would cost the caster (Rolling Spoil's "if {B} was spent", hurting them now): kept
   // for last, the least costly first.
   const harm = (c: ManaType) => (c === "C" ? 0 : (opts.avoid?.[c] ?? 0));
-  for (const { options: opts, life: orLife } of hybrids) {
+  for (const { options: opts, life: orLife, phyrexian: phy } of hybrids) {
     const best = opts.filter((c) => p[c] > 0).sort((a, b) => Number(wanting(b)) - Number(wanting(a)) || harm(a) - harm(b) || pref[b] - pref[a] || p[b] - p[a])[0];
     if (!best && orLife && life - lifePaid >= 2) {
       lifePaid += 2;
+      if (phy) phyrexianLife++;
       continue;
     }
     if (!best) return null;
     spend(best);
   }
-  for (const c of phyrexian) {
+  for (const { color: c, krrik, any } of phyrexian) {
+    // With Chromatic Orrery any mana pays it: its own color first, then colorless, then the color there's most of.
+    const other = any ? (["C", ...COLORS] as ManaType[]).filter((m) => p[m] > 0).sort((a, b) => Number(b === "C") - Number(a === "C") || harm(a) - harm(b) || p[b] - p[a])[0] : undefined;
     if (p[c] > 0) spend(c);
-    else if (life - lifePaid >= 2) lifePaid += 2;
-    else return null;
+    else if (other) spend(other);
+    else if (life - lifePaid >= 2) {
+      lifePaid += 2;
+      if (!krrik) phyrexianLife++;
+    } else return null;
   }
   for (const c of twoHybrids) {
     if (p[c] > 0) spend(c);
@@ -149,7 +164,7 @@ export function payFromPool(cost: ParsedCost, pool: ManaPool, extraGeneric = 0, 
     spend(from);
     generic--;
   }
-  return { pool: p, lifePaid, snow: snowUsed };
+  return { pool: p, lifePaid, ...(phyrexianLife ? { phyrexianLife } : {}), snow: snowUsed };
 }
 
 /**
@@ -161,7 +176,7 @@ export function blackForLife(cost: ParsedCost): ParsedCost {
   return {
     ...cost,
     symbols: cost.symbols.map((x): CostSymbol => {
-      if (x.kind === "colored" && x.color === "B") return { kind: "phyrexian", color: "B" };
+      if (x.kind === "colored" && x.color === "B") return { kind: "phyrexian", color: "B", krrik: true };
       if ((x.kind === "hybrid" && x.options.includes("B")) || (x.kind === "twoHybrid" && x.color === "B")) return { ...x, life: true };
       return x;
     }),

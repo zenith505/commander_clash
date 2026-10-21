@@ -833,7 +833,7 @@ export type Modification =
    * dealt to and dealt by ~ this turn" (CR 615.1): `to` and/or `by` it; `combat` "only" or "non" (noncombat);
    * `fromTypes`: only damage from sources with all these card types ("by creatures", "by artifact sources").
    */
-  | { kind: "preventDamage"; to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[] }
+  | { kind: "preventDamage"; to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[]; /** "Put a +1/+1 counter on that creature for each 1 damage prevented this way" (Vigor, CR 615.5): the ability's controller puts them. */ plusOnes?: true }
   /** "If a source you control would deal damage ..., it deals double that damage instead" (a replacement effect, CR 614.1a). */
   | { kind: "damageMod"; mod: DamageMod }
   /** "Damage that would be dealt by ~ can't be prevented" (CR 615.12); `combat`: combat damage only (Questing Beast). */
@@ -862,6 +862,10 @@ export type Modification =
   | { kind: "cantAttackSamePlayer" }
   /** "Can't attack you or planeswalkers you control" (Promise of Loyalty, CR 508.1c): "you" is the effect's controller. */
   | { kind: "cantAttackYou" }
+  /** "Can't attack its owner" (Alexios): that player, not their planeswalkers or battles (rulings). */
+  | { kind: "cantAttackOwner" }
+  /** "Can't be sacrificed" (CR 701.21): an instruction to sacrifice it does nothing; it can't be chosen to be sacrificed, for a cost either (rulings on Alexios). */
+  | { kind: "cantBeSacrificed" }
   /** Blocking requirements (CR 509.1c): "must be blocked if able", "all creatures able to block ~ do so". */
   | { kind: "mustBeBlocked" }
   | { kind: "allMustBlock" }
@@ -927,6 +931,8 @@ export interface StaticAbility {
  */
 export type StaticCondition =
   | { kind: "graveyardAtLeast"; n: number }
+  /** "If you haven't added mana with this ability this turn" (Carpet of Flowers): the source's addMana with `markSource` this turn. */
+  | { kind: "addedManaThisTurn"; not?: true }
   /** Krovikan Vampire: "if a creature dealt damage by ~ this turn died" (see TurnLog.diedDamaged). */
   | { kind: "damagedBySelfDied" }
   /** "If that creature was dealt excess damage this turn" (CR 120.10): the trigger's subject, as the object it was. */
@@ -1535,7 +1541,7 @@ export type Effect =
    * `double`: "double the number of +1/+1 counters on each creature you control": each gets as many more as it has (CR
    * 701.10e), `n` aside; with `everyKind`, of each kind of counter it has ("double the number of each kind of counter").
    */
-  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true; double?: true; everyKind?: true }
+  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true; double?: true; everyKind?: true; /** "That player ... puts a +1/+1 counter on it" (Alexios): who puts them, when not the ability's controller. */ by?: PlayerRef }
   /**
    * "Distribute X +1/+1 counters among any number of creatures you control" (no targets): its controller divides them
    * among the permanents like `filter` they control as it resolves (rulings on Blessing of Frost, CR 608.2d), each
@@ -1620,7 +1626,8 @@ export type Effect =
    * destroyed this way, its controller draws a card": `effects` (one token or one card, for PlayerRef "eachOne") once for
    * each of them that the instructions before destroyed or exiled, by the player who controlled it as it last existed.
    */
-  | { type: "forEachThisWay"; which: "destroyed" | "exiled"; filter: TargetSpec; effects: Effect[] }
+  /** `graveyard`: "for each permanent put into a graveyard this way" (Terastodon): only the destroyed ones that went there. */
+  | { type: "forEachThisWay"; which: "destroyed" | "exiled"; graveyard?: true; filter: TargetSpec; effects: Effect[] }
   /** "Exile the top two cards of your library. Until the end of your next turn, you may play those cards." */
   /** `who`: "the top card of that player's library" (Ragavan), not yours; `castOnly`: "you may cast that card", not play it. */
   /** `free`: "you may play that card without paying its mana cost" (Urza, Lord High Artificer, CR 118.9). */
@@ -1656,7 +1663,7 @@ export type Effect =
    */
   /** `epic`: the spell with epic as it resolved, by its stack id in `GameState.epics` (CR 702.50a). */
   /** `self`: the spell that's resolving ("you may copy this spell", Sevinne's Reclamation), as it is on the stack. */
-  | { type: "copySpell"; spell: "cause" | "self" | { target: number } | { epic: string }; n: Amount | "storm" | "kicked"; newTargets: boolean; /** Then an opponent you choose copies it too (CR 702.144a). */ demonstrate?: true; /** "If it's a permanent spell, the copy gains haste and "..."" (Nalfeshnee): what the token it becomes has (CR 400.7a, 608.3f). */ gains?: Modification[] }
+  | { type: "copySpell"; spell: "cause" | "self" | { target: number } | { epic: string }; /** "stormInstantSorcery": the instant and sorcery spells its controller cast before it this turn (Thousand-Year Storm). */ n: Amount | "storm" | "kicked" | "stormInstantSorcery"; newTargets: boolean; /** Then an opponent you choose copies it too (CR 702.144a). */ demonstrate?: true; /** "If it's a permanent spell, the copy gains haste and "..."" (Nalfeshnee): what the token it becomes has (CR 400.7a, 608.3f). */ gains?: Modification[] }
   | { type: "removeCounters"; what: ObjRef; counter: CounterKind; n: Amount | "all" }
   /** "Remove (up to) three counters from target permanent": of any kinds, chosen as it resolves (rulings on Glissa Sunslayer); fewer than that, all of them. */
   | { type: "removeAnyCounters"; what: ObjRef; n: Amount; upTo?: true }
@@ -1812,6 +1819,8 @@ export type Effect =
    */
   /** `drain`: "Each opponent loses X life and you gain X life, where X is that card's mana value" (Twilight Prophet). */
   | { type: "revealTopToHand"; life?: { who: PlayerRef; gain?: boolean; drain?: true } }
+  /** "You may repeat this process any number of times" (Ad Nauseam): `effects` (none of which waits on a choice), then the controller decides whether to go again, each time after seeing the result (rulings). */
+  | { type: "repeatMay"; effects: Effect[]; text: string }
   /** "Reveal the top card of your library" (CR 701.20a): what follows ("If it's a creature card, put it into your hand") is about it (ObjRef "revealed"). */
   /** "Reveal the top card of your library" (CR 701.20a), or with `look` only look at it, for an "if it's a ... card" after it. */
   | { type: "revealTop"; look?: true; /** "Reveal a card at random from your hand" (Cursed Scroll) instead. */ randomFromHand?: true; /** Whose library: "reveals the top card of their library" (Chaos Warp: the target's owner). Yours if left out. */ who?: PlayerRef }
@@ -1879,6 +1888,8 @@ export type Effect =
   /** "Put two cards from your hand on top of your library in any order" (Brainstorm): the controller's own hand. */
   /** `bottom`: "put a card from your hand on the bottom of your library" instead (Volcanic Spite). */
   | { type: "handToTop"; n: Amount; bottom?: true }
+  /** Scroll Rack: any number of cards from the hand exiled face down, that many from the top of the library put into the hand (not drawn), then the exiled cards on top in any order. */
+  | { type: "scrollRack" }
   /**
    * Sylvan Library: "choose two cards in your hand drawn this turn. For each of those cards, pay 4 life or put the card on
    * top of your library." With fewer drawn cards still in hand, those (rulings); none, nothing happens.
@@ -1915,6 +1926,8 @@ export type Effect =
       only?: ManaSpend;
       /** "Add {B} or {G} for each ...": `times` mana, each of either color (chosen as it resolves). */
       split?: [ManaType, ManaType];
+      /** Remember that this ability's source added mana this turn (StaticCondition addedManaThisTurn). */
+      markSource?: true;
     }
   /** "Creatures without flying can't block this turn" (Falter): a rule for the turn, not locked to the creatures there now,
    * since it doesn't change characteristics (CR 611.2c; Magmatic Chasm rulings). */
@@ -2070,7 +2083,8 @@ export type Effect =
   /** "Until end of turn, whenever a player taps an Island for mana, that player adds an additional {U}" (High Tide). */
   | { type: "manaTriggerThisTurn"; trigger: ManaTrigger }
   /** "Defending player gets a poison counter", "each opponent gets two poison counters" (CR 122.1f; ten lose, 704.5c). */
-  | { type: "poison"; who: PlayerRef; n: Amount }
+  /** `upTo`: as many as it takes to have that many ("equal to the difference", Vraska, Betrayal's Sting); `n` is unused. */
+  | { type: "poison"; who: PlayerRef; n: Amount; upTo?: number }
   /** "Each opponent loses all counters" (CR 122.1): poison and energy, the player counters there are here. */
   | { type: "loseAllCounters"; who: PlayerRef }
   /**
@@ -2298,6 +2312,14 @@ export type Effect =
    */
   /** Illusion of Choice: "You choose how each player votes this turn" (GameState.votesChosenBy). */
   | { type: "chooseVotes" }
+  /**
+   * "Each player secretly chooses a number 0 or greater, then all players reveal those numbers simultaneously"
+   * (Wheel of Misfortune, Menacing Ogre): each one chooses without seeing the others' numbers, then what the card does
+   * with them. `wheel`: damage equal to the highest number to each player who chose it, then each player who didn't
+   * choose the lowest discards their hand and draws seven. `ogre`: each player with the highest number loses that much
+   * life, and two +1/+1 counters on the source if its controller is one of them.
+   */
+  | { type: "secretNumbers"; then: "wheel" | "ogre" }
   | { type: "vote"; options?: string[]; among?: TargetSpec; secret?: true; text: string }
   | { type: "choose"; choice: ChoiceKind; /** With "opponent": "a player with the most life or tied for most life" (The Black Gate), checked as it resolves; you can be one. */ mostLife?: true; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose };
 
@@ -2387,7 +2409,8 @@ export type SpellCondition =
   /** "If ~ was bargained" (CR 702.166b). */
   | { kind: "bargained" }
   /** "If this spell was cast from a graveyard" (Sevinne's Reclamation): a copy wasn't cast (rulings, CR 707.10). */
-  | { kind: "castFromGraveyard" }
+  /** `exile`: "if ~ was cast from exile" (Delayed Blast Fireball) instead. A copy wasn't cast (CR 707.10). */
+  | { kind: "castFromGraveyard"; exile?: true }
   /** Approach of the Second Sun: "If ~ was cast from your hand and you've cast another spell named ~ this game". */
   | { kind: "castFromHandAndAnotherNamed" }
   /** "If you cast this spell during your main phase" (addendum, CR 207.2c): a copy wasn't cast (CR 707.10). */
@@ -2407,7 +2430,7 @@ export type SpellCondition =
   /** "If the gift was promised" (CR 702.174b, k). */
   | { kind: "gift" }
   /** "If this spell's surge cost was paid" (CR 702.117a), "if ~'s spectacle cost was paid" (702.137a): in the spell, or its permanent's enters trigger. */
-  | { kind: "altPaid"; alt: "surge" | "spectacle" | "awaken" }
+  | { kind: "altPaid"; alt: "surge" | "spectacle" | "awaken" | "alternative" | "madness" }
   /** "If you attacked this turn, ...": a fact about the game, checked as the spell or ability resolves (CR 608.2c). */
   | { kind: "state"; cond: StaticCondition }
   /** "If X is 10 or more" (Finale of Devastation): the X this spell was cast with (CR 107.3a). */
@@ -2454,7 +2477,7 @@ export type SpellCondition =
 
 /** Every effect, including the ones inside "you may" and "if", in order. */
 export const allEffects = (effects: Effect[]): Effect[] =>
-  effects.flatMap((e) => (e.type === "may" || e.type === "if" ? [e, ...allEffects(e.effects), ...allEffects(e.otherwise ?? [])] : e.type === "either" ? [e, ...e.options.flatMap(allEffects)] : e.type === "together" ? [e, ...allEffects(e.effects)] : [e]));
+  effects.flatMap((e) => (e.type === "may" || e.type === "if" ? [e, ...allEffects(e.effects), ...allEffects(e.otherwise ?? [])] : e.type === "either" ? [e, ...e.options.flatMap(allEffects)] : e.type === "together" || e.type === "repeatMay" ? [e, ...allEffects(e.effects)] : [e]));
 
 /** A sequence of effects with the targets they need, like a spell's text or one ability. */
 export interface AbilityBody {
@@ -2651,6 +2674,8 @@ export type TriggerEvent =
   | "youCollectEvidence"
   /** "Whenever you proliferate" (CR 701.27): once for each proliferate action, even with nothing chosen (rulings). */
   | "youProliferate"
+  /** "Whenever a spell or ability you control counters a spell" (Baral): once for each spell countered (CR 701.6a). */
+  | "youCounterSpell"
   /** "Whenever you complete a dungeon" (CR 309.7). */
   | "youCompleteDungeon"
   /** "Whenever you commit a crime", "whenever an opponent commits a crime" (CR 700.13): once for each spell or ability. */
@@ -2786,7 +2811,7 @@ export interface TriggeredAbility {
    * source had to be as it was activated, a permanent on the battlefield ("an ability of an artifact, creature, or land").
    * "That player" is who activated it.
    */
-  activates?: { by: "opponent" | "any"; of?: TargetSpec };
+  activates?: { by: "opponent" | "any" | "you"; of?: TargetSpec };
   /**
    * For "playerDiscards": who discards, `cycled` for "cycles a card" (only a card discarded to pay a cycling cost,
    * CR 702.29c), `other` for "another card", `filter` for "a creature card". "Cycle or discard" is just "discard"
@@ -2955,7 +2980,8 @@ export interface TriggeredAbility {
  * `whose`: who has to control the permanents (or own the cards) relative to this ability's controller.
  */
 export interface BatchTrigger {
-  what: "enters" | "leaves" | "leavesGraveyard" | "toGraveyard" | "discards";
+  /** `exiledFromLibraryOrGraveyard`: "cards are put into exile from your library and/or your graveyard" (Laelia). */
+  what: "enters" | "leaves" | "leavesGraveyard" | "toGraveyard" | "discards" | "exiledFromLibraryOrGraveyard";
   /** What each object has to be ("creature card", "nontoken creature"); unset, any. */
   filter?: TargetSpec;
   whose?: "you" | "opponent";
@@ -3458,7 +3484,11 @@ export interface CompiledCard {
    * anywhere, ..." (Dryad Militant): a replacement effect of this permanent (CR 614.1a) on cards (and with `tokens`,
    * tokens) going to the graveyards of `whose` (from this permanent's controller's view), its owner's (CR 404.2).
    */
-  graveyardExile?: { whose: "any" | "opponents" | "yours"; tokens?: true; filter?: TargetSpec; counter?: CounterKind };
+  /**
+   * `notYours`: "a card you didn't control" (Valgavoth): not one this permanent's controller controlled as a spell or
+   * permanent; a card elsewhere counts as its owner's (CR 108.4a). `linked`: the card is "exiled with ~" (CR 607.2a).
+   */
+  graveyardExile?: { whose: "any" | "opponents" | "yours"; tokens?: true; filter?: TargetSpec; counter?: CounterKind; notYours?: true; linked?: true };
   /** "This creature enters prepared" (CR 722.3a): it becomes prepared as it enters. */
   entersPrepared?: boolean;
   /**
@@ -3570,14 +3600,19 @@ export interface CompiledCard {
    */
   uncounterable?: { filter: TargetSpec; anyone?: true }[];
   /** "Your opponents can't cast spells during your turn." (a "can't" that wins over any "can", CR 101.2) */
+  /** Compleated (CR 702.150a): two fewer loyalty counters for each Phyrexian symbol its caster paid with life. */
+  compleated?: true;
   opponentsCantCastYourTurn?: true;
+  /** "As long as ~ is attached to a creature, your opponents can't cast spells during your turn" (Conqueror's Flail): only while this holds. */
+  opponentsCantCastYourTurnIf?: StaticCondition;
   /**
    * "Each opponent can cast spells only any time they could cast a sorcery." (Teferi, Time Raveler; CR 307.1): over any
    * permission to cast as though with flash (rulings), and not while something resolves (cascade).
    */
   opponentsSorceryTiming?: true;
   /** "No more than one creature can attack each combat." / "... block ..." (Silent Arbiter; CR 508.1c, 509.1b): for everyone. */
-  combatLimit?: { attack?: number; block?: number };
+  /** "No more than one creature can attack each combat" (Silent Arbiter); `attackYou`: "... can attack you each combat" (Crawlspace), its controller only, not their planeswalkers (rulings). */
+  combatLimit?: { attack?: number; block?: number; attackYou?: number };
   /** "You may activate loyalty abilities of planeswalkers you control on any player's turn any time you could cast an instant." (Teferi, Temporal Archmage's emblem) */
   loyaltyAtInstantSpeed?: true;
   /** "Your opponents can't cast spells with mana value 3 or less." (Brisela, Voice of Nightmares): this many or less. */
@@ -3721,6 +3756,14 @@ export interface CompiledCard {
   lifeForBlack?: true;
   /** Chromatic Orrery: "You may spend mana as though it were mana of any color." (CR 609.4b), for its controller's costs. */
   spendAnyColor?: true;
+  /** Agatha's Soul Cauldron: "You may spend mana as though it were mana of any color to activate abilities of creatures you control" (CR 609.4b). */
+  spendAnyColorCreatureAbilities?: true;
+  /**
+   * Agatha's Soul Cauldron: "Creatures you control with +1/+1 counters on them have all activated abilities of all
+   * creature cards exiled with ~": the permanents matching `to` have the activated abilities (mana abilities too) of the
+   * cards matching `cards` linked to this object's exile ability (CR 607.2a). "~" in them is the creature (rulings).
+   */
+  lendsExiled?: { to: TargetSpec; cards: TargetSpec };
   /**
    * Tekuthal: "If you would proliferate, proliferate twice instead." A replacement effect (CR 614.1a); with two, each
    * applies to the proliferating the other made, so four times (as Thought Reflection's rulings do for draws).
@@ -3863,6 +3906,12 @@ export interface CompiledCard {
    * (Rogue Class): its controller may play the cards its linked exile took (CR 607.2a), with any mana (609.4b).
    */
   playLinked?: true;
+  /**
+   * "During your turn, you may play cards exiled with ~. If you cast a spell this way, pay life equal to its mana value
+   * rather than pay its mana cost" (Valgavoth): during its controller's turn only, cast for that alternative cost
+   * (AltCostKind "citadel"; rulings: no other way to pay), without Rogue Class's mana of any color.
+   */
+  playLinkedForLife?: true;
   /** The same, only while this holds (a Class level's, CR 716.2a). */
   playLinkedIf?: StaticCondition;
   /**

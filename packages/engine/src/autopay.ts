@@ -518,7 +518,7 @@ export function planMana(s: GameState, pid: PlayerId, cost0: ParsedCost, extraGe
   if (payFromPool(cost0, start.pool, extraGeneric, payableLife(s, pid), { snow: start.snow, wantSnow })) return [];
   // K'rrik's "you may pay 2 life rather than pay that mana" for {B}: mana from the player's sources first, life once
   // they can't make it (planFree).
-  const cost = payableCost(s, pid, cost0);
+  const cost = payableCost(s, pid, cost0, use);
   const sources = manaSources(s, pid, [...(exclude ? [exclude] : []), ...alsoExclude], use);
   const unrestricted = sources.map((src) => ({ ...src, options: src.options.filter((x) => !x.restricted) }));
   const needColors = namedColors(cost);

@@ -1,5 +1,31 @@
 [
  {
+  "oracleId": "981b0e21-e5e6-4a1e-bfde-679d56623f7f",
+  "name": "Ad Nauseam",
+  "manaCost": "{3}{B}{B}",
+  "cmc": 5,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Reveal the top card of your library and put that card into your hand. You lose life equal to its mana value. You may repeat this process any number of times.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "soa",
+  "releasedAt": "2026-04-24",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": true
+ },
+ {
   "oracleId": "38515f89-348b-4cf3-b7bd-1f6fe4ce2fba",
   "name": "Adeline, Resplendent Cathar",
   "manaCost": "{1}{W}{W}",
@@ -7403,6 +7429,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "648bd03d-247e-4d6f-87a9-12a67688cbf5",
+  "name": "Scroll Rack",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{1}, {T}: Exile any number of cards from your hand face down. Put that many cards from the top of your library into your hand. Then look at the exiled cards and put them on top of your library in any order.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mps",
+  "releasedAt": "2016-09-30",
+  "rarity": "special",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3ea060d8-449c-4a5e-8883-b45bd7707b5b",
   "name": "Season of Gathering",
   "manaCost": "{4}{G}{G}",
@@ -9344,6 +9392,43 @@
   ]
  },
  {
+  "oracleId": "cae3ec72-436d-4086-9dcb-17b3d92ad5c4",
+  "name": "Valgavoth, Terror Eater",
+  "manaCost": "{6}{B}{B}{B}",
+  "cmc": 9,
+  "typeLine": "Legendary Creature — Elder Demon",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elder",
+   "Demon"
+  ],
+  "oracleText": "Flying, lifelink\nWard—Sacrifice three nonland permanents.\nIf a card you didn't control would be put into an opponent's graveyard from anywhere, exile it instead.\nDuring your turn, you may play cards exiled with Valgavoth. If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost.",
+  "power": "9",
+  "toughness": "9",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Flying",
+   "Lifelink",
+   "Ward"
+  ],
+  "commanderLegal": "legal",
+  "set": "dsk",
+  "releasedAt": "2024-09-27",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ededbdae-d9dc-4206-9335-d7158f2d7700",
   "name": "Vampiric Tutor",
   "manaCost": "{B}",
@@ -9765,6 +9850,32 @@
   "commanderLegal": "legal",
   "set": "afr",
   "releasedAt": "2021-07-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "10aff3f6-8347-4e1b-b8e7-c204c9e46657",
+  "name": "Wheel of Misfortune",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Each player secretly chooses a number 0 or greater, then all players reveal those numbers simultaneously and determine the highest and lowest numbers revealed this way. Wheel of Misfortune deals damage equal to the highest number to each player who chose that number. Each player who didn't choose the lowest number discards their hand, then draws seven cards.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2025-02-10",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

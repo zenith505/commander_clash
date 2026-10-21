@@ -1,0 +1,258 @@
+// Round 102: Ad Nauseam ("you may repeat this process any number of times": decided after each card, rulings; life can
+// go to 0 or less meanwhile, the loss waits for state-based actions, CR 704.3, 704.5a). Scroll Rack (cards from the
+// hand traded for as many from the top of the library, not drawn: rulings). Thousand-Year Storm (a copy for each
+// instant and sorcery spell you cast before it this turn). Crawlspace (no more than two creatures can attack you).
+// Delayed Blast Fireball ("each opponent and each creature they control"; "if ~ was cast from exile"). Rings of
+// Brighthearth (copying an activated ability, even once it's countered: rulings). Baleful Mastery ("if the {1}{B} cost
+// was paid, an opponent draws a card": one chosen as it resolves, rulings). Terastodon (a token for each permanent put
+// into a graveyard this way, not one that survived). Monastery Mentor (a token with prowess, CR 702.108a).
+
+import { describe, expect, it } from "vitest";
+import { act, bear, card, passUntil, putOnBattlefield, setup, target } from "./helpers";
+import { defOf, isFullySupported, planActivate, planCast, power, waitingOn, type GameState } from "../src";
+import { defMv } from "../src/faces";
+
+// Real oracle text (Scryfall).
+const nauseam = card("Ad Nauseam", "Instant", "{3}{B}{B}", { oracleText: "Reveal the top card of your library and put that card into your hand. You lose life equal to its mana value. You may repeat this process any number of times." });
+
+const rack = card("Scroll Rack", "Artifact", "{2}", { oracleText: "{1}, {T}: Exile any number of cards from your hand face down. Put that many cards from the top of your library into your hand. Then look at the exiled cards and put them on top of your library in any order." });
+const sage = card("Sage of Lat-Nam Test", "Creature — Human", "{1}{U}", { power: "1", toughness: "1", oracleText: "Whenever you draw a card, you gain 1 life." });
+
+const storm = card("Thousand-Year Storm", "Enchantment", "{4}{U}{R}", { oracleText: "Whenever you cast an instant or sorcery spell, copy it for each other instant and sorcery spell you've cast before it this turn. You may choose new targets for the copies." });
+const bolt = card("Lightning Bolt", "Instant", "{R}", { oracleText: "Lightning Bolt deals 3 damage to any target." });
+const grizzly = card("Runeclaw Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" });
+
+const crawlspace = card("Crawlspace", "Artifact", "{3}", { oracleText: "No more than two creatures can attack you each combat." });
+
+const fireball = card("Delayed Blast Fireball", "Instant", "{1}{R}{R}", { keywords: ["Foretell"], oracleText: "Delayed Blast Fireball deals 2 damage to each opponent and each creature they control. If this spell was cast from exile, it deals 5 damage to each opponent and each creature they control instead.\nForetell {4}{R}{R} (During your turn, you may pay {2} and exile this card from your hand face down. Cast it on a later turn for its foretell cost.)" });
+
+const rings = card("Rings of Brighthearth", "Artifact", "{3}", { oracleText: "Whenever you activate an ability, if it isn't a mana ability, you may pay {2}. If you do, copy that ability. You may choose new targets for the copy." });
+const pyromancer = card("Prodigal Pyromancer", "Creature — Human Wizard", "{2}{R}", { power: "1", toughness: "1", oracleText: "{T}: This creature deals 1 damage to any target." });
+
+const mastery = card("Baleful Mastery", "Instant", "{3}{B}", { oracleText: "You may pay {1}{B} rather than pay this spell's mana cost.\nIf the {1}{B} cost was paid, an opponent draws a card.\nExile target creature or planeswalker." });
+
+const terastodon = card("Terastodon", "Creature — Elephant", "{6}{G}{G}", { power: "9", toughness: "9", oracleText: "When this creature enters, you may destroy up to three target noncreature permanents. For each permanent put into a graveyard this way, its controller creates a 3/3 green Elephant creature token." });
+const relic = card("Darksteel Relic", "Artifact", "{0}", { keywords: ["Indestructible"], oracleText: "Indestructible" });
+
+const mentor = card("Monastery Mentor", "Creature — Human Monk", "{2}{W}", { power: "2", toughness: "2", keywords: ["Prowess"], oracleText: "Prowess (Whenever you cast a noncreature spell, this creature gets +1/+1 until end of turn.)\nWhenever you cast a noncreature spell, create a 1/1 white Monk creature token with prowess." });
+
+const pass = (s: GameState) => act(s, { type: "passPriority", player: waitingOn(s)! });
+const settle = (s: GameState) => {
+  for (let i = 0; i < 100 && (s.stack.length || s.triggerQueue.length) && !s.pending; i++) s = pass(s);
+  return s;
+};
+
+describe("round 102: Ad Nauseam", () => {
+  it("parse", () => expect(isFullySupported(nauseam)).toBe(true));
+
+  it("a card and its mana value in life each time, as many times as you like", () => {
+    const { s: s0, ap, ids } = setup([nauseam]);
+    const top = s0.players[ap]!.library.slice(0, 3);
+    const hand = s0.players[ap]!.hand.length - 1;
+    let s = settle(planCast(s0, ap, ids[0]!)!.reduce((x, y) => act(x, y), s0));
+    for (const yes of [true, true, false]) {
+      expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap, repeat: true });
+      s = settle(act(s, { type: "chooseMay", player: ap, yes }));
+    }
+    expect(s.pending).toBeFalsy();
+    expect(s.players[ap]!.hand.length).toBe(hand + 3);
+    for (const id of top) expect(s.objects[id]!.zone).toBe("hand");
+    expect(s.players[ap]!.life).toBe(40 - top.reduce((n, id) => n + defMv(defOf(s, s.objects[id]!)), 0));
+  });
+
+  it("going on at 0 life or less: the player loses once it's done", () => {
+    const { s: s0, ap, ids } = setup([nauseam]);
+    s0.players[ap]!.life = 1;
+    const bear = s0.players[ap]!.library.find((id) => defMv(defOf(s0, s0.objects[id]!)) > 0)!;
+    s0.players[ap]!.library = [bear, ...s0.players[ap]!.library.filter((id) => id !== bear)];
+    let s = settle(planCast(s0, ap, ids[0]!)!.reduce((x, y) => act(x, y), s0));
+    expect(s.players[ap]!.life).toBeLessThanOrEqual(0);
+    expect(s.players[ap]!.lost).toBeFalsy();
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: false }));
+    expect(s.players[ap]!.lost).toBe(true);
+  });
+});
+
+describe("round 102: Scroll Rack", () => {
+  it("parse", () => expect(isFullySupported(rack)).toBe(true));
+
+  it("trades the chosen cards for the top ones, which aren't drawn; the first pick ends on top", () => {
+    const { s: s0, ap, ids } = setup([nauseam, nauseam, nauseam]);
+    const r = putOnBattlefield(s0, ap, rack);
+    putOnBattlefield(s0, ap, sage);
+    const top = s0.players[ap]!.library.slice(0, 2);
+    const hand = s0.players[ap]!.hand.length;
+    let s = settle(planActivate(s0, ap, r, 0)!.reduce((x, y) => act(x, y), s0));
+    expect(s.pending).toMatchObject({ kind: "handToTop", player: ap, count: hand, upTo: true });
+    s = settle(act(s, { type: "handToTop", player: ap, objectIds: [ids[1]!, ids[0]!] }));
+    expect(s.players[ap]!.library.slice(0, 2)).toEqual([ids[1]!, ids[0]!]);
+    expect(s.players[ap]!.hand).toEqual(expect.arrayContaining([...top, ids[2]!]));
+    expect(s.players[ap]!.hand).toHaveLength(hand);
+    expect(s.players[ap]!.life).toBe(40); // not drawn
+    expect(s.objects[ids[0]!]!.hiddenExile).toBeUndefined();
+  });
+
+  it("with a short library, as many as it has; none chosen does nothing", () => {
+    const { s: s0, ap, ids } = setup([nauseam, nauseam]);
+    const r = putOnBattlefield(s0, ap, rack);
+    const one = s0.players[ap]!.library[0]!;
+    s0.players[ap]!.library = [one];
+    let s = settle(planActivate(s0, ap, r, 0)!.reduce((x, y) => act(x, y), s0));
+    const rest = s.players[ap]!.hand.filter((id) => id !== ids[0] && id !== ids[1]);
+    s = settle(act(s, { type: "handToTop", player: ap, objectIds: [ids[0]!, ids[1]!] }));
+    expect(s.players[ap]!.hand.sort()).toEqual([...rest, one].sort());
+    expect(s.players[ap]!.library).toEqual([ids[0]!, ids[1]!]);
+    expect(s.players[ap]!.lost).toBeFalsy();
+  });
+});
+
+describe("round 102: Thousand-Year Storm", () => {
+  it("parse", () => expect(isFullySupported(storm)).toBe(true));
+
+  it("copies each instant or sorcery for each one cast before it this turn, not creature spells", () => {
+    const { s: s0, ap, opp, ids } = setup([bolt, grizzly, bolt, bolt]);
+    putOnBattlefield(s0, ap, storm);
+    let s = s0;
+    const life = () => s.players[opp]!.life;
+    const castIt = (id: string, targets?: Parameters<typeof planCast>[3]) => {
+      s = planCast(s, ap, id, targets)!.reduce((x, y) => act(x, y), s);
+      for (let i = 0; i < 100 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+        const p = s.pending;
+        if (p?.kind === "copyTargets") s = act(s, { type: "copyTargets", player: p.player });
+        else if (p) throw new Error(`unexpected ${p.kind}`);
+        else s = pass(s);
+      }
+    };
+    const face = { kind: "player" as const, id: opp };
+    castIt(ids[0]!, [face]);
+    expect(life()).toBe(37);
+    castIt(ids[1]!);
+    castIt(ids[2]!, [face]);
+    expect(life()).toBe(31); // itself and one copy
+    castIt(ids[3]!, [face]);
+    expect(life()).toBe(22); // itself and two copies
+  });
+});
+
+describe("round 102: Crawlspace", () => {
+  it("parse", () => expect(isFullySupported(crawlspace)).toBe(true));
+
+  it("no more than two creatures attack its controller; others may attack someone else", () => {
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, opp, crawlspace);
+    const bs = [1, 2, 3].map(() => putOnBattlefield(s0, ap, bear()));
+    const third = s0.turnOrder.find((p) => p !== ap && p !== opp)!;
+    const s = passUntil(s0, "declareAttackers", ap);
+    expect(() => act(s, { type: "declareAttackers", player: ap, attacks: bs.map((b) => ({ attacker: b, defender: opp })) })).toThrow(/no more than 2 creatures can attack/);
+    const ok = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: bs[0]!, defender: opp }, { attacker: bs[1]!, defender: opp }, { attacker: bs[2]!, defender: third }] });
+    expect(bs.map((b) => ok.objects[b]!.attacking)).toEqual([opp, opp, third]);
+  });
+});
+
+describe("round 102: Delayed Blast Fireball", () => {
+  it("parse", () => expect(isFullySupported(fireball)).toBe(true));
+
+  it("2 damage to each opponent and their creatures, 5 if cast from exile; not to you or yours", () => {
+    for (const fromExile of [false, true]) {
+      const { s: s0, ap, opp, ids } = setup([fireball]);
+      const theirs = putOnBattlefield(s0, opp, card("Big Test", "Creature — Giant", "{4}", { power: "4", toughness: "4" }));
+      const mine = putOnBattlefield(s0, ap, bear());
+      let s = planCast(s0, ap, ids[0]!)!.reduce((x, y) => act(x, y), s0);
+      if (fromExile) s.objects[ids[0]!]!.castFrom = "exile";
+      s = settle(s);
+      const n = fromExile ? 5 : 2;
+      for (const p of s.turnOrder) expect(s.players[p]!.life).toBe(p === ap ? 40 : 40 - n);
+      expect(s.objects[theirs]!.zone).toBe(fromExile ? "graveyard" : "battlefield");
+      expect(s.objects[mine]!.zone).toBe("battlefield");
+      expect(s.objects[mine]!.damage ?? 0).toBe(0);
+    }
+  });
+});
+
+describe("round 102: Rings of Brighthearth", () => {
+  it("parse", () => expect(isFullySupported(rings)).toBe(true));
+
+  it("pay {2}: a copy of the ability; not for mana abilities; not for an opponent's ability", () => {
+    for (const pay of [true, false]) {
+      const { s: s0, ap, opp } = setup([]);
+      putOnBattlefield(s0, ap, rings);
+      const py = putOnBattlefield(s0, ap, pyromancer);
+      putOnBattlefield(s0, opp, rings);
+      s0.players[ap]!.manaPool.C = 2;
+      let s = planActivate(s0, ap, py, 0, [{ kind: "player", id: opp }])!.reduce((x, y) => act(x, y), s0);
+      for (let i = 0; i < 100 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+        const p = s.pending;
+        if (p?.kind === "chooseMay") {
+          expect(p.player).toBe(ap);
+          s = act(s, { type: "chooseMay", player: ap, yes: pay });
+        } else if (p?.kind === "copyTargets") s = act(s, { type: "copyTargets", player: p.player });
+        else if (p) throw new Error(`unexpected ${p.kind}`);
+        else s = pass(s);
+      }
+      expect(s.players[opp]!.life).toBe(pay ? 38 : 39);
+      expect(s.players[ap]!.manaPool.C).toBe(pay ? 0 : 2);
+    }
+  });
+});
+
+describe("round 102: Baleful Mastery", () => {
+  it("parse", () => expect(isFullySupported(mastery)).toBe(true));
+
+  it("for {1}{B}: an opponent of the caster's choice draws; for its mana cost, nobody", () => {
+    for (const alt of [true, false]) {
+      const { s: s0, ap, opp, ids } = setup([mastery]);
+      const g = putOnBattlefield(s0, opp, bear());
+      const other = s0.turnOrder.find((p) => p !== ap && p !== opp)!;
+      const hands = s0.turnOrder.map((p) => s0.players[p]!.hand.length);
+      let s = planCast(s0, ap, ids[0]!, [target(g)], undefined, undefined, undefined, alt ? { alt: "alternative" } : undefined)!.reduce((x, y) => act(x, y), s0);
+      for (let i = 0; i < 100 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+        const p = s.pending;
+        if (p?.kind === "chooseOption" && p.what === "opponent") s = act(s, { type: "chooseOption", player: ap, choice: String(other) });
+        else if (p) throw new Error(`unexpected ${p.kind}`);
+        else s = pass(s);
+      }
+      expect(s.objects[g]!.zone).toBe("exile");
+      expect(s.turnOrder.map((p) => s.players[p]!.hand.length)).toEqual(s.turnOrder.map((p, i) => hands[i]! - (p === ap ? 1 : 0) + (alt && p === other ? 1 : 0)));
+    }
+  });
+});
+
+describe("round 102: Terastodon", () => {
+  it("parse", () => expect(isFullySupported(terastodon)).toBe(true));
+
+  it("an Elephant for each permanent put into a graveyard this way, for its controller", () => {
+    const { s: s0, ap, opp, ids } = setup([terastodon]);
+    const l1 = putOnBattlefield(s0, opp, card("Wastes", "Basic Land"));
+    const l2 = putOnBattlefield(s0, opp, card("Wastes", "Basic Land"));
+    const r = putOnBattlefield(s0, ap, relic);
+    s0.players[ap]!.manaPool.G = 8;
+    let s = planCast(s0, ap, ids[0]!)!.reduce((x, y) => act(x, y), s0);
+    for (let i = 0; i < 100 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+      const p = s.pending;
+      if (p?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [target(l1), target(l2), target(r)] });
+      else if (p?.kind === "chooseMay") s = act(s, { type: "chooseMay", player: ap, yes: true });
+      else if (p) throw new Error(`unexpected ${p.kind}`);
+      else s = pass(s);
+    }
+    expect(s.objects[l1]!.zone).toBe("graveyard");
+    expect(s.objects[r]!.zone).toBe("battlefield");
+    const elephants = (pid: number) => s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === pid).length;
+    expect(elephants(opp)).toBe(2);
+    expect(elephants(ap)).toBe(0);
+  });
+});
+
+describe("round 102: Monastery Mentor", () => {
+  it("parse", () => expect(isFullySupported(mentor)).toBe(true));
+
+  it("each noncreature spell: a Monk with prowess, and the Monks already there get +1/+1", () => {
+    const { s: s0, ap, opp, ids } = setup([bolt, bolt]);
+    putOnBattlefield(s0, ap, mentor);
+    let s = s0;
+    for (const id of ids) s = settle(planCast(s, ap, id, [{ kind: "player", id: opp }])!.reduce((x, y) => act(x, y), s));
+    const monks = s.battlefield.filter((id) => s.objects[id]!.isToken);
+    expect(monks).toHaveLength(2);
+    expect(monks.map((id) => power(s, s.objects[id]!)).sort()).toEqual([1, 2]);
+  });
+});

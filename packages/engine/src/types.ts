@@ -400,6 +400,8 @@ export interface GameObject {
   kicked?: number[];
   /** As a spell, and as the permanent it became: the colors of mana spent to cast it (sunburst, CR 702.44a). */
   colorsSpent?: Color[];
+  /** How many Phyrexian symbols of its cost its caster paid with life (compleated, CR 702.150a); kept as it enters. */
+  phyrexianLife?: number;
   /** The creatures tapped to convoke it as it was cast (CR 702.51a), as the permanents they were; kept by the permanent it becomes, like `kicked`. */
   convoked?: { id: ObjectId; zc: number }[];
   /** The amount of mana spent to cast it (CR 601.2h), kept by the permanent the spell becomes. */
@@ -980,7 +982,7 @@ export type PendingDecision =
   /** A resolving spell or ability makes this player discard `count` cards of their choice (CR 701.9b). */
   | { kind: "discard"; player: PlayerId; count: number; source: string; /** Only cards like this: "discard a creature card". */ filter?: TargetSpec; /** Exiled, not discarded ("exiles a card from their hand"). */ exile?: true }
   /** "Put two cards from your hand on top of your library in any order": which, and their order (first on top). */
-  | { kind: "handToTop"; player: PlayerId; count: number; source: string; /** On the bottom instead, the first pick lowest. */ bottom?: true }
+  | { kind: "handToTop"; player: PlayerId; count: number; source: string; /** On the bottom instead, the first pick lowest. */ bottom?: true; /** Scroll Rack: any number up to `count`, exiled face down first and traded for as many from the top of the library. */ upTo?: true }
   /** Scry or surveil (CR 701.22, 701.25): `cards` are the top of their library, top first. */
   /** `order`: put them all back in any order (no bottom or graveyard); `owner` = whose library, if not the player's. */
   /** "bottom": the cards go to the bottom of the library together and their owner orders them (CR 401.4). */
@@ -991,7 +993,7 @@ export type PendingDecision =
    * mana value N or more, or none to decline. `not`: a card that can't be one of them.
    */
   | { kind: "collectEvidence"; player: PlayerId; n: number; source: string; not?: ObjectId }
-  | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; /** "Each player may discard their hand and draw this many cards". */ wheel?: number; pay?: PayCost; /** Pay to keep a permanent: echo, cumulative upkeep. */ keep?: boolean; /** Clash: put the revealed `card` on the bottom of the library (CR 701.30a)? */ clash?: boolean }
+  | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; /** "Each player may discard their hand and draw this many cards". */ wheel?: number; pay?: PayCost; /** Pay to keep a permanent: echo, cumulative upkeep. */ keep?: boolean; /** Clash: put the revealed `card` on the bottom of the library (CR 701.30a)? */ clash?: boolean; /** "You may repeat this process" (Ad Nauseam). */ repeat?: true }
   /**
    * "Counter that spell or ability unless its controller pays {2}" (ward, CR 702.21a). The player
    * may activate mana abilities first (CR 605.3a), then pays or declines.
@@ -1063,7 +1065,7 @@ export type PendingDecision =
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "commander" | "drawUpTo" | "payX" | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | "pile" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom" | "searchZones" | "vote" | "mutate" | "either" | "payOrTop" | "counterKind" | /** "Remove up to three counters": the next one to remove, or "done". */ "removeCounter" | /** Which target of a spell or ability becomes ~ (Spellskite). */ "targetSlot"; options: string[]; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId; /** "pile": the two piles, the first then the second (Fact or Fiction); `of`, the player whose hand the chosen one goes to. */ piles?: [ObjectId[], ObjectId[]] }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "commander" | "drawUpTo" | "payX" | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | "pile" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom" | "searchZones" | "vote" | "mutate" | "either" | "payOrTop" | "counterKind" | /** "Remove up to three counters": the next one to remove, or "done". */ "removeCounter" | /** Which target of a spell or ability becomes ~ (Spellskite). */ "targetSlot" | /** A number chosen secretly (Wheel of Misfortune): any whole number in `numberRange`. */ "secretNumber"; options: string[]; /** Any whole number from `min` to `max` may be chosen, not only `options`. */ numberRange?: { min: number; max: number }; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId; /** "pile": the two piles, the first then the second (Fact or Fiction); `of`, the player whose hand the chosen one goes to. */ piles?: [ObjectId[], ObjectId[]] }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -1252,7 +1254,7 @@ export interface GameState {
   cantBlockThisTurn?: { filter: TargetSpec; controller: PlayerId }[];
   /** "Creatures can't attack this turn": matching creatures can't attack, also ones that arrive later. */
   cantAttackThisTurn?: { filter: TargetSpec; controller: PlayerId }[];
-  /** Each spell cast this turn as it was cast, by stack id: what a copy of it copies if it has left the stack (CR 707.10). */
+  /** Each spell cast (and ability activated) this turn as it was put on the stack, by stack id: what a copy of it copies if it has left the stack (CR 707.10). */
   castItems?: Record<string, StackItem>;
   /** Spells with epic as they resolved, by stack id: copied at each of their controller's upkeeps (CR 702.50a). */
   epics?: Record<string, StackItem>;
@@ -1598,6 +1600,8 @@ export interface Resolving {
   /** Its last roll (CR 706.2): each die's natural result that counts (not the ignored ones, 706.6), and the result. */
   rolled?: { sides: number; naturals: number[]; result: number; /** "The other result" (Effect roll's chooseOne). */ other?: number };
   scratch?: {
+    /** Secret numbers (Wheel of Misfortune): the players still to choose, each one's number, and where the rest stands. */
+    numbers?: { queue: PlayerId[]; chosen: Record<string, number>; pick?: number; step?: "discard" | "draw"; draws?: PlayerId[] };
     /** Tainted Pact: the names exiled so far, and the card the player is asked about. */
     pact?: { names: string[]; asking?: ObjectId };
     queue?: PlayerId[]; // players still to choose, in APNAP order (CR 101.4)

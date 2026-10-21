@@ -8,7 +8,7 @@ import { compileCard, spellTargetSpecs } from "../oracle";
 import type { DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
 import { isLegalTarget, legalTargets, pickOptions, printedMatches, sameTarget, sourceQuality, spellManaValue, spellQuality, stampTargets, swapKeepsOthersLegal } from "./targeting";
 import { ResolveCtx, objects, amountNow, players } from "./resolve";
-import { fireEvent } from "./triggers";
+import { closeZoneBatch, fireEvent } from "./triggers";
 import { discardCards, toBottom } from "./run-library";
 import { defMv, sameName } from "../faces";
 import { copyKey } from "../copies";
@@ -236,7 +236,14 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const id = e.spell === "self" ? r.item.id : typeof e.spell === "object" && "epic" in e.spell ? e.spell.epic : i < 0 ? ctx.cause : t?.kind === "stack" && ctx.legal[i] ? t.id : undefined;
         const orig = e.spell === "self" ? r.item : id ? (s.stack.find((x) => x.id === id) ?? s.castItems?.[id] ?? s.epics?.[id]) : undefined;
         if (!orig || (orig.kind !== "spell" && !(orig.kind === "ability" && orig.body))) return;
-        const n = e.n === "storm" ? (orig.castNth ?? 0) : e.n === "kicked" ? (orig.kicked?.length ?? 0) : amountNow(s, e.n, ctx);
+        const n =
+          e.n === "storm"
+            ? (orig.castNth ?? 0)
+            : e.n === "stormInstantSorcery"
+              ? (s.castThisTurn ?? []).slice(0, orig.castNth ?? 0).filter((c) => c.player === orig.controller && s.cards[c.card] && (isType(s.cards[c.card]!, "Instant") || isType(s.cards[c.card]!, "Sorcery"))).length
+              : e.n === "kicked"
+                ? (orig.kicked?.length ?? 0)
+                : amountNow(s, e.n, ctx);
         if (n <= 0) return;
         sc.copies = { of: id!, left: n };
       }
@@ -338,6 +345,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         while (p.library.length) {
           const id = p.library[0]!;
           moveObject(s, id, "exile");
+          closeZoneBatch(s); // one at a time: each exile is an event of its own (rulings on Laelia)
           exiled.push(id);
           const d = defOf(s, obj(s, id));
           if (!isType(d, "Land") && defMv(d) < limit) {
@@ -396,7 +404,11 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           const rest = seen.filter((id) => id !== hit);
           shuffle(s, rest);
           for (const id of rest) moveObject(s, id, "library");
-        } else for (const id of seen) moveObject(s, id, "exile");
+        } else
+          for (const id of seen) {
+            moveObject(s, id, "exile");
+            closeZoneBatch(s); // exiled one at a time (rulings on Laelia)
+          }
         const caster = e.ownerCasts ? pid : ctx.controller;
         sc.untilNonland = { ...(hit ? { hit } : {}), caster, ...(e.restBottom ? { seen } : {}) };
         if (!hit) return bottomRest(s, sc.untilNonland.seen);
@@ -425,6 +437,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         while (p.library.length) {
           const id = p.library[0]!;
           moveObject(s, id, "exile");
+          closeZoneBatch(s); // one at a time: each exile is an event of its own (rulings on Laelia)
           exiled.push(id);
           const d = defOf(s, obj(s, id));
           if (!isType(d, "Land") && defMv(d) <= n) {
@@ -623,6 +636,8 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
   const gone = item.objectId && s.objects[item.objectId];
   if (gone && item.x && s.resolving) (s.resolving.countered ??= {})[gone.id] = { zc: gone.zoneChanges ?? 0, x: item.x };
   log(s, `${by} counters ${what}${!item.objectId ? "" : instead === "exile" ? " and exiles it" : instead === "hand" ? " and returns it to its owner's hand" : instead ? " and puts it on top of its owner's library" : ""}.`);
+  // "Whenever a spell or ability you control counters a spell" (Baral): only a spell, and only when it's countered.
+  if (item.kind === "spell") fireEvent(s, { type: "spellCountered", by: ctx.controller });
 }
 
 /**

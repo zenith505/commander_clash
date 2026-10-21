@@ -6,7 +6,7 @@ import { pickFilter, parseGroup, parseObject, parsePlayer, parseTargetPhrase } f
 import { addTarget } from "../body";
 import { parseCount } from "../counts";
 import { parseChanges, parseSentence } from "../sentence";
-import { parseAffected, parseExtraBlocks, parseStaticMods } from "../statics";
+import { parseAffected, parseExtraBlocks, parseIsA, parseStaticMods } from "../statics";
 import type { Ctx } from "../body";
 import { canonicalKeyword, CREATURE_TYPES } from "../../keywords";
 import { parseGrants } from "../grants";
@@ -406,7 +406,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return who && what?.ref === "target" && !what.n ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: "game", giveTo: who }] : null;
   }
   // "That player gains control of ~" (Coveted Jewel): the trigger's player, for the rest of the game (layer 2).
-  if (/^That player gains control of ~$/.test(s) && ctx.eventPlayer) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "eventPlayer" } }];
+  if (/^[Tt]hat player gains control of ~$/.test(s) && ctx.eventPlayer) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "eventPlayer" } }];
+  // Alexios: "that player gains control of ~, untaps it, and puts a +1/+1 counter on it": that player puts the counter.
+  if ((m = /^[Tt]hat player gains control of ~, untaps it, and puts (a|two|three) \+1\/\+1 counters? on it$/.exec(s)) && ctx.eventPlayer)
+    return [
+      { type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "eventPlayer" } },
+      { type: "untap", what: { ref: "self" } },
+      { type: "counters", what: { ref: "self" }, counter: "+1/+1", n: m[1] === "a" ? 1 : m[1] === "two" ? 2 : 3, by: { ref: "eventPlayer" } },
+    ];
   if (/^An opponent(?: of your choice)? gains control of ~$/.test(s))
     return [{ type: "choose", choice: "opponent" }, { type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "chosenPlayer" } }];
   // "Gain control of that Equipment until end of turn" (Stolen Uniform): a target an earlier sentence chose.
@@ -522,6 +529,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     const mods = what?.ref === "target" && parseChanges(`becomes ${m[2]!}`);
     return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;
+  }
+  // "Target creature becomes a Treasure artifact with "..." and loses all other card types and abilities" (Vraska,
+  // Betrayal's Sting): for as long as it stays on the battlefield (CR 611.2a). Its supertypes stay (rulings, CR 205.1a);
+  // losing its abilities comes before the one it gains, in layer 6.
+  if ((m = /^(target .+?) becomes (an? .+?) and loses all other card types and abilities$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    const mods = what?.ref === "target" ? parseIsA(m[2]!, true) : null;
+    return what && mods ? [{ type: "continuous", what, mods: [{ kind: "loseAllAbilities" }, ...mods], duration: "game" }] : null;
   }
   // "Target legendary creature becomes a God in addition to its other types" (Tyrite Sanctum), "That creature becomes a
   // Vampire in addition to its other types" (Olivia Voldaren), "each creature you control becomes a Phyrexian in addition

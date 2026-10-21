@@ -130,7 +130,7 @@ export interface Characteristics {
    */
   untargetable?: (Untargetable & { of: PlayerId })[];
   /** "Prevent all damage that would be dealt to / by ~" (CR 615.1). */
-  preventDamage?: { to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[] }[];
+  preventDamage?: { to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[]; plusOnes?: true; /** With plusOnes: the ability's controller and source. */ you?: PlayerId; from?: ObjectId }[];
   /** Damage amount replacements this permanent's static abilities make (see DamageMod): `you` is the ability's controller, `from` its source. */
   damageMods?: (DamageMod & { you: PlayerId; from: ObjectId })[];
   /** The damage it would deal can't be prevented (CR 615.12): all of it, or only its combat damage. */
@@ -164,6 +164,10 @@ export interface Characteristics {
   cantAttackAlone: boolean;
   cantBlockAlone: boolean;
   cantAttackSamePlayer: boolean;
+  /** "Can't attack its owner" (Alexios). */
+  cantAttackOwner: boolean;
+  /** "Can't be sacrificed" (CR 701.21). */
+  cantBeSacrificed: boolean;
   /** "Can't attack you or planeswalkers you control" (Promise of Loyalty): those players and their planeswalkers. */
   cantAttackPlayers: PlayerId[];
   mustBeBlocked: boolean;
@@ -241,6 +245,8 @@ function printed(s: GameState, o: GameObject): Characteristics {
     cantAttackAlone: false,
     cantBlockAlone: false,
     cantAttackSamePlayer: false,
+    cantAttackOwner: false,
+    cantBeSacrificed: false,
     cantAttackPlayers: [],
     mustBeBlocked: false,
     allMustBlock: false,
@@ -657,6 +663,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "opponentsDealtExcess":
       // As the permanent was when it was dealt the damage, wherever it is now (Rith rulings).
       return (s.turnLog?.excessDealt ?? []).some((e) => e.controller !== you && e.types.some((ty) => cond.types.includes(ty)));
+    case "addedManaThisTurn": {
+      const o = s.objects[sourceId];
+      const did = !!o?.triggeredThisTurn?.includes(`${sourceZc ?? o.zoneChanges ?? 0}|addedMana`);
+      return cond.not ? !did : did;
+    }
     case "subjectPutBySelf": {
       const by = subjectId !== undefined ? s.objects[subjectId]?.putBy : undefined;
       const put = !!by && by.id === sourceId && (s.objects[sourceId]?.zoneChanges ?? 0) === by.zc;
@@ -1039,7 +1050,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "preventDamage": {
       const { kind: _, ...p } = m;
-      c.preventDamage = [...(c.preventDamage ?? []), p];
+      c.preventDamage = [...(c.preventDamage ?? []), p.plusOnes ? { ...p, you: controllerOfInst(e, chars), from: e.sourceId ?? "" } : p];
       return;
     }
     case "unpreventable":
@@ -1087,6 +1098,8 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "cantAttackAlone":
     case "cantBlockAlone":
     case "cantAttackSamePlayer":
+    case "cantAttackOwner":
+    case "cantBeSacrificed":
     case "mustBeBlocked":
     case "allMustBlock":
     case "mustBlock":

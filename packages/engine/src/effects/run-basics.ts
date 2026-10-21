@@ -287,7 +287,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     }
     case "poison":
       for (const pid of players(s, e.who, ctx)) {
-        const n = playerCountersToPut(s, pid, "poison", amountNow(s, e.n, ctx));
+        const n = playerCountersToPut(s, pid, "poison", e.upTo !== undefined ? Math.max(0, e.upTo - (player(s, pid).poison ?? 0)) : amountNow(s, e.n, ctx));
         if (n <= 0) continue;
         const p = player(s, pid);
         p.poison = (p.poison ?? 0) + n;
@@ -374,7 +374,10 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${p.name} adds ${mix(k)}.`);
         return;
       }
-      let added = e.mana ? e.mana.repeat(e.times === undefined ? 1 : amountNow(s, e.times, ctx)) : color && e.chosen ? `{${color}}`.repeat(e.chosen) : "";
+      let added = e.mana ? e.mana.repeat(e.times === undefined ? 1 : amountNow(s, e.times, ctx)) : color && e.chosen ? `{${color}}`.repeat(e.chosen * (e.times === undefined ? 1 : amountNow(s, e.times, ctx))) : "";
+      // Carpet of Flowers: "if you haven't added mana with this ability this turn".
+      const marked = e.markSource && added && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (marked) (marked.triggeredThisTurn ??= []).push(`${ctx.sourceZc ?? marked.zoneChanges ?? 0}|addedMana`);
       // An activated mana ability with {T} in its cost taps its source for mana (CR 106.12): Mana Reflection's
       // replacement effect multiplies what it produces (106.12b).
       if (s.resolving?.item.manaAbility?.tapped) added = timesAsMuch([...added.matchAll(/\{([WUBRGC])\}/g)].map((m) => m[1] as ManaType), tapManaTimes(s, ctx.controller)).map((m) => `{${m}}`).join("");

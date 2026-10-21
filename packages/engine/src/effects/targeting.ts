@@ -1,8 +1,8 @@
 import { ANY_COUNTER } from "../abilities";
-import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Modification, ObjRef, Range, TargetChoice, TargetSpec, Untargetable } from "../abilities";
+import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Modification, ObjRef, PickAction, Range, TargetChoice, TargetSpec, Untargetable } from "../abilities";
 import { compileCard } from "../oracle";
 import { manaValue, parseManaCost, xCount } from "../mana";
-import { abilitiesOf, basePowerNow, defOf, objHasKeyword, objIsType, power, toughness } from "../cards";
+import { abilitiesOf, basePowerNow, canBeSacrificed, defOf, objHasKeyword, objIsType, power, toughness } from "../cards";
 import { attackedPlaneswalker, creatureTypesOf, livingPlayers, obj, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, type Characteristics } from "../layers";
 import { expandMany, expandPerOpponent, manySlot, modeCountProblem } from "../modes";
@@ -715,8 +715,10 @@ export function modesProblem(s: GameState, body: AbilityBody, modes: number[] | 
 
 /** The permanents a player could pick for a "pick" effect: their own, matching the filter (not targeted, so hexproof doesn't matter). */
 /** `sourceId`: "another creature you control" (filter.notSource) can't be the ability's source. */
-export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toughness"; greatest?: "power" | "manaValue" }, pid: PlayerId, sourceId?: ObjectId): ObjectId[] {
-  const ids = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !(e.filter.notSource && id === sourceId) && objectMatches(s, { ...e.filter, controller: "you" }, obj(s, id), pid, false));
+export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toughness"; greatest?: "power" | "manaValue"; action?: PickAction }, pid: PlayerId, sourceId?: ObjectId): ObjectId[] {
+  // Without an action: permanents to sacrifice (a sacrifice option or payment), which can't include one that "can't be sacrificed" (CR 701.21).
+  const sacrificing = !e.action || e.action === "sacrifice";
+  const ids = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !(e.filter.notSource && id === sourceId) && objectMatches(s, { ...e.filter, controller: "you" }, obj(s, id), pid, false) && !(sacrificing && !canBeSacrificed(s, obj(s, id))));
   // "Sacrifices a creature with the greatest power among creatures they control": the greatest, or tied for it; the
   // player chooses among those tied (rulings on Crackling Doom). Mana value from the mana cost, X as 0 (CR 202.3, 107.3).
   if (e.greatest) {

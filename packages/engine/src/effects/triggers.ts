@@ -130,6 +130,8 @@ export type TriggerSourceEvent =
   /** A player collected evidence (CR 701.59a), once for each time. */
   | { type: "evidenceCollected"; player: PlayerId }
   | { type: "proliferated"; player: PlayerId }
+  /** A spell was countered by a spell or ability `by` controls (CR 701.6a). */
+  | { type: "spellCountered"; by: PlayerId }
   | { type: "landPlayed"; player: PlayerId; id: ObjectId }
   | { type: "dungeonCompleted"; player: PlayerId }
   /** A player rolled dice (CR 706): each die that counts (706.6), its natural result and its result. */
@@ -202,7 +204,7 @@ export type TriggerSourceEvent =
   /** A player tapped this permanent for mana: activated its mana ability with {T} in the cost (CR 106.12). */
   | { type: "tappedForMana"; id: ObjectId; player: PlayerId }
   /** A player activated an ability that isn't a mana ability; its source as it was then, if it was a permanent. */
-  | { type: "activated"; player: PlayerId; source?: { snapshot: GameObject; chars: Characteristics }; /** A mana ability (CR 605.1a). */ mana?: true; /** Mana from Treasures spent to activate it (CR 106.3). */ treasure?: number }
+  | { type: "activated"; player: PlayerId; /** The ability on the stack ("copy that ability"). */ stackId?: string; source?: { snapshot: GameObject; chars: Characteristics }; /** A mana ability (CR 605.1a). */ mana?: true; /** Mana from Treasures spent to activate it (CR 106.3). */ treasure?: number }
   /**
    * A creature exploited `victim` (CR 702.110b). `watchers`: the permanents of its controller with exploit
    * triggers just before the sacrifice, with those abilities, since they look back in time (CR 603.10a).
@@ -690,6 +692,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === kind, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
+  } else if (ev.type === "spellCountered") {
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (controllerOf(s, o) === ev.by) add(o, ev.by, (e) => e === "youCounterSpell");
+    }
   } else if (ev.type === "tokenCreated") {
     for (const id of s.battlefield) {
       const o = obj(s, id);
@@ -1173,9 +1180,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Vazi: "Whenever an opponent casts a spell or activates an ability, if mana from a Treasure was spent to ...".
         if (e === "castSpell" && t.cast?.orActivates) return !!ev.treasure && (t.cast.by !== "opponent" || ev.player !== you) && (t.cast.by !== "you" || ev.player === you);
         const a = t.activates;
-        if (e !== "abilityActivated" || !a || ev.mana || (a.by === "opponent" && ev.player === you)) return false;
+        if (e !== "abilityActivated" || !a || ev.mana || (a.by === "opponent" && ev.player === you) || (a.by === "you" && ev.player !== you)) return false;
         return !a.of || (!!ev.source && objectMatches(s, a.of, ev.source.snapshot, you, false, undefined, ev.source.chars));
-      }, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+      }, undefined, ev.stackId, undefined, undefined, undefined, undefined, { player: ev.player });
     }
   } else if (ev.type === "searchedLibrary") {
     // Archivist of Oghma: it waits until the search's spell or ability has resolved, like any trigger (rulings).
@@ -1297,6 +1304,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) stepWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(stepWatch);
     fromEmblems(stepWatch);
+    // "At the beginning of each combat this turn" (Full Throttle): a delayed trigger made by a spell (CR 603.7b).
+    fromFloating((o, you, triggers) => add(o, you, (e) => e === each, triggers, undefined, undefined, undefined, undefined, undefined, { player: ev.active }));
   }
 }
 
@@ -1590,6 +1599,7 @@ function batchMoveMatches(s: GameState, b: BatchTrigger, m: ZoneMove, w: GameObj
   const card = s.cards[m.card];
   if (!card || (b.filter && !printedMatches(b.filter, card))) return false;
   if (b.what === "leavesGraveyard") return m.from === "graveyard" && m.to !== "graveyard" && whose(m.owner) && (!b.to || m.to === b.to);
+  if (b.what === "exiledFromLibraryOrGraveyard") return m.to === "exile" && (m.from === "library" || m.from === "graveyard") && whose(m.owner);
   if (b.what === "toGraveyard") return m.to === "graveyard" && m.from !== "graveyard" && whose(m.owner) && (!b.from || (b.from === "notBattlefield" ? m.from !== "battlefield" : m.from === b.from));
   return m.discardedBy !== undefined && whose(m.discardedBy);
 }

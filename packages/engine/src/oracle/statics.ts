@@ -783,6 +783,13 @@ export function parseStaticMods(rest: string): Modification[] | null {
     return filter?.kind === "object" && filter.power ? [{ kind: "cantBlockCreatures", filter: { ...filter, text: `creatures with power ${m[1]} or ${m[2]}` } }] : null;
   }
   if (/^can't attack$/.test(rest)) return [{ kind: "cantAttack" }];
+  if (/^can't attack its owner$/.test(rest)) return [{ kind: "cantAttackOwner" }];
+  if (/^can't be sacrificed$/.test(rest)) return [{ kind: "cantBeSacrificed" }];
+  // Alexios: "attacks each combat if able, can't be sacrificed, and can't attack its owner".
+  if ((m = /^((?:attacks each combat if able|can't [^,]+)), ((?:attacks each combat if able|can't [^,]+)),? and (attacks each combat if able|can't [^,]+)$/.exec(rest))) {
+    const parts = [m[1]!, m[2]!, m[3]!].map((p) => parseStaticMods(p));
+    return parts.every((p) => p) ? parts.flatMap((p) => p!) : null;
+  }
   if ((m = /^can't be the target of (.+)$/.exec(rest))) {
     const by = parseUntargetable(m[1]!);
     return by ? [{ kind: "untargetable", by }] : null;
@@ -899,7 +906,7 @@ function parseTransform(line: string): StaticAbility | null {
  * toughness 0/1 and has indestructible", "a colorless land with "{T}: Add {C}"", "a black Dragon", "a blue Wall in
  * addition to its other colors and types". `only`: the text also says it loses its other card types.
  */
-function parseIsA(phrase: string, only: boolean): Modification[] | null {
+export function parseIsA(phrase: string, only: boolean): Modification[] | null {
   let m = /^an? (.+?)(?: in addition to its other (colors and )?types)?$/.exec(phrase);
   if (!m) return null;
   const addition = /in addition to its other/.test(phrase);
@@ -1033,6 +1040,10 @@ function parseStaticLine(line: string): StaticAbility | null {
   }
   const damageMod = parseDamageMod(line);
   if (damageMod) return damageMod;
+  // Vigor: "If damage would be dealt to another creature you control, prevent that damage. Put a +1/+1 counter on that
+  // creature for each 1 damage prevented this way." A prevention effect with an additional effect (CR 615.5).
+  const vigor = /^If damage would be dealt to (another creature you control|other creatures you control), prevent that damage\. Put a \+1\/\+1 counter on that creature for each 1 damage prevented this way$/.exec(text);
+  if (vigor) return { affects: { kind: "filter", types: ["Creature"], controller: "you", other: true }, mods: [{ kind: "preventDamage", to: true, plusOnes: true }], text: line };
   const prevent = parsePreventAll(text);
   if (prevent) {
     const affects = prevent.subject === "~" ? ({ kind: "self" } as const) : parseAffected(prevent.subject.replace(/^./, (c) => c.toUpperCase()));
@@ -1092,7 +1103,7 @@ function parseStaticLine(line: string): StaticAbility | null {
   // greater is checked as it assigns combat damage, which comes to the same thing as a group that changes with it.
   const greater = /^(.+?) with toughness greater than (?:its|their) power (assigns? .+)$/.exec(text);
   if (greater) text = `${greater[1]} ${greater[2]}`;
-  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|can't .+|can block .+|can attack as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses all abilities)$/.exec(text);
+  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|can't .+|can block .+|can attack as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:, .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses all abilities)$/.exec(text);
   if (!m) return null;
   const affects = parseAffected(m[1]!);
   if (!affects) return null;

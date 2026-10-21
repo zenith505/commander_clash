@@ -75,6 +75,19 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       for (const inner of e.effects) if (runEffect(s, inner, xctx) === "paused") return "paused";
       return;
     }
+    case "repeatMay": {
+      // Each time, the controller decides whether to go on after seeing what happened (rulings on Ad Nauseam). Their
+      // life total may be 0 or less meanwhile: state-based actions wait until the spell is done (CR 704.3).
+      const sc = (s.resolving!.scratch ??= {});
+      const again = sc.may;
+      sc.may = undefined;
+      if (again === false) return;
+      if (again === true) log(s, `${player(s, ctx.controller).name} repeats the process.`);
+      for (const inner of e.effects) if (runEffect(s, inner, ctx) === "paused") return "paused";
+      if (!player(s, ctx.controller).library.length) return;
+      s.pending = { kind: "chooseMay", player: ctx.controller, prompt: `repeat: ${e.text}`, source: src, repeat: true };
+      return "paused";
+    }
     case "either": {
       // The controller picks one as it resolves (CR 608.2d), and only that one happens.
       const sc = (s.resolving!.scratch ??= {});
@@ -274,7 +287,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "castFromHandAndAnotherNamed"
             ? ((o) => !s.resolving!.item.copy && o?.castFrom === "hand" && (player(s, ctx.controller).castNames?.[defOf(s, o).name] ?? 0) >= 2)(s.objects[s.resolving!.item.objectId ?? ""])
             : e.cond.kind === "castFromGraveyard"
-            ? !s.resolving!.item.copy && s.objects[s.resolving!.item.objectId ?? ""]?.castFrom === "graveyard"
+            ? !s.resolving!.item.copy && s.objects[s.resolving!.item.objectId ?? ""]?.castFrom === (e.cond.exile ? "exile" : "graveyard")
             : e.cond.kind === "bargained"
             ? !!s.objects[s.resolving!.item.objectId ?? ""]?.bargained
             : e.cond.kind === "evidence"

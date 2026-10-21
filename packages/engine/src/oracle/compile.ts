@@ -1076,6 +1076,12 @@ export function compile(d: CardDef): CompiledCard {
       out.entersPrepared = true;
       continue;
     }
+    // Valgavoth: "If a card you didn't control would be put into an opponent's graveyard from anywhere, exile it instead":
+    // linked to the permanent, for its "play cards exiled with ~" (CR 607.2a).
+    if (line === "If a card you didn't control would be put into an opponent's graveyard from anywhere, exile it instead." && !out.graveyardExile) {
+      out.graveyardExile = { whose: "opponents", notYours: true, linked: true };
+      continue;
+    }
     const yardExile = /^If an? (card or token|card|(.+?) card) would be put into (a|an opponent's|your) graveyard from anywhere, (?:exile (?:it|that card) instead|instead exile it with an? ([a-z]+) counter on it)\.$/.exec(line);
     if (yardExile && !out.graveyardExile) {
       // The card's own characteristics (read like a card in a graveyard's, its owner aside).
@@ -1151,6 +1157,11 @@ export function compile(d: CardDef): CompiledCard {
     // Information that's public while the permanent is on the battlefield (CR 401.5; hands, CR 402.3).
     if (line === "Play with the top card of your library revealed." || line === "Players play with the top card of their libraries revealed.") {
       out.revealTop = /^Players/.test(line) ? "players" : "you";
+      continue;
+    }
+    if (line === "During your turn, you may play cards exiled with ~. If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost.") {
+      if (out.playLinked || out.playLinkedForLife) out.unsupported.push(raw);
+      else out.playLinkedForLife = true;
       continue;
     }
     if (line === "You may play cards exiled with ~, and you may spend mana as though it were mana of any color to cast those spells.") {
@@ -1512,6 +1523,18 @@ export function compile(d: CardDef): CompiledCard {
       out.spendAnyColor = true;
       continue;
     }
+    if (line === "You may spend mana as though it were mana of any color to activate abilities of creatures you control.") {
+      out.spendAnyColorCreatureAbilities = true;
+      continue;
+    }
+    // Agatha's Soul Cauldron (CompiledCard.lendsExiled), linked to its one exile ability below.
+    const lends = /^(Creatures you control with \+1\/\+1 counters on them) have all activated abilities of all creature cards exiled with ~\.$/.exec(line);
+    if (lends) {
+      const group = parseGroup(lends[1]!.toLowerCase());
+      if (!group || group.other || group.filter.kind !== "object" || group.filter.counter !== "+1/+1") out.unsupported.push(raw); // exiledLentTo looks only at those
+      else out.lendsExiled = { to: group.filter, cards: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature cards" } };
+      continue;
+    }
     if (/^For each \{B\} in a cost, you may pay 2 life rather than pay that mana\.$/.test(line)) {
       out.lifeForBlack = true;
       continue;
@@ -1728,17 +1751,32 @@ export function compile(d: CardDef): CompiledCard {
       out.boastTwice = true;
       continue;
     }
-    const combatCap = /^No more than (one|two) creatures? can (attack|block) each combat\.$/.exec(line);
-    if (combatCap) {
-      (out.combatLimit ??= {})[combatCap[2] as "attack" | "block"] = combatCap[1] === "one" ? 1 : 2;
+    const combatCap = /^No more than (one|two) creatures? can (attack|block)( you)? each combat\.$/.exec(line);
+    if (combatCap && !(combatCap[3] && combatCap[2] === "block")) {
+      (out.combatLimit ??= {})[combatCap[3] ? "attackYou" : (combatCap[2] as "attack" | "block")] = combatCap[1] === "one" ? 1 : 2;
       continue;
     }
     if (line === "Each opponent can cast spells only any time they could cast a sorcery.") {
       out.opponentsSorceryTiming = true;
       continue;
     }
+    if (/^Compleated(?: \(|$)/.test(line) && d.types.includes("Planeswalker")) {
+      out.compleated = true;
+      continue;
+    }
     if (line === "Your opponents can't cast spells during your turn.") {
       out.opponentsCantCastYourTurn = true;
+      continue;
+    }
+    // Conqueror's Flail: only as long as it's attached to a creature.
+    const cantCastIf = /^As long as (~ is attached to a creature), your opponents can't cast spells during your turn\.$/.exec(line);
+    if (cantCastIf) {
+      const cond = parseStaticCondition(cantCastIf[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      if (!cond || out.opponentsCantCastYourTurn) out.unsupported.push(raw);
+      else {
+        out.opponentsCantCastYourTurn = true;
+        out.opponentsCantCastYourTurnIf = cond;
+      }
       continue;
     }
     if (line === "During your turn, your opponents can't cast spells or activate abilities of artifacts, creatures, or enchantments.") {
@@ -1958,7 +1996,7 @@ export function compile(d: CardDef): CompiledCard {
     }
     // A spell's "When you next cast ... this turn, ..." creates a delayed trigger as it resolves (CR 603.7); it isn't a triggered ability of the card.
     // So does a Pact's "At the beginning of your next upkeep, pay {2}{B}. If you don't, you lose the game." (CR 603.7a).
-    if (isSpell && (/^When you next cast /.test(line) || /^At the beginning of your next upkeep, pay (?:\{[^}]+\})+\. If you don't, you lose the game\.$/.test(line))) {
+    if (isSpell && (/^When you next cast /.test(line) || /^At the beginning of each combat this turn, /.test(line) || /^At the beginning of your next upkeep, pay (?:\{[^}]+\})+\. If you don't, you lose the game\.$/.test(line))) {
       spellLines.push(line);
       continue;
     }
@@ -2221,6 +2259,12 @@ function linkExile(out: CompiledCard) {
     if (imprints.length !== 1) out.unsupported.push("(copies an exiled card it can't link to one imprint ability)");
     else (imprints[0] as Extract<Effect, { type: "takeFromHand" }>).linked = true;
   }
+  // Agatha's Soul Cauldron: "creature cards exiled with ~" are the ones its one exile ability exiled (CR 607.2a).
+  if (out.lendsExiled) {
+    const exiles = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
+    if (exiles.length !== 1 || exiles[0]!.type !== "exile" || exiles[0]!.until) out.unsupported.push("(lends abilities of exiled cards it can't link to one exile ability)");
+    else exiles[0]!.linked = true;
+  }
   // "Target creature card exiled with ~" (Dino DNA, The Darkness Crystal): linked to the one ability that exiles cards
   // (CR 607.2a), or to its replacement effect that exiles them (The Darkness Crystal's, already linked).
   const bodies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])];
@@ -2308,9 +2352,12 @@ function checkCastingLinks(out: CompiledCard) {
   if (out.triggers.some((t) => t.event !== "selfEnters" && evidenceIn(t.body)) || evidenceIn(out.activated) || evidenceIn(out.statics)) bad = true;
   // "If this spell's surge cost was paid" needs that alternative cost (CR 702.117a, 702.137a): in the spell, or its
   // permanent's enters trigger.
-  for (const alt of ["surge", "spectacle"] as const) {
+  // "If the {1}{B} cost was paid": the card's one "rather than pay" cost, that mana (Baleful Mastery).
+  const masteryMana = /\bIf the ((?:\{[^}]+\})+) cost was paid\b/.exec(out.spell?.text ?? "")?.[1];
+  for (const alt of ["surge", "spectacle", "alternative", "madness"] as const) {
     const altIn = (v: unknown) => JSON.stringify(v ?? null).includes(`"kind":"altPaid","alt":"${alt}"`);
-    const linked = !!out.altCosts?.some((a) => a.kind === alt);
+    const alts = out.altCosts?.filter((a) => a.kind === alt) ?? [];
+    const linked = alt === "alternative" ? alts.length === 1 && alts[0]!.mana === masteryMana && !alts[0]!.costs?.length : alts.length > 0;
     if ((altIn(out.spell) || out.triggers.some((t) => t.ifAlt === alt || altIn(t.body))) && !linked) bad = true;
     if (out.triggers.some((t) => t.event !== "selfEnters" && altIn(t.body)) || altIn(out.activated) || altIn(out.statics)) bad = true;
   }

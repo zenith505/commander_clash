@@ -482,6 +482,28 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       gainLife(s, up, diff);
       return;
     }
+    case "exchangeLifeWithSelf": {
+      // CR 701.12g: the life total becomes the power or toughness ~ had, and it gets that player's previous life total.
+      const [pid] = players(s, e.who, ctx);
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (pid === undefined || !me || me.zone !== "battlefield" || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc)) {
+        log(s, `${src}: the exchange can't happen.`);
+        return;
+      }
+      const life = player(s, pid).life;
+      const stat = e.stat === "power" ? power(s, me) : toughness(s, me);
+      // A player who can't gain (lose) life can't be given a higher (lower) total, and then nothing is exchanged (CR 701.12a).
+      if ((stat > life && !canGainLife(s, pid)) || (stat < life && !canLoseLife(s, pid))) {
+        log(s, `${src}: ${player(s, pid).name}'s life total can't change, so nothing is exchanged.`);
+        return;
+      }
+      s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, sourceId: me.id, duration: "game", affected: [me.id], mods: [e.stat === "power" ? { kind: "setPower", power: life } : { kind: "setToughness", toughness: life }] });
+      invalidateCharacteristics(s);
+      log(s, `${src}: ${player(s, pid).name}'s life total (${life}) and ${src}'s ${e.stat} (${stat}) are exchanged.`);
+      if (stat > life) gainLife(s, pid, stat - life);
+      else if (stat < life) loseLife(s, pid, life - stat);
+      return;
+    }
     case "setLife": {
       // CR 119.5: the player gains or loses the life it takes, which can't happen if they can't gain or lose life.
       for (const pid of players(s, e.who, ctx)) {

@@ -108,6 +108,14 @@ export function parseCountMod(line: string): CountMod | undefined {
     const token = tokenPhrase(m[1]!);
     return token ? { what: "tokens", who: "you", op: "plusThatMany", token } : undefined;
   }
+  // Divine Visitation: "If one or more creature tokens would be created under your control, that many 4/4 white Angel
+  // creature tokens with flying and vigilance are created instead": each one is that token instead (rulings); "artifact
+  // tokens" (Draconic Visitor).
+  m = /^If one or more (creature|artifact) tokens would be created under your control, that many (.+?) tokens(?: with (.+?))? are created instead\.$/.exec(line);
+  if (m) {
+    const token = tokenPhrase(m[2]!, m[3]);
+    return token ? { what: "tokens", who: "you", op: "instead", type: capital(m[1]!), token } : undefined;
+  }
   // Bilbo: "If you would create a Food token, instead create a Food token and a Treasure token."
   m = /^If you would create an? ([A-Z][a-z]+) token, instead create an? \1 token and an? ([A-Z][a-z]+) token\.$/.exec(line);
   if (m && PREDEFINED_TOKENS[m[1]!] && PREDEFINED_TOKENS[m[2]!]) return { what: "tokens", who: "you", op: "andEach", subtype: m[1]!, token: PREDEFINED_TOKENS[m[2]!]! };

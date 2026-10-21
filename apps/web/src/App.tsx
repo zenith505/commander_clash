@@ -21,6 +21,7 @@ import {
   delveRoom,
   graveyardCast,
   graveyardWays,
+  permissionWay,
   permitLabel,
   castExtraCosts,
   costsHaveX,
@@ -397,6 +398,8 @@ type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined } | 
   setsX?: true;
   /** Foil: one of the cards picked must be this. */
   oneOf?: TargetSpec;
+  /** "Untap a tapped creature you control": the permanents picked are untapped, not tapped. */
+  untap?: true;
   what: string;
   n: number;
   candidates: string[];
@@ -701,7 +704,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       if (c.kind === "tap") {
         // "Tap an untapped creature you control": click what to tap (CR 602.2b).
         if (d.tap !== undefined) continue;
-        return setCostPick({ activate: d, kind: "tap", label: cardOf(s, d.objectId).name, what: `tap ${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`, n: c.n, candidates: tapCostCandidates(s, HUMAN, s.objects[d.objectId]!, c).filter((id) => !d.sacrifice?.includes(id)), chosen: [] });
+        // "Untap a tapped creature you control" (Halo Fountain) likewise.
+        return setCostPick({ activate: d, kind: "tap", ...(c.untap ? { untap: true as const } : {}), label: cardOf(s, d.objectId).name, what: `${c.untap ? "untap" : "tap"} ${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`, n: c.n, candidates: tapCostCandidates(s, HUMAN, s.objects[d.objectId]!, c).filter((id) => !d.sacrifice?.includes(id)), chosen: [] });
       }
       if (c.kind === "exileFromHand" && c.toLibrary) {
         // "Put a card from your hand on top of your library" (Penance): click the cards in your hand.
@@ -957,7 +961,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (face !== undefined && s.objects[id] && s.objects[id]!.face !== face) return asFace(s, s.objects[id]!, face, () => startCast(id, convoke, via, alt, teamwork, face));
     const f = face !== undefined ? { face } : {};
     const d = cardOf(s, id);
-    if (via) return continueCast({ objectId: id, via, ...f }); // from a graveyard: the usual steps, without convoke
+    if (via) return continueCast({ objectId: id, via, ...(alt ? { alt } : {}), ...f }); // from a graveyard: the usual steps, without convoke
     if (alt) return continueCast({ objectId: id, alt, ...f }); // evoke or dash
     if (convoke === undefined && hasConvoke(s, HUMAN, s.objects[id]!) && convokers(s).length && freeCastOf(s, HUMAN) !== id) {
       const fromMana = planCast(s, HUMAN, id, undefined, undefined, undefined, undefined, f) !== null;
@@ -1390,10 +1394,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 if (isLand(s, menu)) dispatch([{ type: "playLand", player: HUMAN, objectId: menu, ...(untapped ? { untapped } : {}) }]);
                 else startCast(menu);
               }}
-              onCastVia={(via, face, permit) => {
+              onCastVia={(via, face, permit, alt) => {
                 setMenu(null);
-                if (permit) continueCast({ objectId: menu, via, permit });
-                else startCast(menu, undefined, via, undefined, undefined, face);
+                if (permit) continueCast({ objectId: menu, via, permit, ...(alt ? { alt } : {}) });
+                else startCast(menu, undefined, via, alt, undefined, face);
               }}
               onCastFace={(face) => {
                 setMenu(null);
@@ -1744,7 +1748,7 @@ function canUseFace(s: GameState, id: string) {
   return castableFaces(s, o).some((f) => canCastFace(s, id, f)) || landFaces(s, o).some((f) => f !== 0 && canPlayLand(s, id, f));
 }
 
-const ALT_NAMES: Record<AltCostKind, string> = { impending: "Impending", citadel: "Cast it:", foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate", convert: "More Than Meets the Eye", omniscience: "Cast it:" };
+const ALT_NAMES: Record<AltCostKind, string> = { payZero: "Cast it for", impending: "Impending", citadel: "Cast it:", foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate", convert: "More Than Meets the Eye", omniscience: "Cast it:" };
 const ALT_NOTES: Record<AltCostKind, string> = {
   impending: "enters with time counters and isn't a creature until the last is removed (one at each of your end steps)",
   citadel: "life equal to its mana value instead of its mana cost (Bolas's Citadel, Valgavoth); X is 0",
@@ -1770,6 +1774,7 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   mutate: "target a non-Human creature you own: it merges with it, on top or underneath, and the merged creature has the abilities of both",
   convert: "cast it converted: its back face is the spell, and it enters with that face up",
   omniscience: "from your hand, for nothing (Omniscience); X is 0",
+  payZero: "{0} instead of its mana cost (As Foretold, Rooftop Storm); X is 0",
 };
 
 const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback", grantedFlashback: "Flashback", grantedEscape: "Escape", grantedRetrace: "Retrace", jumpStart: "Jump-start", retrace: "Retrace", escape: "Escape", mayhem: "Mayhem", harmonize: "Harmonize", permission: "Cast from graveyard", turnPermission: "Cast from graveyard", aftermath: "Aftermath:", disturb: "Disturb:" };
@@ -1783,7 +1788,7 @@ function describeExtraCost(c: AdditionalCost): string {
   if (c.kind === "returnToHand") return `return ${n(c.n, c.filter.text)} to hand`;
   if (c.kind === "revealHand") return "reveal your hand";
   if (c.kind === "giveLife") return c.each ? `have each other player gain ${c.n} life` : `have an opponent gain ${c.n} life`;
-  if (c.kind === "tap") return `tap ${n(c.n, c.filter.text)}`;
+  if (c.kind === "tap") return `${c.untap ? "untap" : "tap"} ${n(c.n, c.filter.text)}`;
   if (c.kind === "reveal") return `reveal ${n(c.n, c.filter.text)} from your hand`;
   if (c.kind === "collectEvidence") return `collect evidence ${c.n}`;
   if (c.kind === "mill") return `mill ${c.n === 1 ? "a card" : `${c.n} cards`}`;
@@ -1792,8 +1797,9 @@ function describeExtraCost(c: AdditionalCost): string {
 }
 
 /** Could you cast this card from your graveyard this way now, tapping mana as needed (costs like discards aside)? */
-function canCastFromGraveyard(s: GameState, id: string, via: CastFromGraveyardKind, face?: number) {
-  const can = (choices: { via: CastFromGraveyardKind; harmonize?: string }) => {
+function canCastFromGraveyard(s: GameState, id: string, via: CastFromGraveyardKind, face?: number, alt?: AltCostKind) {
+  const can = (choices0: { via: CastFromGraveyardKind; harmonize?: string }) => {
+    const choices = alt ? { ...choices0, alt } : choices0;
     const problem = castProblem(s, HUMAN, id, undefined, undefined, undefined, undefined, undefined, { ...choices, face });
     return !problem || (/not enough mana/.test(problem) && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { ...choices, face }) !== null);
   };
@@ -1813,7 +1819,8 @@ function exileOptions(s: GameState, id: string): boolean {
 function graveyardOptions(s: GameState, id: string): boolean {
   const d = cardOf(s, id);
   if (mayPlayLandFromGraveyard(s, s.objects[id]!, HUMAN) && canPlayLand(s, id)) return true; // Crucible of Worlds
-  if (graveyardWays(s, s.objects[id]!).some((g) => canCastFromGraveyard(s, id, g.kind, g.face))) return true;
+  const o = s.objects[id]!;
+  if (graveyardWays(s, o).some((g) => canCastFromGraveyard(s, id, g.kind, g.face) || (permissionWay(g) && altCostsFor(s, HUMAN, o).some((a) => canCastFromGraveyard(s, id, g.kind, undefined, a.kind))))) return true;
   return abilitiesOf(s, s.objects[id]!).activated.some((ab, i) => ab.zone === "graveyard" && planActivate(s, HUMAN, id, i) !== null);
 }
 
@@ -2045,7 +2052,7 @@ function CostPickBar({ pick, onDone, onSkip, onCancel }: { pick: CostPick; onDon
         <strong>{pick.label}</strong>: {pick.what} (click {pick.n === 1 ? "it" : "them"})
       </span>
       <button disabled={pick.chosen.length !== pick.n} onClick={onDone}>
-        {pick.kind === "conspire" ? "Tap and cast" : pick.kind === "returnToHand" ? (pick.activate ? "Return and activate" : "Return and cast") : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : pick.draft ? "Tap and cast" : "Tap and activate") : pick.activate ? "Sacrifice and activate" : "Sacrifice and cast"}
+        {pick.kind === "conspire" ? "Tap and cast" : pick.kind === "returnToHand" ? (pick.activate ? "Return and activate" : "Return and cast") : pick.kind === "tap" ? (pick.mana ? "Tap for mana" : pick.draft ? "Tap and cast" : pick.untap ? "Untap and activate" : "Tap and activate") : pick.activate ? "Sacrifice and activate" : "Sacrifice and cast"}
       </button>
       {onSkip && <button onClick={onSkip}>Cast without</button>}
       <button className="ghost" onClick={onCancel}>
@@ -3716,7 +3723,7 @@ function AbilityMenu({
   onPlay: (untapped?: boolean) => void;
   /** For a card in your graveyard: cast it with flashback, escape, ... */
   /** `face`: the split card's half cast this way (an aftermath half). */
-  onCastVia: (via: CastFromGraveyardKind, face?: number, permit?: string) => void;
+  onCastVia: (via: CastFromGraveyardKind, face?: number, permit?: string, alt?: AltCostKind) => void;
   /** For a card with several faces: cast it as this one (a split card's half, an Adventure, a modal double-faced card's back). */
   onCastFace: (face: number) => void;
   /** For a modal double-faced card: play it as this land face (`untapped`: pay life or reveal so it enters untapped). */
@@ -3914,13 +3921,21 @@ function AbilityMenu({
           const ok = canCastFromGraveyard(s, objectId, g.kind, g.face);
           const problem = ok ? "" : (castProblem(s, HUMAN, objectId, undefined, undefined, undefined, undefined, undefined, { via: g.kind, face: g.face }) ?? "");
           const half = g.face !== undefined ? s.cards[registerFace(s, o, g.face)]! : undefined;
-          return (
+          // With a permission that names no cost (Yawgmoth's Will, Muldrotha), its alternative costs too (rulings).
+          const alts = permissionWay(g) && g.face === undefined ? altCostsFor(s, HUMAN, o).filter((a) => canCastFromGraveyard(s, objectId, g.kind, undefined, a.kind)) : [];
+          return [
             <button key={`${g.kind}${g.face ?? ""}`} disabled={!ok} title={problem || half?.oracleText} onClick={() => onCastVia(g.kind, g.face)}>
               {VIA_NAMES[g.kind]}
               {half ? ` ${half.name}` : ""} <ManaCost cost={g.mana ?? half?.manaCost ?? d.manaCost} size="sm" />
               {g.costs.length ? `, ${g.costs.map(describeExtraCost).join(", ")}` : ""}
-            </button>
-          );
+            </button>,
+            ...alts.map((a) => (
+              <button key={`${g.kind}-${a.kind}`} data-alt={a.kind} title={ALT_NOTES[a.kind]} onClick={() => onCastVia(g.kind, undefined, undefined, a.kind)}>
+                {VIA_NAMES[g.kind]}: {a.text && !a.mana ? a.text : <>{ALT_NAMES[a.kind]} <ManaCost cost={a.mana} size="sm" /></>}
+                {a.text && a.mana ? ` and ${a.text}` : ""}
+              </button>
+            )),
+          ];
         })}
       {!inHand &&
         !inYard &&
@@ -4200,8 +4215,9 @@ function Controls({
       </div>
     );
   }
-  // "You may cast a spell with mana value 3 or less from your hand without paying its mana cost": which card, or none.
-  if (pending?.kind === "chooseOption" && (pending.what === "castFromHand" || pending.what === "castFromAmong") && pending.player === HUMAN)
+  // "You may cast a spell with mana value 3 or less from your hand without paying its mana cost": which card, or none;
+  // and the legend rule's "keep which one?" (CR 704.5j): hovering shows each card.
+  if (pending?.kind === "chooseOption" && (pending.what === "castFromHand" || pending.what === "castFromAmong" || pending.what === "legend") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>

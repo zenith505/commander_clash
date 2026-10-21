@@ -594,6 +594,39 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       moveObject(s, id, "hand");
       return;
     }
+    case "commanderToBattlefield": {
+      // A commander you own (CR 903.3), a permanent card in the command zone as this resolves; it isn't cast, so the
+      // commander tax doesn't go up (rulings).
+      const p = player(s, ctx.controller);
+      const mine = p.command.filter((id) => obj(s, id).isCommander && obj(s, id).owner === p.id && isPermanentCard(defOf(s, obj(s, id))));
+      if (!mine.length) {
+        log(s, `${p.name} has no commander in the command zone to put onto the battlefield (${src}).`);
+        return;
+      }
+      const sc = (s.resolving!.scratch ??= {});
+      if (mine.length > 1 && (sc.commander === undefined || !mine.includes(sc.commander))) {
+        s.pending = { kind: "chooseOption", player: p.id, source: src, what: "commander", options: mine, labels: mine.map((id) => defOf(s, obj(s, id)).name), prompt: "put which commander onto the battlefield?" };
+        return "paused";
+      }
+      const id = mine.length > 1 ? sc.commander! : mine[0]!;
+      sc.commander = undefined;
+      const o = obj(s, id);
+      log(s, `${p.name} puts ${defOf(s, o).name} onto the battlefield from the command zone (${src}).`);
+      moveObject(s, id, "battlefield", { controller: p.id });
+      if (o.zone !== "battlefield") return;
+      if (e.haste) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: p.id, sourceName: src, duration: e.haste, affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
+      if (e.atEndStep) addDelayed(s, "nextEndStep", p.id, o, { targets: [], effects: [{ type: "toCommandZone", what: { ref: "subject" } }], text: "Return ~ to the command zone." }, ctx.sourceId && s.objects[ctx.sourceId] ? cardIdOf(s.objects[ctx.sourceId]!) : cardIdOf(o));
+      invalidateCharacteristics(s);
+      return;
+    }
+    case "toCommandZone":
+      // Only while it's still that permanent (rulings: one that went to another zone stays there).
+      for (const o of objects(s, e.what, ctx)) {
+        if (o.zone !== "battlefield") continue;
+        log(s, `${defOf(s, o).name} returns to the command zone (${src}).`);
+        moveObject(s, o.id, "command");
+      }
+      return;
     case "meld":
       return runMeld(s, e, ctx, src);
     case "exploit":
@@ -983,6 +1016,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             const more = m.more && (!m.moreOpponents || card.owner !== ctx.controller) ? m.more : undefined;
             card.mayPlay = { player: card.owner, zc: card.zoneChanges ?? 0, until: m.until ?? "exiled", turn: s.turn, ...(m.play ? {} : { castOnly: true as const }), ...(m.free ? { free: true as const } : {}), ...(m.cost ? { cost: m.cost } : {}), ...(more ? { more } : {}) };
           }
+          // Hostage Taker: its controller may cast the card, not a token (rulings), for as long as it remains exiled.
+          if (e.youMay && !card.isToken) card.mayPlay = { player: ctx.controller, zc: card.zoneChanges ?? 0, until: "exiled", turn: s.turn, castOnly: true, ...(e.youMay.anyType ? { anyType: true as const } : {}) };
         }
       }
       return;
@@ -1822,11 +1857,18 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const counts = new Map<PlayerId, number>();
       for (const x of s.resolving?.[e.which] ?? [])
         if ((!e.graveyard || ("died" in x && x.died)) && objectMatches(s, e.filter, x.o, ctx.controller, false, undefined, x.ch)) counts.set(x.ch.controller, (counts.get(x.ch.controller) ?? 0) + 1);
+      // A search pauses for its player's choice (Winds of Abandon): the players done so far are kept.
+      const done = (s.resolving!.scratch ??= {}).forEachDone ?? [];
+      s.resolving!.scratch.forEachDone = done;
       for (const pid of apnap(s, [...counts.keys()])) {
-        if (player(s, pid).lost) continue;
+        if (player(s, pid).lost || done.includes(pid)) continue;
         const n = counts.get(pid)!;
-        for (const inner of e.effects) runEffect(s, inner.type === "createToken" || inner.type === "draw" ? { ...inner, n } : inner, { ...ctx, eachOne: pid });
+        for (const inner of e.effects) if (runEffect(s, inner.type === "createToken" || inner.type === "draw" || inner.type === "search" ? { ...inner, n } : inner, { ...ctx, eachOne: pid }) === "paused") return "paused";
+        done.push(pid);
+        // The next player's search starts afresh (its queue, count and found cards are in the scratch).
+        s.resolving!.scratch = { forEachDone: done };
       }
+      s.resolving!.scratch = {};
       return;
     }
     case "playExiled": {

@@ -59,6 +59,7 @@ export function layerOf(m: Modification): Layer {
       return "7a";
     case "setPT":
     case "setToughness":
+    case "setPower":
       return "7b";
     case "modifyPT":
       return "7c";
@@ -326,22 +327,26 @@ interface Inst {
 function gather(s: GameState): Inst[] {
   const out: Inst[] = [];
   let order = 0;
-  for (const e of s.effects)
+  for (const e of s.effects) {
+    const base = { timestamp: e.timestamp, sourceId: e.sourceId, sourceName: e.sourceName, untilEndOfTurn: e.duration === "endOfTurn", controller: e.controller };
+    // "For as long as it has a vow counter on it": only those that still do.
+    const fixed = e.group ? [] : e.whileCounter ? e.affected.filter((id) => (s.objects[id]?.counters[e.whileCounter!] ?? 0) > 0) : e.affected;
+    const held = e.notGranted ? fixed.filter((id) => e.notGranted![id]) : [];
     out.push({
+      ...base,
       key: e.id,
-      timestamp: e.timestamp,
       order: order++,
-      sourceId: e.sourceId,
-      sourceName: e.sourceName,
-      untilEndOfTurn: e.duration === "endOfTurn",
       mods: e.mods,
-      controller: e.controller,
       // A group's rules effect: whatever is in the group now (Effect groupRules).
-      ...(e.group
-        ? { affects: e.group, live: true as const }
-        : // "For as long as it has a vow counter on it": only those that still do.
-          { fixed: e.whileCounter ? e.affected.filter((id) => (s.objects[id]?.counters[e.whileCounter!] ?? 0) > 0) : e.affected }),
+      ...(e.group ? { affects: e.group, live: true as const } : { fixed: held.length ? fixed.filter((id) => !held.includes(id)) : fixed }),
     });
+    // The same effect without the keywords those objects couldn't gain as it was created (Archetypes).
+    for (const id of held) {
+      const no = e.notGranted![id]!;
+      const mods = e.mods.map((m) => (m.kind === "addKeywords" ? { ...m, keywords: m.keywords.filter((k) => !no.some((x) => sameCI(x, k))) } : m));
+      out.push({ ...base, key: `${e.id}:${id}`, order: order++, mods, fixed: [id] });
+    }
+  }
   // Each player's Ring: "Your Ring-bearer is legendary and can't be blocked by creatures with greater power"
   // (CR 701.54c), with the emblem's timestamp (CR 613.7a). Another player gaining control of it ends the designation.
   for (const pid of s.turnOrder) {
@@ -598,6 +603,9 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       }
       return mine > -Infinity && mine >= all;
     }
+    case "eventPlayerMoreThanAnotherOpponent":
+      // Breena: that opponent against each of your other opponents still in the game (rulings: the attacking player may be one).
+      return eventPlayer !== undefined && !s.players[eventPlayer]!.lost && s.turnOrder.some((p) => p !== you && p !== eventPlayer && !s.players[p]!.lost && s.players[p]!.life < s.players[eventPlayer]!.life);
     case "eventPlayerMost":
     case "opponentMore": {
       const measure = (p: PlayerId) => {
@@ -1039,6 +1047,12 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "setToughness": {
       // Base power stays what it was after the earlier 7a/7b effects (CR 613.4b).
       c.toughness = num(m.toughness);
+      c.pt.push({ source: e.sourceName, kind: "set", power: c.power, toughness: c.toughness, untilEndOfTurn: e.untilEndOfTurn });
+      return;
+    }
+    case "setPower": {
+      // Evra: its toughness stays what it was after the earlier 7a/7b effects (CR 613.4b).
+      c.power = num(m.power);
       c.pt.push({ source: e.sourceName, kind: "set", power: c.power, toughness: c.toughness, untilEndOfTurn: e.untilEndOfTurn });
       return;
     }

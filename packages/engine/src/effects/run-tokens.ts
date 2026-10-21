@@ -15,7 +15,7 @@ import { defMv } from "../faces";
  * Create `n` tokens that are copies of `base` for this player (CR 707.2), doubled by token doublers (CR 614.1a). They
  * enter at the same time (CR 608.2f), so each sees the others enter and none counts another as it enters (603.6a, 614.12).
  */
-export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: number, ctx: ResolveCtx, opts: { except?: CopyExcept; tapped?: boolean; attacking?: boolean; defender?: PlayerId } = {}) {
+export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: number, ctx: ResolveCtx, opts: { except?: CopyExcept; tapped?: boolean; attacking?: boolean; defender?: PlayerId; /** What each of the first ones attacks, as chosen (attackChoices). */ attackAt?: { player: PlayerId; planeswalker?: ObjectId }[] } = {}) {
   // A copy of a double-faced object is a double-faced token, with the same face up (CR 707.8a).
   const { key, face } = tokenCopyKey(s, base, opts.except);
   const { same: k, extra } = tokenBatch(s, pid, s.cards[key]!, n);
@@ -27,7 +27,10 @@ export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: numbe
       // "Except it enters with an additional +1/+1 counter on it" (Littjara Mirrorlake).
       const counters = copyEnterCounters(opts.except, (type) => isType(s.cards[key]!, type));
       moveObject(s, o.id, "battlefield", { ...(opts.tapped || opts.attacking ? { tapped: true } : {}), ...(face !== undefined ? { face } : {}), ...(Object.keys(counters).length ? { counters } : {}) });
-      if (defender !== undefined && o.zone === "battlefield") o.attacking = defender;
+      const at = opts.attackAt?.[i];
+      if (defender !== undefined && o.zone === "battlefield") o.attacking = at?.player ?? defender;
+      const pw = at?.planeswalker !== undefined ? s.objects[at.planeswalker] : undefined;
+      if (pw && o.attacking !== undefined && pw.zone === "battlefield") o.attackingPermanent = { id: pw.id, zc: pw.zoneChanges ?? 0 };
       s.resolving?.created?.push(o.id);
       noteCreated(s, pid, o);
     }
@@ -130,9 +133,30 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         return;
       }
       const n = amountNow(s, e.n, ctx);
+      // "Tapped and attacking": its controller declares what each one attacks as it's created (CR 508.4; rulings on
+      // Delina, Wild Mage: not necessarily what the source attacks). Asked for each before they're all created.
+      const who = players(s, e.who, ctx);
+      const choices = e.attacking && who.length === 1 ? attackChoices(s, who[0]!, ctx.sourceId) : [];
+      const sc = (s.resolving!.scratch ??= {});
+      const picks: string[] = [];
+      if (choices.length > 1) {
+        picks.push(...(sc.attackPicks ??= []));
+        if (sc.attackWhom !== undefined) {
+          picks.push(sc.attackWhom);
+          sc.attackPicks = [...picks];
+          sc.attackWhom = undefined;
+        }
+        if (picks.length < n) {
+          const which = n > 1 ? ` (${picks.length + 1} of ${n})` : "";
+          s.pending = { kind: "chooseOption", player: who[0]!, source: src, what: "attackWhom", options: choices.map((a) => a.key), labels: choices.map((a) => a.label), prompt: `choose what the token copy of ${base.name} attacks${which}` };
+          return "paused";
+        }
+        sc.attackPicks = undefined;
+      }
+      const attackAt = picks.flatMap((k) => choices.filter((a) => a.key === k));
       if (s.resolving) s.resolving.created = [];
       enterTogether(s, () => {
-        for (const pid of players(s, e.who, ctx)) tokenCopies(s, pid, base, n, ctx, e);
+        for (const pid of who) tokenCopies(s, pid, base, n, ctx, { ...e, ...(attackAt.length ? { attackAt } : {}) });
       });
       return;
     }

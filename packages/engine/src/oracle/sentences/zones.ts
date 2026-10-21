@@ -66,6 +66,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "Put your commander into your hand from the command zone" (Command Beacon): one you own, of your choice with two
   // (rulings); nothing if none is there (CR 903.3).
   if (/^[Pp]ut your commander into your hand from the command zone$/.test(s)) return [{ type: "commanderToHand" }];
+  // Hellkite Courser: "you may put a commander you own from the command zone onto the battlefield" (not cast, so no tax).
+  if (/^[Pp]ut a commander you own from the command zone onto the battlefield$/.test(s)) return [{ type: "commanderToBattlefield" }];
   // "Return to their owners' hands all creatures with ..." (Engulf the Shore), "Return to the battlefield target ... card in
   // your graveyard" (Squirming Emergence): the destination first, for a long object; the same instruction.
   if ((m = /^Return to (their owners' hands|its owner's hand|the battlefield) ((?:all|each|target) .+)$/.exec(s))) return parseSentence(`Return ${m[2]!} to ${m[1]!}`, ctx);
@@ -147,6 +149,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^[Ss]huffle (target [^,]+?) into its owner's library$/.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" && !what.n ? [{ type: "shuffleIntoLibrary", what }] : null;
+  }
+  // "Shuffle any number of target cards from your graveyard into your library" (Perpetual Timepiece, Piper's Melody),
+  // "... up to four target cards ..." (Cathartic Parting): those cards, then your library is shuffled even with no
+  // target chosen (rulings on Perpetual Timepiece). Not when every target chosen has become illegal (CR 608.2b).
+  if ((m = /^[Ss]huffle ((?:any number of|up to (?:one|two|three|four|five)) target (?:.+? )?cards?(?: with [^,]+?)? from your graveyard) into your library$/.exec(s))) {
+    const what = parseCardTarget(m[1]!, ctx, "you");
+    return what?.ref === "target" ? [{ type: "shuffleIntoLibrary", what, yours: true }] : null;
   }
   // "The owner of target nonland permanent shuffles it into their library."
   if ((m = /^The owner of (target .+?) shuffles it into their library$/i.exec(s))) {
@@ -446,10 +455,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "Put that card onto the battlefield under your control" (Seraph) is the same instruction.
   // Grave Betrayal: "... with an additional +1/+1 counter on it" (it enters with it, CR 614.1c; rulings); Luminous
   // Broodmoth: "... with a flying counter on it" (a keyword counter, CR 122.1b).
-  if ((m = new RegExp(`^(?:Return (that card|it) to|Put (that card) onto) the battlefield( tapped)? under (your|its owner's) control(?: with an additional (\\+1\\/\\+1) counter on it| with an? ${COUNTER} counter on it)?$`, "i").exec(s)) && ctx.subjectLeft) {
+  // With no "under ... control" (Daretti's emblem: "return that card to the battlefield"), under the control of the player
+  // who puts it there, the ability's controller (CR 110.2a).
+  if ((m = new RegExp(`^(?:Return (that card|it) to|Put (that card) onto) the battlefield( tapped)?(?: under (your|its owner's) control)?(?: with an additional (\\+1\\/\\+1) counter on it| with an? ${COUNTER} counter on it)?$`, "i").exec(s)) && ctx.subjectLeft) {
     const what = parseObject(m[1] ?? m[2]!, ctx);
     const counter = m[5] ?? m[6];
-    return what?.ref === "subjectCard" ? [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}), ...(m[4]!.toLowerCase() === "its owner's" ? { owner: true } : {}), ...(counter ? { counters: { [counterKind(counter)]: 1 } } : {}) }] : null;
+    return what?.ref === "subjectCard" ? [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}), ...(m[4]?.toLowerCase() === "its owner's" ? { owner: true } : {}), ...(counter ? { counters: { [counterKind(counter)]: 1 } } : {}) }] : null;
   }
   if ((m = /^Put ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyard) on (top|the bottom) of (your|its owner's) library$/i.exec(s))) {
     const what = parseCardTarget(m[1]!, ctx, m[3]!.toLowerCase() === "your" ? "you" : undefined);

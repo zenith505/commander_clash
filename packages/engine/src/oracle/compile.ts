@@ -1478,6 +1478,16 @@ export function compile(d: CardDef): CompiledCard {
       out.castFromHandFree = true;
       continue;
     }
+    // As Foretold, Darksteel Monolith, Rooftop Storm: "pay {0} rather than pay the mana cost" for some spells (CR 118.9).
+    const payZero = /^(Once each turn, you|You) may pay \{0\} rather than pay the mana cost for (?:an? )?(.*?)spells? you cast( from your hand)?( with mana value X or less, where X is the number of ([a-z]+) counters on ~)?\.$/.exec(line);
+    if (payZero) {
+      const what = payZero[2]!.trim();
+      const spec = what ? parseTargetPhrase(`${what} card from a graveyard`) : null;
+      const filter = spec?.kind === "card" ? (({ owner: _, ...rest }) => ({ ...rest, text: `${what} spell` }))(spec) : undefined;
+      if (what && !filter) out.unsupported.push(raw);
+      else out.payZero = { ...(filter ? { filter } : {}), ...(payZero[3] ? { fromHand: true as const } : {}), ...(/^Once/.test(payZero[1]!) ? { once: true as const } : {}), ...(payZero[5] ? { maxMvCounters: payZero[5] } : {}) };
+      continue;
+    }
     if (line === "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast.") {
       out.payWUBRG = true;
       continue;

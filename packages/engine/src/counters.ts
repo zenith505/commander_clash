@@ -137,7 +137,8 @@ export interface TokenBatch {
  * What `pid` really creates when an effect would create `n` of this token (CR 614.1a). The player creating them orders
  * the replacements (CR 616.1), each applying once to the event as it then is; this order gives the most tokens: the
  * ones adding a token (Xorn, Peregrin Took), then a token for each of a kind (Bilbo), then Academy Manufactor's one of
- * each (two Manufactors make three of each, rulings), then a token for each token (Chatterfang), then the doublers.
+ * each (two Manufactors make three of each, rulings), then a token for each token (Chatterfang), then the doublers, then
+ * Divine Visitation's Angels.
  */
 export function tokenBatch(s: GameState, pid: PlayerId, token: TokenKind, n: number): TokenBatch {
   const mods = modsInPlay(s).flatMap(({ mod, controller }) => (mod.what === "tokens" && (mod.who === "any" || controller === pid) ? [mod] : []));
@@ -181,6 +182,23 @@ export function tokenBatch(s: GameState, pid: PlayerId, token: TokenKind, n: num
   }
   for (const m of mods) if (m.op === "plusThatMany") add(m.token, live().reduce((a, e) => a + e.n, 0));
   for (const m of mods) if (m.op === "double" || m.op === "triple") for (const e of live()) if (fits(e.kind, m)) e.n *= m.op === "double" ? 2 : 3;
+  // Divine Visitation last, so every creature token, the ones other replacements added too, becomes an Angel. Each applies
+  // once, whenever it applies (CR 616.1e): Draconic Visitor's Dragon then becomes an Angel too.
+  const insteads = mods.filter((m) => m.op === "instead");
+  for (let changed = true; changed; ) {
+    changed = false;
+    for (const m of [...insteads]) {
+      const of = live().filter((e) => e.kind.types.includes(m.type) && JSON.stringify(e.spec) !== JSON.stringify(m.token));
+      if (!of.length) continue;
+      insteads.splice(insteads.indexOf(m), 1);
+      for (const e of of) {
+        const k = e.n;
+        e.n = 0;
+        add(m.token, k);
+      }
+      changed = true;
+    }
+  }
   return { same: entries[0]!.n, extra: entries.slice(1).flatMap((e) => (e.n > 0 ? [{ token: e.spec!, n: e.n }] : [])) };
 }
 

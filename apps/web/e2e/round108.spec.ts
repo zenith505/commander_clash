@@ -50,21 +50,27 @@ test("Seize the Spotlight cast by you: Ana chooses fame, you pick which of her t
   expect(pageErrors(page)).toEqual([]);
 });
 
-test("Delina: a 15—20 roll makes a copy and asks Roll again?; Yes rolls once more", async ({ page }) => {
+test("Delina: a 15—20 roll makes a copy and asks Roll again?; Yes rolls once more, and the new copy attacks Ben", async ({ page }) => {
   let s: GameState = scene({ board: ["Delina, Wild Mage", "Grizzly Bears"] }, [{}]);
   const [delina, bears] = [one(s, "Delina, Wild Mage"), one(s, "Grizzly Bears")];
   rig(s, 20, [17, 4]);
   s = playWithBots(s, (st) => st.pending?.kind === "chooseTargets" && st.pending.player === 0, [[delina, 1]]);
   s = applyAction(s, { type: "chooseTargets", player: 0, targets: [{ kind: "object", id: bears }] });
+  // The first copy attacks Ana, as Delina does (round 109: you choose what each copy attacks).
+  s = playWithBots(s, (st) => st.pending?.kind === "chooseOption" && st.pending.what === "attackWhom");
+  s = applyAction(s, { type: "chooseOption", player: 0, choice: "1" });
   s = playWithBots(s, (st) => st.pending?.kind === "chooseMay" && st.pending.player === 0);
   await open(page, s);
   const bar = controls(page);
   await expect(bar).toContainText("Delina, Wild Mage: Roll again?");
   await bar.getByRole("button", { name: "Yes" }).click();
+  // The second copy: Ben, with the button.
+  await expect(bar).toContainText("choose what the token copy of Grizzly Bears attacks");
+  await bar.getByRole("button", { name: "Ben", exact: true }).click();
   const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && st.step === "declareAttackers");
   const copies = after.battlefield.filter((id) => after.objects[id]!.isToken && after.cards[after.objects[id]!.cardId]!.name === "Grizzly Bears");
   expect(copies).toHaveLength(2);
-  for (const id of copies) expect(after.objects[id]!.attacking).toBe(1);
+  expect(copies.map((id) => after.objects[id]!.attacking).sort()).toEqual([1, 2]);
   expect(pageErrors(page)).toEqual([]);
 });
 

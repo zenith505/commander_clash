@@ -293,7 +293,9 @@ function parseManaProduced(text: string): ManaProduce | null {
 export function parseManaSpend(sentence: string): ManaSpend | null {
   // "Spend this mana only to cast monocolored spells of that color" (Throne of Eldraine): of the color chosen for its source.
   if (sentence === "Spend this mana only to cast monocolored spells of that color.") return { text: sentence, spells: { kind: "spell", colorCount: "monocolored", chosen: "color", text: "monocolored spells of the chosen color" } };
-  const m = /^Spend this mana only to (.+?)(, and that spell can't be countered)?\.$/.exec(sentence);
+  // "Only to cast a Dragon spell or an Omen spell" (Maelstrom of the Spirit Dragon): a spell with either subtype (an Omen
+  // half is "Sorcery — Omen", CR 205.3k).
+  const m = /^Spend this mana only to (.+?)(, and that spell can't be countered)?\.$/.exec(sentence.replace(/^Spend this mana only to cast an? (\w+) spell or an? (\w+) spell\.$/, "Spend this mana only to cast $1 or $2 spells."));
   if (!m) return null;
   const only: ManaSpend = { text: sentence, ...(m[2] ? { uncounterable: true as const } : {}) };
   // "Of the chosen type" (Unclaimed Territory): the type its source's controller chose for it (see spend.ts boundSpend).

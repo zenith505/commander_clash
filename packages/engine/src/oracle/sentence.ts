@@ -206,7 +206,7 @@ export function parseChanges(text: string): Modification[] | null {
     } else if (/^loses? all abilities$/i.test(p)) out.push({ kind: "loseAllAbilities" });
     // "Lose hexproof and shroud and can't have hexproof or shroud" (Arcane Lighthouse): effects with later timestamps
     // can't give them back either (rulings).
-    else if ((m = /^loses? (.+?) and can't have (.+)$/i.exec(p))) {
+    else if ((m = /^loses? (.+?) and can't have (?:or gain )?(.+)$/i.exec(p))) {
       const k = parseKeywordList(m[1]!);
       const again = parseKeywordList(m[2]!.replace(/ or /g, " and "));
       if (!k || !again || JSON.stringify([...k].sort()) !== JSON.stringify([...again].sort())) return null;

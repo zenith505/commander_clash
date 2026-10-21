@@ -6,6 +6,7 @@ import { parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
 import { CREATURE_TYPES } from "../keywords";
 import { parseSearchFilter } from "./search";
 import { parseCount } from "./counts";
+import { parseToken } from "./tokens";
 const capital = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
 
 const TRIGGERS: [RegExp, TriggerEvent][] = [
@@ -824,6 +825,14 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
   const putThem = /^put them onto the battlefield( tapped)?\.?$/.exec(rest);
   if (putThem && batch.what === "toGraveyard" && batch.from === "library" && batch.filter && !yourTurn)
     return { event: "batch", batch, body: { targets: [], effects: [{ type: "putOntoBattlefield", what: { ref: "eventGroup" }, ...(putThem[1] ? { tapped: true } : {}) }], text: rest.replace(/\.$/, "") } };
+  // The Skullspore Nexus: "create a green Fungus Dinosaur creature token with base power and toughness each equal to the
+  // total power of those creatures", the ones that died, as they last existed (rulings, CR 608.2h).
+  const totalPower = /^create an? ([a-z]+(?: and [a-z]+)? (?:[A-Z][a-z]+ )+)creature token with base power and toughness each equal to the total power of those creatures\.?$/.exec(rest);
+  if (totalPower && batch.what === "leaves" && batch.dies && !yourTurn) {
+    const token = parseToken(0, 0, totalPower[1]!.trim());
+    if (!token) return "fail";
+    return { event: "batch", batch, body: { targets: [], effects: [{ type: "createToken", who: { ref: "you" }, n: 1, token, pt: { count: { kind: "eventGroupPower" } } }], text: rest.replace(/\.$/, "") } };
+  }
   // The objects as a group: not modeled.
   if (/\b(it|its|they|them|their|those|that card|that creature|that token|one of them|among them|this way)\b/i.test(rest)) return "fail";
   let text = rest;

@@ -804,6 +804,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "newTargets":
       return runSpellsEffect(s, e, ctx, src);
     case "mill":
+    case "revealUntilLandToGraveyard":
     case "exileTop":
     case "revealTopToHand":
     case "revealTop":

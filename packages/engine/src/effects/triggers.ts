@@ -1254,7 +1254,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
               ? { event: "dies", objs: died.map((m) => ({ o: m.snapshot!, c: m.chars!, controller: m.controller ?? m.owner })) }
               : null;
         // "Whenever a creature card leaves your graveyard": once for each of them (CR 603.2c).
-        for (let k = 0; k < (b.each ? n : 1); k++) add(w, you, (_, tt) => tt === t, triggers, undefined, undefined, undefined, undefined, undefined, { amount: b.each ? 1 : n, ...(b.each ? { player: matched[k]!.owner } : b.whose === "you" ? { player: you } : {}), ...((b.what === "enters" || b.what === "toGraveyard") && !b.each ? { group: matched.map((m) => ({ id: m.id, zc: m.zc })) } : {}) });
+        for (let k = 0; k < (b.each ? n : 1); k++) add(w, you, (_, tt) => tt === t, triggers, undefined, undefined, undefined, undefined, undefined, { amount: b.each ? 1 : n, ...(b.each ? { player: matched[k]!.owner } : b.whose === "you" ? { player: you } : {}), ...((b.what === "enters" || b.what === "toGraveyard") && !b.each ? { group: matched.map((m) => ({ id: m.id, zc: m.zc })) } : {}), ...(b.dies && !b.each ? { groupPower: died.reduce((a, m) => a + (m.chars?.power ?? 0), 0) } : {}) });
         causedBy = null;
       }
     };

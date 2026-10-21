@@ -521,6 +521,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   text = text.replace(/(^|\. )Search your library for up to X ([^.,]+), where X is ([^.]+)\. Put those cards onto the battlefield( tapped)?, then shuffle\./, "$1Search your library for up to X $2, put them onto the battlefield$4, then shuffle, where X is $3.");
   // Avatar's Wrath: "Choose up to one target creature, then airbend all other creatures": the target only says which one
   // isn't airbent (CR 701.65a), the same as two sentences.
+  // "Put a night counter on ~. Then if it has eight or more night counters on it, remove all of them and create ..."
+  // (Replicating Ring): ~'s counters, checked as it resolves (rulings).
+  text = text.replace(/^([Pp]ut an? ([a-z]+) counter on ~\.) Then if it has ([a-z]+) or more \2 counters on it, remove all of them and /, (_, put: string, kind: string, n: string) => `${put} If there are ${n} or more ${kind} counters on ~, remove all ${kind} counters from ~ and `);
   text = text.replace(/^Choose (up to one target [a-z]+), then (airbend|exile|destroy) all other ([a-z]+)\./, (_, t: string, verb: string, what: string) => `Choose ${t}. ${verb.charAt(0).toUpperCase()}${verb.slice(1)} all other ${what}.`);
   // "Transform ~, then untap it" (Westvale Abbey): the same permanent, now its back face (CR 712.18).
   text = text.replace(/^Transform ~, then untap it\.$/, "Transform ~, then untap ~.");
@@ -2872,6 +2875,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
         continue;
       }
       return null;
+    }
+    // Consuming Aberration: "each opponent reveals cards from the top of their library until they reveal a land card, then
+    // puts those cards into their graveyard".
+    const untilLand = /^(Each opponent|Each player|Target opponent|Target player) reveals cards from the top of their library until they reveal a land card$/i.exec(s);
+    if (untilLand && /^(?:Then )?puts those cards into their graveyard\.?$/i.test(sentences[si + 1] ?? "")) {
+      const who = parsePlayer(untilLand[1]!, ctx);
+      if (!who) return null;
+      effects.push({ type: "revealUntilLandToGraveyard", who });
+      si++;
+      continue;
     }
     // "Reveal cards from the top of your library until you reveal a creature card. Put that card onto the battlefield and
     // the rest on the bottom of your library in a random order." (Nissa, Leyline Tamer), "... into your hand ...", "...

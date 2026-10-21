@@ -126,6 +126,8 @@ export type Count =
   | { kind: "countersRemovedThisWay" }
   /** "Cards exiled with ~": those this object's linked exile took that are still there (CR 607.2a, 400.7). */
   | { kind: "linkedExiled" }
+  /** "The total power of those creatures": the ones that died in a "one or more ... die" event, as they last existed (The Skullspore Nexus). */
+  | { kind: "eventGroupPower" }
   /** How many cards the last "put all cards exiled with ~ into their owners' graveyards" moved (Valakut Exploration). */
   | { kind: "movedLinkedThisWay" }
   /** "For each creature tapped this way", "the number of creatures tapped this way" after tapAnyNumber, or in its reflexive trigger. */
@@ -249,7 +251,7 @@ export type Count =
   /** "For each player", "for each opponent (you have)": the players still in the game (CR 102.1, 800.4a). */
   /** `lostLife`: "for each of your opponents who lost life this turn" (Belbe): ones who lost the game since too (rulings). */
   /** `drewThisWay`: "for each opponent who drew a card this way" (Cut a Deal): those who drew a card in this resolution's draw before, once each. */
-  | { kind: "players"; opponents?: true; lostLife?: true; drewThisWay?: true }
+  | { kind: "players"; opponents?: true; lostLife?: true; drewThisWay?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
   | { kind: "counters"; counter: CounterKind; of: ObjRef }
   /** Station's "the tapped creature's power" (CR 702.184a): as the ability resolves, or as it last existed (rulings). */
@@ -715,6 +717,8 @@ export interface TokenSpec {
    */
   named?: true;
   legendary?: true;
+  /** "Colorless snow artifact tokens named Replicated Ring" (Replicating Ring): the snow supertype (CR 205.4g). */
+  snow?: true;
 }
 
 /**
@@ -1129,6 +1133,8 @@ export type StaticCondition =
   | { kind: "life"; min?: number; max?: number; opponent?: true }
   /** "As long as equipped creature is a Human": the permanent this is attached to matches. */
   | { kind: "attachedIs"; filter: TargetSpec }
+  /** "As long as it's blocking or blocked by a Goblin or Orc" (Sting): the permanent this is attached to blocks one or is blocked by one. */
+  | { kind: "attachedInCombatWith"; filter: TargetSpec }
   /** "If you have nine or more cards in hand" (Wiretapping). */
   | { kind: "handAtLeast"; n: number; /** "exactly thirteen cards in your hand" (Triskaidekaphile). */ exactly?: true; /** "Fewer than seven cards in hand" (Kozilek): under `n`. */ fewer?: true }
   /** "If you control eight or more artifacts with the same name as one another" (Mechanized Production, CR 201.2a). */
@@ -1739,6 +1745,8 @@ export type Effect =
    * "Reveal cards from the top of your library until you reveal a creature card. Put that card onto the battlefield and the
    * rest on the bottom of your library in a random order" (`found` "battlefield", `rest` "bottom"), `tapped`.
    */
+  /** "Each opponent reveals cards from the top of their library until they reveal a land card, then puts those cards into their graveyard" (Consuming Aberration). */
+  | { type: "revealUntilLandToGraveyard"; who: PlayerRef }
   | { type: "revealUntil"; filter: TargetSpec; found: "hand" | "battlefield"; tapped?: true; rest: "exile" | "bottom"; lifePerRest?: true }
   /**
    * "Exile cards from the top of your library until you exile a nonland card", or "reveal ... until you reveal a nonland

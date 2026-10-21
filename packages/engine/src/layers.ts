@@ -752,6 +752,12 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const c = host && chars.get(host.id);
       return !!c && objectMatches(s, cond.filter, host, you, false, undefined, c, (x) => chars.get(x.id));
     }
+    case "attachedInCombatWith": {
+      const host = src.attachedTo ? s.objects[src.attachedTo] : undefined;
+      if (host?.zone !== "battlefield") return false;
+      const other = [...(host.blocking ?? []), ...(host.blockedBy ?? [])].map((id) => s.objects[id]).filter((o): o is GameObject => o?.zone === "battlefield");
+      return other.some((o) => { const c = chars.get(o.id); return !!c && objectMatches(s, cond.filter, o, you, false, undefined, c, (x) => chars.get(x.id)); });
+    }
     case "opponentPoison":
       return s.turnOrder.some((p) => p !== you && !s.players[p]!.lost && (s.players[p]!.poison ?? 0) >= cond.n);
     case "increment": {

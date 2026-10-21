@@ -1499,6 +1499,8 @@ export interface TriggerEventInfo {
   excess?: number;
   /** "Whenever one or more Dragons you control deal combat damage": those that did, as the objects they were ("one of those Dragons"). */
   group?: { id: ObjectId; zc: number }[];
+  /** The total power of the creatures a "one or more ... die" event was about, as they last existed (The Skullspore Nexus). */
+  groupPower?: number;
   player?: PlayerId;
   /**
    * "If two or more of those creatures are attacking you and/or planeswalkers you control" (Mangara): checked again as it

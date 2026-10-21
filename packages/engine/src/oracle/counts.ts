@@ -153,6 +153,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && /^opponents?(?: you have)?$/i.test(p)) return count({ kind: "players", opponents: true });
   if (each && /^(?:of your opponents|opponent) who lost life this turn$/i.test(p)) return count({ kind: "players", opponents: true, lostLife: true });
   if (each && /^opponent who drew a card this way$/i.test(p)) return count({ kind: "players", opponents: true, drewThisWay: true });
+  // Smuggler's Share: "for each opponent who drew two or more cards this turn", "... who had two or more lands enter the
+  // battlefield under their control this turn".
+  if (each && (m = /^opponent who drew (two|three|four) or more cards this turn$/i.exec(p))) return count({ kind: "players", opponents: true, drewAtLeast: num(m[1]!) });
+  if (each && (m = /^opponent who had (two|three|four) or more lands enter the battlefield under their control this turn$/i.exec(p))) return count({ kind: "players", opponents: true, landsEnteredAtLeast: num(m[1]!) });
   if ((m = /^creatures? that died (under your control )?this turn$/i.exec(p))) return count({ kind: "diedThisTurn", ...(m[1] ? { yours: true as const } : {}) });
   if (/^creatures? that attacked this turn$/i.test(p)) return count({ kind: "attackersThisTurn" });
   if ((m = /^(?:([A-Z][a-z]+) )?tokens you created this turn$/.exec(p))) return count({ kind: "tokensCreatedThisTurn", ...(m[1] ? { subtype: m[1] } : {}) });
@@ -172,8 +176,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^cards? named ~ in (your|all|each) graveyards?$/i.exec(p)))
     return count({ kind: "cardsInGraveyard", who: { ref: m[1] === "your" ? "you" : "eachPlayer" }, filter: { kind: "card", named: "~", text: "card named ~" } });
   // Graveyards: "card in your graveyard", "creature card in your graveyard", "instant and sorcery card in all graveyards".
-  if ((m = /^(.*?)cards? in (your|all|that player's|target player's|their) graveyards?$/i.exec(p))) {
-    const who = /^all$/i.test(m[2]!) ? ({ ref: "eachPlayer" } as PlayerRef) : whosePlayer(m[2]!, ctx);
+  // "Cards in your opponents' graveyards" (Consuming Aberration): each opponent's.
+  if ((m = /^(.*?)cards? in (your|all|that player's|target player's|their|your opponents') graveyards?$/i.exec(p))) {
+    const who = /^all$/i.test(m[2]!) ? ({ ref: "eachPlayer" } as PlayerRef) : /^your opponents'$/i.test(m[2]!) ? ({ ref: "eachOpponent" } as PlayerRef) : whosePlayer(m[2]!, ctx);
     if (!who) return null;
     const kinds = m[1]!.trim().replace(/ and /g, " or ");
     if (!kinds) return count({ kind: "cardsInGraveyard", who });

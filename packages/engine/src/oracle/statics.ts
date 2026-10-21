@@ -71,6 +71,14 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     const mods = parseStaticMods(m[1]!);
     return mods ? { affects: { kind: "paired" }, mods, text: line } : null;
   }
+  // Sting, the Glinting Dagger: "Equipped creature has first strike as long as it's blocking or blocked by a Goblin or Orc":
+  // blocking one or blocked by one (CR 509.1g-h); one removed from combat no longer counts (CR 506.4).
+  if ((m = /^Equipped creature has ([a-z ]+) as long as it's blocking or blocked by an? ([A-Z][a-z]+)(?: or ([A-Z][a-z]+))?$/.exec(text)) && [m[2], m[3]].every((x) => !x || CREATURE_TYPES.has(x))) {
+    const st = parseStatic(`Equipped creature has ${m[1]}.`);
+    if (!st || st.condition || st.affects.kind !== "attached") return null;
+    const types = [m[2]!, ...(m[3] ? [m[3]] : [])];
+    return { ...st, text: line, condition: { kind: "attachedInCombatWith", filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: types, text: types.join(" or ") } } };
+  }
   // "As long as equipped creature is a Human, it gets an additional +1/+1": a second bonus, only for a Human.
   if ((m = /^As long as (enchanted|equipped) creature is an? ([A-Z][a-z]+), it (gets|has) (.+)$/.exec(text)) && CREATURE_TYPES.has(m[2]!)) {
     const st = parseStatic(`${capital(m[1]!)} creature ${m[3]} ${m[4]!.replace(/^an additional /, "")}.`);

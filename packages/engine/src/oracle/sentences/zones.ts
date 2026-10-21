@@ -557,6 +557,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // static ability's evasion (CR 509.1b), until end of turn.
   if ((m = /^(.+?) can't be blocked (this turn except by .+|by .+? this turn)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
+    // The Black Gate: "... by creatures that player controls this turn", the player chosen as it resolves.
+    if (m[2] === "by creatures that player controls this turn")
+      return what && ctx.chosenOpponent ? [{ type: "continuous", what, mods: [{ kind: "cantBeBlockedBy", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "chosenPlayer", text: "creatures that player controls" } }], duration: "endOfTurn" }] : null;
     const mods = what && parseStaticMods(`can't be blocked ${m[2]!.replace(/^this turn (except by .+)$/, "$1").replace(/ this turn$/, "")}`);
     return what && mods ? [{ type: "continuous", what, mods, duration: "endOfTurn" }] : null;
   }

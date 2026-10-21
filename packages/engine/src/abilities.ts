@@ -315,7 +315,8 @@ export interface TargetSpec {
    * "Target creature that player controls" in a trigger about a player ("Whenever ~ deals combat damage to a
    * player"): "eventPlayer", made concrete as `controlledBy` once the trigger knows that player.
    */
-  controller?: "you" | "opponent" | "eventPlayer" | "enchanted";
+  /** "chosenPlayer": "creatures that player controls" after "Choose a player ..." (The Black Gate), bound as it resolves (fixMods). */
+  controller?: "you" | "opponent" | "eventPlayer" | "enchanted" | "chosenPlayer";
   controlledBy?: PlayerId;
   /** A battle's protector (CR 310.9): "each battle they protect" after "each opponent", "battle that player protects". */
   protector?: "opponent" | "eventPlayer";
@@ -431,6 +432,8 @@ export interface TargetSpec {
    * still that object on the battlefield and matches, or that is you (rulings on Rebuff the Wicked).
    */
   targetsWhat?: TargetSpec | "you";
+  /** "That targets you or a creature you control" (Siren Stormtamer): with `targetsWhat`, a spell that targets you counts too. */
+  targetsYouToo?: true;
   /**
    * A target of a part of a spell that has its effect only if it was kicked, bargained, cast using teamwork or its gift
    * was promised (`not`: only if it wasn't, for the part an "instead" replaces): it's chosen only then, and otherwise
@@ -1706,6 +1709,11 @@ export type Effect =
    * effect that changes no characteristics, so it applies to whatever is in the group at any time, creatures that come
    * under an opponent's control later too (CR 611.2c, rulings).
    */
+  /**
+   * "Each player gains control of all creatures they own" (Homeward Path): each permanent matching `filter` another
+   * player controls comes under its owner's control, an effect of that owner's (layer 2) for as long as it stays (CR 613.1b).
+   */
+  | { type: "ownersGainControl"; filter: TargetSpec }
   | { type: "groupRules"; affects: Affects; /** The group as the card says it, for the log. */ text: string; mods: Modification[]; duration: "endOfTurn" | "yourNextTurn" }
   | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game" | "yourNextTurn" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; giveTo?: PlayerRef; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind }
   /**
@@ -1850,7 +1858,12 @@ export type Effect =
    * the battlefield with ~.' Return enchanted creature card to the battlefield under your control and attach ~ to it."
    * `tapped`: Dance of the Dead's "... to the battlefield tapped". Only while the Aura is on the battlefield (rulings).
    */
-  | { type: "animateDead"; tapped?: true }
+  /**
+   * `target`: Necromancy's "it becomes an Aura with 'enchant creature put onto the battlefield with ~.' Put target creature
+   * card from a graveyard onto the battlefield under your control and attach ~ to it": the card is this target of the
+   * ability, and the enchantment becomes an Aura (a resolved effect, CR 611.2c) only as it does this.
+   */
+  | { type: "animateDead"; tapped?: true; target?: number }
   /** Its leaves trigger: "that creature's controller sacrifices it", the creature it put onto the battlefield. */
   | { type: "sacrificeAnimated" }
   /** Firebending's "add N {R}. Until end of combat, you don't lose this mana as steps and phases end" (CR 702.189a). */
@@ -1935,7 +1948,11 @@ export type Effect =
    * resolves, or it stays as it is if there's none; maybe unless that spell's controller pays (CR 118.12).
    */
   /** `toSelf`: "change the target of target instant or sorcery spell with a single target to ~" (Hydroelectric Specimen): to this ability's source, only if it's a legal target for that spell (rulings). */
-  | { type: "changeTarget"; index: number; unless?: UnlessPays; toSelf?: true }
+  /**
+   * `anyOne` with `toSelf`: "change a target of target spell or ability to ~" (Spellskite): any one of its targets, chosen
+   * as this resolves among those ~ could become without making another of its targets illegal (rulings).
+   */
+  | { type: "changeTarget"; index: number; unless?: UnlessPays; toSelf?: true; anyOne?: true }
   /**
    * "You may choose new targets for target spell or ability" (CR 115.7d): as this resolves, its controller keeps any of
    * that spell's targets, legal or not, and changes the rest to legal ones.
@@ -2245,7 +2262,7 @@ export type Effect =
   /** Illusion of Choice: "You choose how each player votes this turn" (GameState.votesChosenBy). */
   | { type: "chooseVotes" }
   | { type: "vote"; options?: string[]; among?: TargetSpec; secret?: true; text: string }
-  | { type: "choose"; choice: ChoiceKind; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose };
+  | { type: "choose"; choice: ChoiceKind; /** With "opponent": "a player with the most life or tied for most life" (The Black Gate), checked as it resolves; you can be one. */ mostLife?: true; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose };
 
 /** What a player chooses by name: a creature type (CR 205.3m) or a color (CR 105.1). */
 /** "keyword": "gains your choice of flying, vigilance, deathtouch, or haste", from the options listed (CR 608.2d). */
@@ -3327,6 +3344,16 @@ export interface Gift {
 }
 
 export interface CompiledCard {
+  /**
+   * "~ has all activated abilities of creatures you control that don't have the same name as ~" (Marvin), "... of each
+   * other creature with a +1/+1 counter on it" (Experiment Kraj), "As long as ~ is on the battlefield, it has all
+   * activated abilities of all creature cards in all graveyards" (Necrotic Ooze): while this is on the battlefield, it
+   * has the activated abilities (mana abilities too, unless `noMana`) of the permanents matching `filter` (`other`: not
+   * itself; `notSameName`: none with its name) or with `graveyard`, of the cards matching it in graveyards (`yours`: only
+   * its controller's). "~" in them means this object (rulings). Only activated abilities: not triggered or static ones.
+   * Abilities that work only from a hand or graveyard, equip and loyalty abilities aren't borrowed.
+   */
+  borrows?: { filter: TargetSpec; other?: boolean; notSameName?: true; graveyard?: true; yours?: true; noMana?: true };
   spell?: AbilityBody; // instants and sorceries
   triggers: TriggeredAbility[];
   activated: ActivatedAbility[];
@@ -3606,6 +3633,8 @@ export interface CompiledCard {
   creatureAbilitiesHaste?: true;
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup; "all": "Players have ...". */
   noMaxHandSize?: boolean | "all";
+  /** K'rrik: "For each {B} in a cost, you may pay 2 life rather than pay that mana" (see blackForLife), for its controller. */
+  lifeForBlack?: true;
   /**
    * "You may activate the loyalty abilities of ~ twice each turn rather than only once" (Urza, Planeswalker), "... of
    * planeswalkers you control ..." (Oath of Teferi): two loyalty abilities of that permanent each turn, the same one

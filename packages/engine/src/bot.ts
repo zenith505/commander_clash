@@ -421,6 +421,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "chooseOption", player: pid, choice: pend.options.find((o) => Number(o) < left) ?? "0" }];
     }
     // Command Beacon with two commanders: the one that costs the most to cast from the command zone.
+    // Spellskite: the target of ours the spell or ability would hurt most, else the first.
+    if (pend.kind === "chooseOption" && pend.what === "targetSlot") return [{ type: "chooseOption", player: pid, choice: targetSlotFor(s, pid, pend.options) }];
     if (pend.kind === "chooseOption" && pend.what === "commander")
       return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => mv(s, b) + 2 * (player(s, pid).commanderCasts[b] ?? 0) - mv(s, a) - 2 * (player(s, pid).commanderCasts[a] ?? 0))[0]! }];
     if (pend.kind === "chooseOption") {
@@ -792,7 +794,7 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     );
     // Reanimating takes the best creature from any graveyard it may.
     const reanimators = allEffects(body.effects).filter((e): e is Extract<Effect, { type: "putOntoBattlefield" }> => e.type === "putOntoBattlefield" && e.what.ref === "target" && i >= e.what.index && i < e.what.index + (e.what.n ?? 1));
-    const reanimate = reanimators.length > 0;
+    const reanimate = reanimators.length > 0 || allEffects(body.effects).some((e) => e.type === "animateDead" && e.target === i);
     // "Under its owner's control" (Bilbo): only our own cards do us good.
     const forOwner = reanimators.some((e) => e.owner);
     // "Becomes a copy of target creature": the best one anywhere, but not a legendary one of ours (the legend rule
@@ -967,12 +969,51 @@ function chooseFullShield(s: GameState, pid: PlayerId): Action[] | null {
   return null;
 }
 
+/** Which target of the spell or ability being changed becomes our Spellskite: one of ours it would hurt, else the first. */
+function targetSlotFor(s: GameState, pid: PlayerId, options: string[]): string {
+  const r = s.resolving;
+  const t = r?.item.targets?.find((x) => x.kind === "stack");
+  const item = t?.kind === "stack" ? s.stack.find((x) => x.id === t.id) : undefined;
+  const body = item?.body ?? (item?.objectId ? castingBody(defOf(s, obj(s, item.objectId))) : undefined);
+  const harm = body ? harmfulTargets(body) : [];
+  return options.find((o) => { const c = item?.targets?.[Number(o)]; return harm[Number(o)] && !!c && c.kind !== "none" && isMine(s, pid, c); }) ?? options[0]!;
+}
+
+/**
+ * Spellskite: an opponent's spell or ability that hurts one of ours (not Spellskite itself) gets our Spellskite as that
+ * target instead, if it can be.
+ */
+function chooseSpellskite(s: GameState, pid: PlayerId, top: StackItem): Action[] | null {
+  if (top.controller === pid) return null;
+  const o = top.objectId ? s.objects[top.objectId] : undefined;
+  const body = top.body ?? (o ? castingBody(defOf(s, o)) : undefined);
+  if (!body) return null;
+  const harm = harmfulTargets(body);
+  for (const id of s.battlefield) {
+    const me = obj(s, id);
+    if (controllerOf(s, me) !== pid) continue;
+    const abilities = abilitiesOf(s, me).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const e = abilities[i]!.body.effects.find((x) => x.type === "changeTarget" && x.anyOne);
+      if (!e) continue;
+      const specs = body.targets;
+      const aimed = (top.targets ?? []).some((c, j) => c.kind !== "none" && harm[j] && isMine(s, pid, c) && !(c.kind === "object" && c.id === id) && !!specs[j] && changeTargetOptions(s, top, specs[j]!, c).some((x) => x.kind === "object" && x.id === id));
+      if (!aimed) continue;
+      const plan = planActivate(s, pid, id, i, [{ kind: "stack", id: top.id }]);
+      if (plan) return plan;
+    }
+  }
+  return null;
+}
+
 /**
  * Turn an opponent's spell aimed at us or ours onto one of theirs (Deflection, CR 115.7a), when there's one it could
  * go to. "Unless that spell's controller pays" only if they can't.
  */
 function chooseDeflection(s: GameState, pid: PlayerId): Action[] | null {
   const top = s.stack[s.stack.length - 1];
+  const skite = top && chooseSpellskite(s, pid, top);
+  if (skite) return skite;
   if (!top || top.kind !== "spell" || top.controller === pid || !top.objectId) return null;
   const chosen = (top.targets ?? []).filter((t) => t.kind !== "none");
   const j = (top.targets ?? []).findIndex((t) => t.kind !== "none");

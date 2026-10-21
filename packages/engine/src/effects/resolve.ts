@@ -524,7 +524,10 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx): Mo
           (m.kind === "setSubtypes" || m.kind === "addTypes") && m.subtypes.includes(CHOSEN_TYPE)
           ? { ...m, subtypes: m.subtypes.flatMap((st) => (st !== CHOSEN_TYPE ? [st] : s.resolving?.chosen?.type ? [s.resolving.chosen.type] : [])) }
           : // "Becomes the basic land type of your choice", "becomes the color of your choice".
-            m.kind === "setLandTypes" && m.subtypes.includes(CHOSEN_LAND_TYPE)
+            // "Can't be blocked by creatures that player controls" (The Black Gate): the player chosen as it resolved.
+            m.kind === "cantBeBlockedBy" && m.filter.controller === "chosenPlayer"
+            ? { ...m, filter: (({ controller: _, ...rest }) => ({ ...rest, controlledBy: s.resolving?.chosen?.player ?? -1 }))(m.filter) }
+            : m.kind === "setLandTypes" && m.subtypes.includes(CHOSEN_LAND_TYPE)
             ? { ...m, subtypes: m.subtypes.flatMap((st) => (st !== CHOSEN_LAND_TYPE ? [st] : s.resolving?.chosen?.landType ? [s.resolving.chosen.landType] : [])) }
             : m.kind === "setColors" && m.chosen
               ? { kind: "setColors", colors: s.resolving?.chosen?.color ? [s.resolving.chosen.color] : [] }
@@ -688,6 +691,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "doublePT":
     case "continuous":
     case "groupRules":
+    case "ownersGainControl":
     case "playerGains":
     case "attach":
     case "attachElsewhere":

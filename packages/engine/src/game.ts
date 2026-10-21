@@ -5087,6 +5087,11 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "targetSlot") {
+    (r.scratch ??= {}).targetSlot = Number(choice);
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "attackWhom") {
     if (!pend.options.includes(choice)) throw new RulesError("choose one of the players or planeswalkers offered");
     (r.scratch ??= {}).attackWhom = choice;

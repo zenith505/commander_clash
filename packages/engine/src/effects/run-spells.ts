@@ -6,7 +6,7 @@ import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { castProblem, describeTargets, log, moveObject, newObject, obj, opponents, player } from "../game";
 import { compileCard, spellTargetSpecs } from "../oracle";
 import type { DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
-import { isLegalTarget, legalTargets, pickOptions, printedMatches, sameTarget, sourceQuality, spellManaValue, spellQuality, stampTargets } from "./targeting";
+import { isLegalTarget, legalTargets, pickOptions, printedMatches, sameTarget, sourceQuality, spellManaValue, spellQuality, stampTargets, swapKeepsOthersLegal } from "./targeting";
 import { ResolveCtx, objects, amountNow, players } from "./resolve";
 import { fireEvent } from "./triggers";
 import { discardCards, toBottom } from "./run-library";
@@ -482,7 +482,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "changeTarget": {
       const t = ctx.targets[e.index];
       if (!ctx.legal[e.index] || t?.kind !== "stack") return;
-      return changeTarget(s, ctx, t.id, src, e.unless, e.toSelf);
+      return e.anyOne ? changeATargetToSelf(s, ctx, t.id, src) : changeTarget(s, ctx, t.id, src, e.unless, e.toSelf);
     }
     case "newTargets": {
       const t = ctx.targets[e.index];
@@ -731,6 +731,45 @@ function changeTarget(s: GameState, ctx: ResolveCtx, stackId: string, by: string
   item.targets = item.targets!.map((x, i) => (i === j ? stampTargets(s, [next])![0]! : x));
   log(s, `${by} changes the target of ${item.description}${describeTargets(s, [next]).replace(/^ targeting/, " to")}.`);
   fireEvent(s, { type: "targeted", stackId: item.id, only: next.kind === "object" ? [next.id] : [] });
+}
+
+/**
+ * "Change a target of target spell or ability to ~" (Spellskite): any one of its targets that ~, still on the battlefield
+ * as the same object, could legally become without making another of its targets illegal, chosen as this resolves
+ * (rulings); "up to" targets left unchosen stay so (the number of targets doesn't change). With none, nothing changes.
+ */
+function changeATargetToSelf(s: GameState, ctx: ResolveCtx, stackId: string, by: string): "paused" | void {
+  const item = s.stack.find((x) => x.id === stackId);
+  const o = item?.objectId ? s.objects[item.objectId] : undefined;
+  if (!item || (item.kind === "spell" && !o)) return;
+  const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+  const here = !!me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc);
+  const current = item.targets ?? [];
+  const specs = item.body?.targets ?? (o ? spellTargetSpecs(defOf(s, o), item.modes) : []);
+  const slots = !here
+    ? []
+    : current.flatMap((c, j) => {
+        const spec = specs[j];
+        if (!spec || c.kind === "none") return [];
+        const to = changeTargetOptions(s, item, spec, c).find((t) => t.kind === "object" && t.id === me!.id);
+        return to && swapKeepsOthersLegal(s, specs, current, j, to) ? [{ j, to }] : [];
+      });
+  if (!slots.length) {
+    log(s, `${by} can't become a target of ${item.description}, so its targets stay the same.`);
+    return;
+  }
+  const sc = (s.resolving!.scratch ??= {});
+  if (sc.targetSlot === undefined && slots.length > 1) {
+    s.pending = { kind: "chooseOption", player: ctx.controller, source: by, what: "targetSlot", prompt: `Which target of ${item.description} becomes ${by}?`, options: slots.map((x) => String(x.j)), labels: slots.map((x) => `Instead of ${describeTargets(s, [current[x.j]!]).replace(/^ targeting /, "")}`) };
+    return "paused";
+  }
+  const pick = slots.find((x) => x.j === (sc.targetSlot ?? slots[0]!.j)) ?? slots[0]!;
+  const was = current[pick.j]!;
+  const amount = was.kind === "object" || was.kind === "player" ? was.amount : undefined;
+  const next = amount !== undefined && pick.to.kind === "object" ? { ...pick.to, amount } : pick.to;
+  item.targets = current.map((x, i) => (i === pick.j ? stampTargets(s, [next])![0]! : x));
+  log(s, `${by} changes a target of ${item.description}${describeTargets(s, [was]).replace(/^ targeting/, " from")}${describeTargets(s, [next]).replace(/^ targeting/, " to")}.`);
+  fireEvent(s, { type: "targeted", stackId: item.id, only: [me!.id] });
 }
 
 /**

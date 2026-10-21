@@ -2,7 +2,7 @@
 // whether it can be activated, and which one to use for a given mana.
 
 import { allEffects, type ActivatedAbility, type ManaAbility, type ManaProduce, type ManaTrigger } from "./abilities";
-import { abilitiesOf, basicLandManaAbility, defOf, objIsType } from "./cards";
+import { abilitiesOf, basicLandManaAbility, defOf, lendersOf, objIsType } from "./cards";
 import { objectMatches } from "./effects";
 import { abilityProblem, activationLessCost, linkedExileCards, obj, payableLife, player, tapAbilitySick, tapCostCandidates } from "./game";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
@@ -16,6 +16,9 @@ import { COLORS, type Action, type Color, type GameObject, type GameState, type 
 /** activatedThisTurn holds activated ability indexes; mana abilities are recorded past this offset. */
 export const MANA_ABILITY_OFFSET = 1000;
 
+/** While adding a lender's mana abilities to a borrower's (see lendersOf). */
+let lendingMana = false;
+
 /**
  * The mana abilities an object has right now: one for each basic land type it has (CR 305.6),
  * then its own, unless an effect removed its abilities (CR 613.1f).
@@ -25,6 +28,19 @@ export function manaAbilitiesOn(s: GameState, o: GameObject): ManaAbility[] {
   const out = c.landAbilitiesLost ? [] : c.subtypes.map(basicLandManaAbility).filter((x): x is ManaAbility => x !== null);
   if (c.hasPrintedAbilities) out.push(...compileCard(defOf(s, o)).mana);
   for (const t of c.grantedAbilities) out.push(...compileGranted(t).mana); // 'Enchanted land has "{T}: Add ..."'
+  // "~ has all activated abilities of ...": the lenders' mana abilities too, a land's basic land types' among them
+  // (rulings on Mirran Safehouse).
+  const borrows = c.hasPrintedAbilities && !lendingMana ? compileCard(defOf(s, o)).borrows : undefined;
+  if (borrows && !borrows.noMana) {
+    const { objects, cards } = lendersOf(s, o, borrows);
+    lendingMana = true; // a lender's own borrowed mana abilities aren't followed (no loops)
+    try {
+      for (const x of objects) out.push(...manaAbilitiesOn(s, x));
+    } finally {
+      lendingMana = false;
+    }
+    for (const d of cards) out.push(...d.subtypes.map(basicLandManaAbility).filter((x): x is ManaAbility => x !== null), ...compileCard(d).mana);
+  }
   // "If ~ has a luck counter on it, instead add one mana of any color" (Gemstone Caverns): what it makes now.
   return out.map((ab) => (ab.insteadIf && staticConditionNow(s, ab.insteadIf.cond, o.id, controllerOf(s, o)) ? { ...ab, produces: ab.insteadIf.produces } : ab));
 }

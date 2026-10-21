@@ -84,7 +84,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.combat === "couldButDidntAttack" && (o.couldAttack !== s.turn || o.attacked?.turn === s.turn)) return false;
   if (spec.controller === "you" && c.controller !== controller) return false;
   if (spec.controller === "opponent" && c.controller === controller) return false;
-  if (spec.controller === "eventPlayer" || spec.controller === "enchanted" || (spec.controlledBy !== undefined && c.controller !== spec.controlledBy)) return false;
+  if (spec.controller === "eventPlayer" || spec.controller === "enchanted" || spec.controller === "chosenPlayer" || (spec.controlledBy !== undefined && c.controller !== spec.controlledBy)) return false;
   if (spec.protector === "eventPlayer" || (spec.protector === "opponent" && (o.protector === undefined || o.protector === controller)) || (spec.protectedBy !== undefined && o.protector !== spec.protectedBy)) return false;
   if (spec.tapped !== undefined && !!o.tapped !== spec.tapped) return false;
   if (spec.dealtDamageThisTurn && !o.wasDealtDamage) return false;
@@ -329,11 +329,12 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     if (!item) return false;
     if (spec.singleTarget && (item.targets ?? []).filter((x) => x.kind !== "none").length !== 1) return false;
     // "Target triggered ability you control" (Strionic Resonator).
-    if (item.kind === "ability") return !!spec.stackAbilities && (spec.stackAbilities === "both" || (spec.stackAbilities === "triggered") === !!item.triggered) && (spec.controller !== "you" || item.controller === controller) && (spec.controller !== "opponent" || item.controller !== controller);
+    const aims = !spec.targetsWhat || targetsMatch(s, item.targets ?? [], spec.targetsWhat, controller) || (!!spec.targetsYouToo && targetsMatch(s, item.targets ?? [], "you", controller));
+    if (item.kind === "ability") return aims && !!spec.stackAbilities && (spec.stackAbilities === "both" || (spec.stackAbilities === "triggered") === !!item.triggered) && (spec.controller !== "you" || item.controller === controller) && (spec.controller !== "opponent" || item.controller !== controller);
     if (spec.noSpells || !item.objectId) return false;
     // "Target spell you control", "... you don't control" / "... an opponent controls" (no teammates here).
     if ((spec.controller === "you" && item.controller !== controller) || (spec.controller === "opponent" && item.controller === controller)) return false;
-    if (spec.targetsWhat && !targetsMatch(s, item.targets ?? [], spec.targetsWhat, controller)) return false;
+    if (!aims) return false;
     // Nothing in the engine changes a spell's characteristics on the stack yet, so the card's are used. Its mana value
     // counts the X chosen for it (CR 202.3e); a face-down spell's is 0 (CR 708.2).
     if (spec.manaValue && !inRange(spellManaValue(s, item), spec.manaValue)) return false;
@@ -535,6 +536,25 @@ export function checkTotals(s: GameState, specs: TargetSpec[], targets: TargetCh
   const { key, max } = specs[group[0]!]!.total!;
   const sum = group.reduce((n, i) => n + totalPart(s, key, targets[i]), 0);
   if (sum > max!) for (const i of group) legal[i] = false;
+}
+
+/**
+ * Changing target `j` of a spell or ability to `t` (Spellskite): it can't make another of its targets illegal (rulings),
+ * so `t` must keep to how target `j` relates to the others ("another target", "with total ...", "from a single
+ * graveyard"), and every other target relating to target `j` must still keep to it.
+ */
+export function swapKeepsOthersLegal(s: GameState, specs: TargetSpec[], targets: TargetChoice[], j: number, t: TargetChoice): boolean {
+  const next = targets.map((x, i) => (i === j ? t : x));
+  const spec = specs[j];
+  if (!spec) return false;
+  if ((spec.distinctFrom ?? []).some((k) => sameTarget(next[k], t)) || !relatedOk(s, spec, next, t) || !totalOk(s, specs, next, j, t)) return false;
+  return specs.every((x, i) => {
+    const c = next[i];
+    if (i === j || !c || c.kind === "none") return true;
+    if (x.distinctFrom?.includes(j) && sameTarget(c, t)) return false;
+    const related = [x.sameGraveyardAs, x.differentNameFrom, x.differentManaValueFrom, x.sharesCreatureTypeWith].some((g) => g?.includes(j));
+    return !related || relatedOk(s, x, next, c);
+  });
 }
 
 /** "From a single graveyard", "that share a creature type": how this target relates to the others of its group already chosen. */

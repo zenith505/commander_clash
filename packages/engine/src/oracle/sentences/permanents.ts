@@ -105,6 +105,16 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const type = m[1]!.toLowerCase() as "destroy" | "exile";
     return a?.ref === "target" && b?.ref === "target" ? [{ type, what: a }, { type, what: b }] : null;
   }
+  // Homeward Path: "Each player gains control of all creatures they own"; Brooding Saurian's "nontoken permanents".
+  if ((m = /^Each player gains control of all (.+) they own$/i.exec(s))) {
+    const g = parseGroup(`all ${m[1]!}`);
+    return g && !g.other && !g.filter.controller ? [{ type: "ownersGainControl", filter: g.filter }] : null;
+  }
+  // Aura Thief: "You gain control of all enchantments", for as long as each stays on the battlefield (CR 611.2c).
+  if ((m = /^You gain control of all (.+)$/i.exec(s))) {
+    const g = parseGroup(`all ${m[1]!}`);
+    return g && !g.other ? [{ type: "continuous", what: { ref: "each", filter: g.filter }, mods: [{ kind: "control" }], duration: "game" }] : null;
+  }
   // Threaten: "Untap target creature and gain control of it until end of turn" (Spinal Embrace without a duration: for as
   // long as it stays on the battlefield, CR 611.2a).
   if ((m = /^Untap ((?:another )?target .+?) and gain control of it( until end of turn)?$/i.exec(s))) {

@@ -769,6 +769,22 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, mods, ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : e.duration === "whileTapped" ? ` for as long as ${src} remains tapped` : e.duration === "whileControlled" ? ` for as long as ${player(s, ctx.controller).name} controls ${src}` : ""}.`);
       return;
     }
+    case "ownersGainControl": {
+      // Each owner's own effect, for the permanents of theirs others control (CR 613.1b, 613.7b).
+      const byOwner = new Map<PlayerId, ObjectId[]>();
+      for (const id of s.battlefield) {
+        const o = obj(s, id);
+        if (s.phasedOut?.includes(id) || controllerOf(s, o) === o.owner || player(s, o.owner).lost || !objectMatches(s, e.filter, o, ctx.controller, false)) continue;
+        byOwner.set(o.owner, [...(byOwner.get(o.owner) ?? []), id]);
+      }
+      for (const [owner, affected] of byOwner) {
+        s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: owner, sourceName: src, sourceId: ctx.sourceId, duration: "game", affected, mods: [{ kind: "control" }] });
+        log(s, `${player(s, owner).name} gains control of ${affected.map((id) => defOf(s, obj(s, id)).name).join(", ")}.`);
+      }
+      if (!byOwner.size) log(s, `${src}: everyone already controls what they own.`);
+      invalidateCharacteristics(s);
+      return;
+    }
     case "groupRules": {
       s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, sourceId: ctx.sourceId, duration: e.duration, ...(e.duration === "yourNextTurn" ? { turnOf: ctx.controller } : {}), affected: [], group: e.affects, mods: e.mods });
       invalidateCharacteristics(s);

@@ -6,7 +6,7 @@ import { characteristics, controllerOf } from "./layers";
 import { abilityProblem, activationCost, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, foretellProblem, tapCostCandidates, turnFaceUpProblem } from "./game";
 import { compileCard } from "./oracle";
 import { hopeValues, spendPlan } from "./value";
-import { abilityUse, boundSpend, poolFor, spendAllows, usableTypes, type ManaUse } from "./spend";
+import { abilityUse, boundSpend, payableCost, poolFor, spendAllows, usableTypes, type ManaUse } from "./spend";
 import type { SpentReq, TargetChoice } from "./abilities";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payFromPool, payGenericWith, splitGeneric, xCount, type ManaPool, type ParsedCost } from "./mana";
 import { COLORS, type Action, type CardDef, type Color, type CostChoices, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
@@ -510,12 +510,15 @@ export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, in
  * that cost nothing come first; when they aren't enough, abilities that cost mana and make
  * more of it or a color we lack (a Signet: "{1}, {T}: Add {W}{U}") are paid for and added.
  */
-export function planMana(s: GameState, pid: PlayerId, cost: ParsedCost, extraGeneric = 0, exclude?: ObjectId, alsoExclude: ObjectId[] = [], use: ManaUse = "other", harm?: Partial<Record<Color, number>>, wantSnow = false): Action[] | null {
+export function planMana(s: GameState, pid: PlayerId, cost0: ParsedCost, extraGeneric = 0, exclude?: ObjectId, alsoExclude: ObjectId[] = [], use: ManaUse = "other", harm?: Partial<Record<Color, number>>, wantSnow = false): Action[] | null {
   const p = player(s, pid);
   // Only the mana that can be spent on this counts (CR 106.6); `restricted` is how much of the pool can't be spent
   // on anything else, such as a Signet's cost. `snow`: how much of it is snow mana (CR 107.4h).
   const start = poolFor(s, pid, use);
-  if (payFromPool(cost, start.pool, extraGeneric, payableLife(s, pid), { snow: start.snow, wantSnow })) return [];
+  if (payFromPool(cost0, start.pool, extraGeneric, payableLife(s, pid), { snow: start.snow, wantSnow })) return [];
+  // K'rrik's "you may pay 2 life rather than pay that mana" for {B}: mana from the player's sources first, life once
+  // they can't make it (planFree).
+  const cost = payableCost(s, pid, cost0);
   const sources = manaSources(s, pid, [...(exclude ? [exclude] : []), ...alsoExclude], use);
   const unrestricted = sources.map((src) => ({ ...src, options: src.options.filter((x) => !x.restricted) }));
   const needColors = namedColors(cost);

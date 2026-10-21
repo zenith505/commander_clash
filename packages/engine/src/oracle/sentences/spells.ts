@@ -321,6 +321,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (unless === null) return null;
     return [{ type: "counterSpell", index: addTarget(ctx, stackSpec(m[1]!)), ...(unless ? { unless } : {}) }];
   }
+  // Siren Stormtamer: "Counter target spell or ability that targets you or a creature you control".
+  if ((m = /^Counter target (spell|spell or ability) that targets (you or )?(you|an? .+)$/i.exec(s)) && !(m[2] && m[3] === "you")) {
+    const what = m[3] === "you" ? "you" : parseTargetPhrase(m[3]!.replace(/^an? /, ""));
+    if (what !== "you" && what?.kind !== "object") return null;
+    const base = m[1]!.toLowerCase() === "spell" ? { kind: "spell" as const } : stackSpec("spell or ability");
+    return [{ type: "counterSpell", index: addTarget(ctx, { ...base, targetsWhat: what, ...(m[2] ? { targetsYouToo: true as const } : {}), text: `target ${m[1]!.toLowerCase()} that targets ${m[2] ?? ""}${m[3]}` }) }];
+  }
   // A mix of abilities and spells (CR 115.1c-d): "Counter target triggered ability or colorless spell" (Consign to Memory),
   // "... activated ability, triggered ability, or legendary spell" (Tale's End), "instant spell, sorcery spell, or
   // triggered ability".
@@ -345,11 +352,6 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return spec?.kind === "spell" && !spec.xRange ? [{ type: "counterSpell", index: addTarget(ctx, spec), bounce: true }] : null;
   }
   // "Counter target spell that targets a permanent you control" (Rebuff the Wicked), "... that targets you".
-  if ((m = /^Counter target spell that targets (you|an? .+)$/i.exec(s))) {
-    const what = m[1] === "you" ? "you" : parseTargetPhrase(m[1]!.replace(/^an? /, ""));
-    if (what !== "you" && what?.kind !== "object") return null;
-    return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", targetsWhat: what, text: `target spell that targets ${m[1]}` }) }];
-  }
   // "Counter target spell if its mana value is X" (Disrupting Shoal): any spell can be targeted; only one with that mana
   // value, as it resolves, is countered (rulings).
   if (/^Counter target spell if its mana value is X$/i.test(s)) return [{ type: "counterSpell", index: addTarget(ctx, { kind: "spell", text: "target spell" }), ifMvX: true }];
@@ -386,6 +388,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Hydroelectric Specimen: "... target instant or sorcery spell with a single target to ~".
   if ((m = /^Change the target of target instant or sorcery spell with a single target to ~$/i.exec(s)))
     return [{ type: "changeTarget", index: addTarget(ctx, { kind: "spell", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], singleTarget: true, text: "target instant or sorcery spell with a single target" }), toSelf: true }];
+  // Spellskite: "Change a target of target spell or ability to ~" (rulings: any one of its targets, chosen as it resolves).
+  if (/^Change a target of target spell or ability to ~$/i.test(s))
+    return [{ type: "changeTarget", index: addTarget(ctx, { ...stackSpec("spell or ability"), text: "target spell or ability" }), toSelf: true, anyOne: true }];
   if ((m = /^Change the target of target spell( or ability)? with a single target(?: unless that spell's controller pays (.+))?$/i.exec(s)) && !(m[1] && m[2])) {
     const unless = m[2] === undefined ? undefined : parseUnlessPays(m[2], ctx);
     if (unless === null) return null;

@@ -446,6 +446,19 @@ export function compile(d: CardDef): CompiledCard {
     // "Vivid — {T}: For each color among permanents you control, add ..." (Bloom Tender): an ability word too.
     else if (!isSpell && /^Vivid — \{/.test(line)) line = line.replace(/^Vivid — /, "");
     if (!line) continue;
+    // "~ has all activated abilities of ..." (CompiledCard.borrows).
+    const borrow = /^(?:As long as ~ is on the battlefield, it|~) has all activated abilities of (.+?)( except mana abilities)?\.$/.exec(line);
+    if (borrow && !out.borrows) {
+      const yard = /^all (.+?) cards in (all graveyards|your graveyard)$/.exec(borrow[1]!);
+      const what = yard ? parseTargetPhrase(yard[1]!) : null;
+      const same = / that don't have the same name as ~$/.exec(borrow[1]!);
+      const group = yard ? null : parseGroup(same ? borrow[1]!.slice(0, same.index) : borrow[1]!);
+      if (yard && what?.kind === "object" && !what.controller && Object.entries(what).every(([k, v]) => v === undefined || ["kind", "types", "notTypes", "notColors", "subtypes", "text"].includes(k)))
+        out.borrows = { filter: { ...what, text: `${yard[1]} cards` }, graveyard: true, ...(yard[2] === "your graveyard" ? { yours: true as const } : {}), ...(borrow[2] ? { noMana: true as const } : {}) };
+      else if (group && group.filter.controller !== "enchanted") out.borrows = { filter: group.filter, ...(group.other ? { other: true } : {}), ...(same ? { notSameName: true as const } : {}), ...(borrow[2] ? { noMana: true as const } : {}) };
+      else out.unsupported.push(raw);
+      continue;
+    }
     if (line === "Spree" && isSpell && !spree) {
       spree = { costs: [], texts: [], lines: [raw] };
       continue;
@@ -1421,6 +1434,10 @@ export function compile(d: CardDef): CompiledCard {
       out.loyaltyTwice = loyaltyTwice[1] === "~" ? "self" : "yours";
       continue;
     }
+    if (/^For each \{B\} in a cost, you may pay 2 life rather than pay that mana\.$/.test(line)) {
+      out.lifeForBlack = true;
+      continue;
+    }
     if (/^You have no maximum hand size\.$/.test(line)) {
       out.noMaxHandSize = out.noMaxHandSize || true;
       continue;
@@ -1707,6 +1724,14 @@ export function compile(d: CardDef): CompiledCard {
     const animate = out.animate && /^When ~ enters, if it's on the battlefield, it loses "enchant creature card in a graveyard" and gains "enchant creature put onto the battlefield with ⟪source⟫\." (?:Return enchanted creature card to the battlefield under your control|Put enchanted creature card onto the battlefield (tapped )?under your control) and attach ~ to it\. When ~ leaves the battlefield, that creature's controller sacrifices it\.$/.exec(line);
     if (animate) {
       out.triggers.push({ event: "selfEnters", body: { targets: [], effects: [{ type: "animateDead", ...(animate[1] ? { tapped: true as const } : {}) }], text: `Return enchanted creature card to the battlefield${animate[1] ? " tapped" : ""} under your control and attach ~ to it.` } });
+      out.triggers.push({ event: "selfLeaves", body: { targets: [], effects: [{ type: "sacrificeAnimated" }], text: "That creature's controller sacrifices it." } });
+      continue;
+    }
+    // Necromancy (rulings): an enchantment that becomes an Aura as its enters trigger resolves, if it's still on the
+    // battlefield, and attaches to the creature it put onto the battlefield; it follows the rules for Auras from then on.
+    if (/^When ~ enters, if it's on the battlefield, it becomes an Aura with "enchant creature put onto the battlefield with ⟪source⟫\." Put target creature card from a graveyard onto the battlefield under your control and attach ~ to it\. When ~ leaves the battlefield, that creature's controller sacrifices it\.$/.test(line) && !d.subtypes.includes("Aura") && !out.enchant) {
+      out.animate = true;
+      out.triggers.push({ event: "selfEnters", body: { targets: [{ kind: "card", types: ["Creature"], text: "target creature card from a graveyard" }], effects: [{ type: "animateDead", target: 0 }], text: "Put target creature card from a graveyard onto the battlefield under your control and attach ~ to it." } });
       out.triggers.push({ event: "selfLeaves", body: { targets: [], effects: [{ type: "sacrificeAnimated" }], text: "That creature's controller sacrifices it." } });
       continue;
     }

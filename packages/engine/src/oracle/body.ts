@@ -2446,9 +2446,10 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     }
     // "Choose an opponent. That player ..." (Myrkul's Edict, the Offerings): chosen as it resolves (CR 608.2d), not
     // targeted. One per ability.
-    if (/^Choose an opponent$/.test(s)) {
+    // The Black Gate: "Choose a player with the most life or tied for most life", any of them, you too.
+    if (/^Choose (?:an opponent|a player with the most life or tied for most life)$/.test(s)) {
       if (ctx.chosenOpponent || ctx.eventPlayer || ctx.lastPlayerTarget !== undefined) return null;
-      effects.push({ type: "choose", choice: "opponent" });
+      effects.push({ type: "choose", choice: "opponent", ...(/most life/.test(s) ? { mostLife: true as const } : {}) });
       ctx.chosenOpponent = true;
       continue;
     }

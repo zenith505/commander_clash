@@ -1663,10 +1663,16 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // the card in the graveyard; the creature it becomes is a new object (CR 400.7), which the Aura is attached to.
       const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       if (!me || me.zone !== "battlefield" || (ctx.sourceZc !== undefined && (me.zoneChanges ?? 0) !== ctx.sourceZc)) return;
-      const link = me.enchantsCard;
+      const t = e.target !== undefined ? ctx.targets[e.target] : undefined;
+      const link = e.target !== undefined ? (ctx.legal[e.target] && t?.kind === "object" ? { id: t.id, zc: s.objects[t.id]?.zoneChanges ?? 0 } : undefined) : me.enchantsCard;
       const c = link && s.objects[link.id];
       if (!c || c.zone !== "graveyard" || (c.zoneChanges ?? 0) !== link.zc) return;
-      log(s, `${src} returns ${defOf(s, c).name} to the battlefield${e.tapped ? " tapped" : ""} under ${player(s, ctx.controller).name}'s control.`);
+      if (e.target !== undefined) {
+        // Necromancy becomes an Aura with "enchant creature put onto the battlefield with ~" (rulings).
+        s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, sourceId: me.id, duration: "game", affected: [me.id], mods: [{ kind: "addTypes", types: [], subtypes: ["Aura"] }] });
+        log(s, `${src} becomes an Aura.`);
+      }
+      log(s, `${src} ${e.target !== undefined ? "puts" : "returns"} ${defOf(s, c).name} ${e.target !== undefined ? "onto" : "to"} the battlefield${e.tapped ? " tapped" : ""} under ${player(s, ctx.controller).name}'s control.`);
       moveObject(s, c.id, "battlefield", { controller: ctx.controller, ...(e.tapped ? { tapped: true } : {}) });
       if ((c.zone as string) !== "battlefield") return;
       (s.animated ??= {})[`${me.id}@${me.zoneChanges ?? 0}`] = { id: c.id, zc: c.zoneChanges ?? 0 };

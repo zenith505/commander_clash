@@ -662,8 +662,9 @@ export function parseTargetPhrase(
     // "With mana value 2" (Spell Snare): exactly that. With X, the X it's cast or activated with (TargetSpec.xRange).
     // "Destroy all creatures with mana value X or less", "search your library for a creature card with mana value X or
     // less": compared as it resolves (TargetSpec.bound), where the amount reader takes X.
-    const xBound = m[2] === "x" && !opts.x && m[3] ? opts.count?.("X") : undefined;
-    if (xBound) extra.bound = { key, at: m[3] === "greater" ? "least" : "most", amount: xBound };
+    // "Destroy each nonland permanent with mana value X" (Steel Hellkite): exactly X, the same way.
+    const xBound = m[2] === "x" && !opts.x ? opts.count?.("X") : undefined;
+    if (xBound) extra.bound = { key, at: m[3] === "greater" ? "least" : m[3] === "less" ? "most" : "exact", amount: xBound };
     else if (m[2] === "x" && !opts.x) return null;
     else if (m[2] === "x") extra.xRange = { key, at: m[3] === "greater" ? "least" : m[3] === "less" ? "most" : "exact" };
     else {

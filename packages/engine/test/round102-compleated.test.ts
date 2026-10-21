@@ -68,7 +68,6 @@ describe("round 102: compleated, Phyrexian mana, Valgavoth", () => {
     expect(abilitiesOf(s, s.objects[b]!).mana).toHaveLength(1);
     // −9 next turn: from 3 poison counters to 9.
     s.players[opp]!.poison = 3;
-    delete s.activatedThisTurn;
     for (const id of s.battlefield) s.objects[id]!.activatedThisTurn = undefined;
     s = run(s, planActivate(s, ap, v, 2, [{ kind: "player", id: opp }]));
     expect(s.players[opp]!.poison).toBe(9);

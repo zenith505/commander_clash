@@ -974,6 +974,23 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const host: TargetSpec = { kind: "object", types: ["Creature"], controller: "you", text: "creature you control" };
     return { ...t, body: { targets: [], effects: [{ type: "if", cond: { kind: "state", cond: { kind: "attachedIs", filter: host } }, effects: t.body.effects }, { type: "if", cond: { kind: "createdNone" }, effects: insect.effects }], text: line.replace(/^[^,]+, /, "") } };
   }
+  // Carpet of Flowers: "At the beginning of each of your main phases, if you haven't added mana with this ability this
+  // turn, you may add X mana of any one color, where X is the number of Islands target opponent controls." Not a mana
+  // ability (rulings; CR 605.1b: it has a target), so it uses the stack; X is counted as it resolves.
+  const carpet = /^At the beginning of each of your main phases, if you haven't added mana with this ability this turn, you may add X mana of any one color, where X is the number of (Islands|Swamps|Mountains|Forests|Plains) target opponent controls\.$/.exec(line);
+  if (carpet) {
+    const land = carpet[1] === "Plains" ? "Plains" : carpet[1]!.replace(/s$/, "");
+    const islands: TargetSpec = { kind: "object", types: ["Land"], subtypes: [land], text: land };
+    return {
+      event: "yourMain",
+      ifCond: { kind: "addedManaThisTurn", not: true },
+      body: {
+        targets: [{ kind: "player", opponent: true, text: "target opponent" }],
+        effects: [{ type: "may", effects: [{ type: "choose", choice: "color" }, { type: "addMana", chosen: 1, times: { count: { kind: "permanents", filter: islands, whose: { ref: "target", index: 0 } } }, markSource: true }], text: `add X mana of any one color, where X is the number of ${carpet[1]} target opponent controls` }],
+        text: line.replace(/^[^,]+, /, ""),
+      },
+    };
+  }
   // "When this Class becomes level 2, draw two cards" (CR 716.2a).
   const level = /^When ~ becomes level (\d+), (.+)$/.exec(line);
   if (level) {

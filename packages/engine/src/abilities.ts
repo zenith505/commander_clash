@@ -927,6 +927,8 @@ export interface StaticAbility {
  */
 export type StaticCondition =
   | { kind: "graveyardAtLeast"; n: number }
+  /** "If you haven't added mana with this ability this turn" (Carpet of Flowers): the source's addMana with `markSource` this turn. */
+  | { kind: "addedManaThisTurn"; not?: true }
   /** Krovikan Vampire: "if a creature dealt damage by ~ this turn died" (see TurnLog.diedDamaged). */
   | { kind: "damagedBySelfDied" }
   /** "If that creature was dealt excess damage this turn" (CR 120.10): the trigger's subject, as the object it was. */
@@ -1915,6 +1917,8 @@ export type Effect =
       only?: ManaSpend;
       /** "Add {B} or {G} for each ...": `times` mana, each of either color (chosen as it resolves). */
       split?: [ManaType, ManaType];
+      /** Remember that this ability's source added mana this turn (StaticCondition addedManaThisTurn). */
+      markSource?: true;
     }
   /** "Creatures without flying can't block this turn" (Falter): a rule for the turn, not locked to the creatures there now,
    * since it doesn't change characteristics (CR 611.2c; Magmatic Chasm rulings). */

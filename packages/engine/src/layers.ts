@@ -657,6 +657,11 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "opponentsDealtExcess":
       // As the permanent was when it was dealt the damage, wherever it is now (Rith rulings).
       return (s.turnLog?.excessDealt ?? []).some((e) => e.controller !== you && e.types.some((ty) => cond.types.includes(ty)));
+    case "addedManaThisTurn": {
+      const o = s.objects[sourceId];
+      const did = !!o?.triggeredThisTurn?.includes(`${sourceZc ?? o.zoneChanges ?? 0}|addedMana`);
+      return cond.not ? !did : did;
+    }
     case "subjectPutBySelf": {
       const by = subjectId !== undefined ? s.objects[subjectId]?.putBy : undefined;
       const put = !!by && by.id === sourceId && (s.objects[sourceId]?.zoneChanges ?? 0) === by.zc;

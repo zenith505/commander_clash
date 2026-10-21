@@ -523,7 +523,12 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // isn't airbent (CR 701.65a), the same as two sentences.
   // "Put a night counter on ~. Then if it has eight or more night counters on it, remove all of them and create ..."
   // (Replicating Ring): ~'s counters, checked as it resolves (rulings).
-  text = text.replace(/^([Pp]ut an? ([a-z]+) counter on ~\.) Then if it has ([a-z]+) or more \2 counters on it, remove all of them and /, (_, put: string, kind: string, n: string) => `${put} If there are ${n} or more ${kind} counters on ~, remove all ${kind} counters from ~ and `);
+  // The Scarab God: "each opponent loses X life and you scry X, where X is the number of Zombies you control": the same X
+  // for both, which losing life doesn't change, so two instructions each with it.
+  text = text.replace(/(^|\. )([Ee]ach opponent loses X life) and you (scry X|draw X cards), where X is ([^.]+)\./, (_, lead: string, a: string, b: string, x: string) => `${lead}${a}, where X is ${x}. ${b.charAt(0).toUpperCase()}${b.slice(1)}, where X is ${x}.`);
+  // Brass's Tunnel-Grinder: "Then if there are three or more bore counters on it, remove those counters and transform it."
+  text = text.replace(/^([Pp]ut an? ([a-z]+) counter on ~\.) Then if (?:it has|there are) ([a-z]+) or more \2 counters on it, remove (?:all of them|those counters) and /, (_, put: string, kind: string, n: string) => `${put} If there are ${n} or more ${kind} counters on ~, remove all ${kind} counters from ~ and `);
+  text = text.replace(/^([Pp]ut an? [a-z]+ counter on ~\. If there are [a-z]+ or more [a-z]+ counters on ~, remove all [a-z]+ counters from ~ and transform) it\.$/, "$1 ~.");
   text = text.replace(/^Choose (up to one target [a-z]+), then (airbend|exile|destroy) all other ([a-z]+)\./, (_, t: string, verb: string, what: string) => `Choose ${t}. ${verb.charAt(0).toUpperCase()}${verb.slice(1)} all other ${what}.`);
   // "Transform ~, then untap it" (Westvale Abbey): the same permanent, now its back face (CR 712.18).
   text = text.replace(/^Transform ~, then untap it\.$/, "Transform ~, then untap ~.");
@@ -655,6 +660,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // Descent into Avernus: "Then each player creates X Treasure tokens and ~ deals X damage to each player, where X is the
   // number of descent counters on ~": the same X for both, which nothing in between changes.
   text = text.replace(/(^|\. )Then each player creates X ([^.]+?) tokens and ~ deals X damage to each player, where X is ([^.]+)\./, "$1Then each player creates X $2 tokens, where X is $3. ~ deals X damage to each player, where X is $3.");
+  // Demonic Counsel: "search your library for any card, put it into your hand": one card, like "a card".
+  text = text.replace(/\b([Ss])earch your library for any card, /g, "$1earch your library for a card, ");
   // Gamble: "Search your library for a card, put that card into your hand, discard a card at random, then shuffle." The
   // discard comes before the shuffle, but the discarded card goes to the graveyard, so the order changes nothing that can
   // be seen: the search, then the discard (at random from the whole hand, the found card included).
@@ -1200,9 +1207,10 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const exTop = exEqual ? (["", "X"] as unknown as RegExpExecArray) : new RegExp(`^[Ee]xile the top (?:card|${NUMX} cards) of your library$`).exec(impulseIf && !impulseIf.not ? impulseIf.text : s);
     // "Exile the top card of that player's library. Until end of turn, you may cast that card." (Ragavan, after combat
     // damage to a player): that player's card, cast only (no land play, rulings), paying its costs.
-    const theirTop = !exTop && !impulseIf && ctx.eventPlayer && /^[Ee]xile the top card of that player's library$/.test(s) ? /^(?:Until end of turn, you may cast that card|You may cast that card this turn)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    const theirTop = !exTop && !impulseIf && ctx.eventPlayer && /^[Ee]xile the top card of that player's library$/.test(s) ? /^(?:Until end of turn, you may cast that card|You may cast that card this turn)( and you may spend mana as though it were mana of any color to cast that spell)?$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    // Grenzo, Havoc Raiser: "... and you may spend mana as though it were mana of any color to cast that spell" (CR 609.4b).
     if (theirTop) {
-      effects.push({ type: "impulse", n: 1, until: "thisTurn", who: { ref: "eventPlayer" }, castOnly: true });
+      effects.push({ type: "impulse", n: 1, until: "thisTurn", who: { ref: "eventPlayer" }, castOnly: true, ...(theirTop[1] ? { anyType: true as const } : {}) });
       ctx.exiledTop = true;
       si++;
       continue;
@@ -2070,6 +2078,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: fx });
       continue;
     }
+    // Parting Gust: "Exile target nontoken creature. If the gift wasn't promised, return that card to the battlefield under
+    // its owner's control with a +1/+1 counter on it at the beginning of the next end step": with the gift promised, an
+    // exile; without, a blink that comes back with a delayed trigger (CR 702.174j, 603.7).
+    const giftBack = ctx.spell ? /^If the gift wasn't promised, (return (?:it|that card) to the battlefield under its owner's control(?: with an? [^ ]+ counter on it)? at the beginning of the next end step)$/.exec(s) : null;
+    const giftExile = giftBack && effects[effects.length - 1];
+    if (giftBack && giftExile && giftExile.type === "exile" && giftExile.what.ref === "target" && !giftExile.until && !giftExile.linked) {
+      const sub = parseBody(`Exile target creature. ${giftBack[1]!.charAt(0).toUpperCase()}${giftBack[1]!.slice(1)}.`, { spell: true });
+      const blink = sub?.effects.length === 1 && sub.effects[0]!.type === "flicker" ? sub.effects[0] : null;
+      if (!blink || blink.type !== "flicker") return null;
+      effects[effects.length - 1] = { type: "if", cond: { kind: "gift" }, effects: [giftExile], otherwise: [{ ...blink, what: giftExile.what }] };
+      continue;
+    }
     const howCast = parseHowCast(s, ctx);
     // Once and Future's adamant, "instead return those cards to your hand and exile ~": done instead of all the spell's
     // instructions before it, so each target card goes to your hand whichever zone it was chosen for (CR 601.2c).
@@ -2091,7 +2111,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       continue;
     }
     // A spell's targets are chosen whatever was spent (Cankerous Thirst rulings), so they aren't gated.
-    if (howCast?.ungated && !howCast.not && !howCast.ofTarget && /^you may /i.test(howCast.text) && !/ instead$/.test(howCast.text)) {
+    if (howCast?.ungated && (howCast.cond.kind !== "castInMain" || /\btarget\b/.test(howCast.text)) && !howCast.not && !howCast.ofTarget && /^you may /i.test(howCast.text) && !/ instead$/.test(howCast.text)) {
       mayGate = { cond: howCast.cond, start: effects.length };
       s = `Y${howCast.text.slice(1)}`;
     } else if (howCast) {
@@ -2890,6 +2910,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // the rest on the bottom of your library in a random order." (Nissa, Leyline Tamer), "... into your hand ...", "...
     // a land card. Put that card onto the battlefield tapped ...". Onto the battlefield only cards that need no choice
     // as they enter there (not Auras, CR 303.4f).
+    // Open the Way: "... until you reveal X land cards. Put those land cards onto the battlefield tapped and the rest ...".
+    const untilX = /^[Rr]eveal cards from the top of your library until you reveal X land cards$/.test(s) && /^Put those land cards onto the battlefield tapped and the rest on the bottom of your library in a random order$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (untilX) {
+      effects.push({ type: "revealUntil", filter: { kind: "card", types: ["Land"], notTypes: [], notColors: [], text: "land card" }, found: "battlefield", rest: "bottom", tapped: true, n: { count: { kind: "x" } } });
+      si++;
+      continue;
+    }
     const until = /^[Rr]eveal cards from the top of your library until you reveal (?:an? )?(.+? card)$/.exec(s);
     const untilPut = /^Put that card (into your hand|onto the battlefield( tapped)?) and the rest on the bottom of your library in a random order$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
     if (until && untilPut && !/\b(?:named|chosen|that name)\b/.test(until[1]!)) {
@@ -3164,13 +3191,13 @@ export function parsePayCost(text: string): PayCost | null {
 }
 
 /** The ways a spell can have been cast that a sentence may depend on, as said in its text. */
-const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true; activatedOnly?: true; noTargets?: true }[] = [
+const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true; activatedOnly?: true; noTargets?: true; ungated?: true }[] = [
   { re: "~ was bargained", cond: { kind: "bargained" }, spellOnly: true },
   { re: "~ was cast from a graveyard", cond: { kind: "castFromGraveyard" }, spellOnly: true, noTargets: true },
   { re: "~ was cast from exile", cond: { kind: "castFromGraveyard", exile: true }, spellOnly: true, noTargets: true },
   { re: "~ was cast using teamwork", cond: { kind: "teamwork" }, spellOnly: true },
-  // Addendum (CR 207.2c). Not for targets: CastHow doesn't know when it's cast.
-  { re: "you cast ~ during your main phase", cond: { kind: "castInMain" }, spellOnly: true, noTargets: true },
+  // Addendum (CR 207.2c). Its targets are chosen whenever it's cast; they're only not acted on (Return to Dust rulings).
+  { re: "you cast ~ during your main phase", cond: { kind: "castInMain" }, spellOnly: true, ungated: true },
   // In a spell, or its permanent's enters trigger (compile checks it's one of those).
   { re: "evidence was collected", cond: { kind: "evidence" } },
   { re: "the gift was promised", cond: { kind: "gift" } },
@@ -3221,7 +3248,7 @@ function parseHowCast(s: string, ctx: Ctx): { cond: SpellCondition; not: boolean
     if (h.spellOnly && !ctx.spell) continue;
     if (h.activatedOnly && !ctx.activated) continue;
     const found = howCastText(s, h);
-    if (found) return { ...found, ...(h.noTargets ? { noTargets: true as const } : {}) };
+    if (found) return { ...found, ...(h.noTargets ? { noTargets: true as const } : {}), ...(h.ungated ? { ungated: true as const } : {}) };
   }
   return spentHowCast(s, ctx);
 }

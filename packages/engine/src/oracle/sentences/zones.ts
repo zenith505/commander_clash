@@ -254,10 +254,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     // as it resolves.
     const mvX = / with mana value X or less$/.exec(m[2]!);
     if (mvX && !ctx.spell && !ctx.activated && !ctx.whereX) return null;
-    const filter = parseSearchFilter(m[2]!.slice(0, mvX?.index).replace(/ and\/or /g, " or "));
+    // "Up to two creature cards with total mana value 4 or less" (Lively Dirge): the cards chosen together.
+    const total = !mvX ? / with total mana value (\d+) or less$/.exec(m[2]!) : null;
+    const filter = parseSearchFilter(m[2]!.slice(0, (mvX ?? total)?.index).replace(/ and\/or /g, " or "));
     const n = num(m[1]!.replace(/^up to /, "").replace(/^an?$/, "one"));
     if (filter === null || !Number.isInteger(n) || n < 1) return null;
-    return [{ type: "chooseFromGraveyard", n, dest: "battlefield", ...(filter ? { filter: mvX ? { ...filter, text: `${filter.text} with mana value X or less` } : filter } : {}), ...(mvX ? { mvMax: amt("X") } : {}), ...(/^up to /.test(m[1]!) ? { upTo: true as const } : {}), ...(m[3] ? { tapped: true as const } : {}), ...(m[4] ? { counters: { [counterKind(m[4])]: 1 } } : {}) }];
+    if (total && (!filter || n < 2)) return null;
+    return [{ type: "chooseFromGraveyard", n, dest: "battlefield", ...(total ? { totalMv: Number(total[1]) } : {}), ...(filter ? { filter: mvX ? { ...filter, text: `${filter.text} with mana value X or less` } : filter } : {}), ...(mvX ? { mvMax: amt("X") } : {}), ...(/^up to /.test(m[1]!) ? { upTo: true as const } : {}), ...(m[3] ? { tapped: true as const } : {}), ...(m[4] ? { counters: { [counterKind(m[4])]: 1 } } : {}) }];
   }
   // "Target player exiles a card from their graveyard" (Relic of Progenitus), "Exile a card from your graveyard"
   // (Decaying Soil): that player chooses as it resolves.

@@ -564,7 +564,10 @@ function sharedKeywords(s: GameState, pid: PlayerId, keywords: string[]): string
 export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx): Modification[] {
   const c = amountCtx(s, ctx);
   return mods.map((m) =>
-    m.kind === "modifyPT" || m.kind === "setPT"
+    // "Attacks this combat if able": the combat going on as it resolves.
+    m.kind === "attacksIfAble" && m.combat === "this"
+      ? { kind: "attacksIfAble", combat: s.combatsThisTurn ?? 0 }
+      : m.kind === "modifyPT" || m.kind === "setPT"
       ? { ...m, power: evalAmount(s, m.power, c), toughness: evalAmount(s, m.toughness, c) }
       : // Odric, Lunarch Marshal: the keywords creatures its controller controls have now (CR 611.2c), variants included.
         m.kind === "addKeywords" && m.sharedAmongYours

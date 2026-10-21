@@ -281,6 +281,8 @@ export interface TargetSpec {
   allTypes?: string[];
   /** "Double-faced card" (CR 712.1): a nonmodal or modal double-faced card or a meld card, whichever face is up. */
   doubleFaced?: true;
+  /** "An artifact card with a mana ability" (Moonsilver Key): an activated or triggered one (CR 605.1). */
+  manaAbility?: true;
   /** "Transformed permanent" (CR 701.27g): a nonmodal double-faced permanent with its back face up, not melded or merged. */
   transformed?: true;
   /** "Each with power greater than its base power" (Kutzil): see basePowerNow. */
@@ -841,7 +843,9 @@ export type Modification =
   /** "Untap ~ during each other player's untap step" (CR 502.3). */
   | { kind: "untapsDuringOthers" }
   | { kind: "blocksOnlyFlyers" } // "can block only creatures with flying" (a blocking restriction, CR 509.1b)
-  | { kind: "attacksIfAble" } // "attacks each combat if able" (an attack requirement, CR 508.1d)
+  /** "Attacks each combat if able" (an attack requirement, CR 508.1d). `combat`: "attacks this combat if able" (Legion
+   * Warboss), only in that combat of the turn (`GameState.combatsThisTurn`); "this" until it resolves. */
+  | { kind: "attacksIfAble"; combat?: number | "this" }
   /**
    * Goaded by the effect's controller (CR 701.15b): it attacks each combat if able, and a player other than them if able.
    * `notGoaded`: the same requirements without goading it (Kardur, Doomscourge; Maximum Carnage rulings).
@@ -1456,7 +1460,7 @@ export type Effect =
    * "Return a creature card from your graveyard to your hand", "you may return up to two instant and/or sorcery cards
    * ...": not targeted, so the cards are chosen as it resolves (CR 608.2c), as many as there are up to `n` unless `upTo`.
    */
-  | { type: "chooseFromGraveyard"; filter?: TargetSpec; n: number; upTo?: true; /** "Mill three cards. You may put a land card from among them into your hand." (Six): only the cards the mill just before put there. */ milled?: true; /** "Return any number of cards with different mana values" (Seasons Past): no limit but one card per mana value; `n` is ignored. */ distinctManaValues?: true; /** "Any number of permanent cards with different names" (Eerie Ultimatum): at most one card of each name. */ oneEach?: true; /** Exiled instead ("Target player exiles a card from their graveyard"), put onto the battlefield under your control, or on top of your library. */ dest?: "exile" | "battlefield" | "libraryTop"; tapped?: true; counters?: Record<string, number>; /** "With a number of +1/+1 counters on it equal to that result" (Grave Endeavor): how many of the one kind in `counters`, as it resolves. */ countersN?: Amount; /** "With mana value X or less", X worked out as it resolves (Blood on the Snow). */ mvMax?: Amount; /** Whose graveyard, and who chooses: yours if left out. */ who?: PlayerRef; /** "For each player, choose a creature or planeswalker card in that player's graveyard. Put those cards onto the battlefield under your control." (Breach the Multiverse): with `who` each player, you choose one card in each of their graveyards and they all enter under your control. */ youChoose?: true }
+  | { type: "chooseFromGraveyard"; filter?: TargetSpec; n: number; upTo?: true; /** "With total mana value 4 or less" (Lively Dirge): of all the cards chosen. */ totalMv?: number; /** "Mill three cards. You may put a land card from among them into your hand." (Six): only the cards the mill just before put there. */ milled?: true; /** "Return any number of cards with different mana values" (Seasons Past): no limit but one card per mana value; `n` is ignored. */ distinctManaValues?: true; /** "Any number of permanent cards with different names" (Eerie Ultimatum): at most one card of each name. */ oneEach?: true; /** Exiled instead ("Target player exiles a card from their graveyard"), put onto the battlefield under your control, or on top of your library. */ dest?: "exile" | "battlefield" | "libraryTop"; tapped?: true; counters?: Record<string, number>; /** "With a number of +1/+1 counters on it equal to that result" (Grave Endeavor): how many of the one kind in `counters`, as it resolves. */ countersN?: Amount; /** "With mana value X or less", X worked out as it resolves (Blood on the Snow). */ mvMax?: Amount; /** Whose graveyard, and who chooses: yours if left out. */ who?: PlayerRef; /** "For each player, choose a creature or planeswalker card in that player's graveyard. Put those cards onto the battlefield under your control." (Breach the Multiverse): with `who` each player, you choose one card in each of their graveyards and they all enter under your control. */ youChoose?: true }
   /** "Reorder your graveyard as you choose" (Fossil Find), "at random" (Search for Survivors). */
   | { type: "reorderGraveyard"; random?: true }
   | {
@@ -1674,7 +1678,7 @@ export type Effect =
   /** "Exile the top two cards of your library. Until the end of your next turn, you may play those cards." */
   /** `who`: "the top card of that player's library" (Ragavan), not yours; `castOnly`: "you may cast that card", not play it. */
   /** `free`: "you may play that card without paying its mana cost" (Urza, Lord High Artificer, CR 118.9). */
-  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" | "yourNextEndStep"; who?: PlayerRef; castOnly?: true; free?: true; /** The cards are "exiled with ~" for its other abilities (CR 607.2a). */ linked?: true }
+  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" | "yourNextEndStep"; who?: PlayerRef; castOnly?: true; free?: true; /** "And you may spend mana as though it were mana of any color to cast that spell" (Grenzo, CR 609.4b). */ anyType?: true; /** The cards are "exiled with ~" for its other abilities (CR 607.2a). */ linked?: true }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
   /** "Remove a +1/+1 counter from it", "remove all -1/-1 counters from ~" (CR 122.8): as many as it has, at most. */
   /**
@@ -1747,7 +1751,7 @@ export type Effect =
    */
   /** "Each opponent reveals cards from the top of their library until they reveal a land card, then puts those cards into their graveyard" (Consuming Aberration). */
   | { type: "revealUntilLandToGraveyard"; who: PlayerRef }
-  | { type: "revealUntil"; filter: TargetSpec; found: "hand" | "battlefield"; tapped?: true; rest: "exile" | "bottom"; lifePerRest?: true }
+  | { type: "revealUntil"; filter: TargetSpec; found: "hand" | "battlefield"; tapped?: true; rest: "exile" | "bottom"; lifePerRest?: true; /** "Until you reveal X land cards" (Open the Way): that many, all put there together. */ n?: Amount }
   /**
    * "Exile cards from the top of your library until you exile a nonland card", or "reveal ... until you reveal a nonland
    * card" (then that card is exiled and the rest go on the bottom in a random order, or all of them go into your hand):
@@ -2861,7 +2865,7 @@ export interface TriggeredAbility {
   /** `orCopy`: magecraft's "whenever you cast or copy" also triggers on a copy put on the stack. */
   /** `nth`: "whenever you cast your second spell each turn", counting the spells that player cast this turn (copies aren't cast). */
   /** `enchanted`: the player this Aura is attached to ("Whenever enchanted player casts a spell"). */
-  cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; nth?: number; /** `nth` counts only its caster's spells this turn that match `spell` ("their first noncreature spell each turn"). */ nthOfKind?: true; /** "If mana from a Treasure was spent to cast it" (CR 106.3, 603.4). */ treasure?: true; /** "If at least four mana was spent to cast it", "if no mana was spent to cast it" (CR 603.4). */ spent?: SpentReq; /** Vazi: "casts a spell or activates an ability", any ability (mana abilities too), with `treasure`. */ orActivates?: true; /** "A spell that targets a creature you control", "... that targets an opponent or a creature an opponent controls": one of its targets as it was cast is one of these (rulings: it triggers once however many do). "You" and "you control" are this ability's controller. */ targets?: (TargetSpec | "you")[]; /** "From exile", "from anywhere other than your hand", "from your graveyard" (its caster's), "from a graveyard": the zone it was cast from (CR 601.2a). */ from?: "hand" | "notHand" | "exile" | "graveyard" | "ownGraveyard" | "ownLibrary"; /** "A spell that shares a creature type with ~" (Folk Hero). */ sharesTypeWithSelf?: true; /** "A spell that has convoke", "a creature spell with flying". */ keyword?: string };
+  cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; nth?: number; /** `nth` counts only its caster's spells this turn that match `spell` ("their first noncreature spell each turn"). */ nthOfKind?: true; /** "If mana from a Treasure was spent to cast it" (CR 106.3, 603.4). */ treasure?: true; /** "If at least four mana was spent to cast it", "if no mana was spent to cast it" (CR 603.4). */ spent?: SpentReq; /** Vazi: "casts a spell or activates an ability", any ability (mana abilities too), with `treasure`. */ orActivates?: true; /** "A spell that targets a creature you control", "... that targets an opponent or a creature an opponent controls": one of its targets as it was cast is one of these (rulings: it triggers once however many do). "You" and "you control" are this ability's controller. */ targets?: (TargetSpec | "you")[]; /** "From exile", "from anywhere other than your hand", "from your graveyard" (its caster's), "from a graveyard": the zone it was cast from (CR 601.2a). */ from?: "hand" | "notHand" | "exile" | "graveyard" | "ownGraveyard" | "ownLibrary"; /** "A spell that shares a creature type with ~" (Folk Hero). */ sharesTypeWithSelf?: true; /** "A spell that has convoke", "a creature spell with flying". */ keyword?: string; /** "Using mana produced by Tecutlan": some of the mana spent to cast it came from this permanent (CR 601.2h). */ manaFromSelf?: true };
   /** An intervening "if" (CR 603.4): "When ~ enters, if you attacked this turn, ...". Checked as it triggers and as it resolves. */
   ifCond?: StaticCondition;
   /**
@@ -2885,7 +2889,7 @@ export interface TriggeredAbility {
    * source had to be as it was activated, a permanent on the battlefield ("an ability of an artifact, creature, or land").
    * "That player" is who activated it.
    */
-  activates?: { by: "opponent" | "any" | "you"; of?: TargetSpec };
+  activates?: { by: "opponent" | "any" | "you"; of?: TargetSpec; /** "Whenever an ability of equipped creature is activated" (Illusionist's Bracers): its source is the creature this is attached to, still there after its costs are paid (rulings). */ equipped?: true };
   /**
    * For "playerDiscards": who discards, `cycled` for "cycles a card" (only a card discarded to pay a cycling cost,
    * CR 702.29c), `other` for "another card", `filter` for "a creature card". "Cycle or discard" is just "discard"
@@ -2940,6 +2944,8 @@ export interface TriggeredAbility {
   sacrifices?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; by?: "any" | "opponent" };
   /** Persist/undying's "if it had no -1/-1 counters on it" (an intervening if, CR 603.4), from last known information; "any": "if it had no counters on it" (Unstoppable Slasher). */
   ifNoCounter?: "+1/+1" | "-1/-1" | "any";
+  /** "When ~ dies, if it's not a token" (Vaultborn Tyrant): as it last existed (CR 603.4, 603.10a). */
+  ifNotToken?: true;
   /** For "selfToGraveyard": "is put into your graveyard", so only if its controller owns it (rulings on Enigma Sphinx). */
   ownGraveyard?: true;
   /**
@@ -3135,6 +3141,8 @@ export interface ActivatedAbility {
   energyCost?: number;
   /** "Exile this card from your graveyard" is part of the cost: scavenge (CR 702.97a); on the battlefield, "Exile ~" (Relic of Progenitus). */
   exileSelf?: boolean;
+  /** "Return ~ to its owner's hand" is part of the cost (Shigeki, Jukai Visionary; CR 602.2b). */
+  returnSelf?: true;
   /** "Sacrifice a creature", "Discard a card" as part of the cost (CR 602.2b, 601.2h). */
   costs?: AdditionalCost[];
   /** "Remove three spore counters from ~" as part of the cost (CR 602.2b). */
@@ -3364,6 +3372,8 @@ export interface CostMod {
   times?: AmountExpr;
   /** "Cost {W}{U}{B}{R}{G} less to cast. This effect reduces only the amount of colored mana you pay" (Morophon): `n` is 0. */
   colored?: Color[];
+  /** The Defilers: only if the caster chose to pay this much life for it as an additional cost (CostChoices.lifeFor). */
+  payLife?: number;
   text: string;
 }
 
@@ -3403,6 +3413,8 @@ export type AdditionalCost =
       mvX?: true;
       /** "Put a card from your hand on top of your library" (Penance, Leashling): moved there instead of exiled. */
       toLibrary?: true;
+      /** "You may exile any number of blue cards from your hand" (the Marches): none or more, `n` unused. */
+      anyNumber?: true;
     }
   /** "Reveal your hand" (Land Grant): all of it, whatever is in it (rulings: even if it's revealed already). */
   | { kind: "revealHand" }
@@ -4145,6 +4157,10 @@ export interface CompiledCard {
   evidence?: number;
   /** "This spell costs {2} less to cast if evidence was collected." */
   evidenceReduction?: number;
+  /** Open the Way: "X can't be greater than the number of players in the game." */
+  xMaxPlayers?: true;
+  /** The Marches: "~ costs {2} less to cast for each card exiled this way" (its optional exileFromHand cost, CR 601.2f). */
+  exiledReduction?: number;
   /** "You may collect evidence N rather than pay the mana cost for spells you cast" (Conspiracy Unraveler, CR 118.9). */
   payEvidence?: number;
   /** Teamwork N: as an additional cost, you may tap any number of creatures you control with total power N or more. */

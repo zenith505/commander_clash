@@ -51,6 +51,7 @@ import {
   copyTargetQuality,
   stackItemQuality,
   castHow,
+  lifeCostOffers,
   isSummoningSick,
   legalActions,
   manaAbilitiesOn,
@@ -323,6 +324,8 @@ type CastDraft = {
   returnToHand?: string[];
   /** Cards exiled from your hand for Force of Will's alternative cost. */
   exileFromHand?: string[];
+  /** The Defilers whose "you may pay 2 life" this spell pays. */
+  lifeFor?: string[];
   /** Untapped creatures tapped for Lashknife's alternative cost. */
   tap?: string[];
   /** Cast from your graveyard this way (flashback, escape, ...). */
@@ -386,7 +389,7 @@ type KickPick = { draft: CastDraft; label: string; costs: string[]; multi: boole
 
 /** Choosing what pays an additional cost: permanents to sacrifice, cards to discard or to exile from your graveyard. */
 type CostPick = ({ draft: CastDraft; activate?: undefined; mana?: undefined } | { activate: ActivateDraft; draft?: undefined; mana?: undefined } | { mana: { objectId: string; ability: number; mana: ManaType; extra?: ManaType[] }; draft?: undefined; activate?: undefined }) & {
-  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "bargain" | "tap" | "reveal" | "conspire" | "exileFromHand" | "splice";
+  kind: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "casualty" | "bargain" | "tap" | "reveal" | "conspire" | "exileFromHand" | "splice" | "lifeFor";
   label: string;
   /** "Any number of": fewer than `n` are fine, down to this many (splice). */
   min?: number;
@@ -768,7 +771,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const card = cardOf(s, d.objectId);
     const compiled = compileCard(card);
     const free = freeCastOf(s, HUMAN) === d.objectId;
-    const how = { ...(d.face !== undefined ? { face: d.face } : {}), ...(d.via ? { via: d.via } : {}), ...(d.buyback ? { buyback: true } : {}), ...(d.splice?.length ? { splice: d.splice } : {}), ...(d.alt ? { alt: d.alt } : {}), ...(d.costOr !== undefined ? { costOr: d.costOr } : {}), ...(d.teamwork?.length ? { teamwork: d.teamwork } : {}), ...(d.harmonize ? { harmonize: d.harmonize } : {}), ...(d.permit ? { permit: d.permit } : {}) };
+    const how = { ...(d.face !== undefined ? { face: d.face } : {}), ...(d.via ? { via: d.via } : {}), ...(d.buyback ? { buyback: true } : {}), ...(d.splice?.length ? { splice: d.splice } : {}), ...(d.alt ? { alt: d.alt } : {}), ...(d.costOr !== undefined ? { costOr: d.costOr } : {}), ...(d.teamwork?.length ? { teamwork: d.teamwork } : {}), ...(d.harmonize ? { harmonize: d.harmonize } : {}), ...(d.permit ? { permit: d.permit } : {}), ...(d.exileFromHand?.length && compiled.exiledReduction ? { exileFromHand: d.exileFromHand } : {}), ...(d.lifeFor?.length ? { lifeFor: d.lifeFor } : {}) };
     const kicks = { ...how, ...(d.kicks?.length ? { kicks: d.kicks } : {}) };
     // Harmonize: which creature to tap is chosen as the cost is (CR 702.180b), first of all.
     if (d.via === "harmonize" && d.harmonize === undefined) {
@@ -793,6 +796,18 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (d.gift === undefined && compiled.gift && opps.length) return setGiftPick({ draft: d, label: card.name, what: compiled.gift.what, options: opps });
     // Cast without paying its mana cost, X is 0 (CR 107.3b); not so for "pay X life" and the like, an X in an
     // additional cost (Toxic Deluge's rulings).
+    // The Marches: "you may exile any number of blue cards from your hand", each one {2} off (CR 601.2b, 601.2f). Asked
+    // before X, so the X offered counts the reduction.
+    const anyExile = compiled.additionalCosts?.find((c) => c.kind === "exileFromHand" && c.anyNumber);
+    if (d.exileFromHand === undefined && anyExile?.kind === "exileFromHand") {
+      const candidates = s.players[HUMAN]!.hand.filter((id) => id !== d.objectId && (!anyExile.filter || printedMatches(anyExile.filter, cardOf(s, id))));
+      if (candidates.length)
+        return setCostPick({ draft: d, kind: "exileFromHand", label: card.name, what: `you may exile any number of ${anyExile.filter?.text ?? "card"}s from your hand, each making it {${compiled.exiledReduction ?? 0}} cheaper`, n: candidates.length, min: 0, candidates, chosen: [] });
+    }
+    // The Defilers: "you may pay 2 life" for each one that applies, each taking a colored mana off (CR 601.2b, 601.2f).
+    const lifeOffers = d.lifeFor === undefined ? lifeCostOffers(s, HUMAN, d.objectId, d.x ?? 0) : [];
+    if (lifeOffers.length)
+      return setCostPick({ draft: d, kind: "lifeFor", label: card.name, what: `you may pay ${lifeOffers[0]!.life} life for each to make it cost one colored mana less`, n: lifeOffers.length, min: 0, candidates: lifeOffers.map((l) => l.id), chosen: [] });
     const costX = costsHaveX(card, d);
     // An alternative cost with X in it: overloaded Street Spasm's {X}{X}{R}{R} (CR 107.3a).
     const altMana = d.alt ? altCost(card, d.alt)?.mana : undefined;
@@ -898,6 +913,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       ...(d.returnToHand?.length ? { returnToHand: d.returnToHand } : {}),
       ...(d.reveal?.length ? { reveal: d.reveal } : {}),
       ...(d.exileFromHand?.length ? { exileFromHand: d.exileFromHand } : {}),
+      ...(d.lifeFor?.length ? { lifeFor: d.lifeFor } : {}),
       ...(d.tap?.length ? { tap: d.tap } : {}),
       ...(d.delve?.length ? { delve: d.delve } : {}),
     };
@@ -3421,7 +3437,8 @@ function LibrarySearch({
   const mvOf = (id: string) => manaValue(parseManaCost(cardOf(s, id).manaCost));
   // "Basic land cards that share a land type" (Myriad Landscape): a card joins only ones it shares a land type with.
   // "A Forest card and a Plains card" (Krosan Verge): a card joins only if each found card can still be a different one.
-  const clashes = (id: string) => (!!pending.distinctManaValues && found.some((f) => mvOf(f) === mvOf(id))) || (!!pending.shareLandType && !shareLandType([...found, id].map((x) => cardOf(s, x)))) || (!!pending.oneOfEach && !oneOfEachFits(pending.oneOfEach, [...found, id].map((x) => cardOf(s, x))));
+  // "With total mana value 4 or less" (Lively Dirge): a card joins only if the total stays within it.
+  const clashes = (id: string) => (pending.totalMv !== undefined && [...found, id].reduce((n, x) => n + mvOf(x), 0) > pending.totalMv) || (!!pending.distinctManaValues && found.some((f) => mvOf(f) === mvOf(id))) || (!!pending.shareLandType && !shareLandType([...found, id].map((x) => cardOf(s, x)))) || (!!pending.oneOfEach && !oneOfEachFits(pending.oneOfEach, [...found, id].map((x) => cardOf(s, x))));
   const add = (ids: string[]) => {
     const next = ids.find((id) => !found.includes(id) && !clashes(id));
     if (next && found.length < pending.max) setFound([...found, next]);
@@ -3472,6 +3489,8 @@ function LibrarySearch({
                 ? `Revealing ${found.length}.`
                 : pending.bottom
                 ? `Chosen ${found.length}; the first goes lowest.`
+                : pending.totalMv !== undefined
+                  ? `Chosen ${found.length} of ${pending.max}, total mana value ${found.reduce((n, x) => n + mvOf(x), 0)} of at most ${pending.totalMv}.`
                 : pending.distinctManaValues
                   ? `Chosen ${found.length}. Each must have a different mana value.`
                   : pending.shareLandType
@@ -3532,7 +3551,7 @@ function LibrarySearch({
               const d = cardOf(s, ids[0]!);
               const can = left > 0 && found.length < pending.max && !clashes(ids[0]!);
               return (
-                <div key={name} className={`card big ${can ? "targetable" : "dim"}`} data-pick={ids[0]} onClick={() => can && add(ids)} {...hoverProps(d, onHover)} title={left > 0 && clashes(ids[0]!) ? (pending.oneOfEach ? "You already found a card of this kind" : pending.shareLandType ? "It doesn't share a land type with the cards you chose" : "You already chose a card with this mana value") : undefined}>
+                <div key={name} className={`card big ${can ? "targetable" : "dim"}`} data-pick={ids[0]} onClick={() => can && add(ids)} {...hoverProps(d, onHover)} title={left > 0 && clashes(ids[0]!) ? (pending.oneOfEach ? "You already found a card of this kind" : pending.shareLandType ? "It doesn't share a land type with the cards you chose" : pending.totalMv !== undefined ? "The total mana value would be too high" : "You already chose a card with this mana value") : undefined}>
                   <CardFace d={d} />
                   {ids.length > 1 && <span className="zone-count">×{left}</span>}
                   {zones && <span className="muted small" data-zone={name}>in {name}</span>}

@@ -2345,6 +2345,8 @@ function beginStep(s: GameState, step: Step): void {
       break;
     case "beginCombat":
       s.combatsThisTurn = (s.combatsThisTurn ?? 0) + 1;
+      // "Attacks this combat if able" holds in one combat only.
+      invalidateCharacteristics(s);
       fireEvent(s, { type: "step", step: "beginCombat", active: ap });
       break;
     case "endCombat":
@@ -2966,7 +2968,9 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     moveObject(s, id, "graveyard", { sacrificed: true });
   }
   const spentTrigger = ab.spentTrigger && { sourceId: o.id, sourceCardId: cardIdOf(o), sourceZc: o.zoneChanges ?? 0, body: ab.spentTrigger.body, sharesCommanderType: true as const };
-  addMana(s, p.id, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}) });
+  // "Whenever you cast a permanent spell using mana produced by Tecutlan": its mana is kept apart, to tell.
+  const source = abilitiesOf(s, o).triggers.some((t) => t.cast?.manaFromSelf) ? `${o.id}#${o.zoneChanges ?? 0}` : undefined;
+  addMana(s, p.id, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(source ? { source } : {}) });
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
   addTriggeredMana(s, p.id, picked);
   if (ab.skipNextUntap && o.zone === "battlefield") o.skipNextUntap = true;
@@ -3226,6 +3230,8 @@ export function castProblem(
   if (fromExile?.free && !choices?.alt && x && manaX) return "X is 0 when a spell is cast without paying its mana cost";
   if (fromExile?.cost && !parseManaCost(fromExile.cost).hasX && x && manaX) return "X is 0 unless the cost you pay has {X}"; // airbend's {2} (CR 107.3b)
   if (madness && x && manaX && !parseManaCost(madness).hasX) return "X is 0 unless the cost you pay has {X}";
+  // Open the Way: "X can't be greater than the number of players in the game" (a player who left isn't, CR 800.4a).
+  if (compileCard(d).xMaxPlayers && (x ?? 0) > livingPlayers(s).length) return "X can't be greater than the number of players in the game";
   const kp = kickProblem(d, choices?.kicks);
   if (kp) return kp;
   const or = compileCard(d).costOr;
@@ -3283,7 +3289,7 @@ function faceProblem(s: GameState, pid: PlayerId, o: GameObject, choices: CostCh
  * The total cost of casting this card (CR 601.2f): its mana cost, plus commander tax (CR 903.8) as
  * extra generic mana, minus cost reductions like affinity (CR 702.41a), which only reduce generic mana.
  */
-export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "face" | "costOr" | "sacrifice" | "bargain" | "evidence" | "splice" | "harmonize"> & { targets?: TargetChoice[]; modes?: number[] } = {}): { cost: ParsedCost; extra: number } {
+export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kicks: number[] = [], how: Pick<CostChoices, "via" | "buyback" | "alt" | "faceDown" | "face" | "costOr" | "sacrifice" | "bargain" | "evidence" | "splice" | "harmonize" | "exileFromHand" | "lifeFor"> & { targets?: TargetChoice[]; modes?: number[] } = {}): { cost: ParsedCost; extra: number } {
   how = convertChoices(o, how);
   // As the face cast, only that face's mana cost (CR 709.3a, 712.11c, 715.3a).
   if (how.face !== undefined && o.face !== how.face) return asFace(s, o, how.face, () => spellCost(s, pid, o, x, kicks, how));
@@ -3302,13 +3308,15 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const kickCost = kicks.map((i) => kicker?.costs[i] ?? "").join("") + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "") + entwine + strive + escalate + spliceMana(s, how.splice);
   // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast: a bestowed creature card is
   // an Aura spell (CR 702.103b, Hero of Iroas rulings).
-  const mods = costModsFor(s, pid, o, how.alt === "bestow" && !o.bestowed && !how.faceDown ? bestowedDef(d) : d, x);
+  const mods = costModsFor(s, pid, o, how.alt === "bestow" && !o.bestowed && !how.faceDown ? bestowedDef(d) : d, x, how.lifeFor);
   // Colored reductions (Morophon) after the costs are added up, on any of their colored mana (CR 601.2f, rulings).
   const lessColored = (c: ParsedCost) => reduceColored(c, mods.lessColored);
   // "~ costs {2} less to cast if it's bargained" (a cost reduction, CR 601.2f).
   if (how.bargain && !how.faceDown) mods.less += compileCard(d).bargainReduction ?? 0;
   // "This spell costs {2} less to cast if evidence was collected" (CR 601.2f).
   if (how.evidence && !how.faceDown) mods.less += compileCard(d).evidenceReduction ?? 0;
+  // The Marches: "~ costs {2} less to cast for each card exiled this way" (CR 601.2f).
+  if (how.exileFromHand?.length && !how.faceDown) mods.less += (compileCard(d).exiledReduction ?? 0) * how.exileFromHand.length;
   // "Spells your opponents cast that target ~ cost {2} more": each such permanent once, however often it's targeted.
   for (const id of new Set((how.targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])))) {
     const t = s.objects[id];
@@ -3361,9 +3369,10 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
  * spells you cast cost {1} less", "Noncreature spells cost {1} more" (CR 601.2f). The spell is checked
  * as it will be on the stack, X included in its mana value (CR 202.3e).
  */
-function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: number): { more: number; less: number; lessColored: Color[] } {
+function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: number, lifeFor?: ObjectId[]): { more: number; less: number; lessColored: Color[]; lifeOffers: { id: ObjectId; life: number }[] } {
   let [more, less] = [0, 0];
   const lessColored: Color[] = [];
+  const lifeOffers: { id: ObjectId; life: number }[] = [];
   const mv = defMv(d) + x * xCount(parseManaCost(d.manaCost));
   // Emblems' too, which work in the command zone (CR 114.4).
   for (const src of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)]) {
@@ -3388,6 +3397,11 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
       }
       // "The first creature spell you cast each turn": the creature spells you cast earlier this turn count, even before this permanent was on the battlefield (rulings).
       if (m.nth && (s.castThisTurn ?? []).filter((c) => c.player === pid && printedMatches(rest, s.cards[c.card]!)).length !== m.nth - 1) continue;
+      // The Defilers: offered as an additional cost, and only then a reduction.
+      if (m.payLife) {
+        if (!lifeOffers.some((l) => l.id === src.id)) lifeOffers.push({ id: src.id, life: m.payLife });
+        if (!lifeFor?.includes(src.id)) continue;
+      }
       if (m.colored) {
         lessColored.push(...m.colored);
         continue;
@@ -3406,7 +3420,16 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
     if (m.n > 0) more += m.n;
     else less -= m.n;
   }
-  return { more, less, lessColored };
+  return { more, less, lessColored, lifeOffers };
+}
+
+/**
+ * The Defilers: the permanents whose "As an additional cost to cast green permanent spells, you may pay 2 life" applies
+ * to casting this card (CR 601.2b), and how much life each asks.
+ */
+export function lifeCostOffers(s: GameState, pid: PlayerId, id: ObjectId, x = 0): { id: ObjectId; life: number }[] {
+  const o = obj(s, id);
+  return costModsFor(s, pid, o, defOf(s, o), x).lifeOffers;
 }
 
 /**
@@ -3888,7 +3911,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // A copy of a prepare spell: its permanent stops being prepared as it becomes cast (CR 722.3c, 601.2i).
   if (o.preparedFrom) unprepareFor(s, o);
   // Once it's cast, "whenever you cast" and "becomes the target" abilities trigger (CR 601.2i).
-  fireEvent(s, { type: "cast", stackId, controller: p.id, card: d, manaSpent, ...(paid.treasure ? { treasureSpent: paid.treasure } : {}), ...(o.spent ? { spent: o.spent } : {}) });
+  fireEvent(s, { type: "cast", stackId, controller: p.id, card: d, manaSpent, ...(paid.treasure ? { treasureSpent: paid.treasure } : {}), ...(o.spent ? { spent: o.spent } : {}), ...(paid.sources ? { manaSources: paid.sources } : {}) });
   fireEvent(s, { type: "targeted", stackId });
 }
 
@@ -4281,11 +4304,17 @@ function casualtyProblem(s: GameState, pid: PlayerId, d: CardDef, choices?: Cost
 /** Can these additional costs be paid (CR 601.2b, 601.2f-h)? Without choices, just whether they could be. */
 function additionalCostProblem(s: GameState, pid: PlayerId, o: GameObject, choices?: CostChoices, x = 0, modes?: number[], targets?: TargetChoice[]): string | null {
   const d = defOf(s, o);
+  // The Defilers: each permanent's life once, and only one whose offer applies to this spell.
+  const lifeFor = choices?.lifeFor ?? [];
+  if (lifeFor.length) {
+    const offers = costModsFor(s, pid, o, d, x).lifeOffers;
+    if (new Set(lifeFor).size !== lifeFor.length || lifeFor.some((id) => !offers.some((l) => l.id === id))) return `${d.name} can't pay life for that`;
+  }
   return extraCostProblem(s, pid, o, castExtraCosts(d, { ...choices, objectId: o.id, ...(modes ? { modes } : {}), ...(targets ? { targets } : {}) }, x, s, pid), choices, `cast ${d.name}`);
 }
 
 /** The costs beyond mana of casting it this way: additional costs, and those of a graveyard or alternative cost (CR 601.2f-h). */
-export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr" | "buyback" | "permit"> & { modes?: number[]; targets?: TargetChoice[]; /** The card being cast, for the once-each-turn permission it would use. */ objectId?: ObjectId }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
+export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr" | "buyback" | "permit" | "lifeFor"> & { modes?: number[]; targets?: TargetChoice[]; /** The card being cast, for the once-each-turn permission it would use. */ objectId?: ObjectId }, x = 0, s?: GameState, pid?: PlayerId): AdditionalCost[] {
   const or = choices?.costOr === undefined ? undefined : compileCard(d).costOr?.[choices.costOr]?.cost;
   // "Escalate—Discard a card": that cost once for each mode beyond the first (CR 702.120a).
   const esc = compileCard(d).spell?.modal?.escalate?.cost;
@@ -4300,7 +4329,9 @@ export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "
       if (t?.zone === "battlefield" && controllerOf(s, t) !== pid) lifeTax += abilitiesOf(s, t).targetLifeTax ?? 0;
     }
   const permit = s && choices?.via === "turnPermission" ? castPermit(s, choices.objectId, d, x, choices.permit) : undefined;
-  const costs = [...(compileCard(d).additionalCosts ?? []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : [])];
+  // The Defilers: the life chosen to pay for each one (CR 601.2b); castProblem checks each one applies.
+  const defilerLife = s ? (choices?.lifeFor ?? []).reduce((n, id) => n + Math.max(0, ...((s.objects[id] && s.objects[id]!.zone === "battlefield" ? abilitiesOf(s, s.objects[id]!).costMods : undefined) ?? []).map((m) => m.payLife ?? 0)), 0) : 0;
+  const costs = [...(compileCard(d).additionalCosts ?? []), ...(or ? [or] : []), ...(graveyardCast(d, choices?.via)?.costs ?? []), ...(permit ? permitCosts(s!, permit) : []), ...(altCost(d, choices?.alt, s, pid)?.costs ?? []), ...escalate, ...(choices?.buyback ? (compileCard(d).buybackCosts ?? []) : []), ...(lifeTax ? [{ kind: "payLife" as const, n: lifeTax }] : []), ...(defilerLife ? [{ kind: "payLife" as const, n: defilerLife }] : [])];
   // "Pay X life", "sacrifice X creatures": as many as the X announced (CR 107.3a); the Shoals' "a red card with mana value
   // X", that mana value.
   return costs.map((c) =>
@@ -4444,6 +4475,11 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     const oneOf = c.kind === "discard" ? c.oneOf : undefined;
     const fits = (id: ObjectId) => !oneOf || printedMatches(oneOf, defOf(s, obj(s, id)));
     const full = oneOf ? `${/^[aeiou]/i.test(oneOf.text) ? "an" : "a"} ${oneOf.text} and ${c.n === 2 ? "another card" : `${c.n - 1} other cards`}` : what;
+    // "You may exile any number of blue cards from your hand": none is fine.
+    if (c.kind === "exileFromHand" && c.anyNumber) {
+      if (chosen && (new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id)))) return `choose ${c.filter?.text ?? "card"}s in your hand to exile`;
+      continue;
+    }
     if (!chosen) {
       if (c.n > 0 && (pool.length < c.n || !pool.some(fits))) return `you need to ${verb} ${full} to ${doing}`;
       continue;
@@ -4579,6 +4615,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       for (const id of [...ids].reverse()) moveObject(s, id, "library", { top: true });
     } else if (c.kind === "exileFromHand") {
       const ids = choices.exileFromHand ?? [];
+      if (!ids.length) continue;
       log(s, `${p.name} exiles ${ids.map((id) => nameOf(s, id)).join(", ")} from their hand.`);
       for (const id of ids) moveObject(s, id, "exile");
     } else if (c.kind === "collectEvidence") collectEvidence(s, p, choices.collect ?? autoEvidence(s, p.id, c.n), c.n);
@@ -4940,6 +4977,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling, undefined, ab.cycling ? x : undefined);
   // Scavenge (CR 702.97a) from the graveyard; "Exile ~" on the battlefield, if it's still the same object (CR 400.7).
   if (ab.exileSelf && (ab.zone !== undefined || (o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc))) moveObject(s, id, "exile");
+  if (ab.returnSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "hand");
   const stackId = `s${s.nextId++}`;
   const item: StackItem = {
     id: stackId,
@@ -5295,6 +5333,7 @@ function searchLibrary(s: GameState, p: Player, found: ObjectId[]) {
   if (found.length < pend.min) throw new RulesError(`find ${pend.min} card${pend.min === 1 ? "" : "s"}`);
   if (pend.distinctManaValues && new Set(found.map((id) => defMv(defOf(s, obj(s, id))))).size !== found.length)
     throw new RulesError("choose cards with different mana values");
+  if (pend.totalMv !== undefined && found.reduce((n, id) => n + defMv(defOf(s, obj(s, id))), 0) > pend.totalMv) throw new RulesError(`choose cards with total mana value ${pend.totalMv} or less`);
   if (pend.shareLandType && !shareLandType(found.map((id) => defOf(s, obj(s, id)))))
     throw new RulesError("choose cards that share a land type");
   if (pend.oneOfEach && !oneOfEachFits(pend.oneOfEach, found.map((id) => defOf(s, obj(s, id)))))

@@ -465,7 +465,8 @@ function enchantedControls(phrase: string): TargetSpec | null {
 }
 
 // "Is put into a graveyard from the battlefield" is what "dies" means (CR 700.4), for any permanent.
-const DIES_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) (dies|is put into a graveyard from the battlefield|leaves the battlefield(?: without dying)?), (.+)$/;
+// "Is exiled from the battlefield" (Soulherder) is leaving it for exile (CR 406.3).
+const DIES_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) (dies|is put into a graveyard from the battlefield|leaves the battlefield(?: without dying)?|is (?:exiled|put into exile) from the battlefield), (.+)$/;
 
 /**
  * "Whenever another creature dies", "Whenever a creature you control dies", "Whenever ~ or another Zombie
@@ -494,7 +495,8 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   }
   // "Whenever another Zombie you control dies, if it didn't have decayed, ..." (Wilhelt): an intervening if (CR 603.4) on
   // the creature as it last existed (CR 603.10a), which can't change, so part of what dies.
-  const leaves = !attached && m![3]!.startsWith("leaves");
+  const exiled = !attached && /^is (?:exiled|put into exile) /.test(m![3]!);
+  const leaves = !attached && (m![3]!.startsWith("leaves") || exiled);
   // "Whenever another creature you control leaves the battlefield, if it didn't die, ..." (Taeko): where it went can't
   // change, so it's part of the event, like "without dying".
   const didntDie = leaves && /^if it didn't die, /.exec(bodyText);
@@ -503,6 +505,11 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // "If it had a counter on it", "if it had one or more counters on it": as it last existed, so it can't change.
   const hadCounter = !attached && /^if it had (?:a counter|one or more counters|counters) on it, /.exec(bodyText);
   if (hadCounter) bodyText = bodyText.slice(hadCounter[0].length);
+  // "If its toughness was less than 1" (Massacre Girl, Known Killer): as it last existed (CR 603.10a), so it can't change
+  // and is part of what dies, like a keyword it had.
+  const wasPT = attached ? null : new RegExp(`^if its (power|toughness) was (?:less than ${NUM}|${NUM} or less|greater than ${NUM}|${NUM} or greater), (.+)$`).exec(bodyText);
+  const ptRange = wasPT && (wasPT[2] ? { max: num(wasPT[2]) - 1 } : wasPT[3] ? { max: num(wasPT[3]) } : wasPT[4] ? { min: num(wasPT[4]) + 1 } : { min: num(wasPT[5]!) });
+  if (wasPT) bodyText = wasPT[6]!;
   const hadKw = attached ? null : /^if it (didn't have|had) ([\w ]+?), (.+)$/.exec(bodyText);
   const kw = hadKw ? parseKeywordList(hadKw[2]!) : null;
   if (hadKw && kw?.length !== 1) return "fail";
@@ -532,14 +539,17 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   if (!filter || filter.kind !== "object") return "fail";
   const kind = m![1]!.toLowerCase();
   const had = hadKw && kw ? (hadKw[1] === "had" ? { keywords: [...(filter.keywords ?? []), ...kw] } : { notKeywords: [...(filter.notKeywords ?? []), ...kw] }) : {};
+  if (wasPT && filter[wasPT[1] as "power" | "toughness"]) return "fail";
+  const wasRange = wasPT ? { [wasPT[1]!]: ptRange } : {};
   return {
     event: "permanentDies",
     dies: {
-      filter: { ...filter, ...had, text: hadKw ? `${phrase} ${hadKw[1] === "had" ? "with" : "without"} ${hadKw[2]}` : phrase },
+      filter: { ...filter, ...had, ...wasRange, text: hadKw ? `${phrase} ${hadKw[1] === "had" ? "with" : "without"} ${hadKw[2]}` : wasPT ? `${phrase} with ${wasPT[1]} ${wasPT[0].slice(`if its ${wasPT[1]} was `.length, wasPT[0].length - wasPT[6]!.length - 2)}` : phrase },
       ...(kind === "another" ? { other: true } : {}),
       ...(kind === "~ or another" ? { orSelf: true } : {}),
       ...(damaged ? { damagedBySelf: true } : {}),
       ...(leaves ? { leaves: true as const } : {}),
+      ...(exiled ? { toZones: ["exile"] as ("graveyard" | "exile")[] } : {}),
       ...(notDies ? { notDies: true as const } : {}),
       ...(hadCounter ? { hadCounter: true as const } : {}),
     },
@@ -853,6 +863,12 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
  * battlefield, if it isn't a mana ability" (Harsh Mentor). One that mana abilities trigger too isn't modeled.
  */
 function parseActivatesTrigger(line: string): TriggeredAbility | "fail" | null {
+  // Illusionist's Bracers: whoever activates it (rulings: the Bracers' controller controls the copy).
+  const equipped = /^Whenever an ability of equipped creature is activated, if it isn't a mana ability, (.+)$/.exec(line);
+  if (equipped) {
+    const body = parseBody(equipped[1]!, { activatedAbility: true });
+    return body ? { event: "abilityActivated", activates: { by: "any", equipped: true }, body } : "fail";
+  }
   const m = /^Whenever (a player|an opponent|you) activates? an ability( of (?:an?|another) (.+?)(?: on the battlefield)?)?(?: that isn't a mana ability|, if it isn't a mana ability), (.+)$/.exec(line);
   if (!m) return /^Whenever (a player|an opponent|you) activates an? /.test(line) ? "fail" : null;
   let of: TargetSpec | undefined;
@@ -1021,6 +1037,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(`Whenever ${orActivates[1]} ${orActivates[1] === "you" ? "cast" : "casts"} a spell, if mana from a Treasure was spent to cast it, ${orActivates[2]}`);
     if (!t || t === "fail" || !t.cast?.treasure || /\b(it|that spell|that player)\b/.test(orActivates[2]!)) return "fail";
     return { ...t, cast: { ...t.cast, orActivates: true } };
+  }
+  // Tecutlan, The Myriad Pools, Barracks of the Thousand: "Whenever you cast a permanent spell using mana produced by ~":
+  // some of the mana spent to cast it (CR 601.2h) came from this permanent.
+  const usingMana = /^Whenever you cast (an? .+? spell) using mana produced by ~, (.+)$/.exec(line);
+  if (usingMana) {
+    const t = parseTrigger(`Whenever you cast ${usingMana[1]}, ${usingMana[2]}`);
+    return t && t !== "fail" && t.event === "castSpell" && t.cast && !t.cast.orCopy && !t.ifCond ? { ...t, cast: { ...t.cast, manaFromSelf: true } } : "fail";
   }
   // Krovikan Vampire: "At the beginning of each end step, if a creature dealt damage by ~ this turn died, put that card
   // onto the battlefield under your control. Sacrifice it when you lose control of ~." Every such card still in a
@@ -1519,6 +1542,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         ifNoCounters = true;
         body0 = noCounters[1]!;
       }
+      // "When ~ dies, if it's not a token, ..." (Vaultborn Tyrant): an intervening if (CR 603.4) on the creature as it last
+      // existed (CR 603.10a).
+      let ifNotToken = false;
+      const notToken = /^if it's not a token, (.+)$/i.exec(body0);
+      if (notToken) {
+        if (event !== "selfDies") return "fail" as const;
+        ifNotToken = true;
+        body0 = notToken[1]!;
+      }
       // "When ~ enters, if tribute wasn't paid, ..." (CR 702.104b).
       let ifTributeUnpaid = false;
       const tribute = /^if tribute wasn't paid, (.+)$/i.exec(body0);
@@ -1584,7 +1616,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // Enigma Sphinx).
       const ownGraveyard = event === "selfToGraveyard" && /^When(?:ever)? ~ is put into your graveyard/.test(line);
       return body
-        ? { event, body, ...(ownGraveyard ? { ownGraveyard } : {}), ...(ifNoCounters ? { ifNoCounter: "any" as const } : {}), ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifSpent ? { ifSpent } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifCast ? { ifCast } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(attacksBattle ? { attacksBattle } : {}), ...(orPlaneswalker ? { orPlaneswalker: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}), ...(onField ? { ifCond: { kind: "self" as const, is: "onBattlefield" as const } } : {}) }
+        ? { event, body, ...(ownGraveyard ? { ownGraveyard } : {}), ...(ifNoCounters ? { ifNoCounter: "any" as const } : {}), ...(ifNotToken ? { ifNotToken } : {}), ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifSpent ? { ifSpent } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifCast ? { ifCast } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(attacksBattle ? { attacksBattle } : {}), ...(orPlaneswalker ? { orPlaneswalker: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}), ...(onField ? { ifCond: { kind: "self" as const, is: "onBattlefield" as const } } : {}) }
         : ("fail" as const);
     }
   }

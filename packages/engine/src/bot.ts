@@ -58,6 +58,7 @@ import {
   altCostsFor,
   unlockCost,
   castExtraCosts,
+  lifeCostOffers,
   costsHaveX,
   bothModes,
   teamworkCandidates,
@@ -241,6 +242,17 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "searchLibrary" && pend.distinctManaValues) {
       const ranked = chooseSearch(s, pid, pend.cards, pend.cards.length);
       return [{ type: "searchLibrary", player: pid, found: ranked.filter((id, i) => ranked.findIndex((x) => mv(s, x) === mv(s, id)) === i) }];
+    }
+    // "With total mana value 4 or less" (Lively Dirge): the best-ranked cards that still fit.
+    if (pend.kind === "searchLibrary" && pend.totalMv !== undefined) {
+      const found: string[] = [];
+      let left = pend.totalMv;
+      for (const id of chooseSearch(s, pid, pend.cards, pend.cards.length)) {
+        if (found.length >= pend.max || mv(s, id) > left) continue;
+        found.push(id);
+        left -= mv(s, id);
+      }
+      return [{ type: "searchLibrary", player: pid, found }];
     }
     // "Basic land cards that share a land type" (Myriad Landscape): as many as we can of one type, the best-ranked first.
     if (pend.kind === "searchLibrary" && pend.shareLandType) {
@@ -1825,6 +1837,8 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
         .sort((a, b) => worth(s, pid, a) - worth(s, pid, b));
       if (pool.length < c.n) return null;
       out.tap = pool.slice(0, c.n).map((o) => o.id);
+    } else if (c.kind === "exileFromHand" && c.anyNumber) {
+      continue; // the Marches: bots exile none
     } else if (c.kind === "exileFromHand") {
       // Pitching cards (Force of Will): the cheapest that fit, and only with another card left in hand after.
       const others = player(s, pid).hand.filter((x) => x !== id);
@@ -1880,6 +1894,10 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
       out.exileCards = pool.slice(0, c.n);
     }
   }
+  // The Defilers: 2 life for a colored mana, with plenty of life to spare.
+  const offers = lifeCostOffers(s, pid, id, x);
+  const life = offers.reduce((n, l) => n + l.life, 0);
+  if (offers.length && player(s, pid).life - life >= 20) out.lifeFor = offers.map((l) => l.id);
   return out;
 }
 
@@ -2627,7 +2645,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // Dauthi Voidwalker: sacrificed in our main phase, with the stack empty, for an exiled spell with a void counter
       // worth more than it (mana value 4 or more) to cast for free right away.
       const voidPlay = ab.sacrificeSelf && ab.body.effects.some((e) => e.type === "playExiled") && s.activePlayer === pid && (s.step === "main1" || s.step === "main2") && !s.stack.length && voidSpells(s, pid, ab.body).some((c) => mv(s, c) >= 4);
-      if ((ab.sacrificeSelf && !cashIn && !flips && !voidPlay) || ab.exileSelf || (freeCost && !necro) || ab.station) continue;
+      if ((ab.sacrificeSelf && !cashIn && !flips && !voidPlay) || ab.exileSelf || ab.returnSelf || (freeCost && !necro) || ab.station) continue;
       // "Pay half your life, rounded up" (Murderous Betrayal, Lurking Evil): only while that's a few life at most.
       if (halfLifeCost(s, pid, ab) > 3) continue;
       // Level up (CR 702.87a) past the last level symbol does nothing more.

@@ -221,7 +221,10 @@ export function parseChanges(text: string): Modification[] | null {
     else if (/^assigns? combat damage equal to (?:its|their) toughness rather than (?:its|their) power$/i.test(p)) out.push({ kind: "assignsToughness" });
     else if (/^can attack (?:this turn )?as though (?:it|they) didn't have defender$/i.test(p)) out.push({ kind: "attackDespiteDefender" });
     else if ((m = /^becomes? (.+)$/i.exec(p))) {
-      const b = parseBecomes(m[1]!);
+      // Tezzeret the Seeker: "Artifacts you control become artifact creatures with base power and toughness 5/5": each
+      // one a 5/5 artifact creature, in addition to its other types (rulings; layers 4 and 7b, CR 613.1d, 613.4b).
+      const plural = /^((?:artifact )?creature)s with base power and toughness (\d+)\/(\d+)$/.exec(m[1]!);
+      const b = parseBecomes(plural ? `a ${plural[2]}/${plural[3]} ${plural[1]}` : m[1]!);
       if (!b) return null;
       out.push(...b);
     } else return null;

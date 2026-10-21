@@ -1,7 +1,7 @@
 # Roadmap
 
-22,129 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,885 of 1,989 (94%), top 5,000: 3,746 of 4,988 (75%).
+22,172 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,911 of 1,989 (96%), top 5,000: 3,775 of 4,988 (75%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,12 +22,18 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 105, most played first: Brass's Tunnel-Grinder (descend),
-   March of Swirling Mist (exile any number of blue cards as a cost), Return to Dust (a second target only if cast in a
-   main phase), Defiler of Vigor, Illusionist's Bracers, Druid Class, Parting Gust (the gift's "return it at the next end
-   step"), Grenzo, Open the Way, Lively Dirge, Moonsilver Key, Ardenn, Extraplanar Lens, Soulherder, Massacre Girl, Known
-   Killer, Twinning Staff, Mirror Box, Death Baron ("Skeletons you control and other Zombies you control"). Smaller gaps
-   from round 105: Kotis, the Fangkeeper (cast spells with total mana value X from among the exiled cards); bots
+00. Most played first (`npm run popular`). Out after round 106, most played first: Ardenn, Intrepid Archaeologist
+   (attach any number of Auras and Equipment to a target), Extraplanar Lens, Twinning Staff, Mirror Box ("for each other
+   creature you control with the same name"), Praetor's Grasp, Ugin, Eye of the Storms, Hoarding Broodlord, Talion,
+   Timely Ward ("as though it had flash if it targets a commander"), Flame of Anor ("if you control a Wizard as you cast
+   ~, you may choose two instead"), Overlord of the Hauntwoods, Jaxis, Delina, Massacre Girl, Ancient Brass Dragon, Jarad
+   ("Sacrifice a Swamp and a Forest": two permanents for two different filters). Smaller gaps from round 106: bots never
+   exile cards for the Marches, and pay a Defiler's life only with 20 or more life to spare; bots never activate
+   "Return ~ to its owner's hand" abilities (Shigeki, Recurring Nightmare, Krasis Incubation); mana Tecutlan made that's
+   still in your pool is spent before other mana of its color, so a permanent spell paid from the pool discovers whether
+   or not you meant it to; a granted quoted ability
+   names the Class in its description (Druid Class); Return to Dust asks "may" after its second target was chosen.
+   Smaller gaps from round 105: Kotis, the Fangkeeper (cast spells with total mana value X from among the exiled cards); bots
    activate Chainer only in their own main phase with an empty stack, five or more cards in hand and a creature card of
    mana value 2 or more they can afford in the graveyard; Valakut Exploration and other "for as long as it remains
    exiled" impulse draws link only when the card has one such exile. Smaller gaps from round 104: bots activate Kozilek, the Great

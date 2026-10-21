@@ -2421,6 +2421,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0a1dc797-7531-4494-afe6-add6ac3f74c0",
+  "name": "Defiler of Vigor",
+  "manaCost": "{3}{G}{G}",
+  "cmc": 5,
+  "typeLine": "Creature — Phyrexian Wurm",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Phyrexian",
+   "Wurm"
+  ],
+  "oracleText": "Trample\nAs an additional cost to cast green permanent spells, you may pay 2 life. Those spells cost {G} less to cast if you paid life this way. This effect reduces only the amount of green mana you pay.\nWhenever you cast a green permanent spell, put a +1/+1 counter on each creature you control.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "dmu",
+  "releasedAt": "2022-09-09",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ae120613-97d6-4393-b39d-c3e6c076f5d6",
   "name": "Deflecting Swat",
   "manaCost": "{2}{R}",
@@ -5594,6 +5627,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0b23d9aa-d4ed-4ccf-8810-4a4d11d6fb9c",
+  "name": "Lively Dirge",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Spree (Choose one or more additional costs.)\n+ {1} — Search your library for a card, put it into your graveyard, then shuffle.\n+ {2} — Return up to two creature cards with total mana value 4 or less from your graveyard to the battlefield.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Spree"
+  ],
+  "commanderLegal": "legal",
+  "set": "otj",
+  "releasedAt": "2024-04-19",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "68954295-54e3-4303-a6bc-fc4547a4e3a3",
   "name": "Llanowar Elves",
   "manaCost": "{G}",
@@ -5653,6 +5714,32 @@
   "set": "dsk",
   "releasedAt": "2024-09-27",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "debc69ea-372a-4720-838a-16856cd50b07",
+  "name": "March of Swirling Mist",
+  "manaCost": "{X}{U}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "As an additional cost to cast this spell, you may exile any number of blue cards from your hand. This spell costs {2} less to cast for each card exiled this way.\nUp to X target creatures phase out. (While they're phased out, they're treated as though they don't exist. Each one phases in before its controller untaps during their next untap step.)",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "neo",
+  "releasedAt": "2022-02-18",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

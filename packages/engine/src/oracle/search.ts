@@ -121,10 +121,16 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
     if (subs.some((x) => !x)) return null;
     return { kind: "card", anyOf: subs as TargetSpec[], text: p };
   }
+  // "An artifact card with a mana ability" (Moonsilver Key): an activated or triggered one (CR 605.1).
+  const manaAb = /^(.+ card) with a mana ability$/.exec(p);
+  if (manaAb) {
+    const head = parseSearchFilter(manaAb[1]!);
+    return head ? { ...head, manaAbility: true, text: p } : null;
+  }
   // "A snow permanent card, a legendary card, or a Saga card" (Search for Glory): a card that fits any one of them.
   const parts = p.split(/,? or an? |, an? /);
   // "An instant card or a card with flash" (Waterlogged Teachings).
-  if (parts.length > 1 && parts.every((x) => / card$|^card with [a-z]+$/.test(x))) {
+  if (parts.length > 1 && parts.every((x) => / card$|^card with [a-z]+$| card with a mana ability$/.test(x))) {
     const subs = parts.map((x) => parseSearchFilter(x));
     if (subs.some((x) => !x)) return null;
     return { kind: "card", anyOf: subs as TargetSpec[], text: p.replace(/\bcard\b(?=,| or )/g, "card") };

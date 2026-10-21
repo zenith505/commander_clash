@@ -95,6 +95,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.transformed && !isTransformed(s, o)) return false;
   if (spec.powerAboveBase && !(c.types.includes("Creature") && power(s, o) > basePowerNow(s, o))) return false;
   if (spec.doubleFaced && !isDoubleFacedDef(s.cards[o.cardId] ?? defOf(s, o))) return false;
+  if (spec.manaAbility && !(abilitiesOf(s, o).mana.length || abilitiesOf(s, o).manaTriggers?.length)) return false;
   if (spec.commander !== undefined && !!o.isCommander !== spec.commander) return false;
   if (spec.status && !hasStatus(s, o, c, spec.status, view)) return false;
   if (spec.suspected && o.suspected === undefined) return false;
@@ -229,6 +230,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.manaCostIn && !spec.manaCostIn.includes(d.manaCost)) return false;
   if (spec.named !== undefined && !hasName(d.name, spec.named)) return false;
   if (spec.doubleFaced && !isDoubleFacedDef(d)) return false;
+  if (spec.manaAbility && !(compileCard(d).mana.length || compileCard(d).manaTriggers?.length)) return false;
   if (spec.transformed || spec.powerAboveBase) return false;
   return true;
 }

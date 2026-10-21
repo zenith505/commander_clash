@@ -1051,6 +1051,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.blocksOnlyFlyers = true;
       return;
     case "attacksIfAble":
+      if (m.combat !== undefined && m.combat !== (s.combatsThisTurn ?? 0)) return;
       c.attacksIfAble = true;
       return;
     case "mustAttackPlayer":

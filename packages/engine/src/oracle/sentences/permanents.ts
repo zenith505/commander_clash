@@ -455,6 +455,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
       { type: "untap", what: { ref: "self" } },
       { type: "counters", what: { ref: "self" }, counter: "+1/+1", n: m[1] === "a" ? 1 : m[1] === "two" ? 2 : 3, by: { ref: "eventPlayer" } },
     ];
+  // Humble Defector: "Target opponent gains control of ~", for the rest of the game (layer 2); if ~ has left the
+  // battlefield, nothing happens (rulings).
+  if ((m = /^(Target player|Target opponent) gains control of ~$/.exec(s)) && !ctx.spell) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    return who ? [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: who }] : null;
+  }
   if (/^An opponent(?: of your choice)? gains control of ~$/.test(s))
     return [{ type: "choose", choice: "opponent" }, { type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "chosenPlayer" } }];
   // "Gain control of that Equipment until end of turn" (Stolen Uniform): a target an earlier sentence chose.
@@ -510,11 +516,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return what && first && second ? [{ type: "continuous", what, mods: [...first, ...second], duration: "endOfTurn" }] : null;
   }
   // "... gets -2/-0 until end of turn and attacks this turn if able" (Chemister's Trick): an attack requirement for each
-  // combat this turn (CR 508.1d), ending with the turn like the rest.
-  if ((m = /^(.+?) ((?:gets?|gains?) .+) until end of turn and attacks? this turn if able$/i.exec(s))) {
+  // combat this turn (CR 508.1d), ending with the turn like the rest. "That token gains haste until end of turn and
+  // attacks this combat if able" (Legion Warboss): in the combat going on only.
+  if ((m = /^(.+?) ((?:gets?|gains?) .+) until end of turn and attacks? this (turn|combat) if able$/i.exec(s))) {
     const what = parseObject(m[1]!.replace(/^It$/, "it"), ctx);
     const first = what && parseChanges(m[2]!);
-    return what && first ? [{ type: "continuous", what, mods: [...first, { kind: "attacksIfAble" }], duration: "endOfTurn" }] : null;
+    return what && first ? [{ type: "continuous", what, mods: [...first, { kind: "attacksIfAble", ...(m[3] === "combat" ? { combat: "this" as const } : {}) }], duration: "endOfTurn" }] : null;
   }
   // "You gain shroud until end of turn" (Gilded Light), "You and permanents you control gain hexproof until end of turn"
   // (Lazotep Plating), "You and target permanent you control each gain protection from the chosen player until end of
@@ -566,7 +573,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // "Target land you control becomes a 3/3 Elemental creature with haste that's still a land" (Brave the Wilds): with no
   // duration, for as long as it stays on the battlefield (CR 611.2a; a new object after a zone change, CR 400.7).
   // "Put four +1/+1 counters on target noncreature artifact. It becomes a 0/0 Bird creature" (Case of the Filched Falcon): the target.
-  if ((m = /^(target .+?|It) becomes? (an? \d+\/\d+ .+)$/i.exec(s))) {
+  // Druid Class: 'becomes a creature with haste and "This creature's power and toughness are each equal to the number of
+  // lands you control."': no number of its own; the ability it gains sets them, in layer 7b (CR 604.3a, 613.4b).
+  if ((m = /^(target .+?|It) becomes? (an? \d+\/\d+ .+|a creature with [a-z, ]+ and "(?:This creature|~)'s power and toughness are each equal to [^"]+")$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods = what?.ref === "target" && parseChanges(`becomes ${m[2]!}`);
     return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;

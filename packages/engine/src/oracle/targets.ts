@@ -823,6 +823,7 @@ export function parseTargetPhrase(
     return { kind: "object", types, notTypes: [], notColors: [], anyOf, ...extra, controller, ...(tapped !== undefined ? { tapped } : {}), text };
   }
   let outlaw = false;
+  let permanentSpell = false;
   if (sharedSubtypes) subtypes.push(...sharedSubtypes);
   for (const alt of alts) {
     const words = alt.trim().split(/\s+/);
@@ -874,6 +875,13 @@ export function parseTargetPhrase(
       else if ((w === "multicolored" || w === "monocolored" || w === "colorless" || w === "colored") && alts.length === 1 && !extra.colorCount) extra.colorCount = w;
       else if (SUPERTYPE_WORDS[w]) supertypes.push(SUPERTYPE_WORDS[w]!);
       else if (w === "permanent" && inGraveyard) types.push(...PERMANENT_TYPES); // "permanent card" (CR 110.4b)
+      // "Green permanent spell": one that isn't an instant or a sorcery (CR 110.4a: those are the spells that become
+      // permanents).
+      // "Faerie or Wizard permanent spell" (Archmage of Echoes): for all of them, which are only subtypes and colors.
+      else if (w === "permanent" && isSpell) {
+        if (alts.length > 1 && alts.some((a) => a.trim().split(/\s+/).some((x) => TYPE_WORDS[x] || x.startsWith("non")))) return null;
+        permanentSpell = true;
+      }
       else if (w === "permanent" || w === "") continue;
       else return null;
     }
@@ -891,6 +899,7 @@ export function parseTargetPhrase(
   if ((supertypes.length || (notSupertypes.length && !onlyNon)) && alts.length > 1) return null;
   // Subtypes mixed with card types in alternatives ("Wall or artifact") would need per-alternative filters too.
   if (subtypes.length && (types.length || notTypes.length) && alts.length > 1) return null;
+  if (permanentSpell) notTypes.push(...["Instant", "Sorcery"].filter((t) => !notTypes.includes(t)));
   const filters = {
     types: allTypes ? [] : types,
     ...(allTypes ? { allTypes } : {}),

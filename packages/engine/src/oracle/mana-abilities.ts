@@ -101,6 +101,14 @@ export function parseManaAbility(line0: string): ManaAbility | null {
       if (!cond || !produces) return null;
       out.insteadIf = { cond, produces };
     }
+    else if ((m2 = /^If ([^,]+), add (.+ mana of any one color) instead\.$/.exec(extra)) && !out.insteadIf && out.produces.kind === "oneOf" && !out.produces.n) {
+      // Ilysian Caryatid: "Add one mana of any color. If you control a creature with power 4 or greater, add two mana of
+      // any one color instead." Checked as it resolves.
+      const cond = parseStaticCondition(m2[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      const produces = parseManaProduced(m2[2]!);
+      if (!cond || !produces) return null;
+      out.insteadIf = { cond, produces };
+    }
     else if (extra === "Activate only as an instant." && !out.instantOnly) out.instantOnly = true;
     else if ((m2 = /^Activate only ([^.]+)\.$/.exec(extra)) && !out.activateIf && !out.oncePerTurn) {
       // "Activate only if you control a Swamp", "... only once each turn", "... only during an opponent's turn" (CR 602.5b).
@@ -223,6 +231,12 @@ function parseManaProduced(text: string): ManaProduce | null {
     if (!combo[2]) return num(combo[1]!) > 1 ? { kind: "anyColors", n: num(combo[1]!) } : null;
     const n = parseCount(combo[3]!, null);
     return n && { kind: "anyColors", n };
+  }
+  // "Two mana in any combination of {U}, {B}, and/or {R}" (Relic of Sauron): only those colors.
+  const some = new RegExp(`^${NUM} mana in any combination of ((?:\\{[WUBRG]\\}, )*\\{[WUBRG]\\},? and/or \\{[WUBRG]\\})$`).exec(text);
+  if (some && num(some[1]!) > 1) {
+    const colors = [...some[2]!.matchAll(/\{([WUBRG])\}/g)].map((x) => x[1] as Color);
+    return new Set(colors).size === colors.length ? { kind: "anyColors", n: num(some[1]!), colors } : null;
   }
   // "X mana in any combination of {U} and/or {R}, where X is ~'s power" (Vivi Ornitier).
   const two = /^X mana in any combination of \{([WUBRG])\} and\/or \{([WUBRG])\}, where X is (.+)$/.exec(text);

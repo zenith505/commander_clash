@@ -173,6 +173,15 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     if (!base || base === "fail" || !("costMod" in base) || base.costMod.times || base.costMod.nth) return "fail";
     return { costMod: { ...base.costMod, n: 0, colored: colors, text: line } };
   }
+  // The Defilers: "As an additional cost to cast green permanent spells, you may pay 2 life. Those spells cost {G} less to
+  // cast if you paid life this way. This effect reduces only the amount of green mana you pay." An optional additional
+  // cost of each spell it applies to, once per spell (rulings, CR 601.2b), and a colored reduction if it was paid (601.2f).
+  if ((m = /^As an additional cost to cast (white|blue|black|red|green) permanent spells, you may pay (\d+) life\. Those spells cost \{([WUBRG])\} less to cast if you paid life this way\. This effect reduces only the amount of \1 mana you pay$/.exec(text))) {
+    const base = parseCostChange(`${m[1]!.charAt(0).toUpperCase()}${m[1]!.slice(1)} permanent spells you cast cost {1} less to cast`);
+    const color = ({ white: "W", blue: "U", black: "B", red: "R", green: "G" } as const)[m[1] as "white"];
+    if (!base || base === "fail" || !("costMod" in base) || color !== m[3]) return "fail";
+    return { costMod: { ...base.costMod, n: 0, colored: [color], payLife: Number(m[2]), text: line } };
+  }
   if ((m = /^Spells your opponents cast that target ~ cost \{(\d+)\} more to cast$/.exec(text))) return { targetTax: Number(m[1]) };
   if ((m = /^Spells your opponents cast that target ~ cost an additional (\d+) life to cast$/.exec(text))) return { targetLifeTax: Number(m[1]) };
   if ((m = /^~ costs \{(\d+)\} less to cast for each (.+)$/.exec(text))) {
@@ -505,6 +514,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^an opponent was dealt ${NUM} or more damage this turn$`).exec(text))) return { kind: "opponentDealtDamage", n: num(m[1]!) };
   if ((m = new RegExp(`^you attacked with ${NUM} or more creatures this turn$`).exec(text))) return { kind: "attackedWith", n: num(m[1]!) };
   if ((m = new RegExp(`^you've drawn ${NUM} or more cards this turn$`).exec(text))) return { kind: "drawn", n: num(m[1]!) };
+  // "If you've drawn more than one card this turn" (Proft's Eidetic Memory): two or more.
+  if ((m = new RegExp(`^you've drawn more than ${NUM} cards? this turn$`).exec(text))) return { kind: "drawn", n: num(m[1]!) + 1 };
   if ((m = new RegExp(`^an opponent drew ${NUM} or more cards this turn$`).exec(text))) return { kind: "drawn", n: num(m[1]!), opponent: true };
   if (/^you descended this turn$/.test(text)) return { kind: "descended" };
   if (/^a permanent left the battlefield under your control this turn$/.test(text)) return { kind: "revolt" };
@@ -803,6 +814,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^can't attack a player it has already attacked this turn$/.test(rest)) return [{ kind: "cantAttackSamePlayer" }];
   if (/^can't block alone$/.test(rest)) return [{ kind: "cantBlockAlone" }];
   if (/^must be blocked if able$/.test(rest)) return [{ kind: "mustBeBlocked" }];
+  // "Each nonland permanent you control is all colors" (Leyline of the Guildpact): layer 5 (CR 105.2, 613.1e).
+  if (/^(?:is|are) all colors$/.test(rest)) return [{ kind: "setColors", colors: ["W", "U", "B", "R", "G"] }];
   // "Can't attack unless defending player controls an Island" (Sea Serpent), "... a Swamp", "... a blue permanent".
   if ((m = /^can't attack unless defending player controls (an? .+)$/.exec(rest))) {
     const filter = parseTargetPhrase(m[1]!.replace(/^an? /, ""));
@@ -1140,7 +1153,7 @@ function parseStaticLine(line: string): StaticAbility | null {
   // greater is checked as it assigns combat damage, which comes to the same thing as a group that changes with it.
   const greater = /^(.+?) with toughness greater than (?:its|their) power (assigns? .+)$/.exec(text);
   if (greater) text = `${greater[1]} ${greater[2]}`;
-  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|can't .+|can block .+|can attack as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:, .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses all abilities)$/.exec(text);
+  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|(?:is|are) all colors|can't .+|can block .+|can attack as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:, .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses all abilities)$/.exec(text);
   if (!m) return null;
   const affects = parseAffected(m[1]!);
   if (!affects) return null;

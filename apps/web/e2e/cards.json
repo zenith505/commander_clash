@@ -1470,6 +1470,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "08c7db90-c0cf-4482-b7ee-bb033e5996d2",
+  "name": "Colossal Dreadmaw",
+  "manaCost": "{4}{G}{G}",
+  "cmc": 6,
+  "typeLine": "Creature — Dinosaur",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dinosaur"
+  ],
+  "oracleText": "Trample (This creature can deal excess combat damage to the player or planeswalker it's attacking.)",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "xln",
+  "releasedAt": "2017-09-29",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5e15ff93-99a0-4000-918e-4bd2c257188d",
   "name": "Combat Celebrant",
   "manaCost": "{2}{R}",
@@ -5338,6 +5370,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "40362fe0-a1a9-4d76-8c35-eac474b91af5",
+  "name": "Mizzix's Mastery",
+  "manaCost": "{3}{R}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Exile target card that's an instant or sorcery from your graveyard. For each card exiled this way, copy it, and you may cast the copy without paying its mana cost. Exile Mizzix's Mastery.\nOverload {5}{R}{R}{R} (You may cast this spell for its overload cost. If you do, change \"target\" in its text to \"each.\")",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Overload"
+  ],
+  "commanderLegal": "legal",
+  "set": "c15",
+  "releasedAt": "2015-11-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b9df2cdf-397c-458d-89cf-911568737ffa",
   "name": "Mockingbird",
   "manaCost": "{X}{U}",
@@ -5859,6 +5919,32 @@
   "set": "msc",
   "releasedAt": "2026-06-26",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "730e39e6-c61d-48b5-8827-bfd952bf1be7",
+  "name": "Omniscience",
+  "manaCost": "{7}{U}{U}{U}",
+  "cmc": 10,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "You may cast spells from your hand without paying their mana costs.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fdn",
+  "releasedAt": "2024-11-15",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

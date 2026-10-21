@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, scry, setup } from "./helpers";
-import { isFullySupported, manaAbilitiesOn, manaChoices, maxHandSize, planActivate, planCast, staticConditionNow, waitingOn, type GameState } from "../src";
+import { abilityProblem, isFullySupported, manaAbilitiesOn, manaChoices, maxHandSize, planActivate, planCast, staticConditionNow, waitingOn, type GameState } from "../src";
 
 // Real oracle text (Scryfall).
 const kozilek = card("Kozilek, the Great Distortion", "Legendary Creature — Eldrazi", "{8}{C}{C}", { power: "12", toughness: "12", keywords: ["Menace"], oracleText: "When you cast this spell, if you have fewer than seven cards in hand, draw cards equal to the difference.\nMenace\nDiscard a card with mana value X: Counter target spell with mana value X." });
@@ -63,6 +63,12 @@ describe("round 104: Eldrazi and the other starting cards", () => {
     s = act(s, { type: "passPriority", player: ap });
     expect(waitingOn(s)).toBe(opp);
     const top = s.stack[s.stack.length - 1]!;
+    // Before X is announced, the ability is usable because X = 3 fits both the cost and a target; not with no card for it.
+    expect(abilityProblem(s, opp, k, 0)).toBeNull();
+    const hand = s.players[opp]!.hand;
+    s.players[opp]!.hand = [two];
+    expect(abilityProblem(s, opp, k, 0)).not.toBeNull();
+    s.players[opp]!.hand = hand;
     // X = 2: the spell's mana value is 3, so it can't be the target; and the card must have mana value X.
     expect(planActivate(s, opp, k, 0, [{ kind: "stack", id: top.id }], undefined, undefined, 2, { discard: [two] })).toBeNull();
     expect(planActivate(s, opp, k, 0, [{ kind: "stack", id: top.id }], undefined, undefined, 3, { discard: [two] })).toBeNull();

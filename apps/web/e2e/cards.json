@@ -5082,6 +5082,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4c1c1537-e519-4e2f-9bc2-d34b289d4487",
+  "name": "Kozilek, the Great Distortion",
+  "manaCost": "{8}{C}{C}",
+  "cmc": 10,
+  "typeLine": "Legendary Creature — Eldrazi",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Eldrazi"
+  ],
+  "oracleText": "When you cast this spell, if you have fewer than seven cards in hand, draw cards equal to the difference.\nMenace\nDiscard a card with mana value X: Counter target spell with mana value X.",
+  "power": "12",
+  "toughness": "12",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Menace"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2022-06-13",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "316d49a0-620b-4942-a5e8-04cff15e6c01",
   "name": "Krav, the Unredeemed",
   "manaCost": "{4}{B}",

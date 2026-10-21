@@ -4618,6 +4618,17 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     const mp = modes === undefined ? (canChooseModes(s, ab.body, pid, sourceQuality(s, id), id) ? null : "no mode can be chosen") : modesProblem(s, ab.body, modes, pid, sourceQuality(s, id), false, id);
     if (mp) return mp;
   }
+  // "Discard a card with mana value X: Counter target spell with mana value X" (Kozilek): before X is announced, the
+  // ability can be activated if some X works for both the cost and the target (CR 107.3a, 602.2b).
+  if (x === undefined && ab.costs?.some((c) => c.kind === "discard" && c.mvX)) {
+    for (let n = 0; n <= 20; n++) {
+      if (abilityProblem(s, pid, id, index, targets, modes, tapCreatures, n, costs)) continue;
+      // Without targets chosen, the check above lets any X target; here the target must have mana value n too.
+      const b = settleDivided(s, withModes(ab.body, modes), { controller: pid, sourceId: id, x: n }, false);
+      if (targets || !b.targets.length || hasLegalTargetsFor(s, b.targets, pid, sourceQuality(s, id), id)) return null;
+    }
+    return abilityProblem(s, pid, id, index, targets, modes, tapCreatures, 0, costs);
+  }
   let body = settleDivided(s, withModes(ab.body, modes), { controller: pid, sourceId: id, x: x ?? 0 }, !targets);
   if (targets && manySlot(body.targets) >= 0) {
     // "Any number of target creatures": as many as were chosen (CR 601.2c, 602.2b).

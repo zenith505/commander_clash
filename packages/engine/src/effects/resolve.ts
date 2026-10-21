@@ -398,6 +398,8 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     }
     case "eventPlayer":
       return ctx.event?.player !== undefined && !player(s, ctx.event.player).lost ? [ctx.event.player] : [];
+    case "attackingPlayer":
+      return ctx.event?.attacker !== undefined && !player(s, ctx.event.attacker).lost ? [ctx.event.attacker] : [];
     case "otherOpponents":
       return opponents(s, ctx.controller).filter((p) => p !== ctx.event?.player);
     case "enchantedPlayer": {
@@ -632,6 +634,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "ascend":
     case "gainLife":
     case "exchangeLife":
+    case "exchangeLifeWithSelf":
     case "loseLife":
     case "setLife":
     case "addCombatMana":
@@ -719,6 +722,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "playExiled":
     case "forEachThisWay":
     case "commanderToHand":
+    case "commanderToBattlefield":
+    case "toCommandZone":
       return runZonesEffect(s, e, ctx, src);
     case "tap":
     case "suspect":

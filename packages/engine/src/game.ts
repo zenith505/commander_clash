@@ -3146,6 +3146,8 @@ export function castProblem(
       return choices.alt === "wubrg" ? "you don't control a permanent that lets you pay {W}{U}{B}{R}{G}" : choices.alt === "omniscience" ? "you don't control a permanent that lets you cast spells from your hand without paying their mana costs" : choices.alt === "evidence" ? "you don't control a permanent that lets you collect evidence instead" : `${d.name} doesn't have ${choices.alt}`;
     // An alternative cost without X: X is 0 (CR 107.3, rulings on Fist of Suns).
     if (choices.alt === "wubrg" && x) return "X is 0 when you pay {W}{U}{B}{R}{G} rather than the mana cost";
+    if (choices.alt === "payZero" && x) return "X is 0 when you pay {0} rather than the mana cost";
+    if (choices.alt === "payZero" && !payZeroSource(s, pid, o)) return `nothing lets you pay {0} rather than ${d.name}'s mana cost now`;
     if (choices.alt === "omniscience" && o.zone !== "hand") return "only spells cast from your hand are free";
     if (choices.alt === "citadel" && o.zone !== "library" && !castFromExileForLife(s, o, pid)) return "only the top card of your library is cast for life";
     // A foretell cost is paid only for a foretold card, after the turn it was foretold (CR 702.143a).
@@ -3552,6 +3554,8 @@ export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: Play
     const n = manaValue(parseManaCost(d.manaCost));
     return { kind: "citadel", mana: "", costs: [{ kind: "payLife", n }], text: `pay ${n} life` };
   }
+  // As Foretold, Rooftop Storm: {0}, while one of `pid`'s permanents lets them (castProblem checks it's for this spell).
+  if (alt === "payZero") return s && pid !== undefined && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && compileCard(defOf(s, obj(s, id))).payZero && characteristics(s, obj(s, id)).hasPrintedAbilities) ? { kind: "payZero", mana: "{0}" } : undefined;
   if (alt === "evidence") {
     const n = s && pid !== undefined ? payEvidenceOf(s, pid) : undefined;
     return n === undefined ? undefined : { kind: "evidence", mana: "", costs: [{ kind: "collectEvidence", n }], text: `collect evidence ${n}` };
@@ -3583,11 +3587,30 @@ function payEvidenceOf(s: GameState, pid: PlayerId): number | undefined {
   return best;
 }
 
+/**
+ * The permanent of `pid`'s whose "you may pay {0} rather than pay the mana cost" covers this spell now (As Foretold, Rooftop
+ * Storm, Darksteel Monolith), X counted as 0 (rulings): one with no once-each-turn limit first, then the first unused one.
+ */
+export function payZeroSource(s: GameState, pid: PlayerId, o: GameObject): GameObject | undefined {
+  const d = defOf(s, o);
+  if (isType(d, "Land")) return undefined;
+  const used = s.turnLog?.payZeroUsed ?? [];
+  const ok = s.battlefield.map((id) => obj(s, id)).filter((p) => {
+    const z = compileCard(defOf(s, p)).payZero;
+    if (!z || controllerOf(s, p) !== pid || !characteristics(s, p).hasPrintedAbilities) return false;
+    if (z.once && used.includes(`${p.id}@${p.zoneChanges ?? 0}`)) return false;
+    if (z.fromHand && o.zone !== "hand") return false;
+    if (z.filter && !printedMatches(z.filter, d)) return false;
+    return z.maxMvCounters === undefined || defMv(d) <= (p.counters[z.maxMvCounters] ?? 0);
+  });
+  return ok.find((p) => !compileCard(defOf(s, p)).payZero!.once) ?? ok[0];
+}
+
 /** The alternative costs `pid` could cast this card for: its own, Fist of Suns' and Conspiracy Unraveler's (CR 118.9). */
 export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): NonNullable<CompiledCard["altCosts"]> {
   const own = compileCard(defOf(s, o)).altCosts ?? [];
   if (isType(defOf(s, o), "Land")) return own;
-  return [...own, ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(["evidence" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
+  return [...own, ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(["evidence" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
 }
 
 /** Artifacts tapped for improvise: untapped artifacts you control, each once, not also tapped for convoke. */
@@ -3797,6 +3820,12 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     log(s, `${p.name} uses ${permitLabel(s, permit)} to cast it from their graveyard.`);
     choices = { ...choices, permit }; // its costs are paid below
   }
+  // "Once each turn, you may pay {0} ..." (As Foretold): that permanent's permission is used up for this turn.
+  if (choices.alt === "payZero") {
+    const by = payZeroSource(s, p.id, o)!;
+    if (compileCard(defOf(s, by)).payZero!.once) ((s.turnLog ??= {}).payZeroUsed ??= []).push(`${by.id}@${by.zoneChanges ?? 0}`);
+    log(s, `${p.name} pays {0} rather than ${d.name}'s mana cost (${characteristics(s, by).name}).`);
+  }
   const from = zoneList(s, o)!;
   from.splice(from.indexOf(id), 1);
   o.zone = "stack";
@@ -3855,7 +3884,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const kickText = kicks ? describeKicks(d, kicks) : "";
   const howText =
     (via ? ` from their graveyard (${describeVia(via.kind)})` : castFrom === "exile" ? " from exile" : "") +
-    (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "omniscience" ? " without paying its mana cost" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt === "convert" ? " converted, for its More Than Meets the Eye cost" : choices.alt ? ` for its ${choices.alt} cost` : "") +
+    (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "payZero" ? " for {0}" : choices.alt === "omniscience" ? " without paying its mana cost" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt === "convert" ? " converted, for its More Than Meets the Eye cost" : choices.alt ? ` for its ${choices.alt} cost` : "") +
     (madness && o.castAlt === "madness" ? " for its madness cost" : madness && o.castAlt === "miracle" ? " for its miracle cost" : "") +
     (choices.buyback ? ", paying buyback" : "") +
     (choices.splice?.length ? `, splicing ${choices.splice.map((c) => nameOf(s, c)).join(" and ")} onto it` : "") +
@@ -5424,6 +5453,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     mergeSpell(s, spell, host, choice === "top");
     return;
   }
+  if (pend.what === "legend") {
+    // The legend rule (CR 704.5j): kept as the state-based actions are performed, after any other group is asked about.
+    (s.legendKeep ??= []).push(choice);
+    log(s, `${p.name} keeps ${characteristics(s, obj(s, choice)).name}${obj(s, choice).isToken ? " (a token)" : ""} (legend rule).`);
+    return;
+  }
   if (pend.what === "enchant" && s.untilReturns?.auras[0]?.asking) {
     // An Aura returning from "until ~ leaves": its owner chose what it enchants (CR 303.4f).
     auraReturnChosen(s, choice);
@@ -6758,6 +6793,53 @@ function finishCombatDamage(s: GameState): boolean {
 // ---------------------------------------------------------------------------
 // State-based actions (CR 704) and leaving the game (CR 800.4)
 
+/**
+ * The groups of two or more legendary permanents with the same name one player controls (CR 704.5j), in the order they
+ * entered. "The "legend rule" doesn't apply to permanents you control" (Sakashima of a Thousand Faces) leaves some out.
+ */
+function legendGroups(s: GameState): ObjectId[][] {
+  const exempt = s.battlefield.flatMap((id) => (abilitiesOf(s, obj(s, id)).noLegendRule ?? []).map((filter) => ({ filter, you: controllerOf(s, obj(s, id)) })));
+  const groups = new Map<string, ObjectId[]>();
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    const c = characteristics(s, o);
+    if (!c.supertypes.includes("Legendary") || exempt.some((x) => objectMatches(s, x.filter, o, x.you, false))) continue;
+    const key = `${c.controller}:${c.name}`;
+    groups.set(key, [...(groups.get(key) ?? []), id]);
+  }
+  const byAge = (a: ObjectId, b: ObjectId) => obj(s, a).timestamp - obj(s, b).timestamp;
+  return [...groups.values()].filter((g) => g.length > 1).map((g) => g.sort(byAge)).sort((a, b) => byAge(a[0]!, b[0]!));
+}
+
+/** Which legend a bot keeps: the one with Auras and Equipment on it, then more counters, then not a token, then the oldest. */
+export function legendBotKeep(s: GameState, group: ObjectId[]): ObjectId {
+  const score = (id: ObjectId) => {
+    const o = obj(s, id);
+    const attached = s.battlefield.filter((a) => obj(s, a).attachedTo === id).length;
+    const counters = Object.entries(o.counters).reduce((n, [k, v]) => n + (k === "-1/-1" ? -v : v), 0);
+    return attached * 100 + counters * 10 + (o.isToken ? 0 : 1);
+  };
+  return group.reduce((best, id) => (score(id) > score(best) ? id : best), group[0]!);
+}
+
+/** Ask a player which of a group of their legends to keep (CR 704.5j), for each group not yet answered. */
+function askLegendRule(s: GameState): boolean {
+  for (const group of legendGroups(s)) {
+    if (group.some((id) => s.legendKeep?.includes(id))) continue;
+    const you = controllerOf(s, obj(s, group[0]!));
+    const label = (id: ObjectId, i: number) => {
+      const o = obj(s, id);
+      const counters = Object.entries(o.counters).filter(([, v]) => v > 0).map(([k, v]) => `${v} ${k}`);
+      const attached = s.battlefield.filter((a) => obj(s, a).attachedTo === id).map((a) => nameOf(s, a));
+      const notes = [o.isToken ? "token" : "", ...counters.map((c) => `${c} counter${c.startsWith("1 ") ? "" : "s"}`), ...attached, o.tapped ? "tapped" : "", i === group.length - 1 ? "newest" : i === 0 ? "oldest" : ""].filter(Boolean);
+      return `Keep ${characteristics(s, o).name}${notes.length ? ` (${notes.join(", ")})` : ""}`;
+    };
+    s.pending = { kind: "chooseOption", player: you, source: characteristics(s, obj(s, group[0]!)).name, what: "legend", options: group, labels: group.map(label), prompt: "legend rule: keep which one? The rest go to the graveyard." };
+    return true;
+  }
+  return false;
+}
+
 function afterAction(s: GameState, holdTriggers = false) {
   runStateBasedActions(s, holdTriggers);
 }
@@ -6779,6 +6861,8 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
     checkAscend(s);
     checkDayNight(s); // not a state-based action, but done at once (CR 702.145c-g)
     checkPrepared(s); // the copies of prepare spells last as long as their permanents stay prepared (CR 722.3c)
+    // The legend rule's choices come first, so this pass's actions all happen at once (CR 704.3).
+    if (!s.pending && askLegendRule(s)) return;
     let changed = auras === "moved";
     for (const p of s.players) {
       if (p.lost) continue;
@@ -6833,24 +6917,20 @@ export function runStateBasedActions(s: GameState, holdTriggers = false) {
         changed = true;
       }
     }
-    // Legend rule (704.5j). TODO: let the controller choose; for now keep the newest.
-    const seen = new Map<string, ObjectId>();
-    // "The "legend rule" doesn't apply to permanents you control" (Sakashima of a Thousand Faces).
-    const exempt = s.battlefield.flatMap((id) => (abilitiesOf(s, obj(s, id)).noLegendRule ?? []).map((filter) => ({ filter, you: controllerOf(s, obj(s, id)) })));
-    for (const id of [...s.battlefield]) {
-      const o = s.objects[id];
-      if (!o || o.zone !== "battlefield") continue;
-      const c = characteristics(s, o);
-      const d = defOf(s, o);
-      if (!c.supertypes.includes("Legendary")) continue;
-      if (exempt.some((x) => objectMatches(s, x.filter, o, x.you, false))) continue;
-      const key = `${c.controller}:${c.name}`;
-      if (seen.has(key)) {
-        log(s, `${d.name} is put into the graveyard (legend rule).`);
-        moveObject(s, id, "graveyard");
-        changed = true;
-      } else seen.set(key, id);
-    }
+    // Legend rule (704.5j): the rest of each group go to the graveyard, all but the one its controller chose (asked at the
+    // start of this pass, askLegendRule). Not while another choice waits: they're checked again once it's made.
+    const keep = s.legendKeep ?? [];
+    s.legendKeep = undefined;
+    if (!s.pending)
+      for (const group of legendGroups(s)) {
+        const kept = group.find((id) => keep.includes(id)) ?? legendBotKeep(s, group);
+        for (const id of group) {
+          if (id === kept) continue;
+          log(s, `${characteristics(s, obj(s, id)).name} is put into the graveyard (legend rule).`);
+          moveObject(s, id, "graveyard");
+          changed = true;
+        }
+      }
     if (attachmentSBAs(s)) changed = true;
     if (battleSBAs(s)) changed = true; // 704.5v-y
     if (!s.pending && s.entersChoices?.length && askEntersChoice(s)) return;

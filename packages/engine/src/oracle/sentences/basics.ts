@@ -44,6 +44,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     ctx.exchanged = true;
     return b ? [{ type: "exchangeLife", a: { ref: "you" }, b }] : null;
   }
+  // Tree of Perdition: "Exchange target opponent's life total with ~'s toughness" (CR 701.12g): the life total and the
+  // toughness each become the other's previous value.
+  if ((m = /^[Ee]xchange (your|target opponent's|target player's) life total with ~'s (power|toughness)$/.exec(s))) {
+    const who = m[1] === "your" ? ({ ref: "you" } as const) : parsePlayer(m[1]!.replace(/'s$/, ""), ctx);
+    return who ? [{ type: "exchangeLifeWithSelf", who, stat: m[2] as "power" | "toughness" }] : null;
+  }
   // Psychic Transfer: "If the difference between your life total and target player's life total is 5 or less, exchange
   // life totals with that player": checked as it resolves; the target is chosen either way.
   if ((m = new RegExp(`^If the difference between your life total and target player's life total is ${NUM} or less, exchange life totals with that player$`).exec(s))) {

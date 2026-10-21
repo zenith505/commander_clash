@@ -616,6 +616,17 @@ function parseAttackerTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!body) return "fail";
     return { event: "creatureYouControlAttacks", attacker: { filter: { ...filter, text: you[2]! }, anyone: true, attacksYou: you[3] ? "orPlaneswalker" : "player" }, body };
   }
+  // "Whenever a creature attacks one of your opponents" (Genestealer Locus, Calculating Lich): a creature attacking an
+  // opponent of this permanent's controller (CR 508.3a), not a planeswalker or battle; "or a planeswalker an opponent
+  // controls" (Gahiji) too. "That player" is the player it attacks.
+  const opp = m || any || you ? null : /^Whenever (an?) (.+?) attacks one of your opponents( or a planeswalker an opponent controls)?, (.+)$/.exec(line);
+  if (opp) {
+    const filter = parseTargetPhrase(opp[2]!);
+    if (!filter || filter.kind !== "object" || !(filter.types?.includes("Creature") || filter.subtypes?.length)) return "fail";
+    const body = parseBody(opp[4]!.replace(/\bthat creature\b(?!'s)/g, "it"), { subjectIt: true, eventPlayer: true });
+    if (!body) return "fail";
+    return { event: "creatureYouControlAttacks", attacker: { filter: { ...filter, text: opp[2]! }, anyone: true, attacksYou: opp[3] ? "opponentOrPlaneswalker" : "opponent" }, body };
+  }
   // Kazuul, Tyrant of the Cliffs: "Whenever a creature an opponent controls attacks, if you're the defending player, ...":
   // once for each creature attacking you, a planeswalker you control or a battle you protect (CR 506.2, rulings), an
   // intervening if (CR 603.4) checked again as it resolves.
@@ -1424,6 +1435,20 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = parseBody(attacked[1]!.replace(/\bthat opponent\b/g, "that player"), { eventPlayer: true });
     if (!body) return "fail";
     return { event: "opponentAttacksYou", attacksYou: { min: 2, ...(/planeswalkers you control/.test(line) ? { orPlaneswalkers: true as const } : {}) }, body: { ...body, text: attacked[1]! } };
+  }
+  // Breena: "Whenever a player attacks one of your opponents, if that opponent has more life than another of your
+  // opponents, ...": once for each player attacking each of your opponents (CR 508.3e); "that attacking player" is the one
+  // who attacked, "that opponent" the one attacked.
+  const attacksOpp = /^Whenever a player attacks one of your opponents, (?:if that opponent has more life than another of your opponents, )?(.+)$/.exec(line);
+  if (attacksOpp) {
+    const text = attacksOpp[1]!;
+    if (/\bthat (?:opponent|player)\b/.test(text.replace(/\bthat attacking player\b/g, ""))) return "fail";
+    const body = parseBody(text.replace(/\bthat attacking player\b/g, "that player").replace(/ and you put /, ". Put "), { eventPlayer: true });
+    if (!body) return "fail";
+    const json = JSON.stringify(body.effects).replaceAll('{"ref":"eventPlayer"}', '{"ref":"attackingPlayer"}');
+    if (json.includes("eventPlayer")) return "fail";
+    const ifCond = /, if that opponent has more life/.test(line) ? { ifCond: { kind: "eventPlayerMoreThanAnotherOpponent" as const, what: "life" as const } } : {};
+    return { event: "playerAttacksYourOpponent", ...ifCond, body: { ...body, effects: JSON.parse(json), text } };
   }
   // Coveted Jewel: "that player draws three cards and gains control of ~. Untap it." (two instructions for that player, then
   // untapping ~).

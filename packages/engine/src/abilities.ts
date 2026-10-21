@@ -648,6 +648,8 @@ export type PlayerRef =
   | { ref: "targetOwner"; index: number } // "its owner": a targeted card's owner (Pharika's "Its owner creates ...")
   /** "That player" in "Whenever ~ deals combat damage to a player, that player discards a card". */
   | { ref: "eventPlayer" }
+  /** "That attacking player" (Breena): the player who attacked, for "playerAttacksYourOpponent" (TriggerEventInfo.attacker). */
+  | { ref: "attackingPlayer" }
   /** "Each other opponent" after "Whenever ~ deals combat damage to an opponent": this ability's controller's opponents but that one. */
   | { ref: "otherOpponents" }
   /** The player this Aura is attached to ("enchanted player", CR 702.5d), as it last existed if it's gone. */
@@ -843,6 +845,7 @@ export type Modification =
   | { kind: "setName"; name: string }
   /** "Have base toughness 1" (Maha, Its Feathers Night): toughness only, power unchanged. */
   | { kind: "setToughness"; toughness: Amount } // layer 7b
+  | { kind: "setPower"; power: Amount } // layer 7b
   /** A characteristic-defining ability (CR 604.3): "~'s power and toughness are each equal to ...", layer 7a. */
   | { kind: "definePT"; power?: Amount; toughness?: Amount }
   | { kind: "modifyPT"; power: Amount; toughness: Amount } // layer 7c
@@ -1055,6 +1058,8 @@ export type StaticCondition =
   | { kind: "opponentMore"; what: "lands" | "creatures" | "life" | "hand"; subjectController?: true; /** "That player" is the active player, an opponent (Keeper of the Accord). */ activePlayer?: true }
   /** "If that player has more cards in hand than each other player" (Battle Angels of Tyr): the trigger's event player. */
   | { kind: "eventPlayerMost"; what: "lands" | "creatures" | "life" | "hand" }
+  /** "If that opponent has more life than another of your opponents" (Breena): the event player against your other opponents. */
+  | { kind: "eventPlayerMoreThanAnotherOpponent"; what: "life" }
   /** "You control the creature with the greatest power or tied for the greatest power" (Triumph of Ferocity), "the artifact with the greatest mana value ..." (Padeem): among all on the battlefield. */
   | { kind: "controlGreatest"; type: "Creature" | "Artifact"; stat: "power" | "toughness" | "manaValue" }
   /** "As long as you have the city's blessing" (CR 702.131c). */
@@ -1295,6 +1300,14 @@ export type Effect =
   | { type: "drawUpTo"; who: PlayerRef; n: number }
   /** "Put your commander into your hand from the command zone" (Command Beacon): one of yours there, chosen with two (rulings). */
   | { type: "commanderToHand" }
+  /**
+   * "Put a commander you own from the command zone onto the battlefield" (Hellkite Courser): one of them, chosen with two;
+   * "It gains haste" (`haste`), "Return it to the command zone at the beginning of the next end step" (`atEndStep`), if
+   * it's still on the battlefield then (rulings).
+   */
+  | { type: "commanderToBattlefield"; haste?: "game" | "endOfTurn"; atEndStep?: "command" }
+  /** Put it into its owner's command zone (Hellkite Courser's delayed trigger), if it's still that permanent. */
+  | { type: "toCommandZone"; what: ObjRef }
   | { type: "gainLife"; who: PlayerRef; n: Amount }
   /** `drain`: "You gain life equal to the life lost this way" (extort, CR 702.101a; Gray Merchant). */
   | { type: "loseLife"; who: PlayerRef; n: Amount; drain?: boolean }
@@ -1311,6 +1324,12 @@ export type Effect =
       /** "If the difference between your life total and target player's life total is 5 or less" (Psychic Transfer), as it resolves. */
       maxDiff?: number;
     }
+  /**
+   * "Exchange target opponent's life total with ~'s toughness" (Tree of Perdition, CR 701.12g): the player gains or loses
+   * life to reach its previous toughness, and an effect sets its toughness (layer 7b) to their previous life total. If
+   * ~ has left the battlefield, or the life can't change, none of it happens (CR 701.12a, rulings).
+   */
+  | { type: "exchangeLifeWithSelf"; who: PlayerRef; stat: "power" | "toughness" }
   | { type: "destroy"; what: ObjRef; noRegen?: boolean } // "It can't be regenerated."
   /** "Regenerate ~": a shield that replaces its next destruction this turn (CR 701.19a). */
   | { type: "regenerate"; what: ObjRef }
@@ -1333,6 +1352,8 @@ export type Effect =
        * "A spell cast (by an opponent) this way costs {2} more to cast" (`more`, `moreOpponents`). A token can't be cast.
        */
       ownerMay?: { play?: true; free?: true; cost?: string; more?: number; moreOpponents?: true; /** Only this turn, or until the end of their next turn (Containment Construct, Moonstone), not for as long as it's exiled. */ until?: "thisTurn" | "nextTurn" };
+      /** "You may cast that card for as long as it remains exiled, and mana of any type can be spent to cast that spell" (Hostage Taker): the ability's controller's permission (CR 609.4b). */
+      youMay?: { anyType?: true };
     }
   /**
    * "Target instant or sorcery card in your graveyard gains flashback until end of turn. The flashback cost is equal to
@@ -1664,7 +1685,8 @@ export type Effect =
    */
   /**
    * `each`: about each token just created, or about the object the trigger was about ("destroy that creature at end
-   * of combat"), instead of the source.
+   * of combat"), instead of the source; "returned": about the permanent the trigger's card just became, with "~" the
+   * source's card in the graveyard (Gift of Immortality).
    */
   /** `lostControl`: "When you lose control of the creature, tap it" (Ray of Command), about `of` (CR 603.7). */
   /** `thisTurn`: "When you lose control of that Equipment this turn" (Stolen Uniform): only until the turn ends. */
@@ -1673,7 +1695,7 @@ export type Effect =
    * spell's) is its event player, "that spell's mana value" (Mana Drain) its event amount. `yourNextMain`: "at the
    * beginning of your next main phase", the next one that begins after it's made (rulings on Mana Drain).
    */
-  | { type: "delayed"; when: "nextTurnUpkeep" | "yourNextUpkeep" | "nextEndStep" | "yourNextEndStep" | "yourNextMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies" | "leaves"; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard"; of?: ObjRef; thisTurn?: true; event?: { player?: PlayerRef; amount?: Amount } }
+  | { type: "delayed"; when: "nextTurnUpkeep" | "yourNextUpkeep" | "nextEndStep" | "yourNextEndStep" | "yourNextMain" | "endOfCombat" | "nextCleanup" | "lostControl" | "dies" | "leaves"; effects: Effect[]; text: string; each?: "created" | "subject" | "selfCard" | "subjectCard" | "returned"; of?: ObjRef; thisTurn?: true; event?: { player?: PlayerRef; amount?: Amount } }
   /** Ninjutsu (CR 702.49a): put this card onto the battlefield from your hand tapped and attacking. */
   | { type: "ninjutsu" }
   /** Madness's trigger (CR 702.35a): its owner may cast the exiled card (the subject) for its madness cost; if not, it goes to the graveyard. */
@@ -2843,6 +2865,12 @@ export type TriggerEvent =
    */
   | "opponentAttacksYou"
   /**
+   * "Whenever a player attacks one of your opponents" (Breena): once for each player attacking each of your opponents with
+   * one or more creatures as attackers are declared, not their planeswalkers or battles (CR 508.3e). The event player is
+   * that opponent; "that attacking player" is TriggerEventInfo.attacker.
+   */
+  | "playerAttacksYourOpponent"
+  /**
    * "Whenever one or more creatures an opponent controls attack you and aren't blocked" (Coveted Jewel): once blockers are
    * declared, for each opponent with an unblocked creature attacking you (not your planeswalkers, rulings); "that player"
    * is that opponent.
@@ -2975,8 +3003,11 @@ export interface TriggeredAbility {
     other?: boolean;
     /** "Whenever a creature attacks": anyone's (Caltrops, Righteous Cause). */
     anyone?: true;
-    /** "Whenever a creature attacks you" (Briar Patch): this permanent's controller; "or a planeswalker you control" (Isperia) too. */
-    attacksYou?: "player" | "orPlaneswalker";
+    /**
+     * "Whenever a creature attacks you" (Briar Patch): this permanent's controller; "or a planeswalker you control" (Isperia)
+     * too. "One of your opponents" (Genestealer Locus): one of their opponents; "or a planeswalker an opponent controls" (Gahiji).
+     */
+    attacksYou?: "player" | "orPlaneswalker" | "opponent" | "opponentOrPlaneswalker";
   };
   /** What the event's subject has to be: "blocks a creature with flying", flanking's "a creature without flanking". */
   subjectFilter?: TargetSpec;
@@ -3538,7 +3569,8 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
 /** `wubrg`: Fist of Suns' "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast". */
 /** `evidence`: Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" (CompiledCard.payEvidence). */
 /** `citadel`: Bolas's Citadel's "pay life equal to its mana value rather than pay its mana cost" for the top card of your library. */
-export type AltCostKind = "impending" | "citadel" | "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle" | "convert" | "omniscience";
+/** `payZero`: "you may pay {0} rather than pay the mana cost" for some spells you cast (CompiledCard.payZero: As Foretold, Rooftop Storm). */
+export type AltCostKind = "payZero" | "impending" | "citadel" | "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle" | "convert" | "omniscience";
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
 /** `aftermath`: the half of a split card with aftermath (CR 702.127a), cast only from a graveyard. */
@@ -3582,6 +3614,8 @@ export type CountMod =
   | { what: "tokens"; who: "you"; op: "andEach"; subtype: string; token: TokenSpec }
   /** "If you would create a Clue, Food, or Treasure token, instead create one of each" (Academy Manufactor): each of those is one of each of `subtypes`. */
   | { what: "tokens"; who: "you"; op: "oneOfEach"; subtypes: string[] }
+  /** "If one or more creature tokens would be created under your control, that many 4/4 white Angel creature tokens ... are created instead" (Divine Visitation): each token of card type `type` is a `token` instead. */
+  | { what: "tokens"; who: "you"; op: "instead"; type: string; token: TokenSpec }
   | { what: "counters"; counter?: CounterKind; on: "creature" | "permanent" | "artifactOrCreature"; who: "you" | "any"; op: "double" | "plusOne" | "minusOne"; other?: boolean }
   /**
    * Vorinclex, Monstrous Raider and Innkeeper's Talent: "If you would put one or more counters on a permanent or player,
@@ -4055,6 +4089,13 @@ export interface CompiledCard {
   payWUBRG?: true;
   /** Omniscience: "You may cast spells from your hand without paying their mana costs" (AltCostKind "omniscience"). */
   castFromHandFree?: true;
+  /**
+   * "You may pay {0} rather than pay the mana cost for Zombie creature spells you cast" (Rooftop Storm, AltCostKind
+   * "payZero", CR 118.9): spells matching `filter`; `fromHand`: cast from your hand; `once`: "once each turn", for each
+   * such permanent; `maxMvCounters`: "with mana value X or less, where X is the number of time counters on ~" (As
+   * Foretold), checked with X at 0 (rulings).
+   */
+  payZero?: { filter?: TargetSpec; fromHand?: true; once?: true; maxMvCounters?: string };
   /**
    * Obstinate Baloth: "If a spell or ability an opponent controls causes you to discard ~, put it onto the battlefield
    * instead of putting it into your graveyard" (a replacement effect, CR 614.1a). It's still discarded (rulings).

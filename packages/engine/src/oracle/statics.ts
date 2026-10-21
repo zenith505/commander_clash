@@ -906,6 +906,14 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^(?:doesn't untap during (?:its controller's|your) untap step|don't untap during their controllers' untap steps)$/.test(rest)) return [{ kind: "doesntUntap" }];
   if (/^can't become suspected$/.test(rest)) return [{ kind: "cantBeSuspected" }];
   if (/^loses all abilities$/.test(rest)) return [{ kind: "loseAllAbilities" }];
+  // The Archetypes: "Creatures your opponents control lose flying and can't have or gain flying": gone whatever gives it,
+  // after every other layer 6 effect (rulings).
+  if ((m = /^loses? ([a-z ,]+?) and can't have or gain ([a-z ,]+)$/.exec(rest))) {
+    const k = parseKeywordList(m[1]!);
+    const again = parseKeywordList(m[2]!.replace(/ or /g, " and "));
+    if (!k || !again || JSON.stringify([...k].sort()) !== JSON.stringify([...again].sort())) return null;
+    return [{ kind: "removeKeywords", keywords: k }, { kind: "cantHaveKeywords", keywords: k }];
+  }
   // Doran (CR 510.1a as modified), defender (CR 702.3b).
   if (/^assigns? combat damage equal to (?:its|their) toughness rather than (?:its|their) power$/.test(rest)) return [{ kind: "assignsToughness" }];
   if (/^can attack as though (?:it|they) didn't have defender$/.test(rest)) return [{ kind: "attackDespiteDefender" }];
@@ -1185,7 +1193,7 @@ function parseStaticLine(line: string): StaticAbility | null {
   // greater is checked as it assigns combat damage, which comes to the same thing as a group that changes with it.
   const greater = /^(.+?) with toughness greater than (?:its|their) power (assigns? .+)$/.exec(text);
   if (greater) text = `${greater[1]} ${greater[2]}`;
-  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|(?:is|are) all colors|can't .+|can block .+|can attack as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:, .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses all abilities)$/.exec(text);
+  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|(?:is|are) all colors|can't .+|can block .+|can attack as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:, .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses all abilities|loses? [a-z ,]+? and can't have or gain [a-z ,]+)$/.exec(text);
   if (!m) return null;
   const affects = parseAffected(m[1]!);
   if (!affects) return null;

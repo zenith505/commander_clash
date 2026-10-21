@@ -122,6 +122,16 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         for (const card of objects(s, { ref: "subjectCard" }, ctx)) addDelayed(s, e.when, ctx.controller, card, body, id && s.objects[id] ? cardIdOf(s.objects[id]!) : cardIdOf(card));
         return;
       }
+      // Gift of Immortality: the creature the dead card became (CR 400.7), and the Aura's card in the graveyard it went
+      // to. A token never comes back, so nothing is set up then (rulings).
+      if (e.each === "returned") {
+        const card = ctx.subject ? s.objects[ctx.subject.id] : undefined;
+        const aura = objects(s, { ref: "selfCard", moved: true }, ctx)[0];
+        if (!card || !aura || card.zone !== "battlefield" || (card.zoneChanges ?? 0) !== ctx.subject!.zc + 1) return;
+        addDelayed(s, e.when, ctx.controller, card, body, cardIdOf(aura));
+        s.delayed![s.delayed!.length - 1]!.source = { id: aura.id, zc: aura.zoneChanges ?? 0 };
+        return;
+      }
       if (e.each === "selfCard") {
         for (const card of objects(s, { ref: "selfCard" }, ctx)) addDelayed(s, e.when, ctx.controller, card, body);
         return;

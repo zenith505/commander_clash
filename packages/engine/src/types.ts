@@ -799,7 +799,8 @@ export interface DelayedTrigger {
   dies?: true;
   /**
    * The ability's source as it was when this was made, when its instructions are about that and not the subject ("When
-   * that creature dies this turn, flip ~", Initiate of Blood): "~" is that object only (CR 603.7c, 400.7).
+   * that creature dies this turn, flip ~", Initiate of Blood): "~" is that object only (CR 603.7c, 400.7). Also an Aura's
+   * card in a graveyard ("Return ~ to the battlefield attached to that creature at the beginning of the next end step").
    */
   source?: { id: ObjectId; zc: number };
   body: AbilityBody;
@@ -989,6 +990,11 @@ export interface ContinuousEffect {
   /** "For as long as it has a vow counter on it" (CR 611.2b): it applies only to those of `affected` with one (Promise of Loyalty). */
   whileCounter?: string;
   affected: ObjectId[];
+  /**
+   * Keywords it doesn't give some of `affected`: they couldn't have them as it was created (an Archetype's "can't have or
+   * gain flying"), so it never gives them, even after that ability stops applying (rulings on the Archetypes).
+   */
+  notGranted?: Record<ObjectId, string[]>;
   /** Instead of `affected`: whatever is in this group from `controller`'s view, at any time (Effect groupRules). */
   group?: Affects;
   mods: Modification[];
@@ -1085,7 +1091,7 @@ export type PendingDecision =
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "commander" | "drawUpTo" | "payX" | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | "pile" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom" | "searchZones" | "vote" | /** One of the words of "each opponent chooses fame or fortune". */ "word" | "mutate" | "either" | "payOrTop" | "counterKind" | /** "Remove up to three counters": the next one to remove, or "done". */ "removeCounter" | /** Which target of a spell or ability becomes ~ (Spellskite). */ "targetSlot" | /** A number chosen secretly (Wheel of Misfortune): any whole number in `numberRange`. */ "secretNumber"; options: string[]; /** Any whole number from `min` to `max` may be chosen, not only `options`. */ numberRange?: { min: number; max: number }; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** "removeCounter": the permanent the counters are moved onto (Resourceful Defense). */ onto?: ObjectId; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId; /** "pile": the two piles, the first then the second (Fact or Fiction); `of`, the player whose hand the chosen one goes to. */ piles?: [ObjectId[], ObjectId[]] }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "commander" | "drawUpTo" | "payX" | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | "pile" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom" | "searchZones" | "vote" | /** One of the words of "each opponent chooses fame or fortune". */ "word" | "mutate" | "either" | "payOrTop" | "counterKind" | /** "Remove up to three counters": the next one to remove, or "done". */ "removeCounter" | /** Which target of a spell or ability becomes ~ (Spellskite). */ "targetSlot" | /** Which legendary permanent of a group to keep (CR 704.5j); the options are their ids. */ "legend" | /** A number chosen secretly (Wheel of Misfortune): any whole number in `numberRange`. */ "secretNumber"; options: string[]; /** Any whole number from `min` to `max` may be chosen, not only `options`. */ numberRange?: { min: number; max: number }; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** "removeCounter": the permanent the counters are moved onto (Resourceful Defense). */ onto?: ObjectId; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId; /** "pile": the two piles, the first then the second (Fact or Fiction); `of`, the player whose hand the chosen one goes to. */ piles?: [ObjectId[], ObjectId[]] }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -1152,6 +1158,8 @@ export interface TurnLog {
    * each permanent type": the permissions used, `id@zoneChanges:slot` (a new object gets a new one, rulings).
    */
   gravePermits?: string[];
+  /** "Once each turn, you may pay {0} rather than pay the mana cost" (As Foretold): the permanents (`id@zc`) used this turn. */
+  payZeroUsed?: string[];
   /** Players who activated an equip ability this turn (Forge Anew's "the first equip ability you activate"). */
   equipped?: PlayerId[];
   /** Players who gained life (Needlebite Trap). */
@@ -1446,6 +1454,8 @@ export interface GameState {
    * in `returned`. `asking`: that one is being asked now.
    */
   untilReturns?: { auras: { id: ObjectId; zc: number; under: PlayerId; source: string; asking?: true }[]; returned: ObjectId[] };
+  /** Legends chosen to keep under the legend rule (CR 704.5j), until the state-based actions are next performed. */
+  legendKeep?: ObjectId[];
   entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; names?: TargetSpec; purpose?: NamePurpose; options?: string[]; range?: { min: number; max: number }; secret?: true; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean } }[];
   nextId: number;
   /**
@@ -1522,6 +1532,8 @@ export interface TriggerEventInfo {
   /** The total power of the creatures a "one or more ... die" event was about, as they last existed (The Skullspore Nexus). */
   groupPower?: number;
   player?: PlayerId;
+  /** "Whenever a player attacks one of your opponents": the attacking player ("that attacking player"); `player` is that opponent. */
+  attacker?: PlayerId;
   /**
    * "If two or more of those creatures are attacking you and/or planeswalkers you control" (Mangara): checked again as it
    * resolves (CR 603.4) with `group`, those attackers; one that left the battlefield counts as it last was (rulings).
@@ -1656,6 +1668,8 @@ export interface Resolving {
     numbers?: { queue: PlayerId[]; chosen: Record<string, number>; pick?: number; step?: "discard" | "draw"; draws?: PlayerId[] };
     /** Tainted Pact: the names exiled so far, and the card the player is asked about. */
     pact?: { names: string[]; asking?: ObjectId };
+    /** "For each creature exiled this way, its controller searches ..." (Winds of Abandon): the players done so far. */
+    forEachDone?: PlayerId[];
     queue?: PlayerId[]; // players still to choose, in APNAP order (CR 101.4)
     drawQueue?: PlayerId[]; // players still to draw: a draw can stop for dredge (CR 702.52a)
     digQueue?: PlayerId[]; // "each player looks at the top five cards": players still to look (Explore the Vastlands)
@@ -1778,6 +1792,8 @@ export interface Resolving {
     topOrBottom?: string; // the owner's choice: "top" or "bottom"
     /** The player a creature put onto the battlefield attacking attacks (CR 508.4), as a PlayerId string. */
     attackWhom?: string;
+    /** Token copies created attacking: what each one attacks, chosen so far (attackChoices keys). */
+    attackPicks?: string[];
     /** "Tapped and attacking that player or a planeswalker they control": each opponent's pick (an attackChoices key). */
     attackEach?: Record<number, string[]>;
     /** "Search your library and/or graveyard": "both", or "graveyard" alone (no shuffle). */

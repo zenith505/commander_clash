@@ -108,6 +108,12 @@ describe("Jaxis, the Troublemaker", () => {
 });
 
 describe("Delina, Wild Mage", () => {
+  // Each token attacks what you choose (round 109): here, the player Delina attacks, offered first.
+  const settleAttack = (s0: GameState) => {
+    let s = settle(s0);
+    while (s.pending?.kind === "chooseOption" && s.pending.what === "attackWhom") s = settle(act(s, { type: "chooseOption", player: s.pending.player, choice: s.pending.options[0]! }));
+    return s;
+  };
   const scene = () => {
     const { s: s0, ap, opp } = setup([]);
     const s = s0;
@@ -123,7 +129,7 @@ describe("Delina, Wild Mage", () => {
     // The trigger's target: the legendary creature (it didn't attack).
     rig(s, 20, [7]);
     s = act(s, { type: "chooseTargets", player: ap, targets: [target(l)] } as never);
-    s = settle(s);
+    s = settleAttack(s);
     const toks = named(s, "Test Legend").filter((id) => s.objects[id]!.isToken);
     expect(toks).toHaveLength(1);
     const t = s.objects[toks[0]!]!;
@@ -140,11 +146,11 @@ describe("Delina, Wild Mage", () => {
     const { s: s0, ap, opp, d, l } = scene();
     let s = attack(s0, ap, [d], opp);
     rig(s, 20, [17, 18, 3]);
-    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [target(l)] } as never));
+    s = settleAttack(act(s, { type: "chooseTargets", player: ap, targets: [target(l)] } as never));
     expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap, prompt: "roll again" });
-    s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+    s = settleAttack(act(s, { type: "chooseMay", player: ap, yes: true }));
     expect(s.pending).toMatchObject({ kind: "chooseMay", prompt: "roll again" });
-    s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+    s = settleAttack(act(s, { type: "chooseMay", player: ap, yes: true }));
     // 17, 18, then 3: three tokens, and no more asking after the 1—14 row.
     expect(s.pending).toBeNull();
     expect(named(s, "Test Legend").filter((id) => s.objects[id]!.isToken)).toHaveLength(3);
@@ -154,7 +160,7 @@ describe("Delina, Wild Mage", () => {
     const { s: s0, ap, opp, d, l } = scene();
     let s = attack(s0, ap, [d], opp);
     rig(s, 20, [20]);
-    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [target(l)] } as never));
+    s = settleAttack(act(s, { type: "chooseTargets", player: ap, targets: [target(l)] } as never));
     s = settle(act(s, { type: "chooseMay", player: ap, yes: false }));
     expect(named(s, "Test Legend").filter((id) => s.objects[id]!.isToken)).toHaveLength(1);
   });

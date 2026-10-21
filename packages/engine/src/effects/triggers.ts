@@ -859,7 +859,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     causedBy = { event: "attacks", objs: [{ o, controller: controllerOf(s, o) }] };
     // Is it attacking `pid` ("attacks you"), or them or a planeswalker they control (CR 506.2: `attacking` is then the
     // planeswalker's controller)?
-    const attackingYou = (a: GameObject, pid: PlayerId) => ({ player: a.attacking === pid && !a.attackingPermanent, orPlaneswalker: a.attacking === pid });
+    const attackingYou = (a: GameObject, pid: PlayerId) => {
+      const opp = a.attacking !== undefined && a.attacking !== pid && opponents(s, pid).includes(a.attacking);
+      return { player: a.attacking === pid && !a.attackingPermanent, orPlaneswalker: a.attacking === pid, opponent: opp && !a.attackingPermanent, opponentOrPlaneswalker: opp && a.attackingPermanent?.battleController === undefined };
+    };
     // "Defending player" is the player it attacked as it became an attacking creature (myriad rulings).
     add(o, controllerOf(s, o), (e, t) => (e === "selfAttacks" || e === "selfAttacksOrBlocks") && (!t.attacksMostLife || attacksMostLife(s, o)) && (!t.attacksPlayer || !o.attackingPermanent) && (!t.attacksBattle || o.attackingPermanent?.battleController !== undefined) && (!t.firstAttack || o.attacked?.n === 1) && (!t.training || trains(s, o)) && (!t.withOthers || othersAttacking(s, o, t.withOthersType, t.withOthersToken) >= t.withOthers), undefined, undefined, undefined, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
     addHosted(o, (e) => e === "selfAttacks" || e === "selfAttacksOrBlocks", undefined, o, o.attacking !== undefined ? { player: o.attacking } : undefined);
@@ -923,6 +926,18 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           const info = { player: ev.controller, group, ...(t.attacksYou.orPlaneswalkers ? { attackingYou: { you, min: t.attacksYou.min, orPlaneswalkers: true as const } } : {}) };
           add(o, you, (e, tt) => e === "opponentAttacksYou" && tt.body.text === t.body.text, undefined, undefined, undefined, undefined, undefined, undefined, info);
         }
+      }
+    }
+    // "Whenever a player attacks one of your opponents" (Breena): once for each of the watcher's opponents that player's
+    // creatures attack, not their planeswalkers or battles (CR 508.3e). The attacking player may be the watcher's controller.
+    if (ev.type === "groupAttack") {
+      const attacked = [...new Set(ev.ids.map((x) => s.objects[x]).filter((a) => a?.attacking !== undefined && !a.attackingPermanent).map((a) => a!.attacking!))];
+      for (const id of s.battlefield) {
+        const o = obj(s, id);
+        const you = controllerOf(s, o);
+        if (!abilitiesOf(s, o).triggers.some((t) => t.event === "playerAttacksYourOpponent")) continue;
+        for (const p of s.turnOrder.filter((q) => attacked.includes(q)))
+          if (opponents(s, you).includes(p)) add(o, you, (e) => e === "playerAttacksYourOpponent", undefined, undefined, undefined, undefined, undefined, undefined, { player: p, attacker: ev.controller });
       }
     }
     // "Whenever enchanted player is attacked": once, however many creatures attack them; not for a planeswalker (rulings).
@@ -1331,7 +1346,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
               : d.when !== "leaves" && d.when !== "lostControl" && ev.step === "upkeep" && (d.when === "nextTurnUpkeep" || ev.active === d.controller) && d.turn < s.turn;
       if (!due) continue;
       if (d.when !== "eachYourUpkeep" && d.when !== "eachYourPrecombatMain") s.delayed = s.delayed!.filter((x) => x !== d);
-      s.triggerQueue.push({ sourceId: d.subject.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, sourceZc: d.subject.zc, body: d.body, transformsAt: d.transforms ?? 0, ...(d.event ? { event: d.event } : {}) });
+      // "~" is the subject, or the source it remembers (Gift of Immortality's Aura card).
+      s.triggerQueue.push({ sourceId: d.source?.id ?? d.subject.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, sourceZc: d.source?.zc ?? d.subject.zc, body: d.body, transformsAt: d.transforms ?? 0, ...(d.event ? { event: d.event } : {}) });
     }
     // "At the beginning of the monarch's end step, that player draws a card" (CR 725.2).
     if (ev.step === "end" && s.monarch === ev.active) monarchTrigger(s, 0);

@@ -279,7 +279,9 @@ describe("round 99, more cards", () => {
     putOnBattlefield(s0, opp, legend);
     let s = act(s0, { type: "passPriority", player: waitingOn(s0)! });
     expect(isamarus(s, ap)).toHaveLength(2);
-    // The opponent's pair still goes down to one (CR 704.5j).
+    // The opponent's pair still goes down to one (CR 704.5j), the one they choose.
+    expect(s.pending?.kind === "chooseOption" && s.pending.what === "legend" && s.pending.player).toBe(opp);
+    s = act(s, { type: "chooseOption", player: opp, choice: isamarus(s, opp)[0]! });
     expect(isamarus(s, opp)).toHaveLength(1);
     putOnBattlefield(s, opp, gallery);
     putOnBattlefield(s, opp, legend);

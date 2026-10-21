@@ -8,7 +8,7 @@ import { parseBecomes, parseDig, parseSentence } from "./sentence";
 import { parsePreventionRider } from "./sentences/prevention";
 import { compileQuoted, parseGrants } from "./grants";
 import { boundAtTargeting, parseCardTarget, parseDamageRecipient, parseObject, parsePlayer, parseTargetPhrase, pickFilter, PERMANENT_TYPES } from "./targets";
-import { parseCardNameChoice, parseSearchFilter } from "./search";
+import { parseCardNameChoice, parseSearch, parseSearchFilter } from "./search";
 import { parseManaSpend, parseManaTrigger } from "./mana-abilities";
 import { parseTrigger } from "./triggers";
 import { parseToken } from "./tokens";
@@ -1153,6 +1153,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
         if (tax[1]) prev.ownerMay.moreOpponents = true;
         si++;
       }
+      continue;
+    }
+    // Hostage Taker: "exile another target creature or artifact until ~ leaves the battlefield. You may cast that card for
+    // as long as it remains exiled, and mana of any type can be spent to cast that spell": a permission for the
+    // ability's controller (CR 609.4b), that card only while it stays exiled (CR 400.7).
+    const youCast = /^You may cast (?:that card|it) for as long as it remains exiled(, and mana of any type can be spent to cast (?:that spell|it))?$/.exec(s);
+    if (youCast) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "exile" || prev.linked || prev.ownerMay || prev.youMay || prev.what.ref !== "target" || (prev.what.n ?? 1) !== 1) return null;
+      prev.youMay = youCast[1] ? { anyType: true } : {};
       continue;
     }
     // A tempting offer and the like: "Each opponent may create a Treasure token. For each opponent who does, you create a
@@ -2352,6 +2362,14 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const UNDER = "(its owner's|their owner's|their owners'|your)";
     const laterRe = new RegExp(`^(?:If you do, )?(?:At the beginning of the next end step, return ${BACK} to the battlefield( tapped)? under ${UNDER} control|[Rr]eturn ${BACK} to the battlefield( tapped)? under ${UNDER} control(?: with an? ${COUNTER} counter on it)? at the beginning of (the|that player's) next end step)(?: with an? ${COUNTER} counter on it)?$`);
     const later = laterRe.exec(s);
+    // Gift of Immortality: "When enchanted creature dies, return that card to the battlefield under its owner's control.
+    // Return ~ to the battlefield attached to that creature at the beginning of the next end step": a delayed trigger
+    // about the permanent the card became, and the Aura's card in the graveyard (rulings).
+    const prevPut = effects[effects.length - 1];
+    if (ctx.auraCard && /^Return ~ to the battlefield attached to that creature at the beginning of the next end step$/.test(s) && prevPut?.type === "putOntoBattlefield" && prevPut.what.ref === "subjectCard" && si === 1) {
+      effects.push({ type: "delayed", when: "nextEndStep", each: "returned", effects: [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, attachToSubject: true }], text: "return ~ to the battlefield attached to that creature" });
+      continue;
+    }
     // "Exile this Saga, then return it to the battlefield transformed under your control": its back face up (CR 712.14a).
     const now = /^(?:[Tt]hen )?[Rr]eturn (?:it|that card|them|those cards) to the battlefield( transformed)? under (its owner's|their owners'|your) control$/.exec(s);
     if (now && effects[effects.length - 1]?.type === "exile") {
@@ -2395,7 +2413,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // the beginning of the next end step." (Sneak Attack), "... Return that creature to your hand at the beginning of the
     // next end step." (Ilharg) likewise.
     const haste = /^(?:That creature|It) gains haste( until end of turn)?$/.exec(s);
-    const atEnd = /^(Exile|Sacrifice) (?:it|that creature|the creature) at the beginning of the next end step$/.exec(s) ?? /^(Return) (?:it|that creature) to your hand at the beginning of the next end step$/.exec(s);
+    const atEnd = /^(Exile|Sacrifice) (?:it|that creature|the creature) at the beginning of the next end step$/.exec(s) ?? /^(Return) (?:it|that creature) to your hand at the beginning of the next end step$/.exec(s) ?? (/^Return it to the command zone at the beginning of the next end step$/.test(s) ? ["", "Return to the command zone"] : null);
     if (haste || atEnd) {
       const last = effects[effects.length - 1];
       const put = last?.type === "may" && last.effects.length === 1 ? last.effects[0] : last;
@@ -2406,6 +2424,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       }
       if (fromHand && atEnd && !fromHand.atEndStep) {
         fromHand.atEndStep = atEnd[1] === "Exile" ? "exile" : atEnd[1] === "Return" ? "hand" : "sacrifice";
+        continue;
+      }
+      // Hellkite Courser: "It gains haste. Return it to the command zone at the beginning of the next end step."
+      const cmd = put?.type === "commanderToBattlefield" ? put : undefined;
+      if (cmd && haste && !cmd.haste && !cmd.atEndStep) {
+        cmd.haste = haste[1] ? "endOfTurn" : "game";
+        continue;
+      }
+      if (cmd && atEnd?.[1] === "Return to the command zone" && !cmd.atEndStep) {
+        cmd.atEndStep = "command";
         continue;
       }
       const one = put?.type === "putOntoBattlefield" && ((put.what.ref === "target" && !put.what.n) || put.what.ref === "graveyardEnd") ? put : undefined;
@@ -2622,6 +2650,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     }
     // "For each creature exiled this way, its controller creates a 2/2 green Boar creature token" (Curse of the Swine),
     // "For each creature destroyed this way, its controller draws a card": after the destroy or exile instruction.
+    // Winds of Abandon: "For each creature exiled this way, its controller searches their library for a basic land card.
+    // Those players put those cards onto the battlefield tapped, then shuffle." Each of those players searches for as many
+    // as they controlled (none found is fine, CR 701.19b), in APNAP order (CR 101.4).
+    const perSearch = /^For each (creature) exiled this way, its controller searches their library for (a basic land card)$/.exec(s);
+    if (perSearch && sentences[si + 1] === "Those players put those cards onto the battlefield tapped, then shuffle") {
+      const search = parseSearch(`Search your library for ${perSearch[2]}, put it onto the battlefield tapped, then shuffle`);
+      const spec = parseTargetPhrase(perSearch[1]!);
+      if (effects[effects.length - 1]?.type !== "exile" || search?.length !== 1 || search[0]!.type !== "search" || spec?.kind !== "object") return null;
+      effects.push({ type: "forEachThisWay", which: "exiled", filter: { ...spec, text: perSearch[1]! }, effects: [{ ...search[0]!, who: { ref: "eachOne" } }] });
+      si++;
+      continue;
+    }
     const perThisWay = /^For each (.+?) (destroyed|exiled|put into a graveyard) this way, its controller (creates an? .+ token(?: with [a-z ]+)?|draws a card)$/.exec(s);
     if (perThisWay) {
       const graveyard = perThisWay[2] === "put into a graveyard";

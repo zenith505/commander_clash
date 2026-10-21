@@ -829,9 +829,19 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // "Target player gains control of target permanent you control" (Donate): that player's effect.
       const giveTo = e.giveTo ? players(s, e.giveTo, ctx)[0] : undefined;
       if (e.giveTo && (giveTo === undefined || player(s, giveTo).lost)) return;
+      // Keywords an affected object can't have now (an Archetype) are never gained from this effect (rulings).
+      const notGranted: Record<ObjectId, string[]> = {};
+      const gains = mods.flatMap((m) => (m.kind === "addKeywords" ? m.keywords : []));
+      if (gains.length)
+        for (const id of affected) {
+          const cant = characteristics(s, obj(s, id)).cantHave ?? [];
+          const no = gains.filter((k) => cant.some((x) => x.toLowerCase() === k.toLowerCase()));
+          if (no.length) notGranted[id] = no;
+        }
       s.effects.push({
         id: `e${s.nextId++}`,
         timestamp: s.nextTimestamp++, // CR 613.7b
+        ...(Object.keys(notGranted).length ? { notGranted } : {}),
         controller: giveTo ?? ctx.controller,
         sourceName: src,
         sourceId: ctx.sourceId,

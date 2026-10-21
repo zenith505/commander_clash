@@ -56,6 +56,8 @@ import {
   autoEvidence,
   evidenceProblem,
   altCostsFor,
+  payZeroSource,
+  legendBotKeep,
   unlockCost,
   castExtraCosts,
   lifeCostOffers,
@@ -333,6 +335,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const best = [...(opps.length ? opps : pend.options)].sort((a, b) => might(Number(b)) - might(Number(a)) || player(s, Number(b)).life - player(s, Number(a)).life)[0]!;
       return [{ type: "chooseOption", player: pid, choice: best }];
     }
+    // The legend rule (CR 704.5j): the one with Auras, Equipment or counters on it, else the card, else the oldest.
+    if (pend.kind === "chooseOption" && pend.what === "legend") return [{ type: "chooseOption", player: pid, choice: legendBotKeep(s, pend.options) }];
     // A Siege's protector (CR 310.12a): the opponent least able to defend it, so we can defeat it and flip it.
     if (pend.kind === "chooseOption" && pend.what === "protector") {
       const guard = (x: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === x && objIsType(s, obj(s, id), "Creature")).reduce((n, id) => n + Math.max(0, toughness(s, obj(s, id))), 0);
@@ -1277,6 +1281,11 @@ function freeAltPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
   // Omniscience: every spell from our hand for nothing.
   if (o.zone === "hand" && altCost(defOf(s, o), "omniscience", s, pid)) {
     const plan = castPlan(s, pid, id, false, undefined, "omniscience");
+    if (plan) return plan;
+  }
+  // As Foretold, Rooftop Storm: {0} rather than the mana cost (a commander's tax is still paid).
+  if (payZeroSource(s, pid, o)) {
+    const plan = castPlan(s, pid, id, false, undefined, "payZero");
     if (plan) return plan;
   }
   if (o.zone !== "hand" || !freeAlt(defOf(s, o))) return null;
@@ -2774,6 +2783,14 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
         const costs = abilityCosts(s, pid, o, ab, targets);
         if (costs === null) continue;
         if (flips && flipWorth(s, pid, o, ab, flips, targets) <= 0) continue;
+        // Tree of Perdition, Tree of Redemption: only to lower an opponent's life total, or raise ours.
+        const swap = body.effects.find((e) => e.type === "exchangeLifeWithSelf");
+        if (swap?.type === "exchangeLifeWithSelf") {
+          const t = swap.who.ref === "target" ? targets[swap.who.index] : undefined;
+          const who = swap.who.ref === "you" ? pid : t?.kind === "player" ? t.id : undefined;
+          const stat = swap.stat === "power" ? power(s, o) : toughness(s, o);
+          if (who === undefined || (who === pid ? stat <= player(s, pid).life + 2 : stat >= player(s, who).life)) continue;
+        }
         plan = planActivate(s, pid, id, i, targets.length ? targets : undefined, modes, undefined, x, costs);
         if (plan) break;
       }

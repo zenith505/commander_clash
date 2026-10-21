@@ -1254,7 +1254,7 @@ export interface GameState {
   cantBlockThisTurn?: { filter: TargetSpec; controller: PlayerId }[];
   /** "Creatures can't attack this turn": matching creatures can't attack, also ones that arrive later. */
   cantAttackThisTurn?: { filter: TargetSpec; controller: PlayerId }[];
-  /** Each spell cast this turn as it was cast, by stack id: what a copy of it copies if it has left the stack (CR 707.10). */
+  /** Each spell cast (and ability activated) this turn as it was put on the stack, by stack id: what a copy of it copies if it has left the stack (CR 707.10). */
   castItems?: Record<string, StackItem>;
   /** Spells with epic as they resolved, by stack id: copied at each of their controller's upkeeps (CR 702.50a). */
   epics?: Record<string, StackItem>;

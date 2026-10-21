@@ -82,6 +82,8 @@ export interface Ctx {
   spell?: boolean;
   /** A "whenever a player casts a spell" trigger: "it" or "that spell" can be the spell cast. */
   castSpell?: boolean;
+  /** A "whenever you activate an ability" trigger: "that ability" is the ability activated (Rings of Brighthearth). */
+  activatedAbility?: boolean;
   /** A cast trigger's first instruction: "it gains haste" (Tyvar Kell's emblem) is the spell cast. */
   spellIt?: boolean;
   /** In a "when you cast this spell" ability: "copy it" is the spell itself. */
@@ -462,7 +464,7 @@ function splitSentences(text: string): string[] {
   return out;
 }
 
-export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean } = {}): AbilityBody | null {
+export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean } = {}): AbilityBody | null {
   const modal = MODAL.exec(text.trim());
   if (modal) {
     const body = parseModal(modal[1]!, modal[3]!, text.trim(), opts);
@@ -488,6 +490,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     ...(opts.costLinked ? { costLinked: true } : {}),
     ...(opts.spell ? { spell: true } : {}),
     ...(opts.castSpell ? { castSpell: true, spellIt: true } : {}),
+    ...(opts.activatedAbility ? { activatedAbility: true } : {}),
     ...(opts.eventPlayer ? { eventPlayer: true } : {}),
     ...(opts.defending ? { defending: true } : {}),
     ...(opts.selfCastSpell ? { selfCastSpell: true } : {}),
@@ -2101,7 +2104,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     if (/^You may choose new targets for the cop(?:y|ies)$/i.test(s)) {
       const prev = effects[effects.length - 1];
       // "You may copy that spell. You may choose new targets for the copy." (Invocation of the Founders): the copy it may make.
-      const copy = prev?.type === "nextCast" ? prev.effects[prev.effects.length - 1] : prev?.type === "may" && !prev.pay && prev.effects.length === 1 ? prev.effects[0] : prev;
+      // "You may pay {2}. If you do, copy that ability" (Rings of Brighthearth): the copy paying makes.
+      const copy = prev?.type === "nextCast" ? prev.effects[prev.effects.length - 1] : prev?.type === "may" && (!prev.pay || prev.effects[0]?.type === "copySpell") && prev.effects.length === 1 ? prev.effects[0] : prev;
       // "Copy it. If you've completed a dungeon, copy that spell twice instead. You may choose new targets for the
       // copies" (Tomb of Horrors Adventurer): the copies either way.
       const both = prev?.type === "if" ? [...prev.effects, ...(prev.otherwise ?? [])] : [];

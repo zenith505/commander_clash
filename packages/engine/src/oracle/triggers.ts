@@ -837,7 +837,7 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
  * battlefield, if it isn't a mana ability" (Harsh Mentor). One that mana abilities trigger too isn't modeled.
  */
 function parseActivatesTrigger(line: string): TriggeredAbility | "fail" | null {
-  const m = /^Whenever (a player|an opponent) activates an ability( of (?:an?|another) (.+?)(?: on the battlefield)?)?(?: that isn't a mana ability|, if it isn't a mana ability), (.+)$/.exec(line);
+  const m = /^Whenever (a player|an opponent|you) activates? an ability( of (?:an?|another) (.+?)(?: on the battlefield)?)?(?: that isn't a mana ability|, if it isn't a mana ability), (.+)$/.exec(line);
   if (!m) return /^Whenever (a player|an opponent|you) activates an? /.test(line) ? "fail" : null;
   let of: TargetSpec | undefined;
   if (m[2]) {
@@ -845,9 +845,9 @@ function parseActivatesTrigger(line: string): TriggeredAbility | "fail" | null {
     if (f?.kind !== "object") return "fail";
     of = f;
   }
-  const body = parseBody(theyAreThatPlayer(m[4]!), { eventPlayer: true });
+  const body = parseBody(theyAreThatPlayer(m[4]!), { eventPlayer: true, activatedAbility: true });
   if (!body) return "fail";
-  return { event: "abilityActivated", activates: { by: m[1] === "an opponent" ? "opponent" : "any", ...(of ? { of } : {}) }, body };
+  return { event: "abilityActivated", activates: { by: m[1] === "an opponent" ? "opponent" : m[1] === "you" ? "you" : "any", ...(of ? { of } : {}) }, body };
 }
 
 /**

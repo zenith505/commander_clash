@@ -2,7 +2,8 @@
 // go to 0 or less meanwhile, the loss waits for state-based actions, CR 704.3, 704.5a). Scroll Rack (cards from the
 // hand traded for as many from the top of the library, not drawn: rulings). Thousand-Year Storm (a copy for each
 // instant and sorcery spell you cast before it this turn). Crawlspace (no more than two creatures can attack you).
-// Delayed Blast Fireball ("each opponent and each creature they control"; "if ~ was cast from exile").
+// Delayed Blast Fireball ("each opponent and each creature they control"; "if ~ was cast from exile"). Rings of
+// Brighthearth (copying an activated ability, even once it's countered: rulings).
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
@@ -22,6 +23,9 @@ const grizzly = card("Runeclaw Bear", "Creature — Bear", "{1}{G}", { power: "2
 const crawlspace = card("Crawlspace", "Artifact", "{3}", { oracleText: "No more than two creatures can attack you each combat." });
 
 const fireball = card("Delayed Blast Fireball", "Instant", "{1}{R}{R}", { keywords: ["Foretell"], oracleText: "Delayed Blast Fireball deals 2 damage to each opponent and each creature they control. If this spell was cast from exile, it deals 5 damage to each opponent and each creature they control instead.\nForetell {4}{R}{R} (During your turn, you may pay {2} and exile this card from your hand face down. Cast it on a later turn for its foretell cost.)" });
+
+const rings = card("Rings of Brighthearth", "Artifact", "{3}", { oracleText: "Whenever you activate an ability, if it isn't a mana ability, you may pay {2}. If you do, copy that ability. You may choose new targets for the copy." });
+const pyromancer = card("Prodigal Pyromancer", "Creature — Human Wizard", "{2}{R}", { power: "1", toughness: "1", oracleText: "{T}: This creature deals 1 damage to any target." });
 
 const pass = (s: GameState) => act(s, { type: "passPriority", player: waitingOn(s)! });
 const settle = (s: GameState) => {
@@ -153,6 +157,32 @@ describe("round 102: Delayed Blast Fireball", () => {
       expect(s.objects[theirs]!.zone).toBe(fromExile ? "graveyard" : "battlefield");
       expect(s.objects[mine]!.zone).toBe("battlefield");
       expect(s.objects[mine]!.damage ?? 0).toBe(0);
+    }
+  });
+});
+
+describe("round 102: Rings of Brighthearth", () => {
+  it("parse", () => expect(isFullySupported(rings)).toBe(true));
+
+  it("pay {2}: a copy of the ability; not for mana abilities; not for an opponent's ability", () => {
+    for (const pay of [true, false]) {
+      const { s: s0, ap, opp } = setup([]);
+      putOnBattlefield(s0, ap, rings);
+      const py = putOnBattlefield(s0, ap, pyromancer);
+      putOnBattlefield(s0, opp, rings);
+      s0.players[ap]!.manaPool.C = 2;
+      let s = planActivate(s0, ap, py, 0, [{ kind: "player", id: opp }])!.reduce((x, y) => act(x, y), s0);
+      for (let i = 0; i < 100 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+        const p = s.pending;
+        if (p?.kind === "chooseMay") {
+          expect(p.player).toBe(ap);
+          s = act(s, { type: "chooseMay", player: ap, yes: pay });
+        } else if (p?.kind === "copyTargets") s = act(s, { type: "copyTargets", player: p.player });
+        else if (p) throw new Error(`unexpected ${p.kind}`);
+        else s = pass(s);
+      }
+      expect(s.players[opp]!.life).toBe(pay ? 38 : 39);
+      expect(s.players[ap]!.manaPool.C).toBe(pay ? 0 : 2);
     }
   });
 });

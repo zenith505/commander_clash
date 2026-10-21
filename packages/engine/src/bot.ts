@@ -259,6 +259,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const saving = (id: string) => manaAbilitiesOn(s, obj(s, id)).some((ab) => ab.produces.kind === "removeX" && (obj(s, id).counters[ab.produces.counter] ?? 0) < 3);
       return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => s.effects.some((e) => e.whileTapped?.id === id) || saving(id)) }];
     }
+    // Ripples of Potential: phase out what an opponent's spell or ability on the stack is aimed at, to save it.
+    if (pend.kind === "pickPermanents" && pend.action === "phaseOut") {
+      const aimed = new Set(s.stack.filter((it) => it.controller !== pid).flatMap((it) => it.targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])));
+      return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => aimed.has(id)) }];
+    }
     if (pend.kind === "pickPermanents" && pend.action === "enlist") return [{ type: "pickPermanents", player: pid, ids: chooseEnlist(s, pid, pend.options) }];
     if (pend.kind === "pickPermanents" && pend.action === "unblocked") return [{ type: "pickPermanents", player: pid, ids: chooseUnblocked(s, pid, pend.options) }];
     // Amplify: reveal everything that counts, for the most counters (CR 702.38a).

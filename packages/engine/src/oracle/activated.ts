@@ -37,7 +37,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const keyword = word && /^(Exhaust|Boast|Power-up)$/.test(word[1]!) ? (word[1] as "Exhaust" | "Boast" | "Power-up") : undefined;
   const line = word && (keyword || ABILITY_WORDS.has(word[1]!.toLowerCase()) || !KEYWORD_NAMES.has(word[1]!.toLowerCase())) ? raw.slice(word[0].length) : raw;
   // Costs: mana symbols run together ("{1}{R}"), other parts are comma-separated ("{2}, {T}, Sacrifice ~").
-  const piece = String.raw`(?:\{[^}]+\})+|Reveal the player you chose|Sacrifice ~|Exert ~|Discard ~|Exile ~ from your graveyard|Exile ~ from your hand|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay life equal to the number of colors in your commanders' color identity|Pay half your life, rounded (?:up|down)|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five|six|seven|eight|nine|ten|X) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Put (?:a|one|two|three) cards? from your hand on top of your library|Put a card exiled with ~ into its owner's graveyard|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control|Collect evidence \d+|Mill (?:a card|\w+ cards)|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile (?:a|an|one|two|three|four|five) [^,:]*?cards? from your graveyard`;
+  const piece = String.raw`(?:\{[^}]+\})+|Reveal the player you chose|Sacrifice ~|Exert ~|Discard ~|Exile ~ from your graveyard|Exile ~ from your hand|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay life equal to the number of colors in your commanders' color identity|Pay half your life, rounded (?:up|down)|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five|six|seven|eight|nine|ten|X) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Put (?:a|one|two|three) cards? from your hand on top of your library|Put a card exiled with ~ into its owner's graveyard|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control|Collect evidence \d+|Mill (?:a card|\w+ cards)|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile (?:a|an|one|two|three|four|five) [^,:]*?cards? from your graveyard|Exile (?:an?|another) [^,:]+? you control`;
   const m = new RegExp(`^((?:${piece})(?:, (?:${piece}))*): (.+)$`).exec(line);
   if (!m) return null;
   // "Pay half your life, rounded up" (Murderous Betrayal) has a comma of its own: read it apart from the other costs.
@@ -81,6 +81,12 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     } else if ((c = /^Collect evidence (\d+)$/.exec(part))) {
       // CR 701.59a: exile cards from your graveyard with total mana value N or more.
       extra.push({ kind: "collectEvidence", n: Number(c[1]) });
+    } else if ((c = /^Exile (an?|another) ([^,:]+?) you control$/.exec(part))) {
+      // "Exile a creature you control" (The Soul Stone): a permanent you choose as it's activated (CR 602.2b, 601.2h),
+      // exiled rather than sacrificed.
+      const filter = pickFilter(c[2]!);
+      if (!filter) return "fail";
+      extra.push({ kind: "sacrifice", filter, n: 1, exile: true, ...(c[1] === "another" ? { other: true } : {}) });
     } else if (/^Exile (?!~|the top )/.test(part)) {
       // "Exile a card from your graveyard" (Relic of Progenitus' cousins, Sigarda): cards chosen as it's activated.
       const c2 = parseAdditionalCost(part);
@@ -114,6 +120,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // "Any player may activate this ability" (CR 602.2): its controller is whoever activates it (CR 113.8), "you" in it
   // being that player; "but only during their turn" is the activator's turn.
   let anyPlayer = false;
+  let spendOnlyChosenColor = false;
   const anyone = / Any player may activate this ability(?: but only ([^.]+))?\.$/.exec(effectText);
   if (anyone) {
     anyPlayer = true;
@@ -132,6 +139,12 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       if (!c) return "fail";
       costLess = { ...c, times: (c.times ?? 1) * Number(less[1]) };
       effectText = effectText.slice(0, less.index);
+      found = true;
+    }
+    // "Spend only mana of the chosen color to activate this ability." (Throne of Eldraine): the color chosen as it entered.
+    if (/ Spend only mana of the chosen color to activate this ability\.$/.test(effectText) && !spendOnlyChosenColor) {
+      spendOnlyChosenColor = true;
+      effectText = effectText.slice(0, effectText.length - " Spend only mana of the chosen color to activate this ability.".length);
       found = true;
     }
     // "X can't be 0." (Ruthless Technomancer): only with an X in its costs.
@@ -212,9 +225,12 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   if (usesX(body) && !symbols.includes("X") && !extra.some((c) => "x" in c && c.x)) return "fail";
   // Any player's: only costs any player can pay (mana, life, their own cards and permanents), not ones that tap,
   // sacrifice, exile or change the permanent itself, which only its controller could do (CR 701.21a, 602.2).
+  // Only the chosen color's mana pays it: an ability of a permanent that chose one, with a mana cost, not a mana ability.
+  if (spendOnlyChosenColor && (mana !== "stack" || !manaCost || fromYard || fromHand)) return "fail";
   if (anyPlayer && (tap || mana !== "stack" || fromYard || fromHand || exileOwn || /Sacrifice ~|Exert ~|Remove |on ~|~/.test(costs) || halfLife || energy)) return "fail";
   return {
     ...(anyPlayer ? { anyPlayer: true as const } : {}),
+    ...(spendOnlyChosenColor ? { spendOnlyChosenColor: true as const } : {}),
     manaCost,
     tap,
     sacrificeSelf: /Sacrifice ~/.test(costs),

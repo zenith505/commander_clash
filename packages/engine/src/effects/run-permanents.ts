@@ -4,7 +4,7 @@ import { auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterT
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { playerCountersToPut, putCounters, tokenBatch } from "../counters";
 import { compileCard } from "../oracle";
-import type { ContinuousEffect, GameObject, GameState, PlayerId } from "../types";
+import type { ContinuousEffect, GameObject, GameState, ObjectId, PlayerId } from "../types";
 import { setFace } from "../faces";
 import { becomePrepared } from "../prepare";
 import { objectMatches } from "./targeting";
@@ -77,9 +77,10 @@ export function flipPermanent(s: GameState, o: GameObject): boolean {
  * each kind it has. Chosen for the player: their own permanents' helpful counters, opponents' permanents'
  * -1/-1 and stun counters, their own energy and experience, and opponents' poison.
  */
-export function proliferate(s: GameState, you: PlayerId, src: string) {
+export function proliferate(s: GameState, you: PlayerId, src: string): ObjectId[] {
   const helpful = (k: string) => k !== "-1/-1" && k !== "stun" && k !== "age" && k !== "time" && k !== "fade";
   const names: string[] = [];
+  const got: ObjectId[] = [];
   invalidateCharacteristics(s);
   for (const id of s.battlefield) {
     const o = obj(s, id);
@@ -89,7 +90,7 @@ export function proliferate(s: GameState, you: PlayerId, src: string) {
       if (!n || (mine ? !helpful(k) : !harmfulCounter(k))) continue;
       if (putCounters(s, o, k, 1)) added = true;
     }
-    if (added) names.push(defOf(s, o).name);
+    if (added) names.push(defOf(s, o).name), got.push(id);
   }
   for (const p of s.players) {
     if (p.lost) continue;
@@ -98,6 +99,7 @@ export function proliferate(s: GameState, you: PlayerId, src: string) {
     } else if (p.poison) (p.poison += playerCountersToPut(s, p.id, "poison", 1)), names.push(`${p.name} (poison)`);
   }
   log(s, `${src}: ${player(s, you).name} proliferates${names.length ? ` (${names.join(", ")})` : ""}.`);
+  return got;
 }
 
 /** Counters that hurt the permanent they're on: -1/-1 shrinks it, stun keeps it from untapping (CR 122.1d). */
@@ -133,6 +135,15 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         else untapPermanent(s, o);
       }
       return;
+    case "harness": {
+      // "Harness ~" (CR 701.64a): the same object only (CR 400.7); it stays harnessed until it leaves (701.64b).
+      const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (!o || o.zone !== "battlefield" || (ctx.sourceZc !== undefined && (o.zoneChanges ?? 0) !== ctx.sourceZc) || o.harnessed) return;
+      o.harnessed = true;
+      invalidateCharacteristics(s); // its "∞" abilities
+      log(s, `${defOf(s, o).name} is harnessed.`);
+      return;
+    }
     case "untapUpTo": {
       // Chosen as it resolves among the tapped ones (CR 608.2d), then untapped together.
       const r = s.resolving!;
@@ -295,8 +306,28 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       return;
     }
-    case "proliferate":
-      return proliferate(s, ctx.controller, src);
+    case "proliferate": {
+      if (!e.thenPhaseOut) {
+        proliferate(s, ctx.controller, src);
+        return;
+      }
+      // Ripples of Potential: then any number of your permanents that got a counter this way phase out (CR 702.26), chosen
+      // after proliferating; none is fine (rulings: "any number" includes zero).
+      const sc = (s.resolving!.scratch ??= {});
+      if (!sc.chosen?.[ctx.controller]) {
+        const got = proliferate(s, ctx.controller, src).filter((id) => s.objects[id]?.zone === "battlefield" && controllerOf(s, obj(s, id)) === ctx.controller);
+        if (!got.length) return;
+        sc.queue = [ctx.controller];
+        sc.chosen = {};
+        s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "phaseOut", what: "permanents of yours that got a counter", options: got, count: got.length, min: 0 };
+        return "paused";
+      }
+      const ids = sc.chosen[ctx.controller]!.filter((id) => s.objects[id]?.zone === "battlefield");
+      sc.chosen = undefined;
+      sc.queue = undefined;
+      if (ids.length) phaseOut(s, ids);
+      return;
+    }
     case "amass": {
       // CR 701.47a: with no Army, create a 0/0 black [subtype] Army first; then counters on an Army you control,
       // which becomes that subtype too. With several Armies, the one with the most counters is chosen.
@@ -730,6 +761,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         ...(e.duration === "yourNextTurn" ? { turnOf: ctx.controller } : {}),
         ...(whileTapped ? { whileTapped } : {}),
         ...(whileControlled ? { whileControlled } : {}),
+        ...(e.whileCounter ? { whileCounter: e.whileCounter } : {}),
         affected,
         mods,
       });

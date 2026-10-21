@@ -205,6 +205,9 @@ function parseManaProduced(text: string): ManaProduce | null {
   // "one mana of the chosen color", "{B} or one mana of the chosen color" (chosen as it entered).
   const chosen = /^(?:(\{[WUBRGC]\}) or )?one mana of the chosen color$/.exec(text);
   if (chosen) return { kind: "chosenColor", ...(chosen[1] ? { also: sym(chosen[1])! } : {}) };
+  // "Four mana of the chosen color" (Throne of Eldraine).
+  const chosenN = new RegExp(`^${NUM} mana of the chosen color$`).exec(text);
+  if (chosenN && num(chosenN[1]!) > 1) return { kind: "chosenColor", n: num(chosenN[1]!) };
   // "an amount of {G} equal to ~'s power", "X mana of any one color, where X is the number of Elves on the battlefield".
   // A static count: "~" is the permanent, "you" its controller.
   const amount = /^an amount of (\{[WUBRGC]\}) equal to (.+)$/.exec(text);
@@ -252,6 +255,8 @@ function parseManaProduced(text: string): ManaProduce | null {
  * ("of the chosen type", "on costs that contain {X}", "and that spell can't be countered", "... source").
  */
 export function parseManaSpend(sentence: string): ManaSpend | null {
+  // "Spend this mana only to cast monocolored spells of that color" (Throne of Eldraine): of the color chosen for its source.
+  if (sentence === "Spend this mana only to cast monocolored spells of that color.") return { text: sentence, spells: { kind: "spell", colorCount: "monocolored", chosen: "color", text: "monocolored spells of the chosen color" } };
   const m = /^Spend this mana only to (.+?)(, and that spell can't be countered)?\.$/.exec(sentence);
   if (!m) return null;
   const only: ManaSpend = { text: sentence, ...(m[2] ? { uncounterable: true as const } : {}) };

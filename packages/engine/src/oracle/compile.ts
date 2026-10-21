@@ -516,6 +516,12 @@ export function compile(d: CardDef): CompiledCard {
       if (!conditionalAbility(d, maxSpeed[1]!, out, { kind: "maxSpeed" })) out.unsupported.push(raw);
       continue;
     }
+    // "∞ — [Ability]": "As long as this permanent is harnessed, it has [ability]" (CR 702.186b).
+    const infinity = /^∞ — (.+)$/.exec(line);
+    if (infinity) {
+      if (!conditionalAbility(d, infinity[1]!, out, { kind: "harnessed" })) out.unsupported.push(raw);
+      continue;
+    }
     // Cases (CR 719.3): "To solve — [Condition]" means "At the beginning of your end step, if [condition] and this Case is
     // not solved, this Case becomes solved", checked as it triggers and as it resolves (603.4, rulings); "Solved —
     // [Ability]" is that ability only while it's solved (702.169).

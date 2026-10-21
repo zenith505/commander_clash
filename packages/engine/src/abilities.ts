@@ -35,7 +35,7 @@ export interface FaceDownPlay {
 /** "unblocked": blocked attackers that assign their combat damage as though they weren't blocked (CR 510.1). */
 /** "exert": attackers their controller exerts as they attack (CR 701.43d). */
 /** "choose": "Choose a creature you control. It gains indestructible until end of turn": only picked; "it" is that one. */
-export type PickAction = "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "encode" | "keep" | "untap" | "tap" | "choose" | "meld";
+export type PickAction = "phaseOut" | "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "encode" | "keep" | "untap" | "tap" | "choose" | "meld";
 
 /**
  * What "unless its controller pays ..." asks for (CR 118.12): a mana cost, plus generic mana counted
@@ -597,7 +597,12 @@ export type PlayerRef =
   /** "Choose an opponent. That player ...": the opponent chosen as this resolves (ChoiceKind "opponent"). */
   | { ref: "chosenPlayer" };
 
-export type DamageRecipient = ObjRef | PlayerRef | { ref: "anyTarget"; index: number; /** "each of up to two targets" */ n?: number };
+export type DamageRecipient =
+  | ObjRef
+  | PlayerRef
+  | { ref: "anyTarget"; index: number; /** "each of up to two targets" */ n?: number }
+  /** "The player or planeswalker it's attacking" (Myr Battlesphere): what the source is attacking, or was as it last existed; nothing for a battle. */
+  | { ref: "attackedBySelf" };
 
 /**
  * What a "damageRule" effect makes (see GameState.damageRules). It applies to damage that matches both `to` and `by`
@@ -817,6 +822,8 @@ export type Modification =
   | { kind: "cantBlockAlone" }
   /** "Can't attack a player it has already attacked this turn" (Port Razer): attacking a planeswalker still can (rulings). */
   | { kind: "cantAttackSamePlayer" }
+  /** "Can't attack you or planeswalkers you control" (Promise of Loyalty, CR 508.1c): "you" is the effect's controller. */
+  | { kind: "cantAttackYou" }
   /** Blocking requirements (CR 509.1c): "must be blocked if able", "all creatures able to block ~ do so". */
   | { kind: "mustBeBlocked" }
   | { kind: "allMustBlock" }
@@ -968,6 +975,8 @@ export type StaticCondition =
   | { kind: "ringBearer"; not?: true; self?: true }
   /** Max speed (CR 702.178a, 702.179e): your speed is 4. */
   | { kind: "maxSpeed" }
+  /** "∞ — [Ability]": as long as this permanent is harnessed (CR 702.186b). */
+  | { kind: "harnessed" }
   /**
    * "Whenever ~ attacks a player, if no opponent has more life than that player": none of the attacking player's
    * opponents has more life than the attacked player (rulings; the attacker's own life isn't compared).
@@ -1289,6 +1298,8 @@ export type Effect =
       keep: { filter: TargetSpec; n: number; upTo?: true; fewest?: true }[];
       among: TargetSpec;
       youChoose?: true;
+      /** "Each player puts a vow counter on a creature they control and sacrifices the rest" (Promise of Loyalty): one on each kept permanent first; they're "those creatures" afterwards (Resolving.created). */
+      counter?: CounterKind;
     }
   /** Return to owner's hand (from the battlefield or a graveyard). `hidden`: a face-down card, named only to its owner. */
   | { type: "bounce"; what: ObjRef; hidden?: true }
@@ -1348,7 +1359,7 @@ export type Effect =
    * "Return a creature card from your graveyard to your hand", "you may return up to two instant and/or sorcery cards
    * ...": not targeted, so the cards are chosen as it resolves (CR 608.2c), as many as there are up to `n` unless `upTo`.
    */
-  | { type: "chooseFromGraveyard"; filter?: TargetSpec; n: number; upTo?: true; /** "Mill three cards. You may put a land card from among them into your hand." (Six): only the cards the mill just before put there. */ milled?: true; /** "Return any number of cards with different mana values" (Seasons Past): no limit but one card per mana value; `n` is ignored. */ distinctManaValues?: true; /** "Any number of permanent cards with different names" (Eerie Ultimatum): at most one card of each name. */ oneEach?: true; /** Exiled instead ("Target player exiles a card from their graveyard"), put onto the battlefield under your control, or on top of your library. */ dest?: "exile" | "battlefield" | "libraryTop"; tapped?: true; counters?: Record<string, number>; /** "With a number of +1/+1 counters on it equal to that result" (Grave Endeavor): how many of the one kind in `counters`, as it resolves. */ countersN?: Amount; /** "With mana value X or less", X worked out as it resolves (Blood on the Snow). */ mvMax?: Amount; /** Whose graveyard, and who chooses: yours if left out. */ who?: PlayerRef }
+  | { type: "chooseFromGraveyard"; filter?: TargetSpec; n: number; upTo?: true; /** "Mill three cards. You may put a land card from among them into your hand." (Six): only the cards the mill just before put there. */ milled?: true; /** "Return any number of cards with different mana values" (Seasons Past): no limit but one card per mana value; `n` is ignored. */ distinctManaValues?: true; /** "Any number of permanent cards with different names" (Eerie Ultimatum): at most one card of each name. */ oneEach?: true; /** Exiled instead ("Target player exiles a card from their graveyard"), put onto the battlefield under your control, or on top of your library. */ dest?: "exile" | "battlefield" | "libraryTop"; tapped?: true; counters?: Record<string, number>; /** "With a number of +1/+1 counters on it equal to that result" (Grave Endeavor): how many of the one kind in `counters`, as it resolves. */ countersN?: Amount; /** "With mana value X or less", X worked out as it resolves (Blood on the Snow). */ mvMax?: Amount; /** Whose graveyard, and who chooses: yours if left out. */ who?: PlayerRef; /** "For each player, choose a creature or planeswalker card in that player's graveyard. Put those cards onto the battlefield under your control." (Breach the Multiverse): with `who` each player, you choose one card in each of their graveyards and they all enter under your control. */ youChoose?: true }
   /** "Reorder your graveyard as you choose" (Fossil Find), "at random" (Search for Survivors). */
   | { type: "reorderGraveyard"; random?: true }
   | {
@@ -1404,7 +1415,8 @@ export type Effect =
   /** Suspect (CR 701.60a): it becomes suspected, unless it already is (701.60d); `no`: "is no longer suspected". */
   | { type: "suspect"; what: ObjRef; no?: true }
   /** Proliferate (CR 701.27): another counter of each kind on the chosen permanents and players. */
-  | { type: "proliferate" }
+  /** `thenPhaseOut`: "then choose any number of permanents you control that had a counter put on them this way. Those permanents phase out." (Ripples of Potential). */
+  | { type: "proliferate"; thenPhaseOut?: true }
   /** Amass [subtype] N (CR 701.47): an Army gets N +1/+1 counters, made first if you have none. */
   | { type: "amass"; subtype: string; n: Amount }
   /**
@@ -1414,7 +1426,7 @@ export type Effect =
    */
   /** `transformed`: "return it to the battlefield transformed" (CR 712.14a). */
   /** `counterIf`: "If it's a Spirit, put a +1/+1 counter on it" (Essence Flux), each returned permanent that matches, once it's back. */
-  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; at?: "nextEndStep"; counter?: CounterKind; tapped?: true; transformed?: true; counterIf?: { counter: CounterKind; filter: TargetSpec } }
+  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; at?: "nextEndStep"; counter?: CounterKind; tapped?: true; transformed?: true; counterIf?: { counter: CounterKind; filter: TargetSpec }; /** Exiled now, returned by the search after it (Sword of Hearth and Home: "Put both cards onto the battlefield"), kept in Resolving.held. */ hold?: true }
   /** A delayed flicker's return: the exiled card, while it's still in exile as that object. */
   /** A delayed flicker's return: its subject, or with `cards` each of those cards, if still the same objects in exile. */
   | { type: "returnExiled"; under: "owner" | "you"; counter?: CounterKind; tapped?: true; cards?: { id: ObjectId; zc: number }[] }
@@ -1662,7 +1674,7 @@ export type Effect =
    * `giveTo`: the effect is that player's, not the ability's controller's: "Target player gains control of target permanent
    * you control" (Donate), "An opponent gains control of ~" (Wishclaw Talisman), with a "control" modification (layer 2).
    */
-  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game" | "yourNextTurn" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; giveTo?: PlayerRef }
+  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game" | "yourNextTurn" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; giveTo?: PlayerRef; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind }
   /**
    * Attach the source (an Equipment or Aura) to `what`, CR 701.3; `source`: another Equipment instead ("Attach target
    * Equipment you control to target creature you control", Brass Squire).
@@ -2008,6 +2020,10 @@ export type Effect =
   | { type: "classLevel"; n: number }
   /** A "To solve" trigger's "this Case becomes solved" (CR 719.3a). */
   | { type: "solve" }
+  /** "Harness ~" (CR 701.64a): if it isn't harnessed, it becomes harnessed; its "∞ —" abilities then work (702.186b). */
+  | { type: "harness" }
+  /** "The next spell you cast this turn has improvise" (Archway of Innovation, CR 702.126): used up by the next spell cast. */
+  | { type: "nextSpellImprovise" }
   /** "Transform ~" (CR 701.27a): turn a double-faced permanent over. */
   /** `convert`: "convert ~" (CR 701.28a), which works just as transforming does. */
   | { type: "transform"; what: ObjRef; convert?: true }
@@ -2084,7 +2100,7 @@ export type Effect =
    * (CR 701.23). `filter` unset = any card. Found cards go to `dest`; with `others`, only the first
    * does and the rest go there (Cultivate). The library is then shuffled (CR 701.20).
    */
-  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; reveal: boolean; /** Whose library: "its controller may search their library" (Path to Exile). Yours if left out. */ who?: PlayerRef; /** "Search target opponent's library" (Bribery): you search that player's library, which they then shuffle. */ library?: PlayerRef; /** "Search your library and/or graveyard ... If you search your library this way, shuffle" (Finale of Devastation): your graveyard, and your library too if you choose. */ orGraveyard?: boolean; /** "A card named A and/or a card named B" (Alpine Houndmaster), "cards with different names" (Three Dreams): at most one card of each name. */ oneEach?: true; /** "Up to two basic land cards that share a land type" (Myriad Landscape): the cards found all have a land type in common. */ shareLandType?: true; /** "Each player may search their library" (Veteran Explorer): each one, as their turn to search comes, chooses whether to (rulings); only those who did shuffle. */ may?: true; /** "Target opponent chooses two of those cards. Put the chosen cards into your graveyard and the rest into your hand" (Gifts Ungiven): `n` of the cards found, chosen by that opponent (by an opponent you choose as it resolves if left out), go `to`; the rest go to `dest`. */ split?: { chooser?: PlayerRef; n: number; to: SearchDest }; /** "Put it onto the battlefield tapped if it's a land card. Otherwise, put it into your hand." (Archdruid's Charm): where a land card found goes instead of `dest`. */ landTo?: SearchDest; /** "A Forest card and a Plains card" (Krosan Verge): up to one card for each of these, each card found matching a different one. */ oneOfEach?: TargetSpec[] }
+  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; reveal: boolean; /** Whose library: "its controller may search their library" (Path to Exile). Yours if left out. */ who?: PlayerRef; /** "Search target opponent's library" (Bribery): you search that player's library, which they then shuffle. */ library?: PlayerRef; /** "Search your library and/or graveyard ... If you search your library this way, shuffle" (Finale of Devastation): your graveyard, and your library too if you choose. */ orGraveyard?: boolean; /** "A card named A and/or a card named B" (Alpine Houndmaster), "cards with different names" (Three Dreams): at most one card of each name. */ oneEach?: true; /** "Up to two basic land cards that share a land type" (Myriad Landscape): the cards found all have a land type in common. */ shareLandType?: true; /** "Each player may search their library" (Veteran Explorer): each one, as their turn to search comes, chooses whether to (rulings); only those who did shuffle. */ may?: true; /** "Target opponent chooses two of those cards. Put the chosen cards into your graveyard and the rest into your hand" (Gifts Ungiven): `n` of the cards found, chosen by that opponent (by an opponent you choose as it resolves if left out), go `to`; the rest go to `dest`. */ split?: { chooser?: PlayerRef; n: number; to: SearchDest }; /** "Put it onto the battlefield tapped if it's a land card. Otherwise, put it into your hand." (Archdruid's Charm): where a land card found goes instead of `dest`. */ landTo?: SearchDest; /** "A Forest card and a Plains card" (Krosan Verge): up to one card for each of these, each card found matching a different one. */ oneOfEach?: TargetSpec[]; /** The cards a "hold" flicker exiled enter with the found cards, at the same time, under your control (Sword of Hearth and Home). */ withHeld?: true }
   /** "Reveal the top three cards of your library. An opponent chooses one of them. Put that card into your graveyard and the rest into your hand" (Murmurs from Beyond): the chooser (an opponent you choose as it resolves if left out) picks one revealed card (one that fits `filter`), which goes `to`; the rest go `rest`, or stay on top. */
   | { type: "revealPick"; n: Amount; chooser?: PlayerRef; filter?: TargetSpec; to: SearchDest; rest?: SearchDest }
   /**
@@ -2833,6 +2849,8 @@ export interface BatchTrigger {
 }
 
 export interface ActivatedAbility {
+  /** "Spend only mana of the chosen color to activate this ability" (Throne of Eldraine): the color chosen as its source entered. */
+  spendOnlyChosenColor?: true;
   manaCost: string; // "{2}{R}" or ""
   tap: boolean;
   sacrificeSelf: boolean;
@@ -2926,7 +2944,7 @@ export type ManaProduce =
   | { kind: "oneOf"; options: ManaType[]; amount: number; n?: AmountExpr }
   | { kind: "commanderIdentity" }
   /** "Add one mana of the chosen color", "Add {B} or one mana of the chosen color": the color chosen as it entered. */
-  | { kind: "chosenColor"; also?: ManaType }
+  | { kind: "chosenColor"; also?: ManaType; /** "Four mana of the chosen color" (Throne of Eldraine): that many. */ n?: number }
   /**
    * "One mana of any color that a land an opponent controls could produce" (Fellwar Stone, Exotic Orchard), "of any
    * type that a land you control could produce" (Reflecting Pool): what those lands' mana abilities would make (CR 106.7).
@@ -3122,7 +3140,7 @@ export interface CostMod {
  */
 export type AdditionalCost =
   /** `other`: "sacrifice another creature", not the ability's source. */
-  | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean; /** With `other`: the source itself may be sacrificed if it's one of these ("another creature or an artifact"). */ selfIf?: TargetSpec; x?: true; /** "Sacrifice half the lands you control, rounded up" (Tectonic Split): `n` is worked out as the cost is (CR 601.2f). */ half?: "up" }
+  | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean; /** With `other`: the source itself may be sacrificed if it's one of these ("another creature or an artifact"). */ selfIf?: TargetSpec; x?: true; /** "Sacrifice half the lands you control, rounded up" (Tectonic Split): `n` is worked out as the cost is (CR 601.2f). */ half?: "up"; /** "Exile a creature you control" (The Soul Stone): chosen the same way, but exiled, not sacrificed (CR 701.21a doesn't apply). */ exile?: true }
   /** "discard a land card" (retrace); `random`: "discard a card at random", chosen by the game as it's paid (CR 701.9b). */
   | { kind: "discard"; n: number; filter?: TargetSpec; random?: true; x?: true; /** "Discard an Island card and another card" (Foil): at least one of the `n` matches this. */ oneOf?: TargetSpec }
   | { kind: "payLife"; n: number; x?: true }

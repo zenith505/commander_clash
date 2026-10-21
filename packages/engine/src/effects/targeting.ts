@@ -53,6 +53,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.colorCount && !colorCountIs(spec.colorCount, c.colors.length)) return false;
   if (spec.supertypes?.some((t) => !c.supertypes.includes(t))) return false;
   if (spec.notSupertypes?.some((t) => c.supertypes.includes(t))) return false;
+  if (spec.owner === "you" && o.owner !== controller) return false;
   if (spec.anyOf && !spec.anyOf.some((a) => objectMatches(s, a, o, controller, false, src, chars, view))) return false;
   if (spec.subtypes?.length && !spec.subtypes.some(hasSubtype)) return false;
   if (spec.notSubtypes?.some(hasSubtype)) return false;

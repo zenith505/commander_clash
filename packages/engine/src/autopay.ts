@@ -6,7 +6,7 @@ import { characteristics, controllerOf } from "./layers";
 import { abilityProblem, activationCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, foretellProblem, tapCostCandidates, turnFaceUpProblem } from "./game";
 import { compileCard } from "./oracle";
 import { hopeValues, spendPlan } from "./value";
-import { boundSpend, poolFor, spendAllows, type ManaUse } from "./spend";
+import { abilityUse, boundSpend, poolFor, spendAllows, usableTypes, type ManaUse } from "./spend";
 import type { SpentReq, TargetChoice } from "./abilities";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payFromPool, payGenericWith, splitGeneric, xCount, type ManaPool, type ParsedCost } from "./mana";
 import { COLORS, type Action, type CardDef, type Color, type CostChoices, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
@@ -47,6 +47,8 @@ interface Source {
 
 function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: ManaUse): Source[] {
   const onlyTreasures = use !== "other" && "spell" in use && !!use.treasureOnly;
+  // "Spend only mana of the chosen color to activate this ability": only sources of that mana help.
+  const only = usableTypes(use);
   // Current controller, types and mana abilities, after continuous effects (CR 613).
   const isCreature = (id: string) => objIsType(s, obj(s, id), "Creature");
   return s.battlefield
@@ -62,7 +64,7 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
         // Mana that can't be spent on this is no help (CR 106.6), nor mana a Treasure didn't make for Security Rhox's cost.
         // A storage land gives one counter's worth at a time, so a payment never takes more of them than it needs.
         // Discarding a hand (Lion's Eye Diamond) is never an automatic choice: the player activates it.
-        .filter((x) => x.adds.length > 0 && (x.removes ?? 1) === 1 && !abs[x.ability]!.discardHand && !manaAbilityProblem(s, pid, o, x.ability, true) && (!abs[x.ability]!.spendOnly || spendAllows(s, pid, boundSpend(o, abs[x.ability]!.spendOnly!), use)) && (!onlyTreasures || (treasure && !abs[x.ability]!.spendOnly)))
+        .filter((x) => x.adds.length > 0 && (x.removes ?? 1) === 1 && !abs[x.ability]!.discardHand && !manaAbilityProblem(s, pid, o, x.ability, true) && (!abs[x.ability]!.spendOnly || spendAllows(s, pid, boundSpend(o, abs[x.ability]!.spendOnly!), use)) && (!onlyTreasures || (treasure && !abs[x.ability]!.spendOnly)) && (!only || x.adds.every((m) => only.includes(m))))
         .map((x) => {
           const ab = abs[x.ability]!;
           const tapCost = ab.tapCost && { n: ab.tapCost.n, candidates: tapPreference(s, tapCostCandidates(s, pid, o, ab.tapCost).filter((id) => !exclude.includes(id))) };
@@ -498,7 +500,7 @@ export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, in
   const cost = activationCost(s, pid, obj(s, objectId), ab, targets);
   // Don't tap the source for mana if the ability itself needs {T}, nor creatures tapped to crew.
   // Don't tap for mana what's about to be sacrificed either.
-  const taps = planMana(s, pid, cost, (x ?? 0) * xCount(cost), ab.tap ? objectId : undefined, [...(tapCreatures ?? []), ...(costs?.sacrifice ?? []), ...(costs?.tap ?? []), ...sacrificedTargets(s, targets)], { ability: obj(s, objectId) });
+  const taps = planMana(s, pid, cost, (x ?? 0) * xCount(cost), ab.tap ? objectId : undefined, [...(tapCreatures ?? []), ...(costs?.sacrifice ?? []), ...(costs?.tap ?? []), ...sacrificedTargets(s, targets)], abilityUse(obj(s, objectId), ab));
   if (!taps) return null;
   return [...taps, { type: "activateAbility", player: pid, objectId, index, targets, ...(modes ? { modes } : {}), ...(tapCreatures ? { tapCreatures } : {}), ...(x ? { x } : {}), ...(costs ? { costs } : {}), ...(pick?.mana ? { mana: pick.mana } : {}), ...(pick?.extra?.length ? { extra: pick.extra } : {}) }];
 }

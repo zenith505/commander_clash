@@ -156,6 +156,8 @@ export interface Characteristics {
   cantAttackAlone: boolean;
   cantBlockAlone: boolean;
   cantAttackSamePlayer: boolean;
+  /** "Can't attack you or planeswalkers you control" (Promise of Loyalty): those players and their planeswalkers. */
+  cantAttackPlayers: PlayerId[];
   mustBeBlocked: boolean;
   allMustBlock: boolean;
   mustBlock: boolean;
@@ -231,6 +233,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     cantAttackAlone: false,
     cantBlockAlone: false,
     cantAttackSamePlayer: false,
+    cantAttackPlayers: [],
     mustBeBlocked: false,
     allMustBlock: false,
     mustBlock: false,
@@ -312,7 +315,8 @@ function gather(s: GameState): Inst[] {
       untilEndOfTurn: e.duration === "endOfTurn",
       mods: e.mods,
       controller: e.controller,
-      fixed: e.affected,
+      // "For as long as it has a vow counter on it": only those that still do.
+      fixed: e.whileCounter ? e.affected.filter((id) => (s.objects[id]?.counters[e.whileCounter!] ?? 0) > 0) : e.affected,
     });
   // Each player's Ring: "Your Ring-bearer is legendary and can't be blocked by creatures with greater power"
   // (CR 701.54c), with the emblem's timestamp (CR 613.7a). Another player gaining control of it ends the designation.
@@ -522,6 +526,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "maxSpeed":
       return s.players[you]?.speed === 4;
+    case "harnessed":
+      return src.zone === "battlefield" && !!src.harnessed; // CR 702.186b
     case "eventPlayerHand":
       if (eventPlayer === undefined) return false;
       return (cond.max === undefined || s.players[eventPlayer]!.hand.length <= cond.max) && (cond.min === undefined || s.players[eventPlayer]!.hand.length >= cond.min);
@@ -1038,6 +1044,11 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
         if (e.sourceId && !c.cantBeBlockedByLesserPowerThan.includes(e.sourceId)) c.cantBeBlockedByLesserPowerThan.push(e.sourceId);
       } else c.cantBeBlockedByLesserPower = true;
       return;
+    case "cantAttackYou": {
+      const you = controllerOfInst(e, chars);
+      if (!c.cantAttackPlayers.includes(you)) c.cantAttackPlayers.push(you);
+      return;
+    }
     case "cantBeBlockedByGreaterPower":
     case "cantAttackAlone":
     case "cantBlockAlone":

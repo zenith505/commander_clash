@@ -22,7 +22,7 @@ import { characteristics, controllerOf, everyCreatureType, invalidateCharacteris
 import { compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
 import { evalAmount, halve } from "./amounts";
-import { addMana, boundSpend, canPayFromPool, manaOriginsOf, poolFor, spendFromPool, type ManaUse } from "./spend";
+import { abilityUse, addMana, boundSpend, canPayFromPool, manaOriginsOf, poolFor, spendFromPool, type ManaUse } from "./spend";
 import { nextRandom, shuffle, shuffleLibrary } from "./rng";
 import { watchForMandatoryLoop } from "./shortcuts";
 import { askGraveyardOrder, closeGraveyardBatch, noteMergedToLibrary, noteToGraveyard, orderGraveyard, orderLibrary, topGraveyardCards } from "./graveyard";
@@ -717,7 +717,7 @@ export function moveObject(
   if (fromZone === "battlefield") {
     (s.leftTogether ??= []).push({ id, controller: lastController, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(o.attachedTo ? { attachedTo: o.attachedTo } : {}), ...(hadAbilities ? { card: snapshotKey } : {}) });
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
-    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, power: last.power, toughness: last.toughness, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
+    (s.lastKnown ??= {})[id] = { zc: o.zoneChanges ?? 0, power: last.power, toughness: last.toughness, controller: last.controller, copyKey: cardIdOf(o), ...(Object.keys(lastCounters).length ? { counters: { ...lastCounters } } : {}), ...(host ? { attachedTo: { id: host.id, zc: host.zoneChanges ?? 0 } } : {}), ...(o.attachedToPlayer !== undefined ? { attachedToPlayer: o.attachedToPlayer } : {}), ...(o.attacking !== undefined ? { attacking: o.attacking, ...(o.attackingPermanent ? { attackingPermanent: { ...o.attackingPermanent } } : {}) } : {}), creatureTypes: last.allCreatureTypes ? "all" : last.subtypes.filter((t) => CREATURE_TYPES.has(t)), source: { name: last.name, colors: last.colors, types: last.types, subtypes: last.subtypes, keywords: last.keywords, ...(last.unpreventable ? { unpreventable: last.unpreventable } : {}) } };
   }
   // Its components become objects of their own (CR 730.3): this one is the card or token it was.
   o.movedWith = undefined;
@@ -800,6 +800,7 @@ export function moveObject(
   o.suspected = undefined; // CR 701.60a
   o.classLevel = undefined; // CR 716.2b
   o.solved = undefined; // CR 719.3b
+  o.harnessed = undefined; // CR 701.64b
   o.transforms = undefined; // a new object (CR 400.7)
   o.prepared = undefined; // CR 722.3a
   o.saddled = undefined; // CR 702.171b
@@ -3242,6 +3243,7 @@ export function hasConvoke(s: GameState, pid: PlayerId, o: GameObject): boolean 
 export function hasImprovise(s: GameState, pid: PlayerId, o: GameObject): boolean {
   const d = defOf(s, o);
   if (compileCard(d).improvise) return true;
+  if (player(s, pid).nextSpellImprovise === s.turn) return true;
   return s.battlefield.some((id) => {
     const p = obj(s, id);
     return controllerOf(s, p) === pid && (abilitiesOf(s, p).spellsHaveImprovise ?? []).some((g) => printedMatches(g.filter, d));
@@ -3677,6 +3679,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // Storm counts the spells cast before it (CR 702.40a); a copy of it made later copies it as it was cast (707.10).
   item.castNth = s.spellsCastThisTurn ?? 0;
   s.spellsCastThisTurn = item.castNth + 1;
+  p.nextSpellImprovise = undefined; // it was the next spell cast (Archway of Innovation)
   if (isMainPhase(s) && s.activePlayer === p.id) item.castInMain = true;
   s.cards[d.oracleId] ??= d;
   (p.castNames ??= {})[d.name] = (p.castNames[d.name] ?? 0) + 1;
@@ -4124,7 +4127,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
           : c.kind === "exileFromGraveyard" && c.linked
           ? `a card exiled with ${d.name}`
           : `${c.n === 1 ? (/^[aeiou]/i.test(c.filter?.text ?? "card") ? "an" : "a") : c.n} ${c.filter?.text ?? "card"}`;
-    const verb = c.kind === "sacrifice" ? "sacrifice" : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : c.kind === "tap" ? "tap" : c.kind === "reveal" ? "reveal" : c.kind === "exileFromHand" ? (c.toLibrary ? "put on top of your library" : "exile from your hand") : c.kind === "exileFromGraveyard" && c.linked ? "put into its owner's graveyard" : "exile";
+    const verb = c.kind === "sacrifice" ? (c.exile ? "exile" : "sacrifice") : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : c.kind === "tap" ? "tap" : c.kind === "reveal" ? "reveal" : c.kind === "exileFromHand" ? (c.toLibrary ? "put on top of your library" : "exile from your hand") : c.kind === "exileFromGraveyard" && c.linked ? "put into its owner's graveyard" : "exile";
     const chosen = given(c.kind === "exileFromGraveyard" ? "exileCards" : c.kind);
     // "Discard a card at random": nothing to choose (CR 701.9b).
     if (c.kind === "discard" && c.random) {
@@ -4208,6 +4211,11 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       if (!c.n) continue; // "pay X life" with X = 0
       loseLife(s, p.id, c.n);
       log(s, `${p.name} pays ${c.n} life.`);
+    } else if (c.kind === "sacrifice" && c.exile) {
+      for (const id of choices.sacrifice ?? []) {
+        log(s, `${p.name} exiles ${nameOf(s, id)}.`);
+        moveObject(s, id, "exile");
+      }
     } else if (c.kind === "sacrifice") {
       for (const id of choices.sacrifice ?? []) {
         const o = obj(s, id);
@@ -4358,7 +4366,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   const cost = activationCost(s, pid, o, ab, targets);
   const xp = ab.loyaltyX || abilityCostsHaveX(ab) ? (x !== undefined && (!Number.isInteger(x) || x < 0) ? "X must be a whole number, 0 or more" : (x ?? 0) < (ab.xMin ?? 0) ? "X can't be 0" : null) : xProblem(cost, x);
   if (xp) return xp;
-  if (!canPayFromPool(s, pid, cost, { ability: o }, ab.loyaltyX ? 0 : (x ?? 0) * xCount(cost), p.life)) return `not enough mana for ${d.name}'s ability`;
+  if (!canPayFromPool(s, pid, cost, abilityUse(o, ab), ab.loyaltyX ? 0 : (x ?? 0) * xCount(cost), p.life)) return `not enough mana for ${d.name}'s ability`;
   return null;
 }
 
@@ -4488,7 +4496,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // "Pay half your life, rounded up": worked out with the rest of the cost, before any of it is paid (CR 601.2f-h).
   const halfLife = halfLifeCost(s, p.id, ab);
   const lifeCost = activatedLifeCost(s, p.id, ab);
-  const paid = spendFromPool(s, p.id, abCost, { ability: o }, ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), payableLife(s, p.id) - halfLife - lifeCost)!;
+  const paid = spendFromPool(s, p.id, abCost, abilityUse(o, ab), ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), payableLife(s, p.id) - halfLife - lifeCost)!;
   // A Treasure's mana ability makes "mana from a Treasure" (CR 106.3), even though it's sacrificed as it's activated.
   const manaFrom = manaPick ? manaOriginsOf(s, o) : [];
   // The source as it is now, for "its power" after it's sacrificed as a cost (CR 608.2h).
@@ -5490,7 +5498,7 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
       (!objHasKeyword(s, o, "Defender") || characteristics(s, o).attackDespiteDefender) &&
       !characteristics(s, o).cantAttack &&
       !(s.cantAttackThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false)) &&
-      (!characteristics(s, o).attackUnless.length || opps.some((d) => !attackProblem(s, o, d))),
+      (!(characteristics(s, o).attackUnless.length || characteristics(s, o).cantAttackPlayers.length) || opps.some((d) => !attackProblem(s, o, d))),
   );
 }
 
@@ -5525,8 +5533,11 @@ export function attackTax(s: GameState, attacks: { defender: PlayerId; planeswal
   return attacks.reduce((n, a) => n + attackTaxOf(s, a), 0);
 }
 
-export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, planeswalker = false): string | null {
+export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, planeswalker = false, /** The planeswalker or battle attacked. */ attacked?: ObjectId): string | null {
   const c = characteristics(s, o);
+  // "Can't attack you or planeswalkers you control": that player, and their planeswalkers (a battle they protect isn't one).
+  const atBattle = !!attacked && !!s.objects[attacked] && objIsType(s, obj(s, attacked), "Battle") && !objIsType(s, obj(s, attacked), "Planeswalker");
+  if (c.cantAttackPlayers.includes(defender) && !atBattle) return `${c.name} can't attack ${player(s, defender).name}${planeswalker ? "'s planeswalkers" : ""}`;
   if (c.cantAttackSamePlayer && !planeswalker && o.attacked?.turn === s.turn && o.attacked.players?.includes(defender)) return `${c.name} can't attack a player it has already attacked this turn`;
   for (const f of c.attackUnless)
     if (!s.battlefield.some((id) => controllerOf(s, obj(s, id)) === defender && objectMatches(s, f, obj(s, id), c.controller, false)))
@@ -5609,7 +5620,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
       const why = attackablePermanentProblem(s, p.id, a.defender, a.planeswalker);
       if (why) throw new RulesError(why);
     }
-    const why = attackProblem(s, obj(s, a.attacker), a.defender, a.planeswalker !== undefined);
+    const why = attackProblem(s, obj(s, a.attacker), a.defender, a.planeswalker !== undefined, a.planeswalker);
     if (why) throw new RulesError(why);
     seen.add(a.attacker);
   }

@@ -1,5 +1,5 @@
 import type { Effect, PlayerRef, SearchDest } from "../abilities";
-import { abilitiesOf, cardIdOf, defOf, isType } from "../cards";
+import { abilitiesOf, cardIdOf, defOf, isPermanentCard, isType } from "../cards";
 import { controllerOf } from "../layers";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
@@ -588,7 +588,15 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       // What it found and put onto the battlefield is "it" afterwards (Vision Quest's "it gains haste").
       if (e.n === 1 && !e.others && e.dest.zone === "battlefield") r.created = [];
+      // Sword of Hearth and Home: the card exiled before enters with the found card, under your control (rulings: at the
+      // same time). A permanent card still in exile as the object it became (CR 400.7).
+      const held = e.withHeld ? (r.held ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (obj(s, l.id).zoneChanges ?? 0) === l.zc && isPermanentCard(defOf(s, obj(s, l.id)))).map((l) => l.id) : [];
+      if (e.withHeld) r.held = undefined;
       enterTogether(s, () => {
+        for (const id of held) {
+          log(s, `${src} returns ${defOf(s, obj(s, id)).name} to the battlefield under ${player(s, ctx.controller).name}'s control.`);
+          moveObject(s, id, "battlefield", { controller: ctx.controller });
+        }
         for (const { pid, id } of moves) {
           const p = player(s, pid);
           const to = dest(pid, id);

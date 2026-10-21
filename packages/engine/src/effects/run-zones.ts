@@ -3,7 +3,7 @@ import { abilitiesOf, cardIdOf, defOf, isPermanentCard, isType, objIsType, power
 import { nameLandBan } from "../names";
 import { attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
-import { putCounters } from "../counters";
+import { putCounters, withPutter } from "../counters";
 import { manaValue } from "../mana";
 import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, objectMatches, pickOptions, printedMatches } from "./targeting";
@@ -242,13 +242,16 @@ function eachFromGraveyard(s: GameState, e: Extract<Effect, { type: "chooseFromG
       continue;
     }
     const kind = e.filter?.text ?? "card";
-    s.pending = { kind: "searchLibrary", player: pid, source: src, what: `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`, cards, min: e.upTo ? 0 : max, max, fromGraveyard: "battlefield" };
+    const whose = e.youChoose ? ` in ${pid === ctx.controller ? "your" : `${p.name}'s`} graveyard` : "";
+    s.pending = { kind: "searchLibrary", player: e.youChoose ? ctx.controller : pid, source: src, what: `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}${whose}`, cards, min: e.upTo ? 0 : max, max, fromGraveyard: "battlefield" };
     return "paused";
   }
   sc.yardPicks = undefined;
+  // Each under its owner's control, or all under yours when you chose them (Breach the Multiverse, CR 110.2a).
   const moves = Object.entries(yp.picked).flatMap(([pid, ids]) => ids.filter((id) => s.objects[id]?.zone === "graveyard").map((id) => ({ id, pid: Number(pid) as PlayerId })));
-  for (const { id, pid } of moves) log(s, `${player(s, pid).name} returns ${defOf(s, obj(s, id)).name} from their graveyard to the battlefield.`);
-  enterTogether(s, () => moves.forEach(({ id, pid }) => moveObject(s, id, "battlefield", { controller: pid, ...(e.tapped ? { tapped: true } : {}) })));
+  const under = (pid: PlayerId) => (e.youChoose ? ctx.controller : pid);
+  for (const { id, pid } of moves) log(s, e.youChoose ? `${player(s, ctx.controller).name} puts ${defOf(s, obj(s, id)).name} from ${pid === ctx.controller ? "their" : `${player(s, pid).name}'s`} graveyard onto the battlefield.` : `${player(s, pid).name} returns ${defOf(s, obj(s, id)).name} from their graveyard to the battlefield.`);
+  enterTogether(s, () => moves.forEach(({ id, pid }) => moveObject(s, id, "battlefield", { controller: under(pid), ...(e.tapped ? { tapped: true } : {}) })));
 }
 
 /**
@@ -354,11 +357,22 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
   }
   sc.keepRest = undefined;
   const gone: ObjectId[] = [];
+  const keptAll: ObjectId[] = [];
   for (const pid of who) {
     const kept = new Set(kr.kept[pid] ?? []);
-    if (kept.size) log(s, `${player(s, pid).name} keeps ${[...kept].map((id) => nameOf(s, id)).join(", ")}.`);
+    if (kept.size && e.counter) {
+      // Promise of Loyalty: each player puts the counter on theirs (who puts it matters to Vorinclex and the like).
+      for (const id of kept) {
+        if (s.objects[id]?.zone !== "battlefield") continue;
+        const put = withPutter(pid, () => putCounters(s, obj(s, id), e.counter!, 1));
+        log(s, `${player(s, pid).name} puts ${put === 1 ? "a" : put} ${e.counter} counter${put === 1 ? "" : "s"} on ${nameOf(s, id)}.`);
+      }
+      invalidateCharacteristics(s);
+    } else if (kept.size) log(s, `${player(s, pid).name} keeps ${[...kept].map((id) => nameOf(s, id)).join(", ")}.`);
+    keptAll.push(...kept);
     gone.push(...among(pid).filter((id) => !kept.has(id)));
   }
+  if (e.counter && s.resolving) s.resolving.created = keptAll.filter((id) => s.objects[id]?.zone === "battlefield");
   if (gone.length) log(s, `${src}: ${gone.map((id) => nameOf(s, id)).join(", ")} ${gone.length === 1 ? "is" : "are"} sacrificed.`);
   for (const id of gone) if (s.objects[id]?.zone === "battlefield") moveObject(s, id, "graveyard", { sacrificed: true });
 }
@@ -1579,7 +1593,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         for (const o of objects(s, e.what, ctx)) {
           if (o.zone !== "battlefield") continue;
           const d = defOf(s, o);
-          log(s, `${src} exiles ${d.name}${e.at ? "" : " and returns it"}.`);
+          log(s, `${src} exiles ${d.name}${e.at || e.hold ? "" : " and returns it"}.`);
           moveObject(s, o.id, "exile");
           // A merged permanent comes back as all of its cards (CR 730.3c).
           for (const l of newObjects(o)) {
@@ -1588,7 +1602,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             if (e.at) {
               first ??= c;
               later.push(l);
-            } else sc.flickered.push(l);
+            } else if (e.hold) (s.resolving!.held ??= []).push(l);
+            else sc.flickered.push(l);
           }
         }
         if (first) {

@@ -653,6 +653,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "becomeSaddled":
     case "classLevel":
     case "solve":
+    case "harness":
     case "transform":
     case "becomePrepared":
     case "flip":
@@ -705,6 +706,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "castLinkedCopy":
     case "copySpell":
     case "nextCast":
+    case "nextSpellImprovise":
     case "floatingTrigger":
     case "cascade":
     case "exileUntilNonland":
@@ -827,6 +829,21 @@ function finishSpell(s: GameState, id: ObjectId, item: StackItem) {
 }
 
 export function damageRecipients(s: GameState, to: DamageRecipient, ctx: ResolveCtx): { objs: GameObject[]; pids: PlayerId[] } {
+  if (to.ref === "attackedBySelf") {
+    // What it's attacking as this resolves, or what it was attacking as it last existed on the battlefield (rulings on
+    // Myr Battlesphere). A planeswalker removed from combat leaves it attacking nothing (CR 506.4c); a battle isn't a
+    // player or planeswalker.
+    const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+    const here = !!o && o.zone === "battlefield" && (ctx.sourceZc === undefined || (o.zoneChanges ?? 0) === ctx.sourceZc);
+    const lk = !here && ctx.sourceId ? s.lastKnown?.[ctx.sourceId] : undefined;
+    const at = here ? o : lk && (ctx.sourceZc === undefined || lk.zc === ctx.sourceZc) ? lk : undefined;
+    if (at?.attackingPermanent) {
+      const pw = s.objects[at.attackingPermanent.id];
+      const still = !at.attackingPermanent.battleController && pw?.zone === "battlefield" && (pw.zoneChanges ?? 0) === at.attackingPermanent.zc;
+      return { objs: still ? [pw!] : [], pids: [] };
+    }
+    return { objs: [], pids: at?.attacking !== undefined && !s.players[at.attacking]?.lost ? [at.attacking] : [] };
+  }
   if (to.ref === "anyTarget") {
     const out: { objs: GameObject[]; pids: PlayerId[] } = { objs: [], pids: [] };
     for (let i = to.index; i < to.index + (to.n ?? 1); i++) {

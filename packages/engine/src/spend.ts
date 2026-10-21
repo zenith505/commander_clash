@@ -1,7 +1,7 @@
 // Spending mana from a pool that may hold restricted mana (CR 106.6: "Spend this mana only to cast a creature spell."),
 // mana from sources that matter (106.3: snow, Treasures, creatures, artifacts) and mana kept as steps end.
 
-import type { ManaSpend } from "./abilities";
+import type { ActivatedAbility, ManaSpend } from "./abilities";
 import { defOf, isType } from "./cards";
 import { bindChosen, objectMatches, printedMatches } from "./effects";
 import { emptyPool, payFromPool, type ManaPool, type ParsedCost, type Payment } from "./mana";
@@ -12,7 +12,15 @@ import type { CardDef, Color, GameObject, GameState, ManaLot, ManaOrigin, ManaSp
  * What a payment is for: casting a spell (as it is on the stack: face down, bestowed), activating an ability of a
  * source, or anything else (a cost paid while something resolves, a special action, another player's spell).
  */
-export type ManaUse = { spell: CardDef; /** Security Rhox's "Spend only mana produced by Treasures to cast it this way". */ treasureOnly?: true; /** The card being cast, for "to cast your commander" (Opal Palace). */ object?: GameObject } | { ability: GameObject } | "other";
+export type ManaUse = { spell: CardDef; /** Security Rhox's "Spend only mana produced by Treasures to cast it this way". */ treasureOnly?: true; /** The card being cast, for "to cast your commander" (Opal Palace). */ object?: GameObject } | { ability: GameObject; /** "Spend only mana of the chosen color to activate this ability" (Throne of Eldraine): only mana of these types. */ onlyColors?: ManaType[] } | "other";
+
+/** What paying an activated ability's mana cost is for: its source, and only the chosen color's mana if it says so. */
+export function abilityUse(o: GameObject, ab: ActivatedAbility): ManaUse {
+  return ab.spendOnlyChosenColor ? { ability: o, onlyColors: o.chosen?.color ? [o.chosen.color] : [] } : { ability: o };
+}
+
+/** The mana types a payment may use (all of them unless it says otherwise). */
+export const usableTypes = (use: ManaUse): ManaType[] | undefined => (use !== "other" && "ability" in use ? use.onlyColors : undefined);
 
 /** The mana of each type in `pid`'s pool that's in no lot: unrestricted, from a source that doesn't matter, not kept. */
 export function plainMana(s: GameState, pid: PlayerId): ManaPool {
@@ -80,6 +88,8 @@ export function poolFor(s: GameState, pid: PlayerId, use: ManaUse): { pool: Mana
     if (l.from?.includes("treasure")) treasure[l.mana] += l.n;
     if (l.from?.includes("snow")) snow[l.mana] += l.n;
   }
+  const only = usableTypes(use);
+  if (only) for (const x of [pool, prefer, treasure, snow]) for (const m of Object.keys(x) as ManaType[]) if (!only.includes(m)) x[m] = 0;
   return { pool, prefer, treasure, snow };
 }
 
@@ -153,6 +163,9 @@ export function boundSpend(o: GameObject, only: ManaSpend): ManaSpend;
 export function boundSpend(o: GameObject, only: ManaSpend | undefined): ManaSpend | undefined;
 export function boundSpend(o: GameObject, only: ManaSpend | undefined): ManaSpend | undefined {
   const abilities = typeof only?.abilities === "object" ? only.abilities : undefined;
+  if (only?.spells?.chosen === "color")
+    // With no color chosen, no spell is of it: colorless and white at once.
+    return { ...only, spells: o.chosen?.color ? bindChosen(only.spells, o.chosen) : { ...only.spells, chosen: undefined, colorCount: "colorless", colors: ["W"] }, text: `${only.text.replace(/\.$/, "")} (${o.chosen?.color ?? "none chosen"}).` };
   if (!only || (only.spells?.chosen !== "type" && abilities?.chosen !== "type")) return only;
   return {
     ...only,

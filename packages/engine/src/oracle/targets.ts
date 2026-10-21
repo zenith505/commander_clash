@@ -16,6 +16,9 @@ HYPHENATED.set("time-lord", "Time Lord");
 const OTHER_SUBTYPES = ["Arcane", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Vehicle", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure", "Gate", "Desert", "Cave", "Town"];
 
 export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | null {
+  // "The player or planeswalker it's attacking" in an attack trigger about the source (Myr Battlesphere, Fathom Fleet
+  // Swordjack): not targeted (CR 506.2).
+  if (/^the player or planeswalker (?:it's|~'s) attacking$/i.test(p)) return ctx.defending ? { ref: "attackedBySelf" } : null;
   if (/^any target$/i.test(p)) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", text: "any target" }) };
   // "target player or planeswalker", "target opponent or planeswalker" (Lava Axe): a player, or a planeswalker permanent.
   const pw = /^target (player|opponent) or planeswalker$/i.exec(p);
@@ -660,6 +663,11 @@ export function parseTargetPhrase(
     p = p.slice(m[0].length);
   }
   let controller: TargetSpec["controller"];
+  // "Target creature you own" (Sword of Hearth and Home): a permanent you own, whoever controls it (CR 108.3).
+  if (!inGraveyard && / you own$/.test(p)) {
+    owner = "you";
+    p = p.replace(/ you own$/, "");
+  }
   if (/ (an opponent controls|you don't control)$/.test(p)) {
     controller = "opponent";
     p = p.replace(/ (an opponent controls|you don't control)$/, "");
@@ -816,8 +824,9 @@ export function parseTargetPhrase(
     return { kind: "card", ...filters, ...(otherThanBasic ? { notSupertypes: [...(filters.notSupertypes ?? []), "Basic"] } : {}), ...(owner ? { owner } : {}), text };
   }
   if (otherThanBasic) return null;
+  if (owner && (isSpell || controller)) return null;
   if (isSpell) return extra.keywords || extra.notKeywords || extra.anyOf || extra.power || extra.toughness || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status || supertypes.length ? null : { kind: "spell", ...filters, ...(controller ? { controller } : {}), text };
-  return { kind: "object", ...filters, controller, ...(tapped !== undefined ? { tapped } : {}), text };
+  return { kind: "object", ...filters, controller, ...(tapped !== undefined ? { tapped } : {}), ...(owner ? { owner } : {}), text };
 }
 
 export function parseKeywordList(text: string): string[] | null {

@@ -1,13 +1,13 @@
 import { allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose } from "../abilities";
 import { substituteX } from "../amounts";
 import { num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS, singularWord } from "./words";
-import { CHOSEN_KEYWORD, CHOSEN_PROTECTION, THAT_PLAYER_PROTECTION } from "../keywords";
+import { CHOSEN_KEYWORD, CHOSEN_PROTECTION, CREATURE_TYPES, THAT_PLAYER_PROTECTION } from "../keywords";
 import { parseStaticCondition } from "./statics";
 import { parseBoundCount, parseCount } from "./counts";
 import { parseBecomes, parseDig, parseSentence } from "./sentence";
 import { parsePreventionRider } from "./sentences/prevention";
 import { compileQuoted, parseGrants } from "./grants";
-import { boundAtTargeting, parseCardTarget, parseObject, parsePlayer, parseTargetPhrase, PERMANENT_TYPES } from "./targets";
+import { boundAtTargeting, parseCardTarget, parseDamageRecipient, parseObject, parsePlayer, parseTargetPhrase, PERMANENT_TYPES } from "./targets";
 import { parseCardNameChoice, parseSearchFilter } from "./search";
 import { parseManaSpend, parseManaTrigger } from "./mana-abilities";
 import { parseTrigger } from "./triggers";
@@ -1097,6 +1097,68 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const filter = parseSearchFilter(yardPick[1]!);
       if (filter === null || (filter?.types ?? []).some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
       effects.push({ type: "chooseFromGraveyard", n: 1, upTo: true, dest: "battlefield", ...(filter ? { filter } : {}), ...(yardBack[1] ? { counters: { [counterKind(yardBack[1])]: 1 } } : {}) });
+      si++;
+      continue;
+    }
+    // "For each player, choose a creature or planeswalker card in that player's graveyard. Put those cards onto the
+    // battlefield under your control." (Breach the Multiverse): not targeted, so chosen as it resolves (CR 608.2c), one in
+    // each graveyard, then all enter at the same time under your control (CR 110.2a). Only permanent card types, so no
+    // Aura needs something to enchant.
+    // Ripples of Potential: "Proliferate, then choose any number of permanents you control that had a counter put on them
+    // this way. Those permanents phase out." Chosen after proliferating, all phasing out at once (CR 702.26).
+    if (/^Proliferate$/i.test(s) && /^[Cc]hoose any number of permanents you control that had a counter put on them this way$/.test(sentences[si + 1] ?? "") && /^Those permanents phase out$/.test(sentences[si + 2]?.replace(/\.$/, "") ?? "")) {
+      effects.push({ type: "proliferate", thenPhaseOut: true });
+      si += 2;
+      continue;
+    }
+    // Sword of Hearth and Home: "exile up to one target creature you own, then search your library for a basic land card.
+    // Put both cards onto the battlefield under your control, then shuffle." Both enter at the same time (rulings).
+    const holdExile = /^[Ee]xile (up to one target creature you own)$/.exec(s);
+    if (holdExile && /^[Ss]earch your library for a basic land card$/.test(sentences[si + 1] ?? "") && /^Put both cards onto the battlefield under your control, then shuffle$/.test(sentences[si + 2]?.replace(/\.$/, "") ?? "")) {
+      const what = parseObject(holdExile[1]!, ctx);
+      if (what?.ref !== "target") return null;
+      effects.push({ type: "flicker", what, under: "you", hold: true });
+      effects.push({ type: "search", filter: { kind: "card", types: ["Land"], supertypes: ["Basic"], text: "basic land card" }, n: 1, upTo: false, dest: { zone: "battlefield" }, reveal: false, withHeld: true });
+      si += 2;
+      continue;
+    }
+    // Myr Battlesphere: "you may tap X untapped Myr you control. If you do, ~ gets +X/+0 until end of turn and deals X
+    // damage to the player or planeswalker it's attacking." X is chosen as it resolves, no more than the untapped Myr you
+    // control, and they can be tapped even after ~ has left the battlefield (rulings); X = 0 does nothing.
+    const tapX = /^[Yy]ou may tap X untapped ([A-Z][a-z]+) you control$/.exec(s);
+    const tapXThen = tapX && CREATURE_TYPES.has(tapX[1]!) ? /^If you do, ~ gets \+X\/\+0 until end of turn and deals X damage to (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (tapX && tapXThen) {
+      const to = parseDamageRecipient(tapXThen[1]!, ctx);
+      if (!to) return null;
+      const x: AmountExpr = { count: { kind: "tappedThisWay" } };
+      effects.push(
+        { type: "tapAnyNumber", filter: { kind: "object", subtypes: [tapX[1]!], controller: "you", text: `${tapX[1]} you control` } },
+        { type: "continuous", what: { ref: "self" }, mods: [{ kind: "modifyPT", power: x, toughness: 0 }], duration: "endOfTurn" },
+        { type: "damage", amount: x, to },
+      );
+      si++;
+      continue;
+    }
+    // Promise of Loyalty: "Each player puts a vow counter on a creature they control and sacrifices the rest. Each of those
+    // creatures can't attack you or planeswalkers you control for as long as it has a vow counter on it." Each must put
+    // one if able (rulings); the counter staying is what keeps the restriction (CR 611.2b), whoever controls it later.
+    const vow = new RegExp(`^Each player puts an? (${COUNTER}) counter on a creature they control and sacrifices the rest$`).exec(s);
+    const vowThen = vow && new RegExp(`^Each of those creatures can't attack you or planeswalkers you control for as long as it has an? ${vow[1]!.replace(/[+/]/g, "\\$&")} counter on it$`).exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (vow && vowThen) {
+      const creature: TargetSpec = { kind: "object", types: ["Creature"], text: "creature" };
+      const counter = counterKind(vow[1]!);
+      effects.push(
+        { type: "keepRest", who: { ref: "eachPlayer" }, keep: [{ filter: creature, n: 1 }], among: creature, counter },
+        { type: "continuous", what: { ref: "created" }, mods: [{ kind: "cantAttackYou" }], duration: "game", whileCounter: counter },
+      );
+      si++;
+      continue;
+    }
+    const eachYard = /^For each player, choose an? (.+? card) in that player's graveyard$/.exec(s);
+    if (eachYard && /^Put those cards onto the battlefield under your control$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      const filter = parseSearchFilter(eachYard[1]!);
+      if (!filter?.types?.length || filter.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
+      effects.push({ type: "chooseFromGraveyard", n: 1, dest: "battlefield", filter, who: { ref: "eachPlayer" }, youChoose: true });
       si++;
       continue;
     }

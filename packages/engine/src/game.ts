@@ -1894,6 +1894,27 @@ function drawOne(s: GameState, pid: PlayerId): boolean {
   return true;
 }
 
+/**
+ * How many cards `pid` mills when told to mill `n` (CR 701.17): The Water Crystal's "that many cards plus four" and
+ * Bruvac's "twice that many" for each of their controllers' opponents (CR 614.1a). With both, the milled player would
+ * choose the order (CR 616.1); we double first, the smaller total. Zero stays zero ("one or more cards").
+ */
+export function millCount(s: GameState, pid: PlayerId, n: number): number {
+  if (n <= 0) return n;
+  let plus = 0;
+  let twice = 0;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    const more = abilitiesOf(s, o).millMore;
+    if (!more || controllerOf(s, o) === pid || !opponents(s, controllerOf(s, o)).includes(pid)) continue;
+    for (const m of more) {
+      if ("plus" in m) plus += m.plus;
+      else twice++;
+    }
+  }
+  return n * 2 ** twice + plus;
+}
+
 /** Cards in `pid`'s graveyard whose dredge could replace their next draw: dredge N needs N cards in their library (CR 702.52a-b). */
 export function dredgeOptions(s: GameState, pid: PlayerId): ObjectId[] {
   const p = player(s, pid);
@@ -1909,7 +1930,7 @@ export function dredgeOptions(s: GameState, pid: PlayerId): ObjectId[] {
  * rest of the draws, and whatever was drawing carries on.
  */
 function dredgeInstead(s: GameState, p: Player, id: ObjectId) {
-  const n = compileCard(defOf(s, obj(s, id))).dredge!;
+  const n = millCount(s, p.id, compileCard(defOf(s, obj(s, id))).dredge!);
   const milled = p.library.slice(0, n);
   for (const c of milled) moveObject(s, c, "graveyard");
   moveObject(s, id, "hand");
@@ -4461,8 +4482,9 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
     }
     else if (c.kind === "reveal") log(s, `${p.name} reveals ${(choices.reveal ?? []).map((id) => nameOf(s, id)).join(", ")} from their hand.`);
     else if (c.kind === "mill") {
-      log(s, `${p.name} mills ${c.n === 1 ? "a card" : `${c.n} cards`}.`);
-      for (const id of p.library.slice(0, c.n)) moveObject(s, id, "graveyard");
+      const n = millCount(s, p.id, c.n);
+      log(s, `${p.name} mills ${n === 1 ? "a card" : `${n} cards`}.`);
+      for (const id of p.library.slice(0, n)) moveObject(s, id, "graveyard");
     } else if (c.kind === "revealHand") log(s, `${p.name} reveals their hand${p.hand.length ? `: ${p.hand.map((id) => nameOf(s, id)).join(", ")}` : " (it's empty)"}.`);
     else if (c.kind === "giveLife") {
       // Unchosen (a caller that didn't ask), the cost is still paid: by the first opponent who can gain life.
@@ -5484,7 +5506,9 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
-  r.chosen = withChoice(r.chosen, pend.what, choice);
+  // "Each player chooses a creature type": one more for "a type chosen this way".
+  if (pend.what === "creatureType" && r.scratch?.eachAsked && r.chosen?.types) r.chosen = { ...r.chosen, types: [...r.chosen.types, choice] };
+  else r.chosen = withChoice(r.chosen, pend.what, choice);
   log(s, `${p.name} chooses ${pend.what === "opponent" ? player(s, Number(choice)).name : choice}${pend.what === "opponent" ? ` for ${pend.source}` : ""}.`);
   continueResolution(s);
 }

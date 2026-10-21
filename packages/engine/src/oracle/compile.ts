@@ -1612,6 +1612,12 @@ export function compile(d: CardDef): CompiledCard {
       (out.altCosts ??= []).push({ kind: "prototype", mana: proto[1]! });
       continue;
     }
+    // The Water Crystal, Bruvac the Grandiloquent: a replacement effect on milling (CR 614.1a, 701.17).
+    const millMore = /^If an opponent would mill one or more cards, they mill (that many cards plus (\w+)|twice that many cards) instead\.$/.exec(line);
+    if (millMore && !Number.isNaN(num(millMore[2] ?? "0"))) {
+      (out.millMore ??= []).push(millMore[2] ? { plus: num(millMore[2]) } : { twice: true });
+      continue;
+    }
     if (line === "Skip your draw step.") {
       out.skipDrawStep = true;
       continue;
@@ -2564,14 +2570,16 @@ export function parseFromTop(text: string): FromTop | null | undefined {
  */
 function triggersAgainLine(line: string): NonNullable<CompiledCard["triggersAgain"]>[number] | null {
   // "Wolf or battle you control", "land or Bird you control": any of them.
-  const kinds = (phrase: string, other: boolean): { filter: TargetSpec; other?: true }[] | null => {
+  // "Colorless spell you control or another colorless permanent you control" (Echoes of Eternity): spells too, when
+  // `spells`.
+  const kinds = (phrase: string, other: boolean, spells = false): { filter: TargetSpec; other?: true }[] | null => {
     const yours = / you control$/.test(phrase);
-    const parts = phrase.replace(/ you control$/, "").split(/,? or (?!less\b|greater\b|more\b)/);
+    const parts = phrase.replace(/ you control$/, "").split(/,? or (?!less\b|greater\b|more\b)/).map((p) => p.replace(/ you control$/, ""));
     const out: { filter: TargetSpec; other?: true }[] = [];
     for (const p of parts) {
       const another = /^another /.test(p);
       const f = parseTargetPhrase(`${p.replace(/^another /, "")}${yours ? " you control" : ""}`);
-      if (f?.kind !== "object") return null;
+      if (f?.kind !== "object" && !(spells && f?.kind === "spell" && !another)) return null;
       out.push({ filter: f, ...(other || another ? { other: true as const } : {}) });
     }
     return out;
@@ -2595,8 +2603,7 @@ function triggersAgainLine(line: string): NonNullable<CompiledCard["triggersAgai
   }
   if (m) {
     const all = /^another (.+ or .+ you control)$/.exec(m[1]!);
-    const of = kinds(all ? all[1]! : m[1]!, !!all);
-    // Only permanents you control (a spell's triggered abilities aren't covered: Echoes of Eternity).
+    const of = kinds(all ? all[1]! : m[1]!, !!all, true);
     return of && of.every((x) => x.filter.controller === "you") ? { of } : null;
   }
   return null;

@@ -1470,6 +1470,8 @@ export interface Chosen {
   anchor?: string;
   /** "Choose a card name" (CR 201.4). */
   name?: string;
+  /** "Each player chooses a creature type" (Patriarch's Bidding): every type chosen, in the order chosen. */
+  types?: string[];
 }
 
 export interface TurnRule {
@@ -1610,6 +1612,8 @@ export interface Resolving {
   /** Its last roll (CR 706.2): each die's natural result that counts (not the ignored ones, 706.6), and the result. */
   rolled?: { sides: number; naturals: number[]; result: number; /** "The other result" (Effect roll's chooseOne). */ other?: number };
   scratch?: {
+    /** "Each player chooses a creature type": the players asked so far. */
+    eachAsked?: PlayerId[];
     /** Secret numbers (Wheel of Misfortune): the players still to choose, each one's number, and where the rest stands. */
     numbers?: { queue: PlayerId[]; chosen: Record<string, number>; pick?: number; step?: "discard" | "draw"; draws?: PlayerId[] };
     /** Tainted Pact: the names exiled so far, and the card the player is asked about. */

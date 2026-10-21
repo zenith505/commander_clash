@@ -42,7 +42,10 @@ type Cause = { event: "enters" | "dies" | "attacks" | "combatDamage"; objs: { o:
 function triggersAgain(s: GameState, src: GameObject, controller: PlayerId, cause: Cause | null): number {
   const leaving = cause?.event === "dies" ? cause.objs.find((x) => x.o.id === src.id) : undefined;
   const permanent = src.zone === "battlefield" || !!leaving || (s.leftTogether ?? []).some((l) => l.id === src.id && src.zone !== "battlefield");
-  if (!permanent) return 0;
+  // A spell's own triggered abilities ("When you cast ~", storm, cascade): only for "a triggered ability of a colorless
+  // spell you control" (Echoes of Eternity).
+  const spell = !permanent && src.zone === "stack" ? s.stack.find((x) => x.objectId === src.id && x.kind === "spell") : undefined;
+  if (!permanent && !spell) return 0;
   const statics: { id: ObjectId; again: NonNullable<CompiledCard["triggersAgain"]> }[] = [];
   for (const id of s.battlefield) {
     const o = obj(s, id);
@@ -59,11 +62,14 @@ function triggersAgain(s: GameState, src: GameObject, controller: PlayerId, caus
   if (!statics.length) return 0;
   // Whose ability it is: as it is, or as it last existed.
   const view = leaving ? { o: leaving.o, c: leaving.c } : { o: src, c: src.zone === "battlefield" ? undefined : characteristics(s, src) };
-  const ofMatches = (f: TargetSpec) => objectMatches(s, { ...f, controller: undefined }, view.o, controller, false, undefined, view.c);
+  const ofMatches = (f: TargetSpec) =>
+    spell ? f.kind === "spell" && spellMatches(s, { ...f, controller: undefined }, spell) : f.kind !== "spell" && objectMatches(s, { ...f, controller: undefined }, view.o, controller, false, undefined, view.c);
   let n = 0;
   for (const { id, again } of statics)
     for (const a of again) {
       if (a.anchor !== undefined && s.objects[id]?.chosen?.anchor !== a.anchor) continue;
+      // The others are about abilities of permanents only.
+      if (spell && !a.of) continue;
       // Veyran: "If you casting or copying an instant or sorcery spell causes ...": that player is this static's controller.
       if (a.by?.event === "castOrCopy") {
         if (cause?.event !== "castOrCopy" || cause.caster !== controller) continue;
@@ -1053,7 +1059,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // Casualty's copy only if its casualty cost was paid (CR 702.153a).
     if (spell && !ev.copy) add(spell, ev.controller, (e, t) => e === "selfCast" && (!t.ifCasualty || !!item?.casualty) && (!t.ifX || (item?.x ?? 0) >= t.ifX) && (!t.ifConspired || !!item?.conspired), compileCard(defOf(s, spell)).triggers, ev.stackId, undefined, undefined, item?.x, item?.kicked);
     // Cascade a permanent gives the spells its controller casts: the spell's own ability, one for each (CR 702.85a, 702.85c).
-    if (spell && item && !ev.copy) for (const _ of grantedCascades(s, item, spell, ev.controller)) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: CASCADE_BODY, cause: ev.stackId });
+    if (spell && item && !ev.copy) for (const _ of grantedCascades(s, item, spell, ev.controller)) for (let n = triggersAgain(s, spell, ev.controller, null); n >= 0; n--) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: CASCADE_BODY, cause: ev.stackId });
     const castWatch = (o: GameObject, you: PlayerId, triggers?: TriggeredAbility[]) =>
       add(o, you, (e, t) => {
         if (e !== "castSpell" || !t.cast || (ev.copy && !t.cast.orCopy)) return false;

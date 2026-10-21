@@ -284,8 +284,16 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // cards from your graveyard to the battlefield" (Replenish: each Aura's controller chooses what it enchants, CR 303.4f).
   // "Each player returns each creature card from their graveyard to the battlefield" (Magister of Worth): the same as from
   // all graveyards under their owners' control.
-  const eachReturns = /^Each player returns each (.+?) card from their graveyard to the battlefield( tapped)?$/.exec(s);
+  // "Each player returns all creature cards from their graveyard to the battlefield" (Twilight's Call), "... all creature
+  // cards of a type chosen this way ..." (Patriarch's Bidding) likewise.
+  const eachReturns = /^Each player returns each (.+?) card from their graveyard to the battlefield( tapped)?$/.exec(s) ?? /^Each player returns all (.+?) cards from their graveyard to the battlefield( tapped)?$/.exec(s);
   if (eachReturns) s = `Return all ${eachReturns[1]} cards from all graveyards to the battlefield${eachReturns[2] ?? ""} under their owners' control`;
+  const ofChosen = /^Each player returns all (\w+) cards of a type chosen this way from their graveyard to the battlefield$/.exec(s);
+  if (ofChosen) {
+    const spec = parseTargetPhrase(`${ofChosen[1]} card of a type chosen this way from a graveyard`, { chosen: true });
+    if (spec?.kind !== "card" || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
+    return [{ type: "returnAllFromGraveyard", who: { ref: "eachPlayer" }, filter: { ...spec, text: `${ofChosen[1]} card of a type chosen this way` }, owners: true }];
+  }
   // "Put all creature cards from all graveyards onto the battlefield under your control" (Rise of the Dark Realms).
   const yours = /^(?:Put|Return) all (.+?) cards from all graveyards (?:onto|to) the battlefield( tapped)? under your control$/.exec(s);
   if (yours) {

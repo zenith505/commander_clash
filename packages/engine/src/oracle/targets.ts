@@ -601,10 +601,10 @@ export function parseTargetPhrase(
   const otherThanBasic = / other than a basic land card\b/.test(p);
   if (otherThanBasic) p = p.replace(/ other than a basic land card\b/, "");
   // "of the chosen type", "that aren't of the chosen type", "of that color": only where the caller fills in the choice.
-  const chosen = /,? (that (?:aren't|are not|isn't|is not) |not )?of (?:the chosen|that) (creature type|type|color)/.exec(p);
+  const chosen = /,? (that (?:aren't|are not|isn't|is not) |not )?of (?:(?:the chosen|that) (creature type|type|color)|(a type chosen this way))/.exec(p);
   if (chosen) {
     if (!opts.chosen) return null;
-    extra.chosen = chosen[2] === "color" ? (chosen[1] ? "notColor" : "color") : chosen[1] ? "notType" : "type";
+    extra.chosen = chosen[3] ? (chosen[1] ? "notTypesChosen" : "typesChosen") : chosen[2] === "color" ? (chosen[1] ? "notColor" : "color") : chosen[1] ? "notType" : "type";
     p = (p.slice(0, chosen.index) + p.slice(chosen.index + chosen[0].length)).trim();
   }
   // "Spell with the chosen name" (Declaration of Naught), "cards with that name" after "choose a card name" (CR 201.4).

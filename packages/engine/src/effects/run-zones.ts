@@ -1532,7 +1532,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         for (const pid of apnap(s, players(s, e.who, ctx)))
           for (const id of player(s, pid).graveyard) {
             const d = defOf(s, s.objects[id]!);
-            if (isPermanentCard(d) && printedMatches(e.filter, d)) sc.found.push(id);
+            if (isPermanentCard(d) && printedMatches(bindChosen(e.filter, ctx.chosen), d)) sc.found.push(id);
           }
       }
       const cards = sc.found.map((id) => obj(s, id)).filter((o) => o.zone === "graveyard");

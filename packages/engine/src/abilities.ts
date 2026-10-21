@@ -430,7 +430,7 @@ export interface TargetSpec {
    * or color chosen for the source (see GameObject.chosen) or while the spell resolves. Before
    * `bindChosen` fills it in, a filter that needs a choice that wasn't made matches nothing.
    */
-  chosen?: "type" | "notType" | "color" | "notColor" | "cardType" | /** "with the chosen name", "with that name" (Chosen.name, CR 201.4). */ "name";
+  chosen?: "type" | "notType" | "color" | "notColor" | "cardType" | /** "Of a type chosen this way" (Chosen.types: any of them), "that aren't ...". */ "typesChosen" | "notTypesChosen" | /** "with the chosen name", "with that name" (Chosen.name, CR 201.4). */ "name";
   /**
    * "Target spell with a single target": a spell that targets exactly one thing once, whether or not that target is
    * still legal (rulings on Deflection).
@@ -2344,7 +2344,7 @@ export type Effect =
    */
   | { type: "secretNumbers"; then: "wheel" | "ogre" }
   | { type: "vote"; options?: string[]; among?: TargetSpec; secret?: true; text: string }
-  | { type: "choose"; choice: ChoiceKind; /** With "opponent": "a player with the most life or tied for most life" (The Black Gate), checked as it resolves; you can be one. */ mostLife?: true; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose };
+  | { type: "choose"; choice: ChoiceKind; /** "Each player chooses a creature type" (Patriarch's Bidding): every player in turn order, starting with the active player, into Chosen.types. */ each?: true; /** With "opponent": "a player with the most life or tied for most life" (The Black Gate), checked as it resolves; you can be one. */ mostLife?: true; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose };
 
 /** What a player chooses by name: a creature type (CR 205.3m) or a color (CR 105.1). */
 /** "keyword": "gains your choice of flying, vigilance, deathtouch, or haste", from the options listed (CR 608.2d). */
@@ -3912,6 +3912,11 @@ export interface CompiledCard {
    * instead of putting it into your graveyard" (a replacement effect, CR 614.1a). It's still discarded (rulings).
    */
   discardedToBattlefield?: boolean;
+  /**
+   * "If an opponent would mill one or more cards, they mill that many cards plus four instead" (The Water Crystal),
+   * "... twice that many cards instead" (Bruvac): replacement effects on its controller's opponents' mills (CR 614.1a).
+   */
+  millMore?: ({ plus: number } | { twice: true })[];
   /** "Skip your draw step." (CR 614.10): its controller's draw steps don't happen. */
   skipDrawStep?: boolean;
   /** "You may choose not to untap ~ during your untap step." (CR 502.3): its controller decides as the step untaps. */

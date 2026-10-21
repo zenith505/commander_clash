@@ -2324,6 +2324,13 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
       } else (c?.mana.length ? d.colorIdentity : d.colors).forEach((col) => count(COLOR_NAMES[col], c?.mana.length ? 3 : 1));
     }
   }
+  // "Returns all creature cards of a type chosen this way from their graveyard" (Patriarch's Bidding): what's in ours.
+  const fromYard = what === "creatureType" && !!c && allEffects([...(c.spell?.effects ?? []), ...c.triggers.flatMap((t) => t.body.effects)]).some((e) => e.type === "returnAllFromGraveyard" && e.filter.chosen === "typesChosen");
+  if (fromYard)
+    for (const id of player(s, pid).graveyard) {
+      const d = defOf(s, obj(s, id));
+      if (d.types.includes("Creature")) d.subtypes.forEach((st) => count(st, 3 + defMv(d)));
+    }
   return [...tally].sort((a, b) => b[1] - a[1])[0]?.[0] ?? options[0]!;
 }
 

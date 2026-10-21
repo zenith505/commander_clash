@@ -3,7 +3,7 @@ import { abilitiesOf, cardIdOf, defOf, isPermanentCard, isType } from "../cards"
 import { controllerOf } from "../layers";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
-import { gainLife, log, loseLife, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
+import { gainLife, log, loseLife, millCount, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, printedMatches } from "./targeting";
@@ -22,7 +22,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       s.resolving!.milled = [];
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
-        const n = amountNow(s, e.n, { ...ctx, eachOne: pid });
+        const n = millCount(s, pid, amountNow(s, e.n, { ...ctx, eachOne: pid }));
         for (const id of p.library.slice(0, n)) {
           moveObject(s, id, "graveyard");
           if (obj(s, id).zone === "graveyard") s.resolving!.milled.push({ id, zc: obj(s, id).zoneChanges ?? 0 });

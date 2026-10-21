@@ -567,6 +567,26 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       ],
       text,
     };
+  // Praetor's Grasp: "Search target opponent's library for a card and exile it face down. Then that player shuffles. You
+  // may play that card for as long as it remains exiled." Hoarding Broodlord, The Creation of Avacyn: "search your
+  // library for a card, exile it face down, then shuffle(. For as long as that card remains exiled, you may play it)."
+  // Only the player who searched may look at it (CR 406.3).
+  const grasp = /^Search target opponent's library for a card and exile it face down\. Then that player shuffles\. You may play that card for as long as it remains exiled\.$/.test(text.trim());
+  const hoard = /^Search your library for a card, exile it face down, then shuffle\.( For as long as that card remains exiled, you may play it\.)?$/i.exec(text.trim());
+  if (grasp || hoard) {
+    const play = grasp || hoard?.[1] ? { play: { until: "exiled" as const } } : {};
+    return {
+      targets: grasp ? [{ kind: "player", opponent: true, text: "target opponent" }] : [],
+      effects: [{ type: "search", n: 1, upTo: false, dest: { zone: "exile", faceDown: true, ...play }, reveal: false, ...(grasp ? { library: { ref: "target", index: 0 } } : {}) }],
+      text,
+    };
+  }
+  // Ugin, Eye of the Storms: "Search your library for any number of colorless nonland cards, exile them, then shuffle.
+  // Until end of turn, you may cast those cards without paying their mana costs." With the normal timing (rulings).
+  const ugin = /^Search your library for any number of (.+? cards), exile them, then shuffle\. Until end of turn, you may cast those cards without paying their mana costs\.$/.exec(text.trim());
+  const uginFilter = ugin ? parseSearchFilter(ugin[1]!) : undefined;
+  if (ugin && uginFilter)
+    return { targets: [], effects: [{ type: "search", filter: uginFilter, n: 99, upTo: true, dest: { zone: "exile", play: { until: "thisTurn", free: true, castOnly: true } }, reveal: false }], text };
   // Shatterskull Smashing: "If X is 6 or more, ~ deals twice X damage divided as you choose among them instead": twice X
   // is what's divided, as it's cast (rulings: "you divide twice X damage; you don't assign X damage and then double it").
   const twiceX = /^(~ deals X damage divided as you choose among [^.]+)\. If X is (\d+) or more, ~ deals twice X damage divided as you choose among them instead\.$/.exec(text.trim());

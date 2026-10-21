@@ -1432,7 +1432,7 @@ export interface GameState {
    * in `returned`. `asking`: that one is being asked now.
    */
   untilReturns?: { auras: { id: ObjectId; zc: number; under: PlayerId; source: string; asking?: true }[]; returned: ObjectId[] };
-  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; names?: TargetSpec; purpose?: NamePurpose; options?: string[]; secret?: true; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean } }[];
+  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; names?: TargetSpec; purpose?: NamePurpose; options?: string[]; range?: { min: number; max: number }; secret?: true; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean } }[];
   nextId: number;
   /**
    * Resolutions in a row in this step with every player only passing priority, and the states they left (as hashes,
@@ -1482,6 +1482,8 @@ export interface Chosen {
   anchor?: string;
   /** "Choose a card name" (CR 201.4). */
   name?: string;
+  /** "Choose a number between 1 and 10" (Talion, Sanctum Prelate). */
+  number?: number;
   /** "Each player chooses a creature type" (Patriarch's Bidding): every type chosen, in the order chosen. */
   types?: string[];
 }

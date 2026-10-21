@@ -33,7 +33,7 @@ export const pawprintsOf = (m: NonNullable<AbilityBody["modal"]>, modes: number[
 export function modeRange(body: AbilityBody, both = false): [number, number] {
   const m = body.modal!;
   if (!both || !m.both) return [m.min, m.max];
-  return m.both === "teamwork" ? [2, 2] : m.both === "kicked" ? [1, m.modes.length] : [1, 2];
+  return m.both === "teamwork" ? [2, 2] : m.both === "kicked" ? [1, m.modes.length] : [1, 2]; // "commander", "control": one or two
 }
 
 /** All the modes of a spell with entwine were chosen, so it costs its entwine cost more (CR 702.42a). */

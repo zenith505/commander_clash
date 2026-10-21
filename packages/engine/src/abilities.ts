@@ -444,7 +444,13 @@ export interface TargetSpec {
    * or color chosen for the source (see GameObject.chosen) or while the spell resolves. Before
    * `bindChosen` fills it in, a filter that needs a choice that wasn't made matches nothing.
    */
-  chosen?: "type" | "notType" | "color" | "notColor" | "cardType" | /** "Of a type chosen this way" (Chosen.types: any of them), "that aren't ...". */ "typesChosen" | "notTypesChosen" | /** "with the chosen name", "with that name" (Chosen.name, CR 201.4). */ "name";
+  chosen?: "type" | "notType" | "color" | "notColor" | "cardType" | /** "Of a type chosen this way" (Chosen.types: any of them), "that aren't ...". */ "typesChosen" | "notTypesChosen" | /** "with the chosen name", "with that name" (Chosen.name, CR 201.4). */ "name" | /** "Equal to the chosen number" (Chosen.number; see equalsChosen). */ "number";
+  /**
+   * "With mana value, power, or toughness equal to the chosen number" (Talion): one of these is that number, filled in
+   * as `equals` once it's known (bindChosen). Only creature spells have power and toughness (CR 208.3).
+   */
+  equalsChosen?: ("manaValue" | "power" | "toughness")[];
+  equals?: number;
   /**
    * "Target spell with a single target": a spell that targets exactly one thing once, whether or not that target is
    * still legal (rulings on Deflection).
@@ -499,6 +505,11 @@ export interface SearchDest {
   tapped?: boolean;
   /** "Exile it face down" (Beseech the Mirror): only its owner may look at it (CR 406.3); kept in Resolving.faceDownExiled. */
   faceDown?: true;
+  /**
+   * "You may play that card for as long as it remains exiled" (Praetor's Grasp, Hoarding Broodlord): the player who
+   * searched may play the card exiled face down, and look at it (CR 406.3).
+   */
+  play?: FaceDownPlay;
   /** "Put that card third from the top" (Long-Term Plans), for "libraryTop". */
   third?: true;
   /** "Put it onto the battlefield with X additional +1/+1 counters on it" (Vision Quest, CR 614.1c). */
@@ -2397,7 +2408,7 @@ export type Effect =
 /** "opponent": "Choose an opponent." as it resolves (CR 608.2d); "that player" is them (PlayerRef "chosenPlayer"). */
 /** "cardType": "Choose artifact or enchantment." (Season of Gathering), from the card types listed (CR 205.2a). */
 /** "cardName": "Choose a card name", "as ~ enters, choose a nonland card name" (CR 201.4): the name of a card (Chosen.name). */
-export type ChoiceKind = "creatureType" | "color" | "basicLandType" | "keyword" | "opponent" | "cardType" | "cardName";
+export type ChoiceKind = "creatureType" | "color" | "basicLandType" | "keyword" | "opponent" | "cardType" | "cardName" | "number";
 
 /**
  * What a chosen card name is for, so a bot can pick one: "deny", cards its opponents shouldn't use (Pithing Needle,
@@ -2587,7 +2598,9 @@ export interface AbilityBody {
     modes: AbilityBody[];
     costs?: string[];
     entwine?: string;
-    both?: "teamwork" | "commander" | "kicked";
+    both?: "teamwork" | "commander" | "kicked" | "control";
+    /** "If you control a Wizard as you cast ~, you may choose two instead" (Flame of Anor): both "control", checked as it's cast. */
+    bothIf?: StaticCondition;
     repeat?: true;
     pawprints?: number[];
     escalate?: { mana?: string; cost?: AdditionalCost; text: string };
@@ -3622,7 +3635,11 @@ export interface CompiledCard {
   entersTappedUnless?: EntersCondition;
   entersTappedChoice?: EntersChoice;
   /** "As ~ enters, choose a creature type / a color" (CR 614.12): made as it enters, kept while it's on the battlefield. */
-  entersChoose?: { what: ChoiceKind; except?: string; names?: TargetSpec; purpose?: NamePurpose; /** "Choose artifact, creature, enchantment, instant, or sorcery" (Cloud Key): the card types offered. */ options?: string[] }[];
+  entersChoose?: { what: ChoiceKind; except?: string; names?: TargetSpec; purpose?: NamePurpose; /** "Choose artifact, creature, enchantment, instant, or sorcery" (Cloud Key): the card types offered. */ options?: string[]; /** "Choose a number between 1 and 10" (Talion): any whole number in it. */ range?: { min: number; max: number } }[];
+  /** "Noncreature spells with mana value equal to the chosen number can't be cast." (Sanctum Prelate): anyone's. */
+  noncreatureChosenMvCantBeCast?: true;
+  /** "You may cast ~ as though it had flash if it targets a commander." (Timely Ward) */
+  flashIfTargetsCommander?: true;
   /** "As ~ enters, choose a player" / "an opponent" (CR 614.12): kept while it's on the battlefield, as Chosen.player. */
   entersChoosePlayer?: "player" | "opponent";
   /** "As ~ enters, choose Khans or Dragons" (CR 614.12b): the anchor words, one chosen as it enters (Chosen.anchor). */
@@ -3919,7 +3936,7 @@ export interface CompiledCard {
    * where X is ..." (Abaddon the Despoiler), X counted as the spell is cast.
    */
   /** "Noncreature spells you cast have convoke" (Caetus), "Multicolored spells you cast have convoke" (Fallaji Wayfarer), CR 702.51. */
-  spellsHaveConvoke?: { filter: TargetSpec; text: string }[];
+  spellsHaveConvoke?: { filter: TargetSpec; /** "Spells you cast from exile" (Hoarding Broodlord). */ fromExile?: true; text: string }[];
   /** "Nonartifact spells you cast have improvise" (Inspiring Statuary), CR 702.126. */
   spellsHaveImprovise?: { filter: TargetSpec; text: string }[];
   spellsHaveCascade?: { filter?: TargetSpec; from?: "hand" | "exile"; first?: true; treasure?: true; commander?: true; yourTurn?: true; maxMv?: Amount; text: string }[];

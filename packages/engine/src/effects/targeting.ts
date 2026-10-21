@@ -75,6 +75,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.power && (!c.types.includes("Creature") || !inRange(c.power, spec.power))) return false;
   if (spec.toughness && (!c.types.includes("Creature") || !inRange(c.toughness, spec.toughness))) return false;
   if (spec.manaValue && !inRange(defMv(defOf(s, o)), spec.manaValue)) return false;
+  if (spec.equalsChosen && (spec.equals === undefined || !spec.equalsChosen.some((k) => (k === "manaValue" ? defMv(defOf(s, o)) : c.types.includes("Creature") ? c[k] : undefined) === spec.equals))) return false;
   if (spec.mvAtMostControllersGraveyard && defMv(defOf(s, o)) > (s.players[c.controller]?.graveyard.length ?? 0)) return false;
   if (spec.manaCostIn && !spec.manaCostIn.includes(defOf(s, o).manaCost)) return false;
   if (spec.combat === "attacking" && o.attacking === undefined) return false;
@@ -159,6 +160,7 @@ export function bindChosen(spec: TargetSpec, chosen: Chosen | undefined): Target
     return kind === "typesChosen" ? { ...rest, subtypes: [...(rest.subtypes ?? []), ...chosen.types] } : { ...rest, notSubtypes: [...(rest.notSubtypes ?? []), ...chosen.types] };
   if (kind === "cardType" && chosen?.cardType) return { ...rest, types: [...(rest.types ?? []), chosen.cardType] };
   if (kind === "name" && chosen?.name !== undefined) return { ...rest, named: chosen.name };
+  if (kind === "number" && chosen?.number !== undefined) return { ...rest, equals: chosen.number };
   if ((kind === "color" || kind === "notColor") && chosen?.color)
     return kind === "color" ? { ...rest, colors: [chosen.color] } : { ...rest, notColors: [...(rest.notColors ?? []), chosen.color] };
   return kind === "notType" || kind === "notColor" || kind === "notTypesChosen" ? rest : spec;
@@ -182,6 +184,7 @@ export function withChoice(chosen: Chosen | undefined, what: ChoiceKind, choice:
   if (what === "keyword") return { ...chosen, keyword: choice };
   if (what === "cardType") return { ...chosen, cardType: choice };
   if (what === "cardName") return { ...chosen, name: choice };
+  if (what === "number") return { ...chosen, number: Number(choice) };
   if (what === "opponent") return { ...chosen, player: Number(choice) };
   const color = (Object.keys(COLOR_NAMES) as Color[]).find((c) => COLOR_NAMES[c] === choice);
   return { ...chosen, ...(color ? { color } : {}) };
@@ -227,6 +230,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.power && (!creature || !inRange(Number.parseInt(d.power ?? "0", 10) || 0, spec.power))) return false;
   if (spec.toughness && (!creature || !inRange(Number.parseInt(d.toughness ?? "0", 10) || 0, spec.toughness))) return false;
   if (spec.manaValue && !inRange(defMv(d), spec.manaValue)) return false;
+  if (spec.equalsChosen && (spec.equals === undefined || !spec.equalsChosen.some((k) => (k === "manaValue" ? defMv(d) : creature && /^\d+$/.test(d[k] ?? "") ? Number(d[k]) : undefined) === spec.equals))) return false;
   if (spec.manaCostIn && !spec.manaCostIn.includes(d.manaCost)) return false;
   if (spec.named !== undefined && !hasName(d.name, spec.named)) return false;
   if (spec.doubleFaced && !isDoubleFacedDef(d)) return false;
@@ -257,24 +261,26 @@ export function spellMatches(s: GameState, spec: TargetSpec, item: StackItem): b
   const o = item.objectId ? s.objects[item.objectId] : undefined;
   if (!o) return false;
   const d = defOf(s, o);
-  const { manaValue: mv, power: pw, toughness: tg, ...rest } = spec;
+  const { manaValue: mv, power: pw, toughness: tg, equalsChosen, equals, ...rest } = spec;
   if (!printedMatches(rest, d)) return false;
   if (mv && !inRange(spellManaValue(s, item), mv)) return false;
+  // Only creature spells have power and toughness (CR 208.3).
+  const pt = (key: "power" | "toughness"): number | undefined => {
+    if (!d.types.includes("Creature")) return undefined;
+    const printed = d[key] ?? "0";
+    if (/^\d+$/.test(printed)) return Number.parseInt(printed, 10);
+    const cda = compileCard(d).statics.find((st) => st.affects.kind === "self" && !st.condition && st.mods.some((m) => m.kind === "definePT"));
+    const def = cda?.mods.find((m) => m.kind === "definePT") as Extract<Modification, { kind: "definePT" }> | undefined;
+    const amount = def?.[key];
+    return amount === undefined ? undefined : evalAmount(s, amount, { controller: item.controller, sourceId: o.id });
+  };
   for (const [key, range] of [["power", pw], ["toughness", tg]] as const) {
     if (!range) continue;
-    // Only creature spells have power and toughness (CR 208.3).
-    if (!d.types.includes("Creature")) return false;
-    const printed = d[key] ?? "0";
-    let n = Number.parseInt(printed, 10);
-    if (!/^\d+$/.test(printed)) {
-      const cda = compileCard(d).statics.find((st) => st.affects.kind === "self" && !st.condition && st.mods.some((m) => m.kind === "definePT"));
-      const def = cda?.mods.find((m) => m.kind === "definePT") as Extract<Modification, { kind: "definePT" }> | undefined;
-      const amount = def?.[key];
-      if (amount === undefined) return false;
-      n = evalAmount(s, amount, { controller: item.controller, sourceId: o.id });
-    }
-    if (!inRange(n, range)) return false;
+    const n = pt(key);
+    if (n === undefined || !inRange(n, range)) return false;
   }
+  // Talion: one of them equal to the chosen number; nothing chosen, nothing matches. An X spell's mana value counts its X (CR 202.3e).
+  if (equalsChosen && (equals === undefined || !equalsChosen.some((k) => (k === "manaValue" ? spellManaValue(s, item) : pt(k)) === equals))) return false;
   return true;
 }
 

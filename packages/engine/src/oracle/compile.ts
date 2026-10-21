@@ -393,7 +393,8 @@ export function compile(d: CardDef): CompiledCard {
   // "Choose one. If this spell was cast using teamwork, choose both instead." and "Choose one. If you control a commander
   // as you cast this spell, you may choose both instead.": a "Choose one —" list whose count can change as it's cast.
   // "Choose one. If this spell was kicked, choose any number instead." (Inscriptions) too.
-  let both: "teamwork" | "commander" | "kicked" | undefined;
+  let both: "teamwork" | "commander" | "kicked" | "control" | undefined;
+  let bothIf: string | undefined;
   // "Choose three. You may choose the same mode more than once." (the Confluences, CR 700.2d).
   let repeat = false;
   let cipher = false;
@@ -411,6 +412,13 @@ export function compile(d: CardDef): CompiledCard {
         }
         if (/^Choose one\. If ~ was kicked, choose any number instead\.$/.test(l.trim())) {
           both = "kicked";
+          return "Choose one —";
+        }
+        // "If you control a Wizard as you cast ~, you may choose two instead" (Flame of Anor): one or two.
+        const control = /^Choose one\. If you control (.+?) as you cast ~, you may choose (?:both|two) instead\.$/.exec(l.trim());
+        if (control && control[1] !== "a commander") {
+          both = "control";
+          bothIf = control[1]!;
           return "Choose one —";
         }
         const m = /^Choose one\. If (~ was cast using teamwork, choose|you control a commander as you cast ~, you may choose) both instead\.$/.exec(l.trim());
@@ -863,6 +871,19 @@ export function compile(d: CardDef): CompiledCard {
     if (asCardType) {
       if (out.entersChoose?.some((c) => c.what === "cardType")) out.unsupported.push(raw);
       else (out.entersChoose ??= []).push({ what: "cardType", options: asCardType[1]!.split(/, (?:or )?/).map(capital) });
+      continue;
+    }
+    // "As ~ enters, choose a number between 1 and 10." (Talion), "choose a number." (Sanctum Prelate): a whole number, kept
+    // as Chosen.number (CR 614.12; CR 107.1: the game uses only integers, and no mana value is negative, so 0 or more).
+    const asNumber = /^As (?:~|it) enters, choose a number(?: between (\d+) and (\d+))?\.$/.exec(line);
+    if (asNumber) {
+      if (out.entersChoose?.some((c) => c.what === "number")) out.unsupported.push(raw);
+      else (out.entersChoose ??= []).push({ what: "number", range: asNumber[1] ? { min: Number(asNumber[1]), max: Number(asNumber[2]) } : { min: 0, max: 999 } });
+      continue;
+    }
+    // Sanctum Prelate: "Noncreature spells with mana value equal to the chosen number can't be cast." (X as chosen, CR 601.3a)
+    if (line === "Noncreature spells with mana value equal to the chosen number can't be cast.") {
+      out.noncreatureChosenMvCantBeCast = true;
       continue;
     }
     // "As ~ enters, choose a nonland card name." (CR 614.12, 201.4): kept while it's on the battlefield, as Chosen.name.
@@ -1483,6 +1504,11 @@ export function compile(d: CardDef): CompiledCard {
       else (out.spellsHaveConvoke ??= []).push({ filter: f, text: line });
       continue;
     }
+    // "Spells you cast from exile have convoke" (Hoarding Broodlord): cast from exile, checked as they're paid for (CR 601.2g-h).
+    if (line === "Spells you cast from exile have convoke.") {
+      (out.spellsHaveConvoke ??= []).push({ filter: { kind: "spell", text: "spell" }, fromExile: true, text: line });
+      continue;
+    }
     // "Nonartifact spells you cast have improvise" (Inspiring Statuary), CR 702.126a, as for convoke.
     const giveImprovise = /^([A-Z][a-z]+) spells you cast have improvise\.$/.exec(line);
     if (giveImprovise) {
@@ -1870,6 +1896,12 @@ export function compile(d: CardDef): CompiledCard {
       out.opponentsCantActivateYourTurn = true;
       continue;
     }
+    // Timely Ward: "You may cast ~ as though it had flash if it targets a commander": one of its targets, as it's cast, is
+    // a commander (CR 903.3); starting to cast it then needs a commander on the battlefield.
+    if (line === "You may cast ~ as though it had flash if it targets a commander.") {
+      out.flashIfTargetsCommander = true;
+      continue;
+    }
     // "~ has flash as long as you've committed a crime this turn" (Take for a Ride), "You may cast ~ as though it had
     // flash if you control a Human" (Bard's Company), "Spell mastery — If there are two or more instant and/or sorcery
     // cards in your graveyard, you may cast ~ as though it had flash": whether it can be cast at instant speed now (CR
@@ -2220,7 +2252,12 @@ export function compile(d: CardDef): CompiledCard {
   } else if (both) {
     // Teamwork's "choose both" needs teamwork; either way, a list of exactly two modes.
     const modal = out.spell?.modal;
-    if (modal && modal.min === 1 && modal.max === 1 && modal.modes.length === 2 && (both === "commander" || out.teamwork !== undefined)) modal.both = both;
+    const cond = bothIf !== undefined ? parseStaticCondition(`you control ${bothIf}`, { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
+    const playerCond = cond?.kind === "control" && !cond.other && (cond.who ?? "you") === "you";
+    if (both === "control" && modal && modal.min === 1 && modal.max === 1 && modal.modes.length >= 2 && playerCond) {
+      modal.both = both;
+      modal.bothIf = cond!;
+    } else if (both !== "control" && modal && modal.min === 1 && modal.max === 1 && modal.modes.length === 2 && (both === "commander" || out.teamwork !== undefined)) modal.both = both;
     else if (out.spell) {
       delete out.spell;
       out.unsupported.push("Choose one. If ... choose both instead.");
@@ -2448,7 +2485,7 @@ function checkCastingLinks(out: CompiledCard) {
     }
     if ((o.ref === "sacrificed" || o.kind === "sacrificedSuspected") && !canSac) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
-    if (typeof o.chosen === "string") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : needs.add("creatureType"));
+    if (typeof o.chosen === "string") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" ? needs.add("number") : needs.add("creatureType"));
     if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen)) needs.add("color");
     if (o.kind === "setLandTypes" && (o.subtypes as string[]).includes(CHOSEN_LAND_TYPE)) needs.add("basicLandType");
     if (o.kind === "addKeywords" && ((o.keywords as string[]).includes(CHOSEN_PROTECTION) || (o.keywords as string[]).includes(CHOSEN_HEXPROOF))) needs.add("color");
@@ -2467,6 +2504,7 @@ function checkCastingLinks(out: CompiledCard) {
   }
   visit([out.costMods, out.activationTaxes]);
   if (out.nameBans || out.protectionFromChosenName) needs.add("cardName");
+  if (out.noncreatureChosenMvCantBeCast) needs.add("number");
   if ([...needs].some((k) => !choices.has(k))) bad = true;
   // "If the discarded card ..." needs a discard cost: the spell's, or the activated ability's own.
   const discIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"discardedIs"');

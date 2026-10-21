@@ -3178,7 +3178,9 @@ export function castProblem(
   // Also a spell cast as an ability resolves, like cascade's (split second rulings).
   if (splitSecondOnStack(s)) return "a spell with split second is on the stack";
   if (!free && (s.priority !== pid || s.pending)) return "you don't have priority";
-  const instantSpeed = choices?.alt === "sneak" || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || flashGranted(s, pid, d, s.objects[id]?.owner);
+  // Timely Ward: with a commander among its targets; before they're chosen, a commander on the battlefield to target.
+  const commanderTarget = !!compileCard(d).flashIfTargetsCommander && (targets ? targets.some((t) => t.kind === "object" && !!s.objects[t.id]?.isCommander && s.objects[t.id]!.zone === "battlefield") : s.battlefield.some((b) => obj(s, b).isCommander));
+  const instantSpeed = choices?.alt === "sneak" || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner);
   if (!free && !instantSpeed && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be cast at sorcery speed`;
   // A plotted card is cast during its owner's main phase while the stack is empty, whatever its type (CR 702.170d).
   if (plotted && !canActAtSorcerySpeed(s, pid)) return `a plotted card can only be cast at sorcery speed`;
@@ -3441,7 +3443,8 @@ export function hasConvoke(s: GameState, pid: PlayerId, o: GameObject): boolean 
   if (compileCard(d).convoke) return true;
   return s.battlefield.some((id) => {
     const p = obj(s, id);
-    return controllerOf(s, p) === pid && (abilitiesOf(s, p).spellsHaveConvoke ?? []).some((g) => printedMatches(g.filter, d));
+    // "From exile": where it's cast from, the zone it's still in while it's paid for (CR 601.2a, 601.2g-h).
+    return controllerOf(s, p) === pid && (abilitiesOf(s, p).spellsHaveConvoke ?? []).some((g) => printedMatches(g.filter, d) && (!g.fromExile || (o.zone === "stack" ? o.castFrom : o.zone) === "exile"));
   });
 }
 
@@ -3965,6 +3968,9 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
     const value = mv ?? (parseManaCost(d.manaCost).hasX ? undefined : defMv(d));
     if (most !== undefined && controllerOf(s, o) !== pid && value !== undefined && value <= most)
       return `${characteristics(s, o).name}: opponents can't cast spells with mana value ${most} or less`;
+    // Sanctum Prelate: anyone's noncreature spell with that mana value, X as chosen (rulings).
+    if (abilitiesOf(s, o).noncreatureChosenMvCantBeCast && o.chosen?.number !== undefined && !isType(d, "Creature") && value === o.chosen.number)
+      return `${characteristics(s, o).name}: noncreature spells with mana value ${o.chosen.number} can't be cast`;
     if (abilitiesOf(s, o).opponentsCantCastEven && controllerOf(s, o) !== pid && value !== undefined && value % 2 === 0)
       return `${characteristics(s, o).name}: opponents can't cast spells with even mana values`;
     for (const f of abilitiesOf(s, o).youCantCast ?? [])
@@ -4163,6 +4169,8 @@ export function bothModes(s: GameState, pid: PlayerId, body: AbilityBody, choice
   if (both === "teamwork") return !!choices?.teamwork?.length;
   if (both === "kicked") return !!choices?.kicks?.length;
   if (both === "commander") return s.battlefield.some((id) => obj(s, id).isCommander && controllerOf(s, obj(s, id)) === pid);
+  // "If you control a Wizard as you cast ~" (Flame of Anor): as it's cast; what happens to the Wizard later doesn't matter (rulings).
+  if (both === "control" && body.modal?.bothIf) return staticConditionNow(s, body.modal.bothIf, "", pid);
   return false;
 }
 
@@ -5833,6 +5841,11 @@ function askEntersChoice(s: GameState): boolean {
         continue;
       }
       s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "cardName", options, objectId: o.id, prompt: `choose ${c.names ? `a ${c.names.text} name` : "a card name"}`, purpose: c.purpose ?? "deny" };
+      return true;
+    }
+    if (c.what === "number") {
+      const r = c.range ?? { min: 0, max: 999 };
+      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "number", options: [String(r.min)], numberRange: r, objectId: o.id, prompt: r.max === 999 ? "choose a number" : `choose a number between ${r.min} and ${r.max}` };
       return true;
     }
     s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: c.what, options: c.options ?? choiceOptions(c.what, c.except), objectId: o.id, ...(c.what === "cardType" ? { prompt: "choose a card type" } : {}) };

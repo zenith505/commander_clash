@@ -1608,7 +1608,15 @@ function castPlanWithX(s: GameState, pid: PlayerId, id: string, free: boolean, x
   }
   // "Choose both instead" (teamwork, or controlling a commander): both modes when both can be chosen.
   const both = printed?.modal?.both;
-  if (both && both !== "kicked" && legalModes(s, printed!, pid).every(Boolean)) {
+  // Flame of Anor with a Wizard: the two best modes.
+  if (both === "control" && bothModes(s, pid, printed!)) {
+    const two = chooseModes(s, pid, { ...printed!, modal: { ...printed!.modal!, max: 2 } }, false, id);
+    if (two && two.modes.length > 1) {
+      const plan = castPlanWithModes(s, pid, id, free, x, via, alt, two.modes);
+      if (plan) return plan;
+    }
+  }
+  if (both && both !== "kicked" && both !== "control" && legalModes(s, printed!, pid).every(Boolean)) {
     const tw = both === "teamwork" ? spareTappers(s, pid, id, compileCard(defOf(s, obj(s, id))).teamwork ?? 0) : undefined;
     if (both === "commander" ? bothModes(s, pid, printed!) : tw) {
       const plan = castPlanWithModes(s, pid, id, free, x, via, alt, [0, 1], tw);
@@ -2336,7 +2344,34 @@ function chooseKeyword(s: GameState, pid: PlayerId, options: string[]): string {
   return [...options].sort((a, b) => rank(a) - rank(b))[0]!;
 }
 
+/**
+ * "Choose a number" (Talion, Sanctum Prelate): the mana value (and, for Talion, power or toughness) most common among the
+ * nonland cards the opponents have shown, on the battlefield and in graveyards. Sanctum Prelate's ban counts only
+ * noncreature cards, and avoids the mana values of our own noncreature cards in hand. With nothing shown, 2.
+ */
+function chooseNumber(s: GameState, pid: PlayerId, c: CompiledCard | undefined, options: string[]): string {
+  const r = (s.pending?.kind === "chooseOption" && s.pending.numberRange) || { min: Number(options[0] ?? 0), max: Number(options[0] ?? 0) };
+  const ban = !!c?.noncreatureChosenMvCantBeCast;
+  const tally = new Map<number, number>();
+  const add = (n: number | undefined, w: number) => n !== undefined && Number.isFinite(n) && tally.set(n, (tally.get(n) ?? 0) + w);
+  const count = (d: CardDef, w: number) => {
+    if (isType(d, "Land") || (ban && isType(d, "Creature"))) return;
+    add(defMv(d), w);
+    if (!ban && isType(d, "Creature")) for (const v of [d.power, d.toughness]) if (v && /^\d+$/.test(v)) add(Number(v), w);
+  };
+  for (const p of s.players) {
+    if (p.id === pid || p.lost) continue;
+    for (const id of p.graveyard) count(defOf(s, obj(s, id)), 1);
+  }
+  for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) !== pid) count(defOf(s, obj(s, id)), 1);
+  if (ban) for (const id of player(s, pid).hand) count(defOf(s, obj(s, id)), -3);
+  let best = Math.max(r.min, Math.min(r.max, 2));
+  for (const [n, w] of tally) if (n >= r.min && n <= r.max && w > (tally.get(best) ?? 0)) best = n;
+  return String(best);
+}
+
 function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardDef | undefined, options: string[]): string {
+  if (what === "number") return chooseNumber(s, pid, card ? compileCard(card) : undefined, options);
   if (what === "basicLandType") return chooseLandType(s, pid, options);
   if (what === "keyword") return chooseKeyword(s, pid, options);
   const c = card ? compileCard(card) : undefined;

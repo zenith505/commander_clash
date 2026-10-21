@@ -52,7 +52,7 @@ describe("round 107: the first popular cards", () => {
     expect(pt(s, a)).toBe("4/4");
     expect(pt(s, tok)).toBe("2/2");
     // A face-down creature has no name (rulings).
-    s.objects[b]!.faceDown = true;
+    s.objects[b]!.faceDown = "manifest";
     invalidateCharacteristics(s);
     expect(pt(s, a)).toBe("3/3");
   });

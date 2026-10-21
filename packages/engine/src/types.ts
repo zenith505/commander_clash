@@ -400,6 +400,8 @@ export interface GameObject {
   kicked?: number[];
   /** As a spell, and as the permanent it became: the colors of mana spent to cast it (sunburst, CR 702.44a). */
   colorsSpent?: Color[];
+  /** How many Phyrexian symbols of its cost its caster paid with life (compleated, CR 702.150a); kept as it enters. */
+  phyrexianLife?: number;
   /** The creatures tapped to convoke it as it was cast (CR 702.51a), as the permanents they were; kept by the permanent it becomes, like `kicked`. */
   convoked?: { id: ObjectId; zc: number }[];
   /** The amount of mana spent to cast it (CR 601.2h), kept by the permanent the spell becomes. */

@@ -6,7 +6,7 @@ import { pickFilter, parseGroup, parseObject, parsePlayer, parseTargetPhrase } f
 import { addTarget } from "../body";
 import { parseCount } from "../counts";
 import { parseChanges, parseSentence } from "../sentence";
-import { parseAffected, parseExtraBlocks, parseStaticMods } from "../statics";
+import { parseAffected, parseExtraBlocks, parseIsA, parseStaticMods } from "../statics";
 import type { Ctx } from "../body";
 import { canonicalKeyword, CREATURE_TYPES } from "../../keywords";
 import { parseGrants } from "../grants";
@@ -522,6 +522,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     const mods = what?.ref === "target" && parseChanges(`becomes ${m[2]!}`);
     return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;
+  }
+  // "Target creature becomes a Treasure artifact with "..." and loses all other card types and abilities" (Vraska,
+  // Betrayal's Sting): for as long as it stays on the battlefield (CR 611.2a). Its supertypes stay (rulings, CR 205.1a);
+  // losing its abilities comes before the one it gains, in layer 6.
+  if ((m = /^(target .+?) becomes (an? .+?) and loses all other card types and abilities$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    const mods = what?.ref === "target" ? parseIsA(m[2]!, true) : null;
+    return what && mods ? [{ type: "continuous", what, mods: [{ kind: "loseAllAbilities" }, ...mods], duration: "game" }] : null;
   }
   // "Target legendary creature becomes a God in addition to its other types" (Tyrite Sanctum), "That creature becomes a
   // Vampire in addition to its other types" (Olivia Voldaren), "each creature you control becomes a Phyrexian in addition

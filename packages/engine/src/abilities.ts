@@ -2070,7 +2070,8 @@ export type Effect =
   /** "Until end of turn, whenever a player taps an Island for mana, that player adds an additional {U}" (High Tide). */
   | { type: "manaTriggerThisTurn"; trigger: ManaTrigger }
   /** "Defending player gets a poison counter", "each opponent gets two poison counters" (CR 122.1f; ten lose, 704.5c). */
-  | { type: "poison"; who: PlayerRef; n: Amount }
+  /** `upTo`: as many as it takes to have that many ("equal to the difference", Vraska, Betrayal's Sting); `n` is unused. */
+  | { type: "poison"; who: PlayerRef; n: Amount; upTo?: number }
   /** "Each opponent loses all counters" (CR 122.1): poison and energy, the player counters there are here. */
   | { type: "loseAllCounters"; who: PlayerRef }
   /**
@@ -3469,7 +3470,11 @@ export interface CompiledCard {
    * anywhere, ..." (Dryad Militant): a replacement effect of this permanent (CR 614.1a) on cards (and with `tokens`,
    * tokens) going to the graveyards of `whose` (from this permanent's controller's view), its owner's (CR 404.2).
    */
-  graveyardExile?: { whose: "any" | "opponents" | "yours"; tokens?: true; filter?: TargetSpec; counter?: CounterKind };
+  /**
+   * `notYours`: "a card you didn't control" (Valgavoth): not one this permanent's controller controlled as a spell or
+   * permanent; a card elsewhere counts as its owner's (CR 108.4a). `linked`: the card is "exiled with ~" (CR 607.2a).
+   */
+  graveyardExile?: { whose: "any" | "opponents" | "yours"; tokens?: true; filter?: TargetSpec; counter?: CounterKind; notYours?: true; linked?: true };
   /** "This creature enters prepared" (CR 722.3a): it becomes prepared as it enters. */
   entersPrepared?: boolean;
   /**
@@ -3581,6 +3586,8 @@ export interface CompiledCard {
    */
   uncounterable?: { filter: TargetSpec; anyone?: true }[];
   /** "Your opponents can't cast spells during your turn." (a "can't" that wins over any "can", CR 101.2) */
+  /** Compleated (CR 702.150a): two fewer loyalty counters for each Phyrexian symbol its caster paid with life. */
+  compleated?: true;
   opponentsCantCastYourTurn?: true;
   /** "As long as ~ is attached to a creature, your opponents can't cast spells during your turn" (Conqueror's Flail): only while this holds. */
   opponentsCantCastYourTurnIf?: StaticCondition;
@@ -3876,6 +3883,12 @@ export interface CompiledCard {
    * (Rogue Class): its controller may play the cards its linked exile took (CR 607.2a), with any mana (609.4b).
    */
   playLinked?: true;
+  /**
+   * "During your turn, you may play cards exiled with ~. If you cast a spell this way, pay life equal to its mana value
+   * rather than pay its mana cost" (Valgavoth): during its controller's turn only, cast for that alternative cost
+   * (AltCostKind "citadel"; rulings: no other way to pay), without Rogue Class's mana of any color.
+   */
+  playLinkedForLife?: true;
   /** The same, only while this holds (a Class level's, CR 716.2a). */
   playLinkedIf?: StaticCondition;
   /**

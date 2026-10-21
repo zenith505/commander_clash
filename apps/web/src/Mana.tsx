@@ -6,11 +6,11 @@ const COLOR_ORDER: ManaType[] = ["W", "U", "B", "R", "G", "C"];
 export function Pip({ sym, size }: { sym: string; size?: "sm" | "lg" }) {
   const parts = sym.split("/");
   const cls = ["pip", size ?? ""];
-  if (parts.length === 2 && parts[1] !== "P") {
-    // Hybrid: split the circle between the two halves.
+  if ((parts.length === 2 && parts[1] !== "P") || (parts.length === 3 && parts[2] === "P")) {
+    // Hybrid: split the circle between the two halves; a hybrid Phyrexian one ({G/W/P}) is marked Φ.
     return (
       <span className={cls.join(" ")} title={`{${sym}}`} style={{ background: `linear-gradient(135deg, var(--mana-${parts[0]}) 50%, var(--mana-${parts[1]}) 50%)` }}>
-        <span className="pip-label">{parts[0] === "2" ? "2" : ""}</span>
+        <span className="pip-label">{parts[0] === "2" ? "2" : parts.length === 3 ? "Φ" : ""}</span>
       </span>
     );
   }

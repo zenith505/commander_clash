@@ -686,6 +686,9 @@ export function moveObject(
   if (yardExile) {
     to = "exile";
     log(s, `${defOf(s, o).name} is exiled instead of being put into a graveyard (${yardExile.source}).`);
+    // "Exiled with ~" (Valgavoth, CR 607.2a): the card as it will be in exile.
+    const src = yardExile.linkTo ? s.objects[yardExile.linkTo] : undefined;
+    if (src) ((s.linkedExile ??= {})[`${src.id}@${src.zoneChanges ?? 0}`] ??= []).push({ id, zc: (o.zoneChanges ?? 0) + 1 });
   }
   if (to === "graveyard" && (fromZone === "battlefield" ? abilitiesOf(s, o) : compileCard(defOf(s, o))).exileInsteadOfGraveyard) {
     to = "exile";
@@ -759,6 +762,7 @@ export function moveObject(
   if (!(fromZone === "stack" && to === "battlefield")) {
     o.kicked = undefined;
     o.colorsSpent = undefined;
+    o.phyrexianLife = undefined;
     o.convoked = undefined;
     o.manaSpent = undefined;
     o.spent = undefined;
@@ -1012,7 +1016,8 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // controller orders those replacement effects (CR 616.1) the way that gives the most.
   const entering: Record<string, number> = {};
   const add = (k: string, n: number) => n > 0 && (entering[k] = (entering[k] ?? 0) + n);
-  if (loyalty > 0) add("loyalty", loyalty);
+  // Compleated: two fewer for each Phyrexian symbol its caster paid life for (CR 702.150a).
+  if (loyalty > 0) add("loyalty", printed.compleated && o.phyrexianLife ? loyalty - 2 * o.phyrexianLife : loyalty);
   // A battle enters with its printed defense in defense counters (CR 310.4b), its copiable values' if it's a copy (rulings).
   const defense = isType(defOf(s, o), "Battle") ? Number.parseInt(defOf(s, o).defense ?? "", 10) : NaN;
   if (defense > 0) add("defense", defense);
@@ -1458,13 +1463,16 @@ export function loseLife(s: GameState, pid: PlayerId, n: number) {
  * graveyardExile) that applies to `o` going to its owner's graveyard, if one does: the name of its source, and the
  * counter it's exiled with.
  */
-function graveyardExileFor(s: GameState, o: GameObject, fromZone: ZoneName): { source: string; counter?: CounterKind } | undefined {
+function graveyardExileFor(s: GameState, o: GameObject, fromZone: ZoneName): { source: string; counter?: CounterKind; linkTo?: ObjectId } | undefined {
+  // Who controlled it: as a permanent or spell, its controller; anywhere else, its owner (CR 108.4a).
+  const item = fromZone === "stack" ? s.stack.find((x) => x.objectId === o.id) : undefined;
+  const controlled = fromZone === "battlefield" ? controllerOf(s, o) : fromZone === "stack" ? (item?.controller ?? o.controller) : o.owner;
   const applies = (x: CompiledCard["graveyardExile"], controller: PlayerId) =>
-    !!x && (!o.isToken || !!x.tokens) && (x.whose === "any" || (x.whose === "yours") === (o.owner === controller)) && (!x.filter || printedMatches(x.filter, defOf(s, o)));
+    !!x && (!o.isToken || !!x.tokens) && (x.whose === "any" || (x.whose === "yours") === (o.owner === controller)) && (!x.filter || printedMatches(x.filter, defOf(s, o))) && !(x.notYours && controlled === controller);
   for (const id of s.battlefield) {
     const p = obj(s, id);
     const x = abilitiesOf(s, p).graveyardExile;
-    if (applies(x, controllerOf(s, p))) return { source: characteristics(s, p).name, ...(x!.counter ? { counter: x!.counter } : {}) };
+    if (applies(x, controllerOf(s, p))) return { source: characteristics(s, p).name, ...(x!.counter ? { counter: x!.counter } : {}), ...(x!.linked && p.id !== o.id ? { linkTo: p.id } : {}) };
   }
   if (fromZone !== "battlefield") return undefined;
   for (const l of s.leftTogether ?? []) {
@@ -2637,26 +2645,39 @@ export function checkAscend(s: GameState) {
  * "You may play cards exiled with ~" (Rogue Class): a permanent `pid` controls with that permission now, whose linked
  * exile took this card (CR 607.2a), as the objects they both are now (CR 400.7).
  */
-function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): boolean {
+function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): false | "anyType" | "life" {
   if (o.zone !== "exile" || !s.linkedExile) return false;
-  return s.battlefield.some((id) => {
+  let how: false | "anyType" | "life" = false;
+  for (const id of s.battlefield) {
     const p = obj(s, id);
-    if (controllerOf(s, p) !== pid) return false;
+    if (controllerOf(s, p) !== pid) continue;
     const a = abilitiesOf(s, p);
-    if (!a.playLinked && !(a.playLinkedIf && staticConditionNow(s, a.playLinkedIf, id, pid))) return false;
-    return (s.linkedExile![`${id}@${p.zoneChanges ?? 0}`] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0));
-  });
+    // Valgavoth's: during its controller's turn, for life.
+    const life = !!a.playLinkedForLife && s.activePlayer === pid;
+    if (!life && !a.playLinked && !(a.playLinkedIf && staticConditionNow(s, a.playLinkedIf, id, pid))) continue;
+    if (!(s.linkedExile[`${id}@${p.zoneChanges ?? 0}`] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0))) continue;
+    if (!life) return "anyType";
+    how = "life";
+  }
+  return how;
 }
 
-/** How `pid` may play this exiled card now: its own permission, or a "play cards exiled with ~" one (any color of mana). */
-function exilePermission(s: GameState, o: GameObject, pid: PlayerId): Pick<NonNullable<GameObject["mayPlay"]>, "anyType" | "free" | "cost" | "more"> | undefined {
+/**
+ * How `pid` may play this exiled card now: its own permission, or a "play cards exiled with ~" one (any color of mana;
+ * Valgavoth's for life equal to its mana value, `life`).
+ */
+function exilePermission(s: GameState, o: GameObject, pid: PlayerId): (Pick<NonNullable<GameObject["mayPlay"]>, "anyType" | "free" | "cost" | "more"> & { life?: true }) | undefined {
   if (ownExilePermission(s, o, pid)) return o.mayPlay;
-  return linkedPlayPermission(s, o, pid) ? { anyType: true } : undefined;
+  const how = linkedPlayPermission(s, o, pid);
+  return how === "anyType" ? { anyType: true } : how === "life" ? { life: true } : undefined;
 }
+
+/** Valgavoth's permission is the one `pid` would cast this exiled card with: for life equal to its mana value, only. */
+export const castFromExileForLife = (s: GameState, o: GameObject, pid: PlayerId): boolean => o.zone === "exile" && !!exilePermission(s, o, pid)?.life;
 
 /** "Until the end of your next turn, you may play that card": `pid` may play this exiled card now. */
 export function mayPlayFromExile(s: GameState, o: GameObject, pid: PlayerId): boolean {
-  return ownExilePermission(s, o, pid) || linkedPlayPermission(s, o, pid) || preparedCopyCastable(s, o, pid);
+  return ownExilePermission(s, o, pid) || !!linkedPlayPermission(s, o, pid) || preparedCopyCastable(s, o, pid);
 }
 
 /** The card's own permission to be played from exile (GameObject.mayPlay), if it's `pid`'s and holds now. */
@@ -3042,6 +3063,8 @@ export function castProblem(
     return o.zone === "graveyard" && graveyardWays(s, o).length ? `choose how to cast ${d.name} from your graveyard` : "you can only cast spells from your hand or your commander";
   if (choices?.buyback && compileCard(d).buyback === undefined) return `${d.name} doesn't have buyback`;
   // From the top of the library, a permission for this way of paying: Bolas's Citadel's spells for life (CR 118.9).
+  // Valgavoth's exiled cards: for life equal to their mana value, and no other way (rulings).
+  if (!free && !via && castFromExileForLife(s, o, pid) && choices?.alt !== "citadel" && !isType(d, "Land")) return `pay life equal to ${d.name}'s mana value rather than its mana cost`;
   if (!free && !via && o.zone === "library" && !mayPlayFromTop(s, o, pid, choices?.alt === "citadel" ? "life" : "mana"))
     return choices?.alt === "citadel" ? `nothing lets you pay life rather than ${d.name}'s mana cost` : `cast ${d.name} from the top of your library by paying life equal to its mana value`;
   if (choices?.alt) {
@@ -3051,7 +3074,7 @@ export function castProblem(
     // An alternative cost without X: X is 0 (CR 107.3, rulings on Fist of Suns).
     if (choices.alt === "wubrg" && x) return "X is 0 when you pay {W}{U}{B}{R}{G} rather than the mana cost";
     if (choices.alt === "omniscience" && o.zone !== "hand") return "only spells cast from your hand are free";
-    if (choices.alt === "citadel" && o.zone !== "library") return "only the top card of your library is cast for life";
+    if (choices.alt === "citadel" && o.zone !== "library" && !castFromExileForLife(s, o, pid)) return "only the top card of your library is cast for life";
     // A foretell cost is paid only for a foretold card, after the turn it was foretold (CR 702.143a).
     if (choices.alt === "foretell" && !foretoldCast(s, pid, o)) return `only a card foretold on an earlier turn can be cast for its foretell cost`;
     // Freerunning (CR 702.173a): only after an Assassin or commander of yours dealt combat damage to a player this turn.
@@ -3417,7 +3440,9 @@ export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: Play
   // Bolas's Citadel: the top card of the caster's library, for life equal to its mana value (X is 0, CR 107.3b).
   if (alt === "citadel") {
     const top = s && pid !== undefined ? s.objects[player(s, pid).library[0] ?? ""] : undefined;
-    if (!top || !mayPlayFromTop(s!, top, pid!, "life")) return undefined;
+    // Valgavoth's exiled cards too (castProblem checks the card is one).
+    const valgavoth = s && pid !== undefined && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).playLinkedForLife);
+    if (!valgavoth && (!top || !mayPlayFromTop(s!, top, pid!, "life"))) return undefined;
     const n = manaValue(parseManaCost(d.manaCost));
     return { kind: "citadel", mana: "", costs: [{ kind: "payLife", n }], text: `pay ${n} life` };
   }
@@ -3456,7 +3481,7 @@ function payEvidenceOf(s: GameState, pid: PlayerId): number | undefined {
 export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): NonNullable<CompiledCard["altCosts"]> {
   const own = compileCard(defOf(s, o)).altCosts ?? [];
   if (isType(defOf(s, o), "Land")) return own;
-  return [...own, ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(["evidence" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
+  return [...own, ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(["evidence" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
 }
 
 /** Artifacts tapped for improvise: untapped artifacts you control, each once, not also tapped for convoke. */
@@ -3622,6 +3647,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const kicks = choices.kicks?.length ? [...choices.kicks].sort() : undefined;
   o.kicked = kicks;
   o.colorsSpent = colorsSpent.length ? colorsSpent : undefined;
+  o.phyrexianLife = paid.phyrexianLife;
   o.convoked = convoke?.length ? convoke.map((c) => ({ id: c, zc: obj(s, c).zoneChanges ?? 0 })) : undefined;
   o.manaSpent = manaSpent || undefined;
   // What was spent, by type, for "if {U} was spent to cast ~" and adamant (CR 601.2h).

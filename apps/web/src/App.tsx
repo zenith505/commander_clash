@@ -1718,7 +1718,7 @@ function canUseFace(s: GameState, id: string) {
 
 const ALT_NAMES: Record<AltCostKind, string> = { citadel: "Cast it:", foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate", convert: "More Than Meets the Eye", omniscience: "Cast it:" };
 const ALT_NOTES: Record<AltCostKind, string> = {
-  citadel: "from the top of your library, life equal to its mana value instead of its mana cost (Bolas's Citadel); X is 0",
+  citadel: "life equal to its mana value instead of its mana cost (Bolas's Citadel, Valgavoth); X is 0",
   evoke: "it's sacrificed as it enters",
   dash: "haste, back to your hand at the end step",
   bestow: "an Aura on a creature; a creature again if it's ever unattached",
@@ -2077,6 +2077,29 @@ function CardChoice({
           })}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** A number to choose secretly (Wheel of Misfortune): any whole number in the range the decision allows. */
+function NumberChoice({ pending, dispatch }: { pending: Extract<NonNullable<GameState["pending"]>, { kind: "chooseOption" }>; dispatch: ReturnType<typeof useGame>["dispatch"] }) {
+  const range = pending.numberRange ?? { min: 0, max: 999 };
+  const [n, setN] = useState(range.min);
+  const set = (x: number) => setN(Math.max(range.min, Math.min(range.max, Math.floor(x) || 0)));
+  const done = () => dispatch([{ type: "chooseOption", player: HUMAN, choice: String(n) }]);
+  return (
+    <div className="controls number-pick">
+      <span>
+        <strong>{pending.source}:</strong> {pending.prompt}
+      </span>
+      <button className="ghost" disabled={n <= range.min} onClick={() => set(n - 1)} aria-label="Number minus one">
+        −
+      </button>
+      <input type="number" min={range.min} max={range.max} value={n} autoFocus onChange={(e) => set(Number(e.target.value))} onKeyDown={(e) => e.key === "Enter" && done()} aria-label="Number" />
+      <button className="ghost" disabled={n >= range.max} onClick={() => set(n + 1)} aria-label="Number plus one">
+        +
+      </button>
+      <button onClick={done}>Choose {n}</button>
     </div>
   );
 }
@@ -4152,6 +4175,7 @@ function Controls({
         ))}
       </div>
     );
+  if (pending?.kind === "chooseOption" && pending.what === "secretNumber" && pending.player === HUMAN) return <NumberChoice key={`${pending.source}:${s.log.length}`} pending={pending} dispatch={dispatch} />;
   if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "anchor" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot") && pending.player === HUMAN)
     return (
       <div className="controls">

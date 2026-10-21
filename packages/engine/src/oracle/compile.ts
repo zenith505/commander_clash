@@ -1076,6 +1076,12 @@ export function compile(d: CardDef): CompiledCard {
       out.entersPrepared = true;
       continue;
     }
+    // Valgavoth: "If a card you didn't control would be put into an opponent's graveyard from anywhere, exile it instead":
+    // linked to the permanent, for its "play cards exiled with ~" (CR 607.2a).
+    if (line === "If a card you didn't control would be put into an opponent's graveyard from anywhere, exile it instead." && !out.graveyardExile) {
+      out.graveyardExile = { whose: "opponents", notYours: true, linked: true };
+      continue;
+    }
     const yardExile = /^If an? (card or token|card|(.+?) card) would be put into (a|an opponent's|your) graveyard from anywhere, (?:exile (?:it|that card) instead|instead exile it with an? ([a-z]+) counter on it)\.$/.exec(line);
     if (yardExile && !out.graveyardExile) {
       // The card's own characteristics (read like a card in a graveyard's, its owner aside).
@@ -1151,6 +1157,11 @@ export function compile(d: CardDef): CompiledCard {
     // Information that's public while the permanent is on the battlefield (CR 401.5; hands, CR 402.3).
     if (line === "Play with the top card of your library revealed." || line === "Players play with the top card of their libraries revealed.") {
       out.revealTop = /^Players/.test(line) ? "players" : "you";
+      continue;
+    }
+    if (line === "During your turn, you may play cards exiled with ~. If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost.") {
+      if (out.playLinked || out.playLinkedForLife) out.unsupported.push(raw);
+      else out.playLinkedForLife = true;
       continue;
     }
     if (line === "You may play cards exiled with ~, and you may spend mana as though it were mana of any color to cast those spells.") {
@@ -1735,6 +1746,10 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "Each opponent can cast spells only any time they could cast a sorcery.") {
       out.opponentsSorceryTiming = true;
+      continue;
+    }
+    if (/^Compleated(?: \(|$)/.test(line) && d.types.includes("Planeswalker")) {
+      out.compleated = true;
       continue;
     }
     if (line === "Your opponents can't cast spells during your turn.") {

@@ -287,7 +287,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     }
     case "poison":
       for (const pid of players(s, e.who, ctx)) {
-        const n = playerCountersToPut(s, pid, "poison", amountNow(s, e.n, ctx));
+        const n = playerCountersToPut(s, pid, "poison", e.upTo !== undefined ? Math.max(0, e.upTo - (player(s, pid).poison ?? 0)) : amountNow(s, e.n, ctx));
         if (n <= 0) continue;
         const p = player(s, pid);
         p.poison = (p.poison ?? 0) + n;

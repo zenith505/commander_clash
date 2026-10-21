@@ -366,6 +366,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who && [{ type: "poison", who, n: m[2] === "a" ? 1 : amt(m[2]!) }];
   }
+  // Vraska, Betrayal's Sting: "If target player has fewer than nine poison counters, they get a number of poison counters
+  // equal to the difference": worked out as it resolves; replacement effects can still change how many (rulings).
+  if ((m = /^If (target player|target opponent) has fewer than (nine|ten) poison counters, they get a number of poison counters equal to the difference$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who && [{ type: "poison", who, n: 0, upTo: m[2] === "nine" ? 9 : 10 }];
+  }
   // Adding mana from a spell or a non-mana triggered ability (CR 605.5a: it uses the stack): "Add {B}{B}{B}" (Dark
   // Ritual), "add one mana of any color", "add three mana of any one color" (the color is chosen as it resolves).
   if ((m = /^[Aa]dd ((?:\{[WUBRGC]\})+)$/.exec(s))) return [{ type: "addMana", mana: m[1]! }];

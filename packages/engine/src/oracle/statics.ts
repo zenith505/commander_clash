@@ -899,7 +899,7 @@ function parseTransform(line: string): StaticAbility | null {
  * toughness 0/1 and has indestructible", "a colorless land with "{T}: Add {C}"", "a black Dragon", "a blue Wall in
  * addition to its other colors and types". `only`: the text also says it loses its other card types.
  */
-function parseIsA(phrase: string, only: boolean): Modification[] | null {
+export function parseIsA(phrase: string, only: boolean): Modification[] | null {
   let m = /^an? (.+?)(?: in addition to its other (colors and )?types)?$/.exec(phrase);
   if (!m) return null;
   const addition = /in addition to its other/.test(phrase);

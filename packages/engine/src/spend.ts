@@ -108,10 +108,19 @@ export function payableCost(s: GameState, pid: PlayerId, cost: ParsedCost): Pars
 /**
  * Chromatic Orrery: "You may spend mana as though it were mana of any color" (CR 609.4b): any mana pays a colored symbol
  * (one mana for {2/W}), so they're generic for paying; {C} still needs colorless mana, and a Phyrexian symbol (K'rrik's
- * {B} too) still needs its color or 2 life. What's spent stays what it was.
+ * {B} too) is any one mana or 2 life. What's spent stays what it was.
  */
 function anyColorPays(cost: ParsedCost): ParsedCost {
-  return { ...cost, symbols: cost.symbols.map((x): CostSymbol => ((x.kind === "colored" && x.color !== "C") || ((x.kind === "hybrid" || x.kind === "twoHybrid") && !x.life) ? { kind: "generic", amount: 1 } : x)) };
+  return {
+    ...cost,
+    symbols: cost.symbols.map((x): CostSymbol => {
+      if ((x.kind === "colored" && x.color !== "C") || ((x.kind === "hybrid" || x.kind === "twoHybrid") && !x.life)) return { kind: "generic", amount: 1 };
+      // A Phyrexian symbol: any mana, or 2 life. So is a hybrid one K'rrik lets be paid with life (as its {B}).
+      if (x.kind === "phyrexian") return { ...x, any: true };
+      if ((x.kind === "hybrid" || x.kind === "twoHybrid") && x.life) return { kind: "phyrexian", color: x.kind === "hybrid" ? x.options[0]! : x.color, ...(x.kind === "hybrid" && x.phyrexian ? {} : { krrik: true as const }), any: true };
+      return x;
+    }),
+  };
 }
 
 /** Could `pid` pay this from their pool for `use`? */

@@ -1154,6 +1154,41 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si++;
       continue;
     }
+    // The Chain cards: "Then that permanent's controller may sacrifice a land of their choice. If the player does, they may
+    // copy ~ and may choose a new target for that copy" (Chain of Vapor), "Then that permanent's controller may copy ~ and
+    // may choose a new target for that copy" (Chain of Acid). That player, as it resolves, controls the copy (CR 707.10,
+    // 707.10c); as if they were "you" (eachMay's each). Who it is when the permanent has left: its last controller (608.2h).
+    const chain = /^([Tt]hat (?:permanent|creature)'s controller) may (sacrifice a land of their choice|copy ~ and may choose a new target for that copy)$/.exec(s);
+    const chainCopy = /^(?:If the player does, )?they may copy ~ and may choose a new target for that copy$/;
+    if (chain && ctx.spell && (chain[2]!.startsWith("copy") || chainCopy.test(sentences[si + 1]?.replace(/\.$/, "") ?? ""))) {
+      const who = parsePlayer(chain[1]!.toLowerCase(), ctx);
+      if (who?.ref !== "targetController") return null;
+      const copy: Effect = { type: "copySpell", spell: "self", n: 1, newTargets: true };
+      const land: TargetSpec = { kind: "object", types: ["Land"], text: "land" };
+      const cost = chain[2] !== undefined && !chain[2].startsWith("copy");
+      effects.push({
+        type: "eachMay",
+        who,
+        each: true,
+        chain: true,
+        effects: cost ? [{ type: "pick", who: { ref: "you" }, filter: land, n: 1, action: "sacrifice" }, { type: "may", effects: [copy], text: "copy ~ and choose a new target for the copy" }] : [copy],
+        text: cost ? "sacrifice a land to copy ~" : "copy ~ and choose a new target for the copy",
+        ...(cost ? { need: { zone: "battlefield" as const, filter: { ...land, controller: "you" as const } } } : {}),
+      });
+      if (cost) si++;
+      continue;
+    }
+    // Moraug: "there's an additional combat phase after this phase. At the beginning of that combat, untap all creatures
+    // you control." The delayed trigger is for that combat phase only (rulings: not the turn's regular combat).
+    const thatCombat = /^(?:[Tt]here(?:'s| is) an additional combat phase after this phase|[Aa]fter this phase, there is an additional combat phase)$/.test(s) ? /^At the beginning of that combat, (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (thatCombat) {
+      const before = ctx.targets.length;
+      const inner = parseSentence(capital(thatCombat[1]!), ctx);
+      if (!inner || ctx.targets.length !== before) return null;
+      effects.push({ type: "addPhases", phases: ["combat"], thatCombat: { effects: inner, text: `${capital(thatCombat[1]!)}.` } });
+      si++;
+      continue;
+    }
     const eachYard = /^For each player, choose an? (.+? card) in that player's graveyard$/.exec(s);
     if (eachYard && /^Put those cards onto the battlefield under your control$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
       const filter = parseSearchFilter(eachYard[1]!);

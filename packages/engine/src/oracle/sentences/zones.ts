@@ -27,8 +27,12 @@ export function parseEveryPlayerZonesSentence(s: string, ctx: Ctx): Effect[] | u
 }
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
-export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
+export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
+  // "Return from your graveyard to the battlefield any number of target creature cards ..." (Agadeem's Awakening): the
+  // same as "Return any number of target creature cards ... from your graveyard to the battlefield".
+  const fromYard = /^Return from your graveyard to the battlefield (any number of target .+)$/.exec(s0);
+  let s = fromYard ? `Return ${fromYard[1]} from your graveyard to the battlefield` : s0;
   // Narset's Reversal: "Copy target instant or sorcery spell, then return it to its owner's hand": it leaves the stack
   // without being countered, so even a spell that can't be countered goes (rulings).
   if (/^(?:Then )?[Rr]eturn (?:it|that spell) to its owner's hand$/.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "spell")
@@ -292,12 +296,13 @@ export function parseZonesSentence(s: string, ctx: Ctx): Effect[] | null | undef
     return [{ type: "returnAllFromGraveyard", who: { ref: m[4] ? "eachPlayer" : "you" }, filter: { ...spec, text: `${m[1]} card` }, ...(m[3] ? { tapped: true } : {}), ...(m[4] ? { owners: true as const } : {}) }];
   }
   // "Return all instant and sorcery cards from your graveyard to your hand" (Wisdom of Ages), "Return all cards from your
-  // graveyard to your hand" (Praetor's Counsel).
-  if ((m = /^[Rr]eturn all (?:(.+?) )?cards from your graveyard to your hand$/.exec(s))) {
+  // graveyard to your hand" (Praetor's Counsel), "Return all creature cards with power 2 or less from your graveyard to
+  // your hand" (Dawn).
+  if ((m = /^[Rr]eturn all (?:(.+?) )?cards( with (?:power|toughness|mana value) \d+ or (?:less|greater))? from your graveyard to your hand$/.exec(s))) {
     const kinds = (m[1] ?? "").replace(/,? and /g, " or ").replace(/, /g, " or ");
-    const spec = parseTargetPhrase(`${kinds ? `${kinds.split(/\s+/).map(singularWord).join(" ")} ` : ""}card from a graveyard`, { chosen: true });
+    const spec = parseTargetPhrase(`${kinds ? `${kinds.split(/\s+/).map(singularWord).join(" ")} ` : ""}card${m[2] ?? ""} from a graveyard`, { chosen: true });
     if (spec?.kind !== "card") return null;
-    return [{ type: "returnAllFromGraveyard", who: { ref: "you" }, filter: { ...spec, text: `${m[1] ? `${m[1]} ` : ""}card` }, toHand: true }];
+    return [{ type: "returnAllFromGraveyard", who: { ref: "you" }, filter: { ...spec, text: `${m[1] ? `${m[1]} ` : ""}card${m[2] ?? ""}` }, toHand: true }];
   }
   // "You may put a land card from your hand onto the battlefield (tapped)".
   // Brainstorm: "put two cards from your hand on top of your library in any order", "put a card from your hand on top

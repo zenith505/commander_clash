@@ -83,7 +83,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       while (sc.mayQueue.length) {
         const pid = sc.mayQueue[0]!;
         if (sc.may === undefined) {
-          s.pending = { kind: "chooseMay", player: pid, prompt: e.text, source: src, ...(e.wheel !== undefined ? { wheel: e.wheel } : {}) };
+          s.pending = { kind: "chooseMay", player: pid, prompt: e.text.replace(/~/g, src), source: src, ...(e.wheel !== undefined ? { wheel: e.wheel } : {}) };
           return "paused";
         }
         if (sc.may) sc.mayers!.push(pid);

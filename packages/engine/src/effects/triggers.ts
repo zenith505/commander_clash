@@ -1229,8 +1229,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // Made during that step, "the next end step" or "end of combat" is a later one (CR 603.7c, 511.2).
       // "The next cleanup step": every one made before this one began, so also during an earlier cleanup step of
       // this turn (CR 514.3a).
+      // "That combat" never came this turn: it never will.
+      if (d.when === "thatCombat" && d.turn !== s.turn) {
+        s.delayed = s.delayed!.filter((x) => x !== d);
+        continue;
+      }
       const due =
-        d.when === "nextCleanup"
+        d.when === "thatCombat"
+          ? ev.step === "beginCombat" && s.thatCombat === d.combat
+          : d.when === "nextCleanup"
           ? ev.step === "cleanup"
           : d.when === "nextEndStep"
           ? ev.step === "end" && !(d.turn === s.turn && d.step === "end")

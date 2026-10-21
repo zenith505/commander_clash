@@ -1937,6 +1937,7 @@ function advanceStep(s: GameState): void {
   // CR 511.3: as the end of combat step ends, everything is removed from combat. Provoke's requirement was for
   // this combat only (CR 702.39a).
   if (s.step === "endCombat") {
+    s.thatCombat = undefined;
     for (const o of attackersAndBlockers(s)) clearCombat(o);
     for (const id of s.battlefield) if (obj(s, id).provokedBy?.turn === undefined) obj(s, id).provokedBy = undefined;
     s.unblockedChoice = undefined; // made for this combat's damage steps
@@ -1949,8 +1950,9 @@ function advanceStep(s: GameState): void {
     if (!s.addedPhases?.length) s.addedPhases = undefined;
     if (added) {
       s.resumeStep ??= next;
-      log(s, added === "combat" ? "An additional combat phase begins." : "An additional main phase begins.");
-      return beginStep(s, added === "combat" ? "beginCombat" : "main2");
+      log(s, added !== "main" ? "An additional combat phase begins." : "An additional main phase begins.");
+      s.thatCombat = typeof added === "object" ? added.combat : undefined;
+      return beginStep(s, added !== "main" ? "beginCombat" : "main2");
     }
     if (s.resumeStep) {
       const resume = s.resumeStep;
@@ -1969,11 +1971,12 @@ const PHASE_ENDS = new Set<Step>(["draw", "main1", "endCombat", "main2"]);
  * directly after the current phase, before any added after it earlier. "After this main phase" and "after this combat
  * phase" add nothing when it isn't one (rulings on Relentless Assault and Full Throttle).
  */
-export function addPhases(s: GameState, phases: ("combat" | "main")[], after?: "main" | "combat") {
-  if (after === "main" && !isMainPhase(s)) return;
-  if (after === "combat" && !inCombatPhase(s)) return;
-  if (s.step === "end" || s.step === "cleanup") return; // nothing comes after the ending phase but the next turn
-  s.addedPhases = [...phases, ...(s.addedPhases ?? [])];
+export function addPhases(s: GameState, phases: ("combat" | "main")[], after?: "main" | "combat", combatKey?: number): boolean {
+  if (after === "main" && !isMainPhase(s)) return false;
+  if (after === "combat" && !inCombatPhase(s)) return false;
+  if (s.step === "end" || s.step === "cleanup") return false; // nothing comes after the ending phase but the next turn
+  s.addedPhases = [...phases.map((p) => (p === "combat" && combatKey !== undefined ? { combat: combatKey } : p)), ...(s.addedPhases ?? [])];
+  return true;
 }
 
 /** The combat phase's steps (CR 506.1). */
@@ -5670,6 +5673,8 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     o.attacked = { turn: s.turn, n: (before?.n ?? 0) + 1, ...(players.length ? { players } : {}), ...(battle ? { battle: true as const } : {}) };
     log(s, `${defOf(s, o).name} attacks ${attackedName(s, o)}.`);
   }
+  // Attacking and "each time it has attacked this turn" (Moraug) change what the layers give it.
+  if (attacks.length) invalidateCharacteristics(s);
   if (attacks.length) p.attackedTurn = s.turn; // raid
   const w = p.attackedWith?.turn === s.turn ? p.attackedWith.keys : [];
   const keys = attacks.map((a) => `${a.attacker}@${obj(s, a.attacker).zoneChanges ?? 0}`);

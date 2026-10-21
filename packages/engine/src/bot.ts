@@ -1951,6 +1951,17 @@ function linkedOwned(s: GameState, sourceId: ObjectId | undefined, pid: PlayerId
 function wantsMay(s: GameState, pid: PlayerId): boolean {
   const r = s.resolving;
   const e = r?.body.effects[r.next];
+  // The Chain cards' copy (Chain of Vapor): only with a target of an opponent's worth it, and for a land only with lands
+  // to spare (each copy can go on back and forth, so this ends it).
+  if (r && e?.type === "eachMay" && e.chain) {
+    // "They may copy ~", asked after the land is sacrificed: what it was for.
+    if (r.scratch?.offer) return true;
+    const spec = r.body.targets[0];
+    const cost = e.effects[0]?.type === "pick";
+    const lands = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length;
+    if (!spec || (cost && lands < 7)) return false;
+    return legalTargets(s, spec, pid).some((t) => t.kind === "object" && controllerOf(s, obj(s, t.id)) !== pid && (!cost || defMv(defOf(s, obj(s, t.id))) >= 3));
+  }
   if (!r || e?.type !== "may") return true;
   // "Sacrifice it unless you discard a creature card", "discard two cards unless you discard an artifact card": the
   // smaller loss (only asked when it can be done).

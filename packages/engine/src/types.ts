@@ -753,7 +753,9 @@ export interface DelayedTrigger {
   /** `leaves`: when the subject leaves the battlefield for one of the zones in `to` (earthbend's return, CR 701.66a). */
   /** `eachYourUpkeep`: at the beginning of each of its controller's upkeeps for the rest of the game (epic, CR 702.50a). */
   /** `lostControl`: when `controller` no longer controls the subject (Ray of Command), checked like a state trigger. */
-  when: "nextEndStep" | "yourNextEndStep" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "eachYourPrecombatMain" | "yourNextMain" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl";
+  /** `thatCombat`: at the beginning of the added combat phase `combat` (GameState.addedPhases), this turn only. */
+  when: "nextEndStep" | "yourNextEndStep" | "yourNextUpkeep" | "nextTurnUpkeep" | "eachYourUpkeep" | "eachYourPrecombatMain" | "yourNextMain" | "endOfCombat" | "nextCleanup" | "leaves" | "lostControl" | "thatCombat";
+  combat?: number;
   /** What it remembers as its trigger event: the player "its controller" was, the amount "that spell's mana value" was (see the delayed effect). */
   event?: TriggerEventInfo;
   to?: ZoneName[];
@@ -1274,7 +1276,11 @@ export interface GameState {
    * Phases added to this turn that come directly after the current phase, in order: the most recently created first
    * (CR 500.8). An additional main phase is a postcombat main phase (CR 505.1a), so it's run as "main2".
    */
-  addedPhases?: ("combat" | "main")[];
+  /** Phases added after the current one (CR 500.8); `{ combat: key }` is a combat phase a delayed trigger waits for ("at the beginning of that combat"). */
+  addedPhases?: ("combat" | "main" | { combat: number })[];
+  /** The key of the added combat phase going on now (see addedPhases), and the last key given out. */
+  thatCombat?: number;
+  combatKeys?: number;
   /** While added phases run: the step the turn's own order goes on with once they're done (CR 500.8). */
   resumeStep?: Step;
   /** "Your opponents can't cast spells this turn" (Silence): who can't cast what, until that turn ends (CR 101.2). */

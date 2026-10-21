@@ -833,10 +833,12 @@ export function damageRecipients(s: GameState, to: DamageRecipient, ctx: Resolve
     // What it's attacking as this resolves, or what it was attacking as it last existed on the battlefield (rulings on
     // Myr Battlesphere). A planeswalker removed from combat leaves it attacking nothing (CR 506.4c); a battle isn't a
     // player or planeswalker.
-    const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
-    const here = !!o && o.zone === "battlefield" && (ctx.sourceZc === undefined || (o.zoneChanges ?? 0) === ctx.sourceZc);
-    const lk = !here && ctx.sourceId ? s.lastKnown?.[ctx.sourceId] : undefined;
-    const at = here ? o : lk && (ctx.sourceZc === undefined || lk.zc === ctx.sourceZc) ? lk : undefined;
+    // "It" is the creature that attacked in a trigger about another creature (Hellrider; Mage Slayer's equipped creature).
+    const who = to.subject ? ctx.subject : ctx.sourceId ? { id: ctx.sourceId, zc: ctx.sourceZc } : undefined;
+    const o = who ? s.objects[who.id] : undefined;
+    const here = !!o && o.zone === "battlefield" && (who!.zc === undefined || (o.zoneChanges ?? 0) === who!.zc);
+    const lk = !here && who ? s.lastKnown?.[who.id] : undefined;
+    const at = here ? o : lk && (who!.zc === undefined || lk.zc === who!.zc) ? lk : undefined;
     if (at?.attackingPermanent) {
       const pw = s.objects[at.attackingPermanent.id];
       const still = !at.attackingPermanent.battleController && pw?.zone === "battlefield" && (pw.zoneChanges ?? 0) === at.attackingPermanent.zc;

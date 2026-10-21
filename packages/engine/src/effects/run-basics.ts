@@ -14,6 +14,7 @@ import { COLOR_NAMES } from "./describe";
 import { ringTempts } from "./run-ring";
 import { chooseDamageSource } from "./run-prevention";
 import { createEmblem } from "../emblems";
+import { addDelayed } from "./run-spells";
 
 /** Damage, prevention, drawing, energy, life, the monarch, fighting. */
 /**
@@ -64,9 +65,18 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${player(s, pid).name} will take ${e.n === 1 ? "an extra turn" : `${e.n} extra turns`} after this one.`);
       }
       return;
-    case "addPhases":
-      addPhases(s, e.phases, e.after);
+    case "addPhases": {
+      // "At the beginning of that combat, ...": a delayed trigger for this added combat phase only (CR 603.7; rulings on
+      // Moraug: not the turn's regular combat).
+      const key = e.thatCombat ? (s.combatKeys = (s.combatKeys ?? 0) + 1) : undefined;
+      const item = s.resolving?.item;
+      const me = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (addPhases(s, e.phases, e.after, key) && e.thatCombat && me) {
+        addDelayed(s, "thatCombat", ctx.controller, me, { targets: [], effects: e.thatCombat.effects, text: e.thatCombat.text });
+        s.delayed![s.delayed!.length - 1]!.combat = key;
+      }
       return;
+    }
     case "loseGame":
       for (const pid of players(s, e.who, ctx)) playerLoses(s, pid, `${src}`);
       return;

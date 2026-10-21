@@ -93,6 +93,8 @@ export type Count =
   | { kind: "permanents"; filter: TargetSpec; other?: boolean; whose?: PlayerRef; /** "Differently named lands you control": each English name once (rulings); a face-down permanent has no name (CR 708.2). */ differentNames?: true; /** "Each other attacking creature that shares a creature type with it" (Shared Animosity): not the trigger's subject, and sharing a type with it. */ sharesTypeWithSubject?: true; /** "Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it" (Coat of Arms): not the permanent the static effect is applied to, and sharing a type with it. */ sharesTypeWithAffected?: true }
   /** "The number of cards in your hand", "in that player's hand". */
   | { kind: "cardsInHand"; who: PlayerRef }
+  /** "Each creature you control gets +1/+0 for each time it has attacked this turn" (Moraug): the permanent the static effect is applied to (GameObject.attacked). */
+  | { kind: "timesAffectedAttacked" }
   | { kind: "cardsInLibrary"; who: PlayerRef }
   /** "That many cards" after discarding a hand (Tolarian Winds); `greatest`: "the greatest number of cards a player discarded this way" (Windfall). */
   | { kind: "discardedThisWay"; greatest?: true }
@@ -268,7 +270,7 @@ export interface TargetSpec {
   /** At least one of these colors, e.g. "blue permanent", "red or green creature". */
   colors?: Color[];
   /** "Multicolored spell" (two or more colors, CR 105.4), "monocolored" (exactly one), "colorless" (none, CR 105.2c). */
-  colorCount?: "multicolored" | "monocolored" | "colorless" | /** exactly two colors, or not exactly two */ "two" | "notTwo";
+  colorCount?: "multicolored" | "monocolored" | "colorless" | /** one or more colors (CR 105.2c) */ "colored" | /** exactly two colors, or not exactly two */ "two" | "notTwo";
   supertypes?: string[]; // "basic land", "legendary creature"
   /** At least one of these subtypes: "Spirit card", "Walls" (changelings have every creature type). */
   subtypes?: string[];
@@ -360,6 +362,13 @@ export interface TargetSpec {
   sharesCreatureTypeWith?: number[];
   /** "Up to six target creature cards with different names" (Behold the Sinister Six!): a name none of these targets of the group has (CR 601.2c). */
   differentNameFrom?: number[];
+  /**
+   * "Any number of target creature cards that each have a different mana value X or less" (Agadeem's Awakening): each a
+   * mana value none of the others has (CR 601.2c). On the "any number" entry (`many`) until it's made into its targets, which
+   * then get `differentManaValueFrom`: a mana value none of these targets of the group has.
+   */
+  differentManaValues?: true;
+  differentManaValueFrom?: number[];
   /**
    * "Any number of target artifacts with total mana value 6 or less", "up to two target creature cards with total power
    * 10 or less": with the other targets that have it, the targets chosen add up to no more than `max` (CR 601.2c), or
@@ -602,7 +611,7 @@ export type DamageRecipient =
   | PlayerRef
   | { ref: "anyTarget"; index: number; /** "each of up to two targets" */ n?: number }
   /** "The player or planeswalker it's attacking" (Myr Battlesphere): what the source is attacking, or was as it last existed; nothing for a battle. */
-  | { ref: "attackedBySelf" };
+  | { ref: "attackedBySelf"; subject?: true };
 
 /**
  * What a "damageRule" effect makes (see GameState.damageRules). It applies to damage that matches both `to` and `by`
@@ -1929,7 +1938,8 @@ export type Effect =
    * and players who can't do it aren't asked (`need`: they must control one of these, or have one in their graveyard). `perAccepted`: then these, once
    * for each player who did (only opponents with `opponents`), with that player as "that player" (PlayerRef "eachOne").
    */
-  | { type: "eachMay"; who: PlayerRef; effects: Effect[]; text: string; wheel?: number; each?: true; need?: { zone: "battlefield" | "graveyard"; filter: TargetSpec }; perAccepted?: { effects: Effect[]; opponents?: true } }
+  /** `chain`: the Chain cards' "that permanent's controller may copy ~" (Chain of Vapor), for the bots' answer. */
+  | { type: "eachMay"; who: PlayerRef; effects: Effect[]; text: string; wheel?: number; each?: true; chain?: true; need?: { zone: "battlefield" | "graveyard"; filter: TargetSpec }; perAccepted?: { effects: Effect[]; opponents?: true } }
   /**
    * A punisher: "Each opponent loses 3 life unless that player sacrifices a nonland permanent of their choice or discards
    * a card". Each player in APNAP order picks one of `options` they can do (or none) and, for a discard or a sacrifice,
@@ -2128,7 +2138,13 @@ export type Effect =
    * "After this phase, there is an additional combat phase [followed by an additional main phase]" (CR 500.8): `after`
    * "main" or "combat" for "after this main/combat phase", which adds nothing in another phase.
    */
-  | { type: "addPhases"; phases: ("combat" | "main")[]; after?: "main" | "combat" }
+  | {
+      type: "addPhases";
+      phases: ("combat" | "main")[];
+      after?: "main" | "combat";
+      /** "At the beginning of that combat, untap all creatures you control" (Moraug): a delayed trigger for the added combat phase only (CR 603.7). */
+      thatCombat?: { effects: Effect[]; text: string };
+    }
   /** "You lose the game" (CR 104.3e). */
   | { type: "loseGame"; who: PlayerRef }
   /** "You win the game" (CR 104.2b): the game ends. */

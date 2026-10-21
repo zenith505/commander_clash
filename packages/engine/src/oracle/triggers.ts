@@ -53,6 +53,9 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever ~ deals damage, (.+)$/, "selfDealsDamage"],
   // Damage dealt to it at the same time by several sources is one event (rulings): "that much" is all of it.
   [/^Whenever ~ is dealt damage, (.+)$/, "selfIsDealtDamage"],
+  // "Whenever a source deals damage to ~, that source's controller ..." (Phyrexian Obliterator): once for each source
+  // that deals it damage at the same time; "that source's controller" is that player (rulings).
+  [/^Whenever a source deals damage to ~, (.+)$/, "selfDealtDamageBySource"],
   [/^Whenever another creature you control enters, (.+)$/, "anotherCreatureYouControlEnters"],
   [/^Whenever another creature enters the battlefield under your control, (.+)$/, "anotherCreatureYouControlEnters"],
   // Landfall
@@ -73,6 +76,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever an opponent commits a crime, (.+)$/, "opponentCommitsCrime"],
   [/^Whenever you choose a creature as your Ring-bearer, (.+)$/, "youChooseRingBearer"],
   [/^Whenever an opponent loses life, (.+)$/, "opponentLosesLife"],
+  [/^Whenever an opponent gains life, (.+)$/, "opponentGainsLife"],
   [/^Whenever you lose life, (.+)$/, "youLoseLife"],
   // Playing a land (CR 305.1), not putting one onto the battlefield with an effect (rulings on Burgeoning).
   [/^Whenever you play a land, (.+)$/, "youPlayLand"],
@@ -158,6 +162,10 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever enchanted land becomes tapped": an Aura on something other than a creature can only see that.
   const m = /^When(?:ever)? (~ or )?(?:enchanted|equipped) (creature|land|artifact|permanent) (.+)$/.exec(line);
   if (!m) return null;
+  // "Whenever equipped creature deals combat damage during your turn, ..." (The Aetherspark): it triggers only during
+  // its controller's turn.
+  const yours = /^(deals (?:combat )?damage) during your turn, /.exec(m[3]!);
+  if (yours) m[3] = m[3]!.replace(" during your turn, ", ", ");
   for (const [re, event, o] of HOST_TRIGGERS) {
     const h = re.exec(m[3]!);
     if (!h) continue;
@@ -181,7 +189,7 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
     let body = parseBody(text, { ...(o.creature ? { subject: true } : { subjectIt: true }), ...(o.eventPlayer ? { eventPlayer: true } : {}), ...(o.defending ? { defending: true } : {}) });
     if (!body) return "fail";
     if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, h[1]!) };
-    return { event, body: withOtherOpponents(body), host: m[1] ? "orSelf" : "attached", ...(o.toOpponent ? { toOpponent: true } : {}), ...(orBattle ? { orBattle: true as const } : {}) };
+    return { event, body: withOtherOpponents(body), host: m[1] ? "orSelf" : "attached", ...(o.toOpponent ? { toOpponent: true } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(yours ? { activeIf: { kind: "yourTurn" as const } } : {}) };
   }
   return null; // "whenever equipped creature dies" is parseDiesTrigger's
 }
@@ -608,6 +616,15 @@ function parseAttackerTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!body) return "fail";
     return { event: "creatureYouControlAttacks", attacker: { filter: { ...filter, text: you[2]! }, anyone: true, attacksYou: you[3] ? "orPlaneswalker" : "player" }, body };
   }
+  // Kazuul, Tyrant of the Cliffs: "Whenever a creature an opponent controls attacks, if you're the defending player, ...":
+  // once for each creature attacking you, a planeswalker you control or a battle you protect (CR 506.2, rulings), an
+  // intervening if (CR 603.4) checked again as it resolves.
+  const defending = m || any || you ? null : /^Whenever a creature an opponent controls attacks, if you're the defending player, (.+)$/.exec(line);
+  if (defending) {
+    const body = parseBody(defending[1]!.replace(/\bthat creature\b(?!'s)/g, "it"), { subjectIt: true });
+    if (!body) return "fail";
+    return { event: "creatureYouControlAttacks", attacker: { filter: { kind: "object", types: ["Creature"], text: "creature an opponent controls" }, anyone: true, attacksYou: "orPlaneswalker" }, ifCond: { kind: "subjectAttackingYou" }, body };
+  }
   const w = m ?? any;
   if (!w) return null;
   // "A creature you control of the chosen type" (Kindred Discovery): the type chosen for this permanent.
@@ -672,6 +689,13 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     bodyText = m[4]!;
     const n = m[2] ? num(m[2]) : 1;
     if (n > 1) min = n;
+  } else if ((m = /^Whenever another player attacks with (two|three|four|five) or more creatures, they draw a card if none of those creatures attacked you\.?$/.exec(line))) {
+    // Firemane Commando: another player's attack, all of their attackers counted; they draw unless one of those creatures
+    // attacked you (not your planeswalkers or battles), as they were declared (rulings).
+    const draw = parseBody("That player draws a card", { eventPlayer: true });
+    if (!draw) return "fail";
+    const body: AbilityBody = { ...draw, effects: [{ type: "if", cond: { kind: "noneAttackedYou" }, effects: draw.effects }], text: m[0].replace(/^[^,]+, /, "") };
+    return { event: "creaturesYouControlAttack", body, minAttackers: num(m[1]!), anyoneAttacks: true, anotherPlayer: true };
   } else if ((m = /^Whenever (?:one or more creatures attack|a player attacks with (two|three|four|five) or more creatures), (.+)$/.exec(line))) {
     // Duelist's Heritage: whoever attacks (rulings), once for each declaration (CR 508.1, 603.2c). "Whenever a player
     // attacks with three or more creatures" (Aurelia, the Law Above): any player's attack, counting all their attackers.
@@ -838,6 +862,10 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
   const putThem = /^put them onto the battlefield( tapped)?\.?$/.exec(rest);
   if (putThem && batch.what === "toGraveyard" && batch.from === "library" && batch.filter && !yourTurn)
     return { event: "batch", batch, body: { targets: [], effects: [{ type: "putOntoBattlefield", what: { ref: "eventGroup" }, ...(putThem[1] ? { tapped: true } : {}) }], text: rest.replace(/\.$/, "") } };
+  // Colossal Grave-Reaver: "put one of them onto the battlefield": one you choose of those cards still in the graveyard
+  // (CR 400.7), under your control.
+  if (/^put one of them onto the battlefield\.?$/.test(rest) && batch.what === "toGraveyard" && batch.from === "library" && batch.filter && !yourTurn)
+    return { event: "batch", batch, body: { targets: [], effects: [{ type: "chooseFromGraveyard", n: 1, dest: "battlefield", eventGroup: true, filter: batch.filter }], text: rest.replace(/\.$/, "") } };
   // The Skullspore Nexus: "create a green Fungus Dinosaur creature token with base power and toughness each equal to the
   // total power of those creatures", the ones that died, as they last existed (rulings, CR 608.2h).
   const totalPower = /^create an? ([a-z]+(?: and [a-z]+)? (?:[A-Z][a-z]+ )+)creature token with base power and toughness each equal to the total power of those creatures\.?$/.exec(rest);
@@ -846,8 +874,10 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!token) return "fail";
     return { event: "batch", batch, body: { targets: [], effects: [{ type: "createToken", who: { ref: "you" }, n: 1, token, pt: { count: { kind: "eventGroupPower" } } }], text: rest.replace(/\.$/, "") } };
   }
-  // The objects as a group: not modeled.
-  if (/\b(it|its|they|them|their|those|that card|that creature|that token|one of them|among them|this way)\b/i.test(rest)) return "fail";
+  // The objects as a group: not modeled. "Exile the top card of your library. You may play that card ..." (Inti) is about
+  // the exiled card, not them.
+  const aboutThem = rest.replace(/exile the top card of your library\. (?:Until (?:the end of your next turn|end of turn|your next end step), you may play that card|You may play that card (?:this turn|until the end of your next turn|until your next end step))\.?$/i, "");
+  if (/\b(it|its|they|them|their|those|that card|that creature|that token|one of them|among them|this way)\b/i.test(aboutThem)) return "fail";
   let text = rest;
   const thatMuch = /\bthat (?:much|many)\b/.test(text);
   if (thatMuch) {
@@ -937,8 +967,14 @@ function parseDiscardTrigger(line: string): TriggeredAbility | "fail" | null {
   }
   // "Exile that card from your graveyard" (Necropotence): the discarded card, if it's there (rulings: not if it went
   // somewhere else, as with madness, or has left).
-  const exileIt = m[1] === "you" && m[2] === "discard" && m[3] === "a" && m[4] === "card" && m[5] === "exile that card from your graveyard.";
-  const body = exileIt ? { targets: [], effects: [{ type: "exile" as const, what: { ref: "subjectCard" as const, zone: "graveyard" as const } }], text: m[5]! } : parseBody(m[5]!, { eventPlayer: true });
+  // "You may exile that card from your graveyard. If you do, you may play that card this turn" (Containment Construct),
+  // "... If you do, until the end of your next turn, you may play that card" (Moonstone): that card, the object it
+  // became in exile (CR 400.7), by you, its owner.
+  const exileIt = m[1] === "you" && m[2] === "discard" && m[3] === "a" && m[4] === "card" ? /^(you may )?exile that card from your graveyard(?:\. If you do, (you may play that card this turn|until the end of your next turn, you may play that card))?\.$/.exec(m[5]!) : null;
+  const exile: Effect | undefined = exileIt
+    ? { type: "exile", what: { ref: "subjectCard", zone: "graveyard" }, ...(exileIt[2] ? { ownerMay: { play: true, until: /next turn/.test(exileIt[2]) ? ("nextTurn" as const) : ("thisTurn" as const) } } : {}) }
+    : undefined;
+  const body = exile ? { targets: [], effects: [exileIt![1] ? { type: "may" as const, effects: [exile], text: m[5]!.replace(/^you may /, "").replace(/\.$/, "") } : exile], text: m[5]! } : parseBody(m[5]!, { eventPlayer: true });
   if (!body) return "fail";
   const by = m[1] === "you" ? "you" : m[1] === "an opponent" ? "opponent" : "any";
   return { event: "playerDiscards", discards: { by, ...(/^cycles?$/.test(m[2]!) ? { cycled: true as const } : {}), ...(m[3] === "another" ? { other: true as const } : {}), ...(filter ? { filter } : {}) }, body };
@@ -1009,6 +1045,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (!t || t === "fail" || !insect || insect.targets.length) return "fail";
     const host: TargetSpec = { kind: "object", types: ["Creature"], controller: "you", text: "creature you control" };
     return { ...t, body: { targets: [], effects: [{ type: "if", cond: { kind: "state", cond: { kind: "attachedIs", filter: host } }, effects: t.body.effects }, { type: "if", cond: { kind: "createdNone" }, effects: insect.effects }], text: line.replace(/^[^,]+, /, "") } };
+  }
+  // Wedding Ring: "Whenever an opponent who controls an artifact named ~ draws a card during their turn, you draw a card",
+  // "... gains life during their turn, you gain that much life": any artifact with that name, not only the token copy
+  // the first ability made (rulings); a trigger condition checked as the event happens (CR 603.2).
+  const weddingRing = /^Whenever an opponent who controls an artifact named ~ (draws a card|gains life) during their turn, (.+)$/.exec(line);
+  if (weddingRing) {
+    const t = parseTrigger(`Whenever an opponent ${weddingRing[1]}, ${weddingRing[2]}`);
+    return t && t !== "fail" ? { ...t, eventPlayerIf: { controlsArtifactNamedSelf: true, theirTurn: true } } : "fail";
   }
   // Carpet of Flowers: "At the beginning of each of your main phases, if you haven't added mana with this ability this
   // turn, you may add X mana of any one color, where X is the number of Islands target opponent controls." Not a mana
@@ -1472,7 +1516,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       let ifKicked: SpellCondition | undefined;
       const kicked = /^if it was kicked(?: with its ((?:\{[^}]+\})+) kicker)?, (.+)$/i.exec(body0);
       if (kicked) {
-        if (event !== "selfEnters") return "fail" as const;
+        // "When you cast ~, if it was kicked, exile target land." (Sowing Mycospawn): the spell as it was cast.
+        if (event !== "selfEnters" && event !== "selfCast") return "fail" as const;
         ifKicked = { kind: "kicked", ...(kicked[1] ? { cost: kicked[1] } : {}) };
         body0 = kicked[2]!;
       }
@@ -1530,7 +1575,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       }
       // "When ~ enters, if you cast it, ..." (Geological Appraiser): an intervening if (CR 603.4) on how it got there.
       let ifCast = false;
-      const wasCast = /^if you cast it, (.+)$/i.exec(body0);
+      // "If it was cast" (Wedding Ring): the same, a permanent spell resolving under its caster's control (CR 608.3).
+      const wasCast = /^if (?:you cast it|it was cast), (.+)$/i.exec(body0);
       if (wasCast) {
         if (event !== "selfEnters") return "fail" as const;
         ifCast = true;
@@ -1584,9 +1630,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       let text = (self ? body0.replace(/^(?:it|he|she) (?=(?:gets|gains|deals|has|becomes|fights|explores)\b)/, "~ ").replace(/^(?:it|he|she) and (?=other )/, "~ and ") : body0).replace(/(would deal [^.]*?damage[^.]*?, it deals )that much( damage)/g, "$1THAT_MUCH$2");
       // "You gain that much life", "put that many +1/+1 counters on it": the damage the event dealt, or the life gained or lost.
       const playerDealt = event === "youAreDealtDamage" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage";
-      const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentLosesLife" || event === "youLoseLife" || playerDealt;
+      const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfDealtDamageBySource" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentGainsLife" || event === "opponentLosesLife" || event === "youLoseLife" || playerDealt;
       // "With mana value less than or equal to that damage" (Aisha of Sparks and Smoke, Covert Technician): the damage dealt.
-      const damage = amount && event !== "youGainLife" && event !== "opponentLosesLife" && event !== "youLoseLife" && !playerDealt;
+      const damage = amount && event !== "youGainLife" && event !== "opponentGainsLife" && event !== "opponentLosesLife" && event !== "youLoseLife" && !playerDealt;
       const thatMuch = amount && (/\bthat (?:much|many)\b/.test(text) || (damage && /\bless than or equal to that damage\b/.test(text)));
       if (thatMuch) {
         if (/\bX\b/.test(text)) return "fail" as const;
@@ -1597,13 +1643,14 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // "Put a +1/+1 counter on it", "untap it": in a trigger about the permanent itself, "it" is that
       // permanent, except after it left ("return it to your hand" means the card in the graveyard).
       const left = event === "selfDies" || event === "selfDiesOrExiled" || event === "selfToGraveyard" || event === "selfLeaves";
+      if (event === "selfDealtDamageBySource") text = text.replace(/\bthat source's controller\b/g, "that player");
       // "At the beginning of each player's upkeep, ~ deals 1 damage to them" (Roiling Vortex): that player.
       if (event === "eachUpkeep" || event === "eachDrawStep") text = text.replace(/^~ deals (\d+) damage to them\.$/, "~ deals $1 damage to that player.");
       // "At the beginning of each postcombat main phase, the active player adds ..." (Belbe): that player is the active one.
       if (event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain") text = text.replace(/\bthe active player\b/g, "that player");
       // Alexios: "that player gains control of ~, untaps it, .... It gains haste until end of turn": "it" is still ~.
       if (event === "eachUpkeep") text = text.replace(/^(that player gains control of ~[^.]*\.) It gains /, "$1 ~ gains ");
-      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || event === "opponentLosesLife" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", ownX: event === "selfEnters" || event === "selfCast" });
+      let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || event === "opponentLosesLife" || event === "opponentGainsLife" || event === "selfDealtDamageBySource" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", ownX: event === "selfEnters" || event === "selfCast" });
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
       const attacksPlayer = /^Whenever ~ attacks (?:a player|an opponent), /.test(line);
       const attacksBattle = /^Whenever ~ attacks a battle, /.test(line);

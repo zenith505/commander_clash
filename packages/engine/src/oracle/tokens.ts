@@ -151,7 +151,8 @@ export function parseCopyExcept(text: string, round?: "up" | "down"): CopyExcept
   const parts = t.split(/,? and (?=(?:it|they|he|she|its|his|her|is|are|has|have|isn't|aren't)\b)|, (?=(?:it|they|he|she|its|his|her|is|are|has|have|isn't|aren't)\b)/).map((p) => p.trim().replace(/^(?:it|they|he|she) /, ""));
   for (const p of parts) {
     let m: RegExpExecArray | null;
-    if (/^(?:isn't|aren't|is not|are not) legendary$/.test(p)) out.notLegendary = true;
+    // "Except it's not legendary" (Delina, Wild Mage) says the same.
+    if (/^(?:isn't|aren't|is not|are not|it's not|they're not) legendary$/.test(p)) out.notLegendary = true;
     // "Enters with an additional +1/+1 counter on it if it's a creature" (Spark Double), "... loyalty counter on it if it's
     // a planeswalker", "enters with an additional +1/+1 counter on it" (Littjara Mirrorlake).
     else if ((m = /^enters with an additional (\+1\/\+1|loyalty) counter on it(?: if it's an? (creature|planeswalker))?$/.exec(p))) (out.enterCounters ??= []).push({ counter: m[1]!, ...(m[2] ? { ifType: m[2] === "creature" ? "Creature" : "Planeswalker" } : {}) });

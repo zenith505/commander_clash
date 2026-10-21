@@ -28,13 +28,15 @@ import { bindChosenKeywords, IDENTITY_PROTECTION, subtypeSet } from "./keywords"
 import { compileCard, compileGranted } from "./oracle";
 import type { CardDef, Color, GameObject, GameState, ObjectId, PlayerId } from "./types";
 
-export type Layer = "2" | "4" | "5" | "6" | "7a" | "7b" | "7c" | "7d" | "rules";
-const LAYERS: Layer[] = ["2", "4", "5", "6", "7a", "7b", "7c", "7d", "rules"];
+export type Layer = "2" | "3" | "4" | "5" | "6" | "7a" | "7b" | "7c" | "7d" | "rules";
+const LAYERS: Layer[] = ["2", "3", "4", "5", "6", "7a", "7b", "7c", "7d", "rules"];
 
 export function layerOf(m: Modification): Layer {
   switch (m.kind) {
     case "control":
       return "2";
+    case "setName":
+      return "3";
     case "addTypes":
     case "setTypes":
     case "setSubtypes":
@@ -56,6 +58,7 @@ export function layerOf(m: Modification): Layer {
     case "definePT":
       return "7a";
     case "setPT":
+    case "setToughness":
       return "7b";
     case "modifyPT":
       return "7c";
@@ -106,6 +109,8 @@ export interface Characteristics {
   cantAttack: boolean;
   cantBlock: boolean;
   cantBeBlocked: boolean;
+  /** "Can't be attacked" (The Aetherspark). */
+  cantBeAttacked?: true;
   /** "You may have ~ assign its combat damage as though it weren't blocked." */
   unblockedDamage: boolean;
   doesntUntap: boolean;
@@ -473,7 +478,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "graveyardAtLeast": // threshold
       return (s.players[you]?.graveyard.length ?? 0) >= cond.n;
     case "graveyardTypes": // delirium: card types, not subtypes or supertypes (CR 205.2a)
-      return new Set(yard().flatMap((d) => d.types)).size >= cond.n;
+      return new Set(yard().flatMap((d) => (cond.permanent ? d.types.filter((t) => PERMANENT_CARD_TYPES.includes(t)) : d.types))).size >= cond.n;
     case "graveyardPermanents": // descend
       return yard().filter((d) => d.types.some((t) => PERMANENT_CARD_TYPES.includes(t))).length >= cond.n;
     case "selfCounter": // unleash (CR 702.98a)
@@ -497,6 +502,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (!c) return false;
       const n = cond.stat === "power" ? c.power : c.toughness;
       return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max);
+    }
+    case "subjectAttackingYou": {
+      const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
+      return !!sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc && sub.attacking === you;
     }
     case "subjectPT": {
       const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
@@ -968,6 +977,10 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.subtypes = c.subtypes.filter((st) => !m.types.includes(subtypeSet(st) ?? ""));
       if (m.types.includes("Creature")) c.allCreatureTypes = false;
       return;
+    case "setName":
+      // A text-changing effect (CR 123.6c, 613.1c): "named Legitimate Businessperson" (Witness Protection).
+      c.name = m.name;
+      return;
     case "setColors":
       c.colors = [...m.colors];
       return;
@@ -1023,6 +1036,12 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       c.pt.push({ source: e.sourceName, kind: "set", power: p, toughness: t, untilEndOfTurn: e.untilEndOfTurn });
       return;
     }
+    case "setToughness": {
+      // Base power stays what it was after the earlier 7a/7b effects (CR 613.4b).
+      c.toughness = num(m.toughness);
+      c.pt.push({ source: e.sourceName, kind: "set", power: c.power, toughness: c.toughness, untilEndOfTurn: e.untilEndOfTurn });
+      return;
+    }
     case "modifyPT": {
       const [p, t] = [num(m.power), num(m.toughness)];
       c.power += p;
@@ -1039,6 +1058,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "cantBlock":
       c.cantBlock = true;
+      return;
+    case "cantBeAttacked":
+      c.cantBeAttacked = true;
       return;
     case "cantBeBlocked":
       c.cantBeBlocked = true;
@@ -1312,6 +1334,7 @@ function countsSomething(st: StaticAbility): boolean {
   for (const m of st.mods) {
     if (m.kind === "definePT") return true;
     if ((m.kind === "modifyPT" || m.kind === "setPT") && (isCounted(m.power) || isCounted(m.toughness))) return true;
+    if (m.kind === "setToughness" && isCounted(m.toughness)) return true;
     if (m.kind === "attackTax" && m.amount !== undefined && isCounted(m.amount)) return true;
   }
   return false;

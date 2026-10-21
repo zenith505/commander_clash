@@ -879,6 +879,10 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         p.lifeCantChange = true;
         log(s, `${p.name}'s life total can't change until their next turn.`);
       }
+      if (e.lifeFloorThisTurn) {
+        p.lifeFloorTurn = s.turn;
+        log(s, `Until end of turn, damage can't reduce ${p.name}'s life total below 1.`);
+      }
       if (e.lifeCantChangeThisTurn) {
         p.lifeCantChangeTurn = s.turn;
         log(s, `${p.name}'s life total can't change this turn.`);

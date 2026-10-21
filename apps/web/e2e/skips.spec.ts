@@ -2,7 +2,7 @@
 // seat shows the pending skip, and it goes away once their draw step has been skipped. Meditate's skipped turn shows on
 // your own seat.
 import { expect, test } from "@playwright/test";
-import { LANDS, one, open, pageErrors, scene } from "./scene";
+import { LANDS, one, open, pageErrors, playUntil, scene } from "./scene";
 import { card, clickPlayer, resolveUntil, seat } from "./ui";
 
 test("Fatigue: the opponent's seat shows the skipped draw step until it's skipped", async ({ page }) => {
@@ -16,8 +16,9 @@ test("Fatigue: the opponent's seat shows the skipped draw step until it's skippe
   await card(page, "Meditate", s).click();
   st = await resolveUntil(page, (x) => x.stack.length === 0 && x.objects[one(s, "Meditate")]!.zone === "graveyard");
   await expect(seat(page, 0)).toContainText("Skips next turn");
-  // Seat 1's turn comes and its draw step is skipped.
-  st = await resolveUntil(page, (x) => x.activePlayer === 1 && x.step === "main1", 200);
+  // Seat 1's turn comes and its draw step is skipped (played in the engine, for speed).
+  st = playUntil(st, (x) => x.activePlayer === 1 && x.step === "main1");
+  await open(page, st);
   expect(st.players[1]!.skips).toBeUndefined();
   await expect(seat(page, 1)).not.toContainText("Skips");
   expect(pageErrors(page)).toEqual([]);

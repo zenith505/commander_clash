@@ -568,7 +568,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = /^([Tt]arget .+?|It|That token|That creature|That artifact|That [A-Z][a-z]+|They) (gains? .+)$/.exec(s)) && !/ until | this turn$/.test(m[2]!)) {
     const what = parseObject(m[1]!, ctx);
     const mods = what && (what.ref === "target" || what.ref === "created") ? parseChanges(m[2]!) : null;
-    if (what && mods?.length && mods.every((x) => x.kind === "addKeywords")) return [{ type: "continuous", what, mods, duration: "game" }];
+    // A quoted ability too, on a token just created: "It gains haste and "When this token dies, draw a card."" (Jaxis).
+    if (what && mods?.length && mods.every((x) => x.kind === "addKeywords" || (x.kind === "addAbility" && what.ref === "created"))) return [{ type: "continuous", what, mods, duration: "game" }];
   }
   // "Target land you control becomes a 3/3 Elemental creature with haste that's still a land" (Brave the Wilds): with no
   // duration, for as long as it stays on the battlefield (CR 611.2a; a new object after a zone change, CR 400.7).

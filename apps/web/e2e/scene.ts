@@ -120,6 +120,27 @@ export function playUntil(s: GameState, done: (s: GameState) => boolean, max = 3
   throw new Error("playUntil: never got there");
 }
 
+/**
+ * Like `playUntil`, but bots also act when they have priority, as they would in the page (cast spells, play lands), and
+ * you attack with `attackers` when you declare attackers. For a test about a bot's spell: the bot casts it in the
+ * engine, and the page opens on your prompt.
+ */
+export function playWithBots(s: GameState, done: (s: GameState) => boolean, attackers: [string, PlayerId][] = [], max = 3000): GameState {
+  for (let i = 0; i < max; i++) {
+    if (done(s)) return s;
+    const pid = waitingOn(s);
+    if (pid === undefined || pid === null) break;
+    const pend = s.pending;
+    if (pend?.kind === "declareAttackers" && pid === 0) s = applyAction(s, { type: "declareAttackers", player: 0, attacks: attackers.map(([attacker, defender]) => ({ attacker, defender })) });
+    else if (pid !== 0) s = applyAction(s, botActions(s, pid)[0]!);
+    else if (pend?.kind === "declareBlockers") s = applyAction(s, { type: "declareBlockers", player: 0, blocks: [] });
+    else if (pend?.kind === "discardToHandSize") s = applyAction(s, { type: "discard", player: 0, objectIds: s.players[0]!.hand.slice(0, pend.count) });
+    else if (!pend) s = applyAction(s, { type: "passPriority", player: 0 });
+    else throw new Error(`playWithBots: a prompt for you (${pend.kind})`);
+  }
+  throw new Error("playWithBots: never got there");
+}
+
 /** Opens the app on `s`. Bots act as in a real game; the human always holds priority ("hold" mode). */
 export async function open(page: Page, s: GameState) {
   watchErrors(page);

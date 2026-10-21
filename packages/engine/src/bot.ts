@@ -439,6 +439,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Damage shields: the options come in the order we'd pick them (damage.ts shieldPreference).
     if (pend.kind === "chooseOption" && pend.what === "damageShield") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "venture") return [{ type: "chooseOption", player: pid, choice: chooseRoom(s, pid, pend.options) }];
+    if (pend.kind === "chooseOption" && pend.what === "word") return [{ type: "chooseOption", player: pid, choice: chooseWord(s, pid, pend.options) }];
     if (pend.kind === "chooseOption" && pend.what === "vote") return [{ type: "chooseOption", player: pid, choice: chooseVote(s, pid, pend.options) }];
     if (pend.kind === "chooseOption" && pend.what === "punisher") return [{ type: "chooseOption", player: pid, choice: choosePunisher(s, pid, pend.options) }];
     if (pend.kind === "chooseOption" && pend.what === "damageSource") return [{ type: "chooseOption", player: pid, choice: chooseDamageSource(s, pid, pend.options) }];
@@ -2008,6 +2009,18 @@ function chooseDistribution(s: GameState, pid: PlayerId, options: ObjectId[], to
     }
   if (left > 0) parts[byWorth[0]!] = (parts[byWorth[0]!] ?? 0) + left;
   return parts;
+}
+
+/**
+ * "Each opponent chooses fame or fortune" (Seize the Spotlight): fame lends the caster one of our creatures for a turn,
+ * fortune gives them a card and a Treasure. Fame when we have no creature worth more than a card, else fortune.
+ */
+function chooseWord(s: GameState, pid: PlayerId, options: string[]): string {
+  if (options.join() === "fame,fortune") {
+    const best = Math.max(0, ...s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature")).map((id) => power(s, obj(s, id))));
+    return best <= 2 ? "fame" : "fortune";
+  }
+  return options[0]!;
 }
 
 function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: number, action: PickAction, counter?: CounterKind): ObjectId[] {
@@ -3594,7 +3607,7 @@ function attackPlaneswalkers(s: GameState, pid: PlayerId, attacks: { attacker: O
   const atPlayer = (d: PlayerId) => attacks.filter((a) => a.defender === d && a.planeswalker === undefined).reduce((n, a) => n + hit(obj(s, a.attacker), d), 0);
   const walkers = s.battlefield
     .map((id) => obj(s, id))
-    .filter((o) => objIsType(s, o, "Planeswalker") && opponents(s, pid).includes(controllerOf(s, o)))
+    .filter((o) => objIsType(s, o, "Planeswalker") && opponents(s, pid).includes(controllerOf(s, o)) && attackablePermanentProblem(s, pid, controllerOf(s, o), o.id) === null)
     .sort((a, b) => (b.counters.loyalty ?? 0) - (a.counters.loyalty ?? 0));
   for (const pw of walkers) {
     const owner = controllerOf(s, pw);

@@ -603,6 +603,8 @@ export interface Player {
   lifeCantChange?: true;
   /** "Until end of turn, your life total can't change" (Flare of Fortitude): the turn it's for (CR 119.7-8). */
   lifeCantChangeTurn?: number;
+  /** "Until end of turn, damage that would reduce your life total to less than 1 reduces it to 1 instead" (Angel's Grace): the turn it's for. */
+  lifeFloorTurn?: number;
   /** The turn this player last began to activate an exhaust ability (CR 702.177b, Elvish Refueler). */
   exhaustTurn?: number;
   /** Times each commander (by object id) has been cast from the command zone. CR 903.8 */
@@ -857,6 +859,8 @@ export interface PendingTrigger {
 }
 
 export interface LastKnown {
+  /** The object it was (a card keeps its id in its new zone): "another permanent card" than the one sacrificed this way. */
+  id?: ObjectId;
   counters?: Record<string, number>;
   /** Its card types as it last existed (CR 608.2h): "a permanent that shares a card type with it" (Braids). */
   types?: string[];
@@ -872,6 +876,8 @@ export interface LastKnown {
   controller?: PlayerId;
   /** It was suspected as it last existed (CR 701.60): "if the sacrificed creature was suspected". */
   suspected?: true;
+  /** It was legendary as it last existed: "if the sacrificed creature was legendary" (Nasty End). */
+  legendary?: true;
   /** The player chosen for it as it entered ("the chosen player"), as it last existed. */
   chosenPlayer?: PlayerId;
   /**
@@ -1079,7 +1085,7 @@ export type PendingDecision =
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "commander" | "drawUpTo" | "payX" | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | "pile" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom" | "searchZones" | "vote" | "mutate" | "either" | "payOrTop" | "counterKind" | /** "Remove up to three counters": the next one to remove, or "done". */ "removeCounter" | /** Which target of a spell or ability becomes ~ (Spellskite). */ "targetSlot" | /** A number chosen secretly (Wheel of Misfortune): any whole number in `numberRange`. */ "secretNumber"; options: string[]; /** Any whole number from `min` to `max` may be chosen, not only `options`. */ numberRange?: { min: number; max: number }; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** "removeCounter": the permanent the counters are moved onto (Resourceful Defense). */ onto?: ObjectId; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId; /** "pile": the two piles, the first then the second (Fact or Fiction); `of`, the player whose hand the chosen one goes to. */ piles?: [ObjectId[], ObjectId[]] }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "commander" | "drawUpTo" | "payX" | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | "pile" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom" | "searchZones" | "vote" | /** One of the words of "each opponent chooses fame or fortune". */ "word" | "mutate" | "either" | "payOrTop" | "counterKind" | /** "Remove up to three counters": the next one to remove, or "done". */ "removeCounter" | /** Which target of a spell or ability becomes ~ (Spellskite). */ "targetSlot" | /** A number chosen secretly (Wheel of Misfortune): any whole number in `numberRange`. */ "secretNumber"; options: string[]; /** Any whole number from `min` to `max` may be chosen, not only `options`. */ numberRange?: { min: number; max: number }; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** "removeCounter": the permanent the counters are moved onto (Resourceful Defense). */ onto?: ObjectId; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId; /** "pile": the two piles, the first then the second (Fact or Fiction); `of`, the player whose hand the chosen one goes to. */ piles?: [ObjectId[], ObjectId[]] }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -1352,6 +1358,12 @@ export interface GameState {
   /** "Until your next turn, your opponents can't cast spells from anywhere other than their hands" (Avatar's Wrath): `controller`'s opponents. */
   /** "You may cast a creature spell from your graveyard this turn" (Chainer): one cast each, used like TurnLog.gravePermits. */
   graveGrants?: { key: string; player: PlayerId; turn: number; filter: TargetSpec; source: string }[];
+  /**
+   * "You may cast spells from your graveyard this turn", "until end of turn, you may play lands ... from your graveyard",
+   * "if a card would be put into your graveyard from anywhere this turn, exile it instead" (Yawgmoth's Will, Forgotten
+   * Cellar): what `player` may do with their graveyard during `turn` (Effect graveyardTurn).
+   */
+  graveyardTurn?: { player: PlayerId; turn: number; cast?: TargetSpec; lands?: true; exileInstead?: true; source: string }[];
   handOnlyUntil?: { controller: PlayerId; source: string }[];
   /** The turn a "damage can't be prevented this turn" effect was made in (CR 615.12). */
   noPreventionTurn?: number;
@@ -1610,6 +1622,10 @@ export interface Resolving {
    * id of the permanent or card voted for.
    */
   votes?: { voter: PlayerId; choice: string }[];
+  /** "Each opponent chooses fame or fortune" (Seize the Spotlight): the word each of them chose. Not a vote (CR 701.38). */
+  chose?: Record<string, string>;
+  /** A library was searched by a search that leaves the shuffle for later (Claim Jumper, `search.noShuffle`). */
+  searchedHere?: true;
   /** The mana it added, for a mana ability: what the triggered mana abilities of tapping its source see (CR 106.12a). */
   made?: ManaType[];
   next: number;
@@ -1646,6 +1662,8 @@ export interface Resolving {
     chosen?: Record<string, ObjectId[]>; // cards each player chose to discard
     venture?: string; // the dungeon or room chosen while venturing (CR 701.49a-b)
     arranged?: { top: ObjectId[]; away: ObjectId[] };
+    /** Teferi's Puzzle Box: how many cards the hand put on the bottom (then drawn). */
+    bottomed?: number;
     bottomOrders?: Record<string, ObjectId[]>; // putAllOnBottom: each owner's order, asked before anything moves
     ordered?: boolean; // "reorder your graveyard as you choose" asked already (graveyard.ts)
     forced?: ObjectId[]; // exileNamed's "all cards with that name" in the public graveyard, found without a choice (CR 701.23b)
@@ -1655,6 +1673,10 @@ export interface Resolving {
     castNow?: { id: ObjectId }; // the card "you may cast that card" offered (Effect castNow)
     /** A vote (Effect "vote"): players still to vote in turn order, the votes left for the one voting, and their pick. */
     vote?: { queue: PlayerId[]; left?: number; may?: number; pick?: string };
+    /** "Each opponent chooses fame or fortune": the players still to choose (APNAP, CR 101.4), and the answer given. */
+    words?: { queue: PlayerId[]; pick?: string };
+    /** "For each player who chose fame, gain control of a creature that player controls": the choosers still to go, and the creatures chosen so far. */
+    fromEach?: { queue: PlayerId[]; ids: ObjectId[] };
     mayQueue?: PlayerId[]; // "each player may ...": players still to decide, in APNAP order (CR 101.4)
     mayers?: PlayerId[]; // and those who chose to
     mayStep?: number; // how many of its instructions are done

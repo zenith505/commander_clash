@@ -204,6 +204,14 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       (s.handOnlyUntil ??= []).push({ controller: ctx.controller, source: src });
       log(s, `${src}: until ${player(s, ctx.controller).name}'s next turn, their opponents can't cast spells from anywhere other than their hands.`);
       return;
+    case "graveyardTurn": {
+      const list = (s.graveyardTurn = (s.graveyardTurn ?? []).filter((g) => g.turn === s.turn));
+      list.push({ player: ctx.controller, turn: s.turn, ...(e.cast ? { cast: e.cast } : {}), ...(e.lands ? { lands: true as const } : {}), ...(e.exileInstead ? { exileInstead: true as const } : {}), source: src });
+      const may = [e.lands ? "play lands" : "", e.cast ? `cast ${e.cast.text.replace(/ cards?$/, "")} spells` : ""].filter(Boolean).join(" and ");
+      if (may) log(s, `${player(s, ctx.controller).name} may ${may} from their graveyard this turn (${src}).`);
+      if (e.exileInstead) log(s, `${src}: cards that would be put into ${player(s, ctx.controller).name}'s graveyard this turn are exiled instead.`);
+      return;
+    }
     case "graveyardCastThisTurn":
       (s.graveGrants ??= []).push({ key: `grant${s.nextId++}`, player: ctx.controller, turn: s.turn, filter: e.filter, source: src });
       log(s, `${player(s, ctx.controller).name} may cast a ${e.filter.text.replace(/ card$/, "")} spell from their graveyard this turn (${src}).`);
@@ -472,6 +480,21 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       loseLife(s, down, diff);
       record({ [down]: before - player(s, down).life });
       gainLife(s, up, diff);
+      return;
+    }
+    case "setLife": {
+      // CR 119.5: the player gains or loses the life it takes, which can't happen if they can't gain or lose life.
+      for (const pid of players(s, e.who, ctx)) {
+        const p = player(s, pid);
+        const diff = e.n - p.life;
+        if (diff > 0 && canGainLife(s, pid)) {
+          gainLife(s, pid, diff);
+          log(s, `${p.name}'s life total becomes ${p.life} (${src}).`);
+        } else if (diff < 0 && canLoseLife(s, pid)) {
+          loseLife(s, pid, -diff);
+          log(s, `${p.name}'s life total becomes ${p.life} (${src}).`);
+        }
+      }
       return;
     }
     case "loseLife": {

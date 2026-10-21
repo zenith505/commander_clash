@@ -126,6 +126,16 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   }
   const manyNow = ctx.manyPlayers !== undefined && ctx.lastPlayerTarget === ctx.manyPlayers;
   if (/^(?:each of )?those (?:players|opponents)$/.test(x) && manyNow) return { ref: "target", index: ctx.manyPlayers!, n: 2 };
+  // "Two target players each draw a card" (Huddle Up), "Choose two target players. Each of them ..." (Scheming
+  // Symmetry): two different players (CR 115.3), then "each of them", "they" are both.
+  if (/^two target players(?: each)?$/.test(x) && !ctx.targets.some((t) => t.many) && ctx.manyPlayers === undefined) {
+    const first = addTarget(ctx, { kind: "player", text: "target player" });
+    addTarget(ctx, { kind: "player", text: "target player", distinctFrom: [first] });
+    ctx.lastPlayerTarget = first;
+    ctx.manyPlayers = first;
+    return { ref: "target", index: first, n: 2 };
+  }
+  if (/^(?:each of them|they each|they)$/.test(x) && manyNow && ctx.targets[ctx.manyPlayers!]?.many === undefined) return { ref: "target", index: ctx.manyPlayers!, n: 2 };
   // "Exile target creature and all other creatures its controller controls .... That player investigates ...": that
   // creature's controller (as it last existed, CR 608.2h).
   if (x === "that player" && ctx.controllerNamed !== undefined && ctx.controllerNamed === ctx.lastObjectTarget && ctx.lastPlayerTarget === undefined) return { ref: "targetController", index: ctx.controllerNamed };
@@ -391,7 +401,8 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   const differMv = many === "any" ? / that each have a different mana value (\d+|X) or less(?= from |$)/.exec(mine0) : null;
   // "With total mana value 6 or less" (TargetSpec.total): the group together, X being the one announced (CR 107.3a).
   const totalM = n > 1 || many ? / with total (mana value|power) (\d+|X) or less(?= from | in |$)/.exec(mine0) : null;
-  if (totalM && totalM[2] === "X" && (!(ctx.spell || ctx.activated || ctx.ownX) || ctx.whereX)) return null;
+  // With "where X is ...", X is defined by the text, which defineX (body.ts) works out or refuses.
+  if (totalM && totalM[2] === "X" && !(ctx.spell || ctx.activated || ctx.ownX || ctx.whereX)) return null;
   const total: TargetSpec["total"] | undefined = totalM ? { key: totalM[1] === "power" ? "power" : "manaValue", ...(totalM[2] === "X" ? { x: true as const } : { max: Number(totalM[2]) }) } : undefined;
   const mine = mine0.replace(/ controlled by different players$/, "").replace(/ that each have a different mana value (\d+|X) or less(?= from |$)/, " with mana value $1 or less").replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "").replace(/ with different names(?= from |$)/, "").replace(/ with total (?:mana value|power) (?:\d+|X) or less(?= from | in |$)/, "");
   const parsed = differMv ? parseTargetPhrase(singularPhrase(mine), { x: true }) : n > 1 || many ? parseTargetPhrase(singularPhrase(mine)) : parseTargetPhrase(mine, { x: true, count: boundCount(ctx) });
@@ -507,8 +518,9 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   const whose = / (you control|your opponents control|an opponent controls|you don't control)\b/i;
   // "Attacking creatures get +1/+1 until end of turn": whichever are attacking as it resolves (CR 611.2c).
   const combat = /^(attacking|blocking|attacking or blocking) creatures\b/i.test(p);
-  // "Creatures of the chosen type get +3/+3 until end of turn": every creature of that type.
-  const ofChosen = /^creatures of the chosen type$/i.test(p);
+  // "Creatures of the chosen type get +3/+3 until end of turn": every creature of that type; "creatures that aren't of
+  // the chosen type get -3/-3" (Crippling Fear): every other creature.
+  const ofChosen = /^creatures (?:that aren't |not )?of the chosen type$/i.test(p);
   if (!all && !whose.test(p) && !bare && !combat && !ofChosen) return null;
   // The kinds come first; plurals become the singular parseTargetPhrase reads ("Elves" -> "Elf").
   const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of|that attacked this turn|that didn't attack this turn|that entered (?:the battlefield )?this turn)\b/i.exec(p);
@@ -655,7 +667,8 @@ export function parseTargetPhrase(
     p = p.slice(0, bare.index);
   }
   // "Target Aura attached to a creature" (Crown of the Ages), "Aura or Equipment attached to a creature you control" (Halvar).
-  const attached = / attached to an? (creature|permanent)( you control)?$/.exec(p);
+  // "Each Aura you control that's attached to a creature" (Sage's Reverie).
+  const attached = / (?:that's |that are )?attached to an? (creature|permanent)( you control)?$/.exec(p);
   if (attached) {
     extra.attachedTo = { kind: "object", ...(attached[1] === "creature" ? { types: ["Creature"] } : {}), ...(attached[2] ? { controller: "you" as const } : {}), text: attached[0].trim().replace(/^attached to /, "") };
     p = p.slice(0, attached.index);
@@ -735,6 +748,9 @@ export function parseTargetPhrase(
     // "Permanent ... with an even mana value" (Desecrate Reality; zero is even).
     extra.manaValue = { parity: m[1] as "even" | "odd" };
     p = p.slice(0, m.index);
+  } else if ((m = / with toxic( you control| you don't control| an opponent controls)?$/.exec(p))) {
+    extra.toxic = true;
+    p = p.slice(0, m.index) + (m[1] ?? "");
   } else if ((m = /(?:^| )(with|without) ([a-z ]+?)( you control| you don't control| an opponent controls)?$/.exec(p))) {
     // "Creature you control with flash or haste" (Shadow the Hedgehog): one of them is enough.
     const either = m[1] === "with" ? /^([a-z]+) or ([a-z]+)$/.exec(m[2]!) : null;

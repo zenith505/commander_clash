@@ -1,7 +1,7 @@
 # Roadmap
 
-22,204 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,934 of 1,989 (97%), top 5,000: 3,802 of 4,988 (76%).
+22,307 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,964 of 1,989 (98%), top 5,000: 3,845 of 4,988 (77%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,13 +22,16 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 107, most played first: Jaxis, the Troublemaker (a copy
-   token that gains a quoted dies trigger), Delina, Wild Mage (d20 results with "you may roll again"), Ancient Brass
-   Dragon (targets with total mana value X after a roll), Seize the Spotlight (each opponent chooses fame or fortune),
-   Walk-In Closet, Matzalantli, Firemane Commando ("they draw a card if none of those creatures attacked you"), The
-   Aetherspark, Claim Jumper ("repeat this process once"), Emrakul, the Promised End, Scheming Symmetry, Sage's Reverie
-   ("each Aura you control that's attached to a creature"), Containment Construct, Wedding Ring, Arwen, Hero's Blade,
-   Colossal Grave-Reaver, Multani, Breena, Phyrexian Obliterator, Kazuul. Smaller gaps from round 107: "Sacrifice A and
+00. Most played first (`npm run popular`). Out after round 108, most played first: Emrakul, the Promised End (needs
+   controlling another player's turn, CR 722, also Mindslaver, Sorin Markov's −7, Worst Fears), Archetype of
+   Imagination, Breena, the Demagogue, Urabrask, Gift of Immortality, As Foretold, Divine Visitation, Hellkite Courser,
+   Halo Fountain, Tree of Perdition, Commandeer, Hostage Taker, Aven Interrupter, Abundance, Sunbird's Invocation, Drana
+   and Linvala, For the Common Good, Norn's Annex, Winds of Abandon (each controller searches once per creature),
+   Wild Magic Surge, One with the Multiverse. Smaller gaps from round 108: Delina's copies attack the player Delina
+   attacks (no choice of defender); a permission to cast from the graveyard (Yawgmoth's Will, Forgotten Cellar) pays
+   the mana cost only, no alternative costs; bots choose fame when their best creature has power 2 or less, else
+   fortune; Witness Protection's new name counts in rules checks, but the card picture still shows the printed card.
+   Smaller gaps from round 107: "Sacrifice A and
    B" costs read only two different single-word types (Jarad); bots never use Jarad's graveyard ability (bots skip
    graveyard abilities); "No more than one creature can attack ~ each combat" is checked for attacks on the planeswalker
    only, and bots move at most that many attackers onto it; "at the beginning of that player's next end step" works for

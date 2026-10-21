@@ -187,6 +187,8 @@ export type TriggerSourceEvent =
   | { type: "combatDamageToPlayer"; id: ObjectId; player: PlayerId; amount: number; planeswalker?: ObjectId; /** Dealt to a battle instead, `player` its protector. */ battle?: ObjectId }
   /** A permanent was dealt this much damage, all at the same time (one event however many sources dealt it). */
   | { type: "wasDealtDamage"; id: ObjectId; amount: number }
+  /** The damage one source dealt a permanent in one event (Phyrexian Obliterator), and that source's controller. */
+  | { type: "dealtDamageBySource"; id: ObjectId; amount: number; by: PlayerId }
   /** A permanent dealt damage to a player, in combat or not. */
   /** `source` is the permanent dealing it, or "" for a spell or a gone permanent's ability (CR 120.3); `by` controls it. */
   | { type: "damagedPlayer"; source: ObjectId; by: PlayerId; player: PlayerId; amount: number; combat: boolean }
@@ -293,6 +295,15 @@ function trains(s: GameState, o: GameObject): boolean {
 }
 
 /** The other creatures attacking along with it (battalion): those just declared as attackers with it. */
+/** Wedding Ring: the event's player controls an artifact with this object's name (CR 201.2), during their own turn. */
+function eventPlayerFits(s: GameState, o: GameObject, t: TriggeredAbility, pid: PlayerId): boolean {
+  const c = t.eventPlayerIf;
+  if (!c) return true;
+  if (c.theirTurn && s.activePlayer !== pid) return false;
+  const name = characteristics(s, o).name;
+  return !c.controlsArtifactNamedSelf || s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Artifact") && characteristics(s, obj(s, id)).name === name);
+}
+
 function othersAttacking(s: GameState, o: GameObject, type?: string, tokens?: true): number {
   return s.battlefield.filter((id) => id !== o.id && s.objects[id]!.attacking !== undefined && objIsType(s, s.objects[id]!, "Creature") && (!tokens || s.objects[id]!.isToken) && (!type || characteristics(s, s.objects[id]!).subtypes.includes(type))).length;
 }
@@ -669,6 +680,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youGainLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
     fromEmblems((o, owner) => owner === ev.player && add(o, ev.player, (e) => e === "youGainLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount }));
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      const you = controllerOf(s, o);
+      if (you !== ev.player) add(o, you, (e, t) => e === "opponentGainsLife" && eventPlayerFits(s, o, t, ev.player), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
+    }
   } else if (ev.type === "diceRolled") {
     // "Whenever you roll one or more dice" once for the roll; "whenever you roll a 4 or higher" once for each die that
     // is (Mr. House rulings; Netherese Puzzle-Ward rulings: "that many times").
@@ -873,6 +889,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const fits = (t: TriggeredAbility) => ev.ids.map((x, i) => [x, i] as const).filter(([x]) => s.objects[x] && (!t.group || objectMatches(s, t.group, obj(s, x), ev.controller, false)));
       for (const t of abilitiesOf(s, o).triggers) {
         if (t.event !== want || !!t.anyoneAttacks !== anyone) continue;
+        if (t.anotherPlayer && controllerOf(s, o) === ev.controller) continue;
         // "To a player or battle": only those are about a battle dealt it (CR 310).
         if (ev.type === "groupCombatDamage" && ev.battle !== undefined && !t.orBattle) continue;
         const hit = fits(t);
@@ -880,7 +897,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const amount = ev.type === "groupCombatDamage" ? hit.reduce((n, [, i]) => n + ev.amounts[i]!, 0) : undefined;
         const same = (tt: TriggeredAbility) => tt.event === want && tt.body.text === t.body.text && JSON.stringify(tt.group) === JSON.stringify(t.group) && tt.minAttackers === t.minAttackers && !!tt.anyoneAttacks === anyone;
         const group = hit.map(([x]) => ({ id: x, zc: obj(s, x).zoneChanges ?? 0 }));
-        add(o, anyone ? controllerOf(s, o) : ev.controller, (_, tt) => same(tt) && !(ev.type === "groupCombatDamage" && ev.battle !== undefined && !tt.orBattle), undefined, undefined, undefined, undefined, undefined, undefined, ev.type === "groupCombatDamage" ? { player: ev.player, amount, group } : undefined);
+        // "Whenever another player attacks": the attacking player, and how many of those creatures attack this one's
+        // controller, as they were declared (rulings on Firemane Commando).
+        const watcher = controllerOf(s, o);
+        const attacked = t.anotherPlayer ? { player: ev.controller, amount: hit.filter(([x]) => obj(s, x).attacking === watcher && !obj(s, x).attackingPermanent).length } : undefined;
+        add(o, anyone ? watcher : ev.controller, (_, tt) => same(tt) && !(ev.type === "groupCombatDamage" && ev.battle !== undefined && !tt.orBattle), undefined, undefined, undefined, undefined, undefined, undefined, ev.type === "groupCombatDamage" ? { player: ev.player, amount, group } : attacked);
       }
     };
     for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === ev.controller) groupWatch(obj(s, id));
@@ -1007,6 +1028,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       add(o, controllerOf(s, o), (e) => e === "selfIsDealtDamage", undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
       addHosted(o, (e) => e === "selfIsDealtDamage", undefined, o, { amount: ev.amount });
     }
+  } else if (ev.type === "dealtDamageBySource") {
+    const o = s.objects[ev.id];
+    if (o?.zone === "battlefield") add(o, controllerOf(s, o), (e) => e === "selfDealtDamageBySource", undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount, player: ev.by });
   } else if (ev.type === "combatDamageToPlayer" && ev.planeswalker) {
     // "Whenever ~ deals combat damage to a player or planeswalker": nothing else is about a planeswalker dealt it.
     const o = obj(s, ev.id);
@@ -1066,7 +1090,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       else if (!d.cascade) s.triggerQueue.push({ sourceId: d.sourceId, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, body: d.body, cause: ev.stackId });
     }
     // Casualty's copy only if its casualty cost was paid (CR 702.153a).
-    if (spell && !ev.copy) add(spell, ev.controller, (e, t) => e === "selfCast" && (!t.ifCasualty || !!item?.casualty) && (!t.ifX || (item?.x ?? 0) >= t.ifX) && (!t.ifConspired || !!item?.conspired), compileCard(defOf(s, spell)).triggers, ev.stackId, undefined, undefined, item?.x, item?.kicked);
+    if (spell && !ev.copy) add(spell, ev.controller, (e, t) => e === "selfCast" && (!t.ifKicked || kickedMatches(item?.kicked, t.ifKicked)) && (!t.ifCasualty || !!item?.casualty) && (!t.ifX || (item?.x ?? 0) >= t.ifX) && (!t.ifConspired || !!item?.conspired), compileCard(defOf(s, spell)).triggers, ev.stackId, undefined, undefined, item?.x, item?.kicked);
     // Cascade a permanent gives the spells its controller casts: the spell's own ability, one for each (CR 702.85a, 702.85c).
     if (spell && item && !ev.copy) for (const _ of grantedCascades(s, item, spell, ev.controller)) for (let n = triggersAgain(s, spell, ev.controller, null); n >= 0; n--) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: CASCADE_BODY, cause: ev.stackId });
     const castWatch = (o: GameObject, you: PlayerId, triggers?: TriggeredAbility[]) =>
@@ -1230,6 +1254,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const by = t.draws.by;
         if ((by === "you" && ev.player !== you) || (by === "opponent" && ev.player === you) || (by === "enchanted" && o.attachedToPlayer !== ev.player)) return false;
         if (t.draws.notFirstInDrawStep && ev.firstInDrawStep) return false;
+        if (!eventPlayerFits(s, o, t, ev.player)) return false;
         return t.draws.nth === undefined || t.draws.nth === ev.nth;
       }, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
@@ -1481,7 +1506,7 @@ export function checkStateTriggers(s: GameState) {
 /** What a waiting trigger does: its source's printed ability, or a delayed trigger's own (CR 603.7). */
 export function triggerBody(s: GameState, t: PendingTrigger): AbilityBody {
   // "Deals X damage divided as you choose": worked out as it's put on the stack (CR 603.3d, 601.2d).
-  const body = settleDivided(s, t.body ?? compileCard(s.cards[t.sourceCardId]!).triggers[t.index]!.body, { controller: t.controller, sourceId: t.sourceId, ...(t.sourceZc !== undefined ? { sourceZc: t.sourceZc } : {}), x: t.x ?? 0, ...(t.lki ? { lki: t.lki } : {}), ...(t.event ? { event: t.event } : {}), ...(t.cause ? { cause: t.cause } : {}), ...(t.tapped !== undefined ? { tapped: t.tapped } : {}) });
+  const body = settleDivided(s, t.body ?? compileCard(s.cards[t.sourceCardId]!).triggers[t.index]!.body, { controller: t.controller, sourceId: t.sourceId, ...(t.sourceZc !== undefined ? { sourceZc: t.sourceZc } : {}), x: t.x ?? 0, ...(t.lki ? { lki: t.lki } : {}), ...(t.event ? { event: t.event } : {}), ...(t.cause ? { cause: t.cause } : {}), ...(t.tapped !== undefined ? { tapped: t.tapped } : {}), ...(t.rolled !== undefined ? { rolled: t.rolled } : {}) });
   // "Target creature that player controls": that player is known once it triggers.
   const who = t.event?.player;
   const isEvent = (x: TargetSpec): boolean => x.controller === "eventPlayer" || x.protector === "eventPlayer" || !!x.anyOf?.some(isEvent);

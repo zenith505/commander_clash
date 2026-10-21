@@ -148,6 +148,8 @@ export type Count =
   | { kind: "exchangedLifeDifference" }
   /** "For each death vote", "the number of profit votes" (CR 701.38): the votes for that choice in this ability's vote. */
   | { kind: "votes"; option: string }
+  /** "For each player who chose fortune": how many players chose that word (Effect eachChooses). */
+  | { kind: "choseWord"; option: string }
   /** "Creature cards in your graveyard", "cards in all graveyards" (`filter` is a "card" spec). */
   | { kind: "cardsInGraveyard"; who: PlayerRef; filter?: TargetSpec }
   /** "~'s power", "its toughness", "that creature's mana value": as it is now, or as it last existed (CR 608.2h). */
@@ -161,6 +163,8 @@ export type Count =
   | { kind: "party" }
   /** "The total amount of life your opponents have lost this turn", "for each 1 life your opponents have lost this turn" (CR 119.3). */
   | { kind: "opponentsLifeLost" }
+  /** "The life they lost this turn" (Wound Reflection): each one's own, however they lost it (rulings). */
+  | { kind: "lifeLostThisTurn"; who: PlayerRef }
   /** "For each unspent green mana you have" (Omnath, Locus of Mana), "six or more unspent mana" (Ozai): what's in your mana pool (CR 106.4). */
   | { kind: "unspentMana"; color?: Color }
   /** "The amount of life you gained this turn", "for each 1 life you gained this turn" (CR 119.3, 119.9): its total, whatever was lost. */
@@ -306,6 +310,8 @@ export interface TargetSpec {
   /** "Artifact, enchantment, or nonbasic land": it also fits one of these (each alternative with its own qualities). */
   anyOf?: TargetSpec[];
   keywords?: string[]; // "creature with flying"
+  /** "Creatures you control with toxic" (Skrelv's Hive): any toxic ability, whatever its number (CR 702.164). */
+  toxic?: true;
   notKeywords?: string[]; // "creature without flying"
   power?: Range; // "with power 4 or greater"
   toughness?: Range;
@@ -412,7 +418,7 @@ export interface TargetSpec {
    * the X announced (`x`, made into `max` as targets are chosen, see settleDivided). Checked again as it resolves: over
    * it then, every one of them is illegal (CR 608.2b; rulings on Nethroi, Reunion of the House).
    */
-  total?: { key: "manaValue" | "power"; max?: number; x?: true };
+  total?: { key: "manaValue" | "power"; max?: number; x?: true; /** The result of the roll a reflexive trigger is after (PendingTrigger.rolled), made into `max` as targets are chosen. */ rolled?: true };
   /** true: tapped; false: untapped. */
   tapped?: boolean;
   /** "Creature that was dealt damage this turn": damage it was dealt, even if it's been removed since (regeneration). */
@@ -833,6 +839,10 @@ export type Modification =
    */
   | { kind: "addAbility"; text: string }
   | { kind: "setPT"; power: Amount; toughness: Amount } // layer 7b
+  /** "Is ... named Legitimate Businessperson" (Witness Protection): its name, a text-changing effect (layer 3, CR 613.1c). */
+  | { kind: "setName"; name: string }
+  /** "Have base toughness 1" (Maha, Its Feathers Night): toughness only, power unchanged. */
+  | { kind: "setToughness"; toughness: Amount } // layer 7b
   /** A characteristic-defining ability (CR 604.3): "~'s power and toughness are each equal to ...", layer 7a. */
   | { kind: "definePT"; power?: Amount; toughness?: Amount }
   | { kind: "modifyPT"; power: Amount; toughness: Amount } // layer 7c
@@ -841,6 +851,8 @@ export type Modification =
   | { kind: "cantAttack" }
   /** `ability`: "This creature can't block" as an ability it has (a suspected creature's, CR 701.60c), so in layer 6. */
   | { kind: "cantBlock"; ability?: true }
+  /** "~ can't be attacked" (The Aetherspark): no creature may be declared as attacking it (CR 508.1b); one already attacking it goes on attacking it (rulings). */
+  | { kind: "cantBeAttacked" }
   | { kind: "cantBeBlocked" }
   /** "You may have ~ assign its combat damage as though it weren't blocked" (an ability, so layer 6). */
   | { kind: "unblockedDamage" }
@@ -1007,7 +1019,7 @@ export type StaticCondition =
   /** "If ~ is in your graveyard" (`creatureAbove`: "with a creature card directly above it", Krovikan Horror). */
   | { kind: "selfInGraveyard"; creatureAbove?: true }
   /** Delirium: card types among cards in your graveyard (CR 205.2a). */
-  | { kind: "graveyardTypes"; n: number }
+  | { kind: "graveyardTypes"; n: number; /** Only permanent types (CR 110.4a): "permanent types among cards in your graveyard". */ permanent?: true }
   /** Descend: permanent cards in your graveyard (CR 110.4b). */
   | { kind: "graveyardPermanents"; n: number }
   | { kind: "selfCounter"; counter: CounterKind }
@@ -1029,6 +1041,8 @@ export type StaticCondition =
   /** "Draw a card if its power is 3 or greater" about a trigger's subject (Tribute to the World Tree): as it is now, or as it last existed (CR 608.2h). */
   /** `greatest`: "if its power is greater than each other creature's power" (Selvala, Heart of the Wilds), creatures on the battlefield now. */
   | { kind: "subjectPT"; stat: "power" | "toughness"; min?: number; max?: number; greatest?: true }
+  /** "If you're the defending player" (Kazuul, Tyrant of the Cliffs): the trigger's subject is still attacking you, a planeswalker you control or a battle you protect (CR 506.2). */
+  | { kind: "subjectAttackingYou" }
   /** "Activate only if ~ entered this turn or if you control a basic land": either one. */
   | { kind: "anyOf"; conds: StaticCondition[] }
   /** Coven: "if you control three or more creatures with different powers" (three or more different power values). */
@@ -1284,6 +1298,8 @@ export type Effect =
   | { type: "gainLife"; who: PlayerRef; n: Amount }
   /** `drain`: "You gain life equal to the life lost this way" (extort, CR 702.101a; Gray Merchant). */
   | { type: "loseLife"; who: PlayerRef; n: Amount; drain?: boolean }
+  /** "Your life total becomes 10" (CR 119.5): that player gains or loses the difference. */
+  | { type: "setLife"; who: PlayerRef; n: number }
   /**
    * "Exchange life totals with target opponent", "two target players exchange life totals" (CR 701.12c): each gains or
    * loses the life needed to reach the other's previous total; if either part can't happen, neither does (701.12a).
@@ -1316,7 +1332,7 @@ export type Effect =
        * "... without paying its mana cost" (`free`), airbend's "for {2} rather than its mana cost" (`cost`, CR 701.65a);
        * "A spell cast (by an opponent) this way costs {2} more to cast" (`more`, `moreOpponents`). A token can't be cast.
        */
-      ownerMay?: { play?: true; free?: true; cost?: string; more?: number; moreOpponents?: true };
+      ownerMay?: { play?: true; free?: true; cost?: string; more?: number; moreOpponents?: true; /** Only this turn, or until the end of their next turn (Containment Construct, Moonstone), not for as long as it's exiled. */ until?: "thisTurn" | "nextTurn" };
     }
   /**
    * "Target instant or sorcery card in your graveyard gains flashback until end of turn. The flashback cost is equal to
@@ -1475,7 +1491,7 @@ export type Effect =
    * "Return a creature card from your graveyard to your hand", "you may return up to two instant and/or sorcery cards
    * ...": not targeted, so the cards are chosen as it resolves (CR 608.2c), as many as there are up to `n` unless `upTo`.
    */
-  | { type: "chooseFromGraveyard"; filter?: TargetSpec; n: number; upTo?: true; /** "With total mana value 4 or less" (Lively Dirge): of all the cards chosen. */ totalMv?: number; /** "Mill three cards. You may put a land card from among them into your hand." (Six): only the cards the mill just before put there. */ milled?: true; /** "Return any number of cards with different mana values" (Seasons Past): no limit but one card per mana value; `n` is ignored. */ distinctManaValues?: true; /** "Any number of permanent cards with different names" (Eerie Ultimatum): at most one card of each name. */ oneEach?: true; /** Exiled instead ("Target player exiles a card from their graveyard"), put onto the battlefield under your control, or on top of your library. */ dest?: "exile" | "battlefield" | "libraryTop"; tapped?: true; counters?: Record<string, number>; /** "With a number of +1/+1 counters on it equal to that result" (Grave Endeavor): how many of the one kind in `counters`, as it resolves. */ countersN?: Amount; /** "With mana value X or less", X worked out as it resolves (Blood on the Snow). */ mvMax?: Amount; /** Whose graveyard, and who chooses: yours if left out. */ who?: PlayerRef; /** "For each player, choose a creature or planeswalker card in that player's graveyard. Put those cards onto the battlefield under your control." (Breach the Multiverse): with `who` each player, you choose one card in each of their graveyards and they all enter under your control. */ youChoose?: true }
+  | { type: "chooseFromGraveyard"; filter?: TargetSpec; n: number; upTo?: true; /** "With total mana value 4 or less" (Lively Dirge): of all the cards chosen. */ totalMv?: number; /** "Mill three cards. You may put a land card from among them into your hand." (Six): only the cards the mill just before put there. */ milled?: true; /** "Whenever one or more creature cards are put into your graveyard from your library, put one of them onto the battlefield" (Colossal Grave-Reaver): only the trigger's cards. */ eventGroup?: true; /** "Return another permanent card" after "if you sacrificed a creature this way" (Rise of the Witch-king): not the card you sacrificed. */ notSacrificed?: true; /** "Return any number of cards with different mana values" (Seasons Past): no limit but one card per mana value; `n` is ignored. */ distinctManaValues?: true; /** "Any number of permanent cards with different names" (Eerie Ultimatum): at most one card of each name. */ oneEach?: true; /** Exiled instead ("Target player exiles a card from their graveyard"), put onto the battlefield under your control, or on top of your library. */ dest?: "exile" | "battlefield" | "libraryTop"; tapped?: true; counters?: Record<string, number>; /** "With a number of +1/+1 counters on it equal to that result" (Grave Endeavor): how many of the one kind in `counters`, as it resolves. */ countersN?: Amount; /** "With mana value X or less", X worked out as it resolves (Blood on the Snow). */ mvMax?: Amount; /** Whose graveyard, and who chooses: yours if left out. */ who?: PlayerRef; /** "For each player, choose a creature or planeswalker card in that player's graveyard. Put those cards onto the battlefield under your control." (Breach the Multiverse): with `who` each player, you choose one card in each of their graveyards and they all enter under your control. */ youChoose?: true }
   /** "Reorder your graveyard as you choose" (Fossil Find), "at random" (Search for Survivors). */
   | { type: "reorderGraveyard"; random?: true }
   | {
@@ -1532,6 +1548,8 @@ export type Effect =
    * their cards first, without revealing the order (CR 401.4).
    */
   | { type: "putAllOnBottom"; filter: TargetSpec }
+  /** "Put the cards in your hand on the bottom of your library in any order, then draw that many cards" (Teferi's Puzzle Box, Mindmoil). */
+  | { type: "handToBottomDraw"; who: PlayerRef }
   | { type: "tap"; what: ObjRef }
   /** Suspect (CR 701.60a): it becomes suspected, unless it already is (701.60d); `no`: "is no longer suspected". */
   | { type: "suspect"; what: ObjRef; no?: true }
@@ -1894,6 +1912,19 @@ export type Effect =
   | { type: "revealTopToHand"; life?: { who: PlayerRef; gain?: boolean; drain?: true } }
   /** "You may repeat this process any number of times" (Ad Nauseam): `effects` (none of which waits on a choice), then the controller decides whether to go again, each time after seeing the result (rulings). */
   | { type: "repeatMay"; effects: Effect[]; text: string }
+  /** "You may roll again" in a results table's row (Delina, Wild Mage): if its controller wants, the ability's roll and the rows after it happen again (CR 706.3c). */
+  | { type: "rollAgain" }
+  /**
+   * "Each opponent chooses fame or fortune" (Seize the Spotlight): each of `who`, in APNAP order and knowing the earlier
+   * answers (CR 101.4), chooses one of the words; what they chose is kept for "for each player who chose ...". Not a vote.
+   */
+  | { type: "eachChooses"; who: PlayerRef; options: string[]; text: string }
+  /**
+   * "For each player who chose fame, gain control of a creature that player controls until end of turn": for each player
+   * who chose `chose`, in APNAP order, its controller chooses one of that player's creatures (not targeted); then it gains
+   * control of all of them for the duration. Afterwards "those creatures" are they (ObjRef created).
+   */
+  | { type: "controlFromEach"; chose: string; duration: "endOfTurn" }
   /** "Reveal the top card of your library" (CR 701.20a): what follows ("If it's a creature card, put it into your hand") is about it (ObjRef "revealed"). */
   /** "Reveal the top card of your library" (CR 701.20a), or with `look` only look at it, for an "if it's a ... card" after it. */
   | { type: "revealTop"; look?: true; /** "Reveal a card at random from your hand" (Cursed Scroll) instead. */ randomFromHand?: true; /** Whose library: "reveals the top card of their library" (Chaos Warp: the target's owner). Yours if left out. */ who?: PlayerRef }
@@ -2008,7 +2039,7 @@ export type Effect =
   /** "Creatures can't attack this turn" (kicked Orim's Chant): a rule for the turn, so also creatures that arrive later (CR 611.2c). */
   | { type: "cantAttackRule"; filter: TargetSpec }
   /** "You may shuffle", "you may have that player shuffle" (CR 701.20). */
-  | { type: "shuffle"; who: PlayerRef }
+  | { type: "shuffle"; who: PlayerRef; /** "If you search your library this way, shuffle" after searches with `noShuffle` (Claim Jumper): only if one of them searched it. */ ifSearched?: true }
   /**
    * "Shuffle it into its owner's library"; `shuffleSpell`: "Shuffle ~ into its owner's library", the resolving spell itself,
    * instead of its owner's graveyard (CR 608.2n). The owner's library is shuffled even if the card is gone (CR 701.24c).
@@ -2265,6 +2296,13 @@ export type Effect =
   | { type: "opponentsHandOnlyUntilNextTurn" }
   /** "You may cast a creature spell from your graveyard this turn" (Chainer, Nightmare Adept): one such cast (GameState.graveGrants). */
   | { type: "graveyardCastThisTurn"; filter: TargetSpec }
+  /**
+   * For the rest of the turn, its controller may cast spells (`cast`: those cards) and/or play lands (`lands`) from their
+   * graveyard, as many as they like, paying their costs and following their timing rules (rulings on Forgotten Cellar;
+   * a land is still their land play, CR 305.2); `exileInstead`: "if a card would be put into your graveyard from anywhere
+   * this turn, exile it instead" (CR 614.1a), not a token (rulings).
+   */
+  | { type: "graveyardTurn"; cast?: TargetSpec; lands?: true; exileInstead?: true }
   /** "Artifact, instant, and sorcery spells you cast this turn cost {2} less to cast" (Urza, Planeswalker): `mod`'s "you" is the ability's controller (CR 601.2f, 611.2a). */
   | { type: "costModThisTurn"; mod: CostMod }
   /**
@@ -2298,7 +2336,7 @@ export type Effect =
    * (CR 701.23). `filter` unset = any card. Found cards go to `dest`; with `others`, only the first
    * does and the rest go there (Cultivate). The library is then shuffled (CR 701.20).
    */
-  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; reveal: boolean; /** Whose library: "its controller may search their library" (Path to Exile). Yours if left out. */ who?: PlayerRef; /** "Search target opponent's library" (Bribery): you search that player's library, which they then shuffle. */ library?: PlayerRef; /** "Search your library and/or graveyard ... If you search your library this way, shuffle" (Finale of Devastation): your graveyard, and your library too if you choose. */ orGraveyard?: boolean; /** "A card named A and/or a card named B" (Alpine Houndmaster), "cards with different names" (Three Dreams): at most one card of each name. */ oneEach?: true; /** "Up to two basic land cards that share a land type" (Myriad Landscape): the cards found all have a land type in common. */ shareLandType?: true; /** "Each player may search their library" (Veteran Explorer): each one, as their turn to search comes, chooses whether to (rulings); only those who did shuffle. */ may?: true; /** "Target opponent chooses two of those cards. Put the chosen cards into your graveyard and the rest into your hand" (Gifts Ungiven): `n` of the cards found, chosen by that opponent (by an opponent you choose as it resolves if left out), go `to`; the rest go to `dest`. */ split?: { chooser?: PlayerRef; n: number; to: SearchDest }; /** "Put it onto the battlefield tapped if it's a land card. Otherwise, put it into your hand." (Archdruid's Charm): where a land card found goes instead of `dest`. */ landTo?: SearchDest; /** "A Forest card and a Plains card" (Krosan Verge): up to one card for each of these, each card found matching a different one. */ oneOfEach?: TargetSpec[]; /** The cards a "hold" flicker exiled enter with the found cards, at the same time, under your control (Sword of Hearth and Home). */ withHeld?: true }
+  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; reveal: boolean; /** Whose library: "its controller may search their library" (Path to Exile). Yours if left out. */ who?: PlayerRef; /** "Search target opponent's library" (Bribery): you search that player's library, which they then shuffle. */ library?: PlayerRef; /** "Search your library and/or graveyard ... If you search your library this way, shuffle" (Finale of Devastation): your graveyard, and your library too if you choose. */ orGraveyard?: boolean; /** "A card named A and/or a card named B" (Alpine Houndmaster), "cards with different names" (Three Dreams): at most one card of each name. */ oneEach?: true; /** "Up to two basic land cards that share a land type" (Myriad Landscape): the cards found all have a land type in common. */ shareLandType?: true; /** "Each player may search their library" (Veteran Explorer): each one, as their turn to search comes, chooses whether to (rulings); only those who did shuffle. */ may?: true; /** "Target opponent chooses two of those cards. Put the chosen cards into your graveyard and the rest into your hand" (Gifts Ungiven): `n` of the cards found, chosen by that opponent (by an opponent you choose as it resolves if left out), go `to`; the rest go to `dest`. */ split?: { chooser?: PlayerRef; n: number; to: SearchDest }; /** "Put it onto the battlefield tapped if it's a land card. Otherwise, put it into your hand." (Archdruid's Charm): where a land card found goes instead of `dest`. */ landTo?: SearchDest; /** "A Forest card and a Plains card" (Krosan Verge): up to one card for each of these, each card found matching a different one. */ oneOfEach?: TargetSpec[]; /** The cards a "hold" flicker exiled enter with the found cards, at the same time, under your control (Sword of Hearth and Home). */ withHeld?: true; /** Not shuffled now: a later "shuffle" with `ifSearched` does it once (Claim Jumper). */ noShuffle?: true }
   /** "Reveal the top three cards of your library. An opponent chooses one of them. Put that card into your graveyard and the rest into your hand" (Murmurs from Beyond): the chooser (an opponent you choose as it resolves if left out) picks one revealed card (one that fits `filter`), which goes `to`; the rest go `rest`, or stay on top. */
   | { type: "revealPick"; n: Amount; chooser?: PlayerRef; filter?: TargetSpec; to: SearchDest; rest?: SearchDest }
   /**
@@ -2386,6 +2424,8 @@ export type Effect =
       lifeCantChange?: true;
       /** "Until end of turn, your life total can't change" (Flare of Fortitude): see Player.lifeCantChangeTurn. */
       lifeCantChangeThisTurn?: true;
+      /** "Until end of turn, damage that would reduce your life total to less than 1 reduces it to 1 instead" (Angel's Grace): see Player.lifeFloorTurn. */
+      lifeFloorThisTurn?: true;
     }
   /**
    * "Starting with you, each player votes for death or taxes" (CR 701.38a): each player in turn order, from the
@@ -2475,7 +2515,8 @@ export type SpellCondition =
   /** `died`: "if that creature dies this way" (Saw in Half): one it destroyed was put into a graveyard (CR 700.4, rulings). */
   | { kind: "destroyedThisWay"; died?: true }
   /** "Sacrifice a creature. When you do, ..." (Tip the Scales): this ability's instructions sacrificed something. */
-  | { kind: "sacrificedThisWay" }
+  /** `you`: "if you sacrificed a creature this way" after "each player sacrifices" (Rise of the Witch-king): you did. */
+  | { kind: "sacrificedThisWay"; you?: true }
   /** "If another Desert was returned this way" (Arid Archway): its "return a ... you control" pick returned one, as it last existed, other than its source. */
   | { kind: "bouncedThisWay"; subtype: string; another: true }
   /** "You may put a land card from among them onto the battlefield tapped. If you don't, ..." (Planar Genesis): its last dig took a card. */
@@ -2487,11 +2528,15 @@ export type SpellCondition =
    * you roll" trigger is about ("If you rolled 6 or higher", Mr. House).
    */
   | { kind: "rollIn"; min?: number; max?: number; event?: true }
+  /** "If none of those creatures attacked you" (Firemane Commando): the attack trigger's event counted none attacking its controller. */
+  | { kind: "noneAttackedYou" }
   /** "If it's suspected, ...": the object, as the instruction is done (CR 701.60). */
   | { kind: "suspected"; what: ObjRef }
   /** "If the sacrificed creature was suspected" (Agency Coroner): the creature its sacrifice cost sacrificed, as it last
    * existed on the battlefield (CR 608.2h), where being suspected is a designation it had (CR 701.60). */
   | { kind: "sacrificedSuspected" }
+  /** "If the sacrificed creature was legendary" (Nasty End): the same, legendary as it last existed (CR 608.2h). */
+  | { kind: "sacrificedLegendary" }
   /**
    * "If the discarded card wasn't a land card" (Grab the Prize), "was a creature card" (Moria Scavenger): the card a
    * discard cost discarded (StackItem.costDiscarded), as it is in the graveyard. Costs are paid after targets are chosen
@@ -2632,6 +2677,7 @@ export type TriggerEvent =
   | "permanentDealtExcess"
   | "selfBecomesTapped" // "Whenever ~ becomes tapped": it changed from untapped to tapped (CR 701.26a)
   | "selfIsDealtDamage" // "Whenever ~ is dealt damage": once for all the damage dealt to it at the same time
+  | "selfDealtDamageBySource" // "Whenever a source deals damage to ~": once for each source dealing it damage; "that player" is that source's controller
   | "permanentBecomesTapped" // "Whenever a creature an opponent controls becomes tapped": see TriggeredAbility.tappedFilter
   | "selfBecomesUntapped" // "Whenever ~ becomes untapped" (inspired): it changed from tapped to untapped (CR 701.26b)
   | "permanentBecomesUntapped" // "Whenever a permanent you control becomes untapped": see TriggeredAbility.tappedFilter
@@ -2740,6 +2786,7 @@ export type TriggerEvent =
   | "selfDealsDamageToCreature"
   | "selfDealsCombatDamageToCreature"
   | "youGainLife" // "Whenever you gain life": once per source that makes you gain life (CR 119.9)
+  | "opponentGainsLife" // "Whenever an opponent gains life": "that player", "that much" (CR 119.9)
   /** "Whenever you win a coin flip", "whenever you lose a coin flip" (CR 705.2): once per flip. */
   | "youWinFlip"
   | "youLoseFlip"
@@ -2906,6 +2953,8 @@ export interface TriggeredAbility {
   /** For "playerDraws": who draws, and for "your second card each turn", which card of the turn it has to be. */
   /** `notFirstInDrawStep`: "except the first one they draw in each of their draw steps" (Orcish Bowmasters). */
   draws?: { by: "you" | "opponent" | "any" | "enchanted"; nth?: number; notFirstInDrawStep?: true };
+  /** Wedding Ring: "an opponent who controls an artifact named ~ ... during their turn": what the event's player must be. */
+  eventPlayerIf?: { controlsArtifactNamedSelf?: true; theirTurn?: true };
   /**
    * For "abilityActivated": who activated an ability that isn't a mana ability (CR 602, 605.1a), and `of`: what its
    * source had to be as it was activated, a permanent on the battlefield ("an ability of an artifact, creature, or land").
@@ -2941,6 +2990,8 @@ export interface TriggeredAbility {
   minAttackers?: number;
   /** For "creaturesYouControlAttack": "Whenever one or more creatures attack" (Duelist's Heritage), any player's, not only its controller's. */
   anyoneAttacks?: true;
+  /** With `anyoneAttacks`: "Whenever another player attacks" (Firemane Commando), not its controller. The event's player is the attacking player, its amount how many of the attackers attack its controller (not their planeswalkers or battles). */
+  anotherPlayer?: true;
   /** For "opponentAttacksYou": at least `min` attackers at you, or (`orPlaneswalkers`, an intervening if, CR 603.4) at your planeswalkers too. */
   attacksYou?: { min: number; orPlaneswalkers?: true };
   /**
@@ -3383,7 +3434,8 @@ export interface CostMod {
   /** Which spells (printed characteristics, with the chosen X counted in the mana value, CR 202.3e). */
   filter: TargetSpec;
   n: number;
-  turn?: "yours" | "notYours";
+  /** During the permanent's controller's turn or not; `notCasters`: "except during its controller's turn" (Defense Grid), the spell's. */
+  turn?: "yours" | "notYours" | "notCasters";
   /** "Spells you cast from your graveyard". */
   fromGraveyard?: boolean;
   /** "Spells you cast but don't own" (Gonti, Canny Acquisitor). */
@@ -3633,7 +3685,7 @@ export interface CompiledCard {
   othersEnterUntapped?: { filter: TargetSpec; text: string }[];
   /** "Each other creature you control enters with an additional +1/+1 counter on it" (Renata): on other permanents entering. */
   /** `perControlled`: "for each Angel you already control" (Giada): `n` times the permanents matching it its controller controls, the entering one aside. */
-  othersEnterWithCounters?: { filter: TargetSpec; counter: CounterKind; n: number; perControlled?: TargetSpec; text: string }[];
+  othersEnterWithCounters?: { filter: TargetSpec; counter: CounterKind; n: number; perControlled?: TargetSpec; /** n times the source's toughness (Arwen, Weaver of Hope). */ perSourceToughness?: true; text: string }[];
   /** "This creature enters with an additional +1/+1 counter on it" (Master Chef's granted ability): on itself entering. */
   entersWithAdditional?: { counter: CounterKind; n: number }[];
   entersTappedUnless?: EntersCondition;

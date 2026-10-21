@@ -3,7 +3,7 @@ import { abilitiesOf, cardIdOf, defOf, isPermanentCard, isType } from "../cards"
 import { controllerOf } from "../layers";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
-import { gainLife, log, loseLife, millCount, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
+import { draw, gainLife, log, loseLife, millCount, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, printedMatches } from "./targeting";
@@ -527,7 +527,25 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         log(s, `${p.name} shuffles their ${e.hand && e.graveyard ? "hand and graveyard" : e.hand ? "hand" : "graveyard"} into their library.`);
       }
       return;
+    case "handToBottomDraw": {
+      // Teferi's Puzzle Box, Mindmoil: the whole hand goes on the bottom in the order its owner chooses (CR 401.4), then
+      // that many cards are drawn, which can be some of them if the library was short.
+      const pid = players(s, e.who, ctx)[0];
+      if (pid === undefined || player(s, pid).lost) return;
+      const sc = (s.resolving!.scratch ??= {});
+      if (sc.bottomed === undefined) {
+        const ids = [...player(s, pid).hand];
+        if (toBottom(s, pid, ids, src, false) === "paused") return "paused";
+        sc.arranged = undefined;
+        sc.bottomed = ids.length;
+      }
+      const n = sc.bottomed;
+      sc.bottomed = undefined;
+      if (n) draw(s, pid, n);
+      return;
+    }
     case "shuffle":
+      if (e.ifSearched && !s.resolving?.searchedHere) return;
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
         shuffleLibrary(s, p);
@@ -544,7 +562,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // "With mana value less than or equal to ..." (TargetSpec.bound): as it resolves.
       const filter0 = e.filter && bindBound(s, e.filter, amountCtx(s, ctx));
       const filter = filter0?.named === "~" ? { ...filter0, named: src } : filter0;
-      const who = e.who ? (e.who.ref === "eachPlayer" || e.who.ref === "eachOpponent" ? apnap(s, players(s, e.who, ctx)) : players(s, e.who, ctx).slice(0, 1)) : [ctx.controller];
+      const who = e.who ? (e.who.ref === "eachPlayer" || e.who.ref === "eachOpponent" || (e.who.ref === "target" && (e.who.n ?? 1) > 1) ? apnap(s, players(s, e.who, ctx)) : players(s, e.who, ctx).slice(0, 1)) : [ctx.controller];
       const queue = (sc.searchQueue ??= who.filter((pid) => !player(s, pid).lost));
       const searchedBy = (sc.searchedBy ??= []);
       // "Search target opponent's library" (Bribery): you search it (CR 701.23a), and it's theirs that's shuffled.
@@ -645,9 +663,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const whose = lib === p ? "their" : `${lib.name}'s`;
         const yardOnly = sc.searchZones === "graveyard";
         const where = yardOnly ? `${whose} graveyard` : e.orGraveyard ? `${whose} library and graveyard` : `${whose} library`;
-        log(s, `${p.name} searches ${where}${found.length ? `, finds ${found.length === 1 ? "a card" : `${found.length} cards`}${shown}${exiledFor(pid) !== undefined ? ` and exiles ${found.length === 1 ? "it" : "them"} for ${player(s, exiledFor(pid)!).name} to play` : ""}` : " and finds nothing"}${searchers.length > 1 || yardOnly ? "" : lib === p ? ", and shuffles" : `, and ${lib.name} shuffles`}.`);
+        log(s, `${p.name} searches ${where}${found.length ? `, finds ${found.length === 1 ? "a card" : `${found.length} cards`}${shown}${exiledFor(pid) !== undefined ? ` and exiles ${found.length === 1 ? "it" : "them"} for ${player(s, exiledFor(pid)!).name} to play` : ""}` : " and finds nothing"}${(searchers.length > 1 && e.dest.zone !== "libraryTop") || yardOnly || e.noShuffle ? "" : lib === p ? ", and shuffles" : `, and ${lib.name} shuffles`}.`);
         for (const id of found) moves.push({ pid, id });
-        if (searchers.length === 1 && !yardOnly) shuffleLibrary(s, lib);
+        // "Then shuffles and puts that card on top": the shuffle comes first, for each of them (Scheming Symmetry).
+        if ((searchers.length === 1 || e.dest.zone === "libraryTop") && !yardOnly && !e.noShuffle) shuffleLibrary(s, lib);
+        if (e.noShuffle && !yardOnly) r.searchedHere = true;
       }
       // What it found and put onto the battlefield is "it" afterwards (Vision Quest's "it gains haste").
       if (e.n === 1 && !e.others && e.dest.zone === "battlefield") r.created = [];
@@ -692,7 +712,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         }
       });
       // "Then shuffles": after the cards are put onto the battlefield, each player who searched (CR 701.23, 701.20).
-      if (searchers.length > 1)
+      if (searchers.length > 1 && e.dest.zone !== "libraryTop")
         for (const pid of searchers) {
           shuffleLibrary(s, player(s, pid));
           log(s, `${player(s, pid).name} shuffles their library.`);

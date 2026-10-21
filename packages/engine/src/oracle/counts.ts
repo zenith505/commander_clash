@@ -68,6 +68,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // "For each death vote", "the number of profit votes": the votes for that word in the ability's vote (CR 701.38).
   if ((m = /^(?:the number of )?(.+?) votes?$/i.exec(p)) && ctx?.vote?.options?.includes(m[1]!)) return { count: { kind: "votes", option: m[1]! } };
+  // "For each player who chose fortune" (Seize the Spotlight): how many chose that word.
+  if ((m = /^player who chose ([a-z]+)$/.exec(p)) && ctx?.chooseWords?.includes(m[1]!)) return { count: { kind: "choseWord", option: m[1]! } };
   // "Draw a card for each counter removed this way" (Nexus Mentality, after "remove all counters").
   if (each && /^counter removed this way$/i.test(p)) return { count: { kind: "countersRemovedThisWay" } };
   // Profane Transfusion: "where X is the difference between those players' life totals", after they exchanged them.
@@ -239,7 +241,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // Permanents: "creature you control", "other Elf you control", "land on the battlefield", "artifacts your opponents control".
   // "Creatures target player controls" (Will of the Mardu), "that player controls": that player's permanents.
-  if ((m = /^(other )?(.+?) (you control|on the battlefield|your opponents control|an opponent controls|target player controls|target opponent controls|that player controls|those players control|those opponents control)(?: ((?:with|of the chosen|of that|that aren't) .+))?$/i.exec(p))) {
+  if ((m = /^(other )?(.+?) (you control|on the battlefield|your opponents control|an opponent controls|target player controls|target opponent controls|that player controls|those players control|those opponents control)(?: ((?:with|of the chosen|of that|that aren't|that's attached to|that are attached to) .+))?$/i.exec(p))) {
     const words = m[2]!.split(/\s+/).map(singularWord).join(" ");
     const who = m[3]!.toLowerCase();
     const theirs = /^(target|that|those) /.test(who);

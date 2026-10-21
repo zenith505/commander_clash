@@ -182,6 +182,9 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     if (!base || base === "fail" || !("costMod" in base) || color !== m[3]) return "fail";
     return { costMod: { ...base.costMod, n: 0, colored: [color], payLife: Number(m[2]), text: line } };
   }
+  // Defense Grid: "Each spell costs {3} more to cast except during its controller's turn": whoever casts it, unless it's
+  // their turn (CR 601.2f).
+  if ((m = /^Each spell costs \{(\d+)\} more to cast except during its controller's turn$/.exec(text))) return { costMod: { who: "all", filter: { kind: "spell", text: "spells" }, n: Number(m[1]), turn: "notCasters", text: line } };
   if ((m = /^Spells your opponents cast that target ~ cost \{(\d+)\} more to cast$/.exec(text))) return { targetTax: Number(m[1]) };
   if ((m = /^Spells your opponents cast that target ~ cost an additional (\d+) life to cast$/.exec(text))) return { targetLifeTax: Number(m[1]) };
   if ((m = /^~ costs \{(\d+)\} less to cast for each (.+)$/.exec(text))) {
@@ -371,6 +374,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   let m: RegExpExecArray | null;
   if ((m = new RegExp(`^(?:there are )?${NUM} or more cards (?:are )?in your graveyard$`).exec(text))) return { kind: "graveyardAtLeast", n: num(m[1]!) };
   if ((m = new RegExp(`^there are ${NUM} or more card types among cards in your graveyard$`).exec(text))) return { kind: "graveyardTypes", n: num(m[1]!) };
+  // "If there are four or more permanent types among cards in your graveyard" (Matzalantli): artifact, battle, creature,
+  // enchantment, land and planeswalker (CR 110.4a).
+  if ((m = new RegExp(`^there are ${NUM} or more permanent types among cards in your graveyard$`).exec(text))) return { kind: "graveyardTypes", n: num(m[1]!), permanent: true };
   if ((m = new RegExp(`^there are ${NUM} or more permanent cards in your graveyard$`).exec(text))) return { kind: "graveyardPermanents", n: num(m[1]!) };
   // "If there are four or more land cards in your graveyard" (Titania, Voice of Gaea).
   // "If you have four or more creature cards in your graveyard" (Oversold Cemetery): the same.
@@ -750,6 +756,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
     if (t !== undefined && !CREATURE_TYPES.has(t)) return null;
     return [{ kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) }, ...(t ? [{ kind: "addTypes" as const, types: [], subtypes: [t] }] : [])];
   }
+  // Maha, Its Feathers Night: "have base toughness 1" (layer 7b, CR 613.4b).
+  if ((m = /^(?:has|have) base toughness (\d+)$/.exec(rest))) return [{ kind: "setToughness", toughness: Number(m[1]) }];
   const IS = "is an? ([A-Z][a-z]+) in addition to its other types";
   if ((m = new RegExp(`^${IS}$`).exec(rest))) return typed(m[1]!, []);
   if ((m = new RegExp(`^${IS},? and ((?:has|have) .+)$`).exec(rest))) return typed(m[1]!, [m[2]!]);
@@ -834,6 +842,12 @@ export function parseStaticMods(rest: string): Modification[] | null {
     return filter?.kind === "object" && !filter.controller ? [{ kind: "cantAttackUnless", defenderControls: { ...filter, text: m[1]! } }] : null;
   }
   if (/^can't block$/.test(rest)) return [{ kind: "cantBlock" }];
+  if (/^can't be attacked$/.test(rest)) return [{ kind: "cantBeAttacked" }];
+  // The Aetherspark: "can't be attacked and has "Whenever equipped creature ...""
+  if ((m = /^can't be attacked and has (.+)$/.exec(rest))) {
+    const grants = parseGrants(m[1]!);
+    return grants ? [{ kind: "cantBeAttacked" }, ...grants] : null;
+  }
   // "Cowards can't block Warriors" (Boldwyr Intimidator): a creature type (CR 509.1b, 205.3m).
   if ((m = /^can't block ([A-Z][a-z]+)$/.exec(rest))) {
     const one = singular(m[1]!);
@@ -922,6 +936,12 @@ export function parseStatic(line: string): StaticAbility | null {
 function parseTransform(line: string): StaticAbility | null {
   const head = /^(Enchanted (?:creature|permanent)|Equipped creature) (.+)$/.exec(line.replace(/\.$/, ""));
   if (!head) return null;
+  // "... with base power and toughness 1/1 named Legitimate Businessperson" (Witness Protection): its name too (layer 3).
+  const named = /^(.+ is an? [^"]+?) named ([A-Z][A-Za-z' ,-]+)$/.exec(head[2]!);
+  if (named) {
+    const rest = parseTransform(`${head[1]} ${named[1]}`);
+    return rest && { ...rest, mods: [{ kind: "setName", name: named[2]! }, ...rest.mods], text: line };
+  }
   const quotes: string[] = [];
   const rest = head[2]!
     .replace(/"[^"]*"/g, (q) => `\u0001${quotes.push(q) - 1}\u0001`)

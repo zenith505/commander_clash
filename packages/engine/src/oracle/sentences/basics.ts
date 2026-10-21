@@ -120,6 +120,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const may: Effect = { type: "eachMay", who: { ref: "subjectController" }, text: "draw a card", effects: [{ type: "draw", who: { ref: "choseThisWay" }, n: 1 }] };
     return m[1] ? [{ type: "if", cond: { kind: "state", cond: { kind: "subjectPT", stat: "power", greatest: true } }, effects: [may] }] : [may];
   }
+  // Scheming Symmetry: "Choose two target players. Each of them searches their library for a card, then shuffles and
+  // puts that card on top." The targets, then each player's search in APNAP order (CR 101.4); each shuffles before
+  // putting the card on top, one action (rulings on Vampiric Tutor).
+  if ((m = /^(Each of them|Target player) searches their library for (.+?), then shuffles and puts that card on top$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    const fx = parseSearch(`Search your library for ${m[2]!}, then shuffle and put that card on top`);
+    if (!who || fx?.length !== 1 || fx[0]!.type !== "search") return null;
+    return [{ ...fx[0]!, who }];
+  }
   // "Each player searches their library for a basic land card, puts it onto the battlefield, then shuffles" (Field of
   // Ruin, Avatar of Growth): each player chooses in APNAP order, then the cards go there at the same time (CR 101.4).
   if ((m = /^[Ee]ach player searches their library for (.+?), puts (it|them|that card|those cards) (onto the battlefield(?: tapped)?|into their hand), then shuffles$/.exec(s))) {
@@ -186,6 +195,27 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const options = parsePunisherOptions(m[3]!, ctx);
     if (!who || who.ref === "you" || !options) return null;
     return [{ type: "punisher", who, options, effects: [{ type: "damage", amount: amt(m[1]!), to: { ref: "punished" } }] }];
+  }
+  // "Put the cards in your hand on the bottom of your library in any order, then draw that many cards" (Mindmoil), "that
+  // player puts the cards in their hand ... then draws that many cards" (Teferi's Puzzle Box).
+  if ((m = /^(?:([Tt]hat player) puts|[Pp]ut) the cards in (?:their|your) hand on the bottom of (?:their|your) library in any order, then draws? that many cards$/.exec(s))) {
+    const who = m[1] ? parsePlayer("that player", ctx) : ({ ref: "you" } as const);
+    return who ? [{ type: "handToBottomDraw", who }] : null;
+  }
+  // "Your life total becomes 10", "target player's life total becomes 20" (CR 119.5).
+  if ((m = /^(Your|Target player's|Target opponent's|That player's|Each player's) life total becomes (\d+)$/i.exec(s))) {
+    const who = m[1]!.toLowerCase() === "your" ? ({ ref: "you" } as const) : parsePlayer(m[1]!.replace(/'s$/, "").toLowerCase(), ctx);
+    return who ? [{ type: "setLife", who, n: Number(m[2]) }] : null;
+  }
+  // Kazuul, Tyrant of the Cliffs: "create a 3/3 red Ogre creature token unless that creature's controller pays {3}": the
+  // attacking creature's controller chooses as it resolves (rulings), as it last existed if it has left (CR 608.2h).
+  if ((m = /^[Cc]reate (.+?) unless that creature's controller (pays? .+)$/.exec(s)) && ctx.subjectIt) {
+    const options = parsePunisherOptions(m[2]!, ctx);
+    const before = ctx.targets.length;
+    const fx = options && parseSentence(`Create ${m[1]!}`, ctx);
+    const tok = fx?.length === 1 ? fx[0] : undefined;
+    if (!options || options.some((o) => !("pay" in o)) || tok?.type !== "createToken" || ctx.targets.length !== before) return null;
+    return [{ type: "punisher", who: { ref: "subjectController" }, options, effects: [tok] }];
   }
   // "For each opponent, you create a 2/2 black Zombie creature token unless that player sacrifices a creature of their
   // choice" (Acererak): one token for each opponent who doesn't, all made at once after the sacrifices (rulings).
@@ -608,6 +638,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const half = roundOf(m[3], ctx);
     if (!who || !half || (who.ref === "you") !== (m[2]!.toLowerCase() === "your")) return null;
     return [{ type: "loseLife", who, n: { count: { kind: "life", who: { ref: "eachOne" } }, half } }];
+  }
+  // "Each opponent loses life equal to the life they lost this turn" (Wound Reflection): each their own, counted as the
+  // ability resolves, so a second one counts the first one's loss too (rulings).
+  if ((m = /^(Each opponent|Each player|Target opponent|Target player) loses life equal to the life (?:they|that player) lost this turn$/i.exec(s))) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    return who ? [{ type: "loseLife", who, n: { count: { kind: "lifeLostThisTurn", who: who.ref === "eachOpponent" || who.ref === "eachPlayer" ? { ref: "eachOne" } : who } } }] : null;
   }
   // "Target player gains twice X life" (Heliod's Intervention): X times 2.
   if ((m = /^(.+?) (gains?|loses?) twice X life$/i.exec(s))) {

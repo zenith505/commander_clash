@@ -26,6 +26,8 @@ export interface AmountCtx {
   x?: number;
   /** A reflexive trigger after "tap any number of untapped creatures you control": how many were tapped. */
   tapped?: number;
+  /** A reflexive trigger after a roll: its result ("with total mana value X or less, where X is the result"). */
+  rolled?: number;
   /** The source as it last existed, if it has left the battlefield (CR 608.2h). */
   lki?: LastKnown;
   /** Kicker costs paid for the spell (or the spell its permanent was), CR 702.33d. */
@@ -180,6 +182,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "votes":
       return (s.resolving?.votes ?? []).filter((v) => v.choice === c.option).length;
+    case "choseWord":
+      return Object.values(s.resolving?.chose ?? {}).filter((w) => w === c.option).length;
     case "discoveredBelow": {
       const d = s.resolving?.discovered;
       return d && d.mv < c.n ? c.n - d.mv : 0;
@@ -249,6 +253,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "lifeGainedThisTurn":
       return s.turnLog?.lifeGained?.[ctx.controller] ?? 0;
+    case "lifeLostThisTurn":
+      return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (s.turnLog?.lifeLost?.[pid] ?? 0), 0);
     case "opponentsLifeLost":
       return Object.entries(s.turnLog?.lifeLost ?? {}).reduce((n, [p, v]) => (Number(p) !== ctx.controller ? n + v : n), 0);
     case "kicked":
@@ -543,6 +549,8 @@ function describeCount(c: Count): string {
       return "the difference between their life totals";
     case "votes":
       return `#${c.option} votes`;
+    case "choseWord":
+      return `#players who chose ${c.option}`;
     case "discoveredBelow":
       return `${c.n} minus the discovered card's mana value`;
     case "destroyedThisWay":
@@ -577,6 +585,8 @@ function describeCount(c: Count): string {
       return "#creatures in your party";
     case "opponentsLifeLost":
       return "life your opponents lost this turn";
+    case "lifeLostThisTurn":
+      return "life lost this turn";
     case "devotion":
       return "devotion";
     case "attachedToSelf":

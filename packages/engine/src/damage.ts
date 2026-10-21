@@ -204,7 +204,8 @@ export function dealDamage(
     } else {
       // "Damage that would reduce your life total to less than 1 reduces it to 1 instead" (Ali from Cairo): the damage is
       // all dealt, only the life lost changes; not if they're below 1 already (rulings).
-      const floor = Math.max(0, ...s.battlefield.map((id) => (controllerOf(s, obj(s, id)) === p.id ? (abilitiesOf(s, obj(s, id)).lifeFloor ?? 0) : 0)));
+      // Angel's Grace: the same until end of turn.
+      const floor = Math.max(p.lifeFloorTurn === s.turn ? 1 : 0, ...s.battlefield.map((id) => (controllerOf(s, obj(s, id)) === p.id ? (abilitiesOf(s, obj(s, id)).lifeFloor ?? 0) : 0)));
       const lost = floor && p.life >= floor && p.life - n < floor ? p.life - floor : n;
       loseLife(s, p.id, lost);
       log(s, `${src.name} deals ${n} damage to ${p.name}${lost < n ? ` (their life total can't go below ${floor})` : ""}.`);
@@ -1105,6 +1106,15 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
   creatureBatch = outerCreatures;
   for (const ev of toCreatures) fireEvent(s, { ...ev, excess: excessThisTurn(s, ev.id, s.objects[ev.id]?.zoneChanges ?? 0) });
   for (const [id, amount] of dealtTo) fireEvent(s, { type: "wasDealtDamage", id, amount });
+  // "Whenever a source deals damage to ~": each source's damage to it, apart (Phyrexian Obliterator).
+  const bySource = new Map<ObjectId, Map<DamageSource, number>>();
+  for (const e of out) {
+    if (!("object" in e.to) || e.dealt <= 0) continue;
+    const m = bySource.get(e.to.object) ?? new Map<DamageSource, number>();
+    m.set(e.src, (m.get(e.src) ?? 0) + e.dealt);
+    bySource.set(e.to.object, m);
+  }
+  for (const [id, m] of bySource) for (const [src, amount] of m) fireEvent(s, { type: "dealtDamageBySource", id, amount, by: src.controller });
   const toPlayers = playerBatch;
   playerBatch = outer;
   for (const [pid, amount] of toPlayers) fireEvent(s, { type: "playerDealtDamage", player: pid, amount });

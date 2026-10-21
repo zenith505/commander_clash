@@ -1,6 +1,6 @@
 // PR #21: Fist of Suns' {W}{U}{B}{R}{G} cast button, and a bot's Rishadan Cutpurse asking you to pay or sacrifice.
 import { expect, test } from "@playwright/test";
-import { LANDS, idsOf, one, open, pageErrors, scene, state } from "./scene";
+import { LANDS, idsOf, one, open, pageErrors, playWithBots, scene, state } from "./scene";
 import { card, controls, menu, resolveUntil } from "./ui";
 
 test("Fist of Suns: cast a spell for {W}{U}{B}{R}{G} from its menu", async ({ page }) => {
@@ -20,9 +20,8 @@ test("Fist of Suns: cast a spell for {W}{U}{B}{R}{G} from its menu", async ({ pa
 test("Rishadan Cutpurse cast by a bot: don't pay, then click the permanent to sacrifice", async ({ page }) => {
   const s = scene({ board: ["Island", "Grizzly Bears"] }, [{ hand: ["Rishadan Cutpurse"], board: ["Island", "Island", "Island"] }]);
   const bears = one(s, "Grizzly Bears");
-  await open(page, s);
-  await controls(page).getByRole("button", { name: "Pass" }).click();
-  await resolveUntil(page, (st) => st.pending?.kind === "payUnless" && st.pending.player === 0, 200);
+  // Ana's bot casts it on her turn, in the engine (for speed).
+  await open(page, playWithBots(s, (st) => st.pending?.kind === "payUnless" && st.pending.player === 0));
   await expect(controls(page)).toContainText("Rishadan Cutpurse:");
   await expect(controls(page).getByRole("button", { name: "Pay", exact: true })).toBeEnabled();
   await controls(page).getByRole("button", { name: "Don't pay" }).click();
@@ -36,9 +35,8 @@ test("Rishadan Cutpurse cast by a bot: don't pay, then click the permanent to sa
 
 test("Rishadan Cutpurse cast by a bot: pay {1} and keep everything", async ({ page }) => {
   const s = scene({ board: ["Island", "Grizzly Bears"] }, [{ hand: ["Rishadan Cutpurse"], board: ["Island", "Island", "Island"] }]);
-  await open(page, s);
-  await controls(page).getByRole("button", { name: "Pass" }).click();
-  await resolveUntil(page, (st) => st.pending?.kind === "payUnless" && st.pending.player === 0, 200);
+  // Ana's bot casts it on her turn, in the engine (for speed).
+  await open(page, playWithBots(s, (st) => st.pending?.kind === "payUnless" && st.pending.player === 0));
   await controls(page).getByRole("button", { name: "Pay", exact: true }).click();
   const after = await resolveUntil(page, (st) => !st.pending && st.stack.length === 0);
   const island = idsOf(s, "Island", "battlefield", 0)[0]!;

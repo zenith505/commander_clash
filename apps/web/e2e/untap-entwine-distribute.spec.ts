@@ -1,7 +1,7 @@
 // PR #28: keeping a permanent tapped in your untap step, the entwine button in the mode menu, distributing counters
 // (from a spell and from an enters trigger), a job select Equipment's Hero, and the bargain sacrifice as you cast.
 import { expect, test, type Page } from "@playwright/test";
-import { LANDS, idsOf, one, open, pageErrors, scene, state } from "./scene";
+import { LANDS, idsOf, one, open, pageErrors, playUntil, scene, state } from "./scene";
 import { card, controls, menu, resolveUntil } from "./ui";
 
 const plusOnes = (s: Awaited<ReturnType<typeof state>>, id: string) => {
@@ -20,16 +20,15 @@ async function weaponryToUntap(page: Page) {
   let now = await resolveUntil(page, (st) => st.stack.length === 0 && st.effects.length === 1);
   expect(now.effects[0]!.whileTapped?.id).toBe(weaponry);
   await expect(page.locator(`[data-obj="${bears}"]`)).toContainText("3/3");
-  // Round the table to your next untap step, where you choose what stays tapped.
-  now = await resolveUntil(page, (st) => st.pending?.kind === "pickPermanents" && st.pending.action === "keepTapped", 200);
+  // Round the table (in the engine, for speed) to your next untap step, where you choose what stays tapped.
+  now = playUntil(now, (st) => st.pending?.kind === "pickPermanents" && st.pending.action === "keepTapped" && st.pending.player === 0);
+  await open(page, now);
   await expect(controls(page)).toContainText("Untap step: click the permanents you want to keep tapped");
   await expect(controls(page).getByRole("button", { name: "Untap all" })).toBeEnabled();
   return { s, weaponry, bears, now };
 }
 
-// Split in two (one trip round the table each) to stay well inside the per-test timeout.
 test("Tawnos's Weaponry: keep it tapped in the untap step and the bonus lasts", async ({ page }) => {
-  test.setTimeout(120_000); // a trip round the table
   const { s, weaponry, bears } = await weaponryToUntap(page);
   await page.locator(`[data-obj="${weaponry}"]`).click();
   await controls(page).getByRole("button", { name: "Keep 1 tapped" }).click();
@@ -42,7 +41,6 @@ test("Tawnos's Weaponry: keep it tapped in the untap step and the bonus lasts", 
 });
 
 test("Tawnos's Weaponry: untap it in the untap step and the bonus ends", async ({ page }) => {
-  test.setTimeout(120_000); // a trip round the table
   const { weaponry, bears } = await weaponryToUntap(page);
   await controls(page).getByRole("button", { name: "Untap all" }).click();
   const now = await resolveUntil(page, (st) => st.step === "main1" && st.activePlayer === 0 && !st.objects[weaponry]!.tapped);

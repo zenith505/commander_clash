@@ -1,7 +1,7 @@
 // Round 91's prompts: a Pact's pay-or-lose-the-game at your next upkeep, Culling Ritual's choice of mana, and abilities
 // that work from your hand (Simian Spirit Guide's mana, Talon Gates of Madara putting itself onto the battlefield).
 import { expect, test } from "@playwright/test";
-import { LANDS, one, open, pageErrors, scene, state } from "./scene";
+import { LANDS, one, open, pageErrors, playUntil, scene, state } from "./scene";
 import { card, controls, menu, resolveUntil } from "./ui";
 
 test("Pact of the Titan: a Giant now, then Pay {4}{R} at your next upkeep or lose the game", async ({ page }) => {
@@ -9,8 +9,9 @@ test("Pact of the Titan: a Giant now, then Pay {4}{R} at your next upkeep or los
   await open(page, s);
   await card(page, "Pact of the Titan", s).click();
   const giants = (st: typeof s) => st.battlefield.filter((id) => st.objects[id]!.controller === 0 && st.cards[st.objects[id]!.cardId]!.name === "Giant Token").length;
-  await resolveUntil(page, (st) => st.stack.length === 0 && giants(st) === 1);
-  await resolveUntil(page, (st) => st.pending?.kind === "chooseMay" && st.pending.player === 0, 400);
+  const now = await resolveUntil(page, (st) => st.stack.length === 0 && giants(st) === 1);
+  // Round the table to your next upkeep, in the engine (for speed).
+  await open(page, playUntil(now, (st) => st.pending?.kind === "chooseMay" && st.pending.player === 0));
   const bar = controls(page);
   await expect(bar).toContainText("Pact of the Titan:");
   await expect(bar).toContainText("or lose the game?");

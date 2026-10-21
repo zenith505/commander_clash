@@ -362,6 +362,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (s.resolving!.item.kind === "spell" ? s.objects[s.resolving!.item.objectId ?? ""]?.castAlt : ctx.event?.castAlt) === e.cond.alt
             : e.cond.kind === "sacrificedSuspected"
             ? !!ctx.sacrificed?.[0]?.suspected
+            : e.cond.kind === "sacrificedLegendary"
+            ? !!ctx.sacrificed?.[0]?.legendary
             : e.cond.kind === "discardedIs"
             ? ((f) => (s.resolving!.item.costDiscarded ?? []).some((k) => !!s.cards[k] && printedMatches(f, s.cards[k]!)))(e.cond.filter)
             : e.cond.kind === "suspected"

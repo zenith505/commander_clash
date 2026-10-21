@@ -126,6 +126,16 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   }
   const manyNow = ctx.manyPlayers !== undefined && ctx.lastPlayerTarget === ctx.manyPlayers;
   if (/^(?:each of )?those (?:players|opponents)$/.test(x) && manyNow) return { ref: "target", index: ctx.manyPlayers!, n: 2 };
+  // "Two target players each draw a card" (Huddle Up), "Choose two target players. Each of them ..." (Scheming
+  // Symmetry): two different players (CR 115.3), then "each of them", "they" are both.
+  if (/^two target players(?: each)?$/.test(x) && !ctx.targets.some((t) => t.many) && ctx.manyPlayers === undefined) {
+    const first = addTarget(ctx, { kind: "player", text: "target player" });
+    addTarget(ctx, { kind: "player", text: "target player", distinctFrom: [first] });
+    ctx.lastPlayerTarget = first;
+    ctx.manyPlayers = first;
+    return { ref: "target", index: first, n: 2 };
+  }
+  if (/^(?:each of them|they each|they)$/.test(x) && manyNow && ctx.targets[ctx.manyPlayers!]?.many === undefined) return { ref: "target", index: ctx.manyPlayers!, n: 2 };
   // "Exile target creature and all other creatures its controller controls .... That player investigates ...": that
   // creature's controller (as it last existed, CR 608.2h).
   if (x === "that player" && ctx.controllerNamed !== undefined && ctx.controllerNamed === ctx.lastObjectTarget && ctx.lastPlayerTarget === undefined) return { ref: "targetController", index: ctx.controllerNamed };
@@ -656,7 +666,8 @@ export function parseTargetPhrase(
     p = p.slice(0, bare.index);
   }
   // "Target Aura attached to a creature" (Crown of the Ages), "Aura or Equipment attached to a creature you control" (Halvar).
-  const attached = / attached to an? (creature|permanent)( you control)?$/.exec(p);
+  // "Each Aura you control that's attached to a creature" (Sage's Reverie).
+  const attached = / (?:that's |that are )?attached to an? (creature|permanent)( you control)?$/.exec(p);
   if (attached) {
     extra.attachedTo = { kind: "object", ...(attached[1] === "creature" ? { types: ["Creature"] } : {}), ...(attached[2] ? { controller: "you" as const } : {}), text: attached[0].trim().replace(/^attached to /, "") };
     p = p.slice(0, attached.index);

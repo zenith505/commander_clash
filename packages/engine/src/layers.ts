@@ -500,6 +500,10 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const n = cond.stat === "power" ? c.power : c.toughness;
       return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max);
     }
+    case "subjectAttackingYou": {
+      const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
+      return !!sub && sub.zone === "battlefield" && (sub.zoneChanges ?? 0) === subjectZc && sub.attacking === you;
+    }
     case "subjectPT": {
       const sub = subjectId !== undefined ? s.objects[subjectId] : undefined;
       const here = !!sub && chars.has(sub.id) && (sub.zoneChanges ?? 0) === subjectZc;

@@ -141,6 +141,9 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
     const rest = more ? parseSentence(`${capital(more)} until end of turn`, ctx) : [];
     return rest ? [{ type: "playerGains", keywords: [], lifeCantChangeThisTurn: true }, ...rest] : null;
   }
+  // Angel's Grace, Angel of Grace: "Until end of turn, damage that would reduce your life total to less than 1 reduces it to
+  // 1 instead": a replacement effect on damage dealt to you (CR 614.1a, rulings on Ali from Cairo).
+  if (/^(?:Until end of turn, damage that would reduce your life total to less than 1 reduces it to 1 instead|Damage that would reduce your life total to less than 1 reduces it to 1 instead until end of turn)$/.test(s)) return [{ type: "playerGains", keywords: [], lifeFloorThisTurn: true }];
   const whole = parseEveryPlayerZonesSentence(s, ctx);
   if (whole) return whole;
   const list = parseTargetList(s, ctx);

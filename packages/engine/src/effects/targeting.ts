@@ -59,7 +59,9 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.notSubtypes?.some(hasSubtype)) return false;
   if (spec.attachedTo) {
     const host = o.attachedTo ? s.objects[o.attachedTo] : undefined;
-    if (!host || !objectMatches(s, spec.attachedTo, host, controller, false, undefined, undefined, view)) return false;
+    // Counted inside the layers (Sage's Reverie): the host as the layers have it so far, not computed again.
+    const hostChars = host && view ? view(host) : undefined;
+    if (!host || (view && !hostChars) || !objectMatches(s, spec.attachedTo, host, controller, false, undefined, hostChars, view)) return false;
   }
   // A choice that was never made: "of the chosen type" matches nothing, "not of the chosen type" everything.
   if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name" || spec.chosen === "typesChosen") return false;

@@ -482,6 +482,21 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       gainLife(s, up, diff);
       return;
     }
+    case "setLife": {
+      // CR 119.5: the player gains or loses the life it takes, which can't happen if they can't gain or lose life.
+      for (const pid of players(s, e.who, ctx)) {
+        const p = player(s, pid);
+        const diff = e.n - p.life;
+        if (diff > 0 && canGainLife(s, pid)) {
+          gainLife(s, pid, diff);
+          log(s, `${p.name}'s life total becomes ${p.life} (${src}).`);
+        } else if (diff < 0 && canLoseLife(s, pid)) {
+          loseLife(s, pid, -diff);
+          log(s, `${p.name}'s life total becomes ${p.life} (${src}).`);
+        }
+      }
+      return;
+    }
     case "loseLife": {
       let total = 0;
       for (const pid of players(s, e.who, ctx)) {

@@ -633,6 +633,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "gainLife":
     case "exchangeLife":
     case "loseLife":
+    case "setLife":
     case "addCombatMana":
     case "addMana":
     case "cantBlockRule":
@@ -825,6 +826,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "scrollRack":
     case "drawnPayOrTop":
     case "shuffle":
+    case "handToBottomDraw":
     case "shuffleIntoLibrary":
     case "shuffleSpell":
     case "taintedPact":

@@ -20,6 +20,8 @@ export function parseCopiesSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Choose any number of target creatures. Each of those creatures gains persist until end of turn." too.
   if ((m = /^[Cc]hoose ((?:any number of |up to one |two )?target .+)$/.exec(s))) {
     // "Choose two target creatures controlled by different players. Return those creatures ..." (Run Away Together).
+    // "Choose two target players. Each of them ..." (Scheming Symmetry).
+    if (m[1] === "two target players") return parsePlayer(m[1], ctx) ? [] : null;
     if (/^two /.test(m[1]!)) {
       const both = /^two target .+ controlled by different players$/.test(m[1]!) ? parseObject(m[1]!, ctx) : null;
       return both?.ref === "target" && both.n === 2 ? [] : null;

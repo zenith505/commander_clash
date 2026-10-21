@@ -403,6 +403,9 @@ export function compile(d: CardDef): CompiledCard {
       // "As ~ enters, choose a creature type. ~ enters with a fellowship counter on it for each ..." (Banner of Kinship):
       // the choice, then the counters, two abilities in one paragraph.
       .replace(/^(As ~ enters, choose a creature type\.) (~ enters with .+)$/m, "$1\n$2")
+      // "~ gets +1/+1 for each land you control and each land card in your graveyard" (Multani, Yavimaya's Avatar): the
+      // sum, which is two such effects with the same timestamp (CR 613.4c, 613.7).
+      .replace(/^(.+? gets? [+-]\d+\/[+-]\d+ for each )([^.]+?) and each ([^.]+?)\.$/m, "$1$2.\n$1$3.")
       .split("\n")
       .map((l) => {
         const same = /^Choose (one|two|three|four|five)\. You may choose the same mode more than once\.$/.exec(l.trim());
@@ -791,6 +794,15 @@ export function compile(d: CardDef): CompiledCard {
     // "Each other creature you control enters with an additional +1/+1 counter on it" (Renata, Called to the Hunt): a
     // replacement effect on other permanents entering while this one is on the battlefield (CR 614.1c). Whether one
     // without "other" that could describe itself applies to itself isn't worked out, so that stays out.
+    // "Each other creature you control enters with a number of additional +1/+1 counters on it equal to ~'s toughness"
+    // (Arwen, Weaver of Hope): its toughness as the creature enters (rulings).
+    const byToughness = new RegExp(`^Each other (creature you control) enters with a number of additional ${COUNTER} counters on it equal to ~'s toughness\\.$`).exec(line);
+    if (byToughness) {
+      const g = parseGroup(`each ${byToughness[1]}`);
+      if (!g || g.filter.kind !== "object" || g.filter.controller !== "you") out.unsupported.push(raw);
+      else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(byToughness[2]!), n: 1, perSourceToughness: true, text: line });
+      continue;
+    }
     const othersExtra = new RegExp(`^Each (other )?(.+? you control(?: [^,]+?)?) enters with (an|a|one|two|three) additional ${COUNTER} counters? on it( for each [A-Z][a-z]+ you already control)?\\.$`).exec(line);
     if (othersExtra) {
       // "Each creature you control that's a Wolf or a Werewolf" (Arlinn, Voice of the Pack) is "each Wolf or Werewolf creature".
@@ -2484,7 +2496,7 @@ function checkCastingLinks(out: CompiledCard) {
       visit(o.otherwise);
       return;
     }
-    if ((o.ref === "sacrificed" || o.kind === "sacrificedSuspected") && !canSac) bad = true;
+    if ((o.ref === "sacrificed" || o.kind === "sacrificedSuspected" || o.kind === "sacrificedLegendary") && !canSac) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
     if (typeof o.chosen === "string") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" ? needs.add("number") : needs.add("creatureType"));
     if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen)) needs.add("color");

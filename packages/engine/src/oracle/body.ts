@@ -1354,6 +1354,15 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si++;
       continue;
     }
+    // Teferi's Puzzle Box, Mindmoil (split at ", then" by now): see handToBottomDraw.
+    const handDown = /^(?:([Tt]hat player) puts|[Pp]ut) the cards in (?:their|your) hand on the bottom of (?:their|your) library in any order$/.exec(s);
+    if (handDown && /^(?:[Tt]hat player )?[Dd]raws? that many cards$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      const fx = parseOne(`${s}, then ${handDown[1] ? "draws" : "draw"} that many cards`, ctx);
+      if (!fx) return null;
+      effects.push(...fx);
+      si++;
+      continue;
+    }
     // By now split at ", then".
     if (/^[Ee]xile all cards from your hand$/.test(s) && /^Draw that many cards$/.test(sentences[si + 1] ?? "") && /^Until the end of your next turn, you may play cards exiled this way$/.test(sentences[si + 2] ?? "")) {
       effects.push({ type: "exileHand", until: "nextTurn" }, { type: "draw", who: { ref: "you" }, n: { count: { kind: "exiledFromHandThisWay" } } });
@@ -1488,6 +1497,22 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       noteLast(ctx, [fx]);
       if (shuffleAt === si + 1) si++;
       else sentences.splice(shuffleAt, 1);
+      continue;
+    }
+    // Claim Jumper: "you may search your library for a Plains card and put it onto the battlefield tapped. Then if an
+    // opponent controls more lands than you, repeat this process once. If you search your library this way, shuffle."
+    // The process (the "you may" too) happens again only if the condition holds then (rulings); one shuffle at the end,
+    // only if a library was searched (CR 701.20, 701.23).
+    const again = /^(?:([Yy]ou may) )?[Ss]earch your library for (a|an) (.+?) and put it onto the battlefield( tapped)?$/.exec(s);
+    const againIf = again && /^Then if (.+), repeat this process once$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (again && againIf && isShuffle(si + 2)) {
+      const filter = parseSearchFilter(again[3]!, (t) => parseBoundCount(t, ctx));
+      const cond = parseStaticCondition(againIf[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      if (filter === null || !cond) return null;
+      const search: Effect = { type: "search", ...(filter ? { filter } : {}), n: 1, upTo: false, reveal: false, dest: { zone: "battlefield", ...(again[4] ? { tapped: true as const } : {}) }, noShuffle: true };
+      const once: Effect = again[1] ? { type: "may", effects: [search], text: s.replace(/^[Yy]ou may /, "") } : search;
+      effects.push(once, { type: "if", cond: { kind: "state", cond }, effects: [once] }, { type: "shuffle", who: { ref: "you" }, ifSearched: true });
+      si += 2;
       continue;
     }
     // "You may choose a creature card in your graveyard. If you do, return it to the battlefield with an additional +1/+1
@@ -3329,6 +3354,7 @@ const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true
   // The creature a sacrifice cost sacrificed (compile checks there is one). Costs are paid after targets are chosen
   // (CR 601.2c, 601.2h), so no target can depend on it.
   { re: "the sacrificed creature was suspected", cond: { kind: "sacrificedSuspected" }, noTargets: true },
+  { re: "the sacrificed creature was legendary", cond: { kind: "sacrificedLegendary" }, noTargets: true },
   { re: "~'s surge cost was paid", cond: { kind: "altPaid", alt: "surge" } },
   // The Masteries: "If the {1}{B} cost was paid" (compile checks it's the card's "rather than pay" cost).
   { re: "the (?:\\{[^}]+\\})+ cost was paid", cond: { kind: "altPaid", alt: "alternative" }, spellOnly: true },

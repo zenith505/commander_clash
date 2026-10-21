@@ -603,6 +603,8 @@ export interface Player {
   lifeCantChange?: true;
   /** "Until end of turn, your life total can't change" (Flare of Fortitude): the turn it's for (CR 119.7-8). */
   lifeCantChangeTurn?: number;
+  /** "Until end of turn, damage that would reduce your life total to less than 1 reduces it to 1 instead" (Angel's Grace): the turn it's for. */
+  lifeFloorTurn?: number;
   /** The turn this player last began to activate an exhaust ability (CR 702.177b, Elvish Refueler). */
   exhaustTurn?: number;
   /** Times each commander (by object id) has been cast from the command zone. CR 903.8 */
@@ -872,6 +874,8 @@ export interface LastKnown {
   controller?: PlayerId;
   /** It was suspected as it last existed (CR 701.60): "if the sacrificed creature was suspected". */
   suspected?: true;
+  /** It was legendary as it last existed: "if the sacrificed creature was legendary" (Nasty End). */
+  legendary?: true;
   /** The player chosen for it as it entered ("the chosen player"), as it last existed. */
   chosenPlayer?: PlayerId;
   /**
@@ -1618,6 +1622,8 @@ export interface Resolving {
   votes?: { voter: PlayerId; choice: string }[];
   /** "Each opponent chooses fame or fortune" (Seize the Spotlight): the word each of them chose. Not a vote (CR 701.38). */
   chose?: Record<string, string>;
+  /** A library was searched by a search that leaves the shuffle for later (Claim Jumper, `search.noShuffle`). */
+  searchedHere?: true;
   /** The mana it added, for a mana ability: what the triggered mana abilities of tapping its source see (CR 106.12a). */
   made?: ManaType[];
   next: number;
@@ -1654,6 +1660,8 @@ export interface Resolving {
     chosen?: Record<string, ObjectId[]>; // cards each player chose to discard
     venture?: string; // the dungeon or room chosen while venturing (CR 701.49a-b)
     arranged?: { top: ObjectId[]; away: ObjectId[] };
+    /** Teferi's Puzzle Box: how many cards the hand put on the bottom (then drawn). */
+    bottomed?: number;
     bottomOrders?: Record<string, ObjectId[]>; // putAllOnBottom: each owner's order, asked before anything moves
     ordered?: boolean; // "reorder your graveyard as you choose" asked already (graveyard.ts)
     forced?: ObjectId[]; // exileNamed's "all cards with that name" in the public graveyard, found without a choice (CR 701.23b)

@@ -1,7 +1,7 @@
 // Sentences that move cards between zones (graveyard, library, exile until it leaves), attach, "can't block this turn", and picking your own permanents.
 
 import type { Effect, Modification, ObjRef, PlayerRef, TargetSpec } from "../../abilities";
-import { NUM, COUNTER, BASIC_TYPES, amt, counterKind, num, singularWord } from "../words";
+import { NUM, NUMX, COUNTER, BASIC_TYPES, amt, counterKind, num, singularWord } from "../words";
 import { parseSearchFilter } from "../search";
 import { parseSentence } from "../sentence";
 import { parseBoundCount, parseCount, roundOf } from "../counts";
@@ -508,6 +508,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // that creature"). If ~ has left the battlefield, or can't legally be attached, it
   // stays where it is (CR 701.3b).
   if (/^Attach ~ to (?:it|that creature)$/i.test(s) && ctx.lastCreated && !ctx.spell) return [{ type: "attach", what: { ref: "created" } }];
+  // "Whenever a legendary creature you control enters, you may attach ~ to it" (Hero's Blade, Cloak and Dagger): the
+  // creature that entered, if it's still on the battlefield and ~ could be attached to it (CR 701.3b).
+  if (/^Attach ~ to (?:it|that creature)$/i.test(s) && ctx.subjectIt && !ctx.lastCreated && !ctx.spell) return [{ type: "attach", what: { ref: "subject" } }];
   // Duplicity, Gustha's Scepter: cards exiled face down with ~, and what happens to them later (CR 406.3, 607.2a).
   if (!ctx.spell) {
     if ((m = new RegExp(`^Exile the top ${NUM} cards of your library face down$`, "i").exec(s))) return [{ type: "exileFaceDown", from: "top", n: num(m[1]!) }];
@@ -710,7 +713,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = pickFilter(m[1]!);
     return filter && filter.kind === "object" ? [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true, text: `other ${filter.text}` }, n: 1, action: "sacrifice" }] : null;
   }
-  if ((m = new RegExp(`^(?:(.+?) )?[Ss]acrifices? ${NUM} (.+?)(?: of (?:their|his or her) choice)?(?: unless (?:they pay|that player pays) (.+))?$`).exec(s)) && !/^(~|it|them|that creature)$/i.test(m[3]!)) {
+  if ((m = new RegExp(`^(?:(.+?) )?[Ss]acrifices? ${NUMX} (.+?)(?: of (?:their|his or her) choice)?(?: unless (?:they pay|that player pays) (.+))?$`).exec(s)) && !/^(~|it|them|that creature)$/i.test(m[3]!)) {
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
     const filter = pickFilter(m[3]!);
     // "Unless they pay {3}": mana only (a discard would need its own choice).

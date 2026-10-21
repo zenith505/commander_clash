@@ -736,7 +736,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return s.turnOrder.some((p) => p !== you && !s.players[p]!.lost && (s.players[p]!.poison ?? 0) >= cond.n);
     case "increment": {
       const c = chars.get(sourceId);
-      return !!c && c.types.includes("Creature") && eventAmount !== undefined && (eventAmount > c.power || eventAmount > c.toughness);
+      return !!c && c.types.includes("Creature") && eventAmount !== undefined && (eventAmount > c.power || (!cond.powerOnly && eventAmount > c.toughness));
     }
     case "suspected":
       return (src.suspected !== undefined) !== !!cond.not; // CR 701.60

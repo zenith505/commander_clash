@@ -618,6 +618,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   text = text.replace(/, then shuffle and you gain (\d+) life\./g, ", then shuffle. You gain $1 life.");
   // "Destroy all creatures other than ~" (Magister of Worth) is "destroy all other creatures".
   text = text.replace(/\ball creatures other than ~/g, "all other creatures");
+  // "Choose any number of target creatures you control. For each of them, create a token that's a copy of that creature,
+  // except it has haste." (Twinflame): a copy of each of them.
+  text = text.replace(/^Choose any number of target ([^.]+?)\. For each of them, create a token that's a copy of that (?:creature|permanent)(, except [^.]+)?\./, "Create a token that's a copy of each of any number of target $1$2.");
   // "Target creature you control other than ~" (Rosie Cotton) is "another target creature you control"; "each creature you
   // control other than ~" (Dawnstrike Vanguard) is "each other creature you control".
   text = text.replace(/\b([Tt])arget (creature|permanent) you control other than ~/g, (_, t: string, w: string) => `${t === "T" ? "A" : "a"}nother target ${w} you control`);

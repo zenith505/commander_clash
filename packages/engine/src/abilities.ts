@@ -1130,7 +1130,7 @@ export type StaticCondition =
   /** "~ costs {2} less to cast if you've cast another spell this turn": checked as it's cast, before it counts itself (CR 601.2f). */
   | { kind: "castAnother" }
   /** Increment (CR 702.191a): it's a creature and the mana spent on the spell (the event's amount) is greater than its power or toughness. */
-  | { kind: "increment" }
+  | { kind: "increment"; /** "If the amount of mana spent to cast that spell is greater than ~'s power" (Liberator): power only. */ powerOnly?: true }
   /** "If that player has two or fewer cards in hand": the trigger's player (whose upkeep it is), checked as it triggers and resolves (CR 603.4). */
   | { kind: "eventPlayerHand"; max?: number; min?: number }
   /**

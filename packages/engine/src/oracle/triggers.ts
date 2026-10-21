@@ -799,6 +799,11 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
   // Kambal, Profiteering Mayor: "for each of them, create a tapped token that's a copy of it", those that entered.
   const eachCopy = /^for each of them, create an? (tapped )?token that's a copy of it\.?$/.exec(rest);
   if (eachCopy && batch.what === "enters" && !yourTurn) return { event: "batch", batch, body: { targets: [], effects: [{ type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "eventGroup" }, each: true, ...(eachCopy[1] ? { tapped: true } : {}) }], text: rest.replace(/\.$/, "") } };
+  // Hedge Shredder: "Whenever one or more land cards are put into your graveyard from your library, put them onto the
+  // battlefield tapped": those cards, if still in the graveyard (CR 400.7).
+  const putThem = /^put them onto the battlefield( tapped)?\.?$/.exec(rest);
+  if (putThem && batch.what === "toGraveyard" && batch.from === "library" && batch.filter && !yourTurn)
+    return { event: "batch", batch, body: { targets: [], effects: [{ type: "putOntoBattlefield", what: { ref: "eventGroup" }, ...(putThem[1] ? { tapped: true } : {}) }], text: rest.replace(/\.$/, "") } };
   // The objects as a group: not modeled.
   if (/\b(it|its|they|them|their|those|that card|that creature|that token|one of them|among them|this way)\b/i.test(rest)) return "fail";
   let text = rest;

@@ -1540,9 +1540,11 @@ export function compile(d: CardDef): CompiledCard {
     const flashFor = /^You may cast (.*?)spells as though they had flash\.$/.exec(line);
     if (flashFor) {
       // "Aura and Equipment spells" (Sigarda's Aid): each of them.
-      const spec = parseTargetPhrase(`${flashFor[1]!.replace(/ and /g, " or ")}spell`);
-      if (spec?.kind === "spell" && !spec.controller) {
-        (out.flashFor ??= []).push({ ...spec, text: `${flashFor[1]}spells` });
+      // "Colorless spells and artifact spells" (Liberator): either kind.
+      const parts = flashFor[1]!.split(/ spells and /).map((x, i, all) => (i < all.length - 1 ? `${x} ` : x));
+      const specs = parts.map((part) => parseTargetPhrase(`${part.replace(/ and /g, " or ")}spell`));
+      if (specs.every((spec) => spec?.kind === "spell" && !spec.controller)) {
+        specs.forEach((spec, i) => (out.flashFor ??= []).push({ ...spec!, text: `${parts[i]}spells` } as typeof spec & {}));
         continue;
       }
     }

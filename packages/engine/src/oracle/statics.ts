@@ -355,6 +355,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^that creature was dealt excess damage this turn$/.test(text)) return { kind: "subjectDealtExcess" };
   if ((m = /^an? (creature|planeswalker)(?: or (planeswalker))? an opponent controlled was dealt excess damage this turn$/.exec(text)))
     return { kind: "opponentsDealtExcess", types: [m[1], m[2]].filter(Boolean).map((x) => x!.charAt(0).toUpperCase() + x!.slice(1)) };
+  // Liberator, Urza's Battlethopter: "if the amount of mana spent to cast that spell is greater than ~'s power", as
+  // increment does it (CR 702.191a), the spell's mana spent being the event's amount.
+  if (/^the amount of mana spent to cast that spell is greater than ~'s power$/.test(text)) return { kind: "increment", powerOnly: true };
   if (/^it's your turn$/.test(text)) return { kind: "yourTurn" };
   if (/^it isn't that player's turn$/.test(text)) return { kind: "eventPlayersTurn", not: true };
   if (/^it's not your turn$/.test(text)) return { kind: "yourTurn", not: true };

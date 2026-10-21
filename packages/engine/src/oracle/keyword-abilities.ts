@@ -257,7 +257,7 @@ export function parseCostKeyword(
     const cost = parseAdditionalCost(m[1]!);
     if (cost?.kind !== "exileFromHand") return "fail";
     return {
-      alt: { kind: "evoke", mana: "", costs: [cost] },
+      alt: { kind: "evoke", mana: "", costs: [cost], text: m[1]!.replace(/^E/, "e") },
       trigger: { event: "selfEnters", ifEvoked: true, body: { targets: [], effects: [sacrificeSelf], text: "When ~ enters, if its evoke cost was paid, its controller sacrifices it." } },
     };
   }

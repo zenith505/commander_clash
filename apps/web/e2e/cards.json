@@ -4190,6 +4190,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "317169b8-9014-48e6-862b-ca21b706846e",
+  "name": "Hopeful Initiate",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Creature — Human Warlock",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Warlock"
+  ],
+  "oracleText": "Training (Whenever this creature attacks with another creature with greater power, put a +1/+1 counter on this creature.)\n{2}{W}, Remove two +1/+1 counters from among creatures you control: Destroy target artifact or enchantment.",
+  "power": "1",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Training"
+  ],
+  "commanderLegal": "legal",
+  "set": "dbl",
+  "releasedAt": "2022-01-28",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f6bd2902-7f8b-419e-bbc7-bcab0c1b7e01",
   "name": "Impulse",
   "manaCost": "{1}{U}",
@@ -6935,6 +6968,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d39c378b-f0a2-400f-af40-a632e24b6d72",
+  "name": "Relentless Pursuit",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Reveal the top four cards of your library. You may put a creature card and/or a land card from among them into your hand. Put the rest into your graveyard.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "thb",
+  "releasedAt": "2020-01-24",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "6a9c3401-570c-41cb-a605-75dfa57d6ab7",
   "name": "Relic of Progenitus",
   "manaCost": "{1}",
@@ -6953,6 +7012,32 @@
   "set": "ala",
   "releasedAt": "2008-10-03",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e9ece3c6-81c2-441a-acce-c109aaa9026b",
+  "name": "Render Inert",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Remove up to five counters from target permanent.\nDraw a card.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mom",
+  "releasedAt": "2023-04-21",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -7210,6 +7295,32 @@
   "set": "a25",
   "releasedAt": "2018-03-16",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c235015e-a7a9-4f8d-bf4a-cf68b3847f83",
+  "name": "Scapeshift",
+  "manaCost": "{2}{G}{G}",
+  "cmc": 4,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Sacrifice any number of lands. Search your library for up to that many land cards, put them onto the battlefield tapped, then shuffle.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "spg",
+  "releasedAt": "2024-04-19",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -7872,6 +7983,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "dcb9c2a7-ae54-4ddc-a567-640bf4bf4366",
+  "name": "Solitude",
+  "manaCost": "{3}{W}{W}",
+  "cmc": 5,
+  "typeLine": "Creature — Elemental Incarnation",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental",
+   "Incarnation"
+  ],
+  "oracleText": "Flash\nLifelink\nWhen this creature enters, exile up to one other target creature. That creature's controller gains life equal to its power.\nEvoke—Exile a white card from your hand.",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Lifelink",
+   "Evoke",
+   "Flash"
+  ],
+  "commanderLegal": "legal",
+  "set": "mh2",
+  "releasedAt": "2021-06-18",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0f5b79ca-9f80-420b-a6c5-bb2a9a95c7e7",
   "name": "Soul Summons",
   "manaCost": "{1}{W}",
@@ -8277,6 +8423,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b1544f21-7e98-461b-aed5-e748b0168c52",
+  "name": "Swords to Plowshares",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Exile target creature. Its controller gains life equal to its power.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2026-09-28",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "92eed395-62ca-4293-882b-8565c40daab5",
   "name": "Sylvan Library",
   "manaCost": "{1}{G}",
@@ -8530,6 +8702,34 @@
   "commanderLegal": "legal",
   "set": "dsc",
   "releasedAt": "2024-09-27",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "660f370a-b25b-4ea5-b765-7abf96899c1c",
+  "name": "The Darkness Crystal",
+  "manaCost": "{2}{B}{B}",
+  "cmc": 4,
+  "typeLine": "Legendary Artifact",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Black spells you cast cost {1} less to cast.\nIf a nontoken creature an opponent controls would die, instead exile it and you gain 2 life.\n{4}{B}{B}, {T}: Put target creature card exiled with The Darkness Crystal onto the battlefield tapped under your control with two additional +1/+1 counters on it.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fin",
+  "releasedAt": "2025-06-13",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

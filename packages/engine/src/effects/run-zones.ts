@@ -124,7 +124,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
         sc.queue.shift();
         continue;
       }
-      s.pending = { kind: "pickPermanents", player: pid, source: src, action: e.action, what: e.filter.text, options, count: options.length, min: 0 };
+      s.pending = { kind: "pickPermanents", player: pid, source: src, action: e.action, what: e.filter.text, options, count: options.length, min: 0, anyNumber: true };
       return "paused";
     }
     if (!n) {

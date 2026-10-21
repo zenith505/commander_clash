@@ -3776,7 +3776,9 @@ function AbilityMenu({
           return (
             <button key={a.kind} disabled={!ok} title={problem || ALT_NOTES[a.kind]} onClick={() => onCastAlt(a.kind)}>
               {a.text && !a.mana ? (
-                <>Cast it: {a.text}</>
+                <>
+                  {a.kind === "evoke" ? "Evoke:" : "Cast it:"} {a.text}
+                </>
               ) : (
                 <>
                   {ALT_NAMES[a.kind]} <ManaCost cost={a.mana} size="sm" />
@@ -4185,7 +4187,7 @@ function Controls({
     // "other creature" reads "another creature".
     const an = /^other /.test(pending.what) ? `an${pending.what}` : `${/^[aeiou]/i.test(pending.what) ? "an" : "a"} ${pending.what}`;
     // Devour: any number of them; exploit: none or one (pending.min).
-    const what = pending.objectId ? `any number of ${pending.what} permanents` : pending.min !== undefined && pending.count === 1 ? `${an}, if you want,` : pending.count === 1 ? an : `${pending.count} (${pending.what})`;
+    const what = pending.objectId ? `any number of ${pending.what} permanents` : pending.anyNumber ? `any number of ${pending.what.replace(/y$/, "ie")}s` : pending.min !== undefined && pending.count === 1 ? `${an}, if you want,` : pending.count === 1 ? an : `${pending.count} (${pending.what})`;
     const n = discards.length;
     const ok = (pending.min !== undefined ? n >= pending.min && n <= pending.count : n === pending.count) && !(pending.action === "band" && n === 1);
     return (

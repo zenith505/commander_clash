@@ -533,6 +533,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       ],
       text,
     };
+  // Scroll Rack: cards from the hand traded for as many from the top of the library (not a draw, rulings).
+  if (text === "Exile any number of cards from your hand face down. Put that many cards from the top of your library into your hand. Then look at the exiled cards and put them on top of your library in any order.")
+    return { targets: [], effects: [{ type: "scrollRack" }], text };
   // Wheel of Misfortune, Menacing Ogre: numbers chosen secretly, revealed at once (Effect secretNumbers).
   if (/^Each player secretly chooses a number 0 or greater, then all players reveal those numbers simultaneously and determine the highest and lowest numbers revealed this way\. ~ deals damage equal to the highest number to each player who chose that number\. Each player who didn't choose the lowest number discards their hand, then draws seven cards\.$/.test(text.trim()))
     return { targets: [], effects: [{ type: "secretNumbers", then: "wheel" }], text };

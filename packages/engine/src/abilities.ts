@@ -1887,6 +1887,8 @@ export type Effect =
   /** "Put two cards from your hand on top of your library in any order" (Brainstorm): the controller's own hand. */
   /** `bottom`: "put a card from your hand on the bottom of your library" instead (Volcanic Spite). */
   | { type: "handToTop"; n: Amount; bottom?: true }
+  /** Scroll Rack: any number of cards from the hand exiled face down, that many from the top of the library put into the hand (not drawn), then the exiled cards on top in any order. */
+  | { type: "scrollRack" }
   /**
    * Sylvan Library: "choose two cards in your hand drawn this turn. For each of those cards, pay 4 life or put the card on
    * top of your library." With fewer drawn cards still in hand, those (rulings); none, nothing happens.

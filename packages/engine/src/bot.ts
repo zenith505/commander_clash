@@ -181,6 +181,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     if (pend.kind === "discard") return [{ type: "discard", player: pid, objectIds: chooseDiscards(s, pid, pend.count, undefined, pend.filter) }];
     // Brainstorm: back go the cards we'd most readily discard, the better of them on top.
+    // Scroll Rack: the lands we don't need, traded for fresh cards (a library short of cards trades fewer).
+    if (pend.kind === "handToTop" && pend.upTo) {
+      const hand = player(s, pid).hand;
+      const landsInHand = hand.filter((id) => isType(defOf(s, obj(s, id)), "Land")).length;
+      const spare = Math.max(0, landsInHand - (lands(s, pid) >= 5 ? 0 : 1));
+      const k = Math.min(spare, player(s, pid).library.length);
+      return [{ type: "handToTop", player: pid, objectIds: k ? chooseDiscards(s, pid, k).reverse() : [] }];
+    }
     if (pend.kind === "handToTop") return [{ type: "handToTop", player: pid, objectIds: chooseDiscards(s, pid, pend.count).reverse() }];
     // Free from the hand: the most expensive card is the best deal.
     // From an opponent's revealed hand: take their most expensive card.

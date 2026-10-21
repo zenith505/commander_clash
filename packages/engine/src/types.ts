@@ -982,7 +982,7 @@ export type PendingDecision =
   /** A resolving spell or ability makes this player discard `count` cards of their choice (CR 701.9b). */
   | { kind: "discard"; player: PlayerId; count: number; source: string; /** Only cards like this: "discard a creature card". */ filter?: TargetSpec; /** Exiled, not discarded ("exiles a card from their hand"). */ exile?: true }
   /** "Put two cards from your hand on top of your library in any order": which, and their order (first on top). */
-  | { kind: "handToTop"; player: PlayerId; count: number; source: string; /** On the bottom instead, the first pick lowest. */ bottom?: true }
+  | { kind: "handToTop"; player: PlayerId; count: number; source: string; /** On the bottom instead, the first pick lowest. */ bottom?: true; /** Scroll Rack: any number up to `count`, exiled face down first and traded for as many from the top of the library. */ upTo?: true }
   /** Scry or surveil (CR 701.22, 701.25): `cards` are the top of their library, top first. */
   /** `order`: put them all back in any order (no bottom or graveyard); `owner` = whose library, if not the player's. */
   /** "bottom": the cards go to the bottom of the library together and their owner orders them (CR 401.4). */

@@ -343,6 +343,33 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       log(s, `${p.name} puts ${cards.length === 1 ? "a card" : `${cards.length} cards`} from their hand on ${e.bottom ? "the bottom" : "top"} of their library.`);
       return;
     }
+    case "scrollRack": {
+      // The player picks the cards and the order they go back in (the first pick ends on top) at once: they know them.
+      const p = player(s, ctx.controller);
+      const sc = (s.resolving!.scratch ??= {});
+      const ids = sc.chosen?.[p.id];
+      if (!ids) {
+        if (!p.hand.length) return;
+        s.pending = { kind: "handToTop", player: p.id, count: p.hand.length, source: src, upTo: true };
+        return "paused";
+      }
+      const cards = ids.filter((id) => p.hand.includes(id));
+      if (!cards.length) return;
+      for (const id of cards) {
+        moveObject(s, id, "exile");
+        const o = obj(s, id);
+        if (o.zone === "exile") o.hiddenExile = { by: ctx.sourceId ?? "", seen: [p.id], label: "Face down" };
+      }
+      log(s, `${p.name} exiles ${cards.length === 1 ? "a card" : `${cards.length} cards`} from their hand face down.`);
+      // Only as many as the library has; not a draw (rulings).
+      const top = p.library.slice(0, cards.length);
+      for (const id of top) moveObject(s, id, "hand");
+      log(s, `${p.name} puts ${top.length === 1 ? "a card" : `${top.length} cards`} from the top of their library into their hand.`);
+      const back = cards.filter((id) => obj(s, id).zone === "exile");
+      for (const id of [...back].reverse()) moveObject(s, id, "library", { top: true });
+      log(s, `${p.name} puts ${back.length === 1 ? "the exiled card" : `the ${back.length} exiled cards`} on top of their library.`);
+      return;
+    }
     case "drawnPayOrTop": {
       const p = player(s, ctx.controller);
       const sc = (s.resolving!.scratch ??= {});

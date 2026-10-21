@@ -5007,7 +5007,7 @@ function chooseHandToTop(s: GameState, p: Player, ids: ObjectId[]) {
   const pend = s.pending;
   const r = s.resolving;
   if (pend?.kind !== "handToTop" || pend.player !== p.id || !r) throw new RulesError("no cards to put on top");
-  if (new Set(ids).size !== pend.count || ids.length !== pend.count || ids.some((id) => !p.hand.includes(id))) throw new RulesError(`choose exactly ${pend.count} card(s) from your hand`);
+  if (new Set(ids).size !== ids.length || (pend.upTo ? ids.length > pend.count : ids.length !== pend.count) || ids.some((id) => !p.hand.includes(id))) throw new RulesError(pend.upTo ? "choose cards from your hand" : `choose exactly ${pend.count} card(s) from your hand`);
   ((r.scratch ??= {}).chosen ??= {})[p.id] = ids;
   s.pending = null;
   continueResolution(s);

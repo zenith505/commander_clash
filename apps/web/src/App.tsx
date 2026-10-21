@@ -4598,6 +4598,19 @@ function Controls({
         </button>
       </div>
     );
+  // Scroll Rack: any number of cards, traded for as many from the top of the library.
+  if (pending?.kind === "handToTop" && pending.player === HUMAN && pending.upTo)
+    return (
+      <div className="controls">
+        <span>
+          <strong>{pending.source}: </strong>click any number of cards to exile face down and trade for as many from the top of your library; they go back on top
+          {discards.length > 1 ? " (first pick ends on top)" : ""}.
+        </span>
+        <button onClick={() => dispatch([{ type: "handToTop", player: HUMAN, objectIds: discards }])}>
+          {discards.length ? `Trade ${discards.length} card${discards.length === 1 ? "" : "s"}` : "Trade none"}
+        </button>
+      </div>
+    );
   if (pending?.kind === "handToTop" && pending.player === HUMAN)
     return (
       <div className="controls">

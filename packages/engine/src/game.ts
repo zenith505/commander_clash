@@ -2590,7 +2590,10 @@ function resolvePermanentSpell(s: GameState, item: StackItem, o: GameObject, d: 
   // Opal Palace: as many more +1/+1 counters as times it's been cast from the command zone, for each of its mana spent.
   const opal = (o.commanderCountersCast ?? 0) * (player(s, o.owner).commanderCasts[o.id] ?? 0);
   o.commanderCountersCast = undefined;
-  moveObject(s, o.id, "battlefield", { controller: item.controller, ...(item.x ? { x: item.x } : {}), ...(sneak ? { tapped: true } : {}), ...(opal ? { counters: { "+1/+1": opal } } : {}) });
+  // Impending: "If you chose to pay this permanent's impending cost, it enters with N time counters on it" (CR 702.176a).
+  const impending = o.castAlt === "impending" ? (compileCard(d).impending ?? 0) : 0;
+  const enterCounters = { ...(opal ? { "+1/+1": opal } : {}), ...(impending ? { time: impending } : {}) };
+  moveObject(s, o.id, "battlefield", { controller: item.controller, ...(item.x ? { x: item.x } : {}), ...(sneak ? { tapped: true } : {}), ...(Object.keys(enterCounters).length ? { counters: enterCounters } : {}) });
   // Sneak: tapped and attacking whom the returned creature was attacking (CR 702.190b, 506.3a).
   if (sneak && o.zone === "battlefield" && objIsType(s, o, "Creature") && enterAttacking(s, o, sneak)) log(s, `${d.name} is attacking ${attackedName(s, o)}.`);
   if (gains && o.zone === "battlefield") {

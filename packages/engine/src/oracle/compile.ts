@@ -661,6 +661,7 @@ export function compile(d: CardDef): CompiledCard {
         if (costKw.suspend) out.suspend = costKw.suspend;
         if (costKw.casualty) out.casualty = costKw.casualty;
         if (costKw.dredge) out.dredge = costKw.dredge;
+        if (costKw.impending) out.impending = costKw.impending;
         if (costKw.faceDown) {
           if (out.faceDownCast) out.unsupported.push(raw); // two ways to turn it face up: not modeled
           else out.faceDownCast = costKw.faceDown;

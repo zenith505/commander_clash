@@ -385,6 +385,10 @@ function gather(s: GameState): Inst[] {
     // it's unattached (CR 702.151b, rulings), even if it loses its abilities meanwhile. Its timestamp is the attaching's.
     if (o.attachedTo && compileCard(d).reconfigure)
       out.push({ key: `reconfigure:${id}`, timestamp: o.timestamp, order: order++, sourceName: d.name, untilEndOfTurn: false, mods: [{ kind: "loseTypes", types: ["Creature"] }], controller: o.controller, fixed: [id] });
+    // Impending (CR 702.176a): "As long as this permanent's impending cost was paid and it has a time counter on it, it's
+    // not a creature", a static ability of its own, with its timestamp (CR 613.7a), that losing its abilities doesn't end.
+    if (o.castAlt === "impending" && (o.counters.time ?? 0) > 0)
+      out.push({ key: `impending:${id}`, timestamp: o.timestamp, order: order++, sourceName: d.name, untilEndOfTurn: false, mods: [{ kind: "loseTypes", types: ["Creature"] }], controller: o.controller, fixed: [id] });
     compileCard(d).statics.forEach((st, i) =>
       st.zone !== "graveyard" && out.push({
         key: `${id}#${i}`,
@@ -817,6 +821,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       if (cond.is === "enteredThisTurn") return src.zone === "battlefield" && src.enteredTurn === s.turn;
       if (cond.is === "onBattlefield") return src.zone === "battlefield";
       if (cond.is === "prepared") return !!src.prepared; // CR 722.3a
+      if (cond.is === "impending") return src.castAlt === "impending" && (src.counters.time ?? 0) > 0; // CR 702.176a
       const attached = s.battlefield.filter((id) => s.objects[id]!.attachedTo === sourceId).map((id) => ({ id, c: chars.get(id) }));
       const aura = (a: { c?: Characteristics }) => !!a.c?.subtypes.includes("Aura");
       if (cond.is === "enchanted") return attached.some(aura);

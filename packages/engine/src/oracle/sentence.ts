@@ -249,6 +249,8 @@ export function parseBecomes(text: string): Modification[] | null {
   // "in addition to its other types".
   if ((m = /^the chosen creature type( in addition to its other types)?$/i.exec(rest)))
     return [m[1] ? { kind: "addTypes", types: [], subtypes: [CHOSEN_TYPE] } : { kind: "setSubtypes", subtypes: [CHOSEN_TYPE] }];
+  // "Becomes a Dinosaur in addition to its other creature types" (Allosaurus Shepherd): a creature type added (CR 205.1b).
+  if ((m = /^an? ([A-Z][a-z]+) in addition to its other creature types$/.exec(rest)) && CREATURE_TYPES.has(m[1]!)) return [{ kind: "addTypes", types: [], subtypes: [m[1]!] }];
   // Just a color: "becomes black", "becomes blue and red"
   if (/^(white|blue|black|red|green|colorless)( and (white|blue|black|red|green))*$/i.test(rest)) {
     return [{ kind: "setColors", colors: rest.split(/ and /).map((w) => COLOR_WORDS[w.toLowerCase()]).filter((c): c is Color => !!c) }];

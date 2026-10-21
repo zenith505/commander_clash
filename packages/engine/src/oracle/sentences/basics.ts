@@ -600,6 +600,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!who || !half || (who.ref === "you") !== (m[2]!.toLowerCase() === "your")) return null;
     return [{ type: "loseLife", who, n: { count: { kind: "life", who: { ref: "eachOne" } }, half } }];
   }
+  // "Target player gains twice X life" (Heliod's Intervention): X times 2.
+  if ((m = /^(.+?) (gains?|loses?) twice X life$/i.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    if (!who) return null;
+    const x = amt("X") as AmountExpr;
+    return [{ type: m[2]!.startsWith("gain") ? "gainLife" : "loseLife", who, n: { ...x, times: 2 } }];
+  }
   if ((m = new RegExp(`^(.+?) (gains?|loses?) ${NUMX} life$`, "i").exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     if (!who) return null;

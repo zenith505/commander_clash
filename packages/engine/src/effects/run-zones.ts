@@ -171,6 +171,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
         const ch = characteristics(s, o);
         (s.resolving.sacrificedThisWay ??= []).push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), controller: pid, types: [...ch.types] });
       }
+      if (e.action === "bounce" && s.resolving) (s.resolving.bouncedThisWay ??= []).push({ id, subtypes: [...characteristics(s, o).subtypes] });
       moveObject(s, id, e.action === "sacrifice" ? "graveyard" : "hand", e.action === "sacrifice" ? { sacrificed: true } : {});
     }
 }
@@ -1221,8 +1222,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "castNow": {
       const sc = (s.resolving!.scratch ??= {});
       if (sc.castNow === undefined) {
+        s.resolving!.did = false;
         const o = objects(s, e.what, ctx)[0];
-        if (!o || o.zone !== "graveyard" || o.owner !== ctx.controller) return;
+        // "Exile the top card of your library. You may cast that card." (Chandra, Torch of Defiance): the card exiled.
+        if (!o || (e.what.ref === "exiledTop" ? o.zone !== "exile" : o.zone !== "graveyard" || o.owner !== ctx.controller)) return;
         if (e.unlessCast && (s.castThisTurn ?? []).some((c) => c.player === ctx.controller)) return;
         sc.castNow = { id: o.id };
         s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src, how: "paid" };
@@ -1237,6 +1240,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const o = s.objects[was.id];
       // Cast: it moved from the graveyard to the stack as this was paused (casting doesn't count as a zone change here).
       const cast = !!o && o.zone === "stack";
+      sc.castNow = undefined;
+      s.resolving!.did = cast;
       if (cast && e.thenNoMore) {
         (s.cantCastThisTurn ??= []).push({ player: ctx.controller, turn: s.turn, source: src });
         log(s, `${player(s, ctx.controller).name} can't cast additional spells this turn.`);

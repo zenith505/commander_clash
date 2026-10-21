@@ -785,7 +785,12 @@ export type Modification =
   | { kind: "setColors"; colors: Color[]; chosen?: true } // layer 5
   | { kind: "addColors"; colors: Color[] } // layer 5, "is blue in addition to its other colors"
   /** Layer 6. `spares`: "This effect doesn't remove ~": the protection it grants doesn't make its source fall off (Cho-Manno's Blessing). */
-  | { kind: "addKeywords"; keywords: string[]; spares?: true }
+  /**
+   * `sharedAmongYours`: "creatures you control gain first strike until end of turn if a creature you control has first
+   * strike. The same is true for flying, ..." (Odric, Lunarch Marshal): of `keywords`, those a creature its controller
+   * controls has as it resolves, a variant such as hexproof from white included (rulings).
+   */
+  | { kind: "addKeywords"; keywords: string[]; spares?: true; sharedAmongYours?: true }
   | { kind: "removeKeywords"; keywords: string[] } // layer 6
   | { kind: "loseAllAbilities" } // layer 6
   /**
@@ -2406,6 +2411,8 @@ export type SpellCondition =
   | { kind: "destroyedThisWay"; died?: true }
   /** "Sacrifice a creature. When you do, ..." (Tip the Scales): this ability's instructions sacrificed something. */
   | { kind: "sacrificedThisWay" }
+  /** "If another Desert was returned this way" (Arid Archway): its "return a ... you control" pick returned one, as it last existed, other than its source. */
+  | { kind: "bouncedThisWay"; subtype: string; another: true }
   /** "If excess damage was dealt this way" (Orbital Plunge): this spell's or ability's damage dealt some (Count excessThisWay). */
   | { kind: "excessDealt"; /** "To a creature this way" (Vikya): only excess dealt to a creature counts. */ creature?: true; /** "If the creature the opponent controls is dealt excess damage this way" after a fight (The Last Agni Kai): only that target's. */ target?: number }
   /**

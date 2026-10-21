@@ -1,7 +1,7 @@
 import { allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose } from "../abilities";
 import { substituteX } from "../amounts";
 import { num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS, singularWord } from "./words";
-import { CHOSEN_KEYWORD, CHOSEN_PROTECTION, CREATURE_TYPES, THAT_PLAYER_PROTECTION } from "../keywords";
+import { canonicalKeyword, CHOSEN_KEYWORD, CHOSEN_PROTECTION, CREATURE_TYPES, THAT_PLAYER_PROTECTION } from "../keywords";
 import { parseStaticCondition } from "./statics";
 import { parseBoundCount, parseCount } from "./counts";
 import { parseBecomes, parseDig, parseSentence } from "./sentence";
@@ -512,6 +512,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // "Choose target artifact or enchantment. Its owner shuffles it into their library." (Deglamer) is one instruction.
   text = text.replace(/^Choose (target [^.]+?)\. Its owner shuffles it into their library\./, "The owner of $1 shuffles it into their library.");
   // Tibalt's Trickery: one instruction about the countered spell's controller (read in parseUntilNonland).
+  // "Transform ~, then untap it" (Westvale Abbey): the same permanent, now its back face (CR 712.18).
+  text = text.replace(/^Transform ~, then untap it\.$/, "Transform ~, then untap ~.");
   text = text.replace(/Choose 1, 2, or 3 at random\. Its controller mills that many cards, then exiles cards from the top of their library until they exile a nonland card with a different name than that spell\. They may cast that card without paying its mana cost\. Then they put the exiled cards on the bottom of their library in a random order\./, `${TIBALT}.`);
   text = text.replace(/If you haven't cast a spell this turn, you may cast that card\. If you do, you can't cast additional spells this turn\./, "If you haven't cast a spell this turn, you may cast that card, and if you do, you can't cast additional spells this turn.");
   text = text.replace(/ gains flashback until end of turn\. (?:The|Its) flashback cost is equal to (?:its|that card's) mana cost\./g, " gains flashback with its mana cost until end of turn.");
@@ -558,6 +560,14 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects: [{ type: "damage", amount: amt(comet[1]!), to: { ref: "anyTarget", index: 0, n: 2 } }],
       text,
     };
+  // Odric, Lunarch Marshal: each keyword creatures you control share, as it resolves (Modification sharedAmongYours).
+  const odric = /^[Cc]reatures you control gain ([a-z ]+) until end of turn if a creature you control has \1\. The same is true for ([a-z ,]+), and ([a-z ]+)\.$/.exec(text.trim());
+  if (odric && !opts.spell) {
+    const keywords = [odric[1]!, ...odric[2]!.split(", "), odric[3]!].map((k) => canonicalKeyword(k));
+    if (keywords.some((k) => !k || /^(Protection|Hexproof from|Toxic)/.test(k) || k.includes("("))) return null;
+    const yours: TargetSpec = { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "creatures you control" };
+    return { targets: [], effects: [{ type: "continuous", what: { ref: "each", filter: yours }, mods: [{ kind: "addKeywords", keywords: keywords as string[], sharedAmongYours: true }], duration: "endOfTurn" }], text };
+  }
   // Scroll Rack: cards from the hand traded for as many from the top of the library (not a draw, rulings).
   if (text === "Exile any number of cards from your hand face down. Put that many cards from the top of your library into your hand. Then look at the exiled cards and put them on top of your library in any order.")
     return { targets: [], effects: [{ type: "scrollRack" }], text };
@@ -867,6 +877,15 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: inner });
       continue;
     }
+    // "Return a land you control to its owner's hand. If another Desert was returned this way, surveil 1" (Arid Archway).
+    const bounced = /^If another ([A-Z][a-z]+) was returned this way, (.+)$/.exec(s);
+    if (bounced && sacPrev?.type === "pick" && sacPrev.action === "bounce" && sacPrev.who.ref === "you" && sacPrev.n === 1 && !sacPrev.unless && !ctx.spell) {
+      const before = ctx.targets.length;
+      const inner = parseOne(capital(bounced[2]!), ctx);
+      if (!inner || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "bouncedThisWay", subtype: bounced[1]!, another: true }, effects: inner });
+      continue;
+    }
     // "Sacrifice a creature. If you can't, sacrifice ~." (Eldrazi Monument): you must if you can, so only when none was.
     const sacCant = /^If you can't, (.+)$/.exec(s);
     if (sacCant && sacPrev?.type === "pick" && sacPrev.action === "sacrifice" && sacPrev.who.ref === "you" && sacPrev.n === 1 && !sacPrev.unless) {
@@ -1134,6 +1153,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       continue;
     }
     if (exTop && !exTop[1]) ctx.exiledTop = true;
+    // "Exile the top card of your library. You may cast that card. If you don't, ~ deals 2 damage to each opponent."
+    // (Chandra, Torch of Defiance): cast as this resolves or not at all, paying its costs (rulings; CR 608.2g).
+    const castTopElse = exTop && !exTop[1] && !exEqual && !impulseIf && sentences[si + 1]?.replace(/\.$/, "") === "You may cast that card" ? /^If you don't, (.+)$/.exec(sentences[si + 2]?.replace(/\.$/, "") ?? "") : null;
+    if (castTopElse) {
+      const before = ctx.targets.length;
+      const inner = parseOne(capital(castTopElse[1]!), ctx);
+      if (!inner || ctx.targets.length !== before) return null;
+      effects.push({ type: "exileTop", who: { ref: "you" }, n: 1 }, { type: "castNow", what: { ref: "exiledTop" } }, { type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner });
+      si += 2;
+      continue;
+    }
     if (exTop && playIt) {
       const when = (playIt[1] ?? playIt[2] ?? "").toLowerCase();
       const free = playIt[3] ? { free: true as const } : {};

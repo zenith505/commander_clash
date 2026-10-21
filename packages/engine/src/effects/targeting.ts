@@ -390,7 +390,9 @@ export function targetsMatch(s: GameState, targets: TargetChoice[], what: Target
 export function bindBound(s: GameState, spec: TargetSpec, ctx: AmountCtx): TargetSpec {
   if (!spec.bound) return spec;
   const { bound, ...rest } = spec;
-  const n = Math.max(0, evalAmount(s, bound.amount, ctx));
+  // Power and toughness may be below 0 (CR 107.1b): "power greater than target creature's power" with that at -2 takes a 0.
+  const n0 = evalAmount(s, bound.amount, ctx);
+  const n = bound.key === "manaValue" ? Math.max(0, n0) : n0;
   const old = rest[bound.key];
   const range: Range = bound.at === "exact" ? { min: Math.max(old?.min ?? n, n), max: Math.min(old?.max ?? n, n) } : bound.at === "most" ? { ...old, max: old?.max === undefined ? n : Math.min(old.max, n) } : { ...old, min: old?.min === undefined ? n : Math.max(old.min, n) };
   return { ...rest, [bound.key]: range };

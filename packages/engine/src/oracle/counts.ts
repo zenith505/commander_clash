@@ -279,6 +279,10 @@ export function halfX(word: string | undefined, ctx: Ctx | null): AmountExpr | n
  * hand with mana value less than or equal to that damage", see HOST_TRIGGERS).
  */
 export function parseBoundCount(text: string, ctx: Ctx): AmountExpr | null {
+  // "Destroy all creatures with power greater than target creature's power" (Fell the Mighty): a spell's own target, its
+  // power as the spell resolves (rulings).
+  const of = ctx.spell && /^target creature's (power|toughness)$/.exec(text);
+  if (of) return { count: { kind: of[1] as "power" | "toughness", of: { ref: "target", index: addTarget(ctx, { kind: "object", types: ["Creature"], text: "target creature" }) } } };
   return text === "X" ? { count: { kind: "x" } } : parseCount(text, ctx);
 }
 

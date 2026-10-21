@@ -541,12 +541,26 @@ export function chosenPlayerOf(s: GameState, ctx: ResolveCtx): PlayerId | undefi
  * A resolving effect's changes with their numbers worked out now: "gets +X/+X" doesn't change
  * later if X's count does (CR 608.2h, 611.2c).
  */
+/** Of `keywords`, the ones (or their "hexproof from" variants, CR 702.11d) a creature `pid` controls has. */
+function sharedKeywords(s: GameState, pid: PlayerId, keywords: string[]): string[] {
+  const out = new Set<string>();
+  for (const id of s.battlefield) {
+    const o = s.objects[id]!;
+    if (!objIsType(s, o, "Creature") || controllerOf(s, o) !== pid) continue;
+    for (const k of characteristics(s, o).keywords) if (keywords.some((w) => k === w || (w === "Hexproof" && k.startsWith("Hexproof from ")))) out.add(k);
+  }
+  return [...out];
+}
+
 export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx): Modification[] {
   const c = amountCtx(s, ctx);
   return mods.map((m) =>
     m.kind === "modifyPT" || m.kind === "setPT"
       ? { ...m, power: evalAmount(s, m.power, c), toughness: evalAmount(s, m.toughness, c) }
-      : // "Gains protection from the color of your choice": the color chosen as it resolved.
+      : // Odric, Lunarch Marshal: the keywords creatures its controller controls have now (CR 611.2c), variants included.
+        m.kind === "addKeywords" && m.sharedAmongYours
+        ? { kind: "addKeywords", keywords: sharedKeywords(s, ctx.controller, m.keywords) }
+        : // "Gains protection from the color of your choice": the color chosen as it resolved.
         m.kind === "addKeywords" && (m.keywords.includes(CHOSEN_PROTECTION) || m.keywords.includes(CHOSEN_HEXPROOF))
         ? { ...m, keywords: bindChosenKeywords(m.keywords, s.resolving?.chosen?.color) }
         : // "Gains protection from the chosen player" (Guardian Archon): the player chosen for its source.

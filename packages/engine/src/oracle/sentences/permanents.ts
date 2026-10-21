@@ -287,6 +287,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const second = first && parseSentence(`Put ${m[4]} on ~`, ctx);
     if (first && second) return [...first, ...second];
   }
+  // "Put a +1/+1 counter and a lifelink counter on target creature" (Unexpected Fangs): the same on the target.
+  if ((m = new RegExp(`^Put (${NUMX} ${COUNTER} counters?) and (${NUMX} ${COUNTER} counters?) on (target .+)$`, "i").exec(s))) {
+    const before = ctx.targets.length;
+    const first = parseSentence(`Put ${m[1]} on ${m[7]}`, ctx);
+    const second = first && ctx.targets.length === before + 1 && ctx.lastObjectTarget === before ? parseSentence(`Put ${m[4]} on it`, ctx) : null;
+    if (first && second) return [...first, ...second];
+    ctx.targets.length = before;
+  }
   // "Choose an artifact or creature you control. Create a token that's a copy of it" (Season of Weaving): picked as it
   // resolves, not targeted (rulings); "it" is the one picked.
   if ((m = /^Choose (an? .+?) you control$/i.exec(s))) {

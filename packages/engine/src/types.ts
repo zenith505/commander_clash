@@ -1591,6 +1591,8 @@ export interface Resolving {
   did?: boolean;
   /** What its instructions sacrificed, as it last existed: "When you do, ~ deals damage equal to that creature's power". */
   sacrificedThisWay?: LastKnown[];
+  /** What its "return a land you control to its owner's hand" returned, as it last existed (SpellCondition bouncedThisWay). */
+  bouncedThisWay?: { id: ObjectId; subtypes: string[] }[];
   /** The players who had nothing to pick for its last "each player sacrifices ..." (PlayerRef "couldntPick"). */
   couldntPick?: PlayerId[];
   /** The Army its amass instruction chose (CR 701.47c), for "the amassed Army". */

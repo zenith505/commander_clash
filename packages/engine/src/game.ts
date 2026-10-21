@@ -2889,7 +2889,7 @@ function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" 
     for (const top of abilitiesOf(s, src).fromTop ?? []) {
       // Bolas's Citadel's spells are cast for life (`way` "life"); the other permissions' for their mana costs.
       if (!land && way && !!top.payLife !== (way === "life")) continue;
-      if ((top.if && !staticConditionNow(s, top.if, src.id, pid)) || !(land ? top.lands : top.spells === "any" || !!top.spells?.some((f) => printedMatches(bindChosen(f, src.chosen), d)))) continue;
+      if ((top.if && !staticConditionNow(s, top.if, src.id, pid)) || !(land ? top.lands && (!top.landFilter || printedMatches(top.landFilter, d)) : top.spells === "any" || !!top.spells?.some((f) => printedMatches(bindChosen(f, src.chosen), d)))) continue;
       if (!top.once) return { by: src };
       if (src.topUsedTurn !== s.turn) once ??= src;
     }

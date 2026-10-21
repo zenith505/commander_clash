@@ -2709,13 +2709,16 @@ function parseCostOr(text: string): CostOption[] | null {
 export function parseFromTop(text: string): FromTop | null | undefined {
   // "You may play the top card of your library", "you may play cards from the top of your library": lands and spells.
   text = text.replace(/^(you may) play (?:the top card of your library|cards from the top of your library)$/i, "$1 play lands and cast spells from the top of your library");
-  const m = /^(Once each turn, )?[Yy]ou may (play lands|play lands and cast (.+)|cast (.+)) from the top of your library$/.exec(text);
+  // "Play historic lands" (Crystal Skull): only lands of that kind.
+  const m = /^(Once each turn, )?[Yy]ou may (?:play (?:([a-z]+) )?lands(?: and cast (.+))?|cast (.+)) from the top of your library$/.exec(text);
   if (!m) return undefined;
-  const lands = !!m[2]!.startsWith("play lands");
+  const lands = m[4] === undefined;
   const what = m[3] ?? m[4];
   if (m[1] && (lands || !what)) return null; // only "once each turn, you may cast ..." is modeled
-  if (!what) return { lands };
-  if (what === "spells") return m[1] ? null : { lands, spells: "any" };
+  const landFilter = m[2] ? parseSearchFilter(`${m[2]} land card`) : undefined;
+  if (m[2] && !landFilter) return null;
+  if (!what) return { lands, ...(landFilter ? { landFilter } : {}) };
+  if (what === "spells") return m[1] ? null : { lands, ...(landFilter ? { landFilter } : {}), spells: "any" };
   // "Creature spells", "an instant or sorcery spell", "a creature spell with power 2 or less", "Angel spells and Human
   // spells", "spells with mana value 4 or greater": each kind as a card filter.
   const parts = what.split(/ spells and (?=\S+ spells$)/).map((x) => x.replace(/^an? /, ""));
@@ -2730,7 +2733,7 @@ export function parseFromTop(text: string): FromTop | null | undefined {
     if (!f) return null;
     spells.push(chosen ? { ...f, chosen: "type", text: `${f.text} of the chosen type` } : f);
   }
-  return { lands, spells, ...(m[1] ? { once: true as const } : {}) };
+  return { lands, ...(landFilter ? { landFilter } : {}), spells, ...(m[1] ? { once: true as const } : {}) };
 }
 
 /**

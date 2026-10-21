@@ -4370,6 +4370,8 @@ export interface CompiledCard {
  */
 export interface FromTop {
   lands: boolean;
+  /** Only these lands: "you may play historic lands ..." (Crystal Skull, Isu Spyglass). */
+  landFilter?: TargetSpec;
   spells?: TargetSpec[] | "any";
   once?: true;
   if?: StaticCondition;

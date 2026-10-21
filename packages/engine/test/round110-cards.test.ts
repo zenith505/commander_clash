@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
-import { altCostsFor, attackCost, botActions, characteristics, graveyardWays, isFullySupported, planActivate, planCast, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
+import { altCostsFor, attackCost, mayPlayFromTop, botActions, characteristics, graveyardWays, isFullySupported, planActivate, planCast, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const urabrask = scry("transform", [
@@ -96,6 +96,9 @@ const drana = card("Drana and Linvala", "Legendary Creature — Vampire Angel", 
   keywords: ["Flying", "Vigilance"],
   oracleText:
     "Flying, vigilance\nActivated abilities of creatures your opponents control can't be activated.\nDrana and Linvala has all activated abilities of all creatures your opponents control. You may spend mana as though it were mana of any color to activate those abilities.",
+});
+const skull = card("Crystal Skull, Isu Spyglass", "Legendary Artifact", "{2}{U}{U}", {
+  oracleText: "You may look at the top card of your library any time.\nYou may play historic lands and cast historic spells from the top of your library. (Artifacts, legendaries, and Sagas are historic.)\n{T}: Add {U}.",
 });
 // Test cards.
 const shock = card("Test Shock", "Instant", "{R}", { oracleText: "Test Shock deals 2 damage to any target." });
@@ -583,6 +586,24 @@ describe("Drana and Linvala", () => {
     for (const id of s.battlefield) if (s.objects[id]!.controller === ap) s.objects[id]!.tapped = true;
     const shockId = toZone(s, ap, shock, "hand");
     expect(planCast(s, ap, shockId, [{ kind: "player", id: opp }])).toBeNull();
+  });
+});
+
+describe("Crystal Skull, Isu Spyglass", () => {
+  it("historic lands and historic spells from the top of your library, nothing else", () => {
+    supported(skull);
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, skull);
+    const check = (d: CardDef) => {
+      const s = structuredClone(s0);
+      const id = toZone(s, ap, d, "library");
+      return mayPlayFromTop(s, s.objects[id]!, ap);
+    };
+    expect(check(card("Legendary Land", "Legendary Land", ""))).toBe(true);
+    expect(check(card("Forest", "Basic Land — Forest"))).toBe(false);
+    expect(check(card("Test Relic", "Artifact", "{1}"))).toBe(true);
+    expect(check(card("Test Saga", "Enchantment — Saga", "{1}", { oracleText: "I — Draw a card." }))).toBe(true);
+    expect(check(card("Test Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }))).toBe(false);
   });
 });
 

@@ -4828,6 +4828,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "316d49a0-620b-4942-a5e8-04cff15e6c01",
+  "name": "Krav, the Unredeemed",
+  "manaCost": "{4}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Demon",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Demon"
+  ],
+  "oracleText": "Partner with Regna, the Redeemer (When this creature enters, target player may put Regna into their hand from their library, then shuffle.)\n{B}, Sacrifice X creatures: Target player draws X cards and gains X life. Put X +1/+1 counters on Krav.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Partner with",
+   "Partner"
+  ],
+  "commanderLegal": "legal",
+  "set": "bbd",
+  "releasedAt": "2018-06-08",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a0ff742b-f709-43ac-84d2-dc00c723bad6",
   "name": "Krosan Cloudscraper",
   "manaCost": "{7}{G}{G}{G}",

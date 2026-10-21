@@ -4010,6 +4010,14 @@ export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "
 
 const xCost = (c: AdditionalCost) => "x" in c && !!c.x;
 
+/** An activated ability's costs beyond mana with its X announced: "Sacrifice X Squirrels" is X of them (CR 107.3a, 602.2b). */
+export function activatedCosts(ab: ActivatedAbility, x: number | undefined): AdditionalCost[] {
+  return (ab.costs ?? []).map((c) => (xCost(c) ? { ...c, n: x ?? 0 } : c));
+}
+
+/** Does the ability have an X to announce in a cost beyond mana, as Chatterfang's "Sacrifice X Squirrels"? */
+export const abilityCostsHaveX = (ab: ActivatedAbility): boolean => !!ab.costs?.some(xCost);
+
 /** Costs paid with objects the player picks; "discard a card at random" and "the top card of your graveyard" aren't. */
 const costNeedsPick = (c: AdditionalCost) =>
   c.kind === "sacrifice" || (c.kind === "discard" && !c.random) || c.kind === "returnToHand" || c.kind === "tap" || c.kind === "reveal" || c.kind === "exileFromHand" || (c.kind === "exileFromGraveyard" && !c.top);
@@ -4334,11 +4342,11 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (tp) return tp;
   }
   if (ab.costs?.length || costs?.sacrifice?.length || costs?.discard?.length || costs?.returnToHand?.length || costs?.tap?.length) {
-    const cp = extraCostProblem(s, pid, o, ab.costs ?? [], costs, `activate ${d.name}'s ability`);
+    const cp = extraCostProblem(s, pid, o, activatedCosts(ab, x), costs, `activate ${d.name}'s ability`);
     if (cp) return cp;
   }
   const cost = activationCost(s, pid, o, ab, targets);
-  const xp = ab.loyaltyX ? (x !== undefined && (!Number.isInteger(x) || x < 0) ? "X must be a whole number, 0 or more" : null) : xProblem(cost, x);
+  const xp = ab.loyaltyX || abilityCostsHaveX(ab) ? (x !== undefined && (!Number.isInteger(x) || x < 0) ? "X must be a whole number, 0 or more" : (x ?? 0) < (ab.xMin ?? 0) ? "X can't be 0" : null) : xProblem(cost, x);
   if (xp) return xp;
   if (!canPayFromPool(s, pid, cost, { ability: o }, ab.loyaltyX ? 0 : (x ?? 0) * xCount(cost), p.life)) return `not enough mana for ${d.name}'s ability`;
   return null;
@@ -4453,7 +4461,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (ab?.crew !== undefined && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose creatures to ${ab.saddle ? "saddle" : "crew"} with`);
   // What pays each cost beyond mana is chosen as it's activated (CR 602.2b, 601.2h): an activation that doesn't say,
   // or says for one cost and not another, can't skip it. As for spells (castSpell).
-  if (ab?.costs?.some((c) => "n" in c && c.n > 0 && costNeedsPick(c) && !costs?.[costPickKey(c)]?.length)) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
+  if (ab && activatedCosts(ab, x).some((c) => "n" in c && c.n > 0 && costNeedsPick(c) && !costs?.[costPickKey(c)]?.length)) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
   let body = ab ? settleDivided(s, withModes(ab.body, modes), { controller: p.id, sourceId: id, x: x ?? 0 }) : undefined;
   const problem = abilityProblem(s, p.id, id, index, body?.targets.length ? (targets ?? []) : undefined, ab?.body.modal ? modes : undefined, tapCreatures, x, costs ?? {});
   if (problem || !ab || !body) throw new RulesError(problem ?? "no such ability");
@@ -4514,7 +4522,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const sourceZc = o.zoneChanges ?? 0;
   const stamped = stampTargets(s, targets);
   const costCardNames: string[] = [];
-  const sacrificed = ab.costs?.length ? payExtraCosts(s, p, ab.costs, costs ?? {}, lki, costCardNames) : [];
+  const sacrificed = ab.costs?.length ? payExtraCosts(s, p, activatedCosts(ab, x), costs ?? {}, lki, costCardNames) : [];
   if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard", { sacrificed: true });
   if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling);
   // Scavenge (CR 702.97a) from the graveyard; "Exile ~" on the battlefield, if it's still the same object (CR 400.7).
@@ -4532,7 +4540,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     targets: body.targets.length ? stamped : undefined,
     modes: ab.body.modal ? modes : undefined,
     ...(lki ? { lki } : {}),
-    ...(abCost.hasX || ab.loyaltyX ? { x: x ?? 0 } : {}),
+    ...(abCost.hasX || ab.loyaltyX || abilityCostsHaveX(ab) ? { x: x ?? 0 } : {}),
     ...(sacrificed.length ? { sacrificed } : {}),
     ...(costCardNames.length ? { costCardNames } : {}),
     ...(ab.station ? { stationed: { id: tapCreatures![0]!, zc: obj(s, tapCreatures![0]!).zoneChanges ?? 0, power: power(s, obj(s, tapCreatures![0]!)) } } : {}),

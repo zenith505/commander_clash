@@ -2869,6 +2869,8 @@ export interface ActivatedAbility {
   keyword?: "Exhaust" | "Boast" | "Power-up";
   /** "Activate no more than twice each turn" (CR 602.5b). */
   maxPerTurn?: number;
+  /** "X can't be 0." for an X in its costs ("Sacrifice X artifacts", Ruthless Technomancer). */
+  xMin?: number;
   /** "Activate only if you have the city's blessing" (CR 602.5b). */
   activateIf?: StaticCondition;
   /** "Pay 2 life" as part of the cost (CR 119.4: only with at least that much life). */

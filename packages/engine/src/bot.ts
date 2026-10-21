@@ -71,6 +71,7 @@ import {
   hasNoMaxHandSize,
   stackItemQuality,
   oneOfEachFits,
+  abilityCostsHaveX,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
@@ -477,7 +478,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const abilities = abilitiesOf(s, o).activated;
       for (let i = 0; i < abilities.length; i++) {
         const ab = abilities[i]!;
-        if (ab.body.modal || parseManaCost(ab.manaCost).hasX || !worthIt(ab.body, id)) continue;
+        if (ab.body.modal || parseManaCost(ab.manaCost).hasX || abilityCostsHaveX(ab) || !worthIt(ab.body, id)) continue;
         const targets = chooseTargets(s, pid, ab.body, false, id);
         const plan = targets && planActivate(s, pid, id, i, targets);
         if (plan) return plan;
@@ -2465,6 +2466,8 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (o.attachedTo && ab.body.effects.some((e) => e.type === "attach")) continue; // already equipped
       // "Equip—Sacrifice a creature": bots don't give up a permanent to move an Equipment.
       if (ab.equip && ab.costs?.some((c) => c.kind === "sacrifice")) continue;
+      // "Sacrifice X Squirrels" (Chatterfang): bots don't weigh how many permanents to give up.
+      if (abilityCostsHaveX(ab)) continue;
       if (ab.body.effects.some((e) => e.type === "unattachSelf")) continue; // reconfigured Equipment stays on
       // Saving a creature with a flip (Frenetic Efreet, Viashino Sandswimmer) waits for something to save it from (chooseFlipEscape).
       if (flips && flipEscape(flips)) continue;

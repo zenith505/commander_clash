@@ -3677,6 +3677,8 @@ export function payZeroSource(s: GameState, pid: PlayerId, o: GameObject): GameO
     if (!z || controllerOf(s, p) !== pid || !characteristics(s, p).hasPrintedAbilities) return false;
     if (z.once && used.includes(`${p.id}@${p.zoneChanges ?? 0}`)) return false;
     if (z.fromHand && o.zone !== "hand") return false;
+    if (z.yourTurn && s.activePlayer !== pid) return false;
+    if (z.fromHandOrTop && o.zone !== "hand" && !(o.zone === "library" && player(s, pid).library[0] === o.id)) return false;
     if (z.filter && !printedMatches(z.filter, d)) return false;
     return z.maxMvCounters === undefined || defMv(d) <= (p.counters[z.maxMvCounters] ?? 0);
   });

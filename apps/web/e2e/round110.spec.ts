@@ -3,7 +3,7 @@
 // nonland card" buttons on each draw, with the other revealed cards ordered on the bottom of your library.
 import { expect, test } from "@playwright/test";
 import { type GameState } from "@cc/engine";
-import { LANDS, one, open, pageErrors, playWithBots, scene } from "./scene";
+import { LANDS, idsOf, one, open, pageErrors, playWithBots, scene } from "./scene";
 import { card, clickPlayer, controls, menu, modal, resolveUntil } from "./ui";
 
 test("The Great Work, chapter III: cast Ana's Lightning Bolt from her graveyard at her; it's exiled", async ({ page }) => {
@@ -90,5 +90,19 @@ test("Sunbird's Invocation: casting Hill Giant reveals four; cast Grizzly Bears 
   const after = await resolveUntil(page, (st) => st.stack.length === 0 && st.objects[bears]!.zone === "battlefield");
   expect(after.objects[angel]!.zone).toBe("library");
   expect(after.players[0]!.library.slice(-3)).toContain(angel);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("One with the Multiverse: cast Serra Angel from the top of your library for {0}, once this turn", async ({ page }) => {
+  const s = scene({ board: ["One with the Multiverse"], library: ["Serra Angel", "Hill Giant"] });
+  const [angel, giant] = [idsOf(s, "Serra Angel", "library")[0]!, idsOf(s, "Hill Giant", "library")[0]!];
+  await open(page, s);
+  await page.locator(`[data-obj="${angel}"]`).first().click();
+  await menu(page).locator("button", { hasText: "Cast it for" }).click();
+  const after = await resolveUntil(page, (st) => st.objects[angel]!.zone === "battlefield" && st.stack.length === 0);
+  expect(after.players[0]!.library[0]).toBe(giant);
+  // Used up for this turn: Hill Giant, now on top, can't be cast without lands.
+  await page.locator(`[data-obj="${giant}"]`).first().click();
+  await expect(menu(page).locator("button", { hasText: "Cast it for" })).toHaveCount(0);
   expect(pageErrors(page)).toEqual([]);
 });

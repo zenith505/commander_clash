@@ -1492,6 +1492,12 @@ export function compile(d: CardDef): CompiledCard {
       else out.payZero = { ...(filter ? { filter } : {}), ...(payZero[3] ? { fromHand: true as const } : {}), ...(/^Once/.test(payZero[1]!) ? { once: true as const } : {}), ...(payZero[5] ? { maxMvCounters: payZero[5] } : {}) };
       continue;
     }
+    // One with the Multiverse: casting without paying the mana cost is an alternative cost (CR 118.9), X is 0 (107.3b);
+    // once for each such permanent (a new object again, rulings), during your turn, following the normal timing rules.
+    if (line === "Once during each of your turns, you may cast a spell from your hand or the top of your library without paying its mana cost.") {
+      out.payZero = { once: true, yourTurn: true, fromHandOrTop: true };
+      continue;
+    }
     if (line === "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast.") {
       out.payWUBRG = true;
       continue;

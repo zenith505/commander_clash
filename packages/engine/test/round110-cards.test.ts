@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
-import { attackCost, botActions, characteristics, graveyardWays, isFullySupported, planActivate, planCast, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
+import { altCostsFor, attackCost, botActions, characteristics, graveyardWays, isFullySupported, planActivate, planCast, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const urabrask = scry("transform", [
@@ -85,6 +85,10 @@ const transmogrify = card("Transmogrify", "Sorcery", "{3}{R}", {
 const sunbird = card("Sunbird's Invocation", "Enchantment", "{5}{R}", {
   oracleText:
     "Whenever you cast a spell from your hand, reveal the top X cards of your library, where X is that spell's mana value. You may cast a spell with mana value X or less from among cards revealed this way without paying its mana cost. Put the rest on the bottom of your library in a random order.",
+});
+const multiverse = card("One with the Multiverse", "Enchantment", "{6}{U}{U}", {
+  oracleText:
+    "You may look at the top card of your library any time.\nYou may play lands and cast spells from the top of your library.\nOnce during each of your turns, you may cast a spell from your hand or the top of your library without paying its mana cost.",
 });
 // Test cards.
 const shock = card("Test Shock", "Instant", "{R}", { oracleText: "Test Shock deals 2 damage to any target." });
@@ -518,6 +522,35 @@ describe("Sunbird's Invocation", () => {
     for (let i = 0; i < 10 && !s.pending && s.stack.length; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
     expect(s.pending).toBeNull();
     expect(s.log.some((l) => /reveals nothing/.test(l.text))).toBe(true);
+  });
+});
+
+describe("One with the Multiverse", () => {
+  it("once during each of your turns, a spell from your hand or the top of your library without paying its mana cost", () => {
+    supported(multiverse);
+    const big = card("Big Sorcery", "Sorcery", "{7}{U}", { oracleText: "Draw a card." });
+    const { s: s0, ap, ids } = setup([big, big]);
+    putOnBattlefield(s0, ap, multiverse);
+    const top = toZone(s0, ap, card("Top Sorcery", "Sorcery", "{6}", { oracleText: "Draw a card." }), "library");
+    const o = (s: GameState, id: string) => s.objects[id]!;
+    expect(altCostsFor(s0, ap, o(s0, ids[0]!)).some((a) => a.kind === "payZero")).toBe(true);
+    // The top card counts too, while it's on top.
+    expect(altCostsFor(s0, ap, o(s0, top)).some((a) => a.kind === "payZero")).toBe(true);
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "auto", undefined, { alt: "payZero" })));
+    expect(o(s, ids[0]!).zone).toBe("graveyard");
+    // Used for this turn.
+    expect(altCostsFor(s, ap, o(s, ids[1]!)).some((a) => a.kind === "payZero")).toBe(false);
+    // Not during another player's turn.
+    s = passUntil(s, "main1", next(s, ap));
+    expect(altCostsFor(s, ap, o(s, ids[1]!)).some((a) => a.kind === "payZero")).toBe(false);
+    s = passUntil(s, "main1", ap);
+    const nowTop = toZone(s, ap, card("Next Sorcery", "Sorcery", "{5}", { oracleText: "Draw a card." }), "library");
+    expect(altCostsFor(s, ap, o(s, nowTop)).some((a) => a.kind === "payZero")).toBe(true);
+    // Only the top one.
+    const second = toZone(s, ap, card("Second Sorcery", "Sorcery", "{5}", { oracleText: "Draw a card." }), "library");
+    expect(altCostsFor(s, ap, o(s, nowTop)).some((a) => a.kind === "payZero")).toBe(false);
+    s = settle(run(s, planCast(s, ap, second, undefined, undefined, "auto", undefined, { alt: "payZero" })));
+    expect(o(s, second).zone).toBe("graveyard");
   });
 });
 

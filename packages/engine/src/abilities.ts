@@ -4135,7 +4135,15 @@ export interface CompiledCard {
    * such permanent; `maxMvCounters`: "with mana value X or less, where X is the number of time counters on ~" (As
    * Foretold), checked with X at 0 (rulings).
    */
-  payZero?: { filter?: TargetSpec; fromHand?: true; once?: true; maxMvCounters?: string };
+  payZero?: {
+    filter?: TargetSpec;
+    fromHand?: true;
+    once?: true;
+    maxMvCounters?: string;
+    /** One with the Multiverse: "once during each of your turns, you may cast a spell from your hand or the top of your library without paying its mana cost". */
+    yourTurn?: true;
+    fromHandOrTop?: true;
+  };
   /**
    * Obstinate Baloth: "If a spell or ability an opponent controls causes you to discard ~, put it onto the battlefield
    * instead of putting it into your graveyard" (a replacement effect, CR 614.1a). It's still discarded (rulings).

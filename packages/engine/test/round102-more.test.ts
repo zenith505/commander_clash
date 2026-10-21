@@ -5,11 +5,11 @@
 // Delayed Blast Fireball ("each opponent and each creature they control"; "if ~ was cast from exile"). Rings of
 // Brighthearth (copying an activated ability, even once it's countered: rulings). Baleful Mastery ("if the {1}{B} cost
 // was paid, an opponent draws a card": one chosen as it resolves, rulings). Terastodon (a token for each permanent put
-// into a graveyard this way, not one that survived).
+// into a graveyard this way, not one that survived). Monastery Mentor (a token with prowess, CR 702.108a).
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, setup, target } from "./helpers";
-import { defOf, isFullySupported, planActivate, planCast, waitingOn, type GameState } from "../src";
+import { defOf, isFullySupported, planActivate, planCast, power, waitingOn, type GameState } from "../src";
 import { defMv } from "../src/faces";
 
 // Real oracle text (Scryfall).
@@ -33,6 +33,8 @@ const mastery = card("Baleful Mastery", "Instant", "{3}{B}", { oracleText: "You 
 
 const terastodon = card("Terastodon", "Creature — Elephant", "{6}{G}{G}", { power: "9", toughness: "9", oracleText: "When this creature enters, you may destroy up to three target noncreature permanents. For each permanent put into a graveyard this way, its controller creates a 3/3 green Elephant creature token." });
 const relic = card("Darksteel Relic", "Artifact", "{0}", { keywords: ["Indestructible"], oracleText: "Indestructible" });
+
+const mentor = card("Monastery Mentor", "Creature — Human Monk", "{2}{W}", { power: "2", toughness: "2", keywords: ["Prowess"], oracleText: "Prowess (Whenever you cast a noncreature spell, this creature gets +1/+1 until end of turn.)\nWhenever you cast a noncreature spell, create a 1/1 white Monk creature token with prowess." });
 
 const pass = (s: GameState) => act(s, { type: "passPriority", player: waitingOn(s)! });
 const settle = (s: GameState) => {
@@ -238,5 +240,19 @@ describe("round 102: Terastodon", () => {
     const elephants = (pid: number) => s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === pid).length;
     expect(elephants(opp)).toBe(2);
     expect(elephants(ap)).toBe(0);
+  });
+});
+
+describe("round 102: Monastery Mentor", () => {
+  it("parse", () => expect(isFullySupported(mentor)).toBe(true));
+
+  it("each noncreature spell: a Monk with prowess, and the Monks already there get +1/+1", () => {
+    const { s: s0, ap, opp, ids } = setup([bolt, bolt]);
+    putOnBattlefield(s0, ap, mentor);
+    let s = s0;
+    for (const id of ids) s = settle(planCast(s, ap, id, [{ kind: "player", id: opp }])!.reduce((x, y) => act(x, y), s));
+    const monks = s.battlefield.filter((id) => s.objects[id]!.isToken);
+    expect(monks).toHaveLength(2);
+    expect(monks.map((id) => power(s, s.objects[id]!)).sort()).toEqual([1, 2]);
   });
 });

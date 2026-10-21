@@ -69,6 +69,9 @@ export function parseToken(power: number, toughness: number, desc: string, withT
   const quoted = withText && /^(?:(.+?),? and )?"([^"]+)"$/.exec(withText);
   if (quoted && !compileQuoted(quoted[2]!)) return null;
   const kwText = quoted ? quoted[1] : withText;
+  // "A 1/1 white Monk creature token with prowess" (Monastery Mentor): a triggered keyword (CR 702.108a) is an ability
+  // of the token's, as if printed.
+  if (!quoted && kwText === "prowess" && subtypes.length) return { name: subtypes.join(" "), power, toughness, colors, types, subtypes, keywords: [], abilities: "Prowess" };
   const keywords = kwText ? parseKeywordList(kwText) : [];
   if (!keywords || !subtypes.length) return null;
   return { name: subtypes.join(" "), power, toughness, colors, types, subtypes, keywords, ...(quoted ? { abilities: quoted[2]! } : {}) };

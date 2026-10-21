@@ -255,7 +255,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Adapt N (CR 701.46a), Monstrosity N (CR 701.37a): only the permanent's own activated abilities do it.
   if ((m = /^(Adapt|Monstrosity) (\d+|X)$/.exec(s))) return ctx.activated ? [{ type: m[1] === "Adapt" ? "adapt" : "monstrosity", n: amt(m[2]!) }] : null;
   // Regeneration (CR 701.19a)
-  if ((m = /^Regenerate (~|target .+|enchanted creature|equipped creature)$/i.exec(s))) {
+  // "Regenerate each creature you control" (Golgari Charm): a shield for each, as it resolves (CR 701.19a, 611.2c).
+  if ((m = /^Regenerate (~|target .+|enchanted creature|equipped creature|each creature you control|all creatures you control)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "regenerate", what }] : null;
   }

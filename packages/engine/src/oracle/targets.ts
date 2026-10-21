@@ -492,6 +492,8 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   let p = phrase.trim().replace(/\b(non[a-z]+), (?=non[a-z]+ )/gi, "$1 ");
   // "Creatures you control that are enchanted or equipped" (Halvar, God of Battle): "enchanted-or-equipped creatures you control".
   p = p.replace(/^((?:all |each )?)(creatures) (you control) that are (enchanted or equipped|enchanted|equipped)$/i, (_, a: string, k: string, w: string, st: string) => `${a}${st.replace(/ /g, "-")} ${k} ${w}`);
+  // "All nonland permanents that aren't legendary" (Urza's Ruinous Blast): the nonlegendary ones.
+  p = p.replace(/^((?:all |each )?)([a-z ]+?) that (?:aren't|are not|isn't|is not) legendary$/i, "$1nonlegendary $2");
   const all = /^(all|each) /i.exec(p);
   if (all) p = p.slice(all[0].length);
   const other = /^other /i.test(p);

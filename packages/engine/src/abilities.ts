@@ -2417,6 +2417,8 @@ export type SpellCondition =
   | { kind: "sacrificedThisWay" }
   /** "If another Desert was returned this way" (Arid Archway): its "return a ... you control" pick returned one, as it last existed, other than its source. */
   | { kind: "bouncedThisWay"; subtype: string; another: true }
+  /** "You may put a land card from among them onto the battlefield tapped. If you don't, ..." (Planar Genesis): its last dig took a card. */
+  | { kind: "digTook" }
   /** "If excess damage was dealt this way" (Orbital Plunge): this spell's or ability's damage dealt some (Count excessThisWay). */
   | { kind: "excessDealt"; /** "To a creature this way" (Vikya): only excess dealt to a creature counts. */ creature?: true; /** "If the creature the opponent controls is dealt excess damage this way" after a fight (The Last Agni Kai): only that target's. */ target?: number }
   /**

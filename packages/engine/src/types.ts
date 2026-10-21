@@ -1595,6 +1595,8 @@ export interface Resolving {
   sacrificedThisWay?: LastKnown[];
   /** What its "return a land you control to its owner's hand" returned, as it last existed (SpellCondition bouncedThisWay). */
   bouncedThisWay?: { id: ObjectId; subtypes: string[] }[];
+  /** Whether its last "look at the top N cards ... put one ..." took a card (SpellCondition digTook). */
+  digTook?: boolean;
   /** The players who had nothing to pick for its last "each player sacrifices ..." (PlayerRef "couldntPick"). */
   couldntPick?: PlayerId[];
   /** The Army its amass instruction chose (CR 701.47c), for "the amassed Army". */

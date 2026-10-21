@@ -512,6 +512,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // "Choose target artifact or enchantment. Its owner shuffles it into their library." (Deglamer) is one instruction.
   text = text.replace(/^Choose (target [^.]+?)\. Its owner shuffles it into their library\./, "The owner of $1 shuffles it into their library.");
   // Tibalt's Trickery: one instruction about the countered spell's controller (read in parseUntilNonland).
+  // "Search your library for up to X basic land cards, where X is .... Put those cards onto the battlefield tapped, then
+  // shuffle." (Traverse the Outlands): the same as "... put them onto the battlefield tapped, then shuffle, where X is ...".
+  text = text.replace(/(^|\. )Search your library for up to X ([^.,]+), where X is ([^.]+)\. Put those cards onto the battlefield( tapped)?, then shuffle\./, "$1Search your library for up to X $2, put them onto the battlefield$4, then shuffle, where X is $3.");
   // "Transform ~, then untap it" (Westvale Abbey): the same permanent, now its back face (CR 712.18).
   text = text.replace(/^Transform ~, then untap it\.$/, "Transform ~, then untap ~.");
   text = text.replace(/Choose 1, 2, or 3 at random\. Its controller mills that many cards, then exiles cards from the top of their library until they exile a nonland card with a different name than that spell\. They may cast that card without paying its mana cost\. Then they put the exiled cards on the bottom of their library in a random order\./, `${TIBALT}.`);
@@ -607,6 +610,27 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       ],
       text,
     };
+  // Planar Genesis: "Look at the top four cards of your library. You may put a land card from among them onto the
+  // battlefield tapped. If you don't, put a card from among them into your hand. Put the rest on the bottom of your library
+  // in a random order." The land, or else any one of the four into your hand; the rest to the bottom.
+  const genesis = /^Look at the top (two|three|four|five) cards of your library\. You may put an? ([a-z]+) card from among them onto the battlefield tapped\. If you don't, put a card from among them into your hand\. Put the rest on the bottom of your library in a random order\.$/.exec(text.trim());
+  const genesisFilter = genesis && parseSearchFilter(`${genesis[2]} card`);
+  if (genesis && genesisFilter) {
+    const n = num(genesis[1]!);
+    return {
+      targets: [],
+      effects: [
+        { type: "dig", n, count: 1, upTo: true, filter: genesisFilter, into: "battlefield", tapped: true, rest: "keep", reveal: false },
+        {
+          type: "if",
+          cond: { kind: "digTook" },
+          effects: [{ type: "dig", n: n - 1, count: 0, upTo: true, into: "hand", rest: "bottom", random: true, reveal: false }],
+          otherwise: [{ type: "dig", n, count: 1, upTo: false, required: true, into: "hand", rest: "bottom", random: true, reveal: false }],
+        },
+      ],
+      text,
+    };
+  }
   // Descent into Avernus: "Then each player creates X Treasure tokens and ~ deals X damage to each player, where X is the
   // number of descent counters on ~": the same X for both, which nothing in between changes.
   text = text.replace(/(^|\. )Then each player creates X ([^.]+?) tokens and ~ deals X damage to each player, where X is ([^.]+)\./, "$1Then each player creates X $2 tokens, where X is $3. ~ deals X damage to each player, where X is $3.");
@@ -2668,7 +2692,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       // greater, counter that spell instead." (Stubborn Denial): the same spell, with no chance to pay.
       const prevCounter = previous.length === 1 && previous[0]!.type === "counterSpell" && previous[0]!.unless ? previous[0]! : null;
       const { unless: _unless, ...uncond } = (prevCounter ?? {}) as Extract<Effect, { type: "counterSpell" }>;
-      const inner = those ? (prevToken ? [{ ...prevToken, n: amt(those[1]!) }] : null) : t === "counter that spell" ? (prevCounter ? [uncond as Effect] : null) : parseOne(t.charAt(0).toUpperCase() + t.slice(1), ctx);
+      // "Return target creature card from your graveyard to your hand. Return that card from your graveyard to the
+      // battlefield instead if there are seven or more cards in your graveyard." (Stitch Together): the same card.
+      const prevBack = previous.length === 1 && previous[0]!.type === "bounce" && previous[0]!.what.ref === "target" && ctx.targets[previous[0]!.what.index]?.kind === "card" ? previous[0]! : null;
+      const toField = /^(?:return|put) (?:that card|it)(?: from your graveyard)? (?:to|onto) the battlefield$/i.test(t);
+      const inner = those ? (prevToken ? [{ ...prevToken, n: amt(those[1]!) }] : null) : t === "counter that spell" ? (prevCounter ? [uncond as Effect] : null) : toField ? (prevBack ? [{ type: "putOntoBattlefield" as const, what: prevBack.what }] : null) : parseOne(t.charAt(0).toUpperCase() + t.slice(1), ctx);
       // Only one of the two happens, so neither may wait on a choice or need targets of its own (one "you may"
       // instead would leave nothing done on a "no").
       // A punisher waits on its players but always does its whole process (Court of Ambition's "instead" one), and so do

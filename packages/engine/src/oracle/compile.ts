@@ -296,6 +296,10 @@ export function normalizeSelf(d: CardDef): string {
   }
   // In a quoted ability the card gives something else, its name still means the card (CR 201.5a), not the
   // object with the ability, which is "~" there: mark it so that text isn't compiled as "~".
+  // A token's name is a name, not the card ("a 3/3 blue Serpent creature token named Koma's Coil", "a 0/1 red Kobold
+  // creature token named Kobolds of Kher Keep").
+  const tokenNames: string[] = [];
+  t = t.replace(/(tokens? named )([A-Z][\w'-]*(?: (?:of |the )?[A-Z][\w'-]*)*)/g, (_, a: string, n: string) => `${a}\u0001${tokenNames.push(n) - 1}\u0001`);
   if (full) {
     t = t.replace(/"[^"]*"/g, (q) => q.replace(new RegExp(esc(full), "g"), QUOTED_SOURCE_NAME));
     t = t.replace(new RegExp(esc(full), "g"), "~");
@@ -309,12 +313,9 @@ export function normalizeSelf(d: CardDef): string {
   if (short && short !== full) {
     const re = new RegExp(`\\b${esc(short)}\\b${ofThe ? "(?! (?:of|the) [A-Z])" : ""}`, "g");
     t = t.replace(/"[^"]*"/g, (q) => q.replace(re, QUOTED_SOURCE_NAME));
-    // A token's name is a name, not the card ("a 3/3 blue Serpent creature token named Koma's Coil").
-    const tokenNames: string[] = [];
-    t = t.replace(/(tokens? named )([A-Z][\w'-]*(?: (?:of |the )?[A-Z][\w'-]*)*)/g, (_, a: string, n: string) => `${a}\u0001${tokenNames.push(n) - 1}\u0001`);
     t = t.replace(re, "~");
-    t = t.replace(/\u0001(\d+)\u0001/g, (_, i: string) => tokenNames[Number(i)]!);
   }
+  t = t.replace(/\u0001(\d+)\u0001/g, (_, i: string) => tokenNames[Number(i)]!);
   // A legendary character card refers to itself as "he" or "she" ("Put a +1/+1 counter on Hercules. He gains
   // vigilance", "his power", "attach up to one target Equipment to her"): the card itself, like "it" (CR 201.5). Not in
   // a quoted ability, where it would mean the object given the ability, and not "his or her" (an old way to say "their").

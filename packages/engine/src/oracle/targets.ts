@@ -147,6 +147,13 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
     ctx.lastPlayerTarget = index;
     return { ref: "target", index };
   }
+  // "Up to one target player" (Endurance): it may be chosen or not (CR 115.6); with none, nobody does it.
+  const upTo = /^up to one target (player|opponent)$/.exec(x);
+  if (upTo) {
+    const index = addTarget(ctx, { kind: "player", opponent: upTo[1] === "opponent", optional: true, text: `target ${upTo[1]}` });
+    ctx.lastPlayerTarget = index;
+    return { ref: "target", index };
+  }
   return null;
 }
 

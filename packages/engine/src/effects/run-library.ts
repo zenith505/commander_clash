@@ -467,6 +467,13 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
         const ids = [...(e.hand ? p.hand : []), ...(e.graveyard ? p.graveyard : [])];
+        if (e.bottom) {
+          // Endurance: "puts all the cards from their graveyard on the bottom of their library in a random order".
+          shuffle(s, ids);
+          for (const id of ids) moveObject(s, id, "library"); // to the bottom
+          log(s, `${p.name} puts ${ids.length === 1 ? "the card" : `all ${ids.length} cards`} from their graveyard on the bottom of their library in a random order.`);
+          continue;
+        }
         for (const id of ids) moveObject(s, id, "library");
         shuffleLibrary(s, p);
         log(s, `${p.name} shuffles their ${e.hand && e.graveyard ? "hand and graveyard" : e.hand ? "hand" : "graveyard"} into their library.`);

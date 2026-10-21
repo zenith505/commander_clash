@@ -2423,9 +2423,34 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "If X is 10 or more, creatures you control get +X/+X and gain haste until end of turn" (Finale of Devastation), "If
     // X is 5 or more, destroy all other creatures" (Martial Coup): the X the spell was cast with (CR 107.3a), as well as
     // what came before ("also"). Only a spell's own X.
+    // "Draw X cards. If X is 10 or more, instead shuffle your graveyard into your library, draw X cards, untap up to five
+    // lands, and you have no maximum hand size for the rest of the game." (Finale of Revelation): one or the other, in
+    // order (CR 608.2c), each instruction once even when one waits on a choice.
+    const xInstead = /^If X is (\d+|ten) or more, instead (.+)$/.exec(s);
+    if (xInstead && ctx.spell && !ctx.whereX) {
+      const previous = effects.slice(prevWhole);
+      const parts = xInstead[2]!.split(/, (?:and )?/);
+      const before = ctx.targets.length;
+      const inner: Effect[] = [];
+      for (const part of parts) {
+        const fx = parseOne(capital(part), ctx);
+        if (!fx) return null;
+        inner.push(...fx);
+      }
+      if (!previous.length || ctx.targets.length !== before || previous.some((e) => pauses(e))) return null;
+      effects.splice(prevWhole, effects.length - prevWhole, { type: "if", cond: { kind: "xAtLeast", n: num(xInstead[1]!) }, effects: inner, otherwise: previous });
+      continue;
+    }
     const xAtLeast = /^If X is (\d+|one|two|three|four|five|six|seven|eight|nine|ten) or (?:more|greater), (?:also )?(.+)$/.exec(s);
     if (xAtLeast && !/\binstead\b/.test(xAtLeast[2]!)) {
       if (!(ctx.spell || ctx.ownX) || ctx.whereX) return null;
+      // Martial Coup: "Create X 1/1 white Soldier creature tokens. If X is 5 or more, destroy all other creatures": all but
+      // those Soldiers (rulings).
+      const made = effects[effects.length - 1];
+      if (ctx.spell && /^destroy all other creatures$/.test(xAtLeast[2]!) && made?.type === "createToken") {
+        effects.push({ type: "if", cond: { kind: "xAtLeast", n: num(xAtLeast[1]!) }, effects: [{ type: "destroy", what: { ref: "each", filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "creature" }, notCreated: true } }] });
+        continue;
+      }
       const inner = parseOne(xAtLeast[2]!.charAt(0).toUpperCase() + xAtLeast[2]!.slice(1), ctx);
       if (!inner) return null;
       effects.push({ type: "if", cond: { kind: "xAtLeast", n: num(xAtLeast[1]!) }, effects: inner });

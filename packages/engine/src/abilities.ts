@@ -566,7 +566,7 @@ export type ObjRef =
    * `of`: "each creature target player controls", "all lands that player controls": only that player's permanents (if
    * it's still a legal target, CR 608.2b).
    */
-  | { ref: "each"; filter: TargetSpec; other?: boolean; /** A spell's "other creatures you control" after "target creature you control": all but that target. */ otherThan?: number; of?: PlayerRef; /** "~ and other creatures you control": the source too, while it's still on the battlefield. */ andSelf?: true; /** "... that share a creature type with it" (Haunted One): with the source as it is, or last was, on the battlefield (CR 608.2h). */ sharesTypeWithSelf?: true; /** "That creature and each other creature you control that shares a creature type with it" (Holy Frazzle-Cannon): the trigger's subject too, the others not it and sharing a creature type with it, as it is or last was on the battlefield (CR 608.2h). */ andSubject?: true }
+  | { ref: "each"; filter: TargetSpec; other?: boolean; /** "Create X 1/1 Soldier tokens. ... destroy all other creatures" (Martial Coup): all but the tokens this resolution created. */ notCreated?: true; /** A spell's "other creatures you control" after "target creature you control": all but that target. */ otherThan?: number; of?: PlayerRef; /** "~ and other creatures you control": the source too, while it's still on the battlefield. */ andSelf?: true; /** "... that share a creature type with it" (Haunted One): with the source as it is, or last was, on the battlefield (CR 608.2h). */ sharesTypeWithSelf?: true; /** "That creature and each other creature you control that shares a creature type with it" (Holy Frazzle-Cannon): the trigger's subject too, the others not it and sharing a creature type with it, as it is or last was on the battlefield (CR 608.2h). */ andSubject?: true }
   /**
    * "The top creature card of your graveyard" (CR 404.1, rulings: the one put there most recently): the topmost card of
    * each player's graveyard that matches `filter`, as this resolves. `bottom`: the bottommost. `only`: "if the top card
@@ -1924,7 +1924,7 @@ export type Effect =
   | { type: "shuffleIntoLibrary"; what: ObjRef }
   | { type: "shuffleSpell"; /** "Put ~ on the bottom of its owner's library" (Seasons Past): there instead, with no shuffle. */ bottom?: true; /** "Put ~ into its owner's library seventh from the top" (Approach of the Second Sun): no shuffle. */ nth?: number }
   /** "Target player shuffles their graveyard into their library", "Each player shuffles their hand and graveyard into their library". */
-  | { type: "shuffleZones"; who: PlayerRef; hand?: true; graveyard?: true }
+  | { type: "shuffleZones"; who: PlayerRef; hand?: true; graveyard?: true; /** "Puts all the cards from their graveyard on the bottom of their library in a random order" (Endurance): no shuffle. */ bottom?: true }
   | { type: "fight"; a: ObjRef; b: ObjRef } // CR 701.14: each deals damage equal to its power to the other
   /**
    * Ezuri's Predation, after "for each creature your opponents control, create a 4/4 ... token": "Each of those tokens

@@ -2,7 +2,7 @@ import type { CopyExcept } from "../copies";
 import type { CountMod, TokenSpec } from "../abilities";
 import { CREATURE_TYPES } from "../keywords";
 import type { Color } from "../types";
-import { COLOR_WORDS, TYPE_WORDS, capital } from "./words";
+import { BASIC_TYPES, COLOR_WORDS, TYPE_WORDS, capital } from "./words";
 import { parseKeywordList } from "./targets";
 import { compileQuoted } from "./grants";
 
@@ -59,7 +59,9 @@ export function parseToken(power: number, toughness: number, desc: string, withT
     if (COLOR_WORDS[lw]) colors.push(COLOR_WORDS[lw]!);
     else if (lw === "and" || lw === "colorless") continue;
     else if (lw === "artifact" || lw === "enchantment") types.unshift(TYPE_WORDS[lw]!);
-    else if (CREATURE_TYPES.has(w)) subtypes.push(w);
+    // "1/1 green Forest Dryad land creature" (Awaken the Woods): a basic land type gives it "{T}: Add {G}" (CR 305.6).
+    else if (lw === "land") types.unshift("Land");
+    else if (CREATURE_TYPES.has(w) || (BASIC_TYPES.includes(w) && /\bland\b/.test(desc))) subtypes.push(w);
     else return null;
   }
   // 'with "Sacrifice ~: Add {C}."': an ability of its own (CR 111.3); 'with flying, haste, and "When this creature dies,

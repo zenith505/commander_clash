@@ -354,7 +354,8 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const except = t?.kind === "object" ? t.id : ref.other ? ctx.sourceId : undefined;
     const whose = ref.of && players(s, ref.of, ctx);
     const mine = ref.sharesTypeWithSelf ? sourceCreatureTypes(s, ctx) : undefined;
-    const others = s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== except && (!whose || whose.includes(controllerOf(s, o))) && objectMatches(s, filter, o, ctx.controller, false) && (!mine || shareCreatureType(mine, creatureTypesOf(s, o))));
+    const made = ref.notCreated ? (s.resolving?.created ?? []) : [];
+    const others = s.battlefield.map((id) => obj(s, id)).filter((o) => o.id !== except && !made.includes(o.id) && (!whose || whose.includes(controllerOf(s, o))) && objectMatches(s, filter, o, ctx.controller, false) && (!mine || shareCreatureType(mine, creatureTypesOf(s, o))));
     if (!ref.andSelf) return others;
     const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
     const here = me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc);

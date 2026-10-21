@@ -3921,6 +3921,11 @@ export interface CompiledCard {
    * controller may cast spells like these any time they could cast an instant.
    */
   flashFor?: TargetSpec[];
+  /**
+   * "Creature cards you own that aren't on the battlefield have flash" (Teferi, Mage of Zhalfir): those cards of its
+   * controller's have flash wherever they are but the battlefield, whoever casts them (CR 702.8a).
+   */
+  flashOwned?: TargetSpec[];
   /** "Whenever enchanted land is tapped for mana, its controller adds an additional {G}" and the like (CR 605.1b). */
   manaTriggers?: ManaTrigger[];
   countMods?: CountMod[];
@@ -3948,6 +3953,8 @@ export interface CompiledCard {
      * slot, "" for one; Muldrotha's are the permanent types, a spell using one of its own types (rulings).
      */
     once?: string[];
+    /** "A permanent spell with mana value 2 or less" (Lurrus): the spell's, its X counted (CR 202.3e), as it's cast. */
+    maxMv?: number;
   }[];
   /** Muldrotha: "you may play a land ... from your graveyard" once during each of your turns. */
   landFromGraveyardOnce?: true;

@@ -164,7 +164,8 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   }
   // "Instant and sorcery spells you cast cost {1} less to cast for each experience counter you have" (Mizzix): that much
   // less for each, counted as the spell is cast (CR 601.2f).
-  if ((m = /^(.+ you cast costs? \{\d+\} less to cast) for each (experience counter you have)$/.exec(text)) && !/^~/.test(text)) {
+  // "Angel spells and Human spells you cast cost {1} less to cast for each +1/+1 counter on ~" (Herald of War).
+  if ((m = /^(.+ you cast costs? \{\d+\} less to cast) for each (.+)$/.exec(text)) && !/^~/.test(text)) {
     const base = parseCostChange(m[1]!);
     const c = parseCount(m[2]!, null, true);
     if (!base || base === "fail" || !("costMod" in base) || !c) return "fail";

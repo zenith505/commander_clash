@@ -1147,14 +1147,16 @@ export function compile(d: CardDef): CompiledCard {
     // permission used once each turn (rulings: the spell's costs are paid, its timing rules followed). Muldrotha: "During
     // each of your turns, you may play a land and cast a permanent spell of each permanent type from your graveyard."
     // Kess: "If a spell cast this way would be put into your graveyard, exile it instead."
-    const onceYard = /^Once during each of your turns, you may cast an? (.+?) spell from your graveyard\.( If a spell cast this way would be put into your graveyard, exile it instead\.)?$/.exec(line);
+    const onceYard = /^Once during each of your turns, you may cast an? (.+?) spell( with mana value \d+ or less)? from your graveyard\.( If a spell cast this way would be put into your graveyard, exile it instead\.)?$/.exec(line);
     if (onceYard || line === "During each of your turns, you may play a land and cast a permanent spell of each permanent type from your graveyard.") {
-      const filter = parseTargetPhrase(`${onceYard ? onceYard[1]!.replace(/ and /g, " or ") : "permanent"} card from a graveyard`);
-      if (filter?.kind !== "card" || filter.manaValue || filter.bound) out.unsupported.push(raw);
+      const filter = parseTargetPhrase(`${onceYard ? onceYard[1]!.replace(/ and /g, " or ") : "permanent"} card${onceYard?.[2] ?? ""} from a graveyard`);
+      // Lurrus: "a permanent spell with mana value 2 or less", the spell's mana value (Count X, CR 202.3e).
+      const maxMv = filter?.manaValue && filter.manaValue.min === undefined && filter.manaValue.max !== undefined && onceYard ? filter.manaValue.max : undefined;
+      if (filter?.kind !== "card" || (filter.manaValue && maxMv === undefined) || filter.bound) out.unsupported.push(raw);
       else {
-        const { owner: _, ...f } = filter;
+        const { owner: _, manaValue: _mv, ...f } = filter;
         const once = onceYard ? [""] : ["Artifact", "Creature", "Enchantment", "Planeswalker", "Battle"];
-        (out.graveyardGrants ??= []).push({ filter: { ...f, text: `${onceYard?.[1] ?? "permanent"} cards` }, way: { kind: "turnPermission", costs: [], exile: !!onceYard?.[2] }, yourTurn: true, once });
+        (out.graveyardGrants ??= []).push({ filter: { ...f, text: `${onceYard?.[1] ?? "permanent"} cards` }, way: { kind: "turnPermission", costs: [], exile: !!onceYard?.[3] }, yourTurn: true, once, ...(maxMv !== undefined ? { maxMv } : {}) });
         if (!onceYard) out.landFromGraveyardOnce = true;
       }
       continue;
@@ -1585,6 +1587,10 @@ export function compile(d: CardDef): CompiledCard {
       out.crewsAs = { ...(crewsAs[2] ? { n: Number(crewsAs[2]) } : { toughness: true as const }), saddles: !!crewsAs[1] };
       continue;
     }
+    if (line === "Creature cards you own that aren't on the battlefield have flash.") {
+      (out.flashOwned ??= []).push({ kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature cards you own" });
+      continue;
+    }
     const flashFor = /^You may cast (.*?)spells as though they had flash\.$/.exec(line);
     if (flashFor) {
       // "Aura and Equipment spells" (Sigarda's Aid): each of them.
@@ -1946,6 +1952,9 @@ export function compile(d: CardDef): CompiledCard {
     // commanderPairProblem).
     // "Doctor's companion" too (CR 702.124m).
     if (/^(?:Partner—(?:Character select|Father & son|Friends forever|Survivors)|Doctor's companion)$/.test(line)) continue;
+    // Companion works only outside the game (CR 702.139a): from a revealed card set aside before the game. Decks here have
+    // no cards outside the game, so in a game it does nothing.
+    if (/^Companion ?— ?.+$/.test(line)) continue;
     // "Partner with [name]" is two abilities (CR 702.124j): the deck-building one (commanderPairProblem) and "When this
     // permanent enters, target player may search their library for a card named [name], reveal it, put it into their
     // hand, then shuffle."

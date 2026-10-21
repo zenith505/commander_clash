@@ -221,6 +221,11 @@ export const toughness = (s: GameState, o: GameObject) => characteristics(s, o).
 export const objIsType = (s: GameState, o: GameObject, t: string) => characteristics(s, o).types.includes(t);
 
 /** Does this permanent have keyword `k` right now (printed, granted, or not lost)? */
+/** Whether it can be sacrificed: not if it "can't be sacrificed" (CR 701.21; rulings on Alexios), for a cost or by an effect. */
+export function canBeSacrificed(s: GameState, o: GameObject): boolean {
+  return !characteristics(s, o).cantBeSacrificed;
+}
+
 export function objHasKeyword(s: GameState, o: GameObject, k: SupportedKeyword | string): boolean {
   return characteristics(s, o).keywords.some((x) => x.toLowerCase() === k.toLowerCase());
 }

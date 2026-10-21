@@ -9,7 +9,7 @@ import { asFace, castableFaces, defMv, hasName, isRoom, landFaces, layoutOf, reg
 import { checkDayNight, dayNightUntapCheck } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
-import { abilitiesOf, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
+import { abilitiesOf, canBeSacrificed, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
 import { bindBound, pickOptions, playerProtectedFrom, spellManaValue } from "./effects/targeting";
@@ -611,6 +611,11 @@ export function moveObject(
 ) {
   const o = obj(s, id);
   const fromZone = o.zone;
+  // "Can't be sacrificed": an instruction to sacrifice it does nothing (rulings on Alexios, CR 701.21).
+  if (opts.sacrificed && fromZone === "battlefield" && !canBeSacrificed(s, o)) {
+    log(s, `${defOf(s, o).name} can't be sacrificed.`);
+    return;
+  }
   // A creature tapped for a station ability that's still on the stack: its power as it last existed (rulings on station).
   if (fromZone === "battlefield")
     for (const item of s.stack) if (item.stationed?.id === id && item.stationed.zc === (o.zoneChanges ?? 0)) item.stationed.power = power(s, o);
@@ -4001,7 +4006,7 @@ export function casualtyCandidates(s: GameState, pid: PlayerId, d: CardDef): Obj
   if (n === undefined) return [];
   return s.battlefield.filter((id) => {
     const o = obj(s, id);
-    return controllerOf(s, o) === pid && objIsType(s, o, "Creature") && power(s, o) >= n;
+    return controllerOf(s, o) === pid && objIsType(s, o, "Creature") && power(s, o) >= n && canBeSacrificed(s, o);
   });
 }
 
@@ -4080,7 +4085,7 @@ export function bargainCandidates(s: GameState, pid: PlayerId, spell: ObjectId):
   if (!compileCard(defOf(s, obj(s, spell))).bargain) return [];
   return s.battlefield.filter((id) => {
     const o = obj(s, id);
-    return id !== spell && controllerOf(s, o) === pid && (o.isToken || objIsType(s, o, "Artifact") || objIsType(s, o, "Enchantment"));
+    return id !== spell && controllerOf(s, o) === pid && (o.isToken || objIsType(s, o, "Artifact") || objIsType(s, o, "Enchantment")) && canBeSacrificed(s, o);
   });
 }
 
@@ -4281,7 +4286,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     }
     const pool =
       c.kind === "sacrifice"
-        ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !(c.other && id === o.id && !(c.selfIf && objectMatches(s, c.selfIf, o, pid, false))) && objectMatches(s, c.filter, obj(s, id), pid, false))
+        ? s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !(c.other && id === o.id && !(c.selfIf && objectMatches(s, c.selfIf, o, pid, false))) && objectMatches(s, c.filter, obj(s, id), pid, false) && (c.exile || canBeSacrificed(s, obj(s, id))))
         : c.kind === "tap"
           ? tapCostCandidates(s, pid, o, c)
         : c.kind === "returnToHand"
@@ -4505,6 +4510,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.sorcerySpeed && !canActAtSorcerySpeed(s, pid) && !((ab.loyalty !== undefined || ab.loyaltyX) && loyaltyAtInstantSpeed(s, pid)) && !(ab.equip && equipAtInstantSpeed(s, pid))) return "activate only as a sorcery";
   if (ab.tap && o.tapped) return `${d.name} is tapped`;
   if (ab.tap && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${d.name} has summoning sickness`; // CR 602.5a
+  if (ab.sacrificeSelf && o.zone === "battlefield" && !canBeSacrificed(s, o)) return `${d.name} can't be sacrificed`; // CR 701.21, 602.2b
   if (ab.oncePerTurn && (o.activatedThisTurn?.filter((n) => n === index).length ?? 0) >= (ab.keyword === "Boast" && boastsTwice(s, pid) ? 2 : 1)) return `${d.name}'s ability can be activated only ${ab.keyword === "Boast" && boastsTwice(s, pid) ? "twice" : "once"} each turn`; // CR 602.5b
   if (ab.onceEver && o.activatedEver?.includes(index) && !(ab.keyword === "Exhaust" && mayExhaustAgain(s, pid)) && !(ab.keyword === "Power-up" && o.activatedEver.filter((i) => i === index).length <= powerUpAgain(s, pid))) return `${d.name}'s ${ab.keyword === "Exhaust" ? "exhaust " : ""}ability can be activated only once`; // CR 702.177a-b, 602.5b
   // "Reveal the player you chose": not if no player was chosen as it entered (rulings on Guardian Archon).
@@ -5533,7 +5539,7 @@ function askEntersChoice(s: GameState): boolean {
       // the battlefield yet as they're chosen, so it can't devour itself.
       const devour = compileCard(defOf(s, o)).devour;
       const you = controllerOf(s, o);
-      const options = devour ? s.battlefield.filter((id) => id !== o.id && controllerOf(s, obj(s, id)) === you && objectMatches(s, devour.filter, obj(s, id), you, false)) : [];
+      const options = devour ? s.battlefield.filter((id) => id !== o.id && controllerOf(s, obj(s, id)) === you && objectMatches(s, devour.filter, obj(s, id), you, false) && canBeSacrificed(s, obj(s, id))) : [];
       if (!options.length) {
         q.shift();
         devourChosen(s, o, [], c.enters);
@@ -5774,7 +5780,7 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
       (!objHasKeyword(s, o, "Defender") || characteristics(s, o).attackDespiteDefender) &&
       !characteristics(s, o).cantAttack &&
       !(s.cantAttackThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false)) &&
-      (!(characteristics(s, o).attackUnless.length || characteristics(s, o).cantAttackPlayers.length) || opps.some((d) => !attackProblem(s, o, d))),
+      (!(characteristics(s, o).attackUnless.length || characteristics(s, o).cantAttackPlayers.length || characteristics(s, o).cantAttackOwner) || opps.some((d) => !attackProblem(s, o, d))),
   );
 }
 
@@ -5814,6 +5820,8 @@ export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, p
   // "Can't attack you or planeswalkers you control": that player, and their planeswalkers (a battle they protect isn't one).
   const atBattle = !!attacked && !!s.objects[attacked] && objIsType(s, obj(s, attacked), "Battle") && !objIsType(s, obj(s, attacked), "Planeswalker");
   if (c.cantAttackPlayers.includes(defender) && !atBattle) return `${c.name} can't attack ${player(s, defender).name}${planeswalker ? "'s planeswalkers" : ""}`;
+  // Alexios: its owner, but not their planeswalkers or the battles they protect (rulings).
+  if (c.cantAttackOwner && !planeswalker && attacked === undefined && defender === o.owner) return `${c.name} can't attack its owner`;
   if (c.cantAttackSamePlayer && !planeswalker && o.attacked?.turn === s.turn && o.attacked.players?.includes(defender)) return `${c.name} can't attack a player it has already attacked this turn`;
   for (const f of c.attackUnless)
     if (!s.battlefield.some((id) => controllerOf(s, obj(s, id)) === defender && objectMatches(s, f, obj(s, id), c.controller, false)))

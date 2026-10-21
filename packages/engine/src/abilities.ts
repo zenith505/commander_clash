@@ -862,6 +862,10 @@ export type Modification =
   | { kind: "cantAttackSamePlayer" }
   /** "Can't attack you or planeswalkers you control" (Promise of Loyalty, CR 508.1c): "you" is the effect's controller. */
   | { kind: "cantAttackYou" }
+  /** "Can't attack its owner" (Alexios): that player, not their planeswalkers or battles (rulings). */
+  | { kind: "cantAttackOwner" }
+  /** "Can't be sacrificed" (CR 701.21): an instruction to sacrifice it does nothing; it can't be chosen to be sacrificed, for a cost either (rulings on Alexios). */
+  | { kind: "cantBeSacrificed" }
   /** Blocking requirements (CR 509.1c): "must be blocked if able", "all creatures able to block ~ do so". */
   | { kind: "mustBeBlocked" }
   | { kind: "allMustBlock" }
@@ -1537,7 +1541,7 @@ export type Effect =
    * `double`: "double the number of +1/+1 counters on each creature you control": each gets as many more as it has (CR
    * 701.10e), `n` aside; with `everyKind`, of each kind of counter it has ("double the number of each kind of counter").
    */
-  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true; double?: true; everyKind?: true }
+  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true; double?: true; everyKind?: true; /** "That player ... puts a +1/+1 counter on it" (Alexios): who puts them, when not the ability's controller. */ by?: PlayerRef }
   /**
    * "Distribute X +1/+1 counters among any number of creatures you control" (no targets): its controller divides them
    * among the permanents like `filter` they control as it resolves (rulings on Blessing of Frost, CR 608.2d), each

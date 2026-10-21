@@ -783,6 +783,13 @@ export function parseStaticMods(rest: string): Modification[] | null {
     return filter?.kind === "object" && filter.power ? [{ kind: "cantBlockCreatures", filter: { ...filter, text: `creatures with power ${m[1]} or ${m[2]}` } }] : null;
   }
   if (/^can't attack$/.test(rest)) return [{ kind: "cantAttack" }];
+  if (/^can't attack its owner$/.test(rest)) return [{ kind: "cantAttackOwner" }];
+  if (/^can't be sacrificed$/.test(rest)) return [{ kind: "cantBeSacrificed" }];
+  // Alexios: "attacks each combat if able, can't be sacrificed, and can't attack its owner".
+  if ((m = /^((?:attacks each combat if able|can't [^,]+)), ((?:attacks each combat if able|can't [^,]+)),? and (attacks each combat if able|can't [^,]+)$/.exec(rest))) {
+    const parts = [m[1]!, m[2]!, m[3]!].map((p) => parseStaticMods(p));
+    return parts.every((p) => p) ? parts.flatMap((p) => p!) : null;
+  }
   if ((m = /^can't be the target of (.+)$/.exec(rest))) {
     const by = parseUntargetable(m[1]!);
     return by ? [{ kind: "untargetable", by }] : null;
@@ -1096,7 +1103,7 @@ function parseStaticLine(line: string): StaticAbility | null {
   // greater is checked as it assigns combat damage, which comes to the same thing as a group that changes with it.
   const greater = /^(.+?) with toughness greater than (?:its|their) power (assigns? .+)$/.exec(text);
   if (greater) text = `${greater[1]} ${greater[2]}`;
-  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|can't .+|can block .+|can attack as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses all abilities)$/.exec(text);
+  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|can't .+|can block .+|can attack as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:, .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses all abilities)$/.exec(text);
   if (!m) return null;
   const affects = parseAffected(m[1]!);
   if (!affects) return null;

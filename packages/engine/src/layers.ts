@@ -164,6 +164,10 @@ export interface Characteristics {
   cantAttackAlone: boolean;
   cantBlockAlone: boolean;
   cantAttackSamePlayer: boolean;
+  /** "Can't attack its owner" (Alexios). */
+  cantAttackOwner: boolean;
+  /** "Can't be sacrificed" (CR 701.21). */
+  cantBeSacrificed: boolean;
   /** "Can't attack you or planeswalkers you control" (Promise of Loyalty): those players and their planeswalkers. */
   cantAttackPlayers: PlayerId[];
   mustBeBlocked: boolean;
@@ -241,6 +245,8 @@ function printed(s: GameState, o: GameObject): Characteristics {
     cantAttackAlone: false,
     cantBlockAlone: false,
     cantAttackSamePlayer: false,
+    cantAttackOwner: false,
+    cantBeSacrificed: false,
     cantAttackPlayers: [],
     mustBeBlocked: false,
     allMustBlock: false,
@@ -1092,6 +1098,8 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "cantAttackAlone":
     case "cantBlockAlone":
     case "cantAttackSamePlayer":
+    case "cantAttackOwner":
+    case "cantBeSacrificed":
     case "mustBeBlocked":
     case "allMustBlock":
     case "mustBlock":

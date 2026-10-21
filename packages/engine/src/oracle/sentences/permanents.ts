@@ -406,7 +406,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return who && what?.ref === "target" && !what.n ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: "game", giveTo: who }] : null;
   }
   // "That player gains control of ~" (Coveted Jewel): the trigger's player, for the rest of the game (layer 2).
-  if (/^That player gains control of ~$/.test(s) && ctx.eventPlayer) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "eventPlayer" } }];
+  if (/^[Tt]hat player gains control of ~$/.test(s) && ctx.eventPlayer) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "eventPlayer" } }];
+  // Alexios: "that player gains control of ~, untaps it, and puts a +1/+1 counter on it": that player puts the counter.
+  if ((m = /^[Tt]hat player gains control of ~, untaps it, and puts (a|two|three) \+1\/\+1 counters? on it$/.exec(s)) && ctx.eventPlayer)
+    return [
+      { type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "eventPlayer" } },
+      { type: "untap", what: { ref: "self" } },
+      { type: "counters", what: { ref: "self" }, counter: "+1/+1", n: m[1] === "a" ? 1 : m[1] === "two" ? 2 : 3, by: { ref: "eventPlayer" } },
+    ];
   if (/^An opponent(?: of your choice)? gains control of ~$/.test(s))
     return [{ type: "choose", choice: "opponent" }, { type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "chosenPlayer" } }];
   // "Gain control of that Equipment until end of turn" (Stolen Uniform): a target an earlier sentence chose.

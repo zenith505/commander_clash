@@ -1,5 +1,5 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
-import { abilitiesOf, cardIdOf, defOf, isPermanentCard, isType, objIsType, power } from "../cards";
+import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType, objIsType, power } from "../cards";
 import { nameLandBan } from "../names";
 import { attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
@@ -192,7 +192,7 @@ function sacrificeEach(s: GameState, e: Extract<Effect, { type: "sacrificeEach" 
       sc.chosen = undefined;
       sl.slot++;
     }
-    const own = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid);
+    const own = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && canBeSacrificed(s, obj(s, id)));
     const fits = (i: number, id: ObjectId) => objectMatches(s, { ...e.filters[i]!, controller: "you" }, obj(s, id), pid, false);
     // The most of filters i.. that permanents other than `used` can fill, each by a different one.
     const most = (i: number, used: ObjectId[]): number => {
@@ -438,7 +438,7 @@ function exploit(s: GameState, ctx: ResolveCtx, src: string): "paused" | void {
   const sc = (s.resolving!.scratch ??= {});
   const pid = ctx.controller;
   if (!sc.queue) {
-    const options = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature"));
+    const options = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature") && canBeSacrificed(s, obj(s, id)));
     if (!options.length) return;
     sc.queue = [pid];
     sc.chosen = {};

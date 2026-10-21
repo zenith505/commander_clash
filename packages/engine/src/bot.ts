@@ -3,7 +3,7 @@ import { allEffects, refCovers, timedCondition, type AbilityBody, type Activated
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
 import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
-import { abilitiesOf, basePower, baseToughness, defOf, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
+import { abilitiesOf, basePower, baseToughness, canBeSacrificed, defOf, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
 import { bindChosen, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, manySlot, gateTargets, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
@@ -1857,7 +1857,7 @@ function sacrificePool(s: GameState, pid: PlayerId, c: Extract<AdditionalCost, {
   const value = (o: GameObject) => (o.isToken ? 0 : 1 + mv(s, o.id));
   return s.battlefield
     .map((x) => obj(s, x))
-    .filter((o) => controllerOf(s, o) === pid && !o.isCommander && !targeted.has(o.id) && objectMatches(s, c.filter, o, pid, false))
+    .filter((o) => controllerOf(s, o) === pid && !o.isCommander && !targeted.has(o.id) && objectMatches(s, c.filter, o, pid, false) && (c.exile || canBeSacrificed(s, o)))
     .filter((o) => (alt === "emerge" ? o.isToken || power(s, o) <= 3 : value(o) <= 3 || (objIsType(s, o, "Land") && lands(s, pid) >= 7)))
     .sort((a, b) => (alt === "emerge" ? mv(s, b.id) - mv(s, a.id) : value(a) - value(b)));
 }

@@ -88,6 +88,26 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       s.pending = { kind: "chooseMay", player: ctx.controller, prompt: `repeat: ${e.text}`, source: src, repeat: true };
       return "paused";
     }
+    case "rollAgain": {
+      // "You may roll again" (CR 706.3c): the same roll, with its modifiers, and the results table after it once more.
+      // Asked after the row's other instructions are done (rulings on Delina: rolling again is optional).
+      const r = s.resolving!;
+      const sc = (r.scratch ??= {});
+      const again = sc.may;
+      if (again === undefined) {
+        s.pending = { kind: "chooseMay", player: ctx.controller, prompt: "roll again", source: src };
+        return "paused";
+      }
+      sc.may = undefined;
+      if (!again) return;
+      // The top-level roll this table belongs to: resolution goes on from it (the loop moves on to `next + 1`).
+      let at = r.next - 1;
+      while (at >= 0 && r.body.effects[at]!.type !== "roll") at--;
+      if (at < 0) return;
+      log(s, `${player(s, ctx.controller).name} rolls again.`);
+      r.next = at - 1;
+      return;
+    }
     case "either": {
       // The controller picks one as it resolves (CR 608.2d), and only that one happens.
       const sc = (s.resolving!.scratch ??= {});
@@ -294,6 +314,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !!s.resolving!.bouncedThisWay?.some((b) => b.subtypes.includes((e.cond as { subtype: string }).subtype) && b.id !== ctx.sourceId)
             : e.cond.kind === "excessDealt"
             ? (e.cond.target !== undefined ? (objects(s, { ref: "target", index: e.cond.target }, ctx).reduce((a, o) => a + (s.resolving!.excessTo?.[o.id] ?? 0), 0)) : e.cond.creature ? (s.resolving!.excessToCreatures ?? 0) : (s.resolving!.excessDamage ?? 0)) > 0
+            : e.cond.kind === "noneAttackedYou"
+            ? ctx.event?.amount === 0
             : e.cond.kind === "rollIn"
             ? rollIn(e.cond, e.cond.event ? ctx.event?.amount : s.resolving!.rolled?.result)
             : e.cond.kind === "foretold"

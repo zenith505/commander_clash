@@ -148,6 +148,8 @@ export type Count =
   | { kind: "exchangedLifeDifference" }
   /** "For each death vote", "the number of profit votes" (CR 701.38): the votes for that choice in this ability's vote. */
   | { kind: "votes"; option: string }
+  /** "For each player who chose fortune": how many players chose that word (Effect eachChooses). */
+  | { kind: "choseWord"; option: string }
   /** "Creature cards in your graveyard", "cards in all graveyards" (`filter` is a "card" spec). */
   | { kind: "cardsInGraveyard"; who: PlayerRef; filter?: TargetSpec }
   /** "~'s power", "its toughness", "that creature's mana value": as it is now, or as it last existed (CR 608.2h). */
@@ -412,7 +414,7 @@ export interface TargetSpec {
    * the X announced (`x`, made into `max` as targets are chosen, see settleDivided). Checked again as it resolves: over
    * it then, every one of them is illegal (CR 608.2b; rulings on Nethroi, Reunion of the House).
    */
-  total?: { key: "manaValue" | "power"; max?: number; x?: true };
+  total?: { key: "manaValue" | "power"; max?: number; x?: true; /** The result of the roll a reflexive trigger is after (PendingTrigger.rolled), made into `max` as targets are chosen. */ rolled?: true };
   /** true: tapped; false: untapped. */
   tapped?: boolean;
   /** "Creature that was dealt damage this turn": damage it was dealt, even if it's been removed since (regeneration). */
@@ -841,6 +843,8 @@ export type Modification =
   | { kind: "cantAttack" }
   /** `ability`: "This creature can't block" as an ability it has (a suspected creature's, CR 701.60c), so in layer 6. */
   | { kind: "cantBlock"; ability?: true }
+  /** "~ can't be attacked" (The Aetherspark): no creature may be declared as attacking it (CR 508.1b); one already attacking it goes on attacking it (rulings). */
+  | { kind: "cantBeAttacked" }
   | { kind: "cantBeBlocked" }
   /** "You may have ~ assign its combat damage as though it weren't blocked" (an ability, so layer 6). */
   | { kind: "unblockedDamage" }
@@ -1007,7 +1011,7 @@ export type StaticCondition =
   /** "If ~ is in your graveyard" (`creatureAbove`: "with a creature card directly above it", Krovikan Horror). */
   | { kind: "selfInGraveyard"; creatureAbove?: true }
   /** Delirium: card types among cards in your graveyard (CR 205.2a). */
-  | { kind: "graveyardTypes"; n: number }
+  | { kind: "graveyardTypes"; n: number; /** Only permanent types (CR 110.4a): "permanent types among cards in your graveyard". */ permanent?: true }
   /** Descend: permanent cards in your graveyard (CR 110.4b). */
   | { kind: "graveyardPermanents"; n: number }
   | { kind: "selfCounter"; counter: CounterKind }
@@ -1894,6 +1898,19 @@ export type Effect =
   | { type: "revealTopToHand"; life?: { who: PlayerRef; gain?: boolean; drain?: true } }
   /** "You may repeat this process any number of times" (Ad Nauseam): `effects` (none of which waits on a choice), then the controller decides whether to go again, each time after seeing the result (rulings). */
   | { type: "repeatMay"; effects: Effect[]; text: string }
+  /** "You may roll again" in a results table's row (Delina, Wild Mage): if its controller wants, the ability's roll and the rows after it happen again (CR 706.3c). */
+  | { type: "rollAgain" }
+  /**
+   * "Each opponent chooses fame or fortune" (Seize the Spotlight): each of `who`, in APNAP order and knowing the earlier
+   * answers (CR 101.4), chooses one of the words; what they chose is kept for "for each player who chose ...". Not a vote.
+   */
+  | { type: "eachChooses"; who: PlayerRef; options: string[]; text: string }
+  /**
+   * "For each player who chose fame, gain control of a creature that player controls until end of turn": for each player
+   * who chose `chose`, in APNAP order, its controller chooses one of that player's creatures (not targeted); then it gains
+   * control of all of them for the duration. Afterwards "those creatures" are they (ObjRef created).
+   */
+  | { type: "controlFromEach"; chose: string; duration: "endOfTurn" }
   /** "Reveal the top card of your library" (CR 701.20a): what follows ("If it's a creature card, put it into your hand") is about it (ObjRef "revealed"). */
   /** "Reveal the top card of your library" (CR 701.20a), or with `look` only look at it, for an "if it's a ... card" after it. */
   | { type: "revealTop"; look?: true; /** "Reveal a card at random from your hand" (Cursed Scroll) instead. */ randomFromHand?: true; /** Whose library: "reveals the top card of their library" (Chaos Warp: the target's owner). Yours if left out. */ who?: PlayerRef }
@@ -2265,6 +2282,13 @@ export type Effect =
   | { type: "opponentsHandOnlyUntilNextTurn" }
   /** "You may cast a creature spell from your graveyard this turn" (Chainer, Nightmare Adept): one such cast (GameState.graveGrants). */
   | { type: "graveyardCastThisTurn"; filter: TargetSpec }
+  /**
+   * For the rest of the turn, its controller may cast spells (`cast`: those cards) and/or play lands (`lands`) from their
+   * graveyard, as many as they like, paying their costs and following their timing rules (rulings on Forgotten Cellar;
+   * a land is still their land play, CR 305.2); `exileInstead`: "if a card would be put into your graveyard from anywhere
+   * this turn, exile it instead" (CR 614.1a), not a token (rulings).
+   */
+  | { type: "graveyardTurn"; cast?: TargetSpec; lands?: true; exileInstead?: true }
   /** "Artifact, instant, and sorcery spells you cast this turn cost {2} less to cast" (Urza, Planeswalker): `mod`'s "you" is the ability's controller (CR 601.2f, 611.2a). */
   | { type: "costModThisTurn"; mod: CostMod }
   /**
@@ -2487,6 +2511,8 @@ export type SpellCondition =
    * you roll" trigger is about ("If you rolled 6 or higher", Mr. House).
    */
   | { kind: "rollIn"; min?: number; max?: number; event?: true }
+  /** "If none of those creatures attacked you" (Firemane Commando): the attack trigger's event counted none attacking its controller. */
+  | { kind: "noneAttackedYou" }
   /** "If it's suspected, ...": the object, as the instruction is done (CR 701.60). */
   | { kind: "suspected"; what: ObjRef }
   /** "If the sacrificed creature was suspected" (Agency Coroner): the creature its sacrifice cost sacrificed, as it last
@@ -2941,6 +2967,8 @@ export interface TriggeredAbility {
   minAttackers?: number;
   /** For "creaturesYouControlAttack": "Whenever one or more creatures attack" (Duelist's Heritage), any player's, not only its controller's. */
   anyoneAttacks?: true;
+  /** With `anyoneAttacks`: "Whenever another player attacks" (Firemane Commando), not its controller. The event's player is the attacking player, its amount how many of the attackers attack its controller (not their planeswalkers or battles). */
+  anotherPlayer?: true;
   /** For "opponentAttacksYou": at least `min` attackers at you, or (`orPlaneswalkers`, an intervening if, CR 603.4) at your planeswalkers too. */
   attacksYou?: { min: number; orPlaneswalkers?: true };
   /**

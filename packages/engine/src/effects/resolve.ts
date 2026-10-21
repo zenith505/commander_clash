@@ -612,6 +612,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "flashUntilNextTurn":
     case "opponentsHandOnlyUntilNextTurn":
     case "graveyardCastThisTurn":
+    case "graveyardTurn":
     case "cantCast":
     case "cantPlayLands":
     case "noPrevention":
@@ -845,11 +846,14 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "flipCoin":
       return runCoinEffect(s, e, ctx, src);
     case "vote":
+    case "eachChooses":
+    case "controlFromEach":
     case "chooseVotes":
     case "secretNumbers":
       return runVotesEffect(s, e, ctx, src);
     case "may":
     case "repeatMay":
+    case "rollAgain":
     case "either":
     case "eachMay":
     case "punisher":

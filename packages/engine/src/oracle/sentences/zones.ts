@@ -387,7 +387,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return what ? [{ type: "bounce", what }] : null;
   }
   // "... to the battlefield with an additional +1/+1 counter on it" (Cauldron's Gift): it enters with it (CR 614.1c).
-  if ((m = new RegExp(`^(Return|Put) ((?:(?:up to )?(?:one|two|three|four|five|six|\\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ (?:graveyard|exiled with ~)) (?:to|onto) the battlefield( tapped)?( under your control| under its owner's control)?(?: with (an additional|an?|two additional|three additional) (${COUNTER}) counters? on it)?( attached to enchanted creature)?$`, "i").exec(s))) {
+  if ((m = new RegExp(`^(Return|Put) ((?:(?:up to )?(?:one|two|three|four|five|six|\\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ (?:graveyards?|exiled with ~)) (?:to|onto) the battlefield( tapped)?( under your control| under its owner's control)?(?: with (an additional|an?|two additional|three additional) (${COUNTER}) counters? on it)?( attached to enchanted creature)?$`, "i").exec(s))) {
     // Without "under your control", only your own cards: the card then enters under your control (CR 110.2a)
     // either way, but "return" text that reaches other graveyards always says whose control. "Under its owner's
     // control" (Bilbo, Unexpected Adventurer): a card from any graveyard, for its owner.
@@ -558,7 +558,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "When ~ enters, attach it to target creature you control." (CR 701.3)
   // "Whenever an Equipment you control enters, you may attach it to target creature you control" (Sigarda's Aid), "...
   // ~ or another Equipment you control enters, you may attach that Equipment ..." (Hammer of Nazahn): the one that entered.
-  if ((m = /^Attach (~|it|that Equipment) to (target .+)$/i.exec(s)) && !ctx.spell) {
+  // "+1: Attach ~ to up to one target creature you control" (The Aetherspark): with none chosen, nothing happens.
+  if ((m = /^Attach (~|it|that Equipment) to ((?:up to one )?target .+)$/i.exec(s)) && !ctx.spell) {
     const what = parseObject(m[2]!, ctx);
     const entered = m[1] !== "~" && (ctx.subject || ctx.subjectIt);
     if (m[1] === "that Equipment" && !entered) return null;

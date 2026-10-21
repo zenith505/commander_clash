@@ -158,6 +158,10 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever enchanted land becomes tapped": an Aura on something other than a creature can only see that.
   const m = /^When(?:ever)? (~ or )?(?:enchanted|equipped) (creature|land|artifact|permanent) (.+)$/.exec(line);
   if (!m) return null;
+  // "Whenever equipped creature deals combat damage during your turn, ..." (The Aetherspark): it triggers only during
+  // its controller's turn.
+  const yours = /^(deals (?:combat )?damage) during your turn, /.exec(m[3]!);
+  if (yours) m[3] = m[3]!.replace(" during your turn, ", ", ");
   for (const [re, event, o] of HOST_TRIGGERS) {
     const h = re.exec(m[3]!);
     if (!h) continue;
@@ -181,7 +185,7 @@ function parseHostTrigger(line: string): TriggeredAbility | "fail" | null {
     let body = parseBody(text, { ...(o.creature ? { subject: true } : { subjectIt: true }), ...(o.eventPlayer ? { eventPlayer: true } : {}), ...(o.defending ? { defending: true } : {}) });
     if (!body) return "fail";
     if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, h[1]!) };
-    return { event, body: withOtherOpponents(body), host: m[1] ? "orSelf" : "attached", ...(o.toOpponent ? { toOpponent: true } : {}), ...(orBattle ? { orBattle: true as const } : {}) };
+    return { event, body: withOtherOpponents(body), host: m[1] ? "orSelf" : "attached", ...(o.toOpponent ? { toOpponent: true } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(yours ? { activeIf: { kind: "yourTurn" as const } } : {}) };
   }
   return null; // "whenever equipped creature dies" is parseDiesTrigger's
 }
@@ -672,6 +676,13 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     bodyText = m[4]!;
     const n = m[2] ? num(m[2]) : 1;
     if (n > 1) min = n;
+  } else if ((m = /^Whenever another player attacks with (two|three|four|five) or more creatures, they draw a card if none of those creatures attacked you\.?$/.exec(line))) {
+    // Firemane Commando: another player's attack, all of their attackers counted; they draw unless one of those creatures
+    // attacked you (not your planeswalkers or battles), as they were declared (rulings).
+    const draw = parseBody("That player draws a card", { eventPlayer: true });
+    if (!draw) return "fail";
+    const body: AbilityBody = { ...draw, effects: [{ type: "if", cond: { kind: "noneAttackedYou" }, effects: draw.effects }], text: m[0].replace(/^[^,]+, /, "") };
+    return { event: "creaturesYouControlAttack", body, minAttackers: num(m[1]!), anyoneAttacks: true, anotherPlayer: true };
   } else if ((m = /^Whenever (?:one or more creatures attack|a player attacks with (two|three|four|five) or more creatures), (.+)$/.exec(line))) {
     // Duelist's Heritage: whoever attacks (rulings), once for each declaration (CR 508.1, 603.2c). "Whenever a player
     // attacks with three or more creatures" (Aurelia, the Law Above): any player's attack, counting all their attackers.

@@ -873,6 +873,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const fits = (t: TriggeredAbility) => ev.ids.map((x, i) => [x, i] as const).filter(([x]) => s.objects[x] && (!t.group || objectMatches(s, t.group, obj(s, x), ev.controller, false)));
       for (const t of abilitiesOf(s, o).triggers) {
         if (t.event !== want || !!t.anyoneAttacks !== anyone) continue;
+        if (t.anotherPlayer && controllerOf(s, o) === ev.controller) continue;
         // "To a player or battle": only those are about a battle dealt it (CR 310).
         if (ev.type === "groupCombatDamage" && ev.battle !== undefined && !t.orBattle) continue;
         const hit = fits(t);
@@ -880,7 +881,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const amount = ev.type === "groupCombatDamage" ? hit.reduce((n, [, i]) => n + ev.amounts[i]!, 0) : undefined;
         const same = (tt: TriggeredAbility) => tt.event === want && tt.body.text === t.body.text && JSON.stringify(tt.group) === JSON.stringify(t.group) && tt.minAttackers === t.minAttackers && !!tt.anyoneAttacks === anyone;
         const group = hit.map(([x]) => ({ id: x, zc: obj(s, x).zoneChanges ?? 0 }));
-        add(o, anyone ? controllerOf(s, o) : ev.controller, (_, tt) => same(tt) && !(ev.type === "groupCombatDamage" && ev.battle !== undefined && !tt.orBattle), undefined, undefined, undefined, undefined, undefined, undefined, ev.type === "groupCombatDamage" ? { player: ev.player, amount, group } : undefined);
+        // "Whenever another player attacks": the attacking player, and how many of those creatures attack this one's
+        // controller, as they were declared (rulings on Firemane Commando).
+        const watcher = controllerOf(s, o);
+        const attacked = t.anotherPlayer ? { player: ev.controller, amount: hit.filter(([x]) => obj(s, x).attacking === watcher && !obj(s, x).attackingPermanent).length } : undefined;
+        add(o, anyone ? watcher : ev.controller, (_, tt) => same(tt) && !(ev.type === "groupCombatDamage" && ev.battle !== undefined && !tt.orBattle), undefined, undefined, undefined, undefined, undefined, undefined, ev.type === "groupCombatDamage" ? { player: ev.player, amount, group } : attacked);
       }
     };
     for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === ev.controller) groupWatch(obj(s, id));
@@ -1481,7 +1486,7 @@ export function checkStateTriggers(s: GameState) {
 /** What a waiting trigger does: its source's printed ability, or a delayed trigger's own (CR 603.7). */
 export function triggerBody(s: GameState, t: PendingTrigger): AbilityBody {
   // "Deals X damage divided as you choose": worked out as it's put on the stack (CR 603.3d, 601.2d).
-  const body = settleDivided(s, t.body ?? compileCard(s.cards[t.sourceCardId]!).triggers[t.index]!.body, { controller: t.controller, sourceId: t.sourceId, ...(t.sourceZc !== undefined ? { sourceZc: t.sourceZc } : {}), x: t.x ?? 0, ...(t.lki ? { lki: t.lki } : {}), ...(t.event ? { event: t.event } : {}), ...(t.cause ? { cause: t.cause } : {}), ...(t.tapped !== undefined ? { tapped: t.tapped } : {}) });
+  const body = settleDivided(s, t.body ?? compileCard(s.cards[t.sourceCardId]!).triggers[t.index]!.body, { controller: t.controller, sourceId: t.sourceId, ...(t.sourceZc !== undefined ? { sourceZc: t.sourceZc } : {}), x: t.x ?? 0, ...(t.lki ? { lki: t.lki } : {}), ...(t.event ? { event: t.event } : {}), ...(t.cause ? { cause: t.cause } : {}), ...(t.tapped !== undefined ? { tapped: t.tapped } : {}), ...(t.rolled !== undefined ? { rolled: t.rolled } : {}) });
   // "Target creature that player controls": that player is known once it triggers.
   const who = t.event?.player;
   const isEvent = (x: TargetSpec): boolean => x.controller === "eventPlayer" || x.protector === "eventPlayer" || !!x.anyOf?.some(isEvent);

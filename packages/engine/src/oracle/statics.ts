@@ -371,6 +371,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   let m: RegExpExecArray | null;
   if ((m = new RegExp(`^(?:there are )?${NUM} or more cards (?:are )?in your graveyard$`).exec(text))) return { kind: "graveyardAtLeast", n: num(m[1]!) };
   if ((m = new RegExp(`^there are ${NUM} or more card types among cards in your graveyard$`).exec(text))) return { kind: "graveyardTypes", n: num(m[1]!) };
+  // "If there are four or more permanent types among cards in your graveyard" (Matzalantli): artifact, battle, creature,
+  // enchantment, land and planeswalker (CR 110.4a).
+  if ((m = new RegExp(`^there are ${NUM} or more permanent types among cards in your graveyard$`).exec(text))) return { kind: "graveyardTypes", n: num(m[1]!), permanent: true };
   if ((m = new RegExp(`^there are ${NUM} or more permanent cards in your graveyard$`).exec(text))) return { kind: "graveyardPermanents", n: num(m[1]!) };
   // "If there are four or more land cards in your graveyard" (Titania, Voice of Gaea).
   // "If you have four or more creature cards in your graveyard" (Oversold Cemetery): the same.
@@ -834,6 +837,12 @@ export function parseStaticMods(rest: string): Modification[] | null {
     return filter?.kind === "object" && !filter.controller ? [{ kind: "cantAttackUnless", defenderControls: { ...filter, text: m[1]! } }] : null;
   }
   if (/^can't block$/.test(rest)) return [{ kind: "cantBlock" }];
+  if (/^can't be attacked$/.test(rest)) return [{ kind: "cantBeAttacked" }];
+  // The Aetherspark: "can't be attacked and has "Whenever equipped creature ...""
+  if ((m = /^can't be attacked and has (.+)$/.exec(rest))) {
+    const grants = parseGrants(m[1]!);
+    return grants ? [{ kind: "cantBeAttacked" }, ...grants] : null;
+  }
   // "Cowards can't block Warriors" (Boldwyr Intimidator): a creature type (CR 509.1b, 205.3m).
   if ((m = /^can't block ([A-Z][a-z]+)$/.exec(rest))) {
     const one = singular(m[1]!);

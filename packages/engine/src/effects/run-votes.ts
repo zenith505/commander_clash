@@ -1,5 +1,5 @@
 import type { Effect, TargetSpec } from "../abilities";
-import { abilitiesOf, defOf } from "../cards";
+import { abilitiesOf, defOf, objIsType } from "../cards";
 import { draw, log, loseLife, obj, player } from "../game";
 import { invalidateCharacteristics } from "../layers";
 import { putCounters, withPutter } from "../counters";
@@ -7,7 +7,7 @@ import { dealDamageBatch } from "../damage";
 import { discardCards } from "./run-library";
 import { controllerOf } from "../layers";
 import type { GameObject, GameState, PlayerId } from "../types";
-import { ResolveCtx, apnap, ctxSource } from "./resolve";
+import { ResolveCtx, apnap, ctxSource, players, runEffect } from "./resolve";
 import { objectMatches, printedMatches } from "./targeting";
 
 /** Votes (CR 701.38): each player, starting with the controller and in turn order, votes for one of the choices. */
@@ -76,6 +76,62 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (!draw(s, pid, 7)) return "paused";
       }
       return;
+    }
+    case "eachChooses": {
+      // Each of them in APNAP order, seeing the earlier answers (CR 101.4).
+      const r = s.resolving!;
+      const sc = (r.scratch ??= {});
+      const st = (sc.words ??= { queue: apnap(s, players(s, e.who, ctx)) });
+      r.chose ??= {};
+      while (st.queue.length) {
+        const pid = st.queue[0]!;
+        if (player(s, pid).lost) {
+          st.queue.shift();
+          continue;
+        }
+        if (st.pick === undefined) {
+          s.pending = { kind: "chooseOption", player: pid, source: src, what: "word", options: e.options, labels: e.options.map((w) => w.charAt(0).toUpperCase() + w.slice(1)), prompt: e.text };
+          return "paused";
+        }
+        r.chose[pid] = st.pick;
+        log(s, `${player(s, pid).name} chooses ${st.pick} (${src}).`);
+        st.pick = undefined;
+        st.queue.shift();
+      }
+      return;
+    }
+    case "controlFromEach": {
+      // For each player who chose the word, in APNAP order, a creature they control, chosen by this one's controller
+      // as it resolves (not targeted); then control of all of them changes at once.
+      const r = s.resolving!;
+      const sc = (r.scratch ??= {});
+      const st = (sc.fromEach ??= { queue: apnap(s, Object.entries(r.chose ?? {}).filter(([, w]) => w === e.chose).map(([k]) => Number(k) as PlayerId)), ids: [] });
+      while (st.queue.length) {
+        const pid = st.queue[0]!;
+        // The answer to the question asked for this player (game.ts pickPermanents keeps it as the chooser's pick).
+        const picked = sc.chosen?.[ctx.controller];
+        if (picked) {
+          st.ids.push(...picked);
+          sc.chosen = undefined;
+          st.queue.shift();
+          continue;
+        }
+        const options = player(s, pid).lost ? [] : s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature"));
+        if (options.length > 1) {
+          sc.queue = [ctx.controller];
+          sc.chosen = {};
+          s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "choose", what: "creature", options, count: 1, of: pid };
+          return "paused";
+        }
+        st.ids.push(...options);
+        st.queue.shift();
+      }
+      sc.queue = undefined;
+      const ids = st.ids.filter((id) => s.objects[id]?.zone === "battlefield");
+      r.created = ids;
+      if (!ids.length) return;
+      log(s, `${player(s, ctx.controller).name} gains control of ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} until end of turn.`);
+      return runEffect(s, { type: "continuous", what: { ref: "created" }, mods: [{ kind: "control" }], duration: e.duration }, ctx);
     }
     case "vote": {
       const r = s.resolving!;

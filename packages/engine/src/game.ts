@@ -1485,6 +1485,10 @@ function graveyardExileFor(s: GameState, o: GameObject, fromZone: ZoneName): { s
     const x = abilitiesOf(s, p).graveyardExile;
     if (applies(x, controllerOf(s, p))) return { source: characteristics(s, p).name, ...(x!.counter ? { counter: x!.counter } : {}), ...(x!.linked && p.id !== o.id ? { linkTo: p.id } : {}) };
   }
+  // "If a card would be put into your graveyard from anywhere this turn, exile it instead" (Yawgmoth's Will, Forgotten
+  // Cellar): its owner's graveyard, a card only (rulings: tokens go to the graveyard as normal).
+  const turn = !o.isToken && s.graveyardTurn?.find((g) => g.player === o.owner && g.turn === s.turn && g.exileInstead);
+  if (turn) return { source: turn.source };
   if (fromZone !== "battlefield") return undefined;
   for (const l of s.leftTogether ?? []) {
     if (!l.hadAbilities || l.id === o.id) continue;
@@ -2769,7 +2773,12 @@ export function plottedCast(s: GameState, pid: PlayerId, o: GameObject): boolean
  */
 export function mayPlayLandFromGraveyard(s: GameState, o: GameObject, pid: PlayerId): boolean {
   if (o.zone !== "graveyard" || o.owner !== pid || !isType(defOf(s, o), "Land")) return false;
-  return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).landsFromGraveyard) || !!landPermit(s, pid);
+  return landsFromGraveyardNow(s, pid) || !!landPermit(s, pid);
+}
+
+/** Every land may be played from `pid`'s graveyard now: Crucible of Worlds, or an effect this turn (Yawgmoth's Will). */
+function landsFromGraveyardNow(s: GameState, pid: PlayerId): boolean {
+  return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).landsFromGraveyard) || !!s.graveyardTurn?.some((g) => g.player === pid && g.turn === s.turn && g.lands);
 }
 
 /** Muldrotha's "you may play a land ... from your graveyard" during each of your turns, if one isn't used yet this turn. */
@@ -2894,7 +2903,7 @@ function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean, fac
     log(s, `${p.name} reveals ${nameOf(s, shown)} so ${d.name} enters untapped.`);
   }
   // Muldrotha's land from the graveyard is used up, unless something lets every land be played from there (Crucible).
-  if (o.zone === "graveyard" && !s.battlefield.some((x) => controllerOf(s, obj(s, x)) === p.id && abilitiesOf(s, obj(s, x)).landsFromGraveyard)) ((s.turnLog ??= {}).gravePermits ??= []).push(landPermit(s, p.id)!);
+  if (o.zone === "graveyard" && !landsFromGraveyardNow(s, p.id)) ((s.turnLog ??= {}).gravePermits ??= []).push(landPermit(s, p.id)!);
   const from = o.zone === "exile" || o.zone === "graveyard" ? ` from ${o.zone === "exile" ? "exile" : "their graveyard"}` : "";
   // Under the control of the player who plays it (CR 305.1, 110.2), an opponent's card from exile too (Opposition Agent).
   moveObject(s, id, "battlefield", { controller: p.id, untapped, ...(face !== undefined ? { face } : {}) });
@@ -4055,6 +4064,10 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef): CastFromGraveyard
       out.push({ ...g.way, mana: g.way.mana ?? d.manaCost });
     }
   }
+  // "You may cast spells from your graveyard this turn" (Forgotten Cellar, Yawgmoth's Will): any number of them, paying
+  // their mana costs (rulings), for the rest of the turn.
+  if (d.manaCost && s.graveyardTurn?.some((g) => g.player === o.owner && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) && !out.some((w) => w.kind === "permission"))
+    out.push({ kind: "permission", mana: d.manaCost, costs: [], exile: false });
   // "You may cast a creature spell from your graveyard this turn" (Chainer, Nightmare Adept): one spell for each, with
   // the once-each-turn permissions (rulings: each activation is a permission of its own).
   const used = s.turnLog?.gravePermits ?? [];
@@ -5647,6 +5660,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "word") {
+    // "Each opponent chooses fame or fortune" (see runVotesEffect's eachChooses).
+    const st = r.scratch?.words;
+    if (!st || !pend.options.includes(choice)) throw new RulesError(`choose ${pend.options.join(" or ")}`);
+    st.pick = choice;
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "vote") {
     // A vote (CR 701.38a), or "none" to pass on an extra vote that's optional (see runVotesEffect).
     const v = r.scratch?.vote;
@@ -6079,7 +6100,8 @@ export function attackablePermanentProblem(s: GameState, pid: PlayerId, defender
   const o = s.objects[id];
   if (!o || o.zone !== "battlefield") return "that permanent isn't on the battlefield";
   if (objIsType(s, o, "Battle")) return o.protector === defender && defender !== pid ? null : "must attack a battle that player protects";
-  return objIsType(s, o, "Planeswalker") && controllerOf(s, o) === defender ? null : "must attack a planeswalker that player controls";
+  if (!objIsType(s, o, "Planeswalker") || controllerOf(s, o) !== defender) return "must attack a planeswalker that player controls";
+  return characteristics(s, o).cantBeAttacked ? `${characteristics(s, o).name} can't be attacked` : null;
 }
 
 /** Where an attacking creature attacks a permanent: which one, and for a battle, its controller now (CR 506.4). */

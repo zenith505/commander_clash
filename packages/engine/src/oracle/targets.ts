@@ -391,7 +391,8 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   const differMv = many === "any" ? / that each have a different mana value (\d+|X) or less(?= from |$)/.exec(mine0) : null;
   // "With total mana value 6 or less" (TargetSpec.total): the group together, X being the one announced (CR 107.3a).
   const totalM = n > 1 || many ? / with total (mana value|power) (\d+|X) or less(?= from | in |$)/.exec(mine0) : null;
-  if (totalM && totalM[2] === "X" && (!(ctx.spell || ctx.activated || ctx.ownX) || ctx.whereX)) return null;
+  // With "where X is ...", X is defined by the text, which defineX (body.ts) works out or refuses.
+  if (totalM && totalM[2] === "X" && !(ctx.spell || ctx.activated || ctx.ownX || ctx.whereX)) return null;
   const total: TargetSpec["total"] | undefined = totalM ? { key: totalM[1] === "power" ? "power" : "manaValue", ...(totalM[2] === "X" ? { x: true as const } : { max: Number(totalM[2]) }) } : undefined;
   const mine = mine0.replace(/ controlled by different players$/, "").replace(/ that each have a different mana value (\d+|X) or less(?= from |$)/, " with mana value $1 or less").replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "").replace(/ with different names(?= from |$)/, "").replace(/ with total (?:mana value|power) (?:\d+|X) or less(?= from | in |$)/, "");
   const parsed = differMv ? parseTargetPhrase(singularPhrase(mine), { x: true }) : n > 1 || many ? parseTargetPhrase(singularPhrase(mine)) : parseTargetPhrase(mine, { x: true, count: boundCount(ctx) });

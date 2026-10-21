@@ -465,7 +465,7 @@ export function settleDivided(s: GameState, body0: AbilityBody, ctx: AmountCtx, 
   const tappedBound = (t: TargetSpec) => t.bound?.amount.count.kind === "tappedThisWay";
   // "With lesser mana value" in a dies trigger (Scrap Trawler): the one that died, as it last existed (ctx.lki).
   const subjectBound = (t: TargetSpec) => t.bound?.amount.count.kind === "manaValue" && t.bound.amount.count.of.ref === "subject";
-  const unsettled = (t: TargetSpec) => (t.divided?.amount && !t.divided.settled) || t.xRange || t.total?.x || castBound(t) || tappedBound(t) || subjectBound(t);
+  const unsettled = (t: TargetSpec) => (t.divided?.amount && !t.divided.settled) || t.xRange || t.total?.x || t.total?.rolled || castBound(t) || tappedBound(t) || subjectBound(t);
   if (!body.targets.some(unsettled) && !body.modal?.modes.some((m) => m.targets?.some(unsettled))) return body;
   const settle = (t: TargetSpec): TargetSpec => {
     if (t.divided?.amount && !t.divided.settled) t = { ...t, divided: { ...t.divided, total: evalAmount(s, t.divided.amount, ctx), settled: true as const } };
@@ -494,6 +494,7 @@ export function settleDivided(s: GameState, body0: AbilityBody, ctx: AmountCtx, 
       t = { ...rest, [bound!.key]: bound!.at === "exact" ? { min: n, max: n } : bound!.at === "most" ? { ...old, max: old?.max === undefined ? n : Math.min(old.max, n) } : { ...old, min: old?.min === undefined ? n : Math.max(old.min, n) }, text: rest.text.replace(/ X or (less|greater)$/, ` ${n} or $1`) };
     }
     // "With total mana value X or less": the X announced (CR 107.3a), or before then anything.
+    if (t.total?.rolled) t = { ...t, total: { key: t.total.key, max: ctx.rolled ?? 0 }, text: t.text.replace(/ X or less\)$/, ` ${ctx.rolled ?? 0} or less)`) };
     if (t.total?.x) t = anyX ? (({ total: _, ...rest }) => rest)(t) : { ...t, total: { key: t.total.key, max: ctx.x ?? 0 }, text: t.text.replace(/ X or less\)$/, ` ${ctx.x ?? 0} or less)`) };
     return t;
   };

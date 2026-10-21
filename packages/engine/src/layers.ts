@@ -106,6 +106,8 @@ export interface Characteristics {
   cantAttack: boolean;
   cantBlock: boolean;
   cantBeBlocked: boolean;
+  /** "Can't be attacked" (The Aetherspark). */
+  cantBeAttacked?: true;
   /** "You may have ~ assign its combat damage as though it weren't blocked." */
   unblockedDamage: boolean;
   doesntUntap: boolean;
@@ -473,7 +475,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     case "graveyardAtLeast": // threshold
       return (s.players[you]?.graveyard.length ?? 0) >= cond.n;
     case "graveyardTypes": // delirium: card types, not subtypes or supertypes (CR 205.2a)
-      return new Set(yard().flatMap((d) => d.types)).size >= cond.n;
+      return new Set(yard().flatMap((d) => (cond.permanent ? d.types.filter((t) => PERMANENT_CARD_TYPES.includes(t)) : d.types))).size >= cond.n;
     case "graveyardPermanents": // descend
       return yard().filter((d) => d.types.some((t) => PERMANENT_CARD_TYPES.includes(t))).length >= cond.n;
     case "selfCounter": // unleash (CR 702.98a)
@@ -1039,6 +1041,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "cantBlock":
       c.cantBlock = true;
+      return;
+    case "cantBeAttacked":
+      c.cantBeAttacked = true;
       return;
     case "cantBeBlocked":
       c.cantBeBlocked = true;

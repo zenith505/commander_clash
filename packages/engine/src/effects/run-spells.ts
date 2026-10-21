@@ -236,7 +236,14 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const id = e.spell === "self" ? r.item.id : typeof e.spell === "object" && "epic" in e.spell ? e.spell.epic : i < 0 ? ctx.cause : t?.kind === "stack" && ctx.legal[i] ? t.id : undefined;
         const orig = e.spell === "self" ? r.item : id ? (s.stack.find((x) => x.id === id) ?? s.castItems?.[id] ?? s.epics?.[id]) : undefined;
         if (!orig || (orig.kind !== "spell" && !(orig.kind === "ability" && orig.body))) return;
-        const n = e.n === "storm" ? (orig.castNth ?? 0) : e.n === "kicked" ? (orig.kicked?.length ?? 0) : amountNow(s, e.n, ctx);
+        const n =
+          e.n === "storm"
+            ? (orig.castNth ?? 0)
+            : e.n === "stormInstantSorcery"
+              ? (s.castThisTurn ?? []).slice(0, orig.castNth ?? 0).filter((c) => c.player === orig.controller && s.cards[c.card] && (isType(s.cards[c.card]!, "Instant") || isType(s.cards[c.card]!, "Sorcery"))).length
+              : e.n === "kicked"
+                ? (orig.kicked?.length ?? 0)
+                : amountNow(s, e.n, ctx);
         if (n <= 0) return;
         sc.copies = { of: id!, left: n };
       }

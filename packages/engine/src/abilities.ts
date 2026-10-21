@@ -1662,7 +1662,7 @@ export type Effect =
    */
   /** `epic`: the spell with epic as it resolved, by its stack id in `GameState.epics` (CR 702.50a). */
   /** `self`: the spell that's resolving ("you may copy this spell", Sevinne's Reclamation), as it is on the stack. */
-  | { type: "copySpell"; spell: "cause" | "self" | { target: number } | { epic: string }; n: Amount | "storm" | "kicked"; newTargets: boolean; /** Then an opponent you choose copies it too (CR 702.144a). */ demonstrate?: true; /** "If it's a permanent spell, the copy gains haste and "..."" (Nalfeshnee): what the token it becomes has (CR 400.7a, 608.3f). */ gains?: Modification[] }
+  | { type: "copySpell"; spell: "cause" | "self" | { target: number } | { epic: string }; /** "stormInstantSorcery": the instant and sorcery spells its controller cast before it this turn (Thousand-Year Storm). */ n: Amount | "storm" | "kicked" | "stormInstantSorcery"; newTargets: boolean; /** Then an opponent you choose copies it too (CR 702.144a). */ demonstrate?: true; /** "If it's a permanent spell, the copy gains haste and "..."" (Nalfeshnee): what the token it becomes has (CR 400.7a, 608.3f). */ gains?: Modification[] }
   | { type: "removeCounters"; what: ObjRef; counter: CounterKind; n: Amount | "all" }
   /** "Remove (up to) three counters from target permanent": of any kinds, chosen as it resolves (rulings on Glissa Sunslayer); fewer than that, all of them. */
   | { type: "removeAnyCounters"; what: ObjRef; n: Amount; upTo?: true }

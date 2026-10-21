@@ -1,6 +1,7 @@
 // Round 102: Ad Nauseam ("you may repeat this process any number of times": decided after each card, rulings; life can
 // go to 0 or less meanwhile, the loss waits for state-based actions, CR 704.3, 704.5a). Scroll Rack (cards from the
-// hand traded for as many from the top of the library, not drawn: rulings).
+// hand traded for as many from the top of the library, not drawn: rulings). Thousand-Year Storm (a copy for each
+// instant and sorcery spell you cast before it this turn).
 
 import { describe, expect, it } from "vitest";
 import { act, card, putOnBattlefield, setup } from "./helpers";
@@ -12,6 +13,10 @@ const nauseam = card("Ad Nauseam", "Instant", "{3}{B}{B}", { oracleText: "Reveal
 
 const rack = card("Scroll Rack", "Artifact", "{2}", { oracleText: "{1}, {T}: Exile any number of cards from your hand face down. Put that many cards from the top of your library into your hand. Then look at the exiled cards and put them on top of your library in any order." });
 const sage = card("Sage of Lat-Nam Test", "Creature — Human", "{1}{U}", { power: "1", toughness: "1", oracleText: "Whenever you draw a card, you gain 1 life." });
+
+const storm = card("Thousand-Year Storm", "Enchantment", "{4}{U}{R}", { oracleText: "Whenever you cast an instant or sorcery spell, copy it for each other instant and sorcery spell you've cast before it this turn. You may choose new targets for the copies." });
+const bolt = card("Lightning Bolt", "Instant", "{R}", { oracleText: "Lightning Bolt deals 3 damage to any target." });
+const grizzly = card("Runeclaw Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" });
 
 const pass = (s: GameState) => act(s, { type: "passPriority", player: waitingOn(s)! });
 const settle = (s: GameState) => {
@@ -81,5 +86,33 @@ describe("round 102: Scroll Rack", () => {
     expect(s.players[ap]!.hand.sort()).toEqual([...rest, one].sort());
     expect(s.players[ap]!.library).toEqual([ids[0]!, ids[1]!]);
     expect(s.players[ap]!.lost).toBeFalsy();
+  });
+});
+
+describe("round 102: Thousand-Year Storm", () => {
+  it("parse", () => expect(isFullySupported(storm)).toBe(true));
+
+  it("copies each instant or sorcery for each one cast before it this turn, not creature spells", () => {
+    const { s: s0, ap, opp, ids } = setup([bolt, grizzly, bolt, bolt]);
+    putOnBattlefield(s0, ap, storm);
+    let s = s0;
+    const life = () => s.players[opp]!.life;
+    const castIt = (id: string, targets?: Parameters<typeof planCast>[3]) => {
+      s = planCast(s, ap, id, targets)!.reduce((x, y) => act(x, y), s);
+      for (let i = 0; i < 100 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+        const p = s.pending;
+        if (p?.kind === "copyTargets") s = act(s, { type: "copyTargets", player: p.player });
+        else if (p) throw new Error(`unexpected ${p.kind}`);
+        else s = pass(s);
+      }
+    };
+    const face = { kind: "player" as const, id: opp };
+    castIt(ids[0]!, [face]);
+    expect(life()).toBe(37);
+    castIt(ids[1]!);
+    castIt(ids[2]!, [face]);
+    expect(life()).toBe(31); // itself and one copy
+    castIt(ids[3]!, [face]);
+    expect(life()).toBe(22); // itself and two copies
   });
 });

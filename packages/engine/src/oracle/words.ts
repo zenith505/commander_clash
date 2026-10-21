@@ -102,3 +102,9 @@ export function parseSpentReq(what: string): SpentReq | null {
 
 /** A results table's row (CR 706.3a): "1—9 | ...", "20 | ...", "15+ | ...", "9 or less | ...". */
 export const ROLL_ROW = /^(\d+)(?:[—–-](\d+)|(\+)| or (less|more|higher))? \| (.+)$/;
+
+/**
+ * "If you have fewer than seven cards in hand, draw cards equal to the difference" (Kozilek, Damia, Iymrith): seven minus
+ * the cards in your hand, counted as it resolves.
+ */
+export const differenceInHand = (text: string) => text.replace(/\b([Ii]f you have fewer than (\w+) cards in hand, draw cards equal to) the difference\b/g, "$1 $2 minus the number of cards in your hand");

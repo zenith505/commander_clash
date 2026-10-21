@@ -246,6 +246,13 @@ function parseManaProduced(text: string): ManaProduce | null {
     if (spec?.kind !== "object" || spec.supertypes || spec.chosen) return null;
     return { kind: "colorsAmong", filter: { ...spec, ...(among[1] ? { supertypes: ["Legendary"] } : {}), text: `${among[1] ?? ""}${among[2]} you control` } };
   }
+  // "One mana of any color among legendary creature cards in your graveyard" (The Grey Havens).
+  const yard = /^one mana of any color among (.+?) cards in your graveyard$/.exec(text);
+  if (yard) {
+    const spec = parseTargetPhrase(`${yard[1]} card from a graveyard`);
+    if (spec?.kind !== "card" || spec.chosen) return null;
+    return { kind: "colorsAmong", filter: { ...spec, text: `${yard[1]} cards in your graveyard` }, inYard: true };
+  }
   if (text === "one mana of each color among permanents you control") return { kind: "eachColorAmong" };
   if (text === "an amount of mana of the chosen color equal to your devotion to that color") return { kind: "devotion" };
   const each = /^(\{[WUBRGC]\}) for each (.+) you control$/.exec(text);

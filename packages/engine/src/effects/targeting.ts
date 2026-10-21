@@ -62,7 +62,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
     if (!host || !objectMatches(s, spec.attachedTo, host, controller, false, undefined, undefined, view)) return false;
   }
   // A choice that was never made: "of the chosen type" matches nothing, "not of the chosen type" everything.
-  if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name") return false;
+  if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name" || spec.chosen === "typesChosen") return false;
   if (spec.noCounters && Object.values(o.counters).some((n) => (n ?? 0) > 0)) return false;
   if (spec.notCounter && (o.counters[spec.notCounter] ?? 0) > 0) return false;
   if (spec.counter && !(spec.counter === ANY_COUNTER ? Object.values(o.counters).some((n) => (n ?? 0) > 0) : (o.counters[spec.counter] ?? 0))) return false;
@@ -153,11 +153,14 @@ export function bindChosen(spec: TargetSpec, chosen: Chosen | undefined): Target
   const { chosen: kind, ...rest } = spec;
   if ((kind === "type" || kind === "notType") && chosen?.type)
     return kind === "type" ? { ...rest, subtypes: [...(rest.subtypes ?? []), chosen.type] } : { ...rest, notSubtypes: [...(rest.notSubtypes ?? []), chosen.type] };
+  // "Of a type chosen this way" (Patriarch's Bidding): any of the types the players chose.
+  if ((kind === "typesChosen" || kind === "notTypesChosen") && chosen?.types?.length)
+    return kind === "typesChosen" ? { ...rest, subtypes: [...(rest.subtypes ?? []), ...chosen.types] } : { ...rest, notSubtypes: [...(rest.notSubtypes ?? []), ...chosen.types] };
   if (kind === "cardType" && chosen?.cardType) return { ...rest, types: [...(rest.types ?? []), chosen.cardType] };
   if (kind === "name" && chosen?.name !== undefined) return { ...rest, named: chosen.name };
   if ((kind === "color" || kind === "notColor") && chosen?.color)
     return kind === "color" ? { ...rest, colors: [chosen.color] } : { ...rest, notColors: [...(rest.notColors ?? []), chosen.color] };
-  return kind === "notType" || kind === "notColor" ? rest : spec;
+  return kind === "notType" || kind === "notColor" || kind === "notTypesChosen" ? rest : spec;
 }
 
 /** The names a player can choose from: every creature type (CR 205.3m) or color, but `except`. */
@@ -214,7 +217,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.anyOf && !spec.anyOf.some((a) => printedMatches(a, d))) return false;
   if (spec.subtypes?.length && !spec.subtypes.some(hasSubtype)) return false;
   if (spec.notSubtypes?.some(hasSubtype)) return false;
-  if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name" || spec.counter) return false;
+  if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name" || spec.chosen === "typesChosen" || spec.counter) return false;
   const hasKw = (k: string) => d.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
   if (spec.keywords?.some((k) => !hasKw(k))) return false;
   if (spec.notKeywords?.some(hasKw)) return false;

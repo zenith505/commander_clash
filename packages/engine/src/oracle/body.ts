@@ -1,6 +1,6 @@
 import { allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose } from "../abilities";
 import { substituteX } from "../amounts";
-import { num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS, singularWord } from "./words";
+import { differenceInHand, num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS, singularWord } from "./words";
 import { canonicalKeyword, CHOSEN_KEYWORD, CHOSEN_PROTECTION, CREATURE_TYPES, THAT_PLAYER_PROTECTION } from "../keywords";
 import { parseStaticCondition } from "./statics";
 import { parseBoundCount, parseCount } from "./counts";
@@ -465,6 +465,8 @@ function splitSentences(text: string): string[] {
 }
 
 export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean } = {}): AbilityBody | null {
+  // "Put a +1/+1 counter on ~ and untap it" (Gwenna): "it" is ~, the one thing named.
+  text = differenceInHand(text).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~");
   const modal = MODAL.exec(text.trim());
   if (modal) {
     const body = parseModal(modal[1]!, modal[3]!, text.trim(), opts);
@@ -692,6 +694,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   text = text.replace(/(^|\. )([Cc]reate an? [^.]+? token) and exile the top card of (your|that player's) library\. (?=(?:Until end of turn, )?[Yy]ou may (?:cast|play) that card)/, "$1$2. Exile the top card of $3 library. ");
   // "..., then shuffle and you gain 1 life" (Brokers Hideout): the search, then the life.
   text = text.replace(/, then shuffle and you gain (\d+) life\./g, ", then shuffle. You gain $1 life.");
+  // "You gain 7 life, draw seven cards, then put up to seven ..." (Ugin, the Spirit Dragon): three instructions in order.
+  text = text.replace(/^You gain (\d+) life, draw (\w+) cards?, then /, "You gain $1 life. Draw $2 cards, then ");
   // "Sacrifice ~, search your library for up to two creature cards, put those cards onto the battlefield, then shuffle"
   // (Defense of the Heart): the sacrifice, then the search.
   text = text.replace(/^([Ss])acrifice ~, search your library /, "$1acrifice ~. Search your library ");
@@ -2401,12 +2405,14 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // the cards milled this way ..." (Blanchwood Prowler), "You may put an instant or sorcery card milled this way into
     // your hand" (Leyline Dowser): one of the cards your mill just put into your graveyard, if any matches.
     const fromMilled =
-      /^[Yy]ou may put (an? .+?) from among (?:them|the cards milled this way|the milled cards|those cards) into your hand$/.exec(s) ?? /^[Yy]ou may put (an? .+?) milled this way into your hand$/.exec(s);
+      /^[Yy]ou may put (an? .+?|up to (?:one|two|three|four|five) .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) into your hand$/.exec(s) ?? /^[Yy]ou may put (an? .+?) milled this way into your hand$/.exec(s);
     if (fromMilled) {
       const prev = effects[effects.length - 1];
-      const filter = parseSearchFilter(fromMilled[1]!.replace(/^an? /, ""));
+      // "Up to two creature and/or land cards from among the milled cards" (Smuggler's Surprise).
+      const upTo = /^up to (\w+) (.+) cards$/.exec(fromMilled[1]!);
+      const filter = parseSearchFilter(upTo ? `${upTo[2]!.replace(/ and\/or /g, " or ")} card` : fromMilled[1]!.replace(/^an? /, ""));
       if (prev?.type !== "mill" || prev.who.ref !== "you" || filter === null) return null;
-      effects.push({ type: "chooseFromGraveyard", n: 1, upTo: true, milled: true, ...(filter ? { filter } : {}) });
+      effects.push({ type: "chooseFromGraveyard", n: upTo ? num(upTo[1]!) : 1, upTo: true, milled: true, ...(filter ? { filter } : {}) });
       // "If you don't, put a +1/+1 counter on this creature." (Ainok Wayfarer): no card was put into your hand.
       const didnt = /^If you don't, (.+)$/.exec(sentences[si + 1] ?? "");
       if (didnt) {
@@ -2597,6 +2603,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       if (!inner) return null;
       const n = num(selfPTIf.n);
       effects.push({ type: "if", cond: { kind: "state", cond: { kind: "selfPT", stat: selfPTIf.stat as "power" | "toughness", ...(selfPTIf.cmp === "less" ? { max: n } : { min: n }) } }, effects: inner });
+      continue;
+    }
+    // Twenty-Toed Toad: "you win the game if there are twenty or more counters on it or you have twenty or more cards in
+    // hand": counters of any kind on it, or the hand, as it resolves.
+    const toad = !ctx.spell ? new RegExp(`^[Yy]ou win the game if there are ${NUM} or more counters on (?:it|~) or you have ${NUM} or more cards in hand$`).exec(s) : null;
+    if (toad) {
+      effects.push({ type: "if", cond: { kind: "state", cond: { kind: "anyOf", conds: [{ kind: "selfCounters", counter: "*", min: num(toad[1]!) }, { kind: "handAtLeast", n: num(toad[2]!) }] } }, effects: [{ type: "winGame", who: { ref: "you" } }] });
       continue;
     }
     // "If ~ is a Warrior, put a flying counter on it and it becomes a ..." (Figure of Destiny, Ascendant Spirit): its

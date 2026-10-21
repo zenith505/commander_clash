@@ -440,6 +440,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^the Ring tempts you$/i.test(s)) return [{ type: "ringTempts" }];
   if (/^Target player becomes the monarch$/i.test(s)) return [{ type: "becomeMonarch", who: { ref: "target", index: addTarget(ctx, { kind: "player", text: "target player" }) } }];
   // "Choose a creature type." / "Choose a color." (the rest of the text says what it's for).
+  // "Each player chooses a creature type." (Patriarch's Bidding, Harsh Mercy): one each, "a type chosen this way" after.
+  if (/^Each player chooses a creature type$/.test(s)) return [{ type: "choose", choice: "creatureType", each: true }];
   if ((m = /^Choose an? (creature type|color)(?: other than (\w+))?$/i.exec(s)))
     return [{ type: "choose", choice: m[1]!.toLowerCase() === "color" ? "color" : "creatureType", ...(m[2] ? { except: m[2] } : {}) }];
 

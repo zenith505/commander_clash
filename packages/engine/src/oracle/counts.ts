@@ -80,6 +80,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // "The greatest power among creature cards exiled this way" (Szat's Will, after exiling graveyards).
   if (!each && /^the greatest power among creature cards exiled this way$/i.test(p)) return { count: { kind: "greatestPowerExiled" } };
+  if (!each && /^the greatest mana value among cards in exile$/i.test(p)) return { count: { kind: "greatestMvInExile" } };
   // "The greatest mana value among permanents you control" (Will of the Temur), 0 with none.
   if (!each && (m = /^the greatest mana value among (.+?) you control$/i.exec(p))) {
     const spec = parseTargetPhrase(`${m[1]!.split(/\s+/).map(singularWord).join(" ")} you control`, { chosen: true });

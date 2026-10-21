@@ -284,8 +284,16 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // cards from your graveyard to the battlefield" (Replenish: each Aura's controller chooses what it enchants, CR 303.4f).
   // "Each player returns each creature card from their graveyard to the battlefield" (Magister of Worth): the same as from
   // all graveyards under their owners' control.
-  const eachReturns = /^Each player returns each (.+?) card from their graveyard to the battlefield( tapped)?$/.exec(s);
+  // "Each player returns all creature cards from their graveyard to the battlefield" (Twilight's Call), "... all creature
+  // cards of a type chosen this way ..." (Patriarch's Bidding) likewise.
+  const eachReturns = /^Each player returns each (.+?) card from their graveyard to the battlefield( tapped)?$/.exec(s) ?? /^Each player returns all (.+?) cards from their graveyard to the battlefield( tapped)?$/.exec(s);
   if (eachReturns) s = `Return all ${eachReturns[1]} cards from all graveyards to the battlefield${eachReturns[2] ?? ""} under their owners' control`;
+  const ofChosen = /^Each player returns all (\w+) cards of a type chosen this way from their graveyard to the battlefield$/.exec(s);
+  if (ofChosen) {
+    const spec = parseTargetPhrase(`${ofChosen[1]} card of a type chosen this way from a graveyard`, { chosen: true });
+    if (spec?.kind !== "card" || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
+    return [{ type: "returnAllFromGraveyard", who: { ref: "eachPlayer" }, filter: { ...spec, text: `${ofChosen[1]} card of a type chosen this way` }, owners: true }];
+  }
   // "Put all creature cards from all graveyards onto the battlefield under your control" (Rise of the Dark Realms).
   const yours = /^(?:Put|Return) all (.+?) cards from all graveyards (?:onto|to) the battlefield( tapped)? under your control$/.exec(s);
   if (yours) {
@@ -329,6 +337,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // "You may put a creature card with mana value X or less from your hand onto the battlefield tapped and attacking"
   // (Kinscaer Sentry): one card, attacking a player its controller chooses (CR 508.4).
+  // "Put up to seven permanent cards from your hand onto the battlefield" (Ugin, the Spirit Dragon), "you may put up to
+  // two creature cards ..." (Smuggler's Surprise): any number of them up to that many.
+  if ((m = /^(?:You may )?[Pp]ut up to (two|three|four|five|six|seven) (.+?) cards from your hand onto the battlefield$/.exec(s))) {
+    const filter = parseSearchFilter(`${m[2]!} card`);
+    if (filter === null) return null;
+    return [{ type: "putFromHand", ...(filter ? { filter } : {}), may: true, any: true, upTo: num(m[1]!) }];
+  }
   if ((m = /^(You may )?[Pp]ut (a|an|any number of) (.+?) from your hand onto the battlefield( tapped)?( and attacking( that opponent)?)?$/.exec(s))) {
     if (m[5] && m[2] === "any number of") return null;
     // "Tapped and attacking that opponent" (Kaalia of the Vast): the player the trigger's creature attacked.

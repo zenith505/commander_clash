@@ -3,7 +3,7 @@ import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, cardIdOf, defOf, isType } from "../cards";
 import { controllerOf } from "../layers";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
-import { castProblem, describeTargets, log, moveObject, newObject, obj, opponents, player } from "../game";
+import { castProblem, describeTargets, log, millCount, moveObject, newObject, obj, opponents, player } from "../game";
 import { compileCard, spellTargetSpecs } from "../oracle";
 import type { DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
 import { isLegalTarget, legalTargets, pickOptions, printedMatches, sameTarget, sourceQuality, spellManaValue, spellQuality, stampTargets, swapKeepsOthersLegal } from "./targeting";
@@ -382,7 +382,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         // Tibalt's Trickery: mill 1, 2 or 3, chosen at random (CR 701.13), first.
         if (e.millFirst) {
           const n = 1 + Math.floor(nextRandom(s) * e.millFirst);
-          const milled = p.library.slice(0, n);
+          const milled = p.library.slice(0, millCount(s, p.id, n));
           for (const id of milled) moveObject(s, id, "graveyard");
           log(s, `${n} is chosen at random: ${p.name} mills ${milled.length} card${milled.length === 1 ? "" : "s"}.`);
         }

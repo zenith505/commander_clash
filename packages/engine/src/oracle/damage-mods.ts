@@ -118,6 +118,17 @@ export function parseDamageMod(line: string): StaticAbility | null {
     .replace(/^Prevent all damage that would be dealt to you and permanents you control by sources with the chosen name$/, "If a source with the chosen name would deal damage to you or a permanent you control, prevent that damage")
     // Glacial Chasm, Solitary Confinement: "Prevent all damage that would be dealt to you" is the same, from any source.
     .replace(/^Prevent all (combat )?damage that would be dealt to you$/, "If a source would deal $1damage to you, prevent that damage");
+  // Ojer Axonil: "If a red source you control would deal an amount of noncombat damage less than ~'s power to an opponent,
+  // that source deals damage equal to ~'s power instead."
+  const raise = /^If (.+?) would deal an amount of (combat |noncombat )?damage less than (.+?) to (.+?), that source deals damage equal to \3 instead$/.exec(text);
+  if (raise) {
+    const byP = parseBy(raise[1]!, false);
+    const to = byP && parseTo(raise[4], false);
+    const amount = parseCount(raise[3]!, null);
+    if (!byP || to === null || !amount) return null;
+    const mod: DamageMod = { op: "raiseTo", amount, text: line, ...(raise[2] ? { combat: raise[2] === "combat " ? ("only" as const) : ("non" as const) } : {}), ...(byP.by ? { by: byP.by } : {}), ...(to ? { to } : {}) };
+    return { affects: { kind: "self" }, mods: [{ kind: "damageMod", mod }], text: line };
+  }
   const OP = "(double that damage|twice that much damage|triple that damage|half that damage, rounded down|that much damage (?:plus|minus) (?:\\d+|X|an amount of damage equal to .+?))";
   const m = new RegExp(
     `^[Ii]f (.+?) would deal (combat |noncombat )?damage(?: to (.+?))?(?: while (.+?))?, (?:(?:it|that source) deals ${OP}(?:,? to (?:that (?:permanent or player|player or permanent|player|creature|permanent)|you|~|equipped creature|enchanted creature))? instead|instead it deals ${OP})(?:, where X is (.+))?$`,

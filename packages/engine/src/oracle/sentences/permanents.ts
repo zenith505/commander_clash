@@ -288,6 +288,23 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const second = first && parseSentence(`Put ${m[4]} on ~`, ctx);
     if (first && second) return [...first, ...second];
   }
+  // "Put a +1/+1 counter, a reach counter, and a deathtouch counter on target creature" (Gift of the Viper): each kind
+  // in turn, on the same permanent.
+  const list = new RegExp(`^Put ((?:${NUMX} ${COUNTER} counters?, )+)and (${NUMX} ${COUNTER} counters?) on (target .+|~)$`, "i").exec(s);
+  if (list) {
+    const kinds = [...list[1]!.split(", ").filter(Boolean), list[4]!];
+    const before = ctx.targets.length;
+    const out: Effect[] = [];
+    for (const [i, k] of kinds.entries()) {
+      const fx = parseSentence(`Put ${k} on ${i === 0 || list[7] === "~" ? list[7] : "it"}`, ctx);
+      if (!fx || (i === 0 && list[7] !== "~" && (ctx.targets.length !== before + 1 || ctx.lastObjectTarget !== before))) {
+        ctx.targets.length = before;
+        return null;
+      }
+      out.push(...fx);
+    }
+    return out;
+  }
   // "Put a +1/+1 counter and a lifelink counter on target creature" (Unexpected Fangs): the same on the target.
   if ((m = new RegExp(`^Put (${NUMX} ${COUNTER} counters?) and (${NUMX} ${COUNTER} counters?) on (target .+)$`, "i").exec(s))) {
     const before = ctx.targets.length;

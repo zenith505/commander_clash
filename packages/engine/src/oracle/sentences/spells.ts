@@ -74,6 +74,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
     return who ? [{ type: "mill", who, n: { count: { kind: "x" }, times: 2 } }] : null;
   }
+  // "Target opponent exiles the top half of their library, rounded up" (Ulamog, the Defiler): half their own library.
+  if ((m = /^(.+?) exiles the top half of (?:their|his or her) library(?:, rounded (up|down))?$/i.exec(s)) && !/^you$/i.test(m[1]!)) {
+    const who = parsePlayer(m[1]!, ctx);
+    const half = roundOf(m[2], ctx);
+    return who && half ? [{ type: "exileTop", who, n: { count: { kind: "cardsInLibrary", who: { ref: "eachOne" } }, half } }] : null;
+  }
   // "That player exiles the top card of their library" (ingest's text); "you" exiling your own goes through impulse draw.
   if ((m = new RegExp(`^(.+?) exiles the top (card|${NUMX} cards) of (?:their|his or her) library$`, "i").exec(s)) && !/^you$/i.test(m[1]!)) {
     const who = parsePlayer(m[1]!, ctx);
@@ -373,7 +379,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^Counter (up to one )?target (.*?spell(?: with mana value (?:\d+|X)(?: or (?:less|greater))?| with the chosen name| with mana value less than or equal to the number of cards in its controller's graveyard)?(?: you don't control| an opponent controls)?)(?: unless its controller pays (.+))?$/i.exec(s))) {
     const spec = parseTargetPhrase(m[2]!, { x: true, chosen: !!ctx.activated && / with the chosen name\b/.test(m[2]!) });
     const unless = m[3] === undefined ? undefined : parseUnlessPays(m[3], ctx);
-    if (!spec || unless === null || (spec.xRange && !ctx.spell && !ctx.whereX)) return null;
+    // An ability's X: one announced for its cost (Kozilek, the Great Distortion; checked in oracle/activated.ts).
+    if (!spec || unless === null || (spec.xRange && !ctx.spell && !ctx.activated && !ctx.whereX)) return null;
     return [{ type: "counterSpell", index: addTarget(ctx, m[1] ? { ...spec, optional: true, text: `up to one target ${m[2]}` } : spec), ...(unless ? { unless } : {}) }];
   }
   // "You may cast a spell with mana value 3 or less from your hand without paying its mana cost" (Sram's Expertise),

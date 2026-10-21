@@ -1894,6 +1894,27 @@ function drawOne(s: GameState, pid: PlayerId): boolean {
   return true;
 }
 
+/**
+ * How many cards `pid` mills when told to mill `n` (CR 701.17): The Water Crystal's "that many cards plus four" and
+ * Bruvac's "twice that many" for each of their controllers' opponents (CR 614.1a). With both, the milled player would
+ * choose the order (CR 616.1); we double first, the smaller total. Zero stays zero ("one or more cards").
+ */
+export function millCount(s: GameState, pid: PlayerId, n: number): number {
+  if (n <= 0) return n;
+  let plus = 0;
+  let twice = 0;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    const more = abilitiesOf(s, o).millMore;
+    if (!more || controllerOf(s, o) === pid || !opponents(s, controllerOf(s, o)).includes(pid)) continue;
+    for (const m of more) {
+      if ("plus" in m) plus += m.plus;
+      else twice++;
+    }
+  }
+  return n * 2 ** twice + plus;
+}
+
 /** Cards in `pid`'s graveyard whose dredge could replace their next draw: dredge N needs N cards in their library (CR 702.52a-b). */
 export function dredgeOptions(s: GameState, pid: PlayerId): ObjectId[] {
   const p = player(s, pid);
@@ -1909,7 +1930,7 @@ export function dredgeOptions(s: GameState, pid: PlayerId): ObjectId[] {
  * rest of the draws, and whatever was drawing carries on.
  */
 function dredgeInstead(s: GameState, p: Player, id: ObjectId) {
-  const n = compileCard(defOf(s, obj(s, id))).dredge!;
+  const n = millCount(s, p.id, compileCard(defOf(s, obj(s, id))).dredge!);
   const milled = p.library.slice(0, n);
   for (const c of milled) moveObject(s, c, "graveyard");
   moveObject(s, id, "hand");
@@ -2326,8 +2347,8 @@ function beginStep(s: GameState, step: Step): void {
       // damage removal, when players get priority (CR 514.3a).
       fireEvent(s, { type: "step", step: "cleanup", active: ap });
       const p = player(s, ap);
-      if (p.hand.length > MAX_HAND_SIZE && !hasNoMaxHandSize(s, ap)) {
-        s.pending = { kind: "discardToHandSize", player: ap, count: p.hand.length - MAX_HAND_SIZE };
+      if (p.hand.length > maxHandSize(s, ap)) {
+        s.pending = { kind: "discardToHandSize", player: ap, count: p.hand.length - maxHandSize(s, ap) };
         return;
       }
       finishCleanup(s);
@@ -2373,6 +2394,23 @@ export const hasNoMaxHandSize = (s: GameState, pid: PlayerId) =>
     return a === "all" || (!!a && controllerOf(s, obj(s, id)) === pid);
   }) ||
   liveEmblems(s).some((o) => o.owner === pid && !!abilitiesOf(s, o).noMaxHandSize);
+
+/**
+ * `pid`'s maximum hand size (CR 402.2): seven, changed by "Your maximum hand size is eight" (Doctor Octopus), "... is
+ * increased by one", "Each opponent's maximum hand size is reduced by seven" (Jin-Gitaxias, Core Augur). Rules-changing
+ * effects, applied in timestamp order (CR 613.11); none with no maximum hand size. Never below 0.
+ */
+export function maxHandSize(s: GameState, pid: PlayerId): number {
+  if (hasNoMaxHandSize(s, pid)) return Infinity;
+  let n = MAX_HAND_SIZE;
+  const mods = s.battlefield
+    .map((id) => obj(s, id))
+    .flatMap((o) => (abilitiesOf(s, o).handSize ?? []).map((h) => ({ h, o })))
+    .filter(({ h, o }) => (h.who === "you" ? controllerOf(s, o) === pid : opponents(s, controllerOf(s, o)).includes(pid)))
+    .sort((a, b) => a.o.timestamp - b.o.timestamp);
+  for (const { h } of mods) n = h.set !== undefined ? h.set : n + (h.plus ?? 0);
+  return Math.max(0, n);
+}
 
 function finishCleanup(s: GameState) {
   closeZoneBatch(s); // discarding to hand size (CR 514.1) triggers "whenever you discard one or more cards"
@@ -4213,11 +4251,14 @@ const xCost = (c: AdditionalCost) => "x" in c && !!c.x;
 
 /** An activated ability's costs beyond mana with its X announced: "Sacrifice X Squirrels" is X of them (CR 107.3a, 602.2b). */
 export function activatedCosts(ab: ActivatedAbility, x: number | undefined): AdditionalCost[] {
-  return (ab.costs ?? []).map((c) => (xCost(c) ? { ...c, n: x ?? 0 } : c));
+  return (ab.costs ?? []).map((c) => (xCost(c) ? { ...c, n: x ?? 0 } : c.kind === "discard" && c.mvX && c.filter ? { ...c, filter: { ...c.filter, manaValue: { min: x ?? 0, max: x ?? 0 }, text: c.filter.text.replace(/\bX\b/, String(x ?? 0)) } } : c));
 }
 
+/** "Discard a card with mana value X" (Kozilek, the Great Distortion): X announced, then a card with that mana value. */
+const mvXCost = (c: AdditionalCost) => c.kind === "discard" && !!c.mvX && !!c.filter;
+
 /** Does the ability have an X to announce in a cost beyond mana, as Chatterfang's "Sacrifice X Squirrels"? */
-export const abilityCostsHaveX = (ab: ActivatedAbility): boolean => !!ab.costs?.some(xCost);
+export const abilityCostsHaveX = (ab: ActivatedAbility): boolean => !!ab.costs?.some((c) => xCost(c) || mvXCost(c));
 
 /** Costs paid with objects the player picks; "discard a card at random" and "the top card of your graveyard" aren't. */
 const costNeedsPick = (c: AdditionalCost) =>
@@ -4461,8 +4502,9 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
     }
     else if (c.kind === "reveal") log(s, `${p.name} reveals ${(choices.reveal ?? []).map((id) => nameOf(s, id)).join(", ")} from their hand.`);
     else if (c.kind === "mill") {
-      log(s, `${p.name} mills ${c.n === 1 ? "a card" : `${c.n} cards`}.`);
-      for (const id of p.library.slice(0, c.n)) moveObject(s, id, "graveyard");
+      const n = millCount(s, p.id, c.n);
+      log(s, `${p.name} mills ${n === 1 ? "a card" : `${n} cards`}.`);
+      for (const id of p.library.slice(0, n)) moveObject(s, id, "graveyard");
     } else if (c.kind === "revealHand") log(s, `${p.name} reveals their hand${p.hand.length ? `: ${p.hand.map((id) => nameOf(s, id)).join(", ")}` : " (it's empty)"}.`);
     else if (c.kind === "giveLife") {
       // Unchosen (a caller that didn't ask), the cost is still paid: by the first opponent who can gain life.
@@ -4575,6 +4617,17 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.body.modal) {
     const mp = modes === undefined ? (canChooseModes(s, ab.body, pid, sourceQuality(s, id), id) ? null : "no mode can be chosen") : modesProblem(s, ab.body, modes, pid, sourceQuality(s, id), false, id);
     if (mp) return mp;
+  }
+  // "Discard a card with mana value X: Counter target spell with mana value X" (Kozilek): before X is announced, the
+  // ability can be activated if some X works for both the cost and the target (CR 107.3a, 602.2b).
+  if (x === undefined && ab.costs?.some((c) => c.kind === "discard" && c.mvX)) {
+    for (let n = 0; n <= 20; n++) {
+      if (abilityProblem(s, pid, id, index, targets, modes, tapCreatures, n, costs)) continue;
+      // Without targets chosen, the check above lets any X target; here the target must have mana value n too.
+      const b = settleDivided(s, withModes(ab.body, modes), { controller: pid, sourceId: id, x: n }, false);
+      if (targets || !b.targets.length || hasLegalTargetsFor(s, b.targets, pid, sourceQuality(s, id), id)) return null;
+    }
+    return abilityProblem(s, pid, id, index, targets, modes, tapCreatures, 0, costs);
   }
   let body = settleDivided(s, withModes(ab.body, modes), { controller: pid, sourceId: id, x: x ?? 0 }, !targets);
   if (targets && manySlot(body.targets) >= 0) {
@@ -5484,7 +5537,9 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
-  r.chosen = withChoice(r.chosen, pend.what, choice);
+  // "Each player chooses a creature type": one more for "a type chosen this way".
+  if (pend.what === "creatureType" && r.scratch?.eachAsked && r.chosen?.types) r.chosen = { ...r.chosen, types: [...r.chosen.types, choice] };
+  else r.chosen = withChoice(r.chosen, pend.what, choice);
   log(s, `${p.name} chooses ${pend.what === "opponent" ? player(s, Number(choice)).name : choice}${pend.what === "opponent" ? ` for ${pend.source}` : ""}.`);
   continueResolution(s);
 }

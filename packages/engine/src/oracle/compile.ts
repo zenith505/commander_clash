@@ -1550,6 +1550,12 @@ export function compile(d: CardDef): CompiledCard {
       out.noMaxHandSize = out.noMaxHandSize || true;
       continue;
     }
+    const handSize = new RegExp(`^(Your|Each opponent's) maximum hand size is (?:${NUM}|(increased|reduced) by ${NUM})\\.$`).exec(line);
+    if (handSize) {
+      const n = num((handSize[2] ?? handSize[4])!);
+      (out.handSize ??= []).push({ who: handSize[1] === "Your" ? "you" : "opponents", ...(handSize[2] ? { set: n } : { plus: handSize[3] === "reduced" ? -n : n }) });
+      continue;
+    }
     if (/^Players have no maximum hand size\.$/.test(line)) {
       out.noMaxHandSize = "all";
       continue;
@@ -1610,6 +1616,30 @@ export function compile(d: CardDef): CompiledCard {
     const proto = /^Prototype ((?:\{[^}]+\})+) — (\d+)\/(\d+)$/.exec(line);
     if (proto && parseManaCost(proto[1]!).supported && !parseManaCost(proto[1]!).hasX) {
       (out.altCosts ??= []).push({ kind: "prototype", mana: proto[1]! });
+      continue;
+    }
+    // Tergrid, God of Fright: two events, each its own trigger; "that card" only while it's still in the graveyard it went
+    // to (rulings: a commander put into the command zone, a card with madness exiled, isn't there).
+    if (line === "Whenever an opponent sacrifices a nontoken permanent or discards a permanent card, you may put that card from a graveyard onto the battlefield under your control.") {
+      const put: AbilityBody = { targets: [], effects: [{ type: "may", effects: [{ type: "putOntoBattlefield", what: { ref: "subjectCard", zone: "graveyard" } }], text: "put that card from a graveyard onto the battlefield under your control" }], text: "you may put that card from a graveyard onto the battlefield under your control." };
+      const halves = ["Whenever an opponent sacrifices a nontoken permanent, draw a card.", "Whenever an opponent discards a permanent card, draw a card."].map((l) => parseTrigger(l));
+      if (halves.every((t) => t && t !== "fail")) {
+        for (const t of halves) out.triggers.push({ ...(t as TriggeredAbility), body: put });
+        continue;
+      }
+    }
+    // "~ has annihilator X, where X is the number of +1/+1 counters on it" (Ulamog, the Defiler): annihilator (CR 702.86a)
+    // with X counted as it resolves (rulings).
+    const annX = /^~ has annihilator X, where X is (.+)\.$/.exec(line);
+    const annCount = annX && parseCount(annX[1]!.replace(/\bon it$/, "on ~"), null);
+    if (annCount) {
+      out.triggers.push({ event: "selfAttacks", body: { targets: [], effects: [{ type: "pick", who: { ref: "eventPlayer" }, filter: { kind: "object", text: "permanent" }, n: annCount, action: "sacrifice" }], text: `Annihilator X: defending player sacrifices X permanents, where X is ${annX![1]}.` } });
+      continue;
+    }
+    // The Water Crystal, Bruvac the Grandiloquent: a replacement effect on milling (CR 614.1a, 701.17).
+    const millMore = /^If an opponent would mill one or more cards, they mill (that many cards plus (\w+)|twice that many cards) instead\.$/.exec(line);
+    if (millMore && !Number.isNaN(num(millMore[2] ?? "0"))) {
+      (out.millMore ??= []).push(millMore[2] ? { plus: num(millMore[2]) } : { twice: true });
       continue;
     }
     if (line === "Skip your draw step.") {
@@ -2564,14 +2594,16 @@ export function parseFromTop(text: string): FromTop | null | undefined {
  */
 function triggersAgainLine(line: string): NonNullable<CompiledCard["triggersAgain"]>[number] | null {
   // "Wolf or battle you control", "land or Bird you control": any of them.
-  const kinds = (phrase: string, other: boolean): { filter: TargetSpec; other?: true }[] | null => {
+  // "Colorless spell you control or another colorless permanent you control" (Echoes of Eternity): spells too, when
+  // `spells`.
+  const kinds = (phrase: string, other: boolean, spells = false): { filter: TargetSpec; other?: true }[] | null => {
     const yours = / you control$/.test(phrase);
-    const parts = phrase.replace(/ you control$/, "").split(/,? or (?!less\b|greater\b|more\b)/);
+    const parts = phrase.replace(/ you control$/, "").split(/,? or (?!less\b|greater\b|more\b)/).map((p) => p.replace(/ you control$/, ""));
     const out: { filter: TargetSpec; other?: true }[] = [];
     for (const p of parts) {
       const another = /^another /.test(p);
       const f = parseTargetPhrase(`${p.replace(/^another /, "")}${yours ? " you control" : ""}`);
-      if (f?.kind !== "object") return null;
+      if (f?.kind !== "object" && !(spells && f?.kind === "spell" && !another)) return null;
       out.push({ filter: f, ...(other || another ? { other: true as const } : {}) });
     }
     return out;
@@ -2584,6 +2616,8 @@ function triggersAgainLine(line: string): NonNullable<CompiledCard["triggersAgai
     const filter = kinds(m[1]!, false);
     return filter ? { by: { event, filter: filter.map((x) => x.filter) } } : null;
   }
+  // Cloud, Midgar Mercenary: its own abilities and its Equipment's, while it's equipped.
+  if (line === "As long as ~ is equipped, if a triggered ability of ~ or an Equipment attached to it triggers, that ability triggers an additional time.") return { selfOrEquipment: true };
   // Veyran, Voice of Duality.
   if (line === "If you casting or copying an instant or sorcery spell causes a triggered ability of a permanent you control to trigger, that ability triggers an additional time.") return { by: { event: "castOrCopy" } };
   m = /^If a triggered ability of (?:an? )?(.+?) triggers, (?:that ability|it) triggers an additional time\.$/.exec(line);
@@ -2595,8 +2629,7 @@ function triggersAgainLine(line: string): NonNullable<CompiledCard["triggersAgai
   }
   if (m) {
     const all = /^another (.+ or .+ you control)$/.exec(m[1]!);
-    const of = kinds(all ? all[1]! : m[1]!, !!all);
-    // Only permanents you control (a spell's triggered abilities aren't covered: Echoes of Eternity).
+    const of = kinds(all ? all[1]! : m[1]!, !!all, true);
     return of && of.every((x) => x.filter.controller === "you") ? { of } : null;
   }
   return null;

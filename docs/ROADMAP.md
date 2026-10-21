@@ -1,7 +1,7 @@
 # Roadmap
 
-22,025 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,841 of 1,989 (92%), top 5,000: 3,686 of 4,988 (73%).
+22,085 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,863 of 1,989 (93%), top 5,000: 3,719 of 4,988 (74%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,12 +22,16 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 103, most played first: Echoes of Eternity, The Water
-   Crystal, Patriarch's Bidding, Ojer Axonil, The Grey Havens, Kozilek, the Great Distortion ("draw cards equal to the
-   difference", "Discard a card with mana value X"), Ulamog, the Defiler, Cloud, Midgar Mercenary, Avatar's Wrath,
-   Exploration Broodship, Mazirek ("sacrifices another permanent"), Malcolm, Resourceful Defense, Phelia, Tergrid,
-   Smuggler's Surprise, Morophon, Ugin, the Spirit Dragon's −10, Desynchronization ("not historic"), Brass's
-   Tunnel-Grinder, Goblin Welder, Valakut Exploration, Cultivator Colossus. Smaller gaps from round 103: experience
+00. Most played first (`npm run popular`). Out after round 104, most played first: Avatar's Wrath, Exploration
+   Broodship, Malcolm, Alluring Scoundrel (cast the discarded card), Resourceful Defense, Phelia, Morophon, Brass's
+   Tunnel-Grinder, Goblin Welder (a target that depends on the other target), Valakut Exploration, Cultivator Colossus
+   ("repeat this process"), March of Swirling Mist, Consuming Aberration, Return to Dust (a second target only if cast in
+   a main phase), Replicating Ring, Chainer, Sting, Defiler of Vigor, Illusionist's Bracers, The Skullspore Nexus,
+   Giada. Smaller gaps from round 104: Death Baron ("Skeletons you control and other Zombies you control"), Tetsuko
+   ("power or toughness 1 or less"), Soulherder, Void Winnower, Run Away Together; bots activate Kozilek, the Great
+   Distortion only against spells with mana value 3 or more; The Water Crystal with Bruvac applies the doubling first
+   without asking (CR 616.1); Ojer Axonil doesn't raise damage that's already been prevented to 0; Kozilek's X picker
+   offers X up to the greatest mana value in your hand even when no spell on the stack has it. Smaller gaps from round 103: experience
    counters play (Meren, Kalemne, Mizzix, Ezuri) but Azula, Daxos, Minthara, Kratos, Katara, Zuko and Kelsien are out
    on other lines; companions can't be used as companions (decks have nothing outside the game; the card plays as
    itself, CR 702.139a); counters of several kinds put at once (All Will Be One with Guide of Souls) are put one kind

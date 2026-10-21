@@ -1,5 +1,5 @@
 import { allEffects, type AbilityBody, type BatchTrigger, type Effect, type TriggeredAbility, type SpellCondition, type SpentReq, type StaticCondition, type TargetSpec, type TriggerEvent } from "../abilities";
-import { COUNTER, NUM, X, num, parseSpentReq, singularWord, SPENT } from "./words";
+import { COUNTER, differenceInHand, NUM, X, num, parseSpentReq, singularWord, SPENT } from "./words";
 import { parseStaticCondition } from "./statics";
 import { parseBody, replaceX } from "./body";
 import { parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
@@ -617,7 +617,7 @@ function parseAttackerTrigger(line: string): TriggeredAbility | "fail" | null {
 function parseSacrificeTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever a player sacrifices a permanent" (Mayhem Devil), "whenever an opponent sacrifices ...": "that player" is the
   // one who sacrificed it, its controller (CR 701.21a).
-  const any = /^Whenever (a player|an opponent) sacrifices (an?) (.+?), (.+)$/.exec(line);
+  const any = /^Whenever (a player|an opponent) sacrifices (an?|another) (.+?), (.+)$/.exec(line);
   const m = any ? [any[0], any[2], any[3], undefined, any[4]] : /^Whenever you sacrifice (~ or another|another|an?) (.+?)( during your turn)?, (.+)$/.exec(line);
   if (!m) return null;
   const phrase = m[2]!.replace(/ or (?=[a-z])/g, " or ");
@@ -962,7 +962,7 @@ const YARD_EVENTS: TriggerEvent[] = ["castSpell", "spellYouControlDealsDamage", 
 
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).
-  const line = raw.replace(/^[A-Z][A-Za-z' -]+ — (?=(When|Whenever|At)\b)/, "");
+  const line = differenceInHand(raw.replace(/^[A-Z][A-Za-z' -]+ — (?=(When|Whenever|At)\b)/, ""));
   if (!/^(When|Whenever|At)\b/.test(line)) return null;
   // Springheart Nantuko: "Whenever a land you control enters, you may pay {1}{G} if ~ is attached to a creature you
   // control. If you do, create a token that's a copy of that creature. If you didn't create a token this way, create a
@@ -1278,6 +1278,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const reach = ["second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth", "eleventh", "twelfth"].indexOf(nth[1]!) + 2;
     const body = parseBody(nth[3]!, { selfIt: true });
     return body ? { event: "selfCountersPut", countersKind: nth[2]!, countersReach: reach, body } : "fail";
+  }
+  // "Whenever a +1/+1 counter is put on ~" (Fathom Mage): once for each counter put on it (rulings).
+  const each = /^Whenever an? ((?:\+1\/\+1|-1\/-1|[a-z]+) )counter is put on ~, (.+)$/.exec(line);
+  if (each) {
+    const body = parseBody(each[2]!.replace(/^it (?=(?:gets|gains|deals|has|becomes)\b)/, "~ "), { selfIt: true });
+    return body ? { event: "selfCountersPut", countersKind: each[1]!.trim(), countersEach: true, body } : "fail";
   }
   // "Whenever one or more +1/+1 counters are put on ~ / on a creature you control" (CR 122.6: also as it enters with
   // them). "That many" is how many were put on it.

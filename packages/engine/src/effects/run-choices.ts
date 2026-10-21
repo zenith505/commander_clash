@@ -222,6 +222,18 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "opponent", options: opps.map(String), labels: opps.map((x) => player(s, x).name), prompt: e.mostLife ? "choose a player with the most life" : "choose an opponent" };
         return "paused";
       }
+      if (e.each) {
+        // "Each player chooses a creature type": the active player first, then the others in turn order (Patriarch's
+        // Bidding rulings). Each answer is added to Chosen.types (see chooseOption).
+        const sc = (r.scratch ??= {});
+        const asked = (sc.eachAsked ??= []);
+        const next = apnap(s, s.turnOrder).find((x) => !player(s, x).lost && !asked.includes(x));
+        if (next === undefined) return;
+        asked.push(next);
+        r.chosen = { ...r.chosen, types: r.chosen?.types ?? [] };
+        s.pending = { kind: "chooseOption", player: next, source: src, what: "creatureType", options: choiceOptions("creatureType") };
+        return "paused";
+      }
       if (e.choice === "cardType") {
         // "Choose artifact or enchantment. Destroy all permanents of the chosen type": a choice of its own each time the
         // instruction is reached (a mode chosen twice asks twice).

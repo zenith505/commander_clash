@@ -500,7 +500,7 @@ export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, in
   const cost = activationCost(s, pid, obj(s, objectId), ab, targets, x);
   // Don't tap the source for mana if the ability itself needs {T}, nor creatures tapped to crew.
   // Don't tap for mana what's about to be sacrificed either.
-  const taps = planMana(s, pid, cost, (x ?? 0) * xCount(cost), ab.tap ? objectId : undefined, [...(tapCreatures ?? []), ...(costs?.sacrifice ?? []), ...(costs?.tap ?? []), ...sacrificedTargets(s, targets)], abilityUse(obj(s, objectId), ab));
+  const taps = planMana(s, pid, cost, (x ?? 0) * xCount(cost), ab.tap ? objectId : undefined, [...(tapCreatures ?? []), ...(costs?.sacrifice ?? []), ...(costs?.tap ?? []), ...sacrificedTargets(s, targets)], abilityUse(obj(s, objectId), ab, s));
   if (!taps) return null;
   return [...taps, { type: "activateAbility", player: pid, objectId, index, targets, ...(modes ? { modes } : {}), ...(tapCreatures ? { tapCreatures } : {}), ...(x ? { x } : {}), ...(costs ? { costs } : {}), ...(pick?.mana ? { mana: pick.mana } : {}), ...(pick?.extra?.length ? { extra: pick.extra } : {}) }];
 }

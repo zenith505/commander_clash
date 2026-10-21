@@ -90,6 +90,13 @@ const multiverse = card("One with the Multiverse", "Enchantment", "{6}{U}{U}", {
   oracleText:
     "You may look at the top card of your library any time.\nYou may play lands and cast spells from the top of your library.\nOnce during each of your turns, you may cast a spell from your hand or the top of your library without paying its mana cost.",
 });
+const drana = card("Drana and Linvala", "Legendary Creature — Vampire Angel", "{1}{W}{W}{B}", {
+  power: "3",
+  toughness: "4",
+  keywords: ["Flying", "Vigilance"],
+  oracleText:
+    "Flying, vigilance\nActivated abilities of creatures your opponents control can't be activated.\nDrana and Linvala has all activated abilities of all creatures your opponents control. You may spend mana as though it were mana of any color to activate those abilities.",
+});
 // Test cards.
 const shock = card("Test Shock", "Instant", "{R}", { oracleText: "Test Shock deals 2 damage to any target." });
 const ponder = card("Test Ponder", "Sorcery", "{U}", { oracleText: "Draw a card." });
@@ -551,6 +558,31 @@ describe("One with the Multiverse", () => {
     expect(altCostsFor(s, ap, o(s, nowTop)).some((a) => a.kind === "payZero")).toBe(false);
     s = settle(run(s, planCast(s, ap, second, undefined, undefined, "auto", undefined, { alt: "payZero" })));
     expect(o(s, second).zone).toBe("graveyard");
+  });
+});
+
+describe("Drana and Linvala", () => {
+  it("has the activated abilities of opponents' creatures, which they can't activate, paid with mana of any color", () => {
+    supported(drana);
+    const { s: s0, ap } = setup([]);
+    const opp = next(s0, ap);
+    const pinger = putOnBattlefield(s0, opp, card("Test Pinger", "Creature — Human Wizard", "{2}{R}", { power: "1", toughness: "1", oracleText: "{R}, {T}: This creature deals 1 damage to any target." }));
+    const dl = putOnBattlefield(s0, ap, drana);
+    // Its own abilities can't be activated now (CR 602.5), Drana and Linvala's copy of it can.
+    expect(planActivate(s0, opp, pinger, 0)).toBeNull();
+    // With only {W} to pay {R}: mana of any color.
+    s0.players[ap]!.manaPool.W = 1;
+    const life = s0.players[opp]!.life;
+    let s = run(s0, planActivate(s0, ap, dl, 0, [{ kind: "player", id: opp }]));
+    s = settle(s);
+    expect(s.players[opp]!.life).toBe(life - 1);
+    expect(s.objects[dl]!.tapped).toBe(true);
+    expect(s.players[ap]!.manaPool.W).toBe(0);
+    // A spell isn't paid that way: only "those abilities".
+    s.players[ap]!.manaPool.W = 1;
+    for (const id of s.battlefield) if (s.objects[id]!.controller === ap) s.objects[id]!.tapped = true;
+    const shockId = toZone(s, ap, shock, "hand");
+    expect(planCast(s, ap, shockId, [{ kind: "player", id: opp }])).toBeNull();
   });
 });
 

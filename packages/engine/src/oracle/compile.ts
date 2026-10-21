@@ -463,7 +463,7 @@ export function compile(d: CardDef): CompiledCard {
     else if (!isSpell && /^Vivid — \{/.test(line)) line = line.replace(/^Vivid — /, "");
     if (!line) continue;
     // "~ has all activated abilities of ..." (CompiledCard.borrows).
-    const borrow = /^(?:As long as ~ is on the battlefield, it|~) has all activated abilities of (.+?)( except mana abilities)?\.$/.exec(line);
+    const borrow = /^(?:As long as ~ is on the battlefield, it|~) has all activated abilities of (.+?)( except mana abilities)?\.( You may spend mana as though it were mana of any color to activate those abilities\.)?$/.exec(line);
     if (borrow && !out.borrows) {
       const yard = /^all (.+?) cards in (all graveyards|your graveyard)$/.exec(borrow[1]!);
       const what = yard ? parseTargetPhrase(yard[1]!) : null;
@@ -471,7 +471,7 @@ export function compile(d: CardDef): CompiledCard {
       const group = yard ? null : parseGroup(same ? borrow[1]!.slice(0, same.index) : borrow[1]!);
       if (yard && what?.kind === "object" && !what.controller && Object.entries(what).every(([k, v]) => v === undefined || ["kind", "types", "notTypes", "notColors", "subtypes", "text"].includes(k)))
         out.borrows = { filter: { ...what, text: `${yard[1]} cards` }, graveyard: true, ...(yard[2] === "your graveyard" ? { yours: true as const } : {}), ...(borrow[2] ? { noMana: true as const } : {}) };
-      else if (group && group.filter.controller !== "enchanted") out.borrows = { filter: group.filter, ...(group.other ? { other: true } : {}), ...(same ? { notSameName: true as const } : {}), ...(borrow[2] ? { noMana: true as const } : {}) };
+      else if (group && group.filter.controller !== "enchanted") out.borrows = { filter: group.filter, ...(group.other ? { other: true } : {}), ...(same ? { notSameName: true as const } : {}), ...(borrow[2] ? { noMana: true as const } : {}), ...(borrow[3] ? { anyColor: true as const } : {}) };
       else out.unsupported.push(raw);
       continue;
     }

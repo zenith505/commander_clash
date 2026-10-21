@@ -4908,7 +4908,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   const cost = activationCost(s, pid, o, ab, targets, x);
   const xp = ab.loyaltyX || abilityCostsHaveX(ab) ? (x !== undefined && (!Number.isInteger(x) || x < 0) ? "X must be a whole number, 0 or more" : (x ?? 0) < (ab.xMin ?? 0) ? "X can't be 0" : null) : xProblem(cost, x);
   if (xp) return xp;
-  if (!canPayFromPool(s, pid, cost, abilityUse(o, ab), ab.loyaltyX ? 0 : (x ?? 0) * xCount(cost), p.life)) return `not enough mana for ${d.name}'s ability`;
+  if (!canPayFromPool(s, pid, cost, abilityUse(o, ab, s), ab.loyaltyX ? 0 : (x ?? 0) * xCount(cost), p.life)) return `not enough mana for ${d.name}'s ability`;
   return null;
 }
 
@@ -5088,7 +5088,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // "Pay half your life, rounded up": worked out with the rest of the cost, before any of it is paid (CR 601.2f-h).
   const halfLife = halfLifeCost(s, p.id, ab);
   const lifeCost = activatedLifeCost(s, p.id, ab);
-  const paid = spendFromPool(s, p.id, abCost, abilityUse(o, ab), ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), payableLife(s, p.id) - halfLife - lifeCost)!;
+  const paid = spendFromPool(s, p.id, abCost, abilityUse(o, ab, s), ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), payableLife(s, p.id) - halfLife - lifeCost)!;
   // A Treasure's mana ability makes "mana from a Treasure" (CR 106.3), even though it's sacrificed as it's activated.
   const manaFrom = manaPick ? manaOriginsOf(s, o) : [];
   // The source as it is now, for "its power" after it's sacrificed as a cost (CR 608.2h).

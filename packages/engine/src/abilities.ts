@@ -3217,6 +3217,8 @@ export interface BatchTrigger {
 }
 
 export interface ActivatedAbility {
+  /** Another permanent's ability that this one has through "~ has all activated abilities of ..." (CompiledCard.borrows). */
+  borrowed?: true;
   /** "Spend only mana of the chosen color to activate this ability" (Throne of Eldraine): the color chosen as its source entered. */
   spendOnlyChosenColor?: true;
   manaCost: string; // "{2}{R}" or ""
@@ -3691,7 +3693,7 @@ export interface CompiledCard {
    * its controller's). "~" in them means this object (rulings). Only activated abilities: not triggered or static ones.
    * Abilities that work only from a hand or graveyard, equip and loyalty abilities aren't borrowed.
    */
-  borrows?: { filter: TargetSpec; other?: boolean; notSameName?: true; graveyard?: true; yours?: true; noMana?: true };
+  borrows?: { filter: TargetSpec; other?: boolean; notSameName?: true; graveyard?: true; yours?: true; noMana?: true; /** "You may spend mana as though it were mana of any color to activate those abilities" (Drana and Linvala, CR 609.4b). */ anyColor?: true };
   spell?: AbilityBody; // instants and sorceries
   /**
    * "As this creature transforms into Sephiroth, One-Winged Angel, you get an emblem with ..." (a back face's): done while

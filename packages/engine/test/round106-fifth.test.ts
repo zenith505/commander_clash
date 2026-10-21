@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, activate, bear, card, passUntil, pt, putOnBattlefield, setup, target } from "./helpers";
-import { abilitiesOf, characteristics, controllerOf, invalidateCharacteristics, isFullySupported, objIsType, planActivate, planCast, waitingOn, type GameState } from "../src";
+import { abilitiesOf, characteristics, controllerOf, invalidateCharacteristics, isFullySupported, objIsType, planActivate, planCast, waitingOn, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const tezzeret = card("Tezzeret the Seeker", "Legendary Planeswalker — Tezzeret", "{3}{U}{U}", { loyalty: "4", oracleText: "+1: Untap up to two target artifacts.\n−X: Search your library for an artifact card with mana value X or less, put it onto the battlefield, then shuffle.\n−5: Artifacts you control become artifact creatures with base power and toughness 5/5 until end of turn." });
@@ -33,7 +33,7 @@ const settle = (s: GameState) => {
   for (let i = 0; i < 100 && (s.stack.length || s.triggerQueue.length) && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
   return s;
 };
-const pool = (s: GameState, pid: string) => Object.entries(s.players[pid]!.manaPool).filter(([, n]) => n > 0).map(([k, n]) => `${k}${n}`).sort().join(" ");
+const pool = (s: GameState, pid: PlayerId) => Object.entries(s.players[pid]!.manaPool).filter(([, n]) => n > 0).map(([k, n]) => `${k}${n}`).sort().join(" ");
 
 describe("round 106: the next popular cards", () => {
   it("parse", () => [tezzeret, defector, leyline, relic, counsel, tyrant, memory, shigeki, caryatid, incubation, witch, nightmare].forEach((d) => expect(isFullySupported(d), d.name).toBe(true)));

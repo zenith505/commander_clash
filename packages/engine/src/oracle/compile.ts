@@ -1892,7 +1892,7 @@ export function compile(d: CardDef): CompiledCard {
               ? [`When ~ transforms into ~, ${effect}`, `When ~ dies, ${effect}`]
             : twice[1] === "create or sacrifice"
               ? [`Whenever you create a token, ${effect}`, `Whenever you sacrifice a token, ${effect}`]
-            : /^When ~ enters and whenever /.test(line)
+            : /^whenever /.test(twice[1]!)
               ? [`When ~ enters, ${effect}`, `W${twice[1]!.slice(1)}, ${effect}`]
             : /^Whenever ~ attacks or becomes the target of a spell, /.test(line)
               ? [`Whenever ~ attacks, ${effect}`, `Whenever ~ becomes the target of a spell, ${effect}`]

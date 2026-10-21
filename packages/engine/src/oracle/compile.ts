@@ -2349,6 +2349,10 @@ function checkCastingLinks(out: CompiledCard) {
   visit([out.costMods, out.activationTaxes]);
   if (out.nameBans || out.protectionFromChosenName) needs.add("cardName");
   if ([...needs].some((k) => !choices.has(k))) bad = true;
+  // "If the discarded card ..." needs a discard cost: the spell's, or the activated ability's own.
+  const discIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"discardedIs"');
+  if (discIn(out.spell) && !out.additionalCosts?.some((c) => c.kind === "discard")) bad = true;
+  if (discIn(out.triggers) || discIn(out.statics) || out.activated.some((ab) => discIn(ab) && !ab.costs?.some((c) => c.kind === "discard"))) bad = true;
   // "If evidence was collected" needs the "you may collect evidence N" it's linked to (CR 701.59c): in the spell, or its
   // permanent's enters trigger.
   const evidenceIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"evidence"');

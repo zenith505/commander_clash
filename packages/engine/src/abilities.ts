@@ -461,7 +461,7 @@ export interface TargetSpec {
    * variable number of targets, announced as it's cast (CR 601.2c), any number from 0 (115.6), up to X, or exactly X. This one entry stands for all of them until then;
    * `expandMany` (modes.ts) makes it that many targets, and the effects' references to it cover them all.
    */
-  many?: "any" | "x" | "exactX";
+  many?: "any" | "x" | "exactX" | /** "Another target for each time ~ was kicked" (Comet Storm): as many as times kicked, made so as it's cast (gateBody). */ "kicked";
   /**
    * "For each opponent, destroy up to one target artifact that player controls": one "up to one" target for each
    * opponent, controlled by that opponent (CR 601.2c, 115.6). This one entry stands for all of them until the targets
@@ -2413,6 +2413,12 @@ export type SpellCondition =
   /** "If the sacrificed creature was suspected" (Agency Coroner): the creature its sacrifice cost sacrificed, as it last
    * existed on the battlefield (CR 608.2h), where being suspected is a designation it had (CR 701.60). */
   | { kind: "sacrificedSuspected" }
+  /**
+   * "If the discarded card wasn't a land card" (Grab the Prize), "was a creature card" (Moria Scavenger): the card a
+   * discard cost discarded (StackItem.costDiscarded), as it is in the graveyard. Costs are paid after targets are chosen
+   * (CR 601.2c, 601.2h), so no target depends on it.
+   */
+  | { kind: "discardedIs"; filter: TargetSpec }
   /** "If this spell was foretold" (CR 702.143c): it was a foretold card before it was cast, whatever it cost. */
   | { kind: "foretold" }
   /** "If ~ was bargained" (CR 702.166b). */

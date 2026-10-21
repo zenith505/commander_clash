@@ -731,6 +731,8 @@ export interface StackItem {
   fromSpell?: true;
   /** The names of cards moved to pay its cost beyond mana: Jester's Scepter's "that card" (CR 608.2h). */
   costCardNames?: string[];
+  /** The cards a discard cost discarded (keys into `cards`): "if the discarded card wasn't a land card" (Grab the Prize). */
+  costDiscarded?: string[];
   /**
    * An activated mana ability resolving right away, never on the stack (CR 605.3b): `index`, the ability; `tapped`, {T}
    * was in its cost, so it tapped its source for mana (CR 106.12); `extra`, the mana picked for what that triggers.

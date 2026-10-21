@@ -14,7 +14,7 @@ import { MANA_ABILITY_OFFSET, abolisherBan, commanderIdentity, activatedAsMana, 
 import { untapStepPhasing, releasePhased } from "./phasing";
 import { bindBound, pickOptions, playerProtectedFrom, spellManaValue } from "./effects/targeting";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
-import { describeCount, entwined, withModes, withSplices, gateTargets, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
+import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
 import { putCounters, tokenBatch } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
@@ -3537,7 +3537,6 @@ export const castHow = (choices?: Pick<CostChoices, "kicks" | "bargain" | "teamw
   ...(choices?.teamwork?.length ? { teamwork: true } : {}),
   ...(choices?.gift !== undefined ? { gift: true } : {}),
 });
-const gateBody = (b: AbilityBody, how: CastHow): AbilityBody => (hasGatedTargets(b.targets) ? { ...b, targets: gateTargets(b.targets, how) } : b);
 /** Every optional cost paid (each kicker cost too): the most targets a spell can have. */
 const ALL_PAID: CastHow = { kicks: [0, 1], bargained: true, teamwork: true, gift: true, evidence: true };
 
@@ -3763,8 +3762,10 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   closeZoneBatch(s);
   // Additional costs are paid with the mana (CR 601.2h); what they did is known to the spell.
   const returned: LastKnown = {};
-  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, { ...choices, targets, ...(chosen ? { modes: chosen } : {}) }, x ?? 0, s, p.id), choices, returned);
+  const discarded: string[] = [];
+  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, { ...choices, targets, ...(chosen ? { modes: chosen } : {}) }, x ?? 0, s, p.id), choices, returned, undefined, discarded);
   if (sacrificed.length) item.sacrificed = sacrificed;
+  if (discarded.length) item.costDiscarded = discarded;
   if (choices.alt === "sneak") o.sneak = returned;
   // Casualty: "you may sacrifice a creature with power N or greater" (CR 702.153a).
   if (choices.casualty) {
@@ -4374,7 +4375,7 @@ export function returnCandidates(s: GameState, pid: PlayerId, c: Extract<Additio
  * Pay costs beyond mana, for a spell or an ability; returns what was sacrificed as it last existed (CR 608.2h).
  * `returned` gets whom a creature returned to hand was attacking (ninjutsu, CR 702.49c).
  */
-function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices: CostChoices, returned?: LastKnown, moved?: string[]) {
+function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices: CostChoices, returned?: LastKnown, moved?: string[], discarded?: string[]) {
   const sacrificed: LastKnown[] = [];
   for (const c of costs) {
     if (c.kind === "exileFromGraveyard" && c.linked) {
@@ -4431,8 +4432,12 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       const pool = [...p.hand];
       const picked: ObjectId[] = [];
       for (let i = 0; i < c.n && pool.length; i++) picked.push(pool.splice(Math.floor(nextRandom(s) * pool.length), 1)[0]!);
+      discarded?.push(...picked.map((id) => cardIdOf(obj(s, id))));
       discardCards(s, p.id, picked, " at random");
-    } else if (c.kind === "discard") discardCards(s, p.id, choices.discard ?? []);
+    } else if (c.kind === "discard") {
+      discarded?.push(...(choices.discard ?? []).map((id) => cardIdOf(obj(s, id))));
+      discardCards(s, p.id, choices.discard ?? []);
+    }
     else if (c.kind === "reveal") log(s, `${p.name} reveals ${(choices.reveal ?? []).map((id) => nameOf(s, id)).join(", ")} from their hand.`);
     else if (c.kind === "mill") {
       log(s, `${p.name} mills ${c.n === 1 ? "a card" : `${c.n} cards`}.`);
@@ -4794,7 +4799,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const sourceZc = o.zoneChanges ?? 0;
   const stamped = stampTargets(s, targets);
   const costCardNames: string[] = [];
-  const sacrificed = ab.costs?.length ? payExtraCosts(s, p, activatedCosts(ab, x), costs ?? {}, lki, costCardNames) : [];
+  const costDiscarded: string[] = [];
+  const sacrificed = ab.costs?.length ? payExtraCosts(s, p, activatedCosts(ab, x), costs ?? {}, lki, costCardNames, costDiscarded) : [];
   if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard", { sacrificed: true });
   if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling, undefined, ab.cycling ? x : undefined);
   // Scavenge (CR 702.97a) from the graveyard; "Exile ~" on the battlefield, if it's still the same object (CR 400.7).
@@ -4815,6 +4821,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(abCost.hasX || ab.loyaltyX || abilityCostsHaveX(ab) ? { x: x ?? 0 } : {}),
     ...(sacrificed.length ? { sacrificed } : {}),
     ...(costCardNames.length ? { costCardNames } : {}),
+    ...(costDiscarded.length ? { costDiscarded } : {}),
     ...(ab.station ? { stationed: { id: tapCreatures![0]!, zc: obj(s, tapCreatures![0]!).zoneChanges ?? 0, power: power(s, obj(s, tapCreatures![0]!)) } } : {}),
     ...(o.tapped ? { sourceUntaps: o.untaps ?? 0 } : {}),
     ...(o.transforms ? { sourceTransforms: o.transforms } : {}),

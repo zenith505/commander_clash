@@ -546,6 +546,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const amount: AmountExpr = { ...(fx.amount as AmountExpr), twiceIfX: Number(twiceX[2]) };
     return { ...body, targets: body.targets.map((t) => ({ ...t, divided: { ...t.divided!, amount } })), effects: [{ ...fx, amount }], text };
   }
+  // Comet Storm: "Choose any target, then choose another target for each time ~ was kicked. ~ deals X damage to each of
+  // them." One target more than the times it was kicked, all different (rulings; CR 601.2c, 702.33d).
+  const comet = /^Choose any target, then choose another target for each time ~ was kicked\. ~ deals (X|\d+) damage to each of them\.$/.exec(text.trim());
+  if (comet && opts.spell)
+    return {
+      targets: [
+        { kind: "any", text: "any target" },
+        { kind: "any", text: "another target", many: "kicked", distinctFrom: [0] },
+      ],
+      effects: [{ type: "damage", amount: amt(comet[1]!), to: { ref: "anyTarget", index: 0, n: 2 } }],
+      text,
+    };
   // Scroll Rack: cards from the hand traded for as many from the top of the library (not a draw, rulings).
   if (text === "Exile any number of cards from your hand face down. Put that many cards from the top of your library into your hand. Then look at the exiled cards and put them on top of your library in any order.")
     return { targets: [], effects: [{ type: "scrollRack" }], text };
@@ -3038,6 +3050,12 @@ function splitSpentPair(x: string): string[] {
 }
 
 function parseHowCast(s: string, ctx: Ctx): { cond: SpellCondition; not: boolean; text: string; noTargets?: true; ungated?: true; ofTarget?: true } | null {
+  // "If the discarded card wasn't a land card, ..." after a discard cost (compile checks there is one).
+  const disc = /^If the discarded card (was|wasn't) (an? .+? card), (.+)$/.exec(s);
+  if (disc) {
+    const filter = parseSearchFilter(disc[2]!.replace(/^an? /, ""));
+    return filter ? { cond: { kind: "discardedIs", filter }, not: disc[1] === "wasn't", text: disc[3]!, noTargets: true } : null;
+  }
   for (const h of HOW_CAST) {
     if (h.spellOnly && !ctx.spell) continue;
     if (h.activatedOnly && !ctx.activated) continue;

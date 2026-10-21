@@ -153,6 +153,7 @@ import {
   oneOfEachFits,
   activatedCosts,
   abilityCostsHaveX,
+  spellManaValue,
 } from "@cc/engine";
 import { HUMAN, STOPPABLE, cardOf, seenCardOf, isCreature, isLand, loopReady, newGame, useGame, type DeckBundle, type LoopRecording, type PriorityMode } from "./useGame";
 import { Arrows, targetSelectors as baseSelectors, type ArrowSpec } from "./Arrows";
@@ -648,6 +649,15 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     }
     // "Sacrifice X Squirrels" (Chatterfang): X is announced first, up to how many you could sacrifice (CR 107.3a, 602.2b).
     if (x === undefined && abilityCostsHaveX(ab)) {
+      // "Discard a card with mana value X" (Kozilek): only some X work, so the greatest that does, starting at the mana value
+      // of the spell on top of the stack when that one does.
+      if (ab.costs?.some((c) => c.kind === "discard" && c.mvX)) {
+        const fits = (n: number) => !!planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, n);
+        const max = Array.from({ length: 21 }, (_, n) => 20 - n).find(fits) ?? 0;
+        const top = s.stack[s.stack.length - 1];
+        const mv = top?.kind === "spell" && top.controller !== HUMAN ? spellManaValue(s, top) : undefined;
+        return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: mv !== undefined && mv <= max && fits(mv) ? mv : max, modes, extra: "discard a card with mana value X" });
+      }
       const max = maxX((n) => planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, n));
       const extra = (ab.costs ?? []).flatMap((c) => ("x" in c && c.x ? [`${c.kind === "sacrifice" ? "sacrifice" : c.kind} X ${c.kind === "sacrifice" ? c.filter.text.replace(/s?$/, "s") : ""}`.trim()] : [])).join(" and ");
       return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: Math.min(max, Math.max(ab.xMin ?? 0, 1)), modes, extra });

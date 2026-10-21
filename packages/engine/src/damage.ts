@@ -143,6 +143,8 @@ export function dealDamage(
   if (!sources.includes(key)) sources.push(key);
   const totals = ((s.turnLog.sourceDamage ??= {})[src.controller] ??= {});
   totals[key] = (totals[key] ?? 0) + n;
+  // Temple of Power: "red sources you controlled dealt 4 or more noncombat damage this turn".
+  if (!opts.combat) for (const c of src.colors) ((s.turnLog.noncombatByColor ??= {})[src.controller] ??= {})[c] = (s.turnLog.noncombatByColor[src.controller]![c] ?? 0) + n;
   if ("object" in to) {
     const o = to.object;
     const c = characteristics(s, o);
@@ -439,6 +441,8 @@ function modApplies(s: GameState, m: LiveMod, e: DamageEvent, preventing: boolea
   if (d.prevent && !preventing) return false;
   if (d.combat && (d.combat === "only") !== !!e.combat) return false;
   if (d.atMost !== undefined && e.n > d.atMost) return false;
+  // Ojer Axonil: only damage less than its power, compared once as it would be dealt (rulings).
+  if (d.op === "raiseTo" && (e.n <= 0 || e.n >= modExtra(s, m))) return false;
   const ref = e.src.ref;
   const isHolder = !!ref && !!h && ref.object === h.id && ref.zc === (h.zoneChanges ?? 0);
   if (d.by?.self && !isHolder) return false;
@@ -477,6 +481,7 @@ function modAmount(s: GameState, m: LiveMod, n: number): number {
   if (d.op === "plus") return n + modExtra(s, m);
   if (d.op === "minus") return Math.max(0, n - modExtra(s, m));
   if (d.op === "allBut") return Math.min(n, d.n ?? 0);
+  if (d.op === "raiseTo") return Math.max(n, modExtra(s, m));
   return 0;
 }
 
@@ -488,6 +493,7 @@ function modLabel(s: GameState, m: LiveMod): string {
     : d.op === "plus" ? `Add ${modExtra(s, m)}`
     : d.op === "minus" ? (d.prevent ? `Prevent ${modExtra(s, m)} of it` : `Take ${modExtra(s, m)} away`)
     : d.op === "allBut" ? `Prevent all but ${d.n} of it`
+    : d.op === "raiseTo" ? `Make it ${modExtra(s, m)}`
     : "Prevent it";
   return `${what} (${m.card})`;
 }

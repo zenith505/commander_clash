@@ -706,7 +706,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "handAtLeast": {
       const n = s.players[you]?.hand.length ?? 0;
-      return cond.exactly ? n === cond.n : n >= cond.n;
+      return cond.exactly ? n === cond.n : cond.fewer ? n < cond.n : n >= cond.n;
     }
     case "sameNamed": {
       // An object with no name (face down) shares a name with nothing (CR 201.2a).
@@ -762,6 +762,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return Math.min(...cond.types.map((t) => s.turnLog?.toGraveyardTypes?.[t] ?? 0)) >= cond.n;
     case "cardToYourGraveyard":
       return cond.types.some((t) => !!s.turnLog?.toOwnGraveyardTypes?.[you]?.includes(t));
+    case "noncombatByColor":
+      return (s.turnLog?.noncombatByColor?.[you]?.[cond.color] ?? 0) >= cond.n;
     case "sourceDealtAtLeast":
       return Object.values(s.turnLog?.sourceDamage?.[you] ?? {}).some((n) => n >= cond.n);
     case "sourcesDealtDamage":

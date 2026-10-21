@@ -188,6 +188,8 @@ export type Count =
     }
   /** "The greatest mana value among permanents you control": 0 when there are none; X is 0 on the battlefield (CR 202.3, 107.3). */
   /** `total`: "the total mana value of historic permanents you control" (Excalibur), the sum instead. */
+  /** "The greatest mana value among cards in exile" (Ulamog, the Defiler): every player's exiled cards, a face-down one 0 (CR 708.2). */
+  | { kind: "greatestMvInExile" }
   | { kind: "greatestManaValue"; filter: TargetSpec; total?: true; /** "Other permanents you control" (Summon: Bahamut): not the source. */ other?: true }
   /** How many times the spell (or the permanent it became) was kicked (CR 702.33d); `which` = with that kicker cost only. */
   | { kind: "kicked"; which?: number }
@@ -738,7 +740,7 @@ export interface DamageMod {
    * `times` multiplies by `n` (double, triple); `half` halves, rounded down (`up`: rounded up); `plus` / `minus` add or
    * take away `amount`; `allBut`: all but `n` of it; `prevent`: all of it.
    */
-  op: "times" | "half" | "plus" | "minus" | "allBut" | "prevent";
+  op: "times" | "half" | "plus" | "minus" | "allBut" | "prevent" | /** "Deals damage equal to ~'s power instead" of less (Ojer Axonil): `amount`, when it's more. */ "raiseTo";
   n?: number;
   amount?: Amount;
   up?: true;
@@ -1116,7 +1118,7 @@ export type StaticCondition =
   /** "As long as equipped creature is a Human": the permanent this is attached to matches. */
   | { kind: "attachedIs"; filter: TargetSpec }
   /** "If you have nine or more cards in hand" (Wiretapping). */
-  | { kind: "handAtLeast"; n: number; /** "exactly thirteen cards in your hand" (Triskaidekaphile). */ exactly?: true }
+  | { kind: "handAtLeast"; n: number; /** "exactly thirteen cards in your hand" (Triskaidekaphile). */ exactly?: true; /** "Fewer than seven cards in hand" (Kozilek): under `n`. */ fewer?: true }
   /** "If you control eight or more artifacts with the same name as one another" (Mechanized Production, CR 201.2a). */
   | { kind: "sameNamed"; types: string[]; n: number }
   /** "If each player has no cards in hand" (Howltooth Hollow). */
@@ -1144,6 +1146,8 @@ export type StaticCondition =
   | { kind: "cardToYourGraveyard"; types: string[] }
   /** "If a source you controlled dealt 5 or more damage this turn" (Dragon Cultist): all of it from one source (rulings). */
   | { kind: "sourceDealtAtLeast"; n: number }
+  /** "Red sources you controlled dealt 4 or more noncombat damage this turn" (Temple of Power). */
+  | { kind: "noncombatByColor"; color: Color; n: number }
   /** "You've cast four or more instant and sorcery spells this turn": your spells this turn matching `filter` as they were cast. */
   | { kind: "castCount"; n: number; filter: TargetSpec }
   /** "There are five colors among permanents you control" (CR 105.2). */
@@ -3160,7 +3164,7 @@ export type ManaProduce =
    * colors of the permanents matching `filter` now), "one mana of any of the exiled card's colors" (Chrome Mox, `linked`:
    * the card its linked imprint ability exiled, CR 607.2a). None if there's no such color (CR 106.5, rulings).
    */
-  | { kind: "colorsAmong"; filter?: TargetSpec; linked?: true }
+  | { kind: "colorsAmong"; filter?: TargetSpec; linked?: true; /** "Among legendary creature cards in your graveyard" (The Grey Havens): cards there, not permanents. */ inYard?: true }
   /** "For each color among permanents you control, add one mana of that color" (Bloom Tender, Faeburrow Elder). */
   | { kind: "eachColorAmong" }
   /**
@@ -3334,7 +3338,7 @@ export type AdditionalCost =
   /** `other`: "sacrifice another creature", not the ability's source. */
   | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean; /** With `other`: the source itself may be sacrificed if it's one of these ("another creature or an artifact"). */ selfIf?: TargetSpec; x?: true; /** "Sacrifice half the lands you control, rounded up" (Tectonic Split): `n` is worked out as the cost is (CR 601.2f). */ half?: "up"; /** "Exile a creature you control" (The Soul Stone): chosen the same way, but exiled, not sacrificed (CR 701.21a doesn't apply). */ exile?: true; /** "You may sacrifice one or more creatures" (Plumb the Forbidden): X may be 0, and is how many. */ optional?: true }
   /** "discard a land card" (retrace); `random`: "discard a card at random", chosen by the game as it's paid (CR 701.9b). */
-  | { kind: "discard"; n: number; filter?: TargetSpec; random?: true; x?: true; /** "Discard an Island card and another card" (Foil): at least one of the `n` matches this. */ oneOf?: TargetSpec }
+  | { kind: "discard"; n: number; filter?: TargetSpec; random?: true; x?: true; /** "Discard an Island card and another card" (Foil): at least one of the `n` matches this. */ oneOf?: TargetSpec; /** "Discard a card with mana value X" (Kozilek, the Great Distortion): X is announced as it's activated (CR 107.3a), and `filter` gets that mana value. */ mvX?: true }
   | { kind: "payLife"; n: number; x?: true }
   /**
    * `top`: "exile the top creature card of your graveyard": the topmost `n` that match, nothing to choose (CR 404.1).
@@ -3802,6 +3806,8 @@ export interface CompiledCard {
   creatureAbilitiesHaste?: true;
   /** "You have no maximum hand size." (CR 402.2): its controller doesn't discard down in cleanup; "all": "Players have ...". */
   noMaxHandSize?: boolean | "all";
+  /** "Your maximum hand size is eight", "... is increased by one", "Each opponent's maximum hand size is reduced by seven" (CR 402.2). */
+  handSize?: { who: "you" | "opponents"; set?: number; plus?: number }[];
   /** K'rrik: "For each {B} in a cost, you may pay 2 life rather than pay that mana" (see blackForLife), for its controller. */
   lifeForBlack?: true;
   /** Chromatic Orrery: "You may spend mana as though it were mana of any color." (CR 609.4b), for its controller's costs. */

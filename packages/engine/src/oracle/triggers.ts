@@ -1,5 +1,5 @@
 import { allEffects, type AbilityBody, type BatchTrigger, type Effect, type TriggeredAbility, type SpellCondition, type SpentReq, type StaticCondition, type TargetSpec, type TriggerEvent } from "../abilities";
-import { COUNTER, NUM, X, num, parseSpentReq, singularWord, SPENT } from "./words";
+import { COUNTER, differenceInHand, NUM, X, num, parseSpentReq, singularWord, SPENT } from "./words";
 import { parseStaticCondition } from "./statics";
 import { parseBody, replaceX } from "./body";
 import { parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
@@ -962,7 +962,7 @@ const YARD_EVENTS: TriggerEvent[] = ["castSpell", "spellYouControlDealsDamage", 
 
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).
-  const line = raw.replace(/^[A-Z][A-Za-z' -]+ — (?=(When|Whenever|At)\b)/, "");
+  const line = differenceInHand(raw.replace(/^[A-Z][A-Za-z' -]+ — (?=(When|Whenever|At)\b)/, ""));
   if (!/^(When|Whenever|At)\b/.test(line)) return null;
   // Springheart Nantuko: "Whenever a land you control enters, you may pay {1}{G} if ~ is attached to a creature you
   // control. If you do, create a token that's a copy of that creature. If you didn't create a token this way, create a

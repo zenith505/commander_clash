@@ -389,6 +389,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       }
       return best;
     }
+    case "greatestMvInExile":
+      return Math.max(0, ...s.turnOrder.flatMap((pid) => s.players[pid]!.exile.map((id) => (s.objects[id]!.faceDown ? 0 : defMv(defOf(s, s.objects[id]!))))));
     case "greatestManaValue": {
       // From its mana cost (copy and face-down values included, CR 202.3, 708.2); X is 0 on the battlefield (CR 107.3).
       let best = 0;
@@ -558,6 +560,8 @@ function describeCount(c: Count): string {
       return "#card types in graveyards";
     case "greatestPower":
       return `the ${c.total ? "total" : "greatest"} ${c.toughness ? "toughness" : "power"} ${c.total ? "of" : "among"} ${c.other ? "other " : ""}${c.filter.text}`;
+    case "greatestMvInExile":
+      return "the greatest mana value among cards in exile";
     case "greatestManaValue":
       return `the ${c.total ? "total mana value of" : "greatest mana value among"} ${c.other ? "other " : ""}${c.filter.text}`;
     case "kicked":

@@ -1161,6 +1161,8 @@ export interface TurnLog {
   damageSources?: Record<number, string[]>;
   /** The damage each source dealt in total, by the player who controlled it as it dealt it (Dragon Cultist). */
   sourceDamage?: Record<number, Record<string, number>>;
+  /** Noncombat damage dealt by sources of each color, by the player who controlled each as it dealt it (Temple of Power). */
+  noncombatByColor?: Record<number, Partial<Record<Color, number>>>;
   /** The card types of the cards put into each player's graveyard from anywhere (Cloakwood Hermit). */
   toOwnGraveyardTypes?: Record<number, string[]>;
   /**

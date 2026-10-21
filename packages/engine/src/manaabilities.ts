@@ -3,7 +3,7 @@
 
 import { allEffects, type ActivatedAbility, type ManaAbility, type ManaProduce, type ManaTrigger } from "./abilities";
 import { abilitiesOf, basicLandManaAbility, canBeSacrificed, exiledLentTo, defOf, lendersOf, objIsType } from "./cards";
-import { objectMatches } from "./effects";
+import { objectMatches, printedMatches } from "./effects";
 import { abilityProblem, activationLessCost, linkedExileCards, obj, payableLife, player, tapAbilitySick, tapCostCandidates } from "./game";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { parseManaCost } from "./mana";
@@ -105,6 +105,12 @@ export function manaChoices(s: GameState, o: GameObject, ab: ManaAbility): ManaT
  */
 function colorsAmong(s: GameState, o: GameObject, p: Extract<ManaProduce, { kind: "colorsAmong" }>): ManaType[] {
   const pid = controllerOf(s, o);
+  if (p.inYard) {
+    // A card's colors in a graveyard are its own (CR 105.2).
+    const cards = player(s, pid).graveyard.map((id) => defOf(s, obj(s, id))).filter((d) => printedMatches(p.filter!, d));
+    const yard = new Set(cards.flatMap((d) => d.colors));
+    return COLORS.filter((c) => yard.has(c));
+  }
   const from = p.linked ? linkedExileCards(s, o) : s.battlefield.filter((id) => objectMatches(s, p.filter!, obj(s, id), pid, false));
   const colors = new Set(from.flatMap((id) => characteristics(s, obj(s, id)).colors));
   return COLORS.filter((c) => colors.has(c));

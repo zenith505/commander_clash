@@ -2347,8 +2347,8 @@ function beginStep(s: GameState, step: Step): void {
       // damage removal, when players get priority (CR 514.3a).
       fireEvent(s, { type: "step", step: "cleanup", active: ap });
       const p = player(s, ap);
-      if (p.hand.length > MAX_HAND_SIZE && !hasNoMaxHandSize(s, ap)) {
-        s.pending = { kind: "discardToHandSize", player: ap, count: p.hand.length - MAX_HAND_SIZE };
+      if (p.hand.length > maxHandSize(s, ap)) {
+        s.pending = { kind: "discardToHandSize", player: ap, count: p.hand.length - maxHandSize(s, ap) };
         return;
       }
       finishCleanup(s);
@@ -2394,6 +2394,23 @@ export const hasNoMaxHandSize = (s: GameState, pid: PlayerId) =>
     return a === "all" || (!!a && controllerOf(s, obj(s, id)) === pid);
   }) ||
   liveEmblems(s).some((o) => o.owner === pid && !!abilitiesOf(s, o).noMaxHandSize);
+
+/**
+ * `pid`'s maximum hand size (CR 402.2): seven, changed by "Your maximum hand size is eight" (Doctor Octopus), "... is
+ * increased by one", "Each opponent's maximum hand size is reduced by seven" (Jin-Gitaxias, Core Augur). Rules-changing
+ * effects, applied in timestamp order (CR 613.11); none with no maximum hand size. Never below 0.
+ */
+export function maxHandSize(s: GameState, pid: PlayerId): number {
+  if (hasNoMaxHandSize(s, pid)) return Infinity;
+  let n = MAX_HAND_SIZE;
+  const mods = s.battlefield
+    .map((id) => obj(s, id))
+    .flatMap((o) => (abilitiesOf(s, o).handSize ?? []).map((h) => ({ h, o })))
+    .filter(({ h, o }) => (h.who === "you" ? controllerOf(s, o) === pid : opponents(s, controllerOf(s, o)).includes(pid)))
+    .sort((a, b) => a.o.timestamp - b.o.timestamp);
+  for (const { h } of mods) n = h.set !== undefined ? h.set : n + (h.plus ?? 0);
+  return Math.max(0, n);
+}
 
 function finishCleanup(s: GameState) {
   closeZoneBatch(s); // discarding to hand size (CR 514.1) triggers "whenever you discard one or more cards"
@@ -4234,11 +4251,14 @@ const xCost = (c: AdditionalCost) => "x" in c && !!c.x;
 
 /** An activated ability's costs beyond mana with its X announced: "Sacrifice X Squirrels" is X of them (CR 107.3a, 602.2b). */
 export function activatedCosts(ab: ActivatedAbility, x: number | undefined): AdditionalCost[] {
-  return (ab.costs ?? []).map((c) => (xCost(c) ? { ...c, n: x ?? 0 } : c));
+  return (ab.costs ?? []).map((c) => (xCost(c) ? { ...c, n: x ?? 0 } : c.kind === "discard" && c.mvX && c.filter ? { ...c, filter: { ...c.filter, manaValue: { min: x ?? 0, max: x ?? 0 }, text: c.filter.text.replace(/\bX\b/, String(x ?? 0)) } } : c));
 }
 
+/** "Discard a card with mana value X" (Kozilek, the Great Distortion): X announced, then a card with that mana value. */
+const mvXCost = (c: AdditionalCost) => c.kind === "discard" && !!c.mvX && !!c.filter;
+
 /** Does the ability have an X to announce in a cost beyond mana, as Chatterfang's "Sacrifice X Squirrels"? */
-export const abilityCostsHaveX = (ab: ActivatedAbility): boolean => !!ab.costs?.some(xCost);
+export const abilityCostsHaveX = (ab: ActivatedAbility): boolean => !!ab.costs?.some((c) => xCost(c) || mvXCost(c));
 
 /** Costs paid with objects the player picks; "discard a card at random" and "the top card of your graveyard" aren't. */
 const costNeedsPick = (c: AdditionalCost) =>

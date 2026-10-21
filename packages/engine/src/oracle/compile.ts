@@ -1550,6 +1550,12 @@ export function compile(d: CardDef): CompiledCard {
       out.noMaxHandSize = out.noMaxHandSize || true;
       continue;
     }
+    const handSize = new RegExp(`^(Your|Each opponent's) maximum hand size is (?:${NUM}|(increased|reduced) by ${NUM})\\.$`).exec(line);
+    if (handSize) {
+      const n = num((handSize[2] ?? handSize[4])!);
+      (out.handSize ??= []).push({ who: handSize[1] === "Your" ? "you" : "opponents", ...(handSize[2] ? { set: n } : { plus: handSize[3] === "reduced" ? -n : n }) });
+      continue;
+    }
     if (/^Players have no maximum hand size\.$/.test(line)) {
       out.noMaxHandSize = "all";
       continue;
@@ -1610,6 +1616,14 @@ export function compile(d: CardDef): CompiledCard {
     const proto = /^Prototype ((?:\{[^}]+\})+) — (\d+)\/(\d+)$/.exec(line);
     if (proto && parseManaCost(proto[1]!).supported && !parseManaCost(proto[1]!).hasX) {
       (out.altCosts ??= []).push({ kind: "prototype", mana: proto[1]! });
+      continue;
+    }
+    // "~ has annihilator X, where X is the number of +1/+1 counters on it" (Ulamog, the Defiler): annihilator (CR 702.86a)
+    // with X counted as it resolves (rulings).
+    const annX = /^~ has annihilator X, where X is (.+)\.$/.exec(line);
+    const annCount = annX && parseCount(annX[1]!.replace(/\bon it$/, "on ~"), null);
+    if (annCount) {
+      out.triggers.push({ event: "selfAttacks", body: { targets: [], effects: [{ type: "pick", who: { ref: "eventPlayer" }, filter: { kind: "object", text: "permanent" }, n: annCount, action: "sacrifice" }], text: `Annihilator X: defending player sacrifices X permanents, where X is ${annX![1]}.` } });
       continue;
     }
     // The Water Crystal, Bruvac the Grandiloquent: a replacement effect on milling (CR 614.1a, 701.17).

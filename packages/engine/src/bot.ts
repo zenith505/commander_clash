@@ -70,8 +70,7 @@ import {
   payableLife,
   halfLifeCost,
   linkedExileCards,
-  MAX_HAND_SIZE,
-  hasNoMaxHandSize,
+  maxHandSize,
   stackItemQuality,
   oneOfEachFits,
   abilityCostsHaveX,
@@ -522,6 +521,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const abilities = abilitiesOf(s, o).activated;
       for (let i = 0; i < abilities.length; i++) {
         const ab = abilities[i]!;
+        // Kozilek, the Great Distortion: X is the spell's mana value, paid with the least useful card with that mana value.
+        if (!ab.body.modal && !parseManaCost(ab.manaCost).hasX && ab.costs?.length === 1 && ab.costs[0]!.kind === "discard" && ab.costs[0]!.mvX && worthIt(ab.body, id)) {
+          const x = spellManaValue(s, top);
+          const card = chooseDiscards(s, pid, player(s, pid).hand.length).find((h) => mv(s, h) === x);
+          const plan = card && planActivate(s, pid, id, i, [{ kind: "stack", id: top.id }], undefined, undefined, x, { discard: [card] });
+          if (plan) return plan;
+          continue;
+        }
         if (ab.body.modal || parseManaCost(ab.manaCost).hasX || abilityCostsHaveX(ab) || !worthIt(ab.body, id)) continue;
         const targets = chooseTargets(s, pid, ab.body, false, id);
         const plan = targets && planActivate(s, pid, id, i, targets);
@@ -2619,7 +2626,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // Gustha's Scepter: in our second main phase, hide a card from a hand we'd discard from in the cleanup step
       // (CR 514.1), and take one back when there's room in the hand. Nothing else exiles our hand face down.
       const hand = player(s, pid).hand.length;
-      const handRoom = hasNoMaxHandSize(s, pid) ? Infinity : MAX_HAND_SIZE - hand;
+      const handRoom = maxHandSize(s, pid) - hand;
       if (!necro && ab.body.effects.some((e) => e.type === "exileFaceDown" && (e.from !== "handCard" || handRoom >= 0))) continue;
       if (ab.body.effects.some((e) => e.type === "moveLinked" && (!linkedOwned(s, id, pid) || (e.dest === "hand" && handRoom <= 0)))) continue;
       // An Incubator becomes a 0/0 Phyrexian: only worth it with +1/+1 counters on it (CR 701.53b).

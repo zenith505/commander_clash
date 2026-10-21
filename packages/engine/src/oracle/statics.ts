@@ -384,6 +384,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return g && !g.other ? { kind: "onBattlefield", filter: g.filter, min: num(m[1]!) } : null;
   }
   if ((m = new RegExp(`^you have ${NUM} or more cards in (?:your )?hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!) };
+  if ((m = new RegExp(`^you have fewer than ${NUM} cards in (?:your )?hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!), fewer: true };
   if ((m = new RegExp(`^you have exactly ${NUM} cards in (?:your )?hand$`).exec(text))) return { kind: "handAtLeast", n: num(m[1]!), exactly: true };
   // "If you control eight or more artifacts with the same name as one another" (Mechanized Production): all of them
   // artifacts (rulings).
@@ -395,6 +396,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^${NUM} or more (creature|artifact|enchantment|land|instant|sorcery) cards were put into graveyards from anywhere this turn$`).exec(text)))
     return { kind: "cardsToGraveyard", n: num(m[1]!), types: [capital(m[2]!)] };
   if ((m = new RegExp(`^${NUM} or more sources you controlled dealt damage this turn$`).exec(text))) return { kind: "sourcesDealtDamage", n: num(m[1]!) };
+  if ((m = new RegExp(`^(white|blue|black|red|green) sources you controlled dealt ${NUM} or more noncombat damage this turn$`).exec(text))) return { kind: "noncombatByColor", color: COLOR_WORDS[m[1]!]!, n: num(m[2]!) };
   if ((m = /^a source you controlled dealt (\d+) or more damage this turn$/.exec(text))) return { kind: "sourceDealtAtLeast", n: Number(m[1]) };
   // The card in the graveyard needn't still be there (rulings on Cloakwood Hermit).
   if ((m = /^an? (creature|artifact|enchantment|land|instant|sorcery) card was put into your graveyard(?: from anywhere)? this turn$/.exec(text))) return { kind: "cardToYourGraveyard", types: [capital(m[1]!)] };

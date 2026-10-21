@@ -1113,14 +1113,17 @@ export function compile(d: CardDef): CompiledCard {
     // Clones: "You may have ~ enter as a copy of any creature on the battlefield[, except ...]." (CR 707.5)
     // Cursed Mirror: "As ~ enters, you may have it become a copy of any creature on the battlefield until end of
     // turn, except it has haste" also becomes the copy as it enters (rulings), for the rest of the turn.
-    const clone = /^(?:You may have ~ enter as|As ~ enters, you may have it become) a copy of (?:any |an? )?(.+?)( until end of turn)?(?:, except (.+?))?\.?$/.exec(line);
+    // Vesuva: "You may have ~ enter tapped as a copy of any land on the battlefield": tapped only as a copy (rulings).
+    const clone = /^(?:You may have ~ enter( tapped)? as|As ~ enters, you may have it become) a copy of (?:any |an? )?(.+?)( until end of turn)?(?:, except (.+?))?\.?$/.exec(line);
+    if (clone) clone.splice(1, 1);
+    const cloneTapped = /^You may have ~ enter tapped as/.test(line) ? { tapped: true as const } : {};
     // "You may have this creature enter as a copy of any creature card in a graveyard, except ..." (Lazotep Convert): a
     // card in any graveyard, by its printed characteristics.
     const fromYard = clone && !clone[2] && /^creature card in a graveyard$/.exec(clone[1]!);
     if (clone && fromYard) {
       const except = clone[3] ? parseCopyExcept(clone[3]) : undefined;
       if (except !== null && !except?.thisAbility) {
-        out.entersAsCopy = { filter: { kind: "card", types: ["Creature"], text: clone[1]! }, ...(except ? { except } : {}) };
+        out.entersAsCopy = { filter: { kind: "card", types: ["Creature"], text: clone[1]! }, ...(except ? { except } : {}), ...cloneTapped };
         continue;
       }
     }
@@ -1133,7 +1136,7 @@ export function compile(d: CardDef): CompiledCard {
       const filter = parsed && spentBound ? { ...parsed, bound: { key: "manaValue" as const, at: "most" as const, amount: { count: { kind: "manaSpent" as const } } } } : parsed;
       const except = clone[3] ? parseCopyExcept(clone[3]) : undefined;
       if (filter?.kind === "object" && except !== null && !except?.thisAbility) {
-        out.entersAsCopy = { filter: { ...filter, text: clone[1]! }, ...(except ? { except } : {}), ...(clone[2] ? { untilEndOfTurn: true } : {}) };
+        out.entersAsCopy = { filter: { ...filter, text: clone[1]! }, ...(except ? { except } : {}), ...(clone[2] ? { untilEndOfTurn: true } : {}), ...cloneTapped };
         continue;
       }
     }

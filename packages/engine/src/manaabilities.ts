@@ -231,8 +231,10 @@ export interface ManaTriggerResult {
  */
 export function manaTriggerResults(s: GameState, pid: PlayerId, o: GameObject, ab: ManaAbility, made: ManaType[], sources = manaTriggerSources(s)): ManaTriggerResult[] {
   let results: ManaTriggerResult[] = [{ extra: [], adds: [], from: [] }];
-  if (!ab.tap || !made.length) return results;
+  if (!made.length) return results;
   for (const { src, controller: ctl, t } of sources) {
+    if (!ab.tap && !t.anyAbility) continue;
+    if (t.madeType && !made.includes(t.madeType)) continue;
     const chosen = src?.chosen?.color;
     if (t.you && ctl !== pid) continue;
     if (t.attached && src?.attachedTo !== o.id) continue;

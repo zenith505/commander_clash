@@ -192,15 +192,15 @@ export function resolveManaAbility(s: GameState, item: StackItem, body: AbilityB
 }
 
 /**
- * After an activated mana ability with {T} in its cost resolves, its source was tapped for mana (CR 106.12): the
+ * After an activated mana ability resolves (with {T} in its cost, its source was tapped for mana, CR 106.12): the
  * triggered mana abilities that triggers add their mana right away (CR 605.4a), as for `ManaAbility`s.
  */
 function manaAbilityResolved(s: GameState, item: StackItem, made: ManaType[]): void {
   const m = item.manaAbility!;
   const o = item.sourceId ? s.objects[item.sourceId] : undefined;
-  if (!m.tapped || !o) return;
-  if (o.zone === "battlefield") fireEvent(s, { type: "tappedForMana", id: o.id, player: item.controller });
-  const results = manaTriggerResults(s, item.controller, o, { tap: true } as ManaAbility, made);
+  if (!o) return;
+  if (m.tapped && o.zone === "battlefield") fireEvent(s, { type: "tappedForMana", id: o.id, player: item.controller });
+  const results = manaTriggerResults(s, item.controller, o, { tap: !!m.tapped } as ManaAbility, made);
   const extra = m.extra ?? [];
   const picked = results.length === 1 ? results[0]! : results.find((r) => r.extra.length === extra.length && r.extra.every((x, i) => x === extra[i]));
   if (!picked) throw new RulesError(`choose the mana that tapping ${defOf(s, o).name} also adds`);

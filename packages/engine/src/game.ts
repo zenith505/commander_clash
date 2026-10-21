@@ -1060,6 +1060,7 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
   if (choice !== "none" && own) {
     const target = obj(s, choice);
     const key = copyKey(s, defOf(s, target), exceptFor(s, o, own.except, realDefOf(s, o).name));
+    if (own.tapped) opts = { ...opts, tapped: true };
     if (own.untilEndOfTurn) addCopyEffect(s, o, key, "endOfTurn");
     else o.copyOf = key;
     lockIfRoom(s, o);

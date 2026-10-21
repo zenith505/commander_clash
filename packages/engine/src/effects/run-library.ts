@@ -667,7 +667,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const filter = e.filter?.xRange ? (({ xRange: _, ...r }) => ({ ...r, manaValue: { max: ctx.x ?? 0 } }))(e.filter) : e.filter && bindBound(s, e.filter, amountCtx(s, ctx));
         const mvMax = filter?.manaValue?.max ?? ctx.x ?? 0;
         const options = sc.looked.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
-        const max = Math.min(e.count, options.length);
+        const max = Math.max(0, Math.min(e.count, options.length, sc.looked.length - (e.minRest ?? 0)));
         const min = e.required ? max : e.upTo || e.filter ? 0 : max;
         log(s, `${p.name} ${e.reveal ? "reveals" : "looks at"} the top ${sc.looked.length === 1 ? "card" : `${sc.looked.length} cards`} of their library${e.reveal ? ` (${sc.looked.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}.`);
         if (max > 0 && !(min === max && options.length === max)) {
@@ -675,7 +675,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           // "Take none" says it's optional; "up to" only reads well with a number.
           const what = max === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${min < max ? "up to " : ""}${max} ${kind.replace(/\bcard\b/, "cards")}`;
           const to = e.into === "hand" ? "into your hand" : e.into === "exile" ? `into exile${e.play ? " (you may play it this turn)" : ""}` : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : "back on top of your library";
-          const rest = e.rest === "graveyard" ? "into your graveyard" : e.rest === "shuffle" ? "shuffled into your library" : e.rest === "hand" ? "into your hand" : "on the bottom of your library";
+          const rest = e.rest === "graveyard" ? "into your graveyard" : e.rest === "shuffle" ? "shuffled into your library" : e.rest === "hand" ? "into your hand" : e.rest === "keep" ? "left on top for now" : "on the bottom of your library";
           s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards: options, min, max, dig: { looked: sc.looked, to, rest } };
           return "paused";
         }
@@ -726,6 +726,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       } else if (e.rest === "graveyard") {
         if (rest.length) log(s, `${p.name} puts ${names(rest)} into their graveyard.`);
         for (const id of rest) moveObject(s, id, "graveyard");
+      } else if (e.rest === "keep") {
+        // They stay on top, in the order they were in.
       } else if (e.rest === "hand") {
         if (rest.length) log(s, `${p.name} puts ${rest.length === 1 ? "the other card" : `the other ${rest.length} cards`} into their hand.`);
         for (const id of rest) moveObject(s, id, "hand");

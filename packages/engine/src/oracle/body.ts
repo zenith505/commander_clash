@@ -502,6 +502,20 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       ],
       text,
     };
+  // Expressive Iteration: "Look at the top three cards of your library. Put one of them into your hand, put one of them on
+  // the bottom of your library, and exile one of them. You may play the exiled card this turn." In that order, with
+  // fewer cards too: two go to your hand and the bottom, one only to your hand (rulings). The other two stay on top
+  // until the second pick, which puts one on the bottom and exiles the other if there are two.
+  const iteration = /^Look at the top three cards of your library\. Put one of them into your hand, put one of them on the bottom of your library, and exile one of them\. You may play the exiled card this turn\.$/.exec(text.trim());
+  if (iteration)
+    return {
+      targets: [],
+      effects: [
+        { type: "dig", n: 3, count: 1, upTo: false, into: "hand", rest: "keep", reveal: false },
+        { type: "dig", n: 2, count: 1, upTo: false, into: "exile", play: "thisTurn", rest: "bottom", minRest: 1, reveal: false },
+      ],
+      text,
+    };
   // Gamble: "Search your library for a card, put that card into your hand, discard a card at random, then shuffle." The
   // discard comes before the shuffle, but the discarded card goes to the graveyard, so the order changes nothing that can
   // be seen: the search, then the discard (at random from the whole hand, the found card included).
@@ -1184,6 +1198,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
         } else return null;
       }
       effects.push(...more);
+      continue;
+    }
+    // Essence Flux: "Exile target creature you control, then return that card to the battlefield under its owner's
+    // control. If it's a Spirit, put a +1/+1 counter on it.": checked once it has returned (rulings).
+    const fluxIf = /^If it's an? ([A-Z][a-z]+), put a \+1\/\+1 counter on it$/.exec(s);
+    if (fluxIf) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "flicker" || prev.at || prev.counter || prev.transformed) return null;
+      const filter = parseTargetPhrase(fluxIf[1]!);
+      if (filter?.kind !== "object") return null;
+      effects[effects.length - 1] = { ...prev, counterIf: { counter: "+1/+1", filter: { ...filter, text: fluxIf[1]! } } };
       continue;
     }
     // "You gain life equal to the damage prevented this way": part of the prevention effect before it (CR 615.5).

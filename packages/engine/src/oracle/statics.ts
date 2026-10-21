@@ -1090,7 +1090,10 @@ function parseStaticLine(line: string): StaticAbility | null {
   if (!mods) return null;
   const counts = (c: AmountExpr | null) => c && staticCountOk(c, affects) ? c : null;
   if (each) {
-    const per = counts(parseCount(each[4]!, null, true));
+    // Coat of Arms: "for each other creature on the battlefield that shares at least one creature type with it", "it"
+    // each creature it affects, counted for that one.
+    const coat = /^other creature on the battlefield that shares at least one creature type with it$/.test(each[4]!) && affects.kind === "filter";
+    const per = coat ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], text: each[4]! }, sharesTypeWithAffected: true as const } } : counts(parseCount(each[4]!, null, true));
     const pt = mods[0];
     if (!per || mods.length !== 1 || pt?.kind !== "modifyPT") return null;
     const [p, t] = [scaleAmount(pt.power, per), scaleAmount(pt.toughness, per)];

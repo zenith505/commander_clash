@@ -1601,7 +1601,16 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
       }
       const back = sc.flickered.map((l) => s.objects[l.id]).filter((c, i): c is GameObject => c?.zone === "exile" && (c.zoneChanges ?? 0) === sc.flickered![i]!.zc);
-      return returnFromExile(s, back, (c) => (e.under === "owner" ? c.owner : ctx.controller), src, e.counter, e.tapped, e.transformed);
+      if (returnFromExile(s, back, (c) => (e.under === "owner" ? c.owner : ctx.controller), src, e.counter, e.tapped, e.transformed) === "paused") return "paused";
+      if (e.counterIf) {
+        for (const c of back) {
+          if (c.zone !== "battlefield" || !objectMatches(s, e.counterIf.filter, c, ctx.controller, false)) continue;
+          putCounters(s, c, e.counterIf.counter, 1);
+          log(s, `${src} puts a ${e.counterIf.counter} counter on ${defOf(s, c).name}.`);
+        }
+        invalidateCharacteristics(s);
+      }
+      return;
     }
     case "returnExiled": {
       const list = e.cards ?? (ctx.subject ? [ctx.subject] : []);

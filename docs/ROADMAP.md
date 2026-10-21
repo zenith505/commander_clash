@@ -1,7 +1,7 @@
 # Roadmap
 
-21,947 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,814 of 1,989 (91%), top 5,000: 3,644 of 4,988 (73%).
+22,025 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,841 of 1,989 (92%), top 5,000: 3,686 of 4,988 (73%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,13 +22,19 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 102, most played first: All Will Be One (which counters
-   count: energy and other player counters), Shatterskull Smashing (X damage divided among up to two targets), Mantle
-   of the Ancients, Cleric Class, Lae'zel, Grab the Prize, Comet Storm, Koma, Drown in the Loch, Treasure Nabber, Dark
-   Depths, Echoes of Eternity, Guide of Souls, Fell the Mighty ("power greater than target creature's power"), Odric,
-   Lunarch Marshal, Arid Archway, Westvale Abbey, Heliod's Intervention, Planar Genesis, The Water Crystal, Chandra,
-   Torch of Defiance, Meren, Patriarch's Bidding, Ojer Axonil, The Grey Havens, Kozilek, the Great Distortion, Ulamog,
-   the Defiler. Smaller gaps from round 102: Subtlety; Hithlain Rope (seating left and right); "can't be sacrificed"
+00. Most played first (`npm run popular`). Out after round 103, most played first: Echoes of Eternity, The Water
+   Crystal, Patriarch's Bidding, Ojer Axonil, The Grey Havens, Kozilek, the Great Distortion ("draw cards equal to the
+   difference", "Discard a card with mana value X"), Ulamog, the Defiler, Cloud, Midgar Mercenary, Avatar's Wrath,
+   Exploration Broodship, Mazirek ("sacrifices another permanent"), Malcolm, Resourceful Defense, Phelia, Tergrid,
+   Smuggler's Surprise, Morophon, Ugin, the Spirit Dragon's −10, Desynchronization ("not historic"), Brass's
+   Tunnel-Grinder, Goblin Welder, Valakut Exploration, Cultivator Colossus. Smaller gaps from round 103: experience
+   counters play (Meren, Kalemne, Mizzix, Ezuri) but Azula, Daxos, Minthara, Kratos, Katara, Zuko and Kelsien are out
+   on other lines; companions can't be used as companions (decks have nothing outside the game; the card plays as
+   itself, CR 702.139a); counters of several kinds put at once (All Will Be One with Guide of Souls) are put one kind
+   after another, so "whenever you put counters" triggers fire once per kind; Chandra, Torch of Defiance casts the
+   exiled card for its mana cost only; Celebrate the Harvest, Surveyor's Scope, Vaan, Replicating Ring, Chainer,
+   Land's Edge, Leonardo and Stormscale Anarch (other "if the discarded card" variants), Interdict, Bruenor's {0}
+   equip. Smaller gaps from round 102: Subtlety; Hithlain Rope (seating left and right); "can't be sacrificed"
    granted to another permanent (Garland, Assault Suit, Jon Irenicus, Stilt-Man, Zurgo); Kindle the Carnage, Forbidden
    Ritual; Agatha's Soul Cauldron lends abilities after every ability-removing effect (no timestamp order against
    "loses all abilities"); a permanent that can't be sacrificed still reads "sacrifices" in some log lines of the effect
@@ -38,8 +44,7 @@ line blocks.
    Spiteful Repossession; an exile ability that can't be told apart from the card's other exiles keeps the card out
    ("returns exiled cards it can't link"); bots casting Pitiless Carnage may sacrifice nothing; the bot removing chosen
    counters takes helpful kinds off others' permanents and harmful ones off its own, and never plays around time or
-   lore counters. Smaller gaps from round 100: Muck Drubb ("a spell that targets only a single creature"); Lurrus (companion,
-   and its mana value bound); once-each-turn graveyard permissions with extra costs (Kotis, Maestros Ascendancy,
+   lore counters. Smaller gaps from round 100: Muck Drubb ("a spell that targets only a single creature"); once-each-turn graveyard permissions with extra costs (Kotis, Maestros Ascendancy,
    Exploration Broodship); Forge Anew's free equip only for equip costs that are all mana, and always taken when it
    applies; Kambal copies only the tokens still on the battlefield as its trigger resolves; two grants of "Toxic 1" may
    count once; K'rrik gives no explicit choice to pay life with lands untapped (autopay prefers mana); Notion Thief's
@@ -47,8 +52,7 @@ line blocks.
    World; Webstrike Elite and Rampaging War Mammoth (an X from the cycling cost in their targets); the other "you may
    pay {X}. When you do" cards (Halo Forager, Isareth, Rose Room Treasurer, Tester of the Tangential); "can't attack
    unless you control more creatures than defending player" (Goblin Goon, Mogg Toady, Monstrous Hound); Kaboom!,
-   Soulfire Eruption ("choose any number of targets. For each of them, ..."). Smaller gaps from round 99: "creature cards you own that aren't on the battlefield have flash" (Teferi,
-   Mage of Zhalfir, Druid of Argoth); Herald of War, Depala, Azor's other line,
+   Soulfire Eruption ("choose any number of targets. For each of them, ..."). Smaller gaps from round 99: Depala, Azor's other line,
    Bane's and Biomancer's Familiar's other lines, Cadric, The Master, Sliver Gravemother, Spider-Verse and Mirror
    Box (Mirror Gallery and Council of Reeds play: the legend rule doesn't apply); the other tiered cards (Cloud, Ice,
    Tifa, Vincent); Archetypes; "can't attack you" limits by count (Crawlspace, Judoon). With Silent Arbiter's "no more
@@ -66,7 +70,7 @@ line blocks.
    Tempt with Discovery shuffles each library after each search instead of once at the end (the same result). Smaller gaps from
    round 96: Ugin's Nexus (its "would be put into a graveyard" line), Stranglehold ("can't search libraries"),
    Gerrard's Hourglass Pendant, Gond Gate ("Gates you control"), Neoform ("with an additional +1/+1 counter"), Vivien
-   on the Hunt's +1, Elite Arcanist, All Will Be One (now possible: counters know who puts them), the
+   on the Hunt's +1, Elite Arcanist, the
    Plans whose other lines are out (Claim the Kingdom, Political Triumph, Robot Domination, Rewrite History). Who puts
    counters (Vorinclex, Innkeeper's Talent) is the effect's controller; for costs and "enters with" counters it's the
    permanent's controller. With both a doubler and Vorinclex's halving on the same counters the order is picked

@@ -2044,6 +2044,8 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   if (r && e?.type === "eachMay" && !e.each && after?.type === "if" && after.cond.kind === "theyChose") {
     const life = player(s, pid).life;
     if (!after.cond.not) return life <= 20;
+    // Wandering Archaic: "they may pay {2}. If they don't, you may copy that spell": pay, so it isn't copied.
+    if (e.pay && !e.effects.length && allEffects(after.effects).some((x) => x.type === "copySpell")) return true;
     // Charismatic Conqueror: tap what entered unless it's a creature that may need to block.
     if (e.untappedSubject) {
       const sub = r.item.subject && s.objects[r.item.subject.id];

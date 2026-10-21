@@ -3475,9 +3475,9 @@ function LibrarySearch({
                   .filter((id) => !found.includes(id))
                   .map((id) => {
                     const d = cardOf(s, id);
-                    const can = pending.cards.includes(id) && found.length < pending.max;
+                    const can = pending.cards.includes(id) && found.length < pending.max && !clashes(id);
                     return (
-                      <div key={id} className={`card big ${can ? "targetable" : "dim"}`} data-pick={id} onClick={() => can && setFound([...found, id])} {...hoverProps(d, onHover)}>
+                      <div key={id} className={`card big ${can ? "targetable" : "dim"}`} data-pick={id} onClick={() => can && setFound([...found, id])} {...hoverProps(d, onHover)} title={pending.cards.includes(id) && clashes(id) && pending.oneOfEach ? "You already took a card of this kind" : undefined}>
                         <CardFace d={d} />
                       </div>
                     );

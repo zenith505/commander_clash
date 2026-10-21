@@ -3,7 +3,7 @@ import { abilitiesOf, cardIdOf, defOf, isPermanentCard, isType } from "../cards"
 import { controllerOf } from "../layers";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
-import { gainLife, log, loseLife, moveObject, enterTogether, obj, opponents, payableLife, player } from "../game";
+import { gainLife, log, loseLife, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, printedMatches } from "./targeting";
@@ -712,8 +712,30 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       return;
     }
     case "dig": {
+      if (e.each) {
+        // "Each player looks at the top five cards of their library and may reveal ..." (Explore the Vastlands): one after
+        // another in APNAP order, each seeing what the ones before took (CR 101.4).
+        const sc = (s.resolving!.scratch ??= {});
+        sc.digQueue ??= apnap(s, players(s, { ref: "eachPlayer" }, ctx));
+        while (sc.digQueue.length) {
+          if (dig(s, e, ctx, src, sc.digQueue[0]!) === "paused") return "paused";
+          const r = s.resolving!.scratch!;
+          r.looked = r.found = r.moved = r.arranged = undefined;
+          r.digQueue!.shift();
+        }
+        s.resolving!.scratch!.digQueue = undefined;
+        return;
+      }
       const pid = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
-      if (pid === undefined || player(s, pid).lost) return;
+      return pid === undefined ? undefined : dig(s, e, ctx, src, pid);
+    }
+  }
+}
+
+/** "Look at the top N cards of your library": `pid` looks at them, takes some, and the rest go where they go. */
+function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx, src: string, pid: PlayerId): "paused" | undefined {
+    {
+      if (player(s, pid).lost) return;
       const p = player(s, pid);
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
@@ -731,13 +753,14 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (max > 0 && !(min === max && options.length === max)) {
           const kind = (e.filter?.text ?? "card").replace(/~/g, src).replace(/ X or less$/, ` ${mvMax} or less`);
           // "Take none" says it's optional; "up to" only reads well with a number.
-          const what = max === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${min < max ? "up to " : ""}${max} ${kind.replace(/\bcard\b/, "cards")}`;
+          const what = e.oneOfEach ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : max === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${min < max ? "up to " : ""}${max} ${kind.replace(/\bcard\b/, "cards")}`;
           const to = e.into === "hand" ? "into your hand" : e.into === "exile" ? `into exile${e.play ? " (you may play it this turn)" : ""}` : e.into === "battlefield" ? "onto the battlefield" : e.into === "manifest" ? "onto the battlefield face down (manifest)" : e.into === "cloak" ? "onto the battlefield face down (cloak)" : "back on top of your library";
           const rest = e.rest === "graveyard" ? "into your graveyard" : e.rest === "shuffle" ? "shuffled into your library" : e.rest === "hand" ? "into your hand" : e.rest === "keep" ? "left on top for now" : "on the bottom of your library";
-          s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards: options, min, max, dig: { looked: sc.looked, to, rest } };
+          s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards: options, min, max, dig: { looked: sc.looked, to, rest }, ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}) };
           return "paused";
         }
-        sc.found = options.slice(0, max);
+        // Nothing to choose: all of them, or (one for each) as many as fit.
+        sc.found = e.oneOfEach ? options.reduce<ObjectId[]>((a, id) => (oneOfEachFits(e.oneOfEach!, [...a, id].map((x) => defOf(s, obj(s, x)))) ? [...a, id] : a), []) : options.slice(0, max);
       }
       const looked = sc.looked;
       let found = (sc.found ?? []).filter((id) => looked.includes(id));
@@ -795,7 +818,6 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       return;
     }
-  }
 }
 
 /**

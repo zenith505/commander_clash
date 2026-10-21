@@ -976,6 +976,19 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const who = parsePlayer(thatMay[1]!.toLowerCase(), ctx);
       const options = parsePunisherOptions(`pays ${thatMay[2]!}`, ctx);
       const then = options && parseOne(capital(thatThen[1]!), ctx);
+      // "They may pay {2}. If they don't, you may copy that spell." (Wandering Archaic): your choice comes after theirs, so
+      // their payment is a "may" of its own, then yours if they didn't (CR 101.4).
+      const pay = options?.length === 1 && "pay" in options[0]! && Object.keys(options[0].pay).length === 1 && /^(?:\{[^}]+\})+$/.test(options[0].pay.cost) ? options[0].pay.cost : undefined;
+      const youMay = /^you may (.+)$/.exec(thatThen[1]!);
+      if (who && who.ref !== "you" && pay && youMay) {
+        ctx.mayNow = true;
+        const inner = parseOne(capital(youMay[1]!), ctx);
+        ctx.mayNow = false;
+        if (inner?.length !== 1) return null;
+        effects.push({ type: "eachMay", who, effects: [], pay: { mana: pay }, text: `pay ${pay}` }, { type: "if", cond: { kind: "theyChose", not: true }, effects: [{ type: "may", effects: inner, text: youMay[1]! }] });
+        si++;
+        continue;
+      }
       if (!who || who.ref === "you" || !options || !then || then.some((e) => pauses(e))) return null;
       effects.push({ type: "punisher", who, options, effects: then, thenText: thatThen[1]!.replace(/^you (\w+)/, (_, v: string) => `${v}s`) });
       si++;
@@ -1576,6 +1589,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     }
     // "Look at the top X cards of your library, where X is the number of tokens you created this turn" (Ellyn Harbreeze):
     // X counted as it resolves (CR 107.3c, 608.2h).
+    // Explore the Vastlands: "Each player looks at the top five cards of their library and may reveal a land card and/or an
+    // instant or sorcery card from among them. Each player puts the cards they revealed this way into their hand and the
+    // rest on the bottom of their library in a random order."
+    const eachLook = new RegExp(`^Each player looks at the top ${NUM} cards of their library and may reveal (an? [^,]+? card) and/or (an? [^,]+? card) from among them$`).exec(s);
+    if (eachLook && !dig && /^Each player puts the cards they revealed this way into their hand and the rest on the bottom of their library in a random order$/.test(sentences[si + 1] ?? "")) {
+      const specs = [eachLook[2]!, eachLook[3]!].map((w) => parseSearchFilter(w.replace(/^an? /, "")));
+      if (specs.some((f) => !f)) return null;
+      const anyOf = specs as TargetSpec[];
+      effects.push({ type: "dig", n: num(eachLook[1]!), reveal: false, count: 2, upTo: true, filter: { kind: "card", anyOf, text: `${eachLook[2]!.replace(/^an? /, "")} and/or ${eachLook[3]!}` }, oneOfEach: anyOf, into: "hand", rest: "bottom", random: true, each: true });
+      si++;
+      continue;
+    }
     const look = new RegExp(`^(Look at|Reveal) the top ${NUMX} cards? of your library(?:, where X is (.+))?$`, "i").exec(s);
     if (look && !dig && (!look[3] || look[2] === "X")) {
       const def = look[3] ? parseCount(look[3], ctx) : undefined;
@@ -2014,6 +2039,12 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const both = prev?.type === "if" ? [...prev.effects, ...(prev.otherwise ?? [])] : [];
       if (both.length === 2 && both.every((e) => e.type === "copySpell")) {
         for (const e of both) if (e.type === "copySpell") e.newTargets = true;
+        continue;
+      }
+      // Wandering Archaic: "If they don't, you may copy that spell. You may choose new targets for the copy."
+      const only = both.length === 1 && both[0]!.type === "may" && both[0]!.effects.length === 1 ? both[0]!.effects[0] : undefined;
+      if (only?.type === "copySpell" && prev?.type === "if" && prev.cond.kind === "theyChose") {
+        only.newTargets = true;
         continue;
       }
       // Narset's Reversal: "Copy target ..., then return it to its owner's hand. You may choose new targets for the copy."

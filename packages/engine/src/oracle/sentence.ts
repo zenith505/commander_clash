@@ -34,6 +34,13 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
     if ((m = new RegExp(`^Put (one|two|three) of (?:them|those cards) into your hand(?: and (?:the rest|the other) ${REST})?$`).exec(s))) {
       Object.assign(dig, { count: num(m[1]!), upTo: false, into: "hand" });
       if (m[2]) Object.assign(dig, restOf(m[2]));
+    } else if ((m = /^You may (?:reveal (an? [^,]+? card) and\/or (an? [^,]+? card) from among them and put (?:them|the revealed cards)|put (an? [^,]+? card) and\/or (an? [^,]+? card) from among them) into your hand$/.exec(s))) {
+      // "You may put a creature card and/or a land card from among them into your hand" (Kiora, Master of the Depths): up
+      // to one card for each, a card that's both being either one (as Krosan Verge's search, oneOfEach).
+      const specs = [m[1] ?? m[3], m[2] ?? m[4]].map((w) => parseSearchFilter(w!.replace(/^an? /, "")));
+      if (specs.some((f) => !f)) return null;
+      const anyOf = specs as NonNullable<(typeof specs)[number]>[];
+      Object.assign(dig, { count: 2, upTo: true, filter: { kind: "card", anyOf, text: `${m[1] ?? m[3]} and/or ${m[2] ?? m[4]}`.replace(/^an? /, "") }, oneOfEach: anyOf, into: "hand" });
     } else if ((m = /^You may (?:reveal (an? .+?) from among them and put it|put (an? .+?) from among them) into your hand$/.exec(s))) {
       const filter = parseSearchFilter((m[1] ?? m[2])!.replace(/^an? /, ""));
       if (!filter) return null;

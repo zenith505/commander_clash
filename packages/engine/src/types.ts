@@ -1598,6 +1598,7 @@ export interface Resolving {
     pact?: { names: string[]; asking?: ObjectId };
     queue?: PlayerId[]; // players still to choose, in APNAP order (CR 101.4)
     drawQueue?: PlayerId[]; // players still to draw: a draw can stop for dredge (CR 702.52a)
+    digQueue?: PlayerId[]; // "each player looks at the top five cards": players still to look (Explore the Vastlands)
     chosen?: Record<string, ObjectId[]>; // cards each player chose to discard
     venture?: string; // the dungeon or room chosen while venturing (CR 701.49a-b)
     arranged?: { top: ObjectId[]; away: ObjectId[] };

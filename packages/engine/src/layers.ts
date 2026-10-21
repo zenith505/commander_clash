@@ -593,6 +593,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
         const that = sub && chars.has(sub.id) && (sub.zoneChanges ?? 0) === subjectZc ? chars.get(sub.id)!.controller : subjectId !== undefined && s.lastKnown?.[subjectId]?.zc === subjectZc ? s.lastKnown![subjectId]!.controller : undefined;
         return that !== undefined && that !== you && !s.players[that]!.lost && measure(that) > mine;
       }
+      if (cond.activePlayer) return s.activePlayer !== you && !s.players[s.activePlayer]!.lost && measure(s.activePlayer) > mine;
       return s.turnOrder.some((p) => p !== you && !s.players[p]!.lost && measure(p) > mine);
     }
     case "attackingMostLife": {

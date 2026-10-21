@@ -2096,6 +2096,33 @@ export function addPhases(s: GameState, phases: ("combat" | "main")[], after?: "
   return true;
 }
 
+/**
+ * The turn that's beginning is the one the player-controlling effects waiting for its player apply to (CR 723.1, 723.1b):
+ * the last one created works (723.1a), and each Emrakul among them makes an extra turn after it (rulings).
+ */
+function takeControl(s: GameState) {
+  const pid = s.activePlayer;
+  const mine = s.playerControls?.filter((c) => c.controlled === pid) ?? [];
+  if (!mine.length) return;
+  s.playerControls = s.playerControls!.filter((c) => c.controlled !== pid);
+  if (!s.playerControls.length) s.playerControls = undefined;
+  const controller = mine.filter((c) => !c.ended).pop()?.controller ?? pid;
+  const extraTurns = mine.filter((c) => c.extraTurnAfter).length;
+  s.controlledTurn = { controlled: pid, controller, ...(extraTurns ? { extraTurns } : {}) };
+  // Controlling yourself changes nothing (CR 723.9).
+  if (controller !== pid) log(s, `${player(s, controller).name} controls ${player(s, pid).name} during this turn.`);
+}
+
+/**
+ * Who makes `pid`'s choices and decisions right now: the player controlling them during their turn (CR 723.5), or
+ * themselves (723.8, 723.9). The engine still waits on `pid` (waitingOn), and actions name `pid`: only who chooses
+ * them changes, using `pid`'s resources (723.5a).
+ */
+export function deciderOf(s: GameState, pid: PlayerId): PlayerId {
+  const c = s.controlledTurn;
+  return c && c.controlled === pid && c.controller !== pid && !player(s, c.controller).lost ? c.controller : pid;
+}
+
 /** The combat phase's steps (CR 506.1). */
 export const inCombatPhase = (s: GameState) => ["beginCombat", "declareAttackers", "declareBlockers", "firstStrikeDamage", "combatDamage", "endCombat"].includes(s.step);
 
@@ -2103,6 +2130,11 @@ function startNextTurn(s: GameState, skipping = false) {
   const prev = s.activePlayer;
   // The turn just taken (not one skipped): who cast how many spells in it (CR 731.2).
   if (!skipping) s.lastTurn = { active: prev, cast: s.players.map((p) => (s.castThisTurn ?? []).filter((c) => c.player === p.id).length) };
+  // A player-controlling effect ends as the next turn begins (CR 723.1); Emrakul's "After that turn, that player takes
+  // an extra turn" is created now, so it's the most recently created and taken first (CR 500.7).
+  const controlled = s.controlledTurn;
+  s.controlledTurn = undefined;
+  for (let i = 0; i < (controlled?.extraTurns ?? 0); i++) (s.extraTurns ??= []).push({ player: controlled!.controlled });
   // An extra turn is taken directly after this one, the most recently created first (CR 500.7); one for a player who
   // left the game isn't taken (CR 800.4a). After them, the normal order goes on from the last normal turn.
   let extra: ExtraTurn | undefined;
@@ -2143,6 +2175,7 @@ function startNextTurn(s: GameState, skipping = false) {
     return startNextTurn(s, true);
   }
   s.extraTurn = extra;
+  takeControl(s);
   endCopyEffects(s, (e) => typeof e.until === "object" && began.has(e.until.turnOf));
   const ending = s.effects.filter((e) => e.duration === "yourNextTurn" && e.turnOf !== undefined && began.has(e.turnOf));
   if (ending.length) {
@@ -7166,6 +7199,10 @@ export function playerLoses(s: GameState, pid: PlayerId, reason: string, concede
   // CR 800.4a: everything they own leaves the game, and effects giving them control of things end.
   s.stack = s.stack.filter((item) => item.controller !== pid);
   for (const e of s.effects) if (e.controller === pid) e.mods = e.mods.filter((m) => m.kind !== "control");
+  // ... and of players (CR 723): Emrakul's extra turn still comes.
+  if (s.controlledTurn?.controller === pid) s.controlledTurn = { ...s.controlledTurn, controller: s.controlledTurn.controlled };
+  s.playerControls = s.playerControls?.flatMap((c) => (c.controller !== pid ? [c] : c.extraTurnAfter ? [{ ...c, ended: true as const }] : []));
+  if (!s.playerControls?.length) s.playerControls = undefined;
   invalidateCharacteristics(s);
   for (const id of [...s.battlefield]) {
     const o = obj(s, id);

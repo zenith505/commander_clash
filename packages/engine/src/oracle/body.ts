@@ -3311,6 +3311,27 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       last.drain = true;
       continue;
     }
+    // Cruel Entertainment: each of two different target players (CR 115.3) controls the other during the other's next turn
+    // (CR 723).
+    if (
+      s === "Choose target player and another target player" &&
+      sentences[si + 1] === "The first player controls the second player during the second player's next turn, and the second player controls the first player during the first player's next turn"
+    ) {
+      const first = addTarget(ctx, { kind: "player", text: "target player" });
+      const second = addTarget(ctx, { kind: "player", text: "another target player", distinctFrom: [first] });
+      const [a, b] = [{ ref: "target" as const, index: first }, { ref: "target" as const, index: second }];
+      effects.push({ type: "controlPlayer", who: b, controller: a }, { type: "controlPlayer", who: a, controller: b });
+      si++;
+      continue;
+    }
+    // Emrakul, the Promised End: "... during that player's next turn. After that turn, that player takes an extra turn."
+    // The extra turn comes right after the controlled turn (rulings).
+    if (/^After that turn, that player takes an extra turn$/.test(s)) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "controlPlayer" || last.who.ref !== "target" || last.extraTurnAfter) return null;
+      last.extraTurnAfter = true;
+      continue;
+    }
     // "Take an extra turn after this one. At the beginning of that turn's end step, you lose the game." (Final Fortune)
     if (/^At the beginning of that turn's end step, you lose the game$/.test(s)) {
       const last = effects[effects.length - 1];

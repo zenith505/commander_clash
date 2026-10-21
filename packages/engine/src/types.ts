@@ -1407,6 +1407,19 @@ export interface GameState {
   extraTurns?: ExtraTurn[];
   /** The extra turn being taken now, if this is one. */
   extraTurn?: ExtraTurn;
+  /**
+   * Player-controlling effects waiting for the controlled player's next turn (CR 723.1, 723.1b), in the order they were
+   * created: the last one for a player is the one that works (723.1a). `extraTurnAfter`: that player takes an extra turn
+   * after that turn (Emrakul, the Promised End: each one makes its own, rulings).
+   */
+  /** `ended`: its controller left the game (CR 800.4a), so only its extra turn is left. */
+  playerControls?: { controlled: PlayerId; controller: PlayerId; extraTurnAfter?: true; ended?: true }[];
+  /**
+   * The turn being taken now is controlled by another player (CR 723): `controller` makes all of the active player's
+   * choices and decisions until the next turn begins (723.1, 723.5). `extraTurns`: extra turns that player takes after
+   * this one.
+   */
+  controlledTurn?: { controlled: PlayerId; controller: PlayerId; extraTurns?: number };
   /** During extra turns: the player whose turn came before them in the normal order, who the next normal turn follows. */
   rotation?: PlayerId;
   /** The player who is the monarch (CR 725), once someone has become it. */

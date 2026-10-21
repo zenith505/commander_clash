@@ -41,6 +41,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
     return who ? [{ type: "extraTurn", who, n: m[2] === "an" ? 1 : m[2] === "two" ? 2 : 3 }] : null;
   }
+  // Controlling another player (CR 723): "You control target player during that player's next turn" (Mindslaver),
+  // "you gain control of target opponent during that player's next turn" (Emrakul), "... during their next turn".
+  if ((m = /^You (?:gain control of|control) (target player|target opponent) during (?:that player's|their) next turn$/i.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who?.ref === "target" ? [{ type: "controlPlayer", who, controller: { ref: "you" } }] : null;
+  }
   // Skipping (CR 614.10): "Target player skips their next combat phase", "You skip your next two turns", "Skip your next
   // turn", "... their next combat phase this turn" (Moment of Silence).
   if ((m = /^(?:(.+?) )?(skips?) (?:their|your) next (?:(two|three) )?(untap step|draw step|combat phase|turn)s?( this turn)?$/i.exec(s))) {

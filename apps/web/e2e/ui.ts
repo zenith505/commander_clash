@@ -1,6 +1,6 @@
 // Small helpers for finding things on the table and moving the game along.
 import { expect, type Locator, type Page } from "@playwright/test";
-import { waitingOn, type GameState, type PlayerId } from "@cc/engine";
+import { deciderOf, waitingOn, type GameState, type PlayerId } from "@cc/engine";
 import { idsOf, state } from "./scene";
 
 /** The bar under the phase track with the current prompt's text and buttons. */
@@ -25,12 +25,14 @@ export async function resolveUntil(page: Page, done: (s: GameState) => boolean, 
   for (let clicks = 0; clicks < max; ) {
     const s = await state(page);
     if (done(s)) return s;
-    if (s.pending?.player === 0 && !["chooseTargets", "declareAttackers", "declareBlockers"].includes(s.pending.kind)) throw new Error(`stopped on a ${s.pending.kind} prompt`);
+    // Yours to click: your own choices, and those of a player you control during their turn (CR 723.5).
+    if (s.pending && deciderOf(s, s.pending.player) === 0 && !["chooseTargets", "declareAttackers", "declareBlockers"].includes(s.pending.kind)) throw new Error(`stopped on a ${s.pending.kind} prompt`);
     // Only click once the game has settled on you: an auto-pass or a bot could be about to move it on.
     await page.waitForTimeout(150);
     const now = await state(page);
     if (done(now)) return now;
-    if (mark(now) !== mark(s) || waitingOn(now) !== 0) continue;
+    const w = waitingOn(now);
+    if (mark(now) !== mark(s) || w === null || deciderOf(now, w) !== 0) continue;
     const pass = controls(page).getByRole("button", { name: /^(Pass|Resolve|No attacks|No blocks)$/ });
     if (now.pending?.kind === "chooseTargets" || !(await pass.count())) continue;
     await pass.click({ timeout: 2000 }).catch(() => undefined);

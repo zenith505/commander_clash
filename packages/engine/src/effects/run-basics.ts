@@ -66,6 +66,17 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${player(s, pid).name} will take ${e.n === 1 ? "an extra turn" : `${e.n} extra turns`} after this one.`);
       }
       return;
+    case "controlPlayer": {
+      // CR 723.1: it applies to the next turn that player actually takes, waiting through skipped turns (723.1b).
+      const controller = players(s, e.controller, ctx)[0];
+      if (controller === undefined) return;
+      for (const pid of players(s, e.who, ctx)) {
+        (s.playerControls ??= []).push({ controlled: pid, controller, ...(e.extraTurnAfter ? { extraTurnAfter: true as const } : {}) });
+        const who = player(s, pid).name;
+        log(s, `${player(s, controller).name} will control ${who} during ${who}'s next turn${e.extraTurnAfter ? `; after it, ${who} takes an extra turn` : ""}.`);
+      }
+      return;
+    }
     case "addPhases": {
       // "At the beginning of that combat, ...": a delayed trigger for this added combat phase only (CR 603.7; rulings on
       // Moraug: not the turn's regular combat).

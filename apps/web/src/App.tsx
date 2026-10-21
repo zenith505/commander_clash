@@ -31,6 +31,7 @@ import {
   topVisible,
   topPlayable,
   handRevealed,
+  deciderOf,
   assistedRemaining,
   dungeonByName,
   commanderTax,
@@ -157,7 +158,7 @@ import {
   abilityCostsHaveX,
   spellManaValue,
 } from "@cc/engine";
-import { HUMAN, STOPPABLE, cardOf, seenCardOf, isCreature, isLand, loopReady, newGame, useGame, type DeckBundle, type LoopRecording, type PriorityMode } from "./useGame";
+import { HUMAN, YOU, actAs, STOPPABLE, cardOf, seenCardOf, isCreature, isLand, loopReady, newGame, useGame, type DeckBundle, type LoopRecording, type PriorityMode } from "./useGame";
 import { Arrows, targetSelectors as baseSelectors, type ArrowSpec } from "./Arrows";
 import { ManaCost, ManaPoolView, RulesText } from "./Mana";
 
@@ -460,6 +461,8 @@ function maxX(plan: (x: number) => unknown): number {
 
 function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) {
   const { state: s, dispatch, error, intent, priorityMode, setPriorityMode, stops, toggleStop, loop, startLoop, cancelLoop, repeatLoop, shortcutNote } = useGame(initial);
+  // While you control another player, you see the table as they do and act for them (CR 723.4, 723.5).
+  actAs(s);
   const [hover, setHover] = useState<CardDef | null>(null);
   const [attacks, setAttacks] = useState<Record<string, AttackTo>>({});
   /** The creature you've clicked to attack with, waiting for you to click the player it attacks. */
@@ -1211,7 +1214,16 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 {s.dayNight === "day" ? "☀ Day" : "☾ Night"}
               </span>
             )}
-            {waiting !== null && waiting !== HUMAN && <span className="thinking">{s.players[waiting]!.name} is thinking…</span>}
+            {waiting !== null && waiting !== HUMAN && (
+              <span className="thinking">{deciderOf(s, waiting) === waiting ? `${s.players[waiting]!.name} is thinking…` : `${s.players[deciderOf(s, waiting)]!.name} is thinking for ${waiting === YOU ? "you" : s.players[waiting]!.name}…`}</span>
+            )}
+            {s.controlledTurn && deciderOf(s, s.controlledTurn.controlled) !== s.controlledTurn.controlled && (
+              <span className="control-note" title="Controlling another player (CR 723): the controller makes all of that player's choices and decisions this turn, with that player's cards and mana.">
+                {s.controlledTurn.controller === YOU
+                  ? `You control ${s.players[s.controlledTurn.controlled]!.name} this turn`
+                  : `${s.players[s.controlledTurn.controller]!.name} controls ${s.controlledTurn.controlled === YOU ? "you" : s.players[s.controlledTurn.controlled]!.name} this turn`}
+              </span>
+            )}
           </div>
           <PhaseTrack s={s} stops={stops} onToggle={toggleStop} />
           {targeting && (
@@ -2854,8 +2866,8 @@ function Seat({
           </span>
         )}
         {pid !== HUMAN &&
-          (handRevealed(s, pid, HUMAN) ? (
-            <button className="hand-peek" data-hand={pid} onClick={(e) => (e.stopPropagation(), onViewZone("hand"))} title="This hand is revealed (Telepathy, Revelation). Click to see it.">
+          (handRevealed(s, pid, HUMAN) || pid === YOU ? (
+            <button className="hand-peek" data-hand={pid} onClick={(e) => (e.stopPropagation(), onViewZone("hand"))} title={pid === YOU && pid !== HUMAN ? "Your hand. Click to see it." : "This hand is revealed (Telepathy, Revelation). Click to see it."}>
               Hand {p.hand.length} 👁
             </button>
           ) : (
@@ -2967,7 +2979,7 @@ function ZoneViewer({
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <header>
           <strong>
-            {view.pid === HUMAN ? "Your" : `${p.name}'s`} {view.zone === "graveyard" ? "graveyard" : view.zone === "hand" ? "revealed hand" : "exile"}
+            {view.pid === HUMAN || view.pid === YOU ? "Your" : `${p.name}'s`} {view.zone === "graveyard" ? "graveyard" : view.zone === "hand" ? (view.pid === YOU ? "hand" : "revealed hand") : "exile"}
           </strong>
           <span className="muted"> {ids.length} card(s){view.zone === "hand" ? "" : ", newest first"}</span>
           <button onClick={onClose}>Close</button>

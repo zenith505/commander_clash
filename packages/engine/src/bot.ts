@@ -77,6 +77,7 @@ import {
   stackItemQuality,
   oneOfEachFits,
   abilityCostsHaveX,
+  deciderOf,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
@@ -94,6 +95,13 @@ import { damageEstimate } from "./damage";
  */
 export function botActions(s: GameState, pid: PlayerId): Action[] {
   const pend = s.pending;
+  // A bot controlling another player's turn (CR 723.5) makes them do nothing they don't have to: no spells, abilities,
+  // land or attacks. The choices they must make (blocks, discards, what their own triggers target) are made for them
+  // as they'd make them.
+  if (deciderOf(s, pid) !== pid) {
+    if (!pend) return [{ type: "passPriority", player: pid }];
+    if (pend.player === pid && pend.kind === "declareAttackers") return [{ type: "declareAttackers", player: pid, attacks: [] }];
+  }
   if (pend?.player === pid) {
     if (pend.kind === "declareAttackers") return chooseAttacks(s, pid);
     if (pend.kind === "declareBlockers") return [chooseBlocks(s, pid)];

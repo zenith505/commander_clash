@@ -195,6 +195,7 @@ button:disabled { opacity: 0.4; cursor: default; }
   background: var(--attack); box-shadow: 0 0 0 2px var(--panel);
 }
 .thinking { color: var(--muted); font-size: 14px; }
+.control-note { color: var(--accent, #e0b84c); font-size: 13px; font-weight: 600; }
 .controls { display: flex; gap: 12px; align-items: center; margin-left: auto; font-size: 15px; }
 /* The window at the end of the game */
 .modal.game-end { width: min(420px, 92vw); align-items: center; text-align: center; padding: 28px 24px; gap: 8px; }

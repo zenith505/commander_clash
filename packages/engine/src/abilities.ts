@@ -2380,6 +2380,12 @@ export type Effect =
   /** "Take an extra turn after this one", "target player takes two extra turns after this one" (CR 500.7). */
   /** `loseAtEnd`: "At the beginning of that turn's end step, you lose the game." */
   | { type: "extraTurn"; who: PlayerRef; n: number; loseAtEnd?: true }
+  /**
+   * "You control target player during that player's next turn" (CR 723): `controller` makes all of `who`'s choices and
+   * decisions during the next turn `who` actually takes (723.1, 723.1b). `extraTurnAfter`: "After that turn, that player
+   * takes an extra turn" (Emrakul, the Promised End).
+   */
+  | { type: "controlPlayer"; who: PlayerRef; controller: PlayerRef; extraTurnAfter?: true }
   /** "Target player skips their next combat phase", "you skip your next two turns" (CR 614.10); `thisTurn`: only this turn. */
   | { type: "skip"; who: PlayerRef; skip: SkipWhat; n: number; thisTurn?: true }
   /**

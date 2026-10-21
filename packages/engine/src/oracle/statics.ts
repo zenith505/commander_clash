@@ -1186,7 +1186,9 @@ function parseStaticLine(line: string): StaticAbility | null {
     const coat = /^other creature on the battlefield that shares at least one creature type with it$/.test(each[4]!) && affects.kind === "filter";
     // Moraug: "for each time it has attacked this turn", each creature it affects, counted for that one.
     const attacks = each[4] === "time it has attacked this turn" && affects.kind === "filter";
-    const per = coat ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], text: each[4]! }, sharesTypeWithAffected: true as const } } : attacks ? { count: { kind: "timesAffectedAttacked" as const } } : counts(parseCount(each[4]!, null, true), each[4]!);
+    // Mirror Box: "for each other creature you control with the same name as that creature", "that creature" each one it affects.
+    const mirror = /^other creature you control with the same name as that creature$/.test(each[4]!) && affects.kind === "filter";
+    const per = mirror ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], controller: "you" as const, text: "creature you control" }, sameNameAsAffected: true as const } } : coat ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], text: each[4]! }, sharesTypeWithAffected: true as const } } : attacks ? { count: { kind: "timesAffectedAttacked" as const } } : counts(parseCount(each[4]!, null, true), each[4]!);
     const pt = mods[0];
     if (!per || mods.length !== 1 || pt?.kind !== "modifyPT") return null;
     const [p, t] = [scaleAmount(pt.power, per), scaleAmount(pt.toughness, per)];

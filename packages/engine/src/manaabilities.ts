@@ -11,6 +11,7 @@ import { evalAmount } from "./amounts";
 import { canPayFromPool, manaOriginsOf } from "./spend";
 import { compileCard, compileGranted } from "./oracle";
 import { nameActivationBan } from "./names";
+import { sameName } from "./faces";
 import { COLORS, type Action, type Color, type GameObject, type GameState, type ManaOrigin, type ManaType, type ObjectId, type PlayerId } from "./types";
 
 /** activatedThisTurn holds activated ability indexes; mana abilities are recorded past this offset. */
@@ -265,6 +266,8 @@ export function manaTriggerResults(s: GameState, pid: PlayerId, o: GameObject, a
     if (t.you && ctl !== pid) continue;
     if (t.attached && src?.attachedTo !== o.id) continue;
     if (t.filter && !objectMatches(s, t.filter, o, ctl, false)) continue;
+    // Extraplanar Lens: no card exiled, nothing has its name (CR 607.2a); a face-down land has no name (CR 708.2).
+    if (t.sameNameAsLinked && (!src || o.faceDown || !linkedExileCards(s, src).some((id) => sameName(defOf(s, obj(s, id)).name, characteristics(s, o).name)))) continue;
     if ((t.ofChosen || t.adds.kind === "chosenColor") && !chosen) continue; // no color chosen: it never triggers (rulings on Gauntlet of Power)
     if (t.ofChosen && !made.includes(chosen!)) continue;
     let picks: { extra: ManaType[]; adds: ManaType[] }[];

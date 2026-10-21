@@ -809,6 +809,14 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     }
     return null;
   }
+  // Ardenn: our best creature, where our Equipment and helpful Auras can go; with none, ourselves (it must target).
+  if (body.targets.length === 1 && body.effects.length === 1 && body.effects[0]!.type === "attachAny") {
+    const all = legalTargets(s, body.targets[0]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId);
+    const ours = all.filter((t) => t.kind === "object" && objIsType(s, obj(s, t.id), "Creature") && controllerOf(s, obj(s, t.id)) === pid).sort((a, b) => worth(s, pid, obj(s, (b as { id: string }).id)) - worth(s, pid, obj(s, (a as { id: string }).id)));
+    const me = all.find((t) => t.kind === "player" && t.id === pid);
+    const pick = ours[0] ?? me ?? (forced ? all[0] : undefined);
+    return pick ? [pick] : null;
+  }
   const harm = harmfulTargets(body);
   const out: TargetChoice[] = [];
   // Damage a target will take from a fight or "damage equal to its power": the other creature's power.
@@ -1158,6 +1166,7 @@ function targetIndexOf(e: Effect): number | undefined {
   const refs = [("what" in e ? e.what : undefined), ("who" in e ? e.who : undefined), ("to" in e ? e.to : undefined), ("a" in e ? e.a : undefined), ("b" in e ? e.b : undefined)];
   for (const r of refs) if (r && "index" in r && (r.ref === "target" || r.ref === "anyTarget")) return r.index;
   if (e.type === "counterSpell") return e.index;
+  if (e.type === "attachAny") return e.host;
   return undefined;
 }
 
@@ -1983,6 +1992,7 @@ function chooseDistribution(s: GameState, pid: PlayerId, options: ObjectId[], to
 
 function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: number, action: PickAction, counter?: CounterKind): ObjectId[] {
   const self = s.resolving?.item.sourceId;
+  if (action === "attach") return attachPicks(s, pid, options);
   // Good counters go on the best creature; stun and -1/-1 counters on the least useful one.
   if (action === "populate" || action === "pair" || action === "choose" || (action === "counters" && (counter === "+1/+1" || counter === "shield" || counter === "loyalty"))) return [...options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
   // Meld (CR 701.42b): the card of the pair itself, not a token or a Clone, which would stay in exile; of those, the one
@@ -2771,6 +2781,31 @@ function flipBranchWorth(s: GameState, pid: PlayerId, o: GameObject, effects: Ef
     } else v += modeValue(s, pid, { targets: [], effects: [e], text: "" }, targets);
   }
   return v;
+}
+
+/**
+ * Ardenn: what to attach to the target. To a creature of ours: Equipment, unless it's on a creature of ours worth more,
+ * and helpful Auras that are on an opponent's permanent. To an opponent's creature or an opponent: harmful Auras that
+ * are on our own permanents. Nothing to ourselves.
+ */
+function attachPicks(s: GameState, pid: PlayerId, options: ObjectId[]): ObjectId[] {
+  const item = s.resolving?.item;
+  const e = item?.body?.effects.find((x) => x.type === "attachAny");
+  const t = e?.type === "attachAny" ? item!.targets?.[e.host] : undefined;
+  if (!t || (t.kind !== "object" && t.kind !== "player")) return [];
+  const host = t.kind === "object" ? s.objects[t.id] : undefined;
+  const ourHost = host ? controllerOf(s, host) === pid : t.id === pid;
+  const harmful = (o: GameObject) => compileCard(defOf(s, o)).statics.some((st) => modsAreHarmful(st.mods));
+  const onOurs = (o: GameObject) => (o.attachedTo ? controllerOf(s, obj(s, o.attachedTo)) === pid : o.attachedToPlayer === pid);
+  return options.filter((id) => {
+    const o = obj(s, id);
+    const aura = characteristics(s, o).subtypes.includes("Aura");
+    if (!ourHost) return aura && harmful(o) && onOurs(o);
+    if (!host || !objIsType(s, host, "Creature")) return false;
+    if (aura) return !harmful(o) && (o.attachedTo ? !onOurs(o) : o.attachedToPlayer !== undefined && o.attachedToPlayer !== pid);
+    const on = o.attachedTo ? s.objects[o.attachedTo] : undefined;
+    return !on || controllerOf(s, on) !== pid || worth(s, pid, on) < worth(s, pid, host);
+  });
 }
 
 /** "Attach target Equipment you control to target creature you control" (Brass Squire) where it already is, or with no Equipment chosen. */

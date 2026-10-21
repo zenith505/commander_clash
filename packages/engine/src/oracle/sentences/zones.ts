@@ -536,6 +536,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (source?.ref !== "target" || source.n || !what || (what.ref === "target" && what.n) || !["self", "subject", "target"].includes(what.ref)) return null;
     return [{ type: "attach", what, source }];
   }
+  // Ardenn: "attach any number of Auras and Equipment you control to target permanent or player": chosen as it resolves
+  // (rulings), each that could be attached to it (CR 701.3a-b).
+  if ((m = /^(?:you may )?attach any number of Auras and Equipment you control to (target permanent or player)$/i.exec(s)) && !ctx.spell) {
+    const host = addTarget(ctx, { kind: "any", types: [...PERMANENT_TYPES], text: m[1]! });
+    return [{ type: "attachAny", host }];
+  }
   // Stolen Uniform: "Attach it to the chosen creature": the target Equipment to the target creature (CR 701.3a); if
   // either is an illegal target, it doesn't move (rulings).
   if ((m = /^Attach (?:it|that Equipment) to (the chosen creature)$/.exec(s)) && ctx.spell) {

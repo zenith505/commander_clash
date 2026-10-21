@@ -165,6 +165,13 @@ export function parseManaTrigger(line: string): ManaTrigger | "fail" | null {
     what = "land";
     adds = "one mana of that color";
   } else return null;
+  // Extraplanar Lens: "a land with the same name as the exiled card", the card its imprint ability exiled (CR 607.2a).
+  const named = / with the same name as the exiled card$/.exec(what);
+  if (named) {
+    if (out.attached) return "fail";
+    out.sameNameAsLinked = true;
+    what = what.slice(0, named.index);
+  }
   const filter = parseTargetPhrase(what);
   if (filter?.kind !== "object" || filter.controller || filter.chosen || filter.tapped || filter.combat) return "fail";
   out.filter = { ...filter, text: what };
@@ -172,7 +179,7 @@ export function parseManaTrigger(line: string): ManaTrigger | "fail" | null {
   else if (adds === "one mana of any color") out.adds = { kind: "anyColor", n: 1 };
   else if (adds === "two mana in any combination of colors") out.adds = { kind: "anyColor", n: 2 };
   else if (adds === "one mana of the chosen color" || (adds === "one mana of that color" && out.ofChosen)) out.adds = { kind: "chosenColor" };
-  else if ((m = /^one mana of any type that (.+) produced$/.exec(adds)) && what.endsWith(m[1]!)) out.adds = { kind: "produced" };
+  else if ((m = /^one mana of any type that (.+) produced$/.exec(adds)) && (what.endsWith(m[1]!) || (named && m[1] === "land" && what === "land"))) out.adds = { kind: "produced" };
   else return "fail";
   return out as ManaTrigger;
 }

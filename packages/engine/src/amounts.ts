@@ -11,7 +11,7 @@ import { bindChosen, objectMatches, printedMatches, spellManaValue } from "./eff
 import { characteristics, staticConditionNow, type Characteristics } from "./layers";
 import { manaValue, parseManaCost, snowSpent, spentMeets, type ManaSpent } from "./mana";
 import type { Chosen, GameObject, GameState, LastKnown, ObjectId, PlayerId, TriggerEventInfo } from "./types";
-import { defMv } from "./faces";
+import { defMv, sameName } from "./faces";
 import { creatureTypesOf, shareCreatureType } from "./game";
 import { CREATURE_TYPES } from "./keywords";
 
@@ -120,14 +120,19 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const types = subject && creatureTypesOf(s, subject);
       // Coat of Arms: the creature types of the permanent it's applied to, and of the others, as the layers have them so far.
       const typesIn = (ch: Characteristics | undefined): Set<string> | "all" => (!ch ? new Set() : ch.allCreatureTypes ? "all" : new Set(ch.subtypes.filter((t) => CREATURE_TYPES.has(t))));
-      const affected = c.sharesTypeWithAffected && ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
-      if (c.sharesTypeWithAffected && !affected) return 0;
-      const affectedTypes = affected && typesIn(view(affected));
+      const byAffected = c.sharesTypeWithAffected || c.sameNameAsAffected;
+      const affected = byAffected && ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
+      if (byAffected && !affected) return 0;
+      const affectedTypes = affected && c.sharesTypeWithAffected && typesIn(view(affected));
+      // Mirror Box: the name of the permanent it's applied to (copy effects are applied by now, layer 1); a face-down one has none (CR 708.2).
+      const affectedName = affected && c.sameNameAsAffected ? (affected.faceDown ? undefined : view(affected)?.name) : undefined;
+      if (c.sameNameAsAffected && !affectedName) return 0;
       for (const id of s.battlefield) {
         const o = s.objects[id]!;
         if (c.other && id === ctx.sourceId) continue;
         if (subject && (id === subject.id || !shareCreatureType(types!, creatureTypesOf(s, o)))) continue;
-        if (affected && (id === affected.id || !shareCreatureType(affectedTypes!, typesIn(view(o))))) continue;
+        if (affected && (id === affected.id || (affectedTypes && !shareCreatureType(affectedTypes, typesIn(view(o)))))) continue;
+        if (affectedName && (o.faceDown || !sameName(view(o)?.name, affectedName))) continue;
         const ch = view(o);
         if (!ch || (whose && !whose.includes(ch.controller)) || !objectMatches(s, filter, o, ctx.controller, false, undefined, ch, ctx.view)) continue;
         if (!c.differentNames) n++;

@@ -1291,6 +1291,10 @@ export function compile(d: CardDef): CompiledCard {
       (out.noLegendRule ??= []).push(noLegendFilter);
       continue;
     }
+    if (line === "If you would copy a spell one or more times, instead copy it that many times plus an additional time. You may choose new targets for the additional copy.") {
+      out.extraSpellCopy = true;
+      continue;
+    }
     const countMod = parseCountMod(line);
     if (countMod) {
       (out.countMods ??= []).push(countMod);
@@ -2355,6 +2359,13 @@ function linkExile(out: CompiledCard) {
     const imprints = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e) => e.type === "takeFromHand" && e.action === "exile");
     if (imprints.length !== 1 || out.triggers.some((t) => allEffects(t.body.effects).some((e) => e.type === "returnLinked"))) out.unsupported.push("(its mana ability can't be linked to one imprint ability)");
     else (imprints[0] as Extract<Effect, { type: "takeFromHand" }>).linked = true;
+  }
+  // Extraplanar Lens: "a land with the same name as the exiled card" is the one its imprint ability exiled (CR 607.2a).
+  if (out.manaTriggers?.some((t) => t.sameNameAsLinked)) {
+    const imprints = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
+    const others = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)].flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown");
+    if (imprints.length !== 1 || others.length !== 1) out.unsupported.push("(its mana trigger can't be linked to one imprint ability)");
+    else imprints[0]!.linked = true;
   }
   // Isochron Scepter: "copy the exiled card" is linked to the one ability that exiles a card from the hand as it enters.
   const copies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)].some((b) => allEffects(b.effects).some((e) => e.type === "castLinkedCopy"));

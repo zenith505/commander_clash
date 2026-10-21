@@ -182,7 +182,7 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx): Effect | null |
 const ROW_MARK = "\u0001";
 
 /** Effects that can stop a resolution to wait for a player's choice. */
-const PAUSING = new Set<Effect["type"]>(["vote", "discard", "reorderGraveyard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure", "tapOrUntap", "untapUpTo", "castFromHand", "punisher", "sacrificeEach", "venture", "chooseFromGraveyard", "keepRest"]);
+const PAUSING = new Set<Effect["type"]>(["vote", "attachAny", "discard", "reorderGraveyard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure", "tapOrUntap", "untapUpTo", "castFromHand", "punisher", "sacrificeEach", "venture", "chooseFromGraveyard", "keepRest"]);
 /** Effects that can stop for a choice partway: they can't share a conditional or a loop with other effects. */
 const pauses = (e: Effect) => PAUSING.has(e.type) || (e.type === "putInLibrary" && e.position === "ownersChoice") || (e.type === "roll" && !!e.chooseOne);
 
@@ -2850,9 +2850,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const only = inner.length === 1 ? inner[0]! : undefined;
       // "You may tap or untap target permanent": tap, untap or neither, as one question.
       // "You may tap any number of untapped creatures you control": tapping none is the "may".
-      if ((only?.type === "putFromHand" || only?.type === "tapOrUntap" || only?.type === "castFromHand" || only?.type === "chooseFromGraveyard" || only?.type === "tapAnyNumber") && !/^If you do\b/.test(sentences[si + 1] ?? "")) {
+      if ((only?.type === "putFromHand" || only?.type === "tapOrUntap" || only?.type === "castFromHand" || only?.type === "chooseFromGraveyard" || only?.type === "tapAnyNumber" || only?.type === "attachAny") && !/^If you do\b/.test(sentences[si + 1] ?? "")) {
         // castFromHand offers "Don't cast" itself; returning cards from the graveyard can take none.
-        effects.push(only.type === "castFromHand" || only.type === "tapAnyNumber" ? only : only.type === "chooseFromGraveyard" ? { ...only, upTo: true } : { ...only, may: true });
+        effects.push(only.type === "castFromHand" || only.type === "tapAnyNumber" || only.type === "attachAny" ? only : only.type === "chooseFromGraveyard" ? { ...only, upTo: true } : { ...only, may: true });
         if (!defineX()) return null;
         continue;
       }

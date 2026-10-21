@@ -35,7 +35,7 @@ export interface FaceDownPlay {
 /** "unblocked": blocked attackers that assign their combat damage as though they weren't blocked (CR 510.1). */
 /** "exert": attackers their controller exerts as they attack (CR 701.43d). */
 /** "choose": "Choose a creature you control. It gains indestructible until end of turn": only picked; "it" is that one. */
-export type PickAction = "phaseOut" | "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "encode" | "keep" | "untap" | "tap" | "choose" | "meld";
+export type PickAction = "attach" | "phaseOut" | "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "encode" | "keep" | "untap" | "tap" | "choose" | "meld";
 
 /**
  * What "unless its controller pays ..." asks for (CR 118.12): a mana cost, plus generic mana counted
@@ -92,7 +92,7 @@ export type Count =
    * "The number of creatures you control", "for each other Elf you control". `filter.controller` is from the ability's controller's view;
    * `whose`: "creatures target player controls", controlled by those players.
    */
-  | { kind: "permanents"; filter: TargetSpec; other?: boolean; whose?: PlayerRef; /** "Differently named lands you control": each English name once (rulings); a face-down permanent has no name (CR 708.2). */ differentNames?: true; /** "Each other attacking creature that shares a creature type with it" (Shared Animosity): not the trigger's subject, and sharing a type with it. */ sharesTypeWithSubject?: true; /** "Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it" (Coat of Arms): not the permanent the static effect is applied to, and sharing a type with it. */ sharesTypeWithAffected?: true }
+  | { kind: "permanents"; filter: TargetSpec; other?: boolean; whose?: PlayerRef; /** "Differently named lands you control": each English name once (rulings); a face-down permanent has no name (CR 708.2). */ differentNames?: true; /** "Each other attacking creature that shares a creature type with it" (Shared Animosity): not the trigger's subject, and sharing a type with it. */ sharesTypeWithSubject?: true; /** "Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it" (Coat of Arms): not the permanent the static effect is applied to, and sharing a type with it. */ sharesTypeWithAffected?: true; /** "Each nontoken creature you control gets +1/+1 for each other creature you control with the same name as that creature" (Mirror Box): not the permanent the static effect is applied to, and with its name (a face-down permanent has none, CR 708.2). */ sameNameAsAffected?: true }
   /** "The number of cards in your hand", "in that player's hand". */
   | { kind: "cardsInHand"; who: PlayerRef }
   /** "Each creature you control gets +1/+0 for each time it has attacked this turn" (Moraug): the permanent the static effect is applied to (GameObject.attacked). */
@@ -1812,6 +1812,11 @@ export type Effect =
    * Equipment you control to target creature you control", Brass Squire).
    */
   | { type: "attach"; what: ObjRef; source?: ObjRef }
+  /**
+   * "Attach any number of Auras and Equipment you control to target permanent or player" (Ardenn): chosen as it resolves
+   * (rulings) among those that could be attached to target `host` (CR 701.3a-b), then attached to it.
+   */
+  | { type: "attachAny"; host: number }
   /** "Attach target Aura attached to a creature to another creature" (Crown of the Ages): a creature chosen as it resolves. */
   | { type: "attachElsewhere"; source: ObjRef }
   /**
@@ -3297,6 +3302,8 @@ export interface ManaTrigger {
   filter?: TargetSpec;
   /** "Whenever you tap ...": only when this ability's controller taps it. */
   you?: true;
+  /** "Whenever a land with the same name as the exiled card is tapped for mana" (Extraplanar Lens): the card its linked imprint ability exiled (CR 607.2a). */
+  sameNameAsLinked?: true;
   /** "... is tapped for mana of the chosen color": only when it made mana of the color chosen for this permanent. */
   ofChosen?: true;
   /** "Whenever you tap a permanent for {C}": only when it made one or more mana of this type. */
@@ -3941,6 +3948,12 @@ export interface CompiledCard {
   activationLess?: { n: number; filter: TargetSpec; atLeastOne?: true }[];
   /** "The "legend rule" doesn't apply to permanents you control" (CR 704.5j): to these, from the source's controller's view. */
   noLegendRule?: TargetSpec[];
+  /**
+   * "If you would copy a spell one or more times, instead copy it that many times plus an additional time. You may choose
+   * new targets for the additional copy." (Twinning Staff, CR 614.1a): one more copy for each such permanent its
+   * controller controls (rulings), only when copying a spell, not a card.
+   */
+  extraSpellCopy?: true;
   /** "Power-up abilities of other creatures you control cost {3} less to activate." (Hulk, Gamma Goliath; CR 702.193) */
   powerUpLess?: number;
   /** "Each power-up ability of permanents you control can be activated an additional time." (Wonder Man; CR 702.193a) */

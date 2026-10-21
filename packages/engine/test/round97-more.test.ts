@@ -19,6 +19,10 @@ const vesuva = card("Vesuva", "Land", "", { oracleText: "You may have this land 
 const flux = card("Essence Flux", "Instant", "{U}", { oracleText: "Exile target creature you control, then return that card to the battlefield under its owner's control. If it's a Spirit, put a +1/+1 counter on it." });
 const iteration = card("Expressive Iteration", "Sorcery", "{U}{R}", { oracleText: "Look at the top three cards of your library. Put one of them into your hand, put one of them on the bottom of your library, and exile one of them. You may play the exiled card this turn." });
 const coat = card("Coat of Arms", "Artifact", "{5}", { oracleText: "Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it." });
+const narset = card("Narset, Parter of Veils", "Legendary Planeswalker — Narset", "{1}{U}{U}", { loyalty: "5", oracleText: "Each opponent can't draw more than one card each turn.\n−2: Look at the top four cards of your library. You may reveal a noncreature, nonland card from among them and put it into your hand. Put the rest on the bottom of your library in a random order." });
+const divination = card("Divination", "Sorcery", "{2}{U}", { oracleText: "Draw two cards." });
+const cutDeal = card("Cut a Deal", "Sorcery", "{2}{W}", { oracleText: "Each opponent draws a card, then you draw a card for each opponent who drew a card this way." });
+const approach = card("Approach of the Second Sun", "Sorcery", "{6}{W}", { oracleText: "If this spell was cast from your hand and you've cast another spell named Approach of the Second Sun this game, you win the game. Otherwise, put Approach of the Second Sun into its owner's library seventh from the top and you gain 7 life." });
 const giant = card("Big Giant", "Creature — Giant", "{6}{R}{R}", { power: "8", toughness: "8" });
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -36,7 +40,7 @@ const tapFor = (s: GameState, pid: number, id: string, mana: ManaType): Action =
 
 describe("round 97, more cards", () => {
   it("parse", () => {
-    supported(bloodghast, omniscience, monument, cagedSun, vesuva, flux, iteration, coat);
+    supported(bloodghast, omniscience, monument, cagedSun, vesuva, flux, iteration, coat, narset, cutDeal, approach);
     expect(compileCard(omniscience).castFromHandFree).toBe(true);
   });
 
@@ -165,5 +169,55 @@ describe("round 97, more cards", () => {
     expect(pt(goblin)).toEqual([3, 3]); // the changeling
     expect(pt(shifter)).toEqual([5, 5]); // the two Elves and the Goblin
     expect(pt(golem)).toEqual([2, 2]);
+  });
+
+  it("Narset, Parter of Veils: an opponent draws only one card each turn; Narset's controller isn't limited", () => {
+    const { s: s0, ap, ids } = setup([divination, divination]);
+    const opp = s0.turnOrder.find((p) => p !== ap)!;
+    s0.objects[putOnBattlefield(s0, opp, narset)]!.counters.loyalty = 5;
+    s0.players[ap]!.draws = undefined;
+    const hand = s0.players[ap]!.hand.length;
+    let s = settle(cast(s0, ap, ids[0]!, []));
+    expect(s.players[ap]!.hand.length).toBe(hand - 1 + 1);
+    s = settle(cast(s, ap, ids[1]!, []));
+    expect(s.players[ap]!.hand.length).toBe(hand - 2 + 1);
+    // Your own Narset: no limit.
+    const { s: t0, ap: me, ids: mine } = setup([divination]);
+    t0.objects[putOnBattlefield(t0, me, narset)]!.counters.loyalty = 5;
+    const h = t0.players[me]!.hand.length;
+    expect(settle(cast(t0, me, mine[0]!, [])).players[me]!.hand.length).toBe(h - 1 + 2);
+  });
+
+  it("Cut a Deal: you draw one for each opponent who drew; one Narset stopped doesn't count", () => {
+    const { s: s0, ap, ids } = setup([cutDeal, cutDeal]);
+    const opps = s0.turnOrder.filter((p) => p !== ap);
+    const hand = s0.players[ap]!.hand.length;
+    let s = settle(cast(s0, ap, ids[0]!, []));
+    expect(s.players[ap]!.hand.length).toBe(hand - 1 + 3);
+    // Your Narset: an opponent who already drew this turn can't draw again.
+    s.objects[putOnBattlefield(s, ap, narset)]!.counters.loyalty = 5;
+    const theirs = opps.map((p) => s.players[p]!.hand.length);
+    s = settle(cast(s, ap, ids[1]!, []));
+    expect(opps.map((p) => s.players[p]!.hand.length)).toEqual(theirs);
+    expect(s.players[ap]!.hand.length).toBe(hand - 2 + 3);
+  });
+
+  it("Approach of the Second Sun: seventh from the top and 7 life the first time; cast again from your hand, you win", () => {
+    const { s: s0, ap, ids } = setup([approach]);
+    const life = s0.players[ap]!.life;
+    let s = settle(cast(s0, ap, ids[0]!, []));
+    expect(s.players[ap]!.library.indexOf(ids[0]!)).toBe(6);
+    expect(s.players[ap]!.life).toBe(life + 7);
+    expect(s.over).toBeFalsy();
+    // Back in hand (drawn) on a later turn: the same card is another spell (rulings).
+    const p = s.players[ap]!;
+    p.library.splice(p.library.indexOf(ids[0]!), 1);
+    p.hand.push(ids[0]!);
+    s.objects[ids[0]!]!.zone = "hand";
+    for (const id of s.battlefield) s.objects[id]!.tapped = false;
+    s.players[ap]!.landsPlayedThisTurn = 0;
+    s = settle(cast(s, ap, ids[0]!, []));
+    expect(s.over).toBe(true);
+    expect(s.winner).toBe(ap);
   });
 });

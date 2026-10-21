@@ -1647,6 +1647,13 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", mad
   // 614.5); each number is how many Alhammarret's Archives can still replace that draw.
   made = [...made];
   while (n > 0 || made.length) {
+    // Narset, Parter of Veils: an opponent who has drawn a card this turn can't draw another; the draw doesn't happen, so
+    // nothing replaces it (rulings), and the rest of these don't either.
+    const narset = (player(s, pid).draws?.turn === s.turn ? player(s, pid).draws!.n : 0) >= 1 ? s.battlefield.find((id) => controllerOf(s, obj(s, id)) !== pid && abilitiesOf(s, obj(s, id)).opponentsDrawOnce) : undefined;
+    if (narset) {
+      log(s, `${player(s, pid).name} can't draw more than one card each turn (${nameOf(s, narset)}).`);
+      break;
+    }
     let archives: number;
     if (!made.length) {
       n--;
@@ -3662,6 +3669,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   s.spellsCastThisTurn = item.castNth + 1;
   if (isMainPhase(s) && s.activePlayer === p.id) item.castInMain = true;
   s.cards[d.oracleId] ??= d;
+  (p.castNames ??= {})[d.name] = (p.castNames[d.name] ?? 0) + 1;
   (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors], from: castFrom, ...(paid.treasure ? { treasure: true as const } : {}) });
   (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv: spellManaValue(s, item) };
   // A copy of a prepare spell: its permanent stops being prepared as it becomes cast (CR 722.3c, 601.2i).

@@ -1168,6 +1168,11 @@ export function compile(d: CardDef): CompiledCard {
       out.damageCantBePrevented = true;
       continue;
     }
+    // Narset, Parter of Veils: draws past the first each turn don't happen, and can't be replaced (rulings).
+    if (line === "Each opponent can't draw more than one card each turn.") {
+      out.opponentsDrawOnce = true;
+      continue;
+    }
     // Bloodletter of Aclazotz (CR 614.1a): life lost to damage too (CR 120.3a), and life paid (CR 119.4).
     if (line === "If an opponent would lose life during your turn, they lose twice that much life instead.") {
       out.opponentsLoseDouble = true;

@@ -386,6 +386,16 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const item = s.resolving?.item;
         const o = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
         if (!o) return;
+        if (e.nth) {
+          // Under the top six cards, or on the bottom with fewer (rulings on Approach of the Second Sun).
+          if (o.zone === "stack") {
+            log(s, `${defOf(s, o).name} is put into its owner's library ${["top", "second", "third", "fourth", "fifth", "sixth", "seventh"][e.nth - 1] ?? `${e.nth}th`} from the top.`);
+            moveObject(s, o.id, "library", { top: true });
+            const lib = player(s, o.owner).library;
+            if (s.objects[o.id]?.zone === "library" && lib[0] === o.id) lib.splice(Math.min(e.nth - 1, lib.length - 1), 0, lib.shift()!);
+          }
+          return;
+        }
         if (e.bottom) {
           if (o.zone === "stack") {
             log(s, `${defOf(s, o).name} is put on the bottom of its owner's library.`);

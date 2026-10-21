@@ -502,6 +502,14 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       ],
       text,
     };
+  // Approach of the Second Sun (rulings): the other one only needs to have been cast, from anywhere, and a copy isn't cast.
+  const approach = /^If ~ was cast from your hand and you've cast another spell named ~ this game, you win the game\. Otherwise, put ~ into its owner's library seventh from the top and you gain (\d+) life\.$/.exec(text.trim());
+  if (approach && opts.spell)
+    return {
+      targets: [],
+      effects: [{ type: "if", cond: { kind: "castFromHandAndAnotherNamed" }, effects: [{ type: "winGame", who: { ref: "you" } }], otherwise: [{ type: "shuffleSpell", nth: 7 }, { type: "gainLife", who: { ref: "you" }, n: Number(approach[1]) }] }],
+      text,
+    };
   // Expressive Iteration: "Look at the top three cards of your library. Put one of them into your hand, put one of them on
   // the bottom of your library, and exile one of them. You may play the exiled card this turn." In that order, with
   // fewer cards too: two go to your hand and the bottom, one only to your hand (rulings). The other two stay on top

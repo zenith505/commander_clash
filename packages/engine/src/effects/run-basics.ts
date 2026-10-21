@@ -235,7 +235,10 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // Worked out for each player in turn: "draws cards equal to the number of cards in their hand". A draw that
       // stops for dredge (CR 702.52a) is finished by the answer, and this carries on with the next player.
       const sc = (s.resolving!.scratch ??= {});
-      if (!sc.drawQueue) s.resolving!.drawnThisWay = [];
+      if (!sc.drawQueue) {
+        s.resolving!.drawnBefore = s.resolving!.drawnThisWay;
+        s.resolving!.drawnThisWay = [];
+      }
       const queue = (sc.drawQueue ??= players(s, e.who, ctx));
       while (queue.length) {
         const pid = queue.shift()!;

@@ -608,6 +608,8 @@ export interface Player {
   drewFromEmptyLibrary: boolean;
   /** Cards drawn in turn `turn`, for "whenever you draw your second card each turn". */
   draws?: { turn: number; n: number };
+  /** How many spells of each English name this player has cast this game (copies aren't cast): Approach of the Second Sun. */
+  castNames?: Record<string, number>;
   /** The turn of their draw step in which they last drew (the first card drawn in it isn't doubled by Alhammarret's Archive). */
   firstDrawStepDraw?: number;
   /** The turn in whose draw step this player last drew a card: the first card they draw in each draw step (Orcish Bowmasters). */
@@ -1479,6 +1481,8 @@ export interface Resolving {
   choseThisWay?: PlayerId[];
   /** The cards drawn so far while this resolves, for "you may cast one of them" (Dungeon of the Mad Mage's last room). */
   drawnThisWay?: ObjectId[];
+  /** The cards the draw instruction before this one drew ("each opponent who drew a card this way", Cut a Deal). */
+  drawnBefore?: ObjectId[];
   /** How many cards each player discarded so far while this resolves ("draw that many cards"). */
   discarded?: Record<PlayerId, number>;
   /** The powers of the creature cards exiling graveyards exiled so far while this resolves ("exiled this way"). */

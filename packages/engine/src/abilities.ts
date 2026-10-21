@@ -1806,7 +1806,21 @@ export type Effect =
    */
   /** "Each opponent reveals cards from the top of their library until they reveal a land card, then puts those cards into their graveyard" (Consuming Aberration). */
   | { type: "revealUntilLandToGraveyard"; who: PlayerRef }
-  | { type: "revealUntil"; filter: TargetSpec; found: "hand" | "battlefield"; tapped?: true; rest: "exile" | "bottom"; lifePerRest?: true; /** "Until you reveal X land cards" (Open the Way): that many, all put there together. */ n?: Amount }
+  | {
+      type: "revealUntil";
+      filter: TargetSpec;
+      found: "hand" | "battlefield";
+      tapped?: true;
+      /** "Shuffle": "then shuffles all other cards revealed this way into their library" (Polymorph), a shuffle of the library. */
+      rest: "exile" | "bottom" | "shuffle";
+      lifePerRest?: true;
+      /** "Until you reveal X land cards" (Open the Way): that many, all put there together. */
+      n?: Amount;
+      /** Who reveals, and puts the card onto the battlefield under their control: "its controller" (Polymorph). Unset, you. */
+      who?: PlayerRef;
+      /** "A permanent card that shares a card type with that permanent" (Wild Magic Surge): target `index` as it is, or last was on the battlefield (CR 608.2h). */
+      sharesTypeWith?: number;
+    }
   /**
    * "Exile cards from the top of your library until you exile a nonland card", or "reveal ... until you reveal a nonland
    * card" (then that card is exiled and the rest go on the bottom in a random order, or all of them go into your hand):
@@ -2445,7 +2459,8 @@ export type Effect =
    * `fromYard` and `copies` (Mizzix's Mastery): the cards are the target card or each card matching `filter` in your
    * graveyard, exiled first; what's cast is a copy of each (CR 707.12), the cards staying exiled.
    */
-  | { type: "castFromAmong"; who: PlayerRef; n: Amount; each?: true; untilNonland?: true; copies?: true; fromYard?: { target?: number; filter?: TargetSpec }; maxMv?: Amount; totalMv?: Amount; untilMv?: number; untilHits?: { n: number; filter: TargetSpec }; hitToHand?: true; filter?: TargetSpec; max?: number; rest?: { dest: "graveyard" | "bottomRandom"; toHand?: boolean } }
+  /** `reveal`: "reveal the top X cards of your library ... from among cards revealed this way" (Sunbird's Invocation): they stay in the library while revealed, cast from there. */
+  | { type: "castFromAmong"; who: PlayerRef; n: Amount; reveal?: true; each?: true; untilNonland?: true; copies?: true; fromYard?: { target?: number; filter?: TargetSpec }; maxMv?: Amount; totalMv?: Amount; untilMv?: number; untilHits?: { n: number; filter: TargetSpec }; hitToHand?: true; filter?: TargetSpec; max?: number; rest?: { dest: "graveyard" | "bottomRandom"; toHand?: boolean } }
   /**
    * "You gain shroud until end of turn", "You and permanents you control gain hexproof until end of turn" (the player's
    * half), "you gain protection from the chosen player": see Player.gained (CR 702.11d, 702.16b-e, 702.16k, 702.18d).

@@ -1474,6 +1474,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si++;
       continue;
     }
+    // Sunbird's Invocation, in a cast trigger: "Reveal the top X cards of your library, where X is that spell's mana value.
+    // You may cast a spell with mana value X or less from among cards revealed this way without paying its mana cost.
+    // Put the rest on the bottom of your library in a random order." Cast from the library, as this resolves (CR 608.2g).
+    const sunbird = /^[Rr]eveal the top X cards of your library, where X is (that spell's mana value)$/.exec(s);
+    if (sunbird && sentences[si + 1]?.replace(/\.$/, "") === "You may cast a spell with mana value X or less from among cards revealed this way without paying its mana cost" && sentences[si + 2]?.replace(/\.$/, "") === "Put the rest on the bottom of your library in a random order") {
+      const x = parseCount(sunbird[1]!, ctx);
+      if (!x) return null;
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: x, reveal: true, maxMv: x, max: 1, rest: { dest: "bottomRandom" } });
+      si += 2;
+      continue;
+    }
     if (castAmongHead && castAmong && (castAmongHead[2] || castAmongHead[3] || afterShuffle)) {
       const n = castAmongHead[1] ?? castAmongHead[4]!;
       const whose = castAmongHead[2] ? (castAmongHead[2] === "your" ? "you" : castAmongHead[2] === "their" ? "that player" : castAmongHead[2].replace(/'s$/, "")) : castAmongHead[3] ?? "you";
@@ -3162,6 +3173,26 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const untilX = /^[Rr]eveal cards from the top of your library until you reveal X land cards$/.test(s) && /^Put those land cards onto the battlefield tapped and the rest on the bottom of your library in a random order$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "");
     if (untilX) {
       effects.push({ type: "revealUntil", filter: { kind: "card", types: ["Land"], notTypes: [], notColors: [], text: "land card" }, found: "battlefield", rest: "bottom", tapped: true, n: { count: { kind: "x" } } });
+      si++;
+      continue;
+    }
+    // After "Destroy target creature" (Polymorph), "Exile target creature" (Transmogrify), "Destroy target permanent an
+    // opponent controls" (Wild Magic Surge): "Its controller reveals cards from the top of their library until they reveal
+    // a creature card", "... a permanent card that shares a card type with that permanent" (its types as it last existed,
+    // CR 608.2h), and they put that card onto the battlefield (under their control), then the rest. With none found, all
+    // the revealed cards are shuffled in, or go to the bottom (CR 701.20a).
+    const theirs = /^(Its controller|That creature's controller|That permanent's controller) reveals cards from the top of their library until they reveal (?:an? )?(.+? card)( that shares a card type with that permanent)?$/.exec(s);
+    const theirPut = /^(?:(?:The|That) player puts that card onto the battlefield, then shuffles (?:all other cards revealed this way|the rest) into their library|They put that card onto the battlefield and (the rest on the bottom of their library in a random order))$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (theirs && theirPut) {
+      const who = parsePlayer(theirs[1]!.toLowerCase(), ctx);
+      const filter = parseSearchFilter(theirs[2]!);
+      if (who?.ref !== "targetController" || ctx.targets[who.index]?.many || !filter || filter.kind !== "card") return null;
+      // Onto the battlefield: creature cards, or (sharing a type) any permanent card, an Aura enchanting what its new
+      // controller chooses (CR 303.4f).
+      const permanent = theirs[3] && theirs[2] === "permanent card";
+      const creature = !theirs[3] && filter.types?.length === 1 && filter.types[0] === "Creature" && !filter.anyOf;
+      if (!permanent && !creature) return null;
+      effects.push({ type: "revealUntil", filter, found: "battlefield", rest: theirPut[1] ? "bottom" : "shuffle", who, ...(theirs[3] ? { sharesTypeWith: who.index } : {}) });
       si++;
       continue;
     }

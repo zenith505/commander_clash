@@ -74,3 +74,21 @@ test("Norn's Annex: attacking Ana costs {W/P} for each creature; with no {W} flo
   expect(after.players[1]!.life).toBe(38);
   expect(pageErrors(page)).toEqual([]);
 });
+
+test("Sunbird's Invocation: casting Hill Giant reveals four; cast Grizzly Bears from among them for free, the rest go to the bottom", async ({ page }) => {
+  const s = scene({ hand: ["Hill Giant"], board: [...LANDS, "Sunbird's Invocation"], library: ["Grizzly Bears", "Serra Angel", "Forest", "Opt"] });
+  const [bears, angel] = [one(s, "Grizzly Bears"), one(s, "Serra Angel")];
+  await open(page, s);
+  await card(page, "Hill Giant", s).click();
+  await resolveUntil(page, (st) => st.pending?.kind === "chooseOption" && st.pending.what === "castFromAmong");
+  const bar = controls(page);
+  await expect(bar).toContainText("cast a spell from among the revealed cards without paying its mana cost?");
+  // Serra Angel's mana value is 5, more than Hill Giant's 4.
+  await expect(bar.getByRole("button", { name: "Serra Angel" })).toHaveCount(0);
+  await bar.getByRole("button", { name: "Grizzly Bears" }).click();
+  await bar.getByRole("button", { name: "Cast it" }).click();
+  const after = await resolveUntil(page, (st) => st.stack.length === 0 && st.objects[bears]!.zone === "battlefield");
+  expect(after.objects[angel]!.zone).toBe("library");
+  expect(after.players[0]!.library.slice(-3)).toContain(angel);
+  expect(pageErrors(page)).toEqual([]);
+});

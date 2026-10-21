@@ -72,6 +72,20 @@ const abundance = card("Abundance", "Enchantment", "{2}{G}{G}", {
 const annex = card("Norn's Annex", "Artifact", "{3}{W/P}{W/P}", {
   oracleText: "({W/P} can be paid with either {W} or 2 life.)\nCreatures can't attack you or planeswalkers you control unless their controller pays {W/P} for each of those creatures.",
 });
+const surge = card("Wild Magic Surge", "Instant", "{2}{R}", {
+  oracleText:
+    "Destroy target permanent an opponent controls. Its controller reveals cards from the top of their library until they reveal a permanent card that shares a card type with that permanent. They put that card onto the battlefield and the rest on the bottom of their library in a random order.",
+});
+const polymorph = card("Polymorph", "Sorcery", "{3}{U}", {
+  oracleText: "Destroy target creature. It can't be regenerated. Its controller reveals cards from the top of their library until they reveal a creature card. The player puts that card onto the battlefield, then shuffles all other cards revealed this way into their library.",
+});
+const transmogrify = card("Transmogrify", "Sorcery", "{3}{R}", {
+  oracleText: "Exile target creature. That creature's controller reveals cards from the top of their library until they reveal a creature card. That player puts that card onto the battlefield, then shuffles the rest into their library.",
+});
+const sunbird = card("Sunbird's Invocation", "Enchantment", "{5}{R}", {
+  oracleText:
+    "Whenever you cast a spell from your hand, reveal the top X cards of your library, where X is that spell's mana value. You may cast a spell with mana value X or less from among cards revealed this way without paying its mana cost. Put the rest on the bottom of your library in a random order.",
+});
 // Test cards.
 const shock = card("Test Shock", "Instant", "{R}", { oracleText: "Test Shock deals 2 damage to any target." });
 const ponder = card("Test Ponder", "Sorcery", "{U}", { oracleText: "Draw a card." });
@@ -408,6 +422,102 @@ describe("Norn's Annex", () => {
     expect(decl(s).attacks.length).toBeGreaterThan(0);
     s.players[ap]!.life = 11;
     expect(decl(s).attacks).toEqual([]);
+  });
+});
+
+describe("Wild Magic Surge, Polymorph, Transmogrify", () => {
+  const relicA = card("Relic A", "Artifact", "{2}");
+  const shrine = card("Test Shrine", "Enchantment", "{2}");
+  const aura = card("Test Aura", "Enchantment — Aura", "{W}", { oracleText: "Enchant creature\nEnchanted creature gets +1/+1." });
+  const giant = card("Test Giant", "Creature — Giant", "{4}", { power: "4", toughness: "4" });
+  const sorcery = card("Test Sorcery", "Sorcery", "{1}");
+  /** `top` on top of `pid`'s library (first = top). */
+  const stack = (s: GameState, pid: PlayerId, top: CardDef[]) => [...top].reverse().map((d) => toZone(s, pid, d, "library")).reverse();
+
+  it("Wild Magic Surge destroys an enchantment; its controller reveals until a permanent card sharing a type, which enters under their control", () => {
+    supported(surge, polymorph, transmogrify);
+    const { s: s0, ap, ids } = setup([surge]);
+    const opp = next(s0, ap);
+    const ench = putOnBattlefield(s0, opp, shrine);
+    const [g, so, sh, r] = stack(s0, opp, [giant, sorcery, shrine, relicA]) as [string, string, string, string];
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: ench }])));
+    expect(s.objects[ench]!.zone).toBe("graveyard");
+    expect(s.objects[sh]!.zone).toBe("battlefield");
+    expect(s.objects[sh]!.controller).toBe(opp);
+    // The creature and the sorcery go to the bottom; the relic stays on top.
+    expect(s.players[opp]!.library[0]).toBe(r);
+    expect(new Set(s.players[opp]!.library.slice(-2))).toEqual(new Set([g, so]));
+  });
+
+  it("an artifact creature shares either type; an Aura found asks its controller what it enchants (CR 303.4f)", () => {
+    const { s: s0, ap, ids } = setup([surge, surge]);
+    const opp = next(s0, ap);
+    const golem = putOnBattlefield(s0, opp, card("Test Golem", "Artifact Creature — Golem", "{3}", { power: "3", toughness: "3" }));
+    const [so, rel] = stack(s0, opp, [sorcery, relicA]) as [string, string];
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: golem }])));
+    expect(s.objects[rel]!.zone).toBe("battlefield");
+    expect(s.objects[so]!.zone).toBe("library");
+    // An enchantment destroyed, and an Aura revealed: its new controller picks a creature for it.
+    const ench = putOnBattlefield(s, opp, shrine);
+    const bearA = putOnBattlefield(s, opp, card("Opp Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    putOnBattlefield(s, ap, card("My Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    const [au] = stack(s, opp, [aura]) as [string];
+    s = run(s, planCast(s, ap, ids[1]!, [{ kind: "object", id: ench }]));
+    for (let i = 0; i < 10 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseOption", player: opp, what: "enchant" });
+    s = settle(act(s, { type: "chooseOption", player: opp, choice: bearA }));
+    expect(s.objects[au]!.zone).toBe("battlefield");
+    expect(s.objects[au]!.attachedTo).toBe(bearA);
+  });
+
+  it("Polymorph: an indestructible creature isn't destroyed, but its controller still reveals; with no creature card, they shuffle (rulings)", () => {
+    const { s: s0, ap, ids } = setup([polymorph, transmogrify]);
+    const opp = next(s0, ap);
+    const tough = putOnBattlefield(s0, opp, card("Tough", "Creature — Golem", "{3}", { power: "1", toughness: "1", keywords: ["Indestructible"], oracleText: "Indestructible" }));
+    const [r, g] = stack(s0, opp, [relicA, giant]) as [string, string];
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: tough }])));
+    expect(s.objects[tough]!.zone).toBe("battlefield");
+    expect(s.objects[g]!.zone).toBe("battlefield");
+    expect(s.objects[r]!.zone).toBe("library");
+    // Transmogrify with no creature card left in the library: exiled, everything revealed, then a shuffle.
+    s.players[opp]!.library = s.players[opp]!.library.filter((id) => !s.cards[s.objects[id]!.cardId]!.typeLine.includes("Creature"));
+    const n = s.players[opp]!.library.length;
+    s = settle(run(s, planCast(s, ap, ids[1]!, [{ kind: "object", id: g }])));
+    expect(s.objects[g]!.zone).toBe("exile");
+    expect(s.players[opp]!.library).toHaveLength(n);
+    expect(s.log.some((l) => /shuffles their library/.test(l.text))).toBe(true);
+  });
+});
+
+describe("Sunbird's Invocation", () => {
+  const spellOf = (name: string, cost: string) => card(name, "Sorcery", cost, { oracleText: "Draw a card." });
+  const stack = (s: GameState, pid: PlayerId, top: CardDef[]) => [...top].reverse().map((d) => toZone(s, pid, d, "library")).reverse();
+
+  it("casting a 3-drop from hand reveals three: cast one with mana value 3 or less from the library, free; the rest to the bottom", () => {
+    supported(sunbird);
+    const { s: s0, ap, ids } = setup([spellOf("Three Drop", "{2}{R}")]);
+    putOnBattlefield(s0, ap, sunbird);
+    const [cheap, big, land] = stack(s0, ap, [spellOf("Cheap Spell", "{1}{R}"), spellOf("Big Spell", "{4}{R}"), card("Forest", "Basic Land — Forest")]) as [string, string, string];
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    for (let i = 0; i < 10 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "castFromAmong", options: [cheap, "none"] });
+    expect(s.objects[cheap]!.zone).toBe("library");
+    s = act(s, { type: "chooseOption", player: ap, choice: cheap });
+    expect(s.pending).toMatchObject({ kind: "castFree", objectId: cheap });
+    s = run(s, planCast(s, ap, cheap));
+    expect(s.objects[cheap]!.zone).toBe("stack");
+    // Above the spell that triggered it (rulings).
+    expect(s.stack.map((x) => x.description)).toEqual(["Three Drop", "Cheap Spell"]);
+    expect(s.players[ap]!.library.slice(-2).sort()).toEqual([big, land].sort());
+  });
+
+  it("a spell with mana value 0 reveals nothing (rulings)", () => {
+    const { s: s0, ap, ids } = setup([spellOf("Free Spell", "{0}")]);
+    putOnBattlefield(s0, ap, sunbird);
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    for (let i = 0; i < 10 && !s.pending && s.stack.length; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toBeNull();
+    expect(s.log.some((l) => /reveals nothing/.test(l.text))).toBe(true);
   });
 });
 

@@ -542,6 +542,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "preventCombatDamage":
     case "noLifeGain":
     case "turnRules":
+    case "flashUntilNextTurn":
     case "cantCast":
     case "cantPlayLands":
     case "noPrevention":

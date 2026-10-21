@@ -1,8 +1,8 @@
 import { allEffects, type Effect, type PayCost, type PunisherOption, type TargetSpec } from "../abilities";
-import { parseManaCost, spentMeets, type ManaSpent } from "../mana";
+import { manaValue, parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
-import { autoEvidence, canLoseLife, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, moveObject, obj, opponents, payableLife, player, shareCreatureType } from "../game";
+import { autoEvidence, availableMana, canLoseLife, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, moveObject, obj, opponents, payableLife, player, shareCreatureType } from "../game";
 import { cardIdOf, defOf } from "../cards";
 import { controllerOf, staticConditionNow } from "../layers";
 import type { GameState, PlayerId } from "../types";
@@ -26,6 +26,24 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const source = e.once && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       const key = `${ctx.sourceZc ?? source?.zoneChanges ?? 0}|do:${e.text}`;
       if (sc.may === undefined && source?.triggeredThisTurn?.includes(key)) sc.may = false; // done already this turn (CR 603.2h)
+      // "You may pay {X}": X first (CR 107.1c), at most what the player could pay, then the payment with that X.
+      if (e.payX && e.pay?.mana && sc.may === undefined) {
+        if (sc.payX === undefined) {
+          const rest = manaValue(parseManaCost(e.pay.mana.replace("{X}", "")));
+          const cap = Math.min(availableMana(s, ctx.controller) - rest, e.payX.max ? amountNow(s, e.payX.max, ctx) : Infinity);
+          if (cap < 0) sc.may = false;
+          else {
+            const options = ["none", ...Array.from({ length: Math.min(cap, 40) + 1 }, (_, i) => String(i))];
+            s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "payX", options, labels: options.map((o) => (o === "none" ? "Don't pay" : `X = ${o}`)), prompt: `${e.text.replace(/~/g, src)}: choose X` };
+            return "paused";
+          }
+        } else if (sc.payX === "none") sc.may = false;
+        else {
+          const pay = { ...e.pay, mana: e.pay.mana.replace("{X}", `{${sc.payX}}`) };
+          s.pending = { kind: "chooseMay", player: ctx.controller, prompt: `pay ${describePay(pay)}`, source: src, pay };
+          return "paused";
+        }
+      }
       if (sc.may === undefined) {
         // Fabricate: with the permanent gone, the counters can't be put on it, so it's the tokens (rulings).
         const onSelf = e.effects.every((x) => "what" in x && x.what?.ref === "self") && (e.effects.length > 0 || !!e.otherwise?.every((x) => "what" in x && x.what?.ref === "self"));
@@ -53,7 +71,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         return;
       }
       if (source && !source.triggeredThisTurn?.includes(key)) (source.triggeredThisTurn ??= []).push(key);
-      for (const inner of e.effects) if (runEffect(s, inner, ctx) === "paused") return "paused";
+      const xctx = e.payX ? { ...ctx, x: Number(sc.payX) } : ctx;
+      for (const inner of e.effects) if (runEffect(s, inner, xctx) === "paused") return "paused";
       return;
     }
     case "either": {

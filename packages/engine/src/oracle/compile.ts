@@ -1245,6 +1245,15 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "You have protection from each of your opponents" (CR 702.16k): their spells and abilities can't target you, their
     // Auras can't enchant you, and damage from their sources is prevented.
+    // "You, planeswalkers you control, and other creatures you control have hexproof." (Shalai, Voice of Plenty): you have
+    // it, and a static ability for each group.
+    const youAnd = /^You(?:, ([^,]+ you control),)? and ((?:other )?[^,]+ you control) have (hexproof|shroud)\.$/.exec(line) ?? /^You, ([^,]+ you control), and ((?:other )?[^,]+ you control) have (hexproof|shroud)\.$/.exec(line);
+    const youAndSt = youAnd && !out.youHave ? [youAnd[1], youAnd[2]].filter((g): g is string => !!g).map((g) => parseStatic(`${g[0]!.toUpperCase()}${g.slice(1)} have ${youAnd[3]}.`)) : null;
+    if (youAnd && youAndSt?.every((x) => x)) {
+      out.youHave = youAnd[3] as "hexproof" | "shroud";
+      for (const st of youAndSt) out.statics.push({ ...st!, text: line });
+      continue;
+    }
     const youHave = /^You have (hexproof|shroud|protection from each of your opponents)\.$/.exec(line);
     if (youHave && !out.youHave) {
       out.youHave = youHave[1]!.startsWith("protection") ? "protection" : (youHave[1] as "hexproof" | "shroud");
@@ -1617,6 +1626,15 @@ export function compile(d: CardDef): CompiledCard {
       out.boastTwice = true;
       continue;
     }
+    const combatCap = /^No more than (one|two) creatures? can (attack|block) each combat\.$/.exec(line);
+    if (combatCap) {
+      (out.combatLimit ??= {})[combatCap[2] as "attack" | "block"] = combatCap[1] === "one" ? 1 : 2;
+      continue;
+    }
+    if (line === "Each opponent can cast spells only any time they could cast a sorcery.") {
+      out.opponentsSorceryTiming = true;
+      continue;
+    }
     if (line === "Your opponents can't cast spells during your turn.") {
       out.opponentsCantCastYourTurn = true;
       continue;
@@ -1850,7 +1868,8 @@ export function compile(d: CardDef): CompiledCard {
       // "Whenever you create or sacrifice a token, ..." (Mirkwood Bats); "When ~ enters and whenever an opponent draws a
       // card except the first one they draw in each of their draw steps, ..." (Orcish Bowmasters).
       /^Whenever you (create or sacrifice) a token, (.+)$/.exec(line) ??
-      /^When ~ enters and (whenever an opponent draws a card except the first one they draw in each of their draw steps), (.+)$/.exec(line) ??
+      // "When ~ enters and whenever you cast a spell with mana value 5 or greater, draw a card." (Up the Beanstalk)
+      /^When ~ enters and (whenever (?!it )[^,]+), (.+)$/.exec(line) ??
       // "Whenever a creature you control of the chosen type enters or attacks, draw a card." (Kindred Discovery)
       /^Whenever (an? [^,]+? you control(?: of the chosen type)?) enters or attacks, (.+)$/.exec(line) ??
       // Syr Konrad: "Whenever another creature dies, or a creature card is put into a graveyard from anywhere other than
@@ -1873,7 +1892,7 @@ export function compile(d: CardDef): CompiledCard {
               ? [`When ~ transforms into ~, ${effect}`, `When ~ dies, ${effect}`]
             : twice[1] === "create or sacrifice"
               ? [`Whenever you create a token, ${effect}`, `Whenever you sacrifice a token, ${effect}`]
-            : /^When ~ enters and whenever an opponent draws/.test(line)
+            : /^When ~ enters and whenever /.test(line)
               ? [`When ~ enters, ${effect}`, `W${twice[1]!.slice(1)}, ${effect}`]
             : /^Whenever ~ attacks or becomes the target of a spell, /.test(line)
               ? [`Whenever ~ attacks, ${effect}`, `Whenever ~ becomes the target of a spell, ${effect}`]

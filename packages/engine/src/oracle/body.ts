@@ -146,6 +146,15 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx): Effect | null |
     if (!trigger || trigger === "fail" || trigger.event !== "selfDealsCombatDamageToPlayer" || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
     return { type: "floatingTrigger", trigger, until: "endOfTurn", about: ctx!.lastObjectTarget! };
   }
+  // "Choose target opponent. Whenever a creature you control deals combat damage to that player this turn, create a tapped
+  // Treasure token." (Great Train Heist): a delayed trigger this turn, only for combat damage to that player.
+  const toThem = ctx && /^Choose target opponent$/.test(s) ? /^Whenever (a creature you control) deals combat damage to that player this turn, (.+)$/.exec(after[0] ?? "") : null;
+  if (toThem) {
+    const trigger = parseTrigger(`Whenever ${toThem[1]!} deals combat damage to a player, ${[toThem[2]!.replace(/\.$/, ""), ...after.slice(1).map((x) => x.replace(/\.$/, ""))].join(". ")}.`);
+    if (!trigger || trigger === "fail" || trigger.event !== "creatureYouControlDealsCombatDamageToPlayer" || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
+    const index = addTarget(ctx!, { kind: "player", opponent: true, text: "target opponent" });
+    return { type: "floatingTrigger", trigger, until: "endOfTurn", aboutPlayer: index };
+  }
   const m = /^([Uu]ntil end of turn|[Tt]his turn|[Uu]ntil your next turn|[Uu]ntil the end of your next turn), ([Ww]henever .+)$/.exec(s);
   if (!m) return undefined;
   const text = [m[2]!, ...after.map((x) => x.replace(/\.$/, ""))].join(". ");
@@ -676,7 +685,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   let prevTargets = 0;
   let curTargets = 0;
   // "You may pay {2}" waits for the sentence after: "If you do, draw a card."
-  let payFirst: { pay: PayCost; text: string } | null = null;
+  let payFirst: { pay: PayCost; text: string; payX?: { max?: Amount } } | null = null;
   // "Look at the top four cards of your library" waits for what to do with them (see parseDig).
   let dig: Partial<Extract<Effect, { type: "dig" }>> | null = null;
   // The look's own "where X is ...", for "with mana value X or less" after it (Hatchery Spider).
@@ -1310,7 +1319,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si += 2;
       continue;
     }
-    if (lookTop && si === sentences.length - 1) {
+    // "Look at the top card of target player's library. Draw a card at the beginning of the next turn's upkeep." (Mishra's
+    // Bauble): a draw after it doesn't refer to the card either.
+    if (lookTop && (si === sentences.length - 1 || (si === sentences.length - 2 && /^Draw a card(?: at the beginning of the next turn's upkeep)?$/.test(sentences[si + 1]!)))) {
       const who = parsePlayer(lookTop[1] === "your" ? "you" : lookTop[1]!.replace(/'s$/, ""), ctx);
       if (!who) return null;
       effects.push({ type: "orderTop", who, n: 1 });
@@ -1345,9 +1356,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // Dark Confidant: "Reveal the top card of your library and put that card into your hand. You lose life equal to
     // its mana value."
     if (/^[Rr]eveal the top card of your library and put (?:that card|it) into your hand$/.test(s)) {
-      const life = /^(You|Each opponent) (?:loses?|(gains?)) life equal to (?:its|that card's|the card's) mana value$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
-      effects.push({ type: "revealTopToHand", ...(life ? { life: { who: life[1] === "You" ? { ref: "you" } : { ref: "eachOpponent" }, ...(life[2] ? { gain: true } : {}) } } : {}) });
-      if (life) si++;
+      const next = sentences[si + 1]?.replace(/\.$/, "") ?? "";
+      const life = /^(You|Each opponent) (?:loses?|(gains?)) life equal to (?:its|that card's|the card's) mana value$/.exec(next);
+      const drain = /^Each opponent loses X life and you gain X life, where X is (?:its|that card's|the card's) mana value$/.test(next);
+      effects.push({ type: "revealTopToHand", ...(drain ? { life: { who: { ref: "eachOpponent" }, drain: true } } : life ? { life: { who: life[1] === "You" ? { ref: "you" } : { ref: "eachOpponent" }, ...(life[2] ? { gain: true } : {}) } } : {}) });
+      if (life || drain) si++;
       continue;
     }
     // "Repeat this process once" after a punisher (Remorseless Punishment); "Repeat the following process X times" before
@@ -1525,6 +1538,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       // "You may pay {2}{W}. When you do, tap target creature." (Thousand Moons Crackshot): paying triggers a reflexive
       // ability with targets of its own, chosen as it's put on the stack (CR 603.12; rulings). The rest of the ability is its.
       const whenPaid = /^When you do, (.+)$/.exec(s);
+      if (whenPaid && payFirst.payX) return null;
       if (whenPaid) {
         const reflexive = reflexiveBody([whenPaid[1]!, ...sentences.slice(si + 1)].join(". "), ctx);
         if (!reflexive) return null;
@@ -1535,9 +1549,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       }
       const then = /^If you do, (.+)$/.exec(s);
       if (!then) return null;
+      // "Whenever ~ attacks, you may pay {X}{R}. If you do, it deals X damage to any target." (Flameblast Dragon): "it" is ~.
+      if (ctx.selfIt && !ctx.subjectIt) then[1] = then[1]!.replace(/^it deals /, "~ deals ");
       // "You may pay {1}. If you do, look at the top two cards of your library. Put one of them into your hand and the
       // other into your graveyard." (Marchesa): the whole look depends on the payment.
       const lookPaid = new RegExp(`^look at the top ${NUMX} cards? of your library$`).exec(then[1]!);
+      if (payFirst.payX && !/\bX\b/.test(then[1]!)) return null;
+      if (lookPaid && payFirst.payX) return null;
       if (lookPaid) {
         dig = { type: "dig", n: amt(lookPaid[1]!), reveal: false };
         digPaid = { pay: payFirst.pay, text: `${payFirst.text}. If you do, ${then[1]}` };
@@ -1547,7 +1565,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
       // "You may pay {R}{G}{W}{U}. If you do, until end of turn, whenever he deals combat damage to an opponent, ..."
       // (Human Torch): the delayed triggered ability, and the rest of the paragraph its instructions, if paid.
-      const floatingPaid = floatingTrigger(then[1]!, sentences.slice(si + 1));
+      const floatingPaid = payFirst.payX ? undefined : floatingTrigger(then[1]!, sentences.slice(si + 1));
       if (floatingPaid !== undefined) {
         if (!floatingPaid) return null;
         effects.push({ type: "may", effects: [floatingPaid], pay: payFirst.pay, text: `${payFirst.text}. If you do, ${[then[1]!, ...sentences.slice(si + 1)].join(". ")}` });
@@ -1557,7 +1575,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       }
       // "You may pay {2}{U}. If you do, exile the top card of your library face down. You may look at that card ... You
       // may play that card ..." (Intet): the exile and its permissions depend on the payment.
-      const paidFaceDown = parseFaceDownPlay([cap(then[1]!), ...sentences.slice(si + 1)], 0, ctx);
+      const paidFaceDown = payFirst.payX ? null : parseFaceDownPlay([cap(then[1]!), ...sentences.slice(si + 1)], 0, ctx);
       if (paidFaceDown === "fail") return null;
       if (paidFaceDown) {
         effects.push({ type: "may", effects: [paidFaceDown.effect], pay: payFirst.pay, text: `${payFirst.text}. If you do, ${sentences.slice(si, si + paidFaceDown.next).join(". ").replace(/^If you do, /, "")}` });
@@ -1581,8 +1599,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
           return all;
         });
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
-      effects.push({ type: "may", effects: inner, pay: payFirst.pay, text: `${payFirst.text}. If you do, ${then[1]}` });
+      effects.push({ type: "may", effects: inner, pay: payFirst.pay, text: `${payFirst.text}. If you do, ${then[1]}`, ...(payFirst.payX ? { payX: payFirst.payX } : {}) });
       payFirst = null;
+      continue;
+    }
+    // "You may pay {X}. If you do, ..." (Decree of Justice), "... {X}{R} ..." (Flameblast Dragon), "you may pay {X}, where
+    // X is less than or equal to the amount of life you gained" (Well of Lost Dreams): X chosen as it resolves.
+    const mayPayX = /^[Yy]ou may pay (\{X\}(?:\{(?:\d+|[WUBRGC])\})*)(?:, where X is less than or equal to (.+))?$/.exec(s);
+    if (mayPayX) {
+      // "The amount of life you gained": what the "whenever you gain life" event gave (CR 119.9).
+      const max = mayPayX[2] === "the amount of life you gained" ? { count: { kind: "eventAmount" as const } } : mayPayX[2] !== undefined ? parseCount(mayPayX[2]!, ctx) : undefined;
+      if (max === null) return null;
+      payFirst = { pay: { mana: mayPayX[1]! }, text: `pay ${mayPayX[1]}`, payX: max ? { max } : {} };
       continue;
     }
     const mayPay = /^[Yy]ou may pay (.+)$/.exec(s);
@@ -3019,6 +3047,8 @@ export function usesX(v: unknown): boolean {
     const o = v as Record<string, unknown>;
     // A reflexive trigger whose X is its own (Unleash the Inferno's excess damage).
     if (o.type === "reflexive" && o.xExcess) return false;
+    // "You may pay {X}. If you do, ...": the X paid (Decree of Justice).
+    if (o.type === "may" && o.payX) return usesX(o.otherwise);
     if (o.count && (o.count as Count).kind === "x") return true;
     if (o.many === "x" || o.many === "exactX") return true; // "X target creatures"
     if (o.xRange || (o.total as TargetSpec["total"])?.x || o.kind === "xAtLeast") return true; // "with mana value X or less", "if X is 5 or more"

@@ -407,10 +407,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
    * is now, and its controller (603.7d-e); `f` adds the ones this event triggers. `self`: only those about this object, as
    * the object it was when the ability was made (603.7c, 400.7).
    */
-  const fromFloating = (f: (o: GameObject, controller: PlayerId, triggers: TriggeredAbility[]) => void, self?: GameObject) => {
+  const fromFloating = (f: (o: GameObject, controller: PlayerId, triggers: TriggeredAbility[]) => void, self?: GameObject, /** The player dealt combat damage. */ dealtTo?: PlayerId) => {
     for (const ft of [...(s.floatingTriggers ?? [])]) {
       const o = s.objects[ft.sourceId];
       if (!o || player(s, ft.controller).lost) continue;
+      if (ft.toPlayer !== undefined && ft.toPlayer !== dealtTo) continue;
       if (self && (ft.about ? ft.about.id !== self.id || (self.zoneChanges ?? 0) !== ft.about.zc : o.id !== self.id || (o.zoneChanges ?? 0) !== ft.sourceZc)) continue;
       floating = ft;
       try {
@@ -672,7 +673,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
-      add(o, you, (e) => e === "playerPlaysLand" || (e === "youPlayLand" && you === ev.player) || (e === "opponentPlaysLand" && you !== ev.player), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+      add(o, you, (e) => e === "playerPlaysLand" || (e === "youPlayLand" && you === ev.player) || (e === "youPlayAnotherLand" && you === ev.player && ev.id !== o.id) || (e === "opponentPlaysLand" && you !== ev.player), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
   } else if (ev.type === "evidenceCollected") {
     for (const id of s.battlefield) {
@@ -690,6 +691,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
       if (you !== ev.player) add(o, you, (e) => e === "opponentLosesLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
+      else add(o, you, (e) => e === "youLoseLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
     speedTrigger(s, ev.player);
   } else if (ev.type === "playerDealtDamage") {
@@ -994,7 +996,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     fromEmblems((w, owner) => owner === dealerBy && dealWatch(w));
     // "Until end of turn, whenever ~ deals combat damage to a player" (Lyra), "... a creature you control" (Mistway Spy).
     fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "selfDealsCombatDamageToPlayer" && !(t.toOpponent && ev.player === ctrl), triggers, undefined, undefined, undefined, undefined, undefined, info), o);
-    fromFloating((src, ctrl, triggers) => ctrl === dealerBy && add(src, ctrl, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer && !(t.dealer.other && src.id === o.id) && objectMatches(s, t.dealer.filter, o, ctrl, false) && !(t.toOpponent && ev.player === ctrl), triggers, undefined, o, undefined, undefined, undefined, info));
+    fromFloating((src, ctrl, triggers) => ctrl === dealerBy && add(src, ctrl, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer && !(t.dealer.other && src.id === o.id) && objectMatches(s, t.dealer.filter, o, ctrl, false) && !(t.toOpponent && ev.player === ctrl), triggers, undefined, o, undefined, undefined, undefined, info), undefined, ev.player);
     causedBy = null;
     // "Whenever a creature deals combat damage to the monarch, its controller becomes the monarch" (CR 725.2).
     if (ev.player === s.monarch && objIsType(s, o, "Creature")) monarchTrigger(s, 1, o);

@@ -17,6 +17,7 @@ import {
   attackProblem,
   attackTax,
   attackTaxOf,
+  combatLimit,
   attackTaxPer,
   blockProblem,
   cantBlockNow,
@@ -408,6 +409,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     if (pend.kind === "chooseOption" && pend.what === "cardName") return [{ type: "chooseOption", player: pid, choice: chooseCardName(s, pid, pend) }];
     // "Draw up to two cards": as many as we can without emptying our library.
+    // "You may pay {X}. If you do, ...": as much as we can, keeping cards in our library.
+    if (pend.kind === "chooseOption" && pend.what === "payX") {
+      const nums = pend.options.filter((o) => o !== "none").map(Number);
+      const draws = s.resolving && allEffects(s.resolving.body.effects).some((x) => x.type === "draw");
+      const most = Math.max(...nums.filter((n) => !draws || n < player(s, pid).library.length - 1), -1);
+      return [{ type: "chooseOption", player: pid, choice: most > 0 ? String(most) : "none" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "drawUpTo") {
       const left = player(s, pid).library.length;
       return [{ type: "chooseOption", player: pid, choice: pend.options.find((o) => Number(o) < left) ?? "0" }];
@@ -3432,6 +3440,12 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   // One that can't attack alone stays home rather than attack by itself (CR 506.5).
   if (attacks.length === 1 && characteristics(s, obj(s, attacks[0]!.attacker)).cantAttackAlone) attacks = [];
   let declared = attackBattles(s, pid, attackPlaneswalkers(s, pid, attacks, hit), hit);
+  // "No more than one creature can attack each combat" (Silent Arbiter): the ones that have to attack, then the strongest.
+  const cap = combatLimit(s, "attack");
+  if (declared.length > cap) {
+    const must = (a: { attacker: string }) => (characteristics(s, obj(s, a.attacker)).attacksIfAble ? 1 : 0);
+    declared = [...declared].sort((a, b) => must(b) - must(a) || power(s, obj(s, b.attacker)) - power(s, obj(s, a.attacker))).slice(0, cap);
+  }
   // Ghostly Prison: pay what attacking costs if we can (CR 508.1g-i); otherwise send the weakest taxed attacker at
   // someone it costs nothing to attack, or keep it home. Nothing obliges paying for a requirement (CR 508.1d).
   for (;;) {
@@ -3521,6 +3535,16 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
     if (blocks.some((b) => b.attacker === at.id) || blockersNeeded(s, at) > 1 || objHasKeyword(s, at, "Deathtouch") || characteristics(s, at).cantBeBlocked) continue;
     const extra = mine.find((b) => used.has(b.id) && blocks.filter((x) => x.blocker === b.id).length < maxBlocks(s, b) && !blockProblem(s, b, at) && toughness(s, b) > hurt(b) + hit(at, b));
     if (extra) blocks.push({ blocker: extra.id, attacker: at.id });
+  }
+  // "No more than one creature can block each combat" (Silent Arbiter): the first blockers chosen (requirements came
+  // first), then none on an attacker left with too few to block it.
+  const cap = combatLimit(s, "block") - s.battlefield.filter((id) => obj(s, id).blocking !== undefined).length;
+  const blockers = [...new Set(blocks.map((b) => b.blocker))];
+  if (blockers.length > cap) {
+    const kept = new Set(blockers.slice(0, Math.max(0, cap)));
+    const left = blocks.filter((b) => kept.has(b.blocker));
+    blocks.length = 0;
+    blocks.push(...left.filter((b) => left.filter((x) => x.attacker === b.attacker).length >= blockersNeeded(s, obj(s, b.attacker))));
   }
   // One that can't block alone doesn't block by itself (CR 506.5).
   const earlier = s.battlefield.some((id) => obj(s, id).blocking !== undefined);

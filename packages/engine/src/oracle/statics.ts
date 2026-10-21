@@ -190,6 +190,9 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   // "Each spell you cast that's red or green costs {1} less to cast" (Goblin Anarchomancer): red or green spells you cast.
   const thats = /^Each spell you cast that's ([a-z]+(?: or [a-z]+)?) costs (\{\d+\} (?:less|more) to cast)$/.exec(text);
   if (thats) text = `${capital(thats[1]!)} spells you cast cost ${thats[2]}`;
+  // "Blue spells and red spells you cast cost {1} less to cast" (Nightscape Familiar): a spell that's both gets {1} less,
+  // not {2} (rulings), as "Blue and red spells".
+  text = text.replace(/^([A-Z][a-z]+) spells and ([A-Za-z]+) spells(?= )/, "$1 and $2 spells");
   const ofChosen = / of the chosen type costs? \{/.test(text);
   if (ofChosen) text = text.replace(/ of the chosen type(?= costs? \{)/, "");
   m = /^(?:(During your turn|During turns other than yours), )?(.+?)( you cast| your opponents cast)?( with (?:mana value|power) \d+ or (?:greater|less))?( from your graveyard)? costs? (\{\d+\}) (less|more) to cast$/.exec(text);

@@ -78,6 +78,10 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         else loseLife(s, pid, n);
         log(s, `${player(s, pid).name} ${e.life.gain ? "gains" : "loses"} ${n} life.`);
       }
+      if (e.life.drain) {
+        gainLife(s, p.id, n);
+        log(s, `${p.name} gains ${n} life.`);
+      }
       return;
     }
     case "discard": {

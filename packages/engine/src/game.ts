@@ -2045,6 +2045,8 @@ function startNextTurn(s: GameState, skipping = false) {
     }
   if (s.namedBansUntil) s.namedBansUntil = s.namedBansUntil.filter((r) => !began.has(r.controller));
   if (!s.namedBansUntil?.length) s.namedBansUntil = undefined;
+  if (s.flashUntil) s.flashUntil = s.flashUntil.filter((r) => !began.has(r.controller));
+  if (!s.flashUntil?.length) s.flashUntil = undefined;
   if (!s.entersTappedUntil?.length) s.entersTappedUntil = undefined;
   s.turn++;
   const ap = player(s, s.activePlayer);
@@ -3439,6 +3441,7 @@ export function flashGranted(s: GameState, pid: PlayerId, d: CardDef): boolean {
   const own = compileCard(d).flashIf;
   if (own && staticConditionNow(s, own, "", pid)) return true;
   if (turnRule(s, pid, "flash")) return true;
+  if (s.flashUntil?.some((r) => r.controller === pid && printedMatches(r.filter, d))) return true;
   return s.battlefield.some((id) => {
     const o = obj(s, id);
     return controllerOf(s, o) === pid && !!abilitiesOf(s, o).flashFor?.some((spec) => printedMatches(spec, d));
@@ -3734,6 +3737,9 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
     if (c.player === pid && c.turn === s.turn && (!c.filter || printedMatches(c.filter, d))) return `${c.source}: you can't cast ${c.filter ? `${c.filter.text.replace(/ spell$/, "")} ` : ""}spells this turn`;
   // Permanents, and emblems in the command zone (CR 114.4).
   for (const o of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)]) {
+    // "Each opponent can cast spells only any time they could cast a sorcery" (Teferi, Time Raveler).
+    if (abilitiesOf(s, o).opponentsSorceryTiming && controllerOf(s, o) !== pid && (s.resolving || !canActAtSorcerySpeed(s, pid)))
+      return `${characteristics(s, o).name}: opponents can cast spells only any time they could cast a sorcery`;
     // "Your opponents can't cast spells during your turn" (Dragonlord Dromoka).
     if (abilitiesOf(s, o).opponentsCantCastYourTurn && controllerOf(s, o) === s.activePlayer && pid !== s.activePlayer)
       return `${characteristics(s, o).name}: opponents can't cast spells during ${player(s, s.activePlayer).name}'s turn`;
@@ -5117,6 +5123,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "payX") {
+    // "You may pay {X}": the X chosen (CR 107.1c), paid next.
+    (r.scratch ??= {}).payX = choice;
+    log(s, choice === "none" ? `${p.name} doesn't pay for ${pend.source}.` : `${p.name} chooses X = ${choice} for ${pend.source}.`);
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "drawUpTo") {
     // "Draw up to two cards": how many (rulings on Arcane Denial).
     (r.scratch ??= {}).drawUpTo = choice;
@@ -5642,6 +5655,16 @@ export function attackedName(s: GameState, o: GameObject): string {
   return pw ? `${player(s, controllerOf(s, pw)).name}'s ${characteristics(s, pw).name}` : o.attacking !== undefined ? player(s, o.attacking).name : "nothing";
 }
 
+/** The most creatures that can attack, or block, each combat (Silent Arbiter): Infinity with no such rule. */
+export function combatLimit(s: GameState, what: "attack" | "block"): number {
+  let n = Infinity;
+  for (const id of s.battlefield) {
+    const m = abilitiesOf(s, obj(s, id)).combatLimit?.[what];
+    if (m !== undefined) n = Math.min(n, m);
+  }
+  return n;
+}
+
 function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId; defender: PlayerId; planeswalker?: ObjectId }[]) {
   if (s.pending?.kind !== "declareAttackers" || s.pending.player !== p.id) throw new RulesError("not declaring attackers now");
   const legal = new Set(potentialAttackers(s, p.id).map((o) => o.id));
@@ -5666,10 +5689,17 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   // unless that would break a restriction: one that can't attack alone needn't attack by itself.
   // A requirement that would need a cost paid to obey (Ghostly Prison) doesn't oblige anyone to pay it (CR 508.1d).
   const free = (o: GameObject, d: PlayerId) => !attackProblem(s, o, d) && !attackTaxPer(s, d);
+  // "No more than one creature can attack each combat" (Silent Arbiter): a restriction, which requirements can't break;
+  // as many of the creatures that have to attack as the limit allows do (CR 508.1c-d).
+  const limit = combatLimit(s, "attack");
+  if (attacks.length > limit) throw new RulesError(`no more than ${limit === 1 ? "one creature" : `${limit} creatures`} can attack each combat`);
   const shirking = potentialAttackers(s, p.id).find(
     (o) => characteristics(s, o).attacksIfAble && !seen.has(o.id) && !(characteristics(s, o).cantAttackAlone && attacks.length === 0) && opps.some((d) => free(o, d)),
   );
-  if (shirking && opps.length) throw new RulesError(`${defOf(s, shirking).name} attacks each combat if able`);
+  const required = potentialAttackers(s, p.id).filter((o) => characteristics(s, o).attacksIfAble && opps.some((d) => free(o, d)));
+  if (attacks.length >= limit) {
+    if (attacks.filter((a) => required.some((o) => o.id === a.attacker)).length < Math.min(limit, required.length)) throw new RulesError(`${defOf(s, shirking!).name} attacks each combat if able`);
+  } else if (shirking && opps.length) throw new RulesError(`${defOf(s, shirking).name} attacks each combat if able`);
   // Goaded: it attacks a player other than the ones who goaded it, if it can (CR 701.15b, 508.1d). Each goad is a
   // requirement, and the attack must obey as many as it can: attacking a planeswalker obeys none of them (rulings).
   for (const a of attacks) {
@@ -5883,7 +5913,15 @@ function declareBlockers(s: GameState, p: Player, blocks: { blocker: ObjectId; a
   // "Can't block alone": the only creature declared as a blocker this combat blocks alone (CR 506.5).
   const earlier = s.battlefield.filter((id) => obj(s, id).blocking !== undefined).length;
   if (seen.size === 1 && !earlier && characteristics(s, obj(s, blocks[0]!.blocker)).cantBlockAlone) throw new RulesError(`${nameOf(s, blocks[0]!.blocker)} can't block alone`);
-  const req = blockRequirementProblem(s, p.id, blocks);
+  // "No more than one creature can block each combat" (Silent Arbiter), counting every defending player's blockers
+  // (CR 509.1b). At the limit, a block that obeys a requirement obeys as many as can be (509.1c).
+  const limit = combatLimit(s, "block");
+  if (earlier + seen.size > limit) throw new RulesError(`no more than ${limit === 1 ? "one creature" : `${limit} creatures`} can block each combat`);
+  const obeys = (b: { blocker: ObjectId; attacker: ObjectId }) => {
+    const at = characteristics(s, obj(s, b.attacker));
+    return at.allMustBlock || at.mustBeBlocked || characteristics(s, obj(s, b.blocker)).mustBlock || provokerOf(s, obj(s, b.blocker))?.id === b.attacker;
+  };
+  const req = earlier + seen.size >= limit && blocks.some(obeys) ? null : blockRequirementProblem(s, p.id, blocks);
   if (req) throw new RulesError(req);
   for (const b of blocks) {
     const bl = obj(s, b.blocker);

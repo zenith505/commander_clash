@@ -3021,6 +3021,11 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
       }
       if (pool.length < c.n) return null;
       out.sacrifice = [...(out.sacrifice ?? []), ...pool.slice(0, c.n).map((x) => x.id)];
+    } else if (c.kind === "tap" && c.untap) {
+      // "Untap a tapped creature you control" (Halo Fountain): untapping is all gain, the most valuable first.
+      const pool = tapCostCandidates(s, pid, o, c).filter((x) => x !== keep && !out.sacrifice?.includes(x)).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
+      if (pool.length < c.n) return null;
+      out.tap = [...(out.tap ?? []), ...pool.slice(0, c.n)];
     } else if (c.kind === "tap") {
       // Tap creatures only once they're done for the turn (after our combat), anything else any time; the least
       // valuable first, and never one already paying a cost or a target.

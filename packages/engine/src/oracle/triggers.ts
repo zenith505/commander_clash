@@ -490,6 +490,10 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   const orDies = /^Whenever ~ dies or another (.+?) is put into a graveyard from the battlefield, (.+)$/.exec(line);
   if (orDies && !/\bartifact\b/.test(orDies[1]!)) return "fail";
   if (orDies) line = `Whenever ~ or another ${orDies[1]} dies, ${orDies[2]}`;
+  // "Whenever an artifact is put into your graveyard from the battlefield" (Daretti's emblem): one you own dies, as
+  // cards go to their owners' graveyards (CR 404.2, 700.4).
+  const yours = /^(When(?:ever)? (?:~ or another|another|an?) .+?) is put into your graveyard from the battlefield, /.exec(line);
+  if (yours && !/ you (?:own|control)\b/.test(yours[1]!)) line = `${yours[1]} you own dies, ${line.slice(yours[0].length)}`;
   const m = attached ? null : DIES_TRIGGER.exec(line);
   if (!attached && !m) return null;
   const ench = !attached && ENCHANTED_CONTROLS.test(m![2]!);
@@ -694,6 +698,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   let bodyText: string;
   let min: number | undefined;
   let anyone = false;
+  let damageX = false;
   if ((m = /^Whenever (?:one or more (.+?) you control attack|you attack with (one|two|three|four|five) or more (.+?)|you attack)(?: a player)?, (.+)$/.exec(line))) {
     event = "creaturesYouControlAttack";
     phrase = m[1] ?? m[3];
@@ -715,10 +720,17 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     anyone = true;
     if (m[1]) min = num(m[1]);
     if (/\bthat player\b/.test(bodyText)) return "fail";
-  } else if ((m = /^Whenever one or more (.+?) you control deal combat damage to (a player or battle|a player|an opponent|one or more players), (.+)$/.exec(line.replace(/^(Whenever one or more creatures) (you control) (each with power greater than its base power) deals /, "$1 $3 $2 deal ")))) {
+  } else if ((m = /^Whenever one or more (.+?) you control deal combat damage to (a player or battle|a player|an opponent|one or more players), (.+)$/.exec(line.replace(/^(Whenever one or more creatures) (you control) (each with power greater than its base power) deals /, "$1 $3 $2 deal ").replace(/^(Whenever one or more creatures) (you control) (with [a-z]+) deal /, "$1 $3 $2 deal ")))) {
     event = "creaturesYouControlDealCombatDamageToPlayer";
     phrase = m[1];
     bodyText = m[3]!;
+    // "Create an X/X ... token, where X is the amount of damage those creatures dealt to that player" (Quartzwood Crasher):
+    // the damage the creatures of the group dealt, as "that much".
+    const dealtX = /, where X is the amount of damage those creatures dealt to that player\.$/.exec(bodyText);
+    if (dealtX && !/\bthat (?:much|many)\b/.test(bodyText)) {
+      bodyText = bodyText.slice(0, dealtX.index) + ".";
+      damageX = true;
+    }
     // "To a player or battle": "that player" isn't about a battle (CR 310).
     orBattle = m[2] === "a player or battle";
     if (orBattle && /\b(that player|defending player)\b/.test(bodyText)) return "fail";
@@ -746,14 +758,14 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     group = { ...spec, text: phrase };
   }
   let text = bodyText;
-  const thatMuch = event === "creaturesYouControlDealCombatDamageToPlayer" && /\bthat (?:much|many)\b/.test(text);
-  if (thatMuch) {
+  const thatMuch = event === "creaturesYouControlDealCombatDamageToPlayer" && (/\bthat (?:much|many)\b/.test(text) || damageX);
+  if (thatMuch && !damageX) {
     if (/\bX\b/.test(text)) return "fail";
     text = text.replace(/\bthat (?:much|many)\b/g, "X");
   }
   let body = parseBody(text, { eventPlayer: event === "creaturesYouControlDealCombatDamageToPlayer" });
   if (!body) return "fail";
-  if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, bodyText) };
+  if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: damageX ? body.text : unX(body.text, bodyText) };
   if (toOpponent) {
     const said = (b: AbilityBody): AbilityBody => ({ ...withOtherOpponents(b), text: withOtherOpponents(b).text.replaceAll("that player", "that opponent"), ...(b.modal ? { modal: { ...b.modal, modes: b.modal.modes.map(said) } } : {}) });
     body = said(body);

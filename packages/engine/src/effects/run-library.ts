@@ -497,6 +497,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
           if (me) owners.add(me.owner);
         }
+        if (e.yours) owners.add(ctx.controller);
         for (const o of objects(s, e.what, ctx)) {
           owners.add(o.owner);
           log(s, `${src} shuffles ${defOf(s, o).name} into its owner's library.`);
@@ -514,7 +515,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
     case "shuffleZones":
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
-        const ids = [...(e.hand ? p.hand : []), ...(e.graveyard ? p.graveyard : [])];
+        const ids = [...(e.hand ? p.hand : []), ...(e.graveyard ? p.graveyard : [])].filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
         if (e.bottom) {
           // Endurance: "puts all the cards from their graveyard on the bottom of their library in a random order".
           shuffle(s, ids);
@@ -524,7 +525,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         }
         for (const id of ids) moveObject(s, id, "library");
         shuffleLibrary(s, p);
-        log(s, `${p.name} shuffles their ${e.hand && e.graveyard ? "hand and graveyard" : e.hand ? "hand" : "graveyard"} into their library.`);
+        log(s, `${p.name} shuffles ${e.filter ? `${ids.length === 1 ? "the" : `all ${ids.length}`} ${e.filter.text}${ids.length === 1 ? "" : "s"} from their graveyard` : `their ${e.hand && e.graveyard ? "hand and graveyard" : e.hand ? "hand" : "graveyard"}`} into their library.`);
       }
       return;
     case "handToBottomDraw": {

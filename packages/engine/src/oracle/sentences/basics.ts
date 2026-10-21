@@ -255,6 +255,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!.toLowerCase(), ctx);
     return who ? [{ type: "shuffleZones", who, graveyard: true, bottom: true }] : null;
   }
+  // "Shuffle all creature cards from your graveyard into your library" (Rooting Kavu, Barishi): those cards only.
+  if ((m = /^[Ss]huffle all (?:(.+?) )?cards from your graveyard into your library$/.exec(s))) {
+    const filter = m[1] ? parseSearchFilter(`${m[1]} card`) : undefined;
+    if (filter === null || /\bthat\b/.test(m[1] ?? "")) return null;
+    return [{ type: "shuffleZones", who: { ref: "you" }, graveyard: true, ...(filter ? { filter } : {}) }];
+  }
   if ((m = /^(?:([Tt]arget player|[Ee]ach player|[Tt]arget opponent) shuffles their|[Ss]huffle your) (hand and graveyard|graveyard|hand) into (?:their|your) library(?:, then (?:draws|draw) (\w+) cards?)?$/.exec(s))) {
     const who: PlayerRef | null = m[1] ? parsePlayer(m[1].toLowerCase(), ctx) : { ref: "you" };
     if (!who) return null;

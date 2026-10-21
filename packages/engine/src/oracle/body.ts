@@ -2,7 +2,7 @@ import { allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDown
 import { substituteX } from "../amounts";
 import { differenceInHand, num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS, singularWord } from "./words";
 import { canonicalKeyword, CHOSEN_KEYWORD, CHOSEN_PROTECTION, CREATURE_TYPES, THAT_PLAYER_PROTECTION } from "../keywords";
-import { parseStaticCondition } from "./statics";
+import { parsePreventAll, parseStaticCondition } from "./statics";
 import { parseBoundCount, parseCount } from "./counts";
 import { parseBecomes, parseDig, parseSentence } from "./sentence";
 import { parsePreventionRider } from "./sentences/prevention";
@@ -1022,10 +1022,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "Sacrifice ~. If you do, create Marit Lage ..." (Dark Depths): only if it was sacrificed (it may have left already,
     // or be one that can't be sacrificed).
     if (sacDo && !/, where X is /.test(s) && ((sacPrev?.type === "pick" && sacPrev.action === "sacrifice" && sacPrev.who.ref === "you" && sacPrev.n === 1 && !sacPrev.unless) || (sacPrev?.type === "sacrifice" && sacPrev.what.ref === "self" && !sacPrev.byController))) {
-      const before = ctx.targets.length;
+      // A target in it ("If you do, return target artifact card from your graveyard to the battlefield", Daretti) is
+      // chosen as the ability is put on the stack, like any other (CR 601.2c).
       const back = /^return the chosen cards to the battlefield( tapped)?$/.exec(sacDo[1]!);
       const inner: Effect[] | null = back ? (chosenCards ? [{ type: "putOntoBattlefield", what: chosenCards, ...(back[1] ? { tapped: true } : {}) }] : null) : parseOne(capital(sacDo[1]!), ctx);
-      if (!inner || ctx.targets.length !== before) return null;
+      if (!inner) return null;
       effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: inner });
       continue;
     }
@@ -2412,6 +2413,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "You may put a creature card from your hand onto the battlefield. That creature gains haste. Sacrifice the creature at
     // the beginning of the next end step." (Sneak Attack), "... Return that creature to your hand at the beginning of the
     // next end step." (Ilharg) likewise.
+    // "Prevent all damage that would be dealt to those permanents this turn" (Mutational Advantage): the ones the effect just
+    // before it affects, as they were when it resolved (CR 611.2c), the same objects.
+    const those = /^(Prevent all (?:combat )?damage that would be dealt (?:to and dealt by|to|by)) those (?:permanents|creatures) this turn$/.exec(s);
+    if (those) {
+      const last = effects[effects.length - 1];
+      const p = parsePreventAll(`${those[1]} them`);
+      if (last?.type !== "continuous" || last.what.ref !== "each" || last.duration !== "endOfTurn" || !p) return null;
+      effects.push({ type: "continuous", what: last.what, mods: [p.mod], duration: "endOfTurn" });
+      continue;
+    }
     const haste = /^(?:That creature|It) gains haste( until end of turn)?$/.exec(s);
     const atEnd = /^(Exile|Sacrifice) (?:it|that creature|the creature) at the beginning of the next end step$/.exec(s) ?? /^(Return) (?:it|that creature) to your hand at the beginning of the next end step$/.exec(s) ?? (/^Return it to the command zone at the beginning of the next end step$/.test(s) ? ["", "Return to the command zone"] : null);
     if (haste || atEnd) {

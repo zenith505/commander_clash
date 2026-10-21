@@ -4529,7 +4529,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
           : c.kind === "exileFromGraveyard" && c.linked
           ? `a card exiled with ${d.name}`
           : `${c.n === 1 ? (/^[aeiou]/i.test(c.filter?.text ?? "card") ? "an" : "a") : c.n} ${c.filter?.text ?? "card"}`;
-    const verb = c.kind === "sacrifice" ? (c.exile ? "exile" : "sacrifice") : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : c.kind === "tap" ? "tap" : c.kind === "reveal" ? "reveal" : c.kind === "exileFromHand" ? (c.toLibrary ? "put on top of your library" : "exile from your hand") : c.kind === "exileFromGraveyard" && c.linked ? "put into its owner's graveyard" : "exile";
+    const verb = c.kind === "sacrifice" ? (c.exile ? "exile" : "sacrifice") : c.kind === "discard" ? "discard" : c.kind === "returnToHand" ? "return" : c.kind === "tap" ? (c.untap ? "untap" : "tap") : c.kind === "reveal" ? "reveal" : c.kind === "exileFromHand" ? (c.toLibrary ? "put on top of your library" : "exile from your hand") : c.kind === "exileFromGraveyard" && c.linked ? "put into its owner's graveyard" : "exile";
     const chosen = given(c.kind === "exileFromGraveyard" ? "exileCards" : c.kind);
     // "Discard a card at random": nothing to choose (CR 701.9b).
     if (c.kind === "discard" && c.random) {
@@ -4576,7 +4576,9 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
 export function tapCostCandidates(s: GameState, pid: PlayerId, source: GameObject, c: Extract<AdditionalCost, { kind: "tap" }>): ObjectId[] {
   return s.battlefield.filter((id) => {
     const x = obj(s, id);
-    return !x.tapped && controllerOf(s, x) === pid && !(c.other && id === source.id) && objectMatches(s, c.filter, x, pid, false);
+    // "Untap a tapped creature you control": tapped ones, but not one a stun counter would keep tapped (CR 122.1d).
+    if (c.untap ? !x.tapped || (x.counters.stun ?? 0) > 0 : x.tapped) return false;
+    return controllerOf(s, x) === pid && !(c.other && id === source.id) && objectMatches(s, c.filter, x, pid, false);
   });
 }
 
@@ -4647,8 +4649,8 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       log(s, `${p.name} removes ${[...done].map(([id, kinds]) => `${Object.entries(kinds).map(([k, n]) => `${n} ${k}`).join(" and ")} counter${Object.values(kinds).reduce((a, b) => a + b, 0) === 1 ? "" : "s"} from ${nameOf(s, id)}`).join(", ")}.`);
     } else if (c.kind === "tap") {
       const ids = choices.tap ?? [];
-      for (const id of ids) tapPermanent(s, obj(s, id));
-      log(s, `${p.name} taps ${ids.map((id) => nameOf(s, id)).join(", ")}.`);
+      for (const id of ids) (c.untap ? untapPermanent : tapPermanent)(s, obj(s, id));
+      log(s, `${p.name} ${c.untap ? "untaps" : "taps"} ${ids.map((id) => nameOf(s, id)).join(", ")}.`);
     } else if (c.kind === "payLife") {
       if (!c.n) continue; // "pay X life" with X = 0
       loseLife(s, p.id, c.n);

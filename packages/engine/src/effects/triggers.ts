@@ -70,6 +70,13 @@ function triggersAgain(s: GameState, src: GameObject, controller: PlayerId, caus
       if (a.anchor !== undefined && s.objects[id]?.chosen?.anchor !== a.anchor) continue;
       // The others are about abilities of permanents only.
       if (spell && !a.of) continue;
+      if (a.selfOrEquipment) {
+        const host = s.objects[id]!;
+        const equipped = host.zone === "battlefield" && s.battlefield.some((e) => s.objects[e]!.attachedTo === id && characteristics(s, s.objects[e]!).subtypes.includes("Equipment"));
+        const equipment = view.o.id !== id && view.o.attachedTo === id && (view.c ?? characteristics(s, view.o)).subtypes.includes("Equipment");
+        if (!spell && equipped && (view.o.id === id || equipment)) n++;
+        continue;
+      }
       // Veyran: "If you casting or copying an instant or sorcery spell causes ...": that player is this static's controller.
       if (a.by?.event === "castOrCopy") {
         if (cause?.event !== "castOrCopy" || cause.caster !== controller) continue;

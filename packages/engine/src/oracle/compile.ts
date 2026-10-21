@@ -1618,6 +1618,16 @@ export function compile(d: CardDef): CompiledCard {
       (out.altCosts ??= []).push({ kind: "prototype", mana: proto[1]! });
       continue;
     }
+    // Tergrid, God of Fright: two events, each its own trigger; "that card" only while it's still in the graveyard it went
+    // to (rulings: a commander put into the command zone, a card with madness exiled, isn't there).
+    if (line === "Whenever an opponent sacrifices a nontoken permanent or discards a permanent card, you may put that card from a graveyard onto the battlefield under your control.") {
+      const put: AbilityBody = { targets: [], effects: [{ type: "may", effects: [{ type: "putOntoBattlefield", what: { ref: "subjectCard", zone: "graveyard" } }], text: "put that card from a graveyard onto the battlefield under your control" }], text: "you may put that card from a graveyard onto the battlefield under your control." };
+      const halves = ["Whenever an opponent sacrifices a nontoken permanent, draw a card.", "Whenever an opponent discards a permanent card, draw a card."].map((l) => parseTrigger(l));
+      if (halves.every((t) => t && t !== "fail")) {
+        for (const t of halves) out.triggers.push({ ...(t as TriggeredAbility), body: put });
+        continue;
+      }
+    }
     // "~ has annihilator X, where X is the number of +1/+1 counters on it" (Ulamog, the Defiler): annihilator (CR 702.86a)
     // with X counted as it resolves (rulings).
     const annX = /^~ has annihilator X, where X is (.+)\.$/.exec(line);
@@ -2606,6 +2616,8 @@ function triggersAgainLine(line: string): NonNullable<CompiledCard["triggersAgai
     const filter = kinds(m[1]!, false);
     return filter ? { by: { event, filter: filter.map((x) => x.filter) } } : null;
   }
+  // Cloud, Midgar Mercenary: its own abilities and its Equipment's, while it's equipped.
+  if (line === "As long as ~ is equipped, if a triggered ability of ~ or an Equipment attached to it triggers, that ability triggers an additional time.") return { selfOrEquipment: true };
   // Veyran, Voice of Duality.
   if (line === "If you casting or copying an instant or sorcery spell causes a triggered ability of a permanent you control to trigger, that ability triggers an additional time.") return { by: { event: "castOrCopy" } };
   m = /^If a triggered ability of (?:an? )?(.+?) triggers, (?:that ability|it) triggers an additional time\.$/.exec(line);

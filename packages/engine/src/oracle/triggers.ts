@@ -617,7 +617,7 @@ function parseAttackerTrigger(line: string): TriggeredAbility | "fail" | null {
 function parseSacrificeTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever a player sacrifices a permanent" (Mayhem Devil), "whenever an opponent sacrifices ...": "that player" is the
   // one who sacrificed it, its controller (CR 701.21a).
-  const any = /^Whenever (a player|an opponent) sacrifices (an?) (.+?), (.+)$/.exec(line);
+  const any = /^Whenever (a player|an opponent) sacrifices (an?|another) (.+?), (.+)$/.exec(line);
   const m = any ? [any[0], any[2], any[3], undefined, any[4]] : /^Whenever you sacrifice (~ or another|another|an?) (.+?)( during your turn)?, (.+)$/.exec(line);
   if (!m) return null;
   const phrase = m[2]!.replace(/ or (?=[a-z])/g, " or ");

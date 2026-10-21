@@ -3908,7 +3908,7 @@ export interface CompiledCard {
    * Never delayed or reflexive triggers (603.2d).
    */
   /** `anchor`: only while that anchor word was chosen as it entered (Windcrag Siege's "• Mardu —", CR 614.12b). */
-  triggersAgain?: { by?: { event: "enters" | "dies" | "attacks" | "combatDamage" | "castOrCopy"; filter?: TargetSpec[] }; of?: { filter: TargetSpec; other?: true }[]; anchor?: string }[];
+  triggersAgain?: { by?: { event: "enters" | "dies" | "attacks" | "combatDamage" | "castOrCopy"; filter?: TargetSpec[] }; of?: { filter: TargetSpec; other?: true }[]; anchor?: string; /** Cloud, Midgar Mercenary: "As long as ~ is equipped, ... a triggered ability of ~ or an Equipment attached to it". */ selfOrEquipment?: true }[];
   /** Fist of Suns: "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast" (an alternative cost, CR 118.9). */
   payWUBRG?: true;
   /** Omniscience: "You may cast spells from your hand without paying their mana costs" (AltCostKind "omniscience"). */

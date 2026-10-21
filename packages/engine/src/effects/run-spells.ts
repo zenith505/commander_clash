@@ -869,8 +869,8 @@ export function unlessCost(cost: string, generic: number): string {
 }
 
 /** "At the beginning of the next end step" / "your next upkeep", about this object as it is now (CR 603.7). */
-export function addDelayed(s: GameState, when: DelayedTrigger["when"], controller: PlayerId, o: GameObject, body: AbilityBody, sourceCardId = cardIdOf(o)) {
-  (s.delayed ??= []).push({ when, controller, sourceCardId, subject: { id: o.id, zc: o.zoneChanges ?? 0 }, body, turn: s.turn, step: s.step, ...(o.transforms ? { transforms: o.transforms } : {}) });
+export function addDelayed(s: GameState, when: DelayedTrigger["when"], controller: PlayerId, o: GameObject, body: AbilityBody, sourceCardId = cardIdOf(o), whose?: PlayerId) {
+  (s.delayed ??= []).push({ when, controller, sourceCardId, subject: { id: o.id, zc: o.zoneChanges ?? 0 }, body, turn: s.turn, step: s.step, ...(o.transforms ? { transforms: o.transforms } : {}), ...(whose !== undefined ? { player: whose } : {}) });
 }
 
 /** Was it kicked (CR 702.33d), with that kicker cost if the condition names one (702.33f)? */

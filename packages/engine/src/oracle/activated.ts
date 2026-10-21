@@ -331,7 +331,7 @@ export function energyIn(costs: string): number {
   if (!m) return 0;
   if (m[1]) return m[1].length / 3;
   const n = num(m[2]!);
-  return Number.isFinite(n) ? n : -1; // a number we don't read ("fifty")
+  return Number.isFinite(n) ? n : -1; // a number we don't read ("sixty")
 }
 
 // ---------------------------------------------------------------------------

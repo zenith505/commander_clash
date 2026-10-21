@@ -1689,11 +1689,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         if (first) {
           const names = later.map((l) => defOf(s, s.objects[l.id]!).name).join(", ");
-          addDelayed(s, "nextEndStep", ctx.controller, first, {
+          addDelayed(s, e.at === "ownersNextEndStep" ? "playersNextEndStep" : "nextEndStep", ctx.controller, first, {
             targets: [],
             effects: [{ type: "returnExiled", under: e.under, ...(e.counter ? { counter: e.counter } : {}), ...(e.tapped ? { tapped: true as const } : {}), ...(later.length > 1 ? { cards: later } : {}), ...(e.selfCounterIfYours && ctx.sourceId ? { selfCounter: { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0, counter: e.selfCounterIfYours } } : {}) }],
             text: `Return ${names} to the battlefield${e.tapped ? " tapped" : ""} under ${e.under === "owner" ? (later.length > 1 ? "their owners'" : "its owner's") : "your"} control.`,
-          });
+          }, cardIdOf(first), e.at === "ownersNextEndStep" ? first.owner : undefined);
         }
       }
       const back = sc.flickered.map((l) => s.objects[l.id]).filter((c, i): c is GameObject => c?.zone === "exile" && (c.zoneChanges ?? 0) === sc.flickered![i]!.zc);

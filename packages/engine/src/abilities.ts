@@ -1547,7 +1547,7 @@ export type Effect =
    */
   /** `transformed`: "return it to the battlefield transformed" (CR 712.14a). */
   /** `counterIf`: "If it's a Spirit, put a +1/+1 counter on it" (Essence Flux), each returned permanent that matches, once it's back. */
-  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; at?: "nextEndStep"; /** With `at`: "If it entered under your control, put a +1/+1 counter on ~" (Phelia), on the source as it is then. */ selfCounterIfYours?: CounterKind; counter?: CounterKind; tapped?: true; transformed?: true; counterIf?: { counter: CounterKind; filter: TargetSpec }; /** Exiled now, returned by the search after it (Sword of Hearth and Home: "Put both cards onto the battlefield"), kept in Resolving.held. */ hold?: true }
+  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; /** `ownersNextEndStep`: "at the beginning of that player's next end step", the card's owner's (one card only). */ at?: "nextEndStep" | "ownersNextEndStep"; /** With `at`: "If it entered under your control, put a +1/+1 counter on ~" (Phelia), on the source as it is then. */ selfCounterIfYours?: CounterKind; counter?: CounterKind; tapped?: true; transformed?: true; counterIf?: { counter: CounterKind; filter: TargetSpec }; /** Exiled now, returned by the search after it (Sword of Hearth and Home: "Put both cards onto the battlefield"), kept in Resolving.held. */ hold?: true }
   /** A delayed flicker's return: the exiled card, while it's still in exile as that object. */
   /** A delayed flicker's return: its subject, or with `cards` each of those cards, if still the same objects in exile. */
   | { type: "returnExiled"; under: "owner" | "you"; counter?: CounterKind; tapped?: true; cards?: { id: ObjectId; zc: number }[]; /** Phelia: a counter on this permanent, while it's still that object, if one of them entered under this ability's controller's control. */ selfCounter?: { id: ObjectId; zc: number; counter: CounterKind } }
@@ -3746,7 +3746,7 @@ export interface CompiledCard {
   opponentsSorceryTiming?: true;
   /** "No more than one creature can attack each combat." / "... block ..." (Silent Arbiter; CR 508.1c, 509.1b): for everyone. */
   /** "No more than one creature can attack each combat" (Silent Arbiter); `attackYou`: "... can attack you each combat" (Crawlspace), its controller only, not their planeswalkers (rulings). */
-  combatLimit?: { attack?: number; block?: number; attackYou?: number };
+  combatLimit?: { attack?: number; block?: number; attackYou?: number; /** "No more than one creature can attack ~ each combat" (The Eternal Wanderer). */ attackSelf?: number };
   /** "You may activate loyalty abilities of planeswalkers you control on any player's turn any time you could cast an instant." (Teferi, Temporal Archmage's emblem) */
   loyaltyAtInstantSpeed?: true;
   /** "Your opponents can't cast spells with mana value 3 or less." (Brisela, Voice of Nightmares): this many or less. */

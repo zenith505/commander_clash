@@ -47,7 +47,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // "The greatest power among creatures you control" (0 with none), "among other creatures you control", "the greatest
   // toughness among Wurms you control", "among creatures they control" (that player's).
-  if (!each && (m = /^the greatest (power|toughness) among (other )?((?:attacking )?(?:non-[A-Z][a-z]+ )?(?:creatures|[A-Z][a-z]+s)) (you control|on the battlefield|they control|that player controls|target player controls|target opponent controls)$/.exec(p.replace(/^The/, "the")))) {
+  // "The greatest power among other attacking creatures" (Ghalta and Mavren): anyone's, like "attacking creatures" below.
+  if (!each && (m = /^the greatest (power|toughness) among (other )?((?:attacking )?(?:non-[A-Z][a-z]+ )?(?:creatures|[A-Z][a-z]+s)) (you control|on the battlefield|they control|that player controls|target player controls|target opponent controls)$/.exec(p.replace(/^The/, "the").replace(/^(the greatest (?:power|toughness) among (?:other )?attacking creatures)$/, "$1 on the battlefield")))) {
     const words = m[3]!.split(/\s+/).map(singularWord).join(" ");
     const who = m[4]!;
     const spec = parseTargetPhrase(`${words}${who === "you control" ? " you control" : ""}`, { chosen: true });
@@ -251,10 +252,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // "The number of creatures attacking you" (Arachnogenesis): attacking you, not your planeswalkers (CR 506.3).
   if (/^creatures? attacking you$/i.test(p)) return count({ kind: "permanents", filter: { kind: "object", types: ["Creature"], combat: "attackingYou", text: p } });
-  // "attacking creature", "tapped creature": any controller.
-  if ((m = /^(attacking|blocking|tapped) (creatures?)$/i.exec(p))) {
-    const spec = parseTargetPhrase(`${m[1]} creature`);
-    return spec?.kind === "object" ? count({ kind: "permanents", filter: { ...spec, text: p } }) : null;
+  // "attacking creature", "tapped creature": any controller. "Other attacking creatures" (Ghalta and Mavren): not the
+  // object with the ability.
+  if ((m = /^(other )?(attacking|blocking|tapped) (creatures?)$/i.exec(p))) {
+    const spec = parseTargetPhrase(`${m[2]} creature`);
+    return spec?.kind === "object" ? count({ kind: "permanents", filter: { ...spec, text: p }, ...(m[1] ? { other: true } : {}) }) : null;
   }
   // Shared Animosity: "it gets +1/+0 until end of turn for each other attacking creature that shares a creature type with
   // it", "it" the attacker the trigger is about (counted as it resolves, CR 608.2h).

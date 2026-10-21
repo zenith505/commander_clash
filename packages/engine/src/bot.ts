@@ -3612,7 +3612,7 @@ function attackPlaneswalkers(s: GameState, pid: PlayerId, attacks: { attacker: O
       moved.push(a);
       need -= hit(obj(s, a.attacker), pw);
     }
-    if (need > 0) continue;
+    if (need > 0 || moved.length > (abilitiesOf(s, pw).combatLimit?.attackSelf ?? Infinity)) continue;
     for (const a of moved) {
       a.defender = owner;
       a.planeswalker = pw.id;

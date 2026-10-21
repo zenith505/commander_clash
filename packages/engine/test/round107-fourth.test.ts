@@ -1,10 +1,11 @@
 // Round 107, more popular cards: Aurelia, the Law Above ("whenever a player attacks with three or more creatures"),
 // Knuckles the Echidna ("thirty or more artifacts"), Battle Angels of Tyr ("if that player has more cards in hand than
 // each other player"), Call Forth the Tempest ("the total mana value of other spells you've cast this turn") and Jarad,
-// Golgari Lich Lord ("Sacrifice a Swamp and a Forest"), Massacre Girl ("whenever a creature dies this turn").
+// Golgari Lich Lord ("Sacrifice a Swamp and a Forest"), Massacre Girl ("whenever a creature dies this turn"),
+// Ghalta and Mavren ("the greatest power among other attacking creatures"), The Eternal Wanderer.
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, cast, forest, passUntil, pt, putOnBattlefield, setup, swamp } from "./helpers";
+import { act, bear, card, cast, forest, passUntil, pt, putOnBattlefield, setup, swamp, target } from "./helpers";
 import { abilitiesOf, abilityProblem, characteristics, botActions, isFullySupported, planActivate, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
@@ -14,6 +15,8 @@ const angels = card("Battle Angels of Tyr", "Creature — Angel Knight", "{2}{W}
 const tempest = card("Call Forth the Tempest", "Sorcery", "{5}{R}{R}{R}", { keywords: ["Cascade"], oracleText: "Cascade, cascade (When you cast this spell, exile cards from the top of your library until you exile a nonland card that costs less. You may cast it without paying its mana cost. Put the exiled cards on the bottom of your library in a random order. Then do it again.)\nCall Forth the Tempest deals damage to each creature your opponents control equal to the total mana value of other spells you've cast this turn." });
 const jarad = card("Jarad, Golgari Lich Lord", "Legendary Creature — Zombie Elf", "{B}{B}{G}{G}", { power: "2", toughness: "2", oracleText: "Jarad gets +1/+1 for each creature card in your graveyard.\n{1}{B}{G}, Sacrifice another creature: Each opponent loses life equal to the sacrificed creature's power.\nSacrifice a Swamp and a Forest: Return this card from your graveyard to your hand." });
 const massacre = card("Massacre Girl", "Legendary Creature — Human Assassin", "{3}{B}{B}", { power: "4", toughness: "4", keywords: ["Menace"], oracleText: "Menace\nWhen Massacre Girl enters, each other creature gets -1/-1 until end of turn. Whenever a creature dies this turn, each creature other than Massacre Girl gets -1/-1 until end of turn." });
+const ghalta = card("Ghalta and Mavren", "Legendary Creature — Dinosaur Vampire", "{3}{G}{G}{W}{W}", { power: "12", toughness: "12", keywords: ["Trample"], oracleText: "Trample\nWhenever you attack, choose one —\n• Create a tapped and attacking X/X green Dinosaur creature token with trample, where X is the greatest power among other attacking creatures.\n• Create X 1/1 white Vampire creature tokens with lifelink, where X is the number of other attacking creatures." });
+const wanderer = card("The Eternal Wanderer", "Legendary Planeswalker", "{4}{W}{W}", { loyalty: "5", oracleText: "No more than one creature can attack The Eternal Wanderer each combat.\n+1: Exile up to one target artifact or creature. Return that card to the battlefield under its owner's control at the beginning of that player's next end step.\n0: Create a 2/2 white Samurai creature token with double strike.\n−4: For each player, choose a creature that player controls. Each player sacrifices all creatures they control not chosen this way." });
 // Test cards.
 const relic = card("Test Relic", "Artifact", "{1}");
 const tomb = card("Test Tomb", "Land — Swamp Forest");
@@ -224,5 +227,95 @@ describe("Massacre Girl", () => {
     // Next turn the delayed trigger is gone (CR 603.7b).
     s = passUntil(s, "upkeep", s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % 4]!);
     expect(s.floatingTriggers ?? []).toHaveLength(0);
+  });
+});
+
+describe("Ghalta and Mavren", () => {
+  const attackWith = (mode: number) => {
+    const { s: s0, ap, opp } = setup([]);
+    let s = s0;
+    const g = putOnBattlefield(s, ap, ghalta);
+    const others = [3, 5].map((n) => putOnBattlefield(s, ap, bear({ name: `Bear ${n}`, power: String(n), toughness: String(n) })));
+    s = act(passUntil(s, "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks: [g, ...others].map((attacker) => ({ attacker, defender: opp })) });
+    for (let i = 0; i < 40 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+      if (s.pending?.kind === "chooseModes") s = act(s, { type: "chooseModes", player: ap, modes: [mode] });
+      else if (s.pending) s = run(s, botActions(s, s.pending.player));
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    const made = s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === ap);
+    return { s, made };
+  };
+
+  it("a tapped and attacking X/X Dinosaur, X the greatest power among the other attackers (not its own 12)", () => {
+    supported(ghalta);
+    const { s, made } = attackWith(0);
+    expect(made).toHaveLength(1);
+    const d = s.objects[made[0]!]!;
+    expect(pt(s, d.id)).toBe("5/5");
+    expect(d.tapped).toBe(true);
+    expect(d.attacking).toBeDefined();
+  });
+
+  it("or one 1/1 lifelink Vampire for each other attacking creature", () => {
+    const { s, made } = attackWith(1);
+    expect(made).toHaveLength(2);
+    for (const id of made) expect(pt(s, id)).toBe("1/1");
+  });
+});
+
+describe("The Eternal Wanderer", () => {
+  const next = (s: GameState, pid: PlayerId) => s.turnOrder[(s.turnOrder.indexOf(pid) + 1) % 4]!;
+
+  it("+1: the exiled card comes back at the beginning of its owner's next end step, not ours", () => {
+    supported(wanderer);
+    const { s: s0, ap, opp } = setup([]);
+    let s = s0;
+    const w = putOnBattlefield(s, ap, wanderer);
+    s.objects[w]!.counters.loyalty = 5;
+    const theirs = putOnBattlefield(s, opp, bear());
+    s = settle(run(s, planActivate(s, ap, w, 0, [target(theirs)])));
+    expect(s.objects[theirs]!.zone).toBe("exile");
+    expect(s.objects[w]!.counters.loyalty).toBe(6);
+    // Our end step: still exiled.
+    s = settle(passUntil(s, "end", ap));
+    expect(s.objects[theirs]!.zone).toBe("exile");
+    // Its owner's (the next player's) end step: back, under its owner's control.
+    expect(next(s, ap)).toBe(opp);
+    s = settle(passUntil(s, "end", opp));
+    expect(s.objects[theirs]!.zone).toBe("battlefield");
+    expect(s.objects[theirs]!.controller).toBe(opp);
+  });
+
+  it("−4: we choose one creature for each player; the rest are sacrificed", () => {
+    const { s: s0, ap, opp } = setup([]);
+    let s = s0;
+    const w = putOnBattlefield(s, ap, wanderer);
+    s.objects[w]!.counters.loyalty = 5;
+    const mine = [putOnBattlefield(s, ap, bear({ name: "Mine A" })), putOnBattlefield(s, ap, bear({ name: "Mine B" }))];
+    const theirs = [putOnBattlefield(s, opp, bear({ name: "Theirs A" })), putOnBattlefield(s, opp, bear({ name: "Theirs B" }))];
+    s = run(s, planActivate(s, ap, w, 2));
+    for (let i = 0; i < 40 && (s.stack.length || s.pending); i++) {
+      const p = s.pending;
+      if (p?.kind === "pickPermanents") {
+        expect(p.player).toBe(ap);
+        s = act(s, { type: "pickPermanents", player: ap, ids: [p.options.includes(mine[1]!) ? mine[1]! : theirs[0]!] });
+      } else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(s.objects[mine[1]!]!.zone).toBe("battlefield");
+    expect(s.objects[mine[0]!]!.zone).toBe("graveyard");
+    expect(s.objects[theirs[0]!]!.zone).toBe("battlefield");
+    expect(s.objects[theirs[1]!]!.zone).toBe("graveyard");
+  });
+
+  it("no more than one creature can attack it each combat", () => {
+    const { s: s0, ap, opp } = setup([]);
+    let s = s0;
+    const w = putOnBattlefield(s, opp, wanderer);
+    s.objects[w]!.counters.loyalty = 5;
+    const two = [putOnBattlefield(s, ap, bear({ name: "A" })), putOnBattlefield(s, ap, bear({ name: "B" }))];
+    s = passUntil(s, "declareAttackers", ap);
+    expect(() => act(s, { type: "declareAttackers", player: ap, attacks: two.map((attacker) => ({ attacker, defender: opp, planeswalker: w })) })).toThrow(/no more than one creature can attack The Eternal Wanderer/);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: two[0]!, defender: opp, planeswalker: w }, { attacker: two[1]!, defender: opp }] });
+    expect(s.objects[two[0]!]!.attacking).toBe(opp);
   });
 });

@@ -6158,6 +6158,11 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     const cap = youLimits.get(d)!;
     if (atPlayer(d) > cap) throw new RulesError(`no more than ${cap === 1 ? "one creature" : `${cap} creatures`} can attack ${player(s, d).name} each combat`);
   }
+  // "No more than one creature can attack ~ each combat" (The Eternal Wanderer): a restriction on that permanent (CR 508.1c).
+  for (const pw of new Set(attacks.flatMap((a) => (a.planeswalker !== undefined ? [a.planeswalker] : [])))) {
+    const cap = s.objects[pw] ? abilitiesOf(s, obj(s, pw)).combatLimit?.attackSelf : undefined;
+    if (cap !== undefined && attacks.filter((a) => a.planeswalker === pw).length > cap) throw new RulesError(`no more than ${cap === 1 ? "one creature" : `${cap} creatures`} can attack ${nameOf(s, pw)} each combat`);
+  }
   const free = (o: GameObject, d: PlayerId) => !attackProblem(s, o, d) && !attackTaxPer(s, d) && atPlayer(d, o.id) < youLimits.get(d)!;
   // "No more than one creature can attack each combat" (Silent Arbiter): a restriction, which requirements can't break;
   // as many of the creatures that have to attack as the limit allows do (CR 508.1c-d).

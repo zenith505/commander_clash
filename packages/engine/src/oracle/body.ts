@@ -1550,6 +1550,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si++;
       continue;
     }
+    // "For each player, choose a creature that player controls. Each player sacrifices all creatures they control not
+    // chosen this way." (The Eternal Wanderer): you choose for everyone, not targeting (rulings), then the rest go at once.
+    const eachKeep = /^For each player, choose an? ([a-z]+) that player controls$/.exec(s);
+    if (eachKeep && new RegExp(`^Each player sacrifices all ${eachKeep[1]}s they control not chosen this way$`).test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      const filter = pickFilter(eachKeep[1]!);
+      if (!filter || filter.kind !== "object") return null;
+      effects.push({ type: "keepRest", who: { ref: "eachPlayer" }, keep: [{ filter, n: 1 }], among: filter, youChoose: true });
+      si++;
+      continue;
+    }
     const eachYard = /^For each player, choose an? (.+? card) in that player's graveyard$/.exec(s);
     if (eachYard && /^Put those cards onto the battlefield under your control$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
       const filter = parseSearchFilter(eachYard[1]!);
@@ -2245,7 +2255,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // Swan); after "you may exile ~ target creature", "If you do, return that card ..." (Astral Slide).
     const BACK = "(?:it|that card|the exiled card|those cards|the exiled cards|them|~)";
     const UNDER = "(its owner's|their owner's|their owners'|your)";
-    const laterRe = new RegExp(`^(?:If you do, )?(?:At the beginning of the next end step, return ${BACK} to the battlefield( tapped)? under ${UNDER} control|[Rr]eturn ${BACK} to the battlefield( tapped)? under ${UNDER} control(?: with an? ${COUNTER} counter on it)? at the beginning of the next end step)(?: with an? ${COUNTER} counter on it)?$`);
+    const laterRe = new RegExp(`^(?:If you do, )?(?:At the beginning of the next end step, return ${BACK} to the battlefield( tapped)? under ${UNDER} control|[Rr]eturn ${BACK} to the battlefield( tapped)? under ${UNDER} control(?: with an? ${COUNTER} counter on it)? at the beginning of (the|that player's) next end step)(?: with an? ${COUNTER} counter on it)?$`);
     const later = laterRe.exec(s);
     // "Exile this Saga, then return it to the battlefield transformed under your control": its back face up (CR 712.14a).
     const now = /^(?:[Tt]hen )?[Rr]eturn (?:it|that card|them|those cards) to the battlefield( transformed)? under (its owner's|their owners'|your) control$/.exec(s);
@@ -2272,10 +2282,14 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const ex = laterAt.into[laterAt.at] as Extract<Effect, { type: "exile" }>;
       if (ex.until || ex.linked || (ex.what.ref === "target" && ex.what.sameName) || (ex.what.ref !== "target" && ex.what.ref !== "each" && ex.what.ref !== "self")) return null;
       const under = (later[2] ?? later[4]) === "your" ? "you" : "owner";
-      const counter = later[5] ?? later[6];
+      const counter = later[5] ?? later[7];
+      // "Return that card to the battlefield under its owner's control at the beginning of that player's next end step"
+      // (The Eternal Wanderer): that player is its owner; one card only.
+      const owners = later[6] === "that player's";
+      if (owners && (later[4] !== "its owner's" || ex.what.ref !== "target" || (ex.what.n !== undefined && ex.what.n !== 1))) return null;
       // Phelia: "If it entered under your control, put a +1/+1 counter on ~", part of the delayed trigger (CR 603.7).
       const ifYours = !ctx.spell && under === "owner" && laterAt.into === effects ? new RegExp(`^If it entered under your control, put an? ${COUNTER} counter on ~$`).exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
-      laterAt.into[laterAt.at] = { type: "flicker", what: ex.what, under, at: "nextEndStep", ...(counter ? { counter: counterKind(counter) } : {}), ...(later[1] || later[3] ? { tapped: true as const } : {}), ...(ifYours ? { selfCounterIfYours: counterKind(ifYours[1]!) } : {}) };
+      laterAt.into[laterAt.at] = { type: "flicker", what: ex.what, under, at: owners ? "ownersNextEndStep" : "nextEndStep", ...(counter ? { counter: counterKind(counter) } : {}), ...(later[1] || later[3] ? { tapped: true as const } : {}), ...(ifYours ? { selfCounterIfYours: counterKind(ifYours[1]!) } : {}) };
       if (ifYours) si++;
       continue;
     }

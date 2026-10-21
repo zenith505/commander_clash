@@ -607,6 +607,8 @@ export interface Player {
   poison?: number;
   /** Energy counters (CR 107.14, 122.1). */
   energy?: number;
+  /** Experience counters (CR 122.1; Meren of Clan Nel Toth). */
+  experience?: number;
   /** The turns this player's current and previous upkeeps began, for echo's "since the beginning of your last upkeep" (CR 702.30a). */
   upkeepTurn?: number;
   lastUpkeepTurn?: number;
@@ -731,6 +733,8 @@ export interface StackItem {
   fromSpell?: true;
   /** The names of cards moved to pay its cost beyond mana: Jester's Scepter's "that card" (CR 608.2h). */
   costCardNames?: string[];
+  /** The cards a discard cost discarded (keys into `cards`): "if the discarded card wasn't a land card" (Grab the Prize). */
+  costDiscarded?: string[];
   /**
    * An activated mana ability resolving right away, never on the stack (CR 605.3b): `index`, the ability; `tapped`, {T}
    * was in its cost, so it tapped its source for mana (CR 106.12); `extra`, the mana picked for what that triggers.
@@ -951,10 +955,12 @@ export interface ContinuousEffect {
   sourceId?: ObjectId;
   /**
    * "endOfTurn" ends in the cleanup step (CR 514.2); "game" lasts until the game ends (CR 611.2a); "yourNextTurn" ends
-   * as `turnOf`'s next turn begins (CR 611.2b), or when it would have for a player who left (CR 800.4m).
+   * as `turnOf`'s next turn begins (CR 611.2b), or when it would have for a player who left (CR 800.4m);
+   * "endOfYourNextTurn" in the cleanup step of `turnOf`'s next turn after `sinceTurn` (CR 514.2).
    */
-  duration: "endOfTurn" | "game" | "yourNextTurn" | "whileTapped" | "whileControlled";
+  duration: "endOfTurn" | "game" | "yourNextTurn" | "endOfYourNextTurn" | "whileTapped" | "whileControlled";
   turnOf?: PlayerId;
+  sinceTurn?: number;
   /**
    * "For as long as ~ remains tapped" (CR 611.2b): it ends when that object (`zc` as it was) untaps, leaves the
    * battlefield or phases out (CR 702.26f); `controller`: "for as long as you control ~" too.
@@ -1587,6 +1593,10 @@ export interface Resolving {
   did?: boolean;
   /** What its instructions sacrificed, as it last existed: "When you do, ~ deals damage equal to that creature's power". */
   sacrificedThisWay?: LastKnown[];
+  /** What its "return a land you control to its owner's hand" returned, as it last existed (SpellCondition bouncedThisWay). */
+  bouncedThisWay?: { id: ObjectId; subtypes: string[] }[];
+  /** Whether its last "look at the top N cards ... put one ..." took a card (SpellCondition digTook). */
+  digTook?: boolean;
   /** The players who had nothing to pick for its last "each player sacrifices ..." (PlayerRef "couldntPick"). */
   couldntPick?: PlayerId[];
   /** The Army its amass instruction chose (CR 701.47c), for "the amassed Army". */

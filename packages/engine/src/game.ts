@@ -14,7 +14,7 @@ import { MANA_ABILITY_OFFSET, abolisherBan, commanderIdentity, activatedAsMana, 
 import { untapStepPhasing, releasePhased } from "./phasing";
 import { bindBound, pickOptions, playerProtectedFrom, spellManaValue } from "./effects/targeting";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
-import { describeCount, entwined, withModes, withSplices, gateTargets, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
+import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
 import { putCounters, tokenBatch } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
@@ -2376,7 +2376,9 @@ export const hasNoMaxHandSize = (s: GameState, pid: PlayerId) =>
 
 function finishCleanup(s: GameState) {
   closeZoneBatch(s); // discarding to hand size (CR 514.1) triggers "whenever you discard one or more cards"
-  s.effects = s.effects.filter((e) => e.duration !== "endOfTurn"); // CR 514.2
+  // "Until the end of your next turn": in the cleanup step of that player's next turn (CR 514.2), or once they've left
+  // the game (CR 800.4m).
+  s.effects = s.effects.filter((e) => e.duration !== "endOfTurn" && !(e.duration === "endOfYourNextTurn" && ((s.activePlayer === e.turnOf && s.turn > (e.sinceTurn ?? 0)) || (e.turnOf !== undefined && player(s, e.turnOf).lost)))); // CR 514.2
   // Delayed triggered abilities lasting "until end of turn", or "until the end of your next turn" in that turn (CR 603.7b).
   s.floatingTriggers = s.floatingTriggers?.filter((f) => !(f.until === "endOfTurn" || (f.until === "endOfYourNextTurn" && s.activePlayer === f.controller && s.turn > f.turn)));
   if (!s.floatingTriggers?.length) s.floatingTriggers = undefined;
@@ -3062,6 +3064,8 @@ export function castProblem(
   if (via?.if && !staticConditionNow(s, via.if, o.id, pid)) return `you can't cast ${d.name} from your graveyard now`;
   if (via?.kind === "mayhem" && o.discardedTurn !== s.turn) return `mayhem works only if you discarded ${d.name} this turn`; // CR 702.187b
   if (choices?.permit !== undefined && (via?.kind !== "turnPermission" || !pickPermit(s, o, via.permits ?? [], choices.permit))) return `that permission doesn't let you cast ${d.name} now`;
+  // Lurrus: "with mana value 2 or less", the X chosen counted (CR 202.3e).
+  if (via?.kind === "turnPermission" && !permitsForMv(s, choices?.permit !== undefined ? [choices.permit] : (via.permits ?? []), defMv(d) + (x ?? 0) * xCount(parseManaCost(d.manaCost))).length) return `${d.name}'s mana value is too high for that permission`;
   // Flashback and jump-start only if the resulting spell is an instant or sorcery (CR 702.34a, 702.133a).
   if (via && (via.kind === "flashback" || via.kind === "grantedFlashback" || via.kind === "jumpStart") && !isType(d, "Instant") && !isType(d, "Sorcery")) return `${d.name} isn't an instant or sorcery`;
   if (!free && !via && !mayPlayFromExile(s, o, pid) && !mayPlayFromTop(s, o, pid) && (!(o.zone === "hand" || (fromCommand && o.isCommander)) || o.owner !== pid))
@@ -3120,7 +3124,7 @@ export function castProblem(
   // Also a spell cast as an ability resolves, like cascade's (split second rulings).
   if (splitSecondOnStack(s)) return "a spell with split second is on the stack";
   if (!free && (s.priority !== pid || s.pending)) return "you don't have priority";
-  const instantSpeed = choices?.alt === "sneak" || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || flashGranted(s, pid, d);
+  const instantSpeed = choices?.alt === "sneak" || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || flashGranted(s, pid, d, s.objects[id]?.owner);
   if (!free && !instantSpeed && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be cast at sorcery speed`;
   // A plotted card is cast during its owner's main phase while the stack is empty, whatever its type (CR 702.170d).
   if (plotted && !canActAtSorcerySpeed(s, pid)) return `a plotted card can only be cast at sorcery speed`;
@@ -3292,7 +3296,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // "You may cast ~ as though it had flash if you pay {2} more to cast it": cast when a sorcery couldn't be, it costs more
   // (CR 601.2f). Not when something else lets it be cast then: a resolving madness trigger, or Flash from elsewhere.
   const flashCost = compileCard(d).flashCost;
-  const more = flashCost && !madness && !isType(d, "Instant") && !d.keywords.includes("Flash") && !flashGranted(s, pid, d) && !canActAtSorcerySpeed(s, pid) ? flashCost : 0;
+  const more = flashCost && !madness && !isType(d, "Instant") && !d.keywords.includes("Flash") && !flashGranted(s, pid, d, o.owner) && !canActAtSorcerySpeed(s, pid) ? flashCost : 0;
   // "Costs {3} less to cast if it targets a tapped creature": the targets are chosen before the cost is (CR 601.2c, 601.2f).
   for (const c of compileCard(d).costLessIfTargets ?? [])
     if (how.targets?.some((t) => t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && objectMatches(s, c.filter, obj(s, t.id), pid, false))) less += c.n;
@@ -3331,8 +3335,9 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
       }
       // "The first creature spell you cast each turn": the creature spells you cast earlier this turn count, even before this permanent was on the battlefield (rulings).
       if (m.nth && (s.castThisTurn ?? []).filter((c) => c.player === pid && printedMatches(rest, s.cards[c.card]!)).length !== m.nth - 1) continue;
-      if (m.n > 0) more += m.n;
-      else less -= m.n;
+      const n = m.times ? m.n * Math.max(0, evalAmount(s, m.times, { controller: c.controller, sourceId: src.id })) : m.n;
+      if (n > 0) more += n;
+      else less -= n;
     }
   }
   // "Spells you cast this turn cost {2} less to cast" (Urza, Planeswalker): from resolved spells and abilities (CR 611.2a).
@@ -3537,7 +3542,6 @@ export const castHow = (choices?: Pick<CostChoices, "kicks" | "bargain" | "teamw
   ...(choices?.teamwork?.length ? { teamwork: true } : {}),
   ...(choices?.gift !== undefined ? { gift: true } : {}),
 });
-const gateBody = (b: AbilityBody, how: CastHow): AbilityBody => (hasGatedTargets(b.targets) ? { ...b, targets: gateTargets(b.targets, how) } : b);
 /** Every optional cost paid (each kicker cost too): the most targets a spell can have. */
 const ALL_PAID: CastHow = { kicks: [0, 1], bargained: true, teamwork: true, gift: true, evidence: true };
 
@@ -3553,7 +3557,7 @@ export const castDef = (s: GameState, id: ObjectId, alt?: AltCostKind): CardDef 
  * permanent `pid` controls lets them cast this card any time they could cast an instant (CR 702.8a). It's a spell then,
  * so it's matched as one.
  */
-export function flashGranted(s: GameState, pid: PlayerId, d: CardDef): boolean {
+export function flashGranted(s: GameState, pid: PlayerId, d: CardDef, owner?: PlayerId): boolean {
   // "This spell has flash as long as you've committed a crime this turn" (CompiledCard.flashIf): about the player only.
   const own = compileCard(d).flashIf;
   if (own && staticConditionNow(s, own, "", pid)) return true;
@@ -3561,6 +3565,8 @@ export function flashGranted(s: GameState, pid: PlayerId, d: CardDef): boolean {
   if (s.flashUntil?.some((r) => r.controller === pid && printedMatches(r.filter, d))) return true;
   return s.battlefield.some((id) => {
     const o = obj(s, id);
+    // Teferi, Mage of Zhalfir: the card's owner's Teferi, whoever casts it.
+    if (owner !== undefined && controllerOf(s, o) === owner && abilitiesOf(s, o).flashOwned?.some((spec) => printedMatches(spec, d))) return true;
     return controllerOf(s, o) === pid && !!abilitiesOf(s, o).flashFor?.some((spec) => printedMatches(spec, d));
   });
 }
@@ -3633,7 +3639,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const sunburst = !!compileCard(d).countsColors;
   // "You may cast ~ as though it had flash. If you cast it any time a sorcery couldn't have been cast, ...": only
   // when cast with that permission, not free or for madness during a resolution (Armor of Thorns ruling).
-  const flashSacrifice = !!compileCard(d).flashSacrifice && !flashGranted(s, p.id, d) && !madness && !suspended && freeCastOf(s, p.id) !== id && !isType(d, "Instant") && !d.keywords.includes("Flash") && !canActAtSorcerySpeed(s, p.id);
+  const flashSacrifice = !!compileCard(d).flashSacrifice && !flashGranted(s, p.id, d, o.owner) && !madness && !suspended && freeCastOf(s, p.id) !== id && !isType(d, "Instant") && !d.keywords.includes("Flash") && !canActAtSorcerySpeed(s, p.id);
   // Mana that can only be spent on spells like this one can pay any part of its total cost (CR 106.6).
   // Text hoping some color was spent to cast it: spent where that helps the caster, kept back where it hurts (CR 601.2h).
   const hopes = spendPlan(s, p.id, d, poolFor(s, p.id, spellUse(d, choices.alt)).pool);
@@ -3690,7 +3696,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const via = graveyardWay(s, o, choices.via);
   // A once-each-turn permission is used up (Karador; Muldrotha's slot for one of the spell's types).
   if (via?.kind === "turnPermission") {
-    const permit = pickPermit(s, o, via.permits ?? [], choices.permit)!;
+    const permit = pickPermit(s, o, permitsForMv(s, via.permits ?? [], defMv(d) + (x ?? 0) * xCount(parseManaCost(d.manaCost))), choices.permit)!;
     ((s.turnLog ??= {}).gravePermits ??= []).push(permit);
     log(s, `${p.name} uses ${permitLabel(s, permit)} to cast it from their graveyard.`);
   }
@@ -3763,8 +3769,10 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   closeZoneBatch(s);
   // Additional costs are paid with the mana (CR 601.2h); what they did is known to the spell.
   const returned: LastKnown = {};
-  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, { ...choices, targets, ...(chosen ? { modes: chosen } : {}) }, x ?? 0, s, p.id), choices, returned);
+  const discarded: string[] = [];
+  const sacrificed = payExtraCosts(s, p, castExtraCosts(d, { ...choices, targets, ...(chosen ? { modes: chosen } : {}) }, x ?? 0, s, p.id), choices, returned, undefined, discarded);
   if (sacrificed.length) item.sacrificed = sacrificed;
+  if (discarded.length) item.costDiscarded = discarded;
   if (choices.alt === "sneak") o.sneak = returned;
   // Casualty: "you may sacrifice a creature with power N or greater" (CR 702.153a).
   if (choices.casualty) {
@@ -3935,6 +3943,8 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef): CastFromGraveyard
       if (g.yourTurn && s.activePlayer !== o.owner) continue;
       if (!d.manaCost && !g.way.mana) continue;
       if (!printedMatches(g.filter, d)) continue;
+      // Lurrus: a card that can be cast with mana value that low (X counted as it's cast, see permitsForMv).
+      if (g.maxMv !== undefined && defMv(d) > g.maxMv) continue;
       // Once each turn (Karador, Muldrotha's permanent types): the permissions not used yet, from every such permanent.
       if (g.once) {
         const used = s.turnLog?.gravePermits ?? [];
@@ -3957,6 +3967,18 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef): CastFromGraveyard
  * one fewest other cards in that graveyard could use (an artifact creature takes Muldrotha's artifact slot when no other
  * artifact card is there to cast, rulings).
  */
+/**
+ * The permits a spell with this mana value (its X counted, CR 202.3e) can use: Lurrus's only for 2 or less
+ * (graveyardGrants maxMv).
+ */
+export function permitsForMv(s: GameState, permits: string[], mv: number): string[] {
+  return permits.filter((k) => {
+    const src = s.objects[k.split("@")[0]!];
+    const max = src ? abilitiesOf(s, src).graveyardGrants?.find((g) => g.once)?.maxMv : undefined;
+    return max === undefined || mv <= max;
+  });
+}
+
 export function pickPermit(s: GameState, o: GameObject, permits: string[], chosen?: string): string | undefined {
   if (chosen !== undefined) return permits.includes(chosen) ? chosen : undefined;
   const others = player(s, o.owner).graveyard.filter((id) => id !== o.id);
@@ -4374,7 +4396,7 @@ export function returnCandidates(s: GameState, pid: PlayerId, c: Extract<Additio
  * Pay costs beyond mana, for a spell or an ability; returns what was sacrificed as it last existed (CR 608.2h).
  * `returned` gets whom a creature returned to hand was attacking (ninjutsu, CR 702.49c).
  */
-function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices: CostChoices, returned?: LastKnown, moved?: string[]) {
+function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices: CostChoices, returned?: LastKnown, moved?: string[], discarded?: string[]) {
   const sacrificed: LastKnown[] = [];
   for (const c of costs) {
     if (c.kind === "exileFromGraveyard" && c.linked) {
@@ -4431,8 +4453,12 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       const pool = [...p.hand];
       const picked: ObjectId[] = [];
       for (let i = 0; i < c.n && pool.length; i++) picked.push(pool.splice(Math.floor(nextRandom(s) * pool.length), 1)[0]!);
+      discarded?.push(...picked.map((id) => cardIdOf(obj(s, id))));
       discardCards(s, p.id, picked, " at random");
-    } else if (c.kind === "discard") discardCards(s, p.id, choices.discard ?? []);
+    } else if (c.kind === "discard") {
+      discarded?.push(...(choices.discard ?? []).map((id) => cardIdOf(obj(s, id))));
+      discardCards(s, p.id, choices.discard ?? []);
+    }
     else if (c.kind === "reveal") log(s, `${p.name} reveals ${(choices.reveal ?? []).map((id) => nameOf(s, id)).join(", ")} from their hand.`);
     else if (c.kind === "mill") {
       log(s, `${p.name} mills ${c.n === 1 ? "a card" : `${c.n} cards`}.`);
@@ -4794,7 +4820,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const sourceZc = o.zoneChanges ?? 0;
   const stamped = stampTargets(s, targets);
   const costCardNames: string[] = [];
-  const sacrificed = ab.costs?.length ? payExtraCosts(s, p, activatedCosts(ab, x), costs ?? {}, lki, costCardNames) : [];
+  const costDiscarded: string[] = [];
+  const sacrificed = ab.costs?.length ? payExtraCosts(s, p, activatedCosts(ab, x), costs ?? {}, lki, costCardNames, costDiscarded) : [];
   if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard", { sacrificed: true });
   if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling, undefined, ab.cycling ? x : undefined);
   // Scavenge (CR 702.97a) from the graveyard; "Exile ~" on the battlefield, if it's still the same object (CR 400.7).
@@ -4815,6 +4842,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(abCost.hasX || ab.loyaltyX || abilityCostsHaveX(ab) ? { x: x ?? 0 } : {}),
     ...(sacrificed.length ? { sacrificed } : {}),
     ...(costCardNames.length ? { costCardNames } : {}),
+    ...(costDiscarded.length ? { costDiscarded } : {}),
     ...(ab.station ? { stationed: { id: tapCreatures![0]!, zc: obj(s, tapCreatures![0]!).zoneChanges ?? 0, power: power(s, obj(s, tapCreatures![0]!)) } } : {}),
     ...(o.tapped ? { sourceUntaps: o.untaps ?? 0 } : {}),
     ...(o.transforms ? { sourceTransforms: o.transforms } : {}),
@@ -6963,7 +6991,7 @@ export function suspendProblem(s: GameState, pid: PlayerId, id: ObjectId): strin
   if (s.priority !== pid || s.pending) return "you don't have priority";
   if (splitSecondOnStack(s)) return "a spell with split second is on the stack";
   // Whenever they could begin to cast it (CR 702.62a), with "as though it had flash" too.
-  const instantSpeed = isType(d, "Instant") || d.keywords.includes("Flash") || flashGranted(s, pid, d);
+  const instantSpeed = isType(d, "Instant") || d.keywords.includes("Flash") || flashGranted(s, pid, d, o.owner);
   if (!instantSpeed && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be suspended when you could cast it (sorcery speed)`;
   // Only if you could begin to cast it: not under Silence or Rule of Law (CR 702.62a, rulings on Silence).
   const limit = castLimitProblem(s, pid, d);

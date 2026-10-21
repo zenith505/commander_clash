@@ -400,7 +400,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (kwM) what = what.slice(0, kwM.index);
   // "a spell of the chosen color", "a creature spell of the chosen type": the choice made as this permanent entered.
   // "A noncreature spell with mana value less than ~'s power" (Pollywog Prodigy): worked out as it's cast (TargetSpec.bound).
-  const parsed = /^spell$/.test(what) ? { kind: "spell" as const, text: "spell" } : parseTargetPhrase(/\bspell\b/.test(what) ? what : `${what} spell`, { chosen: true, count: (t) => (t === "~'s power" ? parseCount(t, null) : null) });
+  const parsed = /^spell$/.test(what) ? { kind: "spell" as const, text: "spell" } : parseTargetPhrase(/\bspell\b/.test(what) ? what : `${what} spell`, { chosen: true, count: (t) => (t === "~'s power" || t === "the number of experience counters you have" ? parseCount(t, null) : null) });
   if (!parsed || parsed.kind !== "spell" || (pw && !parsed.types?.includes("Creature"))) return "fail";
   const range = pw && (pw[3] === "greater" ? { min: Number(pw[2]) } : { max: Number(pw[2]) });
   const spell = range ? { ...parsed, [pw![1] as "power" | "toughness"]: range } : parsed;
@@ -867,7 +867,8 @@ function parseManaTapTrigger(line: string): TriggeredAbility | "fail" | null {
     filter = { ...f, text: other[2]! };
   }
   // Zhur-Taa Druid: "it deals 1 damage to each opponent", "it" being ~.
-  const text = self ? self[1]!.replace(/^it deals /, "~ deals ") : other![3]!;
+  // Treasure Nabber: "gain control of that artifact", the permanent tapped.
+  const text = self ? self[1]!.replace(/^it deals /, "~ deals ") : other![3]!.replace(/\bthat (artifact|land|permanent|creature)\b/g, "it");
   const body = parseBody(theyAreThatPlayer(text), self ? { eventPlayer: true, selfIt: true } : { eventPlayer: true, subjectIt: true });
   if (!body || allEffects(body.effects).some((e) => e.type === "addMana")) return "fail";
   const by = self || other![1] === "you" ? "you" : other![1] === "an opponent" ? "opponent" : "any";
@@ -1284,7 +1285,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // its controller puts (CR 122.6 and the rulings on Generous Patron: the player whose spell or ability puts them, the
   // controller of a wither or infect source, and for a permanent entering with counters its controller). It triggers
   // once for each permanent they're put on at the same time (rulings on Hapatra).
-  const youPut = /^Whenever you put one or more ((?:\+1\/\+1|-1\/-1|loyalty|time|[a-z]+) )?counters on (~|this (?:creature|artifact|enchantment|permanent)|another creature you control|a creature you control|a creature you don't control|a creature|another creature|a permanent you control|a planeswalker|another [a-z]+ creature|an? [A-Z][a-z]+(?:, [A-Z][a-z]+,)? or [A-Z][a-z]+ you control), (.+)$/.exec(line);
+  const youPut = /^Whenever you put one or more ((?:\+1\/\+1|-1\/-1|loyalty|time|[a-z]+) )?counters on (~|this (?:creature|artifact|enchantment|permanent)|another creature you control|a creature you control|a creature you don't control|a creature|another creature|a permanent you control|a permanent or player|a planeswalker|another [a-z]+ creature|an? [A-Z][a-z]+(?:, [A-Z][a-z]+,)? or [A-Z][a-z]+ you control), (.+)$/.exec(line);
   const put = youPut ?? /^Whenever one or more (\+1\/\+1 )?counters are put on (~|another creature you control|a creature you control), (.+)$/.exec(line);
   if (put) {
     const self = /^(?:~|this [a-z]+)$/.test(put[2]!);
@@ -1300,9 +1301,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, put[3]!) };
     const kind = put[1] ? { countersKind: put[1].trim() } : {};
     if (self) return { event: "selfCountersPut", body, ...kind, ...byYou };
-    const filter = parseTargetPhrase(put[2]!.replace(/^another (creature)?/, (_m, c) => (c ? "creature" : "")).replace(/^an? /, ""));
+    // All Will Be One: "on a permanent or player", once for each permanent or player they're put on.
+    const orPlayer = put[2] === "a permanent or player" ? { countersOrPlayer: true as const } : {};
+    const filter = parseTargetPhrase(put[2]!.replace(/ or player$/, "").replace(/^another (creature)?/, (_m, c) => (c ? "creature" : "")).replace(/^an? /, ""));
     if (filter?.kind !== "object") return "fail";
-    return { event: "permanentCountersPut", tappedFilter: { ...filter, ...(put[2]!.startsWith("another") ? { notSource: true } : {}) }, body, ...kind, ...byYou };
+    return { event: "permanentCountersPut", tappedFilter: { ...filter, ...(put[2]!.startsWith("another") ? { notSource: true } : {}) }, body, ...kind, ...byYou, ...orPlayer };
   }
   // "Whenever a Dwarf you control becomes tapped", "Whenever a creature an opponent controls becomes tapped", "Whenever a
   // permanent becomes untapped" (Mesmeric Orb: "that permanent's controller").

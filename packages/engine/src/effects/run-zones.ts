@@ -171,6 +171,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
         const ch = characteristics(s, o);
         (s.resolving.sacrificedThisWay ??= []).push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), controller: pid, types: [...ch.types] });
       }
+      if (e.action === "bounce" && s.resolving) (s.resolving.bouncedThisWay ??= []).push({ id, subtypes: [...characteristics(s, o).subtypes] });
       moveObject(s, id, e.action === "sacrifice" ? "graveyard" : "hand", e.action === "sacrifice" ? { sacrificed: true } : {});
     }
 }
@@ -1221,8 +1222,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "castNow": {
       const sc = (s.resolving!.scratch ??= {});
       if (sc.castNow === undefined) {
+        s.resolving!.did = false;
         const o = objects(s, e.what, ctx)[0];
-        if (!o || o.zone !== "graveyard" || o.owner !== ctx.controller) return;
+        // "Exile the top card of your library. You may cast that card." (Chandra, Torch of Defiance): the card exiled.
+        if (!o || (e.what.ref === "exiledTop" ? o.zone !== "exile" : o.zone !== "graveyard" || o.owner !== ctx.controller)) return;
         if (e.unlessCast && (s.castThisTurn ?? []).some((c) => c.player === ctx.controller)) return;
         sc.castNow = { id: o.id };
         s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src, how: "paid" };
@@ -1237,6 +1240,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const o = s.objects[was.id];
       // Cast: it moved from the graveyard to the stack as this was paused (casting doesn't count as a zone change here).
       const cast = !!o && o.zone === "stack";
+      sc.castNow = undefined;
+      s.resolving!.did = cast;
       if (cast && e.thenNoMore) {
         (s.cantCastThisTurn ??= []).push({ player: ctx.controller, turn: s.turn, source: src });
         log(s, `${player(s, ctx.controller).name} can't cast additional spells this turn.`);
@@ -1346,7 +1351,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // "Flipped": a flip card enters flipped (CR 710.1b); any other card enters as it is, the flip being impossible.
       const faceOf = (o: GameObject) => (e.transformed ? transformedFace(s, o) : e.flipped && s.cards[o.cardId]?.layout === "flip" && s.cards[o.cardId]!.faces?.length === 2 ? 1 : undefined);
       const entering = list.filter((o) => (e.transformed ? faceOf(o) !== undefined : isPermanentCard(defOf(s, o))));
-      const hosts = e.attachToSubject || e.attachToTarget !== undefined ? new Map<ObjectId, AuraHost>() : chooseAuraHosts(s, entering.map((o) => ({ o, under: under(o), face: faceOf(o) })), src);
+      const hosts = e.attachToSubject || e.attachToTarget !== undefined || e.attachToEnchanted ? new Map<ObjectId, AuraHost>() : chooseAuraHosts(s, entering.map((o) => ({ o, under: under(o), face: faceOf(o) })), src);
       if (hosts === "paused") return "paused";
       // "Put a +1/+1 counter on it": the permanents these cards became (CR 400.7), like tokens just created.
       if (s.resolving) s.resolving.created = [];
@@ -1366,6 +1371,30 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             }
             log(s, `${src} returns ${d.name} to the battlefield${face ? " transformed" : ""} attached to ${auraHostName(s, host)}.`);
             moveObject(s, o.id, "battlefield", { controller: under(o), ...(face ? { face } : {}), ...host });
+            continue;
+          }
+          if (e.attachToEnchanted) {
+            // "Attached to enchanted creature" (Mantle of the Ancients): what the source Aura is attached to now, or was
+            // last attached to if it has left (rulings). An Aura only to a permanent it could enchant (CR 303.4d, 303.4f),
+            // an Equipment only to a creature it could equip (CR 301.5c-d); otherwise it stays in the graveyard (rulings).
+            const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+            const here = !!me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc);
+            const lk = !here && ctx.sourceId ? s.lastKnown?.[ctx.sourceId] : undefined;
+            const was = lk && (ctx.sourceZc === undefined || lk.zc === ctx.sourceZc) ? lk.attachedTo : undefined;
+            const host = here ? (me!.attachedTo ? s.objects[me!.attachedTo] : undefined) : was && s.objects[was.id]?.zone === "battlefield" && (s.objects[was.id]!.zoneChanges ?? 0) === was.zc ? s.objects[was.id] : undefined;
+            const enchant = compileCard(d).enchant;
+            const ok =
+              !!host &&
+              host.zone === "battlefield" &&
+              (d.subtypes.includes("Aura")
+                ? enchant?.kind === "object" && objectMatches(s, enchant, host, ctx.controller, false, d)
+                : d.subtypes.includes("Equipment") && !isType(d, "Creature") && objectMatches(s, { kind: "object", types: ["Creature"], text: "creature" }, host, ctx.controller, false, d));
+            if (!ok) {
+              log(s, `${d.name} can't be attached to ${host ? defOf(s, host).name : "that creature"}, so it stays in the graveyard.`);
+              continue;
+            }
+            log(s, `${src} returns ${d.name} to the battlefield attached to ${defOf(s, host!).name}.`);
+            moveObject(s, o.id, "battlefield", { controller: ctx.controller, attachTo: host!.id });
             continue;
           }
           if (e.attachToSubject) {
@@ -1727,7 +1756,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const by = controllerOf(s, o);
         if (by !== ctx.controller && !e.byController) continue; // only your own permanents (CR 701.21a)
         log(s, `${player(s, by).name} sacrifices ${characteristics(s, o).name}.`);
+        const ch = characteristics(s, o);
+        const last = { power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o), controller: by, types: [...ch.types] };
         moveObject(s, o.id, "graveyard", { sacrificed: true });
+        // "If you do" (Dark Depths): it was sacrificed (CR 701.21a).
+        if (s.resolving && o.zone !== "battlefield") (s.resolving.sacrificedThisWay ??= []).push(last);
       }
       return;
     case "ninjutsu": {

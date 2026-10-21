@@ -121,6 +121,11 @@ export function parseCountMod(line: string): CountMod | undefined {
     return { what: "counters", counter: "-1/-1", on: "creature", who: "you", op: "minusOne" };
   if (line === "If you would put one or more counters on a permanent or player, put twice that many of each of those kinds of counters on that permanent or player instead.")
     return { what: "counters", putter: "you", op: "double" };
+  // Lae'zel, Vlaakith's Champion; Doc Samson: "that many plus one of each of those kinds".
+  if (line === "If you would put one or more counters on a creature or planeswalker you control or on yourself, put that many plus one of each of those kinds of counters on that permanent or player instead.")
+    return { what: "counters", putter: "you", op: "plusOne", putOn: "creatureOrPlaneswalkerYouControlOrYou" };
+  if (line === "If you would put one or more counters on a permanent you control, put that many plus one of each of those kinds of counters on that permanent instead.")
+    return { what: "counters", putter: "you", op: "plusOne", putOn: "permanentYouControl" };
   if (line === "If an opponent would put one or more counters on a permanent or player, they put half that many of each of those kinds of counters on that permanent or player instead, rounded down.")
     return { what: "counters", putter: "opponent", op: "halfDown" };
   m = /^If an effect would put one or more counters on a permanent you control, it puts twice that many of those counters on that permanent instead\.$/.exec(line);

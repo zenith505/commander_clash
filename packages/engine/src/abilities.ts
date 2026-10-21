@@ -80,6 +80,8 @@ export interface AmountExpr {
   half?: "up" | "down";
   /** It may be below 0: doubling a creature's power gives it +X/+0 for a negative X too (CR 107.1b, 701.10c). */
   signed?: true;
+  /** "If X is 6 or more, ... twice X damage ... instead" (Shatterskull Smashing): twice as much when the X announced is this or more. */
+  twiceIfX?: number;
 }
 
 /** What an amount counts. */
@@ -145,6 +147,8 @@ export type Count =
   /** "~'s power", "its toughness", "that creature's mana value": as it is now, or as it last existed (CR 608.2h). */
   | { kind: "power" | "toughness" | "manaValue"; of: ObjRef }
   | { kind: "life"; who: PlayerRef }
+  /** "The number of experience counters you have" (CR 122.1). */
+  | { kind: "experience"; who: PlayerRef }
   /** "Your speed": 0 if you have none (CR 702.179f). */
   | { kind: "speed" }
   /** "The number of creatures in your party" (CR 700.8): 0 to 4. */
@@ -159,6 +163,8 @@ export type Count =
   | { kind: "devotion"; colors: Color[] }
   /** "For each Aura attached to it", "each Equipment attached to it". */
   | { kind: "attachedToSelf"; subtypes: string[] }
+  /** "Enchanted creature gets +1/+1 for each Aura and Equipment attached to it" (Mantle of the Ancients): attached to the permanent the static ability's effect is applied to. */
+  | { kind: "attachedToAffected"; subtypes: string[] }
   /** Domain: "basic land type among lands you control". */
   | { kind: "basicLandTypes" }
   /** Vivid: "the number of colors among permanents you control" (white, blue, black, red, green; colorless isn't one, CR 105.2c). */
@@ -307,6 +313,11 @@ export interface TargetSpec {
    * resolves (`bindBound`). Until then, any value.
    */
   bound?: { key: "power" | "toughness" | "manaValue"; at: "most" | "least" | "exact"; amount: AmountExpr };
+  /**
+   * "With mana value less than or equal to the number of cards in its controller's graveyard" (Drown in the Loch): each
+   * candidate against its own controller's graveyard, as it's chosen and as it resolves (CR 601.2c, 608.2b).
+   */
+  mvAtMostControllersGraveyard?: true;
   /**
    * `attackedThisTurn`: "creatures that attacked this turn" (declared as attackers this turn, CR 508.1).
    * `couldButDidntAttack`: "creatures that didn't attack this turn, except for creatures that couldn't attack" (Season of
@@ -457,7 +468,7 @@ export interface TargetSpec {
    * variable number of targets, announced as it's cast (CR 601.2c), any number from 0 (115.6), up to X, or exactly X. This one entry stands for all of them until then;
    * `expandMany` (modes.ts) makes it that many targets, and the effects' references to it cover them all.
    */
-  many?: "any" | "x" | "exactX";
+  many?: "any" | "x" | "exactX" | /** "Another target for each time ~ was kicked" (Comet Storm): as many as times kicked, made so as it's cast (gateBody). */ "kicked";
   /**
    * "For each opponent, destroy up to one target artifact that player controls": one "up to one" target for each
    * opponent, controlled by that opponent (CR 601.2c, 115.6). This one entry stands for all of them until the targets
@@ -776,7 +787,12 @@ export type Modification =
   | { kind: "setColors"; colors: Color[]; chosen?: true } // layer 5
   | { kind: "addColors"; colors: Color[] } // layer 5, "is blue in addition to its other colors"
   /** Layer 6. `spares`: "This effect doesn't remove ~": the protection it grants doesn't make its source fall off (Cho-Manno's Blessing). */
-  | { kind: "addKeywords"; keywords: string[]; spares?: true }
+  /**
+   * `sharedAmongYours`: "creatures you control gain first strike until end of turn if a creature you control has first
+   * strike. The same is true for flying, ..." (Odric, Lunarch Marshal): of `keywords`, those a creature its controller
+   * controls has as it resolves, a variant such as hexproof from white included (rulings).
+   */
+  | { kind: "addKeywords"; keywords: string[]; spares?: true; sharedAmongYours?: true }
   | { kind: "removeKeywords"; keywords: string[] } // layer 6
   | { kind: "loseAllAbilities" } // layer 6
   /**
@@ -1435,6 +1451,11 @@ export type Effect =
       attachToSubject?: boolean;
       /** An Aura "attached to target opponent" (Accursed Witch): this target, if the Aura could enchant it (CR 303.4f). */
       attachToTarget?: number;
+      /**
+       * "Attached to enchanted creature" (Mantle of the Ancients): the creature the source Aura is attached to as this
+       * resolves, or was last attached to if it has left (rulings); each card only if it could be attached to it.
+       */
+      attachToEnchanted?: true;
       /** The Enduring cycle's "It's an enchantment. (It's not a creature.)": its new card types as it enters. */
       becomes?: { types: string[]; subtypes: string[] };
       /** "That creature gains haste until end of turn" ("endOfTurn"), "It gains haste" ("game": for as long as it's that object). */
@@ -1753,7 +1774,7 @@ export type Effect =
    */
   | { type: "ownersGainControl"; filter: TargetSpec }
   | { type: "groupRules"; affects: Affects; /** The group as the card says it, for the log. */ text: string; mods: Modification[]; duration: "endOfTurn" | "yourNextTurn" }
-  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game" | "yourNextTurn" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; giveTo?: PlayerRef; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind }
+  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game" | "yourNextTurn" | "endOfYourNextTurn" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; giveTo?: PlayerRef; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind }
   /**
    * Attach the source (an Equipment or Aura) to `what`, CR 701.3; `source`: another Equipment instead ("Attach target
    * Equipment you control to target creature you control", Brass Squire).
@@ -2099,6 +2120,8 @@ export type Effect =
   | { type: "emblem"; who: PlayerRef; abilities: string[] }
   /** "You get {E}{E}" (CR 107.14): energy counters on a player (CR 122.1). */
   | { type: "getEnergy"; who: PlayerRef; n: Amount }
+  /** "You get an experience counter" (CR 122.1): a counter on the player, counted by other abilities. */
+  | { type: "getExperience"; who: PlayerRef; n: Amount }
   /** Unearth (CR 702.84a): return the source card from your graveyard to the battlefield with haste, exiled at the next end step or if it would leave. */
   | { type: "unearth" }
   /** Rebound's delayed trigger (CR 702.88a): "you may cast this card from exile without paying its mana cost". */
@@ -2392,6 +2415,10 @@ export type SpellCondition =
   | { kind: "destroyedThisWay"; died?: true }
   /** "Sacrifice a creature. When you do, ..." (Tip the Scales): this ability's instructions sacrificed something. */
   | { kind: "sacrificedThisWay" }
+  /** "If another Desert was returned this way" (Arid Archway): its "return a ... you control" pick returned one, as it last existed, other than its source. */
+  | { kind: "bouncedThisWay"; subtype: string; another: true }
+  /** "You may put a land card from among them onto the battlefield tapped. If you don't, ..." (Planar Genesis): its last dig took a card. */
+  | { kind: "digTook" }
   /** "If excess damage was dealt this way" (Orbital Plunge): this spell's or ability's damage dealt some (Count excessThisWay). */
   | { kind: "excessDealt"; /** "To a creature this way" (Vikya): only excess dealt to a creature counts. */ creature?: true; /** "If the creature the opponent controls is dealt excess damage this way" after a fight (The Last Agni Kai): only that target's. */ target?: number }
   /**
@@ -2404,6 +2431,12 @@ export type SpellCondition =
   /** "If the sacrificed creature was suspected" (Agency Coroner): the creature its sacrifice cost sacrificed, as it last
    * existed on the battlefield (CR 608.2h), where being suspected is a designation it had (CR 701.60). */
   | { kind: "sacrificedSuspected" }
+  /**
+   * "If the discarded card wasn't a land card" (Grab the Prize), "was a creature card" (Moria Scavenger): the card a
+   * discard cost discarded (StackItem.costDiscarded), as it is in the graveyard. Costs are paid after targets are chosen
+   * (CR 601.2c, 601.2h), so no target depends on it.
+   */
+  | { kind: "discardedIs"; filter: TargetSpec }
   /** "If this spell was foretold" (CR 702.143c): it was a foretold card before it was cast, whatever it cost. */
   | { kind: "foretold" }
   /** "If ~ was bargained" (CR 702.166b). */
@@ -2774,6 +2807,8 @@ export interface TriggeredAbility {
   countersKind?: string;
   /** For "selfCountersPut" / "permanentCountersPut": "whenever you put one or more counters on ...", only counters this ability's controller puts. */
   countersByYou?: true;
+  /** For "permanentCountersPut": "on a permanent or player" (All Will Be One), counters put on a player too. */
+  countersOrPlayer?: true;
   /** For "selfCountersPut": "when the twelfth hour counter is put on ~", only when the count goes from below this to at least it. */
   countersReach?: number;
   /**
@@ -3284,6 +3319,8 @@ export interface CostMod {
   nth?: number;
   /** Only while this holds: a Class level's (CR 716.2a). */
   if?: StaticCondition;
+  /** "... for each experience counter you have" (Mizzix): `n` that many times, for the permanent's controller. */
+  times?: AmountExpr;
   text: string;
 }
 
@@ -3421,7 +3458,20 @@ export type CountMod =
    * down" (`putter` "opponent", op `halfDown`): it matters who puts the counters, not who controls what gets them
    * (rulings). On a player's counters too.
    */
-  | { what: "counters"; putter: "you" | "opponent"; op: "double" | "halfDown"; counter?: undefined; on?: undefined; who?: undefined; other?: undefined };
+  | {
+      what: "counters";
+      putter: "you" | "opponent";
+      op: "double" | "halfDown" | "plusOne";
+      /**
+       * Only counters put on these (Lae'zel: "on a creature or planeswalker you control or on yourself", Doc Samson: "on a
+       * permanent you control"); unset = any permanent or player.
+       */
+      putOn?: "creatureOrPlaneswalkerYouControlOrYou" | "permanentYouControl";
+      counter?: undefined;
+      on?: undefined;
+      who?: undefined;
+      other?: undefined;
+    };
 
 /**
  * What a gift gives the chosen opponent (CR 702.174d-i): "Gift a card" means they draw a card, "Gift a Food" that they
@@ -3871,6 +3921,11 @@ export interface CompiledCard {
    * controller may cast spells like these any time they could cast an instant.
    */
   flashFor?: TargetSpec[];
+  /**
+   * "Creature cards you own that aren't on the battlefield have flash" (Teferi, Mage of Zhalfir): those cards of its
+   * controller's have flash wherever they are but the battlefield, whoever casts them (CR 702.8a).
+   */
+  flashOwned?: TargetSpec[];
   /** "Whenever enchanted land is tapped for mana, its controller adds an additional {G}" and the like (CR 605.1b). */
   manaTriggers?: ManaTrigger[];
   countMods?: CountMod[];
@@ -3898,6 +3953,8 @@ export interface CompiledCard {
      * slot, "" for one; Muldrotha's are the permanent types, a spell using one of its own types (rulings).
      */
     once?: string[];
+    /** "A permanent spell with mana value 2 or less" (Lurrus): the spell's, its X counted (CR 202.3e), as it's cast. */
+    maxMv?: number;
   }[];
   /** Muldrotha: "you may play a land ... from your graveyard" once during each of your turns. */
   landFromGraveyardOnce?: true;

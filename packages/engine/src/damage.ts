@@ -10,7 +10,7 @@ import { compileCard } from "./oracle";
 import { liveEmblems } from "./emblems";
 import { commanderOf } from "./mutate";
 import { evalAmount } from "./amounts";
-import { playerCountersToPut, putCounters, tokenBatch, withPutter } from "./counters";
+import { batchPlayerCounters, putPlayerCounters, putCounters, tokenBatch, withPutter } from "./counters";
 import { createExtraTokens, createToken } from "./effects/run-tokens";
 import { fireEvent } from "./effects";
 import { bindChosen, objectMatches, playerProtectedFrom } from "./effects/targeting";
@@ -197,8 +197,7 @@ export function dealDamage(
   } else {
     const p = player(s, to.player);
     if (has(src, "Infect")) {
-      const k = withPutter(src.controller, () => playerCountersToPut(s, p.id, "poison", n));
-      p.poison = (p.poison ?? 0) + k;
+      const k = withPutter(src.controller, () => putPlayerCounters(s, p.id, "poison", n));
       log(s, `${src.name} deals ${n} damage to ${p.name} (${k} poison counter${k === 1 ? "" : "s"}).`);
     } else {
       // "Damage that would reduce your life total to less than 1 reduces it to 1 instead" (Ali from Cairo): the damage is
@@ -234,9 +233,8 @@ export function dealDamage(
       // Freerunning (CR 702.173a): an Assassin creature or a commander, as it was when it dealt the damage, lets its
       // controller pay freerunning costs this turn.
       if (src.types.includes("Creature") && (src.subtypes.includes("Assassin") || src.commanderId) && !(s.freerunningThisTurn ??= []).includes(src.controller)) s.freerunningThisTurn.push(src.controller);
-      const toxic = withPutter(src.controller, () => playerCountersToPut(s, p.id, "poison", toxicValue(src.keywords)));
+      const toxic = withPutter(src.controller, () => putPlayerCounters(s, p.id, "poison", toxicValue(src.keywords)));
       if (toxic > 0) {
-        p.poison = (p.poison ?? 0) + toxic;
         log(s, `${p.name} gets ${toxic} poison counter${toxic === 1 ? "" : "s"} (toxic).`);
       }
     }
@@ -1066,13 +1064,16 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
   playerBatch = new Map();
   const outerCreatures = creatureBatch;
   creatureBatch = [];
-  const out = plan.final.map((e) => {
-    const lifelink = typeof opts.lifelink === "function" ? opts.lifelink(e) : opts.lifelink;
-    const o = "object" in e.to ? obj(s, e.to.object) : undefined;
-    const to = o ? { object: o } : { player: (e.to as { player: PlayerId }).player };
-    const dealt = o && o.zone !== "battlefield" ? 0 : dealDamage(s, e.src, to, e.n, { combat: e.combat, lifelink, shielded: true, witherCounters });
-    return { ...e, dealt };
-  });
+  // Poison counters from several sources at once are put as one event (rulings on All Will Be One).
+  const out = batchPlayerCounters(s, () =>
+    plan.final.map((e) => {
+      const lifelink = typeof opts.lifelink === "function" ? opts.lifelink(e) : opts.lifelink;
+      const o = "object" in e.to ? obj(s, e.to.object) : undefined;
+      const to = o ? { object: o } : { player: (e.to as { player: PlayerId }).player };
+      const dealt = o && o.zone !== "battlefield" ? 0 : dealDamage(s, e.src, to, e.n, { combat: e.combat, lifelink, shielded: true, witherCounters });
+      return { ...e, dealt };
+    }),
+  );
   for (const [key, n] of witherCounters) {
     const [id, by] = key.split("|") as [ObjectId, PlayerId];
     const o = obj(s, id);

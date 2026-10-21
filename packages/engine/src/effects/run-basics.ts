@@ -1,5 +1,5 @@
 import type { DamageRecipient, Effect, PlayerRef } from "../abilities";
-import { playerCountersToPut } from "../counters";
+import { putPlayerCounters } from "../counters";
 import { cardIdOf, defOf, objHasKeyword, objIsType, power, toughness } from "../cards";
 import { addPhases, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, log, loseLife, obj, player, playerLoses, winGame } from "../game";
 import { MONARCH } from "../oracle";
@@ -287,19 +287,19 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     }
     case "poison":
       for (const pid of players(s, e.who, ctx)) {
-        const n = playerCountersToPut(s, pid, "poison", e.upTo !== undefined ? Math.max(0, e.upTo - (player(s, pid).poison ?? 0)) : amountNow(s, e.n, ctx));
+        const n = putPlayerCounters(s, pid, "poison", e.upTo !== undefined ? Math.max(0, e.upTo - (player(s, pid).poison ?? 0)) : amountNow(s, e.n, ctx));
         if (n <= 0) continue;
         const p = player(s, pid);
-        p.poison = (p.poison ?? 0) + n;
         log(s, `${p.name} gets ${n === 1 ? "a poison counter" : `${n} poison counters`}.`);
       }
       return;
     case "loseAllCounters":
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
-        if (!p.poison && !p.energy) continue;
+        if (!p.poison && !p.energy && !p.experience) continue;
         p.poison = 0;
         p.energy = 0;
+        p.experience = 0;
         log(s, `${p.name} loses all counters.`);
       }
       return;
@@ -315,11 +315,16 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     }
     case "getEnergy":
       for (const pid of players(s, e.who, ctx)) {
-        const n = playerCountersToPut(s, pid, "energy", amountNow(s, e.n, ctx));
+        const n = putPlayerCounters(s, pid, "energy", amountNow(s, e.n, ctx));
         if (n <= 0) continue;
         const p = player(s, pid);
-        p.energy = (p.energy ?? 0) + n;
         log(s, `${p.name} gets ${"{E}".repeat(Math.min(n, 10))}${n > 10 ? ` (${n})` : ""}.`);
+      }
+      return;
+    case "getExperience":
+      for (const pid of players(s, e.who, ctx)) {
+        const n = putPlayerCounters(s, pid, "experience", amountNow(s, e.n, ctx));
+        if (n > 0) log(s, `${player(s, pid).name} gets ${n === 1 ? "an experience counter" : `${n} experience counters`}.`);
       }
       return;
     case "ringTempts":

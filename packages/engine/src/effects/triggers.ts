@@ -143,6 +143,8 @@ export type TriggerSourceEvent =
   | { type: "untapped"; id: ObjectId }
   /** Counters were put on a permanent, `amount` of them, on the battlefield or as it entered (CR 122.6). */
   | { type: "countersPut"; id: ObjectId; counter: string; amount: number; /** Who put them (Hapatra's "whenever you put"). */ by: PlayerId }
+  /** Counters were put on a player (poison, energy), by `by` (All Will Be One's "whenever you put ... on a player"). */
+  | { type: "playerCountersPut"; player: PlayerId; counter: string; amount: number; by: PlayerId }
   /** A permanent became monstrous (CR 701.37b), with `x` the N, the X of its "when ~ becomes monstrous" abilities (701.37c). */
   | { type: "becameMonstrous"; id: ObjectId; x: number }
   /** A mutating spell merged with this permanent (CR 702.140d). */
@@ -781,6 +783,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const w = obj(s, id);
       const ctrl = controllerOf(s, w);
       add(w, ctrl, (e, t) => e === "permanentCountersPut" && kindOk(t, ctrl) && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false) && !(t.tappedFilter.notSource && id === o.id), undefined, undefined, o, undefined, undefined, undefined, info);
+    }
+  } else if (ev.type === "playerCountersPut") {
+    // "Whenever you put one or more counters on a permanent or player" (All Will Be One): "that much" is how many.
+    const info = { amount: ev.amount, player: ev.player };
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      const ctrl = controllerOf(s, w);
+      add(w, ctrl, (e, t) => e === "permanentCountersPut" && !!t.countersOrPlayer && (t.countersKind === undefined || t.countersKind === ev.counter) && (!t.countersByYou || ev.by === ctrl), undefined, undefined, undefined, undefined, undefined, undefined, info);
     }
   } else if (ev.type === "exerted") {
     // Exert's linked "When you do" (CR 607.2h), and "whenever you exert a creature" (the creature is the subject).

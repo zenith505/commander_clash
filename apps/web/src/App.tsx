@@ -1296,7 +1296,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           )}
           {pending?.kind === "searchLibrary" && (
             <LibrarySearch
-              key={pending.source + pending.cards.join(",")}
+              key={`${pending.source}${pending.min}-${pending.max}${pending.cards.join(",")}`}
               s={s}
               pending={pending}
               onHover={setHover}
@@ -2802,6 +2802,11 @@ function Seat({
             ⚡ {p.energy}
           </span>
         )}
+        {(p.experience ?? 0) > 0 && (
+          <span className="energy" title={`${p.experience} experience counter${p.experience === 1 ? "" : "s"}.`}>
+            ★ XP {p.experience}
+          </span>
+        )}
         {p.speed !== undefined && (
           <span className="energy" title={`Speed ${p.speed}${p.speed === 4 ? " (max speed)" : ""}: it increases once on each of their turns when an opponent loses life. Max speed is 4.`}>
             🏁 {p.speed === 4 ? "Max speed" : `Speed ${p.speed}`}
@@ -3987,7 +3992,8 @@ function Controls({
             </>
           ) : pending.how === "paid" ? (
             <>
-              <strong>{pending.source}:</strong> cast <strong>{d.name}</strong> from your graveyard for <ManaCost cost={madnessCastOf(s, HUMAN, pending.objectId) ?? ""} size="sm" />? Only now, and then you can&apos;t cast other spells this turn.
+              {/* Chandra, Torch of Defiance: the card just exiled, cast now or not at all. */}
+              <strong>{pending.source}:</strong> cast <strong>{d.name}</strong> from {o.zone === "exile" ? "exile" : "your graveyard"} for <ManaCost cost={madnessCastOf(s, HUMAN, pending.objectId) ?? ""} size="sm" />? Only now{o.zone === "exile" ? "." : <>, and then you can&apos;t cast other spells this turn.</>}
             </>
           ) : pending.how === "discover" ? (
             <>

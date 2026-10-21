@@ -134,6 +134,11 @@ export function parseGrants(text: string): Modification[] | null {
       out.push({ kind: "addAbility", text: "Melee" });
       continue;
     }
+    // Annihilator too (CR 702.86b): "has trample and annihilator 2" (Eldrazi Conscription).
+    if (/^annihilator \d+$/i.test(w)) {
+      out.push({ kind: "addAbility", text: `Annihilator ${/\d+/.exec(w)![0]}` });
+      continue;
+    }
     // Myriad too: several instances each trigger (CR 702.116b).
     if (/^myriad$/i.test(w)) {
       out.push({ kind: "addAbility", text: "Myriad" });

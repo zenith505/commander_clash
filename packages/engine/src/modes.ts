@@ -140,12 +140,21 @@ export function castConditionMet(cond: SpellCondition, how: CastHow): boolean {
  * (CR 702.33g, 702.166d, 702.194c, 702.174m: "the spell is cast as if it did not have those targets").
  */
 export function gateTargets(specs: TargetSpec[], how: CastHow = {}): TargetSpec[] {
-  if (!specs.some((t) => t.onlyIf)) return specs;
-  return specs.map((t) => (t.onlyIf && castConditionMet(t.onlyIf.cond, how) === !!t.onlyIf.not ? { ...t, skip: true } : t));
+  return gateBody({ targets: specs, effects: [], text: "" }, how).targets;
+}
+
+/**
+ * The body as cast this way (see gateTargets); "another target for each time it was kicked" (Comet Storm) becomes that
+ * many targets (CR 601.2c, 702.33d), the effects' references to it covering them all.
+ */
+export function gateBody(b: AbilityBody, how: CastHow = {}): AbilityBody {
+  if (!hasGatedTargets(b.targets)) return b;
+  const gated = b.targets.some((t) => t.onlyIf) ? { ...b, targets: b.targets.map((t) => (t.onlyIf && castConditionMet(t.onlyIf.cond, how) === !!t.onlyIf.not ? { ...t, skip: true as const } : t)) } : b;
+  return gated.targets.some((t) => t.many === "kicked") ? expandMany(gated, how.kicks?.length ?? 0) : gated;
 }
 
 /** Whether some of these targets depend on how the spell is cast (see gateTargets). */
-export const hasGatedTargets = (specs: TargetSpec[]) => specs.some((t) => t.onlyIf);
+export const hasGatedTargets = (specs: TargetSpec[]) => specs.some((t) => t.onlyIf || t.many === "kicked");
 
 /** The target entry that stands for "any number of target ..." or "up to X target ..." (TargetSpec.many), or -1. */
 export const manySlot = (specs: TargetSpec[]): number => specs.findIndex((t) => t.many);
@@ -247,6 +256,9 @@ function spreadRefs<T>(x: T, i: number, n: number): T {
   if (typeof o.index === "number" && (typeof o.ref === "string" || o.type === "counterSpell" || o.type === "changeTarget")) {
     if (o.index > i) copy.index = o.index + n - 1;
     else if (o.index === i && (o.ref === "target" || o.ref === "anyTarget" || o.type === "counterSpell")) copy.n = n;
+    // "Choose any target, then choose another target for each time ~ was kicked. ~ deals X damage to each of them."
+    // (Comet Storm): a reference to targets from before the slot through it covers them all.
+    else if (o.index < i && typeof o.n === "number" && o.index + o.n > i && (o.ref === "target" || o.ref === "anyTarget")) copy.n = o.n + n - 1;
   }
   if (typeof o.target === "number" && Object.keys(o).length === 1 && o.target > i) copy.target = o.target + n - 1;
   return copy as T;

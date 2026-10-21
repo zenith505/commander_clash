@@ -75,6 +75,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.power && (!c.types.includes("Creature") || !inRange(c.power, spec.power))) return false;
   if (spec.toughness && (!c.types.includes("Creature") || !inRange(c.toughness, spec.toughness))) return false;
   if (spec.manaValue && !inRange(defMv(defOf(s, o)), spec.manaValue)) return false;
+  if (spec.mvAtMostControllersGraveyard && defMv(defOf(s, o)) > (s.players[c.controller]?.graveyard.length ?? 0)) return false;
   if (spec.manaCostIn && !spec.manaCostIn.includes(defOf(s, o).manaCost)) return false;
   if (spec.combat === "attacking" && o.attacking === undefined) return false;
   if (spec.combat === "attackingYou" && (o.attacking !== controller || o.attackingPermanent)) return false;
@@ -340,6 +341,7 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     // Nothing in the engine changes a spell's characteristics on the stack yet, so the card's are used. Its mana value
     // counts the X chosen for it (CR 202.3e); a face-down spell's is 0 (CR 708.2).
     if (spec.manaValue && !inRange(spellManaValue(s, item), spec.manaValue)) return false;
+    if (spec.mvAtMostControllersGraveyard && spellManaValue(s, item) > (s.players[item.controller]?.graveyard.length ?? 0)) return false;
     const { manaValue: _mv, ...rest } = spec;
     return printedMatches(rest, defOf(s, obj(s, item.objectId)));
   }
@@ -388,7 +390,9 @@ export function targetsMatch(s: GameState, targets: TargetChoice[], what: Target
 export function bindBound(s: GameState, spec: TargetSpec, ctx: AmountCtx): TargetSpec {
   if (!spec.bound) return spec;
   const { bound, ...rest } = spec;
-  const n = Math.max(0, evalAmount(s, bound.amount, ctx));
+  // Power and toughness may be below 0 (CR 107.1b): "power greater than target creature's power" with that at -2 takes a 0.
+  const n0 = evalAmount(s, bound.amount, ctx);
+  const n = bound.key === "manaValue" ? Math.max(0, n0) : n0;
   const old = rest[bound.key];
   const range: Range = bound.at === "exact" ? { min: Math.max(old?.min ?? n, n), max: Math.min(old?.max ?? n, n) } : bound.at === "most" ? { ...old, max: old?.max === undefined ? n : Math.min(old.max, n) } : { ...old, min: old?.min === undefined ? n : Math.max(old.min, n) };
   return { ...rest, [bound.key]: range };

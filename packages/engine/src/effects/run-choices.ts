@@ -276,6 +276,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !!s.resolving!.destroyed?.some((d) => !(e.cond as { died?: true }).died || d.died)
             : e.cond.kind === "sacrificedThisWay"
             ? !!s.resolving!.sacrificedThisWay?.length
+            : e.cond.kind === "digTook"
+            ? !!s.resolving!.digTook
+            : e.cond.kind === "bouncedThisWay"
+            ? !!s.resolving!.bouncedThisWay?.some((b) => b.subtypes.includes((e.cond as { subtype: string }).subtype) && b.id !== ctx.sourceId)
             : e.cond.kind === "excessDealt"
             ? (e.cond.target !== undefined ? (objects(s, { ref: "target", index: e.cond.target }, ctx).reduce((a, o) => a + (s.resolving!.excessTo?.[o.id] ?? 0), 0)) : e.cond.creature ? (s.resolving!.excessToCreatures ?? 0) : (s.resolving!.excessDamage ?? 0)) > 0
             : e.cond.kind === "rollIn"
@@ -324,6 +328,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (s.resolving!.item.kind === "spell" ? s.objects[s.resolving!.item.objectId ?? ""]?.castAlt : ctx.event?.castAlt) === e.cond.alt
             : e.cond.kind === "sacrificedSuspected"
             ? !!ctx.sacrificed?.[0]?.suspected
+            : e.cond.kind === "discardedIs"
+            ? ((f) => (s.resolving!.item.costDiscarded ?? []).some((k) => !!s.cards[k] && printedMatches(f, s.cards[k]!)))(e.cond.filter)
             : e.cond.kind === "suspected"
             ? objects(s, e.cond.what, ctx).some((o) => o.zone === "battlefield" && o.suspected !== undefined)
             : e.cond.kind === "state"

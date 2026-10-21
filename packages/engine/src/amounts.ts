@@ -65,7 +65,8 @@ export const isFixed = (a: Amount): a is number => typeof a === "number";
 /** The value of `a` right now. */
 export function evalAmount(s: GameState, a: Amount, ctx: AmountCtx): number {
   if (typeof a === "number") return a;
-  const v = evalCount(s, a.count, ctx) * (a.times ?? 1) + (a.plus ?? 0);
+  const v0 = evalCount(s, a.count, ctx) * (a.times ?? 1) + (a.plus ?? 0);
+  const v = a.twiceIfX !== undefined && (ctx.x ?? 0) >= a.twiceIfX ? v0 * 2 : v0;
   const n = a.signed ? v : Math.max(0, a.half ? halve(v, a.half) : v);
   return a.negate ? -n : n;
 }
@@ -209,6 +210,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "life":
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.life, 0);
+    case "experience":
+      return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (s.players[pid]!.experience ?? 0), 0);
     case "speed":
       return s.players[ctx.controller]?.speed ?? 0; // CR 702.179f
     case "punished":
@@ -357,6 +360,14 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         return o.attachedTo === me.id && (view(o)?.subtypes ?? []).some((st) => c.subtypes.includes(st));
       }).length;
     }
+    case "attachedToAffected": {
+      const me = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
+      if (!me) return 0;
+      return s.battlefield.filter((id) => {
+        const o = s.objects[id]!;
+        return o.attachedTo === me.id && (view(o)?.subtypes ?? []).some((st) => c.subtypes.includes(st));
+      }).length;
+    }
     case "graveyardCardTypes": {
       const types = new Set<string>();
       for (const pid of refPlayers(s, c.who, ctx)) for (const id of s.players[pid]!.graveyard) for (const t of defOf(s, s.objects[id]!).types) types.add(t);
@@ -451,7 +462,8 @@ export function describeAmount(a: Amount): string {
   const t = a.times ?? 1;
   const times = t === 1 ? base : t === -1 ? `-${base}` : `${t} × ${base}`;
   const v0 = a.plus ? `${times} ${a.plus > 0 ? "+" : "-"} ${Math.abs(a.plus)}` : times;
-  const v = a.half ? `half ${v0}, rounded ${a.half}` : v0;
+  const v1 = a.half ? `half ${v0}, rounded ${a.half}` : v0;
+  const v = a.twiceIfX !== undefined ? `${v1} (twice that if X is ${a.twiceIfX} or more)` : v1;
   return a.negate ? `-(${v})` : v;
 }
 
@@ -507,6 +519,8 @@ function describeCount(c: Count): string {
       return `#${c.filter ? c.filter.text.replace(/^target /, "") : "cards"} in graveyard`;
     case "life":
       return "life";
+    case "experience":
+      return "experience counters";
     case "speed":
       return "speed";
     case "punished":
@@ -532,6 +546,7 @@ function describeCount(c: Count): string {
     case "devotion":
       return "devotion";
     case "attachedToSelf":
+    case "attachedToAffected":
       return `#${c.subtypes.join("/")} attached`;
     case "basicLandTypes":
       return "#basic land types";

@@ -816,6 +816,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
       else if (found.length && e.into === "exile") log(s, `${p.name} exiles ${names(found)}${e.play ? " and may play it this turn" : ""}.`);
       else if (found.length) log(s, `${p.name} puts ${e.into === "hand" ? (e.reveal || e.filter ? names(found) : found.length === 1 ? "a card" : `${found.length} cards`) + " into their hand" : e.into === "battlefield" ? names(found) + " onto the battlefield" : names(found) + " back on top"}.`);
       if (e.into === "battlefield" || faceDown) r.created = [];
+      r.digTook = found.length > 0;
       enterTogether(s, () => {
         for (const id of found) {
           if (e.into === "hand") moveObject(s, id, "hand");

@@ -29,6 +29,10 @@ export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | nul
   // "target player or planeswalker", "target opponent or planeswalker" (Lava Axe): a player, or a planeswalker permanent.
   const pw = /^target (player|opponent) or planeswalker$/i.exec(p);
   if (pw) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", types: ["Planeswalker"], ...(pw[1]!.toLowerCase() === "opponent" ? { opponent: true } : {}), text: p.toLowerCase() }) };
+  // All Will Be One, Nicol Bolas, God-Pharaoh: "target opponent, creature an opponent controls, or planeswalker an opponent
+  // controls".
+  if (/^target opponent, creature an opponent controls, or planeswalker an opponent controls$/i.test(p))
+    return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", types: ["Creature", "Planeswalker"], opponent: true, controller: "opponent", text: p.toLowerCase() }) };
   // "Target player or battle", "target opponent or battle" (Ayara), "another target battle or opponent" (Invasion of
   // Regatha: not itself, CR 115.4): a player, or a battle permanent.
   const battle = /^(another )?target (?:(player|opponent) or battle|battle or (player|opponent))$/i.exec(p);
@@ -488,6 +492,8 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   let p = phrase.trim().replace(/\b(non[a-z]+), (?=non[a-z]+ )/gi, "$1 ");
   // "Creatures you control that are enchanted or equipped" (Halvar, God of Battle): "enchanted-or-equipped creatures you control".
   p = p.replace(/^((?:all |each )?)(creatures) (you control) that are (enchanted or equipped|enchanted|equipped)$/i, (_, a: string, k: string, w: string, st: string) => `${a}${st.replace(/ /g, "-")} ${k} ${w}`);
+  // "All nonland permanents that aren't legendary" (Urza's Ruinous Blast): the nonlegendary ones.
+  p = p.replace(/^((?:all |each )?)([a-z ]+?) that (?:aren't|are not|isn't|is not) legendary$/i, "$1nonlegendary $2");
   const all = /^(all|each) /i.exec(p);
   if (all) p = p.slice(all[0].length);
   const other = /^other /i.test(p);
@@ -546,6 +552,13 @@ export function parseTargetPhrase(
   let p = phrase.trim().toLowerCase();
   const text = `target ${p}`;
   const extra: Partial<TargetSpec> = {};
+  // Drown in the Loch: each candidate's own controller's graveyard.
+  const loch = / with mana value less than or equal to the number of cards in its controller's graveyard$/i.exec(p);
+  if (loch) {
+    extra.mvAtMostControllersGraveyard = true;
+    p = p.slice(0, loch.index);
+    phrase = phrase.trim().slice(0, loch.index);
+  }
   // "Card with mana value less than or equal to ~'s power from your graveyard", "creature with power less than or equal to the
   // number of Islands you control": the amount as written, read first since it may hold words of its own (TargetSpec.bound).
   // Wishing Well: "with mana value equal to the number of coin counters on ~".

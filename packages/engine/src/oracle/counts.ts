@@ -15,6 +15,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   let p = text.trim().replace(/\.$/, "").replace(/ and\/or /g, " or ");
   let m: RegExpExecArray | null;
   if (ctx?.milledThisWay && /^the total mana value of those cards$/i.test(p)) return { count: { kind: "milledManaValue" } };
+  // "The number of experience counters you have", "for each experience counter you have" (CR 122.1).
+  if ((each && /^experience counter you have$/i.test(p)) || /^the number of experience counters you have$/i.test(p)) return { count: { kind: "experience", who: { ref: "you" } } };
   // Arithmetic around a count.
   if ((m = /^twice (.+)$/i.exec(p))) {
     const c = parseCount(m[1]!, ctx);
@@ -219,8 +221,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return of && count({ kind: "counters", counter: counterKind(m[1]!), of });
   }
   // "Aura attached to it", "Equipment attached to ~": only the permanent's own.
-  if ((m = /^(Aura|Equipment)s? attached to (it|~)$/i.exec(p)) && (ctx === null || ctx.selfIt || /~/.test(m[2]!)))
-    return count({ kind: "attachedToSelf", subtypes: [capital(m[1]!.toLowerCase()) === "Aura" ? "Aura" : "Equipment"] });
+  // "Aura and Equipment attached to it" (Champion of the Flame): one of either.
+  if ((m = /^(Aura|Equipment|Aura and Equipment)s? attached to (it|~)$/i.exec(p)) && (ctx === null || ctx.selfIt || /~/.test(m[2]!)))
+    return count({ kind: "attachedToSelf", subtypes: /and/.test(m[1]!) ? ["Aura", "Equipment"] : [capital(m[1]!.toLowerCase()) === "Aura" ? "Aura" : "Equipment"] });
   // "Differently named lands you control" (Awakened Amalgam), "differently named artifact tokens you control" (Gimbal).
   if ((m = /^differently named (.+?) you control$/i.exec(p))) {
     const c = parseCount(`${m[1]} you control`, ctx, each);
@@ -278,6 +281,10 @@ export function halfX(word: string | undefined, ctx: Ctx | null): AmountExpr | n
  * hand with mana value less than or equal to that damage", see HOST_TRIGGERS).
  */
 export function parseBoundCount(text: string, ctx: Ctx): AmountExpr | null {
+  // "Destroy all creatures with power greater than target creature's power" (Fell the Mighty): a spell's own target, its
+  // power as the spell resolves (rulings).
+  const of = ctx.spell && /^target creature's (power|toughness)$/.exec(text);
+  if (of) return { count: { kind: of[1] as "power" | "toughness", of: { ref: "target", index: addTarget(ctx, { kind: "object", types: ["Creature"], text: "target creature" }) } } };
   return text === "X" ? { count: { kind: "x" } } : parseCount(text, ctx);
 }
 
@@ -327,6 +334,9 @@ function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
     if ((x === "that creature's" && ctx.subject) || ctx.subjectIt) return { ref: "subject" };
     // The permanent itself; after it left the battlefield, as it last existed (CR 608.2h).
     if (x === "its" && (ctx.selfIt || ctx.selfCard || ctx.activated)) return { ref: "self" };
+    // "Return target creature card from your graveyard to the battlefield. You gain life equal to that creature's
+    // toughness" (Cleric Class): the card targeted, as the permanent it became (rulings).
+    if (x === "that creature's" && ctx.targets.length === 1 && ctx.targets[0]!.kind === "card" && ctx.targets[0]!.types?.includes("Creature")) return { ref: "target", index: 0 };
   }
   return null;
 }

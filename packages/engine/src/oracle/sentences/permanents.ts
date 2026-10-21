@@ -255,7 +255,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // Adapt N (CR 701.46a), Monstrosity N (CR 701.37a): only the permanent's own activated abilities do it.
   if ((m = /^(Adapt|Monstrosity) (\d+|X)$/.exec(s))) return ctx.activated ? [{ type: m[1] === "Adapt" ? "adapt" : "monstrosity", n: amt(m[2]!) }] : null;
   // Regeneration (CR 701.19a)
-  if ((m = /^Regenerate (~|target .+|enchanted creature|equipped creature)$/i.exec(s))) {
+  // "Regenerate each creature you control" (Golgari Charm): a shield for each, as it resolves (CR 701.19a, 611.2c).
+  if ((m = /^Regenerate (~|target .+|enchanted creature|equipped creature|each creature you control|all creatures you control)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "regenerate", what }] : null;
   }
@@ -286,6 +287,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const first = parseSentence(`Put ${m[1]} on ~`, ctx);
     const second = first && parseSentence(`Put ${m[4]} on ~`, ctx);
     if (first && second) return [...first, ...second];
+  }
+  // "Put a +1/+1 counter and a lifelink counter on target creature" (Unexpected Fangs): the same on the target.
+  if ((m = new RegExp(`^Put (${NUMX} ${COUNTER} counters?) and (${NUMX} ${COUNTER} counters?) on (target .+)$`, "i").exec(s))) {
+    const before = ctx.targets.length;
+    const first = parseSentence(`Put ${m[1]} on ${m[7]}`, ctx);
+    const second = first && ctx.targets.length === before + 1 && ctx.lastObjectTarget === before ? parseSentence(`Put ${m[4]} on it`, ctx) : null;
+    if (first && second) return [...first, ...second];
+    ctx.targets.length = before;
   }
   // "Choose an artifact or creature you control. Create a token that's a copy of it" (Season of Weaving): picked as it
   // resolves, not targeted (rulings); "it" is the one picked.
@@ -398,6 +407,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: m[2] ? "endOfTurn" : "game" }] : null;
   }
+  // Treasure Nabber: "gain control of that artifact until the end of your next turn", the trigger's subject; ends in the
+  // cleanup step of your next turn (CR 514.2, 611.2a).
+  if ((m = /^[Gg]ain control of it( until end of turn| until the end of your next turn)?$/.exec(s)) && ctx.subjectIt)
+    return [{ type: "continuous", what: { ref: "subject" }, mods: [{ kind: "control" }], duration: m[1] === " until end of turn" ? "endOfTurn" : m[1] ? "endOfYourNextTurn" : "game" }];
   // "Target player gains control of target permanent you control" (Donate), "An opponent gains control of ~" (Wishclaw
   // Talisman): an opponent you choose as it resolves (rulings). Layer 2, for the rest of the game.
   if ((m = /^(Target player|Target opponent) gains control of (target .+)$/.exec(s))) {

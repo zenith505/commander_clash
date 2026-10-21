@@ -416,6 +416,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const n = parseCount(m[1]!, ctx);
     return n && [{ type: "getEnergy", who: { ref: "you" }, n }];
   }
+  // Experience counters (CR 122.1): "you get an experience counter", "... for each player who discarded a card this turn".
+  if ((m = new RegExp(`^(?:[Yy]ou )?[Gg]et ${NUMX} experience counters?$`).exec(s))) return [{ type: "getExperience", who: { ref: "you" }, n: amt(m[1]!) }];
+  if ((m = /^(?:[Yy]ou )?[Gg]et an experience counter for each (.+)$/.exec(s))) {
+    const n = parseCount(m[1]!, ctx, true);
+    return n && [{ type: "getExperience", who: { ref: "you" }, n }];
+  }
   // The monarch (CR 725).
   if (/^You become the monarch$/i.test(s)) return [{ type: "becomeMonarch", who: { ref: "you" } }];
   // "You may play an additional land this turn", "you may play up to two additional lands this turn" (CR 305.2a).
@@ -600,6 +606,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!who || !half || (who.ref === "you") !== (m[2]!.toLowerCase() === "your")) return null;
     return [{ type: "loseLife", who, n: { count: { kind: "life", who: { ref: "eachOne" } }, half } }];
   }
+  // "Target player gains twice X life" (Heliod's Intervention): X times 2.
+  if ((m = /^(.+?) (gains?|loses?) twice X life$/i.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    if (!who) return null;
+    const x = amt("X") as AmountExpr;
+    return [{ type: m[2]!.startsWith("gain") ? "gainLife" : "loseLife", who, n: { ...x, times: 2 } }];
+  }
   if ((m = new RegExp(`^(.+?) (gains?|loses?) ${NUMX} life$`, "i").exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     if (!who) return null;
@@ -627,6 +640,24 @@ function addDivided(ctx: Ctx, amount: string | AmountExpr, among: string, what: 
   // targets as there is damage at most, like "any number of", but none at all is fine too (CR 115.6; rulings on
   // Ravenous Gigantotherium: "You may choose zero targets").
   const upTo = /^up to (\w+)$/.exec(among);
+  // "X damage divided as you choose among up to two target creatures and/or planeswalkers" (Shatterskull Smashing): up to
+  // that many targets, each dealt at least 1 of the X announced as it's cast (CR 601.2d, rulings).
+  if (upTo && amount === "X" && upTo[1] !== "X" && !ctx.whereX) {
+    const n = num(upTo[1]!);
+    if (!(n >= 2 && n <= 10) || what === "targets") return null;
+    const words = what.replace(/^target /, "").replace(/ your opponents control$/, " an opponent controls").replace(/ and\/or /g, " or ");
+    const one = words.replace(/\bcreatures\b/g, "creature").replace(/\bplaneswalkers\b/g, "planeswalker");
+    const spec0 = one === words ? null : parseTargetPhrase(one);
+    if (spec0?.kind !== "object") return null;
+    const spec: TargetSpec = { ...spec0, text: `target ${one}` };
+    const x: AmountExpr = { count: { kind: "x" } };
+    const first = ctx.targets.length;
+    const divided = { first, n, total: 0, amount: x, upTo: true as const };
+    for (let k = 0; k < n; k++) addTarget(ctx, { ...spec, divided, optional: true, ...(k ? { distinctFrom: Array.from({ length: k }, (_, j) => first + j) } : {}) });
+    ctx.lastObjectTarget = undefined;
+    ctx.lastTargets = { index: first, n };
+    return { index: first, n, amount: x };
+  }
   if (upTo && upTo[1] !== "X") {
     if (typeof amount !== "string" || !/^\w+$/.test(amount) || amount === "X" || num(upTo[1]!) !== num(amount)) return null;
     among = "any number of";

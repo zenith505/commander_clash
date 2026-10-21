@@ -72,7 +72,7 @@ export function countersToPut(s: GameState, o: GameObject, kind: string, n: numb
   const ops = modsInPlay(s)
     .filter(({ mod, controller, source }) => {
       if (mod.what !== "counters" || ((mod.other || entering) && source === o.id)) return false;
-      if ("putter" in mod && mod.putter) return putterFits(s, mod, controller, putter);
+      if ("putter" in mod && mod.putter) return putterFits(s, mod, controller, putter) && (!mod.putOn || (owner === controller && (mod.putOn === "permanentYouControl" || isCreature || types.includes("Planeswalker"))));
       return (mod.counter === undefined || mod.counter === kind) && fits(mod.on!) && (mod.who === "any" || controller === owner);
     })
     .map(({ mod }) => mod.op);
@@ -84,9 +84,46 @@ export function playerCountersToPut(s: GameState, pid: PlayerId, kind: string, n
   if (n <= 0) return n;
   const putter = putterNow ?? pid;
   const ops = modsInPlay(s)
-    .filter(({ mod, controller }) => "putter" in mod && !!mod.putter && putterFits(s, mod, controller, putter))
+    .filter(({ mod, controller }) => "putter" in mod && !!mod.putter && putterFits(s, mod, controller, putter) && (!mod.putOn || (mod.putOn === "creatureOrPlaneswalkerYouControlOrYou" && pid === controller)))
     .map(({ mod }) => mod.op);
   return apply(n, ops, kind === "poison");
+}
+
+/**
+ * While set, the counters put on players at the same time (by combat damage from several sources with infect or toxic),
+ * keyed "player|putter|kind": one event for them all (rulings on All Will Be One).
+ */
+let playerCounterBatch: Map<string, number> | null = null;
+export function batchPlayerCounters<T>(s: GameState, fn: () => T): T {
+  const outer = playerCounterBatch;
+  playerCounterBatch = new Map();
+  let out: T;
+  const batch = playerCounterBatch;
+  try {
+    out = fn();
+  } finally {
+    playerCounterBatch = outer;
+  }
+  for (const [key, amount] of batch) {
+    const [player, by, counter] = key.split("|") as [string, string, string];
+    fireEvent(s, { type: "playerCountersPut", player: Number(player), counter, amount, by: Number(by) });
+  }
+  return out;
+}
+
+/**
+ * Put `n` poison, energy or experience counters on a player through Vorinclex-style mods (playerCountersToPut); returns how many were
+ * put on. "Whenever you put one or more counters on a ... player" sees who put them (CR 122.6).
+ */
+export function putPlayerCounters(s: GameState, pid: PlayerId, kind: "poison" | "energy" | "experience", n: number): number {
+  const m = playerCountersToPut(s, pid, kind, n);
+  if (m <= 0) return 0;
+  const p = s.players.find((x) => x.id === pid)!;
+  p[kind] = (p[kind] ?? 0) + m;
+  const by = putterNow ?? pid;
+  if (playerCounterBatch) playerCounterBatch.set(`${pid}|${by}|${kind}`, (playerCounterBatch.get(`${pid}|${by}|${kind}`) ?? 0) + m);
+  else fireEvent(s, { type: "playerCountersPut", player: pid, counter: kind, amount: m, by });
+  return m;
 }
 
 type TokenKind = Pick<TokenSpec, "types" | "subtypes">;

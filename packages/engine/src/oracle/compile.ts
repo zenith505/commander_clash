@@ -296,6 +296,10 @@ export function normalizeSelf(d: CardDef): string {
   }
   // In a quoted ability the card gives something else, its name still means the card (CR 201.5a), not the
   // object with the ability, which is "~" there: mark it so that text isn't compiled as "~".
+  // A token's name is a name, not the card ("a 3/3 blue Serpent creature token named Koma's Coil", "a 0/1 red Kobold
+  // creature token named Kobolds of Kher Keep").
+  const tokenNames: string[] = [];
+  t = t.replace(/(tokens? named )([A-Z][\w'-]*(?: (?:of |the )?[A-Z][\w'-]*)*)/g, (_, a: string, n: string) => `${a}\u0001${tokenNames.push(n) - 1}\u0001`);
   if (full) {
     t = t.replace(/"[^"]*"/g, (q) => q.replace(new RegExp(esc(full), "g"), QUOTED_SOURCE_NAME));
     t = t.replace(new RegExp(esc(full), "g"), "~");
@@ -311,6 +315,7 @@ export function normalizeSelf(d: CardDef): string {
     t = t.replace(/"[^"]*"/g, (q) => q.replace(re, QUOTED_SOURCE_NAME));
     t = t.replace(re, "~");
   }
+  t = t.replace(/\u0001(\d+)\u0001/g, (_, i: string) => tokenNames[Number(i)]!);
   // A legendary character card refers to itself as "he" or "she" ("Put a +1/+1 counter on Hercules. He gains
   // vigilance", "his power", "attach up to one target Equipment to her"): the card itself, like "it" (CR 201.5). Not in
   // a quoted ability, where it would mean the object given the ability, and not "his or her" (an old way to say "their").
@@ -1142,14 +1147,16 @@ export function compile(d: CardDef): CompiledCard {
     // permission used once each turn (rulings: the spell's costs are paid, its timing rules followed). Muldrotha: "During
     // each of your turns, you may play a land and cast a permanent spell of each permanent type from your graveyard."
     // Kess: "If a spell cast this way would be put into your graveyard, exile it instead."
-    const onceYard = /^Once during each of your turns, you may cast an? (.+?) spell from your graveyard\.( If a spell cast this way would be put into your graveyard, exile it instead\.)?$/.exec(line);
+    const onceYard = /^Once during each of your turns, you may cast an? (.+?) spell( with mana value \d+ or less)? from your graveyard\.( If a spell cast this way would be put into your graveyard, exile it instead\.)?$/.exec(line);
     if (onceYard || line === "During each of your turns, you may play a land and cast a permanent spell of each permanent type from your graveyard.") {
-      const filter = parseTargetPhrase(`${onceYard ? onceYard[1]!.replace(/ and /g, " or ") : "permanent"} card from a graveyard`);
-      if (filter?.kind !== "card" || filter.manaValue || filter.bound) out.unsupported.push(raw);
+      const filter = parseTargetPhrase(`${onceYard ? onceYard[1]!.replace(/ and /g, " or ") : "permanent"} card${onceYard?.[2] ?? ""} from a graveyard`);
+      // Lurrus: "a permanent spell with mana value 2 or less", the spell's mana value (Count X, CR 202.3e).
+      const maxMv = filter?.manaValue && filter.manaValue.min === undefined && filter.manaValue.max !== undefined && onceYard ? filter.manaValue.max : undefined;
+      if (filter?.kind !== "card" || (filter.manaValue && maxMv === undefined) || filter.bound) out.unsupported.push(raw);
       else {
-        const { owner: _, ...f } = filter;
+        const { owner: _, manaValue: _mv, ...f } = filter;
         const once = onceYard ? [""] : ["Artifact", "Creature", "Enchantment", "Planeswalker", "Battle"];
-        (out.graveyardGrants ??= []).push({ filter: { ...f, text: `${onceYard?.[1] ?? "permanent"} cards` }, way: { kind: "turnPermission", costs: [], exile: !!onceYard?.[2] }, yourTurn: true, once });
+        (out.graveyardGrants ??= []).push({ filter: { ...f, text: `${onceYard?.[1] ?? "permanent"} cards` }, way: { kind: "turnPermission", costs: [], exile: !!onceYard?.[3] }, yourTurn: true, once, ...(maxMv !== undefined ? { maxMv } : {}) });
         if (!onceYard) out.landFromGraveyardOnce = true;
       }
       continue;
@@ -1580,6 +1587,10 @@ export function compile(d: CardDef): CompiledCard {
       out.crewsAs = { ...(crewsAs[2] ? { n: Number(crewsAs[2]) } : { toughness: true as const }), saddles: !!crewsAs[1] };
       continue;
     }
+    if (line === "Creature cards you own that aren't on the battlefield have flash.") {
+      (out.flashOwned ??= []).push({ kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature cards you own" });
+      continue;
+    }
     const flashFor = /^You may cast (.*?)spells as though they had flash\.$/.exec(line);
     if (flashFor) {
       // "Aura and Equipment spells" (Sigarda's Aid): each of them.
@@ -1941,6 +1952,9 @@ export function compile(d: CardDef): CompiledCard {
     // commanderPairProblem).
     // "Doctor's companion" too (CR 702.124m).
     if (/^(?:Partner—(?:Character select|Father & son|Friends forever|Survivors)|Doctor's companion)$/.test(line)) continue;
+    // Companion works only outside the game (CR 702.139a): from a revealed card set aside before the game. Decks here have
+    // no cards outside the game, so in a game it does nothing.
+    if (/^Companion ?— ?.+$/.test(line)) continue;
     // "Partner with [name]" is two abilities (CR 702.124j): the deck-building one (commanderPairProblem) and "When this
     // permanent enters, target player may search their library for a card named [name], reveal it, put it into their
     // hand, then shuffle."
@@ -2185,6 +2199,10 @@ export function compile(d: CardDef): CompiledCard {
     if (!out.spell || v.unsupported.length || !v.spell || targets(v.spell)) out.unsupported.push(`Overload ${overload.mana}`);
   }
   linkExile(out);
+  // "Attached to enchanted creature" (Mantle of the Ancients): only an Aura that enchants a creature has one.
+  const bodies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])];
+  if (bodies.some((b) => allEffects(b.effects).some((e) => e.type === "putOntoBattlefield" && e.attachToEnchanted)) && !(d.subtypes.includes("Aura") && out.enchant?.kind === "object" && out.enchant.types?.includes("Creature")))
+    out.unsupported.push("(attached to enchanted creature, but it isn't an Aura enchanting a creature)");
   // An Aura put onto the battlefield needs a choice of what it enchants (CR 303.4f), which isn't modeled.
   if (d.subtypes.includes("Aura") && out.activated.some((ab) => ab.zone === "graveyard" && ab.body.effects.some((e) => e.type === "putOntoBattlefield"))) out.unsupported.push("(an Aura returning itself to the battlefield)");
   const json = JSON.stringify(out);
@@ -2345,6 +2363,10 @@ function checkCastingLinks(out: CompiledCard) {
   visit([out.costMods, out.activationTaxes]);
   if (out.nameBans || out.protectionFromChosenName) needs.add("cardName");
   if ([...needs].some((k) => !choices.has(k))) bad = true;
+  // "If the discarded card ..." needs a discard cost: the spell's, or the activated ability's own.
+  const discIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"discardedIs"');
+  if (discIn(out.spell) && !out.additionalCosts?.some((c) => c.kind === "discard")) bad = true;
+  if (discIn(out.triggers) || discIn(out.statics) || out.activated.some((ab) => discIn(ab) && !ab.costs?.some((c) => c.kind === "discard"))) bad = true;
   // "If evidence was collected" needs the "you may collect evidence N" it's linked to (CR 701.59c): in the spell, or its
   // permanent's enters trigger.
   const evidenceIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"evidence"');

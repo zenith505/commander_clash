@@ -2,7 +2,7 @@ import type { Effect, Modification, TokenSpec } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
 import { auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, log, moveObject, obj, opponents, player, removeFromCombat, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
-import { playerCountersToPut, putCounters, tokenBatch, withPutter } from "../counters";
+import { putPlayerCounters, putCounters, tokenBatch, withPutter } from "../counters";
 import { compileCard } from "../oracle";
 import type { ContinuousEffect, GameObject, GameState, ObjectId, PlayerId } from "../types";
 import { setFace } from "../faces";
@@ -101,8 +101,9 @@ export function proliferate(s: GameState, you: PlayerId, src: string): ObjectId[
   for (const p of s.players) {
     if (p.lost) continue;
     if (p.id === you) {
-      if (p.energy) (p.energy += playerCountersToPut(s, p.id, "energy", 1)), names.push(`${p.name} (energy)`);
-    } else if (p.poison) (p.poison += playerCountersToPut(s, p.id, "poison", 1)), names.push(`${p.name} (poison)`);
+      if (p.energy) putPlayerCounters(s, p.id, "energy", 1), names.push(`${p.name} (energy)`);
+      if (p.experience) putPlayerCounters(s, p.id, "experience", 1), names.push(`${p.name} (experience)`);
+    } else if (p.poison) putPlayerCounters(s, p.id, "poison", 1), names.push(`${p.name} (poison)`);
   }
   log(s, `${src}: ${player(s, you).name} proliferates${names.length ? ` (${names.join(", ")})` : ""}.`);
   fireEvent(s, { type: "proliferated", player: you });
@@ -819,7 +820,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         sourceName: src,
         sourceId: ctx.sourceId,
         duration: e.duration,
-        ...(e.duration === "yourNextTurn" ? { turnOf: ctx.controller } : {}),
+        ...(e.duration === "yourNextTurn" ? { turnOf: ctx.controller } : e.duration === "endOfYourNextTurn" ? { turnOf: ctx.controller, sinceTurn: s.turn } : {}),
         ...(whileTapped ? { whileTapped } : {}),
         ...(whileControlled ? { whileControlled } : {}),
         ...(e.whileCounter ? { whileCounter: e.whileCounter } : {}),
@@ -827,7 +828,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         mods,
       });
       const names = affected.map((id) => defOf(s, obj(s, id)).name);
-      log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, mods, ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : e.duration === "whileTapped" ? ` for as long as ${src} remains tapped` : e.duration === "whileControlled" ? ` for as long as ${player(s, ctx.controller).name} controls ${src}` : ""}.`);
+      log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, mods, ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : e.duration === "endOfYourNextTurn" ? ` until the end of ${player(s, ctx.controller).name}'s next turn` : e.duration === "whileTapped" ? ` for as long as ${src} remains tapped` : e.duration === "whileControlled" ? ` for as long as ${player(s, ctx.controller).name} controls ${src}` : ""}.`);
       return;
     }
     case "ownersGainControl": {

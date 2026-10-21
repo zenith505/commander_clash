@@ -3,7 +3,7 @@
 // type", and Command Beacon's choice between two commanders.
 import { expect, test } from "@playwright/test";
 import { invalidateCharacteristics } from "@cc/engine";
-import { LANDS, idsOf, one, open, pageErrors, scene, state } from "./scene";
+import { LANDS, idsOf, one, open, pageErrors, playUntil, scene, state } from "./scene";
 import { card, controls, menu, modal, resolveUntil } from "./ui";
 
 test("Rhystic Study: the bar says the bot may draw unless you pay {1}", async ({ page }) => {
@@ -30,8 +30,10 @@ test("Arcane Denial: at the next upkeep, buttons to draw two, one or none", asyn
   const top = (await state(page)).stack[0]!.id;
   await page.locator(`[data-stack="${top}"]`).click();
   await resolveUntil(page, (st) => st.stack.length === 0 && st.objects[denial]!.zone === "graveyard");
-  expect((await state(page)).objects[divination]!.zone).toBe("graveyard");
-  await resolveUntil(page, (x) => x.pending?.kind === "chooseOption" && x.pending.what === "drawUpTo" && x.pending.player === 0, 200);
+  const resolved = await state(page);
+  expect(resolved.objects[divination]!.zone).toBe("graveyard");
+  // On to the next upkeep in the engine (for speed).
+  await open(page, playUntil(resolved, (x) => x.pending?.kind === "chooseOption" && x.pending.what === "drawUpTo" && x.pending.player === 0));
   // Both spells left the hand; both of Arcane Denial's draws are yours.
   const hand = s.players[0]!.hand.length - 2;
   const bar = controls(page);

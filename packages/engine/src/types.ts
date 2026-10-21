@@ -859,6 +859,8 @@ export interface PendingTrigger {
 }
 
 export interface LastKnown {
+  /** The object it was (a card keeps its id in its new zone): "another permanent card" than the one sacrificed this way. */
+  id?: ObjectId;
   counters?: Record<string, number>;
   /** Its card types as it last existed (CR 608.2h): "a permanent that shares a card type with it" (Braids). */
   types?: string[];

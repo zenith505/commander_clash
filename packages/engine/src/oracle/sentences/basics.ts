@@ -639,6 +639,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!who || !half || (who.ref === "you") !== (m[2]!.toLowerCase() === "your")) return null;
     return [{ type: "loseLife", who, n: { count: { kind: "life", who: { ref: "eachOne" } }, half } }];
   }
+  // "Each opponent loses life equal to the life they lost this turn" (Wound Reflection): each their own, counted as the
+  // ability resolves, so a second one counts the first one's loss too (rulings).
+  if ((m = /^(Each opponent|Each player|Target opponent|Target player) loses life equal to the life (?:they|that player) lost this turn$/i.exec(s))) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    return who ? [{ type: "loseLife", who, n: { count: { kind: "lifeLostThisTurn", who: who.ref === "eachOpponent" || who.ref === "eachPlayer" ? { ref: "eachOne" } : who } } }] : null;
+  }
   // "Target player gains twice X life" (Heliod's Intervention): X times 2.
   if ((m = /^(.+?) (gains?|loses?) twice X life$/i.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);

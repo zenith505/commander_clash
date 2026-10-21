@@ -253,6 +253,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "lifeGainedThisTurn":
       return s.turnLog?.lifeGained?.[ctx.controller] ?? 0;
+    case "lifeLostThisTurn":
+      return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (s.turnLog?.lifeLost?.[pid] ?? 0), 0);
     case "opponentsLifeLost":
       return Object.entries(s.turnLog?.lifeLost ?? {}).reduce((n, [p, v]) => (Number(p) !== ctx.controller ? n + v : n), 0);
     case "kicked":
@@ -583,6 +585,8 @@ function describeCount(c: Count): string {
       return "#creatures in your party";
     case "opponentsLifeLost":
       return "life your opponents lost this turn";
+    case "lifeLostThisTurn":
+      return "life lost this turn";
     case "devotion":
       return "devotion";
     case "attachedToSelf":

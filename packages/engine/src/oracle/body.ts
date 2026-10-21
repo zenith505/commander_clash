@@ -1029,6 +1029,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: inner });
       continue;
     }
+    // "Each player sacrifices a creature of their choice. If you sacrificed a creature this way, you may return another
+    // permanent card from your graveyard to the battlefield." (Rise of the Witch-king): chosen after the sacrifices, and
+    // not the card you sacrificed (rulings).
+    const sacYou = /^If you sacrificed a creature this way, you may return another permanent card from your graveyard to the battlefield$/.exec(s);
+    if (sacYou && sacPrev?.type === "pick" && sacPrev.action === "sacrifice" && sacPrev.who.ref === "eachPlayer" && sacPrev.n === 1 && !sacPrev.unless && sacPrev.filter?.types?.join() === "Creature") {
+      const inner = parseOne("Return a permanent card from your graveyard to the battlefield", ctx);
+      if (inner?.length !== 1 || inner[0]!.type !== "chooseFromGraveyard") return null;
+      effects.push({ type: "if", cond: { kind: "sacrificedThisWay", you: true }, effects: [{ ...inner[0]!, upTo: true, notSacrificed: true }] });
+      continue;
+    }
     // "Return a land you control to its owner's hand. If another Desert was returned this way, surveil 1" (Arid Archway).
     const bounced = /^If another ([A-Z][a-z]+) was returned this way, (.+)$/.exec(s);
     if (bounced && sacPrev?.type === "pick" && sacPrev.action === "bounce" && sacPrev.who.ref === "you" && sacPrev.n === 1 && !sacPrev.unless && !ctx.spell) {
@@ -3653,7 +3663,7 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     // Gathering): the one creature picked (kept in `created` too).
     const picked = last?.type === "pick" && (last.action === "counters" || last.action === "choose") && last.n === 1 && last.who.ref === "you" && !last.among;
     ctx.lastCreated = ((last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1) || (faceDown && last.count === 1) || ctx.lastPut || picked;
-    ctx.lastCreatedAny = last?.type === "createToken" || last?.type === "createTokenCopy" || last?.type === "myriad" || faceDown;
+    ctx.lastCreatedAny = last?.type === "createToken" || last?.type === "createTokenCopy" || last?.type === "myriad" || faceDown || (last?.type === "returnAllFromGraveyard" && !last.toHand);
     if (last?.type === "amass") ctx.amassed = true;
     if (last?.type === "damage" || last?.type === "bite" || last?.type === "fight") ctx.excessDamage = true;
     // "Creatures you control get +1/+1 until end of turn. Untap those creatures": the ones it changed (CR 611.2c).

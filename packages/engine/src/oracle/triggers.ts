@@ -1516,7 +1516,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       let ifKicked: SpellCondition | undefined;
       const kicked = /^if it was kicked(?: with its ((?:\{[^}]+\})+) kicker)?, (.+)$/i.exec(body0);
       if (kicked) {
-        if (event !== "selfEnters") return "fail" as const;
+        // "When you cast ~, if it was kicked, exile target land." (Sowing Mycospawn): the spell as it was cast.
+        if (event !== "selfEnters" && event !== "selfCast") return "fail" as const;
         ifKicked = { kind: "kicked", ...(kicked[1] ? { cost: kicked[1] } : {}) };
         body0 = kicked[2]!;
       }

@@ -1,7 +1,7 @@
 // Teamwork's tap pick and "choose both", Akroma's Will's two modes with a commander, the conspire pick, the gift
 // picker, tribute's two prompts, hideaway's pick, face-down card and later play, and cipher's encode prompt.
 import { expect, test } from "@playwright/test";
-import { LANDS, one, open, pageErrors, scene, state } from "./scene";
+import { LANDS, one, open, pageErrors, playWithBots, scene, state } from "./scene";
 import { attack, card, clickPlayer, controls, menu, modal, resolveUntil, seat } from "./ui";
 
 const named = (s: Awaited<ReturnType<typeof state>>, pid: number, name: string) =>
@@ -118,8 +118,8 @@ test("Fanatic of Xenagos: you choose who decides on tribute; when a bot's tribut
   // Ben (a bot) decides.
   now = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && st.objects[mine]!.zone === "battlefield");
   expect(now.objects[mine]!.tribute?.to).toBe(2);
-  // Ana casts hers on her turn and chooses you, with the most life.
-  now = await resolveUntil(page, (st) => st.pending?.kind === "chooseOption" && st.pending.what === "tributePay" && st.pending.player === 0, 200);
+  // Ana casts hers on her turn and chooses you, with the most life (her turn played in the engine, for speed).
+  await open(page, playWithBots(now, (st) => st.pending?.kind === "chooseOption" && st.pending.what === "tributePay" && st.pending.player === 0));
   await expect(controls(page)).toContainText("pay tribute 1?");
   await controls(page).getByRole("button", { name: "Don't" }).click();
   now = await resolveUntil(page, (st) => st.log.some((l) => /doesn't pay tribute/.test(l.text)));

@@ -756,6 +756,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
     if (t !== undefined && !CREATURE_TYPES.has(t)) return null;
     return [{ kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) }, ...(t ? [{ kind: "addTypes" as const, types: [], subtypes: [t] }] : [])];
   }
+  // Maha, Its Feathers Night: "have base toughness 1" (layer 7b, CR 613.4b).
+  if ((m = /^(?:has|have) base toughness (\d+)$/.exec(rest))) return [{ kind: "setToughness", toughness: Number(m[1]) }];
   const IS = "is an? ([A-Z][a-z]+) in addition to its other types";
   if ((m = new RegExp(`^${IS}$`).exec(rest))) return typed(m[1]!, []);
   if ((m = new RegExp(`^${IS},? and ((?:has|have) .+)$`).exec(rest))) return typed(m[1]!, [m[2]!]);
@@ -934,6 +936,12 @@ export function parseStatic(line: string): StaticAbility | null {
 function parseTransform(line: string): StaticAbility | null {
   const head = /^(Enchanted (?:creature|permanent)|Equipped creature) (.+)$/.exec(line.replace(/\.$/, ""));
   if (!head) return null;
+  // "... with base power and toughness 1/1 named Legitimate Businessperson" (Witness Protection): its name too (layer 3).
+  const named = /^(.+ is an? [^"]+?) named ([A-Z][A-Za-z' ,-]+)$/.exec(head[2]!);
+  if (named) {
+    const rest = parseTransform(`${head[1]} ${named[1]}`);
+    return rest && { ...rest, mods: [{ kind: "setName", name: named[2]! }, ...rest.mods], text: line };
+  }
   const quotes: string[] = [];
   const rest = head[2]!
     .replace(/"[^"]*"/g, (q) => `\u0001${quotes.push(q) - 1}\u0001`)

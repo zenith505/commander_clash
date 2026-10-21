@@ -2,8 +2,8 @@
 // fame player's creature (when you cast it), Delina's "Roll again?" and Ancient Brass Dragon's targets with total mana
 // value up to the roll.
 import { expect, test } from "@playwright/test";
-import { applyAction, botActions, controllerOf, nextRandom, waitingOn, type GameState, type PlayerId } from "@cc/engine";
-import { LANDS, one, open, pageErrors, scene } from "./scene";
+import { applyAction, controllerOf, nextRandom, type GameState } from "@cc/engine";
+import { LANDS, one, open, pageErrors, playWithBots, scene } from "./scene";
 import { card, controls, modal, resolveUntil } from "./ui";
 
 /** Seed the game's dice so the next d`sides` rolls come out as `values`. */
@@ -18,23 +18,10 @@ function rig(s: GameState, sides: number, values: number[]) {
   throw new Error("no such seed");
 }
 
-/** Play on in the engine (bots answer their prompts, you pass or attack with `attackers`) until `done`. */
-function stepUntil(s: GameState, done: (s: GameState) => boolean, attackers: [string, PlayerId][] = []): GameState {
-  for (let i = 0; i < 300; i++) {
-    if (done(s)) return s;
-    const pid = waitingOn(s)!;
-    if (s.pending?.kind === "declareAttackers" && pid === 0) s = applyAction(s, { type: "declareAttackers", player: 0, attacks: attackers.map(([attacker, defender]) => ({ attacker, defender })) });
-    else if (pid !== 0) s = applyAction(s, botActions(s, pid)[0]!);
-    else if (!s.pending) s = applyAction(s, { type: "passPriority", player: 0 });
-    else throw new Error(`stepUntil: a ${s.pending.kind} prompt for you`);
-  }
-  throw new Error("stepUntil: never got there");
-}
-
 test("Seize the Spotlight cast by Ana: choose Fortune with its button; she draws a card and makes a Treasure", async ({ page }) => {
   // Ana's bot casts it in her main phase.
   let s: GameState = scene({}, [{ hand: ["Seize the Spotlight"], board: LANDS }]);
-  s = stepUntil(s, (st) => st.pending?.kind === "chooseOption" && st.pending.player === 0);
+  s = playWithBots(s, (st) => st.pending?.kind === "chooseOption" && st.pending.player === 0);
   const hand = s.players[1]!.hand.length;
   await open(page, s);
   const bar = controls(page);
@@ -67,9 +54,9 @@ test("Delina: a 15—20 roll makes a copy and asks Roll again?; Yes rolls once m
   let s: GameState = scene({ board: ["Delina, Wild Mage", "Grizzly Bears"] }, [{}]);
   const [delina, bears] = [one(s, "Delina, Wild Mage"), one(s, "Grizzly Bears")];
   rig(s, 20, [17, 4]);
-  s = stepUntil(s, (st) => st.pending?.kind === "chooseTargets" && st.pending.player === 0, [[delina, 1]]);
+  s = playWithBots(s, (st) => st.pending?.kind === "chooseTargets" && st.pending.player === 0, [[delina, 1]]);
   s = applyAction(s, { type: "chooseTargets", player: 0, targets: [{ kind: "object", id: bears }] });
-  s = stepUntil(s, (st) => st.pending?.kind === "chooseMay" && st.pending.player === 0);
+  s = playWithBots(s, (st) => st.pending?.kind === "chooseMay" && st.pending.player === 0);
   await open(page, s);
   const bar = controls(page);
   await expect(bar).toContainText("Delina, Wild Mage: Roll again?");
@@ -85,7 +72,7 @@ test("Ancient Brass Dragon: a roll of 6 lets you pick Grizzly Bears and Hill Gia
   let s: GameState = scene({ board: ["Ancient Brass Dragon"], yard: ["Grizzly Bears"] }, [{ yard: ["Hill Giant", "Llanowar Elves"] }]);
   const [dragon, bears, giant, elves] = [one(s, "Ancient Brass Dragon"), one(s, "Grizzly Bears"), one(s, "Hill Giant"), one(s, "Llanowar Elves")];
   rig(s, 20, [6]);
-  s = stepUntil(s, (st) => st.pending?.kind === "chooseTargets" && st.pending.player === 0, [[dragon, 1]]);
+  s = playWithBots(s, (st) => st.pending?.kind === "chooseTargets" && st.pending.player === 0, [[dragon, 1]]);
   await open(page, s);
   for (const id of [bears, giant]) await modal(page).locator(`[data-pick="${id}"]`).click();
   await modal(page).getByRole("button", { name: "Done" }).click();

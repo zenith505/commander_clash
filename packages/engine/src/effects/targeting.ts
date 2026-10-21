@@ -72,6 +72,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.named !== undefined && (o.faceDown || !hasName(c.name, spec.named))) return false;
   const hasKw = (k: string) => c.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
   if (spec.keywords?.some((k) => !hasKw(k))) return false;
+  if (spec.toxic && !c.keywords.some((x) => /^toxic\b/i.test(x))) return false;
   if (spec.notKeywords?.some(hasKw)) return false;
   // Power and toughness only exist for creatures (CR 208.3); a noncreature has neither.
   if (spec.power && (!c.types.includes("Creature") || !inRange(c.power, spec.power))) return false;
@@ -226,6 +227,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.chosen === "type" || spec.chosen === "color" || spec.chosen === "name" || spec.chosen === "typesChosen" || spec.counter) return false;
   const hasKw = (k: string) => d.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
   if (spec.keywords?.some((k) => !hasKw(k))) return false;
+  if (spec.toxic && !d.keywords.some((x) => /^toxic\b/i.test(x))) return false;
   if (spec.notKeywords?.some(hasKw)) return false;
   // Only creature cards have power and toughness (CR 208.3).
   const creature = d.types.includes("Creature");

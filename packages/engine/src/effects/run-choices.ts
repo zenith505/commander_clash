@@ -307,7 +307,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "destroyedThisWay"
             ? !!s.resolving!.destroyed?.some((d) => !(e.cond as { died?: true }).died || d.died)
             : e.cond.kind === "sacrificedThisWay"
-            ? !!s.resolving!.sacrificedThisWay?.length
+            ? !!s.resolving!.sacrificedThisWay?.some((k) => !(e.cond as { you?: true }).you || k.controller === ctx.controller)
             : e.cond.kind === "digTook"
             ? !!s.resolving!.digTook
             : e.cond.kind === "bouncedThisWay"

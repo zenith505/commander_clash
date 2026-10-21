@@ -518,8 +518,9 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   const whose = / (you control|your opponents control|an opponent controls|you don't control)\b/i;
   // "Attacking creatures get +1/+1 until end of turn": whichever are attacking as it resolves (CR 611.2c).
   const combat = /^(attacking|blocking|attacking or blocking) creatures\b/i.test(p);
-  // "Creatures of the chosen type get +3/+3 until end of turn": every creature of that type.
-  const ofChosen = /^creatures of the chosen type$/i.test(p);
+  // "Creatures of the chosen type get +3/+3 until end of turn": every creature of that type; "creatures that aren't of
+  // the chosen type get -3/-3" (Crippling Fear): every other creature.
+  const ofChosen = /^creatures (?:that aren't |not )?of the chosen type$/i.test(p);
   if (!all && !whose.test(p) && !bare && !combat && !ofChosen) return null;
   // The kinds come first; plurals become the singular parseTargetPhrase reads ("Elves" -> "Elf").
   const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of|that attacked this turn|that didn't attack this turn|that entered (?:the battlefield )?this turn)\b/i.exec(p);
@@ -747,6 +748,9 @@ export function parseTargetPhrase(
     // "Permanent ... with an even mana value" (Desecrate Reality; zero is even).
     extra.manaValue = { parity: m[1] as "even" | "odd" };
     p = p.slice(0, m.index);
+  } else if ((m = / with toxic( you control| you don't control| an opponent controls)?$/.exec(p))) {
+    extra.toxic = true;
+    p = p.slice(0, m.index) + (m[1] ?? "");
   } else if ((m = /(?:^| )(with|without) ([a-z ]+?)( you control| you don't control| an opponent controls)?$/.exec(p))) {
     // "Creature you control with flash or haste" (Shadow the Hedgehog): one of them is enough.
     const either = m[1] === "with" ? /^([a-z]+) or ([a-z]+)$/.exec(m[2]!) : null;

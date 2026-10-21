@@ -3,7 +3,7 @@
 // with a planeswalker may attack the planeswalker.
 import { expect, test } from "@playwright/test";
 import { invalidateCharacteristics, type GameState } from "@cc/engine";
-import { LANDS, one, open, pageErrors, scene } from "./scene";
+import { LANDS, one, open, pageErrors, playUntil, scene } from "./scene";
 import { attack, card, controls, menu, modal, resolveUntil, seat } from "./ui";
 
 /** Our commander on the battlefield instead of in the command zone. */
@@ -19,8 +19,8 @@ function commanderOut(s: GameState) {
 test("Scion of Halaster: at your next draw, pick which of the top two cards goes to the graveyard, then draw the other", async ({ page }) => {
   const s = commanderOut(scene({ commander: "Isamaru, Hound of Konda", board: ["Scion of Halaster"], library: ["Goblin Piker", "Hill Giant"] }));
   const [piker, giant] = [one(s, "Goblin Piker"), one(s, "Hill Giant")];
-  await open(page, s);
-  await resolveUntil(page, (st) => st.pending?.kind === "drawLook" && st.pending.player === 0, 300);
+  // Round the table to your next draw step in the engine (for speed).
+  await open(page, playUntil(s, (st) => st.pending?.kind === "drawLook" && st.pending.player === 0));
   const bar = controls(page);
   await expect(bar).toContainText("Isamaru, Hound of Konda:");
   await expect(bar).toContainText("instead of drawing");

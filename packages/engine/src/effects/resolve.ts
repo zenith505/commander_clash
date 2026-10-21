@@ -96,7 +96,7 @@ export function beginResolution(s: GameState, item: StackItem, body: AbilityBody
   // An amount bound ("with power less than or equal to ~'s power") is worked out again now (CR 608.2b), with the source as
   // it last existed if it has left (608.2h).
   const now: AmountCtx = { ...targetingCtx(s, item.controller, item.sourceId), ...(item.sourceZc !== undefined ? { sourceZc: item.sourceZc } : {}), ...(item.lki ? { lki: item.lki } : {}), x: item.x ?? 0 };
-  const legal = body.targets.map((spec, i) => !!targets[i] && isLegalTarget(s, bindBound(s, spec, now), targets[i]!, item.controller, src) && lesserPowerOk(s, spec, targets[i]!, item.sourceId));
+  const legal = body.targets.map((spec, i) => !!targets[i] && isLegalTarget(s, bindBound(s, spec, now), targets[i]!, item.controller, src) && lesserPowerOk(s, spec, targets[i]!, item.sourceId, item.sourceZc));
   checkTotals(s, body.targets, targets, legal);
   // With every target it chose now illegal, it doesn't resolve (CR 608.2b). One that chose none of its
   // "up to" targets isn't targeted at all, and resolves (CR 115.6).
@@ -234,9 +234,23 @@ export function apnap(s: GameState, pids: PlayerId[]): PlayerId[] {
   return order.filter((p) => pids.includes(p));
 }
 
+/** The creatures that convoked the resolving spell, or for an ability (an enters trigger), its source's spell (CR 702.51a). */
+export function convokedFor(s: GameState, ctx: ResolveCtx): { id: ObjectId; zc: number }[] {
+  const item = s.resolving?.item;
+  const o = item?.kind === "spell" ? s.objects[item.objectId ?? ""] : ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+  return o?.convoked ?? [];
+}
+
 export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[] {
   if (ref.ref === "castSpell") return []; // only counted (amounts.ts)
   if (ref.ref === "voted") return votedObjects(s);
+  if (ref.ref === "convoker" || ref.ref === "convokers") {
+    const list = convokedFor(s, ctx);
+    return (ref.ref === "convoker" ? list.slice(ref.index, ref.index + 1) : list).flatMap((c) => {
+      const o = s.objects[c.id];
+      return o?.zone === "battlefield" && (o.zoneChanges ?? 0) === c.zc ? [o] : [];
+    });
+  }
   if (ref.ref === "self") {
     const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
     // If it left the battlefield (even if it came back), it's a different object now (CR 400.7).

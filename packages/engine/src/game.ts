@@ -759,6 +759,7 @@ export function moveObject(
   if (!(fromZone === "stack" && to === "battlefield")) {
     o.kicked = undefined;
     o.colorsSpent = undefined;
+    o.convoked = undefined;
     o.manaSpent = undefined;
     o.spent = undefined;
     o.castAlt = undefined; // so is whether its evoke or dash cost was paid (CR 702.74a, 702.109a)
@@ -3621,6 +3622,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const kicks = choices.kicks?.length ? [...choices.kicks].sort() : undefined;
   o.kicked = kicks;
   o.colorsSpent = colorsSpent.length ? colorsSpent : undefined;
+  o.convoked = convoke?.length ? convoke.map((c) => ({ id: c, zc: obj(s, c).zoneChanges ?? 0 })) : undefined;
   o.manaSpent = manaSpent || undefined;
   // What was spent, by type, for "if {U} was spent to cast ~" and adamant (CR 601.2h).
   const spent: SpentMana = Object.fromEntries(Object.entries(paid.spent).filter(([, n]) => n > 0));
@@ -4165,9 +4167,9 @@ export const abilityCostsHaveX = (ab: ActivatedAbility): boolean => !!ab.costs?.
 
 /** Costs paid with objects the player picks; "discard a card at random" and "the top card of your graveyard" aren't. */
 const costNeedsPick = (c: AdditionalCost) =>
-  c.kind === "sacrifice" || (c.kind === "discard" && !c.random) || c.kind === "returnToHand" || c.kind === "tap" || c.kind === "reveal" || c.kind === "exileFromHand" || (c.kind === "exileFromGraveyard" && !c.top);
-const costPickKey = (c: AdditionalCost): "sacrifice" | "discard" | "returnToHand" | "tap" | "reveal" | "exileFromHand" | "exileCards" =>
-  c.kind === "exileFromGraveyard" ? "exileCards" : (c.kind as "sacrifice" | "discard" | "returnToHand" | "tap" | "reveal" | "exileFromHand");
+  c.kind === "sacrifice" || (c.kind === "discard" && !c.random) || c.kind === "returnToHand" || c.kind === "tap" || c.kind === "reveal" || c.kind === "exileFromHand" || (c.kind === "exileFromGraveyard" && !c.top) || c.kind === "removeCounters";
+const costPickKey = (c: AdditionalCost): "sacrifice" | "discard" | "returnToHand" | "tap" | "reveal" | "exileFromHand" | "exileCards" | "counters" =>
+  c.kind === "exileFromGraveyard" ? "exileCards" : c.kind === "removeCounters" ? "counters" : (c.kind as "sacrifice" | "discard" | "returnToHand" | "tap" | "reveal" | "exileFromHand");
 
 /** Does casting it this way have an X to announce in a cost beyond mana, as Toxic Deluge's "pay X life" (CR 107.3a)? */
 export function costsHaveX(d: CardDef, choices?: Pick<CostChoices, "via" | "alt" | "costOr">): boolean {
@@ -4190,6 +4192,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
   const both = [...(choices?.tap ?? []), ...(choices?.sacrifice ?? [])];
   if (new Set(both).size !== both.length) return "one permanent can't pay two costs";
   if (choices?.collect && !costs.some((c) => c.kind === "collectEvidence")) return `${d.name} doesn't ask you to collect evidence`;
+  if (choices?.counters?.length && !costs.some((c) => c.kind === "removeCounters")) return `${d.name} doesn't ask you to remove counters`;
   if (costs.filter((c) => c.kind === "collectEvidence").length > 1) return `${d.name} would collect evidence twice`;
   for (const c of costs) {
     if (c.kind === "collectEvidence") {
@@ -4204,6 +4207,20 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       continue;
     }
     if (c.kind === "revealHand") continue; // always possible, even with an empty or already revealed hand (rulings)
+    if (c.kind === "removeCounters") {
+      // Any mix of the counters on those permanents (CR 602.2b): as many as it says, each one there to remove.
+      const pool = counterCostCandidates(s, pid, o, c);
+      const what = `${c.n} ${c.counter ? `${c.counter} ` : ""}counter${c.n === 1 ? "" : "s"} from among ${c.filter.text}`;
+      const chosen = choices?.counters;
+      if (!chosen) {
+        if (pool.reduce((n, x) => n + x.n, 0) < c.n) return `you need to remove ${what} to ${doing}`;
+        continue;
+      }
+      const used = new Map<string, number>();
+      for (const x of chosen) used.set(`${x.id}|${x.kind}`, (used.get(`${x.id}|${x.kind}`) ?? 0) + 1);
+      if (chosen.length !== c.n || [...used].some(([k, n]) => n > (pool.find((x) => `${x.id}|${x.kind}` === k)?.n ?? 0))) return `choose ${what} to remove`;
+      continue;
+    }
     if (c.kind === "mill") {
       // Not with fewer cards in the library (CR 701.17b).
       if (p.library.length < c.n) return `you need ${c.n === 1 ? "a card" : `${c.n} cards`} in your library to mill to ${doing}`;
@@ -4291,6 +4308,18 @@ export function tapCostCandidates(s: GameState, pid: PlayerId, source: GameObjec
   });
 }
 
+/**
+ * The counters "Remove three counters from among other artifacts, creatures, and planeswalkers you control" can remove:
+ * each permanent you control that matches and each kind of counter on it (only `counter`'s kind if the cost names one).
+ */
+export function counterCostCandidates(s: GameState, pid: PlayerId, source: GameObject, c: Extract<AdditionalCost, { kind: "removeCounters" }>): { id: ObjectId; kind: string; n: number }[] {
+  return s.battlefield.flatMap((id) => {
+    const x = obj(s, id);
+    if (controllerOf(s, x) !== pid || (c.other && id === source.id) || !objectMatches(s, c.filter, x, pid, false)) return [];
+    return Object.entries(x.counters).filter(([k, n]) => n > 0 && (!c.counter || k === c.counter)).map(([kind, n]) => ({ id, kind, n }));
+  });
+}
+
 /** The cards still exiled with `o` by its linked exile ability, as this object (CR 607.2a, 400.7): Jester's Scepter's cost. */
 export function linkedExileCards(s: GameState, o: GameObject): ObjectId[] {
   return (s.linkedExile?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc).map((l) => l.id);
@@ -4335,6 +4364,15 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
         log(s, `${p.name} returns ${nameOf(s, id)} to ${player(s, obj(s, id).owner).name === p.name ? "their" : "its owner's"} hand.`);
         moveObject(s, id, "hand");
       }
+    } else if (c.kind === "removeCounters") {
+      const done = new Map<ObjectId, Record<string, number>>();
+      for (const x of choices.counters ?? []) {
+        const t = done.get(x.id) ?? {};
+        t[x.kind] = (t[x.kind] ?? 0) + 1;
+        done.set(x.id, t);
+      }
+      for (const [id, kinds] of done) for (const [kind, n] of Object.entries(kinds)) removeCountersCost(s, obj(s, id), { counter: kind, n });
+      log(s, `${p.name} removes ${[...done].map(([id, kinds]) => `${Object.entries(kinds).map(([k, n]) => `${n} ${k}`).join(" and ")} counter${Object.values(kinds).reduce((a, b) => a + b, 0) === 1 ? "" : "s"} from ${nameOf(s, id)}`).join(", ")}.`);
     } else if (c.kind === "tap") {
       const ids = choices.tap ?? [];
       for (const id of ids) tapPermanent(s, obj(s, id));

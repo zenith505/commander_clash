@@ -745,6 +745,12 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "Sacrifice any number of other permanents, then draw that many cards" (God-Eternal Bontu), "you may sacrifice any
     // number of other creatures. If you do, draw that many cards" (Sephiroth): any number, none too (CR 107.1c), picked
     // as it resolves; "that many" is how many were sacrificed (none: nothing to draw).
+    // Lethal Scheme: "Each creature that convoked ~ connives" (CR 702.51a, 701.50): one at a time (rulings), each of the
+    // creatures tapped for it, at most one for each mana its cost could have (here up to ten).
+    if (s === "Each creature that convoked ~ connives" && ctx.spell) {
+      for (let i = 0; i < 10; i++) effects.push({ type: "connive", what: { ref: "convoker", index: i }, n: 1 });
+      continue;
+    }
     // "Sacrifice any number of lands. Search your library for up to that many land cards, put them onto the battlefield
     // tapped, then shuffle." (Scapeshift): the same count.
     const anySac = /^(?:[Yy]ou may )?[Ss]acrifice any number of (other )?(.+)$/.exec(s);

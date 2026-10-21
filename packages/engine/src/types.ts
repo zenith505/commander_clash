@@ -400,6 +400,8 @@ export interface GameObject {
   kicked?: number[];
   /** As a spell, and as the permanent it became: the colors of mana spent to cast it (sunburst, CR 702.44a). */
   colorsSpent?: Color[];
+  /** The creatures tapped to convoke it as it was cast (CR 702.51a), as the permanents they were; kept by the permanent it becomes, like `kicked`. */
+  convoked?: { id: ObjectId; zc: number }[];
   /** The amount of mana spent to cast it (CR 601.2h), kept by the permanent the spell becomes. */
   manaSpent?: number;
   /** The mana spent to cast it by type (CR 601.2h), kept by the permanent the spell becomes ("if {U} was spent"). */
@@ -910,6 +912,8 @@ export interface CostChoices {
   evidence?: ObjectId[];
   /** "Collect evidence N" as a cost (an ability's, Conspiracy Unraveler's): the cards exiled from your graveyard for it. */
   collect?: ObjectId[];
+  /** "Remove three counters from among ... you control": one entry for each counter removed, which permanent and kind. */
+  counters?: { id: ObjectId; kind: string }[];
   /** Teamwork N: the untapped creatures you control, with total power N or more, tapped as you cast it. */
   teamwork?: ObjectId[];
   /**

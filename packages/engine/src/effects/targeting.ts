@@ -348,7 +348,7 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
   if (spec.kind === "card") {
     // A card in a graveyard (CR 109.2a). Nothing in the engine changes characteristics in a
     // graveyard, so the printed card is what's checked; hexproof only works on the battlefield.
-    if (o.zone !== "graveyard" || s.players[o.owner]?.lost) return false;
+    if (o.zone !== (spec.linkedExile ? "exile" : "graveyard") || s.players[o.owner]?.lost) return false;
     if (spec.owner === "you" && o.owner !== controller) return false;
     if (spec.owner === "opponent" && o.owner === controller) return false;
     return printedMatches(spec, defOf(s, o));
@@ -410,7 +410,8 @@ export function legalTargets(s: GameState, spec0: TargetSpec, controller: Player
     for (const pid of livingPlayers(s)) out.push({ kind: "player", id: pid });
   if (spec.kind === "object" || spec.kind === "any" || spec.orPermanent) for (const id of s.battlefield) out.push({ kind: "object", id });
   if (spec.kind === "spell") for (const item of s.stack) if (item.id !== excludeStackId) out.push({ kind: "stack", id: item.id });
-  if (spec.kind === "card") for (const pid of livingPlayers(s)) for (const id of player(s, pid).graveyard) out.push({ kind: "object", id });
+  if (spec.kind === "card" && spec.linkedExile) for (const l of linkedCards(s, sourceId)) out.push({ kind: "object", id: l.id, zc: l.zc });
+  else if (spec.kind === "card") for (const pid of livingPlayers(s)) for (const id of player(s, pid).graveyard) out.push({ kind: "object", id });
   return out.filter((t) => isLegalTarget(s, spec, t, controller, src) && lesserPowerOk(s, spec, t, sourceId));
 }
 
@@ -573,7 +574,20 @@ function relatedOk(s: GameState, spec: TargetSpec, chosen: TargetChoice[], t: Ta
  * "Target attacking creature with lesser power" (mentor): less than the source's power, its last known
  * power once it has left the battlefield (CR 702.134a, 608.2h).
  */
-export function lesserPowerOk(s: GameState, spec: TargetSpec, t: TargetChoice, sourceId: ObjectId | undefined): boolean {
+/**
+ * The cards exiled with this source that are still in exile (CR 607.2a): linked to it as it is now or, as an ability of
+ * it resolves after it left the battlefield, as it was (`zc`, CR 400.7).
+ */
+export function linkedCards(s: GameState, sourceId: ObjectId | undefined, zc?: number): { id: ObjectId; zc: number }[] {
+  const me = sourceId ? s.objects[sourceId] : undefined;
+  if (!me) return [];
+  const key = `${me.id}@${zc ?? me.zoneChanges ?? 0}`;
+  return (s.linkedExile?.[key] ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc);
+}
+
+export function lesserPowerOk(s: GameState, spec: TargetSpec, t: TargetChoice, sourceId: ObjectId | undefined, sourceZc?: number): boolean {
+  // "Target card exiled with ~": one of the cards linked to the source (CR 607.2a).
+  if (spec.linkedExile && t.kind === "object" && !linkedCards(s, sourceId, sourceZc).some((l) => l.id === t.id)) return false;
   if (!spec.lesserPowerThanSource || t.kind !== "object" || !sourceId) return true; // without the source, checked later
   const me = s.objects[sourceId];
   const mine = me?.zone === "battlefield" ? power(s, me) : s.lastKnown?.[sourceId]?.power;

@@ -1,5 +1,5 @@
 import type { Effect, Modification, TokenSpec } from "../abilities";
-import { cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
+import { abilitiesOf, cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
 import { auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, log, moveObject, obj, opponents, player, removeFromCombat, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { playerCountersToPut, putCounters, tokenBatch } from "../counters";
@@ -8,7 +8,7 @@ import type { ContinuousEffect, GameObject, GameState, ObjectId, PlayerId } from
 import { setFace } from "../faces";
 import { becomePrepared } from "../prepare";
 import { objectMatches } from "./targeting";
-import { ResolveCtx, objects, amountNow, fixMods, players, runEffect } from "./resolve";
+import { ResolveCtx, convokedFor, objects, amountNow, fixMods, players, runEffect } from "./resolve";
 import { createExtraTokens, createToken } from "./run-tokens";
 import { discardCards } from "./run-library";
 import { describeMods } from "./describe";
@@ -105,7 +105,17 @@ export function proliferate(s: GameState, you: PlayerId, src: string): ObjectId[
     } else if (p.poison) (p.poison += playerCountersToPut(s, p.id, "poison", 1)), names.push(`${p.name} (poison)`);
   }
   log(s, `${src}: ${player(s, you).name} proliferates${names.length ? ` (${names.join(", ")})` : ""}.`);
+  fireEvent(s, { type: "proliferated", player: you });
   return got;
+}
+
+/**
+ * How many times a player proliferates for one instruction to (`n`): twice as many for each Tekuthal they control, each
+ * one's replacement applying to the proliferating another made (CR 614.1a, 616.1).
+ */
+export function proliferateTimes(s: GameState, you: PlayerId, n: number): number {
+  const doublers = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === you && abilitiesOf(s, obj(s, id)).proliferateTwice).length;
+  return n * 2 ** doublers;
 }
 
 /** Counters that hurt the permanent they're on: -1/-1 shrinks it, stun keeps it from untapping (CR 122.1d). */
@@ -313,15 +323,16 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       return;
     }
     case "proliferate": {
+      const times = proliferateTimes(s, ctx.controller, e.twice ? 2 : 1);
       if (!e.thenPhaseOut) {
-        proliferate(s, ctx.controller, src);
+        for (let i = 0; i < times; i++) proliferate(s, ctx.controller, src);
         return;
       }
       // Ripples of Potential: then any number of your permanents that got a counter this way phase out (CR 702.26), chosen
       // after proliferating; none is fine (rulings: "any number" includes zero).
       const sc = (s.resolving!.scratch ??= {});
       if (!sc.chosen?.[ctx.controller]) {
-        const got = proliferate(s, ctx.controller, src).filter((id) => s.objects[id]?.zone === "battlefield" && controllerOf(s, obj(s, id)) === ctx.controller);
+        const got = [...new Set(Array.from({ length: times }, () => proliferate(s, ctx.controller, src)).flat())].filter((id) => s.objects[id]?.zone === "battlefield" && controllerOf(s, obj(s, id)) === ctx.controller);
         if (!got.length) return;
         sc.queue = [ctx.controller];
         sc.chosen = {};
@@ -365,6 +376,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
       if (!sc.connive) {
+        // "Each creature that convoked ~ connives": each one that did, gone or not (rulings), one at a time.
+        if (e.type === "connive" && e.what.ref === "convoker" && !convokedFor(s, ctx)[e.what.index]) return;
         const o = e.type === "connive" ? objects(s, e.what, ctx)[0] : undefined;
         const pid = o ? controllerOf(s, o) : ctx.controller;
         const n = (sc.n = e.type === "connive" ? amountNow(s, e.n, ctx) : 1);

@@ -255,6 +255,8 @@ export interface TargetSpec {
   kind: "object" | "player" | "any" | "spell" | "card";
   /** For "card": whose graveyard ("your graveyard", "an opponent's graveyard"); unset = any graveyard. */
   owner?: "you" | "opponent";
+  /** For "card": a card in exile linked to the source instead ("target creature card exiled with ~", CR 607.2a). */
+  linkedExile?: true;
   /** For objects: owned by this player, a mutating creature spell's owner (CR 702.140a). */
   ownerIs?: PlayerId;
   /** For objects/spells: at least one of these card types (empty = any permanent). */
@@ -499,6 +501,10 @@ export type ChosenTarget = Exclude<TargetChoice, { kind: "none" }>;
 
 /** Which object(s) an effect touches. */
 export type ObjRef =
+  /** "Each creature that convoked ~" (Lethal Scheme): the `index`th creature tapped to convoke the resolving spell (CR 702.51a), while it's that permanent. */
+  | { ref: "convoker"; index: number }
+  /** "Each creature that convoked it" (Venerated Loxodon): all of them still on the battlefield, for its enters trigger the permanent's spell's. */
+  | { ref: "convokers" }
   /** `n`: "up to two target creatures" is `n` targets in a row, starting at `index`. */
   | {
       ref: "target";
@@ -1459,7 +1465,7 @@ export type Effect =
   | { type: "suspect"; what: ObjRef; no?: true }
   /** Proliferate (CR 701.27): another counter of each kind on the chosen permanents and players. */
   /** `thenPhaseOut`: "then choose any number of permanents you control that had a counter put on them this way. Those permanents phase out." (Ripples of Potential). */
-  | { type: "proliferate"; thenPhaseOut?: true }
+  | { type: "proliferate"; thenPhaseOut?: true; /** "Proliferate twice" (Agent Frank Horrigan, Ezuri): two proliferate actions. */ twice?: true }
   /** Amass [subtype] N (CR 701.47): an Army gets N +1/+1 counters, made first if you have none. */
   | { type: "amass"; subtype: string; n: Amount }
   /**
@@ -2635,6 +2641,8 @@ export type TriggerEvent =
   | "youSacrifice"
   /** "Whenever you collect evidence" (CR 701.59a): for any reason, also collecting evidence 0 (rulings). */
   | "youCollectEvidence"
+  /** "Whenever you proliferate" (CR 701.27): once for each proliferate action, even with nothing chosen (rulings). */
+  | "youProliferate"
   /** "Whenever you complete a dungeon" (CR 309.7). */
   | "youCompleteDungeon"
   /** "Whenever you commit a crime", "whenever an opponent commits a crime" (CR 700.13): once for each spell or ability. */
@@ -3299,7 +3307,13 @@ export type AdditionalCost =
    * into your graveyard, not payable with fewer cards there (CR 701.17b). It moves cards from a library, so an ability
    * with it isn't a mana ability (CR 605.1a).
    */
-  | { kind: "mill"; n: number };
+  | { kind: "mill"; n: number }
+  /**
+   * "Remove three counters from among other artifacts, creatures, and planeswalkers you control" (Tekuthal), "Remove two
+   * +1/+1 counters from among creatures you control" (Hopeful Initiate): counters on permanents you control that match,
+   * any mix of them (of `counter`'s kind if set), chosen as it's paid (CR 602.2b, 601.2h); CostChoices.counters.
+   */
+  | { kind: "removeCounters"; n: number; filter: TargetSpec; counter?: string; other?: true };
 
 /**
  * One of the ways to pay "As an additional cost to cast this spell, sacrifice a creature or pay {3}{B}" (CR 118.8,
@@ -3699,6 +3713,11 @@ export interface CompiledCard {
   lifeForBlack?: true;
   /** Chromatic Orrery: "You may spend mana as though it were mana of any color." (CR 609.4b), for its controller's costs. */
   spendAnyColor?: true;
+  /**
+   * Tekuthal: "If you would proliferate, proliferate twice instead." A replacement effect (CR 614.1a); with two, each
+   * applies to the proliferating the other made, so four times (as Thought Reflection's rulings do for draws).
+   */
+  proliferateTwice?: true;
   /**
    * "You may activate the loyalty abilities of ~ twice each turn rather than only once" (Urza, Planeswalker), "... of
    * planeswalkers you control ..." (Oath of Teferi): two loyalty abilities of that permanent each turn, the same one

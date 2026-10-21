@@ -65,6 +65,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever you gain life, (.+)$/, "youGainLife"],
   [/^Whenever you create a token, (.+)$/, "youCreateToken"], // once for each token (CR 111.2)
   [/^Whenever you collect evidence, (.+)$/, "youCollectEvidence"],
+  [/^Whenever you proliferate, (.+)$/, "youProliferate"],
   [/^Whenever you complete a dungeon, (.+)$/, "youCompleteDungeon"],
   [/^Whenever you commit a crime, (.+)$/, "youCommitCrime"], // CR 700.13
   [/^Whenever an opponent commits a crime, (.+)$/, "opponentCommitsCrime"],

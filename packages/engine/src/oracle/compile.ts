@@ -1504,6 +1504,10 @@ export function compile(d: CardDef): CompiledCard {
       out.loyaltyTwice = loyaltyTwice[1] === "~" ? "self" : "yours";
       continue;
     }
+    if (line === "If you would proliferate, proliferate twice instead.") {
+      out.proliferateTwice = true;
+      continue;
+    }
     if (line === "You may spend mana as though it were mana of any color.") {
       out.spendAnyColor = true;
       continue;
@@ -2216,6 +2220,15 @@ function linkExile(out: CompiledCard) {
     const imprints = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e) => e.type === "takeFromHand" && e.action === "exile");
     if (imprints.length !== 1) out.unsupported.push("(copies an exiled card it can't link to one imprint ability)");
     else (imprints[0] as Extract<Effect, { type: "takeFromHand" }>).linked = true;
+  }
+  // "Target creature card exiled with ~" (Dino DNA, The Darkness Crystal): linked to the one ability that exiles cards
+  // (CR 607.2a), or to its replacement effect that exiles them (The Darkness Crystal's, already linked).
+  const bodies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])];
+  if (bodies.some((b) => b.targets.some((t) => t.linkedExile))) {
+    const exiles = bodies.flatMap((b) => allEffects(b.effects)).filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
+    const others = bodies.flatMap((b) => allEffects(b.effects)).some((e) => (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
+    if (others || out.spell || exiles.length + (out.exileInsteadOfDying?.linked ? 1 : 0) !== 1) out.unsupported.push("(targets a card exiled with it that it can't link to one exile ability)");
+    else if (exiles[0]) exiles[0].linked = true;
   }
   const returns = out.triggers.filter((t) => allEffects(t.body.effects).some((e) => e.type === "returnLinked" || e.type === "linkedExileToken"));
   if (!returns.length) return;

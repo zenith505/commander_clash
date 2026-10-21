@@ -37,7 +37,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const keyword = word && /^(Exhaust|Boast|Power-up)$/.test(word[1]!) ? (word[1] as "Exhaust" | "Boast" | "Power-up") : undefined;
   const line = word && (keyword || ABILITY_WORDS.has(word[1]!.toLowerCase()) || !KEYWORD_NAMES.has(word[1]!.toLowerCase())) ? raw.slice(word[0].length) : raw;
   // Costs: mana symbols run together ("{1}{R}"), other parts are comma-separated ("{2}, {T}, Sacrifice ~").
-  const piece = String.raw`(?:\{[^}]+\})+|Reveal the player you chose|Sacrifice ~ and an? [^,:]+?|Sacrifice ~|Exert ~|Discard ~|Exile ~ from your graveyard|Exile ~ from your hand|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay life equal to the number of colors in your commanders' color identity|Pay half your life, rounded (?:up|down)|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five|six|seven|eight|nine|ten|X) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Put (?:a|one|two|three) cards? from your hand on top of your library|Put a card exiled with ~ into its owner's graveyard|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control|Collect evidence \d+|Mill (?:a card|\w+ cards)|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile (?:a|an|one|two|three|four|five) [^,:]*?cards? from your graveyard|Exile (?:an?|another) [^,:]+? you control`;
+  const piece = String.raw`(?:\{[^}]+\})+|Reveal the player you chose|Sacrifice ~ and an? [^,:]+?|Sacrifice ~|Exert ~|Discard ~|Exile ~ from your graveyard|Exile ~ from your hand|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Remove (?:a|one|two|three|four|five|six|seven|eight|nine|ten) (?:(?:[+-]1/[+-]1|[a-z]+) )?counters? from among (?:[^,:]+?, )*?[^,:]+? you control|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay life equal to the number of colors in your commanders' color identity|Pay half your life, rounded (?:up|down)|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five|six|seven|eight|nine|ten|X) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Put (?:a|one|two|three) cards? from your hand on top of your library|Put a card exiled with ~ into its owner's graveyard|Tap (?:an|one|two|three|four|five) untapped [^,:]+? you control|Collect evidence \d+|Mill (?:a card|\w+ cards)|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile (?:a|an|one|two|three|four|five) [^,:]*?cards? from your graveyard|Exile (?:an?|another) [^,:]+? you control`;
   const m = new RegExp(`^((?:${piece})(?:, (?:${piece}))*): (.+)$`).exec(line);
   if (!m) return null;
   // "Pay half your life, rounded up" (Murderous Betrayal) has a comma of its own: read it apart from the other costs.
@@ -47,10 +47,18 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const extra: AdditionalCost[] = [];
   let removeCounters: ActivatedAbility["removeCounters"];
   let putCounters: ActivatedAbility["putCounters"];
-  for (const part of costs.split(", ")) {
+  // "From among other artifacts, creatures, and planeswalkers you control" is one cost, commas and all.
+  for (const part of costs.replace(/from among [^:]+? you control/g, (x) => x.replaceAll(", ", "; ")).split(", ").map((x) => x.replaceAll("; ", ", "))) {
     let c: RegExpExecArray | null;
     if ((c = new RegExp(`^Put ${NUM} ([+-]1/[+-]1|[a-z]+) counters? on ~$`).exec(part))) putCounters = { counter: counterKind(c[2]!), n: num(c[1]!) };
-    else if (/^Remove /.test(part)) {
+    else if ((c = new RegExp(`^Remove ${NUM} (?:([+-]1/[+-]1|[a-z]+) )?counters? from among (other )?(.+) you control$`).exec(part))) {
+      // Tekuthal, Hopeful Initiate: counters on permanents you control, any mix of them (CR 602.2b). "Artifacts,
+      // creatures, and planeswalkers": a permanent of any of those types.
+      const what = c[4]!.split(/, (?:and |or )?| and | or /).map((w) => singular(w));
+      const filter = pickFilter(what.length > 2 ? `${what.slice(0, -1).join(", ")}, or ${what.at(-1)}` : what.join(" or "));
+      if (!filter || filter.kind !== "object" || filter.controller) return "fail";
+      extra.push({ kind: "removeCounters", n: num(c[1]!), filter: { ...filter, text: `${c[3] ?? ""}${c[4]} you control` }, ...(c[2] ? { counter: counterKind(c[2]) } : {}), ...(c[3] ? { other: true as const } : {}) });
+    } else if (/^Remove /.test(part)) {
       const rc = removeCounterCost(part);
       if (!rc || !Number.isFinite(rc.n)) return "fail"; // "Remove X counters" isn't modeled
       removeCounters = rc;

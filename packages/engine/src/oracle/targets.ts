@@ -162,6 +162,8 @@ export function parseObject(p: string, ctx: Ctx, cards = false): ObjRef | null {
 }
 
 function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
+  // "Each creature that convoked it" (Venerated Loxodon, CR 702.51a): the creatures tapped to cast it.
+  if (/^each creature that convoked (?:it|~)$/i.test(p.trim())) return { ref: "convokers" };
   // "Put a +1/+1 counter on each of up to two target creatures", "Up to two target creatures each get +1/+1"
   const x = /\btarget\b/i.test(p) ? p.trim().replace(/^each of /i, "").replace(/ each$/i, "") : p.trim();
   // "They", "those creatures": the targets of an earlier "up to two target creatures".
@@ -644,10 +646,13 @@ export function parseTargetPhrase(
   // "creature card from your graveyard", "card from a graveyard": a card in that zone (CR 109.2a).
   let inGraveyard = false;
   let owner: TargetSpec["owner"];
-  const gy = / (?:from|in) (your|a|an opponent's) graveyard$/.exec(p);
+  // "Target creature card exiled with ~" (The Darkness Crystal): a card in exile linked to the source (CR 607.2a).
+  let linkedExile = false;
+  const gy = / (?:from|in) (your|a|an opponent's) graveyard$/.exec(p) ?? / exiled with (?:~|it)$/.exec(p);
   if (gy) {
     p = p.slice(0, gy.index);
-    owner = gy[1] === "your" ? "you" : gy[1] === "a" ? undefined : "opponent";
+    linkedExile = !gy[1];
+    owner = gy[1] === "your" ? "you" : gy[1] === "a" || !gy[1] ? undefined : "opponent";
     // "Dragon creature card or Ugin planeswalker card" (Haven of the Spirit Dragon): either.
     if (/^[^,]+ card or [^,]+ card$/.test(p)) p = p.replace(/ card or /, " or ");
     // The word "card" comes before any "with ..." qualifier: "creature card with mana value 3 or less".
@@ -778,7 +783,7 @@ export function parseTargetPhrase(
     }
     const types = [...new Set(anyOf.flatMap((a) => a.types ?? []))];
     // A card in a graveyard (Haven of the Spirit Dragon), matched by its printed characteristics.
-    if (inGraveyard) return { kind: "card", types, notTypes: [], notColors: [], anyOf, ...(owner ? { owner } : {}), text };
+    if (inGraveyard) return { kind: "card", types, notTypes: [], notColors: [], anyOf, ...(owner ? { owner } : {}), ...(linkedExile ? { linkedExile: true as const } : {}), text };
     return { kind: "object", types, notTypes: [], notColors: [], anyOf, ...extra, controller, ...(tapped !== undefined ? { tapped } : {}), text };
   }
   let outlaw = false;
@@ -864,7 +869,7 @@ export function parseTargetPhrase(
   };
   if (inGraveyard) {
     if (isSpell || tapped !== undefined || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status) return null;
-    return { kind: "card", ...filters, ...(otherThanBasic ? { notSupertypes: [...(filters.notSupertypes ?? []), "Basic"] } : {}), ...(owner ? { owner } : {}), text };
+    return { kind: "card", ...filters, ...(otherThanBasic ? { notSupertypes: [...(filters.notSupertypes ?? []), "Basic"] } : {}), ...(owner ? { owner } : {}), ...(linkedExile ? { linkedExile: true as const } : {}), text };
   }
   if (otherThanBasic) return null;
   if (owner && (isSpell || controller)) return null;

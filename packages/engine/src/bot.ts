@@ -23,6 +23,7 @@ import {
   cantBlockNow,
   provokerOf,
   tapCostCandidates,
+  counterCostCandidates,
   maxBlocks,
   blockersNeeded,
   canEnterUntapped,
@@ -1815,6 +1816,10 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
       if (topGraveyardCards(s, pid, c.n, c.filter).length < c.n) return null;
     } else if (c.kind === "mill") {
       if (player(s, pid).library.length < c.n + 10) return null;
+    } else if (c.kind === "removeCounters") {
+      const picks = spareCounters(s, pid, obj(s, id), c);
+      if (!picks) return null;
+      out.counters = picks;
     } else {
       const pool = player(s, pid).graveyard.filter((x) => x !== id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x)))));
       if (pool.length < c.n) return null;
@@ -2100,9 +2105,11 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
       v -= options.length ? Math.min(...options.map(cost)) : 10;
     }
     else if (inner.type === "moveCounter") {
-      // Graft: only onto our own creatures.
+      // Graft: only onto our own creatures, and never the counter a 0/0 graft creature lives on (CR 704.5f).
       const to = r.item.subject && s.objects[r.item.subject.id];
+      const from = r.item.sourceId ? s.objects[r.item.sourceId] : undefined;
       if (!to || controllerOf(s, to) !== pid) v -= 2;
+      else if (from?.zone === "battlefield" && objIsType(s, from, "Creature") && toughness(s, from) - from.damage <= 1) v -= 2;
     }
     else v += 1;
   }
@@ -2840,9 +2847,28 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
     } else if (c.kind === "mill") {
       // Mill only with plenty of library left: not toward decking ourselves.
       if (player(s, pid).library.length < c.n + 10) return null;
+    } else if (c.kind === "removeCounters") {
+      const picks = spareCounters(s, pid, o, c);
+      if (!picks) return null;
+      out.counters = picks;
     } else return null;
   }
   return out;
+}
+
+/**
+ * Counters to remove for "Remove three counters from among ... you control" (Tekuthal), or null if we'd rather not: the
+ * -1/-1 and stun counters on our permanents first (good riddance), then other counters that do nothing by being there
+ * (not lore, loyalty, time, or ones a permanent leaves without, CR 122.1), then +1/+1 counters from creatures with
+ * several. Never a planeswalker's last loyalty.
+ */
+function spareCounters(s: GameState, pid: PlayerId, source: GameObject, c: Extract<AdditionalCost, { kind: "removeCounters" }>): { id: ObjectId; kind: string }[] | null {
+  const rank = (k: string) => (harmfulCounter(k) ? 0 : k === "+1/+1" ? 2 : ["loyalty", "lore", "time", "fade", "age", "defense"].includes(k) ? 9 : 1);
+  const pool = counterCostCandidates(s, pid, source, c)
+    .filter((x) => rank(x.kind) < 9)
+    .flatMap((x) => Array.from({ length: x.kind === "+1/+1" ? x.n - 1 : x.n }, () => ({ id: x.id, kind: x.kind })))
+    .sort((a, b) => rank(a.kind) - rank(b.kind));
+  return pool.length < c.n ? null : pool.slice(0, c.n);
 }
 
 /**

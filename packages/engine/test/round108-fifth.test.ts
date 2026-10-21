@@ -229,7 +229,6 @@ describe("Sowing Mycospawn", () => {
         const p = s.pending!;
         if (p.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [target(land)] });
         else if (p.kind === "searchLibrary") s = act(s, { type: "searchLibrary", player: ap, found: [] });
-        else if (p.kind === "orderTriggers") s = act(s, { type: "orderTriggers", player: ap, order: (p as { triggers: string[] }).triggers } as never);
         else throw new Error(p.kind);
         s = settle(s);
       }

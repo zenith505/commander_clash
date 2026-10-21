@@ -178,7 +178,7 @@ export type Count =
     }
   /** "The greatest mana value among permanents you control": 0 when there are none; X is 0 on the battlefield (CR 202.3, 107.3). */
   /** `total`: "the total mana value of historic permanents you control" (Excalibur), the sum instead. */
-  | { kind: "greatestManaValue"; filter: TargetSpec; total?: true }
+  | { kind: "greatestManaValue"; filter: TargetSpec; total?: true; /** "Other permanents you control" (Summon: Bahamut): not the source. */ other?: true }
   /** How many times the spell (or the permanent it became) was kicked (CR 702.33d); `which` = with that kicker cost only. */
   | { kind: "kicked"; which?: number }
   /** 1 if it was kicked at all (or with kicker cost `which`), else 0. */

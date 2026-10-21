@@ -823,7 +823,7 @@ export function toBottom(s: GameState, pid: PlayerId, ids: ObjectId[], src: stri
  * madness ability triggers (CR 702.35a): it's still discarded. `quiet`: the caller says what happened (cycling).
  */
 /** `cause`: the controller of the spell or ability that made them discard, if one did. */
-export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how = "", quiet = false, cycled = false, cause?: PlayerId) {
+export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how = "", quiet = false, cycled = false, cause?: PlayerId, /** The X chosen for a cycling cost (Shark Typhoon). */ cycledX?: number) {
   if (!ids.length) return;
   if (s.resolving) (s.resolving.discarded ??= {})[pid] = (s.resolving.discarded[pid] ?? 0) + ids.length;
   const names = ids.map((id) => defOf(s, obj(s, id)).name);
@@ -858,7 +858,7 @@ export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how =
     });
   }
   // They were discarded at the same time (CR 701.9b); each one triggers "whenever you discard a card" (CR 603.2c).
-  ids.forEach((id, i) => fireEvent(s, { type: "discarded", player: pid, id, card: cards[i]!, ...(cycled ? { cycled: true } : {}) }));
+  ids.forEach((id, i) => fireEvent(s, { type: "discarded", player: pid, id, card: cards[i]!, ...(cycled ? { cycled: true } : {}), ...(cycledX ? { x: cycledX } : {}) }));
 }
 
 /** A card's mana value in a library: a split card's halves together (CR 709.4a). */

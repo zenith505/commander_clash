@@ -169,7 +169,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         ...(item.lki ? { lki: item.lki } : {}),
         ...(item.event ? { event: item.event } : {}),
         // "That amount of excess damage" (Unleash the Inferno): the excess this spell dealt, its X (CR 603.12).
-        ...(e.xExcess ? { x: s.resolving!.excessDamage ?? 0 } : item.x ? { x: item.x } : {}),
+        // "You may pay {X}. When you do, ..." (Electro): the X paid, which the "may" put in ctx.
+        ...(e.xExcess ? { x: s.resolving!.excessDamage ?? 0 } : ctx.x || item.x ? { x: ctx.x || item.x } : {}),
         ...(s.resolving!.rolled ? { rolled: s.resolving!.rolled.result } : {}),
         ...(s.resolving!.revealedFromHand !== undefined ? { revealed: s.resolving!.revealedFromHand } : {}),
         ...(s.resolving!.tappedThisWay !== undefined ? { tapped: s.resolving!.tappedThisWay } : {}),

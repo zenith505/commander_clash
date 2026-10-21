@@ -2319,9 +2319,11 @@ function checkX(d: CardDef, out: CompiledCard) {
   }
   // "Monstrosity X" (CR 701.37c): "when ~ becomes monstrous" abilities use the X it became monstrous with.
   const monstrousX = out.activated.some((a) => allEffects(a.body.effects).some((e) => e.type === "monstrosity" && usesX(e.n)));
+  // "When you cycle this card" uses the X of an {X} in the cycling cost (Shark Typhoon, rulings).
+  const cyclingX = out.activated.some((a) => a.cycling && /\{X\}/.test(a.manaCost));
   out.triggers = out.triggers.filter((tr) => {
     // A "when you cast this spell" ability uses the X the spell was cast with (CR 107.3a, 601.2b; rulings on Hydroid Krasis).
-    if (!usesX(tr.body) || ((tr.event === "selfEnters" || tr.event === "selfCast") && cardX) || (tr.event === "selfBecomesMonstrous" && monstrousX)) return true;
+    if (!usesX(tr.body) || ((tr.event === "selfEnters" || tr.event === "selfCast") && cardX) || (tr.event === "selfBecomesMonstrous" && monstrousX) || (tr.event === "selfCycled" && cyclingX)) return true;
     bad(tr.body.text);
     return false;
   });

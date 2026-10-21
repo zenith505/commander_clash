@@ -991,8 +991,9 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
           text: `Mobilize ${n}: create ${n === 1 ? "a" : n} tapped and attacking 1/1 red Warrior creature token${n > 1 ? "s" : ""}. Sacrifice ${n > 1 ? "them" : "it"} at the beginning of the next end step.`,
         },
       });
-    } else if ((m = /^cycling ((?:\{(?:\d+|[WUBRGC]|[WUBRG]\/[WUBRGP])\})+)$/i.exec(p))) {
-      // CR 702.29a: "[Cost], Discard this card: Draw a card." Only while the card is in your hand.
+    } else if ((m = /^cycling ((?:\{(?:\d+|X|[WUBRGC]|[WUBRG]\/[WUBRGP])\})+)$/i.exec(p))) {
+      // CR 702.29a: "[Cost], Discard this card: Draw a card." Only while the card is in your hand. An {X} in it (Shark
+      // Typhoon) is chosen as it's activated (CR 107.3k), for "When you cycle this card" to use (rulings).
       out.activated.push({
         manaCost: m[1]!,
         tap: false,

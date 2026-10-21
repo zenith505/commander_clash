@@ -618,6 +618,10 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   text = text.replace(/, then shuffle and you gain (\d+) life\./g, ", then shuffle. You gain $1 life.");
   // "Destroy all creatures other than ~" (Magister of Worth) is "destroy all other creatures".
   text = text.replace(/\ball creatures other than ~/g, "all other creatures");
+  // "Target creature you control other than ~" (Rosie Cotton) is "another target creature you control"; "each creature you
+  // control other than ~" (Dawnstrike Vanguard) is "each other creature you control".
+  text = text.replace(/\b([Tt])arget (creature|permanent) you control other than ~/g, (_, t: string, w: string) => `${t === "T" ? "A" : "a"}nother target ${w} you control`);
+  text = text.replace(/\beach (creature|permanent) you control other than ~/g, "each other $1 you control");
   // "Each player secretly votes for truth or consequences, then those votes are revealed" is one instruction (a vote whose
   // votes nobody sees until all are made), not two.
   text = text.replace(/\b(secretly votes for [^.]+?), then those votes are revealed\./g, "$1.");
@@ -1574,11 +1578,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       // "You may pay {2}{W}. When you do, tap target creature." (Thousand Moons Crackshot): paying triggers a reflexive
       // ability with targets of its own, chosen as it's put on the stack (CR 603.12; rulings). The rest of the ability is its.
       const whenPaid = /^When you do, (.+)$/.exec(s);
-      if (whenPaid && payFirst.payX) return null;
       if (whenPaid) {
+        // "You may pay {X}. When you do, ~ deals X damage to target player" (Electro): the reflexive ability's X is the X paid.
         const reflexive = reflexiveBody([whenPaid[1]!, ...sentences.slice(si + 1)].join(". "), ctx);
         if (!reflexive) return null;
-        effects.push({ type: "may", effects: [{ type: "reflexive", body: reflexive }], pay: payFirst.pay, text: `${payFirst.text}. When you do, ${[whenPaid[1]!, ...sentences.slice(si + 1)].join(". ")}` });
+        effects.push({ type: "may", effects: [{ type: "reflexive", body: reflexive }], pay: payFirst.pay, ...(payFirst.payX ? { payX: payFirst.payX } : {}), text: `${payFirst.text}. When you do, ${[whenPaid[1]!, ...sentences.slice(si + 1)].join(". ")}` });
         payFirst = null;
         si = sentences.length;
         continue;

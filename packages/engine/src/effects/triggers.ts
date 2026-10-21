@@ -190,7 +190,7 @@ export type TriggerSourceEvent =
   /** A player searched their own library (CR 701.23). */
   | { type: "searchedLibrary"; player: PlayerId }
   /** A player discarded a card (CR 701.9), `cycled` to pay a cycling cost (CR 702.29a). `id`: the card, in its new zone. */
-  | { type: "discarded"; player: PlayerId; id: ObjectId; card: CardDef; cycled?: boolean }
+  | { type: "discarded"; player: PlayerId; id: ObjectId; card: CardDef; cycled?: boolean; /** The X of the cycling cost. */ x?: number }
   /** A card (or token) was put into a graveyard, from any zone. */
   | { type: "toGraveyard"; id: ObjectId }
   /** A resolved instant or sorcery card was put into its owner's graveyard (CR 608.2n): haunt on a spell (702.55a). */
@@ -1151,7 +1151,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       }, undefined, undefined, card, undefined, undefined, undefined, { player: ev.player });
     }
     // "When you cycle ~" works from the zone the card went to (CR 702.29c), and its owner controls it (CR 113.8).
-    if (ev.cycled && card && card.zone !== "battlefield") add(card, card.owner, (e) => e === "selfCycled", compileCard(defOf(s, card)).triggers);
+    if (ev.cycled && card && card.zone !== "battlefield") add(card, card.owner, (e) => e === "selfCycled", compileCard(defOf(s, card)).triggers, undefined, undefined, undefined, ev.x ?? 0);
   } else if (ev.type === "activated") {
     // "Whenever an opponent activates an ability of a creature that isn't a mana ability" (its source as it was activated).
     for (const id of s.battlefield) {

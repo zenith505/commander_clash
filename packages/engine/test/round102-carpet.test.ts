@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { isFullySupported, waitingOn, type GameState } from "../src";
+import { isFullySupported, waitingOn, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const carpet = card("Carpet of Flowers", "Enchantment", "{G}", { oracleText: "At the beginning of each of your main phases, if you haven't added mana with this ability this turn, you may add X mana of any one color, where X is the number of Islands target opponent controls." });
@@ -11,7 +11,7 @@ const island = card("Island", "Basic Land — Island");
 
 const pass = (s: GameState) => act(s, { type: "passPriority", player: waitingOn(s)! });
 /** Pass priority until the stack is empty, answering the trigger's prompts: the target, "may", the color. */
-const resolveCarpet = (s: GameState, opp: string, yes: boolean) => {
+const resolveCarpet = (s: GameState, opp: PlayerId, yes: boolean) => {
   for (let i = 0; i < 100 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
     const p = s.pending;
     if (!p) s = pass(s);

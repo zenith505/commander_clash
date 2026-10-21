@@ -1125,6 +1125,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (e.dest === "hand") log(s, `${p.name} puts ${cards.length === 1 ? "a card" : `${cards.length} cards`} exiled with ${src} into their hand.`);
       else log(s, `${cards.map((c) => defOf(s, c).name).join(", ")} ${cards.length === 1 ? "goes" : "go"} from exile to ${cards.length === 1 ? "its owner's graveyard" : "their owners' graveyards"} (${src}).`);
       for (const c of cards) moveObject(s, c.id, e.dest);
+      s.resolving!.movedLinked = cards.length;
       if (s.linkedExile?.[key]) s.linkedExile[key] = s.linkedExile[key]!.filter((l) => !cards.some((c) => c.id === l.id));
       return;
     }
@@ -1330,6 +1331,20 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           }
         }
       });
+      return;
+    }
+    case "weld": {
+      if (!ctx.legal[e.artifact] || !ctx.legal[e.card]) return;
+      const [ta, tc] = [ctx.targets[e.artifact], ctx.targets[e.card]];
+      const a = ta?.kind === "object" ? s.objects[ta.id] : undefined;
+      const c = tc?.kind === "object" ? s.objects[tc.id] : undefined;
+      if (a?.zone !== "battlefield" || c?.zone !== "graveyard") return;
+      // The card must still be in that player's graveyard: the artifact's controller now (a target still legal, CR 608.2b).
+      const pid = controllerOf(s, a);
+      if (c.owner !== pid) return;
+      log(s, `${player(s, pid).name} sacrifices ${defOf(s, a).name} and returns ${defOf(s, c).name} to the battlefield.`);
+      moveObject(s, a.id, "graveyard", { sacrificed: true });
+      enterTogether(s, () => moveObject(s, c.id, "battlefield", { controller: pid }));
       return;
     }
     case "putOntoBattlefield": {
@@ -1841,6 +1856,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         moveObject(s, id, "exile");
         const o = obj(s, id);
         o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.castOnly ? { castOnly: true as const } : {}), ...(e.free ? { free: true as const } : {}) };
+        if (e.linked && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
       }
       if (ids.length === 1 && s.resolving) s.resolving.exiledTop = { id: ids[0]!, zc: s.objects[ids[0]!]!.zoneChanges ?? 0 };
       if (s.resolving) (s.resolving.impulsed ??= []).push(...ids);

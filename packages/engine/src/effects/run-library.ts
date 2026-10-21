@@ -125,6 +125,15 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           continue;
         }
         const n = nFor[pid] ?? 0;
+        if (e.upTo && !e.hand) {
+          if (hand.length && n > 0) {
+            s.pending = { kind: "discard", player: pid, count: Math.min(n, hand.length), source: src, upTo: true, ...(filter ? { filter } : {}), ...(e.exile ? { exile: true as const } : {}) };
+            return "paused";
+          }
+          sc.chosen![pid] = [];
+          sc.queue.shift();
+          continue;
+        }
         if (!e.hand && hand.length > n) {
           s.pending = { kind: "discard", player: pid, count: n, source: src, ...(filter ? { filter } : {}), ...(e.exile ? { exile: true as const } : {}) };
           return "paused";

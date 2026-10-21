@@ -378,6 +378,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // increment does it (CR 702.191a), the spell's mana spent being the event's amount.
   if (/^the amount of mana spent to cast that spell is greater than ~'s power$/.test(text)) return { kind: "increment", powerOnly: true };
   if (/^it's your turn$/.test(text)) return { kind: "yourTurn" };
+  // "If there are cards exiled with ~" (Valakut Exploration): the cards this object's linked exile took (CR 607.2a).
+  if (/^there are cards exiled with ~$/.test(text)) return { kind: "amount", amount: { count: { kind: "linkedExiled" } }, min: 1 };
   if (/^it isn't that player's turn$/.test(text)) return { kind: "eventPlayersTurn", not: true };
   if (/^it's not your turn$/.test(text)) return { kind: "yourTurn", not: true };
   // "If four or more creatures are attacking", "if exactly one creature is attacking", "if a white creature is attacking"

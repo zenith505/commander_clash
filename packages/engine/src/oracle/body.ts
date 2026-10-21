@@ -530,6 +530,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // Search for Survivors: "An opponent chooses a card at random in your graveyard. If it's a creature card, put it onto the
   // battlefield. Otherwise, exile it." The choice is at random, so who makes it changes nothing: one instruction.
   text = text.replace(/An opponent chooses a card at random in your graveyard\. If it's a creature card, put it onto the battlefield\. Otherwise, exile it\./, "Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it.");
+  // Goblin Welder: the card is in the graveyard of the artifact's controller ("that player"); both targets must still be
+  // legal as it resolves (rulings), and that player does both at once.
+  if (text.trim() === "Choose target artifact a player controls and target artifact card in that player's graveyard. If both targets are still legal as this ability resolves, that player simultaneously sacrifices the artifact and returns the artifact card to the battlefield.")
+    return {
+      targets: [
+        { kind: "object", types: ["Artifact"], text: "target artifact a player controls" },
+        { kind: "card", types: ["Artifact"], text: "target artifact card in that player's graveyard", inGraveyardOfControllerOf: [0] },
+      ],
+      effects: [{ type: "weld", artifact: 0, card: 1 }],
+      text,
+    };
   // Sylvan Library: "You may draw two additional cards. If you do, choose two cards in your hand drawn this turn. For each of
   // those cards, pay 4 life or put the card on top of your library." Drawing and choosing with nothing in between (rulings).
   const sylvan = /^[Yy]ou may draw (two|three) additional cards\. If you do, choose (two|three) cards in your hand drawn this turn\. For each of those cards, pay (\d+) life or put the card on top of your library\.$/.exec(text.trim());
@@ -844,6 +855,12 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const last = effects[effects.length - 1];
     ctx.afterMill = last?.type === "mill" && last.who.ref === "you";
     if (last?.type === "discard" && last.who.ref === "you" && last.n === 1) ctx.discardedOne = true;
+    // "Put them into their owner's graveyard, then ~ deals that much damage to each opponent" (Valakut Exploration): the
+    // number of cards the move put there (rulings: one played in response isn't counted).
+    if (last?.type === "moveLinked" && last.dest === "graveyard" && !last.one && /^~ deals that much damage to each opponent$/.test(s.replace(/\.$/, ""))) {
+      effects.push({ type: "damage", amount: { count: { kind: "movedLinkedThisWay" } }, to: { ref: "eachOpponent" } });
+      continue;
+    }
     // "At the beginning of the next end step, sacrifice that creature" (Meek Attack) is "Sacrifice that creature at the
     // beginning of the next end step" (one instruction, no condition).
     const atNext = /^At the beginning of (the|your) next end step, ((?:sacrifice|exile|destroy|return) [^,]+)$/.exec(s);
@@ -1174,7 +1191,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // With no duration (Dungeon of the Mad Mage's Runestone Caverns), for as long as each card stays exiled (CR 611.2a, 400.7).
     // "Until your next end step, you may play it" (Yasmin Khan, Wiccan, Ob Nixilis): over as your next end step begins.
     // "Until end of turn, you may play that card without paying its mana cost" (Urza, CR 118.9): `free`.
-    const playRe = /^(?:(Until the end of your next turn|Until end of turn|Until your next end step), you may play (?:that card|those cards|them|it)|You may play (?:that card|those cards|them|it)(?: (this turn|until the end of your next turn|until your next end step))?)( without paying its mana cost)?$/;
+    // "You may play that card for as long as it remains exiled" (Valakut Exploration): no duration, as above.
+    const playRe = /^(?:(Until the end of your next turn|Until end of turn|Until your next end step), you may play (?:that card|those cards|them|it)|You may play (?:that card|those cards|them|it)(?: (this turn|until the end of your next turn|until your next end step)| for as long as (?:it remains|they remain) exiled)?)( without paying its mana cost)?$/;
     const playIt = exTop && sentences[si + 1] && playRe.exec(sentences[si + 1]!.replace(/\.$/, ""));
     // "Exile the top card of your library. ~ gets +X/+0 until end of turn, where X is that card's mana value. You may play
     // that card this turn." (Tavern Brawler, Daredevil): the permission and the sentence between, about that card.
@@ -1211,6 +1229,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // this way." (Invasion of Kaldheim): face up (CR 406.3), each card's permission its own (CR 400.7).
     // "Put any number of cards from your hand on the bottom of your library, then draw that many cards plus one" (Valakut
     // Awakening, Into the Fire).
+    // "Discard any number of cards, then draw that many cards plus one" (Celes, Brass's Tunnel-Grinder), "You may discard
+    // up to two cards. If you do, draw that many cards." (Fable of the Mirror-Breaker): none up to that many, chosen as it
+    // resolves (CR 107.1c); "that many" is how many were discarded.
+    const anyDiscard = /^(?:([Yy]ou may) d|[Dd])iscard (any number of|up to two|up to three) cards$/.exec(s);
+    const drawThat = anyDiscard && /^(If you do, d|D)raw that many cards( plus one)?$/.exec(sentences[si + 1] ?? "");
+    if (anyDiscard && drawThat && !!anyDiscard[1] === !!drawThat[1]?.startsWith("If")) {
+      const max = anyDiscard[2] === "any number of" ? 99 : num(anyDiscard[2]!.slice(6));
+      effects.push({ type: "discard", who: { ref: "you" }, n: max, upTo: true }, { type: "draw", who: { ref: "you" }, n: { count: { kind: "discardedThisWay", who: { ref: "you" } }, ...(drawThat[2] ? { plus: 1 } : {}) } });
+      si++;
+      continue;
+    }
     if (/^[Pp]ut any number of cards from your hand on the bottom of your library$/.test(s) && /^Draw that many cards plus one$/.test(sentences[si + 1] ?? "")) {
       effects.push({ type: "revealFromHand", bottom: true }, { type: "draw", who: { ref: "you" }, n: { count: { kind: "bottomedFromHand" }, plus: 1 } });
       si++;

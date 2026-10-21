@@ -3,7 +3,7 @@ import { allEffects, refCovers, timedCondition, type AbilityBody, type Activated
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
 import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
-import { abilitiesOf, basePower, baseToughness, canBeSacrificed, defOf, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
+import { abilitiesOf, basePower, baseToughness, canBeSacrificed, defOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
 import { bindChosen, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, manySlot, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
@@ -179,7 +179,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const taps = planMana(s, pid, parseManaCost(pend.cost));
       return taps ? [...taps, { type: "payUnless", player: pid, pay: true }] : [{ type: "payUnless", player: pid, pay: false }];
     }
-    if (pend.kind === "discard") return [{ type: "discard", player: pid, objectIds: chooseDiscards(s, pid, pend.count, undefined, pend.filter) }];
+    if (pend.kind === "discard") return [{ type: "discard", player: pid, objectIds: chooseDiscards(s, pid, pend.count, undefined, pend.filter, pend.upTo) }];
     // Brainstorm: back go the cards we'd most readily discard, the better of them on top.
     // Scroll Rack: the lands we don't need, traded for fresh cards (a library short of cards trades fewer).
     if (pend.kind === "handToTop" && pend.upTo) {
@@ -784,6 +784,19 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
   const body = offerMany(s, printed, pid, x, sourceId ? botSource(s, sourceId) : undefined, sourceId);
   const many = manySlot(printed.targets);
   if (!forced && many >= 0 && !printed.targets[many]!.skip && body.targets[many]!.skip) return null;
+  // Goblin Welder: our own cheapest artifact for a costlier artifact card in our graveyard.
+  const weld = body.effects.find((e) => e.type === "weld");
+  if (weld?.type === "weld") {
+    const mine = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Artifact") && id !== sourceId && !obj(s, id).isCommander).sort((a, b) => mv(s, a) - mv(s, b));
+    const cards = player(s, pid).graveyard.filter((id) => isType(defOf(s, obj(s, id)), "Artifact") && isPermanentCard(defOf(s, obj(s, id)))).sort((a, b) => mv(s, b) - mv(s, a));
+    if (mine[0] && cards[0] && mv(s, cards[0]) > mv(s, mine[0])) {
+      const t: TargetChoice[] = [];
+      t[weld.artifact] = { kind: "object", id: mine[0] };
+      t[weld.card] = { kind: "object", id: cards[0] };
+      return t;
+    }
+    return null;
+  }
   const harm = harmfulTargets(body);
   const out: TargetChoice[] = [];
   // Damage a target will take from a fight or "damage equal to its power": the other creature's power.
@@ -2502,7 +2515,8 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
 }
 
 /** Which cards to discard: extra lands once we have enough, otherwise what we're furthest from casting. */
-function chooseDiscards(s: GameState, pid: PlayerId, count: number, except?: string, filter?: TargetSpec): string[] {
+/** `upTo`: "discard any number of cards" (then draw that many): only the cards hardly worth keeping. */
+function chooseDiscards(s: GameState, pid: PlayerId, count: number, except?: string, filter?: TargetSpec, upTo?: boolean): string[] {
   const lands = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length;
   const keepScore = (id: string) => {
     const d = defOf(s, obj(s, id));
@@ -2510,7 +2524,7 @@ function chooseDiscards(s: GameState, pid: PlayerId, count: number, except?: str
     return 8 - Math.max(0, mv(s, id) - lands);
   };
   return player(s, pid)
-    .hand.filter((id) => id !== except && (!filter || printedMatches(filter, defOf(s, obj(s, id)))))
+    .hand.filter((id) => id !== except && (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (!upTo || keepScore(id) <= 2))
     .sort((a, b) => keepScore(a) - keepScore(b))
     .slice(0, count);
 }

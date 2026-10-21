@@ -1243,6 +1243,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (!n) continue;
         // Satoru: not if any of them was cast with mana spent on it (rulings: mana for additional costs counts too).
         if (b.noneCastWithMana && matched.some((m) => s.objects[m.id]?.wasCast && (s.objects[m.id]!.manaSpent ?? 0) > 0)) continue;
+        if (b.fromGraveyard && !matched.some((m) => s.objects[m.id]?.enteredFromGraveyard || s.objects[m.id]?.castFromGraveyard)) continue;
         if (b.first && b.what === "discards" && (s.turnLog?.discards ?? []).some((d) => (b.whose !== "you" || d.player === you) && d.cards.some((c) => !b.filter || printedMatches(b.filter, s.cards[c]!)))) continue;
         // "Whenever one or more creatures enter / die": caused by each of them entering or dying (CR 603.2d).
         const died = matched.filter((m) => m.from === "battlefield" && m.to === "graveyard" && m.snapshot && m.chars?.types.includes("Creature"));

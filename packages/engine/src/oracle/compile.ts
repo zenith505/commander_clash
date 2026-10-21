@@ -1773,6 +1773,16 @@ export function compile(d: CardDef): CompiledCard {
       out.opponentsCantCastMvAtMost = num(mvBan[1]!);
       continue;
     }
+    // Void Winnower: "Your opponents can't cast spells with even mana values" (zero is even; X as chosen, a face-down
+    // spell's 0, rulings) and "can't block with creatures with even mana values" (X is 0 on the battlefield, CR 202.3b).
+    if (/^Your opponents can't cast spells with even mana values\.(?: \(Zero is even\.\))?$/.test(line)) {
+      out.opponentsCantCastEven = true;
+      continue;
+    }
+    if (line === "Your opponents can't block with creatures with even mana values.") {
+      out.opponentsCantBlockEven = true;
+      continue;
+    }
     // Teferi, Temporal Archmage's emblem: loyalty abilities when you could cast an instant, still one per permanent each
     // turn (CR 606.3, rulings).
     if (line === "You may activate loyalty abilities of planeswalkers you control on any player's turn any time you could cast an instant.") {
@@ -2329,6 +2339,14 @@ function linkExile(out: CompiledCard) {
     const others = bodies.flatMap((b) => allEffects(b.effects)).some((e) => (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
     if (others || out.spell || exiles.length + (out.exileInsteadOfDying?.linked ? 1 : 0) !== 1) out.unsupported.push("(targets a card exiled with it that it can't link to one exile ability)");
     else if (exiles[0]) exiles[0].linked = true;
+  }
+  // Valakut Exploration: "cards exiled with ~" are the ones its one impulse exiled (CR 607.2a).
+  const usesLinked = (b: AbilityBody) => allEffects(b.effects).some((e) => e.type === "moveLinked") || JSON.stringify(b).includes('"linkedExiled"');
+  const impulses = bodies.flatMap((b) => allEffects(b.effects)).filter((e): e is Extract<Effect, { type: "impulse" }> => e.type === "impulse");
+  if (impulses.length && (bodies.some(usesLinked) || out.triggers.some((t) => JSON.stringify(t.ifCond ?? null).includes('"linkedExiled"')))) {
+    const others = bodies.flatMap((b) => allEffects(b.effects)).some((e) => e.type === "exile" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
+    if (others || impulses.length !== 1) out.unsupported.push("(refers to cards exiled with it that it can't link to one exile ability)");
+    else impulses[0]!.linked = true;
   }
   const returns = out.triggers.filter((t) => allEffects(t.body.effects).some((e) => e.type === "returnLinked" || e.type === "linkedExileToken"));
   if (!returns.length) return;

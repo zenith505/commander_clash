@@ -422,6 +422,8 @@ export interface GameObject {
   castFrom?: ZoneName;
   /** On the battlefield: it entered as a spell cast from its owner's hand ("if you cast it from your hand"). */
   castFromHand?: true;
+  /** On the battlefield: it entered as a spell cast from a graveyard (Kotis: "was cast from a graveyard"). */
+  castFromGraveyard?: true;
   /** It entered from the stack as a resolving permanent spell (not a copy), for "when ~ enters, if you cast it". */
   wasCast?: true;
   /** On the battlefield: it entered from a graveyard, its owner's, for "when ~ enters from a graveyard" (CR 603.6a). */
@@ -986,7 +988,7 @@ export type PendingDecision =
   | { kind: "declareBlockers"; player: PlayerId; remaining: PlayerId[] }
   | { kind: "discardToHandSize"; player: PlayerId; count: number }
   /** A resolving spell or ability makes this player discard `count` cards of their choice (CR 701.9b). */
-  | { kind: "discard"; player: PlayerId; count: number; source: string; /** Only cards like this: "discard a creature card". */ filter?: TargetSpec; /** Exiled, not discarded ("exiles a card from their hand"). */ exile?: true }
+  | { kind: "discard"; player: PlayerId; count: number; source: string; /** Only cards like this: "discard a creature card". */ filter?: TargetSpec; /** Exiled, not discarded ("exiles a card from their hand"). */ exile?: true; /** Up to `count` ("discard any number of cards"), none too. */ upTo?: true }
   /** "Put two cards from your hand on top of your library in any order": which, and their order (first on top). */
   | { kind: "handToTop"; player: PlayerId; count: number; source: string; /** On the bottom instead, the first pick lowest. */ bottom?: true; /** Scroll Rack: any number up to `count`, exiled face down first and traded for as many from the top of the library. */ upTo?: true }
   /** Scry or surveil (CR 701.22, 701.25): `cards` are the top of their library, top first. */
@@ -1585,6 +1587,8 @@ export interface Resolving {
   discovered?: { id: ObjectId; mv: number };
   /** How many counters "remove all counters" removed so far while this resolves ("for each counter removed this way"). */
   countersRemoved?: number;
+  /** How many cards its "put all cards exiled with ~ into their owners' graveyards" moved. */
+  movedLinked?: number;
   /** The two players its exchangeLife instruction named (even one no longer a legal target), and the life each lost doing it. */
   exchanged?: { players: PlayerId[]; lost: Record<PlayerId, number> };
   /** "Choose a creature type / a color": what was chosen, for the rest of its instructions. */

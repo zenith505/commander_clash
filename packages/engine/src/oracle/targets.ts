@@ -384,13 +384,16 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   const share = (n > 1 || !!many) && / that share a creature type(?= from |$)/.test(mine0);
   // "Up to six target creature cards with different names" (Behold the Sinister Six!): each a name the others don't have.
   const differ = n > 1 && !many && / with different names(?= from |$)/.test(mine0);
+  // "Two target creatures controlled by different players" (Run Away Together, Switcheroo's kin): each a different
+  // controller from the others', checked both ways (rulings: two creatures of one player are both illegal).
+  const diffCtl = n > 1 && !many && / controlled by different players$/.test(mine0);
   // "Any number of target creature cards that each have a different mana value X or less" (Agadeem's Awakening).
   const differMv = many === "any" ? / that each have a different mana value (\d+|X) or less(?= from |$)/.exec(mine0) : null;
   // "With total mana value 6 or less" (TargetSpec.total): the group together, X being the one announced (CR 107.3a).
   const totalM = n > 1 || many ? / with total (mana value|power) (\d+|X) or less(?= from | in |$)/.exec(mine0) : null;
   if (totalM && totalM[2] === "X" && (!(ctx.spell || ctx.activated || ctx.ownX) || ctx.whereX)) return null;
   const total: TargetSpec["total"] | undefined = totalM ? { key: totalM[1] === "power" ? "power" : "manaValue", ...(totalM[2] === "X" ? { x: true as const } : { max: Number(totalM[2]) }) } : undefined;
-  const mine = mine0.replace(/ that each have a different mana value (\d+|X) or less(?= from |$)/, " with mana value $1 or less").replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "").replace(/ with different names(?= from |$)/, "").replace(/ with total (?:mana value|power) (?:\d+|X) or less(?= from | in |$)/, "");
+  const mine = mine0.replace(/ controlled by different players$/, "").replace(/ that each have a different mana value (\d+|X) or less(?= from |$)/, " with mana value $1 or less").replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "").replace(/ with different names(?= from |$)/, "").replace(/ with total (?:mana value|power) (?:\d+|X) or less(?= from | in |$)/, "");
   const parsed = differMv ? parseTargetPhrase(singularPhrase(mine), { x: true }) : n > 1 || many ? parseTargetPhrase(singularPhrase(mine)) : parseTargetPhrase(mine, { x: true, count: boundCount(ctx) });
   if (!parsed || parsed.kind === "player" || parsed.kind === "spell" || (parsed.kind === "card") !== cards || (theirs && (parsed.kind !== "object" || parsed.controller))) return null;
   // "Up to one target creature card with mana value X or less": as for one target (see parseTarget).
@@ -428,7 +431,8 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
       ...(single && k ? { sameGraveyardAs: group } : {}),
       ...(share && k ? { sharesCreatureTypeWith: group } : {}),
       ...(differ && k ? { differentNameFrom: group } : {}),
-      ...(single || share || differ ? { text: `${spec.text.replace(/ from a graveyard$/, single ? " from a single graveyard" : " from a graveyard")}${share ? " sharing a creature type" : ""}${differ ? " with a different name" : ""}` } : {}),
+      ...(diffCtl ? { differentControllerFrom: Array.from({ length: n }, (_, j) => first + j).filter((j) => j !== first + k) } : {}),
+      ...(single || share || differ || diffCtl ? { text: `${spec.text.replace(/ from a graveyard$/, single ? " from a single graveyard" : " from a graveyard")}${share ? " sharing a creature type" : ""}${differ ? " with a different name" : ""}${diffCtl ? " controlled by a different player" : ""}` } : {}),
     });
   }
   // "It" can't mean one of several; "they" / "those creatures" means all of them.
@@ -695,7 +699,12 @@ export function parseTargetPhrase(
     extra.powerAboveBase = true;
     p = p.slice(0, m.index);
   }
-  if ((m = /(?:^| )with (power|toughness|mana value) (\d+|x)(?: or (greater|less))?$/.exec(p))) {
+  // "Creatures you control with power or toughness 1 or less" (Tetsuko Umezawa): either one (TargetSpec.anyOf).
+  if ((m = / with power or toughness (\d+) or (greater|less)$/.exec(p)) && !extra.anyOf) {
+    const r = m[2] === "greater" ? { min: Number(m[1]) } : { max: Number(m[1]) };
+    extra.anyOf = (["power", "toughness"] as const).map((key) => ({ kind: "object" as const, types: [], notTypes: [], notColors: [], [key]: r, text: `${key} ${m![1]} or ${m![2]}` }));
+    p = p.slice(0, m.index);
+  } else if ((m = /(?:^| )with (power|toughness|mana value) (\d+|x)(?: or (greater|less))?$/.exec(p))) {
     const key = m[1] === "mana value" ? "manaValue" : (m[1] as "power" | "toughness");
     // "With mana value 2" (Spell Snare): exactly that. With X, the X it's cast or activated with (TargetSpec.xRange).
     // "Destroy all creatures with mana value X or less", "search your library for a creature card with mana value X or

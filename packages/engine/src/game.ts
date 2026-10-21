@@ -718,6 +718,7 @@ export function moveObject(
   // The Myojin: "~ enters with a divinity counter on it if you cast it from your hand" (a commander cast from the command
   // zone wasn't, rulings).
   const castFromHand = fromZone === "stack" && o.castFrom === "hand" && !o.spellCopy;
+  const castFromGraveyard = fromZone === "stack" && o.castFrom === "graveyard" && !o.spellCopy;
   o.discardedTurn = undefined;
   o.foretold = undefined; // a spell that was foretold is cast without moving it here; anywhere else it's a new object
   if (fromZone === "stack") {
@@ -876,6 +877,7 @@ export function moveObject(
   }
   if (to === "battlefield") [o.controlledSinceTurn, o.enteredTurn] = [s.turn, s.turn];
   o.castFromHand = to === "battlefield" && castFromHand ? true : undefined;
+  o.castFromGraveyard = to === "battlefield" && castFromGraveyard ? true : undefined;
   o.wasCast = to === "battlefield" && fromZone === "stack" && !o.spellCopy ? true : undefined;
   o.enteredFromGraveyard = to === "battlefield" && fromZone === "graveyard" ? true : undefined;
   if (to === "battlefield" && opts.faceDown) o.faceDown = opts.faceDown; // it enters as a face-down 2/2 (CR 701.40a)
@@ -3933,6 +3935,8 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
     const value = mv ?? (parseManaCost(d.manaCost).hasX ? undefined : defMv(d));
     if (most !== undefined && controllerOf(s, o) !== pid && value !== undefined && value <= most)
       return `${characteristics(s, o).name}: opponents can't cast spells with mana value ${most} or less`;
+    if (abilitiesOf(s, o).opponentsCantCastEven && controllerOf(s, o) !== pid && value !== undefined && value % 2 === 0)
+      return `${characteristics(s, o).name}: opponents can't cast spells with even mana values`;
     for (const f of abilitiesOf(s, o).youCantCast ?? [])
       if (controllerOf(s, o) === pid && printedMatches(f, d)) return `${characteristics(s, o).name}: you can't cast ${f.text.replace(/ spell$/, "")} spells`;
     for (const f of abilitiesOf(s, o).opponentsCantCast ?? [])
@@ -5110,7 +5114,7 @@ function chooseDiscard(s: GameState, p: Player, ids: ObjectId[]) {
   const pend = s.pending;
   const r = s.resolving;
   if (pend?.kind !== "discard" || pend.player !== p.id || !r?.scratch?.queue) throw new RulesError("no discard pending");
-  if (new Set(ids).size !== pend.count || ids.some((id) => !p.hand.includes(id))) throw new RulesError(`choose exactly ${pend.count} card(s) from your hand`);
+  if ((pend.upTo ? new Set(ids).size !== ids.length || ids.length > pend.count : new Set(ids).size !== pend.count) || ids.some((id) => !p.hand.includes(id))) throw new RulesError(pend.upTo ? `choose up to ${pend.count} card(s) from your hand` : `choose exactly ${pend.count} card(s) from your hand`);
   if (pend.filter && ids.some((id) => !printedMatches(pend.filter!, defOf(s, obj(s, id))))) throw new RulesError(`choose ${pend.filter.text.replace(/^(?!an? )/, "a ")}`);
   r.scratch.chosen![p.id] = ids;
   r.scratch.queue.shift();
@@ -6390,7 +6394,10 @@ const SUPERTYPE_WALK: Record<string, { supertype: string; non?: true }> = { "Sno
 /** "Can't block": from its abilities, or from a rule for the turn like Falter's. */
 export function cantBlockNow(s: GameState, o: GameObject): boolean {
   // Decayed means "This creature can't block" (CR 702.147a).
-  return characteristics(s, o).cantBlock || objHasKeyword(s, o, "Decayed") || (s.cantBlockThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false));
+  if (characteristics(s, o).cantBlock || objHasKeyword(s, o, "Decayed") || (s.cantBlockThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false))) return true;
+  // Void Winnower: an opponent's creature with an even mana value (X is 0, CR 202.3b; a face-down one's is 0).
+  const you = controllerOf(s, o);
+  return defMv(defOf(s, o)) % 2 === 0 && s.battlefield.some((id) => controllerOf(s, s.objects[id]!) !== you && abilitiesOf(s, s.objects[id]!).opponentsCantBlockEven);
 }
 
 export function blockProblem(s: GameState, blocker: GameObject, attacker: GameObject, defender = attacker.attacking): string | null {

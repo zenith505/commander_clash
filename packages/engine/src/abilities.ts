@@ -124,6 +124,10 @@ export type Count =
   | { kind: "discoveredBelow"; n: number }
   /** "For each counter removed this way" (Nexus Mentality). */
   | { kind: "countersRemovedThisWay" }
+  /** "Cards exiled with ~": those this object's linked exile took that are still there (CR 607.2a, 400.7). */
+  | { kind: "linkedExiled" }
+  /** How many cards the last "put all cards exiled with ~ into their owners' graveyards" moved (Valakut Exploration). */
+  | { kind: "movedLinkedThisWay" }
   /** "For each creature tapped this way", "the number of creatures tapped this way" after tapAnyNumber, or in its reflexive trigger. */
   | { kind: "tappedThisWay" }
   /**
@@ -375,6 +379,10 @@ export interface TargetSpec {
   distinctFrom?: number[];
   /** "Up to three target cards from a single graveyard": in the same graveyard as these targets of the group, if chosen. */
   sameGraveyardAs?: number[];
+  /** Goblin Welder's "target artifact card in that player's graveyard": owned by the controller of these permanent targets. */
+  inGraveyardOfControllerOf?: number[];
+  /** "Two target creatures controlled by different players": not controlled by the controller of these targets. */
+  differentControllerFrom?: number[];
   /**
    * "Each opponent may sacrifice a permanent of their choice that shares a card type with it" (Braids, Arisen Nightmare):
    * a card type of what this ability sacrificed, as it last existed (rulings: any one of them if it had several), made into
@@ -1658,7 +1666,7 @@ export type Effect =
   /** "Exile the top two cards of your library. Until the end of your next turn, you may play those cards." */
   /** `who`: "the top card of that player's library" (Ragavan), not yours; `castOnly`: "you may cast that card", not play it. */
   /** `free`: "you may play that card without paying its mana cost" (Urza, Lord High Artificer, CR 118.9). */
-  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" | "yourNextEndStep"; who?: PlayerRef; castOnly?: true; free?: true }
+  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" | "yourNextEndStep"; who?: PlayerRef; castOnly?: true; free?: true; /** The cards are "exiled with ~" for its other abilities (CR 607.2a). */ linked?: true }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
   /** "Remove a +1/+1 counter from it", "remove all -1/-1 counters from ~" (CR 122.8): as many as it has, at most. */
   /**
@@ -1885,7 +1893,7 @@ export type Effect =
   /** `hand`: "discards their hand", every card in it (n is ignored). */
   /** `filter`: "discard a creature card" (only such cards can be chosen). */
   /** `exile`: "target opponent exiles a card from their hand": chosen the same way, but exiled, not discarded (no discard, CR 701.9a); `linked` as for "exile". */
-  | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean; hand?: true; filter?: TargetSpec; /** "Each player discards cards the same way" (Balancing Act): down to the fewest cards any of them has; `n` is unused. */ downToFewest?: true; exile?: true; linked?: boolean } // CR 701.9
+  | { type: "discard"; who: PlayerRef; n: Amount; random?: boolean; hand?: true; /** "Discard any number of cards", "discard up to two cards": none to `n` (CR 107.1c), chosen as it resolves. */ upTo?: true; filter?: TargetSpec; /** "Each player discards cards the same way" (Balancing Act): down to the fewest cards any of them has; `n` is unused. */ downToFewest?: true; exile?: true; linked?: boolean } // CR 701.9
   | { type: "scry"; n: Amount } // CR 701.22, by the controller
   /** "~ endures N" (CR 701.63a): N +1/+1 counters on it, or an N/N white Spirit token, its controller's choice. */
   | { type: "endure"; what: ObjRef; n: Amount }
@@ -2214,6 +2222,11 @@ export type Effect =
   | { type: "turnRules"; rules: TurnRule["rule"][] }
   /** "Until your next turn, you may cast sorcery spells as though they had flash." (Teferi, Time Raveler; CR 702.8a) */
   | { type: "flashUntilNextTurn"; filter: TargetSpec }
+  /**
+   * Goblin Welder: "If both targets are still legal as this ability resolves, that player simultaneously sacrifices the
+   * artifact and returns the artifact card to the battlefield": targets `artifact` and `card` (rulings: neither if either is illegal).
+   */
+  | { type: "weld"; artifact: number; card: number }
   /** "Until your next turn, your opponents can't cast spells from anywhere other than their hands" (Avatar's Wrath): see GameState.handOnlyUntil. */
   | { type: "opponentsHandOnlyUntilNextTurn" }
   /** "Artifact, instant, and sorcery spells you cast this turn cost {2} less to cast" (Urza, Planeswalker): `mod`'s "you" is the ability's controller (CR 601.2f, 611.2a). */
@@ -3040,6 +3053,8 @@ export interface BatchTrigger {
   orSelf?: true;
   /** Satoru: "if none of them were cast or no mana was spent to cast them" (an intervening if, CR 603.4). */
   noneCastWithMana?: true;
+  /** Kotis: "if one or more of them entered from a graveyard or was cast from a graveyard" (an intervening if, CR 603.4). */
+  fromGraveyard?: true;
   dies?: true;
   notDies?: true;
   /** `notBattlefield`: "from anywhere other than the battlefield" (Syr Konrad). */
@@ -3683,6 +3698,10 @@ export interface CompiledCard {
   loyaltyAtInstantSpeed?: true;
   /** "Your opponents can't cast spells with mana value 3 or less." (Brisela, Voice of Nightmares): this many or less. */
   opponentsCantCastMvAtMost?: number;
+  /** "Your opponents can't cast spells with even mana values." (Void Winnower). */
+  opponentsCantCastEven?: true;
+  /** "Your opponents can't block with creatures with even mana values." (Void Winnower). */
+  opponentsCantBlockEven?: true;
   /** "You can't cast creature spells." (Steel Golem), "You can't cast noncreature spells." (Nikya): its controller. */
   youCantCast?: TargetSpec[];
   /** "Your opponents can't cast noncreature spells." (Narset Transcendent's emblem): each opponent of its controller. */

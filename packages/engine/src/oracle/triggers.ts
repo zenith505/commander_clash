@@ -809,6 +809,13 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     yourTurn = !!m[4];
     rest = m[5]!;
   } else return null;
+  // Kotis, Celes: "if one or more of them entered from a graveyard or was cast from a graveyard" (an intervening if about
+  // the event, CR 603.4).
+  const fromYard = /^if one or more of them entered from a graveyard or was cast from a graveyard, (.+)$/.exec(rest);
+  if (fromYard && batch.what === "enters") {
+    batch.fromGraveyard = true;
+    rest = fromYard[1]!;
+  }
   // Kambal, Profiteering Mayor: "for each of them, create a tapped token that's a copy of it", those that entered.
   const eachCopy = /^for each of them, create an? (tapped )?token that's a copy of it\.?$/.exec(rest);
   if (eachCopy && batch.what === "enters" && !yourTurn) return { event: "batch", batch, body: { targets: [], effects: [{ type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "eventGroup" }, each: true, ...(eachCopy[1] ? { tapped: true } : {}) }], text: rest.replace(/\.$/, "") } };
@@ -1208,6 +1215,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       rest = rest.replace(/\byou gain that much life\b/g, `you gain life equal to ${died}`).replace(new RegExp(`\\bdistribute that many ${COUNTER} counters\\b`, "g"), `distribute a number of $1 counters equal to ${died}`).replace(/ and (distribute a number of)/, ". Distribute a number of");
       if (/\bthat (much|many)\b/.test(rest)) return "fail";
     }
+    // "If there are cards exiled with ~, put them into their owner's graveyard" (Valakut Exploration): those cards.
+    if (/^there are cards exiled with ~$/.test(intervening[2]!)) rest = rest.replace(/^put them into their owner's graveyard,/, "put all cards exiled with ~ into their owners' graveyards,");
     // "At the beginning of your upkeep, if ~ is tapped, put a storage counter on it" (Bottomless Vault): "it" is ~, the
     // only thing named.
     // So is every "it" of "sacrifice it" (Mad Dog) and "it deals 2 damage to you unless it came under your control this

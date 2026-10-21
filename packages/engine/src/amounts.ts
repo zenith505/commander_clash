@@ -159,6 +159,12 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return Math.max(0, ...(s.resolving?.exiledPowers ?? []));
     case "countersRemovedThisWay":
       return s.resolving?.countersRemoved ?? 0;
+    case "linkedExiled": {
+      const src = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      return src ? (s.linkedExile?.[`${src.id}@${src.zoneChanges ?? 0}`] ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc).length : 0;
+    }
+    case "movedLinkedThisWay":
+      return s.resolving?.movedLinked ?? 0;
     case "lifeLostThisWay":
       return s.resolving?.exchanged?.lost[ctx.controller] ?? 0;
     case "exchangedLifeDifference": {
@@ -505,6 +511,10 @@ function describeCount(c: Count): string {
       return "the greatest power among creature cards exiled";
     case "countersRemovedThisWay":
       return "#counters removed";
+    case "linkedExiled":
+      return "#cards exiled with it";
+    case "movedLinkedThisWay":
+      return "#cards put into graveyards";
     case "lifeLostThisWay":
       return "the life you lost";
     case "exchangedLifeDifference":

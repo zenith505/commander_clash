@@ -3,7 +3,7 @@
 import type { Effect, TokenSpec } from "../../abilities";
 import { compileQuoted } from "../grants";
 import { allEffects } from "../../abilities";
-import { NUMX, X, amt, singularWord, isGroup } from "../words";
+import { NUMX, X, amt, singularWord, isGroup, BASIC_TYPES } from "../words";
 import { parsePlayer, parseObject } from "../targets";
 import { INCUBATOR, PREDEFINED_TOKENS, ROLE_TOKENS, parseToken, parseCopyExcept } from "../tokens";
 import { parseSentence } from "../sentence";
@@ -73,6 +73,12 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = new RegExp(`^(?:You )?[Cc]reate ${NUMX} colorless (snow )?artifact tokens? named ((?:[A-Z][\\w'-]*)(?: [A-Z][\\w'-]*)*) with "([^"]+)"$`).exec(s))) {
     const token: TokenSpec = { name: m[3]!, named: true, colors: [], types: ["Artifact"], subtypes: [], keywords: [], abilities: m[4]!, ...(m[2] ? { snow: true as const } : {}) };
     return compileQuoted(m[4]!) ? [{ type: "createToken", who: { ref: "you" }, n: amt(m[1]!), token }] : null;
+  }
+  // Overlord of the Hauntwoods: "create a tapped colorless land token named Everywhere that is every basic land type": a
+  // Plains, Island, Swamp, Mountain and Forest, with each one's mana ability (CR 305.6), but not basic (rulings).
+  if ((m = /^(?:You )?[Cc]reate a (tapped )?colorless land token named ([A-Z][\w'-]*) that is every basic land type$/.exec(s))) {
+    const token: TokenSpec = { name: m[2]!, named: true, colors: [], types: ["Land"], subtypes: [...BASIC_TYPES], keywords: [] };
+    return [{ type: "createToken", who: { ref: "you" }, n: 1, token, ...(m[1] ? { tapped: true } : {}) }];
   }
   // A named legendary token (CR 111.4, 205.4d): "Create Ragavan, a legendary 2/1 red Monkey creature token", "create The
   // Atropal, a legendary 4/4 black God Horror creature token with deathtouch". In its quoted abilities the token's name

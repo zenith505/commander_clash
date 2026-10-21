@@ -56,6 +56,11 @@ function putAbilityCopy(s: GameState, orig: StackItem, controller: PlayerId, tar
   fireEvent(s, { type: "targeted", stackId: id });
 }
 
+/** Twinning Staff: how many additional copies a player gets when they copy a spell (one per permanent with it, rulings). */
+export function extraSpellCopies(s: GameState, pid: PlayerId): number {
+  return s.battlefield.filter((id) => abilitiesOf(s, obj(s, id)).extraSpellCopy && controllerOf(s, obj(s, id)) === pid).length;
+}
+
 /** A copy of a card that wasn't cast ceases to exist (CR 704.5e). */
 export function removeCopy(s: GameState, id: ObjectId) {
   const o = s.objects[id];
@@ -245,7 +250,10 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
                 ? (orig.kicked?.length ?? 0)
                 : amountNow(s, e.n, ctx);
         if (n <= 0) return;
-        sc.copies = { of: id!, left: n };
+        // Twinning Staff: one more for each of them the player copying it controls (CR 614.1a; rulings), whose targets may
+        // always be chosen anew. Only for spells: copying a card or an ability isn't copying a spell.
+        const extra = orig.kind === "spell" ? extraSpellCopies(s, ctx.controller) : 0;
+        sc.copies = { of: id!, left: n, ...(extra ? { extra } : {}) };
       }
       const c = sc.copies;
       // As it is now, or as it was cast if it has left the stack.
@@ -261,9 +269,20 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         c.targets = undefined;
         c.left--;
       }
+      // Twinning Staff's additional copies, after the others (its controller chooses where they go, rulings).
+      while (orig && c.left === 0 && c.extra) {
+        if (specs.length && c.targets === undefined) {
+          s.pending = { kind: "copyTargets", player: ctx.controller, source: src, copyOf: orig.description, specs, current: orig.targets ?? [], left: c.extra };
+          return "paused";
+        }
+        putSpellCopy(s, orig, ctx.controller, c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src });
+        c.targets = undefined;
+        c.extra--;
+      }
       if (orig && e.demonstrate && !c.oppDone) {
         // Demonstrate (CR 702.144a): you copied it, so choose an opponent, who copies it too; their copy goes on the
-        // stack above yours, and they choose its new targets knowing the others (rulings).
+        // stack above yours, and they choose its new targets knowing the others (rulings). Their Twinning Staffs give
+        // them more copies (CR 614.1a).
         if (c.opp === undefined) {
           const opps = opponents(s, ctx.controller);
           if (!opps.length) return;
@@ -273,12 +292,16 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           }
           c.opp = opps[0]!;
         }
-        if (e.newTargets && specs.length && c.targets === undefined) {
-          s.pending = { kind: "copyTargets", player: c.opp, source: src, copyOf: orig.description, specs, current: orig.targets ?? [], left: 1 };
-          return "paused";
+        c.oppLeft ??= 1 + extraSpellCopies(s, c.opp);
+        while (c.oppLeft > 0) {
+          if (e.newTargets && specs.length && c.targets === undefined) {
+            s.pending = { kind: "copyTargets", player: c.opp, source: src, copyOf: orig.description, specs, current: orig.targets ?? [], left: c.oppLeft };
+            return "paused";
+          }
+          putSpellCopy(s, orig, c.opp, c.targets ?? orig.targets);
+          c.targets = undefined;
+          c.oppLeft--;
         }
-        putSpellCopy(s, orig, c.opp, c.targets ?? orig.targets);
-        c.targets = undefined;
         c.oppDone = true;
       }
       return;
@@ -846,8 +869,8 @@ export function unlessCost(cost: string, generic: number): string {
 }
 
 /** "At the beginning of the next end step" / "your next upkeep", about this object as it is now (CR 603.7). */
-export function addDelayed(s: GameState, when: DelayedTrigger["when"], controller: PlayerId, o: GameObject, body: AbilityBody, sourceCardId = cardIdOf(o)) {
-  (s.delayed ??= []).push({ when, controller, sourceCardId, subject: { id: o.id, zc: o.zoneChanges ?? 0 }, body, turn: s.turn, step: s.step, ...(o.transforms ? { transforms: o.transforms } : {}) });
+export function addDelayed(s: GameState, when: DelayedTrigger["when"], controller: PlayerId, o: GameObject, body: AbilityBody, sourceCardId = cardIdOf(o), whose?: PlayerId) {
+  (s.delayed ??= []).push({ when, controller, sourceCardId, subject: { id: o.id, zc: o.zoneChanges ?? 0 }, body, turn: s.turn, step: s.step, ...(o.transforms ? { transforms: o.transforms } : {}), ...(whose !== undefined ? { player: whose } : {}) });
 }
 
 /** Was it kicked (CR 702.33d), with that kicker cost if the condition names one (702.33f)? */

@@ -7,7 +7,7 @@ import { compileCard } from "../oracle";
 import type { ContinuousEffect, GameObject, GameState, ObjectId, PlayerId } from "../types";
 import { setFace } from "../faces";
 import { becomePrepared } from "../prepare";
-import { objectMatches } from "./targeting";
+import { objectMatches, playerProtectedFrom } from "./targeting";
 import { ResolveCtx, convokedFor, objects, amountNow, fixMods, players, runEffect } from "./resolve";
 import { createExtraTokens, createToken } from "./run-tokens";
 import { discardCards } from "./run-library";
@@ -899,6 +899,36 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       attachTo(s, me, host);
       return;
     }
+    case "attachAny": {
+      // Ardenn: the Auras and Equipment are chosen as it resolves, and attached at once (rulings), each only if it could
+      // be attached to the target (CR 701.3a-b). Nothing happens with an illegal target (CR 608.2b).
+      const t = ctx.targets[e.host];
+      if (!t || !ctx.legal[e.host]) return;
+      const host = t.kind === "object" ? s.objects[t.id] : undefined;
+      if (t.kind === "object" && host?.zone !== "battlefield") return;
+      const sc = (s.resolving!.scratch ??= {});
+      if (!sc.queue) {
+        const options = s.battlefield.filter((id) => {
+          const o = obj(s, id);
+          return controllerOf(s, o) === ctx.controller && canAttachTo(s, o, host ?? (t as { id: PlayerId }).id);
+        });
+        if (!options.length) return;
+        sc.queue = [ctx.controller];
+        sc.chosen = {};
+        const to = host ? defOf(s, host).name : player(s, (t as { id: PlayerId }).id).name;
+        s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "attach", what: to, options, count: options.length, min: 0, anyNumber: true };
+        return "paused";
+      }
+      const chosen = sc.chosen?.[ctx.controller] ?? [];
+      if (!chosen.length) log(s, `${player(s, ctx.controller).name} attaches nothing.`);
+      for (const id of chosen) {
+        const o = s.objects[id];
+        if (!o || o.zone !== "battlefield") continue;
+        if (host) attachTo(s, o, host);
+        else attachToPlayer(s, o, (t as { id: PlayerId }).id);
+      }
+      return;
+    }
     case "attachElsewhere": {
       // "Attach target Aura attached to a creature to another creature" (Crown of the Ages): the creature is chosen as
       // it resolves, not targeted (rulings), among those the Aura could enchant (CR 303.4d, 702.16c).
@@ -951,21 +981,53 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
 }
 
 /**
+ * Could this Aura or Equipment on the battlefield be attached to this permanent or player now (CR 701.3a-b)? Not to what
+ * it's attached to already, nor to itself; an Equipment only to a creature, and not while it's a creature itself unless
+ * it has reconfigure (CR 301.5c); an Aura to what its enchant ability allows (CR 303.4d, 702.5d); neither to something
+ * with protection from it (CR 702.16c-d).
+ */
+export function canAttachTo(s: GameState, me: GameObject, host: GameObject | PlayerId): boolean {
+  if (me.zone !== "battlefield") return false;
+  const meChars = characteristics(s, me);
+  const aura = meChars.subtypes.includes("Aura");
+  if (!aura && !meChars.subtypes.includes("Equipment")) return false;
+  const enchant = compileCard(defOf(s, me)).enchant;
+  // "Enchant creature you control" is about the Aura's controller.
+  const who = controllerOf(s, me);
+  if (typeof host === "number") {
+    // "Enchant player", "enchant opponent" (CR 702.5d); a player's protection is checked as for an Aura entering (CR 702.16c).
+    if (!aura || enchant?.kind !== "player" || me.attachedToPlayer === host || s.players[host]?.lost) return false;
+    if (enchant.opponent && host === who) return false;
+    return !playerProtectedFrom(s, host, who, { ...meChars, controller: who });
+  }
+  if (me.attachedTo === host.id || host.id === me.id || host.zone !== "battlefield") return false;
+  // An Aura or Equipment that's also a creature can't be attached, unless it has reconfigure (CR 301.5c, 303.4d).
+  if (objIsType(s, me, "Creature") && !compileCard(defOf(s, me)).reconfigure) return false;
+  return aura ? enchant?.kind === "object" && objectMatches(s, enchant, host, who, false, meChars) : objIsType(s, host, "Creature") && objectMatches(s, { kind: "object", text: "" }, host, who, false, meChars);
+}
+
+/** Attach an Aura to a player (CR 701.3a): "enchant player" (CR 702.5d), with a new timestamp (701.3c). */
+function attachToPlayer(s: GameState, me: GameObject, pid: PlayerId) {
+  if (!canAttachTo(s, me, pid)) return;
+  const was = me.attachedTo;
+  me.attachedTo = undefined;
+  me.attachedToPlayer = pid;
+  me.timestamp = s.nextTimestamp++;
+  if (was) fireEvent(s, { type: "unattached", id: me.id, host: was });
+  invalidateCharacteristics(s);
+  log(s, `${defOf(s, me).name} is attached to ${player(s, pid).name}.`);
+}
+
+/**
  * Attach an Aura or Equipment to `host` (CR 701.3a), with a new timestamp (613.7e). Not to what it's attached to already,
  * nor to itself (701.3b-c); only to something it could be attached to: an Equipment to a creature (CR 301.5c), an Aura
  * to what it can enchant (CR 303.4d), neither to something with protection from it (CR 702.16c-d).
  */
 function attachTo(s: GameState, me: GameObject, host: GameObject) {
-  if (me.zone !== "battlefield" || me.attachedTo === host.id || host.id === me.id) return;
-  // An Equipment that's also a creature can't equip, unless it has reconfigure (CR 301.5c).
-  if (objIsType(s, me, "Creature") && !compileCard(defOf(s, me)).reconfigure) return;
-  const enchant = compileCard(defOf(s, me)).enchant;
-  const meChars = characteristics(s, me);
-  // "Enchant creature you control" is about the Aura's controller.
-  const who = controllerOf(s, me);
-  if (meChars.subtypes.includes("Aura") ? enchant?.kind !== "object" || !objectMatches(s, enchant, host, who, false, meChars) : !objIsType(s, host, "Creature") || !objectMatches(s, { kind: "object", text: "" }, host, who, false, meChars)) return;
+  if (!canAttachTo(s, me, host)) return;
   const was = me.attachedTo;
   me.attachedTo = host.id;
+  me.attachedToPlayer = undefined;
   me.timestamp = s.nextTimestamp++;
   if (was) fireEvent(s, { type: "unattached", id: me.id, host: was });
   invalidateCharacteristics(s); // reconfigure: it stops being a creature (CR 702.151b)

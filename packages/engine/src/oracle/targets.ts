@@ -570,6 +570,15 @@ export function parseTargetPhrase(
   // Wishing Well: "with mana value equal to the number of coin counters on ~".
   // Pollywog Prodigy: "with mana value less than ~'s power", strictly less: one less at most (CR 107.1).
   // A strict comparison the count doesn't read ("greater than its base power", Kutzil) is left to the readings below.
+  // Talion, the Kindly Lord: "a spell with mana value, power, or toughness equal to the chosen number", Sanctum Prelate:
+  // "with mana value equal to the chosen number" (Chosen.number, TargetSpec.equalsChosen).
+  const chosenNumber = / with (mana value, power, or toughness|mana value|power or toughness) equal to the chosen number$/i.exec(phrase.trim());
+  if (chosenNumber) {
+    extra.chosen = "number";
+    extra.equalsChosen = chosenNumber[1]!.toLowerCase() === "mana value" ? ["manaValue"] : chosenNumber[1]!.toLowerCase() === "power or toughness" ? ["power", "toughness"] : ["manaValue", "power", "toughness"];
+    p = p.slice(0, chosenNumber.index);
+    phrase = phrase.trim().slice(0, chosenNumber.index);
+  }
   const bound0 = / with (power|toughness|mana value) (?:(less|greater) than( or equal to)?|equal to) (.+)$/i.exec(phrase.trim());
   const from0 = bound0 && / from (?:your|a|an opponent's) graveyard$/i.exec(bound0[4]!);
   const amount0 = bound0 ? opts.count?.(from0 ? bound0[4]!.slice(0, from0.index) : bound0[4]!) : null;

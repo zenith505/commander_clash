@@ -678,6 +678,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             obj(s, id).hiddenExile = { by: ctx.sourceId ?? "", seen: [pid], label: "Face down" };
             r.faceDownExiled = [...(r.faceDownExiled ?? []), id];
           }
+          // Praetor's Grasp, Ugin: the player who searched may play it, this object only (CR 400.7).
+          if (to.play && to.zone === "exile" && obj(s, id).zone === "exile" && exiledFor(pid) === undefined) {
+            const { until, ...how } = to.play;
+            obj(s, id).mayPlay = { player: pid, zc: obj(s, id).zoneChanges ?? 0, until, turn: s.turn, ...how };
+          }
           // Opposition Agent: exiled face up (CR 406.3), its controller may play it for as long as it remains exiled, a land
           // too (following the normal timing rules) and spend mana as though it were mana of any color to cast it (CR
           // 609.4b: colored symbols paid with any mana).

@@ -203,7 +203,7 @@ describe("energy (CR 107.14)", () => {
     supported(puzzleknot, battlewagon, servo, siphon, reservoir);
     expect(compileCard(battlewagon).activated[1]).toMatchObject({ tap: true, energyCost: 3, manaCost: "" });
     expect(compileCard(servo).mana[0]).toMatchObject({ energyCost: 1 });
-    expect(isFullySupported(card("Big", "Artifact", "{1}", { oracleText: "{T}, Pay fifty {E}: Draw seven cards." }))).toBe(false);
+    expect(isFullySupported(card("Big", "Artifact", "{1}", { oracleText: "{T}, Pay sixty {E}: Draw seven cards." }))).toBe(false);
   });
 
   it("you get energy, and pay it to activate", () => {

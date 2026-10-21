@@ -1,7 +1,7 @@
 # Roadmap
 
-22,172 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,911 of 1,989 (96%), top 5,000: 3,775 of 4,988 (75%).
+22,204 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,934 of 1,989 (97%), top 5,000: 3,802 of 4,988 (76%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,12 +22,18 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 106, most played first: Ardenn, Intrepid Archaeologist
-   (attach any number of Auras and Equipment to a target), Extraplanar Lens, Twinning Staff, Mirror Box ("for each other
-   creature you control with the same name"), Praetor's Grasp, Ugin, Eye of the Storms, Hoarding Broodlord, Talion,
-   Timely Ward ("as though it had flash if it targets a commander"), Flame of Anor ("if you control a Wizard as you cast
-   ~, you may choose two instead"), Overlord of the Hauntwoods, Jaxis, Delina, Massacre Girl, Ancient Brass Dragon, Jarad
-   ("Sacrifice a Swamp and a Forest": two permanents for two different filters). Smaller gaps from round 106: bots never
+00. Most played first (`npm run popular`). Out after round 107, most played first: Jaxis, the Troublemaker (a copy
+   token that gains a quoted dies trigger), Delina, Wild Mage (d20 results with "you may roll again"), Ancient Brass
+   Dragon (targets with total mana value X after a roll), Seize the Spotlight (each opponent chooses fame or fortune),
+   Walk-In Closet, Matzalantli, Firemane Commando ("they draw a card if none of those creatures attacked you"), The
+   Aetherspark, Claim Jumper ("repeat this process once"), Emrakul, the Promised End, Scheming Symmetry, Sage's Reverie
+   ("each Aura you control that's attached to a creature"), Containment Construct, Wedding Ring, Arwen, Hero's Blade,
+   Colossal Grave-Reaver, Multani, Breena, Phyrexian Obliterator, Kazuul. Smaller gaps from round 107: "Sacrifice A and
+   B" costs read only two different single-word types (Jarad); bots never use Jarad's graveyard ability (bots skip
+   graveyard abilities); "No more than one creature can attack ~ each combat" is checked for attacks on the planeswalker
+   only, and bots move at most that many attackers onto it; "at the beginning of that player's next end step" works for
+   a single exiled card (The Eternal Wanderer); impending is read only as "Impending N—[mana cost]" on creature cards;
+   number words go up to twenty plus thirty, forty and fifty. Smaller gaps from round 106: bots never
    exile cards for the Marches, and pay a Defiler's life only with 20 or more life to spare; bots never activate
    "Return ~ to its owner's hand" abilities (Shigeki, Recurring Nightmare, Krasis Incubation); mana Tecutlan made that's
    still in your pool is spent before other mana of its color, so a permanent spell paid from the pool discovers whether

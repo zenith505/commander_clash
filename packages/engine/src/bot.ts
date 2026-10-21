@@ -809,6 +809,14 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     }
     return null;
   }
+  // Ardenn: our best creature, where our Equipment and helpful Auras can go; with none, ourselves (it must target).
+  if (body.targets.length === 1 && body.effects.length === 1 && body.effects[0]!.type === "attachAny") {
+    const all = legalTargets(s, body.targets[0]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId);
+    const ours = all.filter((t) => t.kind === "object" && objIsType(s, obj(s, t.id), "Creature") && controllerOf(s, obj(s, t.id)) === pid).sort((a, b) => worth(s, pid, obj(s, (b as { id: string }).id)) - worth(s, pid, obj(s, (a as { id: string }).id)));
+    const me = all.find((t) => t.kind === "player" && t.id === pid);
+    const pick = ours[0] ?? me ?? (forced ? all[0] : undefined);
+    return pick ? [pick] : null;
+  }
   const harm = harmfulTargets(body);
   const out: TargetChoice[] = [];
   // Damage a target will take from a fight or "damage equal to its power": the other creature's power.
@@ -1158,6 +1166,7 @@ function targetIndexOf(e: Effect): number | undefined {
   const refs = [("what" in e ? e.what : undefined), ("who" in e ? e.who : undefined), ("to" in e ? e.to : undefined), ("a" in e ? e.a : undefined), ("b" in e ? e.b : undefined)];
   for (const r of refs) if (r && "index" in r && (r.ref === "target" || r.ref === "anyTarget")) return r.index;
   if (e.type === "counterSpell") return e.index;
+  if (e.type === "attachAny") return e.host;
   return undefined;
 }
 
@@ -1599,7 +1608,15 @@ function castPlanWithX(s: GameState, pid: PlayerId, id: string, free: boolean, x
   }
   // "Choose both instead" (teamwork, or controlling a commander): both modes when both can be chosen.
   const both = printed?.modal?.both;
-  if (both && both !== "kicked" && legalModes(s, printed!, pid).every(Boolean)) {
+  // Flame of Anor with a Wizard: the two best modes.
+  if (both === "control" && bothModes(s, pid, printed!)) {
+    const two = chooseModes(s, pid, { ...printed!, modal: { ...printed!.modal!, max: 2 } }, false, id);
+    if (two && two.modes.length > 1) {
+      const plan = castPlanWithModes(s, pid, id, free, x, via, alt, two.modes);
+      if (plan) return plan;
+    }
+  }
+  if (both && both !== "kicked" && both !== "control" && legalModes(s, printed!, pid).every(Boolean)) {
     const tw = both === "teamwork" ? spareTappers(s, pid, id, compileCard(defOf(s, obj(s, id))).teamwork ?? 0) : undefined;
     if (both === "commander" ? bothModes(s, pid, printed!) : tw) {
       const plan = castPlanWithModes(s, pid, id, free, x, via, alt, [0, 1], tw);
@@ -1852,6 +1869,18 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
     }
     else if (c.kind === "payLife") {
       if (player(s, pid).life < c.n + 15) return null;
+    } else if (c.kind === "sacrifice" && c.oneOfEach) {
+      // "A Swamp and a Forest" (Jarad): for each in turn, the cheapest that fits it and as few of the others as can be
+      // (a plain Swamp before an Overgrown Tomb), each a different permanent.
+      const pool = sacrificePool(s, pid, c, targeted, alt);
+      const picked: ObjectId[] = [];
+      for (const [i, f] of c.oneOfEach.entries()) {
+        const later = (x: GameObject) => c.oneOfEach!.slice(i + 1).filter((g) => objectMatches(s, g, x, pid, false)).length;
+        const o = pool.filter((x) => !picked.includes(x.id) && objectMatches(s, f, x, pid, false)).sort((a, b) => later(a) - later(b))[0];
+        if (!o) return null;
+        picked.push(o.id);
+      }
+      out.sacrifice = picked;
     } else if (c.kind === "sacrifice") {
       const pool = sacrificePool(s, pid, c, targeted, alt);
       if (pool.length < c.n) return null;
@@ -1983,6 +2012,7 @@ function chooseDistribution(s: GameState, pid: PlayerId, options: ObjectId[], to
 
 function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: number, action: PickAction, counter?: CounterKind): ObjectId[] {
   const self = s.resolving?.item.sourceId;
+  if (action === "attach") return attachPicks(s, pid, options);
   // Good counters go on the best creature; stun and -1/-1 counters on the least useful one.
   if (action === "populate" || action === "pair" || action === "choose" || (action === "counters" && (counter === "+1/+1" || counter === "shield" || counter === "loyalty"))) return [...options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
   // Meld (CR 701.42b): the card of the pair itself, not a token or a Clone, which would stay in exile; of those, the one
@@ -2326,7 +2356,34 @@ function chooseKeyword(s: GameState, pid: PlayerId, options: string[]): string {
   return [...options].sort((a, b) => rank(a) - rank(b))[0]!;
 }
 
+/**
+ * "Choose a number" (Talion, Sanctum Prelate): the mana value (and, for Talion, power or toughness) most common among the
+ * nonland cards the opponents have shown, on the battlefield and in graveyards. Sanctum Prelate's ban counts only
+ * noncreature cards, and avoids the mana values of our own noncreature cards in hand. With nothing shown, 2.
+ */
+function chooseNumber(s: GameState, pid: PlayerId, c: CompiledCard | undefined, options: string[]): string {
+  const r = (s.pending?.kind === "chooseOption" && s.pending.numberRange) || { min: Number(options[0] ?? 0), max: Number(options[0] ?? 0) };
+  const ban = !!c?.noncreatureChosenMvCantBeCast;
+  const tally = new Map<number, number>();
+  const add = (n: number | undefined, w: number) => n !== undefined && Number.isFinite(n) && tally.set(n, (tally.get(n) ?? 0) + w);
+  const count = (d: CardDef, w: number) => {
+    if (isType(d, "Land") || (ban && isType(d, "Creature"))) return;
+    add(defMv(d), w);
+    if (!ban && isType(d, "Creature")) for (const v of [d.power, d.toughness]) if (v && /^\d+$/.test(v)) add(Number(v), w);
+  };
+  for (const p of s.players) {
+    if (p.id === pid || p.lost) continue;
+    for (const id of p.graveyard) count(defOf(s, obj(s, id)), 1);
+  }
+  for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) !== pid) count(defOf(s, obj(s, id)), 1);
+  if (ban) for (const id of player(s, pid).hand) count(defOf(s, obj(s, id)), -3);
+  let best = Math.max(r.min, Math.min(r.max, 2));
+  for (const [n, w] of tally) if (n >= r.min && n <= r.max && w > (tally.get(best) ?? 0)) best = n;
+  return String(best);
+}
+
 function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardDef | undefined, options: string[]): string {
+  if (what === "number") return chooseNumber(s, pid, card ? compileCard(card) : undefined, options);
   if (what === "basicLandType") return chooseLandType(s, pid, options);
   if (what === "keyword") return chooseKeyword(s, pid, options);
   const c = card ? compileCard(card) : undefined;
@@ -2771,6 +2828,31 @@ function flipBranchWorth(s: GameState, pid: PlayerId, o: GameObject, effects: Ef
     } else v += modeValue(s, pid, { targets: [], effects: [e], text: "" }, targets);
   }
   return v;
+}
+
+/**
+ * Ardenn: what to attach to the target. To a creature of ours: Equipment, unless it's on a creature of ours worth more,
+ * and helpful Auras that are on an opponent's permanent. To an opponent's creature or an opponent: harmful Auras that
+ * are on our own permanents. Nothing to ourselves.
+ */
+function attachPicks(s: GameState, pid: PlayerId, options: ObjectId[]): ObjectId[] {
+  const item = s.resolving?.item;
+  const e = item?.body?.effects.find((x) => x.type === "attachAny");
+  const t = e?.type === "attachAny" ? item!.targets?.[e.host] : undefined;
+  if (!t || (t.kind !== "object" && t.kind !== "player")) return [];
+  const host = t.kind === "object" ? s.objects[t.id] : undefined;
+  const ourHost = host ? controllerOf(s, host) === pid : t.id === pid;
+  const harmful = (o: GameObject) => compileCard(defOf(s, o)).statics.some((st) => modsAreHarmful(st.mods));
+  const onOurs = (o: GameObject) => (o.attachedTo ? controllerOf(s, obj(s, o.attachedTo)) === pid : o.attachedToPlayer === pid);
+  return options.filter((id) => {
+    const o = obj(s, id);
+    const aura = characteristics(s, o).subtypes.includes("Aura");
+    if (!ourHost) return aura && harmful(o) && onOurs(o);
+    if (!host || !objIsType(s, host, "Creature")) return false;
+    if (aura) return !harmful(o) && (o.attachedTo ? !onOurs(o) : o.attachedToPlayer !== undefined && o.attachedToPlayer !== pid);
+    const on = o.attachedTo ? s.objects[o.attachedTo] : undefined;
+    return !on || controllerOf(s, on) !== pid || worth(s, pid, on) < worth(s, pid, host);
+  });
 }
 
 /** "Attach target Equipment you control to target creature you control" (Brass Squire) where it already is, or with no Equipment chosen. */
@@ -3530,7 +3612,7 @@ function attackPlaneswalkers(s: GameState, pid: PlayerId, attacks: { attacker: O
       moved.push(a);
       need -= hit(obj(s, a.attacker), pw);
     }
-    if (need > 0) continue;
+    if (need > 0 || moved.length > (abilitiesOf(s, pw).combatLimit?.attackSelf ?? Infinity)) continue;
     for (const a of moved) {
       a.defender = owner;
       a.planeswalker = pw.id;

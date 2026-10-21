@@ -2590,7 +2590,10 @@ function resolvePermanentSpell(s: GameState, item: StackItem, o: GameObject, d: 
   // Opal Palace: as many more +1/+1 counters as times it's been cast from the command zone, for each of its mana spent.
   const opal = (o.commanderCountersCast ?? 0) * (player(s, o.owner).commanderCasts[o.id] ?? 0);
   o.commanderCountersCast = undefined;
-  moveObject(s, o.id, "battlefield", { controller: item.controller, ...(item.x ? { x: item.x } : {}), ...(sneak ? { tapped: true } : {}), ...(opal ? { counters: { "+1/+1": opal } } : {}) });
+  // Impending: "If you chose to pay this permanent's impending cost, it enters with N time counters on it" (CR 702.176a).
+  const impending = o.castAlt === "impending" ? (compileCard(d).impending ?? 0) : 0;
+  const enterCounters = { ...(opal ? { "+1/+1": opal } : {}), ...(impending ? { time: impending } : {}) };
+  moveObject(s, o.id, "battlefield", { controller: item.controller, ...(item.x ? { x: item.x } : {}), ...(sneak ? { tapped: true } : {}), ...(Object.keys(enterCounters).length ? { counters: enterCounters } : {}) });
   // Sneak: tapped and attacking whom the returned creature was attacking (CR 702.190b, 506.3a).
   if (sneak && o.zone === "battlefield" && objIsType(s, o, "Creature") && enterAttacking(s, o, sneak)) log(s, `${d.name} is attacking ${attackedName(s, o)}.`);
   if (gains && o.zone === "battlefield") {
@@ -3178,7 +3181,9 @@ export function castProblem(
   // Also a spell cast as an ability resolves, like cascade's (split second rulings).
   if (splitSecondOnStack(s)) return "a spell with split second is on the stack";
   if (!free && (s.priority !== pid || s.pending)) return "you don't have priority";
-  const instantSpeed = choices?.alt === "sneak" || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || flashGranted(s, pid, d, s.objects[id]?.owner);
+  // Timely Ward: with a commander among its targets; before they're chosen, a commander on the battlefield to target.
+  const commanderTarget = !!compileCard(d).flashIfTargetsCommander && (targets ? targets.some((t) => t.kind === "object" && !!s.objects[t.id]?.isCommander && s.objects[t.id]!.zone === "battlefield") : s.battlefield.some((b) => obj(s, b).isCommander));
+  const instantSpeed = choices?.alt === "sneak" || (!!choices?.teamwork?.length && !!compileCard(d).teamworkFlash) || isType(d, "Instant") || d.keywords.includes("Flash") || !!compileCard(d).flashSacrifice || !!compileCard(d).flashCost || commanderTarget || flashGranted(s, pid, d, s.objects[id]?.owner);
   if (!free && !instantSpeed && !canActAtSorcerySpeed(s, pid)) return `${d.name} can only be cast at sorcery speed`;
   // A plotted card is cast during its owner's main phase while the stack is empty, whatever its type (CR 702.170d).
   if (plotted && !canActAtSorcerySpeed(s, pid)) return `a plotted card can only be cast at sorcery speed`;
@@ -3441,7 +3446,8 @@ export function hasConvoke(s: GameState, pid: PlayerId, o: GameObject): boolean 
   if (compileCard(d).convoke) return true;
   return s.battlefield.some((id) => {
     const p = obj(s, id);
-    return controllerOf(s, p) === pid && (abilitiesOf(s, p).spellsHaveConvoke ?? []).some((g) => printedMatches(g.filter, d));
+    // "From exile": where it's cast from, the zone it's still in while it's paid for (CR 601.2a, 601.2g-h).
+    return controllerOf(s, p) === pid && (abilitiesOf(s, p).spellsHaveConvoke ?? []).some((g) => printedMatches(g.filter, d) && (!g.fromExile || (o.zone === "stack" ? o.castFrom : o.zone) === "exile"));
   });
 }
 
@@ -3906,8 +3912,9 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   if (isMainPhase(s) && s.activePlayer === p.id) item.castInMain = true;
   s.cards[d.oracleId] ??= d;
   (p.castNames ??= {})[d.name] = (p.castNames[d.name] ?? 0) + 1;
-  (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors], from: castFrom, ...(paid.treasure ? { treasure: true as const } : {}) });
-  (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv: spellManaValue(s, item) };
+  const castMv = spellManaValue(s, item);
+  (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors], from: castFrom, ...(paid.treasure ? { treasure: true as const } : {}), mv: castMv });
+  (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv };
   // A copy of a prepare spell: its permanent stops being prepared as it becomes cast (CR 722.3c, 601.2i).
   if (o.preparedFrom) unprepareFor(s, o);
   // Once it's cast, "whenever you cast" and "becomes the target" abilities trigger (CR 601.2i).
@@ -3965,6 +3972,9 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
     const value = mv ?? (parseManaCost(d.manaCost).hasX ? undefined : defMv(d));
     if (most !== undefined && controllerOf(s, o) !== pid && value !== undefined && value <= most)
       return `${characteristics(s, o).name}: opponents can't cast spells with mana value ${most} or less`;
+    // Sanctum Prelate: anyone's noncreature spell with that mana value, X as chosen (rulings).
+    if (abilitiesOf(s, o).noncreatureChosenMvCantBeCast && o.chosen?.number !== undefined && !isType(d, "Creature") && value === o.chosen.number)
+      return `${characteristics(s, o).name}: noncreature spells with mana value ${o.chosen.number} can't be cast`;
     if (abilitiesOf(s, o).opponentsCantCastEven && controllerOf(s, o) !== pid && value !== undefined && value % 2 === 0)
       return `${characteristics(s, o).name}: opponents can't cast spells with even mana values`;
     for (const f of abilitiesOf(s, o).youCantCast ?? [])
@@ -4163,6 +4173,8 @@ export function bothModes(s: GameState, pid: PlayerId, body: AbilityBody, choice
   if (both === "teamwork") return !!choices?.teamwork?.length;
   if (both === "kicked") return !!choices?.kicks?.length;
   if (both === "commander") return s.battlefield.some((id) => obj(s, id).isCommander && controllerOf(s, obj(s, id)) === pid);
+  // "If you control a Wizard as you cast ~" (Flame of Anor): as it's cast; what happens to the Wizard later doesn't matter (rulings).
+  if (both === "control" && body.modal?.bothIf) return staticConditionNow(s, body.modal.bothIf, "", pid);
   return false;
 }
 
@@ -4469,6 +4481,20 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
     if (c.kind === "discard" && c.random) {
       if (chosen?.length) return `${d.name}'s discard is at random`;
       if (pool.length < c.n) return `you need to ${verb} ${what} to ${doing}`;
+      continue;
+    }
+    // "Sacrifice a Swamp and a Forest" (Jarad): one permanent for each, a land that's both being only one (rulings).
+    const each = c.kind === "sacrifice" ? c.oneOfEach : undefined;
+    if (each) {
+      const fitEach = (specs: TargetSpec[], ids: ObjectId[]): boolean => {
+        const [f, ...rest] = specs;
+        return !f || ids.some((id) => objectMatches(s, f, obj(s, id), pid, false) && fitEach(rest, ids.filter((x) => x !== id)));
+      };
+      if (!chosen) {
+        if (!fitEach(each, pool)) return `you need to ${verb} ${what} to ${doing}`;
+        continue;
+      }
+      if (chosen.length !== c.n || new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id)) || !fitEach(each, chosen)) return `choose ${what} to ${verb}`;
       continue;
     }
     // "Discard an Island card and another card" (Foil): one of them an Island card.
@@ -5835,6 +5861,11 @@ function askEntersChoice(s: GameState): boolean {
       s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "cardName", options, objectId: o.id, prompt: `choose ${c.names ? `a ${c.names.text} name` : "a card name"}`, purpose: c.purpose ?? "deny" };
       return true;
     }
+    if (c.what === "number") {
+      const r = c.range ?? { min: 0, max: 999 };
+      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "number", options: [String(r.min)], numberRange: r, objectId: o.id, prompt: r.max === 999 ? "choose a number" : `choose a number between ${r.min} and ${r.max}` };
+      return true;
+    }
     s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: c.what, options: c.options ?? choiceOptions(c.what, c.except), objectId: o.id, ...(c.what === "cardType" ? { prompt: "choose a card type" } : {}) };
     return true;
   }
@@ -6126,6 +6157,11 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   for (const d of opps) {
     const cap = youLimits.get(d)!;
     if (atPlayer(d) > cap) throw new RulesError(`no more than ${cap === 1 ? "one creature" : `${cap} creatures`} can attack ${player(s, d).name} each combat`);
+  }
+  // "No more than one creature can attack ~ each combat" (The Eternal Wanderer): a restriction on that permanent (CR 508.1c).
+  for (const pw of new Set(attacks.flatMap((a) => (a.planeswalker !== undefined ? [a.planeswalker] : [])))) {
+    const cap = s.objects[pw] ? abilitiesOf(s, obj(s, pw)).combatLimit?.attackSelf : undefined;
+    if (cap !== undefined && attacks.filter((a) => a.planeswalker === pw).length > cap) throw new RulesError(`no more than ${cap === 1 ? "one creature" : `${cap} creatures`} can attack ${nameOf(s, pw)} each combat`);
   }
   const free = (o: GameObject, d: PlayerId) => !attackProblem(s, o, d) && !attackTaxPer(s, d) && atPlayer(d, o.id) < youLimits.get(d)!;
   // "No more than one creature can attack each combat" (Silent Arbiter): a restriction, which requirements can't break;

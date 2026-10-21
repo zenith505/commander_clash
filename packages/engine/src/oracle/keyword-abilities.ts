@@ -128,6 +128,7 @@ export function parseCostKeyword(
   foretell?: string;
   casualty?: number;
   dredge?: number;
+  impending?: number;
 } | "fail" | null {
   let m: RegExpExecArray | null;
   // "You may pay {W}{U}{B}{R}{G} rather than pay ~'s mana cost" (Bringers), "You may pay {1} and return a basic land you
@@ -243,6 +244,18 @@ export function parseCostKeyword(
   // Foretell [cost] (CR 702.143a). An {X} foretell cost isn't modeled.
   if ((m = /^Foretell ((?:\{[^}]+\})+)$/.exec(line))) return plainMana(m[1]!) && !/\{X\}/.test(m[1]!) && !d.types.includes("Land") ? { foretell: m[1]! } : "fail";
   if (/^Foretell\b/.test(line)) return "fail";
+  // Impending N—[cost] (CR 702.176a): an alternative cost; paid, it enters with N time counters and isn't a creature while
+  // it has one; "At the beginning of your end step, if this permanent's impending cost was paid and it has a time counter
+  // on it, remove a time counter from it" (an intervening if, CR 603.4).
+  if ((m = /^Impending (\d+)—((?:\{[^}]+\})+)$/.exec(line))) {
+    if (!plainMana(m[2]!) || !d.types.includes("Creature")) return "fail";
+    return {
+      alt: { kind: "impending", mana: m[2]! },
+      impending: Number(m[1]),
+      trigger: { event: "yourEndStep", ifCond: { kind: "self", is: "impending" }, body: { targets: [], effects: [{ type: "removeCounters", what: { ref: "self" }, counter: "time", n: 1 }], text: "Remove a time counter from ~." } },
+    };
+  }
+  if (/^Impending\b/.test(line)) return "fail";
   // Blitz [cost] (CR 702.152a) and warp [cost] (CR 702.185a): alternative costs that send the permanent away at the next
   // end step. "Blitz—{2}{B}{B}, Discard a card" and "Warp—{B}, Pay 2 life" aren't modeled.
   if ((m = /^(Blitz|Warp)(?: |—)(.+?)\.?$/.exec(line))) {

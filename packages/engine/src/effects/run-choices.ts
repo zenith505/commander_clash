@@ -345,7 +345,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             : e.cond.kind === "suspected"
             ? objects(s, e.cond.what, ctx).some((o) => o.zone === "battlefield" && o.suspected !== undefined)
             : e.cond.kind === "state"
-            ? staticConditionNow(s, e.cond.cond, ctx.sourceId ?? s.resolving!.item.objectId!, ctx.controller, undefined, undefined, ctx.sourceId ? ctx.sourceZc : undefined, ctx.subject?.id, ctx.subject?.zc)
+            ? staticConditionNow(s, e.cond.cond, ctx.sourceId ?? s.resolving!.item.objectId!, ctx.controller, ctx.event?.player, undefined, ctx.sourceId ? ctx.sourceZc : undefined, ctx.subject?.id, ctx.subject?.zc)
             : e.cond.kind === "voteWins"
             ? voteWins(s, e.cond.option, !!e.cond.orTie)
             : e.cond.kind === "amountNow"

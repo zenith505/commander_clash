@@ -168,6 +168,10 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx): Effect | null |
     if (!trigger || trigger === "fail" || trigger.event !== "eachBeginCombat" || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
     return { type: "floatingTrigger", trigger, until: "endOfTurn" };
   }
+  // "Whenever a creature dies this turn, each creature other than ~ gets -1/-1 until end of turn" (Massacre Girl): the
+  // same as "This turn, whenever a creature dies, ..." (CR 603.7b).
+  const dies = /^Whenever (an?(?: [a-z]+)? creature(?: you control| an opponent controls)?) dies this turn, (.+)$/.exec(s);
+  if (dies) return floatingTrigger(`This turn, whenever ${dies[1]!} dies, ${dies[2]!}`, after, ctx);
   const m = /^([Uu]ntil end of turn|[Tt]his turn|[Uu]ntil your next turn|[Uu]ntil the end of your next turn), ([Ww]henever .+)$/.exec(s);
   if (!m) return undefined;
   const text = [m[2]!, ...after.map((x) => x.replace(/\.$/, ""))].join(". ");
@@ -182,7 +186,7 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx): Effect | null |
 const ROW_MARK = "\u0001";
 
 /** Effects that can stop a resolution to wait for a player's choice. */
-const PAUSING = new Set<Effect["type"]>(["vote", "discard", "reorderGraveyard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure", "tapOrUntap", "untapUpTo", "castFromHand", "punisher", "sacrificeEach", "venture", "chooseFromGraveyard", "keepRest"]);
+const PAUSING = new Set<Effect["type"]>(["vote", "attachAny", "discard", "reorderGraveyard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure", "tapOrUntap", "untapUpTo", "castFromHand", "punisher", "sacrificeEach", "venture", "chooseFromGraveyard", "keepRest"]);
 /** Effects that can stop for a choice partway: they can't share a conditional or a loop with other effects. */
 const pauses = (e: Effect) => PAUSING.has(e.type) || (e.type === "putInLibrary" && e.position === "ownersChoice") || (e.type === "roll" && !!e.chooseOne);
 
@@ -567,6 +571,26 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       ],
       text,
     };
+  // Praetor's Grasp: "Search target opponent's library for a card and exile it face down. Then that player shuffles. You
+  // may play that card for as long as it remains exiled." Hoarding Broodlord, The Creation of Avacyn: "search your
+  // library for a card, exile it face down, then shuffle(. For as long as that card remains exiled, you may play it)."
+  // Only the player who searched may look at it (CR 406.3).
+  const grasp = /^Search target opponent's library for a card and exile it face down\. Then that player shuffles\. You may play that card for as long as it remains exiled\.$/.test(text.trim());
+  const hoard = /^Search your library for a card, exile it face down, then shuffle\.( For as long as that card remains exiled, you may play it\.)?$/i.exec(text.trim());
+  if (grasp || hoard) {
+    const play = grasp || hoard?.[1] ? { play: { until: "exiled" as const } } : {};
+    return {
+      targets: grasp ? [{ kind: "player", opponent: true, text: "target opponent" }] : [],
+      effects: [{ type: "search", n: 1, upTo: false, dest: { zone: "exile", faceDown: true, ...play }, reveal: false, ...(grasp ? { library: { ref: "target", index: 0 } } : {}) }],
+      text,
+    };
+  }
+  // Ugin, Eye of the Storms: "Search your library for any number of colorless nonland cards, exile them, then shuffle.
+  // Until end of turn, you may cast those cards without paying their mana costs." With the normal timing (rulings).
+  const ugin = /^Search your library for any number of (.+? cards), exile them, then shuffle\. Until end of turn, you may cast those cards without paying their mana costs\.$/.exec(text.trim());
+  const uginFilter = ugin ? parseSearchFilter(ugin[1]!) : undefined;
+  if (ugin && uginFilter)
+    return { targets: [], effects: [{ type: "search", filter: uginFilter, n: 99, upTo: true, dest: { zone: "exile", play: { until: "thisTurn", free: true, castOnly: true } }, reveal: false }], text };
   // Shatterskull Smashing: "If X is 6 or more, ~ deals twice X damage divided as you choose among them instead": twice X
   // is what's divided, as it's cast (rulings: "you divide twice X damage; you don't assign X damage and then double it").
   const twiceX = /^(~ deals X damage divided as you choose among [^.]+)\. If X is (\d+) or more, ~ deals twice X damage divided as you choose among them instead\.$/.exec(text.trim());
@@ -739,12 +763,22 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   text = text.replace(/(^|\. )You add ((?:\{[WUBRGC]\})+)(?= and |\.)/, "$1Add $2");
   // "~ deals 2 damage to each other player" (Syphon Soul): with no teams, every other player is an opponent (CR 102.3).
   text = text.replace(/\b(deals \w+ damage to) each other player\b/g, "$1 each opponent");
+  // "~ deals 3 damage to each of your opponents" (Aurelia, the Law Above) is "each opponent".
+  text = text.replace(/\b(deals \w+ damage to) each of your opponents\b/g, "$1 each opponent");
   // "~ deals 4 damage to target creature and you gain life equal to the damage dealt this way" (Enter the God-Eternals).
   text = text.replace(/^(~ deals [^.]+? damage to [^.]+?) and you gain life equal to the damage dealt this way\./, "$1. You gain life equal to the damage dealt this way.");
   // "Destroy all creatures you don't control and all planeswalkers you don't control" (In Garruk's Wake).
   text = text.replace(/\ball creatures you don't control and all planeswalkers you don't control\b/g, "all creatures and planeswalkers you don't control");
   // "Destroy all creatures other than ~" (Magister of Worth) is "destroy all other creatures".
   text = text.replace(/\ball creatures other than ~/g, "all other creatures");
+  // Insurrection: "Untap all creatures and gain control of them until end of turn. They gain haste until end of turn.":
+  // the same creatures throughout (rulings), those there as it resolves (CR 611.2c).
+  text = text.replace(/^Untap all creatures and gain control of them until end of turn\. They gain haste until end of turn\.$/, "Untap all creatures. Gain control of all creatures until end of turn. All creatures gain haste until end of turn.");
+  // "Until end of turn, target creature gains trample and gets +1/+0 for each card you've drawn this turn" (Fists of
+  // Flame): both until end of turn, the bonus counted as it resolves (rulings, CR 608.2h).
+  text = text.replace(/(^|\. )Until end of turn, target creature gains ([a-z]+) and gets ([+-]\d+\/[+-]\d+) for each ([^.]+)\./, "$1Target creature gains $2 until end of turn. It gets $3 until end of turn for each $4.");
+  // "Each creature other than ~ gets -1/-1 until end of turn" (Massacre Girl) is "each other creature".
+  text = text.replace(/\b([Ee])ach creature other than ~/g, "$1ach other creature");
   // "Choose any number of target creatures you control. For each of them, create a token that's a copy of that creature,
   // except it has haste." (Twinflame): a copy of each of them.
   text = text.replace(/^Choose any number of target ([^.]+?)\. For each of them, create a token that's a copy of that (?:creature|permanent)(, except [^.]+)?\./, "Create a token that's a copy of each of any number of target $1$2.");
@@ -1522,6 +1556,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si++;
       continue;
     }
+    // "For each player, choose a creature that player controls. Each player sacrifices all creatures they control not
+    // chosen this way." (The Eternal Wanderer): you choose for everyone, not targeting (rulings), then the rest go at once.
+    const eachKeep = /^For each player, choose an? ([a-z]+) that player controls$/.exec(s);
+    if (eachKeep && new RegExp(`^Each player sacrifices all ${eachKeep[1]}s they control not chosen this way$`).test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      const filter = pickFilter(eachKeep[1]!);
+      if (!filter || filter.kind !== "object") return null;
+      effects.push({ type: "keepRest", who: { ref: "eachPlayer" }, keep: [{ filter, n: 1 }], among: filter, youChoose: true });
+      si++;
+      continue;
+    }
     const eachYard = /^For each player, choose an? (.+? card) in that player's graveyard$/.exec(s);
     if (eachYard && /^Put those cards onto the battlefield under your control$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
       const filter = parseSearchFilter(eachYard[1]!);
@@ -2217,7 +2261,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // Swan); after "you may exile ~ target creature", "If you do, return that card ..." (Astral Slide).
     const BACK = "(?:it|that card|the exiled card|those cards|the exiled cards|them|~)";
     const UNDER = "(its owner's|their owner's|their owners'|your)";
-    const laterRe = new RegExp(`^(?:If you do, )?(?:At the beginning of the next end step, return ${BACK} to the battlefield( tapped)? under ${UNDER} control|[Rr]eturn ${BACK} to the battlefield( tapped)? under ${UNDER} control(?: with an? ${COUNTER} counter on it)? at the beginning of the next end step)(?: with an? ${COUNTER} counter on it)?$`);
+    const laterRe = new RegExp(`^(?:If you do, )?(?:At the beginning of the next end step, return ${BACK} to the battlefield( tapped)? under ${UNDER} control|[Rr]eturn ${BACK} to the battlefield( tapped)? under ${UNDER} control(?: with an? ${COUNTER} counter on it)? at the beginning of (the|that player's) next end step)(?: with an? ${COUNTER} counter on it)?$`);
     const later = laterRe.exec(s);
     // "Exile this Saga, then return it to the battlefield transformed under your control": its back face up (CR 712.14a).
     const now = /^(?:[Tt]hen )?[Rr]eturn (?:it|that card|them|those cards) to the battlefield( transformed)? under (its owner's|their owners'|your) control$/.exec(s);
@@ -2244,10 +2288,14 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const ex = laterAt.into[laterAt.at] as Extract<Effect, { type: "exile" }>;
       if (ex.until || ex.linked || (ex.what.ref === "target" && ex.what.sameName) || (ex.what.ref !== "target" && ex.what.ref !== "each" && ex.what.ref !== "self")) return null;
       const under = (later[2] ?? later[4]) === "your" ? "you" : "owner";
-      const counter = later[5] ?? later[6];
+      const counter = later[5] ?? later[7];
+      // "Return that card to the battlefield under its owner's control at the beginning of that player's next end step"
+      // (The Eternal Wanderer): that player is its owner; one card only.
+      const owners = later[6] === "that player's";
+      if (owners && (later[4] !== "its owner's" || ex.what.ref !== "target" || (ex.what.n !== undefined && ex.what.n !== 1))) return null;
       // Phelia: "If it entered under your control, put a +1/+1 counter on ~", part of the delayed trigger (CR 603.7).
       const ifYours = !ctx.spell && under === "owner" && laterAt.into === effects ? new RegExp(`^If it entered under your control, put an? ${COUNTER} counter on ~$`).exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
-      laterAt.into[laterAt.at] = { type: "flicker", what: ex.what, under, at: "nextEndStep", ...(counter ? { counter: counterKind(counter) } : {}), ...(later[1] || later[3] ? { tapped: true as const } : {}), ...(ifYours ? { selfCounterIfYours: counterKind(ifYours[1]!) } : {}) };
+      laterAt.into[laterAt.at] = { type: "flicker", what: ex.what, under, at: owners ? "ownersNextEndStep" : "nextEndStep", ...(counter ? { counter: counterKind(counter) } : {}), ...(later[1] || later[3] ? { tapped: true as const } : {}), ...(ifYours ? { selfCounterIfYours: counterKind(ifYours[1]!) } : {}) };
       if (ifYours) si++;
       continue;
     }
@@ -2656,7 +2704,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // creature an opponent controls gets -4/-4 until end of turn if you gained life this turn" (Poisoner's Apprentice):
     // the target is chosen either way, and the condition checked as it resolves (rulings). Only a
     // condition about the game (one the static parser reads), not about "it".
-    const trailIf = !insteadIf ? /^((?:[Dd]raw|[Cc]reate|[Yy]ou gain|[Ee]ach opponent loses|[Pp]ut|[Tt]arget [^,]+ gets) .+) if ((?!it\b|~|that\b|they\b|able\b)[^,]+)$/.exec(s) : null;
+    const trailIf = !insteadIf ? /^((?:[Dd]raw|(?:[Yy]ou )?[Cc]reate|[Yy]ou gain|[Ee]ach opponent loses|[Pp]ut|[Tt]arget [^,]+ gets) .+) if ((?!it\b|~|that\b(?! player (?:has|controls) more [a-z ]+ than each other player$)|they\b|able\b)[^,]+)$/.exec(s) : null;
     if (trailIf && parseStaticCondition(trailIf[2]!, { affects: { kind: "self" }, mods: [], text: "" }))
       s = `If ${trailIf[2]}, ${trailIf[1]!.charAt(0).toLowerCase()}${trailIf[1]!.slice(1)}`;
     // "It deals that much damage to each other opponent if ~'s power is 7 or greater" (Vincent), "Then if ~'s power is 4
@@ -2850,9 +2898,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const only = inner.length === 1 ? inner[0]! : undefined;
       // "You may tap or untap target permanent": tap, untap or neither, as one question.
       // "You may tap any number of untapped creatures you control": tapping none is the "may".
-      if ((only?.type === "putFromHand" || only?.type === "tapOrUntap" || only?.type === "castFromHand" || only?.type === "chooseFromGraveyard" || only?.type === "tapAnyNumber") && !/^If you do\b/.test(sentences[si + 1] ?? "")) {
+      if ((only?.type === "putFromHand" || only?.type === "tapOrUntap" || only?.type === "castFromHand" || only?.type === "chooseFromGraveyard" || only?.type === "tapAnyNumber" || only?.type === "attachAny") && !/^If you do\b/.test(sentences[si + 1] ?? "")) {
         // castFromHand offers "Don't cast" itself; returning cards from the graveyard can take none.
-        effects.push(only.type === "castFromHand" || only.type === "tapAnyNumber" ? only : only.type === "chooseFromGraveyard" ? { ...only, upTo: true } : { ...only, may: true });
+        effects.push(only.type === "castFromHand" || only.type === "tapAnyNumber" || only.type === "attachAny" ? only : only.type === "chooseFromGraveyard" ? { ...only, upTo: true } : { ...only, may: true });
         if (!defineX()) return null;
         continue;
       }

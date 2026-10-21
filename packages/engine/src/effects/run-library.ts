@@ -536,7 +536,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         lib.library = lib.library.filter((id) => !found.includes(id));
         const names = found.map((id) => defOf(s, obj(s, id)).name);
         // Found cards aren't revealed unless the effect says so (CR 701.23e).
-        const shown = e.reveal || e.dest.zone === "battlefield" || e.dest.zone === "exile" || exiledFor(pid) !== undefined ? ` (${names.join(", ")})` : "";
+        const shown = e.reveal || e.dest.zone === "battlefield" || (e.dest.zone === "exile" && !e.dest.faceDown) || exiledFor(pid) !== undefined ? ` (${names.join(", ")})` : "";
         const whose = lib === p ? "their" : `${lib.name}'s`;
         const yardOnly = sc.searchZones === "graveyard";
         const where = yardOnly ? `${whose} graveyard` : e.orGraveyard ? `${whose} library and graveyard` : `${whose} library`;
@@ -560,6 +560,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             moveObject(s, id, "battlefield", { controller: pid, ...(to.tapped ? { tapped: true } : {}), ...hosts.get(id), ...(extra ? { counters: { [to.counters!.counter]: extra } } : {}) });
             if (r.created && obj(s, id).zone === "battlefield") r.created.push(id);
           } else moveObject(s, id, to.zone);
+          // "Exile it face down" (Beseech the Mirror): only its owner sees it (CR 406.3), for the rest of the effect.
+          if (to.faceDown && to.zone === "exile" && obj(s, id).zone === "exile" && exiledFor(pid) === undefined) {
+            obj(s, id).hiddenExile = { by: ctx.sourceId ?? "", seen: [pid], label: "Face down" };
+            r.faceDownExiled = [...(r.faceDownExiled ?? []), id];
+          }
           // Opposition Agent: exiled face up (CR 406.3), its controller may play it for as long as it remains exiled, a land
           // too (following the normal timing rules) and spend mana as though it were mana of any color to cast it (CR
           // 609.4b: colored symbols paid with any mana).

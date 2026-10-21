@@ -566,6 +566,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "cantBlockRule":
     case "cantAttackRule":
     case "keepManaThisTurn":
+    case "manaTriggerThisTurn":
     case "costModThisTurn":
     case "fight":
     case "bite":
@@ -707,6 +708,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "floatingTrigger":
     case "cascade":
     case "exileUntilNonland":
+    case "castFaceDownExiled":
     case "discover":
     case "ripple":
     case "counterUnlessPays":

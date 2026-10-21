@@ -9,7 +9,7 @@ import { parsePreventionRider } from "./sentences/prevention";
 import { compileQuoted, parseGrants } from "./grants";
 import { boundAtTargeting, parseCardTarget, parseObject, parsePlayer, parseTargetPhrase, PERMANENT_TYPES } from "./targets";
 import { parseCardNameChoice, parseSearchFilter } from "./search";
-import { parseManaSpend } from "./mana-abilities";
+import { parseManaSpend, parseManaTrigger } from "./mana-abilities";
 import { parseTrigger } from "./triggers";
 import { parsePunisherOptions } from "./sentences/basics";
 
@@ -489,6 +489,19 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   const sylvan = /^[Yy]ou may draw (two|three) additional cards\. If you do, choose (two|three) cards in your hand drawn this turn\. For each of those cards, pay (\d+) life or put the card on top of your library\.$/.exec(text.trim());
   if (sylvan && sylvan[1] === sylvan[2])
     return { targets: [], effects: [{ type: "may", effects: [{ type: "draw", who: { ref: "you" }, n: num(sylvan[1]!) }, { type: "drawnPayOrTop", n: num(sylvan[2]!), life: Number(sylvan[3]) }], text: `draw ${sylvan[1]} additional cards` }], text };
+  // Beseech the Mirror: "Search your library for a card, exile it face down, then shuffle. If ~ was bargained, you may cast
+  // the exiled card without paying its mana cost if that spell's mana value is 4 or less. Put the exiled card into your
+  // hand if it wasn't cast this way." Cast as it resolves (CR 608.2g); found (Opposition Agent) or not, nothing else.
+  const beseech = /^Search your library for a card, exile it face down, then shuffle\. If ~ was bargained, you may cast the exiled card without paying its mana cost if that spell's mana value is (\d+) or less\. Put the exiled card into your hand if it wasn't cast this way\.$/.exec(text.trim());
+  if (beseech && opts.spell)
+    return {
+      targets: [],
+      effects: [
+        { type: "search", n: 1, upTo: false, dest: { zone: "exile", faceDown: true }, reveal: false },
+        { type: "castFaceDownExiled", maxMv: Number(beseech[1]), ifBargained: true, elseHand: true },
+      ],
+      text,
+    };
   // Gamble: "Search your library for a card, put that card into your hand, discard a card at random, then shuffle." The
   // discard comes before the shuffle, but the discarded card goes to the graveyard, so the order changes nothing that can
   // be seen: the search, then the discard (at random from the whole hand, the found card included).
@@ -856,6 +869,12 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const exEqual = /^Exile cards from the top of your library equal to (.+)$/.exec(s);
     const exEqualN = exEqual ? parseCount(exEqual[1]!, ctx) : null;
     if (exEqual && !exEqualN) return null;
+    // "Shuffle your library, then exile the top card." (Urza, Lord High Artificer): the top card of your library, after.
+    if (/^Shuffle your library$/.test(s) && /^[Ee]xile the top card$/.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "shuffle", who: { ref: "you" } });
+      sentences[si + 1] = "Exile the top card of your library";
+      continue;
+    }
     const exTop = exEqual ? (["", "X"] as unknown as RegExpExecArray) : new RegExp(`^[Ee]xile the top (?:card|${NUMX} cards) of your library$`).exec(impulseIf && !impulseIf.not ? impulseIf.text : s);
     // "Exile the top card of that player's library. Until end of turn, you may cast that card." (Ragavan, after combat
     // damage to a player): that player's card, cast only (no land play, rulings), paying its costs.
@@ -868,12 +887,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     }
     // With no duration (Dungeon of the Mad Mage's Runestone Caverns), for as long as each card stays exiled (CR 611.2a, 400.7).
     // "Until your next end step, you may play it" (Yasmin Khan, Wiccan, Ob Nixilis): over as your next end step begins.
-    const playRe = /^(?:(Until the end of your next turn|Until end of turn|Until your next end step), you may play (?:that card|those cards|them|it)|You may play (?:that card|those cards|them|it)(?: (this turn|until the end of your next turn|until your next end step))?)$/;
+    // "Until end of turn, you may play that card without paying its mana cost" (Urza, CR 118.9): `free`.
+    const playRe = /^(?:(Until the end of your next turn|Until end of turn|Until your next end step), you may play (?:that card|those cards|them|it)|You may play (?:that card|those cards|them|it)(?: (this turn|until the end of your next turn|until your next end step))?)( without paying its mana cost)?$/;
     const playIt = exTop && sentences[si + 1] && playRe.exec(sentences[si + 1]!.replace(/\.$/, ""));
     // "Exile the top card of your library. ~ gets +X/+0 until end of turn, where X is that card's mana value. You may play
     // that card this turn." (Tavern Brawler, Daredevil): the permission and the sentence between, about that card.
     const playAfter = exTop && !exTop[1] && !playIt && sentences[si + 2] && /\b(?:that|the exiled) card's mana value\b/.test(sentences[si + 1] ?? "") ? playRe.exec(sentences[si + 2]!.replace(/\.$/, "")) : null;
-    if (playAfter && !impulseIf) {
+    if (playAfter && !impulseIf && !playAfter[3]) {
       const when = (playAfter[1] ?? playAfter[2] ?? "").toLowerCase();
       effects.push({ type: "impulse", n: 1, until: !when ? "exiled" : /next end step/.test(when) ? "yourNextEndStep" : /next turn/.test(when) ? "nextTurn" : "thisTurn" });
       ctx.exiledTop = true;
@@ -883,7 +903,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     if (exTop && !exTop[1]) ctx.exiledTop = true;
     if (exTop && playIt) {
       const when = (playIt[1] ?? playIt[2] ?? "").toLowerCase();
-      const impulse: Effect = { type: "impulse", n: exEqualN ?? (exTop[1] ? amt(exTop[1]) : 1), until: !when ? "exiled" : /next end step/.test(when) ? "yourNextEndStep" : /next turn/.test(when) ? "nextTurn" : "thisTurn" };
+      const free = playIt[3] ? { free: true as const } : {};
+      if (free.free && (exTop[1] || exEqualN || impulseIf)) return null;
+      const impulse: Effect = { type: "impulse", n: exEqualN ?? (exTop[1] ? amt(exTop[1]) : 1), until: !when ? "exiled" : /next end step/.test(when) ? "yourNextEndStep" : /next turn/.test(when) ? "nextTurn" : "thisTurn", ...free };
       effects.push(impulseIf && !impulseIf.not ? { type: "if", cond: impulseIf.cond, effects: [impulse] } : impulse);
       si++;
       continue;
@@ -934,6 +956,23 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     }
     // Etali, Primal Storm: "exile the top card of each player's library, then you may cast any number of spells from
     // among those cards without paying their mana costs". The cards not cast stay exiled (rulings).
+    // Mizzix's Mastery: "Exile target card that's an instant or sorcery from your graveyard. For each card exiled this way,
+    // copy it, and you may cast the copy without paying its mana cost." Overloaded, "each card" (CR 702.96a): all of them.
+    const mizzix = /^Exile (target|each) card that's an instant or sorcery from your graveyard$/.exec(s);
+    if (mizzix && /^For each card exiled this way, copy it, and you may cast the copy without paying its mana cost$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      const filter: TargetSpec = { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], owner: "you", text: `${mizzix[1]} card that's an instant or sorcery from your graveyard` };
+      const fromYard = mizzix[1] === "target" ? { target: ctx.targets.push(filter) - 1 } : { filter };
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, fromYard });
+      si++;
+      continue;
+    }
+    // Etali, Primal Conqueror: "each player exiles cards from the top of their library until they exile a nonland card.
+    // You may cast any number of spells from among the nonland cards exiled this way without paying their mana costs."
+    if (/^[Ee]ach player exiles cards from the top of their library until they exile a nonland card$/.test(s) && /^You may cast any number of spells from among the nonland cards exiled this way without paying their mana costs$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 1, each: true, untilNonland: true });
+      si++;
+      continue;
+    }
     if (/^[Ee]xile the top card of each player's library$/.test(s) && /^[Yy]ou may cast any number of spells from among those cards without paying their mana costs$/.test(sentences[si + 1] ?? "")) {
       effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 1, each: true });
       si++;
@@ -1148,7 +1187,12 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       continue;
     }
     // "You gain life equal to the damage prevented this way": part of the prevention effect before it (CR 615.5).
-    const rider = parsePreventionRider(s);
+    // Inkshield: "For each 1 damage prevented this way, create a 2/1 ... token": also part of the prevention (CR 615.5).
+    const perDamage = /^For each 1 damage prevented this way, (create an? [^.]+ token(?: with [a-z ]+)?)$/.exec(s);
+    const made = perDamage && parseBody(`${perDamage[1]![0]!.toUpperCase()}${perDamage[1]!.slice(1)}.`, {});
+    const tokenRider = made && made.targets.length === 0 && made.effects.length === 1 && made.effects[0]!.type === "createToken" ? made.effects[0]! : undefined;
+    if (perDamage && !(tokenRider?.type === "createToken" && JSON.stringify(tokenRider.n) === "1" && Object.keys(tokenRider).every((k) => ["type", "token", "n", "who"].includes(k)) && (!tokenRider.who || JSON.stringify(tokenRider.who) === '{"ref":"you"}'))) return null;
+    const rider = tokenRider?.type === "createToken" ? { tokens: tokenRider.token } : parsePreventionRider(s);
     if (rider) {
       const prev = effects[effects.length - 1];
       if (prev?.type !== "damageRule" || prev.rule.redirect) return null;
@@ -2156,6 +2200,15 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       if (!next || !JSON.stringify(next).includes('"chosen":"type"')) return null;
       effects.push({ type: "choose", choice: "cardType", options }, ...(asCardType(next) as Effect[]));
       si++;
+      continue;
+    }
+    // "Until end of turn, whenever a player taps an Island for mana, that player adds an additional {U}" (High Tide): a
+    // triggered mana ability until then (CR 605.1b, 603.7b), also for Islands that arrive later (rulings).
+    const manaUntil = /^Until end of turn, (whenever .+ for mana, .+)$/.exec(s);
+    if (manaUntil) {
+      const trigger = parseManaTrigger(`W${manaUntil[1]!.slice(1)}.`);
+      if (!trigger || trigger === "fail" || trigger.attached || trigger.ofChosen || trigger.adds.kind === "chosenColor") return null;
+      effects.push({ type: "manaTriggerThisTurn", trigger });
       continue;
     }
     // A delayed triggered ability with a duration (CR 603.7b): the rest of the paragraph is its instructions.

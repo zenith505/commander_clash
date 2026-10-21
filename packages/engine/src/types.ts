@@ -1,4 +1,4 @@
-import type { AbilityBody, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CostMod, NamePurpose, CounterKind, DamageMod, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec, TriggeredAbility, TriggerDuration } from "./abilities";
+import type { AbilityBody, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CostMod, NamePurpose, CounterKind, DamageMod, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec, TokenSpec, ManaTrigger, TriggeredAbility, TriggerDuration } from "./abilities";
 import type { DamageEvent } from "./damage";
 import type { Characteristics } from "./layers";
 
@@ -44,6 +44,7 @@ export interface DamageRule {
   redirect?: { object: ObjectId; zc: number } | { player: PlayerId };
   gainLife?: { colors?: Color[] };
   dealBack?: { colors?: Color[] };
+  tokens?: TokenSpec;
 }
 
 /** Each player's starting life total in Commander (CR 903.7). */
@@ -1211,6 +1212,8 @@ export interface GameState {
   costModsThisTurn?: { player: PlayerId; mod: CostMod }[];
   /** "Until end of turn, you don't lose unspent red mana as steps and phases end" (CR 500.4): who, and which color (all if unset). */
   keepManaThisTurn?: { player: PlayerId; color?: ManaType }[];
+  /** High Tide's "until end of turn, whenever a player taps an Island for mana ...": `controller` is "you", `source` the card's name. */
+  manaTriggersThisTurn?: { controller: PlayerId; source: string; trigger: ManaTrigger }[];
   /** "Creatures without flying can't block this turn": matching creatures can't block, also ones that arrive later. */
   cantBlockThisTurn?: { filter: TargetSpec; controller: PlayerId }[];
   /** "Creatures can't attack this turn": matching creatures can't attack, also ones that arrive later. */
@@ -1648,7 +1651,7 @@ export interface Resolving {
     faceDownPick?: true;
     /** moveLinked with `one`: the card is being chosen. */
     linkedPick?: true;
-    castAmong?: { ids: { id: ObjectId; zc: number }[]; budget?: number; maxMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true; /** How many were cast. */ cast?: number; /** `untilHits`: the cards that qualified; `handPick`, choosing which goes to the hand. */ hits?: ObjectId[]; handPick?: true };
+    castAmong?: { ids: { id: ObjectId; zc: number }[]; budget?: number; maxMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true; /** How many were cast. */ cast?: number; /** `untilHits`: the cards that qualified; `handPick`, choosing which goes to the hand. */ hits?: ObjectId[]; handPick?: true; /** `copies`: the card the copy being cast is of. */ copyOf?: ObjectId };
     topOrBottom?: string; // the owner's choice: "top" or "bottom"
     /** The player a creature put onto the battlefield attacking attacks (CR 508.4), as a PlayerId string. */
     attackWhom?: string;

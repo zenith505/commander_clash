@@ -1165,6 +1165,11 @@ export function compile(d: CardDef): CompiledCard {
       out.damageCantBePrevented = true;
       continue;
     }
+    // Bloodletter of Aclazotz (CR 614.1a): life lost to damage too (CR 120.3a), and life paid (CR 119.4).
+    if (line === "If an opponent would lose life during your turn, they lose twice that much life instead.") {
+      out.opponentsLoseDouble = true;
+      continue;
+    }
     if (line === "If you would gain life, you gain twice that much life instead.") {
       out.doubleLifeGain = true;
       continue;
@@ -1256,6 +1261,11 @@ export function compile(d: CardDef): CompiledCard {
     const again = triggersAgainLine(line);
     if (again) {
       (out.triggersAgain ??= []).push(again);
+      continue;
+    }
+    // Omniscience: an alternative cost of nothing for spells cast from your hand (CR 118.9).
+    if (line === "You may cast spells from your hand without paying their mana costs.") {
+      out.castFromHandFree = true;
       continue;
     }
     if (line === "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast.") {

@@ -442,7 +442,9 @@ export function settleDivided(s: GameState, body0: AbilityBody, ctx: AmountCtx, 
   // "When you do, shuffle target nonland permanent ... with mana value X or less, where X is the number of creatures
   // tapped this way" (Teferi Akosa of Zhalfir): the number tapped, fixed before the reflexive trigger's targets are chosen.
   const tappedBound = (t: TargetSpec) => t.bound?.amount.count.kind === "tappedThisWay";
-  const unsettled = (t: TargetSpec) => (t.divided?.amount && !t.divided.settled) || t.xRange || t.total?.x || castBound(t) || tappedBound(t);
+  // "With lesser mana value" in a dies trigger (Scrap Trawler): the one that died, as it last existed (ctx.lki).
+  const subjectBound = (t: TargetSpec) => t.bound?.amount.count.kind === "manaValue" && t.bound.amount.count.of.ref === "subject";
+  const unsettled = (t: TargetSpec) => (t.divided?.amount && !t.divided.settled) || t.xRange || t.total?.x || castBound(t) || tappedBound(t) || subjectBound(t);
   if (!body.targets.some(unsettled) && !body.modal?.modes.some((m) => m.targets?.some(unsettled))) return body;
   const settle = (t: TargetSpec): TargetSpec => {
     if (t.divided?.amount && !t.divided.settled) t = { ...t, divided: { ...t.divided, total: evalAmount(s, t.divided.amount, ctx), settled: true as const } };
@@ -458,6 +460,12 @@ export function settleDivided(s: GameState, body0: AbilityBody, ctx: AmountCtx, 
     // "With mana value less than or equal to that spell's mana value" (Hammerhead Tyrant): the spell that triggered it, as
     // it was cast (rulings), which can't change.
     if (castBound(t) && ctx.cause !== undefined) t = bindBound(s, t, ctx);
+    if (subjectBound(t)) {
+      // Lesser than 0 is nothing (rulings: a mana value can't be less than 0).
+      const { bound, ...rest } = t;
+      const n = (ctx.lki?.manaValue ?? 0) + (bound!.amount.plus ?? 0);
+      t = { ...rest, manaValue: { ...rest.manaValue, max: rest.manaValue?.max === undefined ? n : Math.min(rest.manaValue.max, n) }, text: rest.text.replace(/ with lesser mana value$/, ` with mana value ${n < 0 ? "less than 0" : `${n} or less`}`) };
+    }
     if (tappedBound(t) && ctx.tapped !== undefined) {
       const { bound, ...rest } = t;
       const n = Math.max(0, ctx.tapped * (bound!.amount.times ?? 1) + (bound!.amount.plus ?? 0));

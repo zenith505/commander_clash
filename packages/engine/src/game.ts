@@ -1423,6 +1423,12 @@ export function loseLife(s: GameState, pid: PlayerId, n: number) {
   if (n <= 0) return;
   // "You can't lose life this turn" (Courageous Resolve): damage is still dealt, but the life total doesn't change.
   if (!canLoseLife(s, pid)) return;
+  // Bloodletter of Aclazotz: an opponent of the active player loses twice that much, again for each one (CR 614.1a, 616.1).
+  const doublers = pid === s.activePlayer ? 0 : s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === s.activePlayer && abilitiesOf(s, obj(s, id)).opponentsLoseDouble).length;
+  if (doublers) {
+    n *= 2 ** doublers;
+    log(s, `${player(s, pid).name} loses twice as much life${doublers > 1 ? `, ${doublers} times over` : ""}.`);
+  }
   player(s, pid).life -= n;
   if (!(s.lostLifeThisTurn ??= []).includes(pid)) s.lostLifeThisTurn.push(pid);
   const lost = ((s.turnLog ??= {}).lifeLost ??= {});
@@ -2276,6 +2282,7 @@ function finishCleanup(s: GameState) {
   s.floatingTriggers = s.floatingTriggers?.filter((f) => !(f.until === "endOfTurn" || (f.until === "endOfYourNextTurn" && s.activePlayer === f.controller && s.turn > f.turn)));
   if (!s.floatingTriggers?.length) s.floatingTriggers = undefined;
   s.flashbackGrants = undefined;
+  s.manaTriggersThisTurn = undefined;
   endCopyEffects(s, (e) => e.until === "endOfTurn");
   invalidateCharacteristics(s);
   for (const id of [...s.battlefield, ...(s.phasedOut ?? [])]) {
@@ -2938,9 +2945,10 @@ export function castProblem(
   if (choices?.alt) {
     if (choices.alt === "madness") return "madness is cast as its ability resolves";
     if (!altCost(d, choices.alt, s, pid))
-      return choices.alt === "wubrg" ? "you don't control a permanent that lets you pay {W}{U}{B}{R}{G}" : choices.alt === "evidence" ? "you don't control a permanent that lets you collect evidence instead" : `${d.name} doesn't have ${choices.alt}`;
+      return choices.alt === "wubrg" ? "you don't control a permanent that lets you pay {W}{U}{B}{R}{G}" : choices.alt === "omniscience" ? "you don't control a permanent that lets you cast spells from your hand without paying their mana costs" : choices.alt === "evidence" ? "you don't control a permanent that lets you collect evidence instead" : `${d.name} doesn't have ${choices.alt}`;
     // An alternative cost without X: X is 0 (CR 107.3, rulings on Fist of Suns).
     if (choices.alt === "wubrg" && x) return "X is 0 when you pay {W}{U}{B}{R}{G} rather than the mana cost";
+    if (choices.alt === "omniscience" && o.zone !== "hand") return "only spells cast from your hand are free";
     if (choices.alt === "citadel" && o.zone !== "library") return "only the top card of your library is cast for life";
     // A foretell cost is paid only for a foretold card, after the turn it was foretold (CR 702.143a).
     if (choices.alt === "foretell" && !foretoldCast(s, pid, o)) return `only a card foretold on an earlier turn can be cast for its foretell cost`;
@@ -3291,6 +3299,8 @@ export function delveRoom(s: GameState, pid: PlayerId, id: ObjectId, choices: Co
 export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: PlayerId): NonNullable<CompiledCard["altCosts"]>[number] | undefined {
   if (alt === "foretell") return compileCard(d).foretell ? { kind: "foretell", mana: compileCard(d).foretell! } : undefined;
   if (alt === "wubrg") return s && pid !== undefined && controlsPayWUBRG(s, pid) ? { kind: "wubrg", mana: "{W}{U}{B}{R}{G}" } : undefined;
+  // Omniscience: nothing at all, for a spell cast from the hand (checked in castProblem).
+  if (alt === "omniscience") return s && pid !== undefined && controlsPayWUBRG(s, pid, "castFromHandFree") ? { kind: "omniscience", mana: "", text: "without paying its mana cost" } : undefined;
   // Bolas's Citadel: the top card of the caster's library, for life equal to its mana value (X is 0, CR 107.3b).
   if (alt === "citadel") {
     const top = s && pid !== undefined ? s.objects[player(s, pid).library[0] ?? ""] : undefined;
@@ -3305,10 +3315,10 @@ export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: Play
   return alt ? compileCard(d).altCosts?.find((a) => a.kind === alt) : undefined;
 }
 
-const controlsPayWUBRG = (s: GameState, pid: PlayerId) =>
+const controlsPayWUBRG = (s: GameState, pid: PlayerId, what: "payWUBRG" | "castFromHandFree" = "payWUBRG") =>
   s.battlefield.some((id) => {
     const o = obj(s, id);
-    if (!compileCard(defOf(s, o)).payWUBRG) return false;
+    if (!compileCard(defOf(s, o))[what]) return false;
     const c = characteristics(s, o);
     return c.controller === pid && c.hasPrintedAbilities;
   });
@@ -3333,7 +3343,7 @@ function payEvidenceOf(s: GameState, pid: PlayerId): number | undefined {
 export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): NonNullable<CompiledCard["altCosts"]> {
   const own = compileCard(defOf(s, o)).altCosts ?? [];
   if (isType(defOf(s, o), "Land")) return own;
-  return [...own, ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(["evidence" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
+  return [...own, ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(["evidence" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
 }
 
 /** Artifacts tapped for improvise: untapped artifacts you control, each once, not also tapped for convoke. */
@@ -3588,7 +3598,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const kickText = kicks ? describeKicks(d, kicks) : "";
   const howText =
     (via ? ` from their graveyard (${describeVia(via.kind)})` : castFrom === "exile" ? " from exile" : "") +
-    (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt === "convert" ? " converted, for its More Than Meets the Eye cost" : choices.alt ? ` for its ${choices.alt} cost` : "") +
+    (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "omniscience" ? " without paying its mana cost" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt === "convert" ? " converted, for its More Than Meets the Eye cost" : choices.alt ? ` for its ${choices.alt} cost` : "") +
     (madness && o.castAlt === "madness" ? " for its madness cost" : madness && o.castAlt === "miracle" ? " for its miracle cost" : "") +
     (choices.buyback ? ", paying buyback" : "") +
     (choices.splice?.length ? `, splicing ${choices.splice.map((c) => nameOf(s, c)).join(" and ")} onto it` : "") +
@@ -4476,6 +4486,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     o.counters.loyalty = (o.counters.loyalty ?? 0) + change;
     (o.activatedThisTurn ??= []).push(LOYALTY_USED);
     invalidateCharacteristics(s);
+    // They're still put on, so "whenever you put one or more loyalty counters on a planeswalker" triggers (CR 122.6).
+    if (change > 0) fireEvent(s, { type: "countersPut", id: o.id, counter: "loyalty", amount: change, by: p.id });
   }
   (o.activatedThisTurn ??= []).push(index); // "once each turn" (CR 602.5b); bots also count repeats (bot.ts)
   if (ab.onceEver) (o.activatedEver ??= []).push(index); // exhaust (CR 702.177a)

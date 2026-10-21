@@ -603,8 +603,9 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (cond.max === undefined || n <= cond.max) && (cond.min === undefined || n >= cond.min);
     }
     case "life": {
-      const life = s.players[you]?.life ?? 0;
-      return (cond.min === undefined || life >= cond.min) && (cond.max === undefined || life <= cond.max);
+      const fits = (life: number) => (cond.min === undefined || life >= cond.min) && (cond.max === undefined || life <= cond.max);
+      if (cond.opponent) return s.players.some((p) => p.id !== you && !p.lost && fits(p.life));
+      return fits(s.players[you]?.life ?? 0);
     }
     case "opponentLostLife":
       // Paid life counts too (CR 119.4); gaining life doesn't take any back (rulings on Bloodchief Ascension).

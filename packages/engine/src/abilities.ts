@@ -445,6 +445,8 @@ export interface TargetSpec {
 export interface SearchDest {
   zone: "hand" | "battlefield" | "libraryTop" | "graveyard" | "exile";
   tapped?: boolean;
+  /** "Exile it face down" (Beseech the Mirror): only its owner may look at it (CR 406.3); kept in Resolving.faceDownExiled. */
+  faceDown?: true;
   /** "Put that card third from the top" (Long-Term Plans), for "libraryTop". */
   third?: true;
   /** "Put it onto the battlefield with X additional +1/+1 counters on it" (Vision Quest, CR 614.1c). */
@@ -617,6 +619,8 @@ export interface DamageRuleSpec {
   gainLife?: { colors?: Color[] };
   /** "~ deals that much damage to that source's controller" (CR 615.5); `colors`: only for damage from a source of those colors. */
   dealBack?: { colors?: Color[] };
+  /** "For each 1 damage prevented this way, create a ... token" (Inkshield, CR 615.5): its controller creates them. */
+  tokens?: TokenSpec;
 }
 
 /** Does this reference cover target `i`? ("up to two target creatures" covers two in a row.) */
@@ -1032,7 +1036,8 @@ export type StaticCondition =
    * "As long as you have 25 or more life", fateful hour's "5 or less life", "at least 7 life more than your starting life
    * total", "your life total is greater than or equal to your starting life total" (CR 903.7: 40): your life total now.
    */
-  | { kind: "life"; min?: number; max?: number }
+  /** `opponent`: an opponent's life total instead (Bloodghast's "an opponent has 10 or less life"). */
+  | { kind: "life"; min?: number; max?: number; opponent?: true }
   /** "As long as equipped creature is a Human": the permanent this is attached to matches. */
   | { kind: "attachedIs"; filter: TargetSpec }
   /** "If you have nine or more cards in hand" (Wiretapping). */
@@ -1550,7 +1555,8 @@ export type Effect =
   | { type: "forEachThisWay"; which: "destroyed" | "exiled"; filter: TargetSpec; effects: Effect[] }
   /** "Exile the top two cards of your library. Until the end of your next turn, you may play those cards." */
   /** `who`: "the top card of that player's library" (Ragavan), not yours; `castOnly`: "you may cast that card", not play it. */
-  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" | "yourNextEndStep"; who?: PlayerRef; castOnly?: true }
+  /** `free`: "you may play that card without paying its mana cost" (Urza, Lord High Artificer, CR 118.9). */
+  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" | "yourNextEndStep"; who?: PlayerRef; castOnly?: true; free?: true }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
   /** "Remove a +1/+1 counter from it", "remove all -1/-1 counters from ~" (CR 122.8): as many as it has, at most. */
   /**
@@ -1948,6 +1954,8 @@ export type Effect =
   | { type: "reflexive"; body: AbilityBody; sacrificed?: true; about?: "created" | { target: number; attached?: true }; /** "When it deals excess damage this way, ... that amount of excess damage" (Unleash the Inferno): its X is the excess dealt (CR 603.12). */ xExcess?: true }
   /** "Until end of turn, you don't lose unspent red mana as steps and phases end" (The Last Agni Kai, CR 500.4). */
   | { type: "keepManaThisTurn"; color?: Color }
+  /** "Until end of turn, whenever a player taps an Island for mana, that player adds an additional {U}" (High Tide). */
+  | { type: "manaTriggerThisTurn"; trigger: ManaTrigger }
   /** "Defending player gets a poison counter", "each opponent gets two poison counters" (CR 122.1f; ten lose, 704.5c). */
   | { type: "poison"; who: PlayerRef; n: Amount }
   /** "Each opponent loses all counters" (CR 122.1): poison and energy, the player counters there are here. */
@@ -1974,6 +1982,12 @@ export type Effect =
    * never (CR 707.12, rulings); not if that card has left exile.
    */
   | { type: "castLinkedCopy" }
+  /**
+   * Beseech the Mirror: "If ~ was bargained, you may cast the exiled card without paying its mana cost if that spell's
+   * mana value is 4 or less. Put the exiled card into your hand if it wasn't cast this way." The card this resolution
+   * exiled face down (Resolving.faceDownExiled), cast as it resolves (CR 608.2g).
+   */
+  | { type: "castFaceDownExiled"; maxMv: number; ifBargained?: true; elseHand?: true }
   /**
    * "You may cast target instant card from your graveyard without paying its mana cost" (Torrential Gearhulk): as it
    * resolves, ignoring timing based on its type (CR 608.2g). `exileAfter`: "If that spell would be put into your
@@ -2124,7 +2138,12 @@ export type Effect =
    * hand": the one not cast, or your pick of the two (the other stays exiled), and only the others go to `rest`.
    */
   /** `each`: "exile the top card of each player's library, then you may cast any number of spells from among those cards" (Etali): `n` from every library. */
-  | { type: "castFromAmong"; who: PlayerRef; n: Amount; each?: true; maxMv?: Amount; totalMv?: Amount; untilMv?: number; untilHits?: { n: number; filter: TargetSpec }; hitToHand?: true; filter?: TargetSpec; max?: number; rest?: { dest: "graveyard" | "bottomRandom"; toHand?: boolean } }
+  /** `each`: the top `n` cards of each player's library (Etali, Primal Storm); with `untilNonland`, each player's cards until a nonland card (Etali, Primal Conqueror). */
+  /**
+   * `fromYard` and `copies` (Mizzix's Mastery): the cards are the target card or each card matching `filter` in your
+   * graveyard, exiled first; what's cast is a copy of each (CR 707.12), the cards staying exiled.
+   */
+  | { type: "castFromAmong"; who: PlayerRef; n: Amount; each?: true; untilNonland?: true; copies?: true; fromYard?: { target?: number; filter?: TargetSpec }; maxMv?: Amount; totalMv?: Amount; untilMv?: number; untilHits?: { n: number; filter: TargetSpec }; hitToHand?: true; filter?: TargetSpec; max?: number; rest?: { dest: "graveyard" | "bottomRandom"; toHand?: boolean } }
   /**
    * "You gain shroud until end of turn", "You and permanents you control gain hexproof until end of turn" (the player's
    * half), "you gain protection from the chosen player": see Player.gained (CR 702.11d, 702.16b-e, 702.16k, 702.18d).
@@ -2575,6 +2594,8 @@ export interface TriggeredAbility {
   tappedFilter?: TargetSpec;
   /** For "selfCountersPut" / "permanentCountersPut": that kind of counter ("+1/+1 counters"); unset = any counters. */
   countersKind?: string;
+  /** For "selfCountersPut" / "permanentCountersPut": "whenever you put one or more counters on ...", only counters this ability's controller puts. */
+  countersByYou?: true;
   /** For "selfCountersPut": "when the twelfth hour counter is put on ~", only when the count goes from below this to at least it. */
   countersReach?: number;
   /**
@@ -3150,7 +3171,7 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
 /** `wubrg`: Fist of Suns' "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast". */
 /** `evidence`: Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" (CompiledCard.payEvidence). */
 /** `citadel`: Bolas's Citadel's "pay life equal to its mana value rather than pay its mana cost" for the top card of your library. */
-export type AltCostKind = "citadel" | "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle" | "convert";
+export type AltCostKind = "citadel" | "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle" | "convert" | "omniscience";
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
 /** `aftermath`: the half of a split card with aftermath (CR 702.127a), cast only from a graveyard. */
@@ -3407,6 +3428,8 @@ export interface CompiledCard {
   beginOnBattlefield?: true | { notStarting: true; counter: CounterKind; exileFromHand: true };
   /** "If you would gain life, you gain twice that much life instead" (a replacement effect, CR 614.1a). */
   doubleLifeGain?: boolean;
+  /** "If an opponent would lose life during your turn, they lose twice that much life instead" (Bloodletter of Aclazotz). */
+  opponentsLoseDouble?: true;
   /**
    * "If you tap a permanent for mana, it produces twice as much of that mana instead" (Mana Reflection; three times,
    * Nyxbloom Ancient): a replacement effect on the mana a mana ability with {T} in its cost produces (CR 106.12b,
@@ -3550,6 +3573,8 @@ export interface CompiledCard {
   triggersAgain?: { by?: { event: "enters" | "dies" | "attacks" | "combatDamage" | "castOrCopy"; filter?: TargetSpec[] }; of?: { filter: TargetSpec; other?: true }[] }[];
   /** Fist of Suns: "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast" (an alternative cost, CR 118.9). */
   payWUBRG?: true;
+  /** Omniscience: "You may cast spells from your hand without paying their mana costs" (AltCostKind "omniscience"). */
+  castFromHandFree?: true;
   /**
    * Obstinate Baloth: "If a spell or ability an opponent controls causes you to discard ~, put it onto the battlefield
    * instead of putting it into your graveyard" (a replacement effect, CR 614.1a). It's still discarded (rulings).

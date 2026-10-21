@@ -57,7 +57,7 @@ function putAbilityCopy(s: GameState, orig: StackItem, controller: PlayerId, tar
 }
 
 /** A copy of a card that wasn't cast ceases to exist (CR 704.5e). */
-function removeCopy(s: GameState, id: ObjectId) {
+export function removeCopy(s: GameState, id: ObjectId) {
   const o = s.objects[id];
   if (!o) return;
   const list = player(s, o.owner).exile;
@@ -176,6 +176,25 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       s.pending = null;
       removeCopy(s, copy.id);
       log(s, `The copy of ${defOf(s, card).name} can't be cast.`);
+      return;
+    }
+    case "castFaceDownExiled": {
+      const sc = (s.resolving!.scratch ??= {});
+      const p = player(s, ctx.controller);
+      const card = (s.resolving!.faceDownExiled ?? []).map((id) => s.objects[id]).find((o) => o?.zone === "exile");
+      if (!card) return;
+      // Beseech the Mirror's card's own mana value, as discover reads it (CR 202.3e: X is 0).
+      const bargained = !e.ifBargained || !!s.objects[s.resolving!.item.objectId ?? ""]?.bargained;
+      if (!sc.may && bargained && defMv(defOf(s, card)) <= e.maxMv) {
+        sc.may = true;
+        s.pending = { kind: "castFree", player: p.id, objectId: card.id, source: src };
+        if (castProblem(s, p.id, card.id) === null) return "paused";
+        s.pending = null;
+      }
+      if (e.elseHand && card.zone === "exile") {
+        moveObject(s, card.id, "hand");
+        log(s, `${p.name} puts the exiled card into their hand.`);
+      }
       return;
     }
     case "castParadigm": {

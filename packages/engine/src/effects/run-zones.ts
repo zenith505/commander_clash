@@ -1,7 +1,7 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, isPermanentCard, isType, objIsType, power } from "../cards";
 import { nameLandBan } from "../names";
-import { attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
+import { attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters } from "../counters";
 import { manaValue } from "../mana";
@@ -13,7 +13,7 @@ import { compileCard } from "../oracle";
 import { nextRandom, shuffle } from "../rng";
 import { askWholeGraveyardOrder } from "../graveyard";
 import { foundWith, newObjects } from "../mutate";
-import { addDelayed, paidUnless } from "./run-spells";
+import { addDelayed, paidUnless, removeCopy } from "./run-spells";
 import { toBottom } from "./run-library";
 import { attackDefault, fireEvent, inCombat } from "./triggers";
 import { asFace, defMv, registerFace, sameName, transformedFace } from "../faces";
@@ -723,11 +723,25 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (!sc.castAmong) {
         if (e.each) {
           // Etali: the top card of each player's library, all exiled at once.
-          const ids = livingPlayers(s).flatMap((pid) => player(s, pid).library.slice(0, amountNow(s, e.n, ctx)));
+          // Etali, Primal Conqueror: each player's cards down to their first nonland card, all of them if there's none.
+          const upTo = (lib: ObjectId[]) => {
+            if (!e.untilNonland) return lib.slice(0, amountNow(s, e.n, ctx));
+            const at = lib.findIndex((id) => !isType(defOf(s, obj(s, id)), "Land"));
+            return at < 0 ? [...lib] : lib.slice(0, at + 1);
+          };
+          const ids = livingPlayers(s).flatMap((pid) => upTo(player(s, pid).library));
           for (const id of ids) moveObject(s, id, "exile");
           log(s, ids.length ? `${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} exiled from the top of each library.` : "No library has a card to exile.");
           sc.castAmong = { ids: ids.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
         }
+      }
+      if (!sc.castAmong && e.fromYard) {
+        // Mizzix's Mastery: the target card if it's still legal, or (overloaded) each one in your graveyard, all exiled.
+        const ids = e.fromYard.target !== undefined ? objects(s, { ref: "target", index: e.fromYard.target }, ctx).map((o) => o.id) : you.graveyard.filter((id) => printedMatches(e.fromYard!.filter!, defOf(s, obj(s, id))));
+        for (const id of ids) moveObject(s, id, "exile");
+        const gone = ids.filter((id) => obj(s, id).zone === "exile");
+        if (gone.length) log(s, `${you.name} exiles ${gone.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their graveyard.`);
+        sc.castAmong = { ids: gone.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
       }
       if (!sc.castAmong) {
         const whose = players(s, e.who, ctx)[0];
@@ -795,6 +809,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         for (const [owner, ids] of byOwner) toBottom(s, owner, ids, src, true);
         return;
       };
+      if (st.casting && st.copyOf) {
+        // A copy: one not cast ceases to exist (CR 704.5e); the card it copied stays exiled, copied once (rulings).
+        if (s.objects[st.casting]?.zone === "exile") removeCopy(s, st.casting);
+        else st.cast = (st.cast ?? 0) + 1;
+        st.declined.push(st.copyOf);
+        st.casting = st.copyOf = undefined;
+      }
       if (st.casting) {
         // Cast: it's on the stack now (a new object, CR 400.7); declined: it stays in exile.
         if (exiled(st.casting)) st.declined.push(st.casting);
@@ -810,6 +831,17 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         st.pick = undefined;
         if (pick === "none" || !exiled(pick)) return finish();
         st.casting = pick;
+        if (e.copies) {
+          // "Copy it, and you may cast the copy without paying its mana cost": made in exile and cast now (CR 707.12).
+          const copy = newObject(s, defOf(s, obj(s, pick)), you.id, "exile");
+          copy.spellCopy = true;
+          you.exile.push(copy.id);
+          log(s, `${src} copies ${defOf(s, obj(s, pick)).name}.`);
+          st.casting = copy.id;
+          st.copyOf = pick;
+          s.pending = { kind: "castFree", player: you.id, objectId: copy.id, source: src };
+          return "paused";
+        }
         s.pending = { kind: "castFree", player: you.id, objectId: pick, source: src };
         return "paused";
       }
@@ -1701,11 +1733,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       for (const id of ids) {
         moveObject(s, id, "exile");
         const o = obj(s, id);
-        o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.castOnly ? { castOnly: true as const } : {}) };
+        o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.castOnly ? { castOnly: true as const } : {}), ...(e.free ? { free: true as const } : {}) };
       }
       if (ids.length === 1 && s.resolving) s.resolving.exiledTop = { id: ids[0]!, zc: s.objects[ids[0]!]!.zoneChanges ?? 0 };
       if (ids.length)
-        log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of ${from === p.id ? "their" : `${player(s, from).name}'s`} library and may ${e.castOnly ? "cast" : "play"} ${ids.length === 1 ? "it" : "them"}${e.until === "thisTurn" ? " this turn" : e.until === "nextTurn" ? " until the end of their next turn" : e.until === "yourNextEndStep" ? " until their next end step" : ""}.`);
+        log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of ${from === p.id ? "their" : `${player(s, from).name}'s`} library and may ${e.castOnly ? "cast" : "play"} ${ids.length === 1 ? "it" : "them"}${e.free ? " without paying its mana cost" : ""}${e.until === "thisTurn" ? " this turn" : e.until === "nextTurn" ? " until the end of their next turn" : e.until === "yourNextEndStep" ? " until their next end step" : ""}.`);
       return;
     }
   }

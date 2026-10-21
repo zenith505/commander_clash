@@ -1139,6 +1139,11 @@ const freeAlt = (d: CardDef) => {
 /** Cast it for nothing when its alternative cost is free and allowed now (CR 118.9): the mana stays for something else. */
 function freeAltPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
   const o = obj(s, id);
+  // Omniscience: every spell from our hand for nothing.
+  if (o.zone === "hand" && altCost(defOf(s, o), "omniscience", s, pid)) {
+    const plan = castPlan(s, pid, id, false, undefined, "omniscience");
+    if (plan) return plan;
+  }
   if (o.zone !== "hand" || !freeAlt(defOf(s, o))) return null;
   return castPlan(s, pid, id, false, undefined, "alternative");
 }

@@ -10,10 +10,11 @@ import { compileCard } from "./oracle";
 import { liveEmblems } from "./emblems";
 import { commanderOf } from "./mutate";
 import { evalAmount } from "./amounts";
-import { playerCountersToPut, putCounters, withPutter } from "./counters";
+import { playerCountersToPut, putCounters, tokenBatch, withPutter } from "./counters";
+import { createExtraTokens, createToken } from "./effects/run-tokens";
 import { fireEvent } from "./effects";
 import { bindChosen, objectMatches, playerProtectedFrom } from "./effects/targeting";
-import { canPreventDamage, gainLife, log, loseLife, obj, player, syncControl, turnOrderFrom, useShieldCounter } from "./game";
+import { canPreventDamage, enterTogether, gainLife, log, loseLife, obj, player, syncControl, turnOrderFrom, useShieldCounter } from "./game";
 import { protectedFrom, toxicValue } from "./keywords";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
 import type { CardDef, Color, DamageRule, GameObject, GameState, ObjectId, PlayerId, RedirectShield } from "./types";
@@ -610,13 +611,13 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
       // "Prevent all damage that would be dealt to / by ~" uses up no shield, so it's applied first (CR 615.1, 616.1).
       // One with an additional effect ("you gain life equal to the damage prevented this way") is the one picked.
       const rules = prev(e) ? allRules.filter((r) => preventsAll(r) && !(e.applied ?? []).includes(r.id) && ruleCovers(s, r, to) && ruleTakes(s, r, e)) : [];
-      const rule = rules.find((r) => (r.gainLife && colorsOk(r.gainLife, e.src)) || (r.dealBack && colorsOk(r.dealBack, e.src))) ?? (preventedAll(s, e) ? undefined : rules[0]);
+      const rule = rules.find((r) => (r.gainLife && colorsOk(r.gainLife, e.src)) || (r.dealBack && colorsOk(r.dealBack, e.src)) || r.tokens) ?? (preventedAll(s, e) ? undefined : rules[0]);
       if (rule) {
         // The player being dealt it may apply amount replacements first (CR 616.1): when the prevention gains its
         // controller life or deals that much back, they're applied first when that's who chooses, as the most it can be.
         let n = e.n;
         const boost = allMods.filter((m) => !m.mod.prevent && modApplies(s, m, e, true));
-        if ((rule.gainLife || rule.dealBack) && boost.length && boost.length <= 6 && rule.controller === chooserOf(to))
+        if ((rule.gainLife || rule.dealBack || rule.tokens) && boost.length && boost.length <= 6 && rule.controller === chooserOf(to))
           for (const order of permutations(boost)) n = Math.max(n, order.reduce((a, m) => (a > 0 ? modAmount(s, m, a) : 0), e.n));
         ops.push({ kind: "preventAll", srcName: e.src.name, toName, rule: rule.id, n, src: e.src });
         continue;
@@ -924,14 +925,19 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
   const usedMods = new Set<string>();
   // Life gained from each rule's prevention of damage dealt at the same time is one life-gain event (CR 119.10).
   const gains = new Map<string, { pid: PlayerId; n: number }>();
-  const gainLater = (r: DamageRule, n: number) => gains.set(r.id, { pid: r.controller, n: (gains.get(r.id)?.n ?? 0) + n });
+  const gainLater = (r: DamageRule, n: number, src: DamageSource) => {
+    if (colorsOk(r.gainLife, src)) gains.set(r.id, { pid: r.controller, n: (gains.get(r.id)?.n ?? 0) + n });
+    if (r.tokens) madeLater.set(r.id, { r, n: (madeLater.get(r.id)?.n ?? 0) + n });
+  };
+  // Inkshield's tokens, one for each 1 damage each rule prevented, created together once the damage is prevented.
+  const madeLater = new Map<string, { r: DamageRule; n: number }>();
   const ruleUsed = (id: string, n: number, src?: DamageSource, prevented = false) => {
     const r = s.damageRules?.find((x) => x.id === id);
     if (!r) return;
     if (r.left !== undefined) r.left -= n;
     if (r.nextTime) used.add(r.id);
     if (!prevented || !src) return;
-    if (colorsOk(r.gainLife, src)) gainLater(r, n);
+    gainLater(r, n, src);
     if (colorsOk(r.dealBack, src)) back.push({ cardId: r.cardId, controller: r.controller, to: src.controller, n });
   };
   for (const op of plan.ops) {
@@ -940,7 +946,7 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
       const r = op.rule ? s.damageRules?.find((x) => x.id === op.rule) : undefined;
       log(s, `Damage from ${op.srcName} to ${op.toName} is prevented${r ? ` (${cardName(s, r)})` : ""}.`);
       if (r && op.n && op.src) {
-        if (colorsOk(r.gainLife, op.src)) gainLater(r, op.n);
+        gainLater(r, op.n, op.src);
         if (colorsOk(r.dealBack, op.src)) back.push({ cardId: r.cardId, controller: r.controller, to: op.src.controller, n: op.n });
       }
     } else if (op.kind === "shieldCounter") useShieldCounter(s, obj(s, op.id), `${op.srcName} dealing damage to it`);
@@ -979,6 +985,16 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
     }
   }
   for (const { pid, n } of gains.values()) if (n > 0) gainLife(s, pid, n);
+  if (madeLater.size)
+    enterTogether(s, () => {
+      for (const { r, n } of madeLater.values()) {
+        if (n <= 0 || player(s, r.controller).lost) continue;
+        const batch = tokenBatch(s, r.controller, r.tokens!, n);
+        for (let i = 0; i < batch.same; i++) createToken(s, r.controller, r.tokens!);
+        log(s, `${player(s, r.controller).name} creates ${batch.same} ${r.tokens!.name} token${batch.same === 1 ? "" : "s"} (${cardName(s, r)}).`);
+        createExtraTokens(s, r.controller, batch.extra);
+      }
+    });
   if (usedMods.size && s.damageMods) {
     s.damageMods = s.damageMods.filter((r) => !usedMods.has(r.id));
     if (!s.damageMods.length) s.damageMods = undefined;

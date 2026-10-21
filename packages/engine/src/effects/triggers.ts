@@ -1,4 +1,4 @@
-import { restingDef } from "../faces";
+import { defMv, restingDef } from "../faces";
 import { isSiege, siegeTrigger } from "../battles";
 import type { AbilityBody, BatchTrigger, CompiledCard, TargetChoice, TargetSpec, TriggeredAbility, TriggerEvent } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, power, toughness } from "../cards";
@@ -138,7 +138,7 @@ export type TriggerSourceEvent =
   | { type: "tapped"; id: ObjectId }
   | { type: "untapped"; id: ObjectId }
   /** Counters were put on a permanent, `amount` of them, on the battlefield or as it entered (CR 122.6). */
-  | { type: "countersPut"; id: ObjectId; counter: string; amount: number }
+  | { type: "countersPut"; id: ObjectId; counter: string; amount: number; /** Who put them (Hapatra's "whenever you put"). */ by: PlayerId }
   /** A permanent became monstrous (CR 701.37b), with `x` the N, the X of its "when ~ becomes monstrous" abilities (701.37c). */
   | { type: "becameMonstrous"; id: ObjectId; x: number }
   /** A mutating spell merged with this permanent (CR 702.140d). */
@@ -555,7 +555,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // on the battlefield, and of ones leaving at the same time, which look back in time (CR 603.10a).
     // "Whenever a creature you control leaves the battlefield" (and "without dying"): the same, wherever it went.
     if (ev.snapshot && ev.chars) {
-      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) };
+      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, manaValue: defMv(defOf(s, ev.snapshot)), ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) };
       const dying = { o: ev.snapshot, c: ev.chars };
       const hadCounter = Object.values(ev.counters).some((n) => n > 0);
       const went = (d: NonNullable<TriggeredAbility["dies"]>) => (d.leaves ? !(d.notDies && ev.to === "graveyard") && (!d.toZones || (d.toZones as string[]).includes(ev.to)) : ev.to === "graveyard") && (!d.hadCounter || hadCounter);
@@ -579,7 +579,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever you sacrifice another permanent": the permanents of the player who sacrificed it, and the ones leaving at
     // the same time (CR 603.10a), whatever zone it went to.
     if (ev.sacrificed && ev.snapshot && ev.chars) {
-      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) };
+      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, manaValue: defMv(defOf(s, ev.snapshot)), ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) };
       const dying = { o: ev.snapshot, c: ev.chars };
       // "Whenever a player sacrifices", "whenever an opponent sacrifices": the other players' permanents too, each
       // triggering for its own controller, "that player" being the one who sacrificed it.
@@ -743,11 +743,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "countersPut") {
     // "Whenever one or more +1/+1 counters are put on ~ / on a creature you control": "that many" is how many.
     const o = obj(s, ev.id);
-    const kindOk = (t: TriggeredAbility) => t.countersKind === undefined || t.countersKind === ev.counter;
+    const kindOk = (t: TriggeredAbility, you: PlayerId) => (t.countersKind === undefined || t.countersKind === ev.counter) && (!t.countersByYou || ev.by === you);
     const info = { amount: ev.amount };
     const after = o.counters[ev.counter] ?? 0;
     const reached = (t: TriggeredAbility) => t.countersReach === undefined || (after - ev.amount < t.countersReach && after >= t.countersReach);
-    add(o, controllerOf(s, o), (e, t) => e === "selfCountersPut" && kindOk(t) && reached(t), undefined, undefined, undefined, undefined, undefined, undefined, info);
+    add(o, controllerOf(s, o), (e, t) => e === "selfCountersPut" && kindOk(t, controllerOf(s, o)) && reached(t), undefined, undefined, undefined, undefined, undefined, undefined, info);
     // Chapter abilities: "if the number of lore counters on it was less than N and became at least N" (CR 714.2b).
     // With read ahead, the turn it entered only the chapter it has exactly that many lore counters for (CR 702.155a).
     if (ev.counter === "lore" && o.zone === "battlefield") {
@@ -761,7 +761,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const w = obj(s, id);
       const ctrl = controllerOf(s, w);
-      add(w, ctrl, (e, t) => e === "permanentCountersPut" && kindOk(t) && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false) && !(t.tappedFilter.notSource && id === o.id), undefined, undefined, o, undefined, undefined, undefined, info);
+      add(w, ctrl, (e, t) => e === "permanentCountersPut" && kindOk(t, ctrl) && !!t.tappedFilter && objectMatches(s, t.tappedFilter, o, ctrl, false) && !(t.tappedFilter.notSource && id === o.id), undefined, undefined, o, undefined, undefined, undefined, info);
     }
   } else if (ev.type === "exerted") {
     // Exert's linked "When you do" (CR 607.2h), and "whenever you exert a creature" (the creature is the subject).

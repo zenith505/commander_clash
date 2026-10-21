@@ -3555,6 +3555,8 @@ export interface CompiledCard {
    */
   /** "Noncreature spells you cast have convoke" (Caetus), "Multicolored spells you cast have convoke" (Fallaji Wayfarer), CR 702.51. */
   spellsHaveConvoke?: { filter: TargetSpec; text: string }[];
+  /** "Nonartifact spells you cast have improvise" (Inspiring Statuary), CR 702.126. */
+  spellsHaveImprovise?: { filter: TargetSpec; text: string }[];
   spellsHaveCascade?: { filter?: TargetSpec; from?: "hand" | "exile"; first?: true; treasure?: true; commander?: true; yourTurn?: true; maxMv?: Amount; text: string }[];
   /** Shadow the Hedgehog: "Each spell you cast has split second if mana from an artifact was spent to cast it" (CR 702.61a, 106.3). */
   splitSecondIfArtifactMana?: true;

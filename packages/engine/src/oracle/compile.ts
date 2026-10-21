@@ -1309,6 +1309,14 @@ export function compile(d: CardDef): CompiledCard {
       else (out.spellsHaveConvoke ??= []).push({ filter: f, text: line });
       continue;
     }
+    // "Nonartifact spells you cast have improvise" (Inspiring Statuary), CR 702.126a, as for convoke.
+    const giveImprovise = /^([A-Z][a-z]+) spells you cast have improvise\.$/.exec(line);
+    if (giveImprovise) {
+      const f = parseTargetPhrase(`${giveImprovise[1]!.toLowerCase()} spell`);
+      if (f?.kind !== "spell") out.unsupported.push(raw);
+      else (out.spellsHaveImprovise ??= []).push({ filter: f, text: line });
+      continue;
+    }
     // Cascade for the spells you cast (CR 702.85a): "Sliver spells you cast have cascade", "Instant and sorcery spells you
     // cast from your hand have cascade", "The first spell you cast each turn has cascade" (Maelstrom Nexus).
     const giveCascade = /^(?:(.+?) )?[Ss]pells you cast( from your hand)?( with mana value \d+ or (?:greater|less))? have cascade\.$/.exec(line);

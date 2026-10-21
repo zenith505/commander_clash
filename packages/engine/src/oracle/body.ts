@@ -533,6 +533,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       ],
       text,
     };
+  // Descent into Avernus: "Then each player creates X Treasure tokens and ~ deals X damage to each player, where X is the
+  // number of descent counters on ~": the same X for both, which nothing in between changes.
+  text = text.replace(/(^|\. )Then each player creates X ([^.]+?) tokens and ~ deals X damage to each player, where X is ([^.]+)\./, "$1Then each player creates X $2 tokens, where X is $3. ~ deals X damage to each player, where X is $3.");
   // Gamble: "Search your library for a card, put that card into your hand, discard a card at random, then shuffle." The
   // discard comes before the shuffle, but the discarded card goes to the graveyard, so the order changes nothing that can
   // be seen: the search, then the discard (at random from the whole hand, the found card included).

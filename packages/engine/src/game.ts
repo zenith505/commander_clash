@@ -3238,6 +3238,16 @@ export function hasConvoke(s: GameState, pid: PlayerId, o: GameObject): boolean 
   });
 }
 
+/** Does `o`, cast by `pid`, have improvise (CR 702.126)? Its own, or from "nonartifact spells you cast have improvise". */
+export function hasImprovise(s: GameState, pid: PlayerId, o: GameObject): boolean {
+  const d = defOf(s, o);
+  if (compileCard(d).improvise) return true;
+  return s.battlefield.some((id) => {
+    const p = obj(s, id);
+    return controllerOf(s, p) === pid && (abilitiesOf(s, p).spellsHaveImprovise ?? []).some((g) => printedMatches(g.filter, d));
+  });
+}
+
 /**
  * What's left to pay for casting this card after any convoke creatures (CR 702.51) and improvise
  * artifacts (CR 702.126), as a cost plus extra generic mana. A string says why they can't be used.
@@ -3254,7 +3264,7 @@ function costToPay(s: GameState, pid: PlayerId, o: GameObject, convoke?: ObjectI
     [cost, extra] = [reduced, 0];
   }
   if (improvise?.length) {
-    if (!compileCard(d).improvise) return `${d.name} doesn't have improvise`;
+    if (!hasImprovise(s, pid, o)) return `${d.name} doesn't have improvise`;
     const problem = improviseProblem(s, pid, improvise, convoke ?? []);
     if (problem) return problem;
     const reduced = payGenericWith(cost, extra, improvise.length);

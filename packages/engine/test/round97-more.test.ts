@@ -2,7 +2,7 @@
 // hand without paying their mana costs, CR 118.9: an alternative cost, so X is 0 and additional costs still apply).
 
 import { describe, expect, it } from "vitest";
-import { act, activate, bear, card, cast, putOnBattlefield, setup, target } from "./helpers";
+import { act, activate, bear, card, cast, passUntil, putOnBattlefield, setup, target } from "./helpers";
 import { characteristics, compileCard, isFullySupported, objHasKeyword, planCast, power, toughness, waitingOn, type Action, type CardDef, type GameState, type ManaType } from "../src";
 
 // Real oracle text (Scryfall).
@@ -26,6 +26,8 @@ const approach = card("Approach of the Second Sun", "Sorcery", "{6}{W}", { oracl
 const pact = card("Tainted Pact", "Instant", "{1}{B}", { oracleText: "Exile the top card of your library. You may put that card into your hand unless it has the same name as another card exiled this way. Repeat this process until you put a card into your hand or you exile two cards with the same name, whichever comes first." });
 const temptDiscovery = card("Tempt with Discovery", "Sorcery", "{3}{G}", { keywords: ["Tempting offer"], oracleText: "Tempting offer — Search your library for a land card and put it onto the battlefield. Each opponent may search their library for a land card and put it onto the battlefield. For each opponent who searches a library this way, search your library for a land card and put it onto the battlefield. Then each player who searched a library this way shuffles." });
 const loot = card("Loot, Exuberant Explorer", "Legendary Creature — Beast Noble", "{2}{G}", { power: "1", toughness: "4", oracleText: "You may play an additional land on each of your turns.\n{4}{G}{G}, {T}: Look at the top six cards of your library. You may reveal a creature card with mana value less than or equal to the number of lands you control from among them and put it onto the battlefield. Put the rest on the bottom in a random order." });
+const descent = card("Descent into Avernus", "Enchantment", "{2}{R}", { oracleText: "At the beginning of your upkeep, put two descent counters on this enchantment. Then each player creates X Treasure tokens and this enchantment deals X damage to each player, where X is the number of descent counters on this enchantment." });
+const statuary = card("Inspiring Statuary", "Artifact", "{3}", { oracleText: "Nonartifact spells you cast have improvise. (Your artifacts can help cast those spells. Each artifact you tap after you're done activating mana abilities pays for {1}.)" });
 const giant = card("Big Giant", "Creature — Giant", "{6}{R}{R}", { power: "8", toughness: "8" });
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -43,7 +45,7 @@ const tapFor = (s: GameState, pid: number, id: string, mana: ManaType): Action =
 
 describe("round 97, more cards", () => {
   it("parse", () => {
-    supported(bloodghast, omniscience, monument, cagedSun, vesuva, flux, iteration, coat, narset, cutDeal, approach, pact, temptDiscovery, loot);
+    supported(bloodghast, omniscience, monument, cagedSun, vesuva, flux, iteration, coat, narset, cutDeal, approach, pact, temptDiscovery, loot, descent, statuary);
     expect(compileCard(omniscience).castFromHandFree).toBe(true);
   });
 
@@ -292,5 +294,35 @@ describe("round 97, more cards", () => {
     expect(s.objects[small]!.zone).toBe("battlefield");
     expect(s.objects[huge]!.zone).toBe("library");
     expect(s.players[ap]!.library.slice(-5)).toContain(huge);
+  });
+
+  it("Descent into Avernus: two descent counters, then X Treasures for each player and X damage to each", () => {
+    const { s: s0, ap } = setup([]);
+    const d = putOnBattlefield(s0, ap, descent);
+    s0.objects[d]!.counters.descent = 1;
+    let s = passUntil(s0, "upkeep", ap);
+    const life = s.players.map((p) => p.life);
+    s = settle(s);
+    expect(s.objects[d]!.counters.descent).toBe(3);
+    const treasures = (pid: number) => s.battlefield.filter((id) => s.objects[id]!.controller === pid && s.objects[id]!.isToken && s.cards[s.objects[id]!.cardId]!.subtypes.includes("Treasure")).length;
+    expect(s.turnOrder.map(treasures)).toEqual([3, 3, 3, 3]);
+    expect(s.players.map((p) => p.life)).toEqual(life.map((l) => l - 3));
+  });
+
+  it("Inspiring Statuary: your artifacts pay generic mana for nonartifact spells, not for artifact spells", () => {
+    const { s: s0, ap, ids } = setup([divination, card("Big Trinket", "Artifact", "{2}", { cmc: 2 })]);
+    const island = s0.battlefield.find((id) => s0.objects[id]!.controller === ap && s0.cards[s0.objects[id]!.cardId]!.name === "Island")!;
+    for (const id of s0.battlefield) if (s0.objects[id]!.controller === ap && id !== island) s0.objects[id]!.tapped = true;
+    const trinkets = [putOnBattlefield(s0, ap, card("Trinket A", "Artifact", "{1}")), putOnBattlefield(s0, ap, card("Trinket B", "Artifact", "{1}"))];
+    expect(planCast(s0, ap, ids[0]!, undefined, undefined, "auto")).toBeNull();
+    putOnBattlefield(s0, ap, statuary);
+    const plan = planCast(s0, ap, ids[0]!, undefined, undefined, "auto");
+    const last = plan?.at(-1);
+    expect(last?.type === "castSpell" && last.improvise?.length).toBe(2);
+    expect(trinkets.length).toBe(2);
+    // An artifact spell: no.
+    expect(planCast(s0, ap, ids[1]!, undefined, undefined, "auto")).toBeNull();
+    const s = settle(run(s0, plan));
+    expect(s.objects[ids[0]!]!.zone).toBe("graveyard");
   });
 });

@@ -3156,8 +3156,10 @@ export function castProblem(
     if (choices.alt === "freerunning" && !(s.freerunningThisTurn ?? []).includes(pid)) return "no Assassin or commander of yours has dealt combat damage to a player this turn";
     // Sneak (CR 702.190a): only during your declare blockers step, once blockers are declared (an unblocked attacker).
     if (choices.alt === "sneak" && (s.activePlayer !== pid || s.step !== "declareBlockers" || s.pending?.kind === "declareBlockers")) return "sneak works only during your declare blockers step";
-    // Only one alternative cost can be applied to a spell (CR 118.9a).
-    if (via || free || plotted) return `${d.name} can't be cast for its ${choices.alt} cost this way`;
+    // Only one alternative cost can be applied to a spell (CR 118.9a). A permission to cast it from the graveyard that
+    // names no cost (Yawgmoth's Will, Muldrotha, Lurrus) allows one (rulings), except those that say where the card is.
+    if ((via && !permissionWay(via)) || free || plotted) return `${d.name} can't be cast for its ${choices.alt} cost this way`;
+    if (via && (choices.alt === "foretell" || choices.alt === "citadel" || choices.alt === "omniscience" || choices.alt === "miracle")) return `${d.name} can't be cast for its ${choices.alt} cost from a graveyard`;
     // "If you control a Swamp, you may pay 4 life rather than pay ~'s mana cost": only while that's true (CR 601.2b).
     const cond = altCost(d, choices.alt)?.if;
     if (cond && !staticConditionNow(s, cond, id, pid)) return `${d.name}'s alternative cost can't be paid now`;
@@ -3357,7 +3359,10 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // So do evoke, dash, bestow and madness (CR 702.74a, 702.109a, 702.103a, 702.35a).
   // Airbend's "{2} rather than its mana cost" (CR 701.65a), an alternative cost.
   const airbent = !how.faceDown && !how.alt && freeCastOf(s, pid) !== o.id ? exiled?.cost : undefined;
-  const base = how.faceDown ? "{3}" : (madness ?? graveyardWay(s, o, how.via)?.mana ?? altCost(d, how.alt, s, pid)?.mana ?? airbent ?? d.manaCost);
+  // From a graveyard with a permission that names no cost, an alternative cost replaces the mana cost (CastFromGraveyard).
+  const way = graveyardWay(s, o, how.via);
+  const wayMana = way && !(how.alt && permissionWay(way)) ? way.mana : undefined;
+  const base = how.faceDown ? "{3}" : (madness ?? wayMana ?? altCost(d, how.alt, s, pid)?.mana ?? airbent ?? d.manaCost);
   const mana = anyType(lessColored(parseManaCost(base + kickCost)));
   const total = splitGeneric(mana, tax + x * xCount(mana));
   let less = mods.less;
@@ -4166,6 +4171,12 @@ export function permitLabel(s: GameState, key: string): string {
   const src = s.objects[ref!.split("@")[0]!];
   return `${src ? characteristics(s, src).name : "a permanent"}${slot ? ` (${slot.toLowerCase()})` : ""}`;
 }
+
+/**
+ * A permission to cast it from a graveyard that doesn't name a cost ("you may cast spells from your graveyard this turn",
+ * Muldrotha's): its mana cost is paid, or an alternative cost instead (rulings on Muldrotha, Karador, Lurrus, Emry).
+ */
+export const permissionWay = (g: CastFromGraveyard) => g.kind === "permission" || g.kind === "turnPermission";
 
 /** One way to cast it from a graveyard, if it has it. */
 export function graveyardWay(s: GameState, o: GameObject, via?: CastFromGraveyardKind): CastFromGraveyard | undefined {

@@ -6454,6 +6454,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "24d0f5e7-0d9e-4b76-900e-a7274e80312d",
+  "name": "Mulldrifter",
+  "manaCost": "{4}{U}",
+  "cmc": 5,
+  "typeLine": "Creature — Elemental",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental"
+  ],
+  "oracleText": "Flying\nWhen this creature enters, draw two cards.\nEvoke {2}{U} (You may cast this spell for its evoke cost. If you do, it's sacrificed when it enters.)",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying",
+   "Evoke"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2021-11-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "938b4e2c-88d9-4637-bc00-e228920c9a78",
   "name": "Murder",
   "manaCost": "{1}{B}{B}",
@@ -10695,6 +10728,32 @@
   "set": "emn",
   "releasedAt": "2016-07-22",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "322f0459-f394-44f0-977b-55fd0cbe0712",
+  "name": "Yawgmoth's Will",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Until end of turn, you may play lands and cast spells from your graveyard.\nIf a card would be put into your graveyard from anywhere this turn, exile that card instead.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "usg",
+  "releasedAt": "1998-10-12",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  }

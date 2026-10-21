@@ -1,9 +1,10 @@
 // Round 109's prompts: the legend rule's "Keep ..." buttons (CR 704.5j: you choose which of your legends with the same
-// name stays) and As Foretold's "Cast it for {0}" in a card's menu (CR 118.9), once each turn.
+// name stays), As Foretold's "Cast it for {0}" in a card's menu (CR 118.9), once each turn, and a graveyard card's
+// alternative cost under Yawgmoth's Will ("Cast from graveyard: Evoke").
 import { expect, test } from "@playwright/test";
 import { applyAction, planCast, type GameState } from "@cc/engine";
 import { idsOf, one, open, pageErrors, playWithBots, scene, state } from "./scene";
-import { card, controls, menu, resolveUntil } from "./ui";
+import { card, controls, menu, modal, resolveUntil } from "./ui";
 
 test("Legend rule: a second Isamaru resolves; keep the first one, which has a +1/+1 counter", async ({ page }) => {
   let s: GameState = scene({ hand: ["Isamaru, Hound of Konda"], board: ["Isamaru, Hound of Konda", "Plains"] });
@@ -37,5 +38,22 @@ test("As Foretold with three time counters: cast Divination for {0} from its men
   await card(page, "Opt", s).click();
   await expect.poll(async () => (await state(page)).objects[opt]!.zone).not.toBe("hand");
   expect((await state(page)).objects[island]!.tapped).toBe(true);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Yawgmoth's Will: evoke Mulldrifter from your graveyard for {2}{U}; it draws two and is exiled", async ({ page }) => {
+  let s: GameState = scene({ hand: ["Yawgmoth's Will"], board: ["Swamp", "Swamp", "Swamp", "Island", "Island", "Island"], yard: ["Mulldrifter"] });
+  const drifter = one(s, "Mulldrifter");
+  for (const a of planCast(s, 0, one(s, "Yawgmoth's Will"))!) s = applyAction(s, a);
+  s = playWithBots(s, (st) => st.stack.length === 0 && !st.pending && st.priority === 0);
+  const hand = s.players[0]!.hand.length;
+  await open(page, s);
+  await page.locator('[data-graveyard="0"]').click();
+  await modal(page).locator(".card.playable", { hasText: "Mulldrifter" }).click();
+  // Its mana cost needs five lands (three are left): only the evoke button can be used.
+  await expect(menu(page).locator('button[data-alt="evoke"]')).toContainText("Cast from graveyard: Evoke");
+  await menu(page).locator('button[data-alt="evoke"]').click();
+  const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && st.objects[drifter]!.zone === "exile");
+  expect(after.players[0]!.hand.length).toBe(hand + 2);
   expect(pageErrors(page)).toEqual([]);
 });

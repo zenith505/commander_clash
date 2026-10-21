@@ -80,6 +80,8 @@ export interface AmountExpr {
   half?: "up" | "down";
   /** It may be below 0: doubling a creature's power gives it +X/+0 for a negative X too (CR 107.1b, 701.10c). */
   signed?: true;
+  /** "If X is 6 or more, ... twice X damage ... instead" (Shatterskull Smashing): twice as much when the X announced is this or more. */
+  twiceIfX?: number;
 }
 
 /** What an amount counts. */
@@ -2774,6 +2776,8 @@ export interface TriggeredAbility {
   countersKind?: string;
   /** For "selfCountersPut" / "permanentCountersPut": "whenever you put one or more counters on ...", only counters this ability's controller puts. */
   countersByYou?: true;
+  /** For "permanentCountersPut": "on a permanent or player" (All Will Be One), counters put on a player too. */
+  countersOrPlayer?: true;
   /** For "selfCountersPut": "when the twelfth hour counter is put on ~", only when the count goes from below this to at least it. */
   countersReach?: number;
   /**
@@ -3421,7 +3425,20 @@ export type CountMod =
    * down" (`putter` "opponent", op `halfDown`): it matters who puts the counters, not who controls what gets them
    * (rulings). On a player's counters too.
    */
-  | { what: "counters"; putter: "you" | "opponent"; op: "double" | "halfDown"; counter?: undefined; on?: undefined; who?: undefined; other?: undefined };
+  | {
+      what: "counters";
+      putter: "you" | "opponent";
+      op: "double" | "halfDown" | "plusOne";
+      /**
+       * Only counters put on these (Lae'zel: "on a creature or planeswalker you control or on yourself", Doc Samson: "on a
+       * permanent you control"); unset = any permanent or player.
+       */
+      putOn?: "creatureOrPlaneswalkerYouControlOrYou" | "permanentYouControl";
+      counter?: undefined;
+      on?: undefined;
+      who?: undefined;
+      other?: undefined;
+    };
 
 /**
  * What a gift gives the chosen opponent (CR 702.174d-i): "Gift a card" means they draw a card, "Gift a Food" that they

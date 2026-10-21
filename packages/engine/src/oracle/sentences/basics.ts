@@ -627,6 +627,24 @@ function addDivided(ctx: Ctx, amount: string | AmountExpr, among: string, what: 
   // targets as there is damage at most, like "any number of", but none at all is fine too (CR 115.6; rulings on
   // Ravenous Gigantotherium: "You may choose zero targets").
   const upTo = /^up to (\w+)$/.exec(among);
+  // "X damage divided as you choose among up to two target creatures and/or planeswalkers" (Shatterskull Smashing): up to
+  // that many targets, each dealt at least 1 of the X announced as it's cast (CR 601.2d, rulings).
+  if (upTo && amount === "X" && upTo[1] !== "X" && !ctx.whereX) {
+    const n = num(upTo[1]!);
+    if (!(n >= 2 && n <= 10) || what === "targets") return null;
+    const words = what.replace(/^target /, "").replace(/ your opponents control$/, " an opponent controls").replace(/ and\/or /g, " or ");
+    const one = words.replace(/\bcreatures\b/g, "creature").replace(/\bplaneswalkers\b/g, "planeswalker");
+    const spec0 = one === words ? null : parseTargetPhrase(one);
+    if (spec0?.kind !== "object") return null;
+    const spec: TargetSpec = { ...spec0, text: `target ${one}` };
+    const x: AmountExpr = { count: { kind: "x" } };
+    const first = ctx.targets.length;
+    const divided = { first, n, total: 0, amount: x, upTo: true as const };
+    for (let k = 0; k < n; k++) addTarget(ctx, { ...spec, divided, optional: true, ...(k ? { distinctFrom: Array.from({ length: k }, (_, j) => first + j) } : {}) });
+    ctx.lastObjectTarget = undefined;
+    ctx.lastTargets = { index: first, n };
+    return { index: first, n, amount: x };
+  }
   if (upTo && upTo[1] !== "X") {
     if (typeof amount !== "string" || !/^\w+$/.test(amount) || amount === "X" || num(upTo[1]!) !== num(amount)) return null;
     among = "any number of";

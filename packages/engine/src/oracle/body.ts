@@ -536,6 +536,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       ],
       text,
     };
+  // Shatterskull Smashing: "If X is 6 or more, ~ deals twice X damage divided as you choose among them instead": twice X
+  // is what's divided, as it's cast (rulings: "you divide twice X damage; you don't assign X damage and then double it").
+  const twiceX = /^(~ deals X damage divided as you choose among [^.]+)\. If X is (\d+) or more, ~ deals twice X damage divided as you choose among them instead\.$/.exec(text.trim());
+  if (twiceX && opts.spell) {
+    const body = parseBody(`${twiceX[1]!}.`, opts);
+    const fx = body?.effects[0];
+    if (!body || body.effects.length !== 1 || fx?.type !== "damage" || !fx.divided || !body.targets.every((t) => t.divided?.amount)) return null;
+    const amount: AmountExpr = { ...(fx.amount as AmountExpr), twiceIfX: Number(twiceX[2]) };
+    return { ...body, targets: body.targets.map((t) => ({ ...t, divided: { ...t.divided!, amount } })), effects: [{ ...fx, amount }], text };
+  }
   // Scroll Rack: cards from the hand traded for as many from the top of the library (not a draw, rulings).
   if (text === "Exile any number of cards from your hand face down. Put that many cards from the top of your library into your hand. Then look at the exiled cards and put them on top of your library in any order.")
     return { targets: [], effects: [{ type: "scrollRack" }], text };

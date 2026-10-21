@@ -65,7 +65,8 @@ export const isFixed = (a: Amount): a is number => typeof a === "number";
 /** The value of `a` right now. */
 export function evalAmount(s: GameState, a: Amount, ctx: AmountCtx): number {
   if (typeof a === "number") return a;
-  const v = evalCount(s, a.count, ctx) * (a.times ?? 1) + (a.plus ?? 0);
+  const v0 = evalCount(s, a.count, ctx) * (a.times ?? 1) + (a.plus ?? 0);
+  const v = a.twiceIfX !== undefined && (ctx.x ?? 0) >= a.twiceIfX ? v0 * 2 : v0;
   const n = a.signed ? v : Math.max(0, a.half ? halve(v, a.half) : v);
   return a.negate ? -n : n;
 }
@@ -451,7 +452,8 @@ export function describeAmount(a: Amount): string {
   const t = a.times ?? 1;
   const times = t === 1 ? base : t === -1 ? `-${base}` : `${t} × ${base}`;
   const v0 = a.plus ? `${times} ${a.plus > 0 ? "+" : "-"} ${Math.abs(a.plus)}` : times;
-  const v = a.half ? `half ${v0}, rounded ${a.half}` : v0;
+  const v1 = a.half ? `half ${v0}, rounded ${a.half}` : v0;
+  const v = a.twiceIfX !== undefined ? `${v1} (twice that if X is ${a.twiceIfX} or more)` : v1;
   return a.negate ? `-(${v})` : v;
 }
 

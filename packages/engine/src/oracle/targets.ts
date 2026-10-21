@@ -29,6 +29,10 @@ export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | nul
   // "target player or planeswalker", "target opponent or planeswalker" (Lava Axe): a player, or a planeswalker permanent.
   const pw = /^target (player|opponent) or planeswalker$/i.exec(p);
   if (pw) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", types: ["Planeswalker"], ...(pw[1]!.toLowerCase() === "opponent" ? { opponent: true } : {}), text: p.toLowerCase() }) };
+  // All Will Be One, Nicol Bolas, God-Pharaoh: "target opponent, creature an opponent controls, or planeswalker an opponent
+  // controls".
+  if (/^target opponent, creature an opponent controls, or planeswalker an opponent controls$/i.test(p))
+    return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", types: ["Creature", "Planeswalker"], opponent: true, controller: "opponent", text: p.toLowerCase() }) };
   // "Target player or battle", "target opponent or battle" (Ayara), "another target battle or opponent" (Invasion of
   // Regatha: not itself, CR 115.4): a player, or a battle permanent.
   const battle = /^(another )?target (?:(player|opponent) or battle|battle or (player|opponent))$/i.exec(p);

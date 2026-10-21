@@ -1,7 +1,7 @@
 # Roadmap
 
-21,907 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,793 of 1,989 (90%), top 5,000: 3,619 of 4,988 (72%).
+21,947 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,814 of 1,989 (91%), top 5,000: 3,644 of 4,988 (73%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,17 +22,19 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 101, most played first: Wheel of Misfortune (secret numbers
-   chosen at once), Alexios, Vraska, Betrayal's Sting, Valgavoth, Carpet of Flowers, Vigor, Conqueror's Flail, Full
-   Throttle ("at the beginning of each combat this turn"), Baral, Laelia, Ad Nauseam, Scroll Rack, Agatha's Soul
-   Cauldron, All Will Be One, Thousand-Year Storm, Crawlspace, Shatterskull Smashing, Delayed Blast Fireball, Rings of
-   Brighthearth, Baleful Mastery, Mantle of the Ancients, Cleric Class, Terastodon, Lae'zel, Grab the Prize, Comet
-   Storm, Koma, Drown in the Loch, Treasure Nabber, Dark Depths, Echoes of Eternity, Guide of Souls, Fell the Mighty
-   ("power greater than target creature's power"), Odric, Lunarch Marshal. Smaller gaps from round 101: Subtlety;
-   Chromatic Orrery's mana doesn't pay a Phyrexian symbol as any color (it still needs its color or 2 life); "remove X
-   counters" as a cost; counter costs on spells (Quilled Greatwurm, Dawnhand); Ancient Imperiosaur, Everything Comes
+00. Most played first (`npm run popular`). Out after round 102, most played first: All Will Be One (which counters
+   count: energy and other player counters), Shatterskull Smashing (X damage divided among up to two targets), Mantle
+   of the Ancients, Cleric Class, Lae'zel, Grab the Prize, Comet Storm, Koma, Drown in the Loch, Treasure Nabber, Dark
+   Depths, Echoes of Eternity, Guide of Souls, Fell the Mighty ("power greater than target creature's power"), Odric,
+   Lunarch Marshal, Arid Archway, Westvale Abbey, Heliod's Intervention, Planar Genesis, The Water Crystal, Chandra,
+   Torch of Defiance, Meren, Patriarch's Bidding, Ojer Axonil, The Grey Havens, Kozilek, the Great Distortion, Ulamog,
+   the Defiler. Smaller gaps from round 102: Subtlety; Hithlain Rope (seating left and right); "can't be sacrificed"
+   granted to another permanent (Garland, Assault Suit, Jon Irenicus, Stilt-Man, Zurgo); Kindle the Carnage, Forbidden
+   Ritual; Agatha's Soul Cauldron lends abilities after every ability-removing effect (no timestamp order against
+   "loses all abilities"); a permanent that can't be sacrificed still reads "sacrifices" in some log lines of the effect
+   that tried. Smaller gaps from round 101: counter costs on spells (Quilled Greatwurm, Dawnhand); Ancient Imperiosaur, Everything Comes
    to Dust and Knight-Errant of Eos (what convoked them); Nissa's two-sentence "Nth time" branches; Rose Room
-   Treasurer, Soulbright Flamekin, Ashling; Eivor and Sludge Titan ("and/or" after a mill); Spinal Parasite, Brightflame,
+   Treasurer, Soulbright Flamekin; Eivor and Sludge Titan ("and/or" after a mill); Spinal Parasite, Brightflame,
    Spiteful Repossession; an exile ability that can't be told apart from the card's other exiles keeps the card out
    ("returns exiled cards it can't link"); bots casting Pitiless Carnage may sacrifice nothing; the bot removing chosen
    counters takes helpful kinds off others' permanents and harmful ones off its own, and never plays around time or

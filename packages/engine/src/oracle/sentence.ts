@@ -4,6 +4,7 @@ import type { Color } from "../types";
 import { num, PT, ptAmt, COLOR_WORDS, TYPE_WORDS, WHEEL, COUNTER, counterKind, X, capital } from "./words";
 import { Ctx } from "./body";
 import { parseSearchFilter } from "./search";
+import { parseCount } from "./counts";
 import { parseKeywordList, parseObject } from "./targets";
 import { parseGrants } from "./grants";
 import { parseBasicsSentence } from "./sentences/basics";
@@ -22,7 +23,10 @@ import { parseNamesSentence } from "./sentences/names";
  * graveyard", "on the bottom of your library in a random order"). "more" while the rest is still to come.
  */
 export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }>>, ctx?: Ctx, whereX?: AmountExpr): Extract<Effect, { type: "dig" }> | "more" | null {
-  const REST = "(into your graveyard|into your hand|on the bottom of your library(?: in (?:any|a random) order)?)";
+  const REST = "(into your graveyard|into your hand|on the bottom(?: of your library)?(?: in (?:any|a random) order)?)";
+  // "You may reveal a creature card ... from among them and put it onto the battlefield" (Loot, Exuberant Explorer): the
+  // same as putting it there, revealed.
+  s = s.replace(/^You may reveal (an? .+?) from among them and put it onto the battlefield$/, "You may put $1 from among them onto the battlefield");
   // Without "in a random order", the owner arranges the cards going to the bottom (CR 401.4).
   const restOf = (r: string) => (r === "into your graveyard" ? { rest: "graveyard" as const } : r === "into your hand" ? { rest: "hand" as const } : / random /.test(r) ? { rest: "bottom" as const, random: true as const } : { rest: "bottom" as const });
   let m: RegExpExecArray | null;
@@ -46,13 +50,21 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       // is ..." defined (Hatchery Spider), counted as it resolves (TargetSpec.bound).
       let what = m[3]!.replace(/\bcards\b/, "card").replace(/ and\/or /, " or ");
       const mvX = / with mana value X or less$/.exec(what);
+      // "With mana value less than or equal to the number of lands you control" (Loot): counted as it resolves.
+      const mvCount = / with mana value less than or equal to (.+)$/.exec(what);
+      if (mvCount) {
+        const amount = parseCount(mvCount[1]!, ctx ?? null);
+        if (!amount) return null;
+        whereX = amount;
+        what = what.slice(0, mvCount.index);
+      }
       if (mvX) {
         if (!ctx || (!whereX && !(ctx.spell || ctx.activated || ctx.selfCastSpell)) || ctx.whereX) return null;
         what = what.slice(0, mvX.index);
       }
       const filter = parseSearchFilter(what);
       if (!filter) return null;
-      if (mvX) Object.assign(filter, { ...(whereX ? { bound: { key: "manaValue", at: "most", amount: whereX } } : { xRange: { key: "manaValue", at: "most" } }), text: `${filter.text} with mana value X or less` });
+      if (mvX || mvCount) Object.assign(filter, { ...(whereX ? { bound: { key: "manaValue", at: "most", amount: whereX } } : { xRange: { key: "manaValue", at: "most" } }), text: mvCount ? `${filter.text} with mana value less than or equal to ${mvCount[1]}` : `${filter.text} with mana value X or less` });
       Object.assign(dig, { count, upTo: !required, ...(required ? { required: true } : {}), filter, into: "battlefield", ...(m[4] ? { tapped: true } : {}), ...(m[5] ? { counters: { counter: counterKind(m[5]), n: 1 } } : {}) });
       if (m[6]) Object.assign(dig, restOf(m[6]));
     } else if ((m = new RegExp(`^(You may exile|Exile) one of (?:them|those cards)(?: and put the rest ${REST})?$`).exec(s))) {

@@ -2,7 +2,7 @@
 // hand without paying their mana costs, CR 118.9: an alternative cost, so X is 0 and additional costs still apply).
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, cast, putOnBattlefield, setup, target } from "./helpers";
+import { act, activate, bear, card, cast, putOnBattlefield, setup, target } from "./helpers";
 import { characteristics, compileCard, isFullySupported, objHasKeyword, planCast, power, toughness, waitingOn, type Action, type CardDef, type GameState, type ManaType } from "../src";
 
 // Real oracle text (Scryfall).
@@ -25,6 +25,7 @@ const cutDeal = card("Cut a Deal", "Sorcery", "{2}{W}", { oracleText: "Each oppo
 const approach = card("Approach of the Second Sun", "Sorcery", "{6}{W}", { oracleText: "If this spell was cast from your hand and you've cast another spell named Approach of the Second Sun this game, you win the game. Otherwise, put Approach of the Second Sun into its owner's library seventh from the top and you gain 7 life." });
 const pact = card("Tainted Pact", "Instant", "{1}{B}", { oracleText: "Exile the top card of your library. You may put that card into your hand unless it has the same name as another card exiled this way. Repeat this process until you put a card into your hand or you exile two cards with the same name, whichever comes first." });
 const temptDiscovery = card("Tempt with Discovery", "Sorcery", "{3}{G}", { keywords: ["Tempting offer"], oracleText: "Tempting offer — Search your library for a land card and put it onto the battlefield. Each opponent may search their library for a land card and put it onto the battlefield. For each opponent who searches a library this way, search your library for a land card and put it onto the battlefield. Then each player who searched a library this way shuffles." });
+const loot = card("Loot, Exuberant Explorer", "Legendary Creature — Beast Noble", "{2}{G}", { power: "1", toughness: "4", oracleText: "You may play an additional land on each of your turns.\n{4}{G}{G}, {T}: Look at the top six cards of your library. You may reveal a creature card with mana value less than or equal to the number of lands you control from among them and put it onto the battlefield. Put the rest on the bottom in a random order." });
 const giant = card("Big Giant", "Creature — Giant", "{6}{R}{R}", { power: "8", toughness: "8" });
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -42,7 +43,7 @@ const tapFor = (s: GameState, pid: number, id: string, mana: ManaType): Action =
 
 describe("round 97, more cards", () => {
   it("parse", () => {
-    supported(bloodghast, omniscience, monument, cagedSun, vesuva, flux, iteration, coat, narset, cutDeal, approach, pact, temptDiscovery);
+    supported(bloodghast, omniscience, monument, cagedSun, vesuva, flux, iteration, coat, narset, cutDeal, approach, pact, temptDiscovery, loot);
     expect(compileCard(omniscience).castFromHandFree).toBe(true);
   });
 
@@ -268,5 +269,28 @@ describe("round 97, more cards", () => {
       else s = act(s, { type: "passPriority", player: waitingOn(s)! });
     }
     expect([ap, ...opps].map((p) => lands(s, p))).toEqual([before[0]! + 2, before[1]! + 1, before[2], before[3]]);
+  });
+
+  it("Loot: a creature card with mana value up to the number of lands you control, from the top six", () => {
+    const { s: s0, ap } = setup([]);
+    const l = putOnBattlefield(s0, ap, loot);
+    const onTop = (def: CardDef) => {
+      const id = putOnBattlefield(s0, ap, def);
+      s0.battlefield.splice(s0.battlefield.indexOf(id), 1);
+      s0.objects[id]!.zone = "library";
+      s0.players[ap]!.library.unshift(id);
+      return id;
+    };
+    const huge = onTop(card("Huge Thing", "Creature — Beast", "{15}", { power: "15", toughness: "15", cmc: 15 }));
+    const small = onTop(bear({ name: "Small Bear" }));
+    let s = activate(s0, ap, l, 0);
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", min: 0, max: 1 });
+    const cards = (s.pending as { cards: string[] }).cards;
+    expect(cards).toContain(small);
+    expect(cards).not.toContain(huge);
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: [small] }));
+    expect(s.objects[small]!.zone).toBe("battlefield");
+    expect(s.objects[huge]!.zone).toBe("library");
+    expect(s.players[ap]!.library.slice(-5)).toContain(huge);
   });
 });

@@ -17,6 +17,7 @@ import {
   attackProblem,
   attackTax,
   attackTaxOf,
+  attackYouLimit,
   combatLimit,
   attackTaxPer,
   blockProblem,
@@ -3564,6 +3565,21 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   if (declared.length > cap) {
     const must = (a: { attacker: string }) => (characteristics(s, obj(s, a.attacker)).attacksIfAble ? 1 : 0);
     declared = [...declared].sort((a, b) => must(b) - must(a) || power(s, obj(s, b.attacker)) - power(s, obj(s, a.attacker))).slice(0, cap);
+  }
+  // Crawlspace: no more than its limit at that player; the ones that have to attack and the strongest stay, the rest go at
+  // another opponent with room, or stay home.
+  for (const d of opps) {
+    const room = attackYouLimit(s, d);
+    const at = declared.filter((a) => a.defender === d && a.planeswalker === undefined);
+    if (at.length <= room) continue;
+    const must = (a: { attacker: string }) => (characteristics(s, obj(s, a.attacker)).attacksIfAble ? 1 : 0);
+    const extra = [...at].sort((a, b) => must(b) - must(a) || power(s, obj(s, b.attacker)) - power(s, obj(s, a.attacker))).slice(room);
+    declared = declared.flatMap((a) => {
+      if (!extra.includes(a)) return [a];
+      const o = obj(s, a.attacker);
+      const other = opps.find((x) => x !== d && !attackProblem(s, o, x) && !attackTaxPer(s, x) && declared.filter((y) => y.defender === x && y.planeswalker === undefined).length < attackYouLimit(s, x));
+      return other === undefined ? [] : [{ attacker: a.attacker, defender: other }];
+    });
   }
   // Ghostly Prison: pay what attacking costs if we can (CR 508.1g-i); otherwise send the weakest taxed attacker at
   // someone it costs nothing to attack, or keep it home. Nothing obliges paying for a requirement (CR 508.1d).

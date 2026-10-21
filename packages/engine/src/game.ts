@@ -5900,6 +5900,17 @@ export function combatLimit(s: GameState, what: "attack" | "block"): number {
   return n;
 }
 
+/** Crawlspace: the most creatures that can attack this player (not their planeswalkers) each combat; Infinity with no such rule. */
+export function attackYouLimit(s: GameState, defender: PlayerId): number {
+  let n = Infinity;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    const m = abilitiesOf(s, o).combatLimit?.attackYou;
+    if (m !== undefined && controllerOf(s, o) === defender) n = Math.min(n, m);
+  }
+  return n;
+}
+
 function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId; defender: PlayerId; planeswalker?: ObjectId }[]) {
   if (s.pending?.kind !== "declareAttackers" || s.pending.player !== p.id) throw new RulesError("not declaring attackers now");
   const legal = new Set(potentialAttackers(s, p.id).map((o) => o.id));
@@ -5923,7 +5934,15 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   // Requirements (CR 508.1d): every creature that "attacks each combat if able" and can attack has to,
   // unless that would break a restriction: one that can't attack alone needn't attack by itself.
   // A requirement that would need a cost paid to obey (Ghostly Prison) doesn't oblige anyone to pay it (CR 508.1d).
-  const free = (o: GameObject, d: PlayerId) => !attackProblem(s, o, d) && !attackTaxPer(s, d);
+  // "No more than two creatures can attack you each combat" (Crawlspace): a restriction too (CR 508.1c); a player whose
+  // limit the others already fill can't be attacked by one more.
+  const atPlayer = (d: PlayerId, not?: ObjectId) => attacks.filter((a) => a.defender === d && a.planeswalker === undefined && a.attacker !== not).length;
+  const youLimits = new Map(opps.map((d) => [d, attackYouLimit(s, d)] as const));
+  for (const d of opps) {
+    const cap = youLimits.get(d)!;
+    if (atPlayer(d) > cap) throw new RulesError(`no more than ${cap === 1 ? "one creature" : `${cap} creatures`} can attack ${player(s, d).name} each combat`);
+  }
+  const free = (o: GameObject, d: PlayerId) => !attackProblem(s, o, d) && !attackTaxPer(s, d) && atPlayer(d, o.id) < youLimits.get(d)!;
   // "No more than one creature can attack each combat" (Silent Arbiter): a restriction, which requirements can't break;
   // as many of the creatures that have to attack as the limit allows do (CR 508.1c-d).
   const limit = combatLimit(s, "attack");

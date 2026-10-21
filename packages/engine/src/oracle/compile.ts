@@ -1751,9 +1751,9 @@ export function compile(d: CardDef): CompiledCard {
       out.boastTwice = true;
       continue;
     }
-    const combatCap = /^No more than (one|two) creatures? can (attack|block) each combat\.$/.exec(line);
-    if (combatCap) {
-      (out.combatLimit ??= {})[combatCap[2] as "attack" | "block"] = combatCap[1] === "one" ? 1 : 2;
+    const combatCap = /^No more than (one|two) creatures? can (attack|block)( you)? each combat\.$/.exec(line);
+    if (combatCap && !(combatCap[3] && combatCap[2] === "block")) {
+      (out.combatLimit ??= {})[combatCap[3] ? "attackYou" : (combatCap[2] as "attack" | "block")] = combatCap[1] === "one" ? 1 : 2;
       continue;
     }
     if (line === "Each opponent can cast spells only any time they could cast a sorcery.") {

@@ -1,10 +1,10 @@
 // Round 102: Ad Nauseam ("you may repeat this process any number of times": decided after each card, rulings; life can
 // go to 0 or less meanwhile, the loss waits for state-based actions, CR 704.3, 704.5a). Scroll Rack (cards from the
 // hand traded for as many from the top of the library, not drawn: rulings). Thousand-Year Storm (a copy for each
-// instant and sorcery spell you cast before it this turn).
+// instant and sorcery spell you cast before it this turn). Crawlspace (no more than two creatures can attack you).
 
 import { describe, expect, it } from "vitest";
-import { act, card, putOnBattlefield, setup } from "./helpers";
+import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
 import { defOf, isFullySupported, planActivate, planCast, waitingOn, type GameState } from "../src";
 import { defMv } from "../src/faces";
 
@@ -17,6 +17,8 @@ const sage = card("Sage of Lat-Nam Test", "Creature — Human", "{1}{U}", { powe
 const storm = card("Thousand-Year Storm", "Enchantment", "{4}{U}{R}", { oracleText: "Whenever you cast an instant or sorcery spell, copy it for each other instant and sorcery spell you've cast before it this turn. You may choose new targets for the copies." });
 const bolt = card("Lightning Bolt", "Instant", "{R}", { oracleText: "Lightning Bolt deals 3 damage to any target." });
 const grizzly = card("Runeclaw Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" });
+
+const crawlspace = card("Crawlspace", "Artifact", "{3}", { oracleText: "No more than two creatures can attack you each combat." });
 
 const pass = (s: GameState) => act(s, { type: "passPriority", player: waitingOn(s)! });
 const settle = (s: GameState) => {
@@ -114,5 +116,20 @@ describe("round 102: Thousand-Year Storm", () => {
     expect(life()).toBe(31); // itself and one copy
     castIt(ids[3]!, [face]);
     expect(life()).toBe(22); // itself and two copies
+  });
+});
+
+describe("round 102: Crawlspace", () => {
+  it("parse", () => expect(isFullySupported(crawlspace)).toBe(true));
+
+  it("no more than two creatures attack its controller; others may attack someone else", () => {
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, opp, crawlspace);
+    const bs = [1, 2, 3].map(() => putOnBattlefield(s0, ap, bear()));
+    const third = s0.turnOrder.find((p) => p !== ap && p !== opp)!;
+    const s = passUntil(s0, "declareAttackers", ap);
+    expect(() => act(s, { type: "declareAttackers", player: ap, attacks: bs.map((b) => ({ attacker: b, defender: opp })) })).toThrow(/no more than 2 creatures can attack/);
+    const ok = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: bs[0]!, defender: opp }, { attacker: bs[1]!, defender: opp }, { attacker: bs[2]!, defender: third }] });
+    expect(bs.map((b) => ok.objects[b]!.attacking)).toEqual([opp, opp, third]);
   });
 });

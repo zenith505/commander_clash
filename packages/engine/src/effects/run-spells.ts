@@ -592,7 +592,15 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (e.exileSpell) {
         for (let k = e.index; k < e.index + (e.n ?? 1); k++) {
           const t = ctx.targets[k];
-          if (ctx.legal[k] && t?.kind === "stack") counterOnStack(s, ctx, t.id, src, undefined, "exile", true);
+          if (!ctx.legal[k] || t?.kind !== "stack") continue;
+          const item = s.stack.find((x) => x.id === t.id);
+          const o = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
+          counterOnStack(s, ctx, t.id, src, undefined, "exile", true);
+          // It becomes plotted (CR 702.170c-d): its owner may cast it on a later turn, if it's still that card in exile.
+          if (e.plot && o && s.objects[o.id] === o && o.zone === "exile") {
+            o.mayPlay = { player: o.owner, zc: o.zoneChanges ?? 0, until: "plot", turn: s.turn };
+            log(s, `${defOf(s, o).name} becomes plotted: ${player(s, o.owner).name} may cast it without paying its mana cost on a later turn.`);
+          }
         }
         return;
       }

@@ -920,6 +920,14 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const last = effects[effects.length - 1];
     ctx.afterMill = last?.type === "mill" && last.who.ref === "you";
     if (last?.type === "discard" && last.who.ref === "you" && last.n === 1) ctx.discardedOne = true;
+    // "Exile target spell. It becomes plotted." (Aven Interrupter, CR 702.170c): its owner may cast it from exile on a later
+    // turn without paying its mana cost.
+    if (/^It becomes plotted$/.test(s)) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "counterSpell" || !prev.exileSpell || prev.n !== undefined || ctx.targets[prev.index]?.many) return null;
+      prev.plot = true;
+      continue;
+    }
     // "Gain control of target spell. You may choose new targets for it." (Commandeer): after the change of control, so
     // its targets are chosen as its new controller's (rulings).
     if (/^You may choose new targets for it$/.test(s) && effects[effects.length - 1]?.type === "controlSpell") {

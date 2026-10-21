@@ -239,6 +239,9 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   text = text.replace(/^([A-Z][a-z]+) spells and ([A-Za-z]+) spells(?= )/, "$1 and $2 spells");
   const ofChosen = / of the chosen type costs? \{/.test(text);
   if (ofChosen) text = text.replace(/ of the chosen type(?= costs? \{)/, "");
+  // "Spells your opponents cast from graveyards or from exile cost {2} more to cast" (Aven Interrupter).
+  const zones = / from (graveyards or from exile|graveyards|exile)(?= costs? \{)/.exec(text);
+  if (zones) text = text.slice(0, zones.index) + text.slice(zones.index + zones[0].length);
   m = /^(?:(During your turn|During turns other than yours), )?(.+?)( you cast| your opponents cast)?( with (?:mana value|power) \d+ or (?:greater|less))?( from your graveyard)? costs? (\{\d+\}) (less|more) to cast$/.exec(text);
   if (!m || !/spells?$/i.test(m[2]!)) return null;
   const words = m[2]!.replace(/ ?spells?$/i, "").replace(/ and /g, " or ").trim();
@@ -249,7 +252,7 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   if (!parsed || parsed.kind !== "spell" || (pw && !parsed.types?.includes("Creature"))) return "fail";
   const filter: TargetSpec = pw ? { ...parsed, power: pw[2] === "greater" ? { min: Number(pw[1]) } : { max: Number(pw[1]) } } : parsed;
   const who = m[3] === " you cast" ? "you" : m[3] === " your opponents cast" ? "opponents" : "all";
-  if (m[5] && who !== "you") return "fail";
+  if ((m[5] && who !== "you") || (zones && (m[5] || !m[3]))) return "fail";
   const n = Number(/\d+/.exec(m[6]!)![0]) * (m[7] === "less" ? -1 : 1);
   return {
     costMod: {
@@ -258,6 +261,7 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
       n,
       ...(m[1] ? { turn: m[1] === "During your turn" ? "yours" : "notYours" } : {}),
       ...(m[5] ? { fromGraveyard: true } : {}),
+      ...(zones ? { fromZones: zones[1] === "exile" ? ["exile" as const] : zones[1] === "graveyards" ? ["graveyard" as const] : ["graveyard" as const, "exile" as const] } : {}),
       text: line,
     },
   };

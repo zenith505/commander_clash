@@ -16,7 +16,7 @@ import type { TargetSpec } from "./abilities";
 import { defOf } from "./cards";
 import { printedMatches } from "./effects/targeting";
 import { continueResolution } from "./effects/resolve";
-import { log, player } from "./game";
+import { continueDraws, log, player } from "./game";
 import { RulesError, type CardDef, type GameObject, type GameState, type ObjectId, type Player, type PlayerId } from "./types";
 
 const ORDER_WORDS =
@@ -124,7 +124,8 @@ export function orderLibrary(s: GameState, p: Player, order: ObjectId[]) {
   order.forEach((id, i) => (lib[slots[i]!] = id));
   s.pending = null;
   log(s, `${p.name} puts ${order.length} cards ${pend.bottom ? "on the bottom of" : "on top of"} their library in the order they choose.`);
-  if (s.resolving) continueResolution(s);
+  if (pend.thenDraw) continueDraws(s, p.id, pend.thenDraw.left, pend.thenDraw.after, pend.thenDraw.made);
+  else if (s.resolving) continueResolution(s);
 }
 
 /**

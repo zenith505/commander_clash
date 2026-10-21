@@ -4136,7 +4136,12 @@ function Controls({
     return (
       <div className="controls">
         <span>
-          <strong>Dredge:</strong> {pending.archive ? "Alhammarret's Archive would make this draw two cards. Dredge first instead, milling to return a card from your graveyard to your hand?" : "draw a card, or mill instead to return a card from your graveyard to your hand?"}
+          <strong>{options.length ? "Dredge" : pending.abundance}:</strong>{" "}
+          {pending.archive && options.length
+            ? "Alhammarret's Archive would make this draw two cards. Dredge first instead, milling to return a card from your graveyard to your hand?"
+            : options.length
+              ? "draw a card, or mill instead to return a card from your graveyard to your hand?"
+              : "draw a card, or instead reveal cards from the top of your library until a land or nonland card and put it into your hand?"}
           {pending.left > 1 ? ` (${pending.left} draws left)` : ""}
         </span>
         {options.map((id) => {
@@ -4147,6 +4152,12 @@ function Controls({
             </button>
           );
         })}
+        {pending.abundance &&
+          (["land", "nonland"] as const).map((kind) => (
+            <button key={kind} title={`${pending.abundance}: the other revealed cards go on the bottom of your library`} onClick={() => dispatch([{ type: "dredge", player: HUMAN, abundance: kind }])}>
+              Reveal until a {kind} card
+            </button>
+          ))}
         <button className="ghost" onClick={() => dispatch([{ type: "dredge", player: HUMAN }])}>
           {pending.archive ? "Draw two instead (Archive first)" : "Draw"}
         </button>

@@ -1072,6 +1072,8 @@ export type PendingDecision =
        * cards instead", rather than drawing.
        */
       archive?: number;
+      /** Abundance could replace this draw too (CR 616.1): the permanent's name; choosing land or nonland applies it. */
+      abundance?: string;
       after?: "drawStep";
     }
   /**
@@ -1127,7 +1129,7 @@ export type PendingDecision =
    * A merged permanent was put into its owner's library (CR 730.3a): its cards are `cards` there, top first, together on
    * top of the library or at the bottom, and the owner arranges them without revealing the order.
    */
-  | { kind: "orderLibrary"; player: PlayerId; cards: ObjectId[]; bottom?: true; source: string };
+  | { kind: "orderLibrary"; player: PlayerId; cards: ObjectId[]; bottom?: true; source: string; /** Abundance replaced a draw of several: the draws still to make once these are ordered (see `draw`). */ thenDraw?: { left: number; made: number[]; after?: "drawStep" } };
 
 export interface GameEvent {
   seq: number;
@@ -1902,7 +1904,7 @@ export type Action =
   /** Answer to assistCast: pay the rest of the cost and cast it, or `cancel` the cast (CR 733.1). */
   | { type: "finishAssistedCast"; player: PlayerId; cancel?: boolean }
   /** Answer to dredge: the card to dredge instead of drawing, or none to draw (CR 702.52a). */
-  | { type: "dredge"; player: PlayerId; objectId?: ObjectId }
+  | { type: "dredge"; player: PlayerId; objectId?: ObjectId; /** Abundance instead: reveal until a card of this kind. */ abundance?: "land" | "nonland" }
   /** Which of the cards looked at instead of drawing goes to the graveyard (Scion of Halaster). */
   | { type: "drawLook"; player: PlayerId; /** The card to put into the graveyard (none when fewer than two to look at). */ objectId?: ObjectId; /** Apply another replacement first (see the drawLook prompt). */ instead?: "archive" | { dredge: ObjectId } }
   /** Turn a face-down permanent face up by paying its morph or disguise cost: a special action (CR 116.2b, 702.37e). */

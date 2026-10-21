@@ -2110,6 +2110,8 @@ export type Effect =
       bounce?: true;
       /** "Exile any number of target spells" (Mindbreak Trap): not a counter either, so it exiles one that can't be countered (rulings). */
       exileSpell?: true;
+      /** "Exile target spell. It becomes plotted." (Aven Interrupter, CR 702.170c). */
+      plot?: true;
       /** "Any number of target spells": the targets from `index`, this many (see TargetSpec.many, expandMany). */
       n?: number;
       /** "Counter target spell if its mana value is X" (Disrupting Shoal): only then, checked as it resolves. */
@@ -3480,6 +3482,8 @@ export interface CostMod {
   turn?: "yours" | "notYours" | "notCasters";
   /** "Spells you cast from your graveyard". */
   fromGraveyard?: boolean;
+  /** "Spells your opponents cast from graveyards or from exile" (Aven Interrupter): only spells cast from these zones. */
+  fromZones?: ("graveyard" | "exile")[];
   /** "Spells you cast but don't own" (Gonti, Canny Acquisitor). */
   notOwned?: true;
   /** "The first creature spell you cast each turn", "the second spell you cast each turn": only the nth matching spell. */
@@ -3929,6 +3933,12 @@ export interface CompiledCard {
   lifeFloor?: number;
   /** "If you would draw a card except the first one you draw in each of your draw steps, draw two cards instead." */
   drawTwoInstead?: true;
+  /**
+   * Abundance: "If you would draw a card, you may instead choose land or nonland and reveal cards from the top of your
+   * library until you reveal a card of the chosen kind. Put that card into your hand and put all other cards revealed this
+   * way on the bottom of your library in any order." (CR 614.1a; each draw of several separately, rulings).
+   */
+  drawAbundance?: true;
   /** "If you would draw a card while your library has no cards in it, you win the game instead." (Laboratory Maniac, CR 614.1a) */
   drawEmptyWins?: true;
   /** "Your opponents can't cast spells from anywhere other than their hands." (Drannith Magistrate) */

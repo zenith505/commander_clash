@@ -148,6 +148,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "dredge") {
       // With an Alhammarret's Archive too, the Archive first: each of the two draws it makes can still be dredged.
       const pick = pend.archive ? undefined : chooseDredge(s, pid, pend.options);
+      if (!pick && pend.abundance && !pend.archive) {
+        // Abundance: a land while we're short of them, otherwise a spell. Always when the library is empty: revealing
+        // nothing doesn't lose the game the way drawing from it would (CR 704.5b).
+        const me = s.players[pid]!;
+        const lands = s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === pid && objIsType(s, s.objects[id]!, "Land")).length + me.hand.filter((id) => isType(defOf(s, s.objects[id]!), "Land")).length;
+        return [{ type: "dredge", player: pid, abundance: lands < 5 && me.library.length ? "land" : "nonland" }];
+      }
       return [{ type: "dredge", player: pid, ...(pick ? { objectId: pick } : {}) }];
     }
     // "You may collect evidence N": yes, with cards we don't need in the graveyard.

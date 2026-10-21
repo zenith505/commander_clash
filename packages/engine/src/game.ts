@@ -448,7 +448,7 @@ export function applyInPlace(s: GameState, action: Action): void {
       finishAssistedCast(s, p, action.cancel);
       break;
     case "dredge":
-      chooseDredge(s, p, action.objectId);
+      chooseDredge(s, p, action.objectId, action.abundance);
       break;
     case "drawLook":
       chooseDrawLook(s, p, action.objectId, action.instead);
@@ -1722,10 +1722,12 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", mad
       archives = archivesFor(s, pid);
     } else archives = made.shift()!;
     const options = dredgeOptions(s, pid);
-    if (options.length) {
+    // Abundance: "you may instead ..." for each draw (rulings), even with nothing left to draw.
+    const abundance = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawAbundance);
+    if (options.length || abundance) {
       // Dredge and an Archive could both replace this draw: the player picks which applies first (CR 616.1, Archive
       // ruling). Not dredging means the Archive's "draw two instead", which isn't optional.
-      s.pending = { kind: "dredge", player: pid, options, left: 1 + n + made.length, ...(made.length ? { made } : {}), ...(archives ? { archive: archives } : {}), ...(after ? { after } : {}) };
+      s.pending = { kind: "dredge", player: pid, options, left: 1 + n + made.length, ...(made.length ? { made } : {}), ...(archives ? { archive: archives } : {}), ...(abundance ? { abundance: nameOf(s, abundance) } : {}), ...(after ? { after } : {}) };
       return false;
     }
     if (archives) {
@@ -1948,12 +1950,48 @@ function dredgeInstead(s: GameState, p: Player, id: ObjectId) {
   log(s, `${p.name} dredges ${nameOf(s, id)} instead of drawing, milling ${n} card${n === 1 ? "" : "s"}.`);
 }
 
-function chooseDredge(s: GameState, p: Player, id?: ObjectId) {
+/**
+ * Abundance instead of a draw: reveal from the top until a land (or nonland) card, put it into the hand (not drawn,
+ * rulings), and the other revealed cards on the bottom in the order the player chooses (none found: all of them). Returns
+ * those other cards.
+ */
+function abundanceInstead(s: GameState, p: Player, kind: "land" | "nonland", source: string): ObjectId[] {
+  const i = p.library.findIndex((id) => isType(defOf(s, obj(s, id)), "Land") === (kind === "land"));
+  const seen = i < 0 ? [...p.library] : p.library.slice(0, i + 1);
+  log(s, `${p.name} chooses ${kind} and reveals ${seen.length ? seen.map((id) => nameOf(s, id)).join(", ") : "nothing"} instead of drawing (${source}).`);
+  const found = i < 0 ? undefined : seen[i];
+  if (found) {
+    moveObject(s, found, "hand");
+    log(s, `${p.name} puts ${nameOf(s, found)} into their hand.`);
+  } else log(s, `${p.name} reveals no ${kind} card.`);
+  const rest = seen.filter((id) => id !== found);
+  for (const id of rest) p.library.push(...p.library.splice(p.library.indexOf(id), 1));
+  return rest;
+}
+
+/** The draws left after one was replaced, then whatever was drawing: the draw step, or a resolving spell or ability. */
+export function continueDraws(s: GameState, pid: PlayerId, left: number, after: "drawStep" | undefined, made: number[]) {
+  if (!draw(s, pid, left, after, made)) return;
+  if (after === "drawStep") fireEvent(s, { type: "step", step: "draw", active: s.activePlayer });
+  else if (s.resolving) continueResolution(s);
+}
+
+function chooseDredge(s: GameState, p: Player, id?: ObjectId, abundance?: "land" | "nonland") {
   const pend = s.pending;
   if (pend?.kind !== "dredge" || pend.player !== p.id) throw new RulesError("no draw to replace");
   if (id !== undefined && !pend.options.includes(id)) throw new RulesError("that card can't be dredged");
+  if (abundance && (!pend.abundance || id !== undefined)) throw new RulesError("nothing lets you reveal instead");
   s.pending = null;
   const made = [...(pend.made ?? [])];
+  if (abundance) {
+    const rest = abundanceInstead(s, p, abundance, pend.abundance!);
+    const left = pend.left - 1 - (pend.made?.length ?? 0);
+    if (rest.length > 1) {
+      s.pending = { kind: "orderLibrary", player: p.id, cards: rest, bottom: true, source: pend.abundance!, thenDraw: { left, made, ...(pend.after ? { after: pend.after } : {}) } };
+      return;
+    }
+    return continueDraws(s, p.id, left, pend.after, made);
+  }
   if (id !== undefined) dredgeInstead(s, p, id);
   else if (pend.archive) {
     // The Archive first: two draws, which the other Archives and dredge can each still replace.
@@ -3439,6 +3477,7 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
       if (m.who === "you" ? pid !== c.controller : m.who === "opponents" ? pid === c.controller : m.who === "enchanted" ? src.attachedToPlayer !== pid : false) continue;
       if (m.turn === "notCasters" ? s.activePlayer === pid : m.turn && (s.activePlayer === c.controller) !== (m.turn === "yours")) continue;
       if (m.fromGraveyard && o.zone !== "graveyard") continue;
+      if (m.fromZones && !m.fromZones.includes(o.zone as "graveyard" | "exile")) continue;
       if (m.notOwned && o.owner === pid) continue;
       if (m.if && !staticConditionNow(s, m.if, src.id, c.controller)) continue;
       const { manaValue: range, power: pw, ...rest } = bindChosen(m.filter, src.chosen);

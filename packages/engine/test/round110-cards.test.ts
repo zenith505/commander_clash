@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
-import { characteristics, graveyardWays, isFullySupported, planActivate, planCast, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
+import { botActions, characteristics, graveyardWays, isFullySupported, planActivate, planCast, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const urabrask = scry("transform", [
@@ -58,6 +58,17 @@ const jill = scry("transform", [
     toughness: "5",
   },
 ]);
+const interrupter = card("Aven Interrupter", "Creature — Bird Rogue", "{1}{W}{W}", {
+  power: "2",
+  toughness: "2",
+  keywords: ["Flying", "Plot", "Flash"],
+  oracleText:
+    "Flash\nFlying\nWhen this creature enters, exile target spell. It becomes plotted. (Its owner may cast it as a sorcery on a later turn without paying its mana cost.)\nSpells your opponents cast from graveyards or from exile cost {2} more to cast.",
+});
+const abundance = card("Abundance", "Enchantment", "{2}{G}{G}", {
+  oracleText:
+    "If you would draw a card, you may instead choose land or nonland and reveal cards from the top of your library until you reveal a card of the chosen kind. Put that card into your hand and put all other cards revealed this way on the bottom of your library in any order.",
+});
 // Test cards.
 const shock = card("Test Shock", "Instant", "{R}", { oracleText: "Test Shock deals 2 damage to any target." });
 const ponder = card("Test Ponder", "Sorcery", "{U}", { oracleText: "Draw a card." });
@@ -244,6 +255,105 @@ describe("Jill, Shiva's Dominant", () => {
     s = settle(s);
     expect(s.objects[oppLand]!.tapped).toBe(true);
     expect(characteristics(s, s.objects[j]!).name).toBe("Jill, Shiva's Dominant");
+  });
+});
+
+describe("Aven Interrupter", () => {
+  it("exiles a spell, which becomes plotted: its owner casts it on a later turn for {0}, plus {2} for the Interrupter", () => {
+    supported(interrupter);
+    const { s: s0, ap, ids } = setup([relic]);
+    let s = s0;
+    const opp = next(s, ap);
+    const av = toZone(s, opp, interrupter, "hand");
+    for (let i = 0; i < 3; i++) putOnBattlefield(s, opp, card("Plains", "Basic Land — Plains"));
+    s = run(s, planCast(s, ap, ids[0]!));
+    s = act(s, { type: "passPriority", player: ap });
+    const spell = s.stack.at(-1)!;
+    s = run(s, planCast(s, opp, av));
+    for (let i = 0; i < 10 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending?.kind).toBe("chooseTargets");
+    s = settle(act(s, { type: "chooseTargets", player: opp, targets: [{ kind: "stack", id: spell.id }] }));
+    const r = s.objects[ids[0]!]!;
+    expect(r.zone).toBe("exile");
+    expect(r.mayPlay).toMatchObject({ player: ap, until: "plot" });
+    // Not this turn (CR 702.170d).
+    expect(planCast(s, ap, ids[0]!)).toBeNull();
+    s = passUntil(s, "main1", next(s, next(s, next(s, ap))));
+    s = passUntil(s, "main1", ap);
+    // Free, but {2} more for a spell an opponent of the Interrupter's controller casts from exile.
+    for (const id of s.battlefield) if (s.objects[id]!.controller === ap) s.objects[id]!.tapped = true;
+    expect(planCast(s, ap, ids[0]!)).toBeNull();
+    for (const id of s.battlefield.filter((x) => s.objects[x]!.controller === ap).slice(0, 2)) s.objects[id]!.tapped = false;
+    s = settle(run(s, planCast(s, ap, ids[0]!)));
+    expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
+  });
+});
+
+describe("Abundance", () => {
+  const draw2 = card("Test Divination", "Sorcery", "{0}", { oracleText: "Draw two cards." });
+  const spellA = card("Spell A", "Sorcery", "{1}");
+  const spellB = card("Spell B", "Sorcery", "{2}");
+  const land = card("Test Wastes", "Land");
+  /** Abundance in play, `top` on top of the library (first = top), and a draw spell in hand. */
+  const table = (top: CardDef[], spell = draw2) => {
+    const { s, ap } = setup([]);
+    putOnBattlefield(s, ap, abundance);
+    const ids = [...top].reverse().map((d) => toZone(s, ap, d, "library")).reverse();
+    return { s, ap, ids, spell: toZone(s, ap, spell, "hand") };
+  };
+
+  it("replaces each draw separately: reveal until a land, the others go to the bottom in your order, then the next draw", () => {
+    supported(abundance);
+    const { s: s0, ap, ids, spell } = table([spellA, spellB, land, spellA]);
+    const [a, b, l, a2] = ids as [string, string, string, string];
+    let s = settle(run(s0, planCast(s0, ap, spell)));
+    expect(s.pending).toMatchObject({ kind: "dredge", player: ap, abundance: "Abundance", left: 2 });
+    s = act(s, { type: "dredge", player: ap, abundance: "land" });
+    expect(s.objects[l]!.zone).toBe("hand");
+    // Put into the hand, not drawn (rulings).
+    expect(s.objects[l]!.drawn).toBeUndefined();
+    expect(s.pending).toMatchObject({ kind: "orderLibrary", player: ap, bottom: true, cards: [a, b] });
+    s = act(s, { type: "orderLibrary", player: ap, order: [b, a] });
+    expect(s.players[ap]!.library.slice(-2)).toEqual([b, a]);
+    // The second draw: draw it normally.
+    expect(s.pending).toMatchObject({ kind: "dredge", player: ap, left: 1 });
+    s = settle(act(s, { type: "dredge", player: ap }));
+    expect(s.objects[a2]!.zone).toBe("hand");
+    expect(s.objects[spell]!.zone).toBe("graveyard");
+    expect(s.pending).toBeNull();
+  });
+
+  it("nonland: the first card is already one, so nothing to order", () => {
+    const { s: s0, ap, ids, spell } = table([spellA, land], card("Test Opt", "Instant", "{0}", { oracleText: "Draw a card." }));
+    let s = settle(run(s0, planCast(s0, ap, spell)));
+    s = settle(act(s, { type: "dredge", player: ap, abundance: "nonland" }));
+    expect(s.objects[ids[0]!]!.zone).toBe("hand");
+    expect(s.players[ap]!.library[0]).toBe(ids[1]);
+    expect(s.pending).toBeNull();
+  });
+
+  it("with an empty library it saves you from losing: there's no draw (rulings)", () => {
+    const { s: s0, ap, spell } = table([], card("Test Opt", "Instant", "{0}", { oracleText: "Draw a card." }));
+    for (const id of s0.players[ap]!.library) s0.objects[id]!.zone = "exile";
+    s0.players[ap]!.exile.push(...s0.players[ap]!.library);
+    s0.players[ap]!.library = [];
+    let s = settle(run(s0, planCast(s0, ap, spell)));
+    expect(s.pending).toMatchObject({ kind: "dredge", abundance: "Abundance" });
+    s = settle(act(s, { type: "dredge", player: ap, abundance: "land" }));
+    s = passUntil(s, "main1", next(s, ap));
+    expect(s.players[ap]!.lost).toBeFalsy();
+  });
+
+  it("a bot short of lands reveals until a land, otherwise until a nonland card", () => {
+    const { s: s0, ap, spell } = table([spellA, land], card("Test Opt", "Instant", "{0}", { oracleText: "Draw a card." }));
+    const s = settle(run(s0, planCast(s0, ap, spell)));
+    const isLand = (id: string) => s.cards[s.objects[id]!.cardId]!.typeLine.includes("Land");
+    const lands = s.battlefield.filter((id) => s.objects[id]!.controller === ap && isLand(id));
+    expect(lands.length).toBeGreaterThanOrEqual(5);
+    expect(botActions(s, ap)).toEqual([{ type: "dredge", player: ap, abundance: "nonland" }]);
+    for (const id of lands.slice(2)) s.battlefield.splice(s.battlefield.indexOf(id), 1);
+    s.players[ap]!.hand = s.players[ap]!.hand.filter((id) => !isLand(id));
+    expect(botActions(s, ap)).toEqual([{ type: "dredge", player: ap, abundance: "land" }]);
   });
 });
 

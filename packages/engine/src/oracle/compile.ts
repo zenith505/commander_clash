@@ -1095,6 +1095,19 @@ export function compile(d: CardDef): CompiledCard {
       else out.unsupported.push(raw);
       continue;
     }
+    // Multiversal Passage: "As this land enters, choose a basic land type. Then you may pay 2 life. If you don't, it enters
+    // tapped." (CR 614.12) The choice is kept as Chosen.landType; then "This land is the chosen type." gives it that type,
+    // and with it the type's mana ability (CR 305.6). It has no land type to lose, so the type is added.
+    const landTypeChoice = /^As ~ enters, choose a basic land type\. Then (you may pay \d+ life\. If you don't, it enters tapped\.)$/.exec(line);
+    if (landTypeChoice && !out.entersTappedChoice && !out.entersChoose?.length && d.types.includes("Land") && !d.subtypes.length) {
+      out.entersChoose = [{ what: "basicLandType" }];
+      out.entersTappedChoice = parseEntersChoice(`As ~ enters, ${landTypeChoice[1]}`)!;
+      continue;
+    }
+    if (line === "~ is the chosen type." && out.entersChoose?.some((c) => c.what === "basicLandType")) {
+      out.statics.push({ affects: { kind: "self" }, mods: [{ kind: "addTypes", types: [], subtypes: [], chosenLandType: true }], text: raw });
+      continue;
+    }
     const choice = parseEntersChoice(line);
     if (choice) {
       out.entersTappedChoice = choice;

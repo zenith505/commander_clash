@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passAll, passUntil, putOnBattlefield, setup, swamp } from "./helpers";
-import { botActions, planActivate, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { botActions, characteristics, compileCard, isFullySupported, manaAbilitiesOn, planActivate, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const gix = card("Gix, Yawgmoth Praetor", "Legendary Creature — Phyrexian Praetor", "{1}{B}{B}", {
@@ -14,6 +14,9 @@ const gix = card("Gix, Yawgmoth Praetor", "Legendary Creature — Phyrexian Prae
 });
 const shockland = card("Blood Crypt", "Land — Swamp Mountain", "", {
   oracleText: "({T}: Add {B} or {R}.)\nAs Blood Crypt enters, you may pay 2 life. If you don't, it enters tapped.",
+});
+const passage = card("Multiversal Passage", "Land", "", {
+  oracleText: "As this land enters, choose a basic land type. Then you may pay 2 life. If you don't, it enters tapped.\nThis land is the chosen type.",
 });
 const big = (name: string) => card(name, "Creature — Giant", "{20}", { power: "9", toughness: "9" });
 
@@ -95,5 +98,45 @@ describe("bots and Gix, Yawgmoth Praetor", () => {
     for (let i = 0; i < 5 && s.pending; i++) for (const a of botActions(s, waitingOn(s)!)) s = act(s, a);
     expect(s.objects[land]!).toMatchObject({ zone: "battlefield", tapped: true });
     expect(s.players[ap]!.life).toBe(10);
+  });
+});
+
+describe("Multiversal Passage", () => {
+  it("parse", () => {
+    expect(isFullySupported(passage)).toBe(true);
+    expect(compileCard(passage)).toMatchObject({ entersChoose: [{ what: "basicLandType" }], entersTappedChoice: { kind: "payLife", n: 2 } });
+  });
+
+  it("pay 2 life: untapped, the chosen type, and it taps for that type's mana", () => {
+    const { s: s0, ap, ids } = setup([passage]);
+    let s = act(s0, { type: "playLand", player: ap, objectId: ids[0]!, untapped: true });
+    expect(s.pending).toMatchObject({ kind: "chooseOption", player: ap });
+    expect((s.pending as { options: string[] }).options).toEqual(["Plains", "Island", "Swamp", "Mountain", "Forest"]);
+    s = act(s, { type: "chooseOption", player: ap, choice: "Island" });
+    const o = s.objects[ids[0]!]!;
+    expect(o).toMatchObject({ zone: "battlefield", tapped: false });
+    expect(s.players[ap]!.life).toBe(38);
+    expect(characteristics(s, o).subtypes).toEqual(["Island"]);
+    expect(manaAbilitiesOn(s, o).map((m) => m.produces)).toEqual([{ kind: "fixed", mana: ["U"] }]);
+  });
+
+  it("don't pay: tapped", () => {
+    const { s: s0, ap, ids } = setup([passage]);
+    let s = act(s0, { type: "playLand", player: ap, objectId: ids[0]! });
+    s = act(s, { type: "chooseOption", player: ap, choice: "Forest" });
+    expect(s.objects[ids[0]!]).toMatchObject({ zone: "battlefield", tapped: true });
+    expect(s.players[ap]!.life).toBe(40);
+    expect(characteristics(s, s.objects[ids[0]!]!).subtypes).toEqual(["Forest"]);
+  });
+
+  it("a bot picks a type and plays it", () => {
+    const { s: s0, ap, ids } = setup([passage]);
+    onlyInHand(s0, ap, ids);
+    const acts = botActions(s0, ap);
+    expect(acts).toMatchObject([{ type: "playLand", objectId: ids[0] }]);
+    let s = act(s0, acts[0]!);
+    for (let i = 0; i < 4 && s.pending; i++) for (const a of botActions(s, waitingOn(s)!)) s = act(s, a);
+    expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
+    expect(characteristics(s, s.objects[ids[0]!]!).subtypes).toHaveLength(1);
   });
 });

@@ -1489,6 +1489,8 @@ export interface GameState {
    * their combat damage as though they weren't blocked, and those creatures (CR 510.1).
    */
   unblockedChoice?: { turn: number; step: Step; asked: PlayerId[]; ids: ObjectId[] };
+  /** "Can't block with more than one creature this combat" (Mirri, Weatherlight Duelist): each player's limit, until the end of combat step ends. */
+  blockLimits?: { player: PlayerId; n: number }[];
   /** Attackers just declared, waiting on their enlist choices (CR 508.1g) before "whenever ~ attacks" triggers. */
   declaring?: { ids: ObjectId[]; /** Bands can still be declared (CR 508.1e). */ bands: boolean; enlist: ObjectId[]; enlisted: [ObjectId, ObjectId][]; /** Attackers that may still be exerted (CR 701.43d), and those that were. */ exert?: ObjectId[]; exerted?: ObjectId[] };
   pending: PendingDecision | null;

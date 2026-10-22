@@ -326,6 +326,15 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       return;
     }
+    case "blockLimitThisCombat": {
+      // Until this combat ends (CR 511.3); outside combat there's no combat for it to apply to.
+      if (!["beginCombat", "declareAttackers", "declareBlockers", "firstStrikeDamage", "combatDamage", "endCombat"].includes(s.step)) return;
+      for (const pid of players(s, e.who, ctx)) {
+        (s.blockLimits ??= []).push({ player: pid, n: e.n });
+        log(s, `${player(s, pid).name} can't block with more than ${e.n === 1 ? "one creature" : `${e.n} creatures`} this combat.`);
+      }
+      return;
+    }
     case "proliferate": {
       const times = proliferateTimes(s, ctx.controller, e.twice ? 2 : 1);
       if (!e.thenPhaseOut) {

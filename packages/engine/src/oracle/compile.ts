@@ -1998,6 +1998,11 @@ export function compile(d: CardDef): CompiledCard {
       (out.combatLimit ??= {})[combatCap[3] === " you" ? "attackYou" : combatCap[3] ? "attackSelf" : (combatCap[2] as "attack" | "block")] = combatCap[1] === "one" ? 1 : 2;
       continue;
     }
+    // Mirri, Weatherlight Duelist: only while it's tapped (CR 508.1c).
+    if (line === "As long as ~ is tapped, no more than one creature can attack you each combat.") {
+      (out.combatLimit ??= {}).attackYouIfTapped = 1;
+      continue;
+    }
     if (line === "Each opponent can cast spells only any time they could cast a sorcery.") {
       out.opponentsSorceryTiming = true;
       continue;

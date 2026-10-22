@@ -663,6 +663,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "Target creature can't block this turn", "~ can't attack or block this turn", "~ can't be blocked this
   // turn": until the turn ends.
   // "Target creature can't attack until your next turn" ends as your next turn begins (CR 611.2b).
+  // Mirri, Weatherlight Duelist: "Each opponent can't block with more than one creature this combat" (CR 509.1b).
+  if (/^[Ee]ach opponent can't block with more than one creature this combat$/.test(s)) return [{ type: "blockLimitThisCombat", who: { ref: "eachOpponent" }, n: 1 }];
   if ((m = /^Creatures( without flying)? can't block this turn$/.exec(s))) {
     const filter = parseTargetPhrase(m[1] ? "creature without flying" : "creature");
     return filter?.kind === "object" ? [{ type: "cantBlockRule", filter: { ...filter, text: m[1] ? "creatures without flying" : "creatures" } }] : null;

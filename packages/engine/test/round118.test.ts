@@ -741,3 +741,48 @@ describe("Teferi's Time Twist", () => {
       expect(s.objects[t]!.counters["+1/+1"] ?? 0).toBe(creature ? 1 : 0);
     });
 });
+
+const mirri = card("Mirri, Weatherlight Duelist", "Legendary Creature — Cat Warrior", "{1}{G}{W}", {
+  power: "3",
+  toughness: "2",
+  keywords: ["First strike"],
+  oracleText:
+    "First strike\nWhenever Mirri attacks, each opponent can't block with more than one creature this combat.\nAs long as Mirri is tapped, no more than one creature can attack you each combat.",
+});
+
+describe("Mirri, Weatherlight Duelist", () => {
+  it("when it attacks, each opponent can block with only one creature this combat", () => {
+    expect(isFullySupported(mirri)).toBe(true);
+    const { s: s0, ap, opp } = setup([]);
+    let s = s0;
+    const m = putOnBattlefield(s, ap, mirri);
+    const b = putOnBattlefield(s, ap, bear());
+    const [x, y] = [0, 1].map(() => putOnBattlefield(s, opp, bear({ name: "Wall Bear", power: "0", toughness: "5" })));
+    s = passUntil(s, "declareAttackers", ap);
+    s = settle(act(s, { type: "declareAttackers", player: ap, attacks: [m, b].map((attacker) => ({ attacker, defender: opp })) }));
+    for (let i = 0; i < 20 && !(s.pending?.kind === "declareBlockers" && s.pending.player === opp); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(() => act(s, { type: "declareBlockers", player: opp, blocks: [{ blocker: x!, attacker: m }, { blocker: y!, attacker: b }] })).toThrow(/more than one creature/);
+    // A bot obeys it too.
+    const bot = botActions(s, opp).find((a) => a.type === "declareBlockers");
+    expect(bot?.type === "declareBlockers" && new Set(bot.blocks.map((x) => x.blocker)).size).toBeLessThanOrEqual(1);
+    s = act(s, { type: "declareBlockers", player: opp, blocks: [{ blocker: x!, attacker: m }] });
+    expect(s.objects[x!]!.blocking).toEqual([m]);
+    // Gone after this combat.
+    s = passUntil(s, "main2", ap);
+    expect(s.blockLimits).toBeUndefined();
+  });
+
+  it("while it's tapped, no more than one creature can attack you each combat", () => {
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const m = putOnBattlefield(s, ap, mirri);
+    tapPermanent(s, s.objects[m]!);
+    const foe = later(s, ap, 1);
+    const ids = [0, 1].map(() => putOnBattlefield(s, foe, bear()));
+    s = passUntil(s, "declareAttackers", foe);
+    expect(s.objects[m]!.tapped).toBe(true);
+    expect(() => act(s, { type: "declareAttackers", player: foe, attacks: ids.map((attacker) => ({ attacker, defender: ap })) })).toThrow();
+    s = act(s, { type: "declareAttackers", player: foe, attacks: [{ attacker: ids[0]!, defender: ap }] });
+    expect(s.objects[ids[0]!]!.attacking).toBe(ap);
+  });
+});

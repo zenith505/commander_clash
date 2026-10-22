@@ -21,6 +21,7 @@ import {
   attackTaxOf,
   attackYouLimit,
   combatLimit,
+  playerBlockLimit,
   attackTaxPer,
   blockProblem,
   blockRequirementProblem,
@@ -4204,7 +4205,8 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
   }
   // "No more than one creature can block each combat" (Silent Arbiter): the first blockers chosen (requirements came
   // first), then none on an attacker left with too few to block it.
-  const cap = combatLimit(s, "block") - s.battlefield.filter((id) => obj(s, id).blocking !== undefined).length;
+  // Mirri, Weatherlight Duelist: this player's own limit this combat too.
+  const cap = Math.min(combatLimit(s, "block") - s.battlefield.filter((id) => obj(s, id).blocking !== undefined).length, playerBlockLimit(s, pid) - s.battlefield.filter((id) => obj(s, id).blocking !== undefined && controllerOf(s, obj(s, id)) === pid).length);
   const blockers = [...new Set(blocks.map((b) => b.blocker))];
   if (blockers.length > cap) {
     const kept = new Set(blockers.slice(0, Math.max(0, cap)));

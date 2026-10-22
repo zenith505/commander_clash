@@ -2152,6 +2152,7 @@ function advanceStep(s: GameState): void {
     for (const id of s.battlefield) if (obj(s, id).provokedBy?.turn === undefined) obj(s, id).provokedBy = undefined;
     for (const id of s.battlefield) obj(s, id).provokedAlso = undefined;
     s.unblockedChoice = undefined; // made for this combat's damage steps
+    s.blockLimits = undefined;
   }
   const next = STEP_ORDER[STEP_ORDER.indexOf(s.step) + 1]!;
   // Added phases come directly after the phase they were added after (CR 500.8); then the turn goes on as it would
@@ -6594,12 +6595,18 @@ export function combatLimit(s: GameState, what: "attack" | "block"): number {
   return n;
 }
 
+/** Mirri, Weatherlight Duelist: the most creatures this player can block with this combat; Infinity with no such limit. */
+export function playerBlockLimit(s: GameState, pid: PlayerId): number {
+  return Math.min(Infinity, ...(s.blockLimits ?? []).filter((l) => l.player === pid).map((l) => l.n));
+}
+
 /** Crawlspace: the most creatures that can attack this player (not their planeswalkers) each combat; Infinity with no such rule. */
 export function attackYouLimit(s: GameState, defender: PlayerId): number {
   let n = Infinity;
   for (const id of s.battlefield) {
     const o = obj(s, id);
-    const m = abilitiesOf(s, o).combatLimit?.attackYou;
+    const lim = abilitiesOf(s, o).combatLimit;
+    const m = lim?.attackYou ?? (lim?.attackYouIfTapped !== undefined && o.tapped ? lim.attackYouIfTapped : undefined);
     if (m !== undefined && controllerOf(s, o) === defender) n = Math.min(n, m);
   }
   return n;
@@ -6885,6 +6892,10 @@ function declareBlockers(s: GameState, chooser: Player, blocks: { blocker: Objec
   // (CR 509.1b). At the limit, a block that obeys a requirement obeys as many as can be (509.1c).
   const limit = combatLimit(s, "block");
   if (earlier + seen.size > limit) throw new RulesError(`no more than ${limit === 1 ? "one creature" : `${limit} creatures`} can block each combat`);
+  // Mirri, Weatherlight Duelist: this player's own blockers this combat (CR 509.1b).
+  const mineLimit = playerBlockLimit(s, p.id);
+  const mineEarlier = s.battlefield.filter((id) => obj(s, id).blocking !== undefined && controllerOf(s, obj(s, id)) === p.id).length;
+  if (mineEarlier + seen.size > mineLimit) throw new RulesError(`${p.name} can't block with more than ${mineLimit === 1 ? "one creature" : `${mineLimit} creatures`} this combat`);
   const obeys = (b: { blocker: ObjectId; attacker: ObjectId }) => {
     const at = characteristics(s, obj(s, b.attacker));
     return at.allMustBlock || at.mustBeBlocked || characteristics(s, obj(s, b.blocker)).mustBlock || provokersOf(s, obj(s, b.blocker)).some((x) => x.id === b.attacker);
@@ -6892,7 +6903,7 @@ function declareBlockers(s: GameState, chooser: Player, blocks: { blocker: Objec
   // When every block costs mana (Archangel of Tithes), no requirement makes a creature block: nothing obliges paying a
   // cost to block (CR 509.1c).
   const taxed = !!blockCost(s, 1);
-  const req = taxed || (earlier + seen.size >= limit && blocks.some(obeys)) ? null : blockRequirementProblem(s, p.id, blocks);
+  const req = taxed || ((earlier + seen.size >= limit || mineEarlier + seen.size >= mineLimit) && blocks.some(obeys)) ? null : blockRequirementProblem(s, p.id, blocks);
   if (req) throw new RulesError(req);
   // Block costs are totalled and paid, with mana abilities activated first (CR 509.1d-f).
   const tax = blockCost(s, seen.size);

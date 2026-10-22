@@ -784,6 +784,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "earthbend":
     case "mustBlockSource":
     case "cantBlockSource":
+    case "blockLimitThisCombat":
     case "phaseOut":
     case "proliferate":
     case "amass":

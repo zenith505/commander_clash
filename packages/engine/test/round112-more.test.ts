@@ -475,3 +475,21 @@ describe("Tome of Legends (whenever your commander enters or attacks)", () => {
     expect(pages()).toBe(start + 2);
   });
 });
+
+const dracogenesis = card("Dracogenesis", "Enchantment", "{6}{R}{R}", { oracleText: "You may cast Dragon spells without paying their mana costs." });
+
+describe("Dracogenesis", () => {
+  it("is supported", () => expect(isFullySupported(dracogenesis)).toBe(true));
+
+  it("Dragon spells can be cast without paying their mana costs; others can't", () => {
+    const { s: s0, ap, ids } = setup([card("Big Dragon", "Creature — Dragon", "{9}{R}{R}", { power: "9", toughness: "9" }), card("Big Giant", "Creature — Giant", "{9}{R}{R}", { power: "9", toughness: "9" })]);
+    putOnBattlefield(s0, ap, dracogenesis);
+    const free = { alt: "payZero" as const };
+    expect(castProblem(s0, ap, ids[0]!, undefined, undefined, undefined, undefined, undefined, free)).toBeNull();
+    expect(castProblem(s0, ap, ids[1]!, undefined, undefined, undefined, undefined, undefined, free)).not.toBeNull();
+    let s = s0;
+    for (const a of planCast(s, ap, ids[0]!, undefined, undefined, "auto", undefined, free)!) s = act(s, a);
+    s = passAll(s);
+    expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
+  });
+});

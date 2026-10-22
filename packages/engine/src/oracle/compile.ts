@@ -1496,7 +1496,9 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // As Foretold, Darksteel Monolith, Rooftop Storm: "pay {0} rather than pay the mana cost" for some spells (CR 118.9).
-    const payZero = /^(Once each turn, you|You) may pay \{0\} rather than pay the mana cost for (?:an? )?(.*?)spells? you cast( from your hand)?( with mana value X or less, where X is the number of ([a-z]+) counters on ~)?\.$/.exec(line);
+    // Dracogenesis: "You may cast Dragon spells without paying their mana costs": the same alternative cost of nothing,
+    // from wherever they may be cast (CR 118.9, 107.3b).
+    const payZero = /^(Once each turn, you|You) may pay \{0\} rather than pay the mana cost for (?:an? )?(.*?)spells? you cast( from your hand)?( with mana value X or less, where X is the number of ([a-z]+) counters on ~)?\.$/.exec(line.replace(/^You may cast ([A-Z][a-z]+) spells without paying their mana costs\.$/, "You may pay {0} rather than pay the mana cost for $1 spells you cast."));
     if (payZero) {
       const what = payZero[2]!.trim();
       const spec = what ? parseTargetPhrase(`${what} card from a graveyard`) : null;

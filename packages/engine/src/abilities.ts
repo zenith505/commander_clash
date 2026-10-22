@@ -307,6 +307,8 @@ export interface TargetSpec {
   transformed?: true;
   /** "Each with power greater than its base power" (Kutzil): see basePowerNow. */
   powerAboveBase?: true;
+  /** "With toughness greater than its power" (Fecund Greenshell): as it is now (as it enters, for an enters trigger). */
+  toughnessAbovePower?: true;
   /** Excluded card types, e.g. "nonland permanent" -> ["Land"]. */
   notTypes?: string[];
   /** Excluded colors, e.g. "nonblack creature" -> ["B"]. */
@@ -3200,6 +3202,8 @@ export interface TriggeredAbility {
   countersOrPlayer?: true;
   /** For "selfCountersPut": "when the twelfth hour counter is put on ~", only when the count goes from below this to at least it. */
   countersReach?: number;
+  /** "Whenever one or more counters are put on ~ for the first time each turn" (Danny Pink): the first time this turn, ability or not. */
+  countersFirstTime?: true;
   /** For "selfCountersPut": "whenever a +1/+1 counter is put on ~" (Fathom Mage), once for each counter. */
   countersEach?: true;
   /**
@@ -3918,7 +3922,7 @@ export type CountMod =
   | { what: "tokens"; who: "you"; op: "oneOfEach"; subtypes: string[] }
   /** "If one or more creature tokens would be created under your control, that many 4/4 white Angel creature tokens ... are created instead" (Divine Visitation): each token of card type `type` is a `token` instead. */
   | { what: "tokens"; who: "you"; op: "instead"; type: string; token: TokenSpec }
-  | { what: "counters"; counter?: CounterKind; on: "creature" | "permanent" | "artifactOrCreature"; who: "you" | "any"; op: "double" | "plusOne" | "minusOne"; other?: boolean }
+  | { what: "counters"; counter?: CounterKind; on: "creature" | "permanent" | "artifactOrCreature" | "creatureSpacecraftOrPlanet"; who: "you" | "any"; op: "double" | "plusOne" | "minusOne"; other?: boolean }
   /** "If you would get one or more counters, you get that many plus one of each of those kinds of counters instead" (Winding Constrictor): counters on its controller, whoever puts them. */
   | { what: "counters"; onPlayer: true; op: "plusOne" }
   /**

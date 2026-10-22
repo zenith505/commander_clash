@@ -803,6 +803,10 @@ export function parseTargetPhrase(
     extra.powerAboveBase = true;
     p = p.slice(0, m.index);
   }
+  if ((m = / with toughness greater than its power$/.exec(p))) {
+    extra.toughnessAbovePower = true;
+    p = p.slice(0, m.index);
+  }
   // "Creatures you control with power or toughness 1 or less" (Tetsuko Umezawa): either one (TargetSpec.anyOf).
   if ((m = / with power or toughness (\d+) or (greater|less)$/.exec(p)) && !extra.anyOf) {
     const r = m[2] === "greater" ? { min: Number(m[1]) } : { max: Number(m[1]) };

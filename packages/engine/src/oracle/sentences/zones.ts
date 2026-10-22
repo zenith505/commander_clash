@@ -553,6 +553,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (!spec || spec.kind !== "object") return null; // a permanent, not a spell or a card in a graveyard
     return [{ type: "putInLibrary", what, position: "ownersChoice" }];
   }
+  // Aetherspouts: "For each attacking creature, its owner puts it on their choice of the top or bottom of their library":
+  // one at a time, each owner choosing for each of theirs (their order among them being the order they're put there).
+  if (/^For each attacking creature, its owner puts it on their choice of the top or bottom of their library$/.test(s)) {
+    const what = parseObject("each attacking creature", ctx);
+    return what?.ref === "each" ? [{ type: "putInLibrary", what, position: "ownersChoice" }] : null;
+  }
   // "Put target creature into its owner's library second from the top" (Bury in Books), "third from the top" (Teferi,
   // Hero of Dominaria; Shattered Ego's "enchanted creature").
   if ((m = /^Put (target .+?|~|enchanted creature) into its owner's library (second|third) from the top$/i.exec(s)) && !/graveyard$/i.test(m[1]!)) {

@@ -262,6 +262,8 @@ export interface GameObject {
    * over (CR 400.7), and one that just left the battlefield still remembers (see onceUsed).
    */
   triggeredThisTurn?: string[];
+  /** When counters were last put on it (turn, and its zoneChanges then): "for the first time each turn". */
+  countersPutAt?: { turn: number; zc: number };
   /**
    * "Choose one that hasn't been chosen [this turn]" (Demonic Pact, Gala Greeters): the modes chosen so far for each such
    * ability of this object, keyed by the ability's text, with the turn for "this turn". Any player's choices count, and a

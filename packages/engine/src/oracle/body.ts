@@ -298,6 +298,10 @@ function parseRevealedIf(sentences0: string[], at: number, ctx: Ctx): { effect: 
   let otherwise = other ? revealedAction(other[1]!, ctx) : undefined;
   if (otherwise === null) return null;
   if (other) next++;
+  // Fecund Greenshell: "If it's a land card, you may put it onto the battlefield tapped. Otherwise, put it into your
+  // hand.": a land you choose not to put onto the battlefield goes to your hand too (rulings).
+  const mayPut = then.length === 1 && then[0]!.type === "may" && !then[0]!.otherwise && !then[0]!.pay && then[0]!.effects.length === 1 && then[0]!.effects[0]!.type === "putOntoBattlefield" ? then[0]! : null;
+  if (other && mayPut && otherwise && /^put it into your hand$/.test(other[1]!)) then[0] = { ...mayPut, otherwise: structuredClone(otherwise) };
   // "If it's a land card, you may put it onto the battlefield tapped. If you don't put the card onto the battlefield, put
   // it into your hand." (Risen Reef), "If you didn't put a card onto the battlefield this way, create ..." (Rulik Mons):
   // when it isn't one, or when you choose not to.
@@ -4655,6 +4659,12 @@ export function parseUnlessPays(text: string, ctx: Ctx): UnlessPays | null {
   if ((m = /^((?:\{(?:\d+|[WUBRGC])\})+)(?: and (\d+) life)?$/.exec(text))) return { cost: m[1]!, ...(m[2] ? { life: Number(m[2]) } : {}) };
   // "Pay 5 life" (Dash Hopes): only with that much life (CR 119.4).
   if ((m = /^(\d+) life$/.exec(text))) return { cost: "", life: Number(m[1]) };
+  // "Unless its controller pays mana equal to the greatest power among creatures you control" (Repulsive Mutation):
+  // generic mana, counted as it resolves.
+  if ((m = /^mana equal to (.+)$/.exec(text))) {
+    const n = parseCount(m[1]!, ctx);
+    return n && typeof n === "object" ? { cost: "", generic: n } : null;
+  }
   if ((m = /^\{(\d+)\} for each (.+)$/.exec(text))) {
     const per = parseCount(m[2]!, ctx, true);
     const generic = per && scaleAmount(Number(m[1]), per);

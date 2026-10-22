@@ -879,7 +879,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const info = { amount: ev.amount };
     const after = o.counters[ev.counter] ?? 0;
     const reached = (t: TriggeredAbility) => t.countersReach === undefined || (after - ev.amount < t.countersReach && after >= t.countersReach);
-    add(o, controllerOf(s, o), (e, t) => e === "selfCountersPut" && !t.countersEach && kindOk(t, controllerOf(s, o)) && reached(t), undefined, undefined, undefined, undefined, undefined, undefined, info);
+    // "For the first time each turn": counters put on this object earlier this turn count, whatever had the ability then.
+    const zc = o.zoneChanges ?? 0;
+    const first = !(o.countersPutAt && o.countersPutAt.turn === s.turn && o.countersPutAt.zc === zc);
+    o.countersPutAt = { turn: s.turn, zc };
+    add(o, controllerOf(s, o), (e, t) => e === "selfCountersPut" && !t.countersEach && kindOk(t, controllerOf(s, o)) && reached(t) && (!t.countersFirstTime || first), undefined, undefined, undefined, undefined, undefined, undefined, info);
     // "Whenever a +1/+1 counter is put on ~" (Fathom Mage): once for each counter (rulings).
     for (let i = 0; i < ev.amount; i++) add(o, controllerOf(s, o), (e, t) => e === "selfCountersPut" && !!t.countersEach && kindOk(t, controllerOf(s, o)), undefined, undefined, undefined, undefined, undefined, undefined, { amount: 1 });
     // Chapter abilities: "if the number of lore counters on it was less than N and became at least N" (CR 714.2b).

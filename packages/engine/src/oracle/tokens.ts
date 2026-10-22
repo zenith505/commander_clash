@@ -141,6 +141,9 @@ export function parseCountMod(line: string): CountMod | undefined {
     return { what: "counters", putter: "you", op: "plusOne", putOn: "permanentYouControl" };
   if (line === "If an opponent would put one or more counters on a permanent or player, they put half that many of each of those kinds of counters on that permanent or player instead, rounded down.")
     return { what: "counters", putter: "opponent", op: "halfDown" };
+  // Loading Zone: any kind, on a creature, Spacecraft, or Planet (artifact subtypes, CR 205.3g).
+  if (line === "If one or more counters would be put on a creature, Spacecraft, or Planet you control, twice that many of each of those kinds of counters are put on it instead.")
+    return { what: "counters", on: "creatureSpacecraftOrPlanet", who: "you", op: "double" };
   m = /^If an effect would put one or more counters on a permanent you control, it puts twice that many of those counters on that permanent instead\.$/.exec(line);
   if (m) return { what: "counters", on: "permanent", who: "you", op: "double" };
   return undefined;

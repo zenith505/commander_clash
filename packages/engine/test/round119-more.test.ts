@@ -1,8 +1,9 @@
 // Round 119, more of the most played cards: Folio of Fancies, Price of Progress, Aura Mutation, Raise the Past, Sulfuric
-// Vortex, Kozilek's Unsealing, Heaped Harvest, Cyberman Patrol, Reyav, Emiel the Blessed, Urza's Bauble, Boseiju.
+// Vortex, Kozilek's Unsealing, Heaped Harvest, Cyberman Patrol, Reyav, Emiel the Blessed, Urza's Bauble, Boseiju,
+// Loading Zone, Fecund Greenshell, Repulsive Mutation, Aettir and Priwen, Danny Pink, Aetherspouts.
 
 import { describe, expect, it } from "vitest";
-import { act, activate, bear, card, cast, passUntil, putOnBattlefield, setup } from "./helpers";
+import { act, activate, bear, card, cast, passUntil, pt, putOnBattlefield, setup } from "./helpers";
 import { abilitiesOf, botActions, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
 import { gainLife, moveObject } from "../src/game";
 import { invalidateCharacteristics } from "../src/layers";
@@ -53,9 +54,20 @@ const glimmer = card("Test Aura", "Enchantment — Aura", "{3}", { oracleText: "
 const temple = card("Temple Garden", "Land — Forest Plains", "", { oracleText: "({T}: Add {G} or {W}.)\nAs Temple Garden enters, you may pay 2 life. If you don't, it enters tapped." });
 const unicorn = card("Lancer Unicorn", "Creature — Unicorn", "{1}{W}", { power: "2", toughness: "2" });
 const quiet = card("Quiet Thought", "Instant", "{1}", { oracleText: "Draw a card." });
+const loadingZone = card("Loading Zone", "Enchantment", "{3}{G}", { keywords: ["Warp"], oracleText: "If one or more counters would be put on a creature, Spacecraft, or Planet you control, twice that many of each of those kinds of counters are put on it instead.\nWarp {G} (You may cast this card from your hand for its warp cost. Exile this enchantment at the beginning of the next end step, then you may cast it from exile on a later turn.)" });
+const greenshell = card("Fecund Greenshell", "Creature — Elemental Turtle", "{3}{G}{G}", { power: "4", toughness: "6", keywords: ["Reach"], oracleText: "Reach\nAs long as you control ten or more lands, creatures you control get +2/+2.\nWhenever this creature or another creature you control with toughness greater than its power enters, look at the top card of your library. If it's a land card, you may put it onto the battlefield tapped. Otherwise, put it into your hand." });
+const repulsive = card("Repulsive Mutation", "Instant", "{X}{G}{U}", { oracleText: "Put X +1/+1 counters on target creature you control. Then counter up to one target spell unless its controller pays mana equal to the greatest power among creatures you control." });
+const aettir = card("Aettir and Priwen", "Legendary Artifact — Equipment", "{6}", { keywords: ["Equip"], oracleText: "Equipped creature has base power and toughness X/X, where X is your life total.\nEquip {5}" });
+const danny = card("Danny Pink", "Legendary Creature — Human Soldier Advisor", "{3}{U}", { power: "4", toughness: "3", keywords: ["Mentor"], oracleText: "Mentor (Whenever this creature attacks, put a +1/+1 counter on target attacking creature with lesser power.)\nCreatures you control have \"Whenever one or more counters are put on this creature for the first time each turn, draw a card.\"" });
+const aetherspouts = card("Aetherspouts", "Instant", "{3}{U}{U}", { oracleText: "For each attacking creature, its owner puts it on their choice of the top or bottom of their library." });
+const spacecraft = card("Test Spacecraft", "Artifact — Spacecraft", "{2}");
+const relic = card("Test Relic", "Artifact", "{2}");
+const charge = card("Charge Up", "Instant", "{1}", { oracleText: "Put two charge counters on target artifact." });
+const grow = card("Grow Up", "Instant", "{1}", { oracleText: "Put a +1/+1 counter on target creature." });
+const wall = card("Test Wall", "Creature — Wall", "{1}", { power: "0", toughness: "4", keywords: ["Defender"], oracleText: "Defender" });
 
 describe("round 119 popular cards", () => {
-  it("all supported", () => supported(folio, priceOfProgress, auraMutation, raiseThePast, vortex, unsealing, heapedHarvest, cybermanPatrol, reyav, emiel, bauble, boseiju));
+  it("all supported", () => supported(folio, priceOfProgress, auraMutation, raiseThePast, vortex, unsealing, heapedHarvest, cybermanPatrol, reyav, emiel, bauble, boseiju, loadingZone, greenshell, repulsive, aettir, danny, aetherspouts));
 
   it("Folio of Fancies: each opponent mills as many cards as are in their own hand", () => {
     const { s: s0, ap, opp } = setup([]);
@@ -204,5 +216,100 @@ describe("round 119 popular cards", () => {
     s = act(s, { type: "activateMana", player: ap, objectId: land, ability: 0, mana: "C" });
     s = run(s, planCast(s, ap, creature));
     expect(s.objects[creature]!.uncounterableCast).toBeUndefined();
+  });
+
+  it("Loading Zone: twice the counters on a creature or Spacecraft you control, not on another artifact", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, loadingZone);
+    const b = putOnBattlefield(s0, ap, bear());
+    const craft = putOnBattlefield(s0, ap, spacecraft);
+    const r = putOnBattlefield(s0, ap, relic);
+    let s = cast(s0, ap, toHand(s0, ap, grow), [{ kind: "object", id: b }]);
+    s = cast(s, ap, toHand(s, ap, charge), [{ kind: "object", id: craft }]);
+    s = cast(s, ap, toHand(s, ap, charge), [{ kind: "object", id: r }]);
+    expect(s.objects[b]!.counters["+1/+1"]).toBe(2);
+    expect(s.objects[craft]!.counters.charge).toBe(4);
+    expect(s.objects[r]!.counters.charge).toBe(2);
+  });
+
+  it("Fecund Greenshell: a creature with toughness greater than its power looks at the top card; a land may go onto the battlefield, else to hand", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, greenshell);
+    const lib = s0.players[ap]!.library;
+    const top = lib[0]!;
+    expect(s0.cards[s0.objects[top]!.cardId]!.name).toBe("Forest");
+    // A 2/2 doesn't trigger it.
+    let s = settle(run(s0, planCast(s0, ap, toHand(s0, ap, bear()))));
+    expect(s.objects[top]!.zone).toBe("library");
+    s = settle(run(s, planCast(s, ap, toHand(s, ap, wall))));
+    expect(s.objects[top]!.zone).toBe("battlefield");
+    expect(s.objects[top]!.tapped).toBe(true);
+    // Declining puts the land into your hand (rulings).
+    const next = s.players[ap]!.library[0]!;
+    s = settle(run(s, planCast(s, ap, toHand(s, ap, wall))), false);
+    expect(s.objects[next]!.zone).toBe("hand");
+  });
+
+  it("Repulsive Mutation: X counters, then counter the spell unless its controller pays the greatest power among your creatures", () => {
+    const { s: s0, ap } = setup([]);
+    const b = putOnBattlefield(s0, ap, bear());
+    const q = toHand(s0, ap, quiet);
+    const r = toHand(s0, ap, repulsive);
+    let s = run(s0, planCast(s0, ap, q));
+    s = run(s, planCast(s, ap, r, [{ kind: "object", id: b }, { kind: "stack", id: s.stack[s.stack.length - 1]!.id }], undefined, undefined, 1));
+    for (let i = 0; i < 8 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.objects[b]!.counters["+1/+1"]).toBe(1);
+    expect(s.pending?.kind).toBe("payUnless");
+    expect(s.pending?.kind === "payUnless" && s.pending.cost).toBe("{3}");
+    s = act(s, { type: "payUnless", player: ap, pay: false });
+    expect(s.objects[q]!.zone).toBe("graveyard");
+  });
+
+  it("Aettir and Priwen: equipped creature's base power and toughness follow your life total", () => {
+    const { s: s0, ap } = setup([]);
+    const b = putOnBattlefield(s0, ap, bear());
+    const a = putOnBattlefield(s0, ap, aettir);
+    let s = activate(s0, ap, a, 0, [{ kind: "object", id: b }]);
+    s = settle(s);
+    expect(s.objects[a]!.attachedTo).toBe(b);
+    const life = s.players[ap]!.life;
+    expect(pt(s, b)).toBe(`${life}/${life}`);
+    s.players[ap]!.life = 7;
+    invalidateCharacteristics(s);
+    expect(pt(s, b)).toBe("7/7");
+  });
+
+  it("Danny Pink: creatures you control draw a card the first time counters are put on them each turn", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, danny);
+    const b = putOnBattlefield(s0, ap, bear());
+    const hand = s0.players[ap]!.hand.length;
+    let s = settle(cast(s0, ap, toHand(s0, ap, grow), [{ kind: "object", id: b }]));
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+    s = settle(cast(s, ap, toHand(s, ap, grow), [{ kind: "object", id: b }]));
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+    expect(s.objects[b]!.counters["+1/+1"]).toBe(2);
+  });
+
+  it("Aetherspouts: each attacking creature's owner puts it on the top or bottom of their library", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const a1 = putOnBattlefield(s0, ap, bear({ name: "Bear One" }));
+    const a2 = putOnBattlefield(s0, ap, bear({ name: "Bear Two" }));
+    const stay = putOnBattlefield(s0, ap, bear({ name: "Bear Home" }));
+    for (let i = 0; i < 5; i++) putOnBattlefield(s0, opp, card("Island", "Basic Land — Island"));
+    const spouts = toHand(s0, opp, aetherspouts);
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [a1, a2].map((attacker) => ({ attacker, defender: opp })) });
+    for (let i = 0; i < 8 && waitingOn(s) !== opp; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = run(s, planCast(s, opp, spouts));
+    for (let i = 0; i < 8 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending?.kind === "chooseOption" && s.pending.what).toBe("topOrBottom");
+    s = act(s, { type: "chooseOption", player: ap, choice: "top" });
+    expect(s.pending?.kind === "chooseOption" && s.pending.what).toBe("topOrBottom");
+    s = act(s, { type: "chooseOption", player: ap, choice: "bottom" });
+    const lib = s.players[ap]!.library;
+    expect([a1, a2].filter((x) => s.objects[x]!.zone === "library").length).toBe(2);
+    expect([lib[0], lib[lib.length - 1]].sort()).toEqual([a1, a2].sort());
+    expect(s.objects[stay]!.zone).toBe("battlefield");
   });
 });

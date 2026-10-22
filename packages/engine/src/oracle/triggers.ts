@@ -1619,7 +1619,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // controller of a wither or infect source, and for a permanent entering with counters its controller). It triggers
   // once for each permanent they're put on at the same time (rulings on Hapatra).
   const youPut = /^Whenever you put one or more ((?:\+1\/\+1|-1\/-1|loyalty|time|[a-z]+) )?counters on (~|this (?:creature|artifact|enchantment|permanent)|another creature you control|a creature you control|a creature you don't control|a creature|another creature|a permanent you control|a permanent or player|a planeswalker|another [a-z]+ creature|an? [A-Z][a-z]+(?:, [A-Z][a-z]+,)? or [A-Z][a-z]+ you control), (.+)$/.exec(line);
-  const put = youPut ?? /^Whenever one or more (\+1\/\+1 )?counters are put on (~|another creature you control|a creature you control), (.+)$/.exec(line);
+  // Danny Pink grants "Whenever one or more counters are put on this creature for the first time each turn".
+  const firstTime = !youPut && /^Whenever one or more counters are put on ~ for the first time each turn, /.test(line);
+  const put = youPut ?? /^Whenever one or more (\+1\/\+1 )?counters are put on (~|another creature you control|a creature you control), (.+)$/.exec(firstTime ? line.replace(" for the first time each turn,", ",") : line);
   if (put) {
     const self = /^(?:~|this [a-z]+)$/.test(put[2]!);
     const byYou = youPut ? { countersByYou: true as const } : {};
@@ -1633,7 +1635,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (!body) return "fail";
     if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, put[3]!) };
     const kind = put[1] ? { countersKind: put[1].trim() } : {};
-    if (self) return { event: "selfCountersPut", body, ...kind, ...byYou };
+    if (self) return { event: "selfCountersPut", body, ...kind, ...byYou, ...(firstTime ? { countersFirstTime: true as const } : {}) };
     // All Will Be One: "on a permanent or player", once for each permanent or player they're put on.
     const orPlayer = put[2] === "a permanent or player" ? { countersOrPlayer: true as const } : {};
     const filter = parseTargetPhrase(put[2]!.replace(/ or player$/, "").replace(/^another (creature)?/, (_m, c) => (c ? "creature" : "")).replace(/^an? /, ""));

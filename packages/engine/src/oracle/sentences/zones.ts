@@ -737,6 +737,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Picking your own permanents, not targeted: "sacrifice a creature", "each opponent sacrifices a creature
   // of their choice", "return a land you control to its owner's hand" (CR 701.21).
   // "Return another creature you control to its owner's hand" (Ambush Krotiq): not the source.
+  // Cloudstone Curio: "Return another permanent you control that shares a permanent type with it to its owner's hand",
+  // "it" being the permanent that entered.
+  if (ctx.subjectIt && (m = /^Return another (permanent) you control that shares a permanent type with it to its owner's hand$/.exec(s))) {
+    const filter = pickFilter(m[1]!);
+    return filter && [{ type: "pick", who: { ref: "you" }, filter: { ...filter, sharesPermanentTypeWithSubject: true, text: "other permanent that shares a permanent type with it" }, n: 1, action: "bounce" }];
+  }
   if ((m = /^Return another (?!target )(.+?) you control to its owner's hand$/i.exec(s))) {
     const filter = pickFilter(m[1]!);
     return filter && [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true, text: `other ${filter.text}` }, n: 1, action: "bounce" }];

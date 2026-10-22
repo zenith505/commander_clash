@@ -664,6 +664,13 @@ export function parseTargetPhrase(
     p = p.slice(0, chosenNumber.index);
     phrase = phrase.trim().slice(0, chosenNumber.index);
   }
+  // Expel the Interlopers: "creatures with power greater than or equal to the chosen number" (Chosen.number).
+  const atLeastChosen = / with power greater than or equal to the chosen number$/i.exec(phrase.trim());
+  if (atLeastChosen && !extra.chosen) {
+    extra.chosen = "powerAtLeast";
+    p = p.slice(0, atLeastChosen.index);
+    phrase = phrase.trim().slice(0, atLeastChosen.index);
+  }
   const bound0 = / with (power|toughness|mana value) (?:(less|greater) than( or equal to)?|equal to) (.+)$/i.exec(phrase.trim());
   const from0 = bound0 && / from (?:your|a|an opponent's) graveyard$/i.exec(bound0[4]!);
   const amount0 = bound0 ? opts.count?.(from0 ? bound0[4]!.slice(0, from0.index) : bound0[4]!) : null;

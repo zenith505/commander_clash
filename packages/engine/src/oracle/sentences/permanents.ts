@@ -513,6 +513,16 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
       { type: "untap", what: { ref: "self" } },
       { type: "counters", what: { ref: "self" }, counter: "+1/+1", n: m[1] === "a" ? 1 : m[1] === "two" ? 2 : 3, by: { ref: "eventPlayer" } },
     ];
+  if ((m = /^Put another counter of a kind already on (target [a-z ]+?) on it$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" && !what.n ? [{ type: "counterOfKindOnIt", what }] : null;
+  }
+  // Shadrix Silverquill: "Target player puts a +1/+1 counter on each creature they control": that player puts them.
+  if ((m = /^(Target player|Target opponent) puts (a|two|three) \+1\/\+1 counters? on each creature they control$/.exec(s))) {
+    const fx = parseSentence(`Put ${m[2]} +1/+1 counter${m[2] === "a" ? "" : "s"} on each creature ${m[1]!.toLowerCase()} controls`, ctx);
+    const e = fx?.length === 1 ? fx[0]! : undefined;
+    return e?.type === "counters" && e.what.ref === "each" && e.what.of?.ref === "target" ? [{ ...e, by: e.what.of }] : null;
+  }
   // Humble Defector: "Target opponent gains control of ~", for the rest of the game (layer 2); if ~ has left the
   // battlefield, nothing happens (rulings).
   if ((m = /^(Target player|Target opponent) gains control of ~$/.exec(s)) && !ctx.spell) {

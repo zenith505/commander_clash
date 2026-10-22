@@ -798,6 +798,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "lastKnownCounters":
     case "endure":
     case "moveCounter":
+    case "counterOfKindOnIt":
     case "removeCounters":
     case "removeAnyCounters":
     case "battleDefense":

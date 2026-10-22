@@ -167,6 +167,7 @@ export function bindChosen(spec: TargetSpec, chosen: Chosen | undefined): Target
   if (kind === "cardType" && chosen?.cardType) return { ...rest, types: [...(rest.types ?? []), chosen.cardType] };
   if (kind === "name" && chosen?.name !== undefined) return { ...rest, named: chosen.name };
   if (kind === "number" && chosen?.number !== undefined) return { ...rest, equals: chosen.number };
+  if (kind === "powerAtLeast" && chosen?.number !== undefined) return { ...rest, power: { ...rest.power, min: Math.max(rest.power?.min ?? -Infinity, chosen.number) } };
   if ((kind === "color" || kind === "notColor") && chosen?.color)
     return kind === "color" ? { ...rest, colors: [chosen.color] } : { ...rest, notColors: [...(rest.notColors ?? []), chosen.color] };
   return kind === "notType" || kind === "notColor" || kind === "notTypesChosen" ? rest : spec;
@@ -782,7 +783,8 @@ export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toug
       const host = obj(s, id).attachedTo ? s.objects[obj(s, id).attachedTo!] : undefined;
       return !!host && host.zone === "battlefield" && objIsType(s, host, "Creature") && controllerOf(s, host) === pid && objectMatches(s, e.filter, obj(s, id), pid, false);
     });
-  const ids = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !(e.filter.notSource && id === sourceId) && objectMatches(s, { ...e.filter, controller: "you" }, obj(s, id), pid, false) && !(sacrificing && !canBeSacrificed(s, obj(s, id))));
+  const shares = e.filter.sharesPermanentTypeWithSubject ? subjectPermanentTypes(s) : undefined;
+  const ids = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !(e.filter.notSource && id === sourceId) && objectMatches(s, { ...e.filter, controller: "you" }, obj(s, id), pid, false) && !(sacrificing && !canBeSacrificed(s, obj(s, id))) && (!shares || (id !== shares.id && characteristics(s, obj(s, id)).types.some((t) => shares.types.includes(t)))));
   // "Sacrifices a creature with the greatest power among creatures they control": the greatest, or tied for it; the
   // player chooses among those tied (rulings on Crackling Doom). Mana value from the mana cost, X as 0 (CR 202.3, 107.3).
   if (e.greatest) {
@@ -794,6 +796,20 @@ export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toug
   // Bolster: the least toughness, or tied for it (CR 701.39a).
   const min = Math.min(...ids.map((id) => toughness(s, obj(s, id))));
   return ids.filter((id) => toughness(s, obj(s, id)) === min);
+}
+
+/**
+ * The permanent types (CR 205.2a) of the resolving trigger's subject, as it is on the battlefield or as it last was there
+ * (CR 608.2h): Cloudstone Curio's "shares a permanent type with it".
+ */
+function subjectPermanentTypes(s: GameState): { id: ObjectId; types: string[] } {
+  const subj = s.resolving?.item.subject;
+  const o = subj ? s.objects[subj.id] : undefined;
+  if (!subj || !o) return { id: "", types: [] };
+  const here = o.zone === "battlefield" && (o.zoneChanges ?? 0) === subj.zc;
+  const lk = s.lastKnown?.[subj.id];
+  const types = here ? characteristics(s, o).types : lk && lk.zc === subj.zc ? lk.source?.types ?? [] : [];
+  return { id: subj.id, types: types.filter((t) => ["Artifact", "Battle", "Creature", "Enchantment", "Land", "Planeswalker"].includes(t)) };
 }
 
 /** The battle this creature is attacking, while it's still that battle (CR 506.4). */

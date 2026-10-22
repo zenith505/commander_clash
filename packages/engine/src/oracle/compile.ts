@@ -2010,6 +2010,10 @@ export function compile(d: CardDef): CompiledCard {
       out.opponentsSearchTop = num(mindcensor[1]!);
       continue;
     }
+    if (line === "Spells and abilities your opponents control can't cause their controller to search their library.") {
+      out.opponentsCantSearchOwn = true;
+      continue;
+    }
     if (line === "You control your opponents while they're searching their libraries.") {
       out.controlsOpponentSearches = true;
       continue;
@@ -2719,7 +2723,7 @@ function checkCastingLinks(out: CompiledCard) {
     // "The exiled card" of an "Exile a nonland card from your hand" cost (Jhoira of the Ghitu): that ability's own cost.
     if (o.ref === "costExiled" && !handExileCost) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
-    if (typeof o.chosen === "string") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" ? needs.add("number") : needs.add("creatureType"));
+    if (typeof o.chosen === "string") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" || o.chosen === "powerAtLeast" ? needs.add("number") : needs.add("creatureType"));
     if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen)) needs.add("color");
     if (o.kind === "setLandTypes" && (o.subtypes as string[]).includes(CHOSEN_LAND_TYPE)) needs.add("basicLandType");
     if (o.kind === "addKeywords" && ((o.keywords as string[]).includes(CHOSEN_PROTECTION) || (o.keywords as string[]).includes(CHOSEN_HEXPROOF))) needs.add("color");
@@ -2899,7 +2903,7 @@ function joinModes(lines: string[]): string[] {
     // "..., choose one that hasn't been chosen this turn." followed by bullets (Lita): the same as with a dash.
     const dotted = prev !== undefined && /\bchoose one(?: that hasn't been chosen(?: this turn)?| at random)?\.$/i.test(prev);
     if (/^\s*•/.test(line) && prev !== undefined && dotted) out[out.length - 1] = `${prev.replace(/\.$/, " —")} ${line.trim()}`;
-    else if (/^\s*•/.test(line) && prev !== undefined && /—\s*(•.*)?$/.test(prev)) out[out.length - 1] = `${prev} ${line.trim()}`;
+    else if (/^\s*•/.test(line) && prev !== undefined && (/—\s*(•.*)?$/.test(prev) || /you may choose two\. Each mode must target a different player\.(\s*•.*)?$/.test(prev))) out[out.length - 1] = `${prev} ${line.trim()}`;
     else out.push(line);
   }
   close();
@@ -2981,6 +2985,13 @@ function triggersAgainLine(line: string): NonNullable<CompiledCard["triggersAgai
     }
     return out;
   };
+  // Gandalf the White: "If a legendary permanent or an artifact entering or leaving the battlefield causes ...": either
+  // way, whatever zone it left for.
+  const both = /^If (?:an? )?(.+?) entering or leaving the battlefield causes a triggered ability of a permanent you control to trigger, that ability triggers an additional time\.$/.exec(line);
+  if (both) {
+    const filter = kinds(both[1]!.replace(/ or an? /g, " or "), false);
+    return filter ? { by: { event: "entersOrLeaves", filter: filter.map((x) => x.filter) } } : null;
+  }
   let m = /^If (?:an? )?(.+?) (entering|dying|attacking|dealing combat damage to a player)(?: the battlefield)? causes a triggered ability of a permanent you control to trigger, that ability triggers an additional time\.$/.exec(line);
   if (m) {
     const event = ({ entering: "enters", dying: "dies", attacking: "attacks" } as Record<string, "enters" | "dies" | "attacks">)[m[2]!] ?? "combatDamage";

@@ -345,6 +345,8 @@ type CastDraft = {
   splice?: string[];
   /** Cast for its evoke or dash cost (CR 118.9). */
   alt?: AltCostKind;
+  /** Cast prototyped as well as for `alt` (One with the Multiverse's {0}: prototyped isn't an alternative cost, CR 718.3). */
+  prototyped?: true;
   /** Cards exiled from your graveyard for delve (CR 702.66a). */
   delve?: string[];
   /** The creature sacrificed for casualty, or none (CR 702.153a). */
@@ -795,7 +797,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const card = cardOf(s, d.objectId);
     const compiled = compileCard(card);
     const free = freeCastOf(s, HUMAN) === d.objectId;
-    const how = { ...(d.face !== undefined ? { face: d.face } : {}), ...(d.via ? { via: d.via } : {}), ...(d.buyback ? { buyback: true } : {}), ...(d.splice?.length ? { splice: d.splice } : {}), ...(d.alt ? { alt: d.alt } : {}), ...(d.costOr !== undefined ? { costOr: d.costOr } : {}), ...(d.teamwork?.length ? { teamwork: d.teamwork } : {}), ...(d.harmonize ? { harmonize: d.harmonize } : {}), ...(d.permit ? { permit: d.permit } : {}), ...(d.asType ? { asType: d.asType } : {}), ...(d.exileFromHand?.length && compiled.exiledReduction ? { exileFromHand: d.exileFromHand } : {}), ...(d.lifeFor?.length ? { lifeFor: d.lifeFor } : {}) };
+    const how = { ...(d.face !== undefined ? { face: d.face } : {}), ...(d.via ? { via: d.via } : {}), ...(d.buyback ? { buyback: true } : {}), ...(d.splice?.length ? { splice: d.splice } : {}), ...(d.alt ? { alt: d.alt } : {}), ...(d.prototyped ? { prototyped: d.prototyped } : {}), ...(d.costOr !== undefined ? { costOr: d.costOr } : {}), ...(d.teamwork?.length ? { teamwork: d.teamwork } : {}), ...(d.harmonize ? { harmonize: d.harmonize } : {}), ...(d.permit ? { permit: d.permit } : {}), ...(d.asType ? { asType: d.asType } : {}), ...(d.exileFromHand?.length && compiled.exiledReduction ? { exileFromHand: d.exileFromHand } : {}), ...(d.lifeFor?.length ? { lifeFor: d.lifeFor } : {}) };
     const kicks = { ...how, ...(d.kicks?.length ? { kicks: d.kicks } : {}) };
     // Harmonize: which creature to tap is chosen as the cost is (CR 702.180b), first of all.
     if (d.via === "harmonize" && d.harmonize === undefined) {
@@ -1353,7 +1355,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
             <ModeMenu
               key={modePick ? `${modePick.mode}:${modePick.objectId}` : `trigger:${pending?.kind === "chooseModes" ? pending.description : ""}`}
               {...(pending?.kind === "chooseModes"
-                ? { label: pending.description.split(":")[0]!, min: pending.min, max: pending.max, modes: pending.modes, legal: pending.legal }
+                ? { label: pending.description.split(":")[0]!, min: pending.min, max: pending.max, modes: pending.modes, legal: pending.legal, ...(pending.optional ? { optional: true } : {}) }
                 : modeMenuProps(s, modePick!))}
               sourceName={(pending?.kind === "chooseModes" ? cardOf(s, pending.sourceId) : cardOf(s, modePick!.objectId)).name}
               onDone={pickModes}
@@ -1465,9 +1467,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 setMenu(null);
                 dispatch([{ type: "playLand", player: HUMAN, objectId: menu, face, ...(untapped ? { untapped } : {}) }]);
               }}
-              onCastAlt={(alt) => {
+              onCastAlt={(alt, prototyped) => {
                 setMenu(null);
-                startCast(menu, undefined, undefined, alt);
+                if (prototyped) continueCast({ objectId: menu, alt, prototyped });
+                else startCast(menu, undefined, undefined, alt);
               }}
               onCastAssist={(pid) => {
                 setMenu(null);
@@ -1807,6 +1810,8 @@ function canUseFace(s: GameState, id: string) {
   return castableFaces(s, o).some((f) => canCastFace(s, id, f)) || landFaces(s, o).some((f) => f !== 0 && canPlayLand(s, id, f));
 }
 
+/** Alternative costs that aren't the card's own, which a prototype card may be cast prototyped for (CR 718.3). */
+const PROTOTYPE_WITH: AltCostKind[] = ["payZero", "wubrg", "omniscience", "citadel"];
 const ALT_NAMES: Record<AltCostKind, string> = { payZero: "Cast it for", impending: "Impending", citadel: "Cast it:", foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate", convert: "More Than Meets the Eye", omniscience: "Cast it:" };
 const ALT_NOTES: Record<AltCostKind, string> = {
   impending: "enters with time counters and isn't a creature until the last is removed (one at each of your end steps)",
@@ -1918,7 +1923,11 @@ function canCastNowIgnoringMana(s: GameState, id: string) {
 }
 
 /** Could you cast this card from your hand for its evoke or dash cost now, tapping mana as needed? */
-function canCastAlt(s: GameState, id: string, alt: AltCostKind): boolean {
+function canCastAlt(s: GameState, id: string, alt: AltCostKind, prototyped?: true): boolean {
+  if (prototyped) {
+    const p = castProblem(s, HUMAN, id, undefined, undefined, undefined, undefined, undefined, { alt, prototyped });
+    return !p || (/not enough mana/.test(p) && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { alt, prototyped }) !== null);
+  }
   // The Shoals: X is the mana value of the card exiled (CR 107.3a), so each X a card in hand could give.
   if (altCost(cardOf(s, id), alt)?.costs?.some((c) => c.kind === "exileFromHand" && c.mvX)) {
     const xs = new Set(s.players[HUMAN]!.hand.filter((h) => h !== id).map((h) => manaValue(parseManaCost(cardOf(s, h).manaCost))));
@@ -3730,6 +3739,7 @@ function ModeMenu({
   repeat,
   pawprints,
   escalate,
+  optional,
   onDone,
   onCancel,
 }: {
@@ -3747,6 +3757,8 @@ function ModeMenu({
   pawprints?: number[];
   /** Escalate's cost, for each mode beyond the first (CR 702.120a). */
   escalate?: string;
+  /** "You may choose two" (Shadrix Silverquill): none at all is allowed too. */
+  optional?: boolean;
   onDone: (modes: number[]) => void;
   onCancel?: () => void;
 }) {
@@ -3761,12 +3773,12 @@ function ModeMenu({
   };
   const less = (i: number) => setChosen((c) => c.filter((_, k) => k !== c.lastIndexOf(i)));
   const times = (i: number) => chosen.filter((x) => x === i).length;
-  const ok = pawprints ? used <= max : chosen.length >= min && chosen.length <= max;
+  const ok = pawprints ? used <= max : (chosen.length >= min && chosen.length <= max) || (optional && chosen.length === 0);
   return (
     <div className="ability-menu mode-menu">
       <strong>{label}</strong>
       <span className="muted">
-        {pawprints ? `choose up to ${max} {P} worth of modes (${max - used} left)` : `choose ${describeCount(min, max)}`}
+        {pawprints ? `choose up to ${max} {P} worth of modes (${max - used} left)` : `${optional ? "you may " : ""}choose ${describeCount(min, max)}${optional ? " or none" : ""}`}
         {repeat && !pawprints ? ", the same one more than once if you like" : ""}
         {escalate ? `; escalate ${escalate} for each mode beyond the first` : ""}
       </span>
@@ -3795,7 +3807,7 @@ function ModeMenu({
       )}
       {!single && (
         <button disabled={!ok} onClick={() => onDone([...chosen].sort((a, b) => a - b))}>
-          {chosen.length === 0 && (min === 0 || pawprints) ? "Choose none" : "Done"}
+          {chosen.length === 0 && (min === 0 || pawprints || optional) ? "Choose none" : "Done"}
         </button>
       )}
       {onCancel && (
@@ -3854,7 +3866,7 @@ function AbilityMenu({
   /** For a modal double-faced card: play it as this land face (`untapped`: pay life or reveal so it enters untapped). */
   onPlayFace: (face: number, untapped?: boolean) => void;
   /** For a card in hand: cast it for its evoke or dash cost. */
-  onCastAlt: (alt: AltCostKind) => void;
+  onCastAlt: (alt: AltCostKind, prototyped?: true) => void;
   /** For a card with assist: cast it, asking this player to help pay (CR 702.132a). */
   onCastAssist: (pid: PlayerId) => void;
   /** For a card in hand with morph or disguise: cast it face down for {3}. */
@@ -3993,6 +4005,18 @@ function AbilityMenu({
             </button>
           );
         })}
+      {/* Without paying its mana cost, a prototype card can still be cast prototyped (CR 718.3, rulings on One with the Multiverse). */}
+      {inHand &&
+        !foretold &&
+        !!altCost(d, "prototype") &&
+        altCostsFor(s, HUMAN, o)
+          .filter((a) => PROTOTYPE_WITH.includes(a.kind))
+          .map((a) => (
+            <button key={`${a.kind}-prototyped`} data-alt={`${a.kind}-prototyped`} disabled={!canCastAlt(s, objectId, a.kind, true)} title={ALT_NOTES[a.kind]} onClick={() => onCastAlt(a.kind, true)}>
+              Cast it prototyped for <ManaCost cost={a.mana} size="sm" />
+              {a.text ? ` and ${a.text}` : ""}
+            </button>
+          ))}
       {inHand &&
         !land &&
         compileCard(d).assist &&

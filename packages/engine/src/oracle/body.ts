@@ -538,9 +538,22 @@ const LIM_DULS_VAULT =
 export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; discardedSelf?: true } = {}): AbilityBody | null {
   // "Put a +1/+1 counter on ~ and untap it" (Gwenna): "it" is ~, the one thing named.
   text = differenceInHand(text).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~");
+  // Thousand-Faced Shadow: "create a token that's a copy of another target attacking creature. The token enters tapped and
+  // attacking." (CR 508.4).
+  text = text.replace(/\b([Cc]reate) a token that's a copy of ([^.]+)\. The token enters tapped and attacking\./, "$1 a tapped and attacking token that's a copy of $2.");
+  // Ichormoon Gauntlet: "choose a counter on target permanent. Put an additional counter of that kind on that permanent."
+  text = text.replace(/\b[Cc]hoose a counter on (target [a-z ]+?)\. Put an additional counter of that kind on that permanent\./, "Put another counter of a kind already on $1 on it.");
   // Lim-Dûl's Vault: look at the top five; as many times as you choose, pay 1 life and put them on the bottom in any order,
   // then look at the next five; then shuffle the rest and put the last five looked at on top in any order (rulings).
   if (text.trim() === LIM_DULS_VAULT) return { targets: [], effects: [{ type: "vault", n: 5, life: 1 }], text };
+  // Shadrix Silverquill: "you may choose two. Each mode must target a different player." (a triggered ability's): none, or
+  // exactly two (rulings), the two targeting different players (CR 115.3).
+  const mayTwo = /^[Yy]ou may choose two\. Each mode must target a different player\.\s*((?:•[^•]+)+)$/.exec(text.trim());
+  if (mayTwo && !opts.spell && !opts.activated) {
+    const body = parseModal("two", mayTwo[1]!, text.trim(), opts);
+    if (!body || !body.modal!.modes.every((m) => m.targets.length === 1 && m.targets[0]!.kind === "player")) return null;
+    return { ...body, modal: { ...body.modal!, optional: true, distinctTargets: true } };
+  }
   const modal = MODAL.exec(text.trim());
   if (modal) {
     const body = parseModal(modal[1]!, modal[3]!, text.trim(), opts);

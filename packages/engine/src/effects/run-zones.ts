@@ -1945,8 +1945,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         moveObject(s, o.id, "graveyard");
       }
       return;
-    case "putInLibrary":
-      for (const o of objects(s, e.what, ctx)) {
+    case "putInLibrary": {
+      // Owners choosing for several objects (Aetherspouts): the active player makes all of their choices first, then each
+      // other player in turn order (rulings, CR 101.4).
+      const order = e.position === "ownersChoice" ? apnap(s, s.turnOrder) : [];
+      const todo = [...objects(s, e.what, ctx)];
+      if (order.length) todo.sort((a, b) => order.indexOf(a.owner) - order.indexOf(b.owner));
+      for (const o of todo) {
         let position = e.position;
         if (position === "ownersChoice") {
           // Its owner chooses as it resolves; a token goes too, then ceases to exist (CR 111.7).
@@ -1971,6 +1976,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         moveObject(s, o.id, "library", { top: position === "top" });
       }
       return;
+    }
     case "exileGraveyard":
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
@@ -2140,9 +2146,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const zc = s.resolving?.item.sourceZc;
       // Commander ninjutsu: from the command zone too (CR 702.49d).
       if (!o || (o.zone !== "hand" && o.zone !== "command") || o.owner !== ctx.controller || (zc !== undefined && (o.zoneChanges ?? 0) !== zc)) return;
-      moveObject(s, o.id, "battlefield", { tapped: true });
+      // Attacking as it enters, before its enters abilities trigger ("if it's attacking", Thousand-Faced Shadow).
+      enterTogether(s, () => {
+        moveObject(s, o.id, "battlefield", { tapped: true });
+        if ((o.zone as string) === "battlefield" && ctx.lki) enterAttacking(s, o, ctx.lki);
+      });
       if ((o.zone as string) !== "battlefield") return;
-      if (ctx.lki) enterAttacking(s, o, ctx.lki);
       log(s, `${player(s, ctx.controller).name} puts ${characteristics(s, o).name} onto the battlefield tapped${o.attacking !== undefined ? ` and attacking ${attackedName(s, o)}` : ""} (ninjutsu).`);
       return;
     }

@@ -18,6 +18,7 @@ export function modeCountProblem(body: AbilityBody, modes: number[], both = fals
   // Pawprints (CR 700.2i): modes worth up to that many {P}, as many as fit.
   if (m.pawprints) return pawprintsOf(m, modes) > m.max ? `choose up to ${m.max} {P} worth of modes` : null;
   const [min, max] = modeRange(body, both);
+  if (m.optional && !modes.length) return null;
   if (modes.length < min || (modes.length > max && !entwined(body, modes))) return `choose ${describeCount(min, max)}${m.entwine ? ", or all of them (entwine)" : ""}`;
   return null;
 }
@@ -64,7 +65,9 @@ export function withModes(body: AbilityBody, modes: number[] | undefined): Abili
   for (const i of chosen) {
     const mode = body.modal.modes[i]!;
     const offset = out.targets.length;
-    out.targets.push(...mode.targets.map((spec) => (spec.distinctFrom ? { ...spec, distinctFrom: spec.distinctFrom.map((j) => j + offset) } : spec)));
+    // "Each mode must target a different player": not the same as any target of the modes before it.
+    const earlier = body.modal.distinctTargets ? Array.from({ length: offset }, (_, j) => j) : [];
+    out.targets.push(...mode.targets.map((spec) => (spec.distinctFrom || earlier.length ? { ...spec, distinctFrom: [...earlier, ...(spec.distinctFrom ?? []).map((j) => j + offset)] } : spec)));
     out.effects.push(...mode.effects.map((e) => shiftTargets(e, offset)));
     texts.push(mode.text);
   }

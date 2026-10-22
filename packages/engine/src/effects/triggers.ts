@@ -32,7 +32,7 @@ const STEP_TRIGGERS: Partial<Record<Extract<TriggerSourceEvent, { type: "step" }
 };
 
 /** See `causedBy` in fireEvent. */
-type Cause = { event: "enters" | "dies" | "attacks" | "combatDamage"; objs: { o: GameObject; c?: Characteristics; controller: PlayerId }[] } | { event: "castOrCopy"; caster: PlayerId; objs?: undefined };
+type Cause = { event: "enters" | "dies" | /** Left the battlefield, not dying. */ "leaves" | "attacks" | "combatDamage"; objs: { o: GameObject; c?: Characteristics; controller: PlayerId }[] } | { event: "castOrCopy"; caster: PlayerId; objs?: undefined };
 
 /**
  * How many more times a triggered ability of `src` triggers (CR 603.2d): one for each "triggers an additional time" effect
@@ -40,7 +40,7 @@ type Cause = { event: "enters" | "dies" | "attacks" | "combatDamage"; objs: { o:
  * on Teysa Karlov). Only abilities of permanents, as they are or as they were leaving (CR 603.10a).
  */
 function triggersAgain(s: GameState, src: GameObject, controller: PlayerId, cause: Cause | null): number {
-  const leaving = cause?.event === "dies" ? cause.objs.find((x) => x.o.id === src.id) : undefined;
+  const leaving = cause?.event === "dies" || cause?.event === "leaves" ? cause.objs.find((x) => x.o.id === src.id) : undefined;
   const permanent = src.zone === "battlefield" || !!leaving || (s.leftTogether ?? []).some((l) => l.id === src.id && src.zone !== "battlefield");
   // A spell's own triggered abilities ("When you cast ~", storm, cascade): only for "a triggered ability of a colorless
   // spell you control" (Echoes of Eternity).
@@ -80,7 +80,7 @@ function triggersAgain(s: GameState, src: GameObject, controller: PlayerId, caus
       // Veyran: "If you casting or copying an instant or sorcery spell causes ...": that player is this static's controller.
       if (a.by?.event === "castOrCopy") {
         if (cause?.event !== "castOrCopy" || cause.caster !== controller) continue;
-      } else if (a.by && !(cause?.event === a.by.event && cause.objs!.some((x) => !a.by!.filter || a.by!.filter.some((f) => objectMatches(s, f, x.o, controller, false, undefined, x.c) && (f.controller !== "you" || x.controller === controller))))) continue;
+      } else if (a.by && !(cause && cause.event !== "castOrCopy" && (cause.event === a.by.event || (a.by.event === "entersOrLeaves" && (cause.event === "enters" || cause.event === "dies" || cause.event === "leaves"))) && cause.objs!.some((x) => !a.by!.filter || a.by!.filter.some((f) => objectMatches(s, f, x.o, controller, false, undefined, x.c) && (f.controller !== "you" || x.controller === controller))))) continue;
       // "Of the chosen type": the one chosen as that permanent entered (Roaming Throne).
       if (a.of && !a.of.some((k) => !(k.other && src.id === id) && ((f) => !f.chosen && ofMatches(f))(bindChosen(k.filter, s.objects[id]?.chosen)))) continue;
       n++;
@@ -545,7 +545,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       entering,
       you,
       // Soulbond's intervening if: there's another unpaired creature to pair it with (CR 702.95a, 603.4).
-      (e, t) => e === "selfEnters" && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifX || (ev.x ?? 0) >= t.ifX) && (!t.ifEvoked || entering.castAlt === "evoke") && (!t.ifAlt || entering.castAlt === t.ifAlt) && (!t.ifBargained || !!entering.bargained) && (!t.ifEvidence || !!entering.evidence) && (!t.ifTreasure || (entering.treasureSpent ?? 0) > 0) && (!t.ifSpent || spentMeets(entering.spent, t.ifSpent)) && (t.ifCastFromHand === undefined || !!entering.castFromHand === t.ifCastFromHand) && (!t.ifCast || !!entering.wasCast) && (!t.ifFromGraveyard || (!!entering.enteredFromGraveyard && (t.ifFromGraveyard === "any" || entering.owner === you))) && (!t.ifEnteredUntapped || !entering.tapped) && (!t.ifGift || entering.gift !== undefined) && (!t.ifTributeUnpaid || !entering.tribute?.paid) && (!t.ifSoulbond || pairCandidates(s, entering, you).length > 0),
+      (e, t) => e === "selfEnters" && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifX || (ev.x ?? 0) >= t.ifX) && (!t.ifEvoked || entering.castAlt === "evoke") && (!t.ifAlt || entering.castAlt === t.ifAlt) && (!t.ifBargained || !!entering.bargained) && (!t.ifEvidence || !!entering.evidence) && (!t.ifTreasure || (entering.treasureSpent ?? 0) > 0) && (!t.ifSpent || spentMeets(entering.spent, t.ifSpent)) && (t.ifCastFromHand === undefined || !!entering.castFromHand === t.ifCastFromHand) && (!t.ifCast || !!entering.wasCast) && (!t.ifFromGraveyard || (!!entering.enteredFromGraveyard && (t.ifFromGraveyard === "any" || entering.owner === you))) && (!t.ifFromHand || (!!entering.enteredFromHand && entering.owner === you)) && (!t.ifEnteredUntapped || !entering.tapped) && (!t.ifGift || entering.gift !== undefined) && (!t.ifTributeUnpaid || !entering.tribute?.paid) && (!t.ifSoulbond || pairCandidates(s, entering, you).length > 0),
       undefined,
       undefined,
       undefined,
@@ -593,7 +593,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "dies") {
     const o = obj(s, ev.id);
     // A creature dying (CR 700.4): put into a graveyard from the battlefield.
-    if (ev.to === "graveyard" && ev.wasCreature && ev.snapshot && ev.chars) causedBy = { event: "dies", objs: [{ o: ev.snapshot, c: ev.chars, controller: ev.controller }] };
+    // Any other way of leaving the battlefield (Gandalf the White's "leaving the battlefield").
+    if (ev.snapshot && ev.chars) causedBy = { event: ev.to === "graveyard" && ev.wasCreature ? "dies" : "leaves", objs: [{ o: ev.snapshot, c: ev.chars, controller: ev.controller }] };
     // Earthbend's "when that land dies or is put into exile" (CR 701.66a): it triggers once, for that object only; gone
     // anywhere else, it never will.
     const was = ev.snapshot?.zoneChanges ?? 0;
@@ -1562,7 +1563,8 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
         s.triggerQueue.shift();
         continue;
       }
-      if (n === printed.modal.min) t.modes = legal.flatMap((ok, i) => (ok ? [i] : [])); // the only possible choice
+      // The only possible choice, unless choosing none is one too ("you may choose two").
+      if (n === printed.modal.min && !printed.modal.optional) t.modes = legal.flatMap((ok, i) => (ok ? [i] : []));
       else if (printed.modal.random) {
         // "Choose one at random": among the modes that can be chosen (rulings on Umaro), as it's put on the stack.
         const can = legal.flatMap((ok, i) => (ok ? [i] : []));
@@ -1570,7 +1572,7 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
         log(s, `${def.name}'s ability chooses at random: ${printed.modal.modes[t.modes[0]!]!.text.replace(/~/g, def.name)}`);
       } else {
         const modes = printed.modal.modes.map((m) => m.text);
-        s.pending = { kind: "chooseModes", player: t.controller, sourceId: t.sourceId, description: describeAbility(def, printed.text), min: printed.modal.min, max: printed.modal.max, modes, legal };
+        s.pending = { kind: "chooseModes", player: t.controller, sourceId: t.sourceId, description: describeAbility(def, printed.text), min: printed.modal.min, max: printed.modal.max, modes, legal, ...(printed.modal.optional ? { optional: true as const } : {}) };
         return added;
       }
     }

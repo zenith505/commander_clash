@@ -445,6 +445,8 @@ export interface GameObject {
   wasCast?: true;
   /** On the battlefield: it entered from a graveyard, its owner's, for "when ~ enters from a graveyard" (CR 603.6a). */
   enteredFromGraveyard?: true;
+  /** On the battlefield: it entered from its owner's hand, cast or not (Thousand-Faced Shadow's "enters from your hand"). */
+  enteredFromHand?: true;
   castVia?: CastFromGraveyardKind;
   buyback?: boolean;
   /** The turn this card was discarded into its owner's graveyard; cleared when it moves again (mayhem, CR 702.187b). */
@@ -669,6 +671,8 @@ export interface Player {
   lastTurnBegan?: number;
   /** The turn this player last attacked with a creature, for raid's "if you attacked this turn". */
   attackedTurn?: number;
+  /** The turn this player last activated a loyalty ability of a planeswalker (The Chain Veil). */
+  loyaltyTurn?: number;
   /** The turn this player last committed a crime (CR 700.13), for "if you've committed a crime this turn". */
   crimeTurn?: number;
   /**
@@ -929,6 +933,11 @@ export interface CostChoices {
   buyback?: boolean;
   /** Cast it for its evoke or dash cost instead of its mana cost (CR 118.9). */
   alt?: AltCostKind;
+  /**
+   * Cast a prototype card prototyped together with another alternative cost (One with the Multiverse's "without paying
+   * its mana cost"): prototyped isn't an alternative cost (CR 718.3, rulings), so `alt` can't say both.
+   */
+  prototyped?: true;
   /** Delve (CR 702.66a): cards exiled from your graveyard, each paying for {1}. */
   delve?: ObjectId[];
   /** Cast it face down for {3} with its morph or disguise ability (CR 702.37c, 702.168b). */
@@ -1158,7 +1167,7 @@ export type PendingDecision =
   /** "Change the target of target spell" (CR 115.7a): pick the spell's new target among `options`, the legal ones. */
   | { kind: "changeTarget"; player: PlayerId; source: string; spell: string; stackId: string; index: number; spec: TargetSpec; current: TargetChoice; options: TargetChoice[] }
   /** A modal triggered ability is being put on the stack (CR 603.3c). `legal[i]`: mode i can be chosen (CR 700.2b). */
-  | { kind: "chooseModes"; player: PlayerId; sourceId: ObjectId; description: string; min: number; max: number; modes: string[]; legal: boolean[] }
+  | { kind: "chooseModes"; player: PlayerId; sourceId: ObjectId; description: string; min: number; max: number; modes: string[]; legal: boolean[]; /** "You may choose two": none is allowed too. */ optional?: true }
   /**
    * Cards put into this player's graveyard at the same time (CR 404.3), or with `whole` their whole graveyard ("reorder
    * your graveyard as you choose", Fossil Find): put them in any order. `cards` are as they are now, top first.
@@ -1596,7 +1605,11 @@ export interface TurnRule {
    */
   /** "cantWinGame": "players can't win the game this turn" (Everybody Lives!). */
   /** "creatureSpellsUncounterable": "Creature spells you cast this turn can't be countered" (Domri, Anarch of Bolas): cast, so not a copy. */
-  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable" | "creatureSpellsUncounterable";
+  /**
+   * "extraLoyalty": The Chain Veil's "for each planeswalker you control, you may activate one of its loyalty abilities once
+   * this turn as though none of its loyalty abilities have been activated this turn": one more each, each time (rulings).
+   */
+  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable" | "creatureSpellsUncounterable" | "extraLoyalty";
 }
 
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */

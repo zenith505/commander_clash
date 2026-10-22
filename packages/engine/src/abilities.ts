@@ -424,6 +424,11 @@ export interface TargetSpec {
    * `types` as the choice is made.
    */
   sharesTypeWithSacrificed?: true;
+  /**
+   * Cloudstone Curio: "another permanent you control that shares a permanent type with it": not the trigger's subject,
+   * and sharing a permanent type with it as it is, or last was, on the battlefield (CR 608.2h), checked as it resolves.
+   */
+  sharesPermanentTypeWithSubject?: true;
   /** "Two target creature cards that share a creature type": shares one with each of these targets of the group. */
   sharesCreatureTypeWith?: number[];
   /** "Up to six target creature cards with different names" (Behold the Sinister Six!): a name none of these targets of the group has (CR 601.2c). */
@@ -476,7 +481,7 @@ export interface TargetSpec {
    * or color chosen for the source (see GameObject.chosen) or while the spell resolves. Before
    * `bindChosen` fills it in, a filter that needs a choice that wasn't made matches nothing.
    */
-  chosen?: "type" | "notType" | "color" | "notColor" | "cardType" | /** "Of a type chosen this way" (Chosen.types: any of them), "that aren't ...". */ "typesChosen" | "notTypesChosen" | /** "with the chosen name", "with that name" (Chosen.name, CR 201.4). */ "name" | /** "Equal to the chosen number" (Chosen.number; see equalsChosen). */ "number";
+  chosen?: "type" | "notType" | "color" | "notColor" | "cardType" | /** "Of a type chosen this way" (Chosen.types: any of them), "that aren't ...". */ "typesChosen" | "notTypesChosen" | /** "with the chosen name", "with that name" (Chosen.name, CR 201.4). */ "name" | /** "Equal to the chosen number" (Chosen.number; see equalsChosen). */ "number" | /** "With power greater than or equal to the chosen number" (Expel the Interlopers): `power.min`, once it's known. */ "powerAtLeast";
   /**
    * "With mana value, power, or toughness equal to the chosen number" (Talion): one of these is that number, filled in
    * as `equals` once it's known (bindChosen). Only creature spells have power and toughness (CR 208.3).
@@ -1261,6 +1266,8 @@ export type StaticCondition =
   | { kind: "opponentGraveyard"; n: number }
   /** Raid: "if you attacked this turn" (with one or more creatures); `not`: "if you didn't attack with a creature this turn" (Curious Obsession). */
   | { kind: "attackedThisTurn"; not?: true }
+  /** The Chain Veil: "if you didn't activate a loyalty ability of a planeswalker this turn" (`not`). */
+  | { kind: "activatedLoyaltyThisTurn"; not?: true }
   /** "If you've committed a crime this turn" (CR 700.13). */
   | { kind: "committedCrime" }
   /** A Case's solved designation (CR 719.3b): "Solved — [ability]" (702.169); `not`: a "To solve" trigger's "this Case is not solved" (719.3a). */
@@ -1893,6 +1900,8 @@ export type Effect =
   /** "Move a +1/+1 counter from ~ onto that creature" (CR 122.5): nothing happens unless both parts can. */
   /** `counter` "any": "move a counter" (Nesting Grounds), of a kind chosen as it resolves (rulings). */
   | { type: "moveCounter"; counter: CounterKind | "any"; from: ObjRef; to: ObjRef }
+  /** Ichormoon Gauntlet: "choose a counter on target permanent. Put an additional counter of that kind on that permanent." */
+  | { type: "counterOfKindOnIt"; what: ObjRef }
   /** Cascade (CR 702.85a), resolving: exile until a cheaper nonland card, maybe cast it free, the rest to the bottom. */
   | { type: "cascade" }
   /**
@@ -2694,7 +2703,7 @@ export type Effect =
       theirs?: true;
       text: string;
     }
-  | { type: "choose"; choice: ChoiceKind; /** "Each player chooses a creature type" (Patriarch's Bidding): every player in turn order, starting with the active player, into Chosen.types. */ each?: true; /** With "opponent": "a player with the most life or tied for most life" (The Black Gate), checked as it resolves; you can be one. */ mostLife?: true; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose };
+  | { type: "choose"; choice: ChoiceKind; /** "Each player chooses a creature type" (Patriarch's Bidding): every player in turn order, starting with the active player, into Chosen.types. */ each?: true; /** With "opponent": "a player with the most life or tied for most life" (The Black Gate), checked as it resolves; you can be one. */ mostLife?: true; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose; /** "Choose a number between 0 and 10" (Expel the Interlopers): any whole number in it, into Chosen.number. */ range?: { min: number; max: number } };
 
 /** What a player chooses by name: a creature type (CR 205.3m) or a color (CR 105.1). */
 /** "keyword": "gains your choice of flying, vigilance, deathtouch, or haste", from the options listed (CR 608.2d). */
@@ -2911,6 +2920,10 @@ export interface AbilityBody {
     escalate?: { mana?: string; cost?: AdditionalCost; text: string };
     unchosen?: "ever" | "turn";
     random?: true;
+    /** "You may choose two" (Shadrix Silverquill): no modes at all, or `min` to `max` of them. */
+    optional?: true;
+    /** "Each mode must target a different player" (Shadrix Silverquill): no target of one mode is a target of another. */
+    distinctTargets?: true;
   };
 }
 
@@ -3373,6 +3386,8 @@ export interface TriggeredAbility {
   ifCastFromHand?: boolean;
   /** "When ~ enters from a graveyard" / "from your graveyard" (its owner is its controller): part of the trigger event. */
   ifFromGraveyard?: "any" | "yours";
+  /** "When ~ enters from your hand" (Thousand-Faced Shadow): it came from its owner's hand (CR 603.6a). */
+  ifFromHand?: true;
   /** "When ~ enters untapped" (Mystic Sanctuary): only if it entered untapped, part of the trigger event. */
   ifEnteredUntapped?: true;
   /** "When ~ enters, if you cast it, ..." (Geological Appraiser): it entered as a spell that resolved, not a copy. */
@@ -4249,6 +4264,11 @@ export interface CompiledCard {
   cantCastFrom?: { zones: ("graveyard" | "library" | "exile")[]; noncreature?: true };
   /** Aven Mindcensor: "If an opponent would search a library, that player searches the top four cards of that library instead." (CR 614.1a) */
   opponentsSearchTop?: number;
+  /**
+   * Ashiok, Dream Render: "Spells and abilities your opponents control can't cause their controller to search their
+   * library." Only that player's own library, searched by them; any shuffle the effect calls for still happens (rulings).
+   */
+  opponentsCantSearchOwn?: true;
   /** Opposition Agent: "You control your opponents while they're searching their libraries." (CR 723.2) */
   controlsOpponentSearches?: true;
   /**
@@ -4428,7 +4448,7 @@ export interface CompiledCard {
    * Never delayed or reflexive triggers (603.2d).
    */
   /** `anchor`: only while that anchor word was chosen as it entered (Windcrag Siege's "• Mardu —", CR 614.12b). */
-  triggersAgain?: { by?: { event: "enters" | "dies" | "attacks" | "combatDamage" | "castOrCopy"; filter?: TargetSpec[] }; of?: { filter: TargetSpec; other?: true }[]; anchor?: string; /** Cloud, Midgar Mercenary: "As long as ~ is equipped, ... a triggered ability of ~ or an Equipment attached to it". */ selfOrEquipment?: true }[];
+  triggersAgain?: { by?: { event: "enters" | "dies" | "attacks" | "combatDamage" | "castOrCopy" | /** Gandalf the White: entering, or leaving the battlefield for any zone. */ "entersOrLeaves"; filter?: TargetSpec[] }; of?: { filter: TargetSpec; other?: true }[]; anchor?: string; /** Cloud, Midgar Mercenary: "As long as ~ is equipped, ... a triggered ability of ~ or an Equipment attached to it". */ selfOrEquipment?: true }[];
   /** Fist of Suns: "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast" (an alternative cost, CR 118.9). */
   payWUBRG?: true;
   /** Omniscience: "You may cast spells from your hand without paying their mana costs" (AltCostKind "omniscience"). */

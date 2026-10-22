@@ -219,6 +219,10 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         return;
       }
       for (const rule of e.rules) (s.turnRules ??= []).push({ turn: s.turn, player: ctx.controller, rule });
+      if (e.rules[0] === "extraLoyalty") {
+        log(s, `${player(s, ctx.controller).name} may activate a loyalty ability of each planeswalker they control once more this turn.`);
+        return;
+      }
       log(s, `${player(s, ctx.controller).name}${e.rules.map((r) => (r === "cantLoseLife" ? " can't lose life" : r === "cantLoseGame" ? " can't lose the game" : r === "flash" ? " may cast spells as though they had flash" : r === "spellsUncounterable" ? "'s spells can't be countered" : r === "creatureSpellsUncounterable" ? "'s creature spells can't be countered" : "'s opponents can't win the game")).join(",")} this turn.`);
       return;
     case "flashUntilNextTurn":

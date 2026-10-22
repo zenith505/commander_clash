@@ -606,6 +606,24 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (!from.counters[counter]) fireEvent(s, { type: "lastCounterRemoved", id: from.id, counter });
       return;
     }
+    case "counterOfKindOnIt": {
+      // A kind of counter it has, chosen as it resolves (with one kind, that one); with none, nothing happens.
+      const o = objects(s, e.what, ctx)[0];
+      if (!o) return;
+      const kinds = Object.keys(o.counters).filter((k) => (o.counters[k] ?? 0) > 0);
+      const sc = (s.resolving!.scratch ??= {});
+      if (kinds.length > 1 && sc.counterKind === undefined) {
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "counterKind", options: kinds, labels: kinds.map((k) => `A ${k} counter`), prompt: `choose a kind of counter on ${characteristics(s, o).name} to put another of` };
+        return "paused";
+      }
+      const counter = sc.counterKind ?? kinds[0];
+      sc.counterKind = undefined;
+      if (!counter || !kinds.includes(counter)) return;
+      const put = putCounters(s, o, counter, 1);
+      invalidateCharacteristics(s);
+      log(s, `${src} puts ${put === 1 ? "a" : put} ${counter} counter${put === 1 ? "" : "s"} on ${characteristics(s, o).name}.`);
+      return;
+    }
     case "removeCounters":
       for (const o of objects(s, e.what, ctx)) {
         const had = o.counters[e.counter] ?? 0;

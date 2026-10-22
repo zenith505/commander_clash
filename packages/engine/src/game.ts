@@ -909,6 +909,7 @@ export function moveObject(
   o.castFromGraveyard = to === "battlefield" && castFromGraveyard ? true : undefined;
   o.wasCast = to === "battlefield" && fromZone === "stack" && !o.spellCopy ? true : undefined;
   o.enteredFromGraveyard = to === "battlefield" && fromZone === "graveyard" ? true : undefined;
+  o.enteredFromHand = to === "battlefield" && fromZone === "hand" ? true : undefined;
   if (to === "battlefield" && opts.faceDown) o.faceDown = opts.faceDown; // it enters as a face-down 2/2 (CR 701.40a)
   if (to === "battlefield" && opts.meld) joinMeld(s, o, opts.meld.with, opts.meld.key);
   if (to === "battlefield" && opts.becomes)
@@ -3352,7 +3353,7 @@ export function castProblem(
     }
   }
   if (o.faceDown && !choices?.faceDown) return "a face-down card can't be cast";
-  if (choices?.alt === "prototype" && !o.prototyped) {
+  if ((choices?.alt === "prototype" || choices?.prototyped) && !o.prototyped) {
     // Cast prototyped, only its alternative characteristics are looked at (CR 718.3a).
     if (!altCost(defOf(s, o), "prototype")) return `${defOf(s, o).name} doesn't have prototype`;
     o.prototyped = true;
@@ -4044,7 +4045,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     if (problem) throw new RulesError(problem);
     o.faceDown = compileCard(defOf(s, o)).faceDownCast!.kind; // turned face down before it's put on the stack (CR 708.4)
   }
-  if (choices.alt === "prototype" && !o.prototyped) {
+  if ((choices.alt === "prototype" || choices.prototyped) && !o.prototyped) {
     const problem = castProblem(s, p.id, id, targets, modes, convoke, improvise, x, choices);
     if (problem) throw new RulesError(problem);
     o.prototyped = true; // a prototyped spell from the moment it's cast (CR 718.3b)
@@ -4229,6 +4230,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const kickText = kicks ? describeKicks(d, kicks) : "";
   const howText =
     (via ? ` from their graveyard (${describeVia(via.kind)})` : castFrom === "exile" ? " from exile" : "") +
+    (choices.prototyped && choices.alt !== "prototype" ? " prototyped" : "") +
     (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "payZero" ? " for {0}" : choices.alt === "omniscience" ? " without paying its mana cost" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt === "convert" ? " converted, for its More Than Meets the Eye cost" : choices.alt ? ` for its ${choices.alt} cost` : "") +
     (madness && o.castAlt === "madness" ? " for its madness cost" : madness && o.castAlt === "miracle" ? " for its miracle cost" : "") +
     (choices.buyback ? ", paying buyback" : "") +
@@ -5155,7 +5157,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (!loyaltyAtInstantSpeed(s, pid, o) && !canActAtSorcerySpeed(s, pid)) return "loyalty abilities can be activated only as a sorcery";
     // Gained loyalty abilities count too, and stay counted if the effect that gave them ends (rulings).
     const used = o.activatedThisTurn?.filter((n) => n === LOYALTY_USED).length ?? 0;
-    if (used >= loyaltyPerTurn(s, o)) return `${used === 1 ? "a loyalty ability" : "two loyalty abilities"} of ${d.name} ${used === 1 ? "was" : "were"} already activated this turn`;
+    if (used >= loyaltyPerTurn(s, o)) return `${used === 1 ? "a loyalty ability" : used === 2 ? "two loyalty abilities" : `${used} loyalty abilities`} of ${d.name} ${used === 1 ? "was" : "were"} already activated this turn`;
     const remove = ab.loyaltyX ? (x ?? 0) : -(ab.loyalty ?? 0);
     if (remove > (o.counters.loyalty ?? 0)) return `${d.name} doesn't have ${remove} loyalty to remove`;
   }
@@ -5432,6 +5434,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     const change = ab.loyaltyX ? -(x ?? 0) : ab.loyalty!;
     o.counters.loyalty = (o.counters.loyalty ?? 0) + change;
     (o.activatedThisTurn ??= []).push(LOYALTY_USED);
+    if (objIsType(s, o, "Planeswalker")) p.loyaltyTurn = s.turn; // The Chain Veil
     invalidateCharacteristics(s);
     // They're still put on, so "whenever you put one or more loyalty counters on a planeswalker" triggers (CR 122.6).
     if (change > 0) fireEvent(s, { type: "countersPut", id: o.id, counter: "loyalty", amount: change, by: p.id });
@@ -5788,9 +5791,11 @@ const LOYALTY_USED = -1;
  * own "twice each turn" (Urza, Planeswalker) or its controller's Oath of Teferi.
  */
 function loyaltyPerTurn(s: GameState, o: GameObject): number {
-  if (abilitiesOf(s, o).loyaltyTwice) return 2;
   const pid = controllerOf(s, o);
-  return s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).loyaltyTwice === "yours" && controllerOf(s, obj(s, id)) === pid) ? 2 : 1;
+  // The Chain Veil: one more for each time its ability resolved for this player this turn, planeswalkers only.
+  const veil = objIsType(s, o, "Planeswalker") ? (s.turnRules ?? []).filter((r) => r.turn === s.turn && r.player === pid && r.rule === "extraLoyalty").length : 0;
+  if (abilitiesOf(s, o).loyaltyTwice) return 2 + veil;
+  return (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).loyaltyTwice === "yours" && controllerOf(s, obj(s, id)) === pid) ? 2 : 1) + veil;
 }
 
 /** The cards a library search found (CR 701.23). */

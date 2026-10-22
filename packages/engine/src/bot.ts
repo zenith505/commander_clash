@@ -2472,7 +2472,25 @@ function guessChosen(s: GameState, pid: PlayerId, card: CardDef): Chosen | undef
     const name = chooseOption(s, pid, "color", card, choiceOptions("color"));
     out = { ...out, color: (Object.keys(COLOR_NAMES) as Color[]).find((k) => COLOR_NAMES[k] === name) };
   }
+  const n = kinds.has("number") ? groupNumber(s, pid, card) : undefined;
+  if (n !== undefined) out = { ...out, number: n };
   return out;
+}
+
+/**
+ * "Choose a number between 0 and 10. Destroy all creatures with power greater than or equal to the chosen number."
+ * (Expel the Interlopers): the number its spell does the most good with (groupValue), the highest of equals.
+ */
+function groupNumber(s: GameState, pid: PlayerId, card: CardDef): number | undefined {
+  const body = compileCard(card).spell;
+  const range = body && allEffects(body.effects).flatMap((e) => (e.type === "choose" && e.choice === "number" && e.range ? [e.range] : []))[0];
+  if (!body || !range) return undefined;
+  let best: { n: number; v: number } | undefined;
+  for (let n = range.max; n >= range.min; n--) {
+    const v = groupValue(s, pid, body, { number: n }) ?? 0;
+    if (!best || v > best.v) best = { n, v };
+  }
+  return best?.n;
 }
 
 /**
@@ -2497,8 +2515,11 @@ function chooseKeyword(s: GameState, pid: PlayerId, options: string[]): string {
  * nonland cards the opponents have shown, on the battlefield and in graveyards. Sanctum Prelate's ban counts only
  * noncreature cards, and avoids the mana values of our own noncreature cards in hand. With nothing shown, 2.
  */
-function chooseNumber(s: GameState, pid: PlayerId, c: CompiledCard | undefined, options: string[]): string {
+function chooseNumber(s: GameState, pid: PlayerId, c: CompiledCard | undefined, options: string[], card?: CardDef): string {
   const r = (s.pending?.kind === "chooseOption" && s.pending.numberRange) || { min: Number(options[0] ?? 0), max: Number(options[0] ?? 0) };
+  // A resolving spell's own "choose a number" (Expel the Interlopers).
+  const forSpell = s.resolving && card ? groupNumber(s, pid, card) : undefined;
+  if (forSpell !== undefined) return String(forSpell);
   const ban = !!c?.noncreatureChosenMvCantBeCast;
   const tally = new Map<number, number>();
   const add = (n: number | undefined, w: number) => n !== undefined && Number.isFinite(n) && tally.set(n, (tally.get(n) ?? 0) + w);
@@ -2519,7 +2540,7 @@ function chooseNumber(s: GameState, pid: PlayerId, c: CompiledCard | undefined, 
 }
 
 function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardDef | undefined, options: string[]): string {
-  if (what === "number") return chooseNumber(s, pid, card ? compileCard(card) : undefined, options);
+  if (what === "number") return chooseNumber(s, pid, card ? compileCard(card) : undefined, options, card);
   if (what === "basicLandType") return chooseLandType(s, pid, options);
   if (what === "keyword") return chooseKeyword(s, pid, options);
   const c = card ? compileCard(card) : undefined;

@@ -1761,6 +1761,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "When ~ enters from a graveyard" / "from your graveyard" (Phyrexian Dragon Engine, Oscorp Industries): where it came
   // from is part of the trigger event (CR 603.6a); a card is only ever in its owner's graveyard (CR 404.2), so "your" is
   // its owner, who must be its controller now.
+  // "When ~ enters from your hand" (Thousand-Faced Shadow): put onto the battlefield from its owner's hand, cast or not
+  // (ninjutsu, CR 702.49a).
+  const fromHand = /^When(?:ever)? ~ enters from your hand, (.+)$/.exec(line);
+  if (fromHand) {
+    const t = parseTrigger(`When ~ enters, ${fromHand[1]}`);
+    return !t || t === "fail" || t.event !== "selfEnters" ? "fail" : { ...t, ifFromHand: true };
+  }
   const fromYard = /^When(?:ever)? ~ enters from (a|your) graveyard, (.+)$/.exec(line);
   if (fromYard) {
     const t = parseTrigger(`When ~ enters, ${fromYard[2]}`);

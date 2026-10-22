@@ -1370,6 +1370,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si++;
       continue;
     }
+    // "At the beginning of the upkeep of enchanted creature's controller, that player may pay {1}{B}. If the player does,
+    // untap that creature." (Dance of the Dead): their payment, then what it buys.
+    const thatDo = thatMay && /^If (?:the player|that player|they) (?:does|do), (.+)$/.exec(sentences[si + 1] ?? "");
+    if (thatMay && thatDo && /^(?:\{[^}]+\})+$/.test(thatMay[2]!)) {
+      const who = parsePlayer(thatMay[1]!.toLowerCase(), ctx);
+      const then = parseOne(capital(thatDo[1]!), ctx);
+      if (!who || who.ref === "you" || !then || then.some((e) => pauses(e))) return null;
+      effects.push({ type: "eachMay", who, effects: [], pay: { mana: thatMay[2]! }, text: `pay ${thatMay[2]!}` }, { type: "if", cond: { kind: "theyChose" }, effects: then });
+      si++;
+      continue;
+    }
     // "Each player may scry 1" (Eager Construct), "then each opponent may scry 1" (Myr Custodian), "each player may draw a
     // card" (Kwain): each decides in turn order, knowing the earlier answers, then those who did each do it, in turn
     // order (rulings on Eager Construct and Kaya, Intangible Slayer).

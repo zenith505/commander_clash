@@ -1010,3 +1010,31 @@ describe("You may cast ~ from exile", () => {
     expect(s.objects[sq]!.zone).toBe("battlefield");
   });
 });
+
+describe("Dance of the Dead", () => {
+  const dance = card("Dance of the Dead", "Enchantment — Aura", "{1}{B}", {
+    oracleText:
+      "Enchant creature card in a graveyard\nWhen this Aura enters, if it's on the battlefield, it loses \"enchant creature card in a graveyard\" and gains \"enchant creature put onto the battlefield with this Aura.\" Put enchanted creature card onto the battlefield tapped under your control and attach this Aura to it. When this Aura leaves the battlefield, that creature's controller sacrifices it.\nEnchanted creature gets +1/+1 and doesn't untap during its controller's untap step.\nAt the beginning of the upkeep of enchanted creature's controller, that player may pay {1}{B}. If the player does, untap that creature.",
+  });
+
+  it("plays", () => expect(isFullySupported(dance)).toBe(true));
+
+  it("returns the creature tapped, +1/+1; it stays tapped through the untap step until its controller pays {1}{B}", () => {
+    const { s: s0, ap, ids } = setup([dance]);
+    const b = putOnBattlefield(s0, ap, bear());
+    moveObject(s0, b, "graveyard");
+    let s = s0;
+    for (const a of planCast(s, ap, ids[0]!, [target(b)])!) s = act(s, a);
+    for (let i = 0; i < 20 && (s.stack.length || s.triggerQueue.length); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.objects[b]).toMatchObject({ zone: "battlefield", tapped: true });
+    expect(characteristics(s, s.objects[b]!).power).toBe(3);
+    s = passUntil(s, "upkeep", ap);
+    expect(s.objects[b]!.tapped).toBe(true);
+    for (let i = 0; i < 10 && s.pending?.kind !== "chooseMay"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    s.players[ap]!.manaPool.B = 2;
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect(s.objects[b]!.tapped).toBe(false);
+    expect(s.players[ap]!.manaPool.B).toBe(0);
+  });
+});

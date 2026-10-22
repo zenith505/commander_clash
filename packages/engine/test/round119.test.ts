@@ -491,7 +491,7 @@ describe("Firebender Ascension", () => {
     const token = s.battlefield.find((x) => s.objects[x]!.isToken)!;
     expect(s.objects[token]!.cardId && s.cards[s.objects[token]!.cardId]!.name).toBe("Soldier Token");
     expect(power(s, s.objects[token]!)).toBe(2);
-    s.objects[token]!.summoningSick = false;
+    s.objects[token]!.controlledSinceTurn = -1;
     s = toBlockers(attackWith(s, ap, opp, token), true);
     const asc = s.battlefield.find((x) => s.cards[s.objects[x]!.cardId]!.name === "Firebender Ascension")!;
     expect(s.objects[asc]!.counters.quest).toBe(1);

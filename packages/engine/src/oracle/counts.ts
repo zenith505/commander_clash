@@ -2,7 +2,7 @@ import type { AmountExpr, Count, ObjRef, PlayerRef, TargetSpec } from "../abilit
 import { ANY_COUNTER } from "../abilities";
 import { NUM, num, COUNTER, counterKind, COLOR_WORDS, capital, singularWord } from "./words";
 import { Ctx, addTarget } from "./body";
-import { parsePlayer, parseTargetPhrase, subtypeClause } from "./targets";
+import { parseGroup, parsePlayer, parseTargetPhrase, subtypeClause } from "./targets";
 
 /**
  * A count: "the number of creatures you control", "cards in your hand", "~'s power", "your
@@ -18,6 +18,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (ctx?.milledThisWay && /^the total mana value of those cards$/i.test(p)) return { count: { kind: "milledManaValue" } };
   // "The number of experience counters you have", "for each experience counter you have" (CR 122.1).
   if ((each && /^experience counter you have$/i.test(p)) || /^the number of experience counters you have$/i.test(p)) return { count: { kind: "experience", who: { ref: "you" } } };
+  // "For each Urza's land you control" (Urza's Workshop): the land type Urza's (CR 205.3i), not a possessive.
+  if ((m = /^(?:the number of )?(Urza's lands? you control)$/.exec(p))) {
+    const g = parseGroup(m[1]!.replace(/land you/, "lands you"), true);
+    return g && !g.other ? { count: { kind: "permanents", filter: { ...g.filter, text: m[1]! } } } : null;
+  }
   // Arithmetic around a count.
   if ((m = /^twice (.+)$/i.exec(p))) {
     const c = parseCount(m[1]!, ctx);

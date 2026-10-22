@@ -935,3 +935,25 @@ describe("Fighter Class level 3: up to one target creature blocks the attacker t
     expect(act(s, { type: "declareBlockers", player: opp, blocks: [{ blocker, attacker: a2 }] }).objects[blocker]!.blocking).toEqual([a2]);
   });
 });
+
+describe("Urza's Workshop", () => {
+  const workshop = card("Urza's Workshop", "Land — Urza's", "", { oracleText: "{T}: Add {C}.\nMetalcraft — {T}: Add {C} for each Urza's land you control. Activate only if you control three or more artifacts." });
+  const mine = card("Urza's Mine", "Land — Urza's Mine", "", { oracleText: "{T}: Add {C}. If you control an Urza's Power-Plant and an Urza's Tower, add {C}{C} instead." });
+
+  it("plays", () => expect(isFullySupported(workshop)).toBe(true));
+
+  it("with three artifacts, adds {C} for each Urza's land you control (itself too)", () => {
+    const { s: s0, ap } = setup([]);
+    const w = putOnBattlefield(s0, ap, workshop);
+    putOnBattlefield(s0, ap, mine);
+    putOnBattlefield(s0, ap, card("Forest", "Basic Land — Forest"));
+    const rock = card("Ornithopter", "Artifact Creature — Thopter", "{0}", { power: "0", toughness: "2", keywords: ["Flying"], oracleText: "Flying" });
+    for (let i = 0; i < 2; i++) putOnBattlefield(s0, ap, rock);
+    expect(compileCard(workshop).activated[0]!.mana).toBe(true);
+    const tap: Action = { type: "activateAbility", player: ap, objectId: w, index: 0 };
+    expect(() => act(s0, tap)).toThrow();
+    putOnBattlefield(s0, ap, rock);
+    const s = act(s0, tap);
+    expect(pool(s, ap).C).toBe(2);
+  });
+});

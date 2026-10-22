@@ -876,6 +876,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   text = text.replace(/\b(secretly votes for [^.]+?), then those votes are revealed\./g, "$1.");
   // "You may pay eight {E}. If you pay, ..." (Lightning Runner) says the same as "If you do".
   text = text.replace(/(you may pay [^.]+\.) If you pay, /g, "$1 If you do, ");
+  // "Roll a d20. [Instructions with X.] 1—9 | X is one. 10—19 | X is two. 20 | X is three." (Wand of Wonder): each row
+  // does the instructions with its X (CR 706.3a); only one row applies.
+  text = text.replace(/^(Roll a d\d+\.) (.+?) ((?:\d+(?:—\d+)? \| X is (?:one|two|three|four|five)\.\s*)+)$/, (all, roll: string, body: string, rows: string) =>
+    /\bX\b/.test(body) ? `${roll} ${[...rows.matchAll(/(\d+(?:—\d+)?) \| X is (\w+)\./g)].map((r) => `${r[1]} | ${body.replace(/\bX\b/g, r[2]!)}`).join(" ")}` : all,
+  );
   let rowToken: string | undefined;
   let rowCopy: string | undefined;
   // The instructions split off after a ", then" (the first part of each sentence stays out).
@@ -1734,6 +1739,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const filter: TargetSpec = { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], owner: "you", text: "instant or sorcery card" };
       effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, fromYard: { filter, randomLinked: true } });
       si += 2;
+      continue;
+    }
+    // Wand of Wonder (one row of its table): "Each opponent exiles cards from the top of their library until they exile an
+    // instant or sorcery card, then shuffles the rest into their library. You may cast up to two instant and/or sorcery
+    // spells from among cards exiled this way without paying their mana costs." Cast as this resolves (CR 608.2g).
+    const wandCast = /^[Ee]ach opponent exiles cards from the top of their library until they exile an instant or sorcery card, then shuffles the rest into their library$/.test(s)
+      ? /^You may cast up to (one|two|three) instant and\/or sorcery spells? from among cards exiled this way without paying (?:its|their) mana costs?$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "")
+      : null;
+    if (wandCast) {
+      const spells: TargetSpec = { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" };
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 1, each: true, opponents: true, untilHit: spells, filter: spells, max: num(wandCast[1]!) });
+      si++;
       continue;
     }
     // Etali, Primal Conqueror: "each player exiles cards from the top of their library until they exile a nonland card.

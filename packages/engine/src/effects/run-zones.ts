@@ -10,7 +10,7 @@ import { bindBound, bindChosen, linkedCards, objectMatches, pickOptions, printed
 import { ResolveCtx, apnap, objects, players, amountNow, amountCtx, amountFor, runEffect } from "./resolve";
 import { createToken, tokenCopies } from "./run-tokens";
 import { compileCard } from "../oracle";
-import { nextRandom, shuffle } from "../rng";
+import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { askWholeGraveyardOrder } from "../graveyard";
 import { foundWith, newObjects } from "../mutate";
 import { addDelayed, paidUnless, removeCopy } from "./run-spells";
@@ -837,14 +837,28 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (e.each) {
           // Etali: the top card of each player's library, all exiled at once.
           // Etali, Primal Conqueror: each player's cards down to their first nonland card, all of them if there's none.
+          // Wand of Wonder: each opponent's down to their first instant or sorcery card, the rest shuffled back.
+          const hit = (id: ObjectId) => (e.untilHit ? printedMatches(e.untilHit, defOf(s, obj(s, id))) : !isType(defOf(s, obj(s, id)), "Land"));
           const upTo = (lib: ObjectId[]) => {
-            if (!e.untilNonland) return lib.slice(0, amountNow(s, e.n, ctx));
-            const at = lib.findIndex((id) => !isType(defOf(s, obj(s, id)), "Land"));
+            if (!e.untilNonland && !e.untilHit) return lib.slice(0, amountNow(s, e.n, ctx));
+            const at = lib.findIndex(hit);
             return at < 0 ? [...lib] : lib.slice(0, at + 1);
           };
-          const ids = livingPlayers(s).flatMap((pid) => upTo(player(s, pid).library));
+          const who = livingPlayers(s).filter((pid) => !e.opponents || pid !== ctx.controller);
+          const exiledBy = who.map((pid) => [pid, upTo(player(s, pid).library)] as const);
+          let ids = exiledBy.flatMap(([, x]) => x);
           for (const id of ids) moveObject(s, id, "exile");
-          log(s, ids.length ? `${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} exiled from the top of each library.` : "No library has a card to exile.");
+          log(s, ids.length ? `${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} exiled from the top of ${e.opponents ? "each opponent's library" : "each library"}.` : "No library has a card to exile.");
+          if (e.untilHit) {
+            for (const [pid, theirs] of exiledBy) {
+              const rest = theirs.filter((id) => !hit(id) && obj(s, id).zone === "exile");
+              if (!rest.length) continue;
+              for (const id of rest) moveObject(s, id, "library");
+              shuffleLibrary(s, player(s, pid));
+              log(s, `${player(s, pid).name} shuffles the other ${rest.length} card${rest.length === 1 ? "" : "s"} into their library.`);
+            }
+            ids = ids.filter((id) => obj(s, id).zone === "exile");
+          }
           sc.castAmong = { ids: ids.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
         }
       }

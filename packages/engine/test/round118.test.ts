@@ -421,3 +421,50 @@ describe("Aminatou's Augury", () => {
     expect(planCast(s, ap, top[3]!)).toBeNull();
   });
 });
+
+const wand = card("Wand of Wonder", "Artifact", "{3}{R}", {
+  oracleText:
+    "{4}, {T}: Roll a d20. Each opponent exiles cards from the top of their library until they exile an instant or sorcery card, then shuffles the rest into their library. You may cast up to X instant and/or sorcery spells from among cards exiled this way without paying their mana costs.\n1—9 | X is one.\n10—19 | X is two.\n20 | X is three.",
+});
+const divination = card("Divination", "Sorcery", "{2}{U}", { oracleText: "Draw two cards." });
+
+describe("Wand of Wonder", () => {
+  it("each opponent exiles down to an instant or sorcery card, shuffles the rest back; you cast up to X of them for free", () => {
+    expect(isFullySupported(wand)).toBe(true);
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const w = putOnBattlefield(s, ap, wand);
+    const opps = [1, 2, 3].map((n) => later(s, ap, n));
+    const hits = opps.map((pid) => {
+      const ids = [forest, bear(), divination].map((d) => {
+        const id = putOnBattlefield(s, pid, d);
+        moveObject(s, id, "library");
+        return id;
+      });
+      s.players[pid]!.library = [...ids, ...s.players[pid]!.library.filter((x) => !ids.includes(x))];
+      return { pid, rest: ids.slice(0, 2), hit: ids[2]! };
+    });
+    const lib = opps.map((pid) => s.players[pid]!.library.length);
+    s = settle(run(s, planActivate(s, ap, w, 0)));
+    const rolled = s.log.map((l) => /rolls? (?:a )?(\d+)/.exec(l.text)).find(Boolean);
+    const result = Number(rolled?.[1]);
+    const x = result >= 20 ? 3 : result >= 10 ? 2 : 1;
+    for (const h of hits) {
+      expect(s.objects[h.hit]!.zone).toBe("exile");
+      expect(h.rest.every((id) => s.objects[id]!.zone === "library")).toBe(true);
+    }
+    expect(opps.map((pid) => s.players[pid]!.library.length)).toEqual(lib.map((n) => n - 1));
+    const hand = s.players[ap]!.hand.length;
+    for (let i = 0; i < x; i++) {
+      expect(s.pending).toMatchObject({ kind: "chooseOption", what: "castFromAmong", player: ap });
+      const pick = hits.find((h) => s.objects[h.hit]!.zone === "exile")!.hit;
+      s = act(s, { type: "chooseOption", player: ap, choice: pick });
+      s = run(s, planCast(s, ap, pick));
+    }
+    // No more than X.
+    expect(s.pending?.kind === "chooseOption" && s.pending.what === "castFromAmong").toBe(false);
+    s = settle(s);
+    expect(s.players[ap]!.hand.length).toBe(hand + 2 * x);
+    expect(hits.filter((h) => s.objects[h.hit]!.zone === "exile").length).toBe(3 - x);
+  });
+});

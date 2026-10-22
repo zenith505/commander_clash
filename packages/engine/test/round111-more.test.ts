@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passAll, passUntil, putOnBattlefield, setup } from "./helpers";
-import { isFullySupported, planCast, waitingOn, type GameState } from "../src";
+import { invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type GameState } from "../src";
 
 // Real oracle text (Scryfall).
 const singleCombat = card("Single Combat", "Sorcery", "{3}{W}{W}", {
@@ -17,6 +17,19 @@ const plunderer = card("Generous Plunderer", "Creature — Human Rogue", "{1}{R}
   oracleText:
     "Menace\nAt the beginning of your upkeep, you may create a Treasure token. When you do, target opponent creates a tapped Treasure token.\nWhenever this creature attacks, it deals damage to defending player equal to the number of artifacts they control.",
 });
+const akiri = card("Akiri, Fearless Voyager", "Legendary Creature — Kor Warrior", "{1}{R}{W}", {
+  power: "3",
+  toughness: "3",
+  oracleText:
+    "Whenever you attack a player with one or more equipped creatures, draw a card.\n{W}: You may unattach an Equipment from a creature you control. If you do, tap that creature and it gains indestructible until end of turn.",
+});
+const horizon = card("Horizon Explorer", "Creature — Insect Scout", "{2}{G}", {
+  power: "2",
+  toughness: "4",
+  oracleText:
+    "Lands you control enter untapped.\nWhenever you attack a player, create a Lander token. (It's an artifact with \"{2}, {T}, Sacrifice this token: Search your library for a basic land card, put it onto the battlefield tapped, then shuffle.\")",
+});
+const bonesplitter = card("Bonesplitter", "Artifact — Equipment", "{1}", { oracleText: "Equipped creature gets +2/+0.\nEquip {1}" });
 const treasure = card("Treasure", "Token Artifact — Treasure", "", { oracleText: "{T}, Sacrifice this token: Add one mana of any color." });
 
 /** Pass along, answering every pending choice the dull way, until `stop` holds. */
@@ -71,7 +84,7 @@ describe("Generous Plunderer", () => {
     expect(pend.kind).toBe("chooseTargets");
     s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] } as never);
     s = until(s, (x) => x.step === "main1" && x.activePlayer === ap);
-    const treasures = (pid: string) => s.battlefield.filter((id) => s.objects[id]!.controller === pid && s.cards[s.objects[id]!.cardId]!.name.startsWith("Treasure"));
+    const treasures = (pid: number) => s.battlefield.filter((id) => s.objects[id]!.controller === pid && s.cards[s.objects[id]!.cardId]!.name.startsWith("Treasure"));
     expect(treasures(ap).length).toBe(1);
     expect(treasures(opp).length).toBe(2);
     expect(treasures(opp).filter((id) => s.objects[id]!.tapped).length).toBe(1);
@@ -80,5 +93,67 @@ describe("Generous Plunderer", () => {
     s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: p, defender: opp }] });
     for (let i = 0; i < 20 && s.players[opp]!.life === life; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
     expect(s.players[opp]!.life).toBe(life - 2);
+  });
+});
+
+/** Attach `eq` to `to`. */
+function equip(s: GameState, eq: string, to: string) {
+  s.objects[eq]!.attachedTo = to;
+  invalidateCharacteristics(s);
+}
+
+describe("Akiri, Fearless Voyager", () => {
+  it("is supported, and draws a card for each player attacked by an equipped creature", () => {
+    expect(isFullySupported(akiri)).toBe(true);
+    let { s, ap } = setup([]);
+    putOnBattlefield(s, ap, akiri);
+    const [b1, b2, b3] = [putOnBattlefield(s, ap, bear()), putOnBattlefield(s, ap, bear()), putOnBattlefield(s, ap, bear())];
+    equip(s, putOnBattlefield(s, ap, bonesplitter), b1!);
+    equip(s, putOnBattlefield(s, ap, bonesplitter), b2!);
+    const [o1, o2, o3] = s.turnOrder.filter((p) => p !== ap);
+    s = passUntil(s, "declareAttackers", ap);
+    const hand = s.players[ap]!.hand.length;
+    // Two equipped creatures at one player, one at another, an unequipped one at the third: two cards.
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: b1!, defender: o1! }, { attacker: b2!, defender: o2! }, { attacker: b3!, defender: o3! }] });
+    expect(s.triggerQueue.length + s.stack.length).toBe(2);
+    s = until(s, (x) => x.stack.length === 0 && x.triggerQueue.length === 0);
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
+  });
+
+  it("unattaches an Equipment as the ability resolves; the creature taps and gains indestructible", () => {
+    let { s, ap } = setup([]);
+    const a = putOnBattlefield(s, ap, akiri);
+    const b1 = putOnBattlefield(s, ap, bear());
+    const b2 = putOnBattlefield(s, ap, bear());
+    const e1 = putOnBattlefield(s, ap, bonesplitter);
+    const e2 = putOnBattlefield(s, ap, bonesplitter);
+    equip(s, e1, b1);
+    equip(s, e2, b2);
+    for (const x of planActivate(s, ap, a, 0)!) s = act(s, x);
+    s = passAll(s);
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", action: "unattach", });
+    expect([...(s.pending as { options: string[] }).options].sort()).toEqual([e1, e2].sort());
+    s = act(s, { type: "pickPermanents", player: ap, ids: [e2] });
+    expect(s.objects[e2]!.attachedTo).toBeUndefined();
+    expect(s.objects[e2]!.zone).toBe("battlefield");
+    expect(s.objects[e1]!.attachedTo).toBe(b1);
+    expect(s.objects[b2]!.tapped).toBe(true);
+    expect(s.objects[b1]!.tapped).toBe(false);
+    expect(objHasKeyword(s, s.objects[b2]!, "Indestructible")).toBe(true);
+    expect(objHasKeyword(s, s.objects[b1]!, "Indestructible")).toBe(false);
+  });
+});
+
+describe("Whenever you attack a player", () => {
+  it("triggers once for each player attacked (Horizon Explorer)", () => {
+    let { s, ap } = setup([]);
+    putOnBattlefield(s, ap, horizon);
+    const [b1, b2] = [putOnBattlefield(s, ap, bear()), putOnBattlefield(s, ap, bear())];
+    const [o1, o2] = s.turnOrder.filter((p) => p !== ap);
+    s = passUntil(s, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: b1!, defender: o1! }, { attacker: b2!, defender: o2! }] });
+    expect(s.triggerQueue.length + s.stack.length).toBe(2);
   });
 });

@@ -143,6 +143,24 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
   }
   // "Put a +1/+1 counter on a creature you control. It gains ...": "it" is the one picked, while it's that object (CR 400.7).
   if ((e.action === "counters" || e.action === "choose") && s.resolving) s.resolving.created = apnap(s, who).flatMap((pid) => sc.chosen?.[pid] ?? []).filter((id) => s.objects[id]?.zone === "battlefield");
+  // "Unattach an Equipment from a creature you control. If you do, tap that creature" (Akiri, Fearless Voyager): it stays
+  // on the battlefield, attached to nothing (CR 701.3d); "that creature" is the one it was attached to.
+  if (e.action === "unattach") {
+    const hosts: ObjectId[] = [];
+    for (const pid of apnap(s, who))
+      for (const id of sc.chosen?.[pid] ?? []) {
+        const o = s.objects[id];
+        if (o?.zone !== "battlefield" || !o.attachedTo) continue;
+        const host = o.attachedTo;
+        log(s, `${player(s, pid).name} unattaches ${defOf(s, o).name} from ${defOf(s, obj(s, host)).name}.`);
+        fireEvent(s, { type: "unattached", id, host });
+        o.attachedTo = undefined;
+        invalidateCharacteristics(s);
+        hosts.push(host);
+      }
+    if (s.resolving) s.resolving.created = hosts;
+    return;
+  }
   for (const pid of apnap(s, who))
     for (const id of sc.chosen?.[pid] ?? []) {
       const o = s.objects[id];

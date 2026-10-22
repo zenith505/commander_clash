@@ -2681,6 +2681,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si++;
       continue;
     }
+    // Akiri, Fearless Voyager: "You may unattach an Equipment from a creature you control. If you do, tap that creature
+    // and it gains indestructible until end of turn." The Equipment is chosen as it resolves (rulings), whoever controls
+    // it; "that creature" is the one it was attached to (run as a pick, the creature becoming "it").
+    if (/^You may unattach an Equipment from a creature you control$/.test(s)) {
+      const then = /^If you do, tap that creature and it (gains [^.]+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+      const rest = then ? parseBody(`Choose a creature you control. Tap it. It ${then[1]}.`, {}) : null;
+      if (!rest || rest.targets.length || rest.effects[0]?.type !== "pick") return null;
+      const pick: Effect = { type: "pick", who: { ref: "you" }, filter: { kind: "object", types: [], notTypes: [], notColors: [], subtypes: ["Equipment"], text: "Equipment" }, n: 1, action: "unattach" };
+      effects.push({ type: "may", effects: [pick, ...rest.effects.slice(1)], text: `unattach an Equipment from a creature you control. If you do, tap that creature and it ${then![1]}` });
+      si++;
+      continue;
+    }
     // Sunforger: "Search your library for a red or white instant card with mana value 4 or less and cast that card without
     // paying its mana cost. Then shuffle." The card is cast from the library as this resolves (CR 608.2g), then the
     // library is shuffled.

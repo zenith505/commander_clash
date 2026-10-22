@@ -728,12 +728,21 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   let min: number | undefined;
   let anyone = false;
   let damageX = false;
-  if ((m = /^Whenever (?:one or more (.+?) you control attack|you attack with (one|two|three|four|five) or more (.+?)|you attack)(?: a player)?, (.+)$/.exec(line))) {
+  // "Whenever you attack a player (with one or more equipped creatures)": once for each player attacked, not a
+  // planeswalker or battle (CR 508.3e; rulings on Akiri, Fearless Voyager and Horizon Explorer). "That player" is them.
+  let perPlayer = false;
+  const youAttackAPlayer = /^Whenever you attack a player( with one or more [^,]+)?, /.exec(line);
+  if (youAttackAPlayer) {
+    perPlayer = true;
+    line = `Whenever you attack${youAttackAPlayer[1] ?? ""}, ${line.slice(youAttackAPlayer[0].length)}`;
+  }
+  if ((m = /^Whenever (?:one or more (.+?) you control attack|you attack with (one|two|three|four|five) or more (.+?)|you attack), (.+)$/.exec(line))) {
     event = "creaturesYouControlAttack";
     phrase = m[1] ?? m[3];
     bodyText = m[4]!;
     const n = m[2] ? num(m[2]) : 1;
     if (n > 1) min = n;
+    if (!perPlayer && /\bthat player\b/.test(bodyText)) return "fail";
   } else if ((m = /^Whenever another player attacks with (two|three|four|five) or more creatures, they draw a card if none of those creatures attacked you\.?$/.exec(line))) {
     // Firemane Commando: another player's attack, all of their attackers counted; they draw unless one of those creatures
     // attacked you (not your planeswalkers or battles), as they were declared (rulings).
@@ -792,7 +801,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     if (/\bX\b/.test(text)) return "fail";
     text = text.replace(/\bthat (?:much|many)\b/g, "X");
   }
-  let body = parseBody(text, { eventPlayer: event === "creaturesYouControlDealCombatDamageToPlayer" });
+  let body = parseBody(text, { eventPlayer: event === "creaturesYouControlDealCombatDamageToPlayer" || perPlayer });
   if (!body) return "fail";
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: damageX ? body.text : unX(body.text, bodyText) };
   if (toOpponent) {
@@ -803,7 +812,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     const filter: TargetSpec = group ?? { kind: "object", types: ["Creature"], text: "creature" };
     body = { ...body, effects: [...body.effects, { type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "bounce", fromGroup: true }], text: `return one of those ${phrase} to its owner's hand` }], text: `${body.text} You may return one of those ${phrase} to its owner's hand.` };
   }
-  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}), ...(toOpponent ? { toOpponent: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(anyone ? { anyoneAttacks: true as const } : {}) };
+  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}), ...(toOpponent ? { toOpponent: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(anyone ? { anyoneAttacks: true as const } : {}), ...(perPlayer ? { perPlayer: true as const } : {}) };
 }
 
 /** "Other creatures you control", "tokens you control", "artifacts and/or creatures you control": what a batch trigger counts. */

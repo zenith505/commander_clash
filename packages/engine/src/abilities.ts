@@ -1006,7 +1006,7 @@ export type Modification =
    */
   | { kind: "assignsToughness"; ifGreater?: true }
   /** "Can attack as though it didn't have defender" (CR 702.3b). */
-  | { kind: "attackDespiteDefender" }
+  | { kind: "attackDespiteDefender"; /** Only players who attacked you during their last turn (Weathered Sentinels). */ vsAttackedYou?: true }
   /** "Target creature blocks this turn if able": it blocks some attacking creature if able (CR 509.1c). */
   | { kind: "mustBlock" }
   /**

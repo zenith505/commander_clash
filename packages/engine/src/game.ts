@@ -6565,7 +6565,7 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
       !o.tapped &&
       !isSummoningSick(s, o) &&
       !objIsType(s, o, "Battle") && // a battle can't attack, even one that's also a creature (rulings)
-      (!objHasKeyword(s, o, "Defender") || characteristics(s, o).attackDespiteDefender) &&
+      (!objHasKeyword(s, o, "Defender") || characteristics(s, o).attackDespiteDefender || (characteristics(s, o).attackDespiteDefenderVs && opps.some((d) => attackedYouLastTurn(s, d, pid)))) &&
       !characteristics(s, o).cantAttack &&
       !(s.cantAttackThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false)) &&
       (!(characteristics(s, o).attackUnless.length || characteristics(s, o).cantAttackPlayers.length || characteristics(s, o).cantAttackOwner) || opps.some((d) => !attackProblem(s, o, d))),
@@ -6634,6 +6634,8 @@ export function attackCost(s: GameState, attacks: { defender: PlayerId; planeswa
 
 export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, planeswalker = false, /** The planeswalker or battle attacked. */ attacked?: ObjectId): string | null {
   const c = characteristics(s, o);
+  // Weathered Sentinels: defender stops it attacking anyone but those players themselves (CR 702.3b).
+  if (c.attackDespiteDefenderVs && !c.attackDespiteDefender && objHasKeyword(s, o, "Defender") && (planeswalker || attacked !== undefined || !attackedYouLastTurn(s, defender, c.controller))) return `${c.name} has defender`;
   // "Can't attack you or planeswalkers you control": that player, and their planeswalkers (a battle they protect isn't one).
   const atBattle = !!attacked && !!s.objects[attacked] && objIsType(s, obj(s, attacked), "Battle") && !objIsType(s, obj(s, attacked), "Planeswalker");
   if (c.cantAttackPlayers.includes(defender) && !atBattle) return `${c.name} can't attack ${player(s, defender).name}${planeswalker ? "'s planeswalkers" : ""}`;
@@ -6644,6 +6646,12 @@ export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, p
     if (!s.battlefield.some((id) => controllerOf(s, obj(s, id)) === defender && objectMatches(s, f, obj(s, id), c.controller, false)))
       return `${c.name} can't attack unless defending player controls ${f.text}`;
   return null;
+}
+/** Did `them` attack `you` during their last turn (their latest one that has begun, or the one before it while it's theirs)? */
+export function attackedYouLastTurn(s: GameState, them: PlayerId, you: PlayerId): boolean {
+  const p = player(s, them);
+  const last = s.activePlayer === them ? p.lastTurnBegan : p.turnBegan;
+  return last !== undefined && p.attackedInTurn?.turn === last && p.attackedInTurn.players.includes(you);
 }
 export const attackers = (s: GameState) => s.battlefield.map((id) => obj(s, id)).filter((o) => o.attacking !== undefined);
 const attackersAndBlockers = (s: GameState) =>
@@ -6831,6 +6839,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   s.attackersThisTurn = (s.attackersThisTurn ?? 0) + attacks.length;
   // Melee counts the opponents attacked, not their planeswalkers (rulings).
   p.attackedPlayers = { turn: s.turn, players: [...new Set(attacks.filter((a) => a.planeswalker === undefined).map((a) => a.defender))] };
+  if (p.attackedPlayers.players.length) p.attackedInTurn = { turn: s.turn, players: [...new Set([...(p.attackedInTurn?.turn === s.turn ? p.attackedInTurn.players : []), ...p.attackedPlayers.players])] };
   s.pending = null;
   if (attacks.length === 0) {
     log(s, `${p.name} declares no attackers.`);

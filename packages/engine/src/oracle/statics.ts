@@ -1015,6 +1015,7 @@ export function parseStaticMods(rest: string): Modification[] | null {
   // Doran (CR 510.1a as modified), defender (CR 702.3b).
   if (/^assigns? combat damage equal to (?:its|their) toughness rather than (?:its|their) power$/.test(rest)) return [{ kind: "assignsToughness" }];
   if (/^can attack as though (?:it|they) didn't have defender$/.test(rest)) return [{ kind: "attackDespiteDefender" }];
+  if (/^can attack players who attacked you during their last turn as though it didn't have defender$/.test(rest)) return [{ kind: "attackDespiteDefender", vsAttackedYou: true }];
   // "Gets +0/+2 and assigns combat damage equal to its toughness ..." (Gauntlets of Light), "assigns ... and can attack
   // as though it didn't have defender" (Arcades).
   if ((m = new RegExp(`^(gets? ${PT}/${PT}|assigns? combat damage .+?) and (assigns? combat damage .+|can attack as though .+)$`).exec(rest))) {
@@ -1317,7 +1318,7 @@ function parseStaticLine(line: string): StaticAbility | null {
   // greater is checked as it assigns combat damage, which comes to the same thing as a group that changes with it.
   const greater = /^(.+?) with toughness greater than (?:its|their) power (assigns? .+)$/.exec(text);
   if (greater) text = `${greater[1]} ${greater[2]}`;
-  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|(?:is|are) all colors|can't .+|can block .+|can attack as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:, .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses? all abilities(?: and (?:has|have) base power and toughness \d+\/\d+)?|loses? [a-z ,]+? and can't have or gain [a-z ,]+)$/.exec(text);
+  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|(?:is|are) all colors|can't .+|can block .+|can attack as though .+|can attack players who attacked you during their last turn as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:, .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses? all abilities(?: and (?:has|have) base power and toughness \d+\/\d+)?|loses? [a-z ,]+? and can't have or gain [a-z ,]+)$/.exec(text);
   if (!m) return null;
   const affects = parseAffected(m[1]!);
   if (!affects) return null;

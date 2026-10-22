@@ -682,6 +682,8 @@ export interface Player {
   attackedWith?: { turn: number; keys: string[] };
   /** The players this player attacked with creatures in the latest combat, and its turn (melee, CR 702.121a). */
   attackedPlayers?: { turn: number; players: PlayerId[] };
+  /** The players this player attacked with creatures in any combat of its latest turn that had one (Weathered Sentinels). */
+  attackedInTurn?: { turn: number; players: PlayerId[] };
   /** The city's blessing (CR 702.131c): once a player has it, they keep it for the rest of the game. */
   citysBlessing?: boolean;
   /**

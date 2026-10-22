@@ -188,6 +188,8 @@ export interface Characteristics {
   assignsToughness: boolean;
   assignsToughnessIfGreater: boolean;
   attackDespiteDefender: boolean;
+  /** "Can attack players who attacked you during their last turn as though it didn't have defender" (Weathered Sentinels). */
+  attackDespiteDefenderVs: boolean;
   /** "Can block an additional creature each combat", added up; "can block any number of creatures". */
   extraBlocks: number;
   blockAny: boolean;
@@ -272,6 +274,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     assignsToughness: false,
     assignsToughnessIfGreater: false,
     attackDespiteDefender: false,
+    attackDespiteDefenderVs: false,
     extraBlocks: 0,
     blockAny: false,
   };
@@ -1199,8 +1202,11 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "mustBeBlocked":
     case "allMustBlock":
     case "mustBlock":
-    case "attackDespiteDefender":
       c[m.kind] = true;
+      return;
+    case "attackDespiteDefender":
+      if (m.vsAttackedYou) c.attackDespiteDefenderVs = true;
+      else c.attackDespiteDefender = true;
       return;
     case "assignsToughness":
       if (m.ifGreater) c.assignsToughnessIfGreater = true;

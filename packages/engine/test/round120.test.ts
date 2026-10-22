@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { abilityProblem, botActions, castProblem, isFullySupported, planActivate, planCast, power, spellCost, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { abilityProblem, attackProblem, botActions, castProblem, isFullySupported, potentialAttackers, planActivate, planCast, power, spellCost, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 import { controllerOf, invalidateCharacteristics } from "../src/layers";
 import { moveObject } from "../src/game";
 import { defOf } from "../src/cards";
@@ -558,5 +558,22 @@ describe("more popular cards", () => {
     const s = settle(passUntil(s0, "end", ap));
     expect(s.objects[b]!.counters["+1/+1"]).toBe(1);
     expect(s.objects[w]!.counters.loyalty).toBe(4);
+  });
+  it("Weathered Sentinels can attack only players who attacked you during their last turn", () => {
+    const sentinels = card("Weathered Sentinels", "Artifact Creature — Wall", "{3}", { power: "2", toughness: "5", keywords: ["Defender", "Reach", "Vigilance", "Trample"], oracleText: "Defender, reach, vigilance, trample\nThis creature can attack players who attacked you during their last turn as though it didn't have defender.\nWhenever this creature attacks, it gets +3/+3 and gains indestructible until end of turn." });
+    supported(sentinels);
+    const { s, ap, opp } = setup([]);
+    const w = putOnBattlefield(s, ap, sentinels);
+    const other = later(s, ap, 2);
+    expect(potentialAttackers(s, ap).some((o) => o.id === w)).toBe(false);
+    s.players[opp]!.turnBegan = s.turn - 1;
+    s.players[opp]!.attackedInTurn = { turn: s.turn - 1, players: [ap] };
+    expect(potentialAttackers(s, ap).some((o) => o.id === w)).toBe(true);
+    expect(attackProblem(s, s.objects[w]!, opp)).toBeNull();
+    expect(attackProblem(s, s.objects[w]!, other)).toMatch(/defender/);
+    // Attacks in an earlier turn of theirs don't count.
+    s.players[opp]!.turnBegan = s.turn - 1;
+    s.players[opp]!.attackedInTurn = { turn: s.turn - 5, players: [ap] };
+    expect(attackProblem(s, s.objects[w]!, opp)).toMatch(/defender/);
   });
 });

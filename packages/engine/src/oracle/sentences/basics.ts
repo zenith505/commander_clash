@@ -269,8 +269,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: "shuffleZones", who: { ref: "you" }, graveyard: true, ...(filter ? { filter } : {}) }];
   }
   // Winds of Change: "Each player shuffles the cards from their hand into their library, then draws that many cards."
-  if ((m = /^([Tt]arget player|[Ee]ach player|[Tt]arget opponent) shuffles the cards from their hand into their library, then draws that many cards$/.exec(s))) {
-    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+  // Whirlpool Warrior: "shuffle the cards from your hand into your library, then draw that many cards".
+  if ((m = /^(?:([Tt]arget player|[Ee]ach player|[Tt]arget opponent) shuffles the cards from their hand into their library, then draws|[Ss]huffle the cards from your hand into your library, then draw) that many cards$/.exec(s))) {
+    const who: PlayerRef | null = m[1] ? parsePlayer(m[1].toLowerCase(), ctx) : { ref: "you" };
     return who ? [{ type: "shuffleZones", who, hand: true, drawThatMany: true }] : null;
   }
   if ((m = /^(?:([Tt]arget player|[Ee]ach player|[Tt]arget opponent) shuffles their|[Ss]huffle your) (hand and graveyard|graveyard|hand) into (?:their|your) library(?:, then (?:draws|draw) (\w+) cards?)?$/.exec(s))) {

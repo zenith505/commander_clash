@@ -1040,6 +1040,8 @@ const windsOfChange = card("Winds of Change", "Sorcery", "{R}", { oracleText: "E
 describe("Winds of Change", () => {
   it("each player draws as many cards as they shuffled into their own library (rulings)", () => {
     expect(isFullySupported(windsOfChange)).toBe(true);
+    const whirlpool = card("Whirlpool Warrior", "Creature — Merfolk Warrior", "{2}{U}", { power: "2", toughness: "2", oracleText: "When this creature enters, shuffle the cards from your hand into your library, then draw that many cards.\n{R}, Sacrifice this creature: Each player shuffles the cards from their hand into their library, then draws that many cards." });
+    expect(isFullySupported(whirlpool)).toBe(true);
     const { s: s0, ap, ids, opp } = setup([windsOfChange]);
     s0.players[opp]!.hand = s0.players[opp]!.hand.slice(0, 3);
     const sizes = Object.fromEntries(s0.turnOrder.map((p) => [p, s0.players[p]!.hand.length - (p === ap ? 1 : 0)]));

@@ -740,3 +740,70 @@ describe("Ancient Cellarspawn", () => {
     expect(s.players[opp]!.life).toBe(life - 2);
   });
 });
+
+const yshtola = card("Y'shtola Rhul", "Legendary Creature — Cat Druid", "{4}{U}{U}", {
+  power: "3",
+  toughness: "5",
+  oracleText:
+    "At the beginning of your end step, exile target creature you control, then return it to the battlefield under its owner's control. Then if it's the first end step of the turn, there is an additional end step after this step.",
+});
+
+describe("Y'shtola Rhul", () => {
+  it("blinks a creature; after the first end step there's one more end step (with its triggers), then cleanup", () => {
+    expect(isFullySupported(yshtola)).toBe(true);
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    putOnBattlefield(s, ap, yshtola);
+    const b = putOnBattlefield(s, ap, bear());
+    // "At the beginning of your end step" triggers in each end step (rulings).
+    const scout = putOnBattlefield(s, ap, card("Dusk Scout", "Creature — Human Scout", "{1}", { power: "1", toughness: "1", oracleText: "At the beginning of your end step, you gain 1 life." }));
+    const zc = s.objects[b]!.zoneChanges ?? 0;
+    const life = s.players[ap]!.life;
+    s = passUntil(s, "end", ap);
+    let blinks = 0;
+    for (let i = 0; i < 200 && s.activePlayer === ap; i++) {
+      if (s.pending?.kind === "chooseTargets") {
+        s = act(s, { type: "chooseTargets", player: ap, targets: [target(b)] });
+        blinks++;
+        continue;
+      }
+      if (s.pending?.kind === "discardToHandSize") {
+        s = act(s, { type: "discard", player: ap, objectIds: s.players[ap]!.hand.slice(0, s.pending.count) });
+        continue;
+      }
+      if (s.pending) break;
+      s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(s.activePlayer).not.toBe(ap);
+    expect(blinks).toBe(2);
+    expect(s.objects[b]!.zoneChanges).toBe(zc + 4);
+    expect(s.players[ap]!.life).toBe(life + 2);
+    expect(s.log.filter((l) => l.text === "An additional end step begins.")).toHaveLength(1);
+    expect(s.objects[scout]!.zone).toBe("battlefield");
+  });
+});
+
+describe("Y'shtola Rhul's additional end step", () => {
+  it("'at the beginning of the next end step' made during the first end step triggers in the second (rulings)", () => {
+    const spirit = card("Spirit Call", "Instant", "{W}", { oracleText: "Create a 1/1 white Spirit creature token. Sacrifice it at the beginning of the next end step." });
+    const { s: s0, ap, ids } = setup([spirit]);
+    let s = s0;
+    putOnBattlefield(s, ap, yshtola);
+    const b = putOnBattlefield(s, ap, bear());
+    s = passUntil(s, "end", ap);
+    let token: string | undefined;
+    for (let i = 0; i < 200 && s.activePlayer === ap; i++) {
+      if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [target(b)] });
+      else if (s.pending?.kind === "discardToHandSize") s = act(s, { type: "discard", player: ap, objectIds: s.players[ap]!.hand.slice(0, s.pending.count) });
+      else if (s.pending) break;
+      else if (!token && s.stack.length === 0 && waitingOn(s) === ap && s.turnLog?.endSteps === 1) {
+        s = settle(run(s, planCast(s, ap, ids[0]!)));
+        token = s.battlefield.find((id) => s.objects[id]!.isToken);
+        expect(token).toBeDefined();
+      } else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(s.activePlayer).not.toBe(ap);
+    expect(s.turnLog?.endSteps).toBeUndefined();
+    expect(s.objects[token!]?.zone ?? "gone").not.toBe("battlefield");
+  });
+});

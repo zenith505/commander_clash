@@ -1399,6 +1399,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const [player, cards] of discards) ((s.turnLog ??= {}).discards ??= []).push({ player, cards });
   } else if (ev.type === "step") {
     // Delayed triggers whose moment this is (CR 603.7): each triggers once.
+    // An additional end step (Y'shtola Rhul): one made during an earlier end step of this turn is due now (rulings).
+    const laterEndStep = ev.step === "end" && (s.turnLog?.endSteps ?? 1) > 1;
     for (const d of [...(s.delayed ?? [])]) {
       // Made during that step, "the next end step" or "end of combat" is a later one (CR 603.7c, 511.2).
       // "The next cleanup step": every one made before this one began, so also during an earlier cleanup step of
@@ -1414,9 +1416,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           : d.when === "nextCleanup"
           ? ev.step === "cleanup"
           : d.when === "nextEndStep"
-          ? ev.step === "end" && !(d.turn === s.turn && d.step === "end")
+          ? ev.step === "end" && !(d.turn === s.turn && d.step === "end" && !laterEndStep)
           : d.when === "yourNextEndStep" || d.when === "playersNextEndStep"
-          ? ev.step === "end" && ev.active === (d.when === "playersNextEndStep" ? d.player : d.controller) && !(d.turn === s.turn && d.step === "end")
+          ? ev.step === "end" && ev.active === (d.when === "playersNextEndStep" ? d.player : d.controller) && !(d.turn === s.turn && d.step === "end" && !laterEndStep)
           : d.when === "endOfCombat"
             ? ev.step === "endCombat" && !(d.turn === s.turn && d.step === "endCombat")
             : d.when === "eachYourPrecombatMain"

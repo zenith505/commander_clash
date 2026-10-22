@@ -2543,6 +2543,11 @@ export type Effect =
    * "After this phase, there is an additional combat phase [followed by an additional main phase]" (CR 500.8): `after`
    * "main" or "combat" for "after this main/combat phase", which adds nothing in another phase.
    */
+  /**
+   * "Then if it's the first end step of the turn, there is an additional end step after this step" (Y'shtola Rhul, CR
+   * 500.8): only during the turn's first end step.
+   */
+  | { type: "addEndStep" }
   | {
       type: "addPhases";
       /** "beginning": "there is an additional beginning phase after this phase" (Sphinx of the Second Sun): untap, upkeep and draw steps. */

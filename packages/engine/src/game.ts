@@ -2134,6 +2134,13 @@ function advanceStep(s: GameState): void {
     return beginStep(s, "cleanup"); // CR 514.3a
   }
   if (s.step === "cleanup") return startNextTurn(s);
+  // "There is an additional end step after this step" (Y'shtola Rhul, CR 500.8): only an end step, no cleanup before it
+  // (rulings).
+  if (s.step === "end" && s.extraEndSteps) {
+    s.extraEndSteps = s.extraEndSteps > 1 ? s.extraEndSteps - 1 : undefined;
+    log(s, "An additional end step begins.");
+    return beginStep(s, "end");
+  }
   // CR 511.3: as the end of combat step ends, everything is removed from combat. Provoke's requirement was for
   // this combat only (CR 702.39a).
   if (s.step === "endCombat") {
@@ -2304,6 +2311,7 @@ function startNextTurn(s: GameState, skipping = false) {
   s.damagedThisTurn = undefined;
   s.damageThisTurn = undefined;
   s.turnLog = undefined;
+  s.extraEndSteps = undefined;
   s.oneOfUsed = undefined;
   s.diedThisTurn = undefined;
   s.toGraveyardThisTurn = undefined;
@@ -2425,6 +2433,7 @@ function beginStep(s: GameState, step: Step): void {
           const m = obj(s, id).mayPlay;
           if (m?.until === "yourNextEndStep" && m.player === ap) obj(s, id).mayPlay = undefined;
         }
+      (s.turnLog ??= {}).endSteps = (s.turnLog.endSteps ?? 0) + 1;
       fireEvent(s, { type: "step", step: "end", active: ap });
       // "At the beginning of that turn's end step, you lose the game" (Final Fortune): a delayed trigger (CR 603.7).
       if (s.extraTurn?.loseAtEnd) {

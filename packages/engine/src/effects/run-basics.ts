@@ -77,6 +77,9 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       return;
     }
+    case "addEndStep":
+      if (s.step === "end" && (s.turnLog?.endSteps ?? 0) === 1) s.extraEndSteps = (s.extraEndSteps ?? 0) + 1;
+      return;
     case "addPhases": {
       // "At the beginning of that combat, ...": a delayed trigger for this added combat phase only (CR 603.7; rulings on
       // Moraug: not the turn's regular combat).

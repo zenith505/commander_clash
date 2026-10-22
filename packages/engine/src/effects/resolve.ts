@@ -683,6 +683,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "controlPlayer":
     case "skip":
     case "addPhases":
+    case "addEndStep":
     case "loseGame":
     case "winGame":
       return runBasicsEffect(s, e, ctx, src);

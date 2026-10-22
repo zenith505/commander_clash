@@ -1165,6 +1165,8 @@ export interface GameEvent {
 
 /** What happened this turn, for the Traps' alternative cost conditions (CR 601.2b). */
 export interface TurnLog {
+  /** End steps begun this turn: more than one with additional end steps (Y'shtola Rhul's "the first end step of the turn"). */
+  endSteps?: number;
   /** Players who searched their library (Archive Trap). */
   searched?: PlayerId[];
   /** Each token created this turn (CR 111.2): who created it and its subtypes then ("Treasure tokens you created"). */
@@ -1362,6 +1364,8 @@ export interface GameState {
    */
   /** Phases added after the current one (CR 500.8); `{ combat: key }` is a combat phase a delayed trigger waits for ("at the beginning of that combat"). */
   addedPhases?: ("combat" | "main" | "beginning" | { combat: number })[];
+  /** Additional end steps still to come directly after this end step (Y'shtola Rhul, CR 500.8): no cleanup in between. */
+  extraEndSteps?: number;
   /** The key of the added combat phase going on now (see addedPhases), and the last key given out. */
   thatCombat?: number;
   combatKeys?: number;

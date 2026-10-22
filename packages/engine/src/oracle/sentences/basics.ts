@@ -262,6 +262,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const phases: ("combat" | "main")[] = n.toLowerCase() === "two" ? ["combat", "combat"] : main ? ["combat", "main"] : ["combat"];
     return [{ type: "addPhases", phases, ...(after ? { after: after as "main" | "combat" } : {}) }];
   }
+  // Y'shtola Rhul: "Then if it's the first end step of the turn, there is an additional end step after this step".
+  if (/^(?:[Tt]hen )?[Ii]f it's the first end step of the turn, there is an additional end step after this step$/.test(s)) return [{ type: "addEndStep" }];
   // Sphinx of the Second Sun: "there is an additional beginning phase after this phase" (CR 500.8).
   if (/^[Tt]here is an additional beginning phase after this phase$/.test(s)) return [{ type: "addPhases", phases: ["beginning"] }];
   // Timetwister: "Each player shuffles their hand and graveyard into their library, then draws seven cards." Reminisce:

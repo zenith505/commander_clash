@@ -1694,12 +1694,12 @@ export type Effect =
    */
   /** `transformed`: "return it to the battlefield transformed" (CR 712.14a). */
   /** `counterIf`: "If it's a Spirit, put a +1/+1 counter on it" (Essence Flux), each returned permanent that matches, once it's back. */
-  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; /** With `at` and `counter`: "If it enters as a creature, it enters with an additional +1/+1 counter on it" (Teferi's Time Twist). */ counterIfCreature?: true; /** `ownersNextEndStep`: "at the beginning of that player's next end step", the card's owner's (one card only). */ at?: "nextEndStep" | "ownersNextEndStep"; /** With `at`: "If it entered under your control, put a +1/+1 counter on ~" (Phelia), on the source as it is then. */ selfCounterIfYours?: CounterKind; counter?: CounterKind; tapped?: true; transformed?: true; counterIf?: { counter: CounterKind; filter: TargetSpec }; /** Exiled now, returned by the search after it (Sword of Hearth and Home: "Put both cards onto the battlefield"), kept in Resolving.held. */ hold?: true }
+  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; /** With `at` and `counter`: "If it enters as a creature, it enters with an additional +1/+1 counter on it" (Teferi's Time Twist). */ counterIfCreature?: true; /** With `counterIfCreature`: "and an additional loyalty counter on it if it's a planeswalker" (Semester's End). */ loyaltyIfPlaneswalker?: true; /** `ownersNextEndStep`: "at the beginning of that player's next end step", the card's owner's (one card only). */ at?: "nextEndStep" | "ownersNextEndStep"; /** With `at`: "If it entered under your control, put a +1/+1 counter on ~" (Phelia), on the source as it is then. */ selfCounterIfYours?: CounterKind; counter?: CounterKind; tapped?: true; transformed?: true; counterIf?: { counter: CounterKind; filter: TargetSpec }; /** Exiled now, returned by the search after it (Sword of Hearth and Home: "Put both cards onto the battlefield"), kept in Resolving.held. */ hold?: true }
   /** A delayed flicker's return: the exiled card, while it's still in exile as that object. */
   /** A delayed flicker's return: its subject, or with `cards` each of those cards, if still the same objects in exile. */
   /** "Each opponent can't block with more than one creature this combat" (Mirri, Weatherlight Duelist; CR 509.1b): for each of those players, until the combat ends. */
   | { type: "blockLimitThisCombat"; who: PlayerRef; n: number }
-  | { type: "returnExiled"; under: "owner" | "you"; counter?: CounterKind; /** The counter only if it enters as a creature (Teferi's Time Twist). */ counterIfCreature?: true; tapped?: true; cards?: { id: ObjectId; zc: number }[]; /** Phelia: a counter on this permanent, while it's still that object, if one of them entered under this ability's controller's control. */ selfCounter?: { id: ObjectId; zc: number; counter: CounterKind } }
+  | { type: "returnExiled"; under: "owner" | "you"; counter?: CounterKind; /** The counter only if it enters as a creature (Teferi's Time Twist). */ counterIfCreature?: true; /** And a loyalty counter if it enters as a planeswalker (Semester's End). */ loyaltyIfPlaneswalker?: true; tapped?: true; cards?: { id: ObjectId; zc: number }[]; /** Phelia: a counter on this permanent, while it's still that object, if one of them entered under this ability's controller's control. */ selfCounter?: { id: ObjectId; zc: number; counter: CounterKind } }
   /** Connive (CR 701.50): its controller draws N, discards N, and it gets a +1/+1 counter per nonland card discarded. */
   | { type: "connive"; what: ObjRef; n: Amount }
   /**
@@ -2890,6 +2890,8 @@ export interface AbilityBody {
   targets: TargetSpec[];
   effects: Effect[];
   text: string;
+  /** "This ability still resolves if its target becomes illegal" (Gilded Drake): it isn't removed by CR 608.2b. */
+  resolvesAnyway?: true;
   /**
    * For modal text ("Choose one —" and a bulleted list, CR 700.2): the modes. A modal body
    * has no targets or effects of its own; see `withModes` in modes.ts. `costs`: spree's additional cost for each

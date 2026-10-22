@@ -13,6 +13,8 @@ import type { CardDef, CardFace, Color, CopyEffect, GameObject, GameState } from
  * other types", "except it has haste". They become part of the copy's copiable values (707.9b).
  */
 export interface CopyExcept {
+  /** "Except it has vanishing 3 if that creature doesn't have vanishing" (Flesh Duplicate): `text` only for a copy of one without this keyword. */
+  unlessHas?: string;
   notLegendary?: boolean;
   legendary?: boolean;
   /**
@@ -109,7 +111,8 @@ function excepted<T extends Pick<CardDef, "name" | "supertypes" | "types" | "sub
   // "~" in an added ability is the copy itself (CR 707.9a).
   // A copy whose exception sets its colors doesn't copy a characteristic-defining ability for them (CR 707.9d): "~ is all colors".
   const own = except.colors ? base.oracleText.split("\n").filter((l) => !/ is all colors\./.test(l)).join("\n") : base.oracleText;
-  const text = [own, ...(except.keywords?.length ? [except.keywords.join(", ")] : []), ...(except.text ?? []).map((x) => x.replace(/~/g, name))].filter(Boolean).join("\n");
+  const lacks = !except.unlessHas || (!(base.keywords ?? []).includes(except.unlessHas) && !new RegExp(`^${except.unlessHas}\\b`, "mi").test(base.oracleText));
+  const text = [own, ...(except.keywords?.length ? [except.keywords.join(", ")] : []), ...(lacks ? (except.text ?? []) : []).map((x) => x.replace(/~/g, name))].filter(Boolean).join("\n");
   const typeLine = `${[...supertypes, ...types].join(" ")}${subtypes.length ? ` — ${subtypes.join(" ")}` : ""}`;
   return {
     name,

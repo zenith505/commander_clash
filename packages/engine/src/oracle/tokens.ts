@@ -158,6 +158,9 @@ const COPY_CARD_TYPES = new Set(["Artifact", "Creature", "Enchantment", "Land", 
  */
 export function parseCopyExcept(text: string, round?: "up" | "down"): CopyExcept | null {
   const out: CopyExcept = {};
+  // Flesh Duplicate: "except it has vanishing 3 if that creature doesn't have vanishing" (its copiable values, CR 707.2).
+  const unless = /^it has (vanishing|fading) (\d+) if that creature doesn't have \1$/.exec(text);
+  if (unless) return { text: [`${capital(unless[1]!)} ${unless[2]}`], unlessHas: capital(unless[1]!) };
   if (/^their power is half that creature's power and their toughness is half that creature's toughness$/.test(text)) return round ? { halfPT: round } : null;
   // Imposter Mech: "except it's a Vehicle artifact with crew 3 and it loses all other card types": an artifact only, its
   // subtypes of other card types gone (CR 205.1a, rulings), and crew N its own (CR 702.122a).

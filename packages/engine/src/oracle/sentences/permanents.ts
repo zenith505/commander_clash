@@ -685,7 +685,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // controls with power 3 or less" (CR 701.12b).
   // Volatile Stormdrake: "Exchange control of ~ and target creature an opponent controls": ~ as it is (rulings: it must
   // still be on the battlefield).
-  if ((m = /^[Ee]xchange control of (~|target .+? you control) and (target .+? an opponent controls(?: with .+)?)$/.exec(s))) {
+  // Gilded Drake: "Exchange control of ~ and up to one target creature an opponent controls" (with none chosen, no exchange).
+  if ((m = /^[Ee]xchange control of (~|target .+? you control) and ((?:up to one )?target .+? an opponent controls(?: with .+)?)$/.exec(s))) {
+    if (m[2]!.startsWith("up to") && m[1] !== "~") return null;
     const a: ObjRef | null = m[1] === "~" ? { ref: "self" } : parseObject(m[1]!, ctx);
     const b = a?.ref === "self" || (a?.ref === "target" && !a.n) ? parseObject(m[2]!, ctx) : null;
     return a && b?.ref === "target" && !b.n ? [{ type: "exchangeControl", a, b }] : null;

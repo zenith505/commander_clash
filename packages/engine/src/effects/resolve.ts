@@ -106,7 +106,7 @@ export function beginResolution(s: GameState, item: StackItem, body: AbilityBody
   // With every target it chose now illegal, it doesn't resolve (CR 608.2b). One that chose none of its
   // "up to" targets isn't targeted at all, and resolves (CR 115.6).
   const chose = targets.some((t) => t.kind !== "none");
-  if (body.targets.length && chose && !legal.some(Boolean)) return "fizzled";
+  if (body.targets.length && chose && !legal.some(Boolean) && !body.resolvesAnyway) return "fizzled";
   const spellControllers = targets.map((t) => (t.kind === "stack" ? (s.stack.find((x) => x.id === t.id)?.controller ?? null) : null));
   const spellObjects = targets.map((t) => (t.kind === "stack" ? (s.stack.find((x) => x.id === t.id)?.objectId ?? null) : null));
   // "If this is the second time this ability has resolved this turn": counted as it resolves, for this object's ability

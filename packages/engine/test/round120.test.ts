@@ -4,8 +4,9 @@
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
 import { abilityProblem, botActions, castProblem, isFullySupported, planActivate, planCast, power, spellCost, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
-import { invalidateCharacteristics } from "../src/layers";
+import { controllerOf, invalidateCharacteristics } from "../src/layers";
 import { moveObject } from "../src/game";
+import { defOf } from "../src/cards";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const settle = (s: GameState, yes = true) => {
@@ -454,5 +455,68 @@ describe("more popular cards", () => {
     const next = s.players[opp]!.library[0]!;
     s = settle(run(s, planCast(s, opp, b)));
     expect(s.objects[next]!.zone).toBe("library");
+  });
+  it("Gilded Drake exchanges itself for an opponent's creature, or is sacrificed if it can't", () => {
+    const drake = card("Gilded Drake", "Creature — Drake", "{1}{U}", { power: "3", toughness: "3", keywords: ["Flying"], oracleText: "Flying\nWhen this creature enters, exchange control of this creature and up to one target creature an opponent controls. If you don't or can't make an exchange, sacrifice this creature. This ability still resolves if its target becomes illegal." });
+    supported(drake);
+    const enter = (gone: "none" | "kept" | "left") => {
+      const { s: s0, ap, ids, opp } = setup([drake]);
+      const b = putOnBattlefield(s0, opp, bear());
+      let s = run(s0, planCast(s0, ap, ids[0]!));
+      for (let i = 0; i < 10 && s.pending?.kind !== "chooseTargets"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+      expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+      s = act(s, { type: "chooseTargets", player: ap, targets: [gone === "none" ? { kind: "none" } : { kind: "object", id: b }] });
+      if (gone === "left") moveObject(s, b, "graveyard"); // its target is illegal now: it still resolves (rulings)
+      s = passToStack(s);
+      return { s, ap, opp, drake: ids[0]!, b };
+    };
+    let { s, ap, opp, drake: d, b } = enter("kept");
+    expect(s.objects[d]!.zone).toBe("battlefield");
+    expect(controllerOf(s, s.objects[d]!)).toBe(opp);
+    expect(controllerOf(s, s.objects[b]!)).toBe(ap);
+    ({ s, drake: d } = enter("none"));
+    expect(s.objects[d]!.zone).toBe("graveyard");
+    ({ s, drake: d } = enter("left"));
+    expect(s.objects[d]!.zone).toBe("graveyard");
+  });
+  it("Semester's End returns them at the next end step, a creature with a +1/+1 counter and a planeswalker with a loyalty counter", () => {
+    const semester = card("Semester's End", "Instant", "{3}{W}", { oracleText: "Exile any number of target creatures and/or planeswalkers you control. At the beginning of the next end step, return each of them to the battlefield under its owner's control. Each of them enters with an additional +1/+1 counter on it if it's a creature and an additional loyalty counter on it if it's a planeswalker." });
+    supported(semester);
+    const { s: s0, ap, ids } = setup([semester]);
+    const b = putOnBattlefield(s0, ap, bear());
+    const w = putOnBattlefield(s0, ap, walker);
+    s0.objects[w]!.counters.loyalty = 3;
+    let s = passToStack(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: b }, { kind: "object", id: w }])));
+    expect([s.objects[b]!.zone, s.objects[w]!.zone]).toEqual(["exile", "exile"]);
+    s = settle(passUntil(s, "end", ap));
+    expect([s.objects[b]!.zone, s.objects[w]!.zone]).toEqual(["battlefield", "battlefield"]);
+    expect(s.objects[b]!.counters["+1/+1"]).toBe(1);
+    expect(s.objects[b]!.counters.loyalty ?? 0).toBe(0);
+    expect(s.objects[w]!.counters.loyalty).toBe(4);
+    expect(s.objects[w]!.counters["+1/+1"] ?? 0).toBe(0);
+  });
+  it("Flesh Duplicate has vanishing 3 as a copy of a creature without vanishing, and the copied vanishing otherwise", () => {
+    const flesh = card("Flesh Duplicate", "Creature — Shapeshifter Rebel", "{U}{U}", { power: "0", toughness: "0", oracleText: "You may have this creature enter as a copy of any creature on the battlefield, except it has vanishing 3 if that creature doesn't have vanishing. (A permanent with vanishing 3 enters with three time counters on it. At the beginning of your upkeep, remove a time counter from it. When the last is removed, sacrifice it.)" });
+    const fader = card("Chronozoa", "Creature — Illusion", "{3}{U}", { power: "3", toughness: "3", keywords: ["Flying", "Vanishing"], oracleText: "Flying\nVanishing 3 (This creature enters with three time counters on it. At the beginning of your upkeep, remove a time counter from it. When the last is removed, sacrifice it.)\nWhen this creature dies, if it had no time counters on it, create two tokens that are copies of it." });
+    supported(flesh);
+    const copyOf = (pick: (s: GameState, opp: PlayerId) => string) => {
+      const { s: s0, ap, ids, opp } = setup([flesh]);
+      const target = pick(s0, opp);
+      let s = run(s0, planCast(s0, ap, ids[0]!));
+      for (let i = 0; i < 40 && !(s.pending?.kind === "chooseOption" && s.pending.what === "copy"); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+      s = passToStack(act(s, { type: "chooseOption", player: ap, choice: target }));
+      const o = s.objects[ids[0]!]!;
+      return Object.assign(o, { vanishing: (defOf(s, o).oracleText.match(/^Vanishing/gm) ?? []).length });
+    };
+    const asBear = copyOf((s, opp) => putOnBattlefield(s, opp, bear()));
+    expect(asBear.zone).toBe("battlefield");
+    expect(asBear.counters.time).toBe(3);
+    const asFader = copyOf((s, opp) => {
+      const f = putOnBattlefield(s, opp, fader);
+      s.objects[f]!.counters.time = 1;
+      return f;
+    });
+    expect(asFader.counters.time).toBe(3); // Chronozoa's own vanishing 3, not a second one
+    expect([asBear.vanishing, asFader.vanishing]).toEqual([1, 1]);
   });
 });

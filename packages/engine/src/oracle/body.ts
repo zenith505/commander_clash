@@ -1038,6 +1038,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   let chosenCards: ObjRef | undefined;
   // The counts "if this is the Nth time this ability has resolved this turn" sentences named so far.
   const nthSeen: number[] = [];
+  let resolvesAnyway = false;
   for (let si = 0; si < sentences.length; si++) {
     // "It" is the spell cast only as the first instruction: "Untap ~. It gains ..." is about ~ (Pristine Skywise).
     if (si > 0) delete ctx.spellIt;
@@ -2897,7 +2898,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // the beginning of the next end step, return those cards to the battlefield under their owners' control" (Planar
     // Guide), "... return it to the battlefield tapped ..." (Mystifying Maze), "... with a flying counter on it" (Salvation
     // Swan); after "you may exile ~ target creature", "If you do, return that card ..." (Astral Slide).
-    const BACK = "(?:it|that card|the exiled card|those cards|the exiled cards|them|~)";
+    const BACK = "(?:it|that card|the exiled card|those cards|the exiled cards|them|each of them|~)";
     const UNDER = "(its owner's|their owner's|their owners'|your)";
     const laterRe = new RegExp(`^(?:If you do, )?(?:At the beginning of the next end step, return ${BACK} to the battlefield( tapped)? under ${UNDER} control|[Rr]eturn ${BACK} to the battlefield( tapped)? under ${UNDER} control(?: with an? ${COUNTER} counter on it)? at the beginning of (the|that player's) next end step)(?: with an? ${COUNTER} counter on it)?$`);
     const later = laterRe.exec(s);
@@ -2957,7 +2958,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       // would exist on the battlefield (rulings, CR 614.12). One card only.
       const ifCreature = !counter && !ifYours && ex.what.ref === "target" && !ex.what.n && /^If it enters as a creature, it enters with an additional \+1\/\+1 counter on it\.?$/.test(sentences[si + 1] ?? "");
       if (ifCreature) si++;
-      laterAt.into[laterAt.at] = { type: "flicker", what: ex.what, under, at: owners ? "ownersNextEndStep" : "nextEndStep", ...(counter ? { counter: counterKind(counter) } : {}), ...(ifCreature ? { counter: "+1/+1" as const, counterIfCreature: true as const } : {}), ...(later[1] || later[3] ? { tapped: true as const } : {}), ...(ifYours ? { selfCounterIfYours: counterKind(ifYours[1]!) } : {}) };
+      // Semester's End: "Each of them enters with an additional +1/+1 counter on it if it's a creature and an additional
+      // loyalty counter on it if it's a planeswalker", judged the same way.
+      const eachIf = !counter && !ifYours && !ifCreature && /^Each of them enters with an additional \+1\/\+1 counter on it if it's a creature and an additional loyalty counter on it if it's a planeswalker\.?$/.test(sentences[si + 1] ?? "");
+      if (eachIf) si++;
+      laterAt.into[laterAt.at] = { type: "flicker", what: ex.what, under, at: owners ? "ownersNextEndStep" : "nextEndStep", ...(counter ? { counter: counterKind(counter) } : {}), ...(ifCreature || eachIf ? { counter: "+1/+1" as const, counterIfCreature: true as const } : {}), ...(eachIf ? { loyaltyIfPlaneswalker: true as const } : {}), ...(later[1] || later[3] ? { tapped: true as const } : {}), ...(ifYours ? { selfCounterIfYours: counterKind(ifYours[1]!) } : {}) };
       if (ifYours) si++;
       continue;
     }
@@ -3547,6 +3552,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const prev = effects[effects.length - 1];
       if (prev?.type !== "putOntoBattlefield" || prev.sacrificeOnLostControl || prev.owner) return null;
       prev.sacrificeOnLostControl = true;
+      continue;
+    }
+    // Gilded Drake: "If you don't or can't make an exchange, sacrifice ~." Whether its exchange happened (CR 701.12b).
+    if (s === "If you don't or can't make an exchange, sacrifice ~" && effects[effects.length - 1]?.type === "exchangeControl") {
+      effects.push({ type: "if", cond: { kind: "youDid" }, effects: [], otherwise: [{ type: "sacrifice", what: { ref: "self" } }] });
+      continue;
+    }
+    // "This ability still resolves if its target becomes illegal" (Gilded Drake): not removed by CR 608.2b.
+    if (s === "This ability still resolves if its target becomes illegal" && si === sentences.length - 1 && ctx.targets.length) {
+      resolvesAnyway = true;
       continue;
     }
     const ifDid = /^If you (do|don't), (.+)$/.exec(s);
@@ -4227,7 +4242,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     if (!defineX()) return null;
   }
   if (payFirst || dig || !closeGate() || !closeRow()) return null;
-  return effects.length ? { targets: ctx.targets, effects, text } : null;
+  return effects.length ? { targets: ctx.targets, effects, text, ...(resolvesAnyway ? { resolvesAnyway: true as const } : {}) } : null;
 }
 
 /** "{2}{U}", "3 life", "{E}{E}", "{1} and 2 life": a cost paid as an ability resolves. */

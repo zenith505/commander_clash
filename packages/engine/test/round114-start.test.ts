@@ -907,3 +907,31 @@ describe("Hermit Druid", () => {
     expect(t.players[ap2]!.library.length).toBe(0);
   });
 });
+
+describe("Fighter Class level 3: up to one target creature blocks the attacker this combat if able", () => {
+  const fighter = card("Fighter Class", "Enchantment — Class", "{R}{W}", {
+    oracleText:
+      "(Gain the next level as a sorcery to add its ability.)\nWhen this Class enters, search your library for an Equipment card, reveal it, put it into your hand, then shuffle.\n{1}{R}{W}: Level 2\nEquip abilities you activate cost {2} less to activate.\n{3}{R}{W}: Level 3\nWhenever a creature you control attacks, up to one target creature blocks it this combat if able.",
+  });
+
+  it("plays", () => expect(isFullySupported(fighter)).toBe(true));
+
+  it("triggered for two attackers on one blocker, it must block one of them, either one", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const f = putOnBattlefield(s0, ap, fighter);
+    s0.objects[f]!.classLevel = 3;
+    const a1 = putOnBattlefield(s0, ap, bear());
+    const a2 = putOnBattlefield(s0, ap, bear());
+    const blocker = putOnBattlefield(s0, opp, bear());
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: a1, defender: opp }, { attacker: a2, defender: opp }] });
+    for (let i = 0; i < 20 && s.pending?.kind !== "declareBlockers"; i++) {
+      if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [target(blocker)] });
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(s.pending).toMatchObject({ kind: "declareBlockers", player: opp });
+    expect(() => act(s, { type: "declareBlockers", player: opp, blocks: [] })).toThrow(/must block/);
+    expect(act(s, { type: "declareBlockers", player: opp, blocks: [{ blocker, attacker: a1 }] }).objects[blocker]!.blocking).toEqual([a1]);
+    expect(act(s, { type: "declareBlockers", player: opp, blocks: [{ blocker, attacker: a2 }] }).objects[blocker]!.blocking).toEqual([a2]);
+  });
+});

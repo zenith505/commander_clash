@@ -2133,6 +2133,7 @@ function advanceStep(s: GameState): void {
     s.thatCombat = undefined;
     for (const o of attackersAndBlockers(s)) clearCombat(o);
     for (const id of s.battlefield) if (obj(s, id).provokedBy?.turn === undefined) obj(s, id).provokedBy = undefined;
+    for (const id of s.battlefield) obj(s, id).provokedAlso = undefined;
     s.unblockedChoice = undefined; // made for this combat's damage steps
   }
   const next = STEP_ORDER[STEP_ORDER.indexOf(s.step) + 1]!;
@@ -6758,7 +6759,7 @@ function declareBlockers(s: GameState, p: Player, blocks: { blocker: ObjectId; a
   if (earlier + seen.size > limit) throw new RulesError(`no more than ${limit === 1 ? "one creature" : `${limit} creatures`} can block each combat`);
   const obeys = (b: { blocker: ObjectId; attacker: ObjectId }) => {
     const at = characteristics(s, obj(s, b.attacker));
-    return at.allMustBlock || at.mustBeBlocked || characteristics(s, obj(s, b.blocker)).mustBlock || provokerOf(s, obj(s, b.blocker))?.id === b.attacker;
+    return at.allMustBlock || at.mustBeBlocked || characteristics(s, obj(s, b.blocker)).mustBlock || provokersOf(s, obj(s, b.blocker)).some((x) => x.id === b.attacker);
   };
   // When every block costs mana (Archangel of Tithes), no requirement makes a creature block: nothing obliges paying a
   // cost to block (CR 509.1c).
@@ -6818,14 +6819,16 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
   // A creature already blocking as many demanding attackers as it can block obeys all the requirements it can.
   const full = (b: GameObject) => {
     const at = blocking.get(b.id) ?? [];
-    return at.length >= maxBlocks(s, b) && at.every((x) => demanding.some((a) => a.id === x) || provokerOf(s, b)?.id === x);
+    return at.length >= maxBlocks(s, b) && at.every((x) => demanding.some((a) => a.id === x) || provokersOf(s, b).some((p) => p.id === x));
   };
   // Provoke (CR 702.39a): the provoked creature blocks the creature that provoked it if able. With menace, that
   // takes another creature able to block it too (CR 702.111b), two more with "except by three or more" (509.1b).
+  // Required to block more than one of them, it blocks any one it can (rulings on Fighter Class).
   for (const b of mine) {
-    const at = provokerOf(s, b);
-    if (!at || (blocking.get(b.id) ?? []).includes(at.id) || blockProblem(s, b, at) || full(b)) continue;
-    if (mine.filter((o) => o.id !== b.id && !blockProblem(s, o, at)).length < blockersNeeded(s, at) - 1) continue;
+    const ats = provokersOf(s, b);
+    if (!ats.length || ats.some((at) => (blocking.get(b.id) ?? []).includes(at.id)) || full(b)) continue;
+    const at = ats.find((a) => !blockProblem(s, b, a) && mine.filter((o) => o.id !== b.id && !blockProblem(s, o, a)).length >= blockersNeeded(s, a) - 1);
+    if (!at) continue;
     return `${characteristics(s, b).name} must block ${characteristics(s, at).name} if able (provoke)`;
   }
   // "Target creature blocks this turn if able": it blocks some attacking creature if one it can block, with another
@@ -6851,9 +6854,17 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
 
 /** The attacking creature that provoked this one and that it must block, if that's still so (CR 702.39a). */
 export function provokerOf(s: GameState, b: GameObject): GameObject | undefined {
-  const at = b.provokedBy && s.objects[b.provokedBy.id];
-  if (b.provokedBy?.turn !== undefined && b.provokedBy.turn !== s.turn) return undefined;
-  return at && at.zone === "battlefield" && (at.zoneChanges ?? 0) === b.provokedBy!.zc && at.attacking === controllerOf(s, b) ? at : undefined;
+  return provokersOf(s, b)[0];
+}
+
+/** Every attacking creature this one must block, if able; blocking any one of them obeys the requirement (rulings on Fighter Class). */
+export function provokersOf(s: GameState, b: GameObject): GameObject[] {
+  const live = (p: { id: ObjectId; zc: number }) => {
+    const at = s.objects[p.id];
+    return at && at.zone === "battlefield" && (at.zoneChanges ?? 0) === p.zc && at.attacking === controllerOf(s, b) ? [at] : [];
+  };
+  const first = b.provokedBy && (b.provokedBy.turn === undefined || b.provokedBy.turn === s.turn) ? live(b.provokedBy) : [];
+  return [...first, ...(b.provokedAlso ?? []).flatMap(live).filter((at) => !first.includes(at))];
 }
 
 const LANDWALK: Record<string, string> = { Swampwalk: "Swamp", Islandwalk: "Island", Forestwalk: "Forest", Mountainwalk: "Mountain", Plainswalk: "Plains" };

@@ -30,6 +30,7 @@ export function phaseOut(s: GameState, ids: ObjectId[]) {
     removeFromCombat(s, o); // CR 702.26b, 506.4
     clearCombat(o);
     o.provokedBy = undefined;
+    o.provokedAlso = undefined;
     // A soulbond pairing lasts "for as long as both remain creatures on the battlefield under your control", and
     // such an effect ends when a permanent it tracks phases out (CR 702.26f).
     const partner = pairedWith(s, o);

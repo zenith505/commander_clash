@@ -178,6 +178,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "mustBlockSource", what, ...(m[3] === "turn" ? { thisTurn: true as const } : {}) }] : null;
   }
+  // Fighter Class: "Whenever a creature you control attacks, up to one target creature blocks it this combat if able":
+  // the attacking creature (the trigger's subject).
+  if ((m = /^((?:up to one )?target .+?) blocks it this combat if able$/i.exec(s)) && ctx.subjectIt) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" ? [{ type: "mustBlockSource", what, attacker: { ref: "subject" } }] : null;
+  }
   // "Target creature can't block ~ this turn" (Duct Crawler, Burning-Tree Bloodscale).
   if ((m = /^(target .+?) can't block (~|it) this turn$/i.exec(s)) && (m[2] === "~" || ctx.selfIt)) {
     const what = parseObject(m[1]!, ctx);

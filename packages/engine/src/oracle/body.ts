@@ -599,6 +599,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // Brass's Tunnel-Grinder: "Then if there are three or more bore counters on it, remove those counters and transform it."
   // Primal Amulet: "..., you may remove those counters and transform it."
   text = text.replace(/^([Pp]ut an? ([a-z]+) counter on ~\.) Then if (?:it has|there are) ([a-z]+) or more \2 counters on it, (you may )?remove (?:all of them|those counters) and /, (_, put: string, kind: string, n: string, may?: string) => `${put} If there are ${n} or more ${kind} counters on ~, ${may ?? ""}remove all ${kind} counters from ~ and `);
+  // Firebender Ascension: "Put a quest counter on ~. Then if it has four or more quest counters on it, you may copy that
+  // ability": the same check of ~'s counters as it resolves.
+  text = text.replace(/^([Pp]ut an? ([a-z]+) counter on ~\.) Then if it has ([a-z]+) or more \2 counters on it, (you may copy that ability\.)/, "$1 If there are $3 or more $2 counters on ~, $4");
   text = text.replace(/^([Pp]ut an? [a-z]+ counter on ~\. If there are [a-z]+ or more [a-z]+ counters on ~, (?:you may )?remove all [a-z]+ counters from ~ and transform) it\.$/, "$1 ~.");
   text = text.replace(/^Choose (up to one target [a-z]+), then (airbend|exile|destroy) all other ([a-z]+)\./, (_, t: string, verb: string, what: string) => `Choose ${t}. ${verb.charAt(0).toUpperCase()}${verb.slice(1)} all other ${what}.`);
   // "Transform ~, then untap it" (Westvale Abbey): the same permanent, now its back face (CR 712.18).
@@ -2978,9 +2981,10 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
         for (const e of both) if (e.type === "copySpell") e.newTargets = true;
         continue;
       }
-      // Wandering Archaic: "If they don't, you may copy that spell. You may choose new targets for the copy."
+      // Wandering Archaic: "If they don't, you may copy that spell. You may choose new targets for the copy."; Firebender
+      // Ascension: "Then if it has four or more quest counters on it, you may copy that ability. ..."
       const only = both.length === 1 && both[0]!.type === "may" && both[0]!.effects.length === 1 ? both[0]!.effects[0] : undefined;
-      if (only?.type === "copySpell" && prev?.type === "if" && prev.cond.kind === "theyChose") {
+      if (only?.type === "copySpell" && prev?.type === "if") {
         only.newTargets = true;
         continue;
       }

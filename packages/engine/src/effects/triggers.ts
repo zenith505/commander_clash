@@ -404,9 +404,37 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         s.triggerQueue.push(queued);
         // "That ability triggers an additional time" (CR 603.2d): only a permanent's (or one leaving's) own abilities.
         // Not delayed triggered abilities (CR 603.2d).
-        if (!fromYard && !floating) for (let n = triggersAgain(s, o, controller, causedBy); n > 0; n--) s.triggerQueue.push({ ...queued });
+        const again = !fromYard && !floating ? triggersAgain(s, o, controller, causedBy) : 0;
+        attackCaused(queued);
+        for (let n = again; n > 0; n--) {
+          const more: PendingTrigger = { ...queued };
+          delete more.tag;
+          s.triggerQueue.push(more);
+          attackCaused(more);
+        }
       }
     });
+  };
+  /**
+   * Firebender Ascension: "Whenever a creature you control attacking causes a triggered ability of that creature to
+   * trigger": an ability of the attacking creature itself (not of an Aura or Equipment on it, nor a delayed one). Its
+   * trigger goes on the stack just above that ability (rulings), which becomes its `cause` once it's there.
+   */
+  const attackCaused = (q: PendingTrigger) => {
+    if (fromYard || floating || hosting || causedBy?.event !== "attacks" || !causedBy.objs.some((x) => x.o.id === q.sourceId)) return;
+    const creature = s.objects[q.sourceId];
+    if (creature?.zone !== "battlefield" || !objIsType(s, creature, "Creature") || controllerOf(s, creature) !== q.controller) return;
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      const wc = controllerOf(s, w);
+      if (wc !== q.controller || locked?.(wc)) continue;
+      abilitiesOf(s, w).triggers.forEach((t, index) => {
+        if (t.event !== "attackCausesTrigger" || (t.activeIf && !staticConditionNow(s, t.activeIf, id, wc))) return;
+        q.tag ??= `t${s.nextId++}`;
+        const printed = compileCard(defOf(s, w)).triggers;
+        s.triggerQueue.push({ sourceId: id, sourceCardId: cardIdOf(w), controller: wc, index, sourceZc: w.zoneChanges ?? 0, causeTag: q.tag, ...(printed[index] !== t ? { body: t.body } : {}) });
+      });
+    }
   };
   /**
    * The same event for the Auras and Equipment attached to `host` (TriggeredAbility.host): `subject` is the creature
@@ -1699,6 +1727,8 @@ export function pushTrigger(s: GameState, t: PendingTrigger, chosen: TargetChoic
     // Whether its source transforms before it resolves, or for a delayed trigger since it was made (CR 701.27f).
     ...((t.transformsAt ?? s.objects[t.sourceId]?.transforms) ? { sourceTransforms: t.transformsAt ?? s.objects[t.sourceId]!.transforms } : {}),
   });
+  // Firebender Ascension's trigger is about this one, now on the stack.
+  if (t.tag) for (const q of s.triggerQueue) if (q.causeTag === t.tag) q.cause = s.stack[s.stack.length - 1]!.id;
   log(s, `${def.name}'s ability triggers (${body.text.replace(/~/g, def.name).replace(/\.$/, "")})${describeTargets(s, targets)}.`);
   if (targets.length) fireEvent(s, { type: "targeted", stackId: s.stack[s.stack.length - 1]!.id });
 }

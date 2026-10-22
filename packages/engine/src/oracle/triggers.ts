@@ -1689,6 +1689,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   }
   const activates = parseActivatesTrigger(line);
   if (activates) return activates;
+  // Firebender Ascension: "that ability" is the creature's triggered ability, put on the stack just below this one (rulings).
+  const attackCauses = /^Whenever a creature you control attacking causes a triggered ability of that creature to trigger, (.+)$/.exec(line);
+  if (attackCauses) {
+    const body = parseBody(attackCauses[1]!, { activatedAbility: true });
+    return body ? { event: "attackCausesTrigger", body } : "fail";
+  }
   const manaTap = parseManaTapTrigger(line);
   if (manaTap) return manaTap;
   const dies = parseDiesTrigger(line);

@@ -849,6 +849,9 @@ export interface PendingTrigger {
   sourceZc?: number; // the source's zoneChanges when it triggered
   modes?: number[]; // once chosen, for a modal trigger (CR 603.3c)
   cause?: string; // the stack item that triggered it, see StackItem.cause
+  /** Firebender Ascension: this trigger's tag, and the tag of the trigger whose stack item becomes `cause` once it's put on the stack. */
+  tag?: string;
+  causeTag?: string;
   /** The object the event was about, as it was then ("that creature" for exalted). */
   subject?: { id: ObjectId; zc: number };
   /** A delayed trigger: how many times its source had transformed when it was made (CR 701.27f). */

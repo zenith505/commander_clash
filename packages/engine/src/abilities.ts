@@ -3071,6 +3071,8 @@ export type TriggerEvent =
   | "playerDraws"
   /** "Whenever an opponent activates an ability that isn't a mana ability" (see TriggeredAbility.activates). */
   | "abilityActivated"
+  /** "Whenever a creature you control attacking causes a triggered ability of that creature to trigger" (Firebender Ascension). */
+  | "attackCausesTrigger"
   /** "Whenever you sacrifice another permanent", "a Food", "~ or another creature": see TriggeredAbility.sacrifices. */
   | "youSacrifice"
   /** "Whenever you collect evidence" (CR 701.59a): for any reason, also collecting evidence 0 (rulings). */

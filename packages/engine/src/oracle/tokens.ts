@@ -71,7 +71,8 @@ export function parseToken(power: number, toughness: number, desc: string, withT
   const kwText = quoted ? quoted[1] : withText;
   // "A 1/1 white Monk creature token with prowess" (Monastery Mentor): a triggered keyword (CR 702.108a) is an ability
   // of the token's, as if printed.
-  if (!quoted && kwText === "prowess" && subtypes.length) return { name: subtypes.join(" "), power, toughness, colors, types, subtypes, keywords: [], abilities: "Prowess" };
+  // "With firebending 1" (Firebender Ascension): the same, "Whenever this creature attacks, add {R}" (CR 702.189a).
+  if (!quoted && (kwText === "prowess" || /^firebending \d+$/.test(kwText ?? "")) && subtypes.length) return { name: subtypes.join(" "), power, toughness, colors, types, subtypes, keywords: [], abilities: kwText!.charAt(0).toUpperCase() + kwText!.slice(1) };
   const keywords = kwText ? parseKeywordList(kwText) : [];
   if (!keywords || !subtypes.length) return null;
   return { name: subtypes.join(" "), power, toughness, colors, types, subtypes, keywords, ...(quoted ? { abilities: quoted[2]! } : {}) };

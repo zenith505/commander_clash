@@ -464,3 +464,66 @@ describe("Unbound Flourishing", () => {
     expect(s.players[opp]!.life).toBe(theirs - 1);
   });
 });
+
+describe("Firebender Ascension", () => {
+  const ascension = card("Firebender Ascension", "Enchantment", "{1}{R}", { oracleText: "When this enchantment enters, create a 2/2 red Soldier creature token with firebending 1.\nWhenever a creature you control attacking causes a triggered ability of that creature to trigger, put a quest counter on this enchantment. Then if it has four or more quest counters on it, you may copy that ability. You may choose new targets for the copy." });
+  const fireSages = card("Fire Sages", "Creature — Human Cleric", "{1}{R}", { power: "2", toughness: "2", keywords: ["Firebending"], oracleText: "Firebending 1 (Whenever this creature attacks, add {R}. This mana lasts until end of combat.)\n{1}{R}{R}: Put a +1/+1 counter on this creature." });
+  const watcher = card("Attack Watcher", "Enchantment", "{1}", { oracleText: "Whenever a creature you control attacks, you gain 1 life." });
+  const toBlockers = (s: GameState, yes: boolean) => {
+    for (let i = 0; i < 80 && !(s.step === "declareBlockers" && !s.stack.length && !s.triggerQueue.length); i++) {
+      const p = s.pending;
+      if (p?.kind === "chooseMay") s = act(s, { type: "chooseMay", player: p.player, yes });
+      else if (p?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: p.player, blocks: [] });
+      else if (p) s = act(s, botActions(s, waitingOn(s)!)[0]!);
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    return s;
+  };
+  const attackWith = (s: GameState, ap: PlayerId, opp: PlayerId, id: string) => {
+    s = passUntil(s, "declareAttackers", ap);
+    return act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: id, defender: opp }] });
+  };
+
+  it("makes a Soldier with firebending 1, which it then counts (CR 702.189a)", () => {
+    expect(isFullySupported(ascension)).toBe(true);
+    const { s: s0, ap, opp, ids } = setup([ascension]);
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    const token = s.battlefield.find((x) => s.objects[x]!.isToken)!;
+    expect(s.objects[token]!.cardId && s.cards[s.objects[token]!.cardId]!.name).toBe("Soldier Token");
+    expect(power(s, s.objects[token]!)).toBe(2);
+    s.objects[token]!.summoningSick = false;
+    s = toBlockers(attackWith(s, ap, opp, token), true);
+    const asc = s.battlefield.find((x) => s.cards[s.objects[x]!.cardId]!.name === "Firebender Ascension")!;
+    expect(s.objects[asc]!.counters.quest).toBe(1);
+    expect(s.players[ap]!.manaPool.R).toBe(1);
+  });
+
+  it("copies the ability from the fourth quest counter on, above the original; not another creature's attack trigger", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const asc = putOnBattlefield(s0, ap, ascension);
+    s0.objects[asc]!.counters.quest = 3;
+    const sages = putOnBattlefield(s0, ap, fireSages);
+    putOnBattlefield(s0, ap, watcher);
+    let s = attackWith(s0, ap, opp, sages);
+    // Firebending's trigger and the Ascension's; the watcher's ability isn't the creature's.
+    s = toBlockers(s, true);
+    expect(s.objects[asc]!.counters.quest).toBe(4);
+    expect(s.players[ap]!.manaPool.R).toBe(2);
+  });
+
+  it("may decline the copy; with fewer than four counters there's none", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const asc = putOnBattlefield(s0, ap, ascension);
+    s0.objects[asc]!.counters.quest = 3;
+    const sages = putOnBattlefield(s0, ap, fireSages);
+    const s = toBlockers(attackWith(s0, ap, opp, sages), false);
+    expect(s.objects[asc]!.counters.quest).toBe(4);
+    expect(s.players[ap]!.manaPool.R).toBe(1);
+    const { s: t0, ap: ap2, opp: opp2 } = setup([]);
+    const asc2 = putOnBattlefield(t0, ap2, ascension);
+    t0.objects[asc2]!.counters.quest = 0;
+    const t = toBlockers(attackWith(t0, ap2, opp2, putOnBattlefield(t0, ap2, fireSages)), true);
+    expect(t.objects[asc2]!.counters.quest).toBe(1);
+    expect(t.players[ap2]!.manaPool.R).toBe(1);
+  });
+});

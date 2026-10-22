@@ -1,7 +1,7 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType, objIsType, power } from "../cards";
 import { nameLandBan } from "../names";
-import { canPlayLandNow, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType } from "../game";
+import { canPlayLandNow, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters, withPutter } from "../counters";
 import { manaValue } from "../mana";
@@ -938,6 +938,26 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         st.casting = undefined;
       }
       if (st.handPick) return finish();
+      // Plargg and Nassari: an opponent chosen by you picks one of the nonland cards; the others may be cast (rulings).
+      if (e.opponentExcludes && !st.excluded) {
+        const nonland = st.ids.map((x) => x.id).filter((id) => exiled(id) && !isType(defOf(s, obj(s, id)), "Land"));
+        if (st.excludeBy !== undefined && st.pick !== undefined) {
+          st.excluded = st.pick;
+          st.pick = undefined;
+          log(s, `${player(s, st.excludeBy).name} chooses ${defOf(s, obj(s, st.excluded)).name}.`);
+        } else if (nonland.length) {
+          const opps = opponents(s, you.id);
+          const by = opps.length === 1 ? opps[0] : (s.resolving!.chosen?.player ?? undefined);
+          if (by === undefined) {
+            if (!opps.length) return finish();
+            s.pending = { kind: "chooseOption", player: you.id, source: src, what: "opponent", options: opps.map(String), labels: opps.map((x) => player(s, x).name), prompt: "choose an opponent to choose a nonland card exiled this way" };
+            return "paused";
+          }
+          st.excludeBy = by;
+          s.pending = { kind: "chooseOption", player: by, source: src, what: "castFromAmong", options: nonland, labels: nonland.map((id) => defOf(s, obj(s, id)).name), prompt: `choose a nonland card exiled this way: ${you.name} may cast up to two of the others` };
+          return "paused";
+        }
+      }
       if (st.landPick) {
         // Gix: the land picked, played now; untapped if its controller paid for that (a shock land).
         const id = st.landPick;
@@ -985,7 +1005,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const sharesType = (id: ObjectId) => s.battlefield.some((b) => controllerOf(s, obj(s, b)) === you.id && objIsType(s, obj(s, b), "Creature") && shareCreatureType(creatureTypesOf(s, obj(s, id)), creatureTypesOf(s, obj(s, b))));
       const options = st.ids
         .map((x) => x.id)
-        .filter((id) => exiled(id) && !st.declined.includes(id) && (isLand(id) ? !!e.lands && canPlayLandNow(s, you.id, id) : (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (st.maxMv === undefined || mvOf(id) <= st.maxMv) && (st.budget === undefined || mvOf(id) <= st.budget) && (!st.hits || st.hits.includes(id)) && (!e.sharesTypeWithYours || sharesType(id)) && castable(id)));
+        .filter((id) => exiled(id) && !st.declined.includes(id) && id !== st.excluded && (isLand(id) ? !!e.lands && canPlayLandNow(s, you.id, id) : (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (st.maxMv === undefined || mvOf(id) <= st.maxMv) && (st.budget === undefined || mvOf(id) <= st.budget) && (!st.hits || st.hits.includes(id)) && (!e.sharesTypeWithYours || sharesType(id)) && castable(id)));
       if (!options.length || (e.max !== undefined && (st.cast ?? 0) >= e.max)) return finish();
       const left = st.budget !== undefined ? ` (total mana value ${st.budget} left)` : "";
       s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Done"], prompt: `${e.lands ? "play a land or " : ""}cast a spell from among the ${e.reveal ? "revealed" : "exiled"} cards without paying its mana cost${left}?` };

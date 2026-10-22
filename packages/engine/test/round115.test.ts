@@ -184,3 +184,48 @@ describe("Quilled Greatwurm", () => {
     expect(plan.at(-1)).toMatchObject({ type: "castSpell", objectId: bw, via: "permission" });
   });
 });
+
+const plargg = card("Plargg and Nassari", "Legendary Creature — Dwarf Wizard", "{3}{R}{R}", {
+  power: "5",
+  toughness: "5",
+  oracleText:
+    "At the beginning of your upkeep, each player exiles cards from the top of their library until they exile a nonland card. An opponent chooses a nonland card exiled this way. You may cast up to two spells from among the other cards exiled this way without paying their mana costs.",
+});
+
+describe("Plargg and Nassari", () => {
+  it("you choose an opponent, who picks one nonland card; you cast up to two of the others free", () => {
+    expect(isFullySupported(plargg)).toBe(true);
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, plargg);
+    let s = passUntil(s0, "upkeep", ap);
+    // The top of each library: a Forest, then a nonland card.
+    const tops = s.turnOrder.map((pid, i) => {
+      const nonland = putOnBattlefield(s, pid, bear({ name: `Bear ${i}` }));
+      const land = putOnBattlefield(s, pid, card("Forest", "Basic Land — Forest"));
+      for (const id of [nonland, land]) moveObject(s, id, "library", { top: true });
+      return { pid, nonland, land };
+    });
+    s = settle(s);
+    expect(s.pending).toMatchObject({ kind: "chooseOption", player: ap, what: "opponent" });
+    s = act(s, { type: "chooseOption", player: ap, choice: String(opp) });
+    const mine = tops.find((t) => t.pid === ap)!.nonland;
+    expect(s.pending).toMatchObject({ kind: "chooseOption", player: opp, what: "castFromAmong" });
+    expect((s.pending as { options: string[] }).options).toHaveLength(4);
+    s = act(s, { type: "chooseOption", player: opp, choice: mine });
+    // Ap's own card can't be cast now; two of the other three can.
+    expect(s.pending).toMatchObject({ kind: "chooseOption", player: ap, what: "castFromAmong" });
+    expect((s.pending as { options: string[] }).options).not.toContain(mine);
+    const others = tops.filter((t) => t.pid !== ap).map((t) => t.nonland);
+    for (const pick of others.slice(0, 2)) {
+      s = act(s, { type: "chooseOption", player: ap, choice: pick });
+      if (s.pending?.kind === "castFree") s = run(s, planCast(s, ap, pick));
+    }
+    expect(s.pending?.kind === "chooseOption" && s.pending.what === "castFromAmong").toBe(false);
+    s = settle(s);
+    expect(s.objects[others[0]!]!.zone).toBe("battlefield");
+    expect(s.objects[others[1]!]!.zone).toBe("battlefield");
+    expect(s.objects[others[2]!]!.zone).toBe("exile");
+    expect(s.objects[mine]!.zone).toBe("exile");
+    for (const t of tops) expect(s.objects[t.land]!.zone).toBe("exile");
+  });
+});

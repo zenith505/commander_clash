@@ -1845,7 +1845,7 @@ export interface Resolving {
     linkedPick?: true;
     /** "Exile the top two cards ..., then choose one of them" (Party Thrasher): the cards exiled, and the one chosen. */
     impulseChoice?: { ids: ObjectId[]; pick?: ObjectId };
-    castAmong?: { ids: { id: ObjectId; zc: number }[]; budget?: number; maxMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true; /** How many were cast. */ cast?: number; /** `untilHits`: the cards that qualified; `handPick`, choosing which goes to the hand. */ hits?: ObjectId[]; handPick?: true; /** `copies`: the card the copy being cast is of. */ copyOf?: ObjectId; /** `lands`: the land picked to play, after asking whether it enters untapped. */ landPick?: ObjectId };
+    castAmong?: { ids: { id: ObjectId; zc: number }[]; budget?: number; maxMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true; /** How many were cast. */ cast?: number; /** `untilHits`: the cards that qualified; `handPick`, choosing which goes to the hand. */ hits?: ObjectId[]; handPick?: true; /** `copies`: the card the copy being cast is of. */ copyOf?: ObjectId; /** `lands`: the land picked to play, after asking whether it enters untapped. */ landPick?: ObjectId; /** `opponentExcludes`: the opponent asked, and the card they chose (not to be cast). */ excludeBy?: PlayerId; excluded?: ObjectId };
     topOrBottom?: string; // the owner's choice: "top" or "bottom"
     /** The player a creature put onto the battlefield attacking attacks (CR 508.4), as a PlayerId string. */
     attackWhom?: string;

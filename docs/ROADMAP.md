@@ -1,7 +1,7 @@
 # Roadmap
 
-22,939 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,139 of 4,988 (82%).
+22,981 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,167 of 4,988 (83%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,17 +22,23 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 118, most played first: Sheoldred // The True Scriptures
-   ("a nontoken creature or planeswalker": whether "nontoken" covers both isn't settled by a ruling), Mari, the Killing
-   Quill, Firebender Ascension, Unbound Flourishing, Tinybones, Bauble Burglar, Zack Fair, Scholar of New Horizons (a
-   searched card that goes to the battlefield or the hand depending on a condition), Cunning Rhetoric, Chandra's
-   Incinerator, Shadrix Silverquill, Ashiok, Dream Render, Loading Zone, Ichormoon Gauntlet, Thousand-Faced Shadow, The
-   Chain Veil, Inquisitive Glimmer, Gandalf the White, Worldsoul's Rage, Mind's Dilation, Camellia, the Seedmiser and
-   Forage ("or" costs on activated abilities), Gilded Drake. Arahbo, Inalla, Sahir and The Ur-Sphinx have eminence now
-   but other lines keep them out. Smaller gaps from round 118: Powerbalance compares a split card's combined mana value
-   and a prototype card's printed one; Aminatou's Augury doesn't ask which type a card with two types is cast as;
-   it counts as whichever leaves the most casts open, decided after the fact; Selfless Squire triggers once for each player's batch of prevented damage;
-   bots choose Kozilek, the Broken Reality's targets with their general target logic, not by who would gain most.
+00. Most played first (`npm run popular`). Out after round 119, most played first: Sheoldred // The True Scriptures
+   ("a nontoken creature or planeswalker": whether "nontoken" covers both isn't settled by a ruling), Shadrix
+   Silverquill ("each mode must target a different player"), Ashiok, Dream Render, Ichormoon Gauntlet, Thousand-Faced
+   Shadow, The Chain Veil, Inquisitive Glimmer, Gandalf the White, Worldsoul's Rage, Mind's Dilation, Deadpool, Trading
+   Card, Bloodsoaked Insight, Camellia, the Seedmiser and Forage ("or" costs on activated abilities), Gilded Drake,
+   Cloudstone Curio ("shares a permanent type with it"), Ygra, Wrenn and Realmbreaker, Semester's End, Flesh Duplicate,
+   Gwenom, Witch-king of Angmar, Expel the Interlopers (choose a number as it resolves), Ugin's Labyrinth, Virtue of
+   Strength, Sundial of the Infinite, Pain for All ("enchanted creature deals damage ... to any other target"), Weathered
+   Sentinels, Tishana's Tidebinder, Tragic Arrogance. Arahbo, Inalla, Sahir and The Ur-Sphinx have eminence now but
+   other lines keep them out. Smaller gaps from round 119: Firebender Ascension's copy is of the creature's own
+   triggered ability only (not an Aura's or Equipment's on it, nor a delayed one); Aetherspouts asks each owner about
+   their creatures one at a time in battlefield order, not the active player first; One with the Multiverse and other
+   alternative-cost free casts can't cast a prototype card prototyped (a free cast from a resolving spell or ability
+   can); Zaxara, Geometer's Arthropod, Glava, Nev, Owlin Spiralmancer and Elementalist's Palette (their {X} lines) are
+   out; mana abilities with {X} don't trigger Unbound Flourishing (they can't be copied anyway). Smaller gaps from
+   round 118: Selfless Squire triggers once for each player's batch of prevented damage; bots choose Kozilek, the
+   Broken Reality's targets with their general target logic, not by who would gain most.
    Smaller gaps from round 116: bots never use "target creature it's
    blocking" abilities (Tinder Wall, Wall of Corpses, Goblin Snowman; bots activate abilities in their own main phase
    only); bots stop paying Lim-Dûl's Vault life after four looks; round 115's Assault
@@ -53,9 +59,7 @@ line blocks.
    asks about paying 2 life before the basic land type (the card chooses the type first; nothing hidden depends on the
    order). Smaller gaps from round 111: the tap picker names its cards in the singular ("click 5 untapped artifact or
    creature of yours"). Smaller gaps from round 110: a bot controlling another player's
-   turn (CR 723) makes them do only what they must (no spells, abilities or attacks); One with the Multiverse and
-   other "without paying its mana cost" sources can't cast a prototype card prototyped; Sunbird's Invocation and
-   Villainous Wealth compare a split card's combined mana value, not the half cast; Oviya, Automech Artisan is out
+   turn (CR 723) makes them do only what they must (no spells, abilities or attacks); Oviya, Automech Artisan is out
    (its "it" lines). Smaller gaps from round 109: bots keep the legend with the most attachments and counters, then
    the non-token, then the oldest. Smaller gaps from round 108: bots choose fame when their best creature has power 2 or less, else
    fortune; Witness Protection's new name counts in rules checks, but the card picture still shows the printed card.

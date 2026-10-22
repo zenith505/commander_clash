@@ -736,6 +736,13 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     perPlayer = true;
     line = `Whenever you attack${youAttackAPlayer[1] ?? ""}, ${line.slice(youAttackAPlayer[0].length)}`;
   }
+  // "Whenever one or more Halflings you control attack a player" (Meriadoc Brandybuck, Attuma, Crimson Cowl): likewise
+  // once for each player those creatures attack, not a planeswalker or battle (rulings on Meriadoc Brandybuck).
+  const groupAttacksAPlayer = /^Whenever one or more (.+?) you control attack a player, /.exec(line);
+  if (groupAttacksAPlayer) {
+    perPlayer = true;
+    line = `Whenever one or more ${groupAttacksAPlayer[1]} you control attack, ${line.slice(groupAttacksAPlayer[0].length)}`;
+  }
   if ((m = /^Whenever (?:one or more (.+?) you control attack|you attack with (one|two|three|four|five) or more (.+?)|you attack), (.+)$/.exec(line))) {
     event = "creaturesYouControlAttack";
     phrase = m[1] ?? m[3];

@@ -409,3 +409,57 @@ describe("Party Thrasher", () => {
     expect(s.objects[second]!.mayPlay).toMatchObject({ player: ap });
   });
 });
+
+const meriadoc = card("Meriadoc Brandybuck", "Legendary Creature — Halfling Citizen", "{1}{G}", {
+  power: "2",
+  toughness: "2",
+  oracleText: "Whenever one or more Halflings you control attack a player, create a Food token. (It's an artifact with \"{2}, {T}, Sacrifice this token: You gain 3 life.\")",
+});
+const attuma = card("Attuma, Atlantean Warlord", "Legendary Creature — Merfolk Warrior Villain", "{2}{U}{U}", {
+  power: "3",
+  toughness: "4",
+  oracleText: "Other Merfolk you control get +1/+1.\nWhenever one or more Merfolk you control attack a player, draw a card.",
+});
+const cowl = card("Crimson Cowl, Master of Evil", "Legendary Creature — Human Villain", "{2}{B}", {
+  power: "1",
+  toughness: "3",
+  oracleText: "Whenever one or more nontoken Villains you control attack a player, you create a 2/1 black Villain creature token with menace. (It can't be blocked except by two or more creatures.)",
+});
+const halfling = (name: string) => card(name, "Creature — Halfling", "{G}", { power: "1", toughness: "1" });
+
+describe("whenever one or more creatures you control attack a player", () => {
+  it("parse: Meriadoc, Attuma and Crimson Cowl trigger once for each player attacked", () => {
+    for (const d of [meriadoc, attuma, cowl]) {
+      expect(isFullySupported(d), d.name).toBe(true);
+      expect(compileCard(d).triggers.at(-1)).toMatchObject({ event: "creaturesYouControlAttack", perPlayer: true });
+    }
+  });
+
+  it("Meriadoc: Halflings attacking two players make two Food, however many attack each; another creature type doesn't count", () => {
+    const { s: s0, ap } = setup([]);
+    const m = putOnBattlefield(s0, ap, meriadoc);
+    const h1 = putOnBattlefield(s0, ap, halfling("Halfling One"));
+    const h2 = putOnBattlefield(s0, ap, halfling("Halfling Two"));
+    const other = putOnBattlefield(s0, ap, bear());
+    const [p1, p2, p3] = s0.turnOrder.filter((p) => p !== ap) as [PlayerId, PlayerId, PlayerId];
+    let s = s0;
+    while (s.pending?.kind !== "declareAttackers") s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: m, defender: p1 }, { attacker: h1, defender: p1 }, { attacker: h2, defender: p2 }, { attacker: other, defender: p3 }] });
+    s = passAll(passAll(s));
+    const food = s.battlefield.filter((id) => s.objects[id]!.isToken && characteristics(s, s.objects[id]!).subtypes.includes("Food"));
+    expect(food).toHaveLength(2);
+  });
+
+  it("Attuma: one card for each player Merfolk attack", () => {
+    const { s: s0, ap } = setup([]);
+    const a = putOnBattlefield(s0, ap, attuma);
+    const merfolk = putOnBattlefield(s0, ap, card("Merfolk Trickster", "Creature — Merfolk Wizard", "{U}{U}", { power: "2", toughness: "2" }));
+    const [p1, p2] = s0.turnOrder.filter((p) => p !== ap) as [PlayerId, PlayerId];
+    const hand = s0.players[ap]!.hand.length;
+    let s = s0;
+    while (s.pending?.kind !== "declareAttackers") s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: a, defender: p1 }, { attacker: merfolk, defender: p2 }] });
+    s = passAll(passAll(s));
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
+  });
+});

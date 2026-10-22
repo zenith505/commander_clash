@@ -166,6 +166,12 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
     if (i === undefined && ctx.subjectIt) return { ref: "subjectController" };
     return i !== undefined ? { ref: "targetController", index: i } : null;
   }
+  // The Lord of Pain: "another target player", not the one the trigger is about (bound in triggerBody).
+  if (x === "target player other than that player" && ctx.eventPlayer) {
+    const index = addTarget(ctx, { kind: "player", notEventPlayer: true, text: "another target player" });
+    ctx.lastPlayerTarget = index;
+    return { ref: "target", index };
+  }
   if (x === "target player" || x === "target opponent") {
     const index = addTarget(ctx, { kind: "player", opponent: x === "target opponent", text: x });
     ctx.lastPlayerTarget = index;

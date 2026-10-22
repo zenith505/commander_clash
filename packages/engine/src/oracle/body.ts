@@ -1348,6 +1348,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si++;
       continue;
     }
+    // "Whenever a player casts their first spell each turn, choose another target player. ~ deals damage equal to that
+    // spell's mana value to the chosen player." (The Lord of Pain): a player other than the caster (rulings).
+    const another = ctx.eventPlayer && /^[Cc]hoose another target player$/.test(s) ? /^(.+) to the chosen player$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (another) {
+      const fx = parseOne(`${another[1]!} to target player other than that player`, ctx);
+      if (!fx) return null;
+      effects.push(...fx);
+      si++;
+      continue;
+    }
     // "Each opponent may discard a card. If they don't, they lose 3 life." (Professor Onyx): a punisher, "loses 3 life
     // unless they discard a card".
     const mayOut = /^([Ee]ach opponent|[Tt]arget opponent|[Tt]arget player|[Tt]hat player) may (discard|sacrifice) (.+)$/.exec(s);

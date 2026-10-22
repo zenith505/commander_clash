@@ -357,6 +357,7 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     if (src && t.id !== controller && hexproofFrom(gainedBy(s, t.id), src)) return false;
     if (spec.kind === "any") return !spec.opponent || t.id !== controller;
     if (spec.kind !== "player") return false;
+    if (spec.notEventPlayer || t.id === spec.notPlayer) return false;
     return !spec.opponent || t.id !== controller;
   }
   if (t.kind === "stack") {

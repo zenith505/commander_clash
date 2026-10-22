@@ -912,3 +912,29 @@ describe("Perch Protection", () => {
     expect(s.players[ap]!.lifeCantChange).toBeUndefined();
   });
 });
+
+const lordOfPain = card("The Lord of Pain", "Legendary Creature — Human Assassin", "{3}{B}{R}", {
+  power: "5",
+  toughness: "5",
+  keywords: ["Menace"],
+  oracleText:
+    "Menace\nYour opponents can't gain life.\nWhenever a player casts their first spell each turn, choose another target player. The Lord of Pain deals damage equal to that spell's mana value to the chosen player.",
+});
+
+describe("The Lord of Pain", () => {
+  it("the first spell each turn: damage equal to its mana value to a player other than its caster (rulings)", () => {
+    expect(isFullySupported(lordOfPain)).toBe(true);
+    const { s: s0, ap, ids, opp } = setup([bear(), bear()]);
+    putOnBattlefield(s0, ap, lordOfPain);
+    let s = run(s0, planCast(s0, ap, ids[0]!, [], undefined, "auto"));
+    for (let i = 0; i < 10 && !s.pending && s.triggerQueue.length; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    expect(() => act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: ap }] })).toThrow();
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] }));
+    expect(s.players[opp]!.life).toBe(38);
+    // The second spell this turn doesn't trigger it.
+    s = settle(run(s, planCast(s, ap, ids[1]!, [], undefined, "auto")));
+    expect(s.pending ?? undefined).toBeUndefined();
+    expect(s.players[opp]!.life).toBe(38);
+  });
+});

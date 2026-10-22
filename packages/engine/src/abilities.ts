@@ -369,6 +369,9 @@ export interface TargetSpec {
   protectedBy?: PlayerId;
   /** For players: only opponents. */
   opponent?: boolean;
+  /** For players: not the one a trigger is about ("choose another target player", The Lord of Pain); `notPlayer` once it's known. */
+  notEventPlayer?: true;
+  notPlayer?: PlayerId;
   /** "Up to two target creatures": this target may be left unchosen (CR 115.6). */
   optional?: boolean;
   /**

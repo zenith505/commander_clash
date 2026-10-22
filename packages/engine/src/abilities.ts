@@ -2946,6 +2946,7 @@ export type TriggerEvent =
   | "youCounterSpell"
   /** "Whenever you complete a dungeon" (CR 309.7). */
   | "youCompleteDungeon"
+  | "youFullyUnlockRoom" // "Whenever you fully unlock a Room" (CR 709.5i): one of your Rooms gets its second unlocked designation
   /** "Whenever you commit a crime", "whenever an opponent commits a crime" (CR 700.13): once for each spell or ability. */
   | "youCommitCrime"
   | "opponentCommitsCrime"

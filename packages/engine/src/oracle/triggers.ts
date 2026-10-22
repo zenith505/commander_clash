@@ -72,6 +72,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever you proliferate, (.+)$/, "youProliferate"],
   [/^Whenever a spell or ability you control counters a spell, (.+)$/, "youCounterSpell"],
   [/^Whenever you complete a dungeon, (.+)$/, "youCompleteDungeon"],
+  [/^Whenever you fully unlock a Room, (.+)$/, "youFullyUnlockRoom"],
   [/^Whenever you commit a crime, (.+)$/, "youCommitCrime"], // CR 700.13
   [/^Whenever an opponent commits a crime, (.+)$/, "opponentCommitsCrime"],
   [/^Whenever you choose a creature as your Ring-bearer, (.+)$/, "youChooseRingBearer"],

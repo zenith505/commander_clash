@@ -166,6 +166,8 @@ export type TriggerSourceEvent =
   | { type: "becameLevel"; id: ObjectId; level: number }
   /** A Room's door became unlocked (CR 709.5h). */
   | { type: "doorUnlocked"; id: ObjectId; door: number }
+  /** A Room got both unlocked designations (CR 709.5i), unlocked by its controller `player`. */
+  | { type: "roomFullyUnlocked"; id: ObjectId; player: PlayerId }
   /** A Case became solved (CR 719.3a), under `controller`. */
   | { type: "solved"; id: ObjectId; controller: PlayerId }
   /** A permanent transformed (CR 701.27a), now with the face `face` up (0: the front). */
@@ -850,6 +852,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "When you unlock this door": an ability of that door, which the Room has now that it's unlocked (CR 709.5h).
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e, t) => e === "selfDoorUnlocked" && t.door === ev.door);
+  } else if (ev.type === "roomFullyUnlocked") {
+    // "Eerie — ... whenever you fully unlock a Room": the player who did is its controller (CR 709.5e-f).
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youFullyUnlockRoom", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+    }
   } else if (ev.type === "becameLevel") {
     // "When this Class becomes level 2": an ability it has from that level on (CR 716.2a), so it has it now.
     const o = obj(s, ev.id);

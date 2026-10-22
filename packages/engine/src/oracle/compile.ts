@@ -2245,6 +2245,8 @@ export function compile(d: CardDef): CompiledCard {
       // "Whenever you create or sacrifice a token, ..." (Mirkwood Bats); "When ~ enters and whenever an opponent draws a
       // card except the first one they draw in each of their draw steps, ..." (Orcish Bowmasters).
       /^Whenever you (create or sacrifice) a token, (.+)$/.exec(line) ??
+      // Eerie: "Whenever an enchantment you control enters and whenever you fully unlock a Room, ..." (Entity Tracker).
+      /^Whenever (an enchantment you control enters|~ or another enchantment you control enters) and whenever you fully unlock a Room, (.+)$/.exec(line) ??
       // "When ~ enters and whenever you cast a spell with mana value 5 or greater, draw a card." (Up the Beanstalk)
       /^When ~ enters and (whenever (?!it )[^,]+), (.+)$/.exec(line) ??
       // "Whenever a creature you control of the chosen type enters or attacks, draw a card." (Kindred Discovery)
@@ -2273,6 +2275,8 @@ export function compile(d: CardDef): CompiledCard {
               ? [`When ~ enters, ${effect}`, `A${twice[1]!.slice(1)}, ${effect}`]
             : /^When ~ transforms into ~ or dies/.test(line)
               ? [`When ~ transforms into ~, ${effect}`, `When ~ dies, ${effect}`]
+            : / and whenever you fully unlock a Room, /.test(line)
+              ? [`Whenever ${twice[1]}, ${effect}`, `Whenever you fully unlock a Room, ${effect}`]
             : twice[1] === "create or sacrifice"
               ? [`Whenever you create a token, ${effect}`, `Whenever you sacrifice a token, ${effect}`]
             : /^whenever /.test(twice[1]!)

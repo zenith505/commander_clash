@@ -7773,6 +7773,8 @@ export function setUnlocked(s: GameState, o: GameObject, doors: number[]) {
   registerRoom(s, cardIdOf(o));
   invalidateCharacteristics(s);
   for (const door of o.unlocked) if (!was.includes(door)) fireEvent(s, { type: "doorUnlocked", id: o.id, door });
+  // "Fully unlocks" (CR 709.5i): it had one designation and gets the other, or had neither and gets both.
+  if (was.length < 2 && o.unlocked.length === 2) fireEvent(s, { type: "roomFullyUnlocked", id: o.id, player: controllerOf(s, o) });
 }
 
 /** Plot a card (CR 702.170a): pay its plot cost and exile it. Its owner may cast it free on a later turn (702.170d). */

@@ -2,8 +2,8 @@
 // ability (Klauth, Manamorphose), with a color-split choice as it resolves (CR 106.1b, 608.2d).
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, cast, passAll, passUntil, putOnBattlefield, setup, target } from "./helpers";
-import { applyAction, botActions, characteristics, manaValue, spellCost, invalidateCharacteristics, isFullySupported, manaAbilitiesOn, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { act, bear, card, cast, passAll, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
+import { applyAction, botActions, characteristics, manaValue, spellCost, invalidateCharacteristics, isFullySupported, manaAbilitiesOn, planCast, planUnlock, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 import { moveObject } from "../src/game";
 
 // Real oracle text (Scryfall).
@@ -440,5 +440,35 @@ describe("The Key to the Vault", () => {
     s = settle(act(s, { type: "searchLibrary", player: ap, found: [] }));
     expect(s.objects[div]!.zone).toBe("library");
     expect(s.players[ap]!.library.slice(-2)).toContain(div);
+  });
+});
+
+describe("Eerie: whenever an enchantment you control enters and whenever you fully unlock a Room (CR 709.5i)", () => {
+  const tracker = card("Entity Tracker", "Creature — Human Scout", "{2}{U}", {
+    power: "2",
+    toughness: "3",
+    keywords: ["Flash"],
+    oracleText: "Flash\nEerie — Whenever an enchantment you control enters and whenever you fully unlock a Room, draw a card.",
+  });
+  const REMINDER = "\n(You may cast either half. That door unlocks on the battlefield. As a sorcery, you may pay the mana cost of a locked door to unlock it.)";
+  const glassworks = scry("split", [
+    { name: "Glassworks", mana_cost: "{2}{R}", type_line: "Enchantment — Room", oracle_text: `When you unlock this door, this Room deals 4 damage to target creature an opponent controls.${REMINDER}` },
+    { name: "Shattered Yard", mana_cost: "{4}{R}", type_line: "Enchantment — Room", oracle_text: `At the beginning of your end step, this Room deals 1 damage to each opponent.${REMINDER}` },
+  ]);
+
+  it("Entity Tracker: the Room entering draws (an enchantment), unlocking its second door draws again, the first door alone doesn't", () => {
+    expect(isFullySupported(tracker)).toBe(true);
+    const { s: s0, ap, opp, ids } = setup([glassworks]);
+    putOnBattlefield(s0, ap, tracker);
+    putOnBattlefield(s0, opp, bear());
+    const hand = s0.players[ap]!.hand.length - 1;
+    let s = run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "auto", undefined, { face: 1 }));
+    for (let i = 0; i < 10 && (s.stack.length || s.triggerQueue.length || s.pending); i++) s = s.pending ? act(s, botActions(s, waitingOn(s)!)[0]!) : settle(s);
+    // One draw: an enchantment entered (Shattered Yard's door unlocked, not fully).
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+    s = run(s, planUnlock(s, ap, ids[0]!, 0));
+    for (let i = 0; i < 10 && (s.stack.length || s.triggerQueue.length || s.pending); i++) s = s.pending ? act(s, botActions(s, waitingOn(s)!)[0]!) : settle(s);
+    expect(s.objects[ids[0]!]!.unlocked?.length).toBe(2);
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
   });
 });

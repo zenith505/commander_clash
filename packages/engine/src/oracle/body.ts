@@ -3575,6 +3575,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "continuous", what: { ref: "counteredSource", filter }, mods: [{ kind: "loseAllAbilities" }], duration: "whileControlled", whileOnBattlefield: true });
       continue;
     }
+    // Zurgo Stormrender: "draw a card if it was attacking. Otherwise, each opponent loses 1 life": the token the trigger is
+    // about, as it last existed (CR 608.2h).
+    const wasAttacking = (ctx.subject || ctx.subjectIt) && !effects.length ? /^(.+) if it was attacking$/.exec(s) : null;
+    const elseWas = wasAttacking && /^Otherwise, (.+?)\.?$/.exec(sentences[si + 1] ?? "");
+    if (wasAttacking && elseWas) {
+      const yes = parseOne(capital(wasAttacking[1]!), ctx);
+      const no = parseOne(capital(elseWas[1]!), ctx);
+      if (!yes || !no) return null;
+      effects.push({ type: "if", cond: { kind: "subjectWasAttacking" }, effects: yes, otherwise: no });
+      si++;
+      continue;
+    }
     // Settle the Wreckage: "Exile all attacking creatures target player controls. That player may search their library for
     // that many basic land cards, put those cards onto the battlefield tapped, then shuffle": as many as were exiled
     // (CR 608.2h); they may find fewer (rulings, CR 701.23b).

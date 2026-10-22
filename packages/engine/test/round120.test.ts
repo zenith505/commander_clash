@@ -837,4 +837,24 @@ describe("more popular cards", () => {
     expect(can).toEqual(expect.arrayContaining([lev, bird]));
     void opp;
   });
+  it("Zurgo Stormrender: a creature token leaving draws a card if it was attacking, otherwise each opponent loses 1 life", () => {
+    const zurgo = card("Zurgo Stormrender", "Legendary Creature — Orc Warrior", "{R}{W}{B}", { power: "3", toughness: "3", keywords: ["Mobilize"], oracleText: "Mobilize 1 (Whenever this creature attacks, create a tapped and attacking 1/1 red Warrior creature token. Sacrifice it at the beginning of the next end step.)\nWhenever a creature token you control leaves the battlefield, draw a card if it was attacking. Otherwise, each opponent loses 1 life." });
+    supported(zurgo);
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, zurgo);
+    const [a, b] = [putOnBattlefield(s0, ap, bear({ name: "Token A" })), putOnBattlefield(s0, ap, bear({ name: "Token B" }))];
+    s0.objects[a]!.isToken = true;
+    s0.objects[b]!.isToken = true;
+    s0.objects[a]!.attacking = opp;
+    const hand = s0.players[ap]!.hand.length;
+    const life = s0.players[opp]!.life;
+    moveObject(s0, a, "graveyard");
+    let s = settle(s0);
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+    expect(s.players[opp]!.life).toBe(life);
+    moveObject(s, b, "graveyard");
+    s = settle(s);
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+    expect(s.players[opp]!.life).toBe(life - 1);
+  });
 });

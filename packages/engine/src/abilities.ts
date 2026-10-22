@@ -2861,6 +2861,8 @@ export type SpellCondition =
   | { kind: "targetIs"; index: number; filter: TargetSpec }
   /** "If that land is a Plains" (Emeria Shepherd): the trigger's subject as it is now, or as it last existed (CR 608.2h). */
   | { kind: "subjectIs"; filter: TargetSpec }
+  /** "If it was attacking" (Zurgo Stormrender): the trigger's subject is attacking, or was as it last existed (CR 608.2h). */
+  | { kind: "subjectWasAttacking" }
   /**
    * "If you controlled that permanent, draw a card" about target `index` (Geistwave, Kellan): you control it now, or did
    * as it last existed on the battlefield if this spell or ability moved it (CR 608.2h; rulings on Geistwave and Kellan).

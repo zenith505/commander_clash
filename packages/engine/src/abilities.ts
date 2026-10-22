@@ -304,6 +304,8 @@ export interface TargetSpec {
   doubleFaced?: true;
   /** "An artifact card with a mana ability" (Moonsilver Key): an activated or triggered one (CR 605.1). */
   manaAbility?: true;
+  /** "That has an activated ability with {T} in its cost" (Magewright's Stone): a mana ability or another, its own or granted; tapping other permanents doesn't count (rulings). */
+  tapAbility?: true;
   /** "Transformed permanent" (CR 701.27g): a nonmodal double-faced permanent with its back face up, not melded or merged. */
   transformed?: true;
   /** "Each with power greater than its base power" (Kutzil): see basePowerNow. */

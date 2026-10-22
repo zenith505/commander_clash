@@ -641,6 +641,12 @@ export function parseTargetPhrase(
     count?: (text: string) => AmountExpr | null;
   } = {},
 ): TargetSpec | null {
+  // Magewright's Stone: "creature that has an activated ability with {T} in its cost", printed or granted (rulings).
+  const tapAb = / that has an activated ability with \{T\} in its cost$/.exec(phrase.trim());
+  if (tapAb) {
+    const rest = parseTargetPhrase(phrase.trim().slice(0, tapAb.index), opts);
+    return rest?.kind === "object" ? { ...rest, tapAbility: true, text: `target ${phrase.trim().toLowerCase()}` } : null;
+  }
   // "A creature you control that's enchanted or equipped" (Reyav, Master Smith): "enchanted-or-equipped creature you control".
   let p = subtypeClause(phrase.trim()).toLowerCase().replace(/^(creature)( you control)? that's (enchanted or equipped|enchanted|equipped)$/, (_, k: string, w: string | undefined, st: string) => `${st.replace(/ /g, "-")} ${k}${w ?? ""}`);
   const text = `target ${phrase.trim().toLowerCase()}`;

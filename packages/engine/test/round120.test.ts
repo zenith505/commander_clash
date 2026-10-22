@@ -857,4 +857,18 @@ describe("more popular cards", () => {
     expect(s.players[ap]!.hand.length).toBe(hand + 1);
     expect(s.players[opp]!.life).toBe(life - 1);
   });
+  it("Magewright's Stone untaps a creature with a {T} ability, not one without", () => {
+    const stone = card("Magewright's Stone", "Artifact", "{2}", { oracleText: "{1}, {T}: Untap target creature that has an activated ability with {T} in its cost." });
+    const elf = card("Test Elf", "Creature — Elf", "{G}", { power: "1", toughness: "1", oracleText: "{T}: Add {G}." });
+    supported(stone);
+    const { s: s0, ap } = setup([]);
+    const st = putOnBattlefield(s0, ap, stone);
+    const e = putOnBattlefield(s0, ap, elf);
+    const b = putOnBattlefield(s0, ap, bear());
+    s0.objects[e]!.tapped = true;
+    s0.objects[b]!.tapped = true;
+    expect(planActivate(s0, ap, st, 0, [{ kind: "object", id: b }])).toBeNull();
+    const s = settle(run(s0, planActivate(s0, ap, st, 0, [{ kind: "object", id: e }])));
+    expect(s.objects[e]!.tapped).toBeFalsy();
+  });
 });

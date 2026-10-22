@@ -1145,10 +1145,15 @@ function parseDiscardTrigger(line: string): TriggeredAbility | "fail" | null {
   // "... If you do, until the end of your next turn, you may play that card" (Moonstone): that card, the object it
   // became in exile (CR 400.7), by you, its owner.
   const exileIt = m[1] === "you" && m[2] === "discard" && m[3] === "a" && m[4] === "card" ? /^(you may )?exile that card from your graveyard(?:\. If you do, (you may play that card this turn|until the end of your next turn, you may play that card))?\.$/.exec(m[5]!) : null;
+  // Tinybones: "Whenever an opponent discards a card, exile it from their graveyard with a stash counter on it": the
+  // discarded card, if it's there (rulings on Necropotence), with the counter on it in exile.
+  const exileTheirs = m[1] !== "you" && m[2] === "discards" && m[3] === "a" && m[4] === "card" ? new RegExp(`^exile it from their graveyard with an? ${COUNTER} counter on it\\.$`).exec(m[5]!) : null;
   const exile: Effect | undefined = exileIt
     ? { type: "exile", what: { ref: "subjectCard", zone: "graveyard" }, ...(exileIt[2] ? { ownerMay: { play: true, until: /next turn/.test(exileIt[2]) ? ("nextTurn" as const) : ("thisTurn" as const) } } : {}) }
-    : undefined;
-  const body = exile ? { targets: [], effects: [exileIt![1] ? { type: "may" as const, effects: [exile], text: m[5]!.replace(/^you may /, "").replace(/\.$/, "") } : exile], text: m[5]! } : parseBody(m[5]!, { eventPlayer: true });
+    : exileTheirs
+      ? { type: "exile", what: { ref: "subjectCard", zone: "graveyard" }, counters: { [exileTheirs[1]!]: 1 } }
+      : undefined;
+  const body = exile ? { targets: [], effects: [exileIt?.[1] ? { type: "may" as const, effects: [exile], text: m[5]!.replace(/^you may /, "").replace(/\.$/, "") } : exile], text: m[5]! } : parseBody(m[5]!, { eventPlayer: true });
   if (!body) return "fail";
   const by = m[1] === "you" ? "you" : m[1] === "an opponent" ? "opponent" : "any";
   return { event: "playerDiscards", discards: { by, ...(/^cycles?$/.test(m[2]!) ? { cycled: true as const } : {}), ...(m[3] === "another" ? { other: true as const } : {}), ...(filter ? { filter } : {}) }, body };

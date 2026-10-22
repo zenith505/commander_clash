@@ -413,6 +413,17 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = m[1] === "~" ? ({ ref: "self" } as const) : parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [{ type: "lastKnownCounters", what }] : null;
   }
+  // Mari's granted trigger: "you may remove a hit counter from a card that player owns in exile".
+  if ((m = new RegExp(`^Remove an? ${COUNTER} counter from a card (that player) owns in exile$`, "i").exec(s)) && ctx.eventPlayer) {
+    const owner = parsePlayer(m[2]!, ctx);
+    return owner ? [{ type: "removeExiledCounter", owner, counter: counterKind(m[1]!) }] : null;
+  }
+  // Mari, the Killing Quill: "Whenever a creature an opponent controls dies, exile it with a hit counter on it": the card,
+  // if it's still in the graveyard it went to (CR 400.7), with the counter on it in exile (CR 122.1).
+  if ((m = new RegExp(`^Exile (it|that card) with an? ${COUNTER} counter on it$`, "i").exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "subjectCard" ? [{ type: "exile", what, counters: { [counterKind(m[2]!)]: 1 } }] : null;
+  }
   // Zack Fair, after "{1}, Sacrifice ~: Target creature you control gains indestructible until end of turn.": "Put ~'s
   // counters on that creature and attach an Equipment that was attached to ~ to that creature": as many of each kind as
   // it had as it was sacrificed, put on, not moved (rulings); one of the Equipment that was attached to it.

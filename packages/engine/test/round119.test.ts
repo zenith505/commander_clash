@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { act, bear, card, forest, passUntil, plains, putOnBattlefield, setup } from "./helpers";
 import { botActions, byTypeChoices, isFullySupported, objHasKeyword, planActivate, planCast, power, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 import { invalidateCharacteristics } from "../src/layers";
-import { moveObject, spellCost } from "../src/game";
+import { destroyPermanent, moveObject, spellCost } from "../src/game";
 
 const settle = (s: GameState) => {
   for (let i = 0; i < 80 && (s.stack.length || s.triggerQueue.length) && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
@@ -284,5 +284,135 @@ describe("Scholar of New Horizons", () => {
     const { s, ap, sc } = withScholar(0);
     s.objects[sc]!.counters = {};
     expect(planActivate(s, ap, sc, 0)).toBeNull();
+  });
+});
+
+const rhetoric = card("Cunning Rhetoric", "Enchantment", "{2}{B}", {
+  oracleText:
+    "Whenever an opponent attacks you and/or one or more planeswalkers you control, exile the top card of that player's library. You may play that card for as long as it remains exiled, and you may spend mana as though it were mana of any color to cast it.",
+});
+
+describe("Cunning Rhetoric", () => {
+  it("once for each opponent's attack on you, however many attackers; you may cast the exiled card with any mana", () => {
+    expect(isFullySupported(rhetoric)).toBe(true);
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const me = later(s, ap, 1);
+    putOnBattlefield(s, me, rhetoric);
+    for (let i = 0; i < 3; i++) putOnBattlefield(s, me, card("Swamp", "Basic Land — Swamp"));
+    const bears = [putOnBattlefield(s, ap, bear()), putOnBattlefield(s, ap, bear())];
+    const top = toLibraryTop(s, ap, card("Green Thing", "Creature — Beast", "{1}{G}", { power: "2", toughness: "2", keywords: ["Flash"], oracleText: "Flash" }));
+    s = passUntil(s, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: bears.map((attacker) => ({ attacker, defender: me })) });
+    s = settle(s);
+    expect(s.objects[top]!.zone).toBe("exile");
+    expect(s.players[ap]!.library[0]).not.toBe(top);
+    expect(s.objects[s.players[ap]!.library[0]!]!.zone).toBe("library"); // just the one card
+    // Swamps pay for {1}{G} (flash), on the attacker's turn.
+    for (let i = 0; i < 6 && waitingOn(s) !== me; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = run(s, planCast(s, me, top));
+    expect(s.objects[top]!.zone).toBe("stack");
+  });
+
+  it("not when an opponent attacks someone else", () => {
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const me = later(s, ap, 1);
+    putOnBattlefield(s, me, rhetoric);
+    const b = putOnBattlefield(s, ap, bear());
+    const top = s.players[ap]!.library[0]!;
+    s = passUntil(s, "declareAttackers", ap);
+    s = settle(act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: b, defender: later(s, ap, 2) }] }));
+    expect(s.objects[top]!.zone).toBe("library");
+  });
+});
+
+const tinybones = card("Tinybones, Bauble Burglar", "Legendary Creature — Skeleton Rogue", "{1}{B}", {
+  power: "1",
+  toughness: "3",
+  oracleText:
+    "Whenever an opponent discards a card, exile it from their graveyard with a stash counter on it.\nDuring your turn, you may play cards you don't own with stash counters on them from exile, and mana of any type can be spent to cast those spells.\n{3}{B}, {T}: Each opponent discards a card. Activate only as a sorcery.",
+});
+
+describe("Tinybones, Bauble Burglar", () => {
+  it("each opponent's discarded card is exiled with a stash counter; you may cast it during your turn with any type of mana", () => {
+    expect(isFullySupported(tinybones)).toBe(true);
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const t = putOnBattlefield(s, ap, tinybones);
+    const opps = [1, 2, 3].map((n) => later(s, ap, n));
+    // Each opponent holds one green card (paid for with Swamps and Islands, any type of mana).
+    const held = opps.map((o) => {
+      const id = putOnBattlefield(s, o, bear({ name: `Held Bear ${o}` }));
+      moveObject(s, id, "hand");
+      s.players[o]!.hand = [id];
+      return id;
+    });
+    s = settle(run(s, planActivate(s, ap, t, 0)));
+    for (const id of held) {
+      expect(s.objects[id]!.zone).toBe("exile");
+      expect(s.objects[id]!.counters.stash).toBe(1);
+    }
+    // Tap the forests first, so only non-green mana is left.
+    for (const id of s.battlefield.filter((b) => s.objects[b]!.controller === ap && s.cards[s.objects[b]!.cardId]!.name === "Forest")) s.objects[id]!.tapped = true;
+    s = settle(run(s, planCast(s, ap, held[0]!)));
+    expect(s.objects[held[0]!]!.zone).toBe("battlefield");
+    expect(s.objects[held[0]!]!.controller).toBe(ap);
+  });
+
+  it("not on an opponent's turn, and not a card you own", () => {
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    putOnBattlefield(s, ap, tinybones);
+    const opp = later(s, ap, 1);
+    const theirs = putOnBattlefield(s, opp, bear());
+    moveObject(s, theirs, "exile");
+    s.objects[theirs]!.counters.stash = 1;
+    const mine = putOnBattlefield(s, ap, bear());
+    moveObject(s, mine, "exile");
+    s.objects[mine]!.counters.stash = 1;
+    expect(planCast(s, ap, mine)).toBeNull();
+    s = passUntil(s, "main1", opp);
+    for (let i = 0; i < 3; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(planCast(s, ap, theirs)).toBeNull();
+  });
+});
+
+const mari = card("Mari, the Killing Quill", "Legendary Creature — Vampire Assassin", "{1}{B}{B}", {
+  power: "3",
+  toughness: "2",
+  oracleText:
+    'Whenever a creature an opponent controls dies, exile it with a hit counter on it.\nAssassins, Mercenaries, and Rogues you control have deathtouch and "Whenever this creature deals combat damage to a player, you may remove a hit counter from a card that player owns in exile. If you do, draw a card and create two Treasure tokens."',
+});
+
+describe("Mari, the Killing Quill", () => {
+  it("an opponent's creature that dies is exiled with a hit counter; a Rogue's combat damage cashes one in", () => {
+    expect(isFullySupported(mari)).toBe(true);
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    putOnBattlefield(s, ap, mari);
+    const rogue = putOnBattlefield(s, ap, card("Test Rogue", "Creature — Human Rogue", "{1}{B}", { power: "1", toughness: "1" }));
+    const opp = later(s, ap, 1);
+    const victim = putOnBattlefield(s, opp, bear());
+    invalidateCharacteristics(s);
+    expect(objHasKeyword(s, s.objects[rogue]!, "Deathtouch")).toBe(true);
+    destroyPermanent(s, s.objects[victim]!, "destroyed");
+    s = settle(s);
+    expect(s.objects[victim]!.zone).toBe("exile");
+    expect(s.objects[victim]!.counters.hit).toBe(1);
+    // My own creature dying isn't exiled.
+    const own = putOnBattlefield(s, ap, bear());
+    destroyPermanent(s, s.objects[own]!, "destroyed");
+    s = settle(s);
+    expect(s.objects[own]!.zone).toBe("graveyard");
+    const hand = s.players[ap]!.hand.length;
+    s = passUntil(s, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: rogue, defender: opp }] });
+    for (let i = 0; i < 30 && s.pending?.kind !== "chooseMay"; i++) s = act(s, s.pending?.kind === "declareBlockers" ? { type: "declareBlockers", player: waitingOn(s)!, blocks: [] } : { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect(s.objects[victim]!.counters.hit ?? 0).toBe(0);
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+    expect(s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === ap).length).toBe(2);
   });
 });

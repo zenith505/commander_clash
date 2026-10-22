@@ -2857,12 +2857,15 @@ export function checkAscend(s: GameState) {
  * exile took this card (CR 607.2a), as the objects they both are now (CR 400.7).
  */
 function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): false | "anyType" | "life" {
-  if (o.zone !== "exile" || !s.linkedExile) return false;
+  if (o.zone !== "exile") return false;
   let how: false | "anyType" | "life" = false;
   for (const id of s.battlefield) {
     const p = obj(s, id);
     if (controllerOf(s, p) !== pid) continue;
     const a = abilitiesOf(s, p);
+    // Tinybones: during your turn, a face-up card you don't own with a stash counter on it.
+    if (a.playCountered && s.activePlayer === pid && o.owner !== pid && !o.faceDown && (o.counters[a.playCountered] ?? 0) > 0) return "anyType";
+    if (!s.linkedExile) continue;
     // Valgavoth's: during its controller's turn, for life.
     const life = !!a.playLinkedForLife && s.activePlayer === pid;
     if (!life && !a.playLinked && !(a.playLinkedIf && staticConditionNow(s, a.playLinkedIf, id, pid))) continue;

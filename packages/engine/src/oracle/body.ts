@@ -232,6 +232,8 @@ const checkableMay = (e: Effect) =>
   (e.type === "exile" && e.what.ref === "selfCard") ||
   // "You may tap it. When you do, ..." (The Fire Nation Drill): only an untapped permanent can be tapped (CR 701.26a).
   (e.type === "tap" && e.what.ref === "self") ||
+  // "You may remove a hit counter from a card that player owns in exile. If you do, ..." (Mari): only with one there.
+  e.type === "removeExiledCounter" ||
   // "You may remove a charge counter from ~. If you do, you gain 1 life" (Sun Droplet): only with that many on it.
   (e.type === "removeCounters" && e.what.ref === "self" && typeof e.n === "number") ||
   // "You may put the top creature card of defending player's graveyard onto the battlefield. If you do, ..." (Bone Dancer).

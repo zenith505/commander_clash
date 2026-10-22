@@ -1264,6 +1264,12 @@ export function compile(d: CardDef): CompiledCard {
       else out.playLinkedForLife = true;
       continue;
     }
+    const stash = /^During your turn, you may play cards you don't own with ([a-z]+) counters on them from exile, and mana of any type can be spent to cast those spells\.$/.exec(line);
+    if (stash) {
+      if (out.playCountered) out.unsupported.push(raw);
+      else out.playCountered = stash[1]!;
+      continue;
+    }
     if (line === "You may play cards exiled with ~, and you may spend mana as though it were mana of any color to cast those spells.") {
       if (out.playLinked) out.unsupported.push(raw);
       else out.playLinked = true;

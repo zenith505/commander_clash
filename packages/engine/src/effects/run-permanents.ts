@@ -9,6 +9,7 @@ import { setFace } from "../faces";
 import { becomePrepared } from "../prepare";
 import { objectMatches, playerProtectedFrom } from "./targeting";
 import { ResolveCtx, convokedFor, objects, amountNow, fixMods, players, runEffect } from "./resolve";
+import { exiledWithCounter } from "./run-choices";
 import { createExtraTokens, createToken } from "./run-tokens";
 import { discardCards } from "./run-library";
 import { describeMods } from "./describe";
@@ -1001,6 +1002,30 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         if (host) attachTo(s, o, host);
         else attachToPlayer(s, o, (t as { id: PlayerId }).id);
       }
+      return;
+    }
+    case "removeExiledCounter": {
+      const options = exiledWithCounter(s, players(s, e.owner, ctx), e.counter);
+      if (!options.length) return;
+      const sc = (s.resolving!.scratch ??= {});
+      const picked = (sc.auraHosts ??= {});
+      const key = "exiledCounter";
+      // Which card only matters when they have different numbers of them.
+      const counts = new Set(options.map((id) => obj(s, id).counters[e.counter]));
+      if (picked[key] === undefined) {
+        if (counts.size > 1) {
+          sc.auraAsking = key;
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "enchant", options, labels: options.map((id) => `${defOf(s, obj(s, id)).name} (${obj(s, id).counters[e.counter]})`), prompt: `remove a ${e.counter} counter from which card?` };
+          return "paused";
+        }
+        picked[key] = options[0]!;
+      }
+      const o = s.objects[picked[key]!];
+      if (!o || !options.includes(o.id)) return;
+      const left = (o.counters[e.counter] ?? 0) - 1;
+      if (left > 0) o.counters[e.counter] = left;
+      else delete o.counters[e.counter];
+      log(s, `${player(s, ctx.controller).name} removes a ${e.counter} counter from ${defOf(s, o).name} in exile.`);
       return;
     }
     case "attachLastKnown": {

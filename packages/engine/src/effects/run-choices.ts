@@ -5,7 +5,7 @@ import { planMana } from "../autopay";
 import { autoEvidence, availableMana, canLoseLife, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, moveObject, obj, opponents, payableLife, player, shareCreatureType } from "../game";
 import { cardIdOf, defOf } from "../cards";
 import { controllerOf, staticConditionNow } from "../layers";
-import type { GameState, PlayerId } from "../types";
+import type { GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, choiceOptions, objectMatches, pickOptions, printedMatches, spellMatches } from "./targeting";
 import { ResolveCtx, apnap, objects, players, runEffect, amountNow, amountCtx, gifteeOf, evidenceCollected, sourceCreatureTypes, ctxSource } from "./resolve";
 import { dealDamageBatch } from "../damage";
@@ -593,6 +593,7 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "continuous" && !objects(s, e.what, ctx).length) return false;
     if (e.type === "becomeCopy" && (!objects(s, e.what, ctx).length || !objects(s, e.of, ctx).length)) return false;
     if (e.type === "removeCounters" && typeof e.n === "number" && !objects(s, e.what, ctx).some((o) => (o.counters[e.counter] ?? 0) >= (e.n as number))) return false;
+    if (e.type === "removeExiledCounter" && !exiledWithCounter(s, players(s, e.owner, ctx), e.counter).length) return false;
     // "Unless you exile the top creature card of your graveyard" (Barrow Ghoul): you can't with no creature card there.
     if ((e.type === "exile" || e.type === "putOntoBattlefield") && e.what.ref === "graveyardEnd" && !objects(s, e.what, ctx).length) return false;
     // "You may put it into your graveyard" after revealing nothing (an empty library) or a card that has left: nothing to ask.
@@ -826,4 +827,12 @@ function eachAccepted(s: GameState, e: Extract<Effect, { type: "eachMay" }>, ctx
     sc.mayStep = undefined;
     sc.offer.i++;
   }
+}
+
+/** Cards in exile owned by these players with one or more of these counters on them, the most counters first. */
+export function exiledWithCounter(s: GameState, owners: PlayerId[], counter: string): ObjectId[] {
+  return owners
+    .flatMap((pid) => player(s, pid).exile)
+    .filter((id) => (obj(s, id).counters[counter] ?? 0) > 0)
+    .sort((a, b) => (obj(s, b).counters[counter] ?? 0) - (obj(s, a).counters[counter] ?? 0));
 }

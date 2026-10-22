@@ -1427,6 +1427,8 @@ export type Effect =
       youMay?: { anyType?: true };
       /** "Exile target creature and put two time counters on it. If it doesn't have suspend, it gains suspend." (Suspend, Doom's Time Platform, Epochrasite). */
       suspend?: number;
+      /** "Exile it with a hit counter on it" (Mari, Tinybones): put on the card in exile (CR 122.1), not a permanent's. */
+      counters?: Record<string, number>;
     }
   /**
    * "Target instant or sorcery card in your graveyard gains flashback until end of turn. The flashback cost is equal to
@@ -1996,6 +1998,11 @@ export type Effect =
    * (rulings) among those that could be attached to target `host` (CR 701.3a-b), then attached to it.
    */
   | { type: "attachAny"; host: number }
+  /**
+   * "Remove a hit counter from a card that player owns in exile" (Mari, the Killing Quill): one such card, chosen as it
+   * resolves when they differ in how many they have (Etrata counts the cards, not the counters).
+   */
+  | { type: "removeExiledCounter"; owner: PlayerRef; counter: CounterKind }
   /**
    * Zack Fair: "attach an Equipment that was attached to ~ to that creature": one of those still on the battlefield, chosen
    * as it resolves if there are several (CR 608.2d), attached if it could be (CR 701.3a-b).
@@ -4499,6 +4506,12 @@ export interface CompiledCard {
   playLinkedForLife?: true;
   /** The same, only while this holds (a Class level's, CR 716.2a). */
   playLinkedIf?: StaticCondition;
+  /**
+   * "During your turn, you may play cards you don't own with stash counters on them from exile, and mana of any type can
+   * be spent to cast those spells" (Tinybones, Bauble Burglar): any such card, whoever exiled it (rulings), with the usual
+   * timing (rulings), mana of any type (CR 609.4b).
+   */
+  playCountered?: CounterKind;
   /**
    * "You may play lands from the top of your library" (Courser of Kruphix), "you may cast creature spells from the top
    * of your library" (Garruk's Horde): its controller may play the top card of their library (CR 401.5).

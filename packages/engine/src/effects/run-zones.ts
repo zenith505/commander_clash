@@ -1204,6 +1204,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             const more = m.more && (!m.moreOpponents || card.owner !== ctx.controller) ? m.more : undefined;
             card.mayPlay = { player: card.owner, zc: card.zoneChanges ?? 0, until: m.until ?? "exiled", turn: s.turn, ...(m.play ? {} : { castOnly: true as const }), ...(m.free ? { free: true as const } : {}), ...(m.cost ? { cost: m.cost } : {}), ...(more ? { more } : {}) };
           }
+          // Mari, Tinybones: the counter goes on the card in exile (a token ceases to exist, CR 704.5d).
+          if (e.counters && !card.isToken) for (const [k, n] of Object.entries(e.counters)) card.counters[k] = (card.counters[k] ?? 0) + n;
           // Suspend: the card gets its time counters and suspend (CR 702.62); a token ceases to exist (CR 704.5d).
           if (e.suspend && !card.isToken) suspendExiled(s, card, e.suspend);
           // Hostage Taker: its controller may cast the card, not a token (rulings), for as long as it remains exiled.

@@ -474,6 +474,12 @@ export interface TargetSpec {
   stackAbilities?: "activated" | "triggered" | "both";
   noSpells?: true;
   /**
+   * "Target activated or triggered ability you control from an enchantment source" (Weaver of Harmony), "... from a
+   * colorless source" (Abstruse Archaic): what the ability's source must be (CR 113.7, 113.7a). An ability with no
+   * source, like the monarch's, never matches (rulings on Abstruse Archaic).
+   */
+  abilityFrom?: { types?: string[]; colorless?: true };
+  /**
    * For "spell" targets: a permanent matching this can be the target instead, "target spell or nonland permanent an
    * opponent controls" (Sink into Stupor, Venser, Shaper Savant). One target, either kind (CR 115.1, 115.2).
    */

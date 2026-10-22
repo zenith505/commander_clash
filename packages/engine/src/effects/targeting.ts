@@ -210,6 +210,23 @@ export function sourceQuality(s: GameState, id?: ObjectId, cardId?: string): Sou
 /** A spell's own characteristics (its card's) as a source of targeting: a spell (CR 113.7a doesn't apply to it). */
 export const spellQuality = (s: GameState, cardId?: string): SourceQuality => ({ ...sourceQuality(s, undefined, cardId), spell: true });
 
+/**
+ * "An ability ... from an enchantment source": the source as it is now if it's still the same object, on the battlefield
+ * (its characteristics, CR 613) or in another zone (a channel ability: its card's); if it has left the battlefield, as it
+ * last existed there (CR 113.7a, 608.2h). An ability without a source (the monarch's) has none to match.
+ */
+function abilitySourceIs(s: GameState, item: StackItem, from: NonNullable<TargetSpec["abilityFrom"]>): boolean {
+  if (!item.sourceId) return false;
+  const o = s.objects[item.sourceId];
+  const same = o && (item.sourceZc === undefined || (o.zoneChanges ?? 0) === item.sourceZc);
+  const lk = !same ? s.lastKnown?.[item.sourceId] : undefined;
+  const d = item.sourceCardId ? s.cards[item.sourceCardId] : undefined;
+  const q = same ? (o.zone === "battlefield" ? characteristics(s, o) : defOf(s, o)) : lk && lk.zc === item.sourceZc && lk.source ? lk.source : d;
+  if (!q) return false;
+  if (from.colorless && q.colors.length) return false;
+  return !from.types?.length || from.types.some((t) => q.types.includes(t));
+}
+
 /** Filters checked against a card's printed characteristics, for spells and cards in graveyards. */
 export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   // Changeling gives every creature type wherever the card is (CR 702.73a).
@@ -350,7 +367,7 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     if (spec.singleTarget && (item.targets ?? []).filter((x) => x.kind !== "none").length !== 1) return false;
     // "Target triggered ability you control" (Strionic Resonator).
     const aims = !spec.targetsWhat || targetsMatch(s, item.targets ?? [], spec.targetsWhat, controller) || (!!spec.targetsYouToo && targetsMatch(s, item.targets ?? [], "you", controller));
-    if (item.kind === "ability") return aims && !!spec.stackAbilities && (spec.stackAbilities === "both" || (spec.stackAbilities === "triggered") === !!item.triggered) && (spec.controller !== "you" || item.controller === controller) && (spec.controller !== "opponent" || item.controller !== controller);
+    if (item.kind === "ability") return aims && !!spec.stackAbilities && (spec.stackAbilities === "both" || (spec.stackAbilities === "triggered") === !!item.triggered) && (spec.controller !== "you" || item.controller === controller) && (spec.controller !== "opponent" || item.controller !== controller) && (!spec.abilityFrom || abilitySourceIs(s, item, spec.abilityFrom));
     if (spec.noSpells || !item.objectId) return false;
     // "Target spell you control", "... you don't control" / "... an opponent controls" (no teammates here).
     if ((spec.controller === "you" && item.controller !== controller) || (spec.controller === "opponent" && item.controller === controller)) return false;

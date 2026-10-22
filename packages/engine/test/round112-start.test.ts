@@ -2,9 +2,9 @@
 // and the shock land played from among the cards it exiled).
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, cast, passAll, passUntil, pt, putOnBattlefield, setup, swamp } from "./helpers";
-import { legalTargets, sourceQuality, spellQuality } from "../src/effects/targeting";
-import { botActions, characteristics, compileCard, controllerOf, isFullySupported, manaAbilitiesOn, manaValue, spellCost, planActivate, waitingOn, type Action, type CardDef, type GameObject, type GameState, type PlayerId } from "../src";
+import { act, activate, addEffect, bear, card, cast, passAll, passUntil, pt, putOnBattlefield, setup, swamp } from "./helpers";
+import { isLegalTarget, legalTargets, sourceQuality, spellQuality } from "../src/effects/targeting";
+import { botActions, characteristics, planCast, compileCard, controllerOf, isFullySupported, manaAbilitiesOn, manaValue, spellCost, planActivate, waitingOn, type Action, type CardDef, type GameObject, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const gix = card("Gix, Yawgmoth Praetor", "Legendary Creature — Phyrexian Praetor", "{1}{B}{B}", {
@@ -535,5 +535,83 @@ describe("Volatile Stormdrake", () => {
     expect(spell).toContain(drake);
     // Its controller's own abilities can.
     expect(legalTargets(s, spec, s.activePlayer, undefined, sourceQuality(s, pinger), pinger).map((t) => (t as { id: string }).id)).toContain(drake);
+  });
+});
+
+const weaver = card("Weaver of Harmony", "Enchantment Creature — Human Druid", "{1}{G}", {
+  power: "1",
+  toughness: "1",
+  oracleText: "Other enchantment creatures you control get +1/+1.\n{G}, {T}: Copy target activated or triggered ability you control from an enchantment source. You may choose new targets for the copy. (Mana abilities can't be targeted.)",
+});
+const archaic = card("Abstruse Archaic", "Creature — Eldrazi", "{4}{U}", {
+  power: "3",
+  toughness: "5",
+  oracleText: "Vigilance\n{1}, {T}: Copy target activated or triggered ability you control from a colorless source. You may choose new targets for the copy. (Mana abilities can't be targeted.)",
+});
+const echo = card("Echo, Perceptive Prodigy", "Legendary Creature — Human Wizard", "{1}{U}", {
+  power: "1",
+  toughness: "3",
+  oracleText: "Vigilance\n{1}, {T}: Copy target activated or triggered ability you control from a creature source. You may choose new targets for the copy. (Mana abilities can't be targeted.)",
+});
+
+describe("copy target ability from a kind of source (Weaver of Harmony, Abstruse Archaic)", () => {
+  const abilityOn = (s: GameState, pid: PlayerId, src: string) => {
+    const o = s.objects[src]!;
+    const item = { id: `st${s.nextId++}`, kind: "ability" as const, triggered: true as const, sourceId: src, sourceCardId: o.cardId, sourceZc: o.zoneChanges ?? 0, controller: pid, description: "test trigger" };
+    s.stack.push(item);
+    return item.id;
+  };
+  const spec = (def: CardDef) => compileCard(def).activated.find((a) => a.body.targets.length)!.body.targets[0]!;
+
+  it("parse", () => {
+    for (const d of [weaver, archaic, echo]) expect(isFullySupported(d), d.name).toBe(true);
+    expect(spec(weaver).abilityFrom).toEqual({ types: ["Enchantment"] });
+    expect(spec(archaic).abilityFrom).toEqual({ colorless: true });
+  });
+
+  it("Weaver of Harmony can target an enchantment's ability, not a creature's", () => {
+    const { s, ap, opp } = setup([]);
+    const ench = putOnBattlefield(s, ap, card("Test Aura Shrine", "Enchantment", "{1}{W}", {}));
+    const crit = putOnBattlefield(s, ap, ogre);
+    const fromEnch = abilityOn(s, ap, ench);
+    const fromCrit = abilityOn(s, ap, crit);
+    const theirs = abilityOn(s, opp, putOnBattlefield(s, opp, card("Their Shrine", "Enchantment", "{1}{W}", {})));
+    const ok = (id: string) => isLegalTarget(s, spec(weaver), { kind: "stack", id }, ap);
+    expect(ok(fromEnch)).toBe(true);
+    expect(ok(fromCrit)).toBe(false);
+    expect(ok(theirs)).toBe(false); // "you control"
+  });
+
+  it("the source's characteristics as they are now count (CR 113.7a, 613)", () => {
+    const { s, ap } = setup([]);
+    const crit = putOnBattlefield(s, ap, ogre);
+    const id = abilityOn(s, ap, crit);
+    expect(isLegalTarget(s, spec(weaver), { kind: "stack", id }, ap)).toBe(false);
+    addEffect(s, ap, [crit], [{ kind: "addTypes", types: ["Enchantment"], subtypes: [] }]);
+    expect(isLegalTarget(s, spec(weaver), { kind: "stack", id }, ap)).toBe(true);
+    // A colorless artifact's ability for Abstruse Archaic; red Hill Giant's isn't.
+    const art = putOnBattlefield(s, ap, artifactCreature);
+    expect(isLegalTarget(s, spec(archaic), { kind: "stack", id: abilityOn(s, ap, art) }, ap)).toBe(true);
+    expect(isLegalTarget(s, spec(archaic), { kind: "stack", id }, ap)).toBe(false);
+  });
+
+  it("an ability with no source (the monarch's) can't be targeted", () => {
+    const { s, ap } = setup([]);
+    s.stack.push({ id: "mon", kind: "ability", triggered: true, sourceId: "", sourceCardId: "monarch", controller: ap, description: "monarch" } as GameState["stack"][number]);
+    expect(isLegalTarget(s, spec(archaic), { kind: "stack", id: "mon" }, ap)).toBe(false);
+  });
+
+  it("copies an enchantment creature's enters trigger", () => {
+    const { s: s0, ap, ids } = setup([card("Test Nymph", "Enchantment Creature — Nymph", "{1}{W}", { power: "2", toughness: "2", oracleText: "When this creature enters, you gain 3 life." })]);
+    const w = putOnBattlefield(s0, ap, weaver);
+    const life = s0.players[ap]!.life;
+    let t = s0;
+    for (const x of planCast(t, ap, ids[0]!)!) t = act(t, x);
+    for (let i = 0; i < 12 && !t.stack.some((x) => x.kind === "ability"); i++) t = act(t, { type: "passPriority", player: waitingOn(t)! });
+    const trig = t.stack.find((x) => x.kind === "ability")!;
+    expect(trig).toBeTruthy();
+    t = activate(t, ap, w, 0, [{ kind: "stack", id: trig.id }]);
+    for (let i = 0; i < 12 && t.stack.length; i++) t = passAll(t);
+    expect(t.players[ap]!.life).toBe(life + 6);
   });
 });

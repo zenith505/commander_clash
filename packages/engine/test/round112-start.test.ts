@@ -299,3 +299,41 @@ describe("parley", () => {
     expect(pt(s, ph)).toBe("4/7");
   });
 });
+
+const nissa = card("Nissa, Resurgent Animist", "Legendary Creature — Elf Scout", "{2}{G}", {
+  power: "3",
+  toughness: "3",
+  oracleText:
+    "Landfall — Whenever a land you control enters, add one mana of any color. Then if this is the second time this ability has resolved this turn, reveal cards from the top of your library until you reveal an Elf or Elemental card. Put that card into your hand and the rest on the bottom of your library in a random order.",
+});
+
+describe("Nissa, Resurgent Animist", () => {
+  it("parse", () => expect(isFullySupported(nissa)).toBe(true));
+
+  it("each land: one mana of any color; the second time this turn also an Elf or Elemental card from the library; the third, only mana", () => {
+    const { s: s0, ap, ids } = setup([swamp, swamp, swamp]);
+    putOnBattlefield(s0, ap, nissa);
+    const elf = toZone(s0, ap, card("Llanowar Elves", "Creature — Elf Druid", "{G}", { power: "1", toughness: "1" }), "library");
+    const misses = [toZone(s0, ap, bear({ name: "Miss One" }), "library"), toZone(s0, ap, swamp, "library")];
+    const landfall = (s: GameState, land: string, color: string) => {
+      s.players[ap]!.landsPlayedThisTurn = 0;
+      s = act(s, { type: "playLand", player: ap, objectId: land });
+      s = passAll(s);
+      expect(s.pending).toMatchObject({ kind: "chooseOption", player: ap });
+      return act(s, { type: "chooseOption", player: ap, choice: color });
+    };
+    let s = landfall(s0, ids[0]!, "Green");
+    expect(s.players[ap]!.manaPool.G).toBe(1);
+    expect(s.objects[elf]!.zone).toBe("library");
+    s = landfall(s, ids[1]!, "Blue");
+    expect(s.players[ap]!.manaPool.U).toBe(1);
+    // The second time: the cards above the Elf go to the bottom, the Elf into the hand.
+    expect(s.objects[elf]!.zone).toBe("hand");
+    const lib = s.players[ap]!.library;
+    expect(misses.every((id) => lib.slice(-2).includes(id))).toBe(true);
+    const hand = s.players[ap]!.hand.length;
+    s = landfall(s, ids[2]!, "Red");
+    expect(s.players[ap]!.manaPool.R).toBe(1);
+    expect(s.players[ap]!.hand.length).toBe(hand - 1); // the land played, nothing drawn
+  });
+});

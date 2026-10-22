@@ -2157,6 +2157,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const nthAfter = new RegExp(`^(.+?),? if this is the ${ORD} time this ability has resolved this turn$`).exec(s);
     const nthOtherwise = nthSeen.length ? /^Otherwise, (.+)$/.exec(s) : null;
     if (nthSeen.length && !nthIf && !nthAfter && !nthOtherwise) return null;
+    // Nissa, Resurgent Animist: "Then if this is the second time this ability has resolved this turn, reveal cards from
+    // the top of your library until you reveal an Elf or Elemental card. Put that card into your hand and the rest on the
+    // bottom of your library in a random order." The second sentence finishes the first, under the same condition.
+    const nthUntil = nthIf && nthIf[1] && !nthSeen.length && /^reveal cards from the top of your library until you reveal /.test(nthIf[5]!) && /^Put that card into your hand and the rest on the bottom of your library in a random order\.?$/.test(sentences[si + 1] ?? "") && si + 2 === sentences.length;
+    if (nthUntil) {
+      const sub = parseBody(`R${nthIf[5]!.slice(1)}. ${sentences[si + 1]!.replace(/\.$/, "")}.`);
+      if (!sub || sub.targets.length || sub.effects.length !== 1 || sub.effects[0]!.type !== "revealUntil") return null;
+      effects.push({ type: "if", cond: { kind: "resolvedNth", n: [ORDINAL[nthIf[1]!]!, ...(nthIf[2] ? [ORDINAL[nthIf[2]]!] : [])] }, effects: sub.effects });
+      si++;
+      continue;
+    }
     if (nthIf && (nthIf[1] || nthSeen.length)) {
       const ns = [nthIf[1] ?? nthIf[3]!, nthIf[2] ?? nthIf[4]].filter((x): x is string => !!x).map((w) => ORDINAL[w]!);
       const cond: SpellCondition = { kind: "resolvedNth", n: ns };

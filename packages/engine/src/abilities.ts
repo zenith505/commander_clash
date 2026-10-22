@@ -2086,6 +2086,10 @@ export type Effect =
       token: TokenSpec;
       tapped?: boolean;
       attacking?: boolean;
+      /** "That's attacking" (Brimaz, King of Oreskos): attacking but not tapped (CR 508.4). */
+      untapped?: true;
+      /** "That's blocking that creature" (Brimaz): it enters blocking it, if that creature is still attacking (CR 509.1). */
+      blocking?: ObjRef;
       /** "For each opponent, create ... that's tapped and attacking that player": `n` for each opponent, attacking them. */
       attackingEach?: boolean;
       /** "... attacking that player or a planeswalker they control" (Adeline): its controller chooses which as they enter. */

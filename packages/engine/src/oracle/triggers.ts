@@ -572,6 +572,8 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // "That land's controller", and "that player" after "an artifact an opponent controls": who controlled it as it last
   // existed (CR 603.10a).
   if (!attached) {
+    // "Whenever another creature you own dies, return it to your hand" (Athreos): your card, so its owner's hand.
+    if (/ you own$/.test(m![2]!)) bodyText = bodyText.replace(/^return it to your hand\b/, "return it to its owner's hand");
     bodyText = bodyText.replace(/\bthat (?:land|artifact|creature|permanent|enchantment)'s controller\b/g, "its controller");
     if (/ an opponent controls$/.test(m![2]!)) bodyText = bodyText.replace(/\bthat player\b/g, "its controller");
   }
@@ -1759,7 +1761,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "When you cycle ~" (CR 702.29c): "it" is the card, wherever it went.
   const cycled = /^When you cycle ~, (.+)$/.exec(line);
   if (cycled) {
-    const body = parseBody(cycled[1]!, { selfCard: true });
+    // Magmakin Artillerist: "it deals 1 damage to each opponent": the card is the source (CR 702.29c).
+    const body = parseBody(cycled[1]!.replace(/^it deals /, "~ deals "), { selfCard: true });
     return body ? { event: "selfCycled", body } : "fail";
   }
   // A state trigger (CR 603.8): "When you control no Islands, sacrifice ~."

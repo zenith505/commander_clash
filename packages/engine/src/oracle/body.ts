@@ -4882,6 +4882,14 @@ function parseEqualTo(s: string, ctx: Ctx): Effect[] | null {
     [/^Put a number of ([+-]1\/[+-]1|[a-z]+) counters on (.+) equal to (.+)$/i, (m) => `Put X ${m[1]} counters on ${m[2]}`],
     [/^(?:You )?[Cc]reate a number of (.+?) tokens( with [^,]+?)? equal to (.+)$/, (m) => `Create X ${m[1]} tokens${m[2] ?? ""}`],
   ];
+  // "You gain life and draw cards equal to its power" (Lifeblood Hydra): both by that much.
+  const both = /^you gain life and draw cards equal to (.+)$/i.exec(s);
+  if (both) {
+    const gain = parseSentence("you gain X life", ctx);
+    const draw = parseSentence("draw X cards", ctx);
+    const def = parseCount(both[1]!, ctx);
+    return gain && draw && def ? replaceX([...gain, ...draw], def) : null;
+  }
   for (const [re, rewrite, group] of forms) {
     const m = re.exec(s);
     if (!m) continue;

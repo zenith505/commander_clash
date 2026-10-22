@@ -209,6 +209,17 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const text = `draw ${m[2] === "a" || m[2] === "one" ? "a card" : `${m[2]} cards`}`;
     return [{ type: "punisher", who, options, effects: [m[1] ? { type: "may", effects: [draw], text } : draw], thenText: m[1] ? `may ${text}` : text.replace(/^draw/, "draws") }];
   }
+  // Athreos, God of Passage: "return it to your hand unless target opponent pays 3 life": that opponent decides as it
+  // resolves (rulings); with no legal target, nothing happens.
+  if ((m = /^(.+?) unless target opponent (pays? .+)$/.exec(s)) && /^return it to /i.test(m[1]!)) {
+    const before = ctx.targets.length;
+    const fx = parseSentence(`${m[1]!.charAt(0).toUpperCase()}${m[1]!.slice(1)}`, ctx);
+    if (!fx || ctx.targets.length !== before) return null;
+    const who = parsePlayer("target opponent", ctx);
+    const options = parsePunisherOptions(m[2]!, ctx);
+    if (!who || !options || options.some((o) => !("pay" in o))) return null;
+    return [{ type: "punisher", who, options, effects: fx }];
+  }
   // "~ deals 5 damage to target opponent unless that player sacrifices a creature of their choice" (Demanding Dragon).
   if ((m = new RegExp(`^(?:~|It) deals ${NUMX} damage to (.+?) unless (?:they|that player|he or she) ((?:sacrifices?|discards?|pays?) .+)$`).exec(s))) {
     if (/^It /.test(s) && !ctx.selfIt) return null;

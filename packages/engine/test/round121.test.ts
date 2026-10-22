@@ -611,3 +611,111 @@ describe("untap limits (Winter Moon, Winter Orb, Static Orb)", () => {
     expect(s.objects[orb]!.tapped).toBe(false);
   });
 });
+
+const hydra = card("Lifeblood Hydra", "Creature — Hydra", "{X}{G}{G}{G}", { power: "0", toughness: "0", keywords: ["Trample"], oracleText: "Trample\nThis creature enters with X +1/+1 counters on it.\nWhen this creature dies, you gain life and draw cards equal to its power." });
+const artillerist = card("Magmakin Artillerist", "Creature — Elemental Pirate", "{2}{R}", { power: "1", toughness: "4", keywords: ["Cycling"], oracleText: "Whenever you discard one or more cards, this creature deals that much damage to each opponent.\nCycling {1}{R} ({1}{R}, Discard this card: Draw a card.)\nWhen you cycle this card, it deals 1 damage to each opponent." });
+const ironSpider = card("Iron Spider, Stark Upgrade", "Legendary Artifact Creature — Spider Hero", "{3}", { power: "2", toughness: "3", keywords: ["Vigilance"], oracleText: "Vigilance\n{T}: Put a +1/+1 counter on each artifact creature and/or Vehicle you control.\n{2}, Remove two +1/+1 counters from among artifacts you control: Draw a card." });
+const tyvar = card("Tyvar, the Pummeler", "Legendary Creature — Elf Warrior", "{1}{G}{G}", { power: "3", toughness: "3", oracleText: "Tap another untapped creature you control: Tyvar gains indestructible until end of turn. Tap it.\n{3}{G}{G}: Creatures you control get +X/+X until end of turn, where X is the greatest power among creatures you control." });
+const brimaz = card("Brimaz, King of Oreskos", "Legendary Creature — Cat Soldier", "{1}{W}{W}", { power: "3", toughness: "4", keywords: ["Vigilance"], oracleText: "Vigilance\nWhenever Brimaz attacks, create a 1/1 white Cat Soldier creature token with vigilance that's attacking.\nWhenever Brimaz blocks a creature, create a 1/1 white Cat Soldier creature token with vigilance that's blocking that creature." });
+const athreos = card("Athreos, God of Passage", "Legendary Enchantment Creature — God", "{1}{W}{B}", { power: "5", toughness: "4", keywords: ["Indestructible"], oracleText: "Indestructible\nAs long as your devotion to white and black is less than seven, Athreos isn't a creature.\nWhenever another creature you own dies, return it to your hand unless target opponent pays 3 life." });
+const vehicle = card("Test Cart", "Artifact — Vehicle", "{2}", { power: "3", toughness: "3", oracleText: "Crew 1" });
+const golem = card("Test Golem", "Artifact Creature — Golem", "{2}", { power: "2", toughness: "2", oracleText: "" });
+
+describe("more of the most played", () => {
+  it("Lifeblood Hydra: when it dies, gain life and draw cards equal to its power as it last existed", () => {
+    supported(hydra);
+    const { s: s0, ap, ids, opp } = setup([feed]);
+    const h = putOnBattlefield(s0, ap, hydra);
+    s0.objects[h]!.counters["+1/+1"] = 4;
+    invalidateCharacteristics(s0);
+    const [life, hand] = [s0.players[ap]!.life, s0.players[ap]!.hand.length];
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: h }], undefined, "auto", undefined, { costOr: 1 })));
+    expect(s.objects[h]!.zone).toBe("graveyard");
+    expect(s.players[ap]!.life).toBe(life + 4);
+    expect(s.players[ap]!.hand.length).toBe(hand - 1 + 4);
+    expect(opp).toBeDefined();
+  });
+
+  it("Magmakin Artillerist: cycling it deals 1 to each opponent, from the card", () => {
+    supported(artillerist);
+    const { s: s0, ap, ids, opp } = setup([artillerist]);
+    const i = abilitiesOf(s0, s0.objects[ids[0]!]!).activated.findIndex((a) => a.zone === "hand");
+    const life = s0.players[opp]!.life;
+    const s = settle(run(s0, planActivate(s0, ap, ids[0]!, i)));
+    expect(s.objects[ids[0]!]!.zone).toBe("graveyard");
+    expect(s.turnOrder.filter((p) => p !== ap).every((p) => s.players[p]!.life === life - 1)).toBe(true);
+  });
+
+  it("Iron Spider: a +1/+1 counter on each artifact creature and each Vehicle you control, not other creatures", () => {
+    supported(ironSpider);
+    const { s: s0, ap } = setup([]);
+    const sp = putOnBattlefield(s0, ap, ironSpider);
+    const [cart, gol, b] = [putOnBattlefield(s0, ap, vehicle), putOnBattlefield(s0, ap, golem), putOnBattlefield(s0, ap, bear())];
+    invalidateCharacteristics(s0);
+    const s = settle(run(s0, planActivate(s0, ap, sp, 0)));
+    expect([sp, cart, gol, b].map((id) => s.objects[id]!.counters["+1/+1"] ?? 0)).toEqual([1, 1, 1, 0]);
+  });
+
+  it("Tyvar: tap another untapped creature you control; Tyvar gains indestructible and is tapped, even if it was tapped", () => {
+    supported(tyvar);
+    const { s: s0, ap } = setup([]);
+    const t = putOnBattlefield(s0, ap, tyvar);
+    const b = putOnBattlefield(s0, ap, bear());
+    invalidateCharacteristics(s0);
+    // Not itself.
+    expect(planActivate(s0, ap, t, 0, undefined, undefined, undefined, undefined, { tap: [t] })).toBeNull();
+    const s = settle(run(s0, planActivate(s0, ap, t, 0, undefined, undefined, undefined, undefined, { tap: [b] })));
+    expect(s.objects[b]!.tapped).toBe(true);
+    expect(s.objects[t]!.tapped).toBe(true);
+    expect(characteristics(s, s.objects[t]!).keywords).toContain("Indestructible");
+  });
+
+  it("Brimaz: an untapped attacking Cat Soldier when it attacks; one blocking the creature it blocks", () => {
+    supported(brimaz);
+    const { s: s0, ap, opp } = setup([]);
+    const bz = putOnBattlefield(s0, ap, brimaz);
+    invalidateCharacteristics(s0);
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: bz, defender: opp }] });
+    s = settle(s);
+    const cat = named(s, "Cat Soldier Token");
+    expect(cat).toHaveLength(1);
+    expect(s.objects[cat[0]!]!.attacking).toBe(opp);
+    expect(s.objects[cat[0]!]!.tapped).toBe(false);
+    // On the opponent's turn, it blocks.
+    const { s: t0, ap: me, opp: foe } = setup([]);
+    const bz2 = putOnBattlefield(t0, me, brimaz);
+    const att = putOnBattlefield(t0, foe, card("Test Ogre", "Creature — Ogre", "{2}{R}", { power: "3", toughness: "3", oracleText: "" }));
+    invalidateCharacteristics(t0);
+    let t = passUntil(t0, "declareAttackers", foe);
+    t = act(t, { type: "declareAttackers", player: foe, attacks: [{ attacker: att, defender: me }] });
+    for (let i = 0; i < 40 && !(t.pending?.kind === "declareBlockers" && t.pending.player === me); i++)
+      t = t.pending?.kind === "declareBlockers" ? act(t, { type: "declareBlockers", player: t.pending.player, blocks: [] }) : act(t, { type: "passPriority", player: waitingOn(t)! });
+    t = act(t, { type: "declareBlockers", player: me, blocks: [{ blocker: bz2, attacker: att }] });
+    t = settle(t);
+    const blocker = named(t, "Cat Soldier Token");
+    expect(blocker).toHaveLength(1);
+    expect(t.objects[blocker[0]!]!.blocking).toEqual([att]);
+    expect(t.objects[att]!.blockedBy).toEqual(expect.arrayContaining([bz2, blocker[0]!]));
+  });
+
+  it("Athreos: another creature you own dies, it returns to your hand unless the target opponent pays 3 life", () => {
+    supported(athreos);
+    const { s: s0, ap, ids, opp } = setup([feed, feed]);
+    putOnBattlefield(s0, ap, athreos);
+    const [b1, b2] = [putOnBattlefield(s0, ap, bear()), putOnBattlefield(s0, ap, bear())];
+    invalidateCharacteristics(s0);
+    const life = s0.players[opp]!.life;
+    // The opponent pays the first time (the bot pays while it has life to spare), so the card stays.
+    let s = run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: b1 }], undefined, "auto", undefined, { costOr: 1 }));
+    for (let i = 0; i < 40 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+      const p = s.pending;
+      if (p?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: p.player, targets: [{ kind: "player", id: opp }] });
+      else if (p) s = botActions(s, p.player).reduce((x, a) => act(x, a), s);
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    const paid = s.players[opp]!.life === life - 3;
+    expect(s.objects[b1]!.zone).toBe(paid ? "graveyard" : "hand");
+    expect(b2).toBeDefined();
+  });
+});

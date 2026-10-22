@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, activate, bear, card, cast, passAll, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
-import { applyAction, botActions, characteristics, compileCard, defOf, manaValue, spellCost, invalidateCharacteristics, isFullySupported, isSuspended, objHasKeyword, manaAbilitiesOn, planCast, planUnlock, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { applyAction, botActions, characteristics, compileCard, defOf, manaValue, spellCost, invalidateCharacteristics, isFullySupported, isLegalTarget, isSuspended, type TargetSpec, objHasKeyword, manaAbilitiesOn, planCast, planUnlock, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 import { moveObject } from "../src/game";
 import { nextRandom } from "../src/rng";
 
@@ -816,5 +816,37 @@ describe("Starfall Invocation", () => {
     const { s, mine } = wrath(false);
     expect(s.pending).toBeNull();
     expect(s.objects[mine]!.zone).toBe("graveyard");
+  });
+});
+
+describe("Wrathful Red Dragon", () => {
+  const wrd = card("Wrathful Red Dragon", "Creature — Dragon", "{3}{R}{R}", {
+    power: "5",
+    toughness: "5",
+    keywords: ["Flying"],
+    oracleText: "Flying\nWhenever a Dragon you control is dealt damage, it deals that much damage to any target that isn't a Dragon.",
+  });
+  const whelp = card("Dragon Whelp", "Creature — Dragon", "{2}{R}{R}", { power: "2", toughness: "3", keywords: ["Flying"], oracleText: "Flying" });
+  const shock = card("Shock", "Instant", "{R}", { oracleText: "Shock deals 2 damage to any target." });
+
+  it("plays", () => expect(isFullySupported(wrd)).toBe(true));
+
+  it("a Dragon you control dealt lethal damage still deals that much to any target that isn't a Dragon (its last known self)", () => {
+    const { s: s0, ap, opp, ids } = setup([shock]);
+    putOnBattlefield(s0, ap, card("Mountain", "Basic Land — Mountain"));
+    putOnBattlefield(s0, ap, wrd);
+    const w = putOnBattlefield(s0, ap, whelp);
+    s0.objects[w]!.damage = 1;
+    const theirDragon = putOnBattlefield(s0, opp, whelp);
+    let s = run(s0, planCast(s0, ap, ids[0]!, [target(w)]));
+    for (let i = 0; i < 10 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    const spec = (s.pending as { specs: TargetSpec[] }).specs[0]!;
+    expect(isLegalTarget(s, spec, target(theirDragon), ap)).toBe(false);
+    expect(isLegalTarget(s, spec, { kind: "player", id: opp }, ap)).toBe(true);
+    const life = s.players[opp]!.life;
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] }));
+    expect(s.objects[w]!.zone).toBe("graveyard");
+    expect(s.players[opp]!.life).toBe(life - 2);
   });
 });

@@ -461,6 +461,23 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
  * greater enters": the entering permanent is the subject ("that creature", "it", "its power"). "One or
  * more" (one trigger for several entering at once) isn't modeled.
  */
+/**
+ * "Whenever a Dragon you control is dealt damage, it deals that much damage to any target that isn't a Dragon" (Wrathful
+ * Red Dragon): once for each such permanent, for all the damage dealt to it at the same time; "it" is that permanent.
+ */
+function parseIsDealtDamageTrigger(line: string): TriggeredAbility | "fail" | null {
+  const m = /^Whenever an? (.+?) you control is dealt damage, (.+)$/.exec(line);
+  if (!m) return null;
+  const filter = parseTargetPhrase(`${m[1]!} you control`);
+  if (filter?.kind !== "object") return "fail";
+  const thatMuch = /\bthat much\b/.test(m[2]!);
+  if (thatMuch && /\bX\b/.test(m[2]!)) return "fail";
+  let body = parseBody(thatMuch ? m[2]!.replace(/\bthat much\b/g, "X") : m[2]!, { subjectIt: true });
+  if (!body) return "fail";
+  if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, m[2]!) };
+  return { event: "permanentIsDealtDamage", dealtFilter: { ...filter, text: `${m[1]!} you control` }, body };
+}
+
 const ENTERS_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) enters(?: the battlefield)?( under your control| under an opponent's control)?, (.+)$/;
 
 function parseEntersTrigger(line: string): TriggeredAbility | "fail" | null {
@@ -1551,6 +1568,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (damages) return damages;
   const enters = parseEntersTrigger(line);
   if (enters) return enters;
+  const dealt = parseIsDealtDamageTrigger(line);
+  if (dealt) return dealt;
   const draws = parseDrawTrigger(line);
   if (draws) return draws;
   const attacked = /^Whenever an opponent attacks (?:you with two or more creatures|with creatures, if two or more of those creatures are attacking you and\/or planeswalkers you control), (.+)$/.exec(line);

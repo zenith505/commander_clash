@@ -2807,6 +2807,8 @@ export type TriggerEvent =
   | "permanentDealtExcess"
   | "selfBecomesTapped" // "Whenever ~ becomes tapped": it changed from untapped to tapped (CR 701.26a)
   | "selfIsDealtDamage" // "Whenever ~ is dealt damage": once for all the damage dealt to it at the same time
+  /** "Whenever a Dragon you control is dealt damage" (Wrathful Red Dragon): that permanent is the subject; see TriggeredAbility.dealtFilter. */
+  | "permanentIsDealtDamage"
   | "selfDealtDamageBySource" // "Whenever a source deals damage to ~": once for each source dealing it damage; "that player" is that source's controller
   | "permanentBecomesTapped" // "Whenever a creature an opponent controls becomes tapped": see TriggeredAbility.tappedFilter
   | "selfBecomesUntapped" // "Whenever ~ becomes untapped" (inspired): it changed from tapped to untapped (CR 701.26b)
@@ -3033,6 +3035,8 @@ export type TriggerDuration = "endOfTurn" | "yourNextTurn" | "endOfYourNextTurn"
 export interface TriggeredAbility {
   event: TriggerEvent;
   body: AbilityBody;
+  /** For "permanentIsDealtDamage": what has to be dealt damage. */
+  dealtFilter?: TargetSpec;
   /** "This ability triggers only once each turn": see GameObject.triggeredThisTurn. */
   oncePerTurn?: boolean;
   /** For "selfBecomesLevel": the level. */

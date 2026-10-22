@@ -1076,6 +1076,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (o?.zone === "battlefield") {
       add(o, controllerOf(s, o), (e) => e === "selfIsDealtDamage", undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
       addHosted(o, (e) => e === "selfIsDealtDamage", undefined, o, { amount: ev.amount });
+      // "Whenever a Dragon you control is dealt damage" (Wrathful Red Dragon): that permanent is the subject.
+      for (const id of s.battlefield) {
+        const w = obj(s, id);
+        const wc = controllerOf(s, w);
+        add(w, wc, (e, t) => e === "permanentIsDealtDamage" && !!t.dealtFilter && objectMatches(s, t.dealtFilter, o, wc, false), undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
+      }
     }
   } else if (ev.type === "dealtDamageBySource") {
     const o = s.objects[ev.id];

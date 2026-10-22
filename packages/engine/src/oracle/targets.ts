@@ -56,6 +56,10 @@ export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | nul
     const spec: TargetSpec = { kind: "any", text: "any other target", ...(before.length ? { distinctFrom: before } : { notSource: true }) };
     return { ref: "anyTarget", index: addTarget(ctx, spec) };
   }
+  // "Any target that isn't a Dragon" (Wrathful Red Dragon): a player, or a creature, planeswalker or battle without
+  // that subtype (CR 115.4).
+  const notType = /^any target that isn't an? ([A-Z][a-z]+)$/.exec(p);
+  if (notType && CREATURE_TYPES.has(notType[1]!)) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", notSubtypes: [notType[1]!], text: p }) };
   let several: RegExpExecArray | null;
   // "... and 3 damage to each of up to two other targets" (Drakuseth, Maw of Flames): none of the targets before either.
   if ((several = /^each of (up to )?(two|three|four|one or two)( other)? targets$/i.exec(p))) {

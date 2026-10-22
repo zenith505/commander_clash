@@ -993,6 +993,12 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     batch = { what: m[2]!.startsWith("leaves") ? "leavesGraveyard" : "toGraveyard", ...(whose ? { whose } : {}), ...(filter ? { filter } : {}), ...(/other than the battlefield$/.test(m[2]!) ? { from: "notBattlefield" as const } : {}), each: true };
     rest = m[3]!;
     eachOwner = true;
+  } else if ((m = /^Whenever you create one or more (creature )?tokens( for the first time each turn)?, (.+)$/.exec(line))) {
+    // Staff of the Storyteller: once for each event in which you create any (CR 111.2, 603.2c), whoever controls them.
+    // Akim: "for the first time each turn", counting tokens created before it was on the battlefield.
+    if (m[1] && m[2]) return "fail";
+    batch = { what: "created", whose: "you", ...(m[1] ? { filter: { kind: "object" as const, types: ["Creature"], notTypes: [], notColors: [], text: "creature token" } } : {}), ...(m[2] ? { first: true as const } : {}) };
+    rest = m[3]!;
   } else if ((m = /^Whenever (you|one or more players) discards? one or more (?:(.+?) )?cards( for the first time each turn)?, (.+)$/.exec(line))) {
     const filter = batchCards(m[2]);
     if (filter === null) return "fail";
@@ -1203,6 +1209,12 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
     // "That player draws two additional cards" in their draw step: a trigger, so they just draw two more.
     const body = parseBody(theyAreThatPlayer(step[2]!).replace(/^that player draws (\w+) additional cards?\.$/, "that player draws $1 cards."), { eventPlayer: true });
     return body ? { event, body, enchantedPlayersTurn: true } : "fail";
+  }
+  // Witch-king of Angmar: "Whenever one or more creatures deal combat damage to you, ...".
+  const hurt = /^Whenever one or more creatures deal combat damage to you, (.+)$/.exec(line);
+  if (hurt) {
+    const body = parseBody(hurt[1]!);
+    return body ? { event: "creaturesDealCombatDamageToYou", body } : "fail";
   }
   const attacks = /^Whenever a creature attacks enchanted player, (.+)$/.exec(line);
   if (attacks) {
@@ -1761,6 +1773,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "When ~ enters from a graveyard" / "from your graveyard" (Phyrexian Dragon Engine, Oscorp Industries): where it came
   // from is part of the trigger event (CR 603.6a); a card is only ever in its owner's graveyard (CR 404.2), so "your" is
   // its owner, who must be its controller now.
+  // "When ~ enters from your hand" (Thousand-Faced Shadow): put onto the battlefield from its owner's hand, cast or not
+  // (ninjutsu, CR 702.49a).
+  const fromHand = /^When(?:ever)? ~ enters from your hand, (.+)$/.exec(line);
+  if (fromHand) {
+    const t = parseTrigger(`When ~ enters, ${fromHand[1]}`);
+    return !t || t === "fail" || t.event !== "selfEnters" ? "fail" : { ...t, ifFromHand: true };
+  }
   const fromYard = /^When(?:ever)? ~ enters from (a|your) graveyard, (.+)$/.exec(line);
   if (fromYard) {
     const t = parseTrigger(`When ~ enters, ${fromYard[2]}`);

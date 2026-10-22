@@ -47,7 +47,7 @@ export function suspendExiled(s: GameState, o: GameObject, n: number): void {
  * Put exiled cards onto the battlefield, all at once: an Aura's new controller chooses what it enchants as it enters,
  * and with nothing it can enchant it stays in exile (CR 303.4f-g, rulings on Flicker of Fate).
  */
-function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObject) => PlayerId, src: string, counter?: CounterKind, tapped?: boolean, transformed?: boolean, counterIfCreature?: boolean): "paused" | void {
+function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObject) => PlayerId, src: string, counter?: CounterKind, tapped?: boolean, transformed?: boolean, counterIfCreature?: boolean, loyaltyIfPlaneswalker?: boolean): "paused" | void {
   // Returned transformed: only a double-faced card, with its back face up (CR 712.14a); anything else stays in exile.
   const back = cards.filter((c) => (transformed ? transformedFace(s, c) !== undefined : isPermanentCard(defOf(s, c))));
   const faceOf = (c: GameObject) => (transformed ? transformedFace(s, c) : undefined);
@@ -62,7 +62,7 @@ function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObjec
         continue;
       }
       log(s, `${src} returns ${d.name} to the battlefield${tapped ? " tapped" : ""}${transformed ? " transformed" : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
-      moveObject(s, c.id, "battlefield", { controller: under(c), ...host, ...(counter ? { [counterIfCreature ? "countersIfCreature" : "counters"]: { [counter]: 1 } } : {}), ...(tapped ? { tapped: true } : {}), ...(transformed ? { face: transformedFace(s, c) } : {}) });
+      moveObject(s, c.id, "battlefield", { controller: under(c), ...host, ...(counter ? { [counterIfCreature ? "countersIfCreature" : "counters"]: { [counter]: 1 } } : {}), ...(loyaltyIfPlaneswalker ? { countersIfPlaneswalker: { loyalty: 1 } } : {}), ...(tapped ? { tapped: true } : {}), ...(transformed ? { face: transformedFace(s, c) } : {}) });
     }
   });
 }
@@ -1529,13 +1529,14 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // existed on the battlefield (rulings).
         const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
         const most = !e.lesserPower ? Infinity : me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? power(s, me) : (ctx.lki?.power ?? (ctx.sourceId ? s.lastKnown?.[ctx.sourceId]?.power : undefined) ?? -Infinity);
-        const cards = p.hand.filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (!e.lesserPower || power(s, obj(s, id)) < most));
-        if (!cards.length) return;
-        const what = `${e.upTo ? `up to ${e.upTo} ` : e.any ? "any number of " : /^[aeiou]/i.test(e.filter?.text ?? "card") ? "an " : "a "}${e.filter?.text ?? "card"}${e.any ? "s" : ""}`;
-        s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.may ? 0 : 1, max: e.any ? Math.min(cards.length, e.upTo ?? Infinity) : 1, fromHand: true };
+        const cards = [...p.hand, ...(e.orGraveyard ? p.graveyard : [])].filter((id) => (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (!e.lesserPower || power(s, obj(s, id)) < most));
+        const upTo = e.upTo === undefined ? Infinity : amountNow(s, e.upTo, ctx);
+        if (!cards.length || upTo <= 0) return;
+        const what = `${e.upTo !== undefined ? `up to ${upTo} ` : e.any ? "any number of " : /^[aeiou]/i.test(e.filter?.text ?? "card") ? "an " : "a "}${e.filter?.text ?? "card"}${e.any ? "s" : ""}${e.orGraveyard ? " from your hand and/or graveyard" : ""}`;
+        s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.may ? 0 : 1, max: e.any ? Math.min(cards.length, upTo) : 1, fromHand: true };
         return "paused";
       }
-      const cards = sc.found.map((id) => obj(s, id)).filter((o) => o.zone === "hand" && o.owner === p.id);
+      const cards = sc.found.map((id) => obj(s, id)).filter((o) => (o.zone === "hand" || (e.orGraveyard && o.zone === "graveyard")) && o.owner === p.id);
       // "Tapped and attacking" (CR 508.4): only during combat, attacking a player its controller chooses as it enters (it
       // was never declared as an attacker, rulings on Kinscaer Sentry); outside combat it's only tapped (CR 506.3d).
       // "Attacking that opponent" (Kaalia): the player its creature attacked, even if it's attacking something else now, and
@@ -1562,7 +1563,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             continue;
           }
           const attacks = defender !== undefined && isType(defOf(s, o), "Creature");
-          log(s, `${p.name} puts ${defOf(s, o).name} from their hand onto the battlefield${e.tapped ? ", tapped" : ""}${attacks ? ` and attacking ${attack!.label}` : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
+          log(s, `${p.name} puts ${defOf(s, o).name} from their ${o.zone} onto the battlefield${e.tapped ? ", tapped" : ""}${attacks ? ` and attacking ${attack!.label}` : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
           moveObject(s, o.id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...host });
           if (attacks && o.zone === "battlefield" && objIsType(s, o, "Creature")) {
             o.attacking = defender;
@@ -1687,7 +1688,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             continue;
           }
           log(s, `${src} puts ${d.name} onto the battlefield under ${player(s, under(o)).name}'s control${e.tapped ? ", tapped" : ""}${face ? (e.flipped ? " flipped" : " and transformed") : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
-          moveObject(s, o.id, "battlefield", { controller: under(o), tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}), ...(e.counters ? { counters: e.counters } : {}), ...(e.countersFromLast ? { counters: { [e.countersFromLast.kind]: Math.max(0, (s.lastKnown?.[o.id]?.counters?.[e.countersFromLast.kind] ?? 0) + e.countersFromLast.plus) } } : {}), ...(face ? { face } : {}), ...host }); // CR 110.2a
+          moveObject(s, o.id, "battlefield", { controller: under(o), tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}), ...(e.entersAs && (ctx.x ?? 0) >= e.entersAs.x ? { entersAs: e.entersAs.mods } : {}), ...(e.counters ? { counters: e.counters } : {}), ...(e.countersFromLast ? { counters: { [e.countersFromLast.kind]: Math.max(0, (s.lastKnown?.[o.id]?.counters?.[e.countersFromLast.kind] ?? 0) + e.countersFromLast.plus) } } : {}), ...(face ? { face } : {}), ...host }); // CR 110.2a
           // "That creature gains haste until end of turn. Exile it at the beginning of the next end step" (Corpse Dance): only
           // the permanent it became, while it's still that object (CR 400.7, rulings).
           if (o.zone !== "battlefield") continue;
@@ -1945,8 +1946,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         moveObject(s, o.id, "graveyard");
       }
       return;
-    case "putInLibrary":
-      for (const o of objects(s, e.what, ctx)) {
+    case "putInLibrary": {
+      // Owners choosing for several objects (Aetherspouts): the active player makes all of their choices first, then each
+      // other player in turn order (rulings, CR 101.4).
+      const order = e.position === "ownersChoice" ? apnap(s, s.turnOrder) : [];
+      const todo = [...objects(s, e.what, ctx)];
+      if (order.length) todo.sort((a, b) => order.indexOf(a.owner) - order.indexOf(b.owner));
+      for (const o of todo) {
         let position = e.position;
         if (position === "ownersChoice") {
           // Its owner chooses as it resolves; a token goes too, then ceases to exist (CR 111.7).
@@ -1971,6 +1977,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         moveObject(s, o.id, "library", { top: position === "top" });
       }
       return;
+    }
     case "exileGraveyard":
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
@@ -2019,7 +2026,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           const names = later.map((l) => defOf(s, s.objects[l.id]!).name).join(", ");
           addDelayed(s, e.at === "ownersNextEndStep" ? "playersNextEndStep" : "nextEndStep", ctx.controller, first, {
             targets: [],
-            effects: [{ type: "returnExiled", under: e.under, ...(e.counter ? { counter: e.counter } : {}), ...(e.counterIfCreature ? { counterIfCreature: true as const } : {}), ...(e.tapped ? { tapped: true as const } : {}), ...(later.length > 1 ? { cards: later } : {}), ...(e.selfCounterIfYours && ctx.sourceId ? { selfCounter: { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0, counter: e.selfCounterIfYours } } : {}) }],
+            effects: [{ type: "returnExiled", under: e.under, ...(e.counter ? { counter: e.counter } : {}), ...(e.counterIfCreature ? { counterIfCreature: true as const } : {}), ...(e.loyaltyIfPlaneswalker ? { loyaltyIfPlaneswalker: true as const } : {}), ...(e.tapped ? { tapped: true as const } : {}), ...(later.length > 1 ? { cards: later } : {}), ...(e.selfCounterIfYours && ctx.sourceId ? { selfCounter: { id: ctx.sourceId, zc: ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0, counter: e.selfCounterIfYours } } : {}) }],
             text: `Return ${names} to the battlefield${e.tapped ? " tapped" : ""} under ${e.under === "owner" ? (later.length > 1 ? "their owners'" : "its owner's") : "your"} control.`,
           }, cardIdOf(first), e.at === "ownersNextEndStep" ? first.owner : undefined);
         }
@@ -2040,7 +2047,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const list = e.cards ?? (ctx.subject ? [ctx.subject] : []);
       const back = list.map((l) => s.objects[l.id]).filter((o, i): o is GameObject => o?.zone === "exile" && (o.zoneChanges ?? 0) === list[i]!.zc);
       const sc = (s.resolving!.scratch ??= {});
-      if (back.length && returnFromExile(s, back, (c) => (e.under === "owner" ? c.owner : ctx.controller), src, e.counter, e.tapped, false, e.counterIfCreature) === "paused") {
+      if (back.length && returnFromExile(s, back, (c) => (e.under === "owner" ? c.owner : ctx.controller), src, e.counter, e.tapped, false, e.counterIfCreature, e.loyaltyIfPlaneswalker) === "paused") {
         sc.returning ??= list.filter((l) => back.some((b) => b.id === l.id));
         return "paused";
       }
@@ -2140,9 +2147,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const zc = s.resolving?.item.sourceZc;
       // Commander ninjutsu: from the command zone too (CR 702.49d).
       if (!o || (o.zone !== "hand" && o.zone !== "command") || o.owner !== ctx.controller || (zc !== undefined && (o.zoneChanges ?? 0) !== zc)) return;
-      moveObject(s, o.id, "battlefield", { tapped: true });
+      // Attacking as it enters, before its enters abilities trigger ("if it's attacking", Thousand-Faced Shadow).
+      enterTogether(s, () => {
+        moveObject(s, o.id, "battlefield", { tapped: true });
+        if ((o.zone as string) === "battlefield" && ctx.lki) enterAttacking(s, o, ctx.lki);
+      });
       if ((o.zone as string) !== "battlefield") return;
-      if (ctx.lki) enterAttacking(s, o, ctx.lki);
       log(s, `${player(s, ctx.controller).name} puts ${characteristics(s, o).name} onto the battlefield tapped${o.attacking !== undefined ? ` and attacking ${attackedName(s, o)}` : ""} (ninjutsu).`);
       return;
     }

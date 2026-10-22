@@ -620,8 +620,12 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         sc.searchExileFor = undefined;
       }
       // "Each player may search": a player who declines doesn't search, or shuffle (rulings on Veteran Explorer).
+      // Ashiok, Dream Render: a player its controller can't make search their own library doesn't; "you may search ... If
+      // you do, shuffle", "then shuffle" after a "may": they can't choose to, so no shuffle either (rulings).
+      const barred = (pid: PlayerId) => pid === ctx.controller && libOf(pid) === player(s, pid) && searchBarred(s, pid);
       while (e.may && queue.length && sc.may !== true) {
-        if (sc.may === false) {
+        if (sc.may === false || barred(queue[0]!)) {
+          if (sc.may !== false) log(s, `${player(s, queue[0]!).name} can't search their library.`);
           queue.shift();
           sc.may = undefined;
           continue;
@@ -630,6 +634,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         s.pending = { kind: "chooseMay", player: queue[0]!, source: src, prompt: `search your library for ${e.upTo ? "up to " : ""}${amountNow(s, e.n, ctx) === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${amountNow(s, e.n, ctx)} ${kind.replace(/\bcard\b/, "cards")}`}` };
         return "paused";
       }
+      // Without a "may": no search (nothing found), but the library is still shuffled if the effect says to (rulings).
+      while (!e.orGraveyard && queue.length && barred(queue[0]!)) {
+        log(s, `${player(s, queue[0]!).name} can't search their library.`);
+        searchedBy.push({ pid: queue.shift()!, found: [] });
+      }
       if (queue.length) {
         const p = player(s, queue[0]!);
         const n = (sc.n ??= amountNow(s, e.n, ctx));
@@ -637,11 +646,12 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // asked when the graveyard has a card that fits; otherwise both are searched.
         const fits = (id: ObjectId) => !filter || printedMatches(filter, defOf(s, obj(s, id)));
         if (e.orGraveyard && sc.searchZones === undefined) {
-          if (p.graveyard.some(fits)) {
+          if (!barred(p.id) && p.graveyard.some(fits)) {
             s.pending = { kind: "chooseOption", player: p.id, source: src, what: "searchZones", options: ["both", "graveyard"], labels: ["Library and graveyard", "Graveyard only"], prompt: "search your library too (then shuffle), or only your graveyard?" };
             return "paused";
           }
-          sc.searchZones = "both";
+          // Ashiok, Dream Render: only the graveyard.
+          sc.searchZones = barred(p.id) ? "graveyard" : "both";
         }
         const yardOnly = sc.searchZones === "graveyard";
         // They've searched, found something or not (Archive Trap rulings).
@@ -1137,6 +1147,17 @@ function chooseAnOpponent(s: GameState, ctx: ResolveCtx, src: string, prompt: st
  * rulings). Several Agents each try to exile what they find; the owner of the cards chooses which applies (CR 616.1), and
  * that's the controlling player, who takes them for themselves.
  */
+/**
+ * Ashiok, Dream Render: an opponent's permanent keeps this player's spells and abilities from making them search their
+ * own library.
+ */
+export function searchBarred(s: GameState, pid: PlayerId): boolean {
+  return s.battlefield.some((id) => {
+    const o = obj(s, id);
+    return controllerOf(s, o) !== pid && !player(s, controllerOf(s, o)).lost && !!abilitiesOf(s, o).opponentsCantSearchOwn;
+  });
+}
+
 /** The fewest top cards an opponent's Aven Mindcensor lets this player search, if any does. */
 function searchTop(s: GameState, pid: PlayerId): number | undefined {
   const ns = s.battlefield.map((id) => obj(s, id)).filter((o) => controllerOf(s, o) !== pid && !player(s, controllerOf(s, o)).lost).map((o) => abilitiesOf(s, o).opponentsSearchTop).filter((n): n is number => n !== undefined);

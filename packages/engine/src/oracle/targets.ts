@@ -453,7 +453,9 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   if (totalM && totalM[2] === "X" && !(ctx.spell || ctx.activated || ctx.ownX || ctx.whereX)) return null;
   const total: TargetSpec["total"] | undefined = totalM ? { key: totalM[1] === "power" ? "power" : "manaValue", ...(totalM[2] === "X" ? { x: true as const } : { max: Number(totalM[2]) }) } : undefined;
   const mine = mine0.replace(/ controlled by different players$/, "").replace(/ that each have a different mana value (\d+|X) or less(?= from |$)/, " with mana value $1 or less").replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "").replace(/ with different names(?= from |$)/, "").replace(/ with total (?:mana value|power) (?:\d+|X) or less(?= from | in |$)/, "");
-  const parsed = differMv ? parseTargetPhrase(singularPhrase(mine), { x: true }) : n > 1 || many ? parseTargetPhrase(singularPhrase(mine)) : parseTargetPhrase(mine, { x: true, count: boundCount(ctx) });
+  // "Up to X target artifact cards each with mana value X or less" (Dance of the Manse): each one's, with the spell's X.
+  const each = (n > 1 || !!many) && / each with mana value X or less(?= from |$)/.test(mine);
+  const parsed = differMv || each ? parseTargetPhrase(singularPhrase(mine.replace(/ each with mana value X or less(?= from |$)/, " with mana value X or less")), { x: true }) : n > 1 || many ? parseTargetPhrase(singularPhrase(mine)) : parseTargetPhrase(mine, { x: true, count: boundCount(ctx) });
   if (!parsed || parsed.kind === "player" || parsed.kind === "spell" || (parsed.kind === "card") !== cards || (theirs && (parsed.kind !== "object" || parsed.controller))) return null;
   // "Up to one target creature card with mana value X or less": as for one target (see parseTarget).
   if (parsed.xRange && !ctx.whereX && !ctx.spell && !ctx.activated && !ctx.ownX) return null;
@@ -582,7 +584,7 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   const ofChosen = /^creatures (?:that aren't |not )?of the chosen type$/i.test(p);
   if (!all && !whose.test(p) && !bare && !combat && !ofChosen) return null;
   // The kinds come first; plurals become the singular parseTargetPhrase reads ("Elves" -> "Elf").
-  const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of|that attacked this turn|that didn't attack this turn|that entered (?:the battlefield )?this turn)\b/i.exec(p);
+  const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of|that attacked this turn|that dealt combat damage to you this turn|that didn't attack this turn|that entered (?:the battlefield )?this turn)\b/i.exec(p);
   let head = (cut ? p.slice(0, cut.index) : p).trim();
   const tail = cut ? p.slice(cut.index).replace(/^your opponents control/i, "an opponent controls").replace(/ your opponents control/i, " an opponent controls") : "";
   const words = head.replace(/,? and |, or |, /g, " or ").split(/\s+/);
@@ -639,6 +641,12 @@ export function parseTargetPhrase(
     count?: (text: string) => AmountExpr | null;
   } = {},
 ): TargetSpec | null {
+  // Magewright's Stone: "creature that has an activated ability with {T} in its cost", printed or granted (rulings).
+  const tapAb = / that has an activated ability with \{T\} in its cost$/.exec(phrase.trim());
+  if (tapAb) {
+    const rest = parseTargetPhrase(phrase.trim().slice(0, tapAb.index), opts);
+    return rest?.kind === "object" ? { ...rest, tapAbility: true, text: `target ${phrase.trim().toLowerCase()}` } : null;
+  }
   // "A creature you control that's enchanted or equipped" (Reyav, Master Smith): "enchanted-or-equipped creature you control".
   let p = subtypeClause(phrase.trim()).toLowerCase().replace(/^(creature)( you control)? that's (enchanted or equipped|enchanted|equipped)$/, (_, k: string, w: string | undefined, st: string) => `${st.replace(/ /g, "-")} ${k}${w ?? ""}`);
   const text = `target ${phrase.trim().toLowerCase()}`;
@@ -663,6 +671,13 @@ export function parseTargetPhrase(
     extra.equalsChosen = chosenNumber[1]!.toLowerCase() === "mana value" ? ["manaValue"] : chosenNumber[1]!.toLowerCase() === "power or toughness" ? ["power", "toughness"] : ["manaValue", "power", "toughness"];
     p = p.slice(0, chosenNumber.index);
     phrase = phrase.trim().slice(0, chosenNumber.index);
+  }
+  // Expel the Interlopers: "creatures with power greater than or equal to the chosen number" (Chosen.number).
+  const atLeastChosen = / with power greater than or equal to the chosen number$/i.exec(phrase.trim());
+  if (atLeastChosen && !extra.chosen) {
+    extra.chosen = "powerAtLeast";
+    p = p.slice(0, atLeastChosen.index);
+    phrase = phrase.trim().slice(0, atLeastChosen.index);
   }
   const bound0 = / with (power|toughness|mana value) (?:(less|greater) than( or equal to)?|equal to) (.+)$/i.exec(phrase.trim());
   const from0 = bound0 && / from (?:your|a|an opponent's) graveyard$/i.exec(bound0[4]!);
@@ -725,6 +740,12 @@ export function parseTargetPhrase(
   if (entered) {
     extra.enteredThisTurn = true;
     p = p.slice(0, entered.index);
+  }
+  // Witch-king of Angmar: "a creature of their choice that dealt combat damage to you this turn".
+  const dealtYou = / that dealt combat damage to you this turn$/.exec(p);
+  if (dealtYou) {
+    extra.dealtCombatDamageToYou = true;
+    p = p.slice(0, dealtYou.index);
   }
   // "Untap all creatures that attacked this turn" (Relentless Assault), "creatures you control that attacked this turn".
   const attacked = / that attacked this turn$/.exec(p);
@@ -845,8 +866,10 @@ export function parseTargetPhrase(
   } else if ((m = /(?:^| )(with|without) ([a-z ]+?)( you control| you don't control| an opponent controls)?$/.exec(p))) {
     // "Creature you control with flash or haste" (Shadow the Hedgehog): one of them is enough.
     const either = m[1] === "with" ? /^([a-z]+) or ([a-z]+)$/.exec(m[2]!) : null;
-    const kws = either ? [either[1]!, either[2]!].map((k) => keywordOf(k)) : parseKeywordList(m[2]!);
-    if (!kws || kws.some((k) => !k) || kws.length !== (either ? 2 : 1)) return null;
+    // "Creatures without flying or islandwalk" (Stormtide Leviathan): with neither.
+    const neither = m[1] === "without" ? /^([a-z]+) or ([a-z]+)$/.exec(m[2]!) : null;
+    const kws = either ?? neither ? [(either ?? neither)![1]!, (either ?? neither)![2]!].map((k) => keywordOf(k)) : parseKeywordList(m[2]!);
+    if (!kws || kws.some((k) => !k) || kws.length !== (either || neither ? 2 : 1)) return null;
     if (either) extra.anyOf = kws.map((k) => ({ kind: "object" as const, keywords: [k!], text: k!.toLowerCase() }));
     else if (m[1] === "with") extra.keywords = kws as string[];
     else extra.notKeywords = kws as string[];
@@ -938,7 +961,9 @@ export function parseTargetPhrase(
   const quality = (a: string) => a.trim().split(/\s+/).some((w) => !TYPE_WORDS[w]);
   const leading = quality(alts[0] ?? "") && !alts.slice(1).every(quality);
   if (alts.length > 1 && typeWords.every((n) => n === 1) && alts.some(quality) && !leading && !isSpell && !extra.token && !extra.status && extra.commander === undefined) {
-    if (extra.anyOf || (inGraveyard && Object.keys(extra).length)) return null;
+    // A mana value is the whole card's ("artifact and/or non-Aura enchantment cards each with mana value X or less").
+    const cardWide = (k: string) => k === "xRange" || k === "manaValue";
+    if (extra.anyOf || (inGraveyard && !Object.keys(extra).every(cardWide))) return null;
     const anyOf: TargetSpec[] = [];
     for (const alt of alts) {
       const sub = parseTargetPhrase(alt);
@@ -948,7 +973,7 @@ export function parseTargetPhrase(
     }
     const types = [...new Set(anyOf.flatMap((a) => a.types ?? []))];
     // A card in a graveyard (Haven of the Spirit Dragon), matched by its printed characteristics.
-    if (inGraveyard) return { kind: "card", types, notTypes: [], notColors: [], anyOf, ...(owner ? { owner } : {}), ...(linkedExile ? { linkedExile: true as const } : {}), text };
+    if (inGraveyard) return { kind: "card", types, notTypes: [], notColors: [], anyOf, ...extra, ...(owner ? { owner } : {}), ...(linkedExile ? { linkedExile: true as const } : {}), text };
     return { kind: "object", types, notTypes: [], notColors: [], anyOf, ...extra, controller, ...(tapped !== undefined ? { tapped } : {}), text };
   }
   let outlaw = false;

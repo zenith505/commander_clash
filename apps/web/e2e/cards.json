@@ -3612,6 +3612,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "744b7e93-c893-4770-a3bb-6a45b7f8e4f7",
+  "name": "Expel the Interlopers",
+  "manaCost": "{3}{W}{W}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose a number between 0 and 10. Destroy all creatures with power greater than or equal to the chosen number.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "woe",
+  "releasedAt": "2023-09-08",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8a83ecee-092b-456c-803f-a9aaa17c4da9",
   "name": "Exploration Broodship",
   "manaCost": "{G}",
@@ -9595,6 +9621,44 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2143f413-7baa-4fd6-a7ca-32f52bfa553f",
+  "name": "Shadrix Silverquill",
+  "manaCost": "{3}{W}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Elder Dragon",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elder",
+   "Dragon"
+  ],
+  "oracleText": "Flying, double strike\nAt the beginning of combat on your turn, you may choose two. Each mode must target a different player.\n• Target player creates a 2/1 white and black Inkling creature token with flying.\n• Target player draws a card and loses 1 life.\n• Target player puts a +1/+1 counter on each creature they control.",
+  "power": "2",
+  "toughness": "5",
+  "colors": [
+   "B",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Double strike"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2026-09-28",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8c0520fa-276b-4d21-b4a9-dce1fce59f6b",
   "name": "Shark Typhoon",
   "manaCost": "{5}{U}",
@@ -10258,6 +10322,42 @@
   "set": "m3c",
   "releasedAt": "2024-06-14",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "505231d8-714f-4c5b-a635-d1662bd18a78",
+  "name": "Spider-Man, Web-Slinger",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Spider Human Hero",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spider",
+   "Human",
+   "Hero"
+  ],
+  "oracleText": "Web-slinging {W} (You may cast this spell for {W} if you also return a tapped creature you control to its owner's hand.)",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Web-slinging"
+  ],
+  "commanderLegal": "legal",
+  "set": "spm",
+  "releasedAt": "2025-09-26",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

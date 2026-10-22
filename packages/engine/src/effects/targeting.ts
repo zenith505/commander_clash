@@ -87,6 +87,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.combat === "blocking" && !o.blocking) return false;
   if (spec.combat === "attackingOrBlocking" && o.attacking === undefined && !o.blocking) return false;
   if (spec.combat === "attackedThisTurn" && o.attacked?.turn !== s.turn) return false;
+  if (spec.dealtCombatDamageToYou && !s.turnLog?.combatDamagedBy?.[s.resolving?.item.controller ?? controller]?.includes(`${o.id}@${o.zoneChanges ?? 0}`)) return false;
   if (spec.enteredThisTurn && o.enteredTurn !== s.turn) return false;
   if (spec.combat === "attackingBattle" && !(o.attacking !== undefined && attackedBattle(s, o))) return false;
   if (spec.combat === "couldButDidntAttack" && (o.couldAttack !== s.turn || o.attacked?.turn === s.turn)) return false;
@@ -102,6 +103,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.toughnessAbovePower && !(c.types.includes("Creature") && toughness(s, o) > power(s, o))) return false;
   if (spec.doubleFaced && !isDoubleFacedDef(s.cards[o.cardId] ?? defOf(s, o))) return false;
   if (spec.manaAbility && !(abilitiesOf(s, o).mana.length || abilitiesOf(s, o).manaTriggers?.length)) return false;
+  if (spec.tapAbility && !((ab) => ab.mana.some((m) => m.tap) || ab.activated.some((a) => a.tap))(abilitiesOf(s, o))) return false;
   if (spec.commander !== undefined && !!o.isCommander !== spec.commander) return false;
   if (spec.status && !hasStatus(s, o, c, spec.status, view)) return false;
   if (spec.suspected && o.suspected === undefined) return false;
@@ -167,6 +169,7 @@ export function bindChosen(spec: TargetSpec, chosen: Chosen | undefined): Target
   if (kind === "cardType" && chosen?.cardType) return { ...rest, types: [...(rest.types ?? []), chosen.cardType] };
   if (kind === "name" && chosen?.name !== undefined) return { ...rest, named: chosen.name };
   if (kind === "number" && chosen?.number !== undefined) return { ...rest, equals: chosen.number };
+  if (kind === "powerAtLeast" && chosen?.number !== undefined) return { ...rest, power: { ...rest.power, min: Math.max(rest.power?.min ?? -Infinity, chosen.number) } };
   if ((kind === "color" || kind === "notColor") && chosen?.color)
     return kind === "color" ? { ...rest, colors: [chosen.color] } : { ...rest, notColors: [...(rest.notColors ?? []), chosen.color] };
   return kind === "notType" || kind === "notColor" || kind === "notTypesChosen" ? rest : spec;
@@ -549,6 +552,7 @@ export function canChooseTarget(s: GameState, specs: TargetSpec[], chosen: Targe
   if (t.kind === "none") return !!spec.optional;
   if (!isLegalTarget(s, spec, t, controller, src)) return false;
   if (spec.notSource && t.kind === "object" && t.id === sourceId) return false;
+  if (spec.notSourceHost && t.kind === "object" && sourceId && t.id === s.objects[sourceId]?.attachedTo) return false;
   if (!lesserPowerOk(s, spec, t, sourceId)) return false;
   return !(spec.distinctFrom ?? []).some((j) => sameTarget(chosen[j], t)) && relatedOk(s, spec, chosen, t) && totalOk(s, specs, chosen, i, t);
 }
@@ -782,7 +786,8 @@ export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toug
       const host = obj(s, id).attachedTo ? s.objects[obj(s, id).attachedTo!] : undefined;
       return !!host && host.zone === "battlefield" && objIsType(s, host, "Creature") && controllerOf(s, host) === pid && objectMatches(s, e.filter, obj(s, id), pid, false);
     });
-  const ids = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !(e.filter.notSource && id === sourceId) && objectMatches(s, { ...e.filter, controller: "you" }, obj(s, id), pid, false) && !(sacrificing && !canBeSacrificed(s, obj(s, id))));
+  const shares = e.filter.sharesPermanentTypeWithSubject ? subjectPermanentTypes(s) : undefined;
+  const ids = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !(e.filter.notSource && id === sourceId) && objectMatches(s, { ...e.filter, controller: "you" }, obj(s, id), pid, false) && !(sacrificing && !canBeSacrificed(s, obj(s, id))) && (!shares || (id !== shares.id && characteristics(s, obj(s, id)).types.some((t) => shares.types.includes(t)))));
   // "Sacrifices a creature with the greatest power among creatures they control": the greatest, or tied for it; the
   // player chooses among those tied (rulings on Crackling Doom). Mana value from the mana cost, X as 0 (CR 202.3, 107.3).
   if (e.greatest) {
@@ -794,6 +799,20 @@ export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toug
   // Bolster: the least toughness, or tied for it (CR 701.39a).
   const min = Math.min(...ids.map((id) => toughness(s, obj(s, id))));
   return ids.filter((id) => toughness(s, obj(s, id)) === min);
+}
+
+/**
+ * The permanent types (CR 205.2a) of the resolving trigger's subject, as it is on the battlefield or as it last was there
+ * (CR 608.2h): Cloudstone Curio's "shares a permanent type with it".
+ */
+function subjectPermanentTypes(s: GameState): { id: ObjectId; types: string[] } {
+  const subj = s.resolving?.item.subject;
+  const o = subj ? s.objects[subj.id] : undefined;
+  if (!subj || !o) return { id: "", types: [] };
+  const here = o.zone === "battlefield" && (o.zoneChanges ?? 0) === subj.zc;
+  const lk = s.lastKnown?.[subj.id];
+  const types = here ? characteristics(s, o).types : lk && lk.zc === subj.zc ? lk.source?.types ?? [] : [];
+  return { id: subj.id, types: types.filter((t) => ["Artifact", "Battle", "Creature", "Enchantment", "Land", "Planeswalker"].includes(t)) };
 }
 
 /** The battle this creature is attacking, while it's still that battle (CR 506.4). */

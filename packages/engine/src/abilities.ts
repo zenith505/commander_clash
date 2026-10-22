@@ -192,7 +192,8 @@ export type Count =
   /** Vivid: "the number of colors among permanents you control" (white, blue, black, red, green; colorless isn't one, CR 105.2c). */
   | { kind: "colorsAmongPermanents" }
   /** "For each spell you've cast this turn" (Aetherflux Reservoir): the spells its controller cast this turn, copies not (CR 707.10). */
-  | { kind: "spellsCastThisTurn" }
+  /** `filter`: "the number of instant and sorcery spells you've cast this turn" (Rionya), by the cards cast. */
+  | { kind: "spellsCastThisTurn"; filter?: TargetSpec }
   /** "The total mana value of other spells you've cast this turn" (Call Forth the Tempest): each as it was cast (CR 202.3e); `other`: not the resolving spell itself. */
   | { kind: "manaValueCastThisTurn"; other?: true }
   /** "The number of card types among cards in all graveyards" (Tarmogoyf): card types only, not subtypes or supertypes (CR 205.2a). */
@@ -303,6 +304,8 @@ export interface TargetSpec {
   doubleFaced?: true;
   /** "An artifact card with a mana ability" (Moonsilver Key): an activated or triggered one (CR 605.1). */
   manaAbility?: true;
+  /** "That has an activated ability with {T} in its cost" (Magewright's Stone): a mana ability or another, its own or granted; tapping other permanents doesn't count (rulings). */
+  tapAbility?: true;
   /** "Transformed permanent" (CR 701.27g): a nonmodal double-faced permanent with its back face up, not melded or merged. */
   transformed?: true;
   /** "Each with power greater than its base power" (Kutzil): see basePowerNow. */
@@ -408,6 +411,13 @@ export interface TargetSpec {
   /** "Another target creature" on a permanent's ability: not the source itself. */
   notSource?: boolean;
   /**
+   * "A creature of their choice that dealt combat damage to you this turn" (Witch-king of Angmar): "you" being the resolving
+   * ability's controller, whoever picks it (turnLog.combatDamagedBy, this object as it was then).
+   */
+  dealtCombatDamageToYou?: true;
+  /** "Enchanted creature deals damage ... to any other target" (Pain for All): not the permanent the source is attached to. */
+  notSourceHost?: true;
+  /**
    * Targets this one can't be the same as: the others of the same "two target creatures" (CR 115.3),
    * or the earlier ones for "another target".
    */
@@ -424,6 +434,11 @@ export interface TargetSpec {
    * `types` as the choice is made.
    */
   sharesTypeWithSacrificed?: true;
+  /**
+   * Cloudstone Curio: "another permanent you control that shares a permanent type with it": not the trigger's subject,
+   * and sharing a permanent type with it as it is, or last was, on the battlefield (CR 608.2h), checked as it resolves.
+   */
+  sharesPermanentTypeWithSubject?: true;
   /** "Two target creature cards that share a creature type": shares one with each of these targets of the group. */
   sharesCreatureTypeWith?: number[];
   /** "Up to six target creature cards with different names" (Behold the Sinister Six!): a name none of these targets of the group has (CR 601.2c). */
@@ -476,7 +491,7 @@ export interface TargetSpec {
    * or color chosen for the source (see GameObject.chosen) or while the spell resolves. Before
    * `bindChosen` fills it in, a filter that needs a choice that wasn't made matches nothing.
    */
-  chosen?: "type" | "notType" | "color" | "notColor" | "cardType" | /** "Of a type chosen this way" (Chosen.types: any of them), "that aren't ...". */ "typesChosen" | "notTypesChosen" | /** "with the chosen name", "with that name" (Chosen.name, CR 201.4). */ "name" | /** "Equal to the chosen number" (Chosen.number; see equalsChosen). */ "number";
+  chosen?: "type" | "notType" | "color" | "notColor" | "cardType" | /** "Of a type chosen this way" (Chosen.types: any of them), "that aren't ...". */ "typesChosen" | "notTypesChosen" | /** "with the chosen name", "with that name" (Chosen.name, CR 201.4). */ "name" | /** "Equal to the chosen number" (Chosen.number; see equalsChosen). */ "number" | /** "With power greater than or equal to the chosen number" (Expel the Interlopers): `power.min`, once it's known. */ "powerAtLeast";
   /**
    * "With mana value, power, or toughness equal to the chosen number" (Talion): one of these is that number, filled in
    * as `equals` once it's known (bindChosen). Only creature spells have power and toughness (CR 208.3).
@@ -639,6 +654,8 @@ export type ObjRef =
   | { ref: "sacrificed"; exiledCost?: true }
   /** "The exiled card" of an "Exile a nonland card from your hand" cost (Jhoira of the Ghitu), while it's still that card in exile (CR 400.7). */
   | { ref: "costExiled" }
+  /** "If an ability of an artifact, creature, or planeswalker is countered this way, that permanent" (Tishana's Tidebinder): the source of the ability this resolution countered, if it's still that object and fits `filter` now (rulings). */
+  | { ref: "counteredSource"; filter: TargetSpec }
   /** "A card exiled with ~" (Mimic Vat): the cards this object's linked exile took that are still there (CR 607.2a, 400.7); its controller picks one where one is needed. */
   | { ref: "linkedCard" }
   /** The card "reveal the top card of your library" revealed, while it's still where it was (CR 400.7). */
@@ -999,7 +1016,7 @@ export type Modification =
    */
   | { kind: "assignsToughness"; ifGreater?: true }
   /** "Can attack as though it didn't have defender" (CR 702.3b). */
-  | { kind: "attackDespiteDefender" }
+  | { kind: "attackDespiteDefender"; /** Only players who attacked you during their last turn (Weathered Sentinels). */ vsAttackedYou?: true }
   /** "Target creature blocks this turn if able": it blocks some attacking creature if able (CR 509.1c). */
   | { kind: "mustBlock" }
   /**
@@ -1261,6 +1278,8 @@ export type StaticCondition =
   | { kind: "opponentGraveyard"; n: number }
   /** Raid: "if you attacked this turn" (with one or more creatures); `not`: "if you didn't attack with a creature this turn" (Curious Obsession). */
   | { kind: "attackedThisTurn"; not?: true }
+  /** The Chain Veil: "if you didn't activate a loyalty ability of a planeswalker this turn" (`not`). */
+  | { kind: "activatedLoyaltyThisTurn"; not?: true }
   /** "If you've committed a crime this turn" (CR 700.13). */
   | { kind: "committedCrime" }
   /** A Case's solved designation (CR 719.3b): "Solved — [ability]" (702.169); `not`: a "To solve" trigger's "this Case is not solved" (719.3a). */
@@ -1359,7 +1378,8 @@ export type Effect =
       /** "The damage can't be prevented." (CR 615.12) */ unpreventable?: true;
       /** "It deals ..." after "Whenever a commander you control deals combat damage" (Kediss): the trigger's creature deals it, as it last existed if it's gone (CR 608.2h). */
       /** `target`: "Target creature you control deals damage equal to its power to each other creature" (Chandra's Ignition): that target, if still legal. */
-      by?: "subject" | { target: number };
+      /** `attached`: "Enchanted creature deals damage equal to its power to any other target" (Pain for All): the permanent the source is attached to. */
+      by?: "subject" | "attached" | { target: number };
       /** "Excess damage is dealt to that creature's controller instead" (Flame Spill): the damage beyond lethal goes there (CR 120.4a). */
       excessToController?: true;
     }
@@ -1385,7 +1405,7 @@ export type Effect =
   /** `drain`: "You gain life equal to the life lost this way" (extort, CR 702.101a; Gray Merchant). */
   | { type: "loseLife"; who: PlayerRef; n: Amount; drain?: boolean }
   /** "Your life total becomes 10" (CR 119.5): that player gains or loses the difference. */
-  | { type: "setLife"; who: PlayerRef; n: number }
+  | { type: "setLife"; who: PlayerRef; n: number; /** "Double target player's life total" (CR 701.10d): twice what it is as it resolves; `n` unused. */ double?: true }
   /**
    * "Exchange life totals with target opponent", "two target players exchange life totals" (CR 701.12c): each gains or
    * loses the life needed to reach the other's previous total; if either part can't happen, neither does (701.12a).
@@ -1593,7 +1613,7 @@ export type Effect =
    * player owns; `anyType`: "and mana of any type can be spent to cast that spell" (CR 609.4b).
    */
   | { type: "castNow"; what: ObjRef; thenNoMore?: true; unlessCast?: true; anyOwner?: true; anyType?: true }
-  | { type: "putFromHand"; who?: PlayerRef; filter?: TargetSpec; tapped?: boolean; attacking?: boolean; may: boolean; any?: boolean; /** With `any`: "up to seven" (Ugin, the Spirit Dragon). */ upTo?: number; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand"; /** "If you do, draw a card and repeat this process" (Cultivator Colossus): after each card put, a draw, then again until you put none (rulings). */ drawRepeat?: true; /** "Each manifest two cards from their hands" (Kozilek, the Broken Reality): exactly this many (all with fewer), face down (CR 701.40a). */ manifest?: number }
+  | { type: "putFromHand"; who?: PlayerRef; filter?: TargetSpec; tapped?: boolean; attacking?: boolean; may: boolean; any?: boolean; /** With `any`: "up to seven" (Ugin, the Spirit Dragon), "up to X" (Worldsoul's Rage). */ upTo?: Amount; /** "From your hand and/or graveyard" (Worldsoul's Rage): cards from either, together. */ orGraveyard?: true; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand"; /** "If you do, draw a card and repeat this process" (Cultivator Colossus): after each card put, a draw, then again until you put none (rulings). */ drawRepeat?: true; /** "Each manifest two cards from their hands" (Kozilek, the Broken Reality): exactly this many (all with fewer), face down (CR 701.40a). */ manifest?: number }
   /**
    * "Return all land cards from your graveyard to the battlefield tapped" (CR 110.2a: under your control), "from all graveyards
    * ... under their owners' control". All at once. Never Auras: those need a choice of what they enchant (CR 303.4f).
@@ -1650,6 +1670,8 @@ export type Effect =
       sacrificeOnLostControl?: true | { id: ObjectId; zc: number };
       /** "That creature is a black Zombie in addition to its other colors and types": an effect on the permanent from then on (CR 611.2c). */
       alsoMods?: Modification[];
+      /** "If X is 6 or more, those permanents are 4/4 creatures in addition to their other types" (Dance of the Manse): they enter that way (rulings) when the X is at least `x`. */
+      entersAs?: { mods: Modification[]; x: number };
       /** "Put that card onto the battlefield ... at the beginning of the next end step" (Seraph): a delayed trigger for each card (CR 603.7). */
       atNextEndStep?: true;
     }
@@ -1687,12 +1709,12 @@ export type Effect =
    */
   /** `transformed`: "return it to the battlefield transformed" (CR 712.14a). */
   /** `counterIf`: "If it's a Spirit, put a +1/+1 counter on it" (Essence Flux), each returned permanent that matches, once it's back. */
-  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; /** With `at` and `counter`: "If it enters as a creature, it enters with an additional +1/+1 counter on it" (Teferi's Time Twist). */ counterIfCreature?: true; /** `ownersNextEndStep`: "at the beginning of that player's next end step", the card's owner's (one card only). */ at?: "nextEndStep" | "ownersNextEndStep"; /** With `at`: "If it entered under your control, put a +1/+1 counter on ~" (Phelia), on the source as it is then. */ selfCounterIfYours?: CounterKind; counter?: CounterKind; tapped?: true; transformed?: true; counterIf?: { counter: CounterKind; filter: TargetSpec }; /** Exiled now, returned by the search after it (Sword of Hearth and Home: "Put both cards onto the battlefield"), kept in Resolving.held. */ hold?: true }
+  | { type: "flicker"; what: ObjRef; under: "owner" | "you"; /** With `at` and `counter`: "If it enters as a creature, it enters with an additional +1/+1 counter on it" (Teferi's Time Twist). */ counterIfCreature?: true; /** With `counterIfCreature`: "and an additional loyalty counter on it if it's a planeswalker" (Semester's End). */ loyaltyIfPlaneswalker?: true; /** `ownersNextEndStep`: "at the beginning of that player's next end step", the card's owner's (one card only). */ at?: "nextEndStep" | "ownersNextEndStep"; /** With `at`: "If it entered under your control, put a +1/+1 counter on ~" (Phelia), on the source as it is then. */ selfCounterIfYours?: CounterKind; counter?: CounterKind; tapped?: true; transformed?: true; counterIf?: { counter: CounterKind; filter: TargetSpec }; /** Exiled now, returned by the search after it (Sword of Hearth and Home: "Put both cards onto the battlefield"), kept in Resolving.held. */ hold?: true }
   /** A delayed flicker's return: the exiled card, while it's still in exile as that object. */
   /** A delayed flicker's return: its subject, or with `cards` each of those cards, if still the same objects in exile. */
   /** "Each opponent can't block with more than one creature this combat" (Mirri, Weatherlight Duelist; CR 509.1b): for each of those players, until the combat ends. */
   | { type: "blockLimitThisCombat"; who: PlayerRef; n: number }
-  | { type: "returnExiled"; under: "owner" | "you"; counter?: CounterKind; /** The counter only if it enters as a creature (Teferi's Time Twist). */ counterIfCreature?: true; tapped?: true; cards?: { id: ObjectId; zc: number }[]; /** Phelia: a counter on this permanent, while it's still that object, if one of them entered under this ability's controller's control. */ selfCounter?: { id: ObjectId; zc: number; counter: CounterKind } }
+  | { type: "returnExiled"; under: "owner" | "you"; counter?: CounterKind; /** The counter only if it enters as a creature (Teferi's Time Twist). */ counterIfCreature?: true; /** And a loyalty counter if it enters as a planeswalker (Semester's End). */ loyaltyIfPlaneswalker?: true; tapped?: true; cards?: { id: ObjectId; zc: number }[]; /** Phelia: a counter on this permanent, while it's still that object, if one of them entered under this ability's controller's control. */ selfCounter?: { id: ObjectId; zc: number; counter: CounterKind } }
   /** Connive (CR 701.50): its controller draws N, discards N, and it gets a +1/+1 counter per nonland card discarded. */
   | { type: "connive"; what: ObjRef; n: Amount }
   /**
@@ -1893,6 +1915,10 @@ export type Effect =
   /** "Move a +1/+1 counter from ~ onto that creature" (CR 122.5): nothing happens unless both parts can. */
   /** `counter` "any": "move a counter" (Nesting Grounds), of a kind chosen as it resolves (rulings). */
   | { type: "moveCounter"; counter: CounterKind | "any"; from: ObjRef; to: ObjRef }
+  /** Ichormoon Gauntlet: "choose a counter on target permanent. Put an additional counter of that kind on that permanent." */
+  | { type: "counterOfKindOnIt"; what: ObjRef }
+  /** "End the turn." (CR 724.1, Sundial of the Infinite): its last instruction; the rest happens as it finishes resolving. */
+  | { type: "endTurn" }
   /** Cascade (CR 702.85a), resolving: exile until a cheaper nonland card, maybe cast it free, the rest to the bottom. */
   | { type: "cascade" }
   /**
@@ -1989,7 +2015,7 @@ export type Effect =
   /** "Exchange control of target artifact or creature you control and target creature an opponent controls" (Oko, CR 701.12b). */
   | { type: "exchangeControl"; a: ObjRef; b: ObjRef }
   | { type: "groupRules"; affects: Affects; /** The group as the card says it, for the log. */ text: string; mods: Modification[]; duration: "endOfTurn" | "yourNextTurn" }
-  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game" | "yourNextTurn" | "endOfYourNextTurn" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; giveTo?: PlayerRef; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind }
+  | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game" | "yourNextTurn" | "endOfYourNextTurn" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; /** With "whileControlled": "for as long as ~ remains on the battlefield" (Tishana's Tidebinder), whoever controls it. */ whileOnBattlefield?: true; giveTo?: PlayerRef; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind }
   /**
    * Attach the source (an Equipment or Aura) to `what`, CR 701.3; `source`: another Equipment instead ("Attach target
    * Equipment you control to target creature you control", Brass Squire).
@@ -2694,7 +2720,7 @@ export type Effect =
       theirs?: true;
       text: string;
     }
-  | { type: "choose"; choice: ChoiceKind; /** "Each player chooses a creature type" (Patriarch's Bidding): every player in turn order, starting with the active player, into Chosen.types. */ each?: true; /** With "opponent": "a player with the most life or tied for most life" (The Black Gate), checked as it resolves; you can be one. */ mostLife?: true; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose };
+  | { type: "choose"; choice: ChoiceKind; /** "Each player chooses a creature type" (Patriarch's Bidding): every player in turn order, starting with the active player, into Chosen.types. */ each?: true; /** With "opponent": "a player with the most life or tied for most life" (The Black Gate), checked as it resolves; you can be one. */ mostLife?: true; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose; /** "Choose a number between 0 and 10" (Expel the Interlopers): any whole number in it, into Chosen.number. */ range?: { min: number; max: number } };
 
 /** What a player chooses by name: a creature type (CR 205.3m) or a color (CR 105.1). */
 /** "keyword": "gains your choice of flying, vigilance, deathtouch, or haste", from the options listed (CR 608.2d). */
@@ -2837,6 +2863,8 @@ export type SpellCondition =
   | { kind: "targetIs"; index: number; filter: TargetSpec }
   /** "If that land is a Plains" (Emeria Shepherd): the trigger's subject as it is now, or as it last existed (CR 608.2h). */
   | { kind: "subjectIs"; filter: TargetSpec }
+  /** "If it was attacking" (Zurgo Stormrender): the trigger's subject is attacking, or was as it last existed (CR 608.2h). */
+  | { kind: "subjectWasAttacking" }
   /**
    * "If you controlled that permanent, draw a card" about target `index` (Geistwave, Kellan): you control it now, or did
    * as it last existed on the battlefield if this spell or ability moved it (CR 608.2h; rulings on Geistwave and Kellan).
@@ -2879,6 +2907,8 @@ export interface AbilityBody {
   targets: TargetSpec[];
   effects: Effect[];
   text: string;
+  /** "This ability still resolves if its target becomes illegal" (Gilded Drake): it isn't removed by CR 608.2b. */
+  resolvesAnyway?: true;
   /**
    * For modal text ("Choose one —" and a bulleted list, CR 700.2): the modes. A modal body
    * has no targets or effects of its own; see `withModes` in modes.ts. `costs`: spree's additional cost for each
@@ -2911,6 +2941,10 @@ export interface AbilityBody {
     escalate?: { mana?: string; cost?: AdditionalCost; text: string };
     unchosen?: "ever" | "turn";
     random?: true;
+    /** "You may choose two" (Shadrix Silverquill): no modes at all, or `min` to `max` of them. */
+    optional?: true;
+    /** "Each mode must target a different player" (Shadrix Silverquill): no target of one mode is a target of another. */
+    distinctTargets?: true;
   };
 }
 
@@ -3147,6 +3181,8 @@ export type TriggerEvent =
   | "creaturesYouControlAttack"
   /** "Whenever one or more creatures you control deal combat damage to a player": once per player dealt damage. */
   | "creaturesYouControlDealCombatDamageToPlayer"
+  /** "Whenever one or more creatures deal combat damage to you" (Witch-king of Angmar). */
+  | "creaturesDealCombatDamageToYou"
   /** "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix): see `spellDamage`; once for each one dealt damage. */
   | "spellYouControlDealsDamage"
   /**
@@ -3373,6 +3409,8 @@ export interface TriggeredAbility {
   ifCastFromHand?: boolean;
   /** "When ~ enters from a graveyard" / "from your graveyard" (its owner is its controller): part of the trigger event. */
   ifFromGraveyard?: "any" | "yours";
+  /** "When ~ enters from your hand" (Thousand-Faced Shadow): it came from its owner's hand (CR 603.6a). */
+  ifFromHand?: true;
   /** "When ~ enters untapped" (Mystic Sanctuary): only if it entered untapped, part of the trigger event. */
   ifEnteredUntapped?: true;
   /** "When ~ enters, if you cast it, ..." (Geological Appraiser): it entered as a spell that resolved, not a copy. */
@@ -3432,7 +3470,8 @@ export interface TriggeredAbility {
  */
 export interface BatchTrigger {
   /** `exiledFromLibraryOrGraveyard`: "cards are put into exile from your library and/or your graveyard" (Laelia). */
-  what: "enters" | "leaves" | "leavesGraveyard" | "toGraveyard" | "discards" | "exiledFromLibraryOrGraveyard";
+  /** `created`: "Whenever you create one or more creature tokens" (Staff of the Storyteller), tokens that player created (CR 111.2). */
+  what: "enters" | "leaves" | "leavesGraveyard" | "toGraveyard" | "discards" | "exiledFromLibraryOrGraveyard" | "created";
   /** What each object has to be ("creature card", "nontoken creature"); unset, any. */
   filter?: TargetSpec;
   whose?: "you" | "opponent";
@@ -4249,6 +4288,11 @@ export interface CompiledCard {
   cantCastFrom?: { zones: ("graveyard" | "library" | "exile")[]; noncreature?: true };
   /** Aven Mindcensor: "If an opponent would search a library, that player searches the top four cards of that library instead." (CR 614.1a) */
   opponentsSearchTop?: number;
+  /**
+   * Ashiok, Dream Render: "Spells and abilities your opponents control can't cause their controller to search their
+   * library." Only that player's own library, searched by them; any shuffle the effect calls for still happens (rulings).
+   */
+  opponentsCantSearchOwn?: true;
   /** Opposition Agent: "You control your opponents while they're searching their libraries." (CR 723.2) */
   controlsOpponentSearches?: true;
   /**
@@ -4370,7 +4414,7 @@ export interface CompiledCard {
   spellsHaveImprovise?: { filter: TargetSpec; text: string }[];
   /** "Instant and sorcery spells you cast have storm" (Prismari, Ral's emblem): each such spell's own storm triggers (CR 702.40a). */
   spellsHaveStorm?: { filter: TargetSpec; text: string }[];
-  spellsHaveCascade?: { filter?: TargetSpec; from?: "hand" | "exile"; first?: true; treasure?: true; commander?: true; yourTurn?: true; maxMv?: Amount; text: string }[];
+  spellsHaveCascade?: { filter?: TargetSpec; from?: "hand" | "exile"; /** 'Have "Cascade, cascade."' (Zhulodok): two instances. */ twice?: true; first?: true; treasure?: true; commander?: true; yourTurn?: true; maxMv?: Amount; text: string }[];
   /** Shadow the Hedgehog: "Each spell you cast has split second if mana from an artifact was spent to cast it" (CR 702.61a, 106.3). */
   splitSecondIfArtifactMana?: true;
   /**
@@ -4428,7 +4472,7 @@ export interface CompiledCard {
    * Never delayed or reflexive triggers (603.2d).
    */
   /** `anchor`: only while that anchor word was chosen as it entered (Windcrag Siege's "• Mardu —", CR 614.12b). */
-  triggersAgain?: { by?: { event: "enters" | "dies" | "attacks" | "combatDamage" | "castOrCopy"; filter?: TargetSpec[] }; of?: { filter: TargetSpec; other?: true }[]; anchor?: string; /** Cloud, Midgar Mercenary: "As long as ~ is equipped, ... a triggered ability of ~ or an Equipment attached to it". */ selfOrEquipment?: true }[];
+  triggersAgain?: { by?: { event: "enters" | "dies" | "attacks" | "combatDamage" | "castOrCopy" | /** Gandalf the White: entering, or leaving the battlefield for any zone. */ "entersOrLeaves"; filter?: TargetSpec[] }; of?: { filter: TargetSpec; other?: true }[]; anchor?: string; /** Cloud, Midgar Mercenary: "As long as ~ is equipped, ... a triggered ability of ~ or an Equipment attached to it". */ selfOrEquipment?: true }[];
   /** Fist of Suns: "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast" (an alternative cost, CR 118.9). */
   payWUBRG?: true;
   /** Omniscience: "You may cast spells from your hand without paying their mana costs" (AltCostKind "omniscience"). */
@@ -4552,7 +4596,8 @@ export interface CompiledCard {
    */
   costLess?: Amount[];
   /** "This spell costs {2} less to cast if you control a Wizard": the reduction while the condition holds. */
-  costLessIf?: { n: number; cond: StaticCondition }[];
+  /** A negative `n` costs that much more (Hurkyl's Final Meditation); `colored` takes off colored mana too (Discontinuity). */
+  costLessIf?: { n: number; cond: StaticCondition; colored?: Color[] }[];
   /** "This spell costs {3} less to cast if it targets a tapped creature" (CR 601.2f). */
   costLessIfTargets?: { n: number; filter: TargetSpec }[];
   /** Strive: "This spell costs {2}{G} more to cast for each target beyond the first", an additional cost (CR 601.2f, rulings). */

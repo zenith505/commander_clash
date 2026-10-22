@@ -7,7 +7,7 @@ import { NUMX, X, amt, singularWord, isGroup, BASIC_TYPES } from "../words";
 import { parsePlayer, parseObject } from "../targets";
 import { INCUBATOR, PREDEFINED_TOKENS, ROLE_TOKENS, parseToken, parseCopyExcept } from "../tokens";
 import { parseSentence } from "../sentence";
-import { parseCount } from "../counts";
+import { halfX, parseCount } from "../counts";
 import type { Ctx } from "../body";
 
 /** One sentence to effects, or null if it can't be compiled, or undefined if none of these templates match. */
@@ -22,11 +22,20 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (tok?.type !== "createToken" || typeof tok.n !== "object" || !("count" in tok.n) || tok.n.count.kind !== "x" || tok.n.times !== undefined) return null;
     return [{ ...tok, n: { count: { kind: "x" }, times: 2 } }];
   }
+  // The Goose Mother: "create half X Food tokens, rounded up" (CR 107.1a).
+  if ((m = /^Create half X (.+ tokens), rounded (up|down)$/i.exec(s))) {
+    const fx = parseSentence(`Create X ${m[1]}`, ctx);
+    const tok = fx?.length === 1 ? fx[0] : undefined;
+    const n = halfX(m[2], ctx);
+    if (!n || tok?.type !== "createToken" || typeof tok.n !== "object" || !("count" in tok.n) || tok.n.count.kind !== "x" || tok.n.times !== undefined) return null;
+    return [{ ...tok, n }];
+  }
   // "Create a 3/3 colorless Phyrexian Wurm artifact creature token with deathtouch and a 3/3 colorless Phyrexian Wurm
   // artifact creature token with lifelink" (Wurmcoil Engine): each of them, entering at the same time (CR 608.2f).
   if ((m = /^[Cc]reate (.+)$/.exec(s))) {
     // Triplicate Titan: "a ... token with flying, a ... token with vigilance, and a ... token with trample".
-    const parts = m[1]!.split(/,? and (?=(?:an?|one|two|three|four|five) \d+\/\d+ )|, (?=(?:an?|one|two|three|four|five) \d+\/\d+ )/);
+    // Farmer Cotton: "X 1/1 white Halfling creature tokens and X Food tokens": a predefined token after one.
+    const parts = /"/.test(m[1]!) ? [] : m[1]!.split(/,? and (?=(?:an?|one|two|three|four|five|X) (?:\d+\/\d+ |[A-Z][a-z]+ tokens?$))|, (?=(?:an?|one|two|three|four|five) \d+\/\d+ )/);
     if (parts.length >= 2 && parts.every((x) => / tokens?(?: with .+)?$/.test(x))) {
       const fx = parts.map((x) => parseSentence(`Create ${x}`, ctx));
       if (fx.some((x) => x?.length !== 1 || x[0]!.type !== "createToken" || x[0]!.attacking || x[0]!.attackingEach || x[0]!.attachTo)) return null;

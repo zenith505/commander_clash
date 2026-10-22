@@ -320,6 +320,11 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         s.pending = { kind: "chooseOption", player: chooser, source: src, what: "cardName", options, prompt: `choose ${e.names ? `a ${e.names.text} name` : "a card name"}`, purpose: e.purpose ?? "deny", ...(of?.kind === "player" ? { of: of.id } : {}) };
         return "paused";
       }
+      if (e.choice === "number") {
+        if (r.chosen?.number !== undefined || !e.range) return;
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "number", options: [String(e.range.min)], numberRange: e.range, prompt: `choose a number between ${e.range.min} and ${e.range.max}` };
+        return "paused";
+      }
       if (r.chosen?.[e.choice === "color" ? "color" : e.choice === "basicLandType" ? "landType" : e.choice === "keyword" ? "keyword" : "type"] === undefined) {
         const chooser = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
         if (chooser === undefined) return;
@@ -393,6 +398,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (s.resolving!.milled ?? []).some(({ id }) => printedMatches(bindChosen((e.cond as { filter: TargetSpec }).filter, ctx.chosen), defOf(s, s.objects[id]!)))
             : e.cond.kind === "targetIs"
             ? targetIs(s, ctx, e.cond.index, e.cond.filter)
+            : e.cond.kind === "subjectWasAttacking"
+            ? ((o) => (o ? o.attacking !== undefined : ctx.lki?.attacking !== undefined))(objects(s, { ref: "subject" }, ctx)[0])
             : e.cond.kind === "subjectIs"
             ? ((f) => objects(s, { ref: "subject" }, ctx).some((o) => objectMatches(s, f, o, ctx.controller, false)))(e.cond.filter)
             : e.cond.kind === "targetCardWas"

@@ -1289,6 +1289,8 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   // A Pact: only when our lands can pay its upkeep cost, and any other Pact's we still owe.
   const pact = pactCost(compileCard(d).spell?.effects ?? []);
   if (pact && pact + owedPacts(s, pid) > lands(s, pid)) return null;
+  // "End the turn" (Time Stop, Glorious End): bots don't plan around ending a turn (CR 724.1).
+  if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "endTurn")) return null;
   // A foretold card is cast for its foretell cost (CR 702.143a).
   if (!free && !via && alt === undefined && foretoldCast(s, pid, obj(s, id))) alt = "foretell";
   // Cast as madness or miracle resolves, for that cost (CR 702.35a, 702.94a): its X is paid then.
@@ -2472,7 +2474,25 @@ function guessChosen(s: GameState, pid: PlayerId, card: CardDef): Chosen | undef
     const name = chooseOption(s, pid, "color", card, choiceOptions("color"));
     out = { ...out, color: (Object.keys(COLOR_NAMES) as Color[]).find((k) => COLOR_NAMES[k] === name) };
   }
+  const n = kinds.has("number") ? groupNumber(s, pid, card) : undefined;
+  if (n !== undefined) out = { ...out, number: n };
   return out;
+}
+
+/**
+ * "Choose a number between 0 and 10. Destroy all creatures with power greater than or equal to the chosen number."
+ * (Expel the Interlopers): the number its spell does the most good with (groupValue), the highest of equals.
+ */
+function groupNumber(s: GameState, pid: PlayerId, card: CardDef): number | undefined {
+  const body = compileCard(card).spell;
+  const range = body && allEffects(body.effects).flatMap((e) => (e.type === "choose" && e.choice === "number" && e.range ? [e.range] : []))[0];
+  if (!body || !range) return undefined;
+  let best: { n: number; v: number } | undefined;
+  for (let n = range.max; n >= range.min; n--) {
+    const v = groupValue(s, pid, body, { number: n }) ?? 0;
+    if (!best || v > best.v) best = { n, v };
+  }
+  return best?.n;
 }
 
 /**
@@ -2497,8 +2517,11 @@ function chooseKeyword(s: GameState, pid: PlayerId, options: string[]): string {
  * nonland cards the opponents have shown, on the battlefield and in graveyards. Sanctum Prelate's ban counts only
  * noncreature cards, and avoids the mana values of our own noncreature cards in hand. With nothing shown, 2.
  */
-function chooseNumber(s: GameState, pid: PlayerId, c: CompiledCard | undefined, options: string[]): string {
+function chooseNumber(s: GameState, pid: PlayerId, c: CompiledCard | undefined, options: string[], card?: CardDef): string {
   const r = (s.pending?.kind === "chooseOption" && s.pending.numberRange) || { min: Number(options[0] ?? 0), max: Number(options[0] ?? 0) };
+  // A resolving spell's own "choose a number" (Expel the Interlopers).
+  const forSpell = s.resolving && card ? groupNumber(s, pid, card) : undefined;
+  if (forSpell !== undefined) return String(forSpell);
   const ban = !!c?.noncreatureChosenMvCantBeCast;
   const tally = new Map<number, number>();
   const add = (n: number | undefined, w: number) => n !== undefined && Number.isFinite(n) && tally.set(n, (tally.get(n) ?? 0) + w);
@@ -2519,7 +2542,7 @@ function chooseNumber(s: GameState, pid: PlayerId, c: CompiledCard | undefined, 
 }
 
 function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardDef | undefined, options: string[]): string {
-  if (what === "number") return chooseNumber(s, pid, card ? compileCard(card) : undefined, options);
+  if (what === "number") return chooseNumber(s, pid, card ? compileCard(card) : undefined, options, card);
   if (what === "basicLandType") return chooseLandType(s, pid, options);
   if (what === "keyword") return chooseKeyword(s, pid, options);
   const c = card ? compileCard(card) : undefined;
@@ -2871,6 +2894,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const discardX = discardXCount(s, pid, id, ab);
       if (abilityCostsHaveX(ab) && discardX === undefined && !(energyX > 0) && !(energyTargetX >= 3)) continue;
       if (ab.body.effects.some((e) => e.type === "unattachSelf")) continue; // reconfigured Equipment stays on
+      if (ab.body.effects.some((e) => e.type === "endTurn")) continue; // Sundial of the Infinite: bots don't end their turn early
       // Saving a creature with a flip (Frenetic Efreet, Viashino Sandswimmer) waits for something to save it from (chooseFlipEscape).
       if (flips && flipEscape(flips)) continue;
       // Gustha's Scepter: in our second main phase, hide a card from a hand we'd discard from in the cleanup step

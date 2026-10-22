@@ -41,6 +41,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
     return who ? [{ type: "extraTurn", who, n: m[2] === "an" ? 1 : m[2] === "two" ? 2 : 3 }] : null;
   }
+  // "End the turn." (CR 724.1): Sundial of the Infinite, Time Stop.
+  if (/^End the turn$/i.test(s)) return [{ type: "endTurn" }];
   // Controlling another player (CR 723): "You control target player during that player's next turn" (Mindslaver),
   // "you gain control of target opponent during that player's next turn" (Emrakul), "... during their next turn".
   if ((m = /^You (?:gain control of|control) (target player|target opponent) during (?:that player's|their) next turn$/i.exec(s))) {
@@ -274,6 +276,14 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
       return to ? [{ type: "damage", amount: { count: { kind: "power", of: { ref: "self" } } }, to }] : null;
     }
     const a = parseObject(m[1]!, ctx);
+    // "Enchanted creature deals damage equal to its power to any other target" (Pain for All): damage from that creature,
+    // which can't be the target.
+    if (a?.ref === "attached" && /^enchanted creature$/i.test(m[1]!) && /^any other target$/i.test(m[2]!)) {
+      const to = parseDamageRecipient("any target", ctx);
+      if (to?.ref !== "anyTarget") return null;
+      ctx.targets[to.index] = { ...ctx.targets[to.index]!, notSourceHost: true, text: "any other target" };
+      return [{ type: "damage", amount: { count: { kind: "power", of: a } }, to, by: "attached" }];
+    }
     // "Target creature you control deals damage equal to its power to any target" (Soul's Fire): damage from that creature.
     if (a?.ref === "target" && !a.n && /^any target$/i.test(m[2]!)) {
       const to = parseDamageRecipient(m[2]!, ctx);
@@ -364,10 +374,11 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Abilities on the stack (CR 115.1c-d): "Counter target spell, activated ability, or triggered ability", "Counter target
   // activated ability", "Counter target spell or ability unless its controller pays {2}".
-  if ((m = /^Counter target (spell, activated ability, or triggered ability|spell or ability|activated or triggered ability|activated ability|triggered ability)(?: unless its controller pays (.+))?$/i.exec(s))) {
-    const unless = m[2] === undefined ? undefined : parseUnlessPays(m[2], ctx);
-    if (unless === null) return null;
-    return [{ type: "counterSpell", index: addTarget(ctx, stackSpec(m[1]!)), ...(unless ? { unless } : {}) }];
+  if ((m = /^Counter (up to one )?target (spell, activated ability, or triggered ability|spell or ability|activated or triggered ability|activated ability|triggered ability)(?: unless its controller pays (.+))?$/i.exec(s))) {
+    const unless = m[3] === undefined ? undefined : parseUnlessPays(m[3], ctx);
+    if (unless === null || (m[1] && unless)) return null;
+    const spec = stackSpec(m[2]!);
+    return [{ type: "counterSpell", index: addTarget(ctx, m[1] ? { ...spec, optional: true, text: `up to one ${spec.text}` } : spec), ...(unless ? { unless } : {}) }];
   }
   // Siren Stormtamer: "Counter target spell or ability that targets you or a creature you control".
   if ((m = /^Counter target (spell|spell or ability) that targets (you or )?(you|an? .+)$/i.exec(s)) && !(m[2] && m[3] === "you")) {

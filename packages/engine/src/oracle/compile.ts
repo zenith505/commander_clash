@@ -462,7 +462,8 @@ export function compile(d: CardDef): CompiledCard {
     // An ability word (CR 207.2c) or a flavor word (Khârn's "Berzerker — ", CR 207.2d) before a static or replacement
     // ability: no rules meaning. Not a keyword written with a dash ("Boast — ", CR 702), a chapter number ("II — ", CR
     // 714.2b) or a modal choice.
-    const word = !isSpell ? /^([A-Z][^—•":{}]*?) — (?![{+•])/.exec(line) : null;
+    // "10,000 Needles — " (Jumbo Cactuar) starts with a number.
+    const word = !isSpell ? /^([A-Z][^—•":{}]*?|\d[\d,]* [A-Z][^—•":{}]*?) — (?![{+•])/.exec(line) : null;
     if (word && !KEYWORD_WORDS.has(word[1]!.toLowerCase()) && !/^[IVX]+(?:, [IVX]+)*$/.test(word[1]!) && !/^(?:Choose\b|To solve$)/.test(word[1]!)) line = line.slice(word[0].length);
     // "Vivid — {T}: For each color among permanents you control, add ..." (Bloom Tender): an ability word too.
     else if (!isSpell && /^Vivid — \{/.test(line)) line = line.replace(/^Vivid — /, "");
@@ -1603,7 +1604,8 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Cascade for the spells you cast (CR 702.85a): "Sliver spells you cast have cascade", "Instant and sorcery spells you
     // cast from your hand have cascade", "The first spell you cast each turn has cascade" (Maelstrom Nexus).
-    const giveCascade = /^(?:(.+?) )?[Ss]pells you cast( from your hand)?( with mana value \d+ or (?:greater|less))? have cascade\.$/.exec(line);
+    // Zhulodok, Void Gorger: '... have "Cascade, cascade."': two cascade abilities, each triggering (CR 702.85c).
+    const giveCascade = /^(?:(.+?) )?[Ss]pells you cast( from your hand)?( with mana value \d+ or (?:greater|less))? have (cascade|"Cascade, cascade\.")\.?$/.exec(line);
     const firstCascade = /^The first spell you cast (from exile )?each turn( that mana from a Treasure was spent to cast)? has cascade\.$/.exec(line);
     if (/^Commander spells you cast have cascade\.$/.test(line)) {
       (out.spellsHaveCascade ??= []).push({ commander: true, text: line });
@@ -1639,7 +1641,7 @@ export function compile(d: CardDef): CompiledCard {
         filter = f;
       }
       const from = giveCascade?.[2] ? "hand" : firstCascade?.[1] ? "exile" : undefined;
-      (out.spellsHaveCascade ??= []).push({ ...(filter ? { filter } : {}), ...(from ? { from } : {}), ...(firstCascade ? { first: true as const } : {}), ...(firstCascade?.[2] ? { treasure: true as const } : {}), text: line });
+      (out.spellsHaveCascade ??= []).push({ ...(filter ? { filter } : {}), ...(from ? { from } : {}), ...(giveCascade?.[4]?.startsWith('"') ? { twice: true as const } : {}), ...(firstCascade ? { first: true as const } : {}), ...(firstCascade?.[2] ? { treasure: true as const } : {}), text: line });
       continue;
     }
     // "Instant and sorcery spells you cast have storm" (Prismari, the Inspiration; Ral's emblem), CR 702.40a.
@@ -2010,6 +2012,10 @@ export function compile(d: CardDef): CompiledCard {
       out.opponentsSearchTop = num(mindcensor[1]!);
       continue;
     }
+    if (line === "Spells and abilities your opponents control can't cause their controller to search their library.") {
+      out.opponentsCantSearchOwn = true;
+      continue;
+    }
     if (line === "You control your opponents while they're searching their libraries.") {
       out.controlsOpponentSearches = true;
       continue;
@@ -2308,8 +2314,9 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // A spell's "When you next cast ... this turn, ..." creates a delayed trigger as it resolves (CR 603.7); it isn't a triggered ability of the card.
-    // So does a Pact's "At the beginning of your next upkeep, pay {2}{B}. If you don't, you lose the game." (CR 603.7a).
-    if (isSpell && (/^When you next cast /.test(line) || /^At the beginning of each combat this turn, /.test(line) || /^At the beginning of your next upkeep, pay (?:\{[^}]+\})+\. If you don't, you lose the game\.$/.test(line))) {
+    // So does a Pact's "At the beginning of your next upkeep, pay {2}{B}. If you don't, you lose the game." (CR 603.7a), and
+    // Glorious End's "At the beginning of your next end step, you lose the game."
+    if (isSpell && (/^When you next cast /.test(line) || /^At the beginning of each combat this turn, /.test(line) || /^At the beginning of your next upkeep, pay (?:\{[^}]+\})+\. If you don't, you lose the game\.$/.test(line) || /^At the beginning of your next end step, you lose the game\.$/.test(line))) {
       spellLines.push(line);
       continue;
     }
@@ -2599,6 +2606,14 @@ function linkExile(out: CompiledCard) {
     if (imprints.length !== 1 || others.length !== 1) out.unsupported.push("(its mana trigger can't be linked to one imprint ability)");
     else imprints[0]!.linked = true;
   }
+  // Ugin's Labyrinth: "If a card is exiled with ~" and "Return the exiled card to its owner's hand" are about the card its
+  // imprint ability exiled (CR 607.2a), its only exile.
+  if (out.activated.some((a) => allEffects(a.body.effects).some((e) => e.type === "bounce" && e.what.ref === "linkedCard"))) {
+    const imprints = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e) => e.type === "takeFromHand" && e.action === "exile");
+    const others = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)].flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse");
+    if (imprints.length !== 1 || others.length !== 1 || out.spell) out.unsupported.push("(returns an exiled card it can't link to one imprint ability)");
+    else (imprints[0] as Extract<Effect, { type: "takeFromHand" }>).linked = true;
+  }
   // Semblance Anvil: "the exiled card" its cost reduction compares with is the one its imprint ability exiled.
   if (out.costMods?.some((m) => m.sharesTypeWithLinked)) {
     const imprints = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e) => e.type === "takeFromHand" && e.action === "exile");
@@ -2658,7 +2673,7 @@ function linkExile(out: CompiledCard) {
   }
   // "Create a token that's a copy of a card exiled with ~" (Mimic Vat, The Cloning of Shredder): the cards its one exile
   // ability exiled (CR 607.2a), unless that's already linked (Mimic Vat's imprint).
-  if (bodies.some((b) => JSON.stringify(b).includes('"linkedCard"'))) {
+  if (bodies.some((b) => JSON.stringify(b).includes('"linkedCard"')) && !out.activated.some((a) => allEffects(a.body.effects).some((e) => e.type === "bounce" && e.what.ref === "linkedCard"))) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
     const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
     const others = all.some((e) => (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || (e.type === "discard" && !!e.exile));
@@ -2719,7 +2734,7 @@ function checkCastingLinks(out: CompiledCard) {
     // "The exiled card" of an "Exile a nonland card from your hand" cost (Jhoira of the Ghitu): that ability's own cost.
     if (o.ref === "costExiled" && !handExileCost) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
-    if (typeof o.chosen === "string") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" ? needs.add("number") : needs.add("creatureType"));
+    if (typeof o.chosen === "string") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" || o.chosen === "powerAtLeast" ? needs.add("number") : needs.add("creatureType"));
     if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen)) needs.add("color");
     if (o.kind === "setLandTypes" && (o.subtypes as string[]).includes(CHOSEN_LAND_TYPE)) needs.add("basicLandType");
     if (o.kind === "addKeywords" && ((o.keywords as string[]).includes(CHOSEN_PROTECTION) || (o.keywords as string[]).includes(CHOSEN_HEXPROOF))) needs.add("color");
@@ -2899,7 +2914,7 @@ function joinModes(lines: string[]): string[] {
     // "..., choose one that hasn't been chosen this turn." followed by bullets (Lita): the same as with a dash.
     const dotted = prev !== undefined && /\bchoose one(?: that hasn't been chosen(?: this turn)?| at random)?\.$/i.test(prev);
     if (/^\s*•/.test(line) && prev !== undefined && dotted) out[out.length - 1] = `${prev.replace(/\.$/, " —")} ${line.trim()}`;
-    else if (/^\s*•/.test(line) && prev !== undefined && /—\s*(•.*)?$/.test(prev)) out[out.length - 1] = `${prev} ${line.trim()}`;
+    else if (/^\s*•/.test(line) && prev !== undefined && (/—\s*(•.*)?$/.test(prev) || /you may choose two\. Each mode must target a different player\.(\s*•.*)?$/.test(prev))) out[out.length - 1] = `${prev} ${line.trim()}`;
     else out.push(line);
   }
   close();
@@ -2981,6 +2996,13 @@ function triggersAgainLine(line: string): NonNullable<CompiledCard["triggersAgai
     }
     return out;
   };
+  // Gandalf the White: "If a legendary permanent or an artifact entering or leaving the battlefield causes ...": either
+  // way, whatever zone it left for.
+  const both = /^If (?:an? )?(.+?) entering or leaving the battlefield causes a triggered ability of a permanent you control to trigger, that ability triggers an additional time\.$/.exec(line);
+  if (both) {
+    const filter = kinds(both[1]!.replace(/ or an? /g, " or "), false);
+    return filter ? { by: { event: "entersOrLeaves", filter: filter.map((x) => x.filter) } } : null;
+  }
   let m = /^If (?:an? )?(.+?) (entering|dying|attacking|dealing combat damage to a player)(?: the battlefield)? causes a triggered ability of a permanent you control to trigger, that ability triggers an additional time\.$/.exec(line);
   if (m) {
     const event = ({ entering: "enters", dying: "dies", attacking: "attacks" } as Record<string, "enters" | "dies" | "attacks">)[m[2]!] ?? "combatDamage";

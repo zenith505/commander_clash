@@ -538,9 +538,25 @@ const LIM_DULS_VAULT =
 export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; discardedSelf?: true } = {}): AbilityBody | null {
   // "Put a +1/+1 counter on ~ and untap it" (Gwenna): "it" is ~, the one thing named.
   text = differenceInHand(text).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~");
+  // Witch-king of Angmar: "sacrifices a creature of their choice that dealt combat damage to you this turn" (the
+  // sacrificing player chooses anyway, CR 701.21a).
+  text = text.replace(/\b(sacrifices a creature) of their choice (that dealt combat damage to you this turn)\b/, "$1 $2");
+  // Thousand-Faced Shadow: "create a token that's a copy of another target attacking creature. The token enters tapped and
+  // attacking." (CR 508.4).
+  text = text.replace(/\b([Cc]reate) a token that's a copy of ([^.]+)\. The token enters tapped and attacking\./, "$1 a tapped and attacking token that's a copy of $2.");
+  // Ichormoon Gauntlet: "choose a counter on target permanent. Put an additional counter of that kind on that permanent."
+  text = text.replace(/\b[Cc]hoose a counter on (target [a-z ]+?)\. Put an additional counter of that kind on that permanent\./, "Put another counter of a kind already on $1 on it.");
   // Lim-Dûl's Vault: look at the top five; as many times as you choose, pay 1 life and put them on the bottom in any order,
   // then look at the next five; then shuffle the rest and put the last five looked at on top in any order (rulings).
   if (text.trim() === LIM_DULS_VAULT) return { targets: [], effects: [{ type: "vault", n: 5, life: 1 }], text };
+  // Shadrix Silverquill: "you may choose two. Each mode must target a different player." (a triggered ability's): none, or
+  // exactly two (rulings), the two targeting different players (CR 115.3).
+  const mayTwo = /^[Yy]ou may choose two\. Each mode must target a different player\.\s*((?:•[^•]+)+)$/.exec(text.trim());
+  if (mayTwo && !opts.spell && !opts.activated) {
+    const body = parseModal("two", mayTwo[1]!, text.trim(), opts);
+    if (!body || !body.modal!.modes.every((m) => m.targets.length === 1 && m.targets[0]!.kind === "player")) return null;
+    return { ...body, modal: { ...body.modal!, optional: true, distinctTargets: true } };
+  }
   const modal = MODAL.exec(text.trim());
   if (modal) {
     const body = parseModal(modal[1]!, modal[3]!, text.trim(), opts);
@@ -777,8 +793,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // be seen: the search, then the discard (at random from the whole hand, the found card included).
   text = text.replace(/^Search your library for a card, put that card into your hand, discard a card at random, then shuffle\.$/, "Search your library for a card, put that card into your hand, then shuffle. Discard a card at random.");
   // "Put a +1/+1 counter on each creature you control and a loyalty counter on each other planeswalker you control"
-  // (Ajani Steadfast): two kinds of counters on two groups, one after the other.
-  text = text.replace(/(^|\. )Put (an?|one|two|three) ([^.]*?counters?) on (each [^.]+?) and (an?|one|two|three) ([^.]*?counters?) on (each [^.]+?)\./g, "$1Put $2 $3 on $4. Put $5 $6 on $7.");
+  // (Ajani Steadfast), "put a +1/+1 counter on each creature you control and a loyalty counter on each planeswalker you
+  // control" (Brokers Ascendancy, in a trigger): two kinds of counters on two groups, one after the other.
+  text = text.replace(/(^|\. )[Pp]ut (an?|one|two|three) ([^.]*?counters?) on (each [^.]+?) and (an?|one|two|three) ([^.]*?counters?) on (each [^.]+?)\./g, "$1Put $2 $3 on $4. Put $5 $6 on $7.");
   // "Search your library for up to four cards with different names and reveal them. Target opponent chooses two of those
   // cards. Put the chosen cards into your graveyard and the rest into your hand. Then shuffle." (Gifts Ungiven), and
   // "Reveal the top three cards of your library. An opponent chooses one of them. Put that card into your graveyard and
@@ -1025,6 +1042,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   let chosenCards: ObjRef | undefined;
   // The counts "if this is the Nth time this ability has resolved this turn" sentences named so far.
   const nthSeen: number[] = [];
+  let resolvesAnyway = false;
   for (let si = 0; si < sentences.length; si++) {
     // "It" is the spell cast only as the first instruction: "Untap ~. It gains ..." is about ~ (Pristine Skywise).
     if (si > 0) delete ctx.spellIt;
@@ -1847,6 +1865,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si += 2;
       continue;
     }
+    // Mind's Dilation, in an opponent's cast trigger: "that player exiles the top card of their library. If it's a nonland
+    // card, you may cast it without paying its mana cost." Cast as this resolves (CR 608.2g); a land, or a card not cast,
+    // stays exiled (rulings).
+    if (/^[Tt]hat player exiles the top card of their library$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "If it's a nonland card, you may cast it without paying its mana cost") {
+      const who = parsePlayer("that player", ctx);
+      if (!who || who.ref === "you") return null;
+      effects.push({ type: "castFromAmong", who, n: 1, filter: { kind: "card", types: [], notTypes: ["Land"], notColors: [], text: "nonland card" }, max: 1 });
+      si++;
+      continue;
+    }
     // Powerbalance, in an opponent's cast trigger: "You may reveal the top card of your library. If you do, you may cast
     // that card without paying its mana cost if the two spells have the same mana value." Cast from the library as this
     // resolves (CR 608.2g, rulings), its mana value compared with the spell's (X as chosen for that spell, CR 202.3e).
@@ -2100,6 +2128,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const filter = pickFilter(eachKeep[1]!);
       if (!filter || filter.kind !== "object") return null;
       effects.push({ type: "keepRest", who: { ref: "eachPlayer" }, keep: [{ filter, n: 1 }], among: filter, youChoose: true });
+      si++;
+      continue;
+    }
+    // Tragic Arrogance: "For each player, you choose from among the permanents that player controls an artifact, a creature,
+    // an enchantment, and a planeswalker. Then each player sacrifices all other nonland permanents they control." Like
+    // Cataclysmic Gearhulk's, but you choose for everyone, not targeting (rulings).
+    const arrogance = /^For each player, you choose from among the permanents that player controls (an artifact, a creature, an enchantment, and a planeswalker)$/.exec(s);
+    if (arrogance && /^Then each player sacrifices all other nonland permanents they control\.?$/.test(sentences[si + 1] ?? "")) {
+      const fx = parseSentence(`Each player chooses ${arrogance[1]} from among the nonland permanents they control, then sacrifices the rest`, ctx);
+      if (fx?.length !== 1 || fx[0]!.type !== "keepRest") return null;
+      effects.push({ ...fx[0]!, youChoose: true });
       si++;
       continue;
     }
@@ -2633,6 +2672,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "if", cond: spent.cond, effects: fx, otherwise: [{ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: structuredClone(fx) }] });
       continue;
     }
+    // Fatal Push: "Destroy target creature if it has mana value 2 or less. Revolt — Destroy that creature if it has mana
+    // value 4 or less instead if a permanent left the battlefield under your control this turn." Any creature can be
+    // targeted; its mana value and revolt are checked as it resolves (rulings).
+    const push = /^Destroy target creature if it has mana value (\d+) or less$/.exec(s);
+    const pushRevolt = push && /^Destroy that creature if it has mana value (\d+) or less instead if a permanent left the battlefield under your control this turn\.?$/.exec(sentences[si + 1] ?? "");
+    if (push && pushRevolt && ctx.spell) {
+      const index = addTarget(ctx, { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "target creature" });
+      const upTo = (n: string): Effect => ({ type: "if", cond: { kind: "targetIs", index, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], manaValue: { max: Number(n) }, text: `creature with mana value ${n} or less` } }, effects: [{ type: "destroy", what: { ref: "target", index } }] });
+      effects.push({ type: "if", cond: { kind: "state", cond: { kind: "revolt" } }, effects: [upTo(pushRevolt[1]!)], otherwise: [upTo(push[1]!)] });
+      si++;
+      continue;
+    }
     // "Destroy target nonblack creature if its toughness is less than or equal to the number of cards in your graveyard"
     // (Ghastly Demise), "Counter target spell if its mana value is less than or equal to ..." (Dispersal Shield): any such
     // object can be targeted, and the comparison is made as it resolves (rulings on Ghastly Demise, Prismatic Ending,
@@ -2874,7 +2925,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // the beginning of the next end step, return those cards to the battlefield under their owners' control" (Planar
     // Guide), "... return it to the battlefield tapped ..." (Mystifying Maze), "... with a flying counter on it" (Salvation
     // Swan); after "you may exile ~ target creature", "If you do, return that card ..." (Astral Slide).
-    const BACK = "(?:it|that card|the exiled card|those cards|the exiled cards|them|~)";
+    const BACK = "(?:it|that card|the exiled card|those cards|the exiled cards|them|each of them|~)";
     const UNDER = "(its owner's|their owner's|their owners'|your)";
     const laterRe = new RegExp(`^(?:If you do, )?(?:At the beginning of the next end step, return ${BACK} to the battlefield( tapped)? under ${UNDER} control|[Rr]eturn ${BACK} to the battlefield( tapped)? under ${UNDER} control(?: with an? ${COUNTER} counter on it)? at the beginning of (the|that player's) next end step)(?: with an? ${COUNTER} counter on it)?$`);
     const later = laterRe.exec(s);
@@ -2934,7 +2985,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       // would exist on the battlefield (rulings, CR 614.12). One card only.
       const ifCreature = !counter && !ifYours && ex.what.ref === "target" && !ex.what.n && /^If it enters as a creature, it enters with an additional \+1\/\+1 counter on it\.?$/.test(sentences[si + 1] ?? "");
       if (ifCreature) si++;
-      laterAt.into[laterAt.at] = { type: "flicker", what: ex.what, under, at: owners ? "ownersNextEndStep" : "nextEndStep", ...(counter ? { counter: counterKind(counter) } : {}), ...(ifCreature ? { counter: "+1/+1" as const, counterIfCreature: true as const } : {}), ...(later[1] || later[3] ? { tapped: true as const } : {}), ...(ifYours ? { selfCounterIfYours: counterKind(ifYours[1]!) } : {}) };
+      // Semester's End: "Each of them enters with an additional +1/+1 counter on it if it's a creature and an additional
+      // loyalty counter on it if it's a planeswalker", judged the same way.
+      const eachIf = !counter && !ifYours && !ifCreature && /^Each of them enters with an additional \+1\/\+1 counter on it if it's a creature and an additional loyalty counter on it if it's a planeswalker\.?$/.test(sentences[si + 1] ?? "");
+      if (eachIf) si++;
+      laterAt.into[laterAt.at] = { type: "flicker", what: ex.what, under, at: owners ? "ownersNextEndStep" : "nextEndStep", ...(counter ? { counter: counterKind(counter) } : {}), ...(ifCreature || eachIf ? { counter: "+1/+1" as const, counterIfCreature: true as const } : {}), ...(eachIf ? { loyaltyIfPlaneswalker: true as const } : {}), ...(later[1] || later[3] ? { tapped: true as const } : {}), ...(ifYours ? { selfCounterIfYours: counterKind(ifYours[1]!) } : {}) };
       if (ifYours) si++;
       continue;
     }
@@ -3510,6 +3565,41 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // addition to its other colors and types." (Rise from the Grave, Liliana, Death's Majesty, Dread Slaver): an effect on
     // the permanent the card became, from then on (CR 611.2c, 400.7); a later color or type change overwrites it (rulings).
     // "It's a Phyrexian in addition to its other types" (Portal to Phyrexia): the same.
+    // Tishana's Tidebinder: "If an ability of an artifact, creature, or planeswalker is countered this way, that permanent
+    // loses all abilities for as long as ~ remains on the battlefield": the ability's source, if it's one of those as this
+    // resolves (rulings), from then on while ~ stays (CR 611.2b), whoever controls it.
+    if (/^If an ability of an artifact, creature, or planeswalker is countered this way, that permanent loses all abilities for as long as ~ remains on the battlefield$/.test(s)) {
+      const prev = effects[effects.length - 1];
+      if (ctx.spell || prev?.type !== "counterSpell" || prev.unless || !ctx.targets[prev.index]?.noSpells) return null;
+      const filter: TargetSpec = { kind: "object", types: ["Artifact", "Creature", "Planeswalker"], notTypes: [], notColors: [], text: "artifact, creature, or planeswalker" };
+      effects.push({ type: "continuous", what: { ref: "counteredSource", filter }, mods: [{ kind: "loseAllAbilities" }], duration: "whileControlled", whileOnBattlefield: true });
+      continue;
+    }
+    // Zurgo Stormrender: "draw a card if it was attacking. Otherwise, each opponent loses 1 life": the token the trigger is
+    // about, as it last existed (CR 608.2h).
+    const wasAttacking = (ctx.subject || ctx.subjectIt) && !effects.length ? /^(.+) if it was attacking$/.exec(s) : null;
+    const elseWas = wasAttacking && /^Otherwise, (.+?)\.?$/.exec(sentences[si + 1] ?? "");
+    if (wasAttacking && elseWas) {
+      const yes = parseOne(capital(wasAttacking[1]!), ctx);
+      const no = parseOne(capital(elseWas[1]!), ctx);
+      if (!yes || !no) return null;
+      effects.push({ type: "if", cond: { kind: "subjectWasAttacking" }, effects: yes, otherwise: no });
+      si++;
+      continue;
+    }
+    // Settle the Wreckage: "Exile all attacking creatures target player controls. That player may search their library for
+    // that many basic land cards, put those cards onto the battlefield tapped, then shuffle": as many as were exiled
+    // (CR 608.2h); they may find fewer (rulings, CR 701.23b).
+    const settleLands = /^That player may search their library for that many (basic land cards), put (?:them|those cards) onto the battlefield tapped, then shuffle$/.exec(s);
+    if (settleLands) {
+      const prev = effects[effects.length - 1];
+      const fx = parseSearch(`Search your library for up to two ${settleLands[1]}, put them onto the battlefield tapped, then shuffle`);
+      const sr = fx?.length === 1 && fx[0]!.type === "search" ? fx[0]! : undefined;
+      if (prev?.type !== "exile" || prev.what.ref !== "each" || prev.what.of?.ref !== "target" || !sr || sr.type !== "search") return null;
+      const exiled: TargetSpec = { kind: "object", types: prev.what.filter.types, notTypes: [], notColors: [], text: "creature" };
+      effects.push({ type: "eachMay", who: prev.what.of, text: `search their library for that many ${settleLands[1]}`, effects: [{ ...sr, n: { count: { kind: "exiledThisWay", filter: exiled } }, who: { ref: "choseThisWay" } }] });
+      continue;
+    }
     const isAlso = /^(?:That creature is|It's|It is) (an? .+ in addition to its other (?:colors and )?types)$/.exec(s);
     if (isAlso) {
       const prev = effects[effects.length - 1];
@@ -3518,12 +3608,32 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       prev.alsoMods = mods;
       continue;
     }
+    // Dance of the Manse: "If X is 6 or more, those permanents are 4/4 creatures in addition to their other types": they
+    // enter as 4/4 creatures, not as noncreatures that then become creatures (rulings).
+    const xEntersAs = /^If X is (\d+) or more, those permanents are (\d+\/\d+) creatures in addition to their other types$/.exec(s);
+    if (xEntersAs) {
+      const prev = effects[effects.length - 1];
+      const mods = parseBecomes(`a ${xEntersAs[2]} creature in addition to its other types`);
+      if (!ctx.spell || ctx.whereX || prev?.type !== "putOntoBattlefield" || !mods || prev.alsoMods || prev.entersAs) return null;
+      prev.entersAs = { mods, x: Number(xEntersAs[1]) };
+      continue;
+    }
     // "Sacrifice the creature when you lose control of ~" (Seraph): about the permanent the card just put onto the
     // battlefield became, a delayed trigger watching ~ (CR 603.7).
     if (/^Sacrifice (?:it|the creature|that creature) when you lose control of ~$/.test(s)) {
       const prev = effects[effects.length - 1];
       if (prev?.type !== "putOntoBattlefield" || prev.sacrificeOnLostControl || prev.owner) return null;
       prev.sacrificeOnLostControl = true;
+      continue;
+    }
+    // Gilded Drake: "If you don't or can't make an exchange, sacrifice ~." Whether its exchange happened (CR 701.12b).
+    if (s === "If you don't or can't make an exchange, sacrifice ~" && effects[effects.length - 1]?.type === "exchangeControl") {
+      effects.push({ type: "if", cond: { kind: "youDid" }, effects: [], otherwise: [{ type: "sacrifice", what: { ref: "self" } }] });
+      continue;
+    }
+    // "This ability still resolves if its target becomes illegal" (Gilded Drake): not removed by CR 608.2b.
+    if (s === "This ability still resolves if its target becomes illegal" && si === sentences.length - 1 && ctx.targets.length) {
+      resolvesAnyway = true;
       continue;
     }
     const ifDid = /^If you (do|don't), (.+)$/.exec(s);
@@ -4204,7 +4314,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     if (!defineX()) return null;
   }
   if (payFirst || dig || !closeGate() || !closeRow()) return null;
-  return effects.length ? { targets: ctx.targets, effects, text } : null;
+  return effects.length ? { targets: ctx.targets, effects, text, ...(resolvesAnyway ? { resolvesAnyway: true as const } : {}) } : null;
 }
 
 /** "{2}{U}", "3 life", "{E}{E}", "{1} and 2 life": a cost paid as an ability resolves. */

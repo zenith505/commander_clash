@@ -717,6 +717,7 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
   // "Discover X, where X is that spell's mana value" (Hurl into History): with the X chosen for it (CR 202.3e, rulings).
   const gone = item.objectId && s.objects[item.objectId];
   if (gone && item.x && s.resolving) (s.resolving.countered ??= {})[gone.id] = { zc: gone.zoneChanges ?? 0, x: item.x };
+  if (item.kind !== "spell" && item.sourceId && s.resolving) s.resolving.counteredSource = { id: item.sourceId, zc: item.sourceZc ?? 0 };
   log(s, `${by} counters ${what}${!item.objectId ? "" : instead === "exile" ? " and exiles it" : instead === "hand" ? " and returns it to its owner's hand" : instead ? " and puts it on top of its owner's library" : ""}.`);
   // "Whenever a spell or ability you control counters a spell" (Baral): only a spell, and only when it's countered.
   if (item.kind === "spell") fireEvent(s, { type: "spellCountered", by: ctx.controller });

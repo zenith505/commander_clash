@@ -32,7 +32,7 @@ const STEP_TRIGGERS: Partial<Record<Extract<TriggerSourceEvent, { type: "step" }
 };
 
 /** See `causedBy` in fireEvent. */
-type Cause = { event: "enters" | "dies" | "attacks" | "combatDamage"; objs: { o: GameObject; c?: Characteristics; controller: PlayerId }[] } | { event: "castOrCopy"; caster: PlayerId; objs?: undefined };
+type Cause = { event: "enters" | "dies" | /** Left the battlefield, not dying. */ "leaves" | "attacks" | "combatDamage"; objs: { o: GameObject; c?: Characteristics; controller: PlayerId }[] } | { event: "castOrCopy"; caster: PlayerId; objs?: undefined };
 
 /**
  * How many more times a triggered ability of `src` triggers (CR 603.2d): one for each "triggers an additional time" effect
@@ -40,7 +40,7 @@ type Cause = { event: "enters" | "dies" | "attacks" | "combatDamage"; objs: { o:
  * on Teysa Karlov). Only abilities of permanents, as they are or as they were leaving (CR 603.10a).
  */
 function triggersAgain(s: GameState, src: GameObject, controller: PlayerId, cause: Cause | null): number {
-  const leaving = cause?.event === "dies" ? cause.objs.find((x) => x.o.id === src.id) : undefined;
+  const leaving = cause?.event === "dies" || cause?.event === "leaves" ? cause.objs.find((x) => x.o.id === src.id) : undefined;
   const permanent = src.zone === "battlefield" || !!leaving || (s.leftTogether ?? []).some((l) => l.id === src.id && src.zone !== "battlefield");
   // A spell's own triggered abilities ("When you cast ~", storm, cascade): only for "a triggered ability of a colorless
   // spell you control" (Echoes of Eternity).
@@ -80,7 +80,7 @@ function triggersAgain(s: GameState, src: GameObject, controller: PlayerId, caus
       // Veyran: "If you casting or copying an instant or sorcery spell causes ...": that player is this static's controller.
       if (a.by?.event === "castOrCopy") {
         if (cause?.event !== "castOrCopy" || cause.caster !== controller) continue;
-      } else if (a.by && !(cause?.event === a.by.event && cause.objs!.some((x) => !a.by!.filter || a.by!.filter.some((f) => objectMatches(s, f, x.o, controller, false, undefined, x.c) && (f.controller !== "you" || x.controller === controller))))) continue;
+      } else if (a.by && !(cause && cause.event !== "castOrCopy" && (cause.event === a.by.event || (a.by.event === "entersOrLeaves" && (cause.event === "enters" || cause.event === "dies" || cause.event === "leaves"))) && cause.objs!.some((x) => !a.by!.filter || a.by!.filter.some((f) => objectMatches(s, f, x.o, controller, false, undefined, x.c) && (f.controller !== "you" || x.controller === controller))))) continue;
       // "Of the chosen type": the one chosen as that permanent entered (Roaming Throne).
       if (a.of && !a.of.some((k) => !(k.other && src.id === id) && ((f) => !f.chosen && ofMatches(f))(bindChosen(k.filter, s.objects[id]?.chosen)))) continue;
       n++;
@@ -180,6 +180,8 @@ export type TriggerSourceEvent =
   | { type: "groupAttack"; controller: PlayerId; ids: ObjectId[] }
   /** In one combat damage step, these creatures of `controller` dealt `player` combat damage. */
   | { type: "groupCombatDamage"; controller: PlayerId; player: PlayerId; ids: ObjectId[]; amounts: number[]; /** Dealt to this battle, `player` its protector (CR 310). */ battle?: ObjectId }
+  /** Creatures dealt combat damage to this player in one combat damage step, whoever controls them (Witch-king of Angmar). */
+  | { type: "creaturesDamagedPlayer"; player: PlayerId; ids: ObjectId[] }
   /** The last counter of a kind was removed from it (vanishing's time counters, CR 702.63a). */
   | { type: "lastCounterRemoved"; id: ObjectId; counter: string }
   /** A face-down permanent was turned face up (CR 702.37e, 708.8). */
@@ -545,7 +547,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       entering,
       you,
       // Soulbond's intervening if: there's another unpaired creature to pair it with (CR 702.95a, 603.4).
-      (e, t) => e === "selfEnters" && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifX || (ev.x ?? 0) >= t.ifX) && (!t.ifEvoked || entering.castAlt === "evoke") && (!t.ifAlt || entering.castAlt === t.ifAlt) && (!t.ifBargained || !!entering.bargained) && (!t.ifEvidence || !!entering.evidence) && (!t.ifTreasure || (entering.treasureSpent ?? 0) > 0) && (!t.ifSpent || spentMeets(entering.spent, t.ifSpent)) && (t.ifCastFromHand === undefined || !!entering.castFromHand === t.ifCastFromHand) && (!t.ifCast || !!entering.wasCast) && (!t.ifFromGraveyard || (!!entering.enteredFromGraveyard && (t.ifFromGraveyard === "any" || entering.owner === you))) && (!t.ifEnteredUntapped || !entering.tapped) && (!t.ifGift || entering.gift !== undefined) && (!t.ifTributeUnpaid || !entering.tribute?.paid) && (!t.ifSoulbond || pairCandidates(s, entering, you).length > 0),
+      (e, t) => e === "selfEnters" && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifX || (ev.x ?? 0) >= t.ifX) && (!t.ifEvoked || entering.castAlt === "evoke") && (!t.ifAlt || entering.castAlt === t.ifAlt) && (!t.ifBargained || !!entering.bargained) && (!t.ifEvidence || !!entering.evidence) && (!t.ifTreasure || (entering.treasureSpent ?? 0) > 0) && (!t.ifSpent || spentMeets(entering.spent, t.ifSpent)) && (t.ifCastFromHand === undefined || !!entering.castFromHand === t.ifCastFromHand) && (!t.ifCast || !!entering.wasCast) && (!t.ifFromGraveyard || (!!entering.enteredFromGraveyard && (t.ifFromGraveyard === "any" || entering.owner === you))) && (!t.ifFromHand || (!!entering.enteredFromHand && entering.owner === you)) && (!t.ifEnteredUntapped || !entering.tapped) && (!t.ifGift || entering.gift !== undefined) && (!t.ifTributeUnpaid || !entering.tribute?.paid) && (!t.ifSoulbond || pairCandidates(s, entering, you).length > 0),
       undefined,
       undefined,
       undefined,
@@ -593,7 +595,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "dies") {
     const o = obj(s, ev.id);
     // A creature dying (CR 700.4): put into a graveyard from the battlefield.
-    if (ev.to === "graveyard" && ev.wasCreature && ev.snapshot && ev.chars) causedBy = { event: "dies", objs: [{ o: ev.snapshot, c: ev.chars, controller: ev.controller }] };
+    // Any other way of leaving the battlefield (Gandalf the White's "leaving the battlefield").
+    if (ev.snapshot && ev.chars) causedBy = { event: ev.to === "graveyard" && ev.wasCreature ? "dies" : "leaves", objs: [{ o: ev.snapshot, c: ev.chars, controller: ev.controller }] };
     // Earthbend's "when that land dies or is put into exile" (CR 701.66a): it triggers once, for that object only; gone
     // anywhere else, it never will.
     const was = ev.snapshot?.zoneChanges ?? 0;
@@ -645,7 +648,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // on the battlefield, and of ones leaving at the same time, which look back in time (CR 603.10a).
     // "Whenever a creature you control leaves the battlefield" (and "without dying"): the same, wherever it went.
     if (ev.snapshot && ev.chars) {
-      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, manaValue: defMv(defOf(s, ev.snapshot)), ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) };
+      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, manaValue: defMv(defOf(s, ev.snapshot)), ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.snapshot.attacking !== undefined ? { attacking: ev.snapshot.attacking } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) };
       const dying = { o: ev.snapshot, c: ev.chars };
       const hadCounter = Object.values(ev.counters).some((n) => n > 0);
       const went = (d: NonNullable<TriggeredAbility["dies"]>) => (d.leaves ? !(d.notDies && ev.to === "graveyard") && (!d.toZones || (d.toZones as string[]).includes(ev.to)) : ev.to === "graveyard") && (!d.hadCounter || hadCounter);
@@ -675,7 +678,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever you sacrifice another permanent": the permanents of the player who sacrificed it, and the ones leaving at
     // the same time (CR 603.10a), whatever zone it went to.
     if (ev.sacrificed && ev.snapshot && ev.chars) {
-      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, manaValue: defMv(defOf(s, ev.snapshot)), ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) };
+      const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, manaValue: defMv(defOf(s, ev.snapshot)), ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.snapshot.attacking !== undefined ? { attacking: ev.snapshot.attacking } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) };
       const dying = { o: ev.snapshot, c: ev.chars };
       // "Whenever a player sacrifices", "whenever an opponent sacrifices": the other players' permanents too, each
       // triggering for its own controller, "that player" being the one who sacrificed it.
@@ -976,6 +979,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (aura.attachedToPlayer === o.attacking) add(aura, controllerOf(s, aura), (e) => e === "creatureAttacksEnchantedPlayer", undefined, undefined, o);
       }
     causedBy = null;
+  } else if (ev.type === "creaturesDamagedPlayer") {
+    // "Whenever one or more creatures deal combat damage to you": once for the step's combat damage (CR 510.2, 603.2c).
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "creaturesDealCombatDamageToYou");
+    }
   } else if (ev.type === "groupAttack" || ev.type === "groupCombatDamage") {
     const want = ev.type === "groupAttack" ? "creaturesYouControlAttack" : "creaturesYouControlDealCombatDamageToPlayer";
     causedBy = { event: ev.type === "groupAttack" ? "attacks" : "combatDamage", objs: ev.ids.filter((x) => s.objects[x]).map((x) => ({ o: obj(s, x), controller: ev.controller })) };
@@ -1434,6 +1443,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Satoru: not if any of them was cast with mana spent on it (rulings: mana for additional costs counts too).
         if (b.noneCastWithMana && matched.some((m) => s.objects[m.id]?.wasCast && (s.objects[m.id]!.manaSpent ?? 0) > 0)) continue;
         if (b.fromGraveyard && !matched.some((m) => s.objects[m.id]?.enteredFromGraveyard || s.objects[m.id]?.castFromGraveyard)) continue;
+        if (b.first && b.what === "created" && (s.turnLog?.tokensCreated ?? []).filter((c) => c.player === you).length > n) continue;
         if (b.first && b.what === "discards" && (s.turnLog?.discards ?? []).some((d) => (b.whose !== "you" || d.player === you) && d.cards.some((c) => !b.filter || printedMatches(b.filter, s.cards[c]!)))) continue;
         // "Whenever one or more creatures enter / die": caused by each of them entering or dying (CR 603.2d).
         const died = matched.filter((m) => m.from === "battlefield" && m.to === "graveyard" && m.snapshot && m.chars?.types.includes("Creature"));
@@ -1562,7 +1572,8 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
         s.triggerQueue.shift();
         continue;
       }
-      if (n === printed.modal.min) t.modes = legal.flatMap((ok, i) => (ok ? [i] : [])); // the only possible choice
+      // The only possible choice, unless choosing none is one too ("you may choose two").
+      if (n === printed.modal.min && !printed.modal.optional) t.modes = legal.flatMap((ok, i) => (ok ? [i] : []));
       else if (printed.modal.random) {
         // "Choose one at random": among the modes that can be chosen (rulings on Umaro), as it's put on the stack.
         const can = legal.flatMap((ok, i) => (ok ? [i] : []));
@@ -1570,7 +1581,7 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
         log(s, `${def.name}'s ability chooses at random: ${printed.modal.modes[t.modes[0]!]!.text.replace(/~/g, def.name)}`);
       } else {
         const modes = printed.modal.modes.map((m) => m.text);
-        s.pending = { kind: "chooseModes", player: t.controller, sourceId: t.sourceId, description: describeAbility(def, printed.text), min: printed.modal.min, max: printed.modal.max, modes, legal };
+        s.pending = { kind: "chooseModes", player: t.controller, sourceId: t.sourceId, description: describeAbility(def, printed.text), min: printed.modal.min, max: printed.modal.max, modes, legal, ...(printed.modal.optional ? { optional: true as const } : {}) };
         return added;
       }
     }
@@ -1799,6 +1810,7 @@ function grantedCascades(s: GameState, item: StackItem, spell: GameObject, you: 
       // "The first spell you cast each turn ...": this one is the first of its kind this turn (it's already counted).
       if (g.first && cast.filter((c) => (!g.from || c.from === g.from) && (!g.treasure || c.treasure)).length !== 1) continue;
       out.push(g);
+      if (g.twice) out.push(g);
     }
   }
   return out;
@@ -1824,6 +1836,13 @@ function batchMoveMatches(s: GameState, b: BatchTrigger, m: ZoneMove, w: GameObj
     if (b.other && m.id === w.id && (gone || (w.zoneChanges ?? 0) === m.zc)) return false;
     return whose(m.controller) && (!b.filter || objectMatches(s, b.filter, m.snapshot, you, false, undefined, m.chars));
   }
+  if (b.what === "created") {
+    // As it is now, or as it was created if it's gone already.
+    const o = s.objects[m.id];
+    if (m.createdBy === undefined || !whose(m.createdBy)) return false;
+    return !b.filter || (o?.zone === "battlefield" && (o.zoneChanges ?? 0) === m.zc ? objectMatches(s, b.filter, o, you, false) : printedMatches(b.filter, s.cards[m.card]!));
+  }
+  if (m.createdBy !== undefined) return false;
   // The rest are about cards (not tokens or copies of spells, CR 111.1, 707.10), as they are in that zone.
   if (m.notCard) return false;
   const card = s.cards[m.card];

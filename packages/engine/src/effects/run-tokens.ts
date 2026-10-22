@@ -367,6 +367,7 @@ export function createExtraTokens(s: GameState, pid: PlayerId, extra: TokenBatch
 /** A token `pid` created (CR 111.2), for "the number of Treasure tokens you created this turn". */
 function noteCreated(s: GameState, pid: PlayerId, o: GameObject) {
   ((s.turnLog ??= {}).tokensCreated ??= []).push({ player: pid, subtypes: [...defOf(s, o).subtypes] });
+  (s.zoneBatch ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, to: "battlefield", owner: o.owner, notCard: true, card: o.cardId, createdBy: pid });
   // "Whenever you create a token" (not a copy of a permanent spell becoming one, CR 111.12).
   fireEvent(s, { type: "tokenCreated", player: pid, id: o.id });
 }

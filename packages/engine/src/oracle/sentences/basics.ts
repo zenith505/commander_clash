@@ -228,6 +228,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = m[1]!.toLowerCase() === "your" ? ({ ref: "you" } as const) : parsePlayer(m[1]!.replace(/'s$/, "").toLowerCase(), ctx);
     return who ? [{ type: "setLife", who, n: Number(m[2]) }] : null;
   }
+  // Beacon of Immortality: "Double target player's life total": they gain (or, below 0, lose) as much life as it takes
+  // (CR 701.10d).
+  if ((m = /^Double (your|target player's|target opponent's|that player's|each player's) life total$/i.exec(s))) {
+    const who = m[1]!.toLowerCase() === "your" ? ({ ref: "you" } as const) : parsePlayer(m[1]!.replace(/'s$/, "").toLowerCase(), ctx);
+    return who ? [{ type: "setLife", who, n: 0, double: true }] : null;
+  }
   // Kazuul, Tyrant of the Cliffs: "create a 3/3 red Ogre creature token unless that creature's controller pays {3}": the
   // attacking creature's controller chooses as it resolves (rulings), as it last existed if it has left (CR 608.2h).
   if ((m = /^[Cc]reate (.+?) unless that creature's controller (pays? .+)$/.exec(s)) && ctx.subjectIt) {
@@ -335,8 +341,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     }
     const when = m[2] === "end of combat" ? "endOfCombat" : /cleanup/.test(m[2]!) ? "nextCleanup" : /your next/.test(m[2]!) ? "yourNextEndStep" : "nextEndStep";
     // "Discard three cards at the beginning of the next end step" (Ideas Unbound), "create a 4/4 red Bird creature token
-    // with flying at the beginning of the next end step" (Rukh Egg): about no object, only its controller.
-    if (players && refs.size === 0 && allEffects(inner).every((y) => ["draw", "discard", "createToken", "loseLife", "gainLife"].includes(y.type)))
+    // with flying at the beginning of the next end step" (Rukh Egg), "you lose the game" (Glorious End): about no object,
+    // only its controller.
+    if (players && refs.size === 0 && allEffects(inner).every((y) => ["draw", "discard", "createToken", "loseLife", "gainLife", "loseGame"].includes(y.type)))
       return [{ type: "delayed", when, effects: inner, text: m[1]! }];
     if (!players || refs.size !== 1) return null;
     const [ref] = refs;
@@ -525,6 +532,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Choose a creature type." / "Choose a color." (the rest of the text says what it's for).
   // "Each player chooses a creature type." (Patriarch's Bidding, Harsh Mercy): one each, "a type chosen this way" after.
   if (/^Each player chooses a creature type$/.test(s)) return [{ type: "choose", choice: "creatureType", each: true }];
+  // "Choose a number between 0 and 10." (Expel the Interlopers): as it resolves, kept for the rest (CR 608.2d).
+  if ((m = /^Choose a number between (\d+) and (\d+)$/.exec(s)) && Number(m[1]) <= Number(m[2])) return [{ type: "choose", choice: "number", range: { min: Number(m[1]), max: Number(m[2]) } }];
   if ((m = /^Choose an? (creature type|color)(?: other than (\w+))?$/i.exec(s)))
     return [{ type: "choose", choice: m[1]!.toLowerCase() === "color" ? "color" : "creatureType", ...(m[2] ? { except: m[2] } : {}) }];
 
@@ -551,6 +560,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if (/^Players can't lose life this turn and players can't lose the game or win the game this turn$/.test(s)) return [{ type: "turnRules", rules: ["cantLoseLife", "cantLoseGame", "cantWinGame"], everyone: true }];
   if (/^Players gain hexproof until end of turn$/.test(s)) return [{ type: "playerGains", keywords: ["Hexproof"], everyone: true }];
   if (/^You may cast spells this turn as though they had flash$/i.test(s)) return [{ type: "turnRules", rules: ["flash"] }];
+  // The Chain Veil (CR 606.3, rulings): planeswalkers that come under your control later this turn too.
+  if (/^For each planeswalker you control, you may activate one of its loyalty abilities once this turn as though none of its loyalty abilities have been activated this turn$/.test(s)) return [{ type: "turnRules", rules: ["extraLoyalty"] }];
   if ((m = /^Until your next turn, you may cast (sorcery|creature|artifact|enchantment) spells as though they had flash$/.exec(s))) {
     const filter = parseTargetPhrase(`${m[1]} spell`);
     return filter?.kind === "spell" ? [{ type: "flashUntilNextTurn", filter: { ...filter, text: `${m[1]} spells` } }] : null;

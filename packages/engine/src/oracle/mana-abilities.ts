@@ -77,9 +77,9 @@ export function parseManaAbility(line0: string): ManaAbility | null {
     // Depletion lands: "Put a depletion counter on ~.", "If there are no depletion counters on ~, sacrifice it."
     else if ((m2 = new RegExp(`^Put an? ${COUNTER} counter on ~\\.$`).exec(extra)) && !out.putCounter) out.putCounter = counterKind(m2[1]!);
     else if ((m2 = new RegExp(`^If there are no ${COUNTER} counters on ~, sacrifice it\\.$`).exec(extra)) && !out.sacrificeIfNo && removeCounters?.counter === counterKind(m2[1]!)) out.sacrificeIfNo = counterKind(m2[1]!);
-    // "If you control an Urza's Mine and an Urza's Power-Plant, add {C}{C}{C} instead" (Urza's Tower): the symbols written
-    // out. (Leafkin Druid's "add {G}{G} instead" is an activated mana ability with an "if" instead, mana-abilities-with-costs.)
-    else if ((m2 = new RegExp(`^If (you control an Urza's [^,]+), add ((?:\\{[WUBRGC]\\}){2,}) instead\\.$`).exec(extra)) && new Set(m2[2]!.match(/[WUBRGC]/g)).size === 1 && out.produces.kind === "fixed" && !out.produces.n && !out.produces.count) {
+    // "If you control an Urza's Mine and an Urza's Power-Plant, add {C}{C}{C} instead" (Urza's Tower), "If a card is exiled
+    // with ~, add {C}{C} instead" (Ugin's Labyrinth): the symbols written out. (Leafkin Druid's "add {G}{G} instead" is an activated mana ability with an "if" instead, mana-abilities-with-costs.)
+    else if ((m2 = new RegExp(`^If (you control an Urza's [^,]+|a card is exiled with ~), add ((?:\\{[WUBRGC]\\}){2,}) instead\\.$`).exec(extra)) && new Set(m2[2]!.match(/[WUBRGC]/g)).size === 1 && out.produces.kind === "fixed" && !out.produces.n && !out.produces.count) {
       const p = out.produces;
       const sym = m2[2]!.match(/[WUBRGC]/)![0];
       const n = m2[2]!.match(/\{/g)!.length;

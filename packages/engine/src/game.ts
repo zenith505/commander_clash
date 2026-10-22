@@ -612,6 +612,8 @@ export function moveObject(
     counters?: Record<string, number>;
     /** "If it enters as a creature, it enters with an additional +1/+1 counter on it" (Teferi's Time Twist): judged as it would exist there (CR 614.12, rulings). */
     countersIfCreature?: Record<string, number>;
+    /** "... and an additional loyalty counter on it if it's a planeswalker" (Semester's End): judged the same way. */
+    countersIfPlaneswalker?: Record<string, number>;
     /** For a land that may enter untapped by paying life or revealing a card: that was done (CR 614.12). */
     untapped?: boolean;
     /** The X of the spell it was, for "enters with X counters" and its enters triggers (CR 107.3m). */
@@ -620,6 +622,8 @@ export function moveObject(
     sacrificed?: boolean;
     /** "It's an enchantment": the card types it has from the moment it enters, for as long as it's there. */
     becomes?: { types: string[]; subtypes: string[] };
+    /** "Those permanents are 4/4 creatures in addition to their other types" (Dance of the Manse): it enters that way (rulings). */
+    entersAs?: Modification[];
     /** Manifested or cloaked: turned face down, then put onto the battlefield (CR 701.40a, 701.58a). */
     faceDown?: FaceDownKind;
     /** The face it enters with up: a modal double-faced land's (CR 712.12), "transformed" (712.14a). */
@@ -909,10 +913,13 @@ export function moveObject(
   o.castFromGraveyard = to === "battlefield" && castFromGraveyard ? true : undefined;
   o.wasCast = to === "battlefield" && fromZone === "stack" && !o.spellCopy ? true : undefined;
   o.enteredFromGraveyard = to === "battlefield" && fromZone === "graveyard" ? true : undefined;
+  o.enteredFromHand = to === "battlefield" && fromZone === "hand" ? true : undefined;
   if (to === "battlefield" && opts.faceDown) o.faceDown = opts.faceDown; // it enters as a face-down 2/2 (CR 701.40a)
   if (to === "battlefield" && opts.meld) joinMeld(s, o, opts.meld.with, opts.meld.key);
   if (to === "battlefield" && opts.becomes)
     s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: defOf(s, o).name, duration: "game", affected: [id], mods: [{ kind: "setTypes", ...opts.becomes }] });
+  if (to === "battlefield" && opts.entersAs)
+    s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: defOf(s, o).name, duration: "game", affected: [id], mods: opts.entersAs });
   invalidateCharacteristics(s);
   // "Enters with N counters" is a replacement effect (CR 614.1c): N is counted before it's on the battlefield.
   const printedCounters = to === "battlefield" ? compileCard(defOf(s, o)).entersWithCounters : undefined;
@@ -948,7 +955,7 @@ export function moveObject(
     // "It gains haste until end of turn" while it was a spell (Tyvar Kell's emblem): the permanent it becomes has it (CR 400.7a).
     for (const g of fromZone === "stack" ? (o.spellGains ?? []) : []) s.effects.push({ id: `e${s.nextId++}`, timestamp: g.timestamp, controller: g.controller, sourceName: g.source, duration: "endOfTurn", affected: [o.id], mods: g.mods });
     o.spellGains = undefined;
-    const how: EnterOpts = { ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(opts.countersIfCreature ? { countersIfCreature: opts.countersIfCreature } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
+    const how: EnterOpts = { ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(opts.countersIfCreature ? { countersIfCreature: opts.countersIfCreature } : {}), ...(opts.countersIfPlaneswalker ? { countersIfPlaneswalker: opts.countersIfPlaneswalker } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
     // "You may have ~ enter as a copy of ...": it becomes the copy as it enters (CR 707.5), so how it
     // enters and what it triggers wait for that choice.
     if (printed.entersAsCopy && copyCandidates(s, o, printed.entersAsCopy.filter).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });
@@ -1032,7 +1039,7 @@ function scatterMerged(s: GameState, ids: ObjectId[], to: ZoneName, top: boolean
 }
 
 /** `fromStack`: it's a resolving spell becoming a permanent (sunburst, CR 702.44b). */
-type EnterOpts = { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; countersIfCreature?: Record<string, number>; escaped?: boolean; fromStack?: boolean };
+type EnterOpts = { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; countersIfCreature?: Record<string, number>; countersIfPlaneswalker?: Record<string, number>; escaped?: boolean; fromStack?: boolean };
 
 /**
  * The rest of entering the battlefield (CR 614.1c, 614.12): tapped or not, counters, "as it enters" choices,
@@ -1060,6 +1067,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   if (withCounters) add(withCounters.counter, withCounters.n);
   for (const [k, n] of Object.entries(opts.counters ?? {})) add(k, n);
   if (characteristics(s, o).types.includes("Creature")) for (const [k, n] of Object.entries(opts.countersIfCreature ?? {})) add(k, n);
+  if (characteristics(s, o).types.includes("Planeswalker")) for (const [k, n] of Object.entries(opts.countersIfPlaneswalker ?? {})) add(k, n);
   for (const [k, n] of Object.entries(othersAddCounters(s, o))) add(k, n);
   // Its own "enters with an additional counter", printed or granted as it enters (Master Chef, CR 614.12).
   for (const e of withGranted(printed, characteristics(s, o).grantedAbilities).entersWithAdditional ?? []) add(e.counter, e.n);
@@ -1633,7 +1641,7 @@ export function endWhileTapped(s: GameState): boolean {
 
 export function whileControlledHolds(s: GameState, w: NonNullable<ContinuousEffect["whileControlled"]>): boolean {
   const o = s.objects[w.id];
-  return !!o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === w.zc && controllerOf(s, o) === w.controller;
+  return !!o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === w.zc && (w.controller === undefined || controllerOf(s, o) === w.controller);
 }
 
 export function whileTappedHolds(s: GameState, w: NonNullable<ContinuousEffect["whileTapped"]>): boolean {
@@ -2104,7 +2112,7 @@ function manaKeeping(s: GameState, pid: PlayerId): { all: boolean; colors: Set<M
   return out;
 }
 
-function advanceStep(s: GameState): void {
+function emptyManaPools(s: GameState): void {
   for (const p of s.players) {
     // Mana empties as each step ends (CR 500.4), except firebending's red until end of combat (702.189a), mana kept
     // "until end of turn", lost as the cleanup step ends (514.2), and mana a permanent keeps (manaKeeping). Kept mana keeps
@@ -2138,6 +2146,10 @@ function advanceStep(s: GameState): void {
     p.manaPool = pool;
     p.manaLots = kept.length ? kept : undefined;
   }
+}
+
+function advanceStep(s: GameState): void {
+  emptyManaPools(s);
   if (s.step === "cleanup" && s.cleanupAgain) {
     s.cleanupAgain = undefined;
     return beginStep(s, "cleanup"); // CR 514.3a
@@ -2180,6 +2192,36 @@ function advanceStep(s: GameState): void {
     }
   }
   beginStep(s, next);
+}
+
+/**
+ * "End the turn" (CR 724.1), after the spell or ability doing it has finished resolving (`item`): abilities waiting to
+ * go on the stack cease to exist (724.1a); every object on the stack is exiled, the resolving spell too (724.1b); state-
+ * based actions are checked with no priority and no triggers put on the stack (724.1c); the current step ends, combat
+ * with it, and the game skips straight to the cleanup step (724.1d), so no end step and no "at the beginning of the end
+ * step" (724.1e). Abilities that trigger from here on go on the stack in the cleanup step, which then happens again
+ * (724.1f, 514.3a).
+ */
+export function endTheTurn(s: GameState, item?: StackItem): void {
+  s.triggerQueue = [];
+  const spells = [...(item?.kind === "spell" && item.objectId ? [item.objectId] : []), ...s.stack.flatMap((x) => (x.kind === "spell" && x.objectId ? [x.objectId] : []))];
+  s.stack = [];
+  for (const id of spells) if (s.objects[id]?.zone === "stack") moveObject(s, id, "exile");
+  log(s, `The turn ends${spells.length ? `: ${spells.map((id) => nameOf(s, id)).join(", ")} ${spells.length === 1 ? "is" : "are"} exiled from the stack` : ""}.`);
+  runStateBasedActions(s, true);
+  emptyManaPools(s);
+  s.thatCombat = undefined;
+  for (const o of attackersAndBlockers(s)) clearCombat(o);
+  for (const id of s.battlefield) if (obj(s, id).provokedBy?.turn === undefined) obj(s, id).provokedBy = undefined;
+  for (const id of s.battlefield) obj(s, id).provokedAlso = undefined;
+  s.unblockedChoice = undefined;
+  s.blockLimits = undefined;
+  // The phases and steps skipped go with the ones added after them (CR 500.8) and the end steps added to this one.
+  s.addedPhases = undefined;
+  s.resumeStep = undefined;
+  s.extraEndSteps = undefined;
+  s.cleanupAgain = undefined;
+  beginStep(s, "cleanup");
 }
 
 /** The last step of each phase that can have phases added after it (CR 500.8): beginning, main, combat. */
@@ -3352,7 +3394,7 @@ export function castProblem(
     }
   }
   if (o.faceDown && !choices?.faceDown) return "a face-down card can't be cast";
-  if (choices?.alt === "prototype" && !o.prototyped) {
+  if ((choices?.alt === "prototype" || choices?.prototyped) && !o.prototyped) {
     // Cast prototyped, only its alternative characteristics are looked at (CR 718.3a).
     if (!altCost(defOf(s, o), "prototype")) return `${defOf(s, o).name} doesn't have prototype`;
     o.prototyped = true;
@@ -3630,6 +3672,8 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast: a bestowed creature card is
   // an Aura spell (CR 702.103b, Hero of Iroas rulings).
   const mods = costModsFor(s, pid, o, how.alt === "bestow" && !o.bestowed && !how.faceDown ? bestowedDef(d) : d, x, how.lifeFor);
+  // "During your turn, ~ costs {2}{U}{U} less to cast" (Discontinuity): its colored part.
+  for (const c of compileCard(d).costLessIf ?? []) if (c.colored && staticConditionNow(s, c.cond, o.id, pid)) mods.lessColored.push(...c.colored);
   // Colored reductions (Morophon) after the costs are added up, on any of their colored mana (CR 601.2f, rulings).
   const lessColored = (c: ParsedCost) => reduceColored(c, mods.lessColored);
   // "~ costs {2} less to cast if it's bargained" (a cost reduction, CR 601.2f).
@@ -4044,7 +4088,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     if (problem) throw new RulesError(problem);
     o.faceDown = compileCard(defOf(s, o)).faceDownCast!.kind; // turned face down before it's put on the stack (CR 708.4)
   }
-  if (choices.alt === "prototype" && !o.prototyped) {
+  if ((choices.alt === "prototype" || choices.prototyped) && !o.prototyped) {
     const problem = castProblem(s, p.id, id, targets, modes, convoke, improvise, x, choices);
     if (problem) throw new RulesError(problem);
     o.prototyped = true; // a prototyped spell from the moment it's cast (CR 718.3b)
@@ -4229,6 +4273,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const kickText = kicks ? describeKicks(d, kicks) : "";
   const howText =
     (via ? ` from their graveyard (${describeVia(via.kind)})` : castFrom === "exile" ? " from exile" : "") +
+    (choices.prototyped && choices.alt !== "prototype" ? " prototyped" : "") +
     (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "payZero" ? " for {0}" : choices.alt === "omniscience" ? " without paying its mana cost" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt === "convert" ? " converted, for its More Than Meets the Eye cost" : choices.alt ? ` for its ${choices.alt} cost` : "") +
     (madness && o.castAlt === "madness" ? " for its madness cost" : madness && o.castAlt === "miracle" ? " for its miracle cost" : "") +
     (choices.buyback ? ", paying buyback" : "") +
@@ -5155,7 +5200,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (!loyaltyAtInstantSpeed(s, pid, o) && !canActAtSorcerySpeed(s, pid)) return "loyalty abilities can be activated only as a sorcery";
     // Gained loyalty abilities count too, and stay counted if the effect that gave them ends (rulings).
     const used = o.activatedThisTurn?.filter((n) => n === LOYALTY_USED).length ?? 0;
-    if (used >= loyaltyPerTurn(s, o)) return `${used === 1 ? "a loyalty ability" : "two loyalty abilities"} of ${d.name} ${used === 1 ? "was" : "were"} already activated this turn`;
+    if (used >= loyaltyPerTurn(s, o)) return `${used === 1 ? "a loyalty ability" : used === 2 ? "two loyalty abilities" : `${used} loyalty abilities`} of ${d.name} ${used === 1 ? "was" : "were"} already activated this turn`;
     const remove = ab.loyaltyX ? (x ?? 0) : -(ab.loyalty ?? 0);
     if (remove > (o.counters.loyalty ?? 0)) return `${d.name} doesn't have ${remove} loyalty to remove`;
   }
@@ -5432,6 +5477,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     const change = ab.loyaltyX ? -(x ?? 0) : ab.loyalty!;
     o.counters.loyalty = (o.counters.loyalty ?? 0) + change;
     (o.activatedThisTurn ??= []).push(LOYALTY_USED);
+    if (objIsType(s, o, "Planeswalker")) p.loyaltyTurn = s.turn; // The Chain Veil
     invalidateCharacteristics(s);
     // They're still put on, so "whenever you put one or more loyalty counters on a planeswalker" triggers (CR 122.6).
     if (change > 0) fireEvent(s, { type: "countersPut", id: o.id, counter: "loyalty", amount: change, by: p.id });
@@ -5788,9 +5834,11 @@ const LOYALTY_USED = -1;
  * own "twice each turn" (Urza, Planeswalker) or its controller's Oath of Teferi.
  */
 function loyaltyPerTurn(s: GameState, o: GameObject): number {
-  if (abilitiesOf(s, o).loyaltyTwice) return 2;
   const pid = controllerOf(s, o);
-  return s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).loyaltyTwice === "yours" && controllerOf(s, obj(s, id)) === pid) ? 2 : 1;
+  // The Chain Veil: one more for each time its ability resolved for this player this turn, planeswalkers only.
+  const veil = objIsType(s, o, "Planeswalker") ? (s.turnRules ?? []).filter((r) => r.turn === s.turn && r.player === pid && r.rule === "extraLoyalty").length : 0;
+  if (abilitiesOf(s, o).loyaltyTwice) return 2 + veil;
+  return (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).loyaltyTwice === "yours" && controllerOf(s, obj(s, id)) === pid) ? 2 : 1) + veil;
 }
 
 /** The cards a library search found (CR 701.23). */
@@ -6521,7 +6569,7 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
       !o.tapped &&
       !isSummoningSick(s, o) &&
       !objIsType(s, o, "Battle") && // a battle can't attack, even one that's also a creature (rulings)
-      (!objHasKeyword(s, o, "Defender") || characteristics(s, o).attackDespiteDefender) &&
+      (!objHasKeyword(s, o, "Defender") || characteristics(s, o).attackDespiteDefender || (characteristics(s, o).attackDespiteDefenderVs && opps.some((d) => attackedYouLastTurn(s, d, pid)))) &&
       !characteristics(s, o).cantAttack &&
       !(s.cantAttackThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false)) &&
       (!(characteristics(s, o).attackUnless.length || characteristics(s, o).cantAttackPlayers.length || characteristics(s, o).cantAttackOwner) || opps.some((d) => !attackProblem(s, o, d))),
@@ -6590,6 +6638,8 @@ export function attackCost(s: GameState, attacks: { defender: PlayerId; planeswa
 
 export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, planeswalker = false, /** The planeswalker or battle attacked. */ attacked?: ObjectId): string | null {
   const c = characteristics(s, o);
+  // Weathered Sentinels: defender stops it attacking anyone but those players themselves (CR 702.3b).
+  if (c.attackDespiteDefenderVs && !c.attackDespiteDefender && objHasKeyword(s, o, "Defender") && (planeswalker || attacked !== undefined || !attackedYouLastTurn(s, defender, c.controller))) return `${c.name} has defender`;
   // "Can't attack you or planeswalkers you control": that player, and their planeswalkers (a battle they protect isn't one).
   const atBattle = !!attacked && !!s.objects[attacked] && objIsType(s, obj(s, attacked), "Battle") && !objIsType(s, obj(s, attacked), "Planeswalker");
   if (c.cantAttackPlayers.includes(defender) && !atBattle) return `${c.name} can't attack ${player(s, defender).name}${planeswalker ? "'s planeswalkers" : ""}`;
@@ -6600,6 +6650,12 @@ export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, p
     if (!s.battlefield.some((id) => controllerOf(s, obj(s, id)) === defender && objectMatches(s, f, obj(s, id), c.controller, false)))
       return `${c.name} can't attack unless defending player controls ${f.text}`;
   return null;
+}
+/** Did `them` attack `you` during their last turn (their latest one that has begun, or the one before it while it's theirs)? */
+export function attackedYouLastTurn(s: GameState, them: PlayerId, you: PlayerId): boolean {
+  const p = player(s, them);
+  const last = s.activePlayer === them ? p.lastTurnBegan : p.turnBegan;
+  return last !== undefined && p.attackedInTurn?.turn === last && p.attackedInTurn.players.includes(you);
 }
 export const attackers = (s: GameState) => s.battlefield.map((id) => obj(s, id)).filter((o) => o.attacking !== undefined);
 const attackersAndBlockers = (s: GameState) =>
@@ -6787,6 +6843,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   s.attackersThisTurn = (s.attackersThisTurn ?? 0) + attacks.length;
   // Melee counts the opponents attacked, not their planeswalkers (rulings).
   p.attackedPlayers = { turn: s.turn, players: [...new Set(attacks.filter((a) => a.planeswalker === undefined).map((a) => a.defender))] };
+  if (p.attackedPlayers.players.length) p.attackedInTurn = { turn: s.turn, players: [...new Set([...(p.attackedInTurn?.turn === s.turn ? p.attackedInTurn.players : []), ...p.attackedPlayers.players])] };
   s.pending = null;
   if (attacks.length === 0) {
     log(s, `${p.name} declares no attackers.`);
@@ -7355,6 +7412,10 @@ function finishCombatDamage(s: GameState): boolean {
   // "Whenever ~ deals (combat) damage": once per creature, for all it dealt this step (CR 510.2, 603.2c).
   for (const [id, n] of dealt) if (n) fireEvent(s, { type: "dealtDamage", id, amount: n, combat: true });
   for (const g of groups.values()) fireEvent(s, { type: "groupCombatDamage", ...g });
+  // "Whenever one or more creatures deal combat damage to you" (Witch-king of Angmar): each player dealt it by creatures.
+  const toPlayers = new Map<PlayerId, ObjectId[]>();
+  for (const e of done) if (e.dealt && "player" in e.to && e.src.types.includes("Creature")) toPlayers.set(e.to.player, [...(toPlayers.get(e.to.player) ?? []), key(e)]);
+  for (const [player, ids] of toPlayers) fireEvent(s, { type: "creaturesDamagedPlayer", player, ids });
   return false;
 }
 

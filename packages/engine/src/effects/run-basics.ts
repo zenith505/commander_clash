@@ -50,6 +50,9 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       return;
     }
+    case "endTurn":
+      if (s.resolving) s.resolving.endTurn = true; // CR 724.1: once it's done resolving (continueResolution)
+      return;
     case "extraTurn":
       // CR 500.7: taken directly after this turn; the most recently created first.
       for (const pid of players(s, e.who, ctx)) {
@@ -124,7 +127,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
             ? ((r) => r.pids.map((pid) => ({ objs: [], pids: [pid], n: amountNow(s, e.amount, { ...ctx, eachOne: pid }) })))(damageRecipients(s, to, ctx))
             : [{ ...damageRecipients(s, to, ctx), n: amount }];
       const all = [e.to, ...(e.also ?? [])].flatMap(parts);
-      const by = e.by === "subject" ? subjectSource(s, ctx) : e.by ? targetSource(s, ctx, e.by.target) : ctxSource(s, ctx);
+      const host = e.by === "attached" ? objects(s, { ref: "attached" }, ctx)[0] : undefined;
+      const by = e.by === "subject" ? subjectSource(s, ctx) : e.by === "attached" ? (host?.zone === "battlefield" ? objectSource(s, host) : undefined) : e.by ? targetSource(s, ctx, e.by.target) : ctxSource(s, ctx);
       if (!by) return;
       const from = { ...by, ...(e.unpreventable ? { unpreventable: "all" as const } : {}) };
       // All dealt at once: lifelink is one life-gain event (CR 119.10).
@@ -219,6 +223,10 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         return;
       }
       for (const rule of e.rules) (s.turnRules ??= []).push({ turn: s.turn, player: ctx.controller, rule });
+      if (e.rules[0] === "extraLoyalty") {
+        log(s, `${player(s, ctx.controller).name} may activate a loyalty ability of each planeswalker they control once more this turn.`);
+        return;
+      }
       log(s, `${player(s, ctx.controller).name}${e.rules.map((r) => (r === "cantLoseLife" ? " can't lose life" : r === "cantLoseGame" ? " can't lose the game" : r === "flash" ? " may cast spells as though they had flash" : r === "spellsUncounterable" ? "'s spells can't be countered" : r === "creatureSpellsUncounterable" ? "'s creature spells can't be countered" : "'s opponents can't win the game")).join(",")} this turn.`);
       return;
     case "flashUntilNextTurn":
@@ -562,7 +570,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // CR 119.5: the player gains or loses the life it takes, which can't happen if they can't gain or lose life.
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
-        const diff = e.n - p.life;
+        const diff = (e.double ? 2 * p.life : e.n) - p.life;
         if (diff > 0 && canGainLife(s, pid)) {
           gainLife(s, pid, diff);
           log(s, `${p.name}'s life total becomes ${p.life} (${src}).`);

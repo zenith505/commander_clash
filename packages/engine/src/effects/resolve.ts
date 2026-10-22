@@ -1,7 +1,7 @@
 import { allEffects, type AbilityBody, type Amount, type DamageRecipient, type Effect, type ManaAbility, type Modification, type ObjRef, type PlayerRef, type TargetChoice } from "../abilities";
 import { withPutter } from "../counters";
 import { cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
-import { addTriggeredMana, askAuraReturns, creatureTypesOf, draw, enterTogether, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
+import { addTriggeredMana, askAuraReturns, creatureTypesOf, draw, endTheTurn, enterTogether, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics } from "../layers";
 import { compileCard } from "../oracle";
 import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LAND_TYPE, CHOSEN_HEXPROOF, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, protectionFromPlayer } from "../keywords";
@@ -106,7 +106,7 @@ export function beginResolution(s: GameState, item: StackItem, body: AbilityBody
   // With every target it chose now illegal, it doesn't resolve (CR 608.2b). One that chose none of its
   // "up to" targets isn't targeted at all, and resolves (CR 115.6).
   const chose = targets.some((t) => t.kind !== "none");
-  if (body.targets.length && chose && !legal.some(Boolean)) return "fizzled";
+  if (body.targets.length && chose && !legal.some(Boolean) && !body.resolvesAnyway) return "fizzled";
   const spellControllers = targets.map((t) => (t.kind === "stack" ? (s.stack.find((x) => x.id === t.id)?.controller ?? null) : null));
   const spellObjects = targets.map((t) => (t.kind === "stack" ? (s.stack.find((x) => x.id === t.id)?.objectId ?? null) : null));
   // "If this is the second time this ability has resolved this turn": counted as it resolves, for this object's ability
@@ -188,6 +188,7 @@ export function continueResolution(s: GameState): Resolution {
   }
   s.leftTogether = undefined;
   s.resolving = null;
+  if (r.endTurn) return endTheTurn(s, item), "done";
   if (item.kind === "spell" && item.objectId && s.objects[item.objectId]?.zone === "stack") finishSpell(s, item.objectId, item);
   if (item.manaAbility) manaAbilityResolved(s, item, r.made ?? []);
   return "done";
@@ -308,6 +309,11 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const zc = ctx.sourceZc ?? 0;
     const key = s.linkedExile?.[`${ctx.sourceId}@${zc}`] ? `${ctx.sourceId}@${zc}` : `${ctx.sourceId}@${zc - 1}`;
     return (s.linkedExile?.[key] ?? []).flatMap((l) => (s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc ? [s.objects[l.id]!] : []));
+  }
+  if (ref.ref === "counteredSource") {
+    const c = s.resolving?.counteredSource;
+    const o = c && s.objects[c.id];
+    return o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === c.zc && objectMatches(s, ref.filter, o, ctx.controller, false) ? [o] : [];
   }
   if (ref.ref === "costExiled") return (s.resolving?.item.costExiled ?? []).flatMap((c) => (s.objects[c.id]?.zone === "exile" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc ? [s.objects[c.id]!] : []));
   if (ref.ref === "amassed") {
@@ -684,6 +690,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "createdFightEach":
     case "bite":
     case "extraTurn":
+    case "endTurn":
     case "controlPlayer":
     case "skip":
     case "addPhases":
@@ -798,6 +805,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "lastKnownCounters":
     case "endure":
     case "moveCounter":
+    case "counterOfKindOnIt":
     case "removeCounters":
     case "removeAnyCounters":
     case "battleDefense":

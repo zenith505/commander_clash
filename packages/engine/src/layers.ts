@@ -493,6 +493,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
   const src = s.objects[sourceId]!;
   const yard = () => s.players[you]?.graveyard.map((id) => defOf(s, s.objects[id]!)) ?? [];
   switch (cond.kind) {
+    case "selfCommandOrBattlefield":
+      return src.zone === "command" || src.zone === "battlefield";
     case "selfInGraveyard": // the card's own graveyard ability's intervening if (CR 603.4)
       return src.zone === "graveyard" && src.owner === you && (!cond.creatureAbove || creatureCardAbove(s, src));
     case "graveyardAtLeast": // threshold
@@ -765,6 +767,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "handsEmpty":
       return s.players.filter((p) => !p.lost).every((p) => p.hand.length === 0);
+    case "someHandAtMost":
+      return s.players.some((p) => !p.lost && p.hand.length <= cond.n);
     case "totalPower": {
       let n = 0;
       for (const c of chars.values()) if (c.controller === you && c.types.includes("Creature")) n += c.power;

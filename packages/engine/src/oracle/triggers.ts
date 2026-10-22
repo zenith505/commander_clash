@@ -832,6 +832,8 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     selfOrCommander = true;
     line = `Whenever you attack, ${line.slice(withCommander[0].length)}`;
   }
+  // "Whenever one or more creatures you control with power 4 or greater attack" (The Earth King): the same group.
+  line = line.replace(/^(Whenever one or more creatures) (you control) (with power \d+ or greater) attack, /, "$1 $3 $2 attack, ");
   if ((m = /^Whenever (?:one or more (.+?) you control attack|you attack with (one|two|three|four|five) or more (.+?)|you attack), (.+)$/.exec(line))) {
     event = "creaturesYouControlAttack";
     phrase = m[1] ?? m[3];
@@ -883,7 +885,9 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   const meldThem = /\bIf ~ and an? \w+ named [^.]+ are attacking, and you both own and control them, exile ~ and the attacking \w+ named .+, then meld them into .+$/;
   // "Look at the top three cards of your library. Put one of them into your hand ..." is about those cards.
   const lookAt = /\b[Ll]ook at the top (?:two|three|four|five) cards of your library\. Put (?:one|two) of them [^.]+\./;
-  if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(meldThem, "").replace(lookAt, "")) && !/that player/.test(bodyText)) return "fail";
+  // "Search your library for up to that many basic land cards, put them onto the battlefield tapped" is about the cards.
+  const searched = /\b[Ss]earch your library for [^,.]+ cards, put them onto the battlefield( tapped)?, then shuffle\./;
+  if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(meldThem, "").replace(lookAt, "").replace(searched, "")) && !/that player/.test(bodyText)) return "fail";
   let group: TargetSpec | undefined;
   if (phrase && !/^creatures$/.test(phrase)) {
     const spec = parseTargetPhrase(phrase.split(/\s+/).map(singularWord).join(" "));
@@ -891,7 +895,9 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     group = { ...spec, text: phrase };
   }
   let text = bodyText;
-  const thatMuch = event === "creaturesYouControlDealCombatDamageToPlayer" && (/\bthat (?:much|many)\b/.test(text) || damageX);
+  // "Draw that many cards" (The Ur-Dragon), "search your library for up to that many basic land cards" (The Earth King):
+  // how many of the matching creatures attacked, as they were declared.
+  const thatMuch = (event === "creaturesYouControlDealCombatDamageToPlayer" || (event === "creaturesYouControlAttack" && !anyone && !perPlayer && !selfOrCommander)) && (/\bthat (?:much|many)\b/.test(text) || damageX);
   if (thatMuch && !damageX) {
     if (/\bX\b/.test(text)) return "fail";
     text = text.replace(/\bthat (?:much|many)\b/g, "X");
@@ -1392,6 +1398,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         text: "If it was a creature, return it to the battlefield under its owner's control. It's an enchantment.",
       },
     };
+  // Eminence (C17): "Whenever you cast another Vampire spell, if ~ is in the command zone or on the battlefield, ..." (Edgar
+  // Markov), "... This ability triggers only if ~ is in the command zone or on the battlefield" (Sahir): the ability
+  // works in the command zone too (CR 113.6), with an intervening if (CR 603.4) for the first.
+  const eminence = /^((?:When|Whenever|At)\b[^,]+), if ~ is in the command zone or on the battlefield, (.+)$/.exec(line) ?? /^((?:When|Whenever|At)\b[^,]+), (.+?) This ability triggers only if ~ is in the command zone or on the battlefield\.$/.exec(line);
+  if (eminence) {
+    const t = parseTrigger(`${eminence[1]}, ${eminence[2]}`);
+    if (!t || t === "fail" || t.zone || t.ifCond || t.host || /^(?:When|Whenever) ~ /.test(eminence[1]!)) return "fail";
+    return { ...t, eminence: true, ...(/This ability triggers only/.test(line) ? {} : { ifCond: { kind: "selfCommandOrBattlefield" as const } }) };
+  }
   // "At the beginning of your upkeep, if ~ is in your graveyard, you may pay {1}{B}{B}. If you do, return it to your hand"
   // (Pyre Zombie), "... with a creature card directly above it" (Krovikan Horror, Death Spark): an ability of the card
   // in the graveyard (CR 113.6b) with an intervening if (CR 603.4), so it does nothing if the card has left by then

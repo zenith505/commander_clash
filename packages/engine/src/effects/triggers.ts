@@ -364,6 +364,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // "Whenever enchanted creature ..." is about the creature, not the Aura; "~ or equipped creature" about both.
       if (hosting ? !t.host : t.host === "attached") return;
       if ((t.zone === "graveyard") !== fromYard) return;
+      // In the command zone, only an eminence ability works (CR 113.6).
+      if (o.zone === "command" && !o.emblem && !t.eminence) return;
       // An intervening "if" has to be true for it to trigger at all (CR 603.4).
       // "Max speed — Whenever ...": only while it has the ability (CR 702.178a).
       if (t.activeIf && !staticConditionNow(s, t.activeIf, o.id, controller)) return;
@@ -446,6 +448,17 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
    */
   const fromEmblems = (f: (o: GameObject, owner: PlayerId) => void) => {
     for (const o of liveEmblems(s)) f(o, o.owner);
+    fromCommand(f);
+  };
+  /** Commanders in the command zone with an eminence ability, which works there (CR 113.6), controlled by their owner. */
+  const fromCommand = (f: (o: GameObject, owner: PlayerId) => void) => {
+    for (const p of s.players) {
+      if (p.lost) continue;
+      for (const id of p.command) {
+        const o = s.objects[id];
+        if (o?.zone === "command" && !o.emblem && compileCard(defOf(s, o)).triggers.some((t) => t.eminence)) f(o, p.id);
+      }
+    }
   };
   /**
    * The delayed triggered abilities with a duration still in effect (CR 603.7b), each with its source object, wherever it
@@ -949,7 +962,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // "Whenever another player attacks": the attacking player, and how many of those creatures attack this one's
         // controller, as they were declared (rulings on Firemane Commando).
         const watcher = controllerOf(s, o);
-        const attacked = t.anotherPlayer ? { player: ev.controller, amount: hit.filter(([x]) => obj(s, x).attacking === watcher && !obj(s, x).attackingPermanent).length } : undefined;
+        // Otherwise, "that many": how many of them attacked (The Ur-Dragon).
+        const attacked = t.anotherPlayer ? { player: ev.controller, amount: hit.filter(([x]) => obj(s, x).attacking === watcher && !obj(s, x).attackingPermanent).length } : ev.type === "groupAttack" && !anyone ? { amount: hit.length } : undefined;
         // "Whenever you attack a player": once for each player the matching creatures attack (CR 508.3e).
         if (t.perPlayer) {
           for (const p of s.turnOrder)
@@ -964,6 +978,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever one or more creatures attack" (Duelist's Heritage): every permanent's, whoever attacked.
     if (ev.type === "groupAttack") for (const id of s.battlefield) groupWatch(obj(s, id), true);
     fromGraveyards((o, owner) => owner === ev.controller && groupWatch(o));
+    fromCommand((o, owner) => owner === ev.controller && groupWatch(o));
     // "Whenever an opponent attacks you with two or more creatures" (Mangara): each of the attacker's opponents counts
     // the ones attacking them (and their planeswalkers, for Mangara).
     if (ev.type === "groupAttack") {

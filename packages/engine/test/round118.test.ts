@@ -2,9 +2,9 @@
 // ability after Dionus leaves and returns), then the most played cards.
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, forest, passAll, passUntil, putOnBattlefield, setup } from "./helpers";
+import { act, bear, card, forest, passAll, passUntil, putOnBattlefield, scry, setup, swamp } from "./helpers";
 import { botActions, isFullySupported, planActivate, planCast, planMana, waitingOn, type Action, type GameState, type PlayerId } from "../src";
-import { moveObject, tapPermanent } from "../src/game";
+import { moveObject, spellCost, tapPermanent } from "../src/game";
 import { parseManaCost } from "../src/mana";
 import { characteristics } from "../src/layers";
 
@@ -513,5 +513,144 @@ describe("Kozilek, the Broken Reality", () => {
 
   it("Donatello's Science Lesson: up to two target players each draw a card", () => {
     expect(isFullySupported(donatello)).toBe(true);
+  });
+});
+
+const aclazotzFront =
+  "Flying, lifelink\nWhenever Aclazotz attacks, each opponent discards a card. For each opponent who can't, you draw a card.\nWhenever an opponent discards a land card, create a 1/1 black Bat creature token with flying.\nWhen Aclazotz dies, return it to the battlefield tapped and transformed under its owner's control.";
+const templeText = "(Transforms from Aclazotz, Deepest Betrayal.)\n{T}: Add {B}.\n{2}{B}, {T}: Transform this land. Activate only if a player has one or fewer cards in hand and only as a sorcery.";
+const aclazotz = scry("transform", [
+  { name: "Aclazotz, Deepest Betrayal", mana_cost: "{3}{B}{B}", type_line: "Legendary Creature — Bat God", oracle_text: aclazotzFront, power: "4", toughness: "4" },
+  { name: "Temple of the Dead", type_line: "Land", oracle_text: templeText },
+]);
+/** Aclazotz's front face alone, to attack with. */
+const aclazotzFace = card("Aclazotz, Deepest Betrayal", "Legendary Creature — Bat God", "{3}{B}{B}", { power: "4", toughness: "4", keywords: ["Flying", "Lifelink"], oracleText: aclazotzFront.split("\nWhen Aclazotz dies")[0]! });
+const temple = card("Temple of the Dead", "Land", "", { oracleText: "{T}: Add {B}.\n{2}{B}, {T}: Draw a card. Activate only if a player has one or fewer cards in hand and only as a sorcery." });
+
+describe("Aclazotz, Deepest Betrayal", () => {
+  it("each opponent discards; for each who can't, you draw", () => {
+    expect(isFullySupported(aclazotz)).toBe(true);
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const a = putOnBattlefield(s, ap, aclazotzFace);
+    const [b, c, d] = [1, 2, 3].map((n) => later(s, ap, n));
+    // B and C have no cards; D has a land (a Bat for ap).
+    for (const pid of [b!, c!, d!]) for (const id of [...s.players[pid]!.hand]) moveObject(s, id, "library");
+    const land = putOnBattlefield(s, d!, forest);
+    moveObject(s, land, "hand");
+    const hand = s.players[ap]!.hand.length;
+    s = passUntil(s, "declareAttackers", ap);
+    s = settle(act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: a, defender: b! }] }));
+    expect(s.objects[land]!.zone).toBe("graveyard");
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
+    expect(s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === ap).length).toBe(1);
+  });
+
+  it("Temple of the Dead's condition: some player with one or fewer cards in hand", () => {
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const t = putOnBattlefield(s, ap, temple);
+    for (const p of s.players) while (p.hand.length < 3) {
+      const id = putOnBattlefield(s, p.id, bear());
+      moveObject(s, id, "hand");
+    }
+    expect(planActivate(s, ap, t, 0)).toBeNull();
+    const opp = later(s, ap, 2);
+    for (const id of s.players[opp]!.hand.slice(1)) moveObject(s, id, "library");
+    const hand = s.players[ap]!.hand.length;
+    s = settle(run(s, planActivate(s, ap, t, 0)));
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+  });
+});
+
+const earthKing = card("The Earth King", "Legendary Creature — Human Noble Ally", "{3}{G}", {
+  power: "2",
+  toughness: "2",
+  oracleText:
+    "When The Earth King enters, create a 4/4 green Bear creature token.\nWhenever one or more creatures you control with power 4 or greater attack, search your library for up to that many basic land cards, put them onto the battlefield tapped, then shuffle.",
+});
+
+describe("The Earth King", () => {
+  it("one basic land for each attacking creature with power 4 or greater", () => {
+    const { s: s0, ap, opp } = setup([]);
+    let s = s0;
+    putOnBattlefield(s, ap, earthKing);
+    const big = [0, 1].map(() => putOnBattlefield(s, ap, bear({ name: "Big Bear", power: "4", toughness: "4" })));
+    const small = putOnBattlefield(s, ap, bear());
+    const lands = s.battlefield.filter((id) => s.objects[id]!.controller === ap && s.cards[s.objects[id]!.cardId]!.types.includes("Land"));
+    s = passUntil(s, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [...big, small].map((attacker) => ({ attacker, defender: opp })) });
+    s = settle(s);
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap, max: 2 });
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: s.pending!.kind === "searchLibrary" ? s.pending.cards.slice(0, 2) : [] }));
+    const now = s.battlefield.filter((id) => s.objects[id]!.controller === ap && s.cards[s.objects[id]!.cardId]!.types.includes("Land"));
+    expect(now.length).toBe(lands.length + 2);
+    expect(now.filter((id) => !lands.includes(id)).every((id) => s.objects[id]!.tapped)).toBe(true);
+  });
+});
+
+const urDragon = card("The Ur-Dragon", "Legendary Creature — Dragon Avatar", "{4}{W}{U}{B}{R}{G}", {
+  power: "10",
+  toughness: "10",
+  keywords: ["Flying"],
+  oracleText:
+    "Eminence — As long as The Ur-Dragon is in the command zone or on the battlefield, other Dragon spells you cast cost {1} less to cast.\nFlying\nWhenever one or more Dragons you control attack, draw that many cards, then you may put a permanent card from your hand onto the battlefield.",
+});
+const edgar = card("Edgar Markov", "Legendary Creature — Vampire Knight", "{3}{R}{W}{B}", {
+  power: "4",
+  toughness: "4",
+  keywords: ["First strike", "Haste"],
+  oracleText:
+    "Eminence — Whenever you cast another Vampire spell, if Edgar Markov is in the command zone or on the battlefield, create a 1/1 black Vampire creature token.\nFirst strike, haste\nWhenever Edgar Markov attacks, put a +1/+1 counter on each Vampire you control.",
+});
+const dragon = card("Shivan Dragon", "Creature — Dragon", "{4}{R}{R}", { power: "5", toughness: "5", keywords: ["Flying"], oracleText: "Flying\n{R}: Shivan Dragon gets +1/+0 until end of turn." });
+const vampire = card("Vampire Interloper", "Creature — Vampire Scout", "{1}{B}", { power: "2", toughness: "1", keywords: ["Flying"], oracleText: "Flying\nThis creature can't block." });
+
+describe("Eminence", () => {
+  const asCommander = (d: typeof urDragon, hand: (typeof urDragon)[]) => {
+    const { s, ap, ids, opp } = setup(hand);
+    s.cards[d.oracleId] = d;
+    const c = s.players[ap]!.command[0]!;
+    s.objects[c]!.cardId = d.oracleId;
+    return { s, ap, ids, opp, c };
+  };
+
+  it("The Ur-Dragon in the command zone: other Dragon spells you cast cost {1} less, not it, nor other players' Dragons", () => {
+    expect(isFullySupported(urDragon)).toBe(true);
+    const { s, ap, ids, c } = asCommander(urDragon, [dragon]);
+    // The generic part: {4} becomes {3}.
+    expect(spellCost(s, ap, s.objects[ids[0]!]!).extra).toBe(3);
+    expect(spellCost(s, ap, s.objects[c]!).extra).toBe(4);
+    const opp = later(s, ap, 1);
+    const theirs = putOnBattlefield(s, opp, dragon);
+    moveObject(s, theirs, "hand");
+    expect(spellCost(s, opp, s.objects[theirs]!).extra).toBe(4);
+  });
+
+  it("The Ur-Dragon's attack trigger: draw that many cards, then you may put a permanent card onto the battlefield", () => {
+    const { s: s0, ap, opp } = setup([]);
+    let s = s0;
+    const u = putOnBattlefield(s, ap, urDragon);
+    const d = putOnBattlefield(s, ap, dragon);
+    const hand = s.players[ap]!.hand.length;
+    s = passUntil(s, "declareAttackers", ap);
+    s = settle(act(s, { type: "declareAttackers", player: ap, attacks: [u, d].map((attacker) => ({ attacker, defender: opp })) }));
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap, fromHand: true, min: 0, max: 1 });
+  });
+
+  it("Edgar Markov in the command zone: another Vampire spell makes a Vampire token; not once Edgar has left it", () => {
+    expect(isFullySupported(edgar)).toBe(true);
+    const { s: s0, ap, ids, c } = asCommander(edgar, [vampire, vampire]);
+    let s = s0;
+    putOnBattlefield(s, ap, swamp);
+    const tokens = () => s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === ap).length;
+    s = settle(run(s, planCast(s, ap, ids[0]!)));
+    expect(tokens()).toBe(1);
+    // Edgar on the battlefield works too.
+    s = settle(run(s, planCast(s, ap, c)));
+    expect(s.objects[c]!.zone).toBe("battlefield");
+    s = settle(run(s, planCast(s, ap, ids[1]!)));
+    expect(tokens()).toBe(2);
   });
 });

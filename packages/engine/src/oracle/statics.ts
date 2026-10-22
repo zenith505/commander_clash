@@ -182,6 +182,13 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   // any of those subtypes, read like "Demon, Horror, and Nightmare spells you cast cost {1} less to cast".
   if ((m = /^Each spell you cast that's an? ((?:[A-Z][a-z]+, )*[A-Z][a-z]+,? or [A-Z][a-z]+) costs (\{\d+\} less to cast)$/.exec(text)))
     text = `${m[1]!.replace(/,? or /, m[1]!.includes(",") ? ", and " : " and ")} spells you cast cost ${m[2]}`;
+  // Eminence: "As long as ~ is in the command zone or on the battlefield, other Dragon spells you cast cost {1} less to
+  // cast" (The Ur-Dragon): it works from the command zone too (CR 113.6); not the card itself.
+  if ((m = /^(?:Eminence — )?As long as ~ is in the command zone or on the battlefield, other ((?:[A-Z][a-z]+ )+spells you cast cost \{\d+\} less to cast)$/.exec(text))) {
+    const base = parseCostChange(m[1]!);
+    if (!base || base === "fail" || !("costMod" in base) || base.costMod.who !== "you" || base.costMod.times || base.costMod.nth || base.costMod.if) return "fail";
+    return { costMod: { ...base.costMod, eminence: true, other: true, text: line } };
+  }
   // "Cleric spells you cast cost {W}{B} less to cast. This effect reduces only the amount of colored mana you pay." (Edgewalker),
   // Morophon's "Spells of the chosen type you cast cost {W}{U}{B}{R}{G} less ...": colored mana only, never generic (CR 118.7).
   if ((m = /^(.+ cost) ((?:\{[WUBRG]\})+) (less to cast)\. This effect reduces only the amount of colored mana you pay$/.exec(text))) {
@@ -465,6 +472,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^you control ${NUM} or more (artifacts|creatures|permanents) with the same name as one another$`).exec(text)))
     return { kind: "sameNamed", types: m[2] === "permanents" ? [] : [capital(m[2]!.slice(0, -1))], n: num(m[1]!) };
   if (/^each player has no cards in hand$/.test(text)) return { kind: "handsEmpty" };
+  if ((m = new RegExp(`^a player has ${NUM} or fewer cards in hand$`).exec(text))) return { kind: "someHandAtMost", n: num(m[1]!) };
   if (/^you have no cards in hand$/.test(text)) return { kind: "noneInHand", filter: { kind: "card", text: "card" } };
   // The Cases' "To solve" conditions (CR 719.3a), about this turn.
   if ((m = new RegExp(`^${NUM} or more (creature|artifact|enchantment|land|instant|sorcery) cards were put into graveyards from anywhere this turn$`).exec(text)))

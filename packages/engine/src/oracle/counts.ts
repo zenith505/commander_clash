@@ -182,6 +182,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return spec?.kind === "object" && !spec.controller ? count({ kind: "players", opponents: true, controlling: { ...spec, text: m[1]! } }) : null;
   }
   if (each && /^(?:of your opponents|opponent) who lost life this turn$/i.test(p)) return count({ kind: "players", opponents: true, lostLife: true });
+  // Aclazotz: "Each opponent discards a card. For each opponent who can't, you draw a card": those with no card to discard.
+  if (each && ctx?.opponentsDiscarded && /^opponent who can't$/i.test(p)) return count({ kind: "players", opponents: true, discardedNone: true });
   if (each && /^opponent who drew a card this way$/i.test(p)) return count({ kind: "players", opponents: true, drewThisWay: true });
   // Smuggler's Share: "for each opponent who drew two or more cards this turn", "... who had two or more lands enter the
   // battlefield under their control this turn".

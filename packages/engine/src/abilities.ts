@@ -269,7 +269,7 @@ export type Count =
   /** "For each player", "for each opponent (you have)": the players still in the game (CR 102.1, 800.4a). */
   /** `lostLife`: "for each of your opponents who lost life this turn" (Belbe): ones who lost the game since too (rulings). */
   /** `drewThisWay`: "for each opponent who drew a card this way" (Cut a Deal): those who drew a card in this resolution's draw before, once each. */
-  | { kind: "players"; opponents?: true; lostLife?: true; drewThisWay?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec }
+  | { kind: "players"; opponents?: true; lostLife?: true; drewThisWay?: true; /** "For each opponent who can't" after "each opponent discards a card" (Aclazotz): those in the game who discarded nothing in this resolution. */ discardedNone?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
   | { kind: "counters"; counter: CounterKind; of: ObjRef }
   /** Station's "the tapped creature's power" (CR 702.184a): as the ability resolves, or as it last existed (rulings). */
@@ -1082,6 +1082,8 @@ export type StaticCondition =
   | { kind: "amount"; amount: Amount; min?: number; max?: number }
   /** "If ~ is in your graveyard" (`creatureAbove`: "with a creature card directly above it", Krovikan Horror). */
   | { kind: "selfInGraveyard"; creatureAbove?: true }
+  /** Eminence's "if ~ is in the command zone or on the battlefield". */
+  | { kind: "selfCommandOrBattlefield" }
   /** Delirium: card types among cards in your graveyard (CR 205.2a). */
   | { kind: "graveyardTypes"; n: number; /** Only permanent types (CR 110.4a): "permanent types among cards in your graveyard". */ permanent?: true }
   /** Descend: permanent cards in your graveyard (CR 110.4b). */
@@ -1240,6 +1242,8 @@ export type StaticCondition =
   | { kind: "sameNamed"; types: string[]; n: number }
   /** "If each player has no cards in hand" (Howltooth Hollow). */
   | { kind: "handsEmpty" }
+  /** "If a player has one or fewer cards in hand" (Temple of the Dead): some player in the game. */
+  | { kind: "someHandAtMost"; n: number }
   /** "If creatures you control have total power 10 or greater" (Mosswort Bridge). */
   | { kind: "totalPower"; n: number }
   /** "If a library has twenty or fewer cards in it": any player's (Shelldock Isle). */
@@ -3145,6 +3149,8 @@ export interface TriggeredAbility {
   oncePerTurn?: boolean;
   /** An ability an effect gave it: its index among the object's granted abilities (cards.ts withGranted). */
   grant?: number;
+  /** Eminence: it also works while ~ is a commander in the command zone (CR 903.3, 113.6). */
+  eminence?: true;
   /** For "selfBecomesLevel": the level. */
   level?: number;
   /**
@@ -3742,6 +3748,10 @@ export interface CostMod {
   colored?: Color[];
   /** The Defilers: only if the caster chose to pay this much life for it as an additional cost (CostChoices.lifeFor). */
   payLife?: number;
+  /** Eminence (The Ur-Dragon): it also works while its commander is in the command zone (CR 113.6). */
+  eminence?: true;
+  /** "Other Dragon spells": not the card itself. */
+  other?: true;
   text: string;
 }
 

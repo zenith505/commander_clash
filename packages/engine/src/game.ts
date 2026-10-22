@@ -3623,18 +3623,27 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
  * spells you cast cost {1} less", "Noncreature spells cost {1} more" (CR 601.2f). The spell is checked
  * as it will be on the stack, X included in its mana value (CR 202.3e).
  */
+/** Commanders in the command zone with an eminence cost reduction (The Ur-Dragon), which works there (CR 113.6). */
+export function eminenceCommanders(s: GameState): GameObject[] {
+  return s.players.filter((p) => !p.lost).flatMap((p) => p.command.map((id) => s.objects[id]!)).filter((o) => o?.zone === "command" && !o.emblem && !!compileCard(defOf(s, o)).costMods?.some((m) => m.eminence));
+}
+
 function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: number, lifeFor?: ObjectId[]): { more: number; less: number; lessColored: Color[]; lifeOffers: { id: ObjectId; life: number }[] } {
   let [more, less] = [0, 0];
   const lessColored: Color[] = [];
   const lifeOffers: { id: ObjectId; life: number }[] = [];
   const mv = defMv(d) + x * xCount(parseManaCost(d.manaCost));
   // Emblems' too, which work in the command zone (CR 114.4).
-  for (const src of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)]) {
+  for (const src of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s), ...eminenceCommanders(s)]) {
     // Its own or granted ones (Acolyte of Bahamut's "The first Dragon spell you cast each turn costs {2} less").
     const mods = abilitiesOf(s, src).costMods;
     if (!mods) continue;
-    const c = characteristics(s, src);
+    const inCommand = src.zone === "command";
+    const c = inCommand ? { controller: src.owner } : characteristics(s, src);
     for (const m of mods) {
+      // In the command zone only eminence works, controlled by its owner (CR 113.6, 903.3).
+      if (inCommand && !m.eminence) continue;
+      if (m.other && src.id === o.id) continue;
       if (m.who === "you" ? pid !== c.controller : m.who === "opponents" ? pid === c.controller : m.who === "enchanted" ? src.attachedToPlayer !== pid : false) continue;
       if (m.turn === "notCasters" ? s.activePlayer === pid : m.turn && (s.activePlayer === c.controller) !== (m.turn === "yours")) continue;
       if (m.fromGraveyard && !m.fromZones && o.zone !== "graveyard") continue;

@@ -1,15 +1,14 @@
 // "Put a creature card from your hand onto the battlefield tapped and attacking" (CR 508.4): pick the card, then choose
 // which player it attacks (rulings on Kinscaer Sentry: not necessarily the one the Sentry attacks).
 import { expect, test } from "@playwright/test";
-import { LANDS, one, open, pageErrors, scene, state } from "./scene";
+import { LANDS, one, open, pageErrors, playUntil, scene, state } from "./scene";
 import { attack, controls, modal, resolveUntil } from "./ui";
 
 test("Kinscaer Sentry: put Savannah Lions onto the battlefield attacking Ben while the Sentry attacks Ana", async ({ page }) => {
   const s = scene({ hand: ["Savannah Lions", "Hill Giant"], board: [...LANDS, "Kinscaer Sentry", "Grizzly Bears"] });
   const [sentry, bears, lions, giant] = [one(s, "Kinscaer Sentry"), one(s, "Grizzly Bears"), one(s, "Savannah Lions"), one(s, "Hill Giant")];
-  await open(page, s);
-  await controls(page).getByRole("button", { name: "Pass" }).click();
-  await resolveUntil(page, (st) => st.pending?.kind === "declareAttackers");
+  // The test starts as you declare attackers (the trip from main 1 played in the engine).
+  await open(page, playUntil(s, (st) => st.pending?.kind === "declareAttackers"));
   await attack(page, [[sentry, 1], [bears, 1]]);
   await resolveUntil(page, (st) => st.pending?.kind === "searchLibrary");
   const pick = modal(page);

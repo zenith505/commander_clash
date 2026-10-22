@@ -1,14 +1,13 @@
 // PR #20 and #25: exerting an attacker (Combat Celebrant) and playing through the extra combat it adds.
 import { expect, test } from "@playwright/test";
-import { LANDS, one, open, pageErrors, scene, state } from "./scene";
+import { LANDS, one, open, pageErrors, playUntil, scene, state } from "./scene";
 import { attack, controls, passTo, resolveUntil } from "./ui";
 
 test("Combat Celebrant: exert it as it attacks, then attack again in the additional combat", async ({ page }) => {
   const s = scene({ board: [...LANDS, "Combat Celebrant", "Grizzly Bears"] });
   const [celebrant, bears] = [one(s, "Combat Celebrant"), one(s, "Grizzly Bears")];
-  await open(page, s);
-  await controls(page).getByRole("button", { name: "Pass" }).click();
-  await resolveUntil(page, (st) => st.pending?.kind === "declareAttackers");
+  // The test starts as you declare attackers (the trip from main 1 played in the engine).
+  await open(page, playUntil(s, (st) => st.pending?.kind === "declareAttackers"));
   await attack(page, [[celebrant, 1], [bears, 1]]);
   await expect(controls(page)).toContainText("exert attacking creatures if you want");
   await expect(controls(page).getByRole("button", { name: "Don't exert" })).toBeVisible();

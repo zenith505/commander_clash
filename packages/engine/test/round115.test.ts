@@ -7,7 +7,7 @@ import { abilityProblem, castProblem } from "../src";
 import { controllerOf } from "../src/layers";
 import { manaAbilityProblem } from "../src/manaabilities";
 import { attackTaxPer, botActions, invalidateCharacteristics, isFullySupported, objHasKeyword, objIsType, power, toughness, isSuspended, planActivate, planCast, waitingOn, type Action, type GameState, type PlayerId } from "../src";
-import { moveObject } from "../src/game";
+import { attackProblem, moveObject } from "../src/game";
 
 const run = (s: GameState, plan: Action[] | null) => {
   if (!plan) throw new Error("no plan");
@@ -775,5 +775,24 @@ describe("The Indomitable", () => {
     s.objects[v]!.tapped = true;
     invalidateCharacteristics(s);
     expect(can()).toBeNull();
+  });
+});
+
+const sandwurm = card("Sandwurm Convergence", "Enchantment", "{6}{G}{G}", {
+  oracleText: "Creatures with flying can't attack you or planeswalkers you control.\nAt the beginning of your end step, create a 5/5 green Wurm creature token.",
+});
+
+describe("can't attack you or planeswalkers you control", () => {
+  it("Sandwurm Convergence: flyers can't attack its controller (or their planeswalkers), others can", () => {
+    expect(isFullySupported(sandwurm)).toBe(true);
+    const { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, sandwurm);
+    const flyer = putOnBattlefield(s, opp, card("Wind Drake", "Creature — Drake", "{2}{U}", { power: "2", toughness: "2", keywords: ["Flying"], oracleText: "Flying" }));
+    const walker = putOnBattlefield(s, opp, bear());
+    invalidateCharacteristics(s);
+    const third = s.turnOrder.find((p) => p !== ap && p !== opp)!;
+    expect(attackProblem(s, s.objects[flyer]!, ap)).toMatch(/can't attack/);
+    expect(attackProblem(s, s.objects[flyer]!, third)).toBeNull();
+    expect(attackProblem(s, s.objects[walker]!, ap)).toBeNull();
   });
 });

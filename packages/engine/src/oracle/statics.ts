@@ -824,8 +824,9 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const more = / this turn$/.test(m[5]!) ? null : parseExtraBlocks(m[5]!);
     return first && grants && more ? [...first, ...grants, more] : null;
   }
-  // "Gets +2/+2, has flying, and attacks each combat if able" (Dragon's Rage Channeler).
-  if ((m = new RegExp(`^gets? ${PT}/${PT}, (?:has|have) (.+?),? and (attacks? each combat if able|can't block)$`).exec(rest))) {
+  // "Gets +2/+2, has flying, and attacks each combat if able" (Dragon's Rage Channeler), "... and can't attack you or
+  // planeswalkers you control" (the Vows).
+  if ((m = new RegExp(`^gets? ${PT}/${PT}, (?:has|have) (.+?),? and (attacks? each combat if able|can't block|can't attack you or planeswalkers you control)$`).exec(rest))) {
     const grants = parseGrants(m[3]!);
     const second = parseStaticMods(m[4]!);
     return grants && second ? [{ kind: "modifyPT", power: ptAmt(m[1]!), toughness: ptAmt(m[2]!) }, ...grants, ...second] : null;
@@ -897,6 +898,9 @@ export function parseStaticMods(rest: string): Modification[] | null {
     return filter?.kind === "object" && filter.power ? [{ kind: "cantBlockCreatures", filter: { ...filter, text: `creatures with power ${m[1]} or ${m[2]}` } }] : null;
   }
   if (/^can't attack$/.test(rest)) return [{ kind: "cantAttack" }];
+  // "Creatures with flying can't attack you or planeswalkers you control" (Sandwurm Convergence, CR 508.1c): "you" is the
+  // source's controller.
+  if (/^can't attack you or planeswalkers you control$/.test(rest)) return [{ kind: "cantAttackYou" }];
   if (/^can't attack its owner$/.test(rest)) return [{ kind: "cantAttackOwner" }];
   if (/^can't be sacrificed$/.test(rest)) return [{ kind: "cantBeSacrificed" }];
   // Alexios: "attacks each combat if able, can't be sacrificed, and can't attack its owner".

@@ -1425,6 +1425,12 @@ export type Effect =
    */
   | { type: "returnFaceDownExiled"; cards?: { id: ObjectId; zc: number }[] }
   /**
+   * Glimpse the Impossible: "At the beginning of the next end step, if any of those cards remain exiled, put them into
+   * your graveyard": the cards the spell exiled (`cards`, filled in as the delayed trigger is made) that are still the
+   * same objects in exile (CR 400.7); how many went to the graveyard is "put into your graveyard this way".
+   */
+  | { type: "exiledToGraveyard"; cards?: { id: ObjectId; zc: number }[] }
+  /**
    * Hideaway N (CR 702.75a): look at the top N cards of your library, exile one of them face down (linked to this
    * permanent, CR 607.2a), and put the rest on the bottom of your library in a random order.
    */

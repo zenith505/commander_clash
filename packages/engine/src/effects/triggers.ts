@@ -1370,6 +1370,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
               : d.when !== "leaves" && d.when !== "lostControl" && ev.step === "upkeep" && (d.when === "nextTurnUpkeep" || ev.active === d.controller) && d.turn < s.turn;
       if (!due) continue;
       if (d.when !== "eachYourUpkeep" && d.when !== "eachYourPrecombatMain") s.delayed = s.delayed!.filter((x) => x !== d);
+      // "If any of those cards remain exiled" (Glimpse the Impossible): it triggers only if one does (CR 603.4).
+      const lead = d.body.effects[0];
+      if (lead?.type === "exiledToGraveyard" && !(lead.cards ?? []).some((c) => s.objects[c.id]?.zone === "exile" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc)) continue;
       // "~" is the subject, or the source it remembers (Gift of Immortality's Aura card).
       s.triggerQueue.push({ sourceId: d.source?.id ?? d.subject.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, sourceZc: d.source?.zc ?? d.subject.zc, body: d.body, transformsAt: d.transforms ?? 0, ...(d.event ? { event: d.event } : {}) });
     }

@@ -2991,6 +2991,20 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push(rolled ? { type: "reflexive", body: reflexive } : { type: "if", cond: counted ? { kind: "selfHere" } : { kind: "youDid" }, effects: [{ type: "reflexive", body: reflexive }] });
       continue;
     }
+    // Glimpse the Impossible: "At the beginning of the next end step, if any of those cards remain exiled, put them into
+    // your graveyard, then create a 0/1 colorless Eldrazi Spawn creature token for each card put into your graveyard this
+    // way. Those tokens have "Sacrifice ~: Add {C}."": a delayed trigger about the cards just exiled to play, triggering
+    // only if one is still there (CR 603.4, 603.7).
+    const leftovers = /^At the beginning of the next end step, if any of those cards remain exiled, put them into your graveyard$/.test(s) && /^(Create an? .+? token) for each card put into your graveyard this way\.?$/.exec(sentences[si + 1] ?? "");
+    const leftoverHave = leftovers && /^Those tokens have "([^"]+)"\.?$/.exec(sentences[si + 2] ?? "");
+    if (leftovers && leftoverHave && effects[effects.length - 1]?.type === "impulse") {
+      const made = parseOne(`${leftovers[1]!} with "${leftoverHave[1]!}"`, ctx);
+      const token = made?.length === 1 ? made[0]! : undefined;
+      if (token?.type !== "createToken" || token.n !== 1) return null;
+      effects.push({ type: "delayed", when: "nextEndStep", effects: [{ type: "exiledToGraveyard" }, { ...token, n: { count: { kind: "movedLinkedThisWay" } } }], text: `put those cards still exiled into your graveyard, then ${leftovers[1]!.replace(/^C/, "c")} for each card put into your graveyard this way` });
+      si += 2;
+      continue;
+    }
     // Gustha's Scepter: "Exile a card from your hand face down. You may look at it for as long as it remains exiled."
     if (/^You may look at it for as long as it remains exiled$/i.test(s)) {
       const prev = effects[effects.length - 1];

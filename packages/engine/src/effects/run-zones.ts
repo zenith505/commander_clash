@@ -1692,6 +1692,14 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       return;
     }
+    case "exiledToGraveyard": {
+      const cards = (e.cards ?? []).filter((c) => s.objects[c.id]?.zone === "exile" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc).map((c) => c.id);
+      if (cards.length) log(s, `${src} puts ${cards.map((id) => defOf(s, obj(s, id)).name).join(", ")} into ${cards.length === 1 ? "its owner's graveyard" : "their owners' graveyards"}.`);
+      for (const id of cards) moveObject(s, id, "graveyard");
+      // Only what got there (not what a replacement effect sent elsewhere) was put there this way.
+      s.resolving!.movedLinked = cards.filter((id) => s.objects[id]?.zone === "graveyard").length;
+      return;
+    }
     case "putAllOnBottom": {
       const sc = (s.resolving!.scratch ??= {});
       const all = s.battlefield.filter((id) => objectMatches(s, e.filter, obj(s, id), ctx.controller, false));

@@ -699,6 +699,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "livingDeath":
     case "putAllOnBottom":
     case "returnFaceDownExiled":
+    case "exiledToGraveyard":
     case "flicker":
     case "returnExiled":
     case "exileIfDies":

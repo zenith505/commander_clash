@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, forest, passAll, passUntil, putOnBattlefield, scry, setup } from "./helpers";
-import { blockCost, botActions, planCast, characteristics, invalidateCharacteristics, isFullySupported, objHasKeyword, parseManaCost, planActivate, planMana, power, toughness, waitingOn, type Action, type GameState, type PlayerId } from "../src";
+import { blockCost, botActions, manaAbilitiesOn, planCast, characteristics, invalidateCharacteristics, isFullySupported, objHasKeyword, parseManaCost, planActivate, planMana, power, toughness, waitingOn, type Action, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const foodChain = card("Food Chain", "Enchantment", "{2}{G}", {
@@ -360,5 +360,53 @@ describe("Pyromancer's Goggles and Primal Amulet // Primal Wellspring", () => {
       else s = act(s, { type: "passPriority", player: pid });
     }
     expect(power(s, s.objects[b]!)).toBe(8);
+  });
+});
+
+const glimpse = card("Glimpse the Impossible", "Sorcery", "{2}{R}", {
+  oracleText:
+    'Exile the top three cards of your library. You may play those cards this turn. At the beginning of the next end step, if any of those cards remain exiled, put them into your graveyard, then create a 0/1 colorless Eldrazi Spawn creature token for each card put into your graveyard this way. Those tokens have "Sacrifice this token: Add {C}."',
+});
+
+describe("Glimpse the Impossible", () => {
+  it("is supported", () => expect(isFullySupported(glimpse)).toBe(true));
+
+  const spawns = (s: GameState, pid: PlayerId) => s.battlefield.filter((id) => s.objects[id]!.controller === pid && characteristics(s, s.objects[id]!).subtypes.includes("Spawn"));
+
+  it("the cards not played go to the graveyard at the next end step, a Spawn for each", () => {
+    const { s: s0, ap, ids } = setup([glimpse]);
+    let s = passAll(planCast(s0, ap, ids[0]!)!.reduce(act, s0));
+    const exiled = s.players[ap]!.exile.filter((id) => s.objects[id]!.mayPlay);
+    expect(exiled).toHaveLength(3);
+    // Play one of them (a land if there is one, else cast it), leaving two.
+    const land = exiled.find((id) => s.cards[s.objects[id]!.cardId]!.types.includes("Land"));
+    if (land) s = act(s, { type: "playLand", player: ap, objectId: land });
+    else s = passAll(planCast(s, ap, exiled[0]!)!.reduce(act, s));
+    const left = exiled.filter((id) => s.objects[id]!.zone === "exile");
+    expect(left).toHaveLength(2);
+    s = passUntil(s, "end", ap);
+    for (let i = 0; i < 20 && (s.stack.length || s.triggerQueue.length); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    for (const id of left) expect(s.objects[id]!.zone).toBe("graveyard");
+    const made = spawns(s, ap);
+    expect(made).toHaveLength(2);
+    expect([power(s, s.objects[made[0]!]!), toughness(s, s.objects[made[0]!]!)]).toEqual([0, 1]);
+    // "Sacrifice this token: Add {C}."
+    expect(s.objects[made[0]!]!.isToken).toBe(true);
+    expect(manaAbilitiesOn(s, s.objects[made[0]!]!).some((m) => m.sacrificeSelf)).toBe(true);
+  });
+
+  it("no trigger when none of them remain exiled", () => {
+    const { s: s0, ap, ids } = setup([glimpse]);
+    let s = passAll(planCast(s0, ap, ids[0]!)!.reduce(act, s0));
+    for (const id of s.players[ap]!.exile.filter((x) => s.objects[x]!.mayPlay)) {
+      s.players[ap]!.exile.splice(s.players[ap]!.exile.indexOf(id), 1);
+      s.objects[id]!.zone = "hand";
+      s.objects[id]!.zoneChanges = (s.objects[id]!.zoneChanges ?? 0) + 1;
+      s.players[ap]!.hand.push(id);
+    }
+    s = passUntil(s, "end", ap);
+    expect(s.stack.some((x) => /Glimpse/.test(x.description))).toBe(false);
+    expect(s.triggerQueue).toHaveLength(0);
+    expect(spawns(s, ap)).toHaveLength(0);
   });
 });

@@ -615,7 +615,7 @@ describe("Sepulchral Primordial", () => {
     expect(isFullySupported(primordial)).toBe(true);
     const { s: s0, ap, ids } = setup([primordial]);
     const i = s0.turnOrder.indexOf(ap);
-    const [b, c, d] = [1, 2, 3].map((k) => s0.turnOrder[(i + k) % 4]!);
+    const [b, c, d] = [1, 2, 3].map((k) => s0.turnOrder[(i + k) % 4]!) as [PlayerId, PlayerId, PlayerId];
     const yard = (pid: PlayerId, name: string) => {
       const id = putOnBattlefield(s0, pid, bear({ name }));
       moveObject(s0, id, "graveyard");

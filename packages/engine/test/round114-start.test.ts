@@ -875,3 +875,35 @@ describe("Valgavoth, Harrower of Souls", () => {
     expect(s.objects[v]!.counters["+1/+1"]).toBe(1);
   });
 });
+
+describe("Hermit Druid", () => {
+  const druid = card("Hermit Druid", "Creature — Human Druid", "{1}{G}", {
+    power: "1",
+    toughness: "1",
+    oracleText: "{G}, {T}: Reveal cards from the top of your library until you reveal a basic land card. Put that card into your hand and all other cards revealed this way into your graveyard.",
+  });
+
+  it("plays", () => expect(isFullySupported(druid)).toBe(true));
+
+  it("the basic land goes to your hand, the cards revealed before it into your graveyard; with none, the whole library", () => {
+    const { s: s0, ap } = setup([]);
+    const d = putOnBattlefield(s0, ap, druid);
+    s0.objects[d]!.controlledSinceTurn = -1;
+    putOnBattlefield(s0, ap, card("Forest", "Basic Land — Forest"));
+    const lib = s0.players[ap]!.library;
+    const land = lib.find((id) => s0.cards[s0.objects[id]!.cardId]!.types.includes("Land"))!;
+    const spells = lib.filter((id) => !s0.cards[s0.objects[id]!.cardId]!.types.includes("Land")).slice(0, 2);
+    s0.players[ap]!.library = [...spells, land, ...lib.filter((x) => x !== land && !spells.includes(x))];
+    let s = settle(activate(s0, ap, d, 0));
+    expect(s.objects[land]!.zone).toBe("hand");
+    for (const id of spells) expect(s.objects[id]!.zone).toBe("graveyard");
+    // No basic land left: every card is revealed and goes to the graveyard.
+    const { s: t0, ap: ap2 } = setup([]);
+    const d2 = putOnBattlefield(t0, ap2, druid);
+    t0.objects[d2]!.controlledSinceTurn = -1;
+    putOnBattlefield(t0, ap2, card("Forest", "Basic Land — Forest"));
+    for (const id of [...t0.players[ap2]!.library]) if (t0.cards[t0.objects[id]!.cardId]!.types.includes("Land")) moveObject(t0, id, "exile");
+    const t = settle(activate(t0, ap2, d2, 0));
+    expect(t.players[ap2]!.library.length).toBe(0);
+  });
+});

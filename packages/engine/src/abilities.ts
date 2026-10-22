@@ -1862,7 +1862,8 @@ export type Effect =
       found: "hand" | "battlefield";
       tapped?: true;
       /** "Shuffle": "then shuffles all other cards revealed this way into their library" (Polymorph), a shuffle of the library. */
-      rest: "exile" | "bottom" | "shuffle";
+      /** "Graveyard": "and all other cards revealed this way into your graveyard" (Hermit Druid): the whole library if none is found. */
+      rest: "exile" | "bottom" | "shuffle" | "graveyard";
       lifePerRest?: true;
       /** "Until you reveal X land cards" (Open the Way): that many, all put there together. */
       n?: Amount;

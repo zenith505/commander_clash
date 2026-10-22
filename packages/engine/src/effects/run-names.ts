@@ -96,6 +96,9 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       } else if (e.rest === "shuffle") {
         shuffleLibrary(s, p);
         log(s, `${p.name} shuffles their library.`);
+      } else if (e.rest === "graveyard") {
+        for (const id of rest) moveObject(s, id, "graveyard");
+        if (rest.length) log(s, `${p.name} puts ${rest.length} card${rest.length === 1 ? "" : "s"} into their graveyard.`);
       } else for (const id of rest) moveObject(s, id, "exile");
       if (e.lifePerRest && rest.length) {
         loseLife(s, p.id, rest.length);

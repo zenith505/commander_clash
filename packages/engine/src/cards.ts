@@ -278,13 +278,15 @@ export function abilitiesOf(s: GameState, o: GameObject): CompiledCard {
 }
 
 /**
- * Agatha's Soul Cauldron (CompiledCard.lendsExiled): the cards whose activated abilities this permanent has now, from
- * each permanent its controller controls that lends them to it (a creature of theirs with a +1/+1 counter on it): the
+ * Agatha's Soul Cauldron, Hazel's Brewmaster (CompiledCard.lendsExiled): the cards whose activated abilities this
+ * permanent has now, from each permanent its controller controls that lends them to it (a creature of theirs with a
+ * +1/+1 counter on it, a Food of theirs): the
  * creature cards still exiled with that permanent as the object it is now (CR 607.2a, 400.7).
  */
 export function exiledLentTo(s: GameState, o: GameObject): CardDef[] {
-  // Only Agatha's Soul Cauldron lends them, to creatures with +1/+1 counters: nothing to look for without one.
-  if (o.zone !== "battlefield" || !s.linkedExile || !((o.counters["+1/+1"] ?? 0) > 0)) return [];
+  // Agatha's Soul Cauldron lends them to creatures with +1/+1 counters, Hazel's Brewmaster to Foods: nothing to look
+  // for on anything else.
+  if (o.zone !== "battlefield" || !s.linkedExile || !((o.counters["+1/+1"] ?? 0) > 0 || characteristics(s, o).subtypes.includes("Food"))) return [];
   const out: CardDef[] = [];
   const you = characteristics(s, o).controller;
   for (const id of s.battlefield) {

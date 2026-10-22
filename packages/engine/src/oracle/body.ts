@@ -114,7 +114,7 @@ export interface Ctx {
   /** The ability ends "Round up each time." (CR 107.1a): every "half ..." in it is rounded that way. */
   halfRound?: "up" | "down";
   /** A vote came before (CR 701.38): its words ("death vote", "if taxes gets more votes"), or that it's for objects. */
-  vote?: { options?: string[]; among?: true };
+  vote?: { options?: string[]; among?: true; /** "Each player may choose ..." (not a vote): "each permanent chosen this way". */ choose?: true };
   /** "Each opponent chooses fame or fortune" came before: its words ("for each player who chose fortune"). */
   chooseWords?: string[];
   /** "Gain control of a creature that player controls" for each player who chose a word: "those creatures" are they. */
@@ -1443,6 +1443,20 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // card" (Kwain): each decides in turn order, knowing the earlier answers, then those who did each do it, in turn
     // order (rulings on Eager Construct and Kaya, Intangible Slayer).
     const alone = offer && !does && /^(?:scry \d+|surveil \d+|draw a card)$/.test(offer[2]!) ? parseOffer(offer[2]!, ctx) : null;
+    // "Each player may put two +1/+1 counters on a creature they control. Goad each creature that had counters put on
+    // it this way." (Agitator Ant): each decides in turn order, then puts them; then those creatures are goaded (rulings).
+    const goadPut = offer && !does && /^put .+ counters? on a creature they control$/.test(offer[2]!) && /^Goad each creature that had counters put on it this way$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    const goadFx = goadPut ? parseOffer(offer[2]!, ctx) : null;
+    if (offer && goadFx) {
+      const one = goadFx.length === 1 ? goadFx[0]! : undefined;
+      if (one?.type !== "pick" || one.action !== "counters") return null;
+      effects.push(
+        { type: "eachMay", who: { ref: offer[1] === "player" ? "eachPlayer" : "eachOpponent" }, effects: goadFx, text: offer[2]!.replace(/\btheir\b/g, "your").replace(/\bthey\b/g, "you"), each: true, need: { zone: "battlefield", filter: one.filter } },
+        { type: "continuous", what: { ref: "countersPutThisWay" }, mods: [{ kind: "goad" }], duration: "yourNextTurn" },
+      );
+      si++;
+      continue;
+    }
     if (offer && alone) {
       effects.push({ type: "eachMay", who: { ref: offer[1] === "player" ? "eachPlayer" : "eachOpponent" }, effects: alone, text: offer[2]!, each: true });
       ctx.eachChose = true;
@@ -2847,6 +2861,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const mods = parseGrants(copyGains[1]!);
       if (prev?.type !== "copySpell" || prev.spell !== "cause" || prev.gains || !mods?.every((m) => m.kind === "addKeywords" || m.kind === "addAbility")) return null;
       prev.gains = mods;
+      continue;
+    }
+    // "Starting with you, each player may choose an artifact or enchantment you don't control" (Druid of Purification):
+    // each one in turn order picks one or none, seeing the earlier picks (rulings); not targeted, and not a vote.
+    const eachMayChoose = /^[Ss]tarting with you, each player may choose an? (.+)$/.exec(s);
+    if (eachMayChoose) {
+      if (ctx.vote) return null;
+      const spec = parseTargetPhrase(eachMayChoose[1]!);
+      if (spec?.kind !== "object" || spec.chosen || spec.counter) return null;
+      effects.push({ type: "vote", among: { ...spec, text: eachMayChoose[1]! }, choose: true, text: `choose ${/^[aeiou]/i.test(eachMayChoose[1]!) ? "an" : "a"} ${eachMayChoose[1]}` });
+      ctx.vote = { among: true, choose: true };
       continue;
     }
     // "Starting with you, each player votes for death or taxes" (CR 701.38a): the words, or "a nonland permanent you don't

@@ -12,7 +12,7 @@ import { GRANTED_WAY_COSTS } from "./abilities";
 import { abilitiesOf, canBeSacrificed, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
-import { bindBound, pickOptions, playerProtectedFrom, spellManaValue } from "./effects/targeting";
+import { bindBound, pickOptions, playerProtectedFrom, spellManaValue, targetsMatch } from "./effects/targeting";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
@@ -50,6 +50,7 @@ import {
   type SpentMana,
   type ManaSpentTrigger,
   type ObjectId,
+  type PendingDecision,
   type Player,
   type PlayerId,
   type SkipWhat,
@@ -2444,7 +2445,7 @@ function beginStep(s: GameState, step: Step): void {
       const attacked = livingPlayers(s).filter((pid) => attackers(s).some((a) => a.attacking === pid));
       const order = turnOrderFrom(s, ap).filter((pid) => attacked.includes(pid));
       if (order.length) {
-        s.pending = { kind: "declareBlockers", player: order[0]!, remaining: order.slice(1) };
+        s.pending = blockersPending(s, order[0]!, order.slice(1));
         return;
       }
       break;
@@ -3571,8 +3572,10 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const flashCost = compileCard(d).flashCost;
   const more = flashCost && !madness && !isType(d, "Instant") && !d.keywords.includes("Flash") && !flashGranted(s, pid, d, o.owner) && !canActAtSorcerySpeed(s, pid) ? flashCost : 0;
   // "Costs {3} less to cast if it targets a tapped creature": the targets are chosen before the cost is (CR 601.2c, 601.2f).
+  // "... if it targets a spell or ability that targets a creature you control with power 7 or greater" (Not of This
+  // World): what that spell or ability targets now (rulings).
   for (const c of compileCard(d).costLessIfTargets ?? [])
-    if (how.targets?.some((t) => t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && objectMatches(s, c.filter, obj(s, t.id), pid, false))) less += c.n;
+    if (how.targets?.some((t) => (t.kind === "object" && s.objects[t.id]?.zone === "battlefield" && objectMatches(s, c.filter, obj(s, t.id), pid, false)) || (t.kind === "stack" && c.filter.kind === "spell" && !!c.filter.targetsWhat && targetsMatch(s, s.stack.find((x) => x.id === t.id)?.targets ?? [], c.filter.targetsWhat, pid)))) less += c.n;
   // Increases first, then reductions, which only take off generic mana (CR 601.2f, 118.7a).
   return { cost: total.cost, extra: Math.max(0, total.extra + mods.more + more - less) };
 }
@@ -6769,9 +6772,21 @@ export function maxBlocks(s: GameState, o: GameObject): number {
   return c.blockAny ? Infinity : 1 + Math.max(0, c.extraBlocks);
 }
 
-function declareBlockers(s: GameState, p: Player, blocks: { blocker: ObjectId; attacker: ObjectId }[]) {
+/**
+ * The defending player `defender` declares blockers next (CR 509.1), or, after Odric, Master Tactician's trigger this
+ * combat, its controller declares them for that player (GameState.blocksChosenBy).
+ */
+export function blockersPending(s: GameState, defender: PlayerId, remaining: PlayerId[]): PendingDecision {
+  const by = s.blocksChosenBy;
+  const chooser = by && by.turn === s.turn && by.combat === (s.combatsThisTurn ?? 0) && by.player !== defender && !player(s, by.player).lost ? by.player : undefined;
+  return chooser !== undefined ? { kind: "declareBlockers", player: chooser, remaining, defender } : { kind: "declareBlockers", player: defender, remaining };
+}
+
+function declareBlockers(s: GameState, chooser: Player, blocks: { blocker: ObjectId; attacker: ObjectId }[]) {
   const pend = s.pending;
-  if (pend?.kind !== "declareBlockers" || pend.player !== p.id) throw new RulesError("not declaring blockers now");
+  if (pend?.kind !== "declareBlockers" || pend.player !== chooser.id) throw new RulesError("not declaring blockers now");
+  // The defending player, whose creatures block; Odric's controller may be declaring for them.
+  const p = player(s, pend.defender ?? chooser.id);
   const seen = new Map<ObjectId, ObjectId[]>();
   const count: Record<ObjectId, number> = {};
   for (const b of blocks) {
@@ -6785,7 +6800,7 @@ function declareBlockers(s: GameState, p: Player, blocks: { blocker: ObjectId; a
     if (already.includes(at.id)) throw new RulesError(`${bd.name} already blocks ${ad.name}`);
     const max = maxBlocks(s, bl);
     if (already.length >= max) throw new RulesError(`${bd.name} can only block ${max === 1 ? "one creature" : `${max} creatures`}`);
-    if (at.attacking !== p.id) throw new RulesError(`${ad.name} isn't attacking you`);
+    if (at.attacking !== p.id) throw new RulesError(`${ad.name} isn't attacking ${p.id === chooser.id ? "you" : p.name}`);
     const problem = blockProblem(s, bl, at);
     if (problem) throw new RulesError(problem);
     seen.set(bl.id, [...already, at.id]);
@@ -6814,6 +6829,9 @@ function declareBlockers(s: GameState, p: Player, blocks: { blocker: ObjectId; a
   if (req) throw new RulesError(req);
   // Block costs are totalled and paid, with mana abilities activated first (CR 509.1d-f).
   const tax = blockCost(s, seen.size);
+  // Odric: the blocks' controller may refuse to pay a block's cost, and then another set must be chosen (rulings);
+  // here only the set that costs nothing can be chosen for them.
+  if (tax && p.id !== chooser.id) throw new RulesError(`blocking costs ${tax}, which only ${p.name} could choose to pay`);
   if (tax) {
     const paid = spendFromPool(s, p.id, parseManaCost(tax), "other", 0, payableLife(s, p.id));
     if (!paid) throw new RulesError(`blocking with ${seen.size === 1 ? "this creature" : `these ${seen.size} creatures`} costs ${tax}: add the mana first`);
@@ -6824,8 +6842,9 @@ function declareBlockers(s: GameState, p: Player, blocks: { blocker: ObjectId; a
     const at = obj(s, b.attacker);
     (bl.blocking ??= []).push(at.id);
     (at.blockedBy ??= []).push(bl.id);
-    log(s, `${defOf(s, bl).name} blocks ${defOf(s, at).name}.`);
+    log(s, `${defOf(s, bl).name} blocks ${defOf(s, at).name}${p.id !== chooser.id ? ` (${chooser.name} chose)` : ""}.`);
   }
+  if (p.id !== chooser.id && !blocks.length) log(s, `${chooser.name} chose no blocks for ${p.name}.`);
   // Blocking one creature in a band blocks every creature in it (CR 702.22h).
   for (const b of blocks) {
     const bl = obj(s, b.blocker);
@@ -6839,7 +6858,7 @@ function declareBlockers(s: GameState, p: Player, blocks: { blocker: ObjectId; a
     }
   }
   const [next, ...rest] = pend.remaining;
-  s.pending = next !== undefined ? { kind: "declareBlockers", player: next, remaining: rest } : null;
+  s.pending = next !== undefined ? blockersPending(s, next, rest) : null;
   if (!s.pending) {
     // Once every defending player has declared, "blocks" and "becomes blocked" abilities trigger (CR 509.3).
     fireEvent(s, { type: "blocksDeclared" });
@@ -7551,10 +7570,15 @@ export function playerLoses(s: GameState, pid: PlayerId, reason: string, concede
   invalidateCharacteristics(s);
   for (const o of attackers(s)) if (o.attacking === pid) clearCombat(o);
   s.passedInSuccession = s.passedInSuccession.filter((id) => id !== pid);
-  if (s.pending?.player === pid) {
+  // Odric's controller leaving while declaring for someone: that player declares their own blockers.
+  if (s.pending?.kind === "declareBlockers" && s.pending.player === pid && s.pending.defender !== undefined) s.pending = { kind: "declareBlockers", player: s.pending.defender, remaining: s.pending.remaining };
+  else if (s.pending?.kind === "declareBlockers" && s.pending.defender === pid) {
+    const [next, ...rest] = s.pending.remaining;
+    s.pending = next !== undefined ? blockersPending(s, next, rest) : null;
+  } else if (s.pending?.player === pid) {
     if (s.pending.kind === "declareBlockers") {
       const [next, ...rest] = s.pending.remaining;
-      s.pending = next !== undefined ? { ...s.pending, player: next, remaining: rest } : null;
+      s.pending = next !== undefined ? blockersPending(s, next, rest) : null;
     } else s.pending = null;
   }
   // An assisted cast waiting on a player who left: it isn't cast.

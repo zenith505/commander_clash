@@ -17,7 +17,9 @@ export function chooseVote(s: GameState, pid: PlayerId, options: string[]): stri
   const effects = r.body.effects;
   const words = options.filter((o) => o !== "none" && !o.includes("@"));
   // An extra vote that may be passed on: always worth taking, for whatever the first one was for.
-  const score = (o: string) => (o === "none" ? -Infinity : o.includes("@") ? objectScore(s, pid, controller, effects, o) : words.length ? wordScore(s, pid, controller, effects, o) : 0);
+  // "Each player may choose ..." (Druid of Purification): choosing nothing beats choosing something that hurts us.
+  const none = r.scratch?.vote?.choose ? 0 : -Infinity;
+  const score = (o: string) => (o === "none" ? none : o.includes("@") ? objectScore(s, pid, controller, effects, o) : words.length ? wordScore(s, pid, controller, effects, o) : 0);
   let best = options[0]!;
   for (const o of options) if (score(o) > score(best)) best = o;
   return best;

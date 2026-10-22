@@ -669,7 +669,12 @@ export type ObjRef =
    * "Each permanent with the most votes or tied for most votes" (Council's Judgment), "each card with the most votes ..."
    * (Custodi Squire): what this ability's vote chose (CR 701.38), while each is still that object; none if no one voted.
    */
-  | { ref: "voted" };
+  | { ref: "voted"; /** "Each permanent chosen this way": every one chosen at least once. */ any?: true }
+  /**
+   * "Goad each creature that had counters put on it this way" (Agitator Ant): the permanents this resolution's picks put
+   * counters on (not one a replacement effect kept them off, rulings), while each is still that object.
+   */
+  | { ref: "countersPutThisWay" };
 
 /** Which player(s) an effect touches. */
 export type PlayerRef =
@@ -2605,6 +2610,8 @@ export type Effect =
    */
   /** Illusion of Choice: "You choose how each player votes this turn" (GameState.votesChosenBy). */
   | { type: "chooseVotes" }
+  /** Odric, Master Tactician: "You choose which creatures block this combat and how those creatures block" (GameState.blocksChosenBy). */
+  | { type: "chooseBlocks" }
   /**
    * "Each player secretly chooses a number 0 or greater, then all players reveal those numbers simultaneously"
    * (Wheel of Misfortune, Menacing Ogre): each one chooses without seeing the others' numbers, then what the card does
@@ -2613,7 +2620,12 @@ export type Effect =
    * life, and two +1/+1 counters on the source if its controller is one of them.
    */
   | { type: "secretNumbers"; then: "wheel" | "ogre" }
-  | { type: "vote"; options?: string[]; among?: TargetSpec; secret?: true; text: string }
+  /**
+   * `choose`: "Starting with you, each player may choose an artifact or enchantment you don't control" (Druid of
+   * Purification): not a vote (no extra votes, nobody chooses for another), each player in turn order picks one of
+   * `among` or nothing, knowing the earlier picks (rulings); "each permanent chosen this way" is ObjRef "voted" `any`.
+   */
+  | { type: "vote"; options?: string[]; among?: TargetSpec; secret?: true; choose?: true; text: string }
   | { type: "choose"; choice: ChoiceKind; /** "Each player chooses a creature type" (Patriarch's Bidding): every player in turn order, starting with the active player, into Chosen.types. */ each?: true; /** With "opponent": "a player with the most life or tied for most life" (The Black Gate), checked as it resolves; you can be one. */ mostLife?: true; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose };
 
 /** What a player chooses by name: a creature type (CR 205.3m) or a color (CR 105.1). */

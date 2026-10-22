@@ -1688,11 +1688,13 @@ export function compile(d: CardDef): CompiledCard {
       out.spendAnyColorCreatureAbilities = true;
       continue;
     }
-    // Agatha's Soul Cauldron (CompiledCard.lendsExiled), linked to its one exile ability below.
-    const lends = /^(Creatures you control with \+1\/\+1 counters on them) have all activated abilities of all creature cards exiled with ~\.$/.exec(line);
+    // Agatha's Soul Cauldron, Hazel's Brewmaster ("Foods you control have ...") (CompiledCard.lendsExiled), linked to
+    // its one exile ability below.
+    const lends = /^(Creatures you control with \+1\/\+1 counters on them|Foods you control) have all activated abilities of all creature cards exiled with ~\.$/.exec(line);
     if (lends) {
       const group = parseGroup(lends[1]!.toLowerCase());
-      if (!group || group.other || group.filter.kind !== "object" || group.filter.counter !== "+1/+1") out.unsupported.push(raw); // exiledLentTo looks only at those
+      const food = group?.filter.kind === "object" && group.filter.subtypes?.length === 1 && group.filter.subtypes[0] === "Food" && !group.filter.counter;
+      if (!group || group.other || group.filter.kind !== "object" || (group.filter.counter !== "+1/+1" && !food)) out.unsupported.push(raw); // exiledLentTo looks only at those
       else out.lendsExiled = { to: group.filter, cards: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature cards" } };
       continue;
     }
@@ -2578,8 +2580,11 @@ function linkExile(out: CompiledCard) {
   // Agatha's Soul Cauldron: "creature cards exiled with ~" are the ones its one exile ability exiled (CR 607.2a).
   if (out.lendsExiled) {
     const exiles = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
-    if (exiles.length !== 1 || exiles[0]!.type !== "exile" || exiles[0]!.until) out.unsupported.push("(lends abilities of exiled cards it can't link to one exile ability)");
-    else exiles[0]!.linked = true;
+    // "Whenever ~ enters or attacks, exile ..." (Hazel's Brewmaster) is one ability compiled as one trigger per event:
+    // the same body each time, so still one exile ability to link to.
+    const oneAbility = exiles.length > 1 && new Set(out.triggers.map((t) => JSON.stringify(t.body)).filter((b, i) => allEffects(out.triggers[i]!.body.effects).some((e) => exiles.includes(e)))).size === 1 && exiles.every((e) => out.triggers.some((t) => allEffects(t.body.effects).includes(e)));
+    if ((exiles.length !== 1 && !oneAbility) || exiles.some((e) => e.type !== "exile" || e.until)) out.unsupported.push("(lends abilities of exiled cards it can't link to one exile ability)");
+    else for (const e of exiles) (e as Extract<Effect, { type: "exile" }>).linked = true;
   }
   // "Target creature card exiled with ~" (Dino DNA, The Darkness Crystal): linked to the one ability that exiles cards
   // (CR 607.2a), or to its replacement effect that exiles them (The Darkness Crystal's, already linked).

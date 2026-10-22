@@ -248,7 +248,12 @@ export function convokedFor(s: GameState, ctx: ResolveCtx): { id: ObjectId; zc: 
 
 export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[] {
   if (ref.ref === "castSpell") return []; // only counted (amounts.ts)
-  if (ref.ref === "voted") return votedObjects(s);
+  if (ref.ref === "voted") return votedObjects(s, !!ref.any);
+  if (ref.ref === "countersPutThisWay")
+    return (s.resolving?.countersPutThisWay ?? []).flatMap((c) => {
+      const o = s.objects[c.id];
+      return o?.zone === "battlefield" && (o.zoneChanges ?? 0) === c.zc ? [o] : [];
+    });
   if (ref.ref === "convoker" || ref.ref === "convokers") {
     const list = convokedFor(s, ctx);
     return (ref.ref === "convoker" ? list.slice(ref.index, ref.index + 1) : list).flatMap((c) => {
@@ -892,6 +897,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "eachChooses":
     case "controlFromEach":
     case "chooseVotes":
+    case "chooseBlocks":
     case "secretNumbers":
       return runVotesEffect(s, e, ctx, src);
     case "may":

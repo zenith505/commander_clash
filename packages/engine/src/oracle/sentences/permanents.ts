@@ -16,6 +16,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if (/^You have no maximum hand size for the rest of the game$/.test(s)) return [{ type: "noMaxHandSize" }];
   // Illusion of Choice (CR 701.38): the votes of every vote this turn are this player's to make.
   if (/^You choose how each player votes this turn$/.test(s)) return [{ type: "chooseVotes" }];
+  // Odric, Master Tactician: the defending players' blocks are declared by you (rulings: they must still be legal).
+  if (/^[Yy]ou choose which creatures block this combat and how those creatures block$/.test(s)) return [{ type: "chooseBlocks" }];
   // "Until your next turn, creatures your opponents control enter tapped" (Cone of Cold): a replacement effect that lasts
   // (CR 614.1c, 611.2b).
   const untilTapped = /^Until your next turn, ([a-z][^,]*?) enter tapped$/.exec(s);

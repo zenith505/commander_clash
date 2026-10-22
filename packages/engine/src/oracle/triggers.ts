@@ -1687,6 +1687,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = state && parseBody(st[st.length - 1]!, { selfIt: true });
     return state && body ? { event: "state", state, body } : "fail";
   }
+  // "Whenever this creature becomes tapped during your turn" (granted by Dionus, Elvish Archdruid): only while it's its
+  // controller's turn, whether it triggers at all.
+  const tappedYours = /^Whenever ~ becomes tapped during your turn, (.+)$/.exec(line);
+  if (tappedYours) {
+    const t = parseTrigger(`Whenever ~ becomes tapped, ${tappedYours[1]}`);
+    return t && t !== "fail" && t.event === "selfBecomesTapped" && !t.activeIf ? { ...t, activeIf: { kind: "yourTurn" } } : "fail";
+  }
   // "Whenever you commit a crime during your turn" (Overzealous Muscle, CR 700.13): only while it's your turn, whether it
   // triggers at all, not an intervening if.
   const crime = /^Whenever you commit a crime during your turn, (.+)$/.exec(line);

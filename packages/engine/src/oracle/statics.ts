@@ -222,6 +222,12 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     const c = parseCount(m[1]!, null);
     return c ? { less: c } : "fail";
   }
+  // Not of This World: "... if it targets a spell or ability that targets a creature you control with power 7 or
+  // greater", checked as the spell is cast, against the targets the spell or ability has then (rulings, CR 601.2f).
+  if ((m = /^~ costs \{(\d+)\} less to cast if it targets a spell or ability that targets (an? .+)$/.exec(text))) {
+    const what = parseTargetPhrase(m[2]!.replace(/^an? /, ""));
+    return what?.kind === "object" ? { lessIfTargets: { n: Number(m[1]), filter: { kind: "spell", stackAbilities: "both", targetsWhat: what, text: `spell or ability that targets ${m[2]}` } } } : "fail";
+  }
   if ((m = /^~ costs \{(\d+)\} less to cast if it targets (an? .+)$/.exec(text))) {
     const filter = parseTargetPhrase(m[2]!.replace(/^an? /, ""));
     return filter?.kind === "object" ? { lessIfTargets: { n: Number(m[1]), filter } } : "fail";

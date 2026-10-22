@@ -2987,6 +2987,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "5bb32efd-9e58-4021-bbda-4ffccfa1d601",
+  "name": "Druid of Purification",
+  "manaCost": "{3}{G}",
+  "cmc": 4,
+  "typeLine": "Creature — Human Druid",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Druid"
+  ],
+  "oracleText": "When this creature enters, starting with you, each player may choose an artifact or enchantment you don't control. Destroy each permanent chosen this way.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "drc",
+  "releasedAt": "2025-02-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "01072a45-ab1c-4d19-b493-76cf4aae351e",
   "name": "Duplicity",
   "manaCost": "{3}{U}{U}",
@@ -7510,6 +7541,41 @@
   "set": "bfz",
   "releasedAt": "2015-10-02",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ade898df-14a5-460b-94f6-1f3f74d3ff95",
+  "name": "Odric, Master Tactician",
+  "manaCost": "{2}{W}{W}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Soldier",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Soldier"
+  ],
+  "oracleText": "First strike (This creature deals combat damage before creatures without first strike.)\nWhenever Odric and at least three other creatures attack, you choose which creatures block this combat and how those creatures block.",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "First strike"
+  ],
+  "commanderLegal": "legal",
+  "set": "m13",
+  "releasedAt": "2012-07-13",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

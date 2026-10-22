@@ -354,6 +354,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   ) => {
     if (locked?.(controller)) return;
     const printed = compileCard(defOf(s, o)).triggers;
+    // Two instances of one "triggers only once each turn" ability (two Dionus, Elvish Archdruid granting it) each
+    // trigger once (rulings): the nth instance is used up once n of them have triggered this turn.
+    const instance = new Map<string, number>();
     triggers.forEach((t, index) => {
       // "Whenever enchanted creature ..." is about the creature, not the Aura; "~ or equipped creature" about both.
       if (hosting ? !t.host : t.host === "attached") return;
@@ -361,7 +364,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // An intervening "if" has to be true for it to trigger at all (CR 603.4).
       // "Max speed — Whenever ...": only while it has the ability (CR 702.178a).
       if (t.activeIf && !staticConditionNow(s, t.activeIf, o.id, controller)) return;
-      if (t.oncePerTurn && onceUsed(o, t.zone, t.body.text)) return;
+      // (Keyed by event too: "Whenever ~ enters or attacks, ..." is one ability compiled as two triggers.)
+      const nth = t.oncePerTurn ? (instance.get(`${t.event}|${t.body.text}`) ?? 0) : 0;
+      if (t.oncePerTurn) instance.set(`${t.event}|${t.body.text}`, nth + 1);
+      if (t.oncePerTurn && onceUsed(o, t.zone, t.body.text, nth)) return;
       const once = t.body.effects[0];
       if (once?.type === "may" && once.once && onceUsed(o, t.zone, `do:${once.text}`)) return; // CR 603.2h
       if (pred(t.event, t) && (!t.ifCond || staticConditionNow(s, t.ifCond, o.id, controller, event?.player, event?.amount, undefined, subject?.id, subject?.zoneChanges ?? 0))) {
@@ -1533,9 +1539,9 @@ export function processTriggerQueue(s: GameState, turnOrderFromActive: PlayerId[
 const lookingBack = (o: GameObject, zone: TriggeredAbility["zone"]) => o.zone !== "battlefield" && zone !== "graveyard" && (o.zoneChanges ?? 0) > 0;
 
 /** Whether this object's "only once each turn" ability (by its text, or "do:" and its may's) was used this turn. */
-export function onceUsed(o: GameObject, zone: TriggeredAbility["zone"], text: string): boolean {
+export function onceUsed(o: GameObject, zone: TriggeredAbility["zone"], text: string, nth = 0): boolean {
   const zc = lookingBack(o, zone) ? (o.zoneChanges ?? 0) - 1 : (o.zoneChanges ?? 0);
-  return !!o.triggeredThisTurn?.includes(`${zc}|${text}`);
+  return (o.triggeredThisTurn?.filter((k) => k === `${zc}|${text}`).length ?? 0) > nth;
 }
 
 const triggerOf = (s: GameState, t: PendingTrigger) => (t.body ? undefined : compileCard(s.cards[t.sourceCardId]!).triggers[t.index]);

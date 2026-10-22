@@ -23,6 +23,7 @@ import {
   combatLimit,
   attackTaxPer,
   blockProblem,
+  blockRequirementProblem,
   cantBlockNow,
   provokerOf,
   tapCostCandidates,
@@ -109,7 +110,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   }
   if (pend?.player === pid) {
     if (pend.kind === "declareAttackers") return chooseAttacks(s, pid);
-    if (pend.kind === "declareBlockers") return payForBlocks(s, pid, chooseBlocks(s, pid));
+    if (pend.kind === "declareBlockers") return pend.defender !== undefined ? [blocksForOpponent(s, pid, pend.defender)] : payForBlocks(s, pid, chooseBlocks(s, pid));
     if (pend.kind === "chooseModes") {
       const t = s.triggerQueue[0]!;
       const body = triggerBody(s, t);
@@ -4103,6 +4104,16 @@ function payForBlocks(s: GameState, pid: PlayerId, a: Action): Action[] {
     const earlier = s.battlefield.some((id) => obj(s, id).blocking !== undefined);
     if (blocks.length === 1 && !earlier && characteristics(s, obj(s, blocks[0]!.blocker)).cantBlockAlone) blocks = [];
   }
+}
+
+/**
+ * Odric, Master Tactician: we choose `defender`'s blocks against our attack. No blocks lets every attacker through; when a
+ * requirement makes some creature block (CR 509.1c), the blocks they'd choose themselves, which obey it.
+ */
+function blocksForOpponent(s: GameState, pid: PlayerId, defender: PlayerId): Action {
+  if (!blockRequirementProblem(s, defender, [])) return { type: "declareBlockers", player: pid, blocks: [] };
+  const theirs = chooseBlocks(s, defender);
+  return { type: "declareBlockers", player: pid, blocks: theirs.type === "declareBlockers" ? theirs.blocks : [] };
 }
 
 function chooseBlocks(s: GameState, pid: PlayerId): Action {

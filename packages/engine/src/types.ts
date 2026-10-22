@@ -1019,7 +1019,8 @@ export interface ContinuousEffect {
 /** What the engine is waiting on from a specific player, beyond normal priority. */
 export type PendingDecision =
   | { kind: "declareAttackers"; player: PlayerId }
-  | { kind: "declareBlockers"; player: PlayerId; remaining: PlayerId[] }
+  /** `defender`: Odric's controller (`player`) declares the blockers of that defending player (GameState.blocksChosenBy). */
+  | { kind: "declareBlockers"; player: PlayerId; remaining: PlayerId[]; defender?: PlayerId }
   | { kind: "discardToHandSize"; player: PlayerId; count: number }
   /** A resolving spell or ability makes this player discard `count` cards of their choice (CR 701.9b). */
   | { kind: "discard"; player: PlayerId; count: number; source: string; /** Only cards like this: "discard a creature card". */ filter?: TargetSpec; /** Exiled, not discarded ("exiles a card from their hand"). */ exile?: true; /** Up to `count` ("discard any number of cards"), none too. */ upTo?: true }
@@ -1389,6 +1390,11 @@ export interface GameState {
    */
   /** Illusion of Choice: "You choose how each player votes this turn" (the last one to resolve, rulings). */
   votesChosenBy?: { player: PlayerId; turn: number };
+  /**
+   * Odric, Master Tactician: "you choose which creatures block this combat and how those creatures block": `player`
+   * declares each defending player's blockers in this turn's combat number `combat` (see blockersPending).
+   */
+  blocksChosenBy?: { player: PlayerId; turn: number; combat: number };
   namedBansUntil?: { name: string; players?: PlayerId[]; lands?: true; controller: PlayerId; source: string }[];
   /** "Until your next turn, you may cast sorcery spells as though they had flash" (Teferi, Time Raveler): `controller` may. */
   flashUntil?: { controller: PlayerId; filter: TargetSpec }[];
@@ -1696,6 +1702,8 @@ export interface Resolving {
   did?: boolean;
   /** What its instructions sacrificed, as it last existed: "When you do, ~ deals damage equal to that creature's power". */
   sacrificedThisWay?: LastKnown[];
+  /** "Goad each creature that had counters put on it this way" (Agitator Ant): the permanents a pick put counters on. */
+  countersPutThisWay?: { id: ObjectId; zc: number }[];
   /** What its "return a land you control to its owner's hand" returned, as it last existed (SpellCondition bouncedThisWay). */
   bouncedThisWay?: { id: ObjectId; subtypes: string[] }[];
   /** Whether its last "look at the top N cards ... put one ..." took a card (SpellCondition digTook). */
@@ -1737,7 +1745,7 @@ export interface Resolving {
     may?: boolean; // the answer to "you may ..."
     castNow?: { id: ObjectId }; // the card "you may cast that card" offered (Effect castNow)
     /** A vote (Effect "vote"): players still to vote in turn order, the votes left for the one voting, and their pick. */
-    vote?: { queue: PlayerId[]; left?: number; may?: number; pick?: string };
+    vote?: { queue: PlayerId[]; left?: number; may?: number; pick?: string; /** "Each player may choose ..." (Druid of Purification): one optional pick each, not a vote. */ choose?: true };
     /** "Each opponent chooses fame or fortune": the players still to choose (APNAP, CR 101.4), and the answer given. */
     words?: { queue: PlayerId[]; pick?: string };
     /** "For each player who chose fame, gain control of a creature that player controls": the choosers still to go, and the creatures chosen so far. */

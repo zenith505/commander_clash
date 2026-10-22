@@ -124,6 +124,10 @@ export function parseCountMod(line: string): CountMod | undefined {
   // Ozolith, the Shattered Spire: "on an artifact or creature you control".
   m = /^If one or more \+1\/\+1 counters would be put on (another|an?) (creature|permanent|artifact or creature)( you control)?, (twice that many|that many plus one) \+1\/\+1 counters are put on (?:it|that creature|that permanent) instead\.$/.exec(line);
   if (m) return { what: "counters", counter: "+1/+1", on: m[2] === "artifact or creature" ? "artifactOrCreature" : (m[2] as "creature" | "permanent"), who: m[3] ? "you" : "any", op: m[4] === "twice that many" ? "double" : "plusOne", ...(m[1] === "another" ? { other: true } : {}) };
+  // Winding Constrictor: counters of any kind (each kind one more, rulings).
+  if (line === "If one or more counters would be put on an artifact or creature you control, that many plus one of each of those kinds of counters are put on that permanent instead.")
+    return { what: "counters", on: "artifactOrCreature", who: "you", op: "plusOne" };
+  if (line === "If you would get one or more counters, you get that many plus one of each of those kinds of counters instead.") return { what: "counters", onPlayer: true, op: "plusOne" };
   // Vizier of Remedies.
   if (line === "If one or more -1/-1 counters would be put on a creature you control, that many -1/-1 counters minus one are put on it instead.")
     return { what: "counters", counter: "-1/-1", on: "creature", who: "you", op: "minusOne" };

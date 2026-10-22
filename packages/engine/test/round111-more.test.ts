@@ -65,6 +65,14 @@ const everybodyLives = card("Everybody Lives!", "Instant", "{1}{W}", {
     "All creatures gain hexproof and indestructible until end of turn. Players gain hexproof until end of turn. Players can't lose life this turn and players can't lose the game or win the game this turn.",
 });
 const shock = card("Shock", "Instant", "{R}", { oracleText: "Shock deals 2 damage to any target." });
+const constrictor = card("Winding Constrictor", "Creature — Snake", "{B}{G}", {
+  power: "2",
+  toughness: "3",
+  oracleText:
+    "If one or more counters would be put on an artifact or creature you control, that many plus one of each of those kinds of counters are put on that permanent instead.\nIf you would get one or more counters, you get that many plus one of each of those kinds of counters instead.",
+});
+const counterSpell = card("Test Counters", "Sorcery", "{G}", { oracleText: "Put a +1/+1 counter and a lifelink counter on target creature." });
+const energySpell = card("Test Energy", "Sorcery", "{G}", { oracleText: "You get {E}{E}." });
 const treasure = card("Treasure", "Token Artifact — Treasure", "", { oracleText: "{T}, Sacrifice this token: Add one mana of any color." });
 
 /** Pass along, answering every pending choice the dull way, until `stop` holds. */
@@ -301,5 +309,25 @@ describe("Everybody Lives!", () => {
     s.players[opp]!.life = 0;
     s = act(s, { type: "passPriority", player: waitingOn(s)! });
     expect(s.players[opp]!.lost).toBeFalsy();
+  });
+});
+
+describe("Winding Constrictor", () => {
+  it("is supported: one more of each kind on your artifacts and creatures, and on you", () => {
+    expect(isFullySupported(constrictor)).toBe(true);
+    let { s, ap, ids, opp } = setup([counterSpell, energySpell, counterSpell]);
+    putOnBattlefield(s, ap, constrictor);
+    const b = putOnBattlefield(s, ap, bear());
+    const theirs = putOnBattlefield(s, opp, bear());
+    for (const a of planCast(s, ap, ids[0]!, [{ kind: "object", id: b }])!) s = act(s, a);
+    s = passAll(s);
+    expect(s.objects[b]!.counters).toMatchObject({ "+1/+1": 2, lifelink: 2 });
+    for (const a of planCast(s, ap, ids[1]!)!) s = act(s, a);
+    s = passAll(s);
+    expect(s.players[ap]!.energy).toBe(3);
+    // Not on another player's creature.
+    for (const a of planCast(s, ap, ids[2]!, [{ kind: "object", id: theirs }])!) s = act(s, a);
+    s = passAll(s);
+    expect(s.objects[theirs]!.counters).toMatchObject({ "+1/+1": 1, lifelink: 1 });
   });
 });

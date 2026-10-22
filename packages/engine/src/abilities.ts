@@ -3682,6 +3682,8 @@ export type CountMod =
   /** "If one or more creature tokens would be created under your control, that many 4/4 white Angel creature tokens ... are created instead" (Divine Visitation): each token of card type `type` is a `token` instead. */
   | { what: "tokens"; who: "you"; op: "instead"; type: string; token: TokenSpec }
   | { what: "counters"; counter?: CounterKind; on: "creature" | "permanent" | "artifactOrCreature"; who: "you" | "any"; op: "double" | "plusOne" | "minusOne"; other?: boolean }
+  /** "If you would get one or more counters, you get that many plus one of each of those kinds of counters instead" (Winding Constrictor): counters on its controller, whoever puts them. */
+  | { what: "counters"; onPlayer: true; op: "plusOne" }
   /**
    * Vorinclex, Monstrous Raider and Innkeeper's Talent: "If you would put one or more counters on a permanent or player,
    * put twice that many ..." (`putter` "you") and "If an opponent would put ..., they put half that many ..., rounded

@@ -71,7 +71,7 @@ export function countersToPut(s: GameState, o: GameObject, kind: string, n: numb
   const fits = (on: "creature" | "permanent" | "artifactOrCreature") => on === "permanent" || isCreature || (on === "artifactOrCreature" && types.includes("Artifact"));
   const ops = modsInPlay(s)
     .filter(({ mod, controller, source }) => {
-      if (mod.what !== "counters" || ((mod.other || entering) && source === o.id)) return false;
+      if (mod.what !== "counters" || "onPlayer" in mod || ((("other" in mod && mod.other) || entering) && source === o.id)) return false;
       if ("putter" in mod && mod.putter) return putterFits(s, mod, controller, putter) && (!mod.putOn || (owner === controller && (mod.putOn === "permanentYouControl" || isCreature || types.includes("Planeswalker"))));
       return (mod.counter === undefined || mod.counter === kind) && fits(mod.on!) && (mod.who === "any" || controller === owner);
     })
@@ -84,7 +84,7 @@ export function playerCountersToPut(s: GameState, pid: PlayerId, kind: string, n
   if (n <= 0) return n;
   const putter = putterNow ?? pid;
   const ops = modsInPlay(s)
-    .filter(({ mod, controller }) => "putter" in mod && !!mod.putter && putterFits(s, mod, controller, putter) && (!mod.putOn || (mod.putOn === "creatureOrPlaneswalkerYouControlOrYou" && pid === controller)))
+    .filter(({ mod, controller }) => ("onPlayer" in mod && pid === controller) || ("putter" in mod && !!mod.putter && putterFits(s, mod, controller, putter) && (!mod.putOn || (mod.putOn === "creatureOrPlaneswalkerYouControlOrYou" && pid === controller))))
     .map(({ mod }) => mod.op);
   return apply(n, ops, kind === "poison");
 }

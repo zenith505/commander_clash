@@ -671,3 +671,44 @@ describe("Forge of Heroes", () => {
     expect(s.objects[theirs]!.counters.loyalty).toBe(5);
   });
 });
+
+describe("Swarmyard Massacre", () => {
+  const massacre = card("Swarmyard Massacre", "Sorcery", "{2}{B}{B}", {
+    oracleText: "Create two 1/1 green Squirrel creature tokens. Then each creature that isn't an Insect, Rat, Spider, or Squirrel gets -1/-1 until end of turn for each creature you control that's an Insect, Rat, Spider, or Squirrel.",
+  });
+  it("-1/-1 to each creature that isn't one of those types for each of yours that is, changelings counted and spared", () => {
+    expect(isFullySupported(massacre)).toBe(true);
+    const { s: s0, ap, ids, opp } = setup([massacre]);
+    const rat = putOnBattlefield(s0, ap, card("Our Rat", "Creature — Rat", "{1}{B}", { power: "2", toughness: "2" }));
+    const shifter = card("Shapeshifter", "Creature — Shapeshifter", "{2}", { power: "2", toughness: "2", oracleText: "Changeling (This card is every creature type.)", keywords: ["Changeling"] });
+    const changeling = putOnBattlefield(s0, opp, shifter);
+    const big = putOnBattlefield(s0, opp, card("Big Wurm", "Creature — Wurm", "{6}", { power: "6", toughness: "6" }));
+    const theirSquirrel = putOnBattlefield(s0, opp, card("Their Squirrel", "Creature — Squirrel", "{1}", { power: "1", toughness: "1" }));
+    invalidateCharacteristics(s0);
+    const s = cast(s0, ap, ids[0]!);
+    // Ours: the Rat and two Squirrels, so -3/-3.
+    expect(power(s, s.objects[big]!)).toBe(3);
+    expect(toughness(s, s.objects[big]!)).toBe(3);
+    expect(s.objects[changeling]!.zone).toBe("battlefield");
+    expect(toughness(s, s.objects[changeling]!)).toBe(2);
+    expect(toughness(s, s.objects[theirSquirrel]!)).toBe(1);
+    expect(toughness(s, s.objects[rat]!)).toBe(2);
+  });
+});
+
+describe("creature you control that's a Wolf or a Werewolf", () => {
+  it("Howlpack Resurgence: only those types, a changeling too", () => {
+    const resurgence = card("Howlpack Resurgence", "Enchantment", "{2}{G}", { keywords: ["Flash"], oracleText: "Flash\nEach creature you control that's a Wolf or a Werewolf gets +1/+1 and has trample." });
+    expect(isFullySupported(resurgence)).toBe(true);
+    const { s, ap } = setup([]);
+    putOnBattlefield(s, ap, resurgence);
+    const wolf = putOnBattlefield(s, ap, card("Wolf", "Creature — Wolf", "{1}{G}", { power: "2", toughness: "2" }));
+    const shifter = putOnBattlefield(s, ap, card("Shapeshifter", "Creature — Shapeshifter", "{2}", { power: "2", toughness: "2", oracleText: "Changeling (This card is every creature type.)", keywords: ["Changeling"] }));
+    const b = putOnBattlefield(s, ap, bear());
+    invalidateCharacteristics(s);
+    expect(power(s, s.objects[wolf]!)).toBe(3);
+    expect(objHasKeyword(s, s.objects[wolf]!, "Trample")).toBe(true);
+    expect(power(s, s.objects[shifter]!)).toBe(3);
+    expect(power(s, s.objects[b]!)).toBe(2);
+  });
+});

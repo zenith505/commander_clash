@@ -2,7 +2,7 @@ import type { AmountExpr, Count, ObjRef, PlayerRef, TargetSpec } from "../abilit
 import { ANY_COUNTER } from "../abilities";
 import { NUM, num, COUNTER, counterKind, COLOR_WORDS, capital, singularWord } from "./words";
 import { Ctx, addTarget } from "./body";
-import { parsePlayer, parseTargetPhrase } from "./targets";
+import { parsePlayer, parseTargetPhrase, subtypeClause } from "./targets";
 
 /**
  * A count: "the number of creatures you control", "cards in your hand", "~'s power", "your
@@ -12,7 +12,8 @@ import { parsePlayer, parseTargetPhrase } from "./targets";
  */
 export function parseCount(text: string, ctx: Ctx | null, each = false): AmountExpr | null {
   // "For each artifact and/or enchantment you control" (All That Glitters): each that's one or the other, counted once.
-  let p = text.trim().replace(/\.$/, "").replace(/ and\/or /g, " or ");
+  // "For each creature you control that's an Insect, Rat, Spider, or Squirrel" (Swarmyard Massacre): see subtypeClause.
+  let p = subtypeClause(text.trim().replace(/\.$/, "").replace(/ and\/or /g, " or "));
   let m: RegExpExecArray | null;
   if (ctx?.milledThisWay && /^the total mana value of those cards$/i.test(p)) return { count: { kind: "milledManaValue" } };
   // "The number of experience counters you have", "for each experience counter you have" (CR 122.1).

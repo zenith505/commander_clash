@@ -507,7 +507,7 @@ const PLURAL_TYPES: Record<string, string> = {
  */
 export function parseGroup(phrase: string, bare = false, count?: (text: string) => AmountExpr | null): { filter: TargetSpec; other: boolean } | null {
   // "Each nonland, nontoken permanent": the same as "each nonland nontoken permanent".
-  let p = phrase.trim().replace(/\b(non[a-z]+), (?=non[a-z]+ )/gi, "$1 ");
+  let p = phrase.trim().replace(/\b(non-?[a-z]+), (?=non-?[a-z]+ )/gi, "$1 ");
   // "Creatures you control that are enchanted or equipped" (Halvar, God of Battle): "enchanted-or-equipped creatures you control".
   p = p.replace(/^((?:all |each )?)(creatures) (you control) that are (enchanted or equipped|enchanted|equipped)$/i, (_, a: string, k: string, w: string, st: string) => `${a}${st.replace(/ /g, "-")} ${k} ${w}`);
   // "All nonland permanents that aren't legendary" (Urza's Ruinous Blast): the nonlegendary ones.
@@ -518,6 +518,7 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   if (all) p = p.slice(all[0].length);
   const other = /^other /i.test(p);
   if (other) p = p.slice(6);
+  p = subtypeClause(p);
   const whose = / (you control|your opponents control|an opponent controls|you don't control)\b/i;
   // "Attacking creatures get +1/+1 until end of turn": whichever are attacking as it resolves (CR 611.2c).
   const combat = /^(attacking|blocking|attacking or blocking) creatures\b/i.test(p);
@@ -559,6 +560,19 @@ export function parseCardTarget(p: string, ctx: Ctx, owner?: "you"): ObjRef | nu
 /** The creature types that make an object an outlaw (CR 700.12). */
 export const OUTLAW_TYPES = ["Assassin", "Mercenary", "Pirate", "Rogue", "Warlock"];
 
+/**
+ * "Creature that isn't an Insect, Rat, Spider, or Squirrel" is a "non-Insect, non-Rat, non-Spider, non-Squirrel creature";
+ * "creature you control that's an Insect, Rat, Spider, or Squirrel" an "Insect, Rat, Spider, or Squirrel creature you
+ * control" (Swarmyard Massacre). Only creature types.
+ */
+export function subtypeClause(p: string): string {
+  const m = /^(creatures?)( you control| an opponent controls)? that(?:'s| is| are|'re)( not|n't)? (?:an? )?((?:[A-Z][a-z]+, )*[A-Z][a-z]+(?:,? or (?:an? )?[A-Z][a-z]+)?)$/.exec(p);
+  if (!m) return p;
+  const types = m[4]!.split(/,? or (?:an? )?|, /);
+  if (!types.every((t) => CREATURE_TYPES.has(t))) return p;
+  return m[3] ? `${types.map((t) => `non-${t}`).join(" ")} ${m[1]}${m[2] ?? ""}` : `${m[4]!.replace(/ or an? /, " or ")} ${m[1]}${m[2] ?? ""}`;
+}
+
 /** Parse the words after "target": "nonblack creature an opponent controls", "artifact or enchantment", "spell", ... */
 export function parseTargetPhrase(
   phrase: string,
@@ -570,8 +584,8 @@ export function parseTargetPhrase(
     count?: (text: string) => AmountExpr | null;
   } = {},
 ): TargetSpec | null {
-  let p = phrase.trim().toLowerCase();
-  const text = `target ${p}`;
+  let p = subtypeClause(phrase.trim()).toLowerCase();
+  const text = `target ${phrase.trim().toLowerCase()}`;
   const extra: Partial<TargetSpec> = {};
   // Drown in the Loch: each candidate's own controller's graveyard.
   const loch = / with mana value less than or equal to the number of cards in its controller's graveyard$/i.exec(p);

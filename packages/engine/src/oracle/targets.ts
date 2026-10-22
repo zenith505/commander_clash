@@ -860,8 +860,10 @@ export function parseTargetPhrase(
   } else if ((m = /(?:^| )(with|without) ([a-z ]+?)( you control| you don't control| an opponent controls)?$/.exec(p))) {
     // "Creature you control with flash or haste" (Shadow the Hedgehog): one of them is enough.
     const either = m[1] === "with" ? /^([a-z]+) or ([a-z]+)$/.exec(m[2]!) : null;
-    const kws = either ? [either[1]!, either[2]!].map((k) => keywordOf(k)) : parseKeywordList(m[2]!);
-    if (!kws || kws.some((k) => !k) || kws.length !== (either ? 2 : 1)) return null;
+    // "Creatures without flying or islandwalk" (Stormtide Leviathan): with neither.
+    const neither = m[1] === "without" ? /^([a-z]+) or ([a-z]+)$/.exec(m[2]!) : null;
+    const kws = either ?? neither ? [(either ?? neither)![1]!, (either ?? neither)![2]!].map((k) => keywordOf(k)) : parseKeywordList(m[2]!);
+    if (!kws || kws.some((k) => !k) || kws.length !== (either || neither ? 2 : 1)) return null;
     if (either) extra.anyOf = kws.map((k) => ({ kind: "object" as const, keywords: [k!], text: k!.toLowerCase() }));
     else if (m[1] === "with") extra.keywords = kws as string[];
     else extra.notKeywords = kws as string[];

@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
 import { abilityProblem, attackProblem, botActions, castProblem, isFullySupported, potentialAttackers, planActivate, planCast, power, spellCost, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
-import { controllerOf, invalidateCharacteristics } from "../src/layers";
+import { characteristics, controllerOf, invalidateCharacteristics } from "../src/layers";
 import { moveObject } from "../src/game";
 import { defOf, objHasKeyword, objIsType, toughness } from "../src/cards";
 
@@ -819,5 +819,22 @@ describe("more popular cards", () => {
     s = settle(run(s, planCast(s, ap, ids[1]!, undefined, undefined, "auto", 3)));
     expect(s.objects[ids[1]!]!.counters["+1/+1"]).toBe(3);
     expect(named(s, "Food Token").length).toBe(4);
+  });
+  it("Stormtide Leviathan: all lands are Islands too; creatures without flying or islandwalk can't attack", () => {
+    const leviathan = card("Stormtide Leviathan", "Creature — Leviathan", "{8}{U}{U}{U}", { power: "8", toughness: "8", keywords: ["Islandwalk"], oracleText: "Islandwalk (This creature can't be blocked as long as defending player controls an Island.)\nAll lands are Islands in addition to their other types.\nCreatures without flying or islandwalk can't attack." });
+    supported(leviathan);
+    const { s: s0, ap, opp } = setup([]);
+    const lev = putOnBattlefield(s0, ap, leviathan);
+    const bears = putOnBattlefield(s0, ap, bear());
+    const bird = putOnBattlefield(s0, ap, card("Test Bird", "Creature — Bird", "{U}", { power: "1", toughness: "1", keywords: ["Flying"], oracleText: "Flying" }));
+    const forest = s0.battlefield.find((id) => s0.cards[s0.objects[id]!.cardId]!.name === "Forest")!;
+    invalidateCharacteristics(s0);
+    expect(objIsType(s0, s0.objects[forest]!, "Land")).toBe(true);
+    expect(characteristics(s0, s0.objects[forest]!).subtypes).toEqual(expect.arrayContaining(["Forest", "Island"]));
+    for (const id of [lev, bears, bird]) s0.objects[id]!.summoningSick = false;
+    const can = potentialAttackers(s0, ap).map((o) => o.id);
+    expect(can).not.toContain(bears);
+    expect(can).toEqual(expect.arrayContaining([lev, bird]));
+    void opp;
   });
 });

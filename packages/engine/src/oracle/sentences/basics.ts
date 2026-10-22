@@ -252,6 +252,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const phases: ("combat" | "main")[] = n.toLowerCase() === "two" ? ["combat", "combat"] : main ? ["combat", "main"] : ["combat"];
     return [{ type: "addPhases", phases, ...(after ? { after: after as "main" | "combat" } : {}) }];
   }
+  // Sphinx of the Second Sun: "there is an additional beginning phase after this phase" (CR 500.8).
+  if (/^[Tt]here is an additional beginning phase after this phase$/.test(s)) return [{ type: "addPhases", phases: ["beginning"] }];
   // Timetwister: "Each player shuffles their hand and graveyard into their library, then draws seven cards." Reminisce:
   // "Target player shuffles their graveyard into their library."
   // Endurance: "up to one target player puts all the cards from their graveyard on the bottom of their library in a random

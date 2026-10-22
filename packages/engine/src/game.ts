@@ -2144,9 +2144,10 @@ function advanceStep(s: GameState): void {
     if (!s.addedPhases?.length) s.addedPhases = undefined;
     if (added) {
       s.resumeStep ??= next;
-      log(s, added !== "main" ? "An additional combat phase begins." : "An additional main phase begins.");
+      log(s, added === "beginning" ? "An additional beginning phase begins." : added !== "main" ? "An additional combat phase begins." : "An additional main phase begins.");
       s.thatCombat = typeof added === "object" ? added.combat : undefined;
-      return beginStep(s, added !== "main" ? "beginCombat" : "main2");
+      // An additional beginning phase has its untap, upkeep and draw steps (CR 500.8, 501.1; Sphinx of the Second Sun rulings).
+      return beginStep(s, added === "beginning" ? "untap" : added !== "main" ? "beginCombat" : "main2");
     }
     if (s.resumeStep) {
       const resume = s.resumeStep;
@@ -2165,7 +2166,7 @@ const PHASE_ENDS = new Set<Step>(["draw", "main1", "endCombat", "main2"]);
  * directly after the current phase, before any added after it earlier. "After this main phase" and "after this combat
  * phase" add nothing when it isn't one (rulings on Relentless Assault and Full Throttle).
  */
-export function addPhases(s: GameState, phases: ("combat" | "main")[], after?: "main" | "combat", combatKey?: number): boolean {
+export function addPhases(s: GameState, phases: ("combat" | "main" | "beginning")[], after?: "main" | "combat", combatKey?: number): boolean {
   if (after === "main" && !isMainPhase(s)) return false;
   if (after === "combat" && !inCombatPhase(s)) return false;
   if (s.step === "end" || s.step === "cleanup") return false; // nothing comes after the ending phase but the next turn

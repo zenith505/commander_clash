@@ -286,3 +286,33 @@ describe("attack taxes until your next turn", () => {
     expect(before).toBeGreaterThan(0);
   });
 });
+
+const sphinx = card("Sphinx of the Second Sun", "Creature — Sphinx", "{6}{U}{U}", {
+  power: "6",
+  toughness: "6",
+  keywords: ["Flying"],
+  oracleText: "Flying\nAt the beginning of each of your postcombat main phases, there is an additional beginning phase after this phase. (The beginning phase includes the untap, upkeep, and draw steps.)",
+});
+
+describe("Sphinx of the Second Sun", () => {
+  it("after your postcombat main phase: an untap step, an upkeep step and a draw step, then the end step", () => {
+    expect(isFullySupported(sphinx)).toBe(true);
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, sphinx);
+    const land = s0.battlefield.find((id) => s0.objects[id]!.controller === ap && s0.cards[s0.objects[id]!.cardId]!.name === "Island")!;
+    let s = passUntil(s0, "main2", ap);
+    s = settle(s);
+    s.objects[land]!.tapped = true;
+    const hand = s.players[ap]!.hand.length;
+    const steps: string[] = [];
+    for (let i = 0; i < 40 && s.step !== "end"; i++) {
+      const before = s.step;
+      s = act(s, { type: "passPriority", player: waitingOn(s)! });
+      if (s.step !== before) steps.push(s.step);
+    }
+    expect(steps).toEqual(["upkeep", "draw", "end"]); // the untap step has no priority
+    expect(s.objects[land]!.tapped).toBe(false);
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+    expect(s.activePlayer).toBe(ap);
+  });
+});

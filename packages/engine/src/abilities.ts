@@ -2503,7 +2503,8 @@ export type Effect =
    */
   | {
       type: "addPhases";
-      phases: ("combat" | "main")[];
+      /** "beginning": "there is an additional beginning phase after this phase" (Sphinx of the Second Sun): untap, upkeep and draw steps. */
+      phases: ("combat" | "main" | "beginning")[];
       after?: "main" | "combat";
       /** "At the beginning of that combat, untap all creatures you control" (Moraug): a delayed trigger for the added combat phase only (CR 603.7). */
       thatCombat?: { effects: Effect[]; text: string };

@@ -1360,7 +1360,7 @@ export interface GameState {
    * (CR 500.8). An additional main phase is a postcombat main phase (CR 505.1a), so it's run as "main2".
    */
   /** Phases added after the current one (CR 500.8); `{ combat: key }` is a combat phase a delayed trigger waits for ("at the beginning of that combat"). */
-  addedPhases?: ("combat" | "main" | { combat: number })[];
+  addedPhases?: ("combat" | "main" | "beginning" | { combat: number })[];
   /** The key of the added combat phase going on now (see addedPhases), and the last key given out. */
   thatCombat?: number;
   combatKeys?: number;

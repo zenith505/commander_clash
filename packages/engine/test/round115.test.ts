@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, cast, island, passUntil, putOnBattlefield, setup, target } from "./helpers";
-import { attackTaxPer, botActions, isFullySupported, isSuspended, planActivate, planCast, waitingOn, type Action, type GameState, type PlayerId } from "../src";
+import { attackTaxPer, botActions, invalidateCharacteristics, isFullySupported, objIsType, power, toughness, isSuspended, planActivate, planCast, waitingOn, type Action, type GameState, type PlayerId } from "../src";
 import { moveObject } from "../src/game";
 
 const run = (s: GameState, plan: Action[] | null) => {
@@ -482,5 +482,38 @@ describe("all ... except for", () => {
     s = settle(run(s, planActivate(s, ap, g, 0)));
     expect([b, art, g].map((id) => s.objects[id]!.zone)).toEqual(["graveyard", "battlefield", "graveyard"]);
     expect(s.battlefield.some((id) => s.objects[id]!.controller === ap && s.cards[s.objects[id]!.cardId]!.name === "Island")).toBe(true);
+  });
+});
+
+const toxrill = card("Toxrill, the Corrosive", "Legendary Creature — Slug Horror", "{5}{B}{B}", {
+  power: "7",
+  toughness: "7",
+  oracleText:
+    "At the beginning of each end step, put a slime counter on each creature you don't control.\nCreatures you don't control get -1/-1 for each slime counter on them.\nWhenever a creature you don't control with a slime counter on it dies, create a 1/1 black Slug creature token.\n{U}{B}, Sacrifice a Slug: Draw a card.",
+});
+
+describe("Toxrill, the Corrosive", () => {
+  it("slime counters at each end step shrink each creature you don't control by its own counters; one dying with slime makes a Slug", () => {
+    expect(isFullySupported(toxrill)).toBe(true);
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, toxrill);
+    const mine = putOnBattlefield(s0, ap, bear());
+    const big = putOnBattlefield(s0, opp, card("Big Ox", "Creature — Ox", "{3}", { power: "3", toughness: "3" }));
+    const b = putOnBattlefield(s0, opp, bear());
+    s0.objects[big]!.counters.slime = 1; // from another source: still counts (rulings)
+    invalidateCharacteristics(s0);
+    expect([power(s0, s0.objects[big]!), toughness(s0, s0.objects[big]!)]).toEqual([2, 2]);
+    expect(toughness(s0, s0.objects[b]!)).toBe(2);
+    let s = passUntil(s0, "end", ap);
+    s = settle(s);
+    // One more on each: the bear has one (1/1), the ox two (1/1); yours gets none.
+    expect([s.objects[b]!.counters.slime, s.objects[big]!.counters.slime, s.objects[mine]!.counters.slime ?? 0]).toEqual([1, 2, 0]);
+    expect([toughness(s, s.objects[b]!), toughness(s, s.objects[big]!)]).toEqual([1, 1]);
+    s = passUntil(s, "end", opp);
+    s = settle(s);
+    // Another counter at the opponent's end step: both die, and each makes a Slug for Toxrill's controller.
+    expect([s.objects[b]!.zone, s.objects[big]!.zone]).toEqual(["graveyard", "graveyard"]);
+    const slugs = s.battlefield.filter((id) => s.objects[id]!.controller === ap && s.objects[id]!.isToken && objIsType(s, s.objects[id]!, "Creature"));
+    expect(slugs.length).toBe(2);
   });
 });

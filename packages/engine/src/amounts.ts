@@ -111,6 +111,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
       return o ? manaValue(parseManaCost(defOf(s, o).manaCost)) : 0;
     }
+    case "affectedCounters": {
+      const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
+      return o?.counters[c.counter] ?? 0;
+    }
     case "timesAffectedAttacked": {
       // Counted for this object only (CR 400.7), even times before the static ability's source was on the battlefield (rulings on Moraug).
       const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
@@ -524,6 +528,8 @@ function describeCount(c: Count): string {
       return "#cards in hand";
     case "timesAffectedAttacked":
       return "#times it attacked this turn";
+    case "affectedCounters":
+      return `#${c.counter} counters on it`;
     case "affectedManaValue":
       return "its mana value";
     case "cardsInLibrary":

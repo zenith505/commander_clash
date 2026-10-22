@@ -92,7 +92,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const e = fx?.length === 1 ? fx[0] : undefined;
     if (!e || (e.type !== "bounce" && e.type !== "destroy") || e.what.ref !== "each" || e.what.filter.kind !== "object") return null;
     const f = e.what.filter;
-    return [{ ...e, what: { ...e.what, filter: { ...f, notTypes: [...f.notTypes, ...types], ...(subtypes.length ? { notSubtypes: [...(f.notSubtypes ?? []), ...subtypes] } : {}), text: `${f.text} except ${m[2]}` } } } as Effect];
+    return [{ ...e, what: { ...e.what, filter: { ...f, notTypes: [...(f.notTypes ?? []), ...types], ...(subtypes.length ? { notSubtypes: [...(f.notSubtypes ?? []), ...subtypes] } : {}), text: `${f.text} except ${m[2]}` } } } as Effect];
   }
   // Meld (CR 701.42a), as normalizeSelf words it: "exile ~ and the creature named Bruna, the Fading Light, then meld them
   // into Brisela, Voice of Nightmares", after "if you both own and control ~ and a creature named ..." (checked again as

@@ -104,6 +104,13 @@ const oko = card("Oko, Thief of Crowns", "Legendary Planeswalker — Oko", "{1}{
   oracleText:
     "+2: Create a Food token. (It's an artifact with \"{2}, {T}, Sacrifice this token: You gain 3 life.\")\n+1: Target artifact or creature loses all abilities and becomes a green Elk creature with base power and toughness 3/3.\n−5: Exchange control of target artifact or creature you control and target creature an opponent controls with power 3 or less.",
 });
+const leveler = card("Cityscape Leveler", "Artifact Creature — Construct", "{8}", {
+  power: "8",
+  toughness: "8",
+  keywords: ["Trample", "Unearth"],
+  oracleText:
+    "Trample\nWhen you cast this spell and whenever Cityscape Leveler attacks, destroy up to one target nonland permanent. Its controller creates a tapped Powerstone token. (It's an artifact with \"{T}: Add {C}. This mana can't be spent to cast a nonartifact spell.\")\nUnearth {8}",
+});
 const treasure = card("Treasure", "Token Artifact — Treasure", "", { oracleText: "{T}, Sacrifice this token: Add one mana of any color." });
 
 /** Pass along, answering every pending choice the dull way, until `stop` holds. */
@@ -497,5 +504,30 @@ describe("Oko, Thief of Crowns", () => {
     s = passAll(s);
     expect(controllerOf(s, s.objects[theirs]!)).toBe(ap);
     expect(controllerOf(s, s.objects[mine]!)).toBe(opp);
+  });
+});
+
+describe("Cityscape Leveler", () => {
+  it("is supported: as it's cast and as it attacks, a nonland permanent is destroyed and its controller gets a tapped Powerstone", () => {
+    expect(isFullySupported(leveler)).toBe(true);
+    let { s, ap, ids, opp } = setup([leveler]);
+    const [b1, b2] = [putOnBattlefield(s, opp, bear()), putOnBattlefield(s, opp, bear())];
+    for (const a of planCast(s, ap, ids[0]!)!) s = act(s, a);
+    s = until(s, (x) => x.pending?.kind === "chooseTargets");
+    s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: b1 }] } as never);
+    s = until(s, (x) => x.stack.length === 0);
+    expect(s.objects[b1]!.zone).toBe("graveyard");
+    expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
+    const stones = () => s.battlefield.filter((id) => s.cards[s.objects[id]!.cardId]!.name.startsWith("Powerstone"));
+    expect(stones().map((id) => [controllerOf(s, s.objects[id]!), s.objects[id]!.tapped])).toEqual([[opp, true]]);
+    // Its next attack.
+    s.objects[ids[0]!]!.controlledSinceTurn = -1;
+    s = passUntil(s, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: ids[0]!, defender: opp }] });
+    s = until(s, (x) => x.pending?.kind === "chooseTargets");
+    s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: b2 }] } as never);
+    s = until(s, (x) => x.stack.length === 0 && x.triggerQueue.length === 0);
+    expect(s.objects[b2]!.zone).toBe("graveyard");
+    expect(stones().length).toBe(2);
   });
 });

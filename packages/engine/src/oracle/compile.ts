@@ -2187,6 +2187,8 @@ export function compile(d: CardDef): CompiledCard {
     // died is the card).
     const twice =
       /^When you cast or cycle ~, (.+)$/.exec(line) ??
+      // "When you cast ~ and whenever ~ attacks, destroy up to one target nonland permanent" (Cityscape Leveler).
+      /^When you cast ~ and whenever ~ (attacks), (.+)$/.exec(line) ??
       /^When ~ enters and (at the beginning of (?:your upkeep|your end step|each upkeep|each end step)), (.+)$/.exec(line) ??
       /^When you cycle ~ and when ~ dies, (.+)$/.exec(line) ??
       /^When(?:ever)? ~ enters or (attacks|dies|is put into a graveyard from the battlefield|leaves the battlefield|the creature it haunts dies|deals combat damage to a player|transforms into ~), (.+)$/.exec(line) ??
@@ -2211,7 +2213,9 @@ export function compile(d: CardDef): CompiledCard {
       /^Whenever an opponent (attacks you with two or more creatures), (draws their second card each turn), or (casts their second spell each turn), (.+)$/.exec(line);
     if (twice && !/\bonly once\b/.test(line)) {
       const effect = twice[twice.length - 1]!;
-      const events = /^When you cast/.test(line)
+      const events = /^When you cast ~ and whenever/.test(line)
+        ? [`When you cast ~, ${effect}`, `Whenever ~ ${twice[1]}, ${effect}`]
+        : /^When you cast/.test(line)
         ? [`When you cast ~, ${effect}`, `When you cycle ~, ${effect}`]
         : /^When you cycle/.test(line)
           ? [`When ~ dies, ${effect}`, `When you cycle ~, ${effect}`]

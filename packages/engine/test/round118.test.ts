@@ -721,3 +721,23 @@ describe("Lich-Knights' Conquest", () => {
     expect(dead.map((id) => s.objects[id]!.zone)).toEqual(["battlefield", "graveyard", "battlefield"]);
   });
 });
+
+const timeTwist = card("Teferi's Time Twist", "Instant", "{1}{U}", {
+  oracleText:
+    "Exile target permanent you control. Return that card to the battlefield under its owner's control at the beginning of the next end step. If it enters as a creature, it enters with an additional +1/+1 counter on it.",
+});
+
+describe("Teferi's Time Twist", () => {
+  for (const creature of [true, false])
+    it(`returns the card at the next end step${creature ? " with a +1/+1 counter as a creature" : ", a noncreature with no counter"}`, () => {
+      expect(isFullySupported(timeTwist)).toBe(true);
+      const { s: s0, ap, ids } = setup([timeTwist]);
+      let s = s0;
+      const t = putOnBattlefield(s, ap, creature ? bear() : card("Relic", "Artifact", "{1}", { oracleText: "" }));
+      s = settle(run(s, planCast(s, ap, ids[0]!, [{ kind: "object", id: t }])));
+      expect(s.objects[t]!.zone).toBe("exile");
+      s = settle(passUntil(s, "end", ap));
+      expect(s.objects[t]!.zone).toBe("battlefield");
+      expect(s.objects[t]!.counters["+1/+1"] ?? 0).toBe(creature ? 1 : 0);
+    });
+});

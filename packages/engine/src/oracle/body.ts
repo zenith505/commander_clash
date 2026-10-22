@@ -2866,7 +2866,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       if (owners && (later[4] !== "its owner's" || ex.what.ref !== "target" || (ex.what.n !== undefined && ex.what.n !== 1))) return null;
       // Phelia: "If it entered under your control, put a +1/+1 counter on ~", part of the delayed trigger (CR 603.7).
       const ifYours = !ctx.spell && under === "owner" && laterAt.into === effects ? new RegExp(`^If it entered under your control, put an? ${COUNTER} counter on ~$`).exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
-      laterAt.into[laterAt.at] = { type: "flicker", what: ex.what, under, at: owners ? "ownersNextEndStep" : "nextEndStep", ...(counter ? { counter: counterKind(counter) } : {}), ...(later[1] || later[3] ? { tapped: true as const } : {}), ...(ifYours ? { selfCounterIfYours: counterKind(ifYours[1]!) } : {}) };
+      // Teferi's Time Twist: "If it enters as a creature, it enters with an additional +1/+1 counter on it", judged as it
+      // would exist on the battlefield (rulings, CR 614.12). One card only.
+      const ifCreature = !counter && !ifYours && ex.what.ref === "target" && !ex.what.n && /^If it enters as a creature, it enters with an additional \+1\/\+1 counter on it\.?$/.test(sentences[si + 1] ?? "");
+      if (ifCreature) si++;
+      laterAt.into[laterAt.at] = { type: "flicker", what: ex.what, under, at: owners ? "ownersNextEndStep" : "nextEndStep", ...(counter ? { counter: counterKind(counter) } : {}), ...(ifCreature ? { counter: "+1/+1" as const, counterIfCreature: true as const } : {}), ...(later[1] || later[3] ? { tapped: true as const } : {}), ...(ifYours ? { selfCounterIfYours: counterKind(ifYours[1]!) } : {}) };
       if (ifYours) si++;
       continue;
     }

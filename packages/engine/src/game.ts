@@ -610,6 +610,8 @@ export function moveObject(
     tapped?: boolean;
     /** Counters it enters the battlefield with (persist, undying). */
     counters?: Record<string, number>;
+    /** "If it enters as a creature, it enters with an additional +1/+1 counter on it" (Teferi's Time Twist): judged as it would exist there (CR 614.12, rulings). */
+    countersIfCreature?: Record<string, number>;
     /** For a land that may enter untapped by paying life or revealing a card: that was done (CR 614.12). */
     untapped?: boolean;
     /** The X of the spell it was, for "enters with X counters" and its enters triggers (CR 107.3m). */
@@ -946,7 +948,7 @@ export function moveObject(
     // "It gains haste until end of turn" while it was a spell (Tyvar Kell's emblem): the permanent it becomes has it (CR 400.7a).
     for (const g of fromZone === "stack" ? (o.spellGains ?? []) : []) s.effects.push({ id: `e${s.nextId++}`, timestamp: g.timestamp, controller: g.controller, sourceName: g.source, duration: "endOfTurn", affected: [o.id], mods: g.mods });
     o.spellGains = undefined;
-    const how: EnterOpts = { ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
+    const how: EnterOpts = { ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(opts.countersIfCreature ? { countersIfCreature: opts.countersIfCreature } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
     // "You may have ~ enter as a copy of ...": it becomes the copy as it enters (CR 707.5), so how it
     // enters and what it triggers wait for that choice.
     if (printed.entersAsCopy && copyCandidates(s, o, printed.entersAsCopy.filter).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });
@@ -1030,7 +1032,7 @@ function scatterMerged(s: GameState, ids: ObjectId[], to: ZoneName, top: boolean
 }
 
 /** `fromStack`: it's a resolving spell becoming a permanent (sunburst, CR 702.44b). */
-type EnterOpts = { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean };
+type EnterOpts = { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; countersIfCreature?: Record<string, number>; escaped?: boolean; fromStack?: boolean };
 
 /**
  * The rest of entering the battlefield (CR 614.1c, 614.12): tapped or not, counters, "as it enters" choices,
@@ -1057,6 +1059,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   if (defense > 0) add("defense", defense);
   if (withCounters) add(withCounters.counter, withCounters.n);
   for (const [k, n] of Object.entries(opts.counters ?? {})) add(k, n);
+  if (characteristics(s, o).types.includes("Creature")) for (const [k, n] of Object.entries(opts.countersIfCreature ?? {})) add(k, n);
   for (const [k, n] of Object.entries(othersAddCounters(s, o))) add(k, n);
   // Its own "enters with an additional counter", printed or granted as it enters (Master Chef, CR 614.12).
   for (const e of withGranted(printed, characteristics(s, o).grantedAbilities).entersWithAdditional ?? []) add(e.counter, e.n);

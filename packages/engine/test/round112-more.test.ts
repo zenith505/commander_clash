@@ -254,3 +254,44 @@ function toZoneGy(s: GameState, pid: PlayerId, def: CardDef, zone: "graveyard" |
   s.players[pid]![zone].push(id);
   return id;
 }
+
+const vandal = card("Masked Vandal", "Creature — Shapeshifter", "{1}{G}", {
+  power: "1",
+  toughness: "3",
+  keywords: ["Changeling"],
+  oracleText: "Changeling (This card is every creature type.)\nWhen this creature enters, you may exile a creature card from your graveyard. If you do, exile target artifact or enchantment an opponent controls.",
+});
+
+describe("Masked Vandal", () => {
+  it("is supported", () => expect(isFullySupported(vandal)).toBe(true));
+
+  const enter = (withCard: boolean, yes: boolean) => {
+    const { s: s0, ap, ids, opp } = setup([vandal]);
+    const rock = putOnBattlefield(s0, opp, card("Their Rock", "Artifact", "{2}", {}));
+    const dead = withCard ? toZoneGy(s0, ap, bear({ name: "Dead Bear" })) : undefined;
+    let s = s0;
+    for (const a of planCast(s, ap, ids[0]!)!) s = act(s, a);
+    for (let i = 0; i < 20 && s.pending?.kind !== "chooseMay" && s.pending?.kind !== "searchLibrary" && (s.stack.length || s.pending); i++) {
+      if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: rock }] });
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    if (s.pending?.kind === "chooseMay") s = act(s, { type: "chooseMay", player: ap, yes });
+    if (s.pending?.kind === "searchLibrary") s = act(s, { type: "searchLibrary", player: ap, found: s.pending.cards.slice(0, 1) });
+    s = passAll(s);
+    return { s, rock, dead };
+  };
+
+  it("exiling a creature card from your graveyard exiles their artifact", () => {
+    const { s, rock, dead } = enter(true, true);
+    expect(s.objects[dead!]!.zone).toBe("exile");
+    expect(s.objects[rock]!.zone).toBe("exile");
+  });
+
+  it("not exiling one, or having none, leaves it", () => {
+    const no = enter(true, false);
+    expect(no.s.objects[no.dead!]!.zone).toBe("graveyard");
+    expect(no.s.objects[no.rock]!.zone).toBe("battlefield");
+    const none = enter(false, true);
+    expect(none.s.objects[none.rock]!.zone).toBe("battlefield");
+  });
+});

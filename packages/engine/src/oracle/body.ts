@@ -213,6 +213,8 @@ const checkableMay = (e: Effect) =>
   // "You may put a card from your hand on the bottom of your library. If you do, draw a card." (Volcanic Spite): only
   // with a card in hand.
   (e.type === "handToTop" && e.n === 1) ||
+  // "You may exile a creature card from your graveyard. If you do, ..." (Masked Vandal): only with one there.
+  (e.type === "chooseFromGraveyard" && e.dest === "exile" && e.n === 1 && !e.upTo && !e.who && !e.milled && !e.eventGroup && !e.notSacrificed && e.totalMv === undefined && e.mvMax === undefined) ||
   // "You may create a Treasure token. When you do, ..." (Generous Plunderer): creating it is doing it.
   (e.type === "createToken" && e.who.ref === "you" && typeof e.n === "number" && e.n > 0 && !e.attachTo) ||
   (e.type === "sacrifice" && e.what.ref === "self") ||
@@ -3028,6 +3030,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
         effects.push({ type: "if", cond: { kind: "youDid" }, effects: [{ type: "getEnergy", who: { ref: "you" }, n: energyThen[1]!.length / 3 }, ...rest] });
         continue;
       }
+      // "You may exile a creature card from your graveyard. If you do, exile target artifact or enchantment an opponent
+      // controls" (Masked Vandal): whether a card was exiled.
       if (!mustSac && (prev?.type !== "may" || prev.pay || !prev.effects.every(checkableMay))) return null;
       // "You may sacrifice an artifact, creature, ... If you do, each opponent may sacrifice a permanent of their choice that
       // shares a card type with it. For each opponent who doesn't, that player loses 2 life and you draw a card." (Braids,

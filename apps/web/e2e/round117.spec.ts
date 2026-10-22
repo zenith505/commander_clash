@@ -1,11 +1,11 @@
 // Round 117's prompts: Druid of Purification ("starting with you, each player may choose an artifact or enchantment you
 // don't control": a button for each, and "Choose nothing"), Odric, Master Tactician (you choose the defending
-// player's blocks: click their creatures, then your attackers), and Armored Skyhunter (you may attach the Equipment it
-// put onto the battlefield to a creature you control).
+// player's blocks: click their creatures, then your attackers), Armored Skyhunter (you may attach the Equipment it
+// put onto the battlefield to a creature you control) and Protean Hulk (a library search with a total mana value limit).
 import { expect, test } from "@playwright/test";
-import { applyAction } from "@cc/engine";
+import { applyAction, planCast, waitingOn } from "@cc/engine";
 import { idsOf, LANDS, one, open, pageErrors, playUntil, scene } from "./scene";
-import { card, controls, resolveUntil } from "./ui";
+import { card, controls, modal, resolveUntil } from "./ui";
 
 test("Druid of Purification: choose an artifact you don't control, or nothing; each one chosen is destroyed", async ({ page }) => {
   const s = scene({ hand: ["Druid of Purification"], board: [...LANDS, "Mind Stone"] }, [{ board: ["Sol Ring"] }, { board: ["Grizzly Bears"] }]);
@@ -66,5 +66,28 @@ test("Armored Skyhunter: an Equipment from the top six, then you may attach it t
   const after = await resolveUntil(page, (st) => st.objects[saw]!.attachedTo !== undefined);
   expect(after.objects[saw]!.attachedTo).toBe(bears);
   expect(after.log.some((l) => l.text === "Bonesplitter is attached to Grizzly Bears.")).toBe(true);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Protean Hulk: search for creature cards with total mana value 6 or less", async ({ page }) => {
+  let s = scene({ hand: ["Doom Blade"], board: [...LANDS, "Protean Hulk"], library: ["Hill Giant", "Llanowar Elves", "Grizzly Bears", "Serra Angel"] });
+  const [hulk, giant, elves, bears] = ["Protean Hulk", "Hill Giant", "Llanowar Elves", "Grizzly Bears"].map((n) => one(s, n)) as [string, string, string, string];
+  // Destroying the Hulk is played in the engine; the test starts at the search.
+  s = playUntil(s, (st) => st.step === "main1" && waitingOn(st) === 0 && !st.pending);
+  for (const a of planCast(s, 0, one(s, "Doom Blade"), [{ kind: "object", id: hulk }])!) s = applyAction(s, a);
+  s = playUntil(s, (st) => st.pending?.kind === "searchLibrary");
+  await open(page, s);
+  const pick = modal(page);
+  await expect(pick).toContainText("any number of creature cards with total mana value 6 or less");
+  await pick.locator(`[data-pick="${giant}"]`).click();
+  await pick.locator(`[data-pick="${elves}"]`).click();
+  await expect(pick).toContainText("total mana value 5 of at most 6");
+  // Grizzly Bears would make it 7.
+  await pick.locator(`[data-pick="${bears}"]`).click();
+  await pick.getByRole("button", { name: "Done" }).click();
+  const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending);
+  expect(after.objects[giant]!.zone).toBe("battlefield");
+  expect(after.objects[elves]!.zone).toBe("battlefield");
+  expect(after.objects[bears]!.zone).toBe("library");
   expect(pageErrors(page)).toEqual([]);
 });

@@ -580,3 +580,38 @@ describe("Stonehewer Giant and Quest for the Holy Relic", () => {
     expect(s.objects[saw!]).toMatchObject({ zone: "battlefield", attachedTo: b });
   });
 });
+
+const hulk = card("Protean Hulk", "Creature — Beast", "{5}{G}{G}", {
+  power: "6",
+  toughness: "6",
+  oracleText: "When this creature dies, search your library for any number of creature cards with total mana value 6 or less, put them onto the battlefield, then shuffle.",
+});
+
+describe("Protean Hulk", () => {
+  it("dies: any number of creature cards with total mana value 6 or less onto the battlefield; {X} counts as 0", () => {
+    expect(isFullySupported(hulk)).toBe(true);
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const h = putOnBattlefield(s, ap, hulk);
+    const [four, two, big, x] = onTop(s, ap, [
+      bear({ name: "Four Drop", power: "4", toughness: "4" }),
+      bear({ name: "Two Drop" }),
+      bear({ name: "Seven Drop" }),
+      card("X Drop", "Creature — Hydra", "{X}{G}", { power: "1", toughness: "1" }),
+    ]) as [string, string, string, string];
+    s.cards[s.objects[four]!.cardId]!.manaCost = "{3}{G}";
+    s.cards[s.objects[four]!.cardId]!.cmc = 4;
+    s.cards[s.objects[big]!.cardId]!.manaCost = "{6}{G}";
+    s.cards[s.objects[big]!.cardId]!.cmc = 7;
+    moveObject(s, h, "graveyard");
+    for (let i = 0; i < 20 && s.pending?.kind !== "searchLibrary"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", totalMv: 6, what: "any number of creature cards with total mana value 6 or less" });
+    const offered = (s.pending as { cards: string[] }).cards;
+    expect(offered).not.toContain(big);
+    // 4 + 2 + 1 ({X}{G} is 1) is too much; 4 + 1 is fine.
+    expect(() => act(s, { type: "searchLibrary", player: ap, found: [four, two, x] })).toThrow(/total mana value 6 or less/);
+    s = act(s, { type: "searchLibrary", player: ap, found: [four, x] });
+    for (const id of [four, x]) expect(s.objects[id]!.zone).toBe("battlefield");
+    expect(s.objects[two]!.zone).toBe("library");
+  });
+});

@@ -56,7 +56,11 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
   // with each other one; one card alone is fine (rulings).
   const share = / that share a land type$/.exec(m[3]!);
   if (share && (n === 1 || eachX)) return null;
-  const phrase = eachX ? m[3]!.slice(0, eachX.index) : share ? m[3]!.slice(0, share.index) : m[3]!;
+  // "Any number of creature cards with total mana value 6 or less" (Protean Hulk): all the cards found together, a card
+  // with {X} in its mana cost counting X as 0 (CR 202.3e, rulings).
+  const total = / with total mana value (\d+) or less$/.exec(m[3]!);
+  if (total && (n === 1 || eachX || share)) return null;
+  const phrase = eachX ? m[3]!.slice(0, eachX.index) : share ? m[3]!.slice(0, share.index) : total ? m[3]!.slice(0, total.index) : m[3]!;
   const different = / with different names$/.exec(phrase);
   if ((different && n === 1) || (eachX && !different)) return null;
   const filter0 = parseSearchFilter(different ? phrase.slice(0, different.index) : phrase, count);
@@ -64,7 +68,7 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
   const filter = eachX ? { ...filter0!, bound: { key: "manaValue" as const, at: "exact" as const, amount: X }, text: `${filter0!.text} with mana value X` } : filter0;
   let r: RegExpExecArray | null;
   // An Aura put onto the battlefield this way: its controller chooses what it enchants as it enters (CR 303.4f).
-  const base = { type: "search" as const, ...(filter ? { filter: different ? { ...filter, text: `${filter.text} with different names` } : share ? { ...filter, text: `${filter.text} that share a land type` } : filter } : {}), n, upTo, reveal, ...(different ? { oneEach: true as const } : {}), ...(share ? { shareLandType: true as const } : {}) };
+  const base = { type: "search" as const, ...(filter ? { filter: different ? { ...filter, text: `${filter.text} with different names` } : share ? { ...filter, text: `${filter.text} that share a land type` } : total ? { ...filter, text: `${filter.text} with total mana value ${total[1]} or less` } : filter } : {}), n, upTo, reveal, ...(different ? { oneEach: true as const } : {}), ...(share ? { shareLandType: true as const } : {}), ...(total ? { totalMv: Number(total[1]) } : {}) };
   if ((r = new RegExp(`^put ${SEARCH_PRONOUN} ${SEARCH_DEST}, then shuffle$`, "i").exec(rest))) return [{ ...base, dest: searchDest(r[1]!) }];
   if ((r = new RegExp(`^put one ${SEARCH_DEST} and the other ${SEARCH_DEST}, then shuffle$`, "i").exec(rest)) && n === 2)
     return [{ ...base, dest: searchDest(r[1]!), others: searchDest(r[2]!) }];

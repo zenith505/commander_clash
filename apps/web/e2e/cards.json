@@ -8263,6 +8263,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "10180e2f-90c5-4d41-ba44-16b14948f923",
+  "name": "Protean Hulk",
+  "manaCost": "{5}{G}{G}",
+  "cmc": 7,
+  "typeLine": "Creature — Beast",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Beast"
+  ],
+  "oracleText": "When this creature dies, search your library for any number of creature cards with total mana value 6 or less, put them onto the battlefield, then shuffle.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "rvr",
+  "releasedAt": "2024-01-12",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ecc435e2-deb1-420a-a79f-01dd08747314",
   "name": "Pyroblast",
   "manaCost": "{R}",

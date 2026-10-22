@@ -865,7 +865,8 @@ export function parseStaticMods(rest: string): Modification[] | null {
   }
   // "Gets +2/+2, has flying, and attacks each combat if able" (Dragon's Rage Channeler), "... and can't attack you or
   // planeswalkers you control" (the Vows).
-  if ((m = new RegExp(`^gets? ${PT}/${PT}, (?:has|have) (.+?),? and (attacks? each combat if able|can't block|can't attack you or planeswalkers you control)$`).exec(rest))) {
+  if ((m = new RegExp(`^gets? ${PT}/${PT}, (?:has|have) (.+?),? and (attacks? each combat if able|can't block|can't attack you or planeswalkers you control|is goaded)$`).exec(rest))) {
+    // "... has deathtouch, and is goaded" (Ghoulish Impetus).
     const grants = parseGrants(m[3]!);
     const second = parseStaticMods(m[4]!);
     return grants && second ? [{ kind: "modifyPT", power: ptAmt(m[1]!), toughness: ptAmt(m[2]!) }, ...grants, ...second] : null;

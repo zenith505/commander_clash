@@ -4,9 +4,9 @@
 import { describe, expect, it } from "vitest";
 import { act, bear, card, forest, passAll, passUntil, putOnBattlefield, scry, setup, swamp } from "./helpers";
 import { botActions, isFullySupported, planActivate, planCast, planMana, waitingOn, type Action, type GameState, type PlayerId } from "../src";
-import { moveObject, spellCost, tapPermanent } from "../src/game";
+import { destroyPermanent, moveObject, spellCost, tapPermanent } from "../src/game";
 import { parseManaCost } from "../src/mana";
-import { characteristics } from "../src/layers";
+import { characteristics, invalidateCharacteristics } from "../src/layers";
 
 const settle = (s: GameState) => {
   for (let i = 0; i < 80 && (s.stack.length || s.triggerQueue.length) && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
@@ -652,5 +652,40 @@ describe("Eminence", () => {
     expect(s.objects[c]!.zone).toBe("battlefield");
     s = settle(run(s, planCast(s, ap, ids[1]!)));
     expect(tokens()).toBe(2);
+  });
+});
+
+const impetus = card("Ghoulish Impetus", "Enchantment — Aura", "{2}{B}", {
+  oracleText:
+    "Enchant creature\nEnchanted creature gets +1/+1, has deathtouch, and is goaded. (It attacks each combat if able and attacks a player other than you if able.)\nWhen enchanted creature dies, return this card to the battlefield at the beginning of the next end step.",
+});
+
+describe("Ghoulish Impetus", () => {
+  it("+1/+1, deathtouch, goaded; when the creature dies, the Aura returns at the next end step, on a creature its controller chooses", () => {
+    expect(isFullySupported(impetus)).toBe(true);
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const opp = later(s, ap, 1);
+    const victim = putOnBattlefield(s, opp, bear());
+    const other = putOnBattlefield(s, opp, bear({ name: "Other Bear" }));
+    const aura = putOnBattlefield(s, ap, impetus);
+    s.objects[aura]!.attachedTo = victim;
+    invalidateCharacteristics(s);
+    const ch = characteristics(s, s.objects[victim]!);
+    expect([ch.power, ch.keywords.includes("Deathtouch")]).toEqual([3, true]);
+    destroyPermanent(s, s.objects[victim]!, "test");
+    s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = settle(s);
+    expect(s.objects[aura]!.zone).toBe("graveyard");
+    s = passUntil(s, "end", ap);
+    s = settle(s);
+    for (let i = 0; i < 5 && s.pending; i++) {
+      if (s.pending.kind === "chooseTargets" || s.pending.kind === "chooseOption") s = settle(run(s, botActions(s, s.pending.player)));
+    }
+    expect(s.objects[aura]!.zone).toBe("battlefield");
+    expect(s.objects[aura]!.controller).toBe(ap);
+    expect(s.objects[aura]!.attachedTo).toBeDefined();
+    expect(characteristics(s, s.objects[s.objects[aura]!.attachedTo!]!).power).toBe(3);
+    void other;
   });
 });

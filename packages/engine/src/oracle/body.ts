@@ -2818,6 +2818,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // Return ~ to the battlefield attached to that creature at the beginning of the next end step": a delayed trigger
     // about the permanent the card became, and the Aura's card in the graveyard (rulings).
     const prevPut = effects[effects.length - 1];
+    // Ghoulish Impetus: "When enchanted creature dies, return this card to the battlefield at the beginning of the next end
+    // step": the Aura's card, if it's still in the graveyard then, under the delayed trigger's controller's control (CR
+    // 110.2a, 603.7), enchanting what that player chooses as it enters (303.4f).
+    if (ctx.auraCard && /^[Rr]eturn ~ to the battlefield at the beginning of the next end step$/.test(s) && si === 0) {
+      effects.push({ type: "delayed", when: "nextEndStep", each: "selfCard", of: { ref: "selfCard", moved: true }, effects: [{ type: "putOntoBattlefield", what: { ref: "selfCard" } }], text: "return ~ to the battlefield" });
+      continue;
+    }
     if (ctx.auraCard && /^Return ~ to the battlefield attached to that creature at the beginning of the next end step$/.test(s) && prevPut?.type === "putOntoBattlefield" && prevPut.what.ref === "subjectCard" && si === 1) {
       effects.push({ type: "delayed", when: "nextEndStep", each: "returned", effects: [{ type: "putOntoBattlefield", what: { ref: "selfCard" }, attachToSubject: true }], text: "return ~ to the battlefield attached to that creature" });
       continue;

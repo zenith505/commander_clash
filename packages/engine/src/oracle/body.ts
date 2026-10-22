@@ -3508,6 +3508,19 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // as they enter there (not Auras, CR 303.4f).
     // Open the Way: "... until you reveal X land cards. Put those land cards onto the battlefield tapped and the rest ...".
     const untilX = /^[Rr]eveal cards from the top of your library until you reveal X land cards$/.test(s) && /^Put those land cards onto the battlefield tapped and the rest on the bottom of your library in a random order$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    // Kindred Summons: "Choose a creature type. Reveal cards from the top of your library until you reveal X creature cards
+    // of the chosen type, where X is the number of creatures you control of that type. Put those cards onto the
+    // battlefield, then shuffle the rest of the revealed cards into your library." X counted as it resolves; all of them
+    // enter together; fewer if the library runs out (rulings).
+    const untilChosen = /^[Rr]eveal cards from the top of your library until you reveal X creature cards of the chosen type$/.test(s) && where?.[2] === "the number of creatures you control of that type";
+    if (untilChosen && /^Put those cards onto the battlefield, then shuffle the rest of the revealed cards into your library$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      const prev = effects[effects.length - 1];
+      const n = parseCount(where[2]!, ctx);
+      if (prev?.type !== "choose" || prev.choice !== "creatureType" || !n) return null;
+      effects.push({ type: "revealUntil", filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], chosen: "type", text: "creature card of the chosen type" }, found: "battlefield", rest: "shuffle", n });
+      si++;
+      continue;
+    }
     if (untilX) {
       effects.push({ type: "revealUntil", filter: { kind: "card", types: ["Land"], notTypes: [], notColors: [], text: "land card" }, found: "battlefield", rest: "bottom", tapped: true, n: { count: { kind: "x" } } });
       si++;

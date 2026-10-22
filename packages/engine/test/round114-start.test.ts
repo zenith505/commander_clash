@@ -1228,3 +1228,30 @@ describe("Turntimber Symbiosis", () => {
       expect(s.objects[b]!.counters?.["+1/+1"] ?? 0).toBe(small ? 3 : 0);
     });
 });
+
+describe("Kindred Summons", () => {
+  const summons = card("Kindred Summons", "Instant", "{5}{G}{G}", {
+    oracleText: "Choose a creature type. Reveal cards from the top of your library until you reveal X creature cards of the chosen type, where X is the number of creatures you control of that type. Put those cards onto the battlefield, then shuffle the rest of the revealed cards into your library.",
+  });
+  const elf = () => card("Llanowar Elves", "Creature — Elf Druid", "{G}", { power: "1", toughness: "1", oracleText: "{T}: Add {G}." });
+
+  it("plays", () => expect(isFullySupported(summons)).toBe(true));
+
+  it("X is the number of creatures you control of that type; that many come in together", () => {
+    const { s: s0, ap, ids } = setup([summons]);
+    putOnBattlefield(s0, ap, elf());
+    putOnBattlefield(s0, ap, elf());
+    const lib = [elf(), elf(), elf()].map((d) => { const id = putOnBattlefield(s0, ap, d); moveObject(s0, id, "library"); return id; });
+    const p = s0.players[ap]!;
+    // Two forests, then the three Elves.
+    const forests = p.library.filter((id) => !lib.includes(id)).slice(0, 2);
+    p.library = [...forests, ...lib, ...p.library.filter((id) => !lib.includes(id) && !forests.includes(id))];
+    let s = s0;
+    for (const a of planCast(s, ap, ids[0]!)!) s = act(s, a);
+    for (let i = 0; i < 10 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "creatureType" });
+    s = act(s, { type: "chooseOption", player: ap, choice: "Elf" });
+    expect(lib.map((id) => s.objects[id]!.zone)).toEqual(["battlefield", "battlefield", "library"]);
+    expect(forests.every((id) => s.objects[id]!.zone === "library")).toBe(true);
+  });
+});

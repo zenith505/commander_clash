@@ -341,6 +341,15 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "pickPermanents" && pend.action === "untap") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, "untap") }];
     if (pend.kind === "pickPermanents" && pend.action === "tap") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, "tap") }];
     if (pend.kind === "pickPermanents" && pend.min !== undefined && pend.action !== "keep") return [{ type: "pickPermanents", player: pid, ids: chooseOptionalSacrifices(s, pid, pend) }];
+    // Slaughter the Strong: our best creatures that fit in the total power, those with no power (or less) first.
+    if (pend.kind === "pickPermanents" && pend.action === "keep" && pend.maxTotalPower !== undefined) {
+      const ids: ObjectId[] = [];
+      let total = 0;
+      const pw = (id: ObjectId) => power(s, obj(s, id));
+      for (const id of [...pend.options].sort((a, b) => Number(pw(a) > 0) - Number(pw(b) > 0) || worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))))
+        if (total + pw(id) <= pend.maxTotalPower) (ids.push(id), (total += pw(id)));
+      return [{ type: "pickPermanents", player: pid, ids }];
+    }
     if (pend.kind === "pickPermanents") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, pend.action, pend.counter) }];
     // A secret number, without looking at the others' (Wheel of Misfortune): 1 to get a new hand when ours is nearly empty
     // and we can take the damage, otherwise 0 (no damage, keep our hand). Menacing Ogre: its controller with plenty of

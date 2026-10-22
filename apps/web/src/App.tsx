@@ -4352,7 +4352,9 @@ function Controls({
     // Devour: any number of them; exploit: none or one (pending.min).
     const what = pending.objectId ? `any number of ${pending.what} permanents` : pending.anyNumber ? `any number of ${pending.what.replace(/y$/, "ie")}s` : pending.min !== undefined && pending.count === 1 ? `${an}, if you want,` : pending.count === 1 ? an : `${pending.count} (${pending.what})`;
     const n = discards.length;
-    const ok = (pending.min !== undefined ? n >= pending.min && n <= pending.count : n === pending.count) && !(pending.action === "band" && n === 1);
+    // Slaughter the Strong: the chosen creatures' total power, a negative power subtracting.
+    const totalPower = pending.maxTotalPower !== undefined ? discards.reduce((t, id) => t + power(s, s.objects[id]!), 0) : 0;
+    const ok = (pending.min !== undefined ? n >= pending.min && n <= pending.count : n === pending.count) && !(pending.action === "band" && n === 1) && (pending.maxTotalPower === undefined || totalPower <= pending.maxTotalPower);
     return (
       <div className="controls">
         <span>
@@ -4393,6 +4395,8 @@ function Controls({
                 ? `click an Equipment to unattach from the creature of yours it's attached to. That creature becomes tapped and gains indestructible until end of turn.`
                 : pending.action === "meld"
                 ? `meld: click the ${pending.what} to exile with ${pending.source} and meld them into one permanent. A token or a copy can't meld and stays in exile.`
+                : pending.action === "keep" && pending.maxTotalPower !== undefined
+                ? `click any number of your creatures with total power ${pending.maxTotalPower} or less to keep (now ${totalPower}). The rest are sacrificed.`
                 : pending.action === "keep"
                 ? `click ${pending.count === 1 ? (pending.min === 0 ? `up to one ${pending.what}` : an) : `${pending.min === 0 ? "up to " : ""}${pending.count} ${pending.what}s`} ${pending.destroy ? "to keep (anyone's)" : pending.of === undefined ? "of yours to keep" : `for ${s.players[pending.of]!.name} to keep`}. The rest are ${pending.destroy ? "destroyed" : "sacrificed"}.`
                 : `click ${what} ${theirs ? `${theirs} controls` : "of yours"} to ${verb}.`}

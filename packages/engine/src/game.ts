@@ -5531,6 +5531,7 @@ function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
   const n = new Set(ids).size;
   if (n !== ids.length || n > pend.count || n < (pend.min ?? pend.count))
     throw new RulesError(pend.min === undefined ? `choose exactly ${pend.count} of the permanents offered` : `choose at most ${pend.count} of the permanents offered`);
+  if (pend.maxTotalPower !== undefined && ids.reduce((t, id) => t + power(s, obj(s, id)), 0) > pend.maxTotalPower) throw new RulesError(`choose creatures with total power ${pend.maxTotalPower} or less`);
   if (pend.action === "exert") {
     exertChosen(s, ids);
     return;

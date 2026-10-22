@@ -691,13 +691,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // nonland permanents they control ..." (Cataclysmic Gearhulk), "... up to two creatures they control ..." (Covetous
   // Elegy), "... a land of each basic land type" (Global Ruin), "... a permanent they control of each permanent type"
   // (Liliana, Dreadhorde General). The choices aren't targeted, and are made as it resolves (rulings).
-  if ((m = /^(.+?) chooses (.+?),? (?:then|and) sacrifices the rest$/.exec(s))) {
+  if ((m = /^(.+?) chooses (.+?),? (?:then|and) sacrifices (?:the rest|all other creatures they control)$/.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     const what = m[2]!;
     let r: RegExpExecArray | null;
     let among: TargetSpec | null = null;
     let list: string | undefined;
-    let keep: { filter: TargetSpec; n: number; upTo?: true; fewest?: true }[] | null = null;
+    let keep: { filter: TargetSpec; n: number; upTo?: true; fewest?: true; maxTotalPower?: number }[] | null = null;
     // "Each player chooses a number of lands they control equal to the number of lands controlled by the player who
     // controls the fewest, then sacrifices the rest" (Restore Balance, Balancing Act).
     if ((r = /^a number of (lands|creatures|permanents) they control equal to the number of \1 controlled by the player who controls the fewest$/.exec(what))) {
@@ -712,7 +712,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
       // The permanent types (CR 110.4).
       among = { kind: "object", text: "permanent" };
       keep = (["Artifact", "Battle", "Creature", "Enchantment", "Land", "Planeswalker"] as const).map((t) => ({ filter: { kind: "object", types: [t], text: t.toLowerCase() }, n: 1 }));
-    } else if ((r = new RegExp(`^(up to )?${NUM} (.+?) they control$`).exec(what))) {
+    } else if ((r = /^any number of creatures they control with total power (\d+) or less$/.exec(what)) && /all other creatures they control$/.test(s)) {
+      // Slaughter the Strong: any number whose powers add up to N or less, a negative power subtracting (rulings).
+      among = { kind: "object", types: ["Creature"], text: "creature" };
+      keep = [{ filter: among, n: 0, upTo: true, maxTotalPower: Number(r[1]) }];
+    } else if (/all other creatures they control$/.test(s)) return null;
+    else if ((r = new RegExp(`^(up to )?${NUM} (.+?) they control$`).exec(what))) {
       const filter = pickFilter(r[3]!);
       const n = amt(r[2]!);
       if (!filter || typeof n !== "number") return null;

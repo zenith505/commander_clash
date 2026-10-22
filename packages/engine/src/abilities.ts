@@ -1500,7 +1500,7 @@ export type Effect =
       type: "keepRest";
       who: PlayerRef;
       /** `fewest`: "a number of lands they control equal to the number of lands controlled by the player who controls the fewest" (Restore Balance), counted as it resolves; `n` is unused then. */
-      keep: { filter: TargetSpec; n: number; upTo?: true; fewest?: true }[];
+      keep: { filter: TargetSpec; n: number; upTo?: true; fewest?: true; /** "Any number of creatures they control with total power 4 or less" (Slaughter the Strong): any number, `n` unused. */ maxTotalPower?: number }[];
       among: TargetSpec;
       youChoose?: true;
       /** "Each player puts a vow counter on a creature they control and sacrifices the rest" (Promise of Loyalty): one on each kept permanent first; they're "those creatures" afterwards (Resolving.created). */

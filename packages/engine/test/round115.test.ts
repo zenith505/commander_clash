@@ -517,3 +517,39 @@ describe("Toxrill, the Corrosive", () => {
     expect(slugs.length).toBe(2);
   });
 });
+
+const slaughter = card("Slaughter the Strong", "Sorcery", "{1}{W}{W}", {
+  oracleText: "Each player chooses any number of creatures they control with total power 4 or less, then sacrifices all other creatures they control.",
+});
+
+describe("Slaughter the Strong", () => {
+  it("each player keeps creatures with total power 4 or less (a negative power subtracting); the rest are sacrificed at once", () => {
+    expect(isFullySupported(slaughter)).toBe(true);
+    const { s: s0, ap, opp, ids } = setup([slaughter]);
+    const ox = (n: number) => card(`Ox ${n}`, "Creature — Ox", "{3}", { power: String(n), toughness: "5" });
+    const [a2, b2, c3] = [putOnBattlefield(s0, ap, ox(2)), putOnBattlefield(s0, ap, ox(2)), putOnBattlefield(s0, ap, ox(3))];
+    const [big, weak] = [putOnBattlefield(s0, opp, ox(5)), putOnBattlefield(s0, opp, ox(1))];
+    s0.objects[weak]!.counters["-1/-1"] = 2; // power -1
+    invalidateCharacteristics(s0);
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", player: ap, action: "keep", maxTotalPower: 4, min: 0 });
+    expect(() => act(s, { type: "pickPermanents", player: ap, ids: [a2, c3] })).toThrow(/total power 4 or less/);
+    s = act(s, { type: "pickPermanents", player: ap, ids: [a2, b2] });
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", player: opp, maxTotalPower: 4 });
+    // 5 + (-1) = 4: both survive (rulings).
+    s = settle(act(s, { type: "pickPermanents", player: opp, ids: [big, weak] }));
+    for (let i = 0; i < 6 && s.pending?.kind === "pickPermanents"; i++) s = settle(act(s, { type: "pickPermanents", player: s.pending.player, ids: [] }));
+    expect([a2, b2, c3, big, weak].map((id) => s.objects[id]!.zone)).toEqual(["battlefield", "battlefield", "graveyard", "battlefield", "battlefield"]);
+  });
+
+  it("a bot keeps its best creatures that fit", () => {
+    const { s: s0, ap, opp, ids } = setup([slaughter]);
+    const ox = (n: number) => card(`Ox ${n}`, "Creature — Ox", "{3}", { power: String(n), toughness: String(n) });
+    const [one, three, four] = [putOnBattlefield(s0, opp, ox(1)), putOnBattlefield(s0, opp, ox(3)), putOnBattlefield(s0, opp, ox(4))];
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    for (let i = 0; i < 6 && s.pending?.kind === "pickPermanents"; i++) s = settle(act(s, botActions(s, s.pending.player)[0]!));
+    const kept = [one, three, four].filter((id) => s.objects[id]!.zone === "battlefield");
+    expect(kept.reduce((t, id) => t + power(s, s.objects[id]!), 0)).toBeLessThanOrEqual(4);
+    expect(kept.length).toBeGreaterThan(0);
+  });
+});

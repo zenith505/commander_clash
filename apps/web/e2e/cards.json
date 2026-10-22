@@ -411,6 +411,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ff5caed4-0276-476d-8fae-edae2536df7f",
+  "name": "Archangel of Tithes",
+  "manaCost": "{1}{W}{W}{W}",
+  "cmc": 4,
+  "typeLine": "Creature — Angel",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Angel"
+  ],
+  "oracleText": "Flying\nAs long as this creature is untapped, creatures can't attack you or planeswalkers you control unless their controller pays {1} for each of those creatures.\nAs long as this creature is attacking, creatures can't block unless their controller pays {1} for each of those creatures.",
+  "power": "3",
+  "toughness": "5",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "otj",
+  "releasedAt": "2024-04-19",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "7c521612-21c6-4c4b-b10e-66e70928609b",
   "name": "Ardenn, Intrepid Archaeologist",
   "manaCost": "{2}{W}",
@@ -1423,6 +1455,42 @@
   "commanderLegal": "legal",
   "set": "cmm",
   "releasedAt": "2023-08-04",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a7ac5d98-805e-4212-be94-333a0c0c44a7",
+  "name": "Brudiclad, Telchor Engineer",
+  "manaCost": "{4}{U}{R}",
+  "cmc": 6,
+  "typeLine": "Legendary Artifact Creature — Phyrexian Artificer",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Phyrexian",
+   "Artificer"
+  ],
+  "oracleText": "Creature tokens you control have haste.\nAt the beginning of combat on your turn, create a 2/1 blue Phyrexian Myr artifact creature token. Then you may choose a token you control. If you do, each other token you control becomes a copy of that token.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "R",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c18",
+  "releasedAt": "2018-08-10",
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
@@ -4076,6 +4144,38 @@
   "commanderLegal": "legal",
   "set": "msh",
   "releasedAt": "2026-06-26",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e740ce2f-2134-473c-afa1-1b6d2d1e38ef",
+  "name": "Giant Spider",
+  "manaCost": "{3}{G}",
+  "cmc": 4,
+  "typeLine": "Creature — Spider",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spider"
+  ],
+  "oracleText": "Reach (This creature can block creatures with flying.)",
+  "power": "2",
+  "toughness": "4",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Reach"
+  ],
+  "commanderLegal": "legal",
+  "set": "gs1",
+  "releasedAt": "2018-06-22",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
@@ -8751,6 +8851,38 @@
   "set": "cn2",
   "releasedAt": "2016-08-26",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "480454a0-fb10-432b-a963-8b0c0ffc6680",
+  "name": "Sepulchral Primordial",
+  "manaCost": "{5}{B}{B}",
+  "cmc": 7,
+  "typeLine": "Creature — Avatar",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Avatar"
+  ],
+  "oracleText": "Intimidate (This creature can't be blocked except by artifact creatures and/or creatures that share a color with it.)\nWhen this creature enters, for each opponent, you may put up to one target creature card from that player's graveyard onto the battlefield under your control.",
+  "power": "5",
+  "toughness": "4",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Intimidate"
+  ],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

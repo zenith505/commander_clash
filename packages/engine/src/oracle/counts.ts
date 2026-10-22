@@ -2,7 +2,7 @@ import type { AmountExpr, Count, ObjRef, PlayerRef, TargetSpec } from "../abilit
 import { ANY_COUNTER } from "../abilities";
 import { NUM, num, COUNTER, counterKind, COLOR_WORDS, capital, singularWord } from "./words";
 import { Ctx, addTarget } from "./body";
-import { parsePlayer, parseTargetPhrase } from "./targets";
+import { parsePlayer, parseTargetPhrase, subtypeClause } from "./targets";
 
 /**
  * A count: "the number of creatures you control", "cards in your hand", "~'s power", "your
@@ -12,7 +12,8 @@ import { parsePlayer, parseTargetPhrase } from "./targets";
  */
 export function parseCount(text: string, ctx: Ctx | null, each = false): AmountExpr | null {
   // "For each artifact and/or enchantment you control" (All That Glitters): each that's one or the other, counted once.
-  let p = text.trim().replace(/\.$/, "").replace(/ and\/or /g, " or ");
+  // "For each creature you control that's an Insect, Rat, Spider, or Squirrel" (Swarmyard Massacre): see subtypeClause.
+  let p = subtypeClause(text.trim().replace(/\.$/, "").replace(/ and\/or /g, " or "));
   let m: RegExpExecArray | null;
   if (ctx?.milledThisWay && /^the total mana value of those cards$/i.test(p)) return { count: { kind: "milledManaValue" } };
   // "The number of experience counters you have", "for each experience counter you have" (CR 122.1).
@@ -245,6 +246,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "Creatures target player controls" (Will of the Mardu), "that player controls": that player's permanents.
   // "Damage to defending player equal to the number of artifacts they control" (Generous Plunderer): the defending player's.
   if (ctx?.defending) p = p.replace(/ (?:they control|defending player controls)$/, " that player controls");
+  // "Target player draws X cards and loses X life, where X is the number of creatures they control of the chosen type"
+  // (Pact of the Serpent): the player targeted.
+  else if (ctx?.lastPlayerTarget !== undefined && !ctx.eventPlayer) p = p.replace(/ they control( of the chosen type)?$/, " that player controls$1");
   if ((m = /^(other )?(.+?) (you control|on the battlefield|your opponents control|an opponent controls|target player controls|target opponent controls|that player controls|those players control|those opponents control)(?: ((?:with|of the chosen|of that|that aren't|that's attached to|that are attached to) .+))?$/i.exec(p))) {
     const words = m[2]!.split(/\s+/).map(singularWord).join(" ");
     const who = m[3]!.toLowerCase();

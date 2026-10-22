@@ -416,6 +416,13 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const p = s.resolving?.chosen?.player;
       return p !== undefined && !player(s, p).lost ? [p] : [];
     }
+    case "selfChosenPlayer": {
+      // The source as this ability's source, or as it last existed on the battlefield (CR 608.2h).
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const lk = me && s.lastKnown?.[me.id];
+      const p = me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? me.chosen?.player : lk && lk.zc === ctx.sourceZc ? lk.chosenPlayer : undefined;
+      return p !== undefined && !player(s, p).lost ? [p] : [];
+    }
     case "combatDamagedBySelf": {
       // This object as the ability's source, the same one that dealt the damage (CR 400.7).
       const key = ctx.sourceId !== undefined ? `${ctx.sourceId}@${ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0}` : undefined;
@@ -699,6 +706,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "livingDeath":
     case "putAllOnBottom":
     case "returnFaceDownExiled":
+    case "exiledToGraveyard":
     case "flicker":
     case "returnExiled":
     case "exileIfDies":

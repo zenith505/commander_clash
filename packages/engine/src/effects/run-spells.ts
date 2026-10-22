@@ -80,7 +80,9 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const id = item?.kind === "spell" ? item.objectId : ctx.sourceId;
       // Memory Jar: the cards this ability exiled face down go with the delayed trigger ("each card they exiled this way").
       const exiled = (s.resolving?.faceDownExiled ?? []).map((x) => ({ id: x, zc: s.objects[x]?.zoneChanges ?? 0 }));
-      const effects = e.effects.map((x): Effect => (x.type === "returnFaceDownExiled" ? { ...x, cards: exiled } : x));
+      // Glimpse the Impossible: the cards this spell exiled to play ("those cards").
+      const impulsed = (s.resolving?.impulsed ?? []).map((x) => ({ id: x, zc: s.objects[x]?.zoneChanges ?? 0 }));
+      const effects = e.effects.map((x): Effect => (x.type === "returnFaceDownExiled" ? { ...x, cards: exiled } : x.type === "exiledToGraveyard" ? { ...x, cards: impulsed } : x));
       const body = { targets: [], effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." };
       if (e.when === "dies") {
         // "When that creature dies this turn, flip ~" (Initiate of Blood): about that permanent as it is now (CR 603.7c,

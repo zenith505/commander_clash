@@ -145,7 +145,8 @@ export type TriggerSourceEvent =
   | { type: "proliferated"; player: PlayerId }
   /** A spell was countered by a spell or ability `by` controls (CR 701.6a). */
   | { type: "spellCountered"; by: PlayerId }
-  | { type: "landPlayed"; player: PlayerId; id: ObjectId }
+  /** `from`: the zone it was played from. */
+  | { type: "landPlayed"; player: PlayerId; id: ObjectId; from: ZoneName }
   | { type: "dungeonCompleted"; player: PlayerId }
   /** A player rolled dice (CR 706): each die that counts (706.6), its natural result and its result. */
   | { type: "diceRolled"; player: PlayerId; sides: number; dice: { natural: number; result: number }[]; result: number }
@@ -715,7 +716,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
-      add(o, you, (e) => e === "playerPlaysLand" || (e === "youPlayLand" && you === ev.player) || (e === "youPlayAnotherLand" && you === ev.player && ev.id !== o.id) || (e === "opponentPlaysLand" && you !== ev.player), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+      // "Whenever you play a land or cast a spell (from exile)": the land played, from that zone.
+      const asCast = (t: TriggeredAbility) => !!t.cast?.orPlaysLand && you === ev.player && printedMatches(t.cast.orPlaysLand, defOf(s, obj(s, ev.id))) && (!t.cast.from || castFromMatches(t.cast.from, { castFrom: ev.from } as GameObject, ev.player));
+      add(o, you, (e, t) => e === "playerPlaysLand" || (e === "youPlayLand" && you === ev.player) || (e === "youPlayAnotherLand" && you === ev.player && ev.id !== o.id) || (e === "opponentPlaysLand" && you !== ev.player) || (e === "castSpell" && asCast(t)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
   } else if (ev.type === "evidenceCollected" || ev.type === "proliferated") {
     const kind = ev.type === "proliferated" ? "youProliferate" : "youCollectEvidence";
@@ -1370,6 +1373,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
               : d.when !== "leaves" && d.when !== "lostControl" && ev.step === "upkeep" && (d.when === "nextTurnUpkeep" || ev.active === d.controller) && d.turn < s.turn;
       if (!due) continue;
       if (d.when !== "eachYourUpkeep" && d.when !== "eachYourPrecombatMain") s.delayed = s.delayed!.filter((x) => x !== d);
+      // "If any of those cards remain exiled" (Glimpse the Impossible): it triggers only if one does (CR 603.4).
+      const lead = d.body.effects[0];
+      if (lead?.type === "exiledToGraveyard" && !(lead.cards ?? []).some((c) => s.objects[c.id]?.zone === "exile" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc)) continue;
       // "~" is the subject, or the source it remembers (Gift of Immortality's Aura card).
       s.triggerQueue.push({ sourceId: d.source?.id ?? d.subject.id, sourceCardId: d.sourceCardId, controller: d.controller, index: -1, subject: d.subject, sourceZc: d.source?.zc ?? d.subject.zc, body: d.body, transformsAt: d.transforms ?? 0, ...(d.event ? { event: d.event } : {}) });
     }

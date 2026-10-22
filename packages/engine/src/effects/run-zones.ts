@@ -1,7 +1,7 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType, objIsType, power } from "../cards";
 import { nameLandBan } from "../names";
-import { canPlayLandNow, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
+import { canPlayLandNow, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters, withPutter } from "../counters";
 import { manaValue } from "../mana";
@@ -953,9 +953,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         return problem === null || /^not enough mana/.test(problem);
       };
       const isLand = (id: ObjectId) => isType(defOf(s, obj(s, id)), "Land");
+      const sharesType = (id: ObjectId) => s.battlefield.some((b) => controllerOf(s, obj(s, b)) === you.id && objIsType(s, obj(s, b), "Creature") && shareCreatureType(creatureTypesOf(s, obj(s, id)), creatureTypesOf(s, obj(s, b))));
       const options = st.ids
         .map((x) => x.id)
-        .filter((id) => exiled(id) && !st.declined.includes(id) && (isLand(id) ? !!e.lands && canPlayLandNow(s, you.id, id) : (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (st.maxMv === undefined || mvOf(id) <= st.maxMv) && (st.budget === undefined || mvOf(id) <= st.budget) && (!st.hits || st.hits.includes(id)) && castable(id)));
+        .filter((id) => exiled(id) && !st.declined.includes(id) && (isLand(id) ? !!e.lands && canPlayLandNow(s, you.id, id) : (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (st.maxMv === undefined || mvOf(id) <= st.maxMv) && (st.budget === undefined || mvOf(id) <= st.budget) && (!st.hits || st.hits.includes(id)) && (!e.sharesTypeWithYours || sharesType(id)) && castable(id)));
       if (!options.length || (e.max !== undefined && (st.cast ?? 0) >= e.max)) return finish();
       const left = st.budget !== undefined ? ` (total mana value ${st.budget} left)` : "";
       s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Done"], prompt: `${e.lands ? "play a land or " : ""}cast a spell from among the ${e.reveal ? "revealed" : "exiled"} cards without paying its mana cost${left}?` };
@@ -1690,6 +1691,14 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         log(s, `${player(s, pid).name} returns ${mine.length} card${mine.length === 1 ? "" : "s"} they exiled to their hand (${src}).`);
         for (const c of mine) moveObject(s, c.id, "hand");
       }
+      return;
+    }
+    case "exiledToGraveyard": {
+      const cards = (e.cards ?? []).filter((c) => s.objects[c.id]?.zone === "exile" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc).map((c) => c.id);
+      if (cards.length) log(s, `${src} puts ${cards.map((id) => defOf(s, obj(s, id)).name).join(", ")} into ${cards.length === 1 ? "its owner's graveyard" : "their owners' graveyards"}.`);
+      for (const id of cards) moveObject(s, id, "graveyard");
+      // Only what got there (not what a replacement effect sent elsewhere) was put there this way.
+      s.resolving!.movedLinked = cards.filter((id) => s.objects[id]?.zone === "graveyard").length;
       return;
     }
     case "putAllOnBottom": {

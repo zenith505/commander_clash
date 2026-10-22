@@ -2068,7 +2068,9 @@ export function compile(d: CardDef): CompiledCard {
       else out.unsupported.push(raw);
       continue;
     }
-    const equip = /^Equip (\{[^}]+\}(?:\{[^}]+\})*)$/.exec(line);
+    // "Equip {4}. This ability costs {1} less to activate for each color of the creature it targets." (Dragonfire Blade)
+    const equipLessPer = /^Equip (\{[^}]+\}(?:\{[^}]+\})*)\. This ability costs \{(\d+)\} less to activate for each (color of|\+1\/\+1 counter on) the creature it targets\.$/.exec(line);
+    const equip = /^Equip (\{[^}]+\}(?:\{[^}]+\})*)$/.exec(line) ?? equipLessPer;
     if (equip && d.subtypes.includes("Equipment")) {
       // CR 702.6a: "[Cost]: Attach this permanent to target creature you control. Activate only as a sorcery."
       out.activated.push({
@@ -2079,6 +2081,7 @@ export function compile(d: CardDef): CompiledCard {
         body: { targets: [{ kind: "object", types: ["Creature"], controller: "you", text: "target creature you control" }], effects: [{ type: "attach", what: { ref: "target", index: 0 } }], text: "Attach to target creature you control." },
         text: line,
         equip: true,
+        ...(equipLessPer ? { costLessPerTarget: { n: Number(equipLessPer[2]), each: equipLessPer[3] === "color of" ? ("color" as const) : ("+1/+1" as const) } } : {}),
       });
       continue;
     }
@@ -2188,7 +2191,10 @@ export function compile(d: CardDef): CompiledCard {
       out.triggers.push({ event: "castSpell", cast: { by: "you", spell: { kind: "spell", text: "spell" } }, body: rippleBody(Number(grantedRipple[1]), "cause") });
       continue;
     }
-    const st = parseStatic(line) ?? parseConditionalStatic(line);
+    // Jetmir: "Creatures you control also get +1/+0 and have trample as long as ...": "also" only says it adds to the line
+    // before it; each line is its own static ability (CR 604.1).
+    const also = /^(Creatures you control) also (get .+ as long as .+)$/.exec(line);
+    const st = also ? parseConditionalStatic(`${also[1]} ${also[2]}`) : parseStatic(line) ?? parseConditionalStatic(line);
     if (st) {
       out.statics.push(st);
       continue;
@@ -2234,6 +2240,8 @@ export function compile(d: CardDef): CompiledCard {
       /^When ~ enters and whenever it (attacks while saddled), (.+)$/.exec(line) ??
       // "Whenever ~ attacks or becomes the target of a spell, create a Treasure token" (Goldspan Dragon).
       /^Whenever ~ (attacks) or (becomes the target of a spell), (.+)$/.exec(line) ??
+      // "Whenever this creature attacks, blocks, or becomes the target of a spell, ..." (Giggling Skitterspike).
+      /^Whenever ~ attacks, blocks, or becomes the target of a spell, (.+)$/.exec(line) ??
       // "Whenever you create or sacrifice a token, ..." (Mirkwood Bats); "When ~ enters and whenever an opponent draws a
       // card except the first one they draw in each of their draw steps, ..." (Orcish Bowmasters).
       /^Whenever you (create or sacrifice) a token, (.+)$/.exec(line) ??
@@ -2269,6 +2277,8 @@ export function compile(d: CardDef): CompiledCard {
               ? [`Whenever you create a token, ${effect}`, `Whenever you sacrifice a token, ${effect}`]
             : /^whenever /.test(twice[1]!)
               ? [`When ~ enters, ${effect}`, `W${twice[1]!.slice(1)}, ${effect}`]
+            : /^Whenever ~ attacks, blocks, or becomes the target of a spell, /.test(line)
+              ? [`Whenever ~ attacks, ${effect}`, `Whenever ~ blocks, ${effect}`, `Whenever ~ becomes the target of a spell, ${effect}`]
             : /^Whenever ~ attacks or becomes the target of a spell, /.test(line)
               ? [`Whenever ~ attacks, ${effect}`, `Whenever ~ becomes the target of a spell, ${effect}`]
             : twice.length === 5
@@ -2591,6 +2601,7 @@ function checkCastingLinks(out: CompiledCard) {
     if (o.kind === "setLandTypes" && (o.subtypes as string[]).includes(CHOSEN_LAND_TYPE)) needs.add("basicLandType");
     if (o.kind === "addKeywords" && ((o.keywords as string[]).includes(CHOSEN_PROTECTION) || (o.keywords as string[]).includes(CHOSEN_HEXPROOF))) needs.add("color");
     if (o.kind === "addKeywords" && (o.keywords as string[]).includes(CHOSEN_PLAYER_PROTECTION) && !out.entersChoosePlayer) bad = true;
+    if (o.ref === "selfChosenPlayer" && !out.entersChoosePlayer) bad = true;
     if (o.type === "choose") choices.add(o.choice as ChoiceKind);
     Object.values(o).forEach(visit);
   };

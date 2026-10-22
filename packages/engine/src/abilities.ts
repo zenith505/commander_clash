@@ -560,6 +560,13 @@ export type TargetChoice =
 export type ChosenTarget = Exclude<TargetChoice, { kind: "none" }>;
 
 /** Which object(s) an effect touches. */
+/**
+ * What a "when that mana is spent to cast ..." trigger needs the spell to be: a creature spell that shares a creature
+ * type with your commander (Path of Ancestry), an instant or sorcery spell (Primal Wellspring), a red one (Pyromancer's
+ * Goggles).
+ */
+export type SpentFor = { sharesCommanderType: true } | { instantOrSorcery: true; color?: Color };
+
 export type ObjRef =
   /** "Each creature that convoked ~" (Lethal Scheme): the `index`th creature tapped to convoke the resolving spell (CR 702.51a), while it's that permanent. */
   | { ref: "convoker"; index: number }
@@ -690,6 +697,8 @@ export type PlayerRef =
   | { ref: "eachOne" }
   /** "Choose an opponent. That player ...": the opponent chosen as this resolves (ChoiceKind "opponent"). */
   | { ref: "chosenPlayer" }
+  /** "The chosen player" of "As ~ enters, choose a player" (Stuffy Doll): its source's (CR 614.12), as it last existed. */
+  | { ref: "selfChosenPlayer" }
   /** "Whose controller was dealt combat damage by ~ this turn" (Steel Hellkite): the players this object dealt combat damage to this turn. */
   | { ref: "combatDamagedBySelf" };
 
@@ -882,6 +891,8 @@ export type Modification =
    * attacking you" (CR 508.1g-h): generic mana per creature attacking its controller.
    */
   /** Ghostly Prison: {n} per attacker; Sphere of Safety: {X}, a count (`amount`), attacking your planeswalkers too. */
+  /** "Creatures can't block unless their controller pays {1} for each of those creatures" (Archangel of Tithes, CR 509.1d). */
+  | { kind: "blockTax"; n: number }
   | { kind: "attackTax"; n: number; amount?: Amount; planeswalkers?: true; /** A symbol other than generic mana per creature, "{W/P}" (Norn's Annex). */ mana?: string }
   /** "Untap ~ during each other player's untap step" (CR 502.3). */
   | { kind: "untapsDuringOthers" }
@@ -1415,6 +1426,12 @@ export type Effect =
    * the same objects in exile (CR 400.7).
    */
   | { type: "returnFaceDownExiled"; cards?: { id: ObjectId; zc: number }[] }
+  /**
+   * Glimpse the Impossible: "At the beginning of the next end step, if any of those cards remain exiled, put them into
+   * your graveyard": the cards the spell exiled (`cards`, filled in as the delayed trigger is made) that are still the
+   * same objects in exile (CR 400.7); how many went to the graveyard is "put into your graveyard this way".
+   */
+  | { type: "exiledToGraveyard"; cards?: { id: ObjectId; zc: number }[] }
   /**
    * Hideaway N (CR 702.75a): look at the top N cards of your library, exile one of them face down (linked to this
    * permanent, CR 607.2a), and put the rest on the bottom of your library in a random order.
@@ -2503,7 +2520,7 @@ export type Effect =
    * graveyard, exiled first; what's cast is a copy of each (CR 707.12), the cards staying exiled.
    */
   /** `reveal`: "reveal the top X cards of your library ... from among cards revealed this way" (Sunbird's Invocation): they stay in the library while revealed, cast from there. */
-  | { type: "castFromAmong"; who: PlayerRef; n: Amount; reveal?: true; each?: true; untilNonland?: true; copies?: true; fromYard?: { target?: number; filter?: TargetSpec }; maxMv?: Amount; totalMv?: Amount; untilMv?: number; untilHits?: { n: number; filter: TargetSpec }; hitToHand?: true; filter?: TargetSpec; max?: number; rest?: { dest: "graveyard" | "bottomRandom"; toHand?: boolean }; /** "You may play lands and cast spells from among ..." (Gix): lands are played too, on your turn with a land play left (rulings). */ lands?: true }
+  | { type: "castFromAmong"; who: PlayerRef; n: Amount; reveal?: true; each?: true; untilNonland?: true; copies?: true; fromYard?: { target?: number; filter?: TargetSpec }; maxMv?: Amount; totalMv?: Amount; untilMv?: number; untilHits?: { n: number; filter: TargetSpec }; hitToHand?: true; filter?: TargetSpec; max?: number; rest?: { dest: "graveyard" | "bottomRandom"; toHand?: boolean }; /** "You may play lands and cast spells from among ..." (Gix): lands are played too, on your turn with a land play left (rulings). */ lands?: true; /** Descendants' Path: "that shares a creature type with a creature you control", as it's cast. */ sharesTypeWithYours?: true }
   /**
    * "You gain shroud until end of turn", "You and permanents you control gain hexproof until end of turn" (the player's
    * half), "you gain protection from the chosen player": see Player.gained (CR 702.11d, 702.16b-e, 702.16k, 702.18d).
@@ -3039,7 +3056,7 @@ export interface TriggeredAbility {
   /** `orCopy`: magecraft's "whenever you cast or copy" also triggers on a copy put on the stack. */
   /** `nth`: "whenever you cast your second spell each turn", counting the spells that player cast this turn (copies aren't cast). */
   /** `enchanted`: the player this Aura is attached to ("Whenever enchanted player casts a spell"). */
-  cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; nth?: number; /** `nth` counts only its caster's spells this turn that match `spell` ("their first noncreature spell each turn"). */ nthOfKind?: true; /** "If mana from a Treasure was spent to cast it" (CR 106.3, 603.4). */ treasure?: true; /** "If at least four mana was spent to cast it", "if no mana was spent to cast it" (CR 603.4). */ spent?: SpentReq; /** Vazi: "casts a spell or activates an ability", any ability (mana abilities too), with `treasure`. */ orActivates?: true; /** "Their second spell during their turn" (The Council of Four): only while the caster is the active player. */ ownTurn?: true; /** "A spell that targets a creature you control", "... that targets an opponent or a creature an opponent controls": one of its targets as it was cast is one of these (rulings: it triggers once however many do). "You" and "you control" are this ability's controller. */ targets?: (TargetSpec | "you")[]; /** "From exile", "from anywhere other than your hand", "from your graveyard" (its caster's), "from a graveyard": the zone it was cast from (CR 601.2a). */ from?: "hand" | "notHand" | "exile" | "graveyard" | "ownGraveyard" | "ownLibrary"; /** "A spell that shares a creature type with ~" (Folk Hero). */ sharesTypeWithSelf?: true; /** "A spell that has convoke", "a creature spell with flying". */ keyword?: string; /** "Using mana produced by Tecutlan": some of the mana spent to cast it came from this permanent (CR 601.2h). */ manaFromSelf?: true };
+  cast?: { by: "you" | "opponent" | "any" | "enchanted"; spell: TargetSpec; orCopy?: boolean; nth?: number; /** `nth` counts only its caster's spells this turn that match `spell` ("their first noncreature spell each turn"). */ nthOfKind?: true; /** "If mana from a Treasure was spent to cast it" (CR 106.3, 603.4). */ treasure?: true; /** "If at least four mana was spent to cast it", "if no mana was spent to cast it" (CR 603.4). */ spent?: SpentReq; /** Vazi: "casts a spell or activates an ability", any ability (mana abilities too), with `treasure`. */ orActivates?: true; /** "Their second spell during their turn" (The Council of Four): only while the caster is the active player. */ ownTurn?: true; /** "A spell that targets a creature you control", "... that targets an opponent or a creature an opponent controls": one of its targets as it was cast is one of these (rulings: it triggers once however many do). "You" and "you control" are this ability's controller. */ targets?: (TargetSpec | "you")[]; /** "From exile", "from anywhere other than your hand", "from your graveyard" (its caster's), "from a graveyard": the zone it was cast from (CR 601.2a). */ from?: "hand" | "notHand" | "exile" | "graveyard" | "ownGraveyard" | "ownLibrary"; /** "A spell that shares a creature type with ~" (Folk Hero). */ sharesTypeWithSelf?: true; /** "A spell that has convoke", "a creature spell with flying". */ keyword?: string; /** "Using mana produced by Tecutlan": some of the mana spent to cast it came from this permanent (CR 601.2h). */ manaFromSelf?: true; /** "Whenever you play a land or cast a spell": playing a land that matches this (from `from`, if set) triggers it too. */ orPlaysLand?: TargetSpec };
   /** An intervening "if" (CR 603.4): "When ~ enters, if you attacked this turn, ...". Checked as it triggers and as it resolves. */
   ifCond?: StaticCondition;
   /**
@@ -3290,6 +3307,12 @@ export interface ActivatedAbility {
   discardSelf?: boolean;
   /** "This ability costs {1} less to activate for each legendary creature you control" (CR 602.2b, 601.2f): generic mana only. */
   costLess?: Amount;
+  /**
+   * "This ability costs {1} less to activate for each color of the creature it targets" (Dragonfire Blade), "... for each
+   * +1/+1 counter on the creature it targets" (Warrior's Blades): `n` less for each, once the target is chosen (CR
+   * 602.2b, 601.2f).
+   */
+  costLessPerTarget?: { n: number; each: "color" | "+1/+1" };
   /** It's a cycling ability (CR 702.29a, 702.29f): discarding this card to pay for it is cycling it. */
   cycling?: boolean;
   /** Crew N (CR 702.122a): the cost is tapping other untapped creatures you control with total power N or more. */
@@ -3455,7 +3478,7 @@ export interface ManaAbility {
    * of Ancestry): a triggered ability of its source, once for each of that mana spent so (rulings), with your
    * commanders' creature types as they are just after the spell is cast.
    */
-  spentTrigger?: { body: AbilityBody; sharesCommanderType: true };
+  spentTrigger?: { body: AbilityBody } & SpentFor;
   /**
    * "If any of that mana is spent on a creature spell, it gains haste until end of turn." (Arena of Glory, Generator
    * Servant), "If that mana is spent on a creature spell, it gains haste." (Hall of the Bandit Lord, which doesn't wear

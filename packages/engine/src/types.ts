@@ -1,4 +1,4 @@
-import type { AbilityBody, Affects, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CostMod, NamePurpose, CounterKind, DamageMod, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec, TokenSpec, ManaTrigger, TriggeredAbility, TriggerDuration } from "./abilities";
+import type { AbilityBody, Affects, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CostMod, NamePurpose, CounterKind, DamageMod, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec, TokenSpec, ManaTrigger, TriggeredAbility, TriggerDuration, SpentFor } from "./abilities";
 import type { DamageEvent } from "./damage";
 import type { Characteristics } from "./layers";
 
@@ -560,13 +560,12 @@ export interface ManaLot {
 }
 
 /** A mana's "when that mana is spent" ability: its source as it made the mana, and what it does. */
-export interface ManaSpentTrigger {
+export type ManaSpentTrigger = {
   sourceId: ObjectId;
   sourceCardId: string;
   sourceZc: number;
   body: AbilityBody;
-  sharesCommanderType: true;
-}
+} & SpentFor;
 
 export interface Player {
   /** How many times their library has been shuffled (see rng.ts shuffleLibrary). */
@@ -1446,7 +1445,7 @@ export interface GameState {
   /** The player who has the initiative (CR 726), once someone has taken it. */
   initiative?: PlayerId;
   /** How permanents were as they last existed on the battlefield (CR 608.2h); `attachedTo` with that permanent's zoneChanges then. */
-  lastKnown?: Record<ObjectId, { zc: number; power: number; toughness: number; controller: PlayerId; attachedTo?: { id: ObjectId; zc: number }; attachedToPlayer?: PlayerId; /** Its copiable values (CR 707.2), a key into `cards`. */ copyKey?: string; counters?: Record<string, number>; /** Its creature types ("all" for changeling-like), for kinship once it's gone. */ creatureTypes?: string[] | "all"; /** What it was attacking (Myr Battlesphere's "the player or planeswalker it's attacking"). */ attacking?: PlayerId; attackingPermanent?: { id: ObjectId; zc: number; battleController?: PlayerId }; /** What it was as a source of damage, for "it deals damage" once it's gone (CR 608.2h): its lifelink, deathtouch, colors, and a "can't be prevented" that applied to it (Questing Beast). */ source?: { name: string; colors: Color[]; types: string[]; subtypes: string[]; keywords: string[]; unpreventable?: "all" | "combat" } }>;
+  lastKnown?: Record<ObjectId, { zc: number; power: number; toughness: number; controller: PlayerId; attachedTo?: { id: ObjectId; zc: number }; attachedToPlayer?: PlayerId; /** Its copiable values (CR 707.2), a key into `cards`. */ copyKey?: string; counters?: Record<string, number>; /** Its creature types ("all" for changeling-like), for kinship once it's gone. */ creatureTypes?: string[] | "all"; /** The player chosen as it entered (Saskia's "the chosen player" once it's gone, CR 608.2h). */ chosenPlayer?: PlayerId; /** What it was attacking (Myr Battlesphere's "the player or planeswalker it's attacking"). */ attacking?: PlayerId; attackingPermanent?: { id: ObjectId; zc: number; battleController?: PlayerId }; /** What it was as a source of damage, for "it deals damage" once it's gone (CR 608.2h): its lifelink, deathtouch, colors, and a "can't be prevented" that applied to it (Questing Beast). */ source?: { name: string; colors: Color[]; types: string[]; subtypes: string[]; keywords: string[]; unpreventable?: "all" | "combat" } }>;
   nextTimestamp: number;
   /** Something happened during the cleanup step, so players get priority and then there's another one (CR 514.3a). */
   cleanupAgain?: boolean;

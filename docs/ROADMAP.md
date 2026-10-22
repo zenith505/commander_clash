@@ -1,7 +1,7 @@
 # Roadmap
 
-22,525 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 3,942 of 4,988 (79%).
+22,580 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 3,969 of 4,988 (79%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,13 +22,20 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 112, most played first: Sheoldred // The True Scriptures
-   ("a nontoken creature or planeswalker": whether "nontoken" covers both isn't settled by a ruling), Minas Morgul, Dark
-   Fortress, Dragonfire Blade, Archangel of Tithes, Brudiclad, Telchor Engineer, Primal Amulet, Glimpse the Impossible,
-   Risen Reef, Earthbender Ascension, Klauth, Unrivaled Ancient, Prosper, Tome-Bound, Sepulchral Primordial, The Key to
-   the Vault; also Thor, Guardian of Midgard, Virtue of Courage, Asgardian Inspiration, Painter's Servant, Karazikar,
-   Echoing Assault, Ordruun Mentor, Soaring Lightbringer. Smaller gaps from round 112: bots never activate Food Chain
-   (and autopay never uses it); Karn, the Great Creator and Coax from the Blind Eternities only take a card from exile
+00. Most played first (`npm run popular`). Out after round 113, most played first: Sheoldred // The True Scriptures
+   ("a nontoken creature or planeswalker": whether "nontoken" covers both isn't settled by a ruling), Klauth, Unrivaled
+   Ancient ("add X mana in any combination of colors" from a trigger needs a color-split picker, and "until end of turn,
+   you don't lose this mana"), The Key to the Vault, Entity Tracker, Dragonhawk, Fate's Tempest, Delay, Deep Gnome
+   Terramancer, Imposter Mech, Ral, Crackling Wit, Brainstealer Dragon, Invert Polarity, Starfall Invocation, Quilled
+   Greatwurm, Wrathful Red Dragon, Squee, the Immortal; also Thor, Guardian of Midgard, Virtue of Courage, Asgardian
+   Inspiration, Painter's Servant, Karazikar, Echoing Assault, Ordruun Mentor, Soaring Lightbringer. Smaller gaps from
+   round 113: autopay never exiles a creature to Food Chain (choosing what to exile is the player's; bots do use it);
+   Xolatoyac, Quicksilver Fountain, Aquitect's Will and other "is an Island in addition to its other types for as long as
+   it has a flood counter" lands are out (Minas Morgul's "for as long as" counter link is in); Diluvian Primordial
+   (casting the per-opponent graveyard cards), Flubs, the Fool ("if ... Otherwise"), Cemetery Protector and Duelists'
+   Convocation ("if it shares ...", about the card played) are out; Sepulchral Primordial asks one "you may" for all
+   the chosen cards together; Urianger Augurelt's Arcanum abilities are out (only its play-from-exile trigger reads).
+   Smaller gaps from round 112: Karn, the Great Creator and Coax from the Blind Eternities only take a card from exile
    (decks have nothing outside the game); "whenever your commander enters" watches the commanders you own; Innocuous
    Researcher, Horn of the Mark and Landroval ("two or more creatures attack a player"), Vivi's Persistence and Endless
    Ranks of HYDRA (graveyard triggers) and We Ride at Dawn (its convoke line) are still out; Multiversal Passage's menu

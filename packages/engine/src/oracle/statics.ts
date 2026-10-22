@@ -1138,6 +1138,9 @@ function parseStaticLine(line: string): StaticAbility | null {
     if (tax[3] && !amount) return null;
     return { affects: { kind: "self" }, mods: [{ kind: "attackTax", n: amount ? 0 : Number(tax[2]), ...(amount ? { amount } : {}), ...(tax[1] ? { planeswalkers: true as const } : {}) }], text: line };
   }
+  // Archangel of Tithes (as long as it's attacking): each blocking creature costs its controller {1} (CR 509.1d).
+  const blockTax = /^Creatures can't block unless their controller pays \{(\d+)\} for each of those creatures$/.exec(text);
+  if (blockTax) return { affects: { kind: "self" }, mods: [{ kind: "blockTax", n: Number(blockTax[1]) }], text: line };
   // Norn's Annex: a Phyrexian symbol per creature, its color or 2 life (CR 107.4f).
   const phyTax = /^Creatures can't attack you( or planeswalkers you control)? unless their controller pays (\{[WUBRG]\/P\}) for each of those creatures$/.exec(text);
   if (phyTax) return { affects: { kind: "self" }, mods: [{ kind: "attackTax", n: 0, mana: phyTax[2]!, ...(phyTax[1] ? { planeswalkers: true as const } : {}) }], text: line };

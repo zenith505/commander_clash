@@ -129,6 +129,8 @@ export interface Characteristics {
   /** Other mana symbols per creature attacking its controller, and its controller's planeswalkers ("{W/P}", Norn's Annex). */
   attackTaxMana: string[];
   attackTaxManaPlaneswalkers: string[];
+  /** Generic mana per creature blocking, whoever controls it (Archangel of Tithes, CR 509.1d). */
+  blockTax: number;
   /** Players it has to attack if able (encore). */
   mustAttack: PlayerId[];
   /** "Can't be blocked by creatures with power 2 or less", "by Walls" (CR 509.1b). */
@@ -242,6 +244,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     attackTaxPlaneswalkers: 0,
     attackTaxMana: [],
     attackTaxManaPlaneswalkers: [],
+    blockTax: 0,
     mustAttack: [],
     cantBeBlockedBy: [],
     cantBlockCreatures: [],
@@ -1097,6 +1100,9 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "untapsDuringOthers":
       c.untapsDuringOthers = true;
+      return;
+    case "blockTax":
+      c.blockTax += m.n;
       return;
     case "attackTax": {
       const n = m.amount !== undefined ? Math.max(0, num(m.amount)) : m.n;

@@ -8,6 +8,8 @@ import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
 import { bindChosen, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, manySlot, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
+  applyAction,
+  blockCost,
   livingPlayers,
   abilityProblem,
   faceUpWays,
@@ -107,7 +109,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   }
   if (pend?.player === pid) {
     if (pend.kind === "declareAttackers") return chooseAttacks(s, pid);
-    if (pend.kind === "declareBlockers") return [chooseBlocks(s, pid)];
+    if (pend.kind === "declareBlockers") return payForBlocks(s, pid, chooseBlocks(s, pid));
     if (pend.kind === "chooseModes") {
       const t = s.triggerQueue[0]!;
       const body = triggerBody(s, t);
@@ -515,6 +517,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "targetSlot") return [{ type: "chooseOption", player: pid, choice: targetSlotFor(s, pid, pend.options) }];
     if (pend.kind === "chooseOption" && pend.what === "commander")
       return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => mv(s, b) + 2 * (player(s, pid).commanderCasts[b] ?? 0) - mv(s, a) - 2 * (player(s, pid).commanderCasts[a] ?? 0))[0]! }];
+    // The color of a mana ability's mana, chosen as it resolves (Food Chain): the one that pays for the dearest card we
+    // could then cast from our hand or command zone.
+    if (pend.kind === "chooseOption" && pend.what === "color" && s.resolving?.item.manaAbility) {
+      const pick = manaColorFor(s, pid, pend.options);
+      if (pick) return [{ type: "chooseOption", player: pid, choice: pick }];
+    }
     if (pend.kind === "chooseOption") {
       const card = pend.objectId ? defOf(s, obj(s, pend.objectId)) : s.resolving ? s.cards[s.resolving.item.sourceCardId ?? obj(s, s.resolving.item.objectId!).cardId]! : undefined;
       return [{ type: "chooseOption", player: pid, choice: chooseOption(s, pid, pend.what as ChoiceKind, card, pend.options) }];
@@ -635,6 +643,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     const expiring = options.find((x) => x.plan.some((a) => a.type === "castSpell" && obj(s, a.objectId).zone === "exile" && /Turn$|EndStep$/.test(obj(s, a.objectId).mayPlay?.until ?? "")));
     if (expiring) return expiring.plan;
     if (options[0]) return options[0].plan;
+    // Food Chain, Ashnod's Altar: a creature given up for mana, to cast a card that does more.
+    const fed = chooseCreatureForMana(s, pid);
+    if (fed) return fed;
     // A loyalty ability of each planeswalker we control, once spells are cast (CR 606.3).
     const loyalty = chooseLoyalty(s, pid);
     if (loyalty) return loyalty;
@@ -2850,6 +2861,77 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
   return null;
 }
 
+/** The cards in our hand and command zone we could cast now, the dearest first. */
+function castableNow(s: GameState, pid: PlayerId): ObjectId[] {
+  const p = player(s, pid);
+  return [...p.command, ...p.hand].filter((id) => !isType(defOf(s, obj(s, id)), "Land") && castPlan(s, pid, id, false)).sort((a, b) => mv(s, b) - mv(s, a));
+}
+
+/**
+ * For a mana ability's color chosen as it resolves: the color after which we could cast the dearest card, if any, one
+ * of its colors if that's as good (the mana left over is more use).
+ */
+function manaColorFor(s: GameState, pid: PlayerId, options: string[]): string | undefined {
+  let best: { choice: string; score: number } | undefined;
+  for (const choice of options) {
+    let after: GameState;
+    try {
+      after = applyAction(s, { type: "chooseOption", player: pid, choice });
+    } catch {
+      continue;
+    }
+    if (after.pending) continue;
+    const top = castableNow(after, pid)[0];
+    if (top === undefined) continue;
+    const score = 2 * mv(s, top) + (defOf(s, obj(s, top)).colors.some((c) => COLOR_NAMES[c] === choice) ? 1 : 0);
+    if (!best || score > best.score) best = { choice, score };
+  }
+  return best?.choice;
+}
+
+/**
+ * An activated mana ability whose only cost is a creature we control, sacrificed or exiled (Food Chain, Ashnod's Altar,
+ * Phyrexian Altar), when nothing in our hand or command zone can be cast without it: the least valuable creature that
+ * makes the mana for a card that does more (a token, or a creature with a mana value at least two less than the card's),
+ * never a commander. Checked by activating it and choosing its color: only when the card can then be cast.
+ */
+function chooseCreatureForMana(s: GameState, pid: PlayerId): Action[] | null {
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid) continue;
+    const abilities = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const ab = abilities[i]!;
+      const c = ab.costs?.length === 1 ? ab.costs[0]! : undefined;
+      if (!ab.mana || c?.kind !== "sacrifice" || c.n !== 1 || c.x || c.half || c.optional || c.oneOfEach || ab.manaCost || ab.tap || ab.sacrificeSelf) continue;
+      if ((o.activatedThisTurn?.filter((n) => n === i).length ?? 0) >= BOT_LOOP_LIMIT) continue;
+      const pool = s.battlefield
+        .map((x) => obj(s, x))
+        .filter((x) => controllerOf(s, x) === pid && x.id !== id && !x.isCommander && objIsType(s, x, "Creature") && objectMatches(s, c.filter, x, pid, false) && (c.exile || canBeSacrificed(s, x)))
+        .sort((a, b) => worth(s, pid, a) - worth(s, pid, b))
+        .slice(0, 3);
+      for (const fodder of pool) {
+        const action: Action = { type: "activateAbility", player: pid, objectId: id, index: i, costs: { sacrifice: [fodder.id] } };
+        let after: GameState;
+        try {
+          after = applyAction(s, action);
+          if (after.pending?.kind === "chooseOption" && after.pending.player === pid && after.pending.what === "color") {
+            const choice = manaColorFor(after, pid, after.pending.options);
+            if (!choice) continue;
+            after = applyAction(after, { type: "chooseOption", player: pid, choice });
+          }
+        } catch {
+          continue;
+        }
+        if (after.pending) continue;
+        const top = castableNow(after, pid)[0];
+        if (top !== undefined && (fodder.isToken || mv(s, fodder.id) + 2 <= mv(s, top))) return [action];
+      }
+    }
+  }
+  return null;
+}
+
 /**
  * X for an ability whose only X is "Discard X cards" (Gix, Yawgmoth Praetor), or undefined when we'd rather not: in our
  * main phase with an empty stack, every card in hand but the spells we could still cast after paying for it and a land
@@ -3864,6 +3946,25 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
     const o = obj(s, taxed.attacker);
     const elsewhere = opps.find((d) => !attackTaxPer(s, d) && !attackProblem(s, o, d) && !characteristics(s, o).goadedBy.includes(d));
     declared = declared.flatMap((a) => (a !== taxed ? [a] : elsewhere !== undefined ? [{ attacker: a.attacker, defender: elsewhere }] : []));
+  }
+}
+
+/**
+ * Archangel of Tithes: the mana for blocking (CR 509.1d-f), tapped before the declaration. Blockers we can't pay for are
+ * left out, the last chosen first (the chump blocks and extras), with any attacker then left with too few blockers.
+ */
+function payForBlocks(s: GameState, pid: PlayerId, a: Action): Action[] {
+  if (a.type !== "declareBlockers" || !blockCost(s, 1)) return [a];
+  let blocks = a.blocks;
+  for (;;) {
+    const blockers = [...new Set(blocks.map((b) => b.blocker))];
+    const taps = blockers.length ? planMana(s, pid, parseManaCost(blockCost(s, blockers.length))) : [];
+    if (taps) return [...taps, { ...a, blocks }];
+    const drop = blockers[blockers.length - 1]!;
+    blocks = blocks.filter((b) => b.blocker !== drop);
+    blocks = blocks.filter((b) => blocks.filter((x) => x.attacker === b.attacker).length >= blockersNeeded(s, obj(s, b.attacker)));
+    const earlier = s.battlefield.some((id) => obj(s, id).blocking !== undefined);
+    if (blocks.length === 1 && !earlier && characteristics(s, obj(s, blocks[0]!.blocker)).cantBlockAlone) blocks = [];
   }
 }
 

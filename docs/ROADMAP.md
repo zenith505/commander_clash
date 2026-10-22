@@ -1,7 +1,7 @@
 # Roadmap
 
-22,472 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 3,922 of 4,988 (78%).
+22,525 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 3,942 of 4,988 (79%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,14 +22,19 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 111, most played first: Sheoldred // The True Scriptures
-   ("a nontoken creature or planeswalker": whether "nontoken" covers both isn't settled by a ruling), Volatile
-   Stormdrake (energy paid for the exchanged creature), Nissa, Resurgent Animist, Party Thrasher, Multiversal Passage,
-   Semblance Anvil, Selvala, Explorer Returned, Weaver of Harmony, Karn, the Great Creator, Ainok Strike Leader,
-   Grafdigger's Cage; also Thor, Guardian of Midgard, Virtue of Courage, Asgardian Inspiration, Painter's Servant,
-   Karazikar, Echoing Assault, Ordruun Mentor, Soaring Lightbringer. Smaller gaps from round 111: bots never activate
-   Gix's "Discard X cards" ability and never pay life for an untapped land played from among Gix's exiled cards;
-   the tap picker names its cards in the singular ("click 5 untapped artifact or creature of yours"). Smaller gaps from round 110: a bot controlling another player's
+00. Most played first (`npm run popular`). Out after round 112, most played first: Sheoldred // The True Scriptures
+   ("a nontoken creature or planeswalker": whether "nontoken" covers both isn't settled by a ruling), Minas Morgul, Dark
+   Fortress, Dragonfire Blade, Archangel of Tithes, Brudiclad, Telchor Engineer, Primal Amulet, Glimpse the Impossible,
+   Risen Reef, Earthbender Ascension, Klauth, Unrivaled Ancient, Prosper, Tome-Bound, Sepulchral Primordial, The Key to
+   the Vault; also Thor, Guardian of Midgard, Virtue of Courage, Asgardian Inspiration, Painter's Servant, Karazikar,
+   Echoing Assault, Ordruun Mentor, Soaring Lightbringer. Smaller gaps from round 112: bots never activate Food Chain
+   (and autopay never uses it); Karn, the Great Creator and Coax from the Blind Eternities only take a card from exile
+   (decks have nothing outside the game); "whenever your commander enters" watches the commanders you own; Innocuous
+   Researcher, Horn of the Mark and Landroval ("two or more creatures attack a player"), Vivi's Persistence and Endless
+   Ranks of HYDRA (graveyard triggers) and We Ride at Dawn (its convoke line) are still out; Multiversal Passage's menu
+   asks about paying 2 life before the basic land type (the card chooses the type first; nothing hidden depends on the
+   order). Smaller gaps from round 111: the tap picker names its cards in the singular ("click 5 untapped artifact or
+   creature of yours"). Smaller gaps from round 110: a bot controlling another player's
    turn (CR 723) makes them do only what they must (no spells, abilities or attacks); One with the Multiverse and
    other "without paying its mana cost" sources can't cast a prototype card prototyped; Sunbird's Invocation and
    Villainous Wealth compare a split card's combined mana value, not the half cast; Oviya, Automech Artisan is out

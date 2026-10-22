@@ -2,10 +2,12 @@
 // the most played cards.
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { botActions, chooseTargets, compileCard, isFullySupported, planActivate, planCast, spellCost, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { act, bear, card, passUntil, putOnBattlefield, scry, setup } from "./helpers";
+import { botActions, castProblem, characteristics, chooseTargets, compileCard, isFullySupported, planActivate, planCast, spellCost, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
 import { invalidateCharacteristics } from "../src/layers";
-import { moveObject } from "../src/game";
+import { abilitiesOf } from "../src/cards";
+import { moveObject, unlockCost } from "../src/game";
+import { createEmblem } from "../src/emblems";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const settle = (s: GameState, yes = true) => {
@@ -231,5 +233,182 @@ describe("web-slinging", () => {
     s = settle(s);
     expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
     expect(spellCost(s, opp, s.objects[secret]!).extra).toBe(before + 1);
+  });
+});
+
+const camellia = card("Camellia, the Seedmiser", "Legendary Creature — Squirrel Warlock", "{1}{B}{G}", { power: "3", toughness: "3", keywords: ["Forage", "Menace"], oracleText: "Menace\nOther Squirrels you control have menace.\nWhenever you sacrifice one or more Foods, create a 1/1 green Squirrel creature token.\n{2}, Forage: Put a +1/+1 counter on each other Squirrel you control. (To forage, exile three cards from your graveyard or sacrifice a Food.)" });
+const thornvault = card("Thornvault Forager", "Creature — Squirrel Ranger", "{1}{G}", { power: "2", toughness: "2", keywords: ["Forage"], oracleText: "{T}: Add {G}.\n{T}, Forage: Add two mana in any combination of colors. (To forage, exile three cards from your graveyard or sacrifice a Food.)\n{3}{G}, {T}: Search your library for a Squirrel card, reveal it, put it into your hand, then shuffle." });
+const feed = card("Feed the Cycle", "Instant", "{1}{B}", { keywords: ["Forage"], oracleText: "As an additional cost to cast this spell, forage or pay {B}. (To forage, exile three cards from your graveyard or sacrifice a Food.)\nDestroy target creature or planeswalker." });
+const food = card("Test Food", "Artifact — Food", "{1}", { oracleText: "{2}, {T}, Sacrifice this artifact: You gain 3 life." });
+const squirrel = card("Test Squirrel", "Creature — Squirrel", "{G}", { power: "1", toughness: "1", oracleText: "" });
+const ygra = card("Ygra, Eater of All", "Legendary Creature — Elemental Cat", "{3}{B}{G}", { power: "6", toughness: "6", keywords: ["Ward"], oracleText: "Ward—Sacrifice a Food.\nOther creatures are Food artifacts in addition to their other types and have \"{2}, {T}, Sacrifice this permanent: You gain 3 life.\"\nWhenever a Food is put into a graveyard from the battlefield, put two +1/+1 counters on Ygra." });
+const toYard = (s: GameState, pid: PlayerId, d: CardDef) => {
+  const id = putOnBattlefield(s, pid, d);
+  moveObject(s, id, "graveyard");
+  return id;
+};
+
+describe("forage (CR 701.61a)", () => {
+  it("Camellia: forage by sacrificing a Food, which also makes a Squirrel; the ability then counts it", () => {
+    supported(camellia, thornvault, feed);
+    const { s: s0, ap } = setup([]);
+    const cam = putOnBattlefield(s0, ap, camellia);
+    const sq = putOnBattlefield(s0, ap, squirrel);
+    const f = putOnBattlefield(s0, ap, food);
+    invalidateCharacteristics(s0);
+    // "Other Squirrels you control have menace."
+    expect(characteristics(s0, s0.objects[sq]!).keywords).toContain("Menace");
+    // Forage is a cost: no way chosen, no activation.
+    expect(() => run(s0, planActivate(s0, ap, cam, 0))).toThrow(/forage/);
+    let s = run(s0, planActivate(s0, ap, cam, 0, undefined, undefined, undefined, undefined, { sacrifice: [f] }));
+    expect(s.objects[f]!.zone).toBe("graveyard");
+    s = settle(s);
+    const tokens = named(s, "Squirrel Token");
+    expect(tokens).toHaveLength(1);
+    // The token came from the sacrifice trigger, above the ability on the stack, so it got a counter too.
+    expect(s.objects[sq]!.counters["+1/+1"]).toBe(1);
+    expect(s.objects[tokens[0]!]!.counters["+1/+1"]).toBe(1);
+    expect(s.objects[cam]!.counters["+1/+1"] ?? 0).toBe(0);
+  });
+
+  it("Camellia: forage by exiling three cards from your graveyard; no Food sacrificed, no Squirrel", () => {
+    const { s: s0, ap } = setup([]);
+    const cam = putOnBattlefield(s0, ap, camellia);
+    putOnBattlefield(s0, ap, food);
+    const yard = [toYard(s0, ap, bear()), toYard(s0, ap, bear()), toYard(s0, ap, ogre)];
+    invalidateCharacteristics(s0);
+    expect(planActivate(s0, ap, cam, 0, undefined, undefined, undefined, undefined, { exileCards: yard.slice(0, 2) })).toBeNull();
+    let s = settle(run(s0, planActivate(s0, ap, cam, 0, undefined, undefined, undefined, undefined, { exileCards: yard })));
+    expect(yard.every((id) => s.objects[id]!.zone === "exile")).toBe(true);
+    expect(named(s, "Squirrel Token")).toHaveLength(0);
+  });
+
+  it("Feed the Cycle: forage or pay {B} more; a bot forages with cards that do nothing in its graveyard", () => {
+    const { s: s0, ap, ids, opp } = setup([feed]);
+    const victim = putOnBattlefield(s0, opp, ogre);
+    const yard = [toYard(s0, ap, bear()), toYard(s0, ap, bear()), toYard(s0, ap, bear())];
+    invalidateCharacteristics(s0);
+    const tgt = [{ kind: "object" as const, id: victim }];
+    expect(() => run(s0, planCast(s0, ap, ids[0]!, tgt))).toThrow(/forage or pay \{B\}/); // which way not chosen
+    const blacks = (costOr: number) => spellCost(s0, ap, s0.objects[ids[0]!]!, 0, [], { costOr }).cost.symbols.filter((x) => x.kind === "colored" && x.color === "B").length;
+    expect([blacks(0), blacks(1)]).toEqual([1, 2]);
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, tgt, undefined, "auto", undefined, { costOr: 0, exileCards: yard })));
+    expect(s.objects[victim]!.zone).toBe("graveyard");
+    expect(yard.every((id) => s.objects[id]!.zone === "exile")).toBe(true);
+  });
+});
+
+describe("Ygra, Eater of All", () => {
+  it("other creatures are Food artifacts with the Food ability; when one dies Ygra gets two +1/+1 counters", () => {
+    supported(ygra);
+    const { s: s0, ap, ids, opp } = setup([feed]);
+    const y = putOnBattlefield(s0, ap, ygra);
+    const victim = putOnBattlefield(s0, opp, ogre);
+    invalidateCharacteristics(s0);
+    const c = characteristics(s0, s0.objects[victim]!);
+    expect(c.types).toEqual(expect.arrayContaining(["Creature", "Artifact"]));
+    expect(c.subtypes).toEqual(expect.arrayContaining(["Ogre", "Food"]));
+    expect(characteristics(s0, s0.objects[y]!).subtypes).not.toContain("Food");
+    expect(abilitiesOf(s0, s0.objects[victim]!).activated.some((a) => a.sacrificeSelf && a.tap && a.manaCost === "{2}")).toBe(true);
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: victim }], undefined, "auto", undefined, { costOr: 1 })));
+    expect(s.objects[victim]!.zone).toBe("graveyard");
+    expect(s.objects[y]!.counters["+1/+1"]).toBe(2);
+  });
+});
+
+const glimmer = card("Inquisitive Glimmer", "Enchantment Creature — Fox Glimmer", "{W}{U}", { power: "2", toughness: "3", oracleText: "Enchantment spells you cast cost {1} less to cast.\nUnlock costs you pay cost {1} less." });
+const ROOM = "\n(You may cast either half. That door unlocks on the battlefield. As a sorcery, you may pay the mana cost of a locked door to unlock it.)";
+const pool = scry("split", [
+  { name: "Bottomless Pool", mana_cost: "{U}", type_line: "Enchantment — Room", oracle_text: `When you unlock this door, return up to one target creature to its owner's hand.${ROOM}` },
+  { name: "Locker Room", mana_cost: "{4}{U}", type_line: "Enchantment — Room", oracle_text: `Whenever one or more creatures you control deal combat damage to a player, draw a card.${ROOM}` },
+]);
+
+describe("Inquisitive Glimmer", () => {
+  it("unlock costs you pay cost {1} less (CR 709.5e), and only yours", () => {
+    supported(glimmer);
+    const { s: s0, ap, opp } = setup([]);
+    const room = putOnBattlefield(s0, ap, pool);
+    const theirs = putOnBattlefield(s0, opp, pool);
+    s0.objects[room]!.unlocked = [0];
+    s0.objects[theirs]!.unlocked = [0];
+    invalidateCharacteristics(s0);
+    expect(unlockCost(s0, s0.objects[room]!, 1)).toBe("{4}{U}");
+    putOnBattlefield(s0, ap, glimmer);
+    invalidateCharacteristics(s0);
+    expect(unlockCost(s0, s0.objects[room]!, 1)).toBe("{3}{U}");
+    expect(unlockCost(s0, s0.objects[theirs]!, 1)).toBe("{4}{U}");
+  });
+});
+
+const insight = scry("modal_dfc", [
+  { name: "Bloodsoaked Insight", mana_cost: "{5}{B/R}{B/R}", type_line: "Sorcery", oracle_text: "This spell costs {1} less to cast for each 1 life your opponents have lost this turn.\nTarget opponent exiles the top three cards of their library. Until the end of your next turn, you may play those cards. If you cast a spell this way, mana of any type can be spent to cast it." },
+  { name: "Sanguine Morass", type_line: "Land", oracle_text: "This land enters tapped.\n{T}: Add {B} or {R}." },
+]);
+
+describe("Bloodsoaked Insight", () => {
+  it("costs less for life the opponents lost; exiles their top three, which you may play until the end of your next turn", () => {
+    supported(insight);
+    const { s: s0, ap, ids, opp } = setup([insight]);
+    const generic = () => spellCost(s0, ap, s0.objects[ids[0]!]!).extra;
+    expect(generic()).toBe(5);
+    (s0.turnLog ??= {}).lifeLost = { [opp]: 2 };
+    expect(generic()).toBe(3);
+    // A creature card on top, the rest lands.
+    const lib = s0.players[opp]!.library;
+    const bearAt = lib.findIndex((id) => s0.cards[s0.objects[id]!.cardId]!.types.includes("Creature"));
+    lib.unshift(...lib.splice(bearAt, 1));
+    const top = lib.slice(0, 3);
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "player", id: opp }])));
+    expect(top.every((id) => s.objects[id]!.zone === "exile")).toBe(true);
+    const bearId = top.find((id) => s.cards[s.objects[id]!.cardId]!.types.includes("Creature"));
+    expect(bearId).toBeDefined();
+    expect(planCast(s, ap, bearId!)).not.toBeNull();
+    expect(castProblem(s, opp, bearId!)).not.toMatch(/mana/);
+  });
+});
+
+const wrenn = card("Wrenn and Realmbreaker", "Legendary Planeswalker — Wrenn", "{1}{G}{G}", { loyalty: "4", keywords: ["Mill"], oracleText: "Lands you control have \"{T}: Add one mana of any color.\"\n+1: Up to one target land you control becomes a 3/3 Elemental creature with vigilance, hexproof, and haste until your next turn. It's still a land.\n−2: Mill three cards. You may put a permanent card from among the milled cards into your hand.\n−7: You get an emblem with \"You may play lands and cast permanent spells from your graveyard.\"" });
+const forestCard = card("Test Forest", "Basic Land — Forest", "", { oracleText: "({T}: Add {G}.)" });
+const shock = card("Test Shock", "Instant", "{R}", { oracleText: "Test Shock deals 2 damage to any target." });
+
+describe("Wrenn and Realmbreaker's emblem", () => {
+  it("you may play lands and cast permanent spells (not instants) from your graveyard; an opponent's graveyard isn't yours", () => {
+    supported(wrenn);
+    const { s: s0, ap, opp } = setup([]);
+    const b = toYard(s0, ap, bear());
+    const l = toYard(s0, ap, forestCard);
+    const i = toYard(s0, ap, shock);
+    const theirs = toYard(s0, opp, bear());
+    const yardCast = (id: string, t?: TargetChoice[]) => castProblem(s0, ap, id, t, undefined, undefined, undefined, undefined, { via: "permission" });
+    expect(yardCast(b)).not.toMatch(/mana/);
+    createEmblem(s0, ap, ["You may play lands and cast permanent spells from your graveyard."], "Wrenn and Realmbreaker");
+    invalidateCharacteristics(s0);
+    expect(yardCast(b)).toMatch(/not enough mana/);
+    expect(yardCast(i, [{ kind: "player", id: opp }])).not.toMatch(/mana/);
+    expect(yardCast(theirs)).not.toMatch(/mana/);
+    let s = run(s0, planCast(s0, ap, b, undefined, undefined, undefined, undefined, { via: "permission" }));
+    s = settle(s);
+    expect(s.objects[b]!.zone).toBe("battlefield");
+    s = act(s, { type: "playLand", player: ap, objectId: l });
+    expect(s.objects[l]!.zone).toBe("battlefield");
+  });
+});
+
+const guest = card("Grand Ball Guest", "Creature — Human Peasant", "{1}{R}", { power: "2", toughness: "2", keywords: ["Celebration"], oracleText: "Celebration — This creature gets +1/+1 and has trample as long as two or more nonland permanents entered the battlefield under your control this turn." });
+
+describe("celebration", () => {
+  it("Grand Ball Guest gets +1/+1 and trample once two nonland permanents entered under your control this turn", () => {
+    supported(guest);
+    const { s: s0, ap, ids, opp } = setup([guest, bear()]);
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    const g = ids[0]!;
+    expect(characteristics(s, s.objects[g]!).power).toBe(2);
+    // An opponent's permanent doesn't count.
+    putOnBattlefield(s, opp, bear());
+    invalidateCharacteristics(s);
+    expect(characteristics(s, s.objects[g]!).power).toBe(2);
+    s = settle(run(s, planCast(s, ap, ids[1]!)));
+    expect(characteristics(s, s.objects[g]!).power).toBe(3);
+    expect(characteristics(s, s.objects[g]!).keywords).toContain("Trample");
   });
 });

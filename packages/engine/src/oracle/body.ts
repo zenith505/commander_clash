@@ -30,6 +30,8 @@ export interface Ctx {
   selfIt?: boolean;
   /** After it left the battlefield ("When ~ dies, return it to its owner's hand"), "it" is the card in its new zone. */
   selfCard?: boolean;
+  /** An ability whose cost discards the card it's on ("{2}{R}{G}, Discard this card: ..."): "~" in the graveyard after. */
+  discardedSelf?: true;
   /** An Aura's "when enchanted creature dies": "return ~ ..." is the Aura card, in the graveyard it went to (ObjRef selfCard `moved`). */
   auraCard?: boolean;
   /** "Exile the top card of your library" came before: "that card's mana value" is that card's. */
@@ -516,7 +518,7 @@ function splitSentences(text: string): string[] {
 const LIM_DULS_VAULT =
   "Look at the top five cards of your library. As many times as you choose, you may pay 1 life, put those cards on the bottom of your library in any order, then look at the top five cards of your library. Then shuffle and put the last cards you looked at this way on top in any order.";
 
-export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean } = {}): AbilityBody | null {
+export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; discardedSelf?: true } = {}): AbilityBody | null {
   // "Put a +1/+1 counter on ~ and untap it" (Gwenna): "it" is ~, the one thing named.
   text = differenceInHand(text).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~");
   // Lim-Dûl's Vault: look at the top five; as many times as you choose, pay 1 life and put them on the bottom in any order,
@@ -542,6 +544,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     ...(opts.subjectLeft ? { subjectLeft: true } : {}),
     ...(opts.selfIt ? { selfIt: true } : {}),
     ...(opts.selfCard ? { selfCard: true } : {}),
+    ...(opts.discardedSelf ? { discardedSelf: true as const } : {}),
     ...(opts.auraCard ? { auraCard: true } : {}),
     ...(opts.activated ? { activated: true } : {}),
     ...(opts.costLinked ? { costLinked: true } : {}),
@@ -1032,6 +1035,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     if (yardCast) {
       const type = yardCast[1]!.charAt(0).toUpperCase() + yardCast[1]!.slice(1);
       effects.push({ type: "graveyardCastThisTurn", filter: { kind: "card", types: [type], notTypes: [], notColors: [], text: `${yardCast[1]} card` } });
+      continue;
+    }
+    // "{T}: You may cast target Zombie creature card from your graveyard this turn" (Zul Ashur, Lich Lord): a permission
+    // for that card, paying its costs and following the normal timing (rulings).
+    const yardTarget = /^You may cast (target .+? card) from your graveyard this turn$/.exec(s.replace(/\.$/, ""));
+    if (yardTarget) {
+      const before = ctx.targets.length;
+      const what = parseCardTarget(`${yardTarget[1]} from your graveyard`, ctx, "you");
+      const t = ctx.targets[before];
+      if (what?.ref !== "target" || ctx.targets.length !== before + 1 || t?.kind !== "card" || !t.types?.length || t.types.includes("Land")) return null;
+      effects.push({ type: "mayCastFromGraveyard", what });
       continue;
     }
     // "You may cast spells from your graveyard this turn" (Forgotten Cellar), "you may cast Zombie spells ..." (Liliana,
@@ -3700,7 +3714,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const filter = parseSearchFilter(until[1]!);
       if (!filter || filter.kind !== "card") return null;
       const onto = untilPut[1] !== "into your hand";
-      const safe = !!filter.types?.length && filter.types.every((x) => x === "Creature" || x === "Artifact" || x === "Land") && !filter.anyOf;
+      // A planeswalker card enters with its loyalty (CR 306.5b): no choice either (The Prismatic Bridge).
+      const safe = !!filter.types?.length && filter.types.every((x) => x === "Creature" || x === "Artifact" || x === "Land" || x === "Planeswalker") && !filter.anyOf;
       const tribal = !filter.types?.length && !!filter.subtypes?.length && filter.subtypes.every((x) => CREATURE_TYPES.has(x));
       if (onto && !safe && !tribal) return null;
       effects.push({ type: "revealUntil", filter, found: onto ? "battlefield" : "hand", rest: /graveyard$/.test(untilPut[3]!) ? "graveyard" : "bottom", ...(untilPut[2] ? { tapped: true as const } : {}) });

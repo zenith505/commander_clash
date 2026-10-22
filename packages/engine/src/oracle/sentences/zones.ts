@@ -161,6 +161,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "When ~ dies, shuffle it into its owner's library", "When ~ is put into a graveyard from anywhere, ...": the card where
   // it went. "At the beginning of the end step, ~'s owner shuffles it into their library": the permanent.
   if (ctx.selfCard && /^[Ss]huffle (?:it|~) into its owner's library$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "selfCard" } }];
+  // Kogla and Yidaro: "{2}{R}{G}, Discard this card: ... Shuffle this card into your library from your graveyard": the
+  // card discarded to pay for it, while it's still there (CR 400.7).
+  if (ctx.discardedSelf && /^[Ss]huffle ~ into your library from your graveyard$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "selfCard", moved: true, yours: true } }];
   // "When ~ dies, put it on top of its owner's library" (Dark Revenant): the card in the graveyard, if it's still there.
   if (ctx.selfCard && (m = /^[Pp]ut (?:it|~) on (top|the bottom) of its owner's library$/.exec(s))) return [{ type: "putInLibrary", what: { ref: "selfCard" }, position: m[1] === "top" ? "top" : "bottom" }];
   // The God-Eternals: "you may put it into its owner's library third from the top"; Enigma Sphinx's "into your library"

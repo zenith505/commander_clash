@@ -112,6 +112,7 @@ import {
   foretellProblem,
   foretoldCast,
   plotProblem,
+  plotCost,
   plottedCast,
   compileCard,
   kickerName,
@@ -3864,7 +3865,7 @@ function AbilityMenu({
   const inHand = o.zone === "hand" || o.zone === "command" || mayPlayFromExile(s, o, HUMAN) || mayPlayLandFromGraveyard(s, o, HUMAN) || mayPlayFromTop(s, o, HUMAN);
   const faceDownCast = inHand ? compileCard(d).faceDownCast : undefined;
   const suspend = o.zone === "hand" ? compileCard(d).suspend : undefined;
-  const plot = o.zone === "hand" ? compileCard(d).plot : undefined;
+  const plot = o.zone === "hand" ? plotCost(s, HUMAN, d) : undefined;
   const foretell = o.zone === "hand" ? compileCard(d).foretell : undefined;
   // A foretold card: cast only for its foretell cost (CR 702.143a).
   const foretold = foretoldCast(s, HUMAN, o) ? compileCard(d).foretell : undefined;

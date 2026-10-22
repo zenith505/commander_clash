@@ -265,7 +265,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     .join("");
   // "Sacrifice ~: It deals damage equal to its power to ...", "Put two +1/+1 counters on ~. It deals 1 damage to any
   // target": "it" is the source, the only object named before it.
-  const body = putFromHand ? { targets: [], effects: [{ type: "putOntoBattlefield" as const, what: { ref: "selfCard" as const } }], text: effectText } : parseBody(effectText.replace(/^It (?=deals\b)/, "~ ").replace(/^(Put [^.]+ counters? on ~\. )It (?=deals\b)/, "$1~ "), { activated: true, ...(returnsSelf || inYard ? { selfCard: true } : {}), ...(extra.some((c) => c.kind === "exileFromGraveyard" && c.linked) ? { costLinked: true } : {}) });
+  const body = putFromHand ? { targets: [], effects: [{ type: "putOntoBattlefield" as const, what: { ref: "selfCard" as const } }], text: effectText } : parseBody(effectText.replace(/^It (?=deals\b)/, "~ ").replace(/^(Put [^.]+ counters? on ~\. )It (?=deals\b)/, "$1~ "), { activated: true, ...(returnsSelf || inYard ? { selfCard: true } : {}), ...(fromHand ? { discardedSelf: true as const } : {}), ...(extra.some((c) => c.kind === "exileFromGraveyard" && c.linked) ? { costLinked: true } : {}) });
   if (!body) return "fail";
   // An activated ability without a target that could add mana, and that moves no card to or from a library, is a mana
   // ability (CR 605.1a): it doesn't use the stack (605.3b). One whose other instructions aren't known to stay clear of

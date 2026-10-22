@@ -83,7 +83,7 @@ describe("Hazel's Brewmaster", () => {
     s = run(s, planCast(s, ap, ids[0]!));
     s = settle(s);
     expect(s.pending).toMatchObject({ kind: "chooseTargets" });
-    s = act(s, { type: "chooseTargets", player: ap, sourceId: ids[0]!, targets: [target(pyro)] });
+    s = act(s, { type: "chooseTargets", player: ap, targets: [target(pyro)] });
     s = settle(s);
     expect(s.objects[pyro]!.zone).toBe("exile");
     const food = s.battlefield.find((id) => /^Food/.test(name(s, id)))!;
@@ -96,7 +96,7 @@ describe("Hazel's Brewmaster", () => {
     s = passUntil(s, "declareAttackers", ap);
     s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: ids[0]!, defender: opp }] });
     s = settle(s);
-    if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, sourceId: ids[0]!, targets: [target(ooze)] });
+    if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [target(ooze)] });
     s = settle(s);
     expect(s.objects[ooze]!.zone).toBe("exile");
     const texts = abilitiesOf(s, s.objects[food]!).activated.map((a) => a.text);

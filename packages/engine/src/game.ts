@@ -3599,8 +3599,10 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
     for (const m of mods) {
       if (m.who === "you" ? pid !== c.controller : m.who === "opponents" ? pid === c.controller : m.who === "enchanted" ? src.attachedToPlayer !== pid : false) continue;
       if (m.turn === "notCasters" ? s.activePlayer === pid : m.turn && (s.activePlayer === c.controller) !== (m.turn === "yours")) continue;
-      if (m.fromGraveyard && o.zone !== "graveyard") continue;
+      if (m.fromGraveyard && !m.fromZones && o.zone !== "graveyard") continue;
       if (m.fromZones && !m.fromZones.includes(o.zone as "graveyard" | "exile")) continue;
+      // "From your graveyard": a card cast from another player's graveyard isn't (a card is in its owner's, CR 404.2).
+      if (m.fromGraveyard && o.zone === "graveyard" && o.owner !== pid) continue;
       if (m.notOwned && o.owner === pid) continue;
       // Semblance Anvil: a card type (CR 205.2a) the spell shares with a card exiled with it (CR 607.2a).
       if (m.sharesTypeWithLinked && !linkedExileCards(s, src).some((x) => defOf(s, obj(s, x)).types.some((t) => d.types.includes(t)))) continue;
@@ -7774,8 +7776,8 @@ export function plotProblem(s: GameState, pid: PlayerId, id: ObjectId): string |
   const o = s.objects[id];
   if (!o || o.zone !== "hand" || o.owner !== pid) return "only a card in your hand can be plotted";
   const d = defOf(s, o);
-  const cost = compileCard(d).plot;
-  if (!cost) return `${d.name} doesn't have plot`;
+  const cost = plotCost(s, pid, d);
+  if (cost === undefined) return `${d.name} doesn't have plot`;
   if (s.priority !== pid || s.pending) return "you don't have priority";
   if (!canActAtSorcerySpeed(s, pid)) return "you can only plot during your main phase while the stack is empty";
   if (!canPayFromPool(s, pid, parseManaCost(cost), "other")) return `not enough mana to plot ${d.name} (${cost})`;
@@ -7861,13 +7863,34 @@ export function setUnlocked(s: GameState, o: GameObject, doors: number[]) {
   if (was.length < 2 && o.unlocked.length === 2) fireEvent(s, { type: "roomFullyUnlocked", id: o.id, player: controllerOf(s, o) });
 }
 
+/**
+ * What `pid` pays to plot this card now: its plot cost, less generic mana for each "Plotting cards from your hand costs
+ * {2} less" they control (Doc Aurlock; reductions take off only generic mana, CR 601.2f). Undefined without plot.
+ */
+export function plotCost(s: GameState, pid: PlayerId, d: CardDef): string | undefined {
+  const cost = compileCard(d).plot;
+  if (cost === undefined) return undefined;
+  let less = 0;
+  for (const id of s.battlefield) {
+    const o = s.objects[id]!;
+    const n = abilitiesOf(s, o).plotLess;
+    if (n && controllerOf(s, o) === pid) less += n;
+  }
+  if (!less) return cost;
+  const generic = /\{(\d+)\}/.exec(cost);
+  if (!generic) return cost;
+  const left = Math.max(0, Number(generic[1]) - less);
+  const out = cost.replace(generic[0], left ? `{${left}}` : "");
+  return out || "{0}";
+}
+
 /** Plot a card (CR 702.170a): pay its plot cost and exile it. Its owner may cast it free on a later turn (702.170d). */
 function plotCard(s: GameState, p: Player, id: ObjectId) {
   const problem = plotProblem(s, p.id, id);
   if (problem) throw new RulesError(problem);
   const o = obj(s, id);
   const d = defOf(s, o);
-  const cost = compileCard(d).plot!;
+  const cost = plotCost(s, p.id, d)!;
   spendFromPool(s, p.id, parseManaCost(cost), "other");
   moveObject(s, id, "exile");
   o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "plot", turn: s.turn };

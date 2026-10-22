@@ -3672,7 +3672,7 @@ export interface CostMod {
   n: number;
   /** During the permanent's controller's turn or not; `notCasters`: "except during its controller's turn" (Defense Grid), the spell's. */
   turn?: "yours" | "notYours" | "notCasters";
-  /** "Spells you cast from your graveyard". */
+  /** "Spells you cast from your graveyard": the caster's own (with `fromZones`, a graveyard one must be theirs). */
   fromGraveyard?: boolean;
   /** "Spells your opponents cast from graveyards or from exile" (Aven Interrupter): only spells cast from these zones. */
   fromZones?: ("graveyard" | "exile")[];
@@ -4220,6 +4220,8 @@ export interface CompiledCard {
   handSize?: { who: "you" | "opponents"; set?: number; plus?: number }[];
   /** K'rrik: "For each {B} in a cost, you may pay 2 life rather than pay that mana" (see blackForLife), for its controller. */
   lifeForBlack?: true;
+  /** Doc Aurlock: "Plotting cards from your hand costs {2} less" (CR 702.170a, 601.2f): less generic mana, for its controller. */
+  plotLess?: number;
   /** Chromatic Orrery: "You may spend mana as though it were mana of any color." (CR 609.4b), for its controller's costs. */
   spendAnyColor?: true;
   /** "Players may spend mana as though it were mana of any color" (Mycosynth Lattice): every player, for every cost (CR 609.4b). */

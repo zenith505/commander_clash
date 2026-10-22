@@ -267,8 +267,9 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     return { costMod: { who: "you", filter: { kind: "spell", text: "spells that share a card type with the exiled card" }, n: -Number(m[1]), sharesTypeWithLinked: true, text: line } };
   const ofChosen = / of the chosen type costs? \{/.test(text);
   if (ofChosen) text = text.replace(/ of the chosen type(?= costs? \{)/, "");
-  // "Spells your opponents cast from graveyards or from exile cost {2} more to cast" (Aven Interrupter).
-  const zones = / from (graveyards or from exile|graveyards|exile)(?= costs? \{)/.exec(text);
+  // "Spells your opponents cast from graveyards or from exile cost {2} more to cast" (Aven Interrupter), "Spells you cast
+  // from your graveyard or from exile cost {2} less to cast" (Doc Aurlock): only your own graveyard.
+  const zones = / from (graveyards or from exile|your graveyard or from exile|graveyards|exile)(?= costs? \{)/.exec(text);
   if (zones) text = text.slice(0, zones.index) + text.slice(zones.index + zones[0].length);
   m = /^(?:(During your turn|During turns other than yours), )?(.+?)( you cast| your opponents cast)?( with (?:mana value|power) \d+ or (?:greater|less))?( from your graveyard)? costs? (\{\d+\}) (less|more) to cast$/.exec(text);
   if (!m || !/spells?$/i.test(m[2]!)) return null;
@@ -290,6 +291,7 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
       ...(m[1] ? { turn: m[1] === "During your turn" ? "yours" : "notYours" } : {}),
       ...(m[5] ? { fromGraveyard: true } : {}),
       ...(zones ? { fromZones: zones[1] === "exile" ? ["exile" as const] : zones[1] === "graveyards" ? ["graveyard" as const] : ["graveyard" as const, "exile" as const] } : {}),
+      ...(zones?.[1] === "your graveyard or from exile" ? { fromGraveyard: true } : {}),
       text: line,
     },
   };
@@ -802,6 +804,12 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const t = m[3] ?? (m[4] && singular(m[4]));
     if (t !== undefined && !CREATURE_TYPES.has(t)) return null;
     return [{ kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) }, ...(t ? [{ kind: "addTypes" as const, types: [], subtypes: [t] }] : [])];
+  }
+  // Porcelain Gallery: "have base power and toughness each equal to the number of creatures you control", counted as the
+  // effect applies in layer 7b (CR 613.4b, 611.3a).
+  if ((m = /^(?:has|have) base power and toughness each equal to (the number of .+)$/.exec(rest))) {
+    const n = parseCount(m[1]!, null);
+    return n ? [{ kind: "setPT", power: n, toughness: n }] : null;
   }
   // Maha, Its Feathers Night: "have base toughness 1" (layer 7b, CR 613.4b).
   if ((m = /^(?:has|have) base toughness (\d+)$/.exec(rest))) return [{ kind: "setToughness", toughness: Number(m[1]) }];

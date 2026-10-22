@@ -1680,6 +1680,11 @@ export function compile(d: CardDef): CompiledCard {
       out.spendAnyColor = true;
       continue;
     }
+    const plotLess = /^Plotting cards from your hand costs \{(\d+)\} less\.$/.exec(line);
+    if (plotLess) {
+      out.plotLess = (out.plotLess ?? 0) + Number(plotLess[1]);
+      continue;
+    }
     if (line === "Players may spend mana as though it were mana of any color.") {
       out.spendAnyColorAll = true;
       continue;

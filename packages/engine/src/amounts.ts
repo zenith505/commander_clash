@@ -105,6 +105,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return ctx.x ?? 0;
     case "eventAmount":
       return ctx.event?.amount ?? 0;
+    case "castShortfall": {
+      const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
+      return item ? Math.max(0, spellManaValue(s, item) - (ctx.event?.amount ?? 0)) : 0;
+    }
     case "eventExcess":
       return ctx.event?.excess ?? 0;
     case "affectedManaValue": {

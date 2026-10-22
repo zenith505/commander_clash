@@ -178,6 +178,10 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
 export function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition } } | { lessIfTargets: { n: number; filter: TargetSpec } } | { targetTax: number } | { targetLifeTax: number } | "fail" | null {
   let text = line.replace(/^[A-Z][A-Za-z' -]+ — (?=~ costs|The second)/, "").replace(/\.$/, ""); // "Domain —" is an ability word
   let m: RegExpExecArray | null;
+  // "Each spell you cast that's a Demon, Horror, or Nightmare costs {1} less to cast" (Ancient Cellarspawn): spells of
+  // any of those subtypes, read like "Demon, Horror, and Nightmare spells you cast cost {1} less to cast".
+  if ((m = /^Each spell you cast that's an? ((?:[A-Z][a-z]+, )*[A-Z][a-z]+,? or [A-Z][a-z]+) costs (\{\d+\} less to cast)$/.exec(text)))
+    text = `${m[1]!.replace(/,? or /, m[1]!.includes(",") ? ", and " : " and ")} spells you cast cost ${m[2]}`;
   // "Cleric spells you cast cost {W}{B} less to cast. This effect reduces only the amount of colored mana you pay." (Edgewalker),
   // Morophon's "Spells of the chosen type you cast cost {W}{U}{B}{R}{G} less ...": colored mana only, never generic (CR 118.7).
   if ((m = /^(.+ cost) ((?:\{[WUBRG]\})+) (less to cast)\. This effect reduces only the amount of colored mana you pay$/.exec(text))) {

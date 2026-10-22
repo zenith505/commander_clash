@@ -706,3 +706,37 @@ describe("cards these templates also cover", () => {
     expect(characteristics(s, s.objects[g]!).keywords).toContain("Haste");
   });
 });
+
+const cellarspawn = card("Ancient Cellarspawn", "Creature — Horror", "{1}{B}{B}", {
+  power: "3",
+  toughness: "3",
+  oracleText:
+    "Each spell you cast that's a Demon, Horror, or Nightmare costs {1} less to cast.\nWhenever you cast a spell, if the amount of mana spent to cast it was less than its mana value, target opponent loses life equal to the difference.",
+});
+
+describe("Ancient Cellarspawn", () => {
+  it("Demon, Horror and Nightmare spells cost {1} less; a spell cast for less than its mana value drains the difference", () => {
+    expect(isFullySupported(cellarspawn)).toBe(true);
+    const demon = card("Test Demon", "Creature — Demon", "{3}{B}", { power: "4", toughness: "4" });
+    const nightmare = card("Test Nightmare", "Creature — Nightmare Horse", "{2}{B}", { power: "2", toughness: "2" });
+    const { s: s0, ap, opp, ids } = setup([demon, nightmare, bear()]);
+    let s = s0;
+    putOnBattlefield(s, ap, cellarspawn);
+    expect(spellCost(s, ap, s.objects[ids[0]!]!).extra).toBe(2);
+    expect(spellCost(s, ap, s.objects[ids[2]!]!).extra).toBe(1);
+    const life = s.players[opp]!.life;
+    const castIt = (id: string) => {
+      s = run(s, planCast(s, ap, id));
+      for (let i = 0; i < 20 && s.pending?.kind !== "chooseTargets" && s.stack.length; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+      if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] });
+      s = settle(s);
+    };
+    castIt(ids[0]!);
+    expect(s.players[opp]!.life).toBe(life - 1);
+    // Grizzly Bears: paid in full, nothing happens.
+    castIt(ids[2]!);
+    expect(s.players[opp]!.life).toBe(life - 1);
+    castIt(ids[1]!);
+    expect(s.players[opp]!.life).toBe(life - 2);
+  });
+});

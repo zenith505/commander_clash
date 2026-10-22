@@ -1628,14 +1628,29 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (e.who?.ref === "eachPlayer") return eachFromGraveyard(s, e, ctx, src);
       if (e.fromExile) {
         // Karn, the Great Creator: a face-up card you own in exile, into your hand (rulings: never a face-down one).
+        // Oblivion Sower: that player's face-up land cards in exile, onto the battlefield under your control.
         const p = player(s, ctx.controller);
+        const ownerId = e.who ? players(s, e.who, ctx)[0] : p.id;
+        if (ownerId === undefined) return;
+        const owner = player(s, ownerId);
         const sc = (s.resolving!.scratch ??= {});
+        const fits = (id: ObjectId) => obj(s, id).owner === owner.id && obj(s, id).zone === "exile" && !obj(s, id).faceDown && !obj(s, id).hiddenExile && (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
         if (!sc.found) {
-          const cards = p.exile.filter((id) => obj(s, id).owner === p.id && !obj(s, id).faceDown && !obj(s, id).hiddenExile && (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))));
+          const cards = owner.exile.filter(fits);
           if (!cards.length) return;
           const kind = e.filter?.text ?? "card";
-          s.pending = { kind: "searchLibrary", player: p.id, source: src, what: `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`, cards, min: e.upTo ? 0 : 1, max: 1, exiled: true, dig: { looked: cards, to: "to put into your hand", rest: "stay in exile" } };
+          const toField = e.dest === "battlefield";
+          s.pending = { kind: "searchLibrary", player: p.id, source: src, what: e.anyNumber ? `any number of ${kind}s` : `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`, cards, min: e.upTo ? 0 : 1, max: e.anyNumber ? cards.length : 1, exiled: true, dig: { looked: cards, to: toField ? "to put onto the battlefield under your control" : "to put into your hand", rest: "stay in exile" } };
           return "paused";
+        }
+        if (e.dest === "battlefield") {
+          const found = sc.found.filter(fits);
+          sc.found = undefined;
+          if (found.length) log(s, `${p.name} puts ${found.map((id) => defOf(s, obj(s, id)).name).join(", ")} from exile onto the battlefield under their control.`);
+          enterTogether(s, () => {
+            for (const id of found) moveObject(s, id, "battlefield", { controller: p.id });
+          });
+          return;
         }
         const found = sc.found.filter((id) => p.exile.includes(id) && !obj(s, id).faceDown && !obj(s, id).hiddenExile);
         if (found.length) log(s, `${p.name} puts ${found.map((id) => defOf(s, obj(s, id)).name).join(", ")} from exile into their hand.`);

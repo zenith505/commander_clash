@@ -316,3 +316,52 @@ describe("Sphinx of the Second Sun", () => {
     expect(s.activePlayer).toBe(ap);
   });
 });
+
+const sower = card("Oblivion Sower", "Creature — Eldrazi", "{6}", {
+  power: "5",
+  toughness: "8",
+  oracleText: "When you cast this spell, target opponent exiles the top four cards of their library, then you may put any number of land cards that player owns from exile onto the battlefield under your control.",
+});
+
+describe("Oblivion Sower", () => {
+  it("the opponent exiles four; any of their face-up land cards in exile enter under your control, whatever exiled them", () => {
+    expect(isFullySupported(sower)).toBe(true);
+    const { s: s0, ap, opp, ids } = setup([sower]);
+    let s = s0;
+    // Two lands on top of the opponent's library, and one of theirs exiled earlier; a face-down one doesn't count.
+    const lib = [putOnBattlefield(s, opp, card("Swamp", "Basic Land — Swamp")), putOnBattlefield(s, opp, bear()), putOnBattlefield(s, opp, card("Island", "Basic Land — Island")), putOnBattlefield(s, opp, bear())];
+    for (const id of [...lib].reverse()) moveObject(s, id, "library", { top: true });
+    const old = putOnBattlefield(s, opp, card("Plains", "Basic Land — Plains"));
+    moveObject(s, old, "exile");
+    const hidden = putOnBattlefield(s, opp, card("Forest", "Basic Land — Forest"));
+    moveObject(s, hidden, "exile");
+    s.objects[hidden]!.hiddenExile = { by: hidden, seen: [opp] };
+    s = run(s, planCast(s, ap, ids[0]!));
+    s = settle(s);
+    if (s.pending?.kind === "chooseTargets") s = settle(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] }));
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap, exiled: true });
+    const offered = (s.pending as { cards: string[] }).cards;
+    expect([...offered].sort()).toEqual([lib[0]!, lib[2]!, old].sort());
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: [lib[0]!, old] }));
+    expect(s.objects[lib[0]!]!.zone).toBe("battlefield");
+    expect(s.objects[lib[0]!]!.controller).toBe(ap);
+    expect(s.objects[old]!.zone).toBe("battlefield");
+    expect(s.objects[lib[2]!]!.zone).toBe("exile");
+    expect(s.objects[hidden]!.zone).toBe("exile");
+  });
+});
+
+describe("Oblivion Sower (bot)", () => {
+  it("a bot puts every land it may onto the battlefield", () => {
+    const { s: s0, ap, opp, ids } = setup([sower]);
+    let s = s0;
+    const lib = [putOnBattlefield(s, opp, card("Swamp", "Basic Land — Swamp")), putOnBattlefield(s, opp, card("Island", "Basic Land — Island"))];
+    for (const id of [...lib].reverse()) moveObject(s, id, "library", { top: true });
+    s = run(s, planCast(s, ap, ids[0]!));
+    s = settle(s);
+    if (s.pending?.kind === "chooseTargets") s = settle(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] }));
+    expect(s.pending?.kind).toBe("searchLibrary");
+    s = settle(act(s, botActions(s, ap)[0]!));
+    expect(lib.map((id) => s.objects[id]!.zone)).toEqual(["battlefield", "battlefield"]);
+  });
+});

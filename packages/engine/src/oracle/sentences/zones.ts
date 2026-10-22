@@ -231,6 +231,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = parseSearchFilter(m[1]!);
     return filter === null ? null : [{ type: "chooseFromGraveyard", n: 1, upTo: true, fromExile: true, ...(filter ? { filter } : {}) }];
   }
+  // Oblivion Sower: "you may put any number of land cards that player owns from exile onto the battlefield under your
+  // control": face-up cards in exile, however they got there (rulings), chosen as it resolves.
+  if ((m = /^(?:[Tt]hen )?(?:[Yy]ou may )?[Pp]ut any number of (.+?) (that player|target opponent|target player) owns from exile onto the battlefield under your control$/.exec(s))) {
+    const filter = parseSearchFilter(m[1]!.replace(/ cards$/, " card"));
+    const who = parsePlayer(m[2]!, ctx);
+    if (!filter || !who || who.ref !== "target") return null;
+    return [{ type: "chooseFromGraveyard", n: 0, anyNumber: true, upTo: true, fromExile: true, who, dest: "battlefield", filter }];
+  }
   // Ripples of Undeath: "Mill three cards. Then you may pay {1} and 3 life. If you do, put a card from among those cards into
   // your hand": one of the cards just milled, still in your graveyard.
   if (ctx.afterMill && /^[Pp]ut a card from among (?:those cards|them) into your hand$/.test(s)) return [{ type: "chooseFromGraveyard", n: 1, milled: true }];

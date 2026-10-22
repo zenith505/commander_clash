@@ -253,6 +253,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "searchLibrary", player: pid, found: pend.cards.filter((id) => { const n = defOf(s, obj(s, id)).name; return !names.has(n) && !!names.add(n); }) }];
     }
     if (pend.kind === "searchLibrary" && pend.fromHand) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, pend.max) }];
+    // "Put any number of ... from exile onto the battlefield under your control" (Oblivion Sower): all of them.
+    if (pend.kind === "searchLibrary" && pend.exiled && pend.max > 1 && pend.dig && /battlefield/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: pend.cards.slice(0, pend.max) }];
     // Dauthi Voidwalker: the most expensive spell, to cast for free now (a land only if that's all there is).
     if (pend.kind === "searchLibrary" && pend.exiled) {
       const land = (id: string) => (isType(defOf(s, obj(s, id)), "Land") ? 1 : 0);

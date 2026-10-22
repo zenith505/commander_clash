@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { act, bear, card, cast, island, passUntil, putOnBattlefield, setup, target } from "./helpers";
 import { abilityProblem } from "../src";
+import { manaAbilityProblem } from "../src/manaabilities";
 import { attackTaxPer, botActions, invalidateCharacteristics, isFullySupported, objHasKeyword, objIsType, power, toughness, isSuspended, planActivate, planCast, waitingOn, type Action, type GameState, type PlayerId } from "../src";
 import { moveObject } from "../src/game";
 
@@ -602,5 +603,27 @@ describe("Bruenor Battlehammer", () => {
     expect(power(s, s.objects[a]!)).toBe(6);
     if (waitingOn(s) !== opp) s = act(s, { type: "passPriority", player: waitingOn(s)! });
     expect(abilityProblem(s, opp, sw, 0, [target(b)])).toMatch(/mana/);
+  });
+});
+
+const sceptre = card("Sceptre of Eternal Glory", "Legendary Artifact", "{4}", {
+  oracleText: "{T}: Add one mana of any color.\n{T}: Add three mana of any one color. Activate only if you control three or more lands with the same name.",
+});
+
+describe("Sceptre of Eternal Glory", () => {
+  it("three mana only while you control three or more lands with one name", () => {
+    expect(isFullySupported(sceptre)).toBe(true);
+    const { s, ap } = setup([]);
+    const sc = putOnBattlefield(s, ap, sceptre);
+    const lands = s.battlefield.filter((id) => s.objects[id]!.controller === ap && objIsType(s, s.objects[id]!, "Land"));
+    // Down to two of each name: no.
+    const byName = new Map<string, string[]>();
+    for (const id of lands) byName.set(s.cards[s.objects[id]!.cardId]!.name, [...(byName.get(s.cards[s.objects[id]!.cardId]!.name) ?? []), id]);
+    for (const ids of byName.values()) for (const id of ids.slice(2)) moveObject(s, id, "graveyard");
+    invalidateCharacteristics(s);
+    expect(manaAbilityProblem(s, ap, s.objects[sc]!, 0)).toBeNull();
+    expect(manaAbilityProblem(s, ap, s.objects[sc]!, 1)).not.toBeNull();
+    putOnBattlefield(s, ap, island);
+    expect(manaAbilityProblem(s, ap, s.objects[sc]!, 1)).toBeNull();
   });
 });

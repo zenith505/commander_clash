@@ -3305,6 +3305,8 @@ export interface BatchTrigger {
   each?: true;
   /** "For the first time each turn": only the first such event this turn (counting the ones before this permanent was there). */
   first?: true;
+  /** "Lands enter ... without being played" (Deep Gnome Terramancer): not a land played (CR 305.1). */
+  notPlayed?: true;
 }
 
 export interface ActivatedAbility {

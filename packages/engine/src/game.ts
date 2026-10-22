@@ -3067,7 +3067,9 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
   const fromZone = o.zone;
   const from = o.zone === "exile" || o.zone === "graveyard" || o.zone === "library" ? ` from ${o.zone === "exile" ? "exile" : o.zone === "library" ? "their library" : "their graveyard"}` : "";
   // Under the control of the player who plays it (CR 305.1, 110.2), an opponent's card from exile too (Opposition Agent).
+  s.playingLand = id;
   moveObject(s, id, "battlefield", { controller: p.id, untapped, ...(face !== undefined ? { face } : {}) });
+  s.playingLand = undefined;
   log(s, `${p.name} plays ${d.name}${from}${obj(s, id).tapped ? " (tapped)" : ""}.`);
   fireEvent(s, { type: "landPlayed", player: p.id, id, from: fromZone });
 }

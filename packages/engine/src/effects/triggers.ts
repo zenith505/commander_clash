@@ -480,6 +480,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       card: cardIdOf(entering),
       controller: you,
       entered: true,
+      ...(s.playingLand === entering.id ? { played: true as const } : {}),
       ...(locks.length ? { locks: locks.map((l) => ({ by: l.by, ...(l.lock.opponents ? { opponents: true } : {}) })) } : {}),
     });
     // Its own enters abilities use the X of the spell it was (CR 107.3m), and know whether it was kicked;
@@ -1705,6 +1706,7 @@ function batchMoveMatches(s: GameState, b: BatchTrigger, m: ZoneMove, w: GameObj
     if (m.locks?.some((l) => !l.opponents || l.by !== you)) return false;
     if (b.orSelf && o.id === w.id) return true;
     if (b.other && o.id === w.id) return false;
+    if (b.notPlayed && m.played) return false;
     return whose(m.controller) && (!b.filter || objectMatches(s, b.filter, o, you, false));
   }
   if (b.what === "leaves") {

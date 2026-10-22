@@ -915,6 +915,10 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
       batch.noneCastWithMana = true;
       rest = none[1]!;
     }
+  } else if ((m = /^Whenever one or more lands enter under an opponent's control( without being played)?, (.+)$/.exec(line))) {
+    // Deep Gnome Terramancer: lands put onto the battlefield under an opponent's control, not played (CR 305.1, 305.4).
+    batch = { what: "enters", filter: { kind: "object", types: ["Land"], notTypes: [], notColors: [], text: "lands" }, whose: "opponent", ...(m[1] ? { notPlayed: true as const } : {}) };
+    rest = m[2]!;
   } else if ((m = /^Whenever one or more (.+?) (enter|die|leave the battlefield( without dying)?|are put into a graveyard from the battlefield)( during your turn)?, (.+)$/.exec(line))) {
     const what = batchPermanents(m[1]!);
     if (!what) return "fail";
@@ -961,7 +965,9 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
   // The objects as a group: not modeled. "Exile the top card of your library. You may play that card ..." (Inti) is about
   // the exiled card, not them.
   const aboutThem = rest.replace(/exile the top card of your library\. (?:Until (?:the end of your next turn|end of turn|your next end step), you may play that card|You may play that card (?:this turn|until the end of your next turn|until your next end step))\.?$/i, "");
-  if (/\b(it|its|they|them|their|those|that card|that creature|that token|one of them|among them|this way)\b/i.test(aboutThem)) return "fail";
+  // "Search your library for a Plains card, put it onto the battlefield tapped" (Deep Gnome Terramancer): the card found.
+  const notThem = aboutThem.replace(/search your library for [^,]+, put it (?:onto the battlefield(?: tapped)?|into your hand)/i, "");
+  if (/\b(it|its|they|them|their|those|that card|that creature|that token|one of them|among them|this way)\b/i.test(notThem)) return "fail";
   let text = rest;
   const thatMuch = /\bthat (?:much|many)\b/.test(text);
   if (thatMuch) {

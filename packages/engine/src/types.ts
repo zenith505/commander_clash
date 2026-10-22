@@ -1237,6 +1237,8 @@ export interface ZoneMove {
   /** Who controlled it: as it left the battlefield, or as it entered. */
   controller?: PlayerId;
   entered?: true;
+  /** A land entering because it was played (CR 305.1), not put onto the battlefield. */
+  played?: true;
   discardedBy?: PlayerId;
   /** Torpor Orb: the controllers whose abilities its entering can't trigger (`opponents`: only those of `by`'s opponents). */
   locks?: { by: PlayerId; opponents?: boolean }[];
@@ -1248,6 +1250,8 @@ export interface ZoneMove {
 }
 
 export interface GameState {
+  /** The land being played right now (CR 305.1), while it moves onto the battlefield. */
+  playingLand?: ObjectId;
   /** Phased-out permanents (CR 702.26b), which are treated as though they don't exist. */
   phasedOut?: ObjectId[];
   /**

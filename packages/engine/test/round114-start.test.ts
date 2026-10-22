@@ -579,3 +579,43 @@ describe("Delay: a countered spell is exiled with time counters and gains suspen
     expect(isSuspended(s, s.objects[g]!)).toBe(false);
   });
 });
+
+describe("Deep Gnome Terramancer: lands entering under an opponent's control without being played", () => {
+  const terramancer = card("Deep Gnome Terramancer", "Creature — Gnome Wizard", "{1}{W}", {
+    power: "2",
+    toughness: "2",
+    keywords: ["Flash"],
+    oracleText:
+      "Flash\nMold Earth — Whenever one or more lands enter under an opponent's control without being played, you may search your library for a Plains card, put it onto the battlefield tapped, then shuffle. Do this only once each turn.",
+  });
+  const growth = card("Rampant Growth", "Sorcery", "{1}{G}", { oracleText: "Search your library for a basic land card, put that card onto the battlefield tapped, then shuffle." });
+  const plains = card("Plains", "Basic Land — Plains");
+
+  it("plays", () => expect(isFullySupported(terramancer)).toBe(true));
+
+  it("a land played doesn't trigger it; one put onto the battlefield does, and only once each turn once you search", () => {
+    const { s: s0, ap, opp, ids } = setup([growth, growth]);
+    putOnBattlefield(s0, opp, terramancer);
+    for (const _ of [0, 1]) moveObject(s0, putOnBattlefield(s0, opp, plains), "library");
+    for (let i = 0; i < 4; i++) putOnBattlefield(s0, ap, card("Forest", "Basic Land — Forest"));
+    const land = s0.players[ap]!.hand.find((id) => s0.cards[s0.objects[id]!.cardId]!.name === "Forest")!;
+    let s = settle(act(s0, { type: "playLand", player: ap, objectId: land }));
+    expect(s.pending).toBeNull();
+    expect(s.triggerQueue.length + s.stack.length).toBe(0);
+    s = run(s, planCast(s, ap, ids[0]!));
+    for (let i = 0; i < 20 && s.pending?.kind !== "chooseMay"; i++) s = s.pending ? act(s, botActions(s, waitingOn(s)!)[0]!) : act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: opp });
+    s = act(s, { type: "chooseMay", player: opp, yes: true });
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: opp });
+    s = settle(act(s, botActions(s, opp)[0]!));
+    const plainsOut = () => s.battlefield.filter((id) => s.cards[s.objects[id]!.cardId]!.name === "Plains" && s.objects[id]!.controller === opp).length;
+    expect(plainsOut()).toBe(1);
+    // A second Rampant Growth this turn: no trigger (done once this turn, CR 603.2h).
+    s = run(s, planCast(s, ap, ids[1]!));
+    for (let i = 0; i < 20 && (s.stack.length || s.pending); i++) {
+      expect(s.pending?.kind).not.toBe("chooseMay");
+      s = s.pending ? act(s, botActions(s, waitingOn(s)!)[0]!) : act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(plainsOut()).toBe(1);
+  });
+});

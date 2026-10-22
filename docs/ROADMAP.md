@@ -1,7 +1,7 @@
 # Roadmap
 
-22,675 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,005 of 4,988 (80%).
+22,762 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,047 of 4,988 (81%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,19 +22,20 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 114, most played first: Sheoldred // The True Scriptures
-   ("a nontoken creature or planeswalker": whether "nontoken" covers both isn't settled by a ruling), Quilled Greatwurm
-   (cast from the graveyard by removing counters from among creatures), Plargg and Nassari, Summon: Yojimbo ("until
-   your next turn, creatures can't attack you unless ..." as a one-shot effect), Sphinx of the Second Sun (an additional
-   beginning phase), Oblivion Sower, Arcane Bombardment, Leyline Tyrant, Toxrill, Slaughter the Strong, Silkguard,
-   Chthonian Nightmare, Bruenor Battlehammer, Sceptre of Eternal Glory, Hazel's Brewmaster, Thieving Skydiver; also
-   Thor, Guardian of Midgard, Virtue of Courage, Asgardian Inspiration, Painter's Servant, Karazikar, Echoing Assault,
-   Ordruun Mentor, Soaring Lightbringer. Smaller gaps from round 114: "target player adds two mana in any combination
+00. Most played first (`npm run popular`). Out after round 115, most played first: Sheoldred // The True Scriptures
+   ("a nontoken creature or planeswalker": whether "nontoken" covers both isn't settled by a ruling), Hazel's
+   Brewmaster, Nine-Lives Familiar, Not of This World (kindred), Lim-Dûl's Vault, Mimic Vat, Regal Behemoth, Icon of
+   Ancestry, Emrakul, the World Anew, Tinder Wall ("the creature it's blocking" after it's sacrificed), Gonti, Night
+   Minister, Dionus, Druid of Purification, Agitator Ant, Odric, Selfless Squire (a trigger on prevented damage), Thor,
+   Guardian of Midgard, Virtue of Courage, Asgardian Inspiration, Painter's Servant, Karazikar, Echoing Assault, Ordruun
+   Mentor, Soaring Lightbringer, Epochrasite and Sinister Concierge (suspending other cards). Smaller gaps from round
+   115: bots never use Together Forever, Chthonian Nightmare or HELIOS; Assault Suit and other multi-clause equipment
+   lines are out; Brass Herald, Alrund, Vigean Intuition and Winding Way ("cards of the chosen type revealed this way")
+   and Sages of the Anima (a draw replacement) are out; Serra's Emissary can't name kindred (no kindred card plays).
+   Smaller gaps from round 114: "target player adds two mana in any combination
    of colors" (another player adding it) is out; Quicksilver Fountain (each player floods a land of
    their choice) and Eluge (a cost reduction for each flooded land) are out; Cemetery Illuminator and the other "look at the top card, you may cast it if ..." cards are
-   out; bots never cast Invert Polarity or Commandeer (their counter logic reads a spell's top-level counter only);
-   Jhoira of the Ghitu, Epochrasite, Kang Prime, Sinister Concierge and other cards that suspend other cards are out;
-   Lozhan ("any target that isn't a commander") is out; Knacksaw Clique, Pale Wayfarer, Pili-Pala and Puresight Merrow
+   out; Lozhan ("any target that isn't a commander") is out; Knacksaw Clique, Pale Wayfarer, Pili-Pala and Puresight Merrow
    ({Q} with another cost or a mana ability) are out; Moxite Refinery (Remove X counters as a cost) and Subversive
    Acolyte are out; bots never choose Aetheric Amplifier's "each kind of counter you have" mode. Smaller gaps from round
    113: autopay never exiles a creature to Food Chain (choosing what to exile is the player's; bots do use it);

@@ -448,16 +448,23 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   const spentIf = new RegExp(`^if ${SPENT} was spent to cast (?:it|that spell), (.+)$`).exec(m[4]!);
   const spent = spentIf ? parseSpentReq(spentIf[1]!) : undefined;
   if (spentIf && (m[2] || !spent)) return "fail";
+  // Ancient Cellarspawn: "if the amount of mana spent to cast it was less than its mana value, target opponent loses life
+  // equal to the difference": its mana value as cast, X included (CR 202.3e), against the mana spent (CR 601.2h); fixed
+  // once it's cast, so checking it as it triggers is checking it as it resolves too (CR 603.4).
+  const short = /^if the amount of mana spent to cast it was less than its mana value, (.+)$/.exec(m[4]!);
+  if (short && m[2]) return "fail";
   // "That player" is the one who cast it.
   // "If eight or more mana was spent to cast that spell, ... it deals that much damage to each opponent" (Tellah): the
   // mana spent to cast it (CR 601.2h), which the cast event carries.
-  let text = treasure ? treasure[1]! : spentIf ? spentIf[2]! : m[4]!;
+  let text = treasure ? treasure[1]! : spentIf ? spentIf[2]! : short ? short[1]!.replace(/\bloses life equal to the difference(\.?)$/, "loses X life$1") : m[4]!;
+  if (short && !/\bloses X life\.?$/.test(text)) return "fail";
   const thatMuch = /\bIf [^.,]+ mana was spent to cast that spell, [^.]*\bthat much\b/.test(text) && !/\bX\b/.test(text) && !m[2];
   if (thatMuch) text = text.replace(/\bthat much\b/g, "X");
   let body = parseBody(text, { castSpell: true, eventPlayer: true });
   if (!body) return "fail";
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: body.text.replace(/\bX\b/g, "that much") };
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(targets ? { targets } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}) }, body };
+  if (short) body = { ...replaceX(body, { count: { kind: "castShortfall" } }), text: body.text.replace(/\bloses X life\b/, "loses life equal to the difference") };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}) }, body };
 }
 
 /**
@@ -1686,6 +1693,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const state = parseStaticCondition(st[1]!, { affects: { kind: "self" }, mods: [], text: "" });
     const body = state && parseBody(st[st.length - 1]!, { selfIt: true });
     return state && body ? { event: "state", state, body } : "fail";
+  }
+  // "Whenever this creature becomes tapped during your turn" (granted by Dionus, Elvish Archdruid): only while it's its
+  // controller's turn, whether it triggers at all.
+  const tappedYours = /^Whenever ~ becomes tapped during your turn, (.+)$/.exec(line);
+  if (tappedYours) {
+    const t = parseTrigger(`Whenever ~ becomes tapped, ${tappedYours[1]}`);
+    return t && t !== "fail" && t.event === "selfBecomesTapped" && !t.activeIf ? { ...t, activeIf: { kind: "yourTurn" } } : "fail";
   }
   // "Whenever you commit a crime during your turn" (Overzealous Muscle, CR 700.13): only while it's your turn, whether it
   // triggers at all, not an intervening if.

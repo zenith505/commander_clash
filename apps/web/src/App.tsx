@@ -112,6 +112,7 @@ import {
   foretellProblem,
   foretoldCast,
   plotProblem,
+  plotCost,
   plottedCast,
   compileCard,
   kickerName,
@@ -1083,8 +1084,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     }
     // Blocking: click one of your untapped creatures, then the attacker it blocks. One that can block more
     // than one creature (CR 509.1a) stays picked until it's full; clicking one of its attackers again unblocks it.
+    // Odric, Master Tactician: you may be choosing another player's blocks (pending.defender).
     if (pending?.kind === "declareBlockers") {
-      if (controllerOf(s, o) === HUMAN && o.zone === "battlefield" && isCreature(s, o.id) && !o.tapped) {
+      const defender = pending.defender ?? HUMAN;
+      if (controllerOf(s, o) === defender && o.zone === "battlefield" && isCreature(s, o.id) && !o.tapped) {
         const mine = blocks[o.id] ?? [];
         if (blocker === o.id) setBlocker(null);
         else if (mine.length && mine.length >= maxBlocks(s, o)) {
@@ -1093,7 +1096,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           setBlocks(next);
           setBlocker(null);
         } else setBlocker(o.id);
-      } else if (blocker && o.attacking === HUMAN) {
+      } else if (blocker && o.attacking === defender) {
         const mine = blocks[blocker] ?? [];
         const now = mine.includes(o.id) ? mine.filter((a) => a !== o.id) : [...mine, o.id];
         const next = { ...blocks, [blocker]: now };
@@ -1149,14 +1152,15 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
 
   // Creatures that can still be told to attack or block glow, like playable cards.
   const attackers = pending?.kind === "declareAttackers" ? new Set(potentialAttackers(s, HUMAN).map((a) => a.id)) : null;
-  const attackingMe = s.battlefield.map((id) => s.objects[id]!).filter((o) => o.attacking === HUMAN);
+  const blockingFor = pending?.kind === "declareBlockers" ? (pending.defender ?? HUMAN) : HUMAN;
+  const attackingMe = s.battlefield.map((id) => s.objects[id]!).filter((o) => o.attacking === blockingFor);
   const canBlockWith = (o: GameObject) =>
-    pending?.kind === "declareBlockers" && controllerOf(s, o) === HUMAN && o.zone === "battlefield" && (blocks[o.id]?.length ?? 0) < maxBlocks(s, o) &&
+    pending?.kind === "declareBlockers" && controllerOf(s, o) === blockingFor && o.zone === "battlefield" && (blocks[o.id]?.length ?? 0) < maxBlocks(s, o) &&
     attackingMe.some((a) => !blockProblem(s, o, a));
   // Only attackers this blocker could legally block (flying, menace's partner aside) light up.
   const blockable = (id: string) => {
     const a = s.objects[id];
-    return !!blocker && a?.attacking === HUMAN && !blockProblem(s, s.objects[blocker]!, a);
+    return !!blocker && a?.attacking === blockingFor && !blockProblem(s, s.objects[blocker]!, a);
   };
   const cardProps: CardProps = {
     s,
@@ -3861,7 +3865,7 @@ function AbilityMenu({
   const inHand = o.zone === "hand" || o.zone === "command" || mayPlayFromExile(s, o, HUMAN) || mayPlayLandFromGraveyard(s, o, HUMAN) || mayPlayFromTop(s, o, HUMAN);
   const faceDownCast = inHand ? compileCard(d).faceDownCast : undefined;
   const suspend = o.zone === "hand" ? compileCard(d).suspend : undefined;
-  const plot = o.zone === "hand" ? compileCard(d).plot : undefined;
+  const plot = o.zone === "hand" ? plotCost(s, HUMAN, d) : undefined;
   const foretell = o.zone === "hand" ? compileCard(d).foretell : undefined;
   // A foretold card: cast only for its foretell cost (CR 702.143a).
   const foretold = foretoldCast(s, HUMAN, o) ? compileCard(d).foretell : undefined;
@@ -4321,8 +4325,11 @@ function Controls({
     // Archangel of Tithes: what blocking costs, paid from your lands as you declare (CR 509.1d-f); with a cost, no
     // requirement makes a creature block (CR 509.1c).
     const blockTax = blockCost(s, Object.keys(blocks).length);
-    const blockTaps = blockTax ? planMana(s, HUMAN, parseManaCost(blockTax)) : [];
-    const needed = alone ?? (blockCost(s, 1) ? null : blockRequirementProblem(s, HUMAN, list));
+    // Odric, Master Tactician: choosing another player's blocks; ones that cost anything can't be chosen for them.
+    const defender = pending.defender ?? HUMAN;
+    const theirs = defender !== HUMAN ? s.players[defender]!.name : null;
+    const blockTaps = blockTax ? (theirs ? null : planMana(s, HUMAN, parseManaCost(blockTax))) : [];
+    const needed = alone ?? (blockCost(s, 1) ? null : blockRequirementProblem(s, defender, list));
     return (
       <div className="controls">
         <span>
@@ -4332,11 +4339,13 @@ function Controls({
               : `Now click the attacker ${cardOf(s, blocker).name} blocks.`
             : needed
               ? `${needed.charAt(0).toUpperCase()}${needed.slice(1)}.`
-              : "Click one of your untapped creatures, then the attacker it blocks."}
+              : theirs
+                ? `You choose ${theirs}'s blocks: click one of their untapped creatures, then the attacker it blocks.`
+                : "Click one of your untapped creatures, then the attacker it blocks."}
         </span>
         <button
           disabled={!!needed || !blockTaps}
-          title={blockTax && !blockTaps ? `Blocking costs ${blockTax} and you can't pay it` : undefined}
+          title={blockTax && !blockTaps ? (theirs ? `Blocking costs ${blockTax}, which only ${theirs} could choose to pay` : `Blocking costs ${blockTax} and you can't pay it`) : undefined}
           onClick={() =>
             dispatch([
               ...(blockTaps ?? []),
@@ -4454,6 +4463,8 @@ function Controls({
                 ? `click any number of your creatures with total power ${pending.maxTotalPower} or less to keep (now ${totalPower}). The rest are sacrificed.`
                 : pending.action === "keep"
                 ? `click ${pending.count === 1 ? (pending.min === 0 ? `up to one ${pending.what}` : an) : `${pending.min === 0 ? "up to " : ""}${pending.count} ${pending.what}s`} ${pending.destroy ? "to keep (anyone's)" : pending.of === undefined ? "of yours to keep" : `for ${s.players[pending.of]!.name} to keep`}. The rest are ${pending.destroy ? "destroyed" : "sacrificed"}.`
+                : pending.owned
+                ? `click a permanent ${theirs ? `${theirs} owns` : "you own"} (whoever controls it) to gain control of it.`
                 : `click ${what} ${theirs ? `${theirs} controls` : "of yours"} to ${verb}.`}
         </span>
         <button disabled={!ok} onClick={() => dispatch([{ type: "pickPermanents", player: HUMAN, ids: discards }])}>

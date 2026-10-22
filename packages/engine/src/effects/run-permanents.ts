@@ -474,6 +474,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         invalidateCharacteristics(s);
         const put = by !== undefined ? withPutter(by, () => putCounters(s, o, e.counter, n)) : putCounters(s, o, e.counter, n);
         log(s, `${defOf(s, o).name} gets ${put} ${e.counter} counter${put > 1 ? "s" : ""}.`);
+        // "Each creature that had a +1/+1 counter put on it this way" (Fangs of Kalonia): not one a replacement kept them off.
+        if (put > 0 && s.resolving) (s.resolving.countersPutThisWay ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, kind: e.counter });
       }
       return;
     }
@@ -997,6 +999,35 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       const host = s.objects[hosts[me.id]!];
       if (host) attachTo(s, me, host);
+      return;
+    }
+    case "attachToChosen": {
+      const me = objects(s, e.source, ctx).find((o) => o.zone === "battlefield");
+      if (!me) return;
+      const ch = characteristics(s, me);
+      if (e.equipmentOnly && !ch.subtypes.includes("Equipment")) return;
+      const sc = (s.resolving!.scratch ??= {});
+      const hosts = (sc.auraHosts ??= {});
+      if (hosts[me.id] === undefined) {
+        // The biggest creature first: what a bot picks.
+        const options = s.battlefield
+          .filter((id) => objectMatches(s, e.filter, obj(s, id), ctx.controller, false) && canAttachTo(s, me, obj(s, id)))
+          .sort((a, b) => power(s, obj(s, b)) - power(s, obj(s, a)));
+        if (!options.length) return;
+        if (options.length > 1 || e.may) {
+          sc.auraAsking = me.id;
+          const choices = [...options, ...(e.may ? ["none"] : [])];
+          const labels = choices.map((id) => (id === "none" ? "Don't attach it" : `${defOf(s, obj(s, id)).name}${controllerOf(s, obj(s, id)) === ctx.controller ? "" : ` (${player(s, controllerOf(s, obj(s, id))).name})`}`));
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "enchant", options: choices, labels, prompt: `choose ${e.filter.text.replace(/^an? /, "a ")} to attach ${defOf(s, me).name} to${e.may ? ", or none" : ""}` };
+          return "paused";
+        }
+        hosts[me.id] = options[0]!;
+      }
+      const host = s.objects[hosts[me.id]!];
+      if (host && canAttachTo(s, me, host)) {
+        attachTo(s, me, host);
+        log(s, `${defOf(s, me).name} is attached to ${defOf(s, host).name}.`);
+      }
       return;
     }
     case "transformSelf": {

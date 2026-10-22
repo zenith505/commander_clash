@@ -206,6 +206,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
         invalidateCharacteristics(s);
         const put = putCounters(s, o, k, c);
         log(s, `${player(s, pid).name} puts ${put} ${k} counter${put > 1 ? "s" : ""} on ${defOf(s, o).name}.`);
+        if (put > 0 && s.resolving) (s.resolving.countersPutThisWay ??= []).push({ id, zc: o.zoneChanges ?? 0, kind: k });
         continue;
       }
       log(s, e.action === "sacrifice" ? `${player(s, pid).name} sacrifices ${defOf(s, o).name}.` : `${player(s, pid).name} returns ${defOf(s, o).name} to its owner's hand.`);
@@ -1293,6 +1294,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       else log(s, `${cards.map((c) => defOf(s, c).name).join(", ")} ${cards.length === 1 ? "goes" : "go"} from exile to ${cards.length === 1 ? "its owner's graveyard" : "their owners' graveyards"} (${src}).`);
       for (const c of cards) moveObject(s, c.id, e.dest);
       s.resolving!.movedLinked = cards.length;
+      s.resolving!.movedLinkedIds = cards.map((c) => c.id);
       if (s.linkedExile?.[key]) s.linkedExile[key] = s.linkedExile[key]!.filter((l) => !cards.some((c) => c.id === l.id));
       return;
     }
@@ -1393,10 +1395,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         s.resolving!.did = false;
         const o = objects(s, e.what, ctx)[0];
         // "Exile the top card of your library. You may cast that card." (Chandra, Torch of Defiance): the card exiled.
-        if (!o || (e.what.ref === "exiledTop" ? o.zone !== "exile" : o.zone !== "graveyard" || o.owner !== ctx.controller)) return;
+        if (!o || (e.what.ref === "exiledTop" ? o.zone !== "exile" : o.zone !== "graveyard" || (!e.anyOwner && o.owner !== ctx.controller))) return;
         if (e.unlessCast && (s.castThisTurn ?? []).some((c) => c.player === ctx.controller)) return;
         sc.castNow = { id: o.id };
-        s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src, how: "paid" };
+        s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src, how: "paid", ...(e.anyType ? { anyType: true as const } : {}) };
         // Mana abilities can still be activated to pay for it (CR 601.2g), so only the mana in the pool may be short.
         const problem = castProblem(s, ctx.controller, o.id);
         if (problem === null || /^not enough mana/.test(problem)) return "paused";
@@ -1909,8 +1911,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         sc.flickered = [];
         const later: { id: ObjectId; zc: number }[] = [];
         let first: GameObject | undefined;
+        // A target that already left and came back this resolution is a new object, no longer the target (CR 400.7):
+        // Eldrazi Confluence's blink chosen twice for the same permanent blinks it once (rulings).
+        const stamped = (o: GameObject) => {
+          if (e.what.ref !== "target") return true;
+          const t = ctx.targets.slice(e.what.index, e.what.index + (e.what.n ?? 1)).find((x) => x?.kind === "object" && x.id === o.id);
+          return t?.kind !== "object" || t.zc === undefined || t.zc === (o.zoneChanges ?? 0);
+        };
         for (const o of objects(s, e.what, ctx)) {
-          if (o.zone !== "battlefield") continue;
+          if (o.zone !== "battlefield" || !stamped(o)) continue;
           const d = defOf(s, o);
           log(s, `${src} exiles ${d.name}${e.at || e.hold ? "" : " and returns it"}.`);
           moveObject(s, o.id, "exile");
@@ -2106,7 +2115,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const oneOf = e.oneOf ? `g${s.nextId++}` : undefined;
         const all: ObjectId[] = [];
         for (const pid of apnap(s, players(s, e.who, ctx))) {
-          const ids = player(s, pid).library.slice(0, amountNow(s, e.n, ctx));
+          const ids = e.graveyards ? [...player(s, pid).graveyard] : player(s, pid).library.slice(0, amountNow(s, e.n, ctx));
           for (const id of ids) {
             moveObject(s, id, "exile");
             const o = obj(s, id);
@@ -2115,7 +2124,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           all.push(...ids);
         }
         if (s.resolving) (s.resolving.impulsed ??= []).push(...all);
-        if (all.length) log(s, `${p.name} exiles ${all.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of each ${e.who.ref === "eachOpponent" ? "opponent's " : ""}library and may ${e.oneOf ? "play one of them" : e.castOnly ? "cast them" : "play them"}${e.life ? ", paying life rather than mana for a spell" : ""}${e.anyType ? ", spending mana as though it were mana of any color" : ""}${e.until === "thisTurn" ? " this turn" : ""}.`);
+        if (all.length) log(s, `${p.name} exiles ${all.map((id) => defOf(s, obj(s, id)).name).join(", ")} from ${e.graveyards ? "each opponent's graveyard" : `the top of each ${e.who.ref === "eachOpponent" ? "opponent's " : ""}library`} and may ${e.oneOf ? "play one of them" : e.castOnly ? "cast them" : "play them"}${e.life ? ", paying life rather than mana for a spell" : ""}${e.anyType ? ", spending mana as though it were mana of any color" : ""}${e.until === "thisTurn" ? " this turn" : ""}.`);
         return;
       }
       const from = e.who ? players(s, e.who, ctx)[0] : p.id;

@@ -209,10 +209,12 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Exile ~, then return it to the battlefield transformed under your control" (a Saga's last chapter): with its back
   // face up if it's a double-faced card (CR 712.14a).
   // "... under its owner's control with a +1/+1 counter on it" (Planar Incision): it enters with it (CR 122.6).
-  if ((m = /^Exile (.+?),? then return (?:it|that card|them|those cards) to the battlefield( transformed)? under (its owner's|their owner's|their owners'|your) control(?: with an? (\+1\/\+1) counter on it)?$/i.exec(s))) {
+  // "Exile target nonland permanent, then return it to the battlefield tapped under its owner's control" (Eldrazi
+  // Confluence): it enters tapped.
+  if ((m = /^Exile (.+?),? then return (?:it|that card|them|those cards) to the battlefield( transformed| tapped)? under (its owner's|their owner's|their owners'|your) control(?: with an? (\+1\/\+1) counter on it)?$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
-    if (m[2] && what?.ref !== "self") return null;
-    return what && !isGroup(what) ? [{ type: "flicker", what, under: m[3] === "your" ? "you" : "owner", ...(m[2] ? { transformed: true as const } : {}), ...(m[4] ? { counter: "+1/+1" as const } : {}) }] : null;
+    if (m[2] === " transformed" && what?.ref !== "self") return null;
+    return what && !isGroup(what) ? [{ type: "flicker", what, under: m[3] === "your" ? "you" : "owner", ...(m[2] === " transformed" ? { transformed: true as const } : {}), ...(m[2] === " tapped" ? { tapped: true as const } : {}), ...(m[4] ? { counter: "+1/+1" as const } : {}) }] : null;
   }
   // Investigate (CR 701.16): create a Clue token.
   if ((m = /^Investigate( twice| X times)?$/i.exec(s))) return [{ type: "createToken", who: { ref: "you" }, n: m[1] === " X times" ? X : m[1] ? 2 : 1, token: PREDEFINED_TOKENS.Clue! }];

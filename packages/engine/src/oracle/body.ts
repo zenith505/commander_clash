@@ -30,6 +30,8 @@ export interface Ctx {
   selfIt?: boolean;
   /** After it left the battlefield ("When ~ dies, return it to its owner's hand"), "it" is the card in its new zone. */
   selfCard?: boolean;
+  /** An ability whose cost discards the card it's on ("{2}{R}{G}, Discard this card: ..."): "~" in the graveyard after. */
+  discardedSelf?: true;
   /** An Aura's "when enchanted creature dies": "return ~ ..." is the Aura card, in the graveyard it went to (ObjRef selfCard `moved`). */
   auraCard?: boolean;
   /** "Exile the top card of your library" came before: "that card's mana value" is that card's. */
@@ -78,6 +80,8 @@ export interface Ctx {
   lastPut?: boolean;
   /** The last sentence created tokens, any number: "Sacrifice them at the beginning of the next end step". */
   lastCreatedAny?: boolean;
+  /** "Put all land cards from among them onto the battlefield tapped": "those lands" after (Animist's Awakening). */
+  lastDugLands?: boolean;
   /** The instruction before was "mill N cards" (yours): "those cards" in what follows can be the milled cards (Ripples of Undeath). */
   afterMill?: boolean;
   /** An instruction before discarded one card of yours: "the discarded card" is that card (Malcolm). */
@@ -114,7 +118,7 @@ export interface Ctx {
   /** The ability ends "Round up each time." (CR 107.1a): every "half ..." in it is rounded that way. */
   halfRound?: "up" | "down";
   /** A vote came before (CR 701.38): its words ("death vote", "if taxes gets more votes"), or that it's for objects. */
-  vote?: { options?: string[]; among?: true };
+  vote?: { options?: string[]; among?: true; /** "Each player may choose ..." (not a vote): "each permanent chosen this way". */ choose?: true };
   /** "Each opponent chooses fame or fortune" came before: its words ("for each player who chose fortune"). */
   chooseWords?: string[];
   /** "Gain control of a creature that player controls" for each player who chose a word: "those creatures" are they. */
@@ -516,7 +520,7 @@ function splitSentences(text: string): string[] {
 const LIM_DULS_VAULT =
   "Look at the top five cards of your library. As many times as you choose, you may pay 1 life, put those cards on the bottom of your library in any order, then look at the top five cards of your library. Then shuffle and put the last cards you looked at this way on top in any order.";
 
-export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean } = {}): AbilityBody | null {
+export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; discardedSelf?: true } = {}): AbilityBody | null {
   // "Put a +1/+1 counter on ~ and untap it" (Gwenna): "it" is ~, the one thing named.
   text = differenceInHand(text).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~");
   // Lim-Dûl's Vault: look at the top five; as many times as you choose, pay 1 life and put them on the bottom in any order,
@@ -542,6 +546,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     ...(opts.subjectLeft ? { subjectLeft: true } : {}),
     ...(opts.selfIt ? { selfIt: true } : {}),
     ...(opts.selfCard ? { selfCard: true } : {}),
+    ...(opts.discardedSelf ? { discardedSelf: true as const } : {}),
     ...(opts.auraCard ? { auraCard: true } : {}),
     ...(opts.activated ? { activated: true } : {}),
     ...(opts.costLinked ? { costLinked: true } : {}),
@@ -962,6 +967,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   let digWhere: AmountExpr | undefined;
   // A look that a "you may pay ... If you do," before it depends on (see payFirst).
   let digPaid: { pay: PayCost; text: string } | null = null;
+  /** "If an Equipment is put onto the battlefield this way, you may attach it to a creature you control": after the dig. */
+  let afterDig: Effect[] = [];
   // "If {B} was spent to cast ~, you may have target creature get -3/-3 until end of turn" (Cankerous Thirst): the "you
   // may" sentence is parsed as one, then put under the condition.
   let mayGate: { cond: SpellCondition; start: number } | null = null;
@@ -1034,6 +1041,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "graveyardCastThisTurn", filter: { kind: "card", types: [type], notTypes: [], notColors: [], text: `${yardCast[1]} card` } });
       continue;
     }
+    // "{T}: You may cast target Zombie creature card from your graveyard this turn" (Zul Ashur, Lich Lord): a permission
+    // for that card, paying its costs and following the normal timing (rulings).
+    const yardTarget = /^You may cast (target .+? card) from your graveyard this turn$/.exec(s.replace(/\.$/, ""));
+    if (yardTarget) {
+      const before = ctx.targets.length;
+      const what = parseCardTarget(`${yardTarget[1]} from your graveyard`, ctx, "you");
+      const t = ctx.targets[before];
+      if (what?.ref !== "target" || ctx.targets.length !== before + 1 || t?.kind !== "card" || !t.types?.length || t.types.includes("Land")) return null;
+      effects.push({ type: "mayCastFromGraveyard", what });
+      continue;
+    }
     // "You may cast spells from your graveyard this turn" (Forgotten Cellar), "you may cast Zombie spells ..." (Liliana,
     // Untouched by Death), "Until end of turn, you may play lands and cast spells from your graveyard" (Yawgmoth's Will),
     // "... play lands from your graveyard" (Gaea's Will): permissions for the rest of the turn, any number of times.
@@ -1079,6 +1097,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // number of cards the move put there (rulings: one played in response isn't counted).
     if (last?.type === "moveLinked" && last.dest === "graveyard" && !last.one && /^~ deals that much damage to each opponent$/.test(s.replace(/\.$/, ""))) {
       effects.push({ type: "damage", amount: { count: { kind: "movedLinkedThisWay" } }, to: { ref: "eachOpponent" } });
+      continue;
+    }
+    // Currency Converter: "Put a card exiled with ~ into its owner's graveyard. If it's a land card, create a Treasure token.
+    // If it's a nonland card, ...": the card that moved, by its printed characteristics; nothing if none did.
+    const movedIs = effects.some((e) => e.type === "moveLinked" && e.one && e.dest === "graveyard") ? /^If it's an? (.+? card), (.+)$/.exec(s) : null;
+    if (movedIs) {
+      const filter = parseSearchFilter(movedIs[1]!);
+      const then = filter && parseOne(capital(movedIs[2]!), ctx);
+      if (!filter || !then) return null;
+      effects.push({ type: "if", cond: { kind: "movedLinkedIs", filter }, effects: then });
       continue;
     }
     // "At the beginning of the next end step, sacrifice that creature" (Meek Attack) is "Sacrifice that creature at the
@@ -1443,6 +1471,20 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // card" (Kwain): each decides in turn order, knowing the earlier answers, then those who did each do it, in turn
     // order (rulings on Eager Construct and Kaya, Intangible Slayer).
     const alone = offer && !does && /^(?:scry \d+|surveil \d+|draw a card)$/.test(offer[2]!) ? parseOffer(offer[2]!, ctx) : null;
+    // "Each player may put two +1/+1 counters on a creature they control. Goad each creature that had counters put on
+    // it this way." (Agitator Ant): each decides in turn order, then puts them; then those creatures are goaded (rulings).
+    const goadPut = offer && !does && /^put .+ counters? on a creature they control$/.test(offer[2]!) && /^Goad each creature that had counters put on it this way$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    const goadFx = goadPut ? parseOffer(offer[2]!, ctx) : null;
+    if (offer && goadFx) {
+      const one = goadFx.length === 1 ? goadFx[0]! : undefined;
+      if (one?.type !== "pick" || one.action !== "counters") return null;
+      effects.push(
+        { type: "eachMay", who: { ref: offer[1] === "player" ? "eachPlayer" : "eachOpponent" }, effects: goadFx, text: offer[2]!.replace(/\btheir\b/g, "your").replace(/\bthey\b/g, "you"), each: true, need: { zone: "battlefield", filter: one.filter } },
+        { type: "continuous", what: { ref: "countersPutThisWay" }, mods: [{ kind: "goad" }], duration: "yourNextTurn" },
+      );
+      si++;
+      continue;
+    }
     if (offer && alone) {
       effects.push({ type: "eachMay", who: { ref: offer[1] === "player" ? "eachPlayer" : "eachOpponent" }, effects: alone, text: offer[2]!, each: true });
       ctx.eachChose = true;
@@ -1777,6 +1819,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const last = effects[effects.length - 1];
       if (last?.type !== "castTargetFree" || last.exileAfter) return null;
       last.exileAfter = true;
+      continue;
+    }
+    // Tinybones, the Pickpocket: "you may cast target nonland permanent card from that player's graveyard, and mana of any
+    // type can be spent to cast that spell": cast as it resolves or not at all, paying its costs, timing ignored (rulings).
+    const castTheirs = ctx.eventPlayer ? /^[Yy]ou may cast (target .+? card from that player's graveyard), and mana of any type can be spent to cast that spell$/.exec(s) : null;
+    if (castTheirs) {
+      const before = ctx.targets.length;
+      const what = parseCardTarget(castTheirs[1]!, ctx);
+      const t = ctx.targets[before];
+      if (what?.ref !== "target" || ctx.targets.length !== before + 1 || t?.kind !== "card" || !t.types?.length || !t.notTypes?.includes("Land")) return null;
+      effects.push({ type: "castNow", what, anyOwner: true, anyType: true });
       continue;
     }
     // "You may cast target instant card from your graveyard without paying its mana cost. If that spell would be put into
@@ -2286,12 +2339,20 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "if", cond: { kind: "amountsCompare", a: digWhere!, atLeast: { count: { kind: "cardsInLibrary", who: { ref: "you" } } } }, effects: fx });
       continue;
     }
+    // Armored Skyhunter: the one card put onto the battlefield, if it's an Equipment.
+    if (dig?.into === "battlefield" && dig.count === 1 && !afterDig.length && /^If an Equipment is put onto the battlefield this way, you may attach it to a creature you control$/.test(s)) {
+      afterDig = [{ type: "attachToChosen", source: { ref: "created" }, filter: { kind: "object", types: ["Creature"], controller: "you", text: "a creature you control" }, may: true, equipmentOnly: true }];
+      continue;
+    }
     if (dig) {
       const done = parseDig(s, dig, ctx, digWhere);
       if (!done) return null;
       if (done === "more") continue;
       if (digPaid) effects.push({ type: "may", effects: [done], pay: digPaid.pay, text: digPaid.text });
       else effects.push(done);
+      effects.push(...afterDig);
+      afterDig = [];
+      noteLast(ctx, [done]);
       dig = null;
       digPaid = null;
       continue;
@@ -2725,11 +2786,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "Exile this Saga, then return it to the battlefield (front face up)" (The Great Work): under the control of the
     // player who puts it there (CR 110.2a).
     // "... with a +1/+1 counter on it" (Planar Incision): it enters with it (CR 122.6).
-    const now = /^(?:[Tt]hen )?[Rr]eturn (?:it|that card|them|those cards) to the battlefield( transformed)?(?: under (its owner's|their owner's|their owners'|your) control)?( with an? \+1\/\+1 counter on it)?$/.exec(s);
+    // "... then return it to the battlefield tapped under its owner's control" (Eldrazi Confluence): it enters tapped.
+    const now = /^(?:[Tt]hen )?[Rr]eturn (?:it|that card|them|those cards) to the battlefield( transformed| tapped)?(?: under (its owner's|their owner's|their owners'|your) control)?( with an? \+1\/\+1 counter on it)?$/.exec(s);
     if (now && effects[effects.length - 1]?.type === "exile") {
       const prev = effects[effects.length - 1] as Extract<Effect, { type: "exile" }>;
-      if (prev.until || prev.linked || isGroup(prev.what) || (now[1] && prev.what.ref !== "self") || (!now[2] && prev.what.ref !== "self")) return null;
-      effects[effects.length - 1] = { type: "flicker", what: prev.what, under: !now[2] || now[2] === "your" ? "you" : "owner", ...(now[1] ? { transformed: true as const } : {}), ...(now[3] ? { counter: "+1/+1" as const } : {}) };
+      const transformed = now[1] === " transformed";
+      if (prev.until || prev.linked || isGroup(prev.what) || (transformed && prev.what.ref !== "self") || (!now[2] && prev.what.ref !== "self")) return null;
+      effects[effects.length - 1] = { type: "flicker", what: prev.what, under: !now[2] || now[2] === "your" ? "you" : "owner", ...(transformed ? { transformed: true as const } : {}), ...(now[1] === " tapped" ? { tapped: true as const } : {}), ...(now[3] ? { counter: "+1/+1" as const } : {}) };
       continue;
     }
     // Which exile it returns: the last exile in this ability ("Exile X target creatures, then investigate X times. Return the
@@ -2849,6 +2912,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       prev.gains = mods;
       continue;
     }
+    // "Starting with you, each player may choose an artifact or enchantment you don't control" (Druid of Purification):
+    // each one in turn order picks one or none, seeing the earlier picks (rulings); not targeted, and not a vote.
+    const eachMayChoose = /^[Ss]tarting with you, each player may choose an? (.+)$/.exec(s);
+    if (eachMayChoose) {
+      if (ctx.vote) return null;
+      const spec = parseTargetPhrase(eachMayChoose[1]!);
+      if (spec?.kind !== "object" || spec.chosen || spec.counter) return null;
+      effects.push({ type: "vote", among: { ...spec, text: eachMayChoose[1]! }, choose: true, text: `choose ${/^[aeiou]/i.test(eachMayChoose[1]!) ? "an" : "a"} ${eachMayChoose[1]}` });
+      ctx.vote = { among: true, choose: true };
+      continue;
+    }
     // "Starting with you, each player votes for death or taxes" (CR 701.38a): the words, or "a nonland permanent you don't
     // control", "an artifact, creature, or enchantment card in your graveyard" (objects, not targeted). One vote per ability.
     const vote = /^(?:[Ss]tarting with you, each player votes|Each player (secretly) votes) for (.+)$/.exec(s);
@@ -2881,6 +2955,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     }
     // "For each player who chose fame, gain control of a creature that player controls until end of turn": a creature of
     // each of theirs, chosen as it resolves (not targeted); "those creatures" are then those.
+    // Expropriate: "For each money vote, choose a permanent owned by the voter and gain control of it" (for good).
+    const perVote = ctx.vote && !ctx.vote.among && !ctx.vote.choose ? /^For each ([a-z]+) vote, choose a permanent owned by the voter and gain control of it$/.exec(s) : null;
+    if (perVote) {
+      if (!ctx.vote!.options?.includes(perVote[1]!)) return null;
+      effects.push({ type: "controlFromEach", votedFor: perVote[1]!, duration: "game" });
+      continue;
+    }
     const fromEach = /^For each player who chose ([a-z]+), gain control of a creature that player controls until end of turn$/.exec(s);
     if (fromEach) {
       if (!ctx.chooseWords?.includes(fromEach[1]!) || ctx.fromEach) return null;
@@ -3234,6 +3315,20 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
         continue;
       }
       effects.push(rolled ? { type: "reflexive", body: reflexive } : { type: "if", cond: counted ? { kind: "selfHere" } : { kind: "youDid" }, effects: [{ type: "reflexive", body: reflexive }] });
+      continue;
+    }
+    // Mnemonic Betrayal: "Exile all opponents' graveyards. You may cast spells from among those cards this turn, and mana
+    // of any type can be spent to cast them." Each card exiled may be cast by you this turn (CR 601.2a), its colored mana
+    // paid with any type (CR 609.4b); lands can't be cast.
+    if (/^Exile all opponents' graveyards$/.test(s) && (sentences[si + 1] ?? "").replace(/\.$/, "") === "You may cast spells from among those cards this turn, and mana of any type can be spent to cast them") {
+      effects.push({ type: "impulse", n: 0, until: "thisTurn", who: { ref: "eachOpponent" }, castOnly: true, anyType: true, graveyards: true });
+      si++;
+      continue;
+    }
+    // "At the beginning of the next end step, if any of those cards remain exiled, return them to their owners'
+    // graveyards" (Mnemonic Betrayal): a delayed trigger (CR 603.7) with an intervening if (CR 603.4) about those cards.
+    if (/^At the beginning of the next end step, if any of those cards remain exiled, return them to their owners' graveyards$/.test(s) && effects[effects.length - 1]?.type === "impulse") {
+      effects.push({ type: "delayed", when: "nextEndStep", effects: [{ type: "exiledToGraveyard" }], text: "return those cards still exiled to their owners' graveyards" });
       continue;
     }
     // Glimpse the Impossible: "At the beginning of the next end step, if any of those cards remain exiled, put them into
@@ -3675,7 +3770,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const filter = parseSearchFilter(until[1]!);
       if (!filter || filter.kind !== "card") return null;
       const onto = untilPut[1] !== "into your hand";
-      const safe = !!filter.types?.length && filter.types.every((x) => x === "Creature" || x === "Artifact" || x === "Land") && !filter.anyOf;
+      // A planeswalker card enters with its loyalty (CR 306.5b): no choice either (The Prismatic Bridge).
+      const safe = !!filter.types?.length && filter.types.every((x) => x === "Creature" || x === "Artifact" || x === "Land" || x === "Planeswalker") && !filter.anyOf;
       const tribal = !filter.types?.length && !!filter.subtypes?.length && filter.subtypes.every((x) => CREATURE_TYPES.has(x));
       if (onto && !safe && !tribal) return null;
       effects.push({ type: "revealUntil", filter, found: onto ? "battlefield" : "hand", rest: /graveyard$/.test(untilPut[3]!) ? "graveyard" : "bottom", ...(untilPut[2] ? { tapped: true as const } : {}) });
@@ -4330,6 +4426,7 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     const picked = pk?.type === "pick" && (pk.action === "counters" || pk.action === "choose") && pk.n === 1 && pk.who.ref === "you" && !pk.among;
     ctx.lastCreated = ((last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1) || (faceDown && last.count === 1) || ctx.lastPut || picked;
     ctx.lastCreatedAny = last?.type === "createToken" || last?.type === "createTokenCopy" || last?.type === "myriad" || faceDown || (last?.type === "returnAllFromGraveyard" && !last.toHand);
+    ctx.lastDugLands = last?.type === "dig" && last.into === "battlefield" && last.filter?.kind === "card" && last.filter.types?.length === 1 && last.filter.types[0] === "Land" && !last.filter.notTypes?.length;
     if (last?.type === "amass") ctx.amassed = true;
     if (last?.type === "damage" || last?.type === "bite" || last?.type === "fight") ctx.excessDamage = true;
     // "Creatures you control get +1/+1 until end of turn. Untap those creatures": the ones it changed (CR 611.2c).
@@ -4494,8 +4591,9 @@ function scaleEffect(e: Effect, per: AmountExpr): Effect | null {
     case "scry":
     case "surveil":
     case "preventNext":
+    case "extraTurn":
     case "pick": {
-      if (e.type === "counters" && (e.perLastKnownCounter || e.double)) return null;
+      if ((e.type === "counters" && (e.perLastKnownCounter || e.double)) || (e.type === "extraTurn" && (e.n !== 1 || e.loseAtEnd))) return null;
       const n = sc(e.n);
       return n === null ? null : ({ ...e, n } as Effect);
     }

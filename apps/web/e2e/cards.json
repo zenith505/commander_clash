@@ -510,6 +510,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b4dbbf56-d7df-4183-bb48-cfc6b4d0468f",
+  "name": "Armored Skyhunter",
+  "manaCost": "{3}{W}",
+  "cmc": 4,
+  "typeLine": "Creature — Cat Knight",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Cat",
+   "Knight"
+  ],
+  "oracleText": "Flying\nWhenever this creature attacks, look at the top six cards of your library. You may put an Aura or Equipment card from among them onto the battlefield. If an Equipment is put onto the battlefield this way, you may attach it to a creature you control. Put the rest of those cards on the bottom of your library in a random order.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "cmr",
+  "releasedAt": "2020-11-20",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e4b3e0af-5caa-47c1-b5be-c56a875cbb15",
   "name": "As Foretold",
   "manaCost": "{2}{U}",
@@ -2583,6 +2616,30 @@
   "gameChanger": false
  },
  {
+  "oracleId": "981298e6-ddee-49c0-9377-f47f019b4138",
+  "name": "Currency Converter",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever you discard a card, you may exile that card from your graveyard.\n{2}, {T}: Draw a card, then discard a card.\n{T}: Put a card exiled with this artifact into its owner's graveyard. If it's a land card, create a Treasure token. If it's a nonland card, create a 2/2 black Rogue creature token.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Treasure"
+  ],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5480f855-80b7-45c7-94a9-071c7b5d5ccf",
   "name": "Curse of the Bloody Tome",
   "manaCost": "{2}{U}",
@@ -2983,6 +3040,37 @@
   "set": "msc",
   "releasedAt": "2026-06-26",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "5bb32efd-9e58-4021-bbda-4ffccfa1d601",
+  "name": "Druid of Purification",
+  "manaCost": "{3}{G}",
+  "cmc": 4,
+  "typeLine": "Creature — Human Druid",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Druid"
+  ],
+  "oracleText": "When this creature enters, starting with you, each player may choose an artifact or enchantment you don't control. Destroy each permanent chosen this way.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "drc",
+  "releasedAt": "2025-02-14",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -3491,6 +3579,34 @@
   "set": "otj",
   "releasedAt": "2024-04-19",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a69265b2-0e37-4d86-866e-e4a923233b4d",
+  "name": "Expropriate",
+  "manaCost": "{7}{U}{U}",
+  "cmc": 9,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Council's dilemma — Starting with you, each player votes for time or money. For each time vote, take an extra turn after this one. For each money vote, choose a permanent owned by the voter and gain control of it. Exile Expropriate.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Council's dilemma"
+  ],
+  "commanderLegal": "legal",
+  "set": "cn2",
+  "releasedAt": "2016-08-26",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -7514,6 +7630,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ade898df-14a5-460b-94f6-1f3f74d3ff95",
+  "name": "Odric, Master Tactician",
+  "manaCost": "{2}{W}{W}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Soldier",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Soldier"
+  ],
+  "oracleText": "First strike (This creature deals combat damage before creatures without first strike.)\nWhenever Odric and at least three other creatures attack, you choose which creatures block this combat and how those creatures block.",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "First strike"
+  ],
+  "commanderLegal": "legal",
+  "set": "m13",
+  "releasedAt": "2012-07-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "730e39e6-c61d-48b5-8827-bfd952bf1be7",
   "name": "Omniscience",
   "manaCost": "{7}{U}{U}{U}",
@@ -8160,6 +8311,36 @@
   "set": "brr",
   "releasedAt": "2022-11-18",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "10180e2f-90c5-4d41-ba44-16b14948f923",
+  "name": "Protean Hulk",
+  "manaCost": "{5}{G}{G}",
+  "cmc": 7,
+  "typeLine": "Creature — Beast",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Beast"
+  ],
+  "oracleText": "When this creature dies, search your library for any number of creature cards with total mana value 6 or less, put them onto the battlefield, then shuffle.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "rvr",
+  "releasedAt": "2024-01-12",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

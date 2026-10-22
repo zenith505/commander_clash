@@ -178,6 +178,10 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
 export function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition } } | { lessIfTargets: { n: number; filter: TargetSpec } } | { targetTax: number } | { targetLifeTax: number } | "fail" | null {
   let text = line.replace(/^[A-Z][A-Za-z' -]+ — (?=~ costs|The second)/, "").replace(/\.$/, ""); // "Domain —" is an ability word
   let m: RegExpExecArray | null;
+  // "Each spell you cast that's a Demon, Horror, or Nightmare costs {1} less to cast" (Ancient Cellarspawn): spells of
+  // any of those subtypes, read like "Demon, Horror, and Nightmare spells you cast cost {1} less to cast".
+  if ((m = /^Each spell you cast that's an? ((?:[A-Z][a-z]+, )*[A-Z][a-z]+,? or [A-Z][a-z]+) costs (\{\d+\} less to cast)$/.exec(text)))
+    text = `${m[1]!.replace(/,? or /, m[1]!.includes(",") ? ", and " : " and ")} spells you cast cost ${m[2]}`;
   // "Cleric spells you cast cost {W}{B} less to cast. This effect reduces only the amount of colored mana you pay." (Edgewalker),
   // Morophon's "Spells of the chosen type you cast cost {W}{U}{B}{R}{G} less ...": colored mana only, never generic (CR 118.7).
   if ((m = /^(.+ cost) ((?:\{[WUBRG]\})+) (less to cast)\. This effect reduces only the amount of colored mana you pay$/.exec(text))) {
@@ -222,6 +226,12 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     const c = parseCount(m[1]!, null);
     return c ? { less: c } : "fail";
   }
+  // Not of This World: "... if it targets a spell or ability that targets a creature you control with power 7 or
+  // greater", checked as the spell is cast, against the targets the spell or ability has then (rulings, CR 601.2f).
+  if ((m = /^~ costs \{(\d+)\} less to cast if it targets a spell or ability that targets (an? .+)$/.exec(text))) {
+    const what = parseTargetPhrase(m[2]!.replace(/^an? /, ""));
+    return what?.kind === "object" ? { lessIfTargets: { n: Number(m[1]), filter: { kind: "spell", stackAbilities: "both", targetsWhat: what, text: `spell or ability that targets ${m[2]}` } } } : "fail";
+  }
   if ((m = /^~ costs \{(\d+)\} less to cast if it targets (an? .+)$/.exec(text))) {
     const filter = parseTargetPhrase(m[2]!.replace(/^an? /, ""));
     return filter?.kind === "object" ? { lessIfTargets: { n: Number(m[1]), filter } } : "fail";
@@ -261,8 +271,9 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     return { costMod: { who: "you", filter: { kind: "spell", text: "spells that share a card type with the exiled card" }, n: -Number(m[1]), sharesTypeWithLinked: true, text: line } };
   const ofChosen = / of the chosen type costs? \{/.test(text);
   if (ofChosen) text = text.replace(/ of the chosen type(?= costs? \{)/, "");
-  // "Spells your opponents cast from graveyards or from exile cost {2} more to cast" (Aven Interrupter).
-  const zones = / from (graveyards or from exile|graveyards|exile)(?= costs? \{)/.exec(text);
+  // "Spells your opponents cast from graveyards or from exile cost {2} more to cast" (Aven Interrupter), "Spells you cast
+  // from your graveyard or from exile cost {2} less to cast" (Doc Aurlock): only your own graveyard.
+  const zones = / from (graveyards or from exile|your graveyard or from exile|graveyards|exile)(?= costs? \{)/.exec(text);
   if (zones) text = text.slice(0, zones.index) + text.slice(zones.index + zones[0].length);
   m = /^(?:(During your turn|During turns other than yours), )?(.+?)( you cast| your opponents cast)?( with (?:mana value|power) \d+ or (?:greater|less))?( from your graveyard)? costs? (\{\d+\}) (less|more) to cast$/.exec(text);
   if (!m || !/spells?$/i.test(m[2]!)) return null;
@@ -284,6 +295,7 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
       ...(m[1] ? { turn: m[1] === "During your turn" ? "yours" : "notYours" } : {}),
       ...(m[5] ? { fromGraveyard: true } : {}),
       ...(zones ? { fromZones: zones[1] === "exile" ? ["exile" as const] : zones[1] === "graveyards" ? ["graveyard" as const] : ["graveyard" as const, "exile" as const] } : {}),
+      ...(zones?.[1] === "your graveyard or from exile" ? { fromGraveyard: true } : {}),
       text: line,
     },
   };
@@ -406,8 +418,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^there are ${NUM} or more permanent cards in your graveyard$`).exec(text))) return { kind: "graveyardPermanents", n: num(m[1]!) };
   // "If there are four or more land cards in your graveyard" (Titania, Voice of Gaea).
   // "If you have four or more creature cards in your graveyard" (Oversold Cemetery): the same.
-  if ((m = new RegExp(`^(?:there are|you have) ${NUM} or more (\\w+) cards in your graveyard$`).exec(text))) {
-    const amount = parseCount(`the number of ${m[2]} cards in your graveyard`, null);
+  // Spell mastery: "If there are two or more instant and/or sorcery cards in your graveyard" (each card counted once).
+  if ((m = new RegExp(`^(?:there are|you have) ${NUM} or more (\\w+|instant and/or sorcery) cards in your graveyard$`).exec(text))) {
+    const amount = parseCount(`the number of ${m[2] === "instant and/or sorcery" ? "instant and sorcery" : m[2]} cards in your graveyard`, null);
     return amount ? { kind: "amount", amount, min: num(m[1]!) } : null;
   }
   // "Your devotion to black is less than five" (Theros gods, CR 700.5), "... is five or greater".
@@ -796,6 +809,12 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const t = m[3] ?? (m[4] && singular(m[4]));
     if (t !== undefined && !CREATURE_TYPES.has(t)) return null;
     return [{ kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) }, ...(t ? [{ kind: "addTypes" as const, types: [], subtypes: [t] }] : [])];
+  }
+  // Porcelain Gallery: "have base power and toughness each equal to the number of creatures you control", counted as the
+  // effect applies in layer 7b (CR 613.4b, 611.3a).
+  if ((m = /^(?:has|have) base power and toughness each equal to (the number of .+)$/.exec(rest))) {
+    const n = parseCount(m[1]!, null);
+    return n ? [{ kind: "setPT", power: n, toughness: n }] : null;
   }
   // Maha, Its Feathers Night: "have base toughness 1" (layer 7b, CR 613.4b).
   if ((m = /^(?:has|have) base toughness (\d+)$/.exec(rest))) return [{ kind: "setToughness", toughness: Number(m[1]) }];

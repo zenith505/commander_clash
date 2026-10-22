@@ -1,7 +1,7 @@
 # Roadmap
 
-22,812 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,081 of 4,988 (81%).
+22,865 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,108 of 4,988 (82%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,18 +22,19 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 116, most played first: Sheoldred // The True Scriptures
-   ("a nontoken creature or planeswalker": whether "nontoken" covers both isn't settled by a ruling), Hazel's
-   Brewmaster, Not of This World (kindred), Dionus, Druid of Purification, Agitator Ant ("goad each creature that had
-   counters put on it this way"), Odric, Kozilek, the Broken Reality, Ancient Cellarspawn, Wand of Wonder, Y'shtola
-   Rhul, Dollmaker's Shop, Aminatou's Augury, Currency Converter, Animist's Awakening, Expropriate, Selfless Squire (a
-   trigger on prevented damage), Echoing Deeps, Mnemonic Betrayal, Yuriko (commander ninjutsu), Esika, Powerbalance, Doc
-   Aurlock, Armored Skyhunter, Kogla and Yidaro, Fangs of Kalonia, Protean Hulk, Gogo, Tinybones and Zul Ashur. Smaller
-   gaps from round 116: bots never use "target creature it's blocking" abilities (Tinder Wall, Wall of Corpses, Goblin
-   Snowman; bots activate abilities in their own main phase only); bots stop paying Lim-Dûl's Vault life after four
-   looks; Aclazotz ("for each opponent who can't"), Lich-Knights' Conquest and Fangs of Kalonia are out; round 115's
-   Assault Suit, Brass Herald, Alrund, Vigean Intuition, Winding Way, Sages of the Anima and Serra's Emissary (kindred)
-   are still out.
+00. Most played first (`npm run popular`). Out after round 117, most played first: Sheoldred // The True Scriptures
+   ("a nontoken creature or planeswalker": whether "nontoken" covers both isn't settled by a ruling), Kozilek, the
+   Broken Reality, Wand of Wonder, Aminatou's Augury, Selfless Squire (a trigger on prevented damage), Echoing Deeps,
+   Yuriko (commander ninjutsu), Powerbalance, Gogo, Aclazotz ("for each opponent who can't"), Mari, the Killing Quill,
+   The Earth King, Firebender Ascension, Unbound Flourishing, Tinybones, Bauble Burglar, Ghoulish Impetus, Zack Fair,
+   Scholar of New Horizons, Cunning Rhetoric and Chandra's Incinerator. Smaller gaps from round 117: under Odric, a
+   block tax (Archangel of Tithes) lets the player choosing blocks only choose none; Agitator Ant asks each player in
+   turn and puts their counters as they answer (the others see the earlier answers); Dionus's granted trigger
+   remembers "once each turn" for a card that left and came back that turn. Smaller gaps from round 116: bots never use "target creature it's
+   blocking" abilities (Tinder Wall, Wall of Corpses, Goblin Snowman; bots activate abilities in their own main phase
+   only); bots stop paying Lim-Dûl's Vault life after four looks; Lich-Knights' Conquest is out; round 115's Assault
+   Suit, Brass Herald, Alrund, Vigean Intuition, Winding Way, Sages of the Anima and Serra's Emissary (kindred) are
+   still out.
    Smaller gaps from round 114: "target player adds two mana in any combination
    of colors" (another player adding it) is out; Quicksilver Fountain (each player floods a land of
    their choice) and Eluge (a cost reduction for each flooded land) are out; Cemetery Illuminator and the other "look at the top card, you may cast it if ..." cards are

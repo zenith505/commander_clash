@@ -209,8 +209,15 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // "They", "those creatures": the targets of an earlier "up to two target creatures".
   // "Create two 1/1 colorless Spirit creature tokens. They gain haste until end of turn": the tokens just created.
   if (ctx.lastCreatedAny && /^(?:each of )?(they|them|those tokens|the tokens)$/i.test(x)) return { ref: "created" };
+  // "Put all land cards from among them onto the battlefield tapped ... untap those lands" (Animist's Awakening).
+  if (ctx.lastDugLands && /^those lands$/i.test(x)) return { ref: "created" };
   // "Exile each permanent with the most votes or tied for most votes" (Council's Judgment): what the vote chose.
-  if (ctx.vote?.among && /^each (?:permanent|card) with the most votes or tied for most votes$/i.test(x)) return { ref: "voted" };
+  if (ctx.vote?.among && !ctx.vote.choose && /^each (?:permanent|card) with the most votes or tied for most votes$/i.test(x)) return { ref: "voted" };
+  // "Destroy each permanent chosen this way" (Druid of Purification): every one a player chose.
+  if (ctx.vote?.choose && /^each permanent chosen this way$/i.test(x)) return { ref: "voted", any: true };
+  // "Put a +1/+1 counter on target creature you control, then double the number of +1/+1 counters on each creature that had
+  // a +1/+1 counter put on it this way" (Fangs of Kalonia).
+  if (/^each creature that had an? \+1\/\+1 counter put on it this way$/i.test(x)) return { ref: "countersPutThisWay", kind: "+1/+1" };
   if (/^(?:each of )?(they|them|those creatures|those permanents|those cards)$/i.test(x)) return ctx.lastTargets ? { ref: "target", ...ctx.lastTargets } : /^(?:each of )?(they|them|those creatures)$/i.test(x) && ctx.lastGroup ? ctx.lastGroup : null;
   // "Tap each creature dealt damage this way" (Aurelia's Fury): what this spell's or ability's damage hit.
   const dealt = /^each (creature|planeswalker|permanent) dealt damage this way$/i.exec(x);
@@ -329,7 +336,7 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   }
   const [phrase, theirs] = thatPlayerControls(m[1]!, ctx);
   const spec = parseTargetPhrase(phrase, { x: true, count: boundCount(ctx) });
-  if (!spec || spec.kind === "player" || spec.kind === "spell" || (spec.kind === "card") !== cards || (theirs && (spec.kind !== "object" || spec.controller))) return null;
+  if (!spec || spec.kind === "player" || spec.kind === "spell" || (spec.kind === "card") !== cards || (theirs && (spec.kind === "card" ? !!spec.owner : spec.kind !== "object" || spec.controller))) return null;
   // "Target creature with power X or less": the X of a spell or of an activated ability's cost (CR 107.3a).
   // With "where X is ...", body.ts makes it a bound (TargetSpec.bound) once X is read, or gives up.
   if (spec.xRange && !ctx.whereX && !ctx.spell && !ctx.activated && !ctx.ownX) return null;
@@ -387,6 +394,9 @@ export function boundAtTargeting(a: AmountExpr): boolean {
 function thatPlayerControls(phrase: string, ctx: Ctx): [string, boolean] {
   const m = / that player controls$/i.exec(phrase);
   if (m && ctx.eventPlayer) return [phrase.slice(0, m.index), true];
+  // "Target nonland permanent card from that player's graveyard" (Tinybones, the Pickpocket): a card that player owns.
+  const yard = / from that player's graveyard$/i.exec(phrase);
+  if (yard && ctx.eventPlayer) return [`${phrase.slice(0, yard.index)} from a graveyard`, true];
   // "Whenever ~ attacks, tap target creature defending player controls": the player it's attacking (CR 506.2, rulings).
   const d = / defending player controls$/i.exec(phrase);
   return d && ctx.defending ? [phrase.slice(0, d.index), true] : [phrase, false];

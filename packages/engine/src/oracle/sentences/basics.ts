@@ -111,6 +111,16 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const n: Amount = piles[1] === "X plus one" ? { count: { kind: "x" }, plus: 1 } : amt(piles[1]!);
     return [{ type: "piles", n, separator: piles[2]!.startsWith("an opponent") ? "opponent" : "you", rest: piles[3] === "into your graveyard" ? "graveyard" : "bottom" }];
   }
+  // "Search your library for an Equipment card, put it onto the battlefield, attach it to a creature you control, then
+  // shuffle" (Stonehewer Giant): attached as it resolves, to a creature chosen then (not targeted); the shuffle comes last
+  // but nothing in between sees the library order.
+  const attach = /^(Search your library for an Equipment card, put it onto the battlefield), attach it to a creature you control(, then shuffle)$/.exec(s);
+  if (attach) {
+    const fx = parseSearch(attach[1]! + attach[2]!);
+    const sr = fx?.length === 1 ? fx[0]! : undefined;
+    if (sr?.type !== "search" || sr.n !== 1 || sr.dest.zone !== "battlefield") return null;
+    return [sr, { type: "attachToChosen", source: { ref: "created" }, filter: { kind: "object", types: ["Creature"], controller: "you", text: "a creature you control" } }];
+  }
   if (/^Search your library /i.test(s)) return parseSearch(s, (t) => parseBoundCount(t, ctx));
   // "Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then
   // shuffle" (Path to Exile): that player chooses whether to search, and doesn't shuffle if they don't (rulings). "That
@@ -252,6 +262,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const phases: ("combat" | "main")[] = n.toLowerCase() === "two" ? ["combat", "combat"] : main ? ["combat", "main"] : ["combat"];
     return [{ type: "addPhases", phases, ...(after ? { after: after as "main" | "combat" } : {}) }];
   }
+  // Y'shtola Rhul: "Then if it's the first end step of the turn, there is an additional end step after this step".
+  if (/^(?:[Tt]hen )?[Ii]f it's the first end step of the turn, there is an additional end step after this step$/.test(s)) return [{ type: "addEndStep" }];
   // Sphinx of the Second Sun: "there is an additional beginning phase after this phase" (CR 500.8).
   if (/^[Tt]here is an additional beginning phase after this phase$/.test(s)) return [{ type: "addPhases", phases: ["beginning"] }];
   // Timetwister: "Each player shuffles their hand and graveyard into their library, then draws seven cards." Reminisce:

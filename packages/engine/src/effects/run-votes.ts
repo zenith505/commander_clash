@@ -13,6 +13,11 @@ import { objectMatches, printedMatches } from "./targeting";
 /** Votes (CR 701.38): each player, starting with the controller and in turn order, votes for one of the choices. */
 export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
   switch (e.type) {
+    case "chooseBlocks":
+      // Odric: for this combat (the one its attack trigger is in); the last one to resolve decides.
+      s.blocksChosenBy = { player: ctx.controller, turn: s.turn, combat: s.combatsThisTurn ?? 0 };
+      log(s, `${player(s, ctx.controller).name} chooses which creatures block this combat and how they block.`);
+      return;
     case "chooseVotes":
       // Illusion of Choice: the last one to resolve this turn decides (rulings).
       s.votesChosenBy = { player: ctx.controller, turn: s.turn };
@@ -105,7 +110,10 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // as it resolves (not targeted); then control of all of them changes at once.
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
-      const st = (sc.fromEach ??= { queue: apnap(s, Object.entries(r.chose ?? {}).filter(([, w]) => w === e.chose).map(([k]) => Number(k) as PlayerId)), ids: [] });
+      const st = (sc.fromEach ??= {
+        queue: e.votedFor !== undefined ? (r.votes ?? []).filter((v) => v.choice === e.votedFor).map((v) => v.voter) : apnap(s, Object.entries(r.chose ?? {}).filter(([, w]) => w === e.chose).map(([k]) => Number(k) as PlayerId)),
+        ids: [],
+      });
       while (st.queue.length) {
         const pid = st.queue[0]!;
         // The answer to the question asked for this player (game.ts pickPermanents keeps it as the chooser's pick).
@@ -116,21 +124,22 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           st.queue.shift();
           continue;
         }
-        const options = player(s, pid).lost ? [] : s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature"));
+        // A permanent the voter owns, whoever controls it now (Expropriate); the same one may be chosen again.
+        const options = player(s, pid).lost ? [] : s.battlefield.filter((id) => (e.votedFor !== undefined ? obj(s, id).owner === pid : controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature")));
         if (options.length > 1) {
           sc.queue = [ctx.controller];
           sc.chosen = {};
-          s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "choose", what: "creature", options, count: 1, of: pid };
+          s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "choose", what: e.votedFor !== undefined ? "permanent" : "creature", options, count: 1, of: pid, ...(e.votedFor !== undefined ? { owned: true as const } : {}) };
           return "paused";
         }
         st.ids.push(...options);
         st.queue.shift();
       }
       sc.queue = undefined;
-      const ids = st.ids.filter((id) => s.objects[id]?.zone === "battlefield");
+      const ids = [...new Set(st.ids)].filter((id) => s.objects[id]?.zone === "battlefield");
       r.created = ids;
       if (!ids.length) return;
-      log(s, `${player(s, ctx.controller).name} gains control of ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} until end of turn.`);
+      log(s, `${player(s, ctx.controller).name} gains control of ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")}${e.duration === "endOfTurn" ? " until end of turn" : ""}.`);
       return runEffect(s, { type: "continuous", what: { ref: "created" }, mods: [{ kind: "control" }], duration: e.duration }, ctx);
     }
     case "vote": {
@@ -138,7 +147,7 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const sc = (r.scratch ??= {});
       if (!sc.vote) {
         r.votes = [];
-        sc.vote = { queue: turnOrderFrom(s, ctx.controller) };
+        sc.vote = { queue: turnOrderFrom(s, ctx.controller), ...(e.choose ? { choose: true as const } : {}) };
       }
       const v = sc.vote;
       while (v.queue.length) {
@@ -146,9 +155,10 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // Every vote a player has, made at the time they'd vote (CR 701.38d): "you get an additional vote", and the ones
         // they may take or leave ("you may vote an additional time"), asked after the others.
         if (v.left === undefined) {
-          const extra = extraVotes(s, voter);
-          v.left = 1 + extra.get;
-          v.may = extra.may;
+          // "Each player may choose": one pick or none, whatever gives extra votes.
+          const extra = e.choose ? { get: 0, may: 0 } : extraVotes(s, voter);
+          v.left = e.choose ? 0 : 1 + extra.get;
+          v.may = e.choose ? 1 : extra.may;
         }
         const options = voteOptions(s, e, ctx);
         if (!options.length) {
@@ -159,29 +169,32 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (v.pick !== undefined) {
           if (v.pick !== "none") {
             r.votes!.push({ voter, choice: v.pick });
-            log(s, e.secret ? `${player(s, voter).name} votes.` : `${player(s, voter).name} votes for ${voteLabel(s, v.pick)}.`);
-          } else v.may = 0;
+            log(s, e.choose ? `${player(s, voter).name} chose ${voteLabel(s, v.pick)}.` : e.secret ? `${player(s, voter).name} votes.` : `${player(s, voter).name} votes for ${voteLabel(s, v.pick)}.`);
+          } else {
+            if (e.choose) log(s, `${player(s, voter).name} chose nothing.`);
+            v.may = 0;
+          }
           v.pick = undefined;
           if (v.left > 0) v.left--;
           else if (v.may) v.may--;
         }
         if (v.left > 0 || v.may) {
           const optional = v.left === 0;
-          const chooser = s.votesChosenBy?.turn === s.turn && !player(s, s.votesChosenBy.player).lost ? s.votesChosenBy.player : voter;
+          const chooser = !e.choose && s.votesChosenBy?.turn === s.turn && !player(s, s.votesChosenBy.player).lost ? s.votesChosenBy.player : voter;
           const mine = r.votes!.filter((x) => x.voter === voter).length;
           // In turn order, everyone knows the votes made before theirs (rulings on Council's Judgment); a secret vote shows
           // only their own.
           const seen = e.secret ? r.votes!.filter((x) => x.voter === voter) : r.votes!;
           const so = seen.length ? ` (${seen.map((x) => `${player(s, x.voter).name}: ${voteLabel(s, x.choice)}`).join(", ")})` : "";
           const whose = chooser === voter ? "" : ` for ${player(s, voter).name}`;
-          const prompt = `vote${whose}${mine ? " an additional time" : ""}: ${e.text}${so}`;
+          const prompt = e.choose ? `${e.text}${so}` : `vote${whose}${mine ? " an additional time" : ""}: ${e.text}${so}`;
           s.pending = {
             kind: "chooseOption",
             player: chooser,
             source: src,
             what: "vote",
             options: [...options, ...(optional ? ["none"] : [])],
-            labels: [...options.map((o) => voteLabel(s, o)), ...(optional ? ["No additional vote"] : [])],
+            labels: [...options.map((o) => voteLabel(s, o)), ...(optional ? [e.choose ? "Choose nothing" : "No additional vote"] : [])],
             prompt,
             ...(chooser !== voter ? { voter } : {}),
           };
@@ -262,14 +275,17 @@ export function voteWins(s: GameState, option: string, orTie: boolean): boolean 
   return orTie && top > 1;
 }
 
-/** "Each permanent with the most votes or tied for most votes" (ObjRef "voted"): still those objects (CR 400.7). */
-export function votedObjects(s: GameState): GameObject[] {
+/**
+ * "Each permanent with the most votes or tied for most votes" (ObjRef "voted"), or with `any` "each permanent chosen this
+ * way": still those objects (CR 400.7).
+ */
+export function votedObjects(s: GameState, any = false): GameObject[] {
   const tally = voteTally(s);
   const most = Math.max(0, ...tally.values());
   if (!most) return [];
   return [...tally].flatMap(([choice, n]) => {
     const [id, zc] = choice.split("@");
-    const o = n === most && id ? s.objects[id] : undefined;
+    const o = (any || n === most) && id ? s.objects[id] : undefined;
     return o && String(o.zoneChanges ?? 0) === zc ? [o] : [];
   });
 }

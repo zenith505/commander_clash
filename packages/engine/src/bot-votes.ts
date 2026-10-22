@@ -17,7 +17,9 @@ export function chooseVote(s: GameState, pid: PlayerId, options: string[]): stri
   const effects = r.body.effects;
   const words = options.filter((o) => o !== "none" && !o.includes("@"));
   // An extra vote that may be passed on: always worth taking, for whatever the first one was for.
-  const score = (o: string) => (o === "none" ? -Infinity : o.includes("@") ? objectScore(s, pid, controller, effects, o) : words.length ? wordScore(s, pid, controller, effects, o) : 0);
+  // "Each player may choose ..." (Druid of Purification): choosing nothing beats choosing something that hurts us.
+  const none = r.scratch?.vote?.choose ? 0 : -Infinity;
+  const score = (o: string) => (o === "none" ? none : o.includes("@") ? objectScore(s, pid, controller, effects, o) : words.length ? wordScore(s, pid, controller, effects, o) : 0);
   let best = options[0]!;
   for (const o of options) if (score(o) > score(best)) best = o;
   return best;
@@ -46,6 +48,11 @@ function wordScore(s: GameState, pid: PlayerId, controller: PlayerId, effects: E
     for (const e of es) {
       if (e.type === "if" && e.cond.kind === "voteWins") {
         if (e.cond.option === option) v += effectsValue(s, pid, controller, e.effects);
+        continue;
+      }
+      // Expropriate's money vote: the caster takes one of the voter's permanents (the best one, say).
+      if (e.type === "controlFromEach" && e.votedFor === option) {
+        if (pid !== controller) v -= Math.max(0, ...s.battlefield.map((id) => obj(s, id)).filter((o) => o.owner === pid).map((o) => worth(s, pid, o)));
         continue;
       }
       // "For each strength vote": what one more vote for it adds.

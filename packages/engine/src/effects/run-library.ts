@@ -655,13 +655,14 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         let cards = [...(yardOnly ? [] : top === undefined ? lib : lib.slice(0, top)), ...(e.orGraveyard ? p.graveyard : [])].filter(fits);
         // At most one of each name: cards with the same name in a library are alike, so one of each is offered.
         if (e.oneEach) cards = cards.filter((id, i) => cards.findIndex((x) => sameName(defOf(s, obj(s, x)).name, defOf(s, obj(s, id)).name)) === i);
+        if (e.totalMv !== undefined) cards = cards.filter((id) => defMv(defOf(s, obj(s, id))) <= e.totalMv!);
         const max = Math.min(n, cards.length);
         const min = filter || e.upTo ? 0 : max;
         // Opposition Agent: searching their own library, an opponent of its controller is controlled by them (CR 723.5).
         const agent = !yardOnly && libOf(p.id) === p ? searchAgent(s, p.id) : undefined;
         if (agent?.exileFor !== undefined) sc.searchExileFor = agent.exileFor;
         const kind = (filter?.text ?? "card").replace(/~/g, src);
-        const what = e.oneOfEach ? `up to a ${kind}` : `${e.upTo ? "up to " : ""}${n === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${n >= 99 ? "any number of" : n} ${kind.replace(/\bcard\b/, "cards")}`}`;
+        const what = e.oneOfEach ? `up to a ${kind}` : `${e.upTo && n < 99 ? "up to " : ""}${n === 1 ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}` : `${n >= 99 ? "any number of" : n} ${kind.replace(/\bcard\b/, "cards")}`}`;
         s.pending = {
           kind: "searchLibrary",
           player: agent?.controller ?? p.id,
@@ -674,6 +675,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           ...(agent?.exileFor !== undefined ? { foundExiled: true as const } : {}),
           ...(e.others && agent?.exileFor === undefined ? { firstTo: describeDest(e.dest), othersTo: describeDest(e.others) } : {}),
           ...(e.shareLandType ? { shareLandType: true as const } : {}),
+          ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}),
           ...(e.oneOfEach ? { oneOfEach: e.oneOfEach } : {}),
         };
         return "paused";

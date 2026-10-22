@@ -221,8 +221,11 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const energy = energyIn(costs);
   if (energy < 0) return "fail";
   const symbols = [...costs.replace(/Pay (?:\{E\})+|Pay \w+ \{E\}/, "").matchAll(/\{([^}]+)\}/g)].map((x) => x[1]!);
-  if (symbols.some((x) => x === "Q" || x === "E")) return "fail";
+  if (symbols.some((x) => x === "E")) return "fail";
   const tap = symbols.includes("T");
+  // The untap symbol (CR 107.6): only on a permanent, and not with {T} too.
+  const untapSelf = symbols.includes("Q");
+  if (untapSelf && (tap || symbols.filter((x) => x === "Q").length > 1 || inYard)) return "fail";
   // "{3}, Exile this card from your graveyard: ...", "{2}{B}: Return this card from your graveyard to your hand":
   // it works only from your graveyard (CR 113.6j), where "~" is the card.
   const returnsSelf = /^(?:Return ~ from your graveyard to (?:your hand|the battlefield(?: tapped)?)|Put ~ from your graveyard into your library third from the top)\./.test(effectText);
@@ -248,8 +251,9 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // 602.2b, 601.2h).
   const bounceOwn = costs.split(", ").includes("Return ~ to its owner's hand");
   if (bounceOwn && (fromYard || fromHand || exileOwn || /Sacrifice ~/.test(costs))) return "fail";
+  if (untapSelf && (fromYard || fromHand || exileFromHand || putFromHand)) return "fail";
   const manaCost = symbols
-    .filter((x) => x !== "T")
+    .filter((x) => x !== "T" && x !== "Q")
     .map((x) => `{${x}}`)
     .join("");
   // "Sacrifice ~: It deals damage equal to its power to ...", "Put two +1/+1 counters on ~. It deals 1 damage to any
@@ -261,7 +265,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // libraries isn't compiled.
   // A cost that mills moves a card from a library: it uses the stack (CR 605.1a; Millikin rulings).
   const mana = extra.some((c) => c.kind === "mill") ? "stack" : manaAbilityKind(body);
-  if (mana === "fail" || (mana === "mana" && (fromHand || exileOwn || bounceOwn || keyword || halfLife))) return "fail";
+  if (mana === "fail" || (mana === "mana" && (fromHand || exileOwn || bounceOwn || keyword || halfLife || untapSelf))) return "fail";
   if (exileFromHand && (mana !== "mana" || anyPlayer || sorcerySpeed || oncePerTurn || activateIf || extra.length)) return "fail";
   // X in the effect is the X paid in the cost (CR 107.3a); with none to pay, it isn't defined.
   if (usesX(body) && !symbols.includes("X") && !extra.some((c) => ("x" in c && c.x) || (c.kind === "discard" && c.mvX))) return "fail";
@@ -269,7 +273,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // sacrifice, exile or change the permanent itself, which only its controller could do (CR 701.21a, 602.2).
   // Only the chosen color's mana pays it: an ability of a permanent that chose one, with a mana cost, not a mana ability.
   if (spendOnlyChosenColor && (mana !== "stack" || !manaCost || fromYard || fromHand)) return "fail";
-  if (anyPlayer && (tap || mana !== "stack" || fromYard || fromHand || exileOwn || /Sacrifice ~|Exert ~|Remove |on ~|~/.test(costs) || halfLife || energy)) return "fail";
+  if (anyPlayer && (tap || untapSelf || mana !== "stack" || fromYard || fromHand || exileOwn || /Sacrifice ~|Exert ~|Remove |on ~|~/.test(costs) || halfLife || energy)) return "fail";
   return {
     ...(anyPlayer ? { anyPlayer: true as const } : {}),
     ...(spendOnlyChosenColor ? { spendOnlyChosenColor: true as const } : {}),
@@ -277,6 +281,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     tap,
     sacrificeSelf: /Sacrifice ~/.test(costs),
     ...(/Exert ~/.test(costs) ? { exertCost: true as const } : {}),
+    ...(untapSelf ? { untapSelf: true as const } : {}),
     ...(/Unattach ~/.test(costs) ? { unattachCost: true as const } : {}),
     ...(/Reveal the player you chose/.test(costs) ? { revealChosen: true as const } : {}),
     sorcerySpeed,

@@ -957,3 +957,28 @@ describe("Urza's Workshop", () => {
     expect(pool(s, ap).C).toBe(2);
   });
 });
+
+describe("the untap symbol {Q} (CR 107.6)", () => {
+  const sentry = card("Safehold Sentry", "Creature — Elf Warrior", "{1}{W}", { power: "2", toughness: "2", oracleText: "{2}{W}, {Q}: This creature gets +0/+2 until end of turn. ({Q} is the untap symbol.)" });
+  const mantle = card("Umbral Mantle", "Artifact — Equipment", "{3}", { oracleText: "Equipped creature has \"{3}, {Q}: This creature gets +2/+2 until end of turn.\" ({Q} is the untap symbol.)\nEquip {0}" });
+
+  it("these cards play", () => {
+    for (const d of [sentry, mantle]) expect(isFullySupported(d)).toBe(true);
+  });
+
+  it("untaps the creature as a cost; can't be activated while untapped or summoning sick", () => {
+    const { s: s0, ap } = setup([]);
+    const id = putOnBattlefield(s0, ap, sentry);
+    const sick = putOnBattlefield(s0, ap, sentry, { sick: true });
+    s0.players[ap]!.manaPool.W = 3;
+    const use = (x: string): Action => ({ type: "activateAbility", player: ap, objectId: x, index: 0 });
+    expect(() => act(s0, use(id))).toThrow(/untapped/);
+    s0.objects[id]!.tapped = true;
+    s0.objects[sick]!.tapped = true;
+    expect(() => act(s0, use(sick))).toThrow(/summoning sickness/);
+    let s = act(s0, use(id));
+    expect(s.objects[id]!.tapped).toBe(false);
+    s = passAll(s);
+    expect(characteristics(s, s.objects[id]!).toughness).toBe(4);
+  });
+});

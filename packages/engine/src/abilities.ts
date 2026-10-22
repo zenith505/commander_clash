@@ -3390,6 +3390,8 @@ export interface ActivatedAbility {
   removeCounters?: { counter: CounterKind; n: number };
   /** "{T}, Exert ~: ..." (CR 701.43a): it won't untap during your next untap step; possible even if already exerted (701.43b). */
   exertCost?: true;
+  /** The untap symbol {Q} (CR 107.6): untapping this permanent is part of the cost; it must be tapped, and a creature not summoning sick (CR 302.6). */
+  untapSelf?: true;
   /** "Unattach ~" as a cost (Sunforger): it must be attached to a creature (rulings). */
   unattachCost?: true;
   /** "Put a -1/-1 counter on ~" as part of the cost (Devoted Druid): replacement effects on counters apply (Vizier of Remedies rulings). */

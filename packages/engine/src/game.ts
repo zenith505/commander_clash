@@ -4977,6 +4977,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.sorcerySpeed && !canActAtSorcerySpeed(s, pid) && !((ab.loyalty !== undefined || ab.loyaltyX) && loyaltyAtInstantSpeed(s, pid, o)) && !(ab.equip && equipAtInstantSpeed(s, pid))) return "activate only as a sorcery";
   if (ab.tap && o.tapped) return `${d.name} is tapped`;
   if (ab.tap && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${d.name} has summoning sickness`; // CR 602.5a
+  if (ab.untapSelf && !o.tapped) return `${d.name} is untapped`; // CR 107.6
+  if (ab.untapSelf && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${d.name} has summoning sickness`; // CR 302.6
   if (ab.sacrificeSelf && o.zone === "battlefield" && !canBeSacrificed(s, o)) return `${d.name} can't be sacrificed`; // CR 701.21, 602.2b
   if (ab.oncePerTurn && (o.activatedThisTurn?.filter((n) => n === index).length ?? 0) >= (ab.keyword === "Boast" && boastsTwice(s, pid) ? 2 : 1)) return `${d.name}'s ability can be activated only ${ab.keyword === "Boast" && boastsTwice(s, pid) ? "twice" : "once"} each turn`; // CR 602.5b
   if (ab.onceEver && o.activatedEver?.includes(index) && !(ab.keyword === "Exhaust" && mayExhaustAgain(s, pid)) && !(ab.keyword === "Power-up" && o.activatedEver.filter((i) => i === index).length <= powerUpAgain(s, pid))) return `${d.name}'s ${ab.keyword === "Exhaust" ? "exhaust " : ""}ability can be activated only once`; // CR 702.177a-b, 602.5b
@@ -5268,6 +5270,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // "Choose one that hasn't been chosen" (Three Bowls of Porridge): chosen as it's activated.
   if (ab.body.modal && modes) noteModesChosen(s, ab.body, o.id, modes);
   if (ab.tap) tapPermanent(s, o);
+  if (ab.untapSelf) untapPermanent(s, o);
   if (ab.exertCost && o.zone === "battlefield") {
     o.skipNextUntap = true; // CR 701.43a
     o.exertedTurn = s.turn;

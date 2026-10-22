@@ -331,7 +331,7 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   }
   const [phrase, theirs] = thatPlayerControls(m[1]!, ctx);
   const spec = parseTargetPhrase(phrase, { x: true, count: boundCount(ctx) });
-  if (!spec || spec.kind === "player" || spec.kind === "spell" || (spec.kind === "card") !== cards || (theirs && (spec.kind !== "object" || spec.controller))) return null;
+  if (!spec || spec.kind === "player" || spec.kind === "spell" || (spec.kind === "card") !== cards || (theirs && (spec.kind === "card" ? !!spec.owner : spec.kind !== "object" || spec.controller))) return null;
   // "Target creature with power X or less": the X of a spell or of an activated ability's cost (CR 107.3a).
   // With "where X is ...", body.ts makes it a bound (TargetSpec.bound) once X is read, or gives up.
   if (spec.xRange && !ctx.whereX && !ctx.spell && !ctx.activated && !ctx.ownX) return null;
@@ -389,6 +389,9 @@ export function boundAtTargeting(a: AmountExpr): boolean {
 function thatPlayerControls(phrase: string, ctx: Ctx): [string, boolean] {
   const m = / that player controls$/i.exec(phrase);
   if (m && ctx.eventPlayer) return [phrase.slice(0, m.index), true];
+  // "Target nonland permanent card from that player's graveyard" (Tinybones, the Pickpocket): a card that player owns.
+  const yard = / from that player's graveyard$/i.exec(phrase);
+  if (yard && ctx.eventPlayer) return [`${phrase.slice(0, yard.index)} from a graveyard`, true];
   // "Whenever ~ attacks, tap target creature defending player controls": the player it's attacking (CR 506.2, rulings).
   const d = / defending player controls$/i.exec(phrase);
   return d && ctx.defending ? [phrase.slice(0, d.index), true] : [phrase, false];

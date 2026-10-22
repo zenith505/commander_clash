@@ -1807,6 +1807,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       last.exileAfter = true;
       continue;
     }
+    // Tinybones, the Pickpocket: "you may cast target nonland permanent card from that player's graveyard, and mana of any
+    // type can be spent to cast that spell": cast as it resolves or not at all, paying its costs, timing ignored (rulings).
+    const castTheirs = ctx.eventPlayer ? /^[Yy]ou may cast (target .+? card from that player's graveyard), and mana of any type can be spent to cast that spell$/.exec(s) : null;
+    if (castTheirs) {
+      const before = ctx.targets.length;
+      const what = parseCardTarget(castTheirs[1]!, ctx);
+      const t = ctx.targets[before];
+      if (what?.ref !== "target" || ctx.targets.length !== before + 1 || t?.kind !== "card" || !t.types?.length || !t.notTypes?.includes("Land")) return null;
+      effects.push({ type: "castNow", what, anyOwner: true, anyType: true });
+      continue;
+    }
     // "You may cast target instant card from your graveyard without paying its mana cost. If that spell would be put into
     // your graveyard, exile it instead." (Torrential Gearhulk): cast as it resolves (CR 608.2g), or not.
     const castTarget = /^[Yy]ou may cast (target .+? card(?: with .+?)? from your graveyard) without paying its mana cost$/.exec(s);

@@ -6,9 +6,9 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passAll, passUntil, putOnBattlefield, setup, target } from "./helpers";
-import { abilitiesOf, botActions, isFullySupported, planCast, spellCost, waitingOn, type Action, type GameState, type PlayerId } from "../src";
+import { abilitiesOf, botActions, isFullySupported, planActivate, planCast, plotCost, spellCost, waitingOn, type Action, type GameState, type PlayerId } from "../src";
 import { moveObject, tapPermanent } from "../src/game";
-import { characteristics } from "../src/layers";
+import { characteristics, invalidateCharacteristics as invalidate } from "../src/layers";
 
 const run = (s: GameState, plan: Action[] | null) => {
   if (!plan) throw new Error("no plan");
@@ -268,5 +268,156 @@ describe("Odric, Master Tactician", () => {
     expect(two.s.pending).toEqual({ kind: "declareBlockers", player: two.opp, remaining: [] });
     const three = attackWith(3);
     expect(botActions(three.s, three.ap)).toEqual([{ type: "declareBlockers", player: three.ap, blocks: [] }]);
+  });
+});
+
+const bridge = card("The Prismatic Bridge", "Legendary Enchantment", "{W}{U}{B}{R}{G}", {
+  oracleText:
+    "At the beginning of your upkeep, reveal cards from the top of your library until you reveal a creature or planeswalker card. Put that card onto the battlefield and the rest on the bottom of your library in a random order.",
+});
+const gallery = card("Porcelain Gallery", "Enchantment — Room", "{4}{W}{W}", {
+  oracleText:
+    "Creatures you control have base power and toughness each equal to the number of creatures you control.\n(You may cast either half. That door unlocks on the battlefield. As a sorcery, you may pay the mana cost of a locked door to unlock it.)",
+});
+const doc = card("Doc Aurlock, Grizzled Genius", "Legendary Creature — Bear Druid", "{G}{U}", {
+  power: "2",
+  toughness: "3",
+  oracleText: "Spells you cast from your graveyard or from exile cost {2} less to cast.\nPlotting cards from your hand costs {2} less.",
+});
+const kogla = card("Kogla and Yidaro", "Legendary Creature — Ape Dinosaur Turtle", "{2}{R}{R}{G}{G}", {
+  power: "7",
+  toughness: "7",
+  oracleText:
+    "When Kogla and Yidaro enters, choose one —\n• It gains trample and haste until end of turn.\n• It fights target creature you don't control.\n{2}{R}{G}, Discard this card: Destroy up to one target artifact or enchantment. Shuffle this card into your library from your graveyard, then draw a card.",
+});
+const zul = card("Zul Ashur, Lich Lord", "Legendary Creature — Zombie Warlock", "{1}{B}", {
+  power: "2",
+  toughness: "2",
+  keywords: ["Ward"],
+  oracleText:
+    "Ward—Pay 2 life. (Whenever this creature becomes the target of a spell or ability an opponent controls, counter it unless that player pays 2 life.)\n{T}: You may cast target Zombie creature card from your graveyard this turn.",
+});
+const tinybones = card("Tinybones, the Pickpocket", "Legendary Creature — Skeleton Rogue", "{B}", {
+  power: "1",
+  toughness: "1",
+  keywords: ["Deathtouch"],
+  oracleText:
+    "Deathtouch\nWhenever Tinybones deals combat damage to a player, you may cast target nonland permanent card from that player's graveyard, and mana of any type can be spent to cast that spell.",
+});
+const zombie = card("Gravecrawler", "Creature — Zombie", "{B}", { power: "2", toughness: "1", oracleText: "" });
+
+describe("The Prismatic Bridge (Esika's back face)", () => {
+  it("reveals until a creature or planeswalker card and puts it onto the battlefield, a planeswalker with its loyalty", () => {
+    expect(isFullySupported(bridge)).toBe(true);
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    putOnBattlefield(s, ap, bridge);
+    const walker = card("Jace Beleren", "Legendary Planeswalker — Jace", "{1}{U}{U}", { loyalty: "3", oracleText: "+2: Each player draws a card.\n−1: Target player draws a card.\n−10: Target player mills twenty cards." });
+    const shock = card("Shock", "Instant", "{R}", { oracleText: "Shock deals 2 damage to any target." });
+    const ids = [shock, shock, walker].map((d) => {
+      const id = putOnBattlefield(s, ap, d);
+      moveObject(s, id, "library");
+      return id;
+    });
+    s.players[ap]!.library = [...ids, ...s.players[ap]!.library.filter((id) => !ids.includes(id))];
+    s = passUntil(s, "upkeep", later(s, ap, 4));
+    s = settle(s);
+    expect(s.objects[ids[2]!]!.zone).toBe("battlefield");
+    expect(s.objects[ids[2]!]!.counters.loyalty).toBe(3);
+    expect(s.players[ap]!.library.slice(-2).sort()).toEqual([ids[0]!, ids[1]!].sort());
+  });
+});
+
+describe("Porcelain Gallery", () => {
+  it("creatures you control have base power and toughness equal to the number of creatures you control", () => {
+    expect(isFullySupported(gallery)).toBe(true);
+    const { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, gallery);
+    const bears = [1, 2, 3].map((i) => putOnBattlefield(s, ap, bear({ name: `Bear ${i}` })));
+    const theirs = putOnBattlefield(s, opp, bear({ name: "Their Bear" }));
+    s.objects[bears[0]!]!.counters["+1/+1"] = 1;
+    invalidate(s);
+    expect(characteristics(s, s.objects[bears[1]!]!).power).toBe(3);
+    expect(characteristics(s, s.objects[bears[0]!]!).toughness).toBe(4); // base 3, then the counter (layer 7c)
+    expect(characteristics(s, s.objects[theirs]!).power).toBe(2);
+  });
+});
+
+describe("Doc Aurlock, Grizzled Genius", () => {
+  it("spells you cast from exile cost {2} less, and plotting costs {2} less", () => {
+    expect(isFullySupported(doc)).toBe(true);
+    const plotter = card("Slickshot Show-Off", "Creature — Bird Wizard", "{1}{R}", {
+      power: "1",
+      toughness: "2",
+      keywords: ["Flying", "Haste", "Plot"],
+      oracleText: "Flying, haste\nWhenever you cast a noncreature spell, this creature gets +2/+0 until end of turn.\nPlot {3}{R} (You may pay {3}{R} and exile this card from your hand. Cast it as a sorcery on a later turn without paying its mana cost. Plot only as a sorcery.)",
+    });
+    const giant = card("Hill Giant", "Creature — Giant", "{3}{R}", { power: "3", toughness: "3" });
+    const { s, ap, ids } = setup([plotter, giant]);
+    expect(plotCost(s, ap, plotter)).toBe("{3}{R}");
+    const exiled = s.objects[ids[1]!]!;
+    moveObject(s, exiled.id, "exile");
+    exiled.mayPlay = { player: ap, zc: exiled.zoneChanges ?? 0, until: "thisTurn", turn: s.turn };
+    expect(spellCost(s, ap, exiled).extra).toBe(3);
+    putOnBattlefield(s, ap, doc);
+    expect(plotCost(s, ap, plotter)).toBe("{1}{R}");
+    expect(spellCost(s, ap, exiled).extra).toBe(1);
+  });
+});
+
+describe("Kogla and Yidaro", () => {
+  it("discarded for its ability: destroys the artifact, shuffles itself into your library from your graveyard and draws", () => {
+    expect(isFullySupported(kogla)).toBe(true);
+    const { s: s0, ap, ids, opp } = setup([kogla]);
+    let s = s0;
+    const relicId = putOnBattlefield(s, opp, relic("Their Relic"));
+    const hand = s.players[ap]!.hand.length;
+    const ab = abilitiesOf(s, s.objects[ids[0]!]!).activated.findIndex((a) => /Discard ~/.test(a.text));
+    s = run(s, planActivate(s, ap, ids[0]!, ab, [target(relicId)]));
+    expect(s.objects[ids[0]!]!.zone).toBe("graveyard");
+    s = settle(s);
+    expect(s.objects[relicId]!.zone).toBe("graveyard");
+    expect(s.objects[ids[0]!]!.zone).toBe("library");
+    expect(s.players[ap]!.hand.length).toBe(hand); // discarded one, drew one
+  });
+});
+
+describe("Zul Ashur, Lich Lord", () => {
+  it("lets you cast the targeted Zombie creature card from your graveyard this turn, paying its cost", () => {
+    expect(isFullySupported(zul)).toBe(true);
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const z = putOnBattlefield(s, ap, zul);
+    const crawler = toYard(s, ap, zombie);
+    const other = toYard(s, ap, bear());
+    const via = { via: "permission" as const };
+    expect(planCast(s, ap, crawler, undefined, undefined, undefined, undefined, via)).toBeNull();
+    s = run(s, planActivate(s, ap, z, 0, [target(crawler)]));
+    s = settle(s);
+    expect(planCast(s, ap, other, undefined, undefined, undefined, undefined, via)).toBeNull();
+    s = settle(run(s, planCast(s, ap, crawler, undefined, undefined, undefined, undefined, via)));
+    expect(s.objects[crawler]!.zone).toBe("battlefield");
+  });
+});
+
+describe("Tinybones, the Pickpocket", () => {
+  it("combat damage to a player: cast a nonland permanent card from their graveyard, with mana of any type", () => {
+    expect(isFullySupported(tinybones)).toBe(true);
+    const { s: s0, ap, opp } = setup([]);
+    let s = s0;
+    const t = putOnBattlefield(s, ap, tinybones);
+    // Only Swamps untapped: the white card's {W} is paid with black mana.
+    for (const id of s.battlefield) if (/Basic Land/.test(s.cards[s.objects[id]!.cardId]!.typeLine) && !/Swamp/.test(name(s, id))) s.objects[id]!.tapped = true;
+    const knight = toYard(s, opp, card("White Knight", "Creature — Human Knight", "{W}{W}", { power: "2", toughness: "2", keywords: ["First strike"], oracleText: "First strike" }));
+    s = passUntil(s, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: t, defender: opp }] });
+    s = passUntil(s, "combatDamage", ap);
+    for (let i = 0; i < 20 && s.pending?.kind !== "chooseTargets" && s.pending?.kind !== "castFree"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [target(knight)] });
+    for (let i = 0; i < 20 && s.pending?.kind !== "castFree"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "castFree", player: ap, objectId: knight, how: "paid", anyType: true });
+    s = settle(run(s, planCast(s, ap, knight)));
+    expect(s.objects[knight]!.zone).toBe("battlefield");
+    expect(characteristics(s, s.objects[knight]!).controller).toBe(ap);
   });
 });

@@ -1569,7 +1569,11 @@ export type Effect =
    * this turn", even if another effect would let you (rulings, CR 101.2). `unlessCast`: "if you haven't cast a spell this
    * turn", checked as it begins (spells cast earlier this turn count, even countered ones and the card with the ability).
    */
-  | { type: "castNow"; what: ObjRef; thenNoMore?: true; unlessCast?: true }
+  /**
+   * `anyOwner`: "you may cast target nonland permanent card from that player's graveyard" (Tinybones), a card another
+   * player owns; `anyType`: "and mana of any type can be spent to cast that spell" (CR 609.4b).
+   */
+  | { type: "castNow"; what: ObjRef; thenNoMore?: true; unlessCast?: true; anyOwner?: true; anyType?: true }
   | { type: "putFromHand"; who?: PlayerRef; filter?: TargetSpec; tapped?: boolean; attacking?: boolean; may: boolean; any?: boolean; /** With `any`: "up to seven" (Ugin, the Spirit Dragon). */ upTo?: number; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand"; /** "If you do, draw a card and repeat this process" (Cultivator Colossus): after each card put, a draw, then again until you put none (rulings). */ drawRepeat?: true }
   /**
    * "Return all land cards from your graveyard to the battlefield tapped" (CR 110.2a: under your control), "from all graveyards

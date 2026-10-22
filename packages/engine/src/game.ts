@@ -3534,7 +3534,10 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // Cast from exile with "mana of any type can be spent to cast it" (CR 609.4b): each mana symbol but snow and
   // Phyrexian ones can be paid with any type, so it's generic.
   const exiled = !how.via ? exilePermission(s, o, pid) : undefined;
-  const anyType = (c: ParsedCost): ParsedCost => (exiled?.anyType ? { ...c, symbols: c.symbols.map((y) => (y.kind === "colored" || y.kind === "hybrid" || y.kind === "twoHybrid" ? { kind: "generic" as const, amount: 1 } : y)) } : c);
+  // Tinybones: cast as its trigger resolves, "and mana of any type can be spent to cast that spell".
+  const pend = s.pending;
+  const anyTypeNow = !!exiled?.anyType || (pend?.kind === "castFree" && pend.player === pid && pend.objectId === o.id && !!pend.anyType);
+  const anyType = (c: ParsedCost): ParsedCost => (anyTypeNow ? { ...c, symbols: c.symbols.map((y) => (y.kind === "colored" || y.kind === "hybrid" || y.kind === "twoHybrid" ? { kind: "generic" as const, amount: 1 } : y)) } : c);
   // "You may play that card without paying its mana cost" (Intet, CR 118.9): additional costs are still paid.
   const freeFromExile = !!exiled?.free && !how.faceDown && !how.alt;
   // "A spell cast this way costs {2} more" (Soul Partition): an increase (CR 601.2f).

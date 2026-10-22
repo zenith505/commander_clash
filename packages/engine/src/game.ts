@@ -3414,8 +3414,12 @@ export function castProblem(
   // "Pay X life", "discard X cards": X can be in an additional cost, or the flashback cost paid, too (CR 107.3a).
   const manaX = parseManaCost(d.manaCost).hasX;
   const costX = costsHaveX(d, choices);
-  const xp = xProblem(costX ? parseManaCost("{X}") : parseManaCost(d.manaCost), x);
+  // "Kicker {X}": X only when it's kicked (CR 107.3a, 601.2b); "X can't be 0" then.
+  const kicker = compileCard(d).kicker;
+  const kickX = !!choices?.kicks?.some((i) => parseManaCost(kicker?.costs[i] ?? "").hasX);
+  const xp = xProblem(costX || kickX ? parseManaCost("{X}") : parseManaCost(d.manaCost), x);
   if (xp) return xp;
+  if (kickX && (x ?? 0) < (kicker?.xMin ?? 0)) return "X can't be 0";
   // Cast without paying an {X} in its mana cost, the only choice for X is 0 (CR 107.3b); not so for an X in an
   // additional cost (Toxic Deluge's rulings).
   if ((free || plotted) && !madness && x && manaX) return "X is 0 when a spell is cast without paying its mana cost";
@@ -3528,7 +3532,12 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const freeFromExile = !!exiled?.free && !how.faceDown && !how.alt;
   // "A spell cast this way costs {2} more" (Soul Partition): an increase (CR 601.2f).
   if (exiled?.more && !madness && freeCastOf(s, pid) !== o.id) mods.more += exiled.more;
-  if ((freeCastOf(s, pid) === o.id && !madness) || (!how.faceDown && !how.alt && plottedCast(s, pid, o)) || freeFromExile) return { cost: anyType(lessColored(parseManaCost(kickCost))), extra: Math.max(0, mods.more - mods.less) };
+  // A "Kicker {X}" is still paid, with its X (CR 118.9d).
+  if ((freeCastOf(s, pid) === o.id && !madness) || (!how.faceDown && !how.alt && plottedCast(s, pid, o)) || freeFromExile) {
+    const kicked = anyType(lessColored(parseManaCost(kickCost)));
+    const kx = x * xCount(kicked);
+    return { cost: kx ? splitGeneric(kicked, 0).cost : kicked, extra: Math.max(0, mods.more - mods.less) + (kx ? splitGeneric(kicked, kx).extra : 0) };
+  }
   const tax = o.zone === "command" ? commanderTax(player(s, pid), o) : 0;
   // {X} is generic mana, paid once for each {X} (CR 107.4b); reductions can take it down too (CR 601.2f).
   // Flashback and escape pay their cost instead of the mana cost (an alternative cost, CR 118.9).
@@ -4046,7 +4055,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const chosen = spell?.modal ? modes : undefined;
   const free = freeCastOf(s, p.id) === id && !madness;
   // X is announced as it's cast (CR 601.2b) and is part of the spell while it's on the stack (CR 107.3a).
-  const hasX = parseManaCost(d.manaCost).hasX || costsHaveX(d, choices);
+  const hasX = parseManaCost(d.manaCost).hasX || costsHaveX(d, choices) || !!choices?.kicks?.some((i) => parseManaCost(compileCard(d).kicker?.costs[i] ?? "").hasX);
   s.stack.push({
     id: `s${s.nextId++}`,
     kind: "spell",

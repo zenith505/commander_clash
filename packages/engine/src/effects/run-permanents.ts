@@ -944,7 +944,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const me = e.source ? objects(s, e.source, ctx)[0] : ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       if (!host || !me) return;
       // Something that isn't an Equipment (or an Aura, for "attach target Aura") doesn't move (CR 701.3b).
-      if (e.source && !characteristics(s, me).subtypes.some((t) => t === "Equipment" || t === "Aura")) return;
+      if (e.source && !characteristics(s, me).subtypes.some((t) => t === "Equipment" || (t === "Aura" && !e.equipmentOnly))) return;
       attachTo(s, me, host);
       return;
     }

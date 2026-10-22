@@ -3,7 +3,8 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, cast, island, passUntil, putOnBattlefield, setup, target } from "./helpers";
-import { abilityProblem } from "../src";
+import { abilityProblem, castProblem } from "../src";
+import { controllerOf } from "../src/layers";
 import { manaAbilityProblem } from "../src/manaabilities";
 import { attackTaxPer, botActions, invalidateCharacteristics, isFullySupported, objHasKeyword, objIsType, power, toughness, isSuspended, planActivate, planCast, waitingOn, type Action, type GameState, type PlayerId } from "../src";
 import { moveObject } from "../src/game";
@@ -625,5 +626,50 @@ describe("Sceptre of Eternal Glory", () => {
     expect(manaAbilityProblem(s, ap, s.objects[sc]!, 1)).not.toBeNull();
     putOnBattlefield(s, ap, island);
     expect(manaAbilityProblem(s, ap, s.objects[sc]!, 1)).toBeNull();
+  });
+});
+
+const skydiver = card("Thieving Skydiver", "Creature — Merfolk Rogue", "{1}{U}", {
+  power: "2",
+  toughness: "1",
+  keywords: ["Kicker", "Flying"],
+  oracleText:
+    "Kicker {X}. X can't be 0. (You may pay an additional {X} as you cast this spell.)\nFlying\nWhen Thieving Skydiver enters, if it was kicked, gain control of target artifact with mana value X or less. If that artifact is an Equipment, attach it to Thieving Skydiver.",
+});
+
+describe("Kicker {X}: Thieving Skydiver", () => {
+  it("X only when kicked, never 0; it steals an artifact with mana value X or less and wears it if it's an Equipment", () => {
+    expect(isFullySupported(skydiver)).toBe(true);
+    const { s: s0, ap, opp, ids } = setup([skydiver]);
+    const sw = putOnBattlefield(s0, opp, splitter);
+    const big = putOnBattlefield(s0, opp, card("Big Relic", "Artifact", "{4}", { oracleText: "" }));
+    expect(castProblem(s0, ap, ids[0]!, undefined, undefined, undefined, undefined, 2, {})).toMatch(/no X/);
+    expect(castProblem(s0, ap, ids[0]!, undefined, undefined, undefined, undefined, 0, { kicks: [0] })).toMatch(/can't be 0/);
+    const plan = planCast(s0, ap, ids[0]!, undefined, undefined, "auto", 1, { kicks: [0] });
+    expect(plan).not.toBeNull();
+    let s = settle(run(s0, plan));
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    // X = 1: Bonesplitter (mana value 1) can be chosen, the 4-mana relic can't.
+    expect(() => act(s, { type: "chooseTargets", player: ap, targets: [target(big)] })).toThrow();
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [target(sw)] }));
+    expect(controllerOf(s, s.objects[sw]!)).toBe(ap);
+    expect(s.objects[sw]!.attachedTo).toBe(ids[0]);
+  });
+
+  it("unkicked: no X, no trigger; a bot kicks it with an X big enough", () => {
+    const { s: s0, ap, opp, ids } = setup([skydiver]);
+    const sw = putOnBattlefield(s0, opp, splitter);
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
+    expect(controllerOf(s, s.objects[sw]!)).toBe(opp);
+    const b = setup([skydiver]);
+    const sw2 = putOnBattlefield(b.s, b.opp, splitter);
+    b.s.players[b.ap]!.hand = [b.ids[0]!];
+    b.s.players[b.ap]!.command = [];
+    const cast = botActions(b.s, b.ap).find((a) => a.type === "castSpell");
+    expect(cast).toMatchObject({ kicks: [0] });
+    s = run(b.s, botActions(b.s, b.ap));
+    for (let i = 0; i < 20 && (s.stack.length || s.triggerQueue.length || s.pending); i++) s = s.pending ? act(s, botActions(s, s.pending.player)[0]!) : settle(s);
+    expect(controllerOf(s, s.objects[sw2]!)).toBe(b.ap);
   });
 });

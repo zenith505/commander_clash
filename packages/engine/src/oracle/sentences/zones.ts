@@ -608,6 +608,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (t?.kind !== "object" || !t.subtypes?.includes("Equipment")) return null;
     return [{ type: "attach", what: { ref: "self" }, source: { ref: "target", index: ctx.lastObjectTarget } }];
   }
+  // Thieving Skydiver: "gain control of target artifact ... If that artifact is an Equipment, attach it to ~": only an
+  // Equipment moves (an artifact Aura wouldn't).
+  if (/^If that artifact is an Equipment, attach it to ~$/.test(s) && !ctx.spell && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.types?.includes("Artifact"))
+    return [{ type: "attach", what: { ref: "self" }, source: { ref: "target", index: ctx.lastObjectTarget }, equipmentOnly: true }];
   // "When ~ enters, attach it to target creature you control." (CR 701.3)
   // "Whenever an Equipment you control enters, you may attach it to target creature you control" (Sigarda's Aid), "...
   // ~ or another Equipment you control enters, you may attach that Equipment ..." (Hammer of Nazahn): the one that entered.

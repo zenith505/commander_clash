@@ -994,11 +994,14 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // Kicker (CR 702.33a-c): "Kicker {2}{R}", "Kicker {1}{U} and/or {2}{B}", "Multikicker {1}{G}".
-    const kicker = /^(Multikicker|Kicker) ((?:\{[^}]+\})+)(?: and\/or ((?:\{[^}]+\})+))?$/.exec(line);
+    // "Kicker {X}. X can't be 0." (Thieving Skydiver, Verdeloth): one kicker cost with X, on a card with no other X; X is
+    // chosen as it's cast when it's kicked, else it's 0 (CR 107.3a, 601.2b).
+    const kicker = /^(Multikicker|Kicker) ((?:\{[^}]+\})+)(?: and\/or ((?:\{[^}]+\})+))?(\. X can't be 0\.)?$/.exec(line);
     if (kicker) {
       const costs = [kicker[2]!, ...(kicker[3] ? [kicker[3]] : [])];
-      if (out.kicker || costs.some((c) => !parseManaCost(c).supported || parseManaCost(c).hasX)) out.unsupported.push(raw);
-      else out.kicker = { costs, ...(kicker[1] === "Multikicker" ? { multi: true } : {}) };
+      const kickX = costs.length === 1 && kicker[1] === "Kicker" && parseManaCost(costs[0]!).hasX && !parseManaCost(d.manaCost).hasX && !/\{X\}.*\{X\}/.test(costs[0]!);
+      if (out.kicker || costs.some((c) => !parseManaCost(c).supported || (parseManaCost(c).hasX && !kickX)) || (kicker[4] && !kickX)) out.unsupported.push(raw);
+      else out.kicker = { costs, ...(kicker[1] === "Multikicker" ? { multi: true } : {}), ...(kicker[4] ? { xMin: 1 } : {}) };
       continue;
     }
     // "If ~ was kicked, it enters with two +1/+1 counters on it." (a replacement effect, CR 614.1c)
@@ -2700,7 +2703,8 @@ function checkCastingLinks(out: CompiledCard) {
  */
 function checkX(d: CardDef, out: CompiledCard) {
   // Or in an additional cost: "As an additional cost to cast this spell, pay X life" (CR 107.3a).
-  const cardX = parseManaCost(d.manaCost).hasX || !!out.additionalCosts?.some((c) => "x" in c && c.x);
+  // Or in its kicker cost, "Kicker {X}" (0 unless it was kicked).
+  const cardX = parseManaCost(d.manaCost).hasX || !!out.additionalCosts?.some((c) => "x" in c && c.x) || !!out.kicker?.costs.some((c) => parseManaCost(c).hasX);
   const bad = (what: string) => out.unsupported.push(what);
   if (out.spell && usesX(out.spell) && !cardX) {
     bad(out.spell.text);

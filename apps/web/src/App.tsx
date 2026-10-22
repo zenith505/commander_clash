@@ -419,7 +419,8 @@ type ManaPick = { mana?: ManaType; extra?: ManaType[] };
 /** Announcing X for a spell or activated ability with {X} in its cost (CR 107.3a, 601.2b, 602.2b). */
 type XPick =
   /** `extra`: an additional cost with X in it, "pay X life" (CR 107.3a). */
-  | { mode: "cast"; draft: CastDraft; label: string; cost: string; max: number; value: number; extra?: string }
+  /** `min`: "X can't be 0" (Thieving Skydiver's kicker). */
+  | { mode: "cast"; draft: CastDraft; label: string; cost: string; max: number; value: number; extra?: string; min?: number }
   | { mode: "activate"; objectId: string; index: number; label: string; cost: string; max: number; value: number; modes?: number[]; extra?: string };
 
 /** The biggest X you can pay for (`plan(x)` is null when you can't), up to 99. */
@@ -837,6 +838,13 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const optional = compiled.additionalCosts?.find((c) => c.kind === "sacrifice" && c.optional);
       const extra = optional?.kind === "sacrifice" ? `sacrifice X ${optional.filter.text.replace(/s?$/, "s")} (X can be 0)` : costX ? (/\b(?:pay|discard|sacrifice|return|exile) X [^.(]*/i.exec(card.oracleText)?.[0]?.trim().replace(/^./, (c) => c.toLowerCase()) ?? "its cost") : undefined;
       return setXPick({ mode: "cast", draft: d, label: card.name, cost: (free && madnessCastOf(s, HUMAN, d.objectId)) || (altX ? altMana! : card.manaCost), max, value: optional ? 0 : max, ...(extra ? { extra } : {}) });
+    }
+    // "Kicker {X}": X is announced once it's kicked (CR 601.2b), "X can't be 0" (Thieving Skydiver).
+    const kickX = d.kicks?.map((i) => compiled.kicker?.costs[i] ?? "").find((c) => parseManaCost(c).hasX);
+    if (d.x === undefined && kickX) {
+      const min = compiled.kicker?.xMin ?? 0;
+      const max = maxX((n) => planCast(s, HUMAN, d.objectId, undefined, d.modes, d.convoke ?? "auto", Math.max(n, min), kicks));
+      return setXPick({ mode: "cast", draft: d, label: `${card.name} (kicked)`, cost: kickX, max: Math.max(max, min), value: Math.max(max, min), ...(min ? { min } : {}) });
     }
     // The optional costs announced so far decide which targets it has (CR 702.33g, 702.166d, 702.174m); bargain is
     // asked before them when a target depends on it.
@@ -1926,19 +1934,20 @@ function tapCandidates(s: GameState, pick: TapPick): GameObject[] {
 
 /** The bar shown while announcing X. */
 function XPickBar({ pick, onChange, onDone, onCancel }: { pick: XPick; onChange: (x: number) => void; onDone: () => void; onCancel: () => void }) {
-  const set = (n: number) => onChange(Math.max(0, Math.min(pick.max, Math.floor(n) || 0)));
+  const min = pick.mode === "cast" ? (pick.min ?? 0) : 0;
+  const set = (n: number) => onChange(Math.max(min, Math.min(pick.max, Math.floor(n) || 0)));
   return (
     <div className="targeting x-pick">
       <span>
         <strong>{pick.label}</strong> <ManaCost cost={pick.cost} size="sm" />
         {pick.extra ? ` and ${pick.extra}: choose X (up to ${pick.max})` : `: choose X (up to ${pick.max} with your mana)`}
       </span>
-      <button className="ghost" disabled={pick.value <= 0} onClick={() => set(pick.value - 1)} aria-label="X minus one">
+      <button className="ghost" disabled={pick.value <= min} onClick={() => set(pick.value - 1)} aria-label="X minus one">
         −
       </button>
       <input
         type="number"
-        min={0}
+        min={min}
         max={pick.max}
         value={pick.value}
         autoFocus

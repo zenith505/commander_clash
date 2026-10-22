@@ -1285,6 +1285,18 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
     if (!player(s, pid).hand.some((h) => h !== id && !isType(defOf(s, obj(s, h)), "Land") && mv(s, h) > avail && mv(s, h) <= avail + gain)) return null;
   }
   let xs: (number | undefined)[] = cost.hasX ? xChoices(availableMana(s, pid) + delveRoom(s, pid, id, { via, alt }) - totalWithoutX(s, pid, id, via), xCount(cost)) : [undefined];
+  // "Kicker {X}" (Thieving Skydiver): kicked with as big an X as we can pay, else not kicked.
+  const kickX = compileCard(d).kicker?.costs.find((c) => parseManaCost(c).hasX);
+  if (!cost.hasX && kickX && !via && !alt) {
+    xs = [...xChoices(availableMana(s, pid) - totalWithoutX(s, pid, id) - manaValue(parseManaCost(kickX)), xCount(parseManaCost(kickX))), undefined];
+    // "Target artifact with mana value X or less" as it enters: no more X than the best one an opponent has needs.
+    const spec = compileCard(d).triggers.find((t) => t.event === "selfEnters")?.body.targets.find((t) => t.kind === "object" && t.xRange?.key === "manaValue" && t.xRange.at === "most");
+    if (spec) {
+      const best = Math.max(0, ...s.battlefield.filter((b) => controllerOf(s, obj(s, b)) !== pid && objectMatches(s, { ...spec, xRange: undefined }, obj(s, b), pid, false)).map((b) => mv(s, b)));
+      const most = Math.max(0, ...xs.filter((x): x is number => x !== undefined));
+      xs = best > 0 && best <= most ? [best, undefined] : [undefined];
+    }
+  }
   // "Pay X life", "sacrifice X creatures" (CR 107.3a): no bigger an X than we'd pay that way too.
   if (costsHaveX(d, { via, alt })) {
     const most = costXRoom(s, pid, id, castExtraCosts(d, { via, alt }));
@@ -1840,7 +1852,7 @@ function castPlanPaying(s: GameState, pid: PlayerId, id: string, free: boolean, 
   const spliced = chooseSplices(s, pid, id, x ?? 0);
   for (const splice of spliced.ids.length ? [spliced, undefined] : [undefined])
     for (const buyback of buybacks)
-      for (const kicks of kickOptions(s, pid, id, free).filter(kickOk).filter((k) => !(printed?.modal?.both === "kicked" && (modes?.length ?? 0) < 2 && k.length))) {
+      for (const kicks of kickOptions(s, pid, id, free, x).filter(kickOk).filter((k) => !(printed?.modal?.both === "kicked" && (modes?.length ?? 0) < 2 && k.length))) {
         const all = splice ? [...(targets ?? []), ...splice.targets] : targets;
         const plan = planCast(s, pid, id, all?.length ? all : (targets ?? undefined), modes, "auto", x, { ...extra, ...(buyback && bbCosts ? bbCosts : {}), ...(kicks.length ? { kicks } : {}), ...(via ? { via } : {}), ...(buyback ? { buyback } : {}), ...(splice ? { splice: splice.ids } : {}) });
         // Leave mana for ward on what it targets, or don't bother (CR 702.21a).
@@ -1886,9 +1898,11 @@ function wantsEvidence(c: CompiledCard): boolean {
 }
 
 /** Kicker choices to try, most kicked first, ending with not kicking it. */
-function kickOptions(s: GameState, pid: PlayerId, id: string, free: boolean): number[][] {
+function kickOptions(s: GameState, pid: PlayerId, id: string, free: boolean, x?: number): number[][] {
   const k = compileCard(defOf(s, obj(s, id))).kicker;
   if (!k) return [[]];
+  // "Kicker {X}": kicked only with an X chosen for it, else not.
+  if (parseManaCost(k.costs[0]!).hasX && !parseManaCost(defOf(s, obj(s, id)).manaCost).hasX) return x ? [[0]] : [[]];
   if (k.multi) {
     const each = manaValue(parseManaCost(k.costs[0]!));
     const spare = availableMana(s, pid) - (free ? 0 : totalWithoutX(s, pid, id));

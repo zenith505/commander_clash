@@ -594,6 +594,21 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const mods = what?.ref === "target" && parseChanges(`becomes ${m[2]!}`);
     return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;
   }
+  // Oko, Thief of Crowns: "Exchange control of target artifact or creature you control and target creature an opponent
+  // controls with power 3 or less" (CR 701.12b).
+  if ((m = /^Exchange control of (target .+? you control) and (target .+? an opponent controls(?: with .+)?)$/.exec(s))) {
+    const a = parseObject(m[1]!, ctx);
+    const b = a?.ref === "target" && !a.n ? parseObject(m[2]!, ctx) : null;
+    return a && b?.ref === "target" && !b.n ? [{ type: "exchangeControl", a, b }] : null;
+  }
+  // "Target artifact or creature loses all abilities and becomes a green Elk creature with base power and toughness 3/3"
+  // (Oko, Thief of Crowns): with no duration, for as long as it stays on the battlefield (CR 611.2a, 400.7). Its colors,
+  // card and creature types are replaced; its supertypes stay (rulings).
+  if ((m = /^(target .+?) (loses all abilities and becomes an? .+)$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    const mods = what?.ref === "target" ? parseChanges(m[2]!) : null;
+    if (what && mods) return [{ type: "continuous", what, mods, duration: "game" }];
+  }
   // "Target creature becomes a Treasure artifact with "..." and loses all other card types and abilities" (Vraska,
   // Betrayal's Sting): for as long as it stays on the battlefield (CR 611.2a). Its supertypes stay (rulings, CR 205.1a);
   // losing its abilities comes before the one it gains, in layer 6.

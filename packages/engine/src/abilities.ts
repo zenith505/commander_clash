@@ -1889,6 +1889,8 @@ export type Effect =
    * player controls comes under its owner's control, an effect of that owner's (layer 2) for as long as it stays (CR 613.1b).
    */
   | { type: "ownersGainControl"; filter: TargetSpec }
+  /** "Exchange control of target artifact or creature you control and target creature an opponent controls" (Oko, CR 701.12b). */
+  | { type: "exchangeControl"; a: ObjRef; b: ObjRef }
   | { type: "groupRules"; affects: Affects; /** The group as the card says it, for the log. */ text: string; mods: Modification[]; duration: "endOfTurn" | "yourNextTurn" }
   | { type: "continuous"; what: ObjRef; mods: Modification[]; duration: "endOfTurn" | "game" | "yourNextTurn" | "endOfYourNextTurn" | "whileTapped" | "whileControlled"; notSource?: boolean; whileControlled?: true; giveTo?: PlayerRef; /** "For as long as it has a vow counter on it" (Promise of Loyalty): only to those of them with one. */ whileCounter?: CounterKind }
   /**

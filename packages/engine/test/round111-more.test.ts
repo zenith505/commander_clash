@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passAll, passUntil, putOnBattlefield, scry, setup } from "./helpers";
-import { castProblem, characteristics, spellCost, invalidateCharacteristics, isFullySupported, power, toughness, objHasKeyword, planActivate, planCast, waitingOn, type GameState } from "../src";
+import { castProblem, characteristics, controllerOf, spellCost, invalidateCharacteristics, isFullySupported, power, toughness, objHasKeyword, planActivate, planCast, waitingOn, type GameState } from "../src";
 
 // Real oracle text (Scryfall).
 const singleCombat = card("Single Combat", "Sorcery", "{3}{W}{W}", {
@@ -98,6 +98,11 @@ const shinobi = card("Fallen Shinobi", "Creature — Zombie Ninja", "{3}{U}{B}",
   keywords: ["Ninjutsu"],
   oracleText:
     "Ninjutsu {2}{U}{B} ({2}{U}{B}, Return an unblocked attacker you control to hand: Put this card onto the battlefield from your hand tapped and attacking.)\nWhenever Fallen Shinobi deals combat damage to a player, that player exiles the top two cards of their library. Until end of turn, you may play those cards without paying their mana costs.",
+});
+const oko = card("Oko, Thief of Crowns", "Legendary Planeswalker — Oko", "{1}{G}{U}", {
+  loyalty: "4",
+  oracleText:
+    "+2: Create a Food token. (It's an artifact with \"{2}, {T}, Sacrifice this token: You gain 3 life.\")\n+1: Target artifact or creature loses all abilities and becomes a green Elk creature with base power and toughness 3/3.\n−5: Exchange control of target artifact or creature you control and target creature an opponent controls with power 3 or less.",
 });
 const treasure = card("Treasure", "Token Artifact — Treasure", "", { oracleText: "{T}, Sacrifice this token: Add one mana of any color." });
 
@@ -458,5 +463,39 @@ describe("Fallen Shinobi", () => {
     s = passAll(s);
     expect(s.objects[top2[0]!]!.zone).toBe("battlefield");
     expect(s.objects[top2[0]!]!.controller).toBe(ap);
+  });
+});
+
+describe("Oko, Thief of Crowns", () => {
+  it("is supported: +1 makes an artifact a 3/3 green Elk creature with no abilities, for good", () => {
+    expect(isFullySupported(oko)).toBe(true);
+    let { s, ap, opp } = setup([]);
+    const o = putOnBattlefield(s, ap, oko);
+    s.objects[o]!.counters.loyalty = 4;
+    const t = putOnBattlefield(s, opp, treasure);
+    for (const a of planActivate(s, ap, o, 1, [{ kind: "object", id: t }])!) s = act(s, a);
+    s = passAll(s);
+    const ch = characteristics(s, s.objects[t]!);
+    expect(ch.types).toEqual(["Creature"]);
+    expect(ch.subtypes).toEqual(["Elk"]);
+    expect(ch.colors).toEqual(["G"]);
+    expect([power(s, s.objects[t]!), toughness(s, s.objects[t]!)]).toEqual([3, 3]);
+    // Still so on later turns.
+    s = until(s, (x) => x.turn > s.turn && x.step === "main1");
+    expect(characteristics(s, s.objects[t]!).subtypes).toEqual(["Elk"]);
+  });
+
+  it("−5 exchanges control of our artifact and their creature with power 3 or less", () => {
+    let { s, ap, opp } = setup([]);
+    const o = putOnBattlefield(s, ap, oko);
+    s.objects[o]!.counters.loyalty = 6;
+    const mine = putOnBattlefield(s, ap, treasure);
+    const theirs = putOnBattlefield(s, opp, bear());
+    const big = putOnBattlefield(s, opp, card("Big", "Creature — Giant", "{4}", { power: "4", toughness: "4" }));
+    expect(planActivate(s, ap, o, 2, [{ kind: "object", id: mine }, { kind: "object", id: big }])).toBeNull();
+    for (const a of planActivate(s, ap, o, 2, [{ kind: "object", id: mine }, { kind: "object", id: theirs }])!) s = act(s, a);
+    s = passAll(s);
+    expect(controllerOf(s, s.objects[theirs]!)).toBe(ap);
+    expect(controllerOf(s, s.objects[mine]!)).toBe(opp);
   });
 });

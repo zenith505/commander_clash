@@ -1008,3 +1008,29 @@ describe("Valley Rotcaller", () => {
     expect(s.players[ap]!.life).toBe(42);
   });
 });
+
+const hippocamp = card("Wavebreak Hippocamp", "Enchantment Creature — Horse Fish", "{2}{U}", { power: "2", toughness: "2", oracleText: "Whenever you cast your first spell during each opponent's turn, draw a card." });
+const gain1 = card("Small Gain", "Instant", "{W}", { oracleText: "You gain 1 life." });
+
+describe("Wavebreak Hippocamp", () => {
+  it("draws for your first spell during an opponent's turn only", () => {
+    expect(isFullySupported(hippocamp)).toBe(true);
+    const { s: s0, ap, ids } = setup([gain1, gain1, gain1]);
+    putOnBattlefield(s0, ap, hippocamp);
+    s0.players[ap]!.hand = [...ids];
+    const hand = (s: GameState) => s.players[ap]!.hand.length;
+    // Your own turn: nothing.
+    const h0 = hand(s0);
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [], undefined, "auto")));
+    expect(hand(s)).toBe(h0 - 1);
+    const next = s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % 4]!;
+    s = passUntil(passUntil(s, "end"), "upkeep", next);
+    for (let i = 0; i < 4 && waitingOn(s) !== ap; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(waitingOn(s)).toBe(ap);
+    s = settle(run(s, planCast(s, ap, ids[1]!, [], undefined, "auto")));
+    expect(hand(s)).toBe(h0 - 1);
+    for (let i = 0; i < 4 && waitingOn(s) !== ap; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = settle(run(s, planCast(s, ap, ids[2]!, [], undefined, "auto")));
+    expect(hand(s)).toBe(h0 - 2);
+  });
+});

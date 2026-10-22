@@ -1181,6 +1181,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const by = t.cast.by;
         if ((by === "you" && ev.controller !== you) || (by === "opponent" && ev.controller === you) || (by === "enchanted" && o.attachedToPlayer !== ev.controller)) return false;
         if (t.cast.ownTurn && ev.controller !== s.activePlayer) return false;
+        if (t.cast.opponentsTurn && ev.controller === s.activePlayer) return false;
         // Its caster's spells this turn, this one included (it was counted as it was cast).
         if (t.cast.nth && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller && (!t.cast!.nthOfKind || (!!s.cards[c.card] && printedMatches(t.cast!.spell, s.cards[c.card]!)))).length !== t.cast.nth) return false;
         if (t.cast.treasure && !(ev.treasureSpent && !ev.copy)) return false;

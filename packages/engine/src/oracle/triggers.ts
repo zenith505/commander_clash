@@ -378,14 +378,15 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever you cast your second spell each turn", "Whenever an opponent casts their second spell each turn", "...
   // their first noncreature spell each turn" (Esper Sentinel): counting only the spells of that kind they cast this turn.
   // "Whenever a player casts their second spell during their turn" (The Council of Four): only in their own turn.
-  const nth = /^Whenever (you|an opponent|a player) casts? (?:your|their) (first|second) (?:(.+?) )?spell (each turn|during their turn), (.+)$/.exec(line);
+  // "Whenever you cast your first spell during each opponent's turn" (Wavebreak Hippocamp): the first you cast in that turn.
+  const nth = /^Whenever (you|an opponent|a player) casts? (?:your|their) (first|second) (?:(.+?) )?spell (each turn|during their turn|during each opponent's turn), (.+)$/.exec(line);
   if (nth) {
     const parsed = nth[3] ? parseTargetPhrase(`${nth[3]} spell`) : { kind: "spell" as const, text: "spell" };
     const kind = parsed && { ...parsed, text: nth[3] ? `${nth[3]} spell` : "spell" };
     if (kind?.kind !== "spell") return "fail";
-    if (nth[4] === "during their turn" && nth[1] === "you") return "fail";
+    if ((nth[4] === "during their turn" && nth[1] === "you") || (nth[4] === "during each opponent's turn" && nth[1] !== "you")) return "fail";
     const body = parseBody(nth[5]!, { castSpell: true, eventPlayer: true });
-    return body ? { event: "castSpell", cast: { by: CAST_BY[nth[1] as keyof typeof CAST_BY], spell: kind, nth: nth[2] === "first" ? 1 : 2, ...(nth[3] ? { nthOfKind: true as const } : {}), ...(nth[4] === "during their turn" ? { ownTurn: true as const } : {}) }, body } : "fail";
+    return body ? { event: "castSpell", cast: { by: CAST_BY[nth[1] as keyof typeof CAST_BY], spell: kind, nth: nth[2] === "first" ? 1 : 2, ...(nth[3] ? { nthOfKind: true as const } : {}), ...(nth[4] === "during their turn" ? { ownTurn: true as const } : {}), ...(nth[4] === "during each opponent's turn" ? { opponentsTurn: true as const } : {}) }, body } : "fail";
   }
   const m = CAST_TRIGGER.exec(line);
   if (!m) return null;

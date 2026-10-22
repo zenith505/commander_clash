@@ -1141,3 +1141,38 @@ describe("Bloodline Bidding", () => {
     expect(s.objects[elf]!.zone).toBe("graveyard");
   });
 });
+
+const mulch = card("Mulch", "Sorcery", "{1}{G}", { oracleText: "Reveal the top four cards of your library. Put all land cards revealed this way into your hand and the rest into your graveyard." });
+const lairDelve = card("Lair Delve", "Sorcery", "{2}{G}", { oracleText: "Reveal the top two cards of your library. Put all creature and land cards revealed this way into your hand and the rest on the bottom of your library in any order." });
+
+describe("reveal the top cards, put all of a kind into your hand", () => {
+  it("Mulch: every land card to your hand, no choice; the rest into your graveyard", () => {
+    expect(isFullySupported(mulch)).toBe(true);
+    const { s: s0, ap, ids } = setup([mulch]);
+    const top = [putOnBattlefield(s0, ap, island), putOnBattlefield(s0, ap, bear()), putOnBattlefield(s0, ap, island), putOnBattlefield(s0, ap, relic)];
+    for (const id of [...top].reverse()) {
+      moveObject(s0, id, "library");
+      const lib = s0.players[ap]!.library;
+      lib.splice(lib.indexOf(id), 1);
+      lib.unshift(id);
+    }
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [], undefined, "auto")));
+    expect(s.pending ?? undefined).toBeUndefined();
+    expect([top[0], top[2]].every((id) => s.players[ap]!.hand.includes(id!))).toBe(true);
+    expect([top[1], top[3]].map((id) => s.objects[id!]!.zone)).toEqual(["graveyard", "graveyard"]);
+  });
+  it("Lair Delve: creature and land cards to your hand", () => {
+    expect(isFullySupported(lairDelve)).toBe(true);
+    const { s: s0, ap, ids } = setup([lairDelve]);
+    const top = [putOnBattlefield(s0, ap, relic), putOnBattlefield(s0, ap, bear())];
+    for (const id of [...top].reverse()) {
+      moveObject(s0, id, "library");
+      const lib = s0.players[ap]!.library;
+      lib.splice(lib.indexOf(id), 1);
+      lib.unshift(id);
+    }
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [], undefined, "auto")));
+    expect(s.players[ap]!.hand).toContain(top[1]);
+    expect(s.players[ap]!.library.at(-1)).toBe(top[0]);
+  });
+});

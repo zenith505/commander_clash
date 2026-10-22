@@ -1567,6 +1567,22 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si++;
       continue;
     }
+    // "Reveal the top four cards of your library. Put all land cards revealed this way into your hand and the rest into your
+    // graveyard." (Mulch, Wrenn and Seven): every matching card, no choice; the rest where they go (CR 401.4 for "any order").
+    // "Put all creature and land cards revealed this way" (Lair Delve): each that's either. "The top X cards" (Enshrined
+    // Memories): X as it was cast.
+    const revealN = new RegExp(`^Reveal the top ${NUMX} cards of your library$`, "i").exec(s);
+    const putAll = revealN && /^Put all (.+?) cards revealed this way into your hand and the rest (into your graveyard|on the bottom of your library in any order|on the bottom of your library in a random order)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (revealN && putAll) {
+      const filter = parseSearchFilter(`${putAll[1]!.replace(/\band\/or\b|,? and /g, " or ").replace(/  +/g, " ").replace(/ cards\b/g, " card")} card`);
+      const n = revealN[1] === "X" ? X : num(revealN[1]!);
+      if (!filter || (typeof n === "number" && !Number.isInteger(n))) return null;
+      const rest = putAll[2] === "into your graveyard" ? "graveyard" : "bottom";
+      // Every match is taken, however many.
+      effects.push({ type: "dig", n, count: typeof n === "number" ? n : 1000, upTo: false, filter, into: "hand", rest, reveal: true, required: true, ...(/random/.test(putAll[2]!) ? { random: true as const } : {}) });
+      si++;
+      continue;
+    }
     // Teferi's Puzzle Box, Mindmoil (split at ", then" by now): see handToBottomDraw.
     const handDown = /^(?:([Tt]hat player) puts|[Pp]ut) the cards in (?:their|your) hand on the bottom of (?:their|your) library in any order$/.exec(s);
     if (handDown && /^(?:[Tt]hat player )?[Dd]raws? that many cards$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {

@@ -584,8 +584,8 @@ describe("whenever you play a land or cast a spell (Prosper, Infernal Sovereign,
 
 describe("legendary spells (Serah Farron)", () => {
   const serah = scry("transform", [
-    { name: "Serah Farron", mana_cost: "{1}{G}{W}", type_line: "Legendary Creature — Human Citizen", oracle_text: "The first legendary creature spell you cast each turn costs {2} less to cast.\nAt the beginning of combat on your turn, if you control two or more other legendary creatures, you may transform Serah Farron.", power: "2", toughness: "2", colors: ["G", "W"] },
-    { name: "Crystallized Serah", mana_cost: "", type_line: "Legendary Artifact", oracle_text: "The first legendary creature spell you cast each turn costs {2} less to cast.\nLegendary creatures you control get +2/+2.", colors: ["G", "W"] },
+    { name: "Serah Farron", mana_cost: "{1}{G}{W}", type_line: "Legendary Creature — Human Citizen", oracle_text: "The first legendary creature spell you cast each turn costs {2} less to cast.\nAt the beginning of combat on your turn, if you control two or more other legendary creatures, you may transform Serah Farron.", power: "2", toughness: "2" },
+    { name: "Crystallized Serah", mana_cost: "", type_line: "Legendary Artifact", oracle_text: "The first legendary creature spell you cast each turn costs {2} less to cast.\nLegendary creatures you control get +2/+2." },
   ]);
   const legend = (n: number) => card(`Legend ${n}`, "Legendary Creature — Bear", "{3}{G}", { power: "2", toughness: "2" });
   it("the first legendary creature spell costs {2} less, not a nonlegendary one or the second", () => {

@@ -582,7 +582,7 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   const ofChosen = /^creatures (?:that aren't |not )?of the chosen type$/i.test(p);
   if (!all && !whose.test(p) && !bare && !combat && !ofChosen) return null;
   // The kinds come first; plurals become the singular parseTargetPhrase reads ("Elves" -> "Elf").
-  const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of|that attacked this turn|that didn't attack this turn|that entered (?:the battlefield )?this turn)\b/i.exec(p);
+  const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of|that attacked this turn|that dealt combat damage to you this turn|that didn't attack this turn|that entered (?:the battlefield )?this turn)\b/i.exec(p);
   let head = (cut ? p.slice(0, cut.index) : p).trim();
   const tail = cut ? p.slice(cut.index).replace(/^your opponents control/i, "an opponent controls").replace(/ your opponents control/i, " an opponent controls") : "";
   const words = head.replace(/,? and |, or |, /g, " or ").split(/\s+/);
@@ -732,6 +732,12 @@ export function parseTargetPhrase(
   if (entered) {
     extra.enteredThisTurn = true;
     p = p.slice(0, entered.index);
+  }
+  // Witch-king of Angmar: "a creature of their choice that dealt combat damage to you this turn".
+  const dealtYou = / that dealt combat damage to you this turn$/.exec(p);
+  if (dealtYou) {
+    extra.dealtCombatDamageToYou = true;
+    p = p.slice(0, dealtYou.index);
   }
   // "Untap all creatures that attacked this turn" (Relentless Assault), "creatures you control that attacked this turn".
   const attacked = / that attacked this turn$/.exec(p);

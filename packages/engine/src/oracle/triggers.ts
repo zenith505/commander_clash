@@ -1204,6 +1204,12 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
     const body = parseBody(theyAreThatPlayer(step[2]!).replace(/^that player draws (\w+) additional cards?\.$/, "that player draws $1 cards."), { eventPlayer: true });
     return body ? { event, body, enchantedPlayersTurn: true } : "fail";
   }
+  // Witch-king of Angmar: "Whenever one or more creatures deal combat damage to you, ...".
+  const hurt = /^Whenever one or more creatures deal combat damage to you, (.+)$/.exec(line);
+  if (hurt) {
+    const body = parseBody(hurt[1]!);
+    return body ? { event: "creaturesDealCombatDamageToYou", body } : "fail";
+  }
   const attacks = /^Whenever a creature attacks enchanted player, (.+)$/.exec(line);
   if (attacks) {
     const body = parseBody(attacks[1]!.replace(/\bthat creature\b/g, "it"), { subjectIt: true });

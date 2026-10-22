@@ -7408,6 +7408,10 @@ function finishCombatDamage(s: GameState): boolean {
   // "Whenever ~ deals (combat) damage": once per creature, for all it dealt this step (CR 510.2, 603.2c).
   for (const [id, n] of dealt) if (n) fireEvent(s, { type: "dealtDamage", id, amount: n, combat: true });
   for (const g of groups.values()) fireEvent(s, { type: "groupCombatDamage", ...g });
+  // "Whenever one or more creatures deal combat damage to you" (Witch-king of Angmar): each player dealt it by creatures.
+  const toPlayers = new Map<PlayerId, ObjectId[]>();
+  for (const e of done) if (e.dealt && "player" in e.to && e.src.types.includes("Creature")) toPlayers.set(e.to.player, [...(toPlayers.get(e.to.player) ?? []), key(e)]);
+  for (const [player, ids] of toPlayers) fireEvent(s, { type: "creaturesDamagedPlayer", player, ids });
   return false;
 }
 

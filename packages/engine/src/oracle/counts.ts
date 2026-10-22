@@ -4,6 +4,7 @@ import { NUM, num, COUNTER, counterKind, COLOR_WORDS, capital, singularWord } fr
 import { CREATURE_TYPES } from "../keywords";
 import { Ctx, addTarget } from "./body";
 import { parseGroup, parsePlayer, parseTargetPhrase, subtypeClause } from "./targets";
+import { parseSearchFilter } from "./search";
 
 /**
  * A count: "the number of creatures you control", "cards in your hand", "~'s power", "your
@@ -226,6 +227,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Vivid: "the number of colors among permanents you control".
   if (/^colou?rs? among permanents you control$/i.test(p)) return count({ kind: "colorsAmongPermanents" });
   if (/^spells? you've cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn" });
+  // "Instant and sorcery spells you've cast this turn" (Rionya, Fire Dancer): copies aren't cast (CR 707.10).
+  if ((m = /^((?:instant|sorcery|creature|noncreature|artifact|enchantment)(?: (?:and|or) (?:instant|sorcery|creature|artifact|enchantment))?) spells you've cast this turn$/i.exec(p))) {
+    const filter = parseSearchFilter(`${m[1]!.replace(/ and /, " or ")} card`);
+    return filter ? count({ kind: "spellsCastThisTurn", filter }) : null;
+  }
   if ((m = /^the total mana value of (other )?spells you've cast this turn$/i.exec(p))) return count({ kind: "manaValueCastThisTurn", ...(m[1] ? { other: true as const } : {}) });
   // "For each creature it devoured" (CR 702.82b): only the permanent's own abilities know what it devoured.
   if (/^creatures? (?:it|~) devoured$/i.test(p) && (ctx === null || ctx.selfIt)) return count({ kind: "devoured" });

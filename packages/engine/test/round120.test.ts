@@ -6,7 +6,7 @@ import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
 import { abilityProblem, attackProblem, botActions, castProblem, isFullySupported, potentialAttackers, planActivate, planCast, power, spellCost, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 import { controllerOf, invalidateCharacteristics } from "../src/layers";
 import { moveObject } from "../src/game";
-import { defOf } from "../src/cards";
+import { defOf, objHasKeyword } from "../src/cards";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const settle = (s: GameState, yes = true) => {
@@ -575,5 +575,41 @@ describe("more popular cards", () => {
     s.players[opp]!.turnBegan = s.turn - 1;
     s.players[opp]!.attackedInTurn = { turn: s.turn - 5, players: [ap] };
     expect(attackProblem(s, s.objects[w]!, opp)).toMatch(/defender/);
+  });
+  it("Rionya makes one plus the number of instant and sorcery spells you've cast this turn hasty token copies, exiled at end step", () => {
+    const rionya = card("Rionya, Fire Dancer", "Legendary Creature — Human Wizard", "{3}{R}{R}", { power: "3", toughness: "4", oracleText: "At the beginning of combat on your turn, create X tokens that are copies of another target creature you control, where X is one plus the number of instant and sorcery spells you've cast this turn. They gain haste. Exile them at the beginning of the next end step." });
+    supported(rionya);
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, rionya);
+    const b = putOnBattlefield(s0, ap, bear());
+    const sorcery = putOnBattlefield(s0, ap, divination);
+    moveObject(s0, sorcery, "graveyard");
+    const creature = s0.cards[s0.objects[b]!.cardId]!.oracleId;
+    s0.castThisTurn = [{ player: ap, card: s0.cards[s0.objects[sorcery]!.cardId]!.oracleId }, { player: ap, card: creature }];
+    let s = passUntil(s0, "beginCombat", ap);
+    for (let i = 0; i < 10 && s.pending?.kind !== "chooseTargets" && (s.stack.length || s.triggerQueue.length); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: b }] });
+    s = passToStack(s);
+    const tokens = s.battlefield.filter((id) => s.objects[id]!.isToken && s.cards[s.objects[id]!.cardId]!.name === s.cards[s.objects[b]!.cardId]!.name);
+    expect(tokens.length).toBe(2);
+    for (const id of tokens) expect(objHasKeyword(s, s.objects[id]!, "Haste")).toBe(true);
+    s = settle(passUntil(s, "end", ap));
+    expect(tokens.every((id) => !s.battlefield.includes(id))).toBe(true);
+  });
+  it("Witch-king of Angmar: each opponent sacrifices a creature that dealt you combat damage this turn, then the Ring tempts you", () => {
+    const witch = card("Witch-king of Angmar", "Legendary Creature — Wraith Noble", "{3}{B}{B}", { power: "5", toughness: "3", keywords: ["Flying"], oracleText: "Flying\nWhenever one or more creatures deal combat damage to you, each opponent sacrifices a creature of their choice that dealt combat damage to you this turn. The Ring tempts you.\nDiscard a card: Witch-king of Angmar gains indestructible until end of turn. Tap him." });
+    supported(witch);
+    const { s: s0, ap, opp } = setup([]);
+    const w = putOnBattlefield(s0, ap, witch);
+    s0.objects[w]!.tapped = true; // it doesn't block
+    const hitter = putOnBattlefield(s0, opp, bear({ name: "Hitter" }));
+    const stayer = putOnBattlefield(s0, opp, bear({ name: "Stayer" }));
+    let s = passUntil(s0, "declareAttackers", opp);
+    for (let i = 0; i < 5 && s.pending?.kind !== "declareAttackers"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = act(s, { type: "declareAttackers", player: opp, attacks: [{ attacker: hitter, defender: ap }] });
+    s = settle(passUntil(s, "endCombat", opp));
+    expect(s.objects[hitter]!.zone).toBe("graveyard");
+    expect(s.objects[stayer]!.zone).toBe("battlefield");
+    expect(s.players[ap]!.ring?.tempted).toBe(1);
   });
 });

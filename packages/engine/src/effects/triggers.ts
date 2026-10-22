@@ -180,6 +180,8 @@ export type TriggerSourceEvent =
   | { type: "groupAttack"; controller: PlayerId; ids: ObjectId[] }
   /** In one combat damage step, these creatures of `controller` dealt `player` combat damage. */
   | { type: "groupCombatDamage"; controller: PlayerId; player: PlayerId; ids: ObjectId[]; amounts: number[]; /** Dealt to this battle, `player` its protector (CR 310). */ battle?: ObjectId }
+  /** Creatures dealt combat damage to this player in one combat damage step, whoever controls them (Witch-king of Angmar). */
+  | { type: "creaturesDamagedPlayer"; player: PlayerId; ids: ObjectId[] }
   /** The last counter of a kind was removed from it (vanishing's time counters, CR 702.63a). */
   | { type: "lastCounterRemoved"; id: ObjectId; counter: string }
   /** A face-down permanent was turned face up (CR 702.37e, 708.8). */
@@ -977,6 +979,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (aura.attachedToPlayer === o.attacking) add(aura, controllerOf(s, aura), (e) => e === "creatureAttacksEnchantedPlayer", undefined, undefined, o);
       }
     causedBy = null;
+  } else if (ev.type === "creaturesDamagedPlayer") {
+    // "Whenever one or more creatures deal combat damage to you": once for the step's combat damage (CR 510.2, 603.2c).
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "creaturesDealCombatDamageToYou");
+    }
   } else if (ev.type === "groupAttack" || ev.type === "groupCombatDamage") {
     const want = ev.type === "groupAttack" ? "creaturesYouControlAttack" : "creaturesYouControlDealCombatDamageToPlayer";
     causedBy = { event: ev.type === "groupAttack" ? "attacks" : "combatDamage", objs: ev.ids.filter((x) => s.objects[x]).map((x) => ({ o: obj(s, x), controller: ev.controller })) };

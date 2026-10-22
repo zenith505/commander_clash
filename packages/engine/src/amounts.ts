@@ -457,7 +457,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return best;
     }
     case "spellsCastThisTurn":
-      return (s.castThisTurn ?? []).filter((x) => x.player === ctx.controller).length;
+      return (s.castThisTurn ?? []).filter((x) => x.player === ctx.controller && (!c.filter || (!!s.cards[x.card] && printedMatches(c.filter, s.cards[x.card]!)))).length;
     case "manaValueCastThisTurn": {
       // The resolving spell's own cast is its castNth'th; a copy wasn't cast, so it has none (CR 707.10).
       const self = c.other && s.resolving?.item.kind === "spell" ? s.resolving.item.castNth : undefined;
@@ -636,7 +636,7 @@ function describeCount(c: Count): string {
     case "colorsAmongPermanents":
       return "#colors among your permanents";
     case "spellsCastThisTurn":
-      return "#spells you've cast this turn";
+      return `#${c.filter ? `${c.filter.text.replace(/ card$/, "")} ` : ""}spells you've cast this turn`;
     case "graveyardCardTypes":
       return "#card types in graveyards";
     case "greatestPower":

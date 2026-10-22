@@ -192,7 +192,8 @@ export type Count =
   /** Vivid: "the number of colors among permanents you control" (white, blue, black, red, green; colorless isn't one, CR 105.2c). */
   | { kind: "colorsAmongPermanents" }
   /** "For each spell you've cast this turn" (Aetherflux Reservoir): the spells its controller cast this turn, copies not (CR 707.10). */
-  | { kind: "spellsCastThisTurn" }
+  /** `filter`: "the number of instant and sorcery spells you've cast this turn" (Rionya), by the cards cast. */
+  | { kind: "spellsCastThisTurn"; filter?: TargetSpec }
   /** "The total mana value of other spells you've cast this turn" (Call Forth the Tempest): each as it was cast (CR 202.3e); `other`: not the resolving spell itself. */
   | { kind: "manaValueCastThisTurn"; other?: true }
   /** "The number of card types among cards in all graveyards" (Tarmogoyf): card types only, not subtypes or supertypes (CR 205.2a). */
@@ -407,6 +408,11 @@ export interface TargetSpec {
   };
   /** "Another target creature" on a permanent's ability: not the source itself. */
   notSource?: boolean;
+  /**
+   * "A creature of their choice that dealt combat damage to you this turn" (Witch-king of Angmar): "you" being the resolving
+   * ability's controller, whoever picks it (turnLog.combatDamagedBy, this object as it was then).
+   */
+  dealtCombatDamageToYou?: true;
   /** "Enchanted creature deals damage ... to any other target" (Pain for All): not the permanent the source is attached to. */
   notSourceHost?: true;
   /**
@@ -3167,6 +3173,8 @@ export type TriggerEvent =
   | "creaturesYouControlAttack"
   /** "Whenever one or more creatures you control deal combat damage to a player": once per player dealt damage. */
   | "creaturesYouControlDealCombatDamageToPlayer"
+  /** "Whenever one or more creatures deal combat damage to you" (Witch-king of Angmar). */
+  | "creaturesDealCombatDamageToYou"
   /** "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix): see `spellDamage`; once for each one dealt damage. */
   | "spellYouControlDealsDamage"
   /**

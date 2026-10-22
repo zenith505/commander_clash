@@ -1176,3 +1176,24 @@ describe("reveal the top cards, put all of a kind into your hand", () => {
     expect(s.players[ap]!.library.at(-1)).toBe(top[0]);
   });
 });
+
+const wrennAndSeven = card("Wrenn and Seven", "Legendary Planeswalker — Wrenn", "{3}{G}{G}", {
+  loyalty: "5",
+  oracleText:
+    '+1: Reveal the top four cards of your library. Put all land cards revealed this way into your hand and the rest into your graveyard.\n0: Put any number of land cards from your hand onto the battlefield tapped.\n−3: Create a green Treefolk creature token with reach and "This token\'s power and toughness are each equal to the number of lands you control."\n−8: Return all permanent cards from your graveyard to your hand. You get an emblem with "You have no maximum hand size."',
+});
+
+describe("Wrenn and Seven", () => {
+  it("−3: a Treefolk with reach, as big as the lands you control", () => {
+    expect(isFullySupported(wrennAndSeven)).toBe(true);
+    const { s: s0, ap } = setup([]);
+    const w = putOnBattlefield(s0, ap, wrennAndSeven);
+    s0.objects[w]!.counters = { loyalty: 5 };
+    const s = settle(run(s0, planActivate(s0, ap, w, 2)));
+    const tree = Object.values(s.objects).find((o) => o.zone === "battlefield" && /^Treefolk/.test(s.cards[o.cardId]?.name ?? ""))!;
+    expect(tree).toBeDefined();
+    expect(objHasKeyword(s, tree, "Reach")).toBe(true);
+    const lands = s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === ap && objIsType(s, s.objects[id]!, "Land")).length;
+    expect([power(s, tree), toughness(s, tree)]).toEqual([lands, lands]);
+  });
+});

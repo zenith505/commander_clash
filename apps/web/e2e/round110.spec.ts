@@ -1,7 +1,8 @@
 // Round 110's prompts: The Great Work's chapter III lets you cast an instant from an opponent's graveyard (their
 // graveyard shows it as playable; it's exiled instead of going to a graveyard), and Abundance's "Reveal until a land /
 // nonland card" buttons on each draw, with the other revealed cards ordered on the bottom of your library, and more;
-// Halo Fountain's "Untap a tapped creature you control" also offers a mana creature that's tapped for the {W} first.
+// Halo Fountain's "Untap a tapped creature you control" also offers a mana creature that's tapped for the {W} first;
+// Muldrotha's permissions each come with the card's alternative costs (a prototype).
 import { expect, test } from "@playwright/test";
 import { type GameState } from "@cc/engine";
 import { LANDS, idsOf, one, open, pageErrors, playWithBots, scene } from "./scene";
@@ -121,5 +122,21 @@ test("Halo Fountain: click the untapped Avacyn's Pilgrim; it's tapped for the {W
   const after = await resolveUntil(page, (st) => st.stack.length === 0 && st.battlefield.some((id) => st.objects[id]!.isToken));
   expect(after.objects[pilgrim]!.tapped).toBe(false);
   expect(after.objects[fountain]!.tapped).toBe(true);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Muldrotha: cast Phyrexian Fleshgorger prototyped from the graveyard with the creature permission", async ({ page }) => {
+  const s = scene({ board: [...LANDS, "Muldrotha, the Gravetide"], yard: ["Phyrexian Fleshgorger"] });
+  const gorger = one(s, "Phyrexian Fleshgorger");
+  await open(page, s);
+  await page.locator('[data-graveyard="0"]').click();
+  await modal(page).locator(".card.playable", { hasText: "Phyrexian Fleshgorger" }).click();
+  // Artifact or creature, each for its mana cost or prototyped.
+  await expect(menu(page).locator("[data-permit]")).toHaveCount(4);
+  await expect(menu(page).locator('[data-alt="prototype"]')).toHaveCount(2);
+  await menu(page).getByRole("button", { name: /^Cast from graveyard with Muldrotha, the Gravetide \(creature\): Prototype/ }).click();
+  const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && st.objects[gorger]!.zone === "battlefield");
+  expect(after.objects[gorger]!.prototyped).toBe(true);
+  expect(after.turnLog?.gravePermits).toEqual([expect.stringMatching(/:Creature$/)]);
   expect(pageErrors(page)).toEqual([]);
 });

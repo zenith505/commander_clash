@@ -3924,15 +3924,28 @@ function AbilityMenu({
       {inYard &&
         graveyardWays(s, o, HUMAN).flatMap((g) => {
           // Muldrotha: an artifact creature can use the artifact or the creature permission, the player's choice (rulings).
+          // Each with the card's alternative costs too, which the permission doesn't rule out (rulings on Muldrotha).
           if (g.kind === "turnPermission" && (g.permits?.length ?? 0) > 1)
-            return g.permits!.map((permit) => {
+            return g.permits!.flatMap((permit) => {
               const problem = castProblem(s, HUMAN, objectId, undefined, undefined, undefined, undefined, undefined, { via: g.kind, permit });
               const ok = !problem || (/not enough mana/.test(problem) && planCast(s, HUMAN, objectId, undefined, undefined, "auto", undefined, { via: g.kind, permit }) !== null);
-              return (
+              const altOk = (alt: AltCostKind) => {
+                const p = castProblem(s, HUMAN, objectId, undefined, undefined, undefined, undefined, undefined, { via: g.kind, permit, alt });
+                return !p || (/not enough mana/.test(p) && planCast(s, HUMAN, objectId, undefined, undefined, "auto", undefined, { via: g.kind, permit, alt }) !== null);
+              };
+              return [
                 <button key={`permit-${permit}`} data-permit={permit} disabled={!ok} title={problem ?? ""} onClick={() => onCastVia(g.kind, undefined, permit)}>
                   Cast from graveyard with {permitLabel(s, permit)} <ManaCost cost={g.mana ?? d.manaCost} size="sm" />
-                </button>
-              );
+                </button>,
+                ...altCostsFor(s, HUMAN, o)
+                  .filter((a) => altOk(a.kind))
+                  .map((a) => (
+                    <button key={`permit-${permit}-${a.kind}`} data-permit={permit} data-alt={a.kind} title={ALT_NOTES[a.kind]} onClick={() => onCastVia(g.kind, undefined, permit, a.kind)}>
+                      Cast from graveyard with {permitLabel(s, permit)}: {a.text && !a.mana ? a.text : <>{ALT_NAMES[a.kind]} <ManaCost cost={a.mana} size="sm" /></>}
+                      {a.text && a.mana ? ` and ${a.text}` : ""}
+                    </button>
+                  )),
+              ];
             });
           const ok = canCastFromGraveyard(s, objectId, g.kind, g.face);
           const problem = ok ? "" : (castProblem(s, HUMAN, objectId, undefined, undefined, undefined, undefined, undefined, { via: g.kind, face: g.face }) ?? "");

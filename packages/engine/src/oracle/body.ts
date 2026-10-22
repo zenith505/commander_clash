@@ -2696,6 +2696,24 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si++;
       continue;
     }
+    // Gonti, Lord of Luxury: "Look at the top four cards of target opponent's library, exile one of them face down, then
+    // put the rest on the bottom of that library in a random order. You may cast that card for as long as it remains
+    // exiled, and mana of any type can be spent to cast that spell." Cast only (no land play), with its usual timing and
+    // costs (rulings).
+    const gonti = new RegExp(`^[Ll]ook at the top ${NUMX} cards of (target opponent's|target player's) library, exile one of them face down(?:, then put| and put)? ?(?:the rest on the bottom of that library in a random order)?$`).exec(s);
+    if (gonti) {
+      let k = si + 1;
+      if (!/the rest on the bottom/.test(s)) {
+        if (!/^(?:Then )?[Pp]ut the rest on the bottom of that library in a random order$/.test(sentences[k] ?? "")) return null;
+        k++;
+      }
+      if ((sentences[k] ?? "").replace(/\.$/, "") !== "You may cast that card for as long as it remains exiled, and mana of any type can be spent to cast that spell") return null;
+      const who = parsePlayer(gonti[2]!.replace(/'s$/, ""), ctx);
+      if (!who) return null;
+      effects.push({ type: "hideaway", n: num(gonti[1]!), from: who, castAnyType: true });
+      si = k;
+      continue;
+    }
     // Akiri, Fearless Voyager: "You may unattach an Equipment from a creature you control. If you do, tap that creature
     // and it gains indestructible until end of turn." The Equipment is chosen as it resolves (rulings), whoever controls
     // it; "that creature" is the one it was attached to (run as a pick, the creature becoming "it").

@@ -85,6 +85,13 @@ const pearlEar = card("Pearl-Ear, Imperial Advisor", "Legendary Creature — Fox
     "Lifelink\nEnchantment spells you cast have affinity for Auras. (They cost {1} less to cast for each Aura you control.)\nWhenever you cast an Aura spell that targets a modified permanent you control, draw a card. (Equipment, Auras you control, and counters are modifications.)",
 });
 const pacifism = card("Pacifism", "Enchantment — Aura", "{1}{W}", { oracleText: "Enchant creature\nEnchanted creature can't attack or block." });
+const gonti = card("Gonti, Lord of Luxury", "Legendary Creature — Aetherborn Rogue", "{2}{B}{B}", {
+  power: "2",
+  toughness: "3",
+  keywords: ["Deathtouch"],
+  oracleText:
+    "Deathtouch\nWhen Gonti enters, look at the top four cards of target opponent's library, exile one of them face down, then put the rest on the bottom of that library in a random order. You may cast that card for as long as it remains exiled, and mana of any type can be spent to cast that spell.",
+});
 const treasure = card("Treasure", "Token Artifact — Treasure", "", { oracleText: "{T}, Sacrifice this token: Add one mana of any color." });
 
 /** Pass along, answering every pending choice the dull way, until `stop` holds. */
@@ -391,5 +398,35 @@ describe("Pearl-Ear, Imperial Advisor", () => {
     const after = [spellCost(s, ap, s.objects[ids[0]!]!), spellCost(s, ap, s.objects[ids[1]!]!)];
     expect(before[0]!.extra - after[0]!.extra).toBe(2);
     expect(before[1]!.extra - after[1]!.extra).toBe(0);
+  });
+});
+
+describe("Gonti, Lord of Luxury", () => {
+  it("is supported: one of the opponent's top four exiled face down, castable by Gonti's controller with any mana", () => {
+    expect(isFullySupported(gonti)).toBe(true);
+    let { s, ap, ids, opp } = setup([gonti]);
+    putOnBattlefield(s, ap, card("Swamp", "Basic Land — Swamp"));
+    const lib = s.players[opp]!.library;
+    const i = lib.findIndex((id) => s.cards[s.objects[id]!.cardId]!.name === "Grizzly Bears");
+    lib.unshift(...lib.splice(i, 1));
+    const top4 = lib.slice(0, 4);
+    for (const a of planCast(s, ap, ids[0]!)!) s = act(s, a);
+    s = until(s, (x) => x.pending?.kind === "chooseTargets");
+    s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] } as never);
+    s = until(s, (x) => x.pending?.kind === "searchLibrary");
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap, cards: top4 });
+    s = act(s, { type: "searchLibrary", player: ap, found: [top4[0]!] });
+    const b = top4[0]!;
+    expect(s.objects[b]!.zone).toBe("exile");
+    expect(s.objects[b]!.hiddenExile?.seen).toEqual([ap]);
+    // The rest went to the bottom.
+    expect(s.players[opp]!.library.slice(-3).sort()).toEqual(top4.slice(1).sort());
+    s = until(s, (x) => x.stack.length === 0);
+    // Cast with mana of any type: only Islands and Plains left untapped would do too.
+    for (const id of s.battlefield) if (s.objects[id]!.controller === ap && /Forest|Swamp|Mountain/.test(s.cards[s.objects[id]!.cardId]!.name)) s.objects[id]!.tapped = true;
+    for (const a of planCast(s, ap, b)!) s = act(s, a);
+    s = passAll(s);
+    expect(s.objects[b]!.zone).toBe("battlefield");
+    expect(s.objects[b]!.controller).toBe(ap);
   });
 });

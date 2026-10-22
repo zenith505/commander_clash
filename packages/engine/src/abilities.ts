@@ -1406,7 +1406,13 @@ export type Effect =
    * Hideaway N (CR 702.75a): look at the top N cards of your library, exile one of them face down (linked to this
    * permanent, CR 607.2a), and put the rest on the bottom of your library in a random order.
    */
-  | { type: "hideaway"; n: number }
+  /**
+   * Hideaway (CR 702.75a), or Gonti, Lord of Luxury's "look at the top four cards of target opponent's library, exile one
+   * of them face down, then put the rest on the bottom of that library in a random order. You may cast that card for as
+   * long as it remains exiled, and mana of any type can be spent to cast that spell": `from` that player's library, and
+   * `castAnyType` the permission (CR 609.4b).
+   */
+  | { type: "hideaway"; n: number; from?: PlayerRef; castAnyType?: true }
   /**
    * "You may play the exiled card without paying its mana cost": the card this permanent's hideaway exiled, as this
    * resolves. A land only on your turn with a land play left (CR 305.2-3, rulings on Evercoat Ursine).

@@ -680,3 +680,38 @@ describe("more of the most played: Ascend from Avernus, Urabrask's Forge, Karn, 
     expect(one((s, ap) => void putOnBattlefield(s, ap, dragon))).toBe(false);
   });
 });
+
+describe("cards the new templates also cover", () => {
+  const shredder = card("The Cloning of Shredder", "Enchantment — Saga", "{3}{B}", {
+    oracleText:
+      "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI — Exile target creature card from your graveyard. Create a token that's a copy of it, except it isn't legendary and is a Mutant in addition to its other types.\nII, III — Create a token that's a copy of a card exiled with this Saga, except it isn't legendary and is a Mutant in addition to its other types.",
+  });
+  const smelter = card("Hoard-Smelter Dragon", "Creature — Dragon", "{4}{R}{R}", { power: "5", toughness: "5", keywords: ["Flying"], oracleText: "Flying\n{3}{R}: Destroy target artifact. This creature gets +X/+0 until end of turn, where X is that artifact's mana value." });
+  const rock = card("Mind Stone", "Artifact", "{2}", { oracleText: "{T}: Add {C}." });
+
+  it("The Cloning of Shredder: chapter I's exile is linked, so chapter II copies that card", () => {
+    expect(isFullySupported(shredder)).toBe(true);
+    const { s: s0, ap, ids } = setup([shredder]);
+    const b = toHand(s0, ap, bear());
+    moveObject(s0, b, "graveyard");
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    s = settle(s);
+    if (s.pending?.kind === "chooseTargets") s = settle(act(s, { type: "chooseTargets", player: ap, targets: [target(b)] }));
+    expect(s.objects[b]!.zone).toBe("exile");
+    const tokens = (t: GameState) => t.battlefield.filter((id) => t.objects[id]!.isToken && t.objects[id]!.controller === ap);
+    expect(tokens(s)).toHaveLength(1);
+    s = settle(passUntil(s, "main1", s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % 4]!));
+    s = settle(passUntil(s, "main1", ap));
+    expect(tokens(s)).toHaveLength(2);
+    expect(characteristics(s, s.objects[tokens(s)[1]!]!).subtypes).toEqual(expect.arrayContaining(["Bear", "Mutant"]));
+  });
+
+  it("Hoard-Smelter Dragon: +X/+0 for the destroyed artifact's mana value", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const d = putOnBattlefield(s0, ap, smelter);
+    const r = putOnBattlefield(s0, opp, rock);
+    const s = settle(run(s0, planActivate(s0, ap, d, 0, [target(r)])));
+    expect(s.objects[r]!.zone).toBe("graveyard");
+    expect(pt(s, d)).toBe("7/5");
+  });
+});

@@ -696,3 +696,37 @@ describe("instant and sorcery spells you cast have storm (CR 702.40a)", () => {
     expect(twice(s, ap, ids)).toBe(8);
   });
 });
+
+describe("Brainstealer Dragon", () => {
+  const dragon = card("Brainstealer Dragon", "Creature — Dragon Horror", "{5}{B}{B}", {
+    power: "6",
+    toughness: "6",
+    keywords: ["Flying"],
+    oracleText:
+      "Flying\nAt the beginning of your end step, exile the top card of each opponent's library. You may play those cards for as long as they remain exiled. If you cast a spell this way, you may spend mana as though it were mana of any color to cast it.\nWhenever a nonland permanent an opponent owns enters the battlefield under your control, they lose life equal to its mana value.",
+  });
+  const viper = card("Ambush Viper", "Creature — Snake", "{1}{G}", { power: "2", toughness: "1", keywords: ["Flash", "Deathtouch"], oracleText: "Flash\nDeathtouch" });
+
+  it("plays", () => {
+    expect(isFullySupported(dragon)).toBe(true);
+    expect(isFullySupported(card("Stolen Strategy", "Enchantment", "{4}{R}", { oracleText: "At the beginning of your upkeep, exile the top card of each opponent's library. Until end of turn, you may cast spells from among those exiled cards, and you may spend mana as though it were mana of any color to cast those spells." }))).toBe(true);
+  });
+
+  it("exiles each opponent's top card at your end step; you cast an opponent's Viper with Islands, and its owner loses 2 life", () => {
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, dragon);
+    for (let i = 0; i < 2; i++) putOnBattlefield(s0, ap, card("Island", "Basic Land — Island"));
+    const v = putOnBattlefield(s0, opp, viper);
+    moveObject(s0, v, "library");
+    s0.players[opp]!.library = [v, ...s0.players[opp]!.library.filter((x) => x !== v)];
+    const others = s0.turnOrder.filter((p) => p !== ap).map((p) => s0.players[p]!.library[0]!);
+    let s = settle(passUntil(s0, "end", ap));
+    for (const id of others) expect(s.objects[id]).toMatchObject({ zone: "exile", mayPlay: { player: ap, until: "exiled", anyType: true } });
+    expect(s.players[ap]!.library.length).toBe(s0.players[ap]!.library.length); // not your own
+    const life = s.players[opp]!.life;
+    s = settle(run(s, planCast(s, ap, v)));
+    expect(s.objects[v]).toMatchObject({ zone: "battlefield", owner: opp });
+    expect(characteristics(s, s.objects[v]!).controller).toBe(ap);
+    expect(s.players[opp]!.life).toBe(life - 2);
+  });
+});

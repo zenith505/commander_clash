@@ -155,6 +155,8 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (x === "its owner" && ctx.lastObjectTarget === lastCard && ctx.targets[lastCard]?.kind === "object" && !ctx.targets[lastCard]!.many) return { ref: "targetOwner", index: lastCard };
   // "Destroy target land. ~ deals 2 damage to that land's controller" (Melt Terrain): as it last existed (CR 608.2h).
   if (x === "that land's controller" && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && isLandSpec(ctx.targets[ctx.lastObjectTarget]!)) return { ref: "targetController", index: ctx.lastObjectTarget };
+  // "Its owner loses life equal to its mana value" (Brainstealer Dragon): whose the entering permanent is.
+  if (x === "its owner" && ctx.lastObjectTarget === undefined && ctx.subjectIt && !ctx.targets.length) return { ref: "subjectOwner" };
   if (x === "its controller" || x === "that creature's controller" || x === "that permanent's controller") {
     const i = ctx.lastObjectTarget;
     if (i === undefined && ctx.subjectIt) return { ref: "subjectController" };
@@ -802,9 +804,10 @@ export function parseTargetPhrase(
     p = p.replace(/ you own$/, "");
   }
   // "Permanents you don't own" (Agent of Treachery): another player's, whoever controls it (CR 108.3).
-  if (!inGraveyard && / you don't own$/.test(p)) {
+  // "A nonland permanent an opponent owns" (Brainstealer Dragon): every other player is an opponent (CR 102.2).
+  if (!inGraveyard && / (?:you don't|an opponent) owns?$/.test(p)) {
     owner = "opponent";
-    p = p.replace(/ you don't own$/, "");
+    p = p.replace(/ (?:you don't|an opponent) owns?$/, "");
   }
   if (/ (an opponent controls|you don't control)$/.test(p)) {
     controller = "opponent";

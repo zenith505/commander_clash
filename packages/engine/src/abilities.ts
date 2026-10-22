@@ -662,6 +662,7 @@ export type ObjRef =
 export type PlayerRef =
   | { ref: "you" }
   | { ref: "subjectController" } // the controller of the object the trigger was about, or as it last existed
+  | { ref: "subjectOwner" } // "its owner": whose the object the trigger was about is (CR 108.3)
   /** `n`: "any number of target players" covers the targets from `index` on (TargetSpec.many). */
   | { ref: "target"; index: number; n?: number }
   | { ref: "eachOpponent" }

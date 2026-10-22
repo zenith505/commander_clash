@@ -1416,6 +1416,24 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si += 2;
       continue;
     }
+    // Brainstealer Dragon: "Exile the top card of each opponent's library. You may play those cards for as long as they
+    // remain exiled. If you cast a spell this way, you may spend mana as though it were mana of any color to cast it."
+    // Stolen Strategy: "... Until end of turn, you may cast spells from among those exiled cards, and you may spend mana as
+    // though it were mana of any color to cast those spells." Face up (CR 406.3), each card's permission its own (CR 400.7),
+    // mana of any type for a spell (CR 609.4b).
+    if (/^[Ee]xile the top card of each opponent's library$/.test(s)) {
+      const next = (k: number) => sentences[si + k]?.replace(/\.$/, "") ?? "";
+      if (next(1) === "You may play those cards for as long as they remain exiled" && next(2) === "If you cast a spell this way, you may spend mana as though it were mana of any color to cast it") {
+        effects.push({ type: "impulse", n: 1, until: "exiled", who: { ref: "eachOpponent" }, anyType: true });
+        si += 2;
+        continue;
+      }
+      if (next(1) === "Until end of turn, you may cast spells from among those exiled cards, and you may spend mana as though it were mana of any color to cast those spells") {
+        effects.push({ type: "impulse", n: 1, until: "thisTurn", who: { ref: "eachOpponent" }, castOnly: true, anyType: true });
+        si++;
+        continue;
+      }
+    }
     // Grenzo, Havoc Raiser: "... and you may spend mana as though it were mana of any color to cast that spell" (CR 609.4b).
     if (theirTop) {
       effects.push({ type: "impulse", n: 1, until: "thisTurn", who: { ref: "eventPlayer" }, castOnly: true, ...(theirTop[1] ? { anyType: true as const } : {}) });

@@ -467,14 +467,20 @@ function parseEntersTrigger(line: string): TriggeredAbility | "fail" | null {
   const m = ENTERS_TRIGGER.exec(line);
   if (!m) return null;
   let phrase = m[2]!;
-  if (m[3]) phrase += m[3] === " under your control" ? " you control" : " an opponent controls";
+  // "A nonland permanent an opponent owns enters under your control" (Brainstealer Dragon): owned by another player, under
+  // your control (CR 108.3).
+  const owned = m[3] === " under your control" && / (?:an opponent|you don't) owns?$/.test(phrase);
+  if (m[3] && !owned) phrase += m[3] === " under your control" ? " you control" : " an opponent controls";
   const ench = ENCHANTED_CONTROLS.test(phrase);
-  const filter = ench ? enchantedControls(phrase) : parseTargetPhrase(phrase, { chosen: true });
+  const parsed = ench ? enchantedControls(phrase) : parseTargetPhrase(phrase, { chosen: true });
+  const filter = owned && parsed?.kind === "object" && !parsed.controller && parsed.owner === "opponent" ? { ...parsed, controller: "you" as const } : owned ? null : parsed;
   if (!filter || filter.kind !== "object" || (filter.chosen && filter.chosen !== "type")) return "fail";
   // "That land's controller" (Zo-Zu), and "that player" after "a creature an opponent controls" (Suture Priest): the
   // entering permanent's controller.
   let bodyText = ench ? m[4]!.replace(/\bthat player\b/g, "enchanted player") : m[4]!.replace(/\bthat (?:land|artifact|creature|permanent|enchantment)'s controller\b/g, "its controller");
   if (!ench && filter.controller === "opponent") bodyText = bodyText.replace(/\bthat player\b/g, "its controller");
+  // "They lose life equal to its mana value" after "a nonland permanent an opponent owns" (Brainstealer Dragon): its owner.
+  if (owned) bodyText = bodyText.replace(/^they lose\b/, "its owner loses");
   const body = parseBody(bodyText, { subjectIt: true });
   if (!body) return "fail";
   const kind = m[1]!.toLowerCase();

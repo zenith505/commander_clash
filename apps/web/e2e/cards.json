@@ -6919,6 +6919,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0ba134d8-ee7d-48ec-8dc6-57942b8e9261",
+  "name": "Liliana of the Veil",
+  "manaCost": "{1}{B}{B}",
+  "cmc": 3,
+  "typeLine": "Legendary Planeswalker — Liliana",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Liliana"
+  ],
+  "oracleText": "+1: Each player discards a card.\n−2: Target player sacrifices a creature.\n−6: Separate all permanents target player controls into two piles. That player sacrifices all permanents in the pile of their choice.",
+  "loyalty": "3",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dmu",
+  "releasedAt": "2022-09-09",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3f8e7a45-4c6e-4ee6-93d0-b7de9715ec97",
   "name": "Lim-Dûl's Vault",
   "manaCost": "{U}{B}",

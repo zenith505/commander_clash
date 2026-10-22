@@ -2057,6 +2057,36 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       return;
     }
+    case "permanentPiles": {
+      // CR 700.3: you separate every permanent the player controls into two piles (one can be empty, and an Aura can go
+      // in a different pile from what it enchants: rulings); that player chooses one, and all of it is sacrificed at once.
+      const sc = (s.resolving!.scratch ??= {});
+      const pid = players(s, e.who, ctx)[0];
+      if (pid === undefined) return;
+      if (!sc.looked) {
+        sc.looked = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid);
+        if (!sc.looked.length) return;
+        sc.queue = [ctx.controller];
+        sc.chosen = {};
+        s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "pile", what: "permanent", options: sc.looked, count: sc.looked.length, min: 0, anyNumber: true, of: pid };
+        return "paused";
+      }
+      const names = (ids: ObjectId[]) => (ids.length ? ids.map((id) => defOf(s, obj(s, id)).name).join(", ") : "no permanents");
+      const one = sc.chosen?.[ctx.controller] ?? [];
+      const two = sc.looked.filter((id) => !one.includes(id));
+      if (sc.pileChoice === undefined) {
+        log(s, `${player(s, ctx.controller).name} separates ${player(s, pid).name}'s permanents into two piles: ${names(one)}; and ${names(two)}.`);
+        s.pending = { kind: "chooseOption", player: pid, source: src, what: "pile", options: ["0", "1"], labels: [`Pile 1: ${names(one)}`, `Pile 2: ${names(two)}`], piles: [one, two], of: pid, sacrificePile: true, prompt: "choose the pile of your permanents to sacrifice" };
+        return "paused";
+      }
+      for (const id of sc.pileChoice === 0 ? one : two) {
+        const o = s.objects[id];
+        if (o?.zone !== "battlefield" || controllerOf(s, o) !== pid || !canBeSacrificed(s, o)) continue;
+        log(s, `${player(s, pid).name} sacrifices ${defOf(s, o).name}.`);
+        moveObject(s, id, "graveyard", { sacrificed: true });
+      }
+      return;
+    }
     case "returnHeld": {
       const sc = (s.resolving!.scratch ??= {});
       const list = sc.returningHeld ?? (s.resolving!.held ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc);

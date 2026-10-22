@@ -242,6 +242,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Separating cards into two piles (Fact or Fiction): as even as can be, by what the cards are worth in that player's
     // hand. An opponent choosing for them takes the worse pile, they take the better one, so both ways the evener the better.
     if (pend.kind === "searchLibrary" && pend.piles) return [{ type: "searchLibrary", player: pid, found: evenPiles(s, pend.forPlayer ?? pid, pend.cards) }];
+    // Another player's permanents into two piles, for them to sacrifice one: as even as can be, so either pile costs them half.
+    if (pend.kind === "pickPermanents" && pend.action === "pile") return [{ type: "pickPermanents", player: pid, ids: evenPiles(s, pid, pend.options, (id) => permanentWorth(s, pid, id)) }];
     // Choosing among an opponent's revealed cards (Gifts Ungiven, Intuition): the ones they'd least like where the chosen
     // ones go, by how they'd rank them for themselves.
     if (pend.kind === "searchLibrary" && pend.forPlayer !== undefined) {
@@ -510,8 +512,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "counterKind") return [{ type: "chooseOption", player: pid, choice: pend.options.includes("+1/+1") ? "+1/+1" : pend.options[0]! }];
     // Two piles: the better one for our own hand, the worse one for an opponent's.
     if (pend.kind === "chooseOption" && pend.what === "pile" && pend.piles) {
-      const [a, b] = pend.piles.map((pile) => pile.reduce((n, id) => n + handWorth(s, id), 0));
-      const mine = pend.of === pid;
+      // Our own permanents to sacrifice (Liliana of the Veil): the pile worth less.
+      const worth = pend.sacrificePile ? (id: string) => permanentWorth(s, pid, id) : (id: string) => handWorth(s, id);
+      const [a, b] = pend.piles.map((pile) => pile.reduce((n, id) => n + worth(id), 0));
+      const mine = pend.of === pid && !pend.sacrificePile;
       return [{ type: "chooseOption", player: pid, choice: (mine ? a! >= b! : a! <= b!) ? "0" : "1" }];
     }
     // Liliana of the Dark Realms: +X/+X for our own creature, -X/-X for anyone else's.
@@ -4021,10 +4025,15 @@ function handWorth(s: GameState, id: string): number {
   return isType(defOf(s, obj(s, id)), "Land") ? 1.5 : 1 + Math.min(mv(s, id), 7) * 0.5;
 }
 
+/** What a permanent is worth to its controller, for piles of permanents. */
+function permanentWorth(s: GameState, pid: PlayerId, id: string): number {
+  return targetWorth(s, pid, { kind: "object", id }, false, 0);
+}
+
 /** The first of two piles that splits `cards` as evenly as can be by handWorth (every split tried, up to 12 cards). */
-function evenPiles(s: GameState, pid: PlayerId, cards: string[]): string[] {
+function evenPiles(s: GameState, pid: PlayerId, cards: string[], worthOf: (id: string) => number = (id) => handWorth(s, id)): string[] {
   void pid;
-  const worth = cards.map((id) => handWorth(s, id));
+  const worth = cards.map(worthOf);
   const total = worth.reduce((a, b) => a + b, 0);
   if (cards.length > 12) {
     // Greedy: the most valuable cards first, each into the lighter pile.

@@ -624,3 +624,64 @@ describe("Maze's End, Derevi", () => {
     expect(plan.some((a) => a.type === "activateAbility" && a.objectId === d)).toBe(true);
   });
 });
+
+const lotv = card("Liliana of the Veil", "Legendary Planeswalker — Liliana", "{1}{B}{B}", { loyalty: "3", oracleText: "+1: Each player discards a card.\n−2: Target player sacrifices a creature.\n−6: Separate all permanents target player controls into two piles. That player sacrifices all permanents in the pile of their choice." });
+const enchanted = card("Rancor", "Enchantment — Aura", "{G}", { oracleText: "Enchant creature\nEnchanted creature gets +2/+0 and has trample.\nWhen Rancor is put into a graveyard from the battlefield, return Rancor to its owner's hand." });
+
+describe("Liliana of the Veil −6: two piles of permanents (CR 700.3)", () => {
+  it("you separate the player's permanents (an Aura apart from its creature, rulings); they sacrifice the pile they choose", () => {
+    supported(lotv);
+    const { s: s0, ap, opp } = setup([]);
+    const l = putOnBattlefield(s0, ap, lotv);
+    s0.objects[l]!.counters.loyalty = 6;
+    const big = putOnBattlefield(s0, opp, bear({ power: "6", toughness: "6" }));
+    const aura = putOnBattlefield(s0, opp, enchanted);
+    s0.objects[aura]!.attachedTo = big;
+    const small = putOnBattlefield(s0, opp, bear());
+    const land = putOnBattlefield(s0, opp, forest);
+    invalidateCharacteristics(s0);
+    let s = passUntil(s0, "main1", ap);
+    s = run(s, planActivate(s, ap, l, 2, [{ kind: "player", id: opp }]));
+    for (let i = 0; i < 10 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", player: ap, action: "pile", of: opp });
+    expect([...(s.pending as { options: string[] }).options].sort()).toEqual([big, aura, small, land].sort());
+    s = act(s, { type: "pickPermanents", player: ap, ids: [big, small] });
+    expect(s.pending).toMatchObject({ kind: "chooseOption", player: opp, what: "pile", sacrificePile: true });
+    expect((s.pending as { piles: string[][] }).piles.map((p) => [...p].sort())).toEqual([[big, small].sort(), [aura, land].sort()]);
+    s = act(s, { type: "chooseOption", player: opp, choice: "1" });
+    s = settle(s);
+    expect(s.objects[aura]!.zone).not.toBe("battlefield"); // sacrificed (Rancor's trigger returns it to hand)
+    expect(s.objects[land]!.zone).toBe("graveyard");
+    expect(s.objects[big]!.zone).toBe("battlefield");
+    expect(s.objects[small]!.zone).toBe("battlefield");
+    expect(s.objects[l]!.zone).toBe("graveyard"); // 0 loyalty
+  });
+
+  it("an empty pile can be chosen, and nothing is sacrificed; bots split evenly and sacrifice the lesser pile", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const l = putOnBattlefield(s0, ap, lotv);
+    s0.objects[l]!.counters.loyalty = 7;
+    const a = putOnBattlefield(s0, opp, bear());
+    invalidateCharacteristics(s0);
+    let s = passUntil(s0, "main1", ap);
+    s = run(s, planActivate(s, ap, l, 2, [{ kind: "player", id: opp }]));
+    for (let i = 0; i < 10 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = act(s, { type: "pickPermanents", player: ap, ids: [a] });
+    // The bot chooses the empty pile.
+    s = botActions(s, opp).reduce((x, y) => act(x, y), s);
+    s = settle(s);
+    expect(s.objects[a]!.zone).toBe("battlefield");
+    // A bot separating: both piles worth about the same.
+    const { s: t0, ap: bp, opp: bo } = setup([]);
+    const l2 = putOnBattlefield(t0, bp, lotv);
+    t0.objects[l2]!.counters.loyalty = 6;
+    const mine = [putOnBattlefield(t0, bo, bear({ power: "4", toughness: "4" })), putOnBattlefield(t0, bo, bear({ power: "4", toughness: "4" })), putOnBattlefield(t0, bo, forest), putOnBattlefield(t0, bo, forest)];
+    invalidateCharacteristics(t0);
+    let t = passUntil(t0, "main1", bp);
+    t = run(t, planActivate(t, bp, l2, 2, [{ kind: "player", id: bo }]));
+    for (let i = 0; i < 10 && !t.pending; i++) t = act(t, { type: "passPriority", player: waitingOn(t)! });
+    t = botActions(t, bp).reduce((x, y) => act(x, y), t);
+    t = settle(t);
+    expect(mine.filter((id) => t.objects[id]!.zone === "battlefield")).toHaveLength(2);
+  });
+});

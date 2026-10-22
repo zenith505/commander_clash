@@ -935,6 +935,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   text = text.replace(/([Pp]ut all creature cards exiled with ~ onto the battlefield under your control)\. They gain decayed\./, "$1, and they gain decayed.");
   // "Until your next turn, it gains indestructible." (Hydaelyn) says the same as "It gains indestructible until your next turn."
   text = text.replace(/\bUntil your next turn, it gains ([a-z ]+)\./g, "It gains $1 until your next turn.");
+  // Liliana of the Veil's two sentences are one effect: the piles, then the sacrifice of the chosen one (CR 700.3).
+  text = text.replace(/\bSeparate all permanents (target player|target opponent) controls into two piles\. That player sacrifices all permanents in the pile of their choice\./g, "Separate all permanents $1 controls into two piles for that player to sacrifice the pile of their choice.");
   // "You may pay eight {E}. If you pay, ..." (Lightning Runner) says the same as "If you do".
   text = text.replace(/(you may pay [^.]+\.) If you pay, /g, "$1 If you do, ");
   // "Roll a d20. [Instructions with X.] 1—9 | X is one. 10—19 | X is two. 20 | X is three." (Wand of Wonder): each row

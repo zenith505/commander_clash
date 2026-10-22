@@ -3574,11 +3574,11 @@ function PilePicker({
           {(pending.piles ?? [[], []]).map((pile, i) => (
             <div key={i} data-pile={i}>
               <h4>
-                Pile {i + 1} ({pile.length === 1 ? "1 card" : `${pile.length} cards`}){" "}
-                <button onClick={() => onDone(String(i))}>{`Put pile ${i + 1} into ${whose} hand`}</button>
+                Pile {i + 1} ({pile.length === 1 ? `1 ${pending.sacrificePile ? "permanent" : "card"}` : `${pile.length} ${pending.sacrificePile ? "permanents" : "cards"}`}){" "}
+                <button onClick={() => onDone(String(i))}>{pending.sacrificePile ? `Sacrifice pile ${i + 1}` : `Put pile ${i + 1} into ${whose} hand`}</button>
               </h4>
               <div className="modal-cards">
-                {pile.length === 0 && <span className="muted">No cards</span>}
+                {pile.length === 0 && <span className="muted">{pending.sacrificePile ? "No permanents" : "No cards"}</span>}
                 {pile.map((id) => {
                   const d = cardOf(s, id);
                   return (
@@ -4571,6 +4571,8 @@ function Controls({
                 ? `cipher: click a creature of yours to exile ${pending.source} encoded on it. Whenever that creature deals combat damage to a player, you may cast a copy of ${pending.source} for free.`
                 : pending.action === "unattach"
                 ? `click an Equipment to unattach from the creature of yours it's attached to. That creature becomes tapped and gains indestructible until end of turn.`
+                : pending.action === "pile"
+                ? `separate all permanents ${theirs ?? "you"} control${theirs ? "s" : ""} into two piles: click the ones for the first pile (the rest form the second). ${theirs ?? "You"} sacrifice${theirs ? "s" : ""} all permanents in the pile of ${theirs ? "their" : "your"} choice.`
                 : pending.action === "meld"
                 ? `meld: click the ${pending.what} to exile with ${pending.source} and meld them into one permanent. A token or a copy can't meld and stays in exile.`
                 : pending.action === "keep" && pending.maxTotalPower !== undefined
@@ -4582,7 +4584,7 @@ function Controls({
                 : `click ${what} ${theirs ? `${theirs} controls` : "of yours"} to ${verb}.`}
         </span>
         <button disabled={!ok} onClick={() => dispatch([{ type: "pickPermanents", player: HUMAN, ids: discards }])}>
-          {pending.action === "attach" ? (n ? `Attach ${n}` : "Attach none") : pending.action === "keep" ? (n ? `Keep ${n}` : "Keep none") : pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "encode" ? (n ? "Encode" : "Don't encode") : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "keepTapped" ? (n ? `Keep ${n} tapped` : "Untap all") : pending.action === "untapLimited" ? `Untap ${n}` : pending.action === "phaseOut" ? (n ? `Phase out ${n}` : "Phase out none") : pending.action === "untap" ? (n ? `Untap ${n}` : "Untap none") : pending.action === "tap" ? (n ? `Tap ${n}` : "Tap none") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : pending.action === "choose" ? "Choose" : pending.action === "meld" ? "Meld" : pending.action === "unattach" ? "Unattach" : "Return"}
+          {pending.action === "attach" ? (n ? `Attach ${n}` : "Attach none") : pending.action === "keep" ? (n ? `Keep ${n}` : "Keep none") : pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "encode" ? (n ? "Encode" : "Don't encode") : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "keepTapped" ? (n ? `Keep ${n} tapped` : "Untap all") : pending.action === "untapLimited" ? `Untap ${n}` : pending.action === "phaseOut" ? (n ? `Phase out ${n}` : "Phase out none") : pending.action === "untap" ? (n ? `Untap ${n}` : "Untap none") : pending.action === "tap" ? (n ? `Tap ${n}` : "Tap none") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.action === "pile" ? `First pile: ${n}, second pile: ${pending.count - n}` : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : pending.action === "choose" ? "Choose" : pending.action === "meld" ? "Meld" : pending.action === "unattach" ? "Unattach" : "Return"}
         </button>
       </div>
     );

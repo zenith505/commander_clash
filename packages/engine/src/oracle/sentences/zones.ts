@@ -804,6 +804,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (!who || !among || among.kind !== "object" || !keep?.length || keep.some((k) => k.filter.kind !== "object")) return null;
     return [{ type: "keepRest", who, keep, among }];
   }
+  // "Separate all permanents target player controls into two piles. That player sacrifices all permanents in the pile
+  // of their choice." (Liliana of the Veil; joined into one sentence in body.ts).
+  if ((m = /^Separate all permanents (.+?) controls into two piles for that player to sacrifice the pile of their choice$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who && who.ref === "target" ? [{ type: "permanentPiles", who }] : null;
+  }
   // "Each opponent sacrifices a creature with the greatest power among creatures they control", "... a creature they
   // control with the greatest power" (Szat's Will), "a creature or planeswalker with the greatest mana value among
   // creatures and planeswalkers they control" (Soul Shatter).

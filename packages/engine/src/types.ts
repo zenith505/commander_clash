@@ -1,4 +1,4 @@
-import type { AbilityBody, Affects, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CostMod, NamePurpose, CounterKind, DamageMod, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec, TokenSpec, ManaTrigger, TriggeredAbility, TriggerDuration } from "./abilities";
+import type { AbilityBody, Affects, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CostMod, NamePurpose, CounterKind, DamageMod, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec, TokenSpec, ManaTrigger, TriggeredAbility, TriggerDuration, SpentFor } from "./abilities";
 import type { DamageEvent } from "./damage";
 import type { Characteristics } from "./layers";
 
@@ -560,13 +560,12 @@ export interface ManaLot {
 }
 
 /** A mana's "when that mana is spent" ability: its source as it made the mana, and what it does. */
-export interface ManaSpentTrigger {
+export type ManaSpentTrigger = {
   sourceId: ObjectId;
   sourceCardId: string;
   sourceZc: number;
   body: AbilityBody;
-  sharesCommanderType: true;
-}
+} & SpentFor;
 
 export interface Player {
   /** How many times their library has been shuffled (see rng.ts shuffleLibrary). */

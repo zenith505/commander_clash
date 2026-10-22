@@ -130,6 +130,10 @@ export function parseManaAbility(line0: string): ManaAbility | null {
     } else if ((m2 = /^When that mana is spent to cast a creature spell that shares a creature type with your commander, scry (\d+)\.$/.exec(extra)) && !out.spentTrigger) {
       const text = extra.replace(/^When that mana is spent to cast a creature spell that shares a creature type with your commander, /, "");
       out.spentTrigger = { sharesCommanderType: true, body: { targets: [], effects: [{ type: "scry", n: Number(m2[1]) }], text: text[0]!.toUpperCase() + text.slice(1) } };
+    } else if ((m2 = /^When that mana is spent to cast an? (red )?instant or sorcery spell, copy that spell and you may choose new targets for the copy\.$/.exec(extra)) && !out.spentTrigger) {
+      // Primal Wellspring, Pyromancer's Goggles: a triggered ability of its source (CR 603.1), the spell it paid for
+      // copied as the trigger resolves (CR 707.10).
+      out.spentTrigger = { instantOrSorcery: true, ...(m2[1] ? { color: "R" as const } : {}), body: { targets: [], effects: [{ type: "copySpell", spell: "cause", n: 1, newTargets: true }], text: "Copy that spell and you may choose new targets for the copy." } };
     } else if (/^Spend this mana only /.test(extra) && !out.spendOnly) {
       const only = parseManaSpend(extra);
       if (!only) return null;

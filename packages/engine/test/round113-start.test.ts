@@ -1,8 +1,8 @@
 // Round 113, the first of the most played cards: bots and Food Chain, ...
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, forest, passAll, passUntil, putOnBattlefield, setup } from "./helpers";
-import { blockCost, botActions, characteristics, invalidateCharacteristics, isFullySupported, objHasKeyword, parseManaCost, planActivate, planMana, power, toughness, waitingOn, type Action, type GameState, type PlayerId } from "../src";
+import { act, bear, card, forest, passAll, passUntil, putOnBattlefield, scry, setup } from "./helpers";
+import { blockCost, botActions, planCast, characteristics, invalidateCharacteristics, isFullySupported, objHasKeyword, parseManaCost, planActivate, planMana, power, toughness, waitingOn, type Action, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const foodChain = card("Food Chain", "Enchantment", "{2}{G}", {
@@ -270,5 +270,95 @@ describe("Brudiclad, Telchor Engineer", () => {
     s = act(s, { type: "chooseMay", player: ap, yes: false });
     expect(characteristics(s, s.objects[treasure]!).name).toBe("Treasure");
     expect(s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === ap)).toHaveLength(3);
+  });
+});
+
+const goggles = card("Pyromancer's Goggles", "Legendary Artifact", "{5}", {
+  oracleText: "{T}: Add {R}. When that mana is spent to cast a red instant or sorcery spell, copy that spell and you may choose new targets for the copy.",
+});
+const amulet = scry("transform", [
+  { name: "Primal Amulet", mana_cost: "{4}", type_line: "Artifact", oracle_text: "Instant and sorcery spells you cast cost {1} less to cast.\nWhenever you cast an instant or sorcery spell, put a charge counter on Primal Amulet. Then if there are four or more charge counters on it, you may remove those counters and transform it." },
+  { name: "Primal Wellspring", type_line: "Land", oracle_text: "(Transforms from Primal Amulet.)\n{T}: Add one mana of any color. When that mana is spent to cast an instant or sorcery spell, copy that spell and you may choose new targets for the copy." },
+], { keywords: ["Transform"] });
+const bolt = (name = "Lightning Bolt") => card(name, "Instant", "{R}", { oracleText: `${name} deals 3 damage to any target.` });
+const growth = card("Giant Growth", "Instant", "{G}", { oracleText: "Target creature gets +3/+3 until end of turn." });
+
+/** Every land of the player's tapped, so only `keep` can make mana. */
+const onlyMana = (s: GameState, pid: PlayerId, keep: string) => {
+  for (const id of s.battlefield) if (id !== keep && s.objects[id]!.controller === pid && s.cards[s.objects[id]!.cardId]!.types.includes("Land")) s.objects[id]!.tapped = true;
+};
+/** Pass, keeping the old targets of each copy, until the stack is empty. */
+const settleCopies = (s: GameState) => {
+  for (let i = 0; i < 100 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+    const pid = waitingOn(s)!;
+    s = s.pending?.kind === "copyTargets" ? act(s, { type: "copyTargets", player: pid }) : act(s, { type: "passPriority", player: pid });
+  }
+  return s;
+};
+
+describe("Pyromancer's Goggles and Primal Amulet // Primal Wellspring", () => {
+  it("are supported", () => {
+    for (const d of [goggles, amulet]) expect(isFullySupported(d), d.name).toBe(true);
+  });
+
+  it("Goggles' mana spent on a red instant copies it", () => {
+    const { s: s0, ap, opp, ids } = setup([bolt()]);
+    const g = putOnBattlefield(s0, ap, goggles);
+    onlyMana(s0, ap, g);
+    const life = s0.players[opp]!.life;
+    let s = planCast(s0, ap, ids[0]!, [{ kind: "player", id: opp }])!.reduce(act, s0);
+    expect(s.objects[g]!.tapped).toBe(true);
+    s = settleCopies(s);
+    expect(s.players[opp]!.life).toBe(life - 6);
+  });
+
+  it("not on a spell that isn't red, nor on a creature spell", () => {
+    const { s: s0, ap, ids } = setup([card("Blue Bolt", "Instant", "{1}", { colors: ["U"], oracleText: "Blue Bolt deals 3 damage to any target." }), bear()]);
+    const g = putOnBattlefield(s0, ap, goggles);
+    const target = putOnBattlefield(s0, ap, bear({ name: "Target Bear" }));
+    onlyMana(s0, ap, g);
+    let s = planCast(s0, ap, ids[0]!, [{ kind: "object", id: target }])!.reduce(act, s0);
+    expect(s.objects[g]!.tapped).toBe(true);
+    expect(s.triggerQueue).toHaveLength(0);
+    s = settleCopies(s);
+    expect(s.objects[target]!.zone).toBe("graveyard");
+  });
+
+  it("Primal Amulet: instants cost {1} less; the fourth charge counter may transform it", () => {
+    const shock = (name: string) => card(name, "Instant", "{1}{R}", { oracleText: `${name} deals 2 damage to any target.` });
+    const { s: s0, ap, ids } = setup([shock("Shock A"), shock("Shock B")]);
+    const a = putOnBattlefield(s0, ap, amulet);
+    s0.objects[a]!.counters.charge = 2;
+    const opp = s0.turnOrder[(s0.turnOrder.indexOf(ap) + 1) % 4]!;
+    let s = planCast(s0, ap, ids[0]!, [{ kind: "player", id: opp }])!.reduce(act, s0);
+    // {1}{R} less {1}: one land tapped.
+    expect(s.battlefield.filter((id) => s.objects[id]!.controller === ap && s.objects[id]!.tapped)).toHaveLength(1);
+    for (let i = 0; i < 20 && !s.pending && s.stack.length; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.objects[a]!.counters.charge).toBe(3);
+    s = planCast(s, ap, ids[1]!, [{ kind: "player", id: opp }])!.reduce(act, s);
+    for (let i = 0; i < 20 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending?.kind).toBe("chooseMay");
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect(s.objects[a]!.counters.charge ?? 0).toBe(0);
+    expect(s.objects[a]!.face).toBe(1);
+    expect(characteristics(s, s.objects[a]!).types).toEqual(["Land"]);
+  });
+
+  it("Primal Wellspring: its mana copies an instant or sorcery, any color", () => {
+    const { s: s0, ap, ids } = setup([growth]);
+    const w = putOnBattlefield(s0, ap, amulet);
+    s0.objects[w]!.face = 1;
+    invalidateCharacteristics(s0);
+    const b = putOnBattlefield(s0, ap, bear());
+    onlyMana(s0, ap, w);
+    let s = planCast(s0, ap, ids[0]!, [{ kind: "object", id: b }])!.reduce(act, s0);
+    expect(s.objects[w]!.tapped).toBe(true);
+    // The copy resolves first, then the spell: +6/+6.
+    for (let i = 0; i < 100 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+      const pid = waitingOn(s)!;
+      if (s.pending?.kind === "copyTargets") s = act(s, { type: "copyTargets", player: pid });
+      else s = act(s, { type: "passPriority", player: pid });
+    }
+    expect(power(s, s.objects[b]!)).toBe(8);
   });
 });

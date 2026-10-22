@@ -48,6 +48,7 @@ import {
   type ManaOrigin,
   type ManaType,
   type SpentMana,
+  type ManaSpentTrigger,
   type ObjectId,
   type Player,
   type PlayerId,
@@ -3129,7 +3130,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     log(s, `${p.name} sacrifices ${name} for mana.`);
     moveObject(s, id, "graveyard", { sacrificed: true });
   }
-  const spentTrigger = ab.spentTrigger && { sourceId: o.id, sourceCardId: cardIdOf(o), sourceZc: o.zoneChanges ?? 0, body: ab.spentTrigger.body, sharesCommanderType: true as const };
+  const spentTrigger: ManaSpentTrigger | undefined = ab.spentTrigger && { ...ab.spentTrigger, sourceId: o.id, sourceCardId: cardIdOf(o), sourceZc: o.zoneChanges ?? 0 };
   // "Whenever you cast a permanent spell using mana produced by Tecutlan": its mana is kept apart, to tell.
   const source = abilitiesOf(s, o).triggers.some((t) => t.cast?.manaFromSelf) ? `${o.id}#${o.zoneChanges ?? 0}` : undefined;
   addMana(s, p.id, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(source ? { source } : {}) });
@@ -3962,14 +3963,18 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   o.hasteCast = paid.haste;
   o.commanderCountersCast = paid.commanderCounters;
   // "When that mana is spent to cast a creature spell that shares a creature type with your commander" (Path of
-  // Ancestry): one trigger for each such mana, its commanders' types checked now (rulings).
-  if (paid.spentTriggers && isType(d, "Creature")) {
-    // Changeling is every creature type (CR 702.73a); a commander with no creature type shares none (rulings).
-    const kinds = (types: string[], all: boolean) => (all ? [...CREATURE_TYPES] : types.filter((t) => CREATURE_TYPES.has(t)));
-    const mine = kinds(d.subtypes, everyCreatureType(d));
-    const theirs = Object.values(s.objects).flatMap((c) => (c.isCommander && c.owner === p.id ? kinds(characteristics(s, c).subtypes, characteristics(s, c).allCreatureTypes) : []));
-    if (mine.some((t) => theirs.includes(t)))
-      for (const t of paid.spentTriggers) s.triggerQueue.push({ sourceId: t.sourceId, sourceCardId: t.sourceCardId, sourceZc: t.sourceZc, controller: p.id, index: -1, body: t.body });
+  // Ancestry): one trigger for each such mana, its commanders' types checked now (rulings). "... to cast a red instant
+  // or sorcery spell" (Pyromancer's Goggles): queued once the spell is on the stack, "that spell" being it.
+  const spentQueue: ManaSpentTrigger[] = [];
+  for (const t of paid.spentTriggers ?? []) {
+    if ("sharesCommanderType" in t) {
+      if (!isType(d, "Creature")) continue;
+      // Changeling is every creature type (CR 702.73a); a commander with no creature type shares none (rulings).
+      const kinds = (types: string[], all: boolean) => (all ? [...CREATURE_TYPES] : types.filter((x) => CREATURE_TYPES.has(x)));
+      const mine = kinds(d.subtypes, everyCreatureType(d));
+      const theirs = Object.values(s.objects).flatMap((c) => (c.isCommander && c.owner === p.id ? kinds(characteristics(s, c).subtypes, characteristics(s, c).allCreatureTypes) : []));
+      if (mine.some((x) => theirs.includes(x))) spentQueue.push(t);
+    } else if ((isType(d, "Instant") || isType(d, "Sorcery")) && (!t.color || characteristics(s, o).colors.includes(t.color))) spentQueue.push(t);
   }
   if (fromCommand) p.commanderCasts[o.id] = (p.commanderCasts[o.id] ?? 0) + 1;
   const castFrom = o.zone;
@@ -4034,6 +4039,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   });
   const item = s.stack[s.stack.length - 1]!;
   const stackId = item.id;
+  for (const t of spentQueue) s.triggerQueue.push({ sourceId: t.sourceId, sourceCardId: t.sourceCardId, sourceZc: t.sourceZc, controller: p.id, index: -1, body: t.body, cause: stackId });
   // "... the controller of the permanent it becomes sacrifices it at the beginning of the next cleanup step": about
   // the permanent it becomes as it enters (one more zone change, CR 400.7).
   if (flashSacrifice)

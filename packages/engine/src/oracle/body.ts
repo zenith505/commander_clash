@@ -545,8 +545,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // for both, which losing life doesn't change, so two instructions each with it.
   text = text.replace(/(^|\. )([Ee]ach opponent loses X life) and you (scry X|draw X cards), where X is ([^.]+)\./, (_, lead: string, a: string, b: string, x: string) => `${lead}${a}, where X is ${x}. ${b.charAt(0).toUpperCase()}${b.slice(1)}, where X is ${x}.`);
   // Brass's Tunnel-Grinder: "Then if there are three or more bore counters on it, remove those counters and transform it."
-  text = text.replace(/^([Pp]ut an? ([a-z]+) counter on ~\.) Then if (?:it has|there are) ([a-z]+) or more \2 counters on it, remove (?:all of them|those counters) and /, (_, put: string, kind: string, n: string) => `${put} If there are ${n} or more ${kind} counters on ~, remove all ${kind} counters from ~ and `);
-  text = text.replace(/^([Pp]ut an? [a-z]+ counter on ~\. If there are [a-z]+ or more [a-z]+ counters on ~, remove all [a-z]+ counters from ~ and transform) it\.$/, "$1 ~.");
+  // Primal Amulet: "..., you may remove those counters and transform it."
+  text = text.replace(/^([Pp]ut an? ([a-z]+) counter on ~\.) Then if (?:it has|there are) ([a-z]+) or more \2 counters on it, (you may )?remove (?:all of them|those counters) and /, (_, put: string, kind: string, n: string, may?: string) => `${put} If there are ${n} or more ${kind} counters on ~, ${may ?? ""}remove all ${kind} counters from ~ and `);
+  text = text.replace(/^([Pp]ut an? [a-z]+ counter on ~\. If there are [a-z]+ or more [a-z]+ counters on ~, (?:you may )?remove all [a-z]+ counters from ~ and transform) it\.$/, "$1 ~.");
   text = text.replace(/^Choose (up to one target [a-z]+), then (airbend|exile|destroy) all other ([a-z]+)\./, (_, t: string, verb: string, what: string) => `Choose ${t}. ${verb.charAt(0).toUpperCase()}${verb.slice(1)} all other ${what}.`);
   // "Transform ~, then untap it" (Westvale Abbey): the same permanent, now its back face (CR 712.18).
   text = text.replace(/^Transform ~, then untap it\.$/, "Transform ~, then untap ~.");
@@ -3245,7 +3246,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       // "If you've completed a dungeon, that creature also gets +5/+0" (Rilsa Rael): as well as what came before.
       // "Draw another card": one more.
       const then = ifState[2]!.replace(/^(that creature|that player|it|~) also (?=(?:gains?|gets?|deals?|has|loses?) )/i, "$1 ").replace(/^draw another card$/, "draw a card");
-      const inner = parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
+      // "If there are four or more charge counters on ~, you may remove all charge counters from ~ and transform ~" (Primal
+      // Amulet): optional, decided as it resolves (CR 608.2d).
+      const mayThen = /^you may (.+)$/.exec(then);
+      const inner0 = parseOne(capital(mayThen ? mayThen[1]! : then), ctx);
+      const inner: Effect[] | null = mayThen && inner0 ? [{ type: "may", effects: inner0, text: mayThen[1]! }] : inner0;
       // Its instructions run one at a time, so one may wait on a player ("draw a card, then discard a card", see the "if"
       // effect).
       if (!inner) return null;

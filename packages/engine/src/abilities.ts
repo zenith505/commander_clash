@@ -560,6 +560,13 @@ export type TargetChoice =
 export type ChosenTarget = Exclude<TargetChoice, { kind: "none" }>;
 
 /** Which object(s) an effect touches. */
+/**
+ * What a "when that mana is spent to cast ..." trigger needs the spell to be: a creature spell that shares a creature
+ * type with your commander (Path of Ancestry), an instant or sorcery spell (Primal Wellspring), a red one (Pyromancer's
+ * Goggles).
+ */
+export type SpentFor = { sharesCommanderType: true } | { instantOrSorcery: true; color?: Color };
+
 export type ObjRef =
   /** "Each creature that convoked ~" (Lethal Scheme): the `index`th creature tapped to convoke the resolving spell (CR 702.51a), while it's that permanent. */
   | { ref: "convoker"; index: number }
@@ -3463,7 +3470,7 @@ export interface ManaAbility {
    * of Ancestry): a triggered ability of its source, once for each of that mana spent so (rulings), with your
    * commanders' creature types as they are just after the spell is cast.
    */
-  spentTrigger?: { body: AbilityBody; sharesCommanderType: true };
+  spentTrigger?: { body: AbilityBody } & SpentFor;
   /**
    * "If any of that mana is spent on a creature spell, it gains haste until end of turn." (Arena of Glory, Generator
    * Servant), "If that mana is spent on a creature spell, it gains haste." (Hall of the Bandit Lord, which doesn't wear

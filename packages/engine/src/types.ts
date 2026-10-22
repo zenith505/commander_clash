@@ -514,6 +514,8 @@ export interface GameObject {
   bestowed?: boolean;
   /** A creature spell cast with suspend has haste until this player loses control of it (CR 702.62a). */
   suspendHaste?: PlayerId;
+  /** "If it doesn't have suspend, it gains suspend" (Delay, Jhoira of the Ghitu): it has suspend while it's this object, by its zone changes (CR 702.62, 400.7). */
+  gainedSuspend?: number;
   /** Soulbond (CR 702.95b): the creature it's paired with (that object, by its zone changes) and who paired them. */
   paired?: { id: ObjectId; zc: number; by: PlayerId };
 }

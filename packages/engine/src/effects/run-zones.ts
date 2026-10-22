@@ -21,7 +21,26 @@ import { meld, meldPartners } from "../meld";
 
 /** A suspended card (CR 702.62b): in exile, with suspend and a time counter on it. */
 export function isSuspended(s: GameState, o: GameObject): boolean {
-  return o.zone === "exile" && (o.counters.time ?? 0) > 0 && !!compileCard(defOf(s, o)).suspend;
+  return o.zone === "exile" && (o.counters.time ?? 0) > 0 && hasSuspend(s, o);
+}
+
+/** Suspend printed on the card, or gained in exile (Delay, Jhoira of the Ghitu). */
+export function hasSuspend(s: GameState, o: GameObject): boolean {
+  return !!compileCard(defOf(s, o)).suspend || o.gainedSuspend === (o.zoneChanges ?? 0);
+}
+
+/**
+ * "Exile it with three time counters on it. If it doesn't have suspend, it gains suspend." (Delay): a card in exile gets
+ * the time counters and, without suspend of its own, suspend's abilities for as long as it stays this object (CR 702.62a,
+ * 400.7). It's then suspended (CR 702.62b).
+ */
+export function suspendExiled(s: GameState, o: GameObject, n: number): void {
+  if (o.zone !== "exile") return;
+  o.counters.time = (o.counters.time ?? 0) + n;
+  const had = hasSuspend(s, o);
+  if (!had) o.gainedSuspend = o.zoneChanges ?? 0;
+  invalidateCharacteristics(s);
+  log(s, `${defOf(s, o).name} is exiled with ${n} time counter${n === 1 ? "" : "s"} on it${had ? "" : " and gains suspend"}.`);
 }
 
 /**
@@ -1068,6 +1087,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             const more = m.more && (!m.moreOpponents || card.owner !== ctx.controller) ? m.more : undefined;
             card.mayPlay = { player: card.owner, zc: card.zoneChanges ?? 0, until: m.until ?? "exiled", turn: s.turn, ...(m.play ? {} : { castOnly: true as const }), ...(m.free ? { free: true as const } : {}), ...(m.cost ? { cost: m.cost } : {}), ...(more ? { more } : {}) };
           }
+          // Suspend: the card gets its time counters and suspend (CR 702.62); a token ceases to exist (CR 704.5d).
+          if (e.suspend && !card.isToken) suspendExiled(s, card, e.suspend);
           // Hostage Taker: its controller may cast the card, not a token (rulings), for as long as it remains exiled.
           if (e.youMay && !card.isToken) card.mayPlay = { player: ctx.controller, zc: card.zoneChanges ?? 0, until: "exiled", turn: s.turn, castOnly: true, ...(e.youMay.anyType ? { anyType: true as const } : {}) };
         }

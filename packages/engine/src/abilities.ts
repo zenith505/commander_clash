@@ -1389,6 +1389,8 @@ export type Effect =
       ownerMay?: { play?: true; free?: true; cost?: string; more?: number; moreOpponents?: true; /** Only this turn, or until the end of their next turn (Containment Construct, Moonstone), not for as long as it's exiled. */ until?: "thisTurn" | "nextTurn" };
       /** "You may cast that card for as long as it remains exiled, and mana of any type can be spent to cast that spell" (Hostage Taker): the ability's controller's permission (CR 609.4b). */
       youMay?: { anyType?: true };
+      /** "Exile target creature and put two time counters on it. If it doesn't have suspend, it gains suspend." (Suspend, Doom's Time Platform, Epochrasite). */
+      suspend?: number;
     }
   /**
    * "Target instant or sorcery card in your graveyard gains flashback until end of turn. The flashback cost is equal to
@@ -2183,6 +2185,8 @@ export type Effect =
       top?: boolean;
       /** Remand: "If that spell is countered this way, put it into its owner's hand instead of into that player's graveyard." */
       hand?: true;
+      /** Delay: "exile it with three time counters on it instead ... If it doesn't have suspend, it gains suspend." */
+      suspend?: number;
       /**
        * "Return target spell to its owner's hand" (Reprieve): not a counter, so a spell that can't be countered goes too
        * (CR 101.2 doesn't apply); otherwise like Remand's.

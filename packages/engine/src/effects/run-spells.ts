@@ -10,6 +10,7 @@ import { isLegalTarget, legalTargets, pickOptions, printedMatches, sameTarget, s
 import { ResolveCtx, objects, amountNow, players } from "./resolve";
 import { closeZoneBatch, fireEvent } from "./triggers";
 import { discardCards, toBottom } from "./run-library";
+import { suspendExiled } from "./run-zones";
 import { defMv, sameName } from "../faces";
 import { copyKey } from "../copies";
 
@@ -646,7 +647,13 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           return;
         }
       }
-      return counterOnStack(s, ctx, t.id, src, e.unless, e.exile ? "exile" : e.top ? "libraryTop" : e.hand || e.bounce ? "hand" : undefined, e.bounce);
+      const spellObj = e.suspend ? s.stack.find((x) => x.id === t.id && x.kind === "spell")?.objectId : undefined;
+      const done = counterOnStack(s, ctx, t.id, src, e.unless, e.exile ? "exile" : e.top ? "libraryTop" : e.hand || e.bounce ? "hand" : undefined, e.bounce);
+      if (done === "paused") return done;
+      // Delay: the card it was, countered and exiled this way (a copy has ceased to exist, CR 707.10a).
+      const o = spellObj ? s.objects[spellObj] : undefined;
+      if (e.suspend && o?.zone === "exile" && !s.stack.some((x) => x.id === t.id)) suspendExiled(s, o, e.suspend);
+      return;
     }
   }
 }

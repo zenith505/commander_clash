@@ -17,7 +17,7 @@ import { initiativeTrigger } from "./run-dungeons";
 import { INITIATIVE } from "../oracle";
 import { isRingBearer, ringTrigger } from "./run-ring";
 import { kickedMatches } from "./run-spells";
-import { isSuspended } from "./run-zones";
+import { hasSuspend, isSuspended } from "./run-zones";
 import { liveEmblems } from "../emblems";
 
 /** The trigger events for the beginning of a step: on your turn, and on every turn. */
@@ -982,7 +982,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // A Siege's intrinsic "When the last defense counter is removed from this permanent" (CR 310.12b).
     if (o?.zone === "battlefield" && ev.counter === "defense" && isSiege(s, o)) siegeTrigger(s, o);
     // Suspend's third ability (CR 702.62a), whatever removed the counter (rulings): its owner may cast it.
-    if (o?.zone === "exile" && ev.counter === "time" && compileCard(defOf(s, o)).suspend)
+    if (o?.zone === "exile" && ev.counter === "time" && hasSuspend(s, o))
       s.triggerQueue.push({
         sourceId: o.id,
         sourceCardId: cardIdOf(o),

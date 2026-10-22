@@ -3718,6 +3718,31 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "If that spell is countered this way, exile it instead of putting it into its owner's graveyard" (CR 701.6a),
     // "... put it on top of its owner's library instead of into that player's graveyard" (Memory Lapse).
     // Remand: "... put it into its owner's hand instead of into that player's graveyard".
+    // "Exile target creature and put two time counters on it. If it doesn't have suspend, it gains suspend." (Suspend),
+    // "exile target nonland card from your graveyard with two time counters on it. If ..." (Doom's Time Platform), "When ~
+    // dies, exile it with three time counters on it and it gains suspend." (Epochrasite): the card in exile is suspended
+    // (CR 702.62b), with suspend's abilities for as long as it stays there (CR 400.7).
+    const susp = new RegExp(`^([Ee]xile .+?) (?:with ${NUM} time counters? on it|and put ${NUM} time counters? on it)( and it gains suspend)?$`).exec(s);
+    if (susp && (susp[4] || /^If it doesn't have suspend, it gains suspend\.?$/.test(sentences[si + 1] ?? ""))) {
+      const before = ctx.targets.length;
+      const inner = parseOne(susp[1]!, ctx);
+      const ex = inner?.length === 1 ? inner[0] : undefined;
+      if (ex?.type !== "exile" || ex.until || ex.linked || ex.ownerMay || ex.youMay || ctx.targets.length > before + 1) return null;
+      effects.push({ ...ex, suspend: Number(amt(susp[2] ?? susp[3]!)) });
+      if (!susp[4]) si++;
+      continue;
+    }
+    // Delay: "If the spell is countered this way, exile it with three time counters on it instead of putting it into its
+    // owner's graveyard. If it doesn't have suspend, it gains suspend." (CR 702.62).
+    const delay = new RegExp(`^If (?:that|the) spell is countered this way, exile it with ${NUM} time counters? on it instead of putting it into its owner's graveyard$`).exec(s);
+    if (delay && /^If it doesn't have suspend, it gains suspend\.?$/.test(sentences[si + 1] ?? "")) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "counterSpell" || last.bounce || last.unless) return null;
+      last.exile = true;
+      last.suspend = Number(amt(delay[1]!));
+      si++;
+      continue;
+    }
     const lapse = /^If that spell is countered this way, (?:(exile it) instead of putting it into its owner's graveyard|put it (on top of its owner's library|into its owner's hand) instead of into that player's graveyard)$/i.exec(s);
     if (lapse) {
       const last = effects[effects.length - 1];

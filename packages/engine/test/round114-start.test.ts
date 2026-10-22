@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, cast, passAll, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
-import { applyAction, botActions, characteristics, manaValue, spellCost, invalidateCharacteristics, isFullySupported, manaAbilitiesOn, planCast, planUnlock, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { applyAction, botActions, characteristics, manaValue, spellCost, invalidateCharacteristics, isFullySupported, isSuspended, objHasKeyword, manaAbilitiesOn, planCast, planUnlock, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 import { moveObject } from "../src/game";
 
 // Real oracle text (Scryfall).
@@ -499,7 +499,7 @@ describe("Dragonhawk, Fate's Tempest", () => {
   it("exiles X = 2 cards to play; at your next end step, 2 damage to each opponent for each still exiled", () => {
     const { s: s1, ap, opp, top } = attacked();
     for (const id of top) expect(s1.objects[id]).toMatchObject({ zone: "exile", mayPlay: { player: ap, until: "yourNextEndStep" } });
-    const lives = Object.fromEntries(s1.turnOrder.filter((p) => p !== ap).map((p) => [p, s1.players[p]!.life]));
+    const lives = new Map(s1.turnOrder.filter((p) => p !== ap).map((p) => [p, s1.players[p]!.life]));
     let s = passUntil(s1, "main2", ap);
     // Play one of them (a Forest) from exile; the other stays.
     s = act(s, { type: "playLand", player: ap, objectId: top[0]! });
@@ -507,6 +507,75 @@ describe("Dragonhawk, Fate's Tempest", () => {
     s = passUntil(s, "end", ap);
     s = settle(s);
     // The Bird Dragon hit one opponent for 5 in combat; every opponent also takes 2 for the one card still exiled.
-    for (const p of Object.keys(lives)) expect(lives[p]! - s.players[p]!.life).toBe(p === String(opp) ? 7 : 2);
+    for (const [p, life] of lives) expect(life - s.players[p]!.life).toBe(p === opp ? 7 : 2);
+  });
+});
+
+describe("Delay: a countered spell is exiled with time counters and gains suspend (CR 702.62)", () => {
+  const delay = card("Delay", "Instant", "{1}{U}", {
+    oracleText:
+      "Counter target spell. If the spell is countered this way, exile it with three time counters on it instead of putting it into its owner's graveyard. If it doesn't have suspend, it gains suspend. (At the beginning of its owner's upkeep, they remove a time counter. When the last is removed, they may play it without paying its mana cost. If it's a creature, it has haste.)",
+  });
+  const giant = card("Hill Giant", "Creature — Giant", "{3}{R}", { power: "3", toughness: "3" });
+  const island = card("Island", "Basic Land — Island");
+  const mountain = card("Mountain", "Basic Land — Mountain");
+
+  it("plays", () => expect(isFullySupported(delay)).toBe(true));
+
+  it("the Giant is exiled with three time counters, suspended; when the last is removed its owner casts it free, with haste", () => {
+    const { s: s0, ap, opp, ids } = setup([giant]);
+    const g = ids[0]!;
+    for (let i = 0; i < 4; i++) putOnBattlefield(s0, ap, mountain);
+    const d = putOnBattlefield(s0, opp, delay);
+    moveObject(s0, d, "hand");
+    for (let i = 0; i < 2; i++) putOnBattlefield(s0, opp, island);
+    let s = run(s0, planCast(s0, ap, g));
+    s = act(s, { type: "passPriority", player: ap });
+    s = run(s, planCast(s, opp, d, [{ kind: "stack", id: s.stack.find((x) => x.objectId === g)!.id }]));
+    s = settle(s);
+    const o = s.objects[g]!;
+    expect(o.zone).toBe("exile");
+    expect(o.counters.time).toBe(3);
+    expect(isSuspended(s, o)).toBe(true);
+    o.counters.time = 1; // two upkeeps later
+    s = passUntil(s, "upkeep", ap);
+    s = passUntil(act(s, { type: "passPriority", player: waitingOn(s)! }), "upkeep", ap);
+    s = settle(s);
+    expect(s.pending).toMatchObject({ kind: "castFree", player: ap, objectId: g, how: "suspend" });
+    s = settle(run(s, botActions(s, ap)));
+    expect(s.objects[g]!.zone).toBe("battlefield");
+    expect(objHasKeyword(s, s.objects[g]!, "Haste")).toBe(true);
+  });
+
+  it("Suspend and Doom's Time Platform: exiling a creature or a graveyard card with time counters gives it suspend", () => {
+    const suspendCard = card("Suspend", "Instant", "{U}", {
+      oracleText: "Exile target creature and put two time counters on it. If it doesn't have suspend, it gains suspend. (At the beginning of its owner's upkeep, remove a time counter from that card. When the last is removed, the player plays it without paying its mana cost. If it's a creature, it has haste.)",
+    });
+    const platform = card("Doom's Time Platform", "Legendary Artifact", "{3}{U}{R}", {
+      oracleText: "Whenever you attack, exile target nonland card from your graveyard with two time counters on it. If it doesn't have suspend, it gains suspend.",
+    });
+    for (const d of [suspendCard, platform]) expect(isFullySupported(d)).toBe(true);
+    const { s: s0, ap, opp, ids } = setup([suspendCard]);
+    putOnBattlefield(s0, ap, island);
+    const b = putOnBattlefield(s0, opp, bear());
+    const s = cast(s0, ap, ids[0]!, [target(b)]);
+    expect(s.objects[b]).toMatchObject({ zone: "exile", counters: { time: 2 } });
+    expect(isSuspended(s, s.objects[b]!)).toBe(true);
+  });
+
+  it("a card that left exile and came back is a new object without the gained suspend (CR 400.7)", () => {
+    const { s: s0, ap, opp, ids } = setup([giant]);
+    const g = ids[0]!;
+    for (let i = 0; i < 4; i++) putOnBattlefield(s0, ap, mountain);
+    const d = putOnBattlefield(s0, opp, delay);
+    moveObject(s0, d, "hand");
+    for (let i = 0; i < 2; i++) putOnBattlefield(s0, opp, island);
+    let s = run(s0, planCast(s0, ap, g));
+    s = act(s, { type: "passPriority", player: ap });
+    s = settle(run(s, planCast(s, opp, d, [{ kind: "stack", id: s.stack.find((x) => x.objectId === g)!.id }])));
+    moveObject(s, g, "graveyard");
+    moveObject(s, g, "exile");
+    s.objects[g]!.counters.time = 2;
+    expect(isSuspended(s, s.objects[g]!)).toBe(false);
   });
 });

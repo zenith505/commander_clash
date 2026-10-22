@@ -258,7 +258,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.named !== undefined && !hasName(d.name, spec.named)) return false;
   if (spec.doubleFaced && !isDoubleFacedDef(d)) return false;
   if (spec.manaAbility && !(compileCard(d).mana.length || compileCard(d).manaTriggers?.length)) return false;
-  if (spec.transformed || spec.powerAboveBase) return false;
+  if (spec.transformed || spec.powerAboveBase || spec.colorOfYourLegend) return false;
   return true;
 }
 
@@ -339,6 +339,8 @@ export function playerProtectedFrom(s: GameState, pid: PlayerId, from: PlayerId 
   if (src && protectedFrom(gained, src.controller === undefined && from !== undefined ? { ...src, controller: from } : src, holder)) return true;
   // "You have protection from the chosen card name" (Runed Halo): anything with that name, its own sources too.
   if (src?.name !== undefined && s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === pid && hasName(src.name, s.objects[id]!.chosen?.name ?? "\u0000") && !!abilitiesOf(s, s.objects[id]!).protectionFromChosenName)) return true;
+  // Serra's Emissary: from sources of the chosen card type, its controller's own too.
+  if (src?.types && s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === pid && abilitiesOf(s, s.objects[id]!).youProtectedFromChosenType && src.types!.includes(s.objects[id]!.chosen?.cardType ?? "\u0000"))) return true;
   if (from === undefined || from === pid) return false;
   if (protectedFromPlayer(gained, from, holder)) return true;
   return s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === pid && abilitiesOf(s, s.objects[id]!).youHave === "protection");
@@ -357,6 +359,7 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     if (src && t.id !== controller && hexproofFrom(gainedBy(s, t.id), src)) return false;
     if (spec.kind === "any") return !spec.opponent || t.id !== controller;
     if (spec.kind !== "player") return false;
+    if (spec.notEventPlayer || t.id === spec.notPlayer) return false;
     return !spec.opponent || t.id !== controller;
   }
   if (t.kind === "stack") {

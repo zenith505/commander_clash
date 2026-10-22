@@ -1,12 +1,12 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType, objIsType, power } from "../cards";
 import { nameLandBan } from "../names";
-import { canPlayLandNow, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType } from "../game";
+import { canPlayLandNow, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters, withPutter } from "../counters";
 import { manaValue } from "../mana";
 import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../types";
-import { bindBound, bindChosen, objectMatches, pickOptions, printedMatches } from "./targeting";
+import { bindBound, bindChosen, linkedCards, objectMatches, pickOptions, printedMatches } from "./targeting";
 import { ResolveCtx, apnap, objects, players, amountNow, amountCtx, amountFor, runEffect } from "./resolve";
 import { createToken, tokenCopies } from "./run-tokens";
 import { compileCard } from "../oracle";
@@ -387,8 +387,9 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
     }
     while (kr.slot < e.keep.length) {
       const k0 = e.keep[kr.slot]!;
-      const k = k0.fewest ? { ...k0, n: kr.fewest ?? 0 } : k0;
-      const options = among(pid).filter((id) => objectMatches(s, { ...k.filter, controller: "you" }, obj(s, id), pid, false));
+      const options0 = among(pid).filter((id) => objectMatches(s, { ...k0.filter, controller: "you" }, obj(s, id), pid, false));
+      const k = k0.fewest ? { ...k0, n: kr.fewest ?? 0 } : k0.maxTotalPower !== undefined ? { ...k0, n: options0.length } : k0;
+      const options = options0;
       const max = Math.min(k.n, options.length);
       // Nothing to choose between: all of them are kept.
       if (!k.upTo && options.length <= k.n) {
@@ -403,7 +404,7 @@ function keepRest(s: GameState, e: Extract<Effect, { type: "keepRest" }>, ctx: R
       }
       sc.queue = [chooser];
       sc.chosen = {};
-      s.pending = { kind: "pickPermanents", player: chooser, source: src, action: "keep", what: k.filter.text, options, count: max, ...(k.upTo ? { min: 0 } : {}), ...(chooser !== pid ? { of: pid } : {}) };
+      s.pending = { kind: "pickPermanents", player: chooser, source: src, action: "keep", what: k.filter.text, options, count: max, ...(k.upTo ? { min: 0 } : {}), ...(chooser !== pid ? { of: pid } : {}), ...(k.maxTotalPower !== undefined ? { maxTotalPower: k.maxTotalPower } : {}) };
       return "paused";
     }
     kr.queue.shift();
@@ -621,6 +622,9 @@ function runMeld(s: GameState, e: Extract<Effect, { type: "meld" }>, ctx: Resolv
 
 export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
   switch (e.type) {
+    case "suspendCard":
+      for (const o of objects(s, e.what, ctx)) if (!o.isToken) suspendExiled(s, o, e.n);
+      return;
     case "commanderToHand": {
       // "Your commander" is a commander you own (CR 903.3); in the command zone as this resolves, or nothing happens.
       const p = player(s, ctx.controller);
@@ -843,6 +847,18 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           sc.castAmong = { ids: ids.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
         }
       }
+      if (!sc.castAmong && e.fromYard?.randomLinked) {
+        // Arcane Bombardment: one card at random, linked to the source; then every card still exiled with it.
+        const pool = you.graveyard.filter((id) => printedMatches(e.fromYard!.filter!, defOf(s, obj(s, id))));
+        if (pool.length) {
+          const id = pool[Math.floor(nextRandom(s) * pool.length)]!;
+          moveObject(s, id, "exile");
+          const o = obj(s, id);
+          log(s, `${you.name} exiles ${defOf(s, o).name}, chosen at random, from their graveyard.`);
+          if (o.zone === "exile" && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
+        }
+        sc.castAmong = { ids: linkedCards(s, ctx.sourceId, ctx.sourceZc ?? 0), declined: [] };
+      }
       if (!sc.castAmong && e.fromYard) {
         // Mizzix's Mastery: the target card if it's still legal, or (overloaded) each one in your graveyard, all exiled.
         const ids = e.fromYard.target !== undefined ? objects(s, { ref: "target", index: e.fromYard.target }, ctx).map((o) => o.id) : you.graveyard.filter((id) => printedMatches(e.fromYard!.filter!, defOf(s, obj(s, id))));
@@ -935,6 +951,26 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         st.casting = undefined;
       }
       if (st.handPick) return finish();
+      // Plargg and Nassari: an opponent chosen by you picks one of the nonland cards; the others may be cast (rulings).
+      if (e.opponentExcludes && !st.excluded) {
+        const nonland = st.ids.map((x) => x.id).filter((id) => exiled(id) && !isType(defOf(s, obj(s, id)), "Land"));
+        if (st.excludeBy !== undefined && st.pick !== undefined) {
+          st.excluded = st.pick;
+          st.pick = undefined;
+          log(s, `${player(s, st.excludeBy).name} chooses ${defOf(s, obj(s, st.excluded)).name}.`);
+        } else if (nonland.length) {
+          const opps = opponents(s, you.id);
+          const by = opps.length === 1 ? opps[0] : (s.resolving!.chosen?.player ?? undefined);
+          if (by === undefined) {
+            if (!opps.length) return finish();
+            s.pending = { kind: "chooseOption", player: you.id, source: src, what: "opponent", options: opps.map(String), labels: opps.map((x) => player(s, x).name), prompt: "choose an opponent to choose a nonland card exiled this way" };
+            return "paused";
+          }
+          st.excludeBy = by;
+          s.pending = { kind: "chooseOption", player: by, source: src, what: "castFromAmong", options: nonland, labels: nonland.map((id) => defOf(s, obj(s, id)).name), prompt: `choose a nonland card exiled this way: ${you.name} may cast up to two of the others` };
+          return "paused";
+        }
+      }
       if (st.landPick) {
         // Gix: the land picked, played now; untapped if its controller paid for that (a shock land).
         const id = st.landPick;
@@ -982,7 +1018,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const sharesType = (id: ObjectId) => s.battlefield.some((b) => controllerOf(s, obj(s, b)) === you.id && objIsType(s, obj(s, b), "Creature") && shareCreatureType(creatureTypesOf(s, obj(s, id)), creatureTypesOf(s, obj(s, b))));
       const options = st.ids
         .map((x) => x.id)
-        .filter((id) => exiled(id) && !st.declined.includes(id) && (isLand(id) ? !!e.lands && canPlayLandNow(s, you.id, id) : (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (st.maxMv === undefined || mvOf(id) <= st.maxMv) && (st.budget === undefined || mvOf(id) <= st.budget) && (!st.hits || st.hits.includes(id)) && (!e.sharesTypeWithYours || sharesType(id)) && castable(id)));
+        .filter((id) => exiled(id) && !st.declined.includes(id) && id !== st.excluded && (isLand(id) ? !!e.lands && canPlayLandNow(s, you.id, id) : (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (st.maxMv === undefined || mvOf(id) <= st.maxMv) && (st.budget === undefined || mvOf(id) <= st.budget) && (!st.hits || st.hits.includes(id)) && (!e.sharesTypeWithYours || sharesType(id)) && castable(id)));
       if (!options.length || (e.max !== undefined && (st.cast ?? 0) >= e.max)) return finish();
       const left = st.budget !== undefined ? ` (total mana value ${st.budget} left)` : "";
       s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Done"], prompt: `${e.lands ? "play a land or " : ""}cast a spell from among the ${e.reveal ? "revealed" : "exiled"} cards without paying its mana cost${left}?` };
@@ -1605,14 +1641,29 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (e.who?.ref === "eachPlayer") return eachFromGraveyard(s, e, ctx, src);
       if (e.fromExile) {
         // Karn, the Great Creator: a face-up card you own in exile, into your hand (rulings: never a face-down one).
+        // Oblivion Sower: that player's face-up land cards in exile, onto the battlefield under your control.
         const p = player(s, ctx.controller);
+        const ownerId = e.who ? players(s, e.who, ctx)[0] : p.id;
+        if (ownerId === undefined) return;
+        const owner = player(s, ownerId);
         const sc = (s.resolving!.scratch ??= {});
+        const fits = (id: ObjectId) => obj(s, id).owner === owner.id && obj(s, id).zone === "exile" && !obj(s, id).faceDown && !obj(s, id).hiddenExile && (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
         if (!sc.found) {
-          const cards = p.exile.filter((id) => obj(s, id).owner === p.id && !obj(s, id).faceDown && !obj(s, id).hiddenExile && (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))));
+          const cards = owner.exile.filter(fits);
           if (!cards.length) return;
           const kind = e.filter?.text ?? "card";
-          s.pending = { kind: "searchLibrary", player: p.id, source: src, what: `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`, cards, min: e.upTo ? 0 : 1, max: 1, exiled: true, dig: { looked: cards, to: "to put into your hand", rest: "stay in exile" } };
+          const toField = e.dest === "battlefield";
+          s.pending = { kind: "searchLibrary", player: p.id, source: src, what: e.anyNumber ? `any number of ${kind}s` : `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`, cards, min: e.upTo ? 0 : 1, max: e.anyNumber ? cards.length : 1, exiled: true, dig: { looked: cards, to: toField ? "to put onto the battlefield under your control" : "to put into your hand", rest: "stay in exile" } };
           return "paused";
+        }
+        if (e.dest === "battlefield") {
+          const found = sc.found.filter(fits);
+          sc.found = undefined;
+          if (found.length) log(s, `${p.name} puts ${found.map((id) => defOf(s, obj(s, id)).name).join(", ")} from exile onto the battlefield under their control.`);
+          enterTogether(s, () => {
+            for (const id of found) moveObject(s, id, "battlefield", { controller: p.id });
+          });
+          return;
         }
         const found = sc.found.filter((id) => p.exile.includes(id) && !obj(s, id).faceDown && !obj(s, id).hiddenExile);
         if (found.length) log(s, `${p.name} puts ${found.map((id) => defOf(s, obj(s, id)).name).join(", ")} from exile into their hand.`);

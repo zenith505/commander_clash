@@ -378,14 +378,15 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever you cast your second spell each turn", "Whenever an opponent casts their second spell each turn", "...
   // their first noncreature spell each turn" (Esper Sentinel): counting only the spells of that kind they cast this turn.
   // "Whenever a player casts their second spell during their turn" (The Council of Four): only in their own turn.
-  const nth = /^Whenever (you|an opponent|a player) casts? (?:your|their) (first|second) (?:(.+?) )?spell (each turn|during their turn), (.+)$/.exec(line);
+  // "Whenever you cast your first spell during each opponent's turn" (Wavebreak Hippocamp): the first you cast in that turn.
+  const nth = /^Whenever (you|an opponent|a player) casts? (?:your|their) (first|second) (?:(.+?) )?spell (each turn|during their turn|during each opponent's turn), (.+)$/.exec(line);
   if (nth) {
     const parsed = nth[3] ? parseTargetPhrase(`${nth[3]} spell`) : { kind: "spell" as const, text: "spell" };
     const kind = parsed && { ...parsed, text: nth[3] ? `${nth[3]} spell` : "spell" };
     if (kind?.kind !== "spell") return "fail";
-    if (nth[4] === "during their turn" && nth[1] === "you") return "fail";
+    if ((nth[4] === "during their turn" && nth[1] === "you") || (nth[4] === "during each opponent's turn" && nth[1] !== "you")) return "fail";
     const body = parseBody(nth[5]!, { castSpell: true, eventPlayer: true });
-    return body ? { event: "castSpell", cast: { by: CAST_BY[nth[1] as keyof typeof CAST_BY], spell: kind, nth: nth[2] === "first" ? 1 : 2, ...(nth[3] ? { nthOfKind: true as const } : {}), ...(nth[4] === "during their turn" ? { ownTurn: true as const } : {}) }, body } : "fail";
+    return body ? { event: "castSpell", cast: { by: CAST_BY[nth[1] as keyof typeof CAST_BY], spell: kind, nth: nth[2] === "first" ? 1 : 2, ...(nth[3] ? { nthOfKind: true as const } : {}), ...(nth[4] === "during their turn" ? { ownTurn: true as const } : {}), ...(nth[4] === "during each opponent's turn" ? { opponentsTurn: true as const } : {}) }, body } : "fail";
   }
   const m = CAST_TRIGGER.exec(line);
   if (!m) return null;
@@ -635,6 +636,26 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(any[1]!, { subjectIt: true, eventPlayer: true });
     if (!body) return "fail";
     return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter: { kind: "object", types: ["Creature"], text: "creature" }, anyone: true }, body, toOpponent: true };
+  }
+  // "Whenever a creature you control deals combat damage during your turn, put that many +1/+1 counters on it" (Quilled
+  // Greatwurm): to anything, all its combat damage of the step at once (CR 510.2), "that many" being that total.
+  const anyRecipient = /^Whenever (another|an?) (.+?) you control deals combat damage( during your turn)?, (.+)$/.exec(line);
+  if (anyRecipient) {
+    const filter = parseTargetPhrase(anyRecipient[2]!);
+    if (!filter || filter.kind !== "object" || filter.controller || !(filter.types?.includes("Creature") || filter.subtypes?.length)) return "fail";
+    let text = anyRecipient[4]!;
+    if (/\b(?:that player|defending player|X)\b/.test(text)) return "fail";
+    const thatMuch = /\bthat (?:much|many)\b/.test(text);
+    if (thatMuch) text = text.replace(/\bthat (?:much|many)\b/g, "X");
+    let body = parseBody(text, { subjectIt: true });
+    if (!body) return "fail";
+    if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, anyRecipient[4]!) };
+    return {
+      event: "creatureYouControlDealsCombatDamage",
+      dealer: { filter: { ...filter, controller: "you", text: `${anyRecipient[2]} you control` }, ...(anyRecipient[1] === "another" ? { other: true } : {}) },
+      body,
+      ...(anyRecipient[3] ? { activeIf: { kind: "yourTurn" as const } } : {}),
+    };
   }
   const m = /^Whenever (another|an?) (.+?) you control deals combat damage to (a player(?: or battle)?|an opponent), (.+)$/.exec(line);
   if (!m) return null;
@@ -1238,7 +1259,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (playM && !(playM[2] && !playM[3]) && !(playM[2] && playM[3] !== " from exile")) {
     const legendary = /legendary/.test(playM[1]!);
     const body = playM[4]!;
-    if (/(it|its|that card|that spell)/.test(body)) return "fail";
+    if (/\b(it|its|that card|that spell)\b/.test(body)) return "fail";
     const t = parseTrigger(`Whenever you cast a ${legendary ? "legendary " : ""}spell${playM[3] ?? ""}, ${body}`);
     if (!t || t === "fail" || t.event !== "castSpell" || !t.cast || t.cast.orCopy || t.ifCond) return "fail";
     const land = parseTargetPhrase(legendary ? "legendary land" : "land");

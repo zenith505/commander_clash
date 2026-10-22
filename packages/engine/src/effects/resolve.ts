@@ -294,6 +294,7 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
   }
   if (ref.ref === "damagedThisWay") return [...new Set(s.resolving?.damagedThisWay ?? [])].map((id) => obj(s, id)).filter((o) => o.zone === "battlefield" && (!ref.filter || objectMatches(s, ref.filter, o, ctx.controller, false)));
   if (ref.ref === "sacrificed") return []; // gone: only its last known information is used
+  if (ref.ref === "costExiled") return (s.resolving?.item.costExiled ?? []).flatMap((c) => (s.objects[c.id]?.zone === "exile" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc ? [s.objects[c.id]!] : []));
   if (ref.ref === "amassed") {
     const a = s.resolving?.amassed ?? s.resolving?.item.amassed;
     const o = a && s.objects[a.id];
@@ -743,6 +744,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "commanderToHand":
     case "commanderToBattlefield":
     case "toCommandZone":
+    case "suspendCard":
       return runZonesEffect(s, e, ctx, src);
     case "tap":
     case "suspect":

@@ -166,6 +166,12 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
     if (i === undefined && ctx.subjectIt) return { ref: "subjectController" };
     return i !== undefined ? { ref: "targetController", index: i } : null;
   }
+  // The Lord of Pain: "another target player", not the one the trigger is about (bound in triggerBody).
+  if (x === "target player other than that player" && ctx.eventPlayer) {
+    const index = addTarget(ctx, { kind: "player", notEventPlayer: true, text: "another target player" });
+    ctx.lastPlayerTarget = index;
+    return { ref: "target", index };
+  }
   if (x === "target player" || x === "target opponent") {
     const index = addTarget(ctx, { kind: "player", opponent: x === "target opponent", text: x });
     ctx.lastPlayerTarget = index;
@@ -527,6 +533,15 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   p = p.replace(/^((?:all |each )?)([a-z ]+?) that (?:aren't|are not|isn't|is not) legendary$/i, "$1nonlegendary $2");
   // "Each nonland permanent that's not historic" (Desynchronization): not an artifact, not legendary, not a Saga (CR 700.6).
   p = p.replace(/^((?:all |each )?)([a-z ]+?) that(?:'s| is| are|'re) not historic$/i, "$1nonartifact nonlegendary non-Saga $2");
+  // "Auras, Equipment, and modified creatures you control" (Silkguard): each permanent that's one of them (CR 700.9).
+  if (/^Auras, Equipment, and modified creatures you control$/i.test(p)) {
+    const anyOf: TargetSpec[] = [
+      { kind: "object", types: ["Enchantment"], subtypes: ["Aura"], text: "Aura" },
+      { kind: "object", types: ["Artifact"], subtypes: ["Equipment"], text: "Equipment" },
+      { kind: "object", types: ["Creature"], status: "modified", text: "modified creature" },
+    ];
+    return { filter: { kind: "object", types: ["Enchantment", "Artifact", "Creature"], notTypes: [], notColors: [], anyOf, controller: "you", text: phrase.trim().toLowerCase() }, other: false };
+  }
   const all = /^(all|each) /i.exec(p);
   if (all) p = p.slice(all[0].length);
   const other = /^other /i.test(p);
@@ -711,7 +726,7 @@ export function parseTargetPhrase(
   }
   // "creature with a +1/+1 counter on it", "creatures with ice counters on them", "creature you control with a counter on
   // it", "permanents you control with counters on them" (any kind)
-  const counter = / with (?:an? ([+-]1\/[+-]1|ice) counter on it|([+-]1\/[+-]1|ice) counters on them|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
+  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime) counter on it|([+-]1\/[+-]1|ice|slime) counters on them|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
   if (counter) {
     extra.counter = counter[1] ?? counter[2] ?? ANY_COUNTER;
     p = (p.slice(0, counter.index) + p.slice(counter.index + counter[0].length)).trim();
@@ -878,7 +893,8 @@ export function parseTargetPhrase(
     const anyOf: TargetSpec[] = [];
     for (const alt of alts) {
       const sub = parseTargetPhrase(alt);
-      if (sub?.kind !== "object" || sub.controller || sub.tapped !== undefined || sub.combat || sub.anyOf) return null;
+      // "Artifact, enchantment, or tapped creature" (Summon: Yojimbo): tapped is that alternative's own quality.
+      if (sub?.kind !== "object" || sub.controller || (sub.tapped !== undefined && tapped !== undefined) || sub.combat || sub.anyOf) return null;
       anyOf.push(sub);
     }
     const types = [...new Set(anyOf.flatMap((a) => a.types ?? []))];

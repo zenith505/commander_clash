@@ -78,7 +78,7 @@ export type SupportedKeyword = (typeof SUPPORTED_KEYWORDS)[number];
 const PROTECTION_COLOR: Record<string, "W" | "U" | "B" | "R" | "G"> = { white: "W", blue: "U", black: "B", red: "R", green: "G" };
 const PROTECTION_TYPES: Record<string, string> = {
   artifacts: "Artifact", creatures: "Creature", enchantments: "Enchantment", instants: "Instant", sorceries: "Sorcery",
-  planeswalkers: "Planeswalker", lands: "Land",
+  planeswalkers: "Planeswalker", lands: "Land", battles: "Battle",
 };
 
 /** What protection looks at in a source (CR 702.16a): its colors, card types and subtypes. */
@@ -162,13 +162,19 @@ const COLOR_WORD: Record<string, string> = { W: "white", U: "blue", B: "black", 
  * commander (rulings).
  */
 export const IDENTITY_PROTECTION = "Protection from each color not in your commander's color identity";
+/** "Protection from the chosen card type" (Serra's Emissary): the card type chosen as the source entered (CR 702.16a). */
+export const CHOSEN_TYPE_PROTECTION = "Protection from the chosen card type";
+/** The card types a player may name in a game here (rulings on Serra's Emissary; kindred cards aren't supported), as protection says them. */
+export const CARD_TYPE_PLURAL: Record<string, string> = { Artifact: "artifacts", Battle: "battles", Creature: "creatures", Enchantment: "enchantments", Instant: "instants", Land: "lands", Planeswalker: "planeswalkers", Sorcery: "sorceries" };
 /**
  * Keywords with "the chosen color" filled in; without a choice, that protection is dropped. `identity`: the colors in the
  * color identity of the commanders of the effect's controller, undefined if they have none.
  */
-export const bindChosenKeywords = (keywords: readonly string[], color: string | undefined, identity?: readonly string[]) =>
+export const bindChosenKeywords = (keywords: readonly string[], color: string | undefined, identity?: readonly string[], cardType?: string) =>
   keywords.flatMap((k) =>
-    k === CHOSEN_PROTECTION || k === CHOSEN_HEXPROOF
+    k === CHOSEN_TYPE_PROTECTION
+      ? cardType && CARD_TYPE_PLURAL[cardType] ? [`Protection from ${CARD_TYPE_PLURAL[cardType]}`] : []
+      : k === CHOSEN_PROTECTION || k === CHOSEN_HEXPROOF
       ? color && COLOR_WORD[color] ? [`${k === CHOSEN_HEXPROOF ? "Hexproof" : "Protection"} from ${COLOR_WORD[color]}`] : []
       : k === IDENTITY_PROTECTION
         ? identity ? Object.keys(COLOR_WORD).filter((c) => !identity.includes(c)).map((c) => `Protection from ${COLOR_WORD[c]}`) : []

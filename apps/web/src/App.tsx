@@ -332,6 +332,8 @@ type CastDraft = {
   lifeFor?: string[];
   /** Untapped creatures tapped for Lashknife's alternative cost. */
   tap?: string[];
+  /** Counters removed for Quilled Greatwurm's "removing six counters from among creatures you control". */
+  counters?: { id: string; kind: string }[];
   /** Cast from your graveyard this way (flashback, escape, ...). */
   via?: CastFromGraveyardKind;
   buyback?: boolean;
@@ -372,7 +374,7 @@ type CastDraft = {
  * spell (its optional additional cost, or Conspiracy Unraveler's alternative cost), or activate an ability.
  */
 /** "Remove three counters from among ... you control" (Tekuthal): which counters, as the ability is activated. */
-type CounterPick = { activate: ActivateDraft; label: string; what: string; n: number; candidates: { id: string; kind: string; n: number }[] };
+type CounterPick = { label: string; what: string; n: number; candidates: { id: string; kind: string; n: number }[] } & ({ activate: ActivateDraft; draft?: undefined } | { draft: CastDraft; activate?: undefined });
 type EvidencePick = { label: string; n: number; candidates: string[]; optional: boolean } & ({ draft: CastDraft; key: "evidence" | "collect"; activate?: undefined } | { activate: ActivateDraft; draft?: undefined; key?: undefined });
 
 /** Choosing how to pay "sacrifice a creature or pay {3}{B}" (CR 601.2b). */
@@ -417,7 +419,8 @@ type ManaPick = { mana?: ManaType; extra?: ManaType[] };
 /** Announcing X for a spell or activated ability with {X} in its cost (CR 107.3a, 601.2b, 602.2b). */
 type XPick =
   /** `extra`: an additional cost with X in it, "pay X life" (CR 107.3a). */
-  | { mode: "cast"; draft: CastDraft; label: string; cost: string; max: number; value: number; extra?: string }
+  /** `min`: "X can't be 0" (Thieving Skydiver's kicker). */
+  | { mode: "cast"; draft: CastDraft; label: string; cost: string; max: number; value: number; extra?: string; min?: number }
   | { mode: "activate"; objectId: string; index: number; label: string; cost: string; max: number; value: number; modes?: number[]; extra?: string };
 
 /** The biggest X you can pay for (`plan(x)` is null when you can't), up to 99. */
@@ -670,7 +673,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: mv !== undefined && mv <= max && fits(mv) ? mv : max, modes, extra: "discard a card with mana value X" });
       }
       const max = maxX((n) => planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, n));
-      const extra = (ab.costs ?? []).flatMap((c) => ("x" in c && c.x ? [`${c.kind === "sacrifice" ? "sacrifice" : c.kind} X ${c.kind === "sacrifice" ? c.filter.text.replace(/s?$/, "s") : ""}`.trim()] : [])).join(" and ");
+      const extra = [...(ab.energyX ? ["pay X energy"] : []), ...(ab.costs ?? []).flatMap((c) => ("x" in c && c.x ? [`${c.kind === "sacrifice" ? "sacrifice" : c.kind} X ${c.kind === "sacrifice" ? c.filter.text.replace(/s?$/, "s") : ""}`.trim()] : []))].join(" and ");
       return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: Math.min(max, Math.max(ab.xMin ?? 0, 1)), modes, extra });
     }
     // −X loyalty abilities: X loyalty counters, up to how many it has (CR 606.6).
@@ -716,6 +719,12 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         // "Put a card from your hand on top of your library" (Penance): click the cards in your hand.
         if (d.exileFromHand !== undefined) continue;
         return setCostPick({ activate: d, kind: "exileFromHand", label: cardOf(s, d.objectId).name, what: `put ${c.n === 1 ? "a card" : `${c.n} cards`} from your hand on top of your library`, n: c.n, candidates: s.players[HUMAN]!.hand.filter((id) => id !== d.objectId), chosen: [] });
+      }
+      if (c.kind === "exileFromHand" && !c.anyNumber && !c.mvX) {
+        // "Exile a nonland card from your hand" (Jhoira of the Ghitu): click the cards in your hand.
+        if (d.exileFromHand !== undefined) continue;
+        const what = c.filter?.text ?? "card";
+        return setCostPick({ activate: d, kind: "exileFromHand", label: cardOf(s, d.objectId).name, what: `exile from your hand ${c.n === 1 ? (/^[aeiou]/i.test(what) ? "an" : "a") : c.n} ${what}${c.n > 1 ? "s" : ""}`, n: c.n, candidates: s.players[HUMAN]!.hand.filter((id) => id !== d.objectId && (!c.filter || printedMatches(c.filter, cardOf(s, id)))), chosen: [] });
       }
       if (c.kind === "exileFromGraveyard" && c.linked) {
         // Jester's Scepter: pick one of the cards exiled with it (you may look at them) to put into its owner's graveyard.
@@ -830,6 +839,13 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       const extra = optional?.kind === "sacrifice" ? `sacrifice X ${optional.filter.text.replace(/s?$/, "s")} (X can be 0)` : costX ? (/\b(?:pay|discard|sacrifice|return|exile) X [^.(]*/i.exec(card.oracleText)?.[0]?.trim().replace(/^./, (c) => c.toLowerCase()) ?? "its cost") : undefined;
       return setXPick({ mode: "cast", draft: d, label: card.name, cost: (free && madnessCastOf(s, HUMAN, d.objectId)) || (altX ? altMana! : card.manaCost), max, value: optional ? 0 : max, ...(extra ? { extra } : {}) });
     }
+    // "Kicker {X}": X is announced once it's kicked (CR 601.2b), "X can't be 0" (Thieving Skydiver).
+    const kickX = d.kicks?.map((i) => compiled.kicker?.costs[i] ?? "").find((c) => parseManaCost(c).hasX);
+    if (d.x === undefined && kickX) {
+      const min = compiled.kicker?.xMin ?? 0;
+      const max = maxX((n) => planCast(s, HUMAN, d.objectId, undefined, d.modes, d.convoke ?? "auto", Math.max(n, min), kicks));
+      return setXPick({ mode: "cast", draft: d, label: `${card.name} (kicked)`, cost: kickX, max: Math.max(max, min), value: Math.max(max, min), ...(min ? { min } : {}) });
+    }
     // The optional costs announced so far decide which targets it has (CR 702.33g, 702.166d, 702.174m); bargain is
     // asked before them when a target depends on it.
     const gated = spellTargets(s, d.objectId, d.modes, d.alt, { bargained: true });
@@ -858,7 +874,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       }
       if (!c.n) continue; // "sacrifice X creatures" with X = 0
       if (c.kind === "exileFromGraveyard" && c.top) continue; // "the top three black cards of your graveyard": no choice
-      if (c.kind === "removeCounters") continue; // only activated abilities have this cost so far (oracle/activated.ts)
+      // "Removing six counters from among creatures you control" (Quilled Greatwurm): pick them (CR 601.2h).
+      if (c.kind === "removeCounters") {
+        if (d.counters !== undefined) continue;
+        return setCounterPick({ draft: d, label: card.name, what: `remove ${c.n} ${c.counter ? `${c.counter} ` : ""}counter${c.n === 1 ? "" : "s"} from among ${c.filter.text}`, n: c.n, candidates: counterCostCandidates(s, HUMAN, s.objects[d.objectId]!, c) });
+      }
       const key = c.kind === "exileFromGraveyard" ? "exileCards" : c.kind;
       if (d[key] !== undefined) continue;
       if (c.kind === "returnToHand")
@@ -926,6 +946,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       ...(d.exileFromHand?.length ? { exileFromHand: d.exileFromHand } : {}),
       ...(d.lifeFor?.length ? { lifeFor: d.lifeFor } : {}),
       ...(d.tap?.length ? { tap: d.tap } : {}),
+      ...(d.counters?.length ? { counters: d.counters } : {}),
       ...(d.delve?.length ? { delve: d.delve } : {}),
     };
     // Delve: pick cards to exile from your graveyard, suggesting just enough to pay (CR 702.66a).
@@ -1623,7 +1644,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onHover={setHover}
               onDone={(counters) => {
                 setCounterPick(null);
-                continueActivate({ ...counterPick.activate, counters });
+                if (counterPick.draft) continueCast({ ...counterPick.draft, counters });
+                else continueActivate({ ...counterPick.activate, counters });
               }}
               onCancel={() => setCounterPick(null)}
             />
@@ -1912,19 +1934,20 @@ function tapCandidates(s: GameState, pick: TapPick): GameObject[] {
 
 /** The bar shown while announcing X. */
 function XPickBar({ pick, onChange, onDone, onCancel }: { pick: XPick; onChange: (x: number) => void; onDone: () => void; onCancel: () => void }) {
-  const set = (n: number) => onChange(Math.max(0, Math.min(pick.max, Math.floor(n) || 0)));
+  const min = pick.mode === "cast" ? (pick.min ?? 0) : 0;
+  const set = (n: number) => onChange(Math.max(min, Math.min(pick.max, Math.floor(n) || 0)));
   return (
     <div className="targeting x-pick">
       <span>
         <strong>{pick.label}</strong> <ManaCost cost={pick.cost} size="sm" />
         {pick.extra ? ` and ${pick.extra}: choose X (up to ${pick.max})` : `: choose X (up to ${pick.max} with your mana)`}
       </span>
-      <button className="ghost" disabled={pick.value <= 0} onClick={() => set(pick.value - 1)} aria-label="X minus one">
+      <button className="ghost" disabled={pick.value <= min} onClick={() => set(pick.value - 1)} aria-label="X minus one">
         −
       </button>
       <input
         type="number"
-        min={0}
+        min={min}
         max={pick.max}
         value={pick.value}
         autoFocus
@@ -2020,7 +2043,8 @@ function KickPickBar({
   onCancel: () => void;
 }) {
   const d = pick.draft;
-  const can = (kicks: number[]) => planCast(s, HUMAN, d.objectId, undefined, d.modes, d.convoke ?? "auto", undefined, { ...(d.via ? { via: d.via } : {}), ...(kicks.length ? { kicks } : {}) }) !== null;
+  // "Kicker {X}. X can't be 0" (Thieving Skydiver): affordable with the smallest X allowed.
+  const can = (kicks: number[]) => [undefined, 1].some((x) => planCast(s, HUMAN, d.objectId, undefined, d.modes, d.convoke ?? "auto", x, { ...(d.via ? { via: d.via } : {}), ...(kicks.length ? { kicks } : {}) }) !== null);
   const cancel = (
     <button className="ghost" onClick={onCancel}>
       Cancel
@@ -4338,7 +4362,9 @@ function Controls({
     // Devour: any number of them; exploit: none or one (pending.min).
     const what = pending.objectId ? `any number of ${pending.what} permanents` : pending.anyNumber ? `any number of ${pending.what.replace(/y$/, "ie")}s` : pending.min !== undefined && pending.count === 1 ? `${an}, if you want,` : pending.count === 1 ? an : `${pending.count} (${pending.what})`;
     const n = discards.length;
-    const ok = (pending.min !== undefined ? n >= pending.min && n <= pending.count : n === pending.count) && !(pending.action === "band" && n === 1);
+    // Slaughter the Strong: the chosen creatures' total power, a negative power subtracting.
+    const totalPower = pending.maxTotalPower !== undefined ? discards.reduce((t, id) => t + power(s, s.objects[id]!), 0) : 0;
+    const ok = (pending.min !== undefined ? n >= pending.min && n <= pending.count : n === pending.count) && !(pending.action === "band" && n === 1) && (pending.maxTotalPower === undefined || totalPower <= pending.maxTotalPower);
     return (
       <div className="controls">
         <span>
@@ -4379,6 +4405,8 @@ function Controls({
                 ? `click an Equipment to unattach from the creature of yours it's attached to. That creature becomes tapped and gains indestructible until end of turn.`
                 : pending.action === "meld"
                 ? `meld: click the ${pending.what} to exile with ${pending.source} and meld them into one permanent. A token or a copy can't meld and stays in exile.`
+                : pending.action === "keep" && pending.maxTotalPower !== undefined
+                ? `click any number of your creatures with total power ${pending.maxTotalPower} or less to keep (now ${totalPower}). The rest are sacrificed.`
                 : pending.action === "keep"
                 ? `click ${pending.count === 1 ? (pending.min === 0 ? `up to one ${pending.what}` : an) : `${pending.min === 0 ? "up to " : ""}${pending.count} ${pending.what}s`} ${pending.destroy ? "to keep (anyone's)" : pending.of === undefined ? "of yours to keep" : `for ${s.players[pending.of]!.name} to keep`}. The rest are ${pending.destroy ? "destroyed" : "sacrificed"}.`
                 : `click ${what} ${theirs ? `${theirs} controls` : "of yours"} to ${verb}.`}

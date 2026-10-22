@@ -153,6 +153,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const of = ctx.lastObjectTarget !== undefined ? ({ ref: "target", index: ctx.lastObjectTarget } as const) : null;
     return of && !ctx.spell ? [{ type: "delayed", when: "dies", of, effects: [{ type: "flip", what: { ref: "self" } }], text: "flip ~", thisTurn: true }] : null;
   }
+  // Together Forever: "When that creature dies this turn, return that card to its owner's hand": the card it became in
+  // the graveyard (CR 400.7, 603.7c).
+  if (/^When that creature dies this turn, return that card to its owner's hand$/.test(s) && ctx.lastObjectTarget !== undefined)
+    return [{ type: "delayed", when: "dies", of: { ref: "target", index: ctx.lastObjectTarget }, effects: [{ type: "bounce", what: { ref: "subjectCard", zone: "graveyard" } }], text: "return that card to its owner's hand", thisTurn: true }];
   // Removal and tapping. Not a blink ("Exile target creature you control, then return that card ...", sentences/tokens.ts).
   if (!/^Exile [^,]+, then return /i.test(s) && (m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+|all .+|each .+|~|it|that creature|that permanent|that land|them|those creatures|those permanents|enchanted \w+|equipped \w+)$/i.exec(s))) {
     const what = parseObject(m[2]!, ctx);
@@ -558,6 +562,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
       out.push({ type: "continuous", what, mods: [{ kind: "addKeywords", keywords: keywords as string[] }], duration: "endOfTurn" });
     }
     return out;
+  }
+  // "All permanents you control phase out, and until your next turn, your life total can't change and you gain protection
+  // from everything" (Perch Protection): Teferi's Protection's two sentences in one.
+  if ((m = /^(All permanents you control phase out), and (until your next turn, .+)$/.exec(s))) {
+    const a = parsePermanentsSentence(m[1]!, ctx);
+    const b = parsePermanentsSentence(capital(m[2]!), ctx);
+    return a && b ? [...a, ...b] : null;
   }
   // "You gain protection from everything until your next turn" (The One Ring); "Until your next turn, your life total
   // can't change and you gain protection from everything" (Teferi's Protection).

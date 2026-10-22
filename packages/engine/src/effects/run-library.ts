@@ -13,6 +13,16 @@ import { fireEvent } from "./triggers";
 import { chooseAuraHosts } from "./run-zones";
 import type { AuraHost } from "../game";
 import { defMv, sameName } from "../faces";
+import { characteristics } from "../layers";
+import type { TargetSpec } from "../abilities";
+
+/** "Shares a color with a legendary creature you control" (Ringsight): their colors now; a colorless one shares none (rulings). */
+function legendColors(s: GameState, spec: TargetSpec, pid: PlayerId): TargetSpec {
+  const { colorOfYourLegend: _, ...rest } = spec;
+  const colors = [...new Set(Object.values(s.objects).filter((o) => o.zone === "battlefield" && controllerOf(s, o) === pid).map((o) => characteristics(s, o)).filter((c) => c.types.includes("Creature") && c.supertypes.includes("Legendary")).flatMap((c) => c.colors))];
+  // No color to share: nothing fits.
+  return colors.length ? { ...rest, colors } : { ...rest, colors: ["W"], notColors: ["W"] };
+}
 
 /** Libraries, hands and graveyards: mill, discard, scry, surveil, search, look at the top cards. */
 export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
@@ -539,7 +549,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       return;
     }
-    case "shuffleZones":
+    case "shuffleZones": {
+      const shuffled: [PlayerId, number][] = [];
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
         const ids = [...(e.hand ? p.hand : []), ...(e.graveyard ? p.graveyard : [])].filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
@@ -552,9 +563,13 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         }
         for (const id of ids) moveObject(s, id, "library");
         shuffleLibrary(s, p);
+        shuffled.push([pid, ids.length]);
         log(s, `${p.name} shuffles ${e.filter ? `${ids.length === 1 ? "the" : `all ${ids.length}`} ${e.filter.text}${ids.length === 1 ? "" : "s"} from their graveyard` : `their ${e.hand && e.graveyard ? "hand and graveyard" : e.hand ? "hand" : "graveyard"}`} into their library.`);
       }
+      // Winds of Change: each draws as many as they shuffled into their own library (rulings).
+      if (e.drawThatMany) for (const [pid, n] of shuffled) if (n && !player(s, pid).lost) draw(s, pid, n);
       return;
+    }
     case "handToBottomDraw": {
       // Teferi's Puzzle Box, Mindmoil: the whole hand goes on the bottom in the order its owner chooses (CR 401.4), then
       // that many cards are drawn, which can be some of them if the library was short.
@@ -589,7 +604,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const sc = (r.scratch ??= {});
       // "With mana value less than or equal to ..." (TargetSpec.bound): as it resolves.
       const filter0 = e.filter && bindBound(s, e.filter, amountCtx(s, ctx));
-      const filter = filter0?.named === "~" ? { ...filter0, named: src } : filter0;
+      const filter1 = filter0?.named === "~" ? { ...filter0, named: src } : filter0;
+      const filter = filter1?.colorOfYourLegend ? legendColors(s, filter1, ctx.controller) : filter1;
       const who = e.who ? (e.who.ref === "eachPlayer" || e.who.ref === "eachOpponent" || (e.who.ref === "target" && (e.who.n ?? 1) > 1) ? apnap(s, players(s, e.who, ctx)) : players(s, e.who, ctx).slice(0, 1)) : [ctx.controller];
       const queue = (sc.searchQueue ??= who.filter((pid) => !player(s, pid).lost));
       const searchedBy = (sc.searchedBy ??= []);

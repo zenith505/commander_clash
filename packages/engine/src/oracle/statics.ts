@@ -599,7 +599,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Beastmaster Ascension: "as long as ~ has seven or more quest counters on it".
   // "If ~ has fewer than three +1/+1 counters on it" (Runaway Steam-Kin).
   if ((m = new RegExp(`^~ has fewer than ${NUM} ${COUNTER} counters on it$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[2]!), min: 0, max: num(m[1]!) - 1 };
-  if ((m = new RegExp(`^~ has ${NUM} or more ${COUNTER} counters on it$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[2]!), min: num(m[1]!) };
+  // "~ has trample as long as it has ten or more +1/+1 counters on it" (Primordial Hydra).
+  if ((m = new RegExp(`^(?:~|it) has ${NUM} or more ${COUNTER} counters on it$`).exec(text)) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "selfCounters", counter: counterKind(m[2]!), min: num(m[1]!) };
   // The Tron lands: "If you control an Urza's Mine and an Urza's Power-Plant" (CR 205.3i: "Urza's" and "Mine" are both
   // land types, so one land with both; not Processing Plant, an Ulamog's Power-Plant), each of them.
   if ((m = /^you control an Urza's (Mine|Power-Plant|Tower) and an Urza's (Mine|Power-Plant|Tower)$/.exec(text)) && m[1] !== m[2])
@@ -608,10 +609,10 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     // "At least three other enchantments" (Ephara, Ever-Sheltering) is "three or more other enchantments".
     m[2] = m[2]!.replace(/^at least (\w+) /, "$1 or more ");
     // "Seven or more lands with different names" (Field of the Dead): names counted once each.
-    const names = new RegExp(`^${NUM} or more (lands|creatures|artifacts) with different names$`).exec(m[2]!);
+    const names = new RegExp(`^${NUM} or more (lands|creatures|artifacts) with (different names|the same name)$`).exec(m[2]!);
     if (names && m[1] === "you") {
       const filter = pickFilter(names[2]!);
-      return filter ? { kind: "control", who: "you", filter, min: num(names[1]!), differentNames: true } : null;
+      return filter ? { kind: "control", who: "you", filter, min: num(names[1]!), ...(names[3] === "the same name" ? { sameName: true as const } : { differentNames: true as const }) } : null;
     }
     const who = m[1] === "you" ? "you" : m[1] === "an opponent" ? "opponent" : "defending";
     // Each attacking creature has its own defending player (CR 506.2), so only the source's own is modeled.
@@ -620,7 +621,10 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const q = CONTROL_COUNT.exec(m[2]!.replace(/^(an? \S+) or an? (?=\S+$)/, "$1 or "));
     if (!q) return null;
     // NUM is a group of its own: q[1] the word, q[2] "N or more", q[3] "N or fewer", q[4] what.
-    const filter = pickFilter(q[4]!);
+    // "Three or more tapped Pirates and/or Vehicles" (The Indomitable): each permanent with either subtype.
+    const either = /^(tapped )?([A-Z][a-z]+) and\/or ([A-Z][a-z]+)$/.exec(q[4]!);
+    const kinds = either ? [singular(either[2]!), singular(either[3]!)] : [];
+    const filter: TargetSpec | null = either ? (kinds.every((k) => CREATURE_TYPES.has(k) || k === "Vehicle") ? { kind: "object", types: [], subtypes: kinds, ...(either[1] ? { tapped: true } : {}), text: q[4]!.toLowerCase() } : null) : pickFilter(q[4]!);
     if (!filter) return null;
     if (q[1] === "no") return { kind: "control", who, filter, max: 0 };
     if (q[1] === "another") return { kind: "control", who, filter, min: 1, other: true };
@@ -821,8 +825,9 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const more = / this turn$/.test(m[5]!) ? null : parseExtraBlocks(m[5]!);
     return first && grants && more ? [...first, ...grants, more] : null;
   }
-  // "Gets +2/+2, has flying, and attacks each combat if able" (Dragon's Rage Channeler).
-  if ((m = new RegExp(`^gets? ${PT}/${PT}, (?:has|have) (.+?),? and (attacks? each combat if able|can't block)$`).exec(rest))) {
+  // "Gets +2/+2, has flying, and attacks each combat if able" (Dragon's Rage Channeler), "... and can't attack you or
+  // planeswalkers you control" (the Vows).
+  if ((m = new RegExp(`^gets? ${PT}/${PT}, (?:has|have) (.+?),? and (attacks? each combat if able|can't block|can't attack you or planeswalkers you control)$`).exec(rest))) {
     const grants = parseGrants(m[3]!);
     const second = parseStaticMods(m[4]!);
     return grants && second ? [{ kind: "modifyPT", power: ptAmt(m[1]!), toughness: ptAmt(m[2]!) }, ...grants, ...second] : null;
@@ -894,6 +899,9 @@ export function parseStaticMods(rest: string): Modification[] | null {
     return filter?.kind === "object" && filter.power ? [{ kind: "cantBlockCreatures", filter: { ...filter, text: `creatures with power ${m[1]} or ${m[2]}` } }] : null;
   }
   if (/^can't attack$/.test(rest)) return [{ kind: "cantAttack" }];
+  // "Creatures with flying can't attack you or planeswalkers you control" (Sandwurm Convergence, CR 508.1c): "you" is the
+  // source's controller.
+  if (/^can't attack you or planeswalkers you control$/.test(rest)) return [{ kind: "cantAttackYou" }];
   if (/^can't attack its owner$/.test(rest)) return [{ kind: "cantAttackOwner" }];
   if (/^can't be sacrificed$/.test(rest)) return [{ kind: "cantBeSacrificed" }];
   // Alexios: "attacks each combat if able, can't be sacrificed, and can't attack its owner".
@@ -1288,9 +1296,11 @@ function parseStaticLine(line: string): StaticAbility | null {
     const coat = /^other creature on the battlefield that shares at least one creature type with it$/.test(each[4]!) && affects.kind === "filter";
     // Moraug: "for each time it has attacked this turn", each creature it affects, counted for that one.
     const attacks = each[4] === "time it has attacked this turn" && affects.kind === "filter";
+    // Toxrill: "for each slime counter on them", each creature it affects, counted for that one.
+    const ownCounters = affects.kind === "filter" ? new RegExp(`^${COUNTER} counter on (?:it|them)$`).exec(each[4]!) : null;
     // Mirror Box: "for each other creature you control with the same name as that creature", "that creature" each one it affects.
     const mirror = /^other creature you control with the same name as that creature$/.test(each[4]!) && affects.kind === "filter";
-    const per = mirror ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], controller: "you" as const, text: "creature you control" }, sameNameAsAffected: true as const } } : coat ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], text: each[4]! }, sharesTypeWithAffected: true as const } } : attacks ? { count: { kind: "timesAffectedAttacked" as const } } : counts(parseCount(each[4]!, null, true), each[4]!);
+    const per = mirror ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], controller: "you" as const, text: "creature you control" }, sameNameAsAffected: true as const } } : coat ? { count: { kind: "permanents" as const, filter: { kind: "object" as const, types: ["Creature"], text: each[4]! }, sharesTypeWithAffected: true as const } } : attacks ? { count: { kind: "timesAffectedAttacked" as const } } : ownCounters ? { count: { kind: "affectedCounters" as const, counter: counterKind(ownCounters[1]!) } } : counts(parseCount(each[4]!, null, true), each[4]!);
     const pt = mods[0];
     if (!per || mods.length !== 1 || pt?.kind !== "modifyPT") return null;
     const [p, t] = [scaleAmount(pt.power, per), scaleAmount(pt.toughness, per)];

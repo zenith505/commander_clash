@@ -1,6 +1,7 @@
 import type { AmountExpr, Count, ObjRef, PlayerRef, TargetSpec } from "../abilities";
 import { ANY_COUNTER } from "../abilities";
 import { NUM, num, COUNTER, counterKind, COLOR_WORDS, capital, singularWord } from "./words";
+import { CREATURE_TYPES } from "../keywords";
 import { Ctx, addTarget } from "./body";
 import { parseGroup, parsePlayer, parseTargetPhrase, subtypeClause } from "./targets";
 
@@ -15,6 +16,15 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "For each creature you control that's an Insect, Rat, Spider, or Squirrel" (Swarmyard Massacre): see subtypeClause.
   let p = subtypeClause(text.trim().replace(/\.$/, "").replace(/ and\/or /g, " or "));
   let m: RegExpExecArray | null;
+  // "The number of other Squirrels, Bats, Lizards, and Rats you control" (Valley Rotcaller): each that's any of them,
+  // counted once, as "A or B" is.
+  if ((m = /^(the number of (?:other )?)((?:[A-Z][a-z]+, )+)(?:and|or) ([A-Z][a-z]+)( you control)$/.exec(p))) {
+    const types = [...m[2]!.split(", ").filter(Boolean), m[3]!].map(singularWord);
+    if (!types.every((x) => CREATURE_TYPES.has(x))) return null;
+    const c = parseCount(`${m[1]}${m[3]} or ${m[2]!.split(", ")[0]}${m[4]}`, ctx);
+    if (!c || !("count" in c) || c.count.kind !== "permanents" || c.count.filter.subtypes?.length !== 2) return null;
+    return { ...c, count: { ...c.count, filter: { ...c.count.filter, subtypes: types, text: p.replace(/^the number of /, "") } } };
+  }
   if (ctx?.milledThisWay && /^the total mana value of those cards$/i.test(p)) return { count: { kind: "milledManaValue" } };
   // "The number of experience counters you have", "for each experience counter you have" (CR 122.1).
   if ((each && /^experience counter you have$/i.test(p)) || /^the number of experience counters you have$/i.test(p)) return { count: { kind: "experience", who: { ref: "you" } } };
@@ -163,6 +173,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^(?:players?|opponents?) being attacked$/i.test(p)) return count({ kind: "playersAttacked" });
   // "For each opponent you have", "the number of opponents you have" (Inspired Sphinx).
   if (each && /^opponents?(?: you have)?$/i.test(p)) return count({ kind: "players", opponents: true });
+  // "The number of opponents who control a creature with power 4 or greater" (Summon: Yojimbo), "for each opponent who
+  // controls an artifact": opponents controlling at least one such permanent.
+  if (each && (m = /^opponents? who controls? (?:an?|one or more) (.+)$/i.exec(p))) {
+    const spec = parseTargetPhrase(m[1]!);
+    return spec?.kind === "object" && !spec.controller ? count({ kind: "players", opponents: true, controlling: { ...spec, text: m[1]! } }) : null;
+  }
   if (each && /^(?:of your opponents|opponent) who lost life this turn$/i.test(p)) return count({ kind: "players", opponents: true, lostLife: true });
   if (each && /^opponent who drew a card this way$/i.test(p)) return count({ kind: "players", opponents: true, drewThisWay: true });
   // Smuggler's Share: "for each opponent who drew two or more cards this turn", "... who had two or more lands enter the

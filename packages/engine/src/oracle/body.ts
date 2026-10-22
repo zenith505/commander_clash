@@ -428,6 +428,10 @@ function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect:
       : /^You may cast that card this turn$/.test(cast)
         ? "thisTurn"
         : undefined;
+  // "Put two time counters on that card. If it doesn't have suspend, it gains suspend." (Kang Prime, CR 702.62).
+  const suspend = exile && !then ? new RegExp(`^Put ${NUM} time counters? on that card$`).exec(cast) : null;
+  if (suspend && /^If it doesn't have suspend, it gains suspend$/.test(sentences[next + 1] ?? ""))
+    return { effect: { type: "exileUntilNonland", then: "suspend", suspend: Number(amt(suspend[1]!)) }, next: next + 2 };
   if (!then) return null;
   const who = they ? parsePlayer(they[1]!, ctx) : undefined;
   if (they && !who) return "fail";
@@ -550,6 +554,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // "Search your library for up to X basic land cards, where X is .... Put those cards onto the battlefield tapped, then
   // shuffle." (Traverse the Outlands): the same as "... put them onto the battlefield tapped, then shuffle, where X is ...".
   text = text.replace(/(^|\. )Search your library for up to X ([^.,]+), where X is ([^.]+)\. Put those cards onto the battlefield( tapped)?, then shuffle\./, "$1Search your library for up to X $2, put them onto the battlefield$4, then shuffle, where X is $3.");
+  // Harvest Season: "Search your library for up to X basic land cards, where X is ..., put those cards onto the
+  // battlefield tapped, then shuffle." The same.
+  text = text.replace(/(^|\. )Search your library for up to X ([^.,]+), where X is ([^.,]+), put those cards onto the battlefield( tapped)?, then shuffle\./, "$1Search your library for up to X $2, put them onto the battlefield$4, then shuffle, where X is $3.");
   // Avatar's Wrath: "Choose up to one target creature, then airbend all other creatures": the target only says which one
   // isn't airbent (CR 701.65a), the same as two sentences.
   // "Put a night counter on ~. Then if it has eight or more night counters on it, remove all of them and create ..."
@@ -780,6 +787,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // (Ragavan): two instructions, the second an impulse with its permission.
   text = text.replace(/(^|\. )([Cc]reate an? [^.]+? token) and exile the top card of (your|that player's) library\. (?=(?:Until end of turn, )?[Yy]ou may (?:cast|play) that card)/, "$1$2. Exile the top card of $3 library. ");
   // "..., then shuffle and you gain 1 life" (Brokers Hideout): the search, then the life.
+  // "Loses two times X life" (Debt to the Deathless) is "loses twice X life".
+  text = text.replace(/\bloses two times X life\b/g, "loses twice X life");
   text = text.replace(/, then shuffle and you gain (\d+) life\./g, ", then shuffle. You gain $1 life.");
   // "You gain 7 life, draw seven cards, then put up to seven ..." (Ugin, the Spirit Dragon): three instructions in order.
   text = text.replace(/^You gain (\d+) life, draw (\w+) cards?, then /, "You gain $1 life. Draw $2 cards, then ");
@@ -868,7 +877,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // Nor "exile the top two cards of your library, then choose one of them" (Party Thrasher): the choice is of those cards.
     // Nor "you may exile target creature you control, then return that card to the battlefield" (Conjurer's Closet): one
     // blink, all of it optional.
-    .flatMap((x) => (/^If [^,]+, /.test(x) || /^[Yy]ou may exile [^,]+, then return (?:it|that card) to the battlefield under (?:its owner's|your) control\.?$/.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then reveals the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|destroy the rest$|meld them into |choose one of them$)/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
+    .flatMap((x) => (/^If [^,]+, /.test(x) || /^[Yy]ou may exile [^,]+, then return (?:it|that card) to the battlefield under (?:its owner's|your) control\.?$/.test(x) || WHEEL.test(x) || /^(?:\w+ player shuffles (?:their|the cards from their) .+ into their library, then draws|[Ss]huffle the cards from your hand into your library, then draw) /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then reveals the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|sacrifices all other creatures they control$|destroy the rest$|meld them into |choose one of them$)/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
     // "Target opponent reveals their hand and you choose a nonland card from it": two instructions, in order.
     .flatMap((x) => x.split(/(?<=reveals (?:their|his or her) hand) and (?=you choose )/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p)))
     .flatMap(splitSpentPair)
@@ -918,7 +927,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   let prevTargets = 0;
   let curTargets = 0;
   // "You may pay {2}" waits for the sentence after: "If you do, draw a card."
-  let payFirst: { pay: PayCost; text: string; payX?: { max?: Amount } } | null = null;
+  let payFirst: { pay: PayCost; text: string; payX?: { max?: Amount; color?: "W" | "U" | "B" | "R" | "G" } } | null = null;
   // "Look at the top four cards of your library" waits for what to do with them (see parseDig).
   let dig: Partial<Extract<Effect, { type: "dig" }>> | null = null;
   // The look's own "where X is ...", for "with mana value X or less" after it (Hatchery Spider).
@@ -1344,6 +1353,27 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si++;
       continue;
     }
+    // "Whenever a player casts their first spell each turn, choose another target player. ~ deals damage equal to that
+    // spell's mana value to the chosen player." (The Lord of Pain): a player other than the caster (rulings).
+    const another = ctx.eventPlayer && /^[Cc]hoose another target player$/.test(s) ? /^(.+) to the chosen player$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (another) {
+      const fx = parseOne(`${another[1]!} to target player other than that player`, ctx);
+      if (!fx) return null;
+      effects.push(...fx);
+      si++;
+      continue;
+    }
+    // "Each opponent may discard a card. If they don't, they lose 3 life." (Professor Onyx): a punisher, "loses 3 life
+    // unless they discard a card".
+    const mayOut = /^([Ee]ach opponent|[Tt]arget opponent|[Tt]arget player|[Tt]hat player) may (discard|sacrifice) (.+)$/.exec(s);
+    const mayLose = mayOut && new RegExp(`^If (?:they|that player|the player) (?:doesn't|don't), (?:they|that player|the player) loses? (\\d+) life$`).exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (mayOut && mayLose) {
+      const fx = parseOne(`${mayOut[1]!} loses ${mayLose[1]!} life unless they ${mayOut[2]!}s ${mayOut[3]!}`, ctx);
+      if (fx?.length !== 1 || fx[0]!.type !== "punisher") return null;
+      effects.push(...fx);
+      si++;
+      continue;
+    }
     // "Whenever an opponent draws a card, that player may pay {2}. If the player doesn't, you create a Treasure token."
     // (Smothering Tithe): a punisher whose only way out is the payment.
     const thatMay = /^([Tt]hat player|[Tt]hey|[Tt]arget opponent|[Tt]arget player|[Ee]ach opponent) may pay (.+)$/.exec(s);
@@ -1539,6 +1569,22 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si++;
       continue;
     }
+    // "Reveal the top four cards of your library. Put all land cards revealed this way into your hand and the rest into your
+    // graveyard." (Mulch, Wrenn and Seven): every matching card, no choice; the rest where they go (CR 401.4 for "any order").
+    // "Put all creature and land cards revealed this way" (Lair Delve): each that's either. "The top X cards" (Enshrined
+    // Memories): X as it was cast.
+    const revealN = new RegExp(`^Reveal the top ${NUMX} cards of your library$`, "i").exec(s);
+    const putAll = revealN && /^Put all (.+?) cards revealed this way into your hand and the rest (into your graveyard|on the bottom of your library in any order|on the bottom of your library in a random order)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (revealN && putAll) {
+      const filter = parseSearchFilter(`${putAll[1]!.replace(/\band\/or\b|,? and /g, " or ").replace(/  +/g, " ").replace(/ cards\b/g, " card")} card`);
+      const n = revealN[1] === "X" ? X : num(revealN[1]!);
+      if (!filter || (typeof n === "number" && !Number.isInteger(n))) return null;
+      const rest = putAll[2] === "into your graveyard" ? "graveyard" : "bottom";
+      // Every match is taken, however many.
+      effects.push({ type: "dig", n, count: typeof n === "number" ? n : 1000, upTo: false, filter, into: "hand", rest, reveal: true, required: true, ...(/random/.test(putAll[2]!) ? { random: true as const } : {}) });
+      si++;
+      continue;
+    }
     // Teferi's Puzzle Box, Mindmoil (split at ", then" by now): see handToBottomDraw.
     const handDown = /^(?:([Tt]hat player) puts|[Pp]ut) the cards in (?:their|your) hand on the bottom of (?:their|your) library in any order$/.exec(s);
     if (handDown && /^(?:[Tt]hat player )?[Dd]raws? that many cards$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
@@ -1598,11 +1644,35 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si++;
       continue;
     }
+    // Arcane Bombardment: "exile an instant or sorcery card at random from your graveyard. Then copy each card exiled with
+    // this enchantment. You may cast any number of the copies without paying their mana costs." The copies are cast as
+    // the ability resolves, or never (rulings); the cards stay exiled, linked to it (CR 607.2a).
+    if (
+      /^[Ee]xile an instant or sorcery card at random from your graveyard$/.test(s) &&
+      /^Then copy each card exiled with (?:~|this enchantment)$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "") &&
+      /^You may cast any number of the copies without paying their mana costs$/.test(sentences[si + 2]?.replace(/\.$/, "") ?? "")
+    ) {
+      const filter: TargetSpec = { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], owner: "you", text: "instant or sorcery card" };
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, fromYard: { filter, randomLinked: true } });
+      si += 2;
+      continue;
+    }
     // Etali, Primal Conqueror: "each player exiles cards from the top of their library until they exile a nonland card.
     // You may cast any number of spells from among the nonland cards exiled this way without paying their mana costs."
     if (/^[Ee]ach player exiles cards from the top of their library until they exile a nonland card$/.test(s) && /^You may cast any number of spells from among the nonland cards exiled this way without paying their mana costs$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
       effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 1, each: true, untilNonland: true });
       si++;
+      continue;
+    }
+    // Plargg and Nassari: "... An opponent chooses a nonland card exiled this way. You may cast up to two spells from among
+    // the other cards exiled this way without paying their mana costs." You choose the opponent (rulings).
+    if (
+      /^[Ee]ach player exiles cards from the top of their library until they exile a nonland card$/.test(s) &&
+      sentences[si + 1]?.replace(/\.$/, "") === "An opponent chooses a nonland card exiled this way" &&
+      /^You may cast up to two spells from among the other cards exiled this way without paying their mana costs$/.test(sentences[si + 2]?.replace(/\.$/, "") ?? "")
+    ) {
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 1, each: true, untilNonland: true, opponentExcludes: true, max: 2 });
+      si += 2;
       continue;
     }
     if (/^[Ee]xile the top card of each player's library$/.test(s) && /^[Yy]ou may cast any number of spells from among those cards without paying their mana costs$/.test(sentences[si + 1] ?? "")) {
@@ -1959,10 +2029,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     }
     // "Repeat this process once" after a punisher (Remorseless Punishment); "Repeat the following process X times" before
     // one (Torment of Hailfire): the whole process again, the same players each time (rulings).
-    if (/^Repeat this process once$/.test(s)) {
+    // "Repeat this process six more times" (Professor Onyx): seven in all.
+    const repeatN = /^Repeat this process (once|twice|(two|three|four|five|six) more times)$/.exec(s);
+    if (repeatN) {
       const prev = effects[effects.length - 1];
       if (prev?.type !== "punisher" || prev.times !== undefined) return null;
-      effects[effects.length - 1] = { ...prev, times: 2 };
+      const more = repeatN[1] === "once" ? 1 : repeatN[1] === "twice" ? 2 : ["two", "three", "four", "five", "six"].indexOf(repeatN[2]!) + 2;
+      effects[effects.length - 1] = { ...prev, times: more + 1 };
       continue;
     }
     // Ad Nauseam: "Reveal the top card of your library and put that card into your hand. You lose life equal to its mana
@@ -2201,7 +2274,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const whenPaid = /^When you do, (.+)$/.exec(s);
       if (whenPaid) {
         // "You may pay {X}. When you do, ~ deals X damage to target player" (Electro): the reflexive ability's X is the X paid.
-        const reflexive = reflexiveBody([whenPaid[1]!, ...sentences.slice(si + 1)].join(". "), ctx);
+        // "You may pay any amount of {R}. When you do, it deals that much damage to any target" (Leyline Tyrant): that
+        // much is the X paid, and "it" the source.
+        const paidText = payFirst.payX?.color ? whenPaid[1]!.replace(/^it deals that much damage\b/, "~ deals X damage") : whenPaid[1]!;
+        if (payFirst.payX?.color && !/\bX\b/.test(paidText)) return null;
+        const reflexive = reflexiveBody([paidText, ...sentences.slice(si + 1)].join(". "), ctx);
         if (!reflexive) return null;
         effects.push({ type: "may", effects: [{ type: "reflexive", body: reflexive }], pay: payFirst.pay, ...(payFirst.payX ? { payX: payFirst.payX } : {}), text: `${payFirst.text}. When you do, ${[whenPaid[1]!, ...sentences.slice(si + 1)].join(". ")}` });
         payFirst = null;
@@ -2272,6 +2349,12 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const max = mayPayX[2] === "the amount of life you gained" ? { count: { kind: "eventAmount" as const } } : mayPayX[2] !== undefined ? parseCount(mayPayX[2]!, ctx) : undefined;
       if (max === null) return null;
       payFirst = { pay: { mana: mayPayX[1]! }, text: `pay ${mayPayX[1]}`, payX: max ? { max } : {} };
+      continue;
+    }
+    // "You may pay any amount of {R}" (Leyline Tyrant): X of that color, chosen as it resolves (CR 107.1c).
+    const payAny = /^[Yy]ou may pay any amount of \{([WUBRG])\}$/.exec(s);
+    if (payAny) {
+      payFirst = { pay: { mana: "{X}" }, text: `pay any amount of {${payAny[1]}}`, payX: { color: payAny[1] as "W" | "U" | "B" | "R" | "G" } };
       continue;
     }
     const mayPay = /^[Yy]ou may pay (.+)$/.exec(s);
@@ -3355,6 +3438,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "if", cond: { kind: "targetIs", index: lastT, filter: { kind: "object", combat: "attackingBattle", text: "attacking a battle" } }, effects: inner, otherwise: previous });
       continue;
     }
+    // "Put a +1/+1 counter on equipped creature. If equipped creature is a Vampire, put two +1/+1 counters on it instead."
+    // (Blade of the Bloodchief): which one, by that creature as it is when this resolves (CR 608.2c).
+    const hostType = /^If (equipped|enchanted) creature is an? ([A-Z][a-z]+), put (\w+) (\+1\/\+1) counters on it instead$/.exec(s);
+    if (hostType && CREATURE_TYPES.has(hostType[2]!) && effects.length - prevWhole === 1 && /^[Pp]ut an? \+1\/\+1 counter on (?:equipped|enchanted) creature$/.test(sentences[si - 1] ?? "")) {
+      const inner = parseOne(`Put ${hostType[3]} ${hostType[4]} counters on ${hostType[1]} creature`, ctx);
+      if (!inner) return null;
+      const previous = effects.splice(prevWhole);
+      effects.push({ type: "if", cond: { kind: "state", cond: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], subtypes: [hostType[2]!], text: hostType[2]! } } }, effects: inner, otherwise: previous });
+      continue;
+    }
     const ifState = /^If ([^,]+), (.+)$/.exec(s);
     const stateCond = ifState && !/^(it|~)\b(?!'s (?:your|not your|the first) )/.test(ifState[1]!) && !/\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
     // "Draw two cards. If you have the city's blessing, draw three cards instead.": the condition picks which of the
@@ -3803,6 +3896,14 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       if (ex?.type !== "exile" || ex.until || ex.linked || ex.ownerMay || ex.youMay || ctx.targets.length > before + 1) return null;
       effects.push({ ...ex, suspend: Number(amt(susp[2] ?? susp[3]!)) });
       if (!susp[4]) si++;
+      continue;
+    }
+    // "Put four time counters on the exiled card. If it doesn't have suspend, it gains suspend." (Jhoira of the Ghitu): the
+    // card its "Exile a nonland card from your hand" cost exiled (checked in compile.ts).
+    const suspendCost = new RegExp(`^Put ${NUM} time counters? on the exiled card$`).exec(s);
+    if (suspendCost && /^If it doesn't have suspend, it gains suspend\.?$/.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "suspendCard", what: { ref: "costExiled" }, n: Number(amt(suspendCost[1]!)) });
+      si++;
       continue;
     }
     // Delay: "If the spell is countered this way, exile it with three time counters on it instead of putting it into its

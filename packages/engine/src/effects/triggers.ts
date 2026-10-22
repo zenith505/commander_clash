@@ -1020,6 +1020,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (o?.zone === "battlefield") {
       add(o, controllerOf(s, o), (e) => e === "selfDealsDamage" || (ev.combat && e === "selfDealsCombatDamage"), undefined, undefined, undefined, undefined, undefined, undefined, { amount: ev.amount });
       addHosted(o, (e) => e === "selfDealsDamage" || (ev.combat && e === "selfDealsCombatDamage"), undefined, o, { amount: ev.amount });
+      // "Whenever a creature you control deals combat damage" (Quilled Greatwurm): the creature is the subject.
+      const dealerBy = controllerOf(s, o);
+      if (ev.combat)
+        for (const id of s.battlefield) {
+          const w = obj(s, id);
+          if (controllerOf(s, w) === dealerBy) add(w, dealerBy, (e, t) => e === "creatureYouControlDealsCombatDamage" && !!t.dealer && !(t.dealer.other && w.id === o.id) && objectMatches(s, t.dealer.filter, o, dealerBy, false), undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
+        }
     }
   } else if (ev.type === "damagedPlayer") {
     // "Whenever ~ deals damage to a player / an opponent": once for each player dealt damage (CR 603.2c).
@@ -1174,6 +1181,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const by = t.cast.by;
         if ((by === "you" && ev.controller !== you) || (by === "opponent" && ev.controller === you) || (by === "enchanted" && o.attachedToPlayer !== ev.controller)) return false;
         if (t.cast.ownTurn && ev.controller !== s.activePlayer) return false;
+        if (t.cast.opponentsTurn && ev.controller === s.activePlayer) return false;
         // Its caster's spells this turn, this one included (it was counted as it was cast).
         if (t.cast.nth && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller && (!t.cast!.nthOfKind || (!!s.cards[c.card] && printedMatches(t.cast!.spell, s.cards[c.card]!)))).length !== t.cast.nth) return false;
         if (t.cast.treasure && !(ev.treasureSpent && !ev.copy)) return false;
@@ -1592,10 +1600,14 @@ export function triggerBody(s: GameState, t: PendingTrigger): AbilityBody {
   const body = settleDivided(s, t.body ?? compileCard(s.cards[t.sourceCardId]!).triggers[t.index]!.body, { controller: t.controller, sourceId: t.sourceId, ...(t.sourceZc !== undefined ? { sourceZc: t.sourceZc } : {}), x: t.x ?? 0, ...(t.lki ? { lki: t.lki } : {}), ...(t.event ? { event: t.event } : {}), ...(t.cause ? { cause: t.cause } : {}), ...(t.tapped !== undefined ? { tapped: t.tapped } : {}), ...(t.rolled !== undefined ? { rolled: t.rolled } : {}) });
   // "Target creature that player controls": that player is known once it triggers.
   const who = t.event?.player;
-  const isEvent = (x: TargetSpec): boolean => x.controller === "eventPlayer" || x.protector === "eventPlayer" || !!x.anyOf?.some(isEvent);
+  const isEvent = (x: TargetSpec): boolean => x.controller === "eventPlayer" || x.protector === "eventPlayer" || !!x.notEventPlayer || !!x.anyOf?.some(isEvent);
   if (!body.targets.some(isEvent) && !body.modal?.modes.some((m) => m.targets?.some(isEvent))) return body;
   const fix = (x0: TargetSpec): TargetSpec => {
     const x = x0.anyOf ? { ...x0, anyOf: x0.anyOf.map(fix) } : x0;
+    if (x.notEventPlayer && who !== undefined) {
+      const { notEventPlayer: _, ...rest } = x;
+      return { ...rest, notPlayer: who };
+    }
     if (x.protector === "eventPlayer" && who !== undefined) {
       const { protector: _, ...rest } = x;
       return fix({ ...rest, protectedBy: who });

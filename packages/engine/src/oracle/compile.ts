@@ -2,7 +2,7 @@ import { faceDef, hasFuse, isRoom, restingDef, roomDoorDefs } from "../faces";
 import { isMeldResult, meldPartnerName, meldResultDef } from "../meld-results";
 import { allEffects, GRANTED_WAY_COSTS } from "../abilities";
 import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq, StaticAbility, Affects } from "../abilities";
-import { CHOSEN_HEXPROOF, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CREATURE_TYPES, stripReminder } from "../keywords";
+import { CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, stripReminder } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
@@ -883,10 +883,11 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "As this artifact enters, choose artifact, creature, enchantment, instant, or sorcery." (Cloud Key, CR 614.12): a
     // card type, kept as Chosen.cardType.
-    const asCardType = /^As (?:~|it) enters, choose ((?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle)(?:, (?:or )?(?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle))+)\.$/.exec(line);
+    const asCardType = /^As (?:~|it) enters, choose ((?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle)(?:, (?:or )?(?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle))+|a card type)\.$/.exec(line);
     if (asCardType) {
       if (out.entersChoose?.some((c) => c.what === "cardType")) out.unsupported.push(raw);
-      else (out.entersChoose ??= []).push({ what: "cardType", options: asCardType[1]!.split(/, (?:or )?/).map(capital) });
+      // "Choose a card type" (Serra's Emissary): any that a card here can have (rulings).
+      else (out.entersChoose ??= []).push({ what: "cardType", options: asCardType[1] === "a card type" ? Object.keys(CARD_TYPE_PLURAL) : asCardType[1]!.split(/, (?:or )?/).map(capital) });
       continue;
     }
     // "As ~ enters, choose a number between 1 and 10." (Talion), "choose a number." (Sanctum Prelate): a whole number, kept
@@ -994,11 +995,14 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // Kicker (CR 702.33a-c): "Kicker {2}{R}", "Kicker {1}{U} and/or {2}{B}", "Multikicker {1}{G}".
-    const kicker = /^(Multikicker|Kicker) ((?:\{[^}]+\})+)(?: and\/or ((?:\{[^}]+\})+))?$/.exec(line);
+    // "Kicker {X}. X can't be 0." (Thieving Skydiver, Verdeloth): one kicker cost with X, on a card with no other X; X is
+    // chosen as it's cast when it's kicked, else it's 0 (CR 107.3a, 601.2b).
+    const kicker = /^(Multikicker|Kicker) ((?:\{[^}]+\})+)(?: and\/or ((?:\{[^}]+\})+))?(\. X can't be 0\.)?$/.exec(line);
     if (kicker) {
       const costs = [kicker[2]!, ...(kicker[3] ? [kicker[3]] : [])];
-      if (out.kicker || costs.some((c) => !parseManaCost(c).supported || parseManaCost(c).hasX)) out.unsupported.push(raw);
-      else out.kicker = { costs, ...(kicker[1] === "Multikicker" ? { multi: true } : {}) };
+      const kickX = costs.length === 1 && kicker[1] === "Kicker" && parseManaCost(costs[0]!).hasX && !parseManaCost(d.manaCost).hasX && !/\{X\}.*\{X\}/.test(costs[0]!);
+      if (out.kicker || costs.some((c) => !parseManaCost(c).supported || (parseManaCost(c).hasX && !kickX)) || (kicker[4] && !kickX)) out.unsupported.push(raw);
+      else out.kicker = { costs, ...(kicker[1] === "Multikicker" ? { multi: true } : {}), ...(kicker[4] ? { xMin: 1 } : {}) };
       continue;
     }
     // "If ~ was kicked, it enters with two +1/+1 counters on it." (a replacement effect, CR 614.1c)
@@ -1180,8 +1184,9 @@ export function compile(d: CardDef): CompiledCard {
       out.equipAtInstantSpeed = equipFast[1] ? "yourTurn" : "always";
       continue;
     }
-    if (line === "You may pay {0} rather than pay the equip cost of the first equip ability you activate during each of your turns.") {
-      out.firstEquipFree = true;
+    const firstEquip = /^You may pay \{0\} rather than pay the equip cost of the first equip ability you activate (during each of your turns|each turn)\.$/.exec(line);
+    if (firstEquip) {
+      out.firstEquipFree = firstEquip[1] === "each turn" ? "eachTurn" : "yourTurn";
       continue;
     }
     if (line === "You may play lands from your graveyard.") {
@@ -1443,6 +1448,15 @@ export function compile(d: CardDef): CompiledCard {
       out.youHave = youAnd[3] as "hexproof" | "shroud";
       for (const st of youAndSt) out.statics.push({ ...st!, text: line });
       continue;
+    }
+    // Serra's Emissary: "You and creatures you control have protection from the chosen card type." (CR 702.16a, 702.16b).
+    if (line === "You and creatures you control have protection from the chosen card type." && out.entersChoose?.some((c) => c.what === "cardType") && !out.youProtectedFromChosenType) {
+      const st = parseStatic("Creatures you control have hexproof.");
+      if (st) {
+        out.youProtectedFromChosenType = true;
+        out.statics.push({ ...st, mods: [{ kind: "addKeywords", keywords: [CHOSEN_TYPE_PROTECTION] }], text: line });
+        continue;
+      }
     }
     const youHave = /^You have (hexproof|shroud|protection from each of your opponents)\.$/.exec(line);
     if (youHave && !out.youHave) {
@@ -2619,6 +2633,8 @@ function checkCastingLinks(out: CompiledCard) {
     }
     if ((o.ref === "sacrificed" || o.kind === "sacrificedSuspected" || o.kind === "sacrificedLegendary") && !canSac) bad = true;
     if (o.ref === "sacrificed" && o.exiledCost && !exileCost) bad = true;
+    // "The exiled card" of an "Exile a nonland card from your hand" cost (Jhoira of the Ghitu): that ability's own cost.
+    if (o.ref === "costExiled" && !handExileCost) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
     if (typeof o.chosen === "string") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" ? needs.add("number") : needs.add("creatureType"));
     if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen)) needs.add("color");
@@ -2634,13 +2650,16 @@ function checkCastingLinks(out: CompiledCard) {
   // "The sacrificed creature" refers to a sacrifice cost: the spell's, or the activated ability's own.
   let canSac = !!out.additionalCosts?.some((c) => c.kind === "sacrifice");
   let exileCost = false;
+  let handExileCost = false;
   visit([out.spell, out.triggers, out.statics, out.mana]);
   for (const ab of out.activated) {
     canSac = !!ab.costs?.some((c) => c.kind === "sacrifice");
     exileCost = !!ab.costs?.some((c) => c.kind === "sacrifice" && c.exile);
+    handExileCost = !!ab.costs?.some((c) => c.kind === "exileFromHand" && !c.toLibrary && c.n === 1);
     visit(ab);
   }
   exileCost = false;
+  handExileCost = false;
   visit([out.costMods, out.activationTaxes]);
   if (out.nameBans || out.protectionFromChosenName) needs.add("cardName");
   if (out.noncreatureChosenMvCantBeCast) needs.add("number");
@@ -2694,7 +2713,8 @@ function checkCastingLinks(out: CompiledCard) {
  */
 function checkX(d: CardDef, out: CompiledCard) {
   // Or in an additional cost: "As an additional cost to cast this spell, pay X life" (CR 107.3a).
-  const cardX = parseManaCost(d.manaCost).hasX || !!out.additionalCosts?.some((c) => "x" in c && c.x);
+  // Or in its kicker cost, "Kicker {X}" (0 unless it was kicked).
+  const cardX = parseManaCost(d.manaCost).hasX || !!out.additionalCosts?.some((c) => "x" in c && c.x) || !!out.kicker?.costs.some((c) => parseManaCost(c).hasX);
   const bad = (what: string) => out.unsupported.push(what);
   if (out.spell && usesX(out.spell) && !cardX) {
     bad(out.spell.text);

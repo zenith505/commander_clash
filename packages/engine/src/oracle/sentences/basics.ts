@@ -252,6 +252,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const phases: ("combat" | "main")[] = n.toLowerCase() === "two" ? ["combat", "combat"] : main ? ["combat", "main"] : ["combat"];
     return [{ type: "addPhases", phases, ...(after ? { after: after as "main" | "combat" } : {}) }];
   }
+  // Sphinx of the Second Sun: "there is an additional beginning phase after this phase" (CR 500.8).
+  if (/^[Tt]here is an additional beginning phase after this phase$/.test(s)) return [{ type: "addPhases", phases: ["beginning"] }];
   // Timetwister: "Each player shuffles their hand and graveyard into their library, then draws seven cards." Reminisce:
   // "Target player shuffles their graveyard into their library."
   // Endurance: "up to one target player puts all the cards from their graveyard on the bottom of their library in a random
@@ -265,6 +267,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const filter = m[1] ? parseSearchFilter(`${m[1]} card`) : undefined;
     if (filter === null || /\bthat\b/.test(m[1] ?? "")) return null;
     return [{ type: "shuffleZones", who: { ref: "you" }, graveyard: true, ...(filter ? { filter } : {}) }];
+  }
+  // Winds of Change: "Each player shuffles the cards from their hand into their library, then draws that many cards."
+  // Whirlpool Warrior: "shuffle the cards from your hand into your library, then draw that many cards".
+  if ((m = /^(?:([Tt]arget player|[Ee]ach player|[Tt]arget opponent) shuffles the cards from their hand into their library, then draws|[Ss]huffle the cards from your hand into your library, then draw) that many cards$/.exec(s))) {
+    const who: PlayerRef | null = m[1] ? parsePlayer(m[1].toLowerCase(), ctx) : { ref: "you" };
+    return who ? [{ type: "shuffleZones", who, hand: true, drawThatMany: true }] : null;
   }
   if ((m = /^(?:([Tt]arget player|[Ee]ach player|[Tt]arget opponent) shuffles their|[Ss]huffle your) (hand and graveyard|graveyard|hand) into (?:their|your) library(?:, then (?:draws|draw) (\w+) cards?)?$/.exec(s))) {
     const who: PlayerRef | null = m[1] ? parsePlayer(m[1].toLowerCase(), ctx) : { ref: "you" };

@@ -50,8 +50,8 @@ export function parseGraveyardKeyword(
     if (cond === null) return "fail";
     const costs: AdditionalCost[] = [];
     // "Paying 3 life and discarding a card": the gerunds as the costs they name.
-    const gerund: Record<string, string> = { discarding: "Discard", paying: "Pay", sacrificing: "Sacrifice", exiling: "Exile", tapping: "Tap" };
-    for (const part of m[2] ? m[2].split(/,? and (?=discarding|paying|sacrificing|exiling|tapping)|, (?=discarding|paying|sacrificing|exiling|tapping)/) : []) {
+    const gerund: Record<string, string> = { discarding: "Discard", paying: "Pay", sacrificing: "Sacrifice", exiling: "Exile", tapping: "Tap", removing: "Remove" };
+    for (const part of m[2] ? m[2].split(/,? and (?=discarding|paying|sacrificing|exiling|tapping|removing)|, (?=discarding|paying|sacrificing|exiling|tapping|removing)/) : []) {
       const w = /^(\w+) (.+)$/.exec(part);
       const c = w && gerund[w[1]!] ? parseAdditionalCost(`${gerund[w[1]!]} ${w[2]}`, true) : null;
       if (!c) return "fail";
@@ -512,6 +512,10 @@ export function parseAdditionalCost(text: string, allowX = false): AdditionalCos
     return filter ? { kind: "discard", n: num(m[1]!), filter } : null;
   }
   if (/^reveal your hand$/i.test(text)) return { kind: "revealHand" };
+  // "Removing six counters from among creatures you control" (Quilled Greatwurm): any mix of counters on those
+  // permanents, chosen as it's paid (CR 601.2h).
+  if ((m = new RegExp(`^remove ${NUM} counters from among creatures you control$`, "i").exec(text)))
+    return { kind: "removeCounters", n: num(m[1]!), filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], controller: "you", text: "creatures you control" } };
   // "Exile a red card with mana value X from your hand" (the Shoals): X is the spell's (CR 107.3a).
   if (allowX && (m = /^exile an? (.+? card) with mana value X from your hand$/i.exec(text))) {
     const filter = parseSearchFilter(m[1]!);

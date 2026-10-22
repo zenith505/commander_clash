@@ -874,15 +874,19 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
         let n = 0;
         // A face-down permanent has no name (CR 708.2), so it adds none.
         const names = new Set<string>();
+        const byName = new Map<string, number>();
         for (const [id, c] of chars) {
           if (cond.other && id === sourceId) continue;
           if (cond.otherThanSubject && id === subjectId) continue;
           if (c.controller !== who) continue;
           if (!objectMatches(s, cond.filter, s.objects[id]!, you, false, undefined, c, (x) => chars.get(x.id))) continue;
-          if (!cond.differentNames) n++;
+          if (cond.sameName) {
+            if (!s.objects[id]!.faceDown) byName.set(c.name, (byName.get(c.name) ?? 0) + 1);
+          } else if (!cond.differentNames) n++;
           else if (!s.objects[id]!.faceDown) names.add(c.name);
         }
         if (cond.differentNames) n = names.size;
+        if (cond.sameName) n = Math.max(0, ...byName.values());
         return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max);
       });
     }
@@ -1010,7 +1014,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "addKeywords":
       // "Has protection from the chosen color": the color chosen as the source entered.
-      for (const k of bindChosenKeywords(m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined, m.keywords.includes(IDENTITY_PROTECTION) ? commandersIdentity(s, controllerOfInst(e, chars)) : undefined)) {
+      for (const k of bindChosenKeywords(m.keywords, e.sourceId ? s.objects[e.sourceId]?.chosen?.color : undefined, m.keywords.includes(IDENTITY_PROTECTION) ? commandersIdentity(s, controllerOfInst(e, chars)) : undefined, e.sourceId ? s.objects[e.sourceId]?.chosen?.cardType : undefined)) {
         const key = k.toLowerCase();
         if (!c.keywords.some((x) => sameCI(x, k))) {
           c.keywords.push(k);

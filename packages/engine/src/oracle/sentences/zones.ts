@@ -1,7 +1,8 @@
 // Sentences that move cards between zones (graveyard, library, exile until it leaves), attach, "can't block this turn", and picking your own permanents.
 
 import type { Effect, Modification, ObjRef, PlayerRef, TargetSpec } from "../../abilities";
-import { NUM, NUMX, COUNTER, BASIC_TYPES, amt, counterKind, num, singularWord } from "../words";
+import { NUM, NUMX, COUNTER, BASIC_TYPES, amt, capital, counterKind, num, singularWord } from "../words";
+import { CREATURE_TYPES } from "../../keywords";
 import { parseSearchFilter } from "../search";
 import { parseSentence } from "../sentence";
 import { parseBoundCount, parseCount, roundOf } from "../counts";
@@ -79,6 +80,20 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "Return to their owners' hands all creatures with ..." (Engulf the Shore), "Return to the battlefield target ... card in
   // your graveyard" (Squirming Emergence): the destination first, for a long object; the same instruction.
   if ((m = /^Return to (their owners' hands|its owner's hand|the battlefield) ((?:all|each|target) .+)$/.exec(s))) return parseSentence(`Return ${m[2]!} to ${m[1]!}`, ctx);
+  // "Return all creatures to their owners' hands except for Krakens, Leviathans, Octopuses, and Serpents" (Whelming Wave),
+  // "... all permanents ... except for Giants, Wizards, and lands", "Destroy all permanents except for artifacts and lands":
+  // every one that has none of those subtypes or card types.
+  if ((m = /^([Rr]eturn all (?:creatures|permanents) to their owners' hands|[Dd]estroy all (?:creatures|permanents)) except for (.+)$/.exec(s))) {
+    const names = m[2]!.split(/,? and |, /).map((w) => (/^(Octopus|Platypus)es$/.test(w) ? w.slice(0, -2) : singularWord(w)));
+    const types = names.filter((w) => PERMANENT_TYPES.includes(capital(w) as never)).map(capital);
+    const subtypes = names.filter((w) => CREATURE_TYPES.has(w));
+    if (types.length + subtypes.length !== names.length) return null;
+    const fx = parseSentence(m[1]!, ctx);
+    const e = fx?.length === 1 ? fx[0] : undefined;
+    if (!e || (e.type !== "bounce" && e.type !== "destroy") || e.what.ref !== "each" || e.what.filter.kind !== "object") return null;
+    const f = e.what.filter;
+    return [{ ...e, what: { ...e.what, filter: { ...f, notTypes: [...(f.notTypes ?? []), ...types], ...(subtypes.length ? { notSubtypes: [...(f.notSubtypes ?? []), ...subtypes] } : {}), text: `${f.text} except ${m[2]}` } } } as Effect];
+  }
   // Meld (CR 701.42a), as normalizeSelf words it: "exile ~ and the creature named Bruna, the Fading Light, then meld them
   // into Brisela, Voice of Nightmares", after "if you both own and control ~ and a creature named ..." (checked again as
   // it melds) or "if ~ and a creature named ... are attacking, and you both own and control them" (with "tapped and
@@ -231,6 +246,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = parseSearchFilter(m[1]!);
     return filter === null ? null : [{ type: "chooseFromGraveyard", n: 1, upTo: true, fromExile: true, ...(filter ? { filter } : {}) }];
   }
+  // Oblivion Sower: "you may put any number of land cards that player owns from exile onto the battlefield under your
+  // control": face-up cards in exile, however they got there (rulings), chosen as it resolves.
+  if ((m = /^(?:[Tt]hen )?(?:[Yy]ou may )?[Pp]ut any number of (.+?) (that player|target opponent|target player) owns from exile onto the battlefield under your control$/.exec(s))) {
+    const filter = parseSearchFilter(m[1]!.replace(/ cards$/, " card"));
+    const who = parsePlayer(m[2]!, ctx);
+    if (!filter || !who || who.ref !== "target") return null;
+    return [{ type: "chooseFromGraveyard", n: 0, anyNumber: true, upTo: true, fromExile: true, who, dest: "battlefield", filter }];
+  }
   // Ripples of Undeath: "Mill three cards. Then you may pay {1} and 3 life. If you do, put a card from among those cards into
   // your hand": one of the cards just milled, still in your graveyard.
   if (ctx.afterMill && /^[Pp]ut a card from among (?:those cards|them) into your hand$/.test(s)) return [{ type: "chooseFromGraveyard", n: 1, milled: true }];
@@ -321,6 +344,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const spec = parseTargetPhrase(`${ofChosen[1]} card of a type chosen this way from a graveyard`, { chosen: true });
     if (spec?.kind !== "card" || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
     return [{ type: "returnAllFromGraveyard", who: { ref: "eachPlayer" }, filter: { ...spec, text: `${ofChosen[1]} card of a type chosen this way` }, owners: true }];
+  }
+  // "Choose a creature type. Return all creature cards of the chosen type from your graveyard to the battlefield."
+  // (Bloodline Bidding).
+  if ((m = /^[Rr]eturn all (creature) cards of the chosen type from your graveyard to (the battlefield|your hand)$/.exec(s))) {
+    const spec = parseTargetPhrase(`${m[1]} card of the chosen type from a graveyard`, { chosen: true });
+    if (spec?.kind !== "card" || spec.chosen !== "type") return null;
+    return [{ type: "returnAllFromGraveyard", who: { ref: "you" }, filter: { ...spec, text: `${m[1]} card of the chosen type` }, ...(m[2] === "your hand" ? { toHand: true as const } : {}) }];
   }
   // "Put all creature cards from all graveyards onto the battlefield under your control" (Rise of the Dark Realms).
   const yours = /^(?:Put|Return) all (.+?) cards from all graveyards (?:onto|to) the battlefield( tapped)? under your control$/.exec(s);
@@ -478,7 +508,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const counter = m[5] ?? m[6];
     return what?.ref === "subjectCard" ? [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}), ...(m[4]?.toLowerCase() === "its owner's" ? { owner: true } : {}), ...(counter ? { counters: { [counterKind(counter)]: 1 } } : {}) }] : null;
   }
-  if ((m = /^Put ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyard) on (top|the bottom) of (your|its owner's) library$/i.exec(s))) {
+  // "... on the bottom of your library in any order" (Bow of Nylea): in the order the targets were chosen, which the
+  // controller picks (CR 401.4).
+  if ((m = /^Put ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyard) on (top|the bottom) of (your|its owner's) library(?: in any order)?$/i.exec(s))) {
     const what = parseCardTarget(m[1]!, ctx, m[3]!.toLowerCase() === "your" ? "you" : undefined);
     return what ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() === "top" ? "top" : "bottom" }] : null;
   }
@@ -585,6 +617,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (t?.kind !== "object" || !t.subtypes?.includes("Equipment")) return null;
     return [{ type: "attach", what: { ref: "self" }, source: { ref: "target", index: ctx.lastObjectTarget } }];
   }
+  // Thieving Skydiver: "gain control of target artifact ... If that artifact is an Equipment, attach it to ~": only an
+  // Equipment moves (an artifact Aura wouldn't).
+  if (/^If that artifact is an Equipment, attach it to ~$/.test(s) && !ctx.spell && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.types?.includes("Artifact"))
+    return [{ type: "attach", what: { ref: "self" }, source: { ref: "target", index: ctx.lastObjectTarget }, equipmentOnly: true }];
   // "When ~ enters, attach it to target creature you control." (CR 701.3)
   // "Whenever an Equipment you control enters, you may attach it to target creature you control" (Sigarda's Aid), "...
   // ~ or another Equipment you control enters, you may attach that Equipment ..." (Hammer of Nazahn): the one that entered.
@@ -668,13 +704,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // nonland permanents they control ..." (Cataclysmic Gearhulk), "... up to two creatures they control ..." (Covetous
   // Elegy), "... a land of each basic land type" (Global Ruin), "... a permanent they control of each permanent type"
   // (Liliana, Dreadhorde General). The choices aren't targeted, and are made as it resolves (rulings).
-  if ((m = /^(.+?) chooses (.+?),? (?:then|and) sacrifices the rest$/.exec(s))) {
+  if ((m = /^(.+?) chooses (.+?),? (?:then|and) sacrifices (?:the rest|all other creatures they control)$/.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     const what = m[2]!;
     let r: RegExpExecArray | null;
     let among: TargetSpec | null = null;
     let list: string | undefined;
-    let keep: { filter: TargetSpec; n: number; upTo?: true; fewest?: true }[] | null = null;
+    let keep: { filter: TargetSpec; n: number; upTo?: true; fewest?: true; maxTotalPower?: number }[] | null = null;
     // "Each player chooses a number of lands they control equal to the number of lands controlled by the player who
     // controls the fewest, then sacrifices the rest" (Restore Balance, Balancing Act).
     if ((r = /^a number of (lands|creatures|permanents) they control equal to the number of \1 controlled by the player who controls the fewest$/.exec(what))) {
@@ -689,7 +725,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
       // The permanent types (CR 110.4).
       among = { kind: "object", text: "permanent" };
       keep = (["Artifact", "Battle", "Creature", "Enchantment", "Land", "Planeswalker"] as const).map((t) => ({ filter: { kind: "object", types: [t], text: t.toLowerCase() }, n: 1 }));
-    } else if ((r = new RegExp(`^(up to )?${NUM} (.+?) they control$`).exec(what))) {
+    } else if ((r = /^any number of creatures they control with total power (\d+) or less$/.exec(what)) && /all other creatures they control$/.test(s)) {
+      // Slaughter the Strong: any number whose powers add up to N or less, a negative power subtracting (rulings).
+      among = { kind: "object", types: ["Creature"], text: "creature" };
+      keep = [{ filter: among, n: 0, upTo: true, maxTotalPower: Number(r[1]) }];
+    } else if (/all other creatures they control$/.test(s)) return null;
+    else if ((r = new RegExp(`^(up to )?${NUM} (.+?) they control$`).exec(what))) {
       const filter = pickFilter(r[3]!);
       const n = amt(r[2]!);
       if (!filter || typeof n !== "number") return null;

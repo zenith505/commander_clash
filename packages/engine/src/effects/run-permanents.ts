@@ -928,6 +928,10 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         p.lifeCantChangeTurn = s.turn;
         log(s, `${p.name}'s life total can't change this turn.`);
       }
+      if (e.attackTax) {
+        p.attackTaxUntil = [...(p.attackTaxUntil ?? []), e.attackTax];
+        log(s, `Until ${p.name}'s next turn, creatures can't attack them${e.attackTax.planeswalkers ? " or planeswalkers they control" : ""} unless their controller pays {${e.attackTax.n}} for each.`);
+      }
       if (!keywords.length) return;
       if (e.untilYourNextTurn) p.gainedUntilNextTurn = [...new Set([...(p.gainedUntilNextTurn ?? []), ...keywords])];
       else p.gained = [...new Set([...(p.gained ?? []), ...keywords])];
@@ -940,7 +944,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const me = e.source ? objects(s, e.source, ctx)[0] : ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       if (!host || !me) return;
       // Something that isn't an Equipment (or an Aura, for "attach target Aura") doesn't move (CR 701.3b).
-      if (e.source && !characteristics(s, me).subtypes.some((t) => t === "Equipment" || t === "Aura")) return;
+      if (e.source && !characteristics(s, me).subtypes.some((t) => t === "Equipment" || (t === "Aura" && !e.equipmentOnly))) return;
       attachTo(s, me, host);
       return;
     }

@@ -613,6 +613,8 @@ export interface Player {
   gainedUntilNextTurn?: string[];
   /** "Until your next turn, your life total can't change" (Teferi's Protection): no life gained or lost (CR 119.7-8). */
   lifeCantChange?: true;
+  /** "Until your next turn, creatures can't attack you unless their controller pays {2} for each" (Summon: Yojimbo), one entry per effect. */
+  attackTaxUntil?: { n: number; planeswalkers?: true }[];
   /** "Until end of turn, your life total can't change" (Flare of Fortitude): the turn it's for (CR 119.7-8). */
   lifeCantChangeTurn?: number;
   /** "Until end of turn, damage that would reduce your life total to less than 1 reduces it to 1 instead" (Angel's Grace): the turn it's for. */
@@ -753,6 +755,8 @@ export interface StackItem {
   costCardNames?: string[];
   /** The cards a discard cost discarded (keys into `cards`): "if the discarded card wasn't a land card" (Grab the Prize). */
   costDiscarded?: string[];
+  /** The cards an "Exile a card from your hand" cost exiled, as the objects they became there: "the exiled card" (Jhoira of the Ghitu). */
+  costExiled?: { id: ObjectId; zc: number }[];
   /**
    * An activated mana ability resolving right away, never on the stack (CR 605.3b): `index`, the ability; `tapped`, {T}
    * was in its cost, so it tapped its source for mana (CR 106.12); `extra`, the mana picked for what that triggers.
@@ -1112,7 +1116,7 @@ export type PendingDecision =
    * (exploit's "you may sacrifice a creature"). With `objectId`, it's devour's choice as that permanent enters
    * (CR 702.82a): any number of them.
    */
-  | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId; /** The player whose permanents these are, when someone else chooses: for "keep" (Mythos of Snapdax), or the target player of Split the Party. */ of?: PlayerId; /** "keep": the rest are destroyed, not sacrificed (Mount Doom). */ destroy?: true; /** "Sacrifice any number of lands" (Scapeshift): as many as they like, none too. */ anyNumber?: true }
+  | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId; /** The player whose permanents these are, when someone else chooses: for "keep" (Mythos of Snapdax), or the target player of Split the Party. */ of?: PlayerId; /** "keep": the rest are destroyed, not sacrificed (Mount Doom). */ destroy?: true; /** "Sacrifice any number of lands" (Scapeshift): as many as they like, none too. */ anyNumber?: true; /** "keep": the chosen ones' powers add up to at most this (Slaughter the Strong; a negative power subtracts). */ maxTotalPower?: number }
   /** "Distribute X +1/+1 counters among any number of creatures you control": how many each of `options` gets, adding up to `total`. */
   /** `move`: moving the counters on the source, any number of them (Forgotten Ancient); otherwise all `total` are distributed. */
   | { kind: "distribute"; player: PlayerId; source: string; counter: CounterKind; total: number; options: ObjectId[]; what: string; move?: true }
@@ -1356,7 +1360,7 @@ export interface GameState {
    * (CR 500.8). An additional main phase is a postcombat main phase (CR 505.1a), so it's run as "main2".
    */
   /** Phases added after the current one (CR 500.8); `{ combat: key }` is a combat phase a delayed trigger waits for ("at the beginning of that combat"). */
-  addedPhases?: ("combat" | "main" | { combat: number })[];
+  addedPhases?: ("combat" | "main" | "beginning" | { combat: number })[];
   /** The key of the added combat phase going on now (see addedPhases), and the last key given out. */
   thatCombat?: number;
   combatKeys?: number;
@@ -1843,7 +1847,7 @@ export interface Resolving {
     linkedPick?: true;
     /** "Exile the top two cards ..., then choose one of them" (Party Thrasher): the cards exiled, and the one chosen. */
     impulseChoice?: { ids: ObjectId[]; pick?: ObjectId };
-    castAmong?: { ids: { id: ObjectId; zc: number }[]; budget?: number; maxMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true; /** How many were cast. */ cast?: number; /** `untilHits`: the cards that qualified; `handPick`, choosing which goes to the hand. */ hits?: ObjectId[]; handPick?: true; /** `copies`: the card the copy being cast is of. */ copyOf?: ObjectId; /** `lands`: the land picked to play, after asking whether it enters untapped. */ landPick?: ObjectId };
+    castAmong?: { ids: { id: ObjectId; zc: number }[]; budget?: number; maxMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true; /** How many were cast. */ cast?: number; /** `untilHits`: the cards that qualified; `handPick`, choosing which goes to the hand. */ hits?: ObjectId[]; handPick?: true; /** `copies`: the card the copy being cast is of. */ copyOf?: ObjectId; /** `lands`: the land picked to play, after asking whether it enters untapped. */ landPick?: ObjectId; /** `opponentExcludes`: the opponent asked, and the card they chose (not to be cast). */ excludeBy?: PlayerId; excluded?: ObjectId };
     topOrBottom?: string; // the owner's choice: "top" or "bottom"
     /** The player a creature put onto the battlefield attacking attacks (CR 508.4), as a PlayerId string. */
     attackWhom?: string;

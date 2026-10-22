@@ -4257,14 +4257,14 @@ function Controls({
   }
   // "You may cast a spell with mana value 3 or less from your hand without paying its mana cost": which card, or none;
   // and the legend rule's "keep which one?" (CR 704.5j): hovering shows each card.
-  if (pending?.kind === "chooseOption" && (pending.what === "castFromHand" || pending.what === "castFromAmong" || pending.what === "legend") && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "castFromHand" || pending.what === "castFromAmong" || pending.what === "legend" || pending.what === "revealHandOrTop") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>
           <strong>{pending.source}:</strong> {pending.prompt}
         </span>
         {pending.options.map((o, i) => (
-          <button key={o} className={o === "none" ? "ghost" : ""} onMouseEnter={() => o !== "none" && onHover(cardOf(s, o))} onMouseLeave={() => onHover(null)} onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
+          <button key={o} className={o === "none" ? "ghost" : ""} onMouseEnter={() => o !== "none" && o !== "top" && onHover(cardOf(s, o))} onMouseLeave={() => onHover(null)} onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
             {pending.labels?.[i] ?? o}
           </button>
         ))}

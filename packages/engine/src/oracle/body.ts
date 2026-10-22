@@ -2669,6 +2669,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // cards. Otherwise, you draw a card." (Predict): about the cards that mill instruction put into the graveyard.
     // "Mill a card. If a land card was milled this way, ..." (Lorehold Excavation), several of them after one mill (Old
     // Rutstein): by its printed characteristics in the graveyard.
+    // Eladamri, Korvecdal: "Reveal a card from your hand or the top card of your library. If you reveal a creature card
+    // this way, put it onto the battlefield." One card, from either place, chosen as it resolves.
+    if (/^Reveal a card from your hand or the top card of your library$/.test(s)) {
+      const then = /^If you reveal an? ([a-z]+ card) this way, put it onto the battlefield$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+      const filter = then && parseSearchFilter(then[1]!);
+      if (!filter) return null;
+      effects.push({ type: "revealHandOrTop", filter });
+      si++;
+      continue;
+    }
     // Sunforger: "Search your library for a red or white instant card with mana value 4 or less and cast that card without
     // paying its mana cost. Then shuffle." The card is cast from the library as this resolves (CR 608.2g), then the
     // library is shuffled.

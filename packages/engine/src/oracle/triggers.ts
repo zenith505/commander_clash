@@ -376,13 +376,15 @@ function parseTargetedTrigger(line: string): TriggeredAbility | "fail" | null {
 function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever you cast your second spell each turn", "Whenever an opponent casts their second spell each turn", "...
   // their first noncreature spell each turn" (Esper Sentinel): counting only the spells of that kind they cast this turn.
-  const nth = /^Whenever (you|an opponent|a player) casts? (?:your|their) (first|second) (?:(.+?) )?spell each turn, (.+)$/.exec(line);
+  // "Whenever a player casts their second spell during their turn" (The Council of Four): only in their own turn.
+  const nth = /^Whenever (you|an opponent|a player) casts? (?:your|their) (first|second) (?:(.+?) )?spell (each turn|during their turn), (.+)$/.exec(line);
   if (nth) {
     const parsed = nth[3] ? parseTargetPhrase(`${nth[3]} spell`) : { kind: "spell" as const, text: "spell" };
     const kind = parsed && { ...parsed, text: nth[3] ? `${nth[3]} spell` : "spell" };
     if (kind?.kind !== "spell") return "fail";
-    const body = parseBody(nth[4]!, { castSpell: true, eventPlayer: true });
-    return body ? { event: "castSpell", cast: { by: CAST_BY[nth[1] as keyof typeof CAST_BY], spell: kind, nth: nth[2] === "first" ? 1 : 2, ...(nth[3] ? { nthOfKind: true as const } : {}) }, body } : "fail";
+    if (nth[4] === "during their turn" && nth[1] === "you") return "fail";
+    const body = parseBody(nth[5]!, { castSpell: true, eventPlayer: true });
+    return body ? { event: "castSpell", cast: { by: CAST_BY[nth[1] as keyof typeof CAST_BY], spell: kind, nth: nth[2] === "first" ? 1 : 2, ...(nth[3] ? { nthOfKind: true as const } : {}), ...(nth[4] === "during their turn" ? { ownTurn: true as const } : {}) }, body } : "fail";
   }
   const m = CAST_TRIGGER.exec(line);
   if (!m) return null;
@@ -991,14 +993,17 @@ function parseManaTapTrigger(line: string): TriggeredAbility | "fail" | null {
 }
 
 function parseDrawTrigger(line: string): TriggeredAbility | "fail" | null {
-  const m = /^Whenever (you|an opponent|a player|enchanted player|enchanted opponent) draws? (a card(?: except the first one (?:they|you) draw in each of (?:their|your) draw steps)?|(?:your|their) (first|second|third) card each turn), (.+)$/.exec(line);
+  // "Whenever a player draws their second card during their turn" (The Council of Four): only cards drawn in their own
+  // turn count, the second of that turn.
+  const m = /^Whenever (you|an opponent|a player|enchanted player|enchanted opponent) draws? (a card(?: except the first one (?:they|you) draw in each of (?:their|your) draw steps)?|(?:your|their) (first|second|third) card (?:each|during their) turn), (.+)$/.exec(line);
   if (!m) return null;
+  const ownTurn = / during their turn$/.test(m[2]!);
   const body = parseBody(theyAreThatPlayer(m[4]!), { eventPlayer: true });
   if (!body) return "fail";
   const by = m[1] === "you" ? "you" : m[1] === "an opponent" ? "opponent" : /^enchanted /.test(m[1]!) ? "enchanted" : "any";
   const nth = m[3] ? { first: 1, second: 2, third: 3 }[m[3] as "first"] : undefined;
   const except = / except the first one /.test(m[2]!);
-  return { event: "playerDraws", draws: { by, ...(nth ? { nth } : {}), ...(except ? { notFirstInDrawStep: true as const } : {}) }, body };
+  return { event: "playerDraws", draws: { by, ...(nth ? { nth } : {}), ...(except ? { notFirstInDrawStep: true as const } : {}), ...(ownTurn ? { ownTurn: true as const } : {}) }, body };
 }
 
 /**

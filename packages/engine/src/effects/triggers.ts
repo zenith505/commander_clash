@@ -1127,6 +1127,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (e !== "castSpell" || !t.cast || (ev.copy && !t.cast.orCopy)) return false;
         const by = t.cast.by;
         if ((by === "you" && ev.controller !== you) || (by === "opponent" && ev.controller === you) || (by === "enchanted" && o.attachedToPlayer !== ev.controller)) return false;
+        if (t.cast.ownTurn && ev.controller !== s.activePlayer) return false;
         // Its caster's spells this turn, this one included (it was counted as it was cast).
         if (t.cast.nth && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller && (!t.cast!.nthOfKind || (!!s.cards[c.card] && printedMatches(t.cast!.spell, s.cards[c.card]!)))).length !== t.cast.nth) return false;
         if (t.cast.treasure && !(ev.treasureSpent && !ev.copy)) return false;
@@ -1283,6 +1284,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const by = t.draws.by;
         if ((by === "you" && ev.player !== you) || (by === "opponent" && ev.player === you) || (by === "enchanted" && o.attachedToPlayer !== ev.player)) return false;
         if (t.draws.notFirstInDrawStep && ev.firstInDrawStep) return false;
+        if (t.draws.ownTurn && ev.player !== s.activePlayer) return false;
         if (!eventPlayerFits(s, o, t, ev.player)) return false;
         return t.draws.nth === undefined || t.draws.nth === ev.nth;
       }, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });

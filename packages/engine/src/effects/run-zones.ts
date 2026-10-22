@@ -1070,6 +1070,26 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       log(s, `${defOf(s, card).name} is exiled haunting ${defOf(s, host).name}.`);
       return;
     }
+    case "revealHandOrTop": {
+      // Eladamri: the card picked as it resolves, revealed; a creature card goes onto the battlefield under your control.
+      const p = player(s, ctx.controller);
+      const sc = (s.resolving!.scratch ??= {});
+      const options = [...p.hand, ...(p.library.length ? ["top"] : [])];
+      if (sc.revealPick === undefined) {
+        if (!options.length) return;
+        s.pending = { kind: "chooseOption", player: p.id, source: src, what: "revealHandOrTop", options, labels: [...p.hand.map((id) => defOf(s, obj(s, id)).name), ...(p.library.length ? ["Top card of your library"] : [])], prompt: `reveal a card from your hand or the top card of your library (a ${e.filter.text} is put onto the battlefield)` };
+        return "paused";
+      }
+      const id = sc.revealPick === "top" ? p.library[0] : p.hand.includes(sc.revealPick) ? sc.revealPick : undefined;
+      sc.revealPick = undefined;
+      if (!id) return;
+      const d = defOf(s, obj(s, id));
+      log(s, `${p.name} reveals ${d.name} from their ${obj(s, id).zone === "hand" ? "hand" : "library"}.`);
+      if (!printedMatches(e.filter, d)) return;
+      moveObject(s, id, "battlefield", { controller: p.id });
+      if (obj(s, id).zone === "battlefield") log(s, `${p.name} puts ${d.name} onto the battlefield.`);
+      return;
+    }
     case "playLinked": {
       // The card this permanent's hideaway exiled, still the same object in exile (CR 400.7, 607.2a), played as this
       // resolves (rulings: it can't wait). Asked once; a land goes through "you may" since it isn't cast.

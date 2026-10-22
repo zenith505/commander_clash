@@ -405,6 +405,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const pick = cards.sort((a, b) => mv(s, b) - mv(s, a))[0];
       return [{ type: "chooseOption", player: pid, choice: pick ?? "none" }];
     }
+    // Eladamri: the biggest creature card in hand, else the top card of the library (it may be one).
+    if (pend.kind === "chooseOption" && pend.what === "revealHandOrTop") {
+      const creatures = pend.options.filter((o) => o !== "top" && isType(defOf(s, obj(s, o)), "Creature"));
+      const pick = creatures.sort((a, b) => mv(s, b) - mv(s, a))[0];
+      return [{ type: "chooseOption", player: pid, choice: pick ?? (pend.options.includes("top") ? "top" : pend.options[0]!) }];
+    }
     // "You may cast any number of spells ... from among them": the biggest each time, until none is left or worth it.
     if (pend.kind === "chooseOption" && pend.what === "castFromAmong") {
       const cards = pend.options.filter((o) => o !== "none" && !isCounterOnly(compileCard(defOf(s, obj(s, o))).spell ?? { targets: [], effects: [], text: "" }));

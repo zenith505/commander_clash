@@ -33,6 +33,18 @@ const arixmethes = card("Arixmethes, Slumbering Isle", "Legendary Creature — K
   oracleText:
     "Arixmethes enters tapped with five slumber counters on it.\nAs long as Arixmethes has a slumber counter on it, it's a land. (It's not a creature.)\nWhenever you cast a spell, you may remove a slumber counter from Arixmethes.\n{T}: Add {G}{U}.",
 });
+const eladamri = card("Eladamri, Korvecdal", "Legendary Creature — Elf Warrior", "{1}{G}{G}", {
+  power: "3",
+  toughness: "3",
+  oracleText:
+    "You may look at the top card of your library any time.\nYou may cast creature spells from the top of your library.\n{G}, {T}, Tap two untapped creatures you control: Reveal a card from your hand or the top card of your library. If you reveal a creature card this way, put it onto the battlefield. Activate only during your turn.",
+});
+const council = card("The Council of Four", "Legendary Creature — Human Noble", "{3}{W}{U}", {
+  power: "0",
+  toughness: "8",
+  oracleText:
+    "Whenever a player draws their second card during their turn, you draw a card.\nWhenever a player casts their second spell during their turn, you create a 2/2 white Knight creature token.",
+});
 // Test cards.
 const opt = card("Test Opt", "Instant", "{U}", { oracleText: "Draw a card." });
 const ponder = card("Test Ponder", "Sorcery", "{U}", { oracleText: "Draw a card." });
@@ -247,5 +259,51 @@ describe("Arixmethes, Slumbering Isle", () => {
     expect(characteristics(s, s.objects[a]!).types).toEqual(["Creature"]);
     expect(characteristics(s, s.objects[a]!).subtypes).toEqual(["Kraken"]);
     expect(characteristics(s, s.objects[a]!).power).toBe(12);
+  });
+});
+
+describe("Eladamri, Korvecdal", () => {
+  it("parse", () => supported(eladamri));
+
+  it("tap it and two creatures: a creature card revealed from the hand, or the top of the library, goes onto the battlefield", () => {
+    const big = card("Test Wurm", "Creature — Wurm", "{6}{G}{G}", { power: "8", toughness: "8" });
+    const { s: s0, ap, ids } = setup([big, ponder]);
+    const e = putOnBattlefield(s0, ap, eladamri);
+    const helpers = [putOnBattlefield(s0, ap, bear()), putOnBattlefield(s0, ap, bear())];
+    const topBear = toZone(s0, ap, bear({ name: "Top Bear" }), "library");
+    let s = passAll(run(s0, planActivate(s0, ap, e, 0, undefined, undefined, undefined, undefined, { tap: helpers })));
+    expect(helpers.every((id) => s.objects[id]!.tapped)).toBe(true);
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "revealHandOrTop" });
+    expect((s.pending as { options: string[] }).options.slice(-3)).toEqual([...ids, "top"]);
+    s = act(s, { type: "chooseOption", player: ap, choice: ids[0]! });
+    expect(s.objects[ids[0]!]!).toMatchObject({ zone: "battlefield", controller: ap });
+    // The top card instead, on another turn.
+    const s1 = passAll(run(s0, planActivate(s0, ap, e, 0, undefined, undefined, undefined, undefined, { tap: helpers })));
+    const s2 = act(s1, { type: "chooseOption", player: ap, choice: "top" });
+    expect(s2.objects[topBear]!.zone).toBe("battlefield");
+    // A noncreature card is only revealed.
+    const s3 = act(s1, { type: "chooseOption", player: ap, choice: ids[1]! });
+    expect(s3.objects[ids[1]!]!.zone).toBe("hand");
+  });
+});
+
+describe("The Council of Four", () => {
+  it("parse", () => supported(council));
+
+  it("the active player's second card drawn and second spell cast this turn; not another player's", () => {
+    const { s: s0, ap, opp, ids } = setup([opt, opt, opt]);
+    putOnBattlefield(s0, opp, council);
+    // The active player drew once already this turn (draw step); the first Opt is their second card.
+    const hand = s0.players[opp]!.hand.length;
+    let s = passAll(run(s0, planCast(s0, ap, ids[0]!)));
+    s = passAll(s);
+    expect(s.players[opp]!.hand.length).toBe(hand + 1);
+    // The second spell: a Knight; and its draw is the third card, so no more.
+    s = passAll(passAll(run(s, planCast(s, ap, ids[1]!))));
+    const knights = (x: GameState) => x.battlefield.filter((id) => x.objects[id]!.isToken && characteristics(x, x.objects[id]!).subtypes.includes("Knight")).length;
+    expect(knights(s)).toBe(1);
+    expect(s.players[opp]!.hand.length).toBe(hand + 1);
+    s = passAll(passAll(run(s, planCast(s, ap, ids[2]!))));
+    expect(knights(s)).toBe(1);
   });
 });

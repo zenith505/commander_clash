@@ -5740,6 +5740,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "revealHandOrTop") {
+    if (!pend.options.includes(choice)) throw new RulesError("choose a card from your hand or the top card of your library");
+    (r.scratch ??= {}).revealPick = choice;
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "castFromAmong") {
     const st = r.scratch?.castAmong;
     if (!st || !pend.options.includes(choice)) throw new RulesError("choose one of the cards offered, or none");

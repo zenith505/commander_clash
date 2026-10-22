@@ -712,3 +712,33 @@ describe("creature you control that's a Wolf or a Werewolf", () => {
     expect(power(s, s.objects[b]!)).toBe(2);
   });
 });
+
+describe("the number of creatures they control (the target player's)", () => {
+  it("Pact of the Serpent: the targeted player's creatures of the chosen type", () => {
+    const pact = card("Pact of the Serpent", "Sorcery — Arcane", "{1}{B}{B}", { oracleText: "Choose a creature type. Target player draws X cards and loses X life, where X is the number of creatures they control of the chosen type." });
+    expect(isFullySupported(pact)).toBe(true);
+    const { s: s0, ap, ids, opp } = setup([pact]);
+    for (let i = 0; i < 2; i++) putOnBattlefield(s0, opp, bear());
+    putOnBattlefield(s0, ap, bear());
+    putOnBattlefield(s0, opp, card("Wurm", "Creature — Wurm", "{6}", { power: "6", toughness: "6" }));
+    let s = cast(s0, ap, ids[0]!, [{ kind: "player", id: opp }]);
+    expect(s.pending).toMatchObject({ kind: "chooseOption", player: ap });
+    const hand = s.players[opp]!.hand.length;
+    const life = s.players[opp]!.life;
+    s = passAll(act(s, { type: "chooseOption", player: ap, choice: "Bear" }));
+    expect(s.players[opp]!.hand.length).toBe(hand + 2);
+    expect(s.players[opp]!.life).toBe(life - 2);
+  });
+
+  it("Villainous Wrath: the target opponent loses life for each creature they control, then all creatures are destroyed", () => {
+    const wrath = card("Villainous Wrath", "Sorcery", "{3}{B}{B}", { oracleText: "Target opponent loses life equal to the number of creatures they control. Then destroy all creatures." });
+    expect(isFullySupported(wrath)).toBe(true);
+    const { s: s0, ap, ids, opp } = setup([wrath]);
+    const theirs = [0, 1, 2].map(() => putOnBattlefield(s0, opp, bear()));
+    const mine = putOnBattlefield(s0, ap, bear());
+    const life = s0.players[opp]!.life;
+    const s = cast(s0, ap, ids[0]!, [{ kind: "player", id: opp }]);
+    expect(s.players[opp]!.life).toBe(life - 3);
+    for (const id of [...theirs, mine]) expect(s.objects[id]!.zone).toBe("graveyard");
+  });
+});

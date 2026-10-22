@@ -295,3 +295,27 @@ describe("Masked Vandal", () => {
     expect(none.s.objects[none.rock]!.zone).toBe("battlefield");
   });
 });
+
+const liliana = card("Liliana of the Dark Realms", "Legendary Planeswalker — Liliana", "{2}{B}{B}", {
+  loyalty: "3",
+  oracleText:
+    "+1: Search your library for a Swamp card, reveal it, put it into your hand, then shuffle.\n−3: Target creature gets +X/+X or -X/-X until end of turn, where X is the number of Swamps you control.\n−6: You get an emblem with \"Swamps you control have '{T}: Add {B}{B}{B}{B}.'\"",
+});
+
+describe("Liliana of the Dark Realms", () => {
+  it("is supported", () => expect(isFullySupported(liliana)).toBe(true));
+
+  for (const [choice, pt] of [["0", "4/4"], ["1", null]] as const)
+    it(`−3: the choice is made as it resolves, X the Swamps you control then (${choice === "0" ? "+X/+X" : "-X/-X"})`, () => {
+      let { s, ap } = setup([]);
+      const l = putOnBattlefield(s, ap, liliana);
+      s.objects[l]!.counters.loyalty = 3;
+      const b = putOnBattlefield(s, ap, bear());
+      for (const a of planActivate(s, ap, l, 1, [{ kind: "object", id: b }])!) s = act(s, a);
+      s = passAll(s);
+      expect(s.pending?.kind === "chooseOption" && s.pending.what).toBe("either");
+      s = passAll(act(s, { type: "chooseOption", player: ap, choice }));
+      if (pt) expect(`${power(s, s.objects[b]!)}/${toughness(s, s.objects[b]!)}`).toBe(pt);
+      else expect(s.objects[b]!.zone).toBe("graveyard");
+    });
+});

@@ -465,6 +465,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const mine = pend.of === pid;
       return [{ type: "chooseOption", player: pid, choice: (mine ? a! >= b! : a! <= b!) ? "0" : "1" }];
     }
+    // Liliana of the Dark Realms: +X/+X for our own creature, -X/-X for anyone else's.
+    if (pend.kind === "chooseOption" && pend.what === "either" && pend.labels?.[0] === "It gets +X/+X until end of turn") {
+      const t = s.resolving?.item.targets?.[0];
+      const it = t?.kind === "object" ? s.objects[t.id] : undefined;
+      return [{ type: "chooseOption", player: pid, choice: it && controllerOf(s, it) === pid ? "0" : "1" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "either") {
       const i = pend.labels?.findIndex((l) => /Treasure/.test(l)) ?? -1;
       return [{ type: "chooseOption", player: pid, choice: pend.options[Math.max(0, i)]! }];

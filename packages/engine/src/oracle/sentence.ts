@@ -79,6 +79,12 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       // permission is the sentence after (see parseBody).
       Object.assign(dig, { count: 1, upTo: m[1] === "You may exile", into: "exile" });
       if (m[2]) Object.assign(dig, restOf(m[2]));
+    } else if ((m = /^You may exile (an? .+? card) from among them$/.exec(s))) {
+      // "You may exile a nonland card from among them" (The Key to the Vault): what's done with it is the sentence after the
+      // rest go to the bottom (see parseBody).
+      const filter = parseSearchFilter(m[1]!.replace(/^an? /, ""));
+      if (!filter) return null;
+      Object.assign(dig, { count: 1, upTo: true, filter, into: "exile" });
     } else if (/^You may put one of (?:them|those cards) back on top of your library$/.test(s)) {
       Object.assign(dig, { count: 1, upTo: true, into: "libraryTop" });
     } else if ((m = new RegExp(`^Put up to one of them on top of your library(?: and the rest ${REST})?$`).exec(s))) {

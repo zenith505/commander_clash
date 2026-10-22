@@ -1605,6 +1605,14 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si += rest ? 2 : 1;
       continue;
     }
+    // The Key to the Vault, after "You may exile a nonland card from among them. Put the rest on the bottom ...": cast as
+    // this resolves, or it stays exiled (rulings).
+    if (/^You may cast the exiled card without paying its mana cost$/.test(s)) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "dig" || last.into !== "exile" || last.count !== 1 || last.play || last.castFree || last.each || !last.filter?.notTypes?.includes("Land")) return null;
+      last.castFree = true;
+      continue;
+    }
     // Diluvian Primordial, after its "for each opponent, you may cast ...": the spells cast this way.
     if (/^If a spell cast this way would be put into a graveyard, exile it instead$/.test(s)) {
       const last = effects[effects.length - 1];

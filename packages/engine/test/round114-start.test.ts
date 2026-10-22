@@ -388,3 +388,57 @@ describe("exile a card from a graveyard, and the exiled card's card types (Cemet
     expect([mine, spell]).not.toContain((a as { found: string[] }).found[0]);
   });
 });
+
+describe("The Key to the Vault", () => {
+  const key = card("The Key to the Vault", "Legendary Artifact — Equipment", "{1}{U}", {
+    oracleText: "Whenever equipped creature deals combat damage to a player, look at that many cards from the top of your library. You may exile a nonland card from among them. Put the rest on the bottom of your library in a random order. You may cast the exiled card without paying its mana cost.\nEquip {2}{U}",
+  });
+  const divination = card("Divination", "Sorcery", "{2}{U}", { oracleText: "Draw two cards." });
+  /** Ap's equipped Bear has hit opp; the trigger is waiting to resolve; the top of ap's library is Divination, then two Forests. */
+  function hit() {
+    const { s: s0, ap, opp } = setup([]);
+    const b = putOnBattlefield(s0, ap, bear());
+    s0.objects[putOnBattlefield(s0, ap, key)]!.attachedTo = b;
+    const div = putOnBattlefield(s0, ap, divination);
+    moveObject(s0, div, "library");
+    const lib = s0.players[ap]!.library;
+    s0.players[ap]!.library = [div, ...lib.filter((x) => x !== div)];
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: b, defender: opp }] });
+    for (let i = 0; i < 30 && s.pending?.kind !== "searchLibrary"; i++) {
+      const pid = waitingOn(s)!;
+      s = act(s, s.pending?.kind === "declareBlockers" ? { type: "declareBlockers", player: pid, blocks: [] } : { type: "passPriority", player: pid });
+    }
+    return { s, ap, opp, div };
+  }
+
+  it("plays", () => expect(isFullySupported(key)).toBe(true));
+
+  it("looks at two cards (2 damage), exiles Divination, the Forest goes to the bottom, then casts it free", () => {
+    let { s, ap, div } = hit();
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap, cards: [div], min: 0, max: 1 });
+    const second = s.players[ap]!.library[1]!;
+    s = act(s, { type: "searchLibrary", player: ap, found: [div] });
+    expect(s.objects[div]!.zone).toBe("exile");
+    expect(s.players[ap]!.library[s.players[ap]!.library.length - 1]).toBe(second);
+    expect(s.pending).toMatchObject({ kind: "castFree", objectId: div });
+    const hand = s.players[ap]!.hand.length;
+    s = settle(run(s, planCast(s, ap, div)));
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
+  });
+
+  it("declining the cast, the card stays exiled (rulings: you choose as it resolves)", () => {
+    let { s, ap, div } = hit();
+    s = act(s, { type: "searchLibrary", player: ap, found: [div] });
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: false }));
+    expect(s.objects[div]!.zone).toBe("exile");
+    expect(s.pending).toBeNull();
+  });
+
+  it("taking nothing, both go to the bottom", () => {
+    let { s, ap, div } = hit();
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: [] }));
+    expect(s.objects[div]!.zone).toBe("library");
+    expect(s.players[ap]!.library.slice(-2)).toContain(div);
+  });
+});

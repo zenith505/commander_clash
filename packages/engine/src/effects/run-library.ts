@@ -3,7 +3,7 @@ import { abilitiesOf, cardIdOf, defOf, isPermanentCard, isType } from "../cards"
 import { controllerOf } from "../layers";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
-import { draw, gainLife, log, loseLife, millCount, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
+import { castProblem, draw, gainLife, log, loseLife, millCount, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, printedMatches } from "./targeting";
@@ -877,8 +877,21 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
       let found = (sc.found ?? []).filter((id) => looked.includes(id));
       const names = (ids: ObjectId[]) => ids.map((id) => defOf(s, obj(s, id)).name).join(", ");
       const faceDown = e.into === "manifest" || e.into === "cloak" ? e.into : undefined;
+      // The Key to the Vault: the exiled card cast (or not) as this resolves, after the rest went to the bottom (CR 608.2g).
+      const castExiled = (): "paused" | undefined => {
+        if (!e.castFree || sc.castingTarget !== undefined) return;
+        const o = found.length === 1 ? s.objects[found[0]!] : undefined;
+        if (!o || o.zone !== "exile") return;
+        sc.castingTarget = o.id;
+        s.pending = { kind: "castFree", player: p.id, objectId: o.id, source: src };
+        if (castProblem(s, p.id, o.id) === null) return "paused";
+        s.pending = null;
+        log(s, `${defOf(s, o).name} can't be cast.`);
+        return;
+      };
+      if (sc.castingTarget !== undefined && e.castFree) return;
       // Resuming after the owner ordered the rest for the bottom: the cards taken have already moved.
-      if (sc.moved) return toBottom(s, pid, looked.filter((id) => !found.includes(id) && obj(s, id).zone === "library"), src, false);
+      if (sc.moved) return toBottom(s, pid, looked.filter((id) => !found.includes(id) && obj(s, id).zone === "library"), src, false) ?? castExiled();
       // An Aura put onto the battlefield: its controller chooses what it enchants as it enters (CR 303.4f), or it stays
       // with the rest (303.4g).
       const hosts = e.into === "battlefield" ? chooseAuraHosts(s, found.map((id) => ({ o: obj(s, id), under: p.id })), src) : new Map<ObjectId, AuraHost>();
@@ -926,9 +939,9 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         for (const id of rest) moveObject(s, id, "hand");
       } else {
         sc.moved = true;
-        return toBottom(s, pid, rest, src, !!e.random);
+        return toBottom(s, pid, rest, src, !!e.random) ?? castExiled();
       }
-      return;
+      return castExiled();
     }
 }
 

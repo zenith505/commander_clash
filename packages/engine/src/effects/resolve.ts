@@ -250,9 +250,9 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
   if (ref.ref === "castSpell") return []; // only counted (amounts.ts)
   if (ref.ref === "voted") return votedObjects(s, !!ref.any);
   if (ref.ref === "countersPutThisWay")
-    return (s.resolving?.countersPutThisWay ?? []).flatMap((c) => {
-      const o = s.objects[c.id];
-      return o?.zone === "battlefield" && (o.zoneChanges ?? 0) === c.zc ? [o] : [];
+    return [...new Set((s.resolving?.countersPutThisWay ?? []).filter((c) => !ref.kind || c.kind === ref.kind).map((c) => c.id))].flatMap((id) => {
+      const o = s.objects[id];
+      return o?.zone === "battlefield" && (s.resolving!.countersPutThisWay ?? []).some((c) => c.id === id && (o.zoneChanges ?? 0) === c.zc) ? [o] : [];
     });
   if (ref.ref === "convoker" || ref.ref === "convokers") {
     const list = convokedFor(s, ctx);
@@ -811,6 +811,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "attach":
     case "attachAny":
     case "attachElsewhere":
+    case "attachToChosen":
     case "unattach":
     case "unattachSelf":
     case "transformSelf":

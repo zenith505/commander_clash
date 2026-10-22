@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, forest, passAll, passUntil, putOnBattlefield, setup, target } from "./helpers";
-import { abilitiesOf, botActions, isFullySupported, planActivate, planCast, plotCost, spellCost, waitingOn, type Action, type GameState, type PlayerId } from "../src";
+import { abilitiesOf, botActions, isFullySupported, planActivate, planCast, plotCost, spellCost, waitingOn, type Action, type GameState, type ObjectId, type PlayerId } from "../src";
 import { moveObject, tapPermanent } from "../src/game";
 import { characteristics, invalidateCharacteristics as invalidate } from "../src/layers";
 
@@ -426,7 +426,7 @@ const awakening = card("Animist's Awakening", "Sorcery", "{X}{G}", {
   oracleText:
     "Reveal the top X cards of your library. Put all land cards from among them onto the battlefield tapped and the rest on the bottom of your library in a random order.\nSpell mastery — If there are two or more instant and/or sorcery cards in your graveyard, untap those lands.",
 });
-const onTop = (s: GameState, pid: PlayerId, defs: ReturnType<typeof card>[]) => {
+const onTop = (s: GameState, pid: PlayerId, defs: ReturnType<typeof card>[]): ObjectId[] => {
   const ids = defs.map((d) => {
     const id = putOnBattlefield(s, pid, d);
     s.battlefield.splice(s.battlefield.indexOf(id), 1);
@@ -457,5 +457,126 @@ describe("Animist's Awakening", () => {
   it("spell mastery: with two instant and/or sorcery cards in your graveyard, those lands are untapped", () => {
     const { s, l1, l2 } = play(true);
     for (const l of [l1, l2]) expect(s.objects[l]).toMatchObject({ zone: "battlefield", tapped: false });
+  });
+});
+
+const fangs = card("Fangs of Kalonia", "Sorcery", "{1}{G}", {
+  keywords: ["Overload"],
+  oracleText:
+    'Put a +1/+1 counter on target creature you control, then double the number of +1/+1 counters on each creature that had a +1/+1 counter put on it this way.\nOverload {4}{G}{G} (You may cast this spell for its overload cost. If you do, change "target" in its text to "each.")',
+});
+const hardened = card("Hardened Scales", "Enchantment", "{G}", {
+  oracleText: "If one or more +1/+1 counters would be put on a creature you control, that many plus one +1/+1 counters are put on it instead.",
+});
+
+describe("Fangs of Kalonia", () => {
+  it("one counter on the target, then its +1/+1 counters doubled", () => {
+    expect(isFullySupported(fangs)).toBe(true);
+    const { s: s0, ap, ids } = setup([fangs]);
+    let s = s0;
+    const b = putOnBattlefield(s, ap, bear());
+    s.objects[b]!.counters["+1/+1"] = 2;
+    s = settle(run(s, planCast(s, ap, ids[0]!, [target(b)])));
+    expect(s.objects[b]!.counters["+1/+1"]).toBe(6);
+  });
+  it("overloaded: each creature you control gets one, then each one's counters are doubled; a replacement adds to both", () => {
+    const { s: s0, ap, ids, opp } = setup([fangs]);
+    let s = s0;
+    putOnBattlefield(s, ap, hardened);
+    const [a, b] = [putOnBattlefield(s, ap, bear()), putOnBattlefield(s, ap, bear())];
+    const theirs = putOnBattlefield(s, opp, bear());
+    s.objects[a]!.counters["+1/+1"] = 1;
+    s.objects[theirs]!.counters["+1/+1"] = 1;
+    s = settle(run(s, planCast(s, ap, ids[0]!, undefined, undefined, "auto", undefined, { alt: "overload" })));
+    // Hardened Scales: 1 + 2 = 3, then 3 + (3 + 1) = 7; and 0 + 2 = 2, then 2 + 3 = 5 (rulings: doubling is putting counters).
+    expect(s.objects[a]!.counters["+1/+1"]).toBe(7);
+    expect(s.objects[b]!.counters["+1/+1"]).toBe(5);
+    expect(s.objects[theirs]!.counters["+1/+1"]).toBe(1);
+  });
+});
+
+const skyhunter = card("Armored Skyhunter", "Creature — Cat Knight", "{3}{W}", {
+  power: "3",
+  toughness: "3",
+  keywords: ["Flying"],
+  oracleText:
+    "Flying\nWhenever this creature attacks, look at the top six cards of your library. You may put an Aura or Equipment card from among them onto the battlefield. If an Equipment is put onto the battlefield this way, you may attach it to a creature you control. Put the rest of those cards on the bottom of your library in a random order.",
+});
+const sword = card("Bone Saw", "Artifact — Equipment", "{0}", { oracleText: "Equipped creature gets +1/+0.\nEquip {1}" });
+const stonehewer = card("Stonehewer Giant", "Creature — Giant Warrior", "{3}{W}{W}", {
+  power: "4",
+  toughness: "4",
+  keywords: ["Vigilance"],
+  oracleText: "Vigilance\n{1}{W}, {T}: Search your library for an Equipment card, put it onto the battlefield, attach it to a creature you control, then shuffle.",
+});
+const holyRelic = card("Quest for the Holy Relic", "Enchantment", "{W}", {
+  oracleText:
+    "Whenever you cast a creature spell, you may put a quest counter on this enchantment.\nRemove five quest counters from this enchantment and sacrifice it: Search your library for an Equipment card, put it onto the battlefield, attach it to a creature you control, then shuffle.",
+});
+
+describe("Armored Skyhunter", () => {
+  it("attacks: an Equipment from the top six onto the battlefield, then you may attach it to a creature you control", () => {
+    expect(isFullySupported(skyhunter)).toBe(true);
+    const { s: s0, ap, opp } = setup([]);
+    let s = s0;
+    const sky = putOnBattlefield(s, ap, skyhunter);
+    const b = putOnBattlefield(s, ap, bear({ power: "5", toughness: "5", name: "Big Bear" }));
+    const [, saw] = onTop(s, ap, [forest, sword, forest]);
+    s = passUntil(s, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: sky, defender: opp }] });
+    for (let i = 0; i < 20 && s.pending?.kind !== "searchLibrary"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", cards: [saw], min: 0, max: 1 });
+    s = act(s, { type: "searchLibrary", player: ap, found: [saw!] });
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "enchant", options: [b, sky, "none"], labels: ["Big Bear", "Armored Skyhunter", "Don't attach it"] });
+    s = act(s, { type: "chooseOption", player: ap, choice: b });
+    expect(s.objects[saw!]).toMatchObject({ zone: "battlefield", attachedTo: b });
+  });
+  it("you may attach nothing; an Aura enters attached as usual and isn't moved", () => {
+    const { s: s0, ap, opp } = setup([]);
+    let s = s0;
+    const sky = putOnBattlefield(s, ap, skyhunter);
+    const [saw] = onTop(s, ap, [sword]);
+    s = passUntil(s, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: sky, defender: opp }] });
+    for (let i = 0; i < 20 && s.pending?.kind !== "searchLibrary"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = act(s, { type: "searchLibrary", player: ap, found: [saw!] });
+    s = act(s, { type: "chooseOption", player: ap, choice: "none" });
+    expect(s.objects[saw!]!.zone).toBe("battlefield");
+    expect(s.objects[saw!]!.attachedTo).toBeUndefined();
+  });
+});
+
+describe("Stonehewer Giant and Quest for the Holy Relic", () => {
+  it("searches for an Equipment and attaches it to a creature you control, chosen as it resolves", () => {
+    expect(isFullySupported(stonehewer)).toBe(true);
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const g = putOnBattlefield(s, ap, stonehewer);
+    const b = putOnBattlefield(s, ap, bear());
+    const [saw] = onTop(s, ap, [sword]);
+    s = run(s, planActivate(s, ap, g, 0));
+    for (let i = 0; i < 20 && s.pending?.kind !== "searchLibrary"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = act(s, { type: "searchLibrary", player: ap, found: [saw!] });
+    // No "none": the attach isn't optional.
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "enchant", options: [g, b] });
+    s = act(s, { type: "chooseOption", player: ap, choice: b });
+    expect(s.objects[saw!]).toMatchObject({ zone: "battlefield", attachedTo: b });
+  });
+  it("Quest for the Holy Relic: remove five quest counters and sacrifice it; with one creature, no question", () => {
+    expect(isFullySupported(holyRelic)).toBe(true);
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const q = putOnBattlefield(s, ap, holyRelic);
+    const b = putOnBattlefield(s, ap, bear());
+    const [saw] = onTop(s, ap, [sword]);
+    s.objects[q]!.counters.quest = 4;
+    expect(planActivate(s, ap, q, 0)).toBeNull();
+    s.objects[q]!.counters.quest = 5;
+    s = run(s, planActivate(s, ap, q, 0));
+    expect(s.objects[q]!.zone).toBe("graveyard");
+    for (let i = 0; i < 20 && s.pending?.kind !== "searchLibrary"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = act(s, { type: "searchLibrary", player: ap, found: [saw!] });
+    s = settle(s);
+    expect(s.objects[saw!]).toMatchObject({ zone: "battlefield", attachedTo: b });
   });
 });

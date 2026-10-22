@@ -1703,7 +1703,7 @@ export interface Resolving {
   /** What its instructions sacrificed, as it last existed: "When you do, ~ deals damage equal to that creature's power". */
   sacrificedThisWay?: LastKnown[];
   /** "Goad each creature that had counters put on it this way" (Agitator Ant): the permanents a pick put counters on. */
-  countersPutThisWay?: { id: ObjectId; zc: number }[];
+  countersPutThisWay?: { id: ObjectId; zc: number; kind?: string }[];
   /** What its "return a land you control to its owner's hand" returned, as it last existed (SpellCondition bouncedThisWay). */
   bouncedThisWay?: { id: ObjectId; subtypes: string[] }[];
   /** Whether its last "look at the top N cards ... put one ..." took a card (SpellCondition digTook). */

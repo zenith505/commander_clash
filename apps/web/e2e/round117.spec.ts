@@ -1,6 +1,7 @@
 // Round 117's prompts: Druid of Purification ("starting with you, each player may choose an artifact or enchantment you
-// don't control": a button for each, and "Choose nothing") and Odric, Master Tactician (you choose the defending
-// player's blocks: click their creatures, then your attackers).
+// don't control": a button for each, and "Choose nothing"), Odric, Master Tactician (you choose the defending
+// player's blocks: click their creatures, then your attackers), and Armored Skyhunter (you may attach the Equipment it
+// put onto the battlefield to a creature you control).
 import { expect, test } from "@playwright/test";
 import { applyAction } from "@cc/engine";
 import { idsOf, LANDS, one, open, pageErrors, playUntil, scene } from "./scene";
@@ -45,5 +46,25 @@ test("Odric, Master Tactician: with three others attacking, you choose how Ana b
   const after = await resolveUntil(page, (st) => st.pending?.kind !== "declareBlockers" && st.objects[bears]!.blocking !== undefined);
   expect(after.objects[bears]!.blocking).toEqual([giant]);
   expect(after.log.some((l) => l.text === "Grizzly Bears blocks Hill Giant (You chose).")).toBe(true);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Armored Skyhunter: an Equipment from the top six, then you may attach it to a creature you control", async ({ page }) => {
+  let s = scene({ board: [...LANDS, "Armored Skyhunter", "Grizzly Bears"], library: ["Forest", "Bonesplitter", "Forest"] }, [{}]);
+  const [sky, bears, saw] = [one(s, "Armored Skyhunter"), one(s, "Grizzly Bears"), one(s, "Bonesplitter")];
+  // The attack and the look at the top six are played in the engine; the test starts at the attach question.
+  s = playUntil(s, (st) => st.pending?.kind === "declareAttackers");
+  s = applyAction(s, { type: "declareAttackers", player: 0, attacks: [{ attacker: sky, defender: 1 }] });
+  s = playUntil(s, (st) => st.pending?.kind === "searchLibrary");
+  s = applyAction(s, { type: "searchLibrary", player: 0, found: [saw] });
+  expect(s.pending).toMatchObject({ kind: "chooseOption", what: "enchant" });
+  await open(page, s);
+  const bar = controls(page);
+  await expect(bar).toContainText("Armored Skyhunter: choose a creature you control to attach Bonesplitter to, or none");
+  await expect(bar.getByRole("button", { name: "Don't attach it" })).toBeVisible();
+  await bar.getByRole("button", { name: "Grizzly Bears" }).click();
+  const after = await resolveUntil(page, (st) => st.objects[saw]!.attachedTo !== undefined);
+  expect(after.objects[saw]!.attachedTo).toBe(bears);
+  expect(after.log.some((l) => l.text === "Bonesplitter is attached to Grizzly Bears.")).toBe(true);
   expect(pageErrors(page)).toEqual([]);
 });

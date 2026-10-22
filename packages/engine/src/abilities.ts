@@ -672,9 +672,10 @@ export type ObjRef =
   | { ref: "voted"; /** "Each permanent chosen this way": every one chosen at least once. */ any?: true }
   /**
    * "Goad each creature that had counters put on it this way" (Agitator Ant): the permanents this resolution's picks put
-   * counters on (not one a replacement effect kept them off, rulings), while each is still that object.
+   * counters on (not one a replacement effect kept them off, rulings), while each is still that object. `kind`: "each
+   * creature that had a +1/+1 counter put on it this way" (Fangs of Kalonia), counters of that kind put by any instruction.
    */
-  | { ref: "countersPutThisWay" };
+  | { ref: "countersPutThisWay"; kind?: CounterKind };
 
 /** Which player(s) an effect touches. */
 export type PlayerRef =
@@ -1975,6 +1976,13 @@ export type Effect =
   | { type: "attachAny"; host: number }
   /** "Attach target Aura attached to a creature to another creature" (Crown of the Ages): a creature chosen as it resolves. */
   | { type: "attachElsewhere"; source: ObjRef }
+  /**
+   * "Put it onto the battlefield, attach it to a creature you control" (Stonehewer Giant), "If an Equipment is put onto
+   * the battlefield this way, you may attach it to a creature you control" (Armored Skyhunter): the creature is chosen as
+   * it resolves, not targeted (CR 608.2d), among those it could be attached to (CR 701.3a-b, 301.5c). `equipmentOnly`:
+   * nothing happens unless it's an Equipment; `may`: attaching it to none is a choice too.
+   */
+  | { type: "attachToChosen"; source: ObjRef; filter: TargetSpec; may?: true; equipmentOnly?: true }
   /**
    * "Exile them, then meld them into [the combined back face]" (CR 701.42): ~ and a permanent of this card type named its
    * counterpart, if you both own and control them (and both are attacking, `attacking`: then it enters tapped and

@@ -104,7 +104,7 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
     Object.assign(dig, { countersIfMv: { max: Number(m[1]), counter: "+1/+1", n: m[2] === "an" ? 1 : num(m[2]!) } });
     return "more";
   }
-  if ((m = new RegExp(`^Put (?:the rest|all cards revealed this way that weren't put onto the battlefield) ${REST}$`).exec(s))) return { ...(dig as Extract<Effect, { type: "dig" }>), ...restOf(m[1]!) };
+  if ((m = new RegExp(`^Put (?:the rest(?: of those cards)?|all cards revealed this way that weren't put onto the battlefield) ${REST}$`).exec(s))) return { ...(dig as Extract<Effect, { type: "dig" }>), ...restOf(m[1]!) };
   // "Then shuffle" (the "Then" is gone by now), "Then shuffle the rest into your library" (CR 701.20).
   if (/^Shuffle(?: the rest into your library)?$/.test(s)) return { ...(dig as Extract<Effect, { type: "dig" }>), rest: "shuffle" };
   return null;

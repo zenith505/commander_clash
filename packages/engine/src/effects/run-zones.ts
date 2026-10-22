@@ -206,7 +206,7 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
         invalidateCharacteristics(s);
         const put = putCounters(s, o, k, c);
         log(s, `${player(s, pid).name} puts ${put} ${k} counter${put > 1 ? "s" : ""} on ${defOf(s, o).name}.`);
-        if (put > 0 && s.resolving) (s.resolving.countersPutThisWay ??= []).push({ id, zc: o.zoneChanges ?? 0 });
+        if (put > 0 && s.resolving) (s.resolving.countersPutThisWay ??= []).push({ id, zc: o.zoneChanges ?? 0, kind: k });
         continue;
       }
       log(s, e.action === "sacrifice" ? `${player(s, pid).name} sacrifices ${defOf(s, o).name}.` : `${player(s, pid).name} returns ${defOf(s, o).name} to its owner's hand.`);

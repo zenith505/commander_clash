@@ -967,6 +967,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   let digWhere: AmountExpr | undefined;
   // A look that a "you may pay ... If you do," before it depends on (see payFirst).
   let digPaid: { pay: PayCost; text: string } | null = null;
+  /** "If an Equipment is put onto the battlefield this way, you may attach it to a creature you control": after the dig. */
+  let afterDig: Effect[] = [];
   // "If {B} was spent to cast ~, you may have target creature get -3/-3 until end of turn" (Cankerous Thirst): the "you
   // may" sentence is parsed as one, then put under the condition.
   let mayGate: { cond: SpellCondition; start: number } | null = null;
@@ -2327,12 +2329,19 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "if", cond: { kind: "amountsCompare", a: digWhere!, atLeast: { count: { kind: "cardsInLibrary", who: { ref: "you" } } } }, effects: fx });
       continue;
     }
+    // Armored Skyhunter: the one card put onto the battlefield, if it's an Equipment.
+    if (dig?.into === "battlefield" && dig.count === 1 && !afterDig.length && /^If an Equipment is put onto the battlefield this way, you may attach it to a creature you control$/.test(s)) {
+      afterDig = [{ type: "attachToChosen", source: { ref: "created" }, filter: { kind: "object", types: ["Creature"], controller: "you", text: "a creature you control" }, may: true, equipmentOnly: true }];
+      continue;
+    }
     if (dig) {
       const done = parseDig(s, dig, ctx, digWhere);
       if (!done) return null;
       if (done === "more") continue;
       if (digPaid) effects.push({ type: "may", effects: [done], pay: digPaid.pay, text: digPaid.text });
       else effects.push(done);
+      effects.push(...afterDig);
+      afterDig = [];
       noteLast(ctx, [done]);
       dig = null;
       digPaid = null;

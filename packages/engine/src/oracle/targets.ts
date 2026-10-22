@@ -215,6 +215,9 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (ctx.vote?.among && !ctx.vote.choose && /^each (?:permanent|card) with the most votes or tied for most votes$/i.test(x)) return { ref: "voted" };
   // "Destroy each permanent chosen this way" (Druid of Purification): every one a player chose.
   if (ctx.vote?.choose && /^each permanent chosen this way$/i.test(x)) return { ref: "voted", any: true };
+  // "Put a +1/+1 counter on target creature you control, then double the number of +1/+1 counters on each creature that had
+  // a +1/+1 counter put on it this way" (Fangs of Kalonia).
+  if (/^each creature that had an? \+1\/\+1 counter put on it this way$/i.test(x)) return { ref: "countersPutThisWay", kind: "+1/+1" };
   if (/^(?:each of )?(they|them|those creatures|those permanents|those cards)$/i.test(x)) return ctx.lastTargets ? { ref: "target", ...ctx.lastTargets } : /^(?:each of )?(they|them|those creatures)$/i.test(x) && ctx.lastGroup ? ctx.lastGroup : null;
   // "Tap each creature dealt damage this way" (Aurelia's Fury): what this spell's or ability's damage hit.
   const dealt = /^each (creature|planeswalker|permanent) dealt damage this way$/i.exec(x);

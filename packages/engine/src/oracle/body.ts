@@ -621,6 +621,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects: [{ type: "weld", artifact: 0, card: 1 }],
       text,
     };
+  // Aminatou's Augury (see Effect "exileCastEachType").
+  const augury = /^Exile the top (\w+) cards of your library\. You may put a land card from among them onto the battlefield\. Until end of turn, for each nonland card type, you may cast a spell of that type from among the exiled cards without paying its mana cost\.$/.exec(text.trim());
+  if (augury && opts.spell && num(augury[1]!)) return { targets: [], effects: [{ type: "exileCastEachType", n: num(augury[1]!) }], text };
   // Sylvan Library: "You may draw two additional cards. If you do, choose two cards in your hand drawn this turn. For each of
   // those cards, pay 4 life or put the card on top of your library." Drawing and choosing with nothing in between (rulings).
   const sylvan = /^[Yy]ou may draw (two|three) additional cards\. If you do, choose (two|three) cards in your hand drawn this turn\. For each of those cards, pay (\d+) life or put the card on top of your library\.$/.exec(text.trim());

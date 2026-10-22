@@ -2313,6 +2313,7 @@ function startNextTurn(s: GameState, skipping = false) {
   s.turnLog = undefined;
   s.extraEndSteps = undefined;
   s.oneOfUsed = undefined;
+  s.byTypeCast = undefined;
   s.diedThisTurn = undefined;
   s.toGraveyardThisTurn = undefined;
   s.attackersThisTurn = undefined;
@@ -2881,6 +2882,29 @@ function exilePermission(s: GameState, o: GameObject, pid: PlayerId): (Pick<NonN
 /** "You may play one of those cards" (Nashi): playing this exiled card uses up its group's permission. */
 function useOneOf(s: GameState, o: GameObject, pid: PlayerId): void {
   if (o.zone === "exile" && o.mayPlay?.oneOf && ownExilePermission(s, o, pid)) (s.oneOfUsed ??= []).push(o.mayPlay.oneOf);
+  if (o.zone === "exile" && o.mayPlay?.byType && ownExilePermission(s, o, pid)) ((s.byTypeCast ??= {})[o.mayPlay.byType] ??= []).push(nonlandTypes(defOf(s, o)));
+}
+
+const nonlandTypes = (d: CardDef) => d.types.filter((t) => t !== "Land");
+
+/**
+ * Aminatou's Augury: whether one more card with these nonland card types can be cast too, each card cast as a different
+ * one of its types (rulings: an artifact creature as either). A player who chose well each time could cast them all.
+ */
+function byTypeFits(cast: string[][], more: string[]): boolean {
+  const all = [...cast, more];
+  const used = new Set<string>();
+  const assign = (i: number): boolean => {
+    if (i === all.length) return true;
+    for (const t of all[i]!) {
+      if (used.has(t)) continue;
+      used.add(t);
+      if (assign(i + 1)) return true;
+      used.delete(t);
+    }
+    return false;
+  };
+  return assign(0);
 }
 
 /** Valgavoth's permission is the one `pid` would cast this exiled card with: for life equal to its mana value, only. */
@@ -2906,6 +2930,8 @@ function ownExilePermission(s: GameState, o: GameObject, pid: PlayerId): boolean
   if (m.castOnly && isType(defOf(s, o), "Land")) return false;
   // "You may play one of those cards" (Nashi): not once one of them has been played.
   if (m.oneOf && s.oneOfUsed?.includes(m.oneOf)) return false;
+  // "For each nonland card type, ... a spell of that type" (Aminatou's Augury): a type still free for it.
+  if (m.byType && !byTypeFits(s.byTypeCast?.[m.byType] ?? [], nonlandTypes(defOf(s, o)))) return false;
   // A warped or plotted card: only on a later turn (CR 702.185a, 702.170d), and only cast, not played as a land.
   return !castOnlyFromExile(o) || (s.turn > o.mayPlay.turn && !isType(defOf(s, o), "Land"));
 }

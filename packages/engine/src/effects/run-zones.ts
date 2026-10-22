@@ -1025,6 +1025,36 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Done"], prompt: `${e.lands ? "play a land or " : ""}cast a spell from among the ${e.reveal ? "revealed" : "exiled"} cards without paying its mana cost${left}?` };
       return "paused";
     }
+    case "exileCastEachType": {
+      // The land is put onto the battlefield as this resolves, even after a land play (rulings); a land card that wasn't
+      // can't be played later, nor cast (rulings). Each nonland card may be cast this turn as one of its types not yet used.
+      const sc = (s.resolving!.scratch ??= {});
+      const you = player(s, ctx.controller);
+      if (!sc.castAmong) {
+        const ids = you.library.slice(0, amountNow(s, e.n, ctx));
+        for (const id of ids) moveObject(s, id, "exile");
+        const gone = ids.filter((id) => obj(s, id).zone === "exile");
+        log(s, `${you.name} exiles ${gone.length ? gone.map((id) => defOf(s, obj(s, id)).name).join(", ") : "nothing"} from the top of their library.`);
+        sc.castAmong = { ids: gone.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
+        const group = `${src}#${s.nextId++}`;
+        for (const id of gone) {
+          const o = obj(s, id);
+          if (!isType(defOf(s, o), "Land")) o.mayPlay = { player: you.id, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, free: true, castOnly: true, byType: group };
+        }
+        const lands = gone.filter((id) => isType(defOf(s, obj(s, id)), "Land"));
+        if (!lands.length) return;
+        s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...lands, "none"], labels: [...lands.map((id) => defOf(s, obj(s, id)).name), "None"], prompt: "you may put a land card from among them onto the battlefield" };
+        return "paused";
+      }
+      const st = sc.castAmong;
+      const pick = st.pick;
+      st.pick = undefined;
+      const was = st.ids.find((x) => x.id === pick);
+      if (!was || s.objects[was.id]?.zone !== "exile" || (s.objects[was.id]!.zoneChanges ?? 0) !== was.zc) return;
+      moveObject(s, was.id, "battlefield");
+      log(s, `${you.name} puts ${defOf(s, obj(s, was.id)).name} onto the battlefield.`);
+      return;
+    }
     case "suspendTick": {
       // CR 702.62a: "At the beginning of your upkeep, if this card is suspended, remove a time counter from it."
       const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;

@@ -753,6 +753,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "miracle":
     case "castFromHand":
     case "castFromAmong":
+    case "exileCastEachType":
     case "suspendTick":
     case "suspendCast":
     case "siegeDefeated":

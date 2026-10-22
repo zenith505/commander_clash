@@ -378,3 +378,46 @@ describe("Powerbalance", () => {
     expect(s.players[b]!.library[0]).toBe(t);
   });
 });
+
+const augury = card("Aminatou's Augury", "Sorcery", "{6}{U}{U}", {
+  oracleText:
+    "Exile the top eight cards of your library. You may put a land card from among them onto the battlefield. Until end of turn, for each nonland card type, you may cast a spell of that type from among the exiled cards without paying its mana cost.",
+});
+
+describe("Aminatou's Augury", () => {
+  it("a land onto the battlefield, then one spell of each nonland card type for free; an artifact creature counts as either", () => {
+    expect(isFullySupported(augury)).toBe(true);
+    const { s: s0, ap, ids } = setup([augury]);
+    let s = s0;
+    const golem = card("Test Golem", "Artifact Creature — Golem", "{3}", { power: "3", toughness: "3" });
+    const relicA = card("Relic A", "Artifact", "{2}", { oracleText: "" });
+    const top = [forest, bear({ name: "Top Bear" }), golem, relicA, card("Relic B", "Artifact", "{1}", { oracleText: "" }), shock, forest, bear({ name: "Second Bear" })].map((d) => {
+      const id = putOnBattlefield(s, ap, d);
+      moveObject(s, id, "library");
+      return id;
+    });
+    s.players[ap]!.library = [...top, ...s.players[ap]!.library.filter((x) => !top.includes(x))];
+    s = settle(run(s, planCast(s, ap, ids[0]!)));
+    expect(top.every((id) => s.objects[id]!.zone === "exile")).toBe(true);
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "castFromAmong", options: [top[0], top[6], "none"] });
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: top[0]! }));
+    expect(s.objects[top[0]!]!.zone).toBe("battlefield");
+    // The other land card stays exiled and can't be played.
+    expect(() => act(s, { type: "playLand", player: ap, objectId: top[6]! })).toThrow();
+    // A creature, then the artifact creature (as an artifact): no second creature, no second artifact.
+    const tapped = s.battlefield.filter((id) => s.objects[id]!.tapped).length;
+    s = settle(run(s, planCast(s, ap, top[1]!)));
+    expect(s.objects[top[1]!]!.zone).toBe("battlefield");
+    s = settle(run(s, planCast(s, ap, top[2]!)));
+    expect(s.objects[top[2]!]!.zone).toBe("battlefield");
+    expect(s.battlefield.filter((id) => s.objects[id]!.tapped).length).toBe(tapped);
+    expect(planCast(s, ap, top[7]!)).toBeNull();
+    expect(planCast(s, ap, top[3]!)).toBeNull();
+    // An instant is still free.
+    s = settle(run(s, planCast(s, ap, top[5]!, [{ kind: "player", id: later(s, ap, 1) }])));
+    expect(s.objects[top[5]!]!.zone).toBe("graveyard");
+    // Until end of turn only.
+    s = passUntil(s, "upkeep", later(s, ap, 1));
+    expect(planCast(s, ap, top[3]!)).toBeNull();
+  });
+});

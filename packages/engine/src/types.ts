@@ -903,6 +903,8 @@ export interface LastKnown {
   legendary?: true;
   /** The player chosen for it as it entered ("the chosen player"), as it last existed. */
   chosenPlayer?: PlayerId;
+  /** The Equipment attached to it as it last existed (Zack Fair: "an Equipment that was attached to ~"). */
+  equipment?: { id: ObjectId; zc: number }[];
   /**
    * A merged permanent `of` that left the battlefield (an ability triggered by its leaving): the other cards it became
    * (CR 730.3c), which an effect finding the new object `of` finds too.
@@ -949,6 +951,8 @@ export interface CostChoices {
   casualty?: ObjectId;
   /** Cast with a once-each-turn graveyard permission (CastFromGraveyard.permits): which one (Muldrotha's slot for the spell). */
   permit?: string;
+  /** Aminatou's Augury: the nonland card type it's cast as, of its own (GameObject.mayPlay.byType); unset, `defaultByType`'s. */
+  asType?: string;
   /** The artifact, enchantment, or token sacrificed for bargain (CR 702.166a), if any. */
   bargain?: ObjectId;
   /** "As an additional cost to cast this spell, you may collect evidence N": the cards exiled for it, if it's paid (CR 701.59a). */
@@ -1059,7 +1063,7 @@ export type PendingDecision =
   | { kind: "assist"; player: PlayerId; caster: PlayerId; source: string; max: number; cast: Extract<Action, { type: "castSpell" }> }
   /** Assist: `helper` will pay `n`; now the caster may activate mana abilities and pay the rest, or not cast it. */
   | { kind: "assistCast"; player: PlayerId; helper: PlayerId; source: string; n: number; cast: Extract<Action, { type: "castSpell" }> }
-  | { kind: "castFree"; player: PlayerId; objectId: ObjectId; source: string; /** Madness: for its madness cost instead (CR 702.35a), miracle for its miracle cost (702.94a); suspend: free, and a creature gains haste (702.62a). */ how?: "madness" | "suspend" | "miracle" | /** "You may cast that card" as it resolves (Conduit of Worlds): for its mana cost, timing ignored (CR 608.2g, 601.2). */ "paid" | /** Discover (CR 701.57a): if it isn't cast, it goes to the hand. */ "discover" | /** A defeated Siege: only transformed (CR 310.12b). */ "transformed"; /** "Mana of any type can be spent to cast that spell" (Tinybones, CR 609.4b). */ anyType?: true }
+  | { kind: "castFree"; player: PlayerId; objectId: ObjectId; source: string; /** Madness: for its madness cost instead (CR 702.35a), miracle for its miracle cost (702.94a); suspend: free, and a creature gains haste (702.62a). */ how?: "madness" | "suspend" | "miracle" | /** "You may cast that card" as it resolves (Conduit of Worlds): for its mana cost, timing ignored (CR 608.2g, 601.2). */ "paid" | /** Discover (CR 701.57a): if it isn't cast, it goes to the hand. */ "discover" | /** A defeated Siege: only transformed (CR 310.12b). */ "transformed"; /** "Mana of any type can be spent to cast that spell" (Tinybones, CR 609.4b). */ anyType?: true; /** "A spell with mana value X or less" (Sunbird's Invocation), "the same mana value" (Powerbalance): the spell as it's cast, a split card's half or a prototyped spell (CR 202.3, 709.3, 718.3b). */ mv?: { max?: number; exact?: number } }
   /**
    * A draw that dredge could replace (CR 702.52a): dredge one of `options` (cards in the player's graveyard), or draw.
    * `left` counts this draw and the ones after it; `after`: the draw step's turn-based draw, whose triggers wait.
@@ -1183,6 +1187,8 @@ export interface TurnLog {
   destroyed?: { controller: PlayerId; by: PlayerId }[];
   /** For each player, the creatures (`id@zoneChanges`) that dealt them damage (Inferno Trap). */
   damagedBy?: Record<number, string[]>;
+  /** Noncombat damage each player was dealt this turn (Chandra's Incinerator), also after they lost the game (rulings). */
+  noncombatDamage?: Record<number, number>;
   /** For each player, the sources (`id@zoneChanges`) that dealt them combat damage (Steel Hellkite). */
   combatDamagedBy?: Record<number, string[]>;
   /**

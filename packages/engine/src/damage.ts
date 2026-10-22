@@ -219,6 +219,7 @@ export function dealDamage(
       if (!list.includes(`${from.id}@${zc}`)) list.push(`${from.id}@${zc}`);
     }
     (s.damageThisTurn ??= {})[p.id] = (s.damageThisTurn[p.id] ?? 0) + n;
+    if (!opts.combat) ((s.turnLog ??= {}).noncombatDamage ??= {})[p.id] = (s.turnLog.noncombatDamage?.[p.id] ?? 0) + n;
     // "Whenever you're dealt damage": once for the damage dealt at the same time (see dealPlanned).
     if (playerBatch) playerBatch.set(p.id, (playerBatch.get(p.id) ?? 0) + n);
     else fireEvent(s, { type: "playerDealtDamage", player: p.id, amount: n });

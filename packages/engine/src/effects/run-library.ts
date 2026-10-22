@@ -3,7 +3,7 @@ import { abilitiesOf, cardIdOf, defOf, isPermanentCard, isType } from "../cards"
 import { controllerOf } from "../layers";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
-import { castProblem, draw, gainLife, log, loseLife, millCount, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
+import { castProblem, freeCastable, draw, gainLife, log, loseLife, millCount, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, printedMatches } from "./targeting";
@@ -963,7 +963,7 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         if (!o || o.zone !== "exile") return;
         sc.castingTarget = o.id;
         s.pending = { kind: "castFree", player: p.id, objectId: o.id, source: src };
-        if (castProblem(s, p.id, o.id) === null) return "paused";
+        if (freeCastable(s, p.id, o.id)) return "paused";
         s.pending = null;
         log(s, `${defOf(s, o).name} can't be cast.`);
         return;

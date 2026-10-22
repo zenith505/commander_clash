@@ -5,7 +5,7 @@ import { battleSBAs, isSiege, protectorOptions, setProtector } from "./battles";
 import { joinMeld } from "./meld";
 import { liveEmblems } from "./emblems";
 import { meldResultsFor } from "./meld-results";
-import { asFace, castableFaces, defMv, hasName, isRoom, landFaces, layoutOf, registerRoom, restingDef, setFace, transformedFace } from "./faces";
+import { asFace, castableFaces, defMv, hasName, isRoom, landFaces, layoutOf, registerFace, registerRoom, restingDef, setFace, transformedFace } from "./faces";
 import { checkDayNight, dayNightUntapCheck } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
@@ -2883,17 +2883,21 @@ function exilePermission(s: GameState, o: GameObject, pid: PlayerId): (Pick<NonN
   return how === "anyType" ? { anyType: true } : how === "life" ? { life: true } : undefined;
 }
 
-/** "You may play one of those cards" (Nashi): playing this exiled card uses up its group's permission. */
-function useOneOf(s: GameState, o: GameObject, pid: PlayerId): void {
+/**
+ * "You may play one of those cards" (Nashi): playing this exiled card uses up its group's permission. Aminatou's Augury:
+ * the card type it's cast as is used up (`asType`, or the one `defaultByType` picks).
+ */
+function useOneOf(s: GameState, o: GameObject, pid: PlayerId, asType?: string): void {
   if (o.zone === "exile" && o.mayPlay?.oneOf && ownExilePermission(s, o, pid)) (s.oneOfUsed ??= []).push(o.mayPlay.oneOf);
-  if (o.zone === "exile" && o.mayPlay?.byType && ownExilePermission(s, o, pid)) ((s.byTypeCast ??= {})[o.mayPlay.byType] ??= []).push(nonlandTypes(defOf(s, o)));
+  if (o.zone === "exile" && o.mayPlay?.byType && ownExilePermission(s, o, pid)) ((s.byTypeCast ??= {})[o.mayPlay.byType] ??= []).push([asType ?? defaultByType(s, o, pid)!]);
 }
 
 const nonlandTypes = (d: CardDef) => d.types.filter((t) => t !== "Land");
 
 /**
  * Aminatou's Augury: whether one more card with these nonland card types can be cast too, each card cast as a different
- * one of its types (rulings: an artifact creature as either). A player who chose well each time could cast them all.
+ * one of its types. Each card cast was cast as one type, chosen as it was cast (rulings: "you may cast it as either of
+ * those types").
  */
 function byTypeFits(cast: string[][], more: string[]): boolean {
   const all = [...cast, more];
@@ -2909,6 +2913,42 @@ function byTypeFits(cast: string[][], more: string[]): boolean {
     return false;
   };
   return assign(0);
+}
+
+/**
+ * Aminatou's Augury: the card types `pid` may cast this exiled card as now, the nonland types of its that no card cast
+ * from its group was cast as (an artifact creature as either, rulings). Empty for a card without such a permission.
+ */
+export function byTypeChoices(s: GameState, o: GameObject, pid: PlayerId): string[] {
+  const group = o.mayPlay?.byType;
+  if (!group || o.zone !== "exile" || !ownExilePermission(s, o, pid)) return [];
+  const cast = s.byTypeCast?.[group] ?? [];
+  return nonlandTypes(defOf(s, o)).filter((t) => byTypeFits(cast, [t]));
+}
+
+/**
+ * The type to cast this card as when none was chosen: the one that leaves the most of the group's other exiled cards
+ * castable, then the first printed.
+ */
+export function defaultByType(s: GameState, o: GameObject, pid: PlayerId): string | undefined {
+  const options = byTypeChoices(s, o, pid);
+  if (options.length < 2) return options[0];
+  const cast = s.byTypeCast?.[o.mayPlay!.byType!] ?? [];
+  const others = Object.values(s.objects).filter((c) => c.id !== o.id && c.zone === "exile" && c.mayPlay?.byType === o.mayPlay!.byType && c.mayPlay?.zc === (c.zoneChanges ?? 0));
+  const left = (t: string) => {
+    // As many of the others as can still be cast each as a different type, greedily.
+    const taken = [...cast, [t]];
+    let n = 0;
+    for (const c of others) {
+      const ts = nonlandTypes(defOf(s, c));
+      if (byTypeFits(taken, ts)) {
+        taken.push(ts.filter((x) => byTypeFits(taken, [x])).slice(0, 1));
+        n++;
+      }
+    }
+    return n;
+  };
+  return options.reduce((best, t) => (left(t) > left(best) ? t : best), options[0]!);
 }
 
 /** Valgavoth's permission is the one `pid` would cast this exiled card with: for life equal to its mana value, only. */
@@ -3248,6 +3288,21 @@ export function commanderTax(p: Player, o: GameObject) {
  * Without `targets`, only checks that legal targets exist; for a modal spell, without `modes`
  * only checks that some mode can be chosen (CR 700.2a).
  */
+/**
+ * Whether the pending free cast (PendingDecision "castFree") can cast this card one way or another: whole, as a split
+ * card's half or another face (CR 709.3, 712.11b, 715.3), or prototyped (CR 718.3). `manaOk`: a problem with mana alone
+ * (an additional cost) doesn't count.
+ */
+export function freeCastable(s: GameState, pid: PlayerId, id: ObjectId, manaOk = false): boolean {
+  const o = s.objects[id];
+  if (!o) return false;
+  const ways: CostChoices[] = [{}, ...castableFaces(s, o).filter((f) => !isType(s.cards[registerFace(s, o, f)]!, "Land")).map((face) => ({ face })), ...(altCost(defOf(s, o), "prototype") ? [{ alt: "prototype" as const }] : [])];
+  return ways.some((how) => {
+    const problem = castProblem(s, pid, id, undefined, undefined, undefined, undefined, undefined, how);
+    return problem === null || (manaOk && /^not enough mana/.test(problem));
+  });
+}
+
 export function castProblem(
   s: GameState,
   pid: PlayerId,
@@ -3351,6 +3406,8 @@ export function castProblem(
   if (!free && !via && !mayPlayFromExile(s, o, pid) && !mayPlayFromTop(s, o, pid) && (!(o.zone === "hand" || (fromCommand && o.isCommander)) || o.owner !== pid))
     return o.zone === "graveyard" && graveyardWays(s, o, pid).length ? `choose how to cast ${d.name} from ${o.owner === pid ? "your" : "a"} graveyard` : "you can only cast spells from your hand or your commander";
   if (choices?.buyback && compileCard(d).buyback === undefined) return `${d.name} doesn't have buyback`;
+  // Aminatou's Augury: cast as one of its nonland card types no other card from the group was cast as (rulings).
+  if (choices?.asType !== undefined && !byTypeChoices(s, o, pid).includes(choices.asType)) return `${d.name} can't be cast as ${/^[AEIOU]/.test(choices.asType) ? "an" : "a"} ${choices.asType.toLowerCase()} spell now`;
   // From the top of the library, a permission for this way of paying: Bolas's Citadel's spells for life (CR 118.9).
   // Valgavoth's exiled cards: for life equal to their mana value, and no other way (rulings).
   if (!free && !via && castFromExileForLife(s, o, pid) && choices?.alt !== "citadel" && !isType(d, "Land")) return `pay life equal to ${d.name}'s mana value rather than its mana cost`;
@@ -3374,7 +3431,9 @@ export function castProblem(
     if (choices.alt === "sneak" && (s.activePlayer !== pid || s.step !== "declareBlockers" || s.pending?.kind === "declareBlockers")) return "sneak works only during your declare blockers step";
     // Only one alternative cost can be applied to a spell (CR 118.9a). A permission to cast it from the graveyard that
     // names no cost (Yawgmoth's Will, Muldrotha, Lurrus) allows one (rulings), except those that say where the card is.
-    if ((via && !permissionWay(via)) || free || plotted) return `${d.name} can't be cast for its ${choices.alt} cost this way`;
+    // Casting a prototype card prototyped isn't an alternative cost (CR 718.3): it may be cast so without paying its mana
+    // cost (rulings on Powerbalance).
+    if (((via && !permissionWay(via)) || free || plotted) && choices.alt !== "prototype") return `${d.name} can't be cast for its ${choices.alt} cost this way`;
     if (via && (choices.alt === "foretell" || choices.alt === "citadel" || choices.alt === "omniscience" || choices.alt === "miracle")) return `${d.name} can't be cast for its ${choices.alt} cost from a graveyard`;
     // "If you control a Swamp, you may pay 4 life rather than pay ~'s mana cost": only while that's true (CR 601.2b).
     const cond = altCost(d, choices.alt)?.if;
@@ -3387,6 +3446,14 @@ export function castProblem(
   // A foretold card is cast for its foretell cost (CR 702.143a), unless something lets it be cast without paying.
   if (!free && o.zone === "exile" && o.mayPlay?.until === "foretell" && choices?.alt !== "foretell") return `${d.name} is foretold: cast it for its foretell cost`;
   if (isType(d, "Land")) return "lands are played, not cast";
+  // "A spell with mana value X or less", "the same mana value": the spell as cast, a split card's half or a prototyped
+  // spell, not the card (CR 202.3, 709.3, 718.3b; rulings on Powerbalance).
+  const pendMv = s.pending?.kind === "castFree" && s.pending.objectId === id ? s.pending.mv : undefined;
+  if (pendMv) {
+    const spellMv = choices?.faceDown ? 0 : defMv(d) + (x ?? 0) * xCount(parseManaCost(d.manaCost));
+    if (pendMv.exact !== undefined && spellMv !== pendMv.exact) return `the spell must have mana value ${pendMv.exact}`;
+    if (pendMv.max !== undefined && spellMv > pendMv.max) return `the spell must have mana value ${pendMv.max} or less`;
+  }
   // Its mana value as proposed (CR 601.2e): a face-down spell's is 0 (CR 708.2), X is the X chosen (202.3e).
   const proposedCost = parseManaCost(d.manaCost);
   const limit = castLimitProblem(s, pid, d, choices?.faceDown ? 0 : defMv(d) + (proposedCost.hasX ? (x ?? 0) * xCount(proposedCost) : 0));
@@ -3578,11 +3645,13 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const anyTypeNow = !!exiled?.anyType || (pend?.kind === "castFree" && pend.player === pid && pend.objectId === o.id && !!pend.anyType);
   const anyType = (c: ParsedCost): ParsedCost => (anyTypeNow ? { ...c, symbols: c.symbols.map((y) => (y.kind === "colored" || y.kind === "hybrid" || y.kind === "twoHybrid" ? { kind: "generic" as const, amount: 1 } : y)) } : c);
   // "You may play that card without paying its mana cost" (Intet, CR 118.9): additional costs are still paid.
-  const freeFromExile = !!exiled?.free && !how.faceDown && !how.alt;
+  // Prototyped isn't an alternative cost (CR 718.3): it's still free.
+  const realAlt = how.alt && how.alt !== "prototype";
+  const freeFromExile = !!exiled?.free && !how.faceDown && !realAlt;
   // "A spell cast this way costs {2} more" (Soul Partition): an increase (CR 601.2f).
   if (exiled?.more && !madness && freeCastOf(s, pid) !== o.id) mods.more += exiled.more;
   // A "Kicker {X}" is still paid, with its X (CR 118.9d).
-  if ((freeCastOf(s, pid) === o.id && !madness) || (!how.faceDown && !how.alt && plottedCast(s, pid, o)) || freeFromExile) {
+  if ((freeCastOf(s, pid) === o.id && !madness) || (!how.faceDown && !realAlt && plottedCast(s, pid, o)) || freeFromExile) {
     const kicked = anyType(lessColored(parseManaCost(kickCost)));
     const kx = x * xCount(kicked);
     return { cost: kx ? splitGeneric(kicked, 0).cost : kicked, extra: Math.max(0, mods.more - mods.less) + (kx ? splitGeneric(kicked, kx).extra : 0) };
@@ -4071,7 +4140,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   }
   if (fromCommand) p.commanderCasts[o.id] = (p.commanderCasts[o.id] ?? 0) + 1;
   const castFrom = o.zone;
-  useOneOf(s, o, p.id);
+  useOneOf(s, o, p.id, choices.asType);
   // A once-a-turn permission to cast from the top is used up (Johann).
   if (castFrom === "library") {
     const how = topPermission(s, o, p.id);
@@ -5329,7 +5398,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // A Treasure's mana ability makes "mana from a Treasure" (CR 106.3), even though it's sacrificed as it's activated.
   const manaFrom = manaPick ? manaOriginsOf(s, o) : [];
   // The source as it is now, for "its power" after it's sacrificed as a cost (CR 608.2h).
-  const lki: LastKnown | undefined = o.zone === "battlefield" ? { power: power(s, o), toughness: toughness(s, o), counters: { ...o.counters }, ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}) } : ab.costs?.some((c) => c.kind === "returnToHand") ? {} : undefined;
+  const equipment = o.zone === "battlefield" ? s.battlefield.filter((b) => obj(s, b).attachedTo === o.id && characteristics(s, obj(s, b)).subtypes.includes("Equipment")).map((b) => ({ id: b, zc: obj(s, b).zoneChanges ?? 0 })) : [];
+  const lki: LastKnown | undefined = o.zone === "battlefield" ? { power: power(s, o), toughness: toughness(s, o), counters: { ...o.counters }, ...(o.chosen?.player !== undefined ? { chosenPlayer: o.chosen.player } : {}), ...(equipment.length ? { equipment } : {}) } : ab.costs?.some((c) => c.kind === "returnToHand") ? {} : undefined;
   if (ab.revealChosen && o.chosen?.player !== undefined) {
     o.chosen = { ...o.chosen, secret: undefined };
     log(s, `${p.name} reveals the player chosen for ${d.name}: ${player(s, o.chosen.player!).name}.`);

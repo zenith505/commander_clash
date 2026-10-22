@@ -3,7 +3,7 @@ import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, cardIdOf, defOf, isType } from "../cards";
 import { controllerOf, invalidateCharacteristics } from "../layers";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
-import { castProblem, describeTargets, log, millCount, moveObject, newObject, obj, opponents, player } from "../game";
+import { castProblem, freeCastable, describeTargets, log, millCount, moveObject, newObject, obj, opponents, player } from "../game";
 import { compileCard, spellTargetSpecs } from "../oracle";
 import type { DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
 import { isLegalTarget, legalTargets, pickOptions, printedMatches, sameTarget, sourceQuality, spellManaValue, spellQuality, stampTargets, swapKeepsOthersLegal } from "./targeting";
@@ -166,7 +166,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (sc.playLinked || !id || s.objects[id]?.zone !== "library") return;
       sc.playLinked = true;
       s.pending = { kind: "castFree", player: ctx.controller, objectId: id, source: src };
-      if (castProblem(s, ctx.controller, id) === null) return "paused";
+      if (freeCastable(s, ctx.controller, id)) return "paused";
       s.pending = null;
       log(s, `${defOf(s, obj(s, id)).name} can't be cast.`);
       return;
@@ -228,7 +228,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (!sc.may && bargained && defMv(defOf(s, card)) <= e.maxMv) {
         sc.may = true;
         s.pending = { kind: "castFree", player: p.id, objectId: card.id, source: src };
-        if (castProblem(s, p.id, card.id) === null) return "paused";
+        if (freeCastable(s, p.id, card.id)) return "paused";
         s.pending = null;
       }
       if (e.elseHand && card.zone === "exile") {
@@ -411,7 +411,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         if (hit) {
           // Cast as this resolves, so its card type's timing doesn't matter; it still needs legal targets and modes.
           s.pending = { kind: "castFree", player: p.id, objectId: hit, source: src };
-          if (castProblem(s, p.id, hit) === null) return "paused";
+          if (freeCastable(s, p.id, hit)) return "paused";
           s.pending = null;
           log(s, `${defOf(s, obj(s, hit)).name} can't be cast.`);
         }
@@ -477,7 +477,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         }
         // Cast as this resolves, so its card type's timing doesn't matter; it still needs legal targets and modes.
         s.pending = { kind: "castFree", player: caster, objectId: hit, source: src };
-        if (castProblem(s, caster, hit) === null) return "paused";
+        if (freeCastable(s, caster, hit)) return "paused";
         s.pending = null;
         log(s, `${defOf(s, obj(s, hit)).name} can't be cast.`);
       }
@@ -509,7 +509,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         if (hit) {
           // Cast as this resolves, so its card type's timing doesn't matter; it still needs legal targets and modes.
           s.pending = { kind: "castFree", player: p.id, objectId: hit, source: src, how: "discover" };
-          if (castProblem(s, p.id, hit) === null) return "paused";
+          if (freeCastable(s, p.id, hit)) return "paused";
           s.pending = null;
         }
       }
@@ -541,7 +541,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const id = sc.ripple.queue.shift()!;
         if (obj(s, id).zone !== "library") continue;
         s.pending = { kind: "castFree", player: p.id, objectId: id, source: src };
-        if (castProblem(s, p.id, id) === null) return "paused";
+        if (freeCastable(s, p.id, id)) return "paused";
         s.pending = null;
         log(s, `${defOf(s, obj(s, id)).name} can't be cast.`);
       }

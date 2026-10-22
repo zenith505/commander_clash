@@ -173,6 +173,8 @@ export type Count =
   | { kind: "party" }
   /** "The total amount of life your opponents have lost this turn", "for each 1 life your opponents have lost this turn" (CR 119.3). */
   | { kind: "opponentsLifeLost" }
+  /** "The total amount of noncombat damage dealt to your opponents this turn" (Chandra's Incinerator). */
+  | { kind: "opponentsNoncombatDamage" }
   /** "The life they lost this turn" (Wound Reflection): each one's own, however they lost it (rulings). */
   | { kind: "lifeLostThisTurn"; who: PlayerRef }
   /** "For each unspent green mana you have" (Omnath, Locus of Mana), "six or more unspent mana" (Ozai): what's in your mana pool (CR 106.4). */
@@ -1994,6 +1996,11 @@ export type Effect =
    * (rulings) among those that could be attached to target `host` (CR 701.3a-b), then attached to it.
    */
   | { type: "attachAny"; host: number }
+  /**
+   * Zack Fair: "attach an Equipment that was attached to ~ to that creature": one of those still on the battlefield, chosen
+   * as it resolves if there are several (CR 608.2d), attached if it could be (CR 701.3a-b).
+   */
+  | { type: "attachLastKnown"; what: ObjRef }
   /** "Attach target Aura attached to a creature to another creature" (Crown of the Ages): a creature chosen as it resolves. */
   | { type: "attachElsewhere"; source: ObjRef }
   /**

@@ -141,7 +141,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return plan ? plan.map((a) => (a.type === "castSpell" && a.objectId === pend.objectId ? { ...a, face: 1 } : a)) : [{ type: "chooseMay", player: pid, yes: false }];
     }
     if (pend.kind === "castFree") {
-      const plan = facePlan(s, pid, pend.objectId, true, "first") ?? castPlan(s, pid, pend.objectId, true) ?? facePlan(s, pid, pend.objectId, true, "after");
+      // Prototyped when it can't be cast whole (CR 718.3): "the same mana value" may allow only that (Powerbalance).
+      const plan = facePlan(s, pid, pend.objectId, true, "first") ?? castPlan(s, pid, pend.objectId, true) ?? facePlan(s, pid, pend.objectId, true, "after") ?? (altCost(defOf(s, obj(s, pend.objectId)), "prototype") ? castPlan(s, pid, pend.objectId, true, undefined, "prototype") : null);
       return plan ?? [{ type: "chooseMay", player: pid, yes: false }];
     }
     if (pend.kind === "drawLook") {

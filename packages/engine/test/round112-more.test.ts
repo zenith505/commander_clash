@@ -1,8 +1,8 @@
 // Round 112, more of the most played cards: Karn, the Great Creator, ...
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, passAll, putOnBattlefield, setup } from "./helpers";
-import { characteristics, isFullySupported, planActivate, power, toughness, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
+import { act, bear, card, cast, passAll, putOnBattlefield, setup } from "./helpers";
+import { castProblem, characteristics, isFullySupported, planActivate, planCast, power, toughness, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const karn = card("Karn, the Great Creator", "Legendary Planeswalker — Karn", "{4}", {
@@ -171,3 +171,86 @@ describe("Ainok Strike Leader", () => {
     expect(goblins(s, ap).length).toBe(0);
   });
 });
+
+const cage = card("Grafdigger's Cage", "Artifact", "{1}", {
+  oracleText: "Creature cards in graveyards and libraries can't enter the battlefield.\nPlayers can't cast spells from graveyards or libraries.",
+});
+const runestone = card("Weathered Runestone", "Artifact", "{2}", {
+  oracleText: "Nonland permanent cards in graveyards and libraries can't enter the battlefield.\nPlayers can't cast spells from graveyards or libraries.",
+});
+const jailer = card("Soulless Jailer", "Artifact Creature — Phyrexian Golem", "{2}", {
+  power: "0",
+  toughness: "4",
+  oracleText: "Permanent cards in graveyards can't enter the battlefield.\nPlayers can't cast noncreature spells from graveyards or exile.",
+});
+const zombify = card("Zombify", "Sorcery", "{3}{B}", { oracleText: "Return target creature card from your graveyard to the battlefield." });
+const looting = card("Faithless Looting", "Sorcery", "{R}", { oracleText: "Draw two cards, then discard two cards.\nFlashback {2}{R} (You may cast this card from your graveyard for its flashback cost. Then exile it.)" });
+const tutorIn = card("Test Summoning", "Sorcery", "{G}", { oracleText: "Search your library for a creature card, put it onto the battlefield, then shuffle." });
+const unearth = card("Return to the Ranks Test", "Sorcery", "{1}{W}", { oracleText: "Return target artifact card from your graveyard to the battlefield." });
+
+describe("Grafdigger's Cage and the like", () => {
+  it("are supported", () => {
+    for (const d of [cage, runestone, jailer, card("Kunoros, Hound of Athreos", "Legendary Creature — Dog", "{1}{W}{B}", { power: "3", toughness: "3", oracleText: "Vigilance, menace, lifelink\nCreature cards in graveyards can't enter the battlefield.\nPlayers can't cast spells from graveyards." })])
+      expect(isFullySupported(d), d.name).toBe(true);
+  });
+
+  it("a creature card in a graveyard can't be returned to the battlefield: it stays there", () => {
+    const { s: s0, ap, ids, opp } = setup([zombify]);
+    putOnBattlefield(s0, opp, cage);
+    const dead = toZoneGy(s0, ap, bear({ name: "Dead Bear" }));
+    const s = cast(s0, ap, ids[0]!, [{ kind: "object", id: dead }]);
+    expect(s.objects[dead]!.zone).toBe("graveyard");
+    expect(s.log.some((l) => /Dead Bear can't enter the battlefield from a graveyard \(Grafdigger's Cage\)/.test(l.text))).toBe(true);
+  });
+
+  it("a noncreature card can, under Grafdigger's Cage but not Weathered Runestone", () => {
+    for (const [ban, enters] of [[cage, true], [runestone, false]] as const) {
+      const { s: s0, ap, ids, opp } = setup([unearth]);
+      putOnBattlefield(s0, opp, ban);
+      const rock = toZoneGy(s0, ap, card("Mind Rock", "Artifact", "{2}", {}));
+      const s = cast(s0, ap, ids[0]!, [{ kind: "object", id: rock }]);
+      expect(s.objects[rock]!.zone, ban.name).toBe(enters ? "battlefield" : "graveyard");
+    }
+  });
+
+  it("a creature card found in a library stays there", () => {
+    const { s: s0, ap, ids, opp } = setup([tutorIn]);
+    putOnBattlefield(s0, opp, cage);
+    let s = s0;
+    for (const a of planCast(s, ap, ids[0]!)!) s = act(s, a);
+    s = passAll(s);
+    expect(s.pending?.kind).toBe("searchLibrary");
+    if (s.pending?.kind !== "searchLibrary") return;
+    const found = s.pending.cards[0]!;
+    s = passAll(act(s, { type: "searchLibrary", player: ap, found: [found] }));
+    expect(s.objects[found]!.zone).toBe("library");
+    expect(s.battlefield.filter((id) => s.objects[id]!.controller === ap && characteristics(s, s.objects[id]!).types.includes("Creature")).length).toBe(0);
+  });
+
+  it("no spells cast from graveyards: flashback can't be used", () => {
+    const { s, ap, opp } = setup([]);
+    putOnBattlefield(s, opp, cage);
+    const fl = toZoneGy(s, ap, looting);
+    expect(castProblem(s, ap, fl, undefined, undefined, undefined, undefined, undefined, { via: "flashback" })).toMatch(/Grafdigger's Cage: players can't cast spells from graveyards/);
+    expect(planCast(s, ap, fl)).toBeNull();
+  });
+
+  it("Soulless Jailer: no noncreature spells from exile either, but a creature spell from exile is fine", () => {
+    const { s, ap, opp } = setup([]);
+    putOnBattlefield(s, opp, jailer);
+    const ex = toZoneGy(s, ap, card("Exiled Shock", "Instant", "{R}", { oracleText: "Exiled Shock deals 2 damage to any target." }), "exile");
+    s.objects[ex]!.mayPlay = { player: ap, zc: s.objects[ex]!.zoneChanges ?? 0, until: "thisTurn", turn: s.turn } as never;
+    expect(castProblem(s, ap, ex)).toMatch(/Soulless Jailer: players can't cast noncreature spells from exile/);
+    const exBear = toZoneGy(s, ap, bear({ name: "Exiled Bear" }), "exile");
+    s.objects[exBear]!.mayPlay = { player: ap, zc: s.objects[exBear]!.zoneChanges ?? 0, until: "thisTurn", turn: s.turn } as never;
+    expect(castProblem(s, ap, exBear) ?? "").not.toMatch(/Soulless Jailer/);
+  });
+});
+
+function toZoneGy(s: GameState, pid: PlayerId, def: CardDef, zone: "graveyard" | "exile" = "graveyard") {
+  const id = putOnBattlefield(s, pid, def);
+  s.battlefield.splice(s.battlefield.indexOf(id), 1);
+  s.objects[id]!.zone = zone;
+  s.players[pid]![zone].push(id);
+  return id;
+}

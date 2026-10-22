@@ -580,6 +580,18 @@ export function enterTogether(s: GameState, run: () => void) {
 }
 
 /** Move an object between zones. It becomes a new object with no memory of its old one (CR 400.7). */
+/** The name of a permanent whose ability stops this card entering the battlefield from its graveyard or library. */
+export function cantEnterFromHere(s: GameState, o: GameObject, zone: "graveyard" | "library", faceDown = false): string | undefined {
+  const d = defOf(s, o);
+  for (const b of s.battlefield) {
+    const ban = abilitiesOf(s, obj(s, b)).cantEnterFrom;
+    if (!ban?.zones.includes(zone)) continue;
+    const hit = faceDown || (ban.what === "creature" ? isType(d, "Creature") : isPermanentCard(d) && (ban.what === "permanent" || !isType(d, "Land")));
+    if (hit) return characteristics(s, obj(s, b)).name;
+  }
+  return undefined;
+}
+
 export function moveObject(
   s: GameState,
   id: ObjectId,
@@ -623,6 +635,16 @@ export function moveObject(
   if (o.spellCopy && to !== "stack" && to !== "battlefield") {
     delete s.objects[id];
     return;
+  }
+  // Grafdigger's Cage: "Creature cards in graveyards and libraries can't enter the battlefield": it stays where it is,
+  // judged as the card is there (rulings), a manifested or cloaked card as the face-down 2/2 creature it's turned into
+  // (CR 701.40a, 701.58a; rulings on Grafdigger's Cage).
+  if (to === "battlefield" && (fromZone === "graveyard" || fromZone === "library")) {
+    const cage = cantEnterFromHere(s, o, fromZone, !!opts.faceDown);
+    if (cage) {
+      log(s, `${opts.faceDown ? "The face-down card" : defOf(s, o).name} can't enter the battlefield from ${fromZone === "graveyard" ? "a graveyard" : "a library"} (${cage}).`);
+      return;
+    }
   }
   // Primeval Spawn: "If ~ would enter and it wasn't cast or no mana was spent to cast it, exile it instead" (CR 614.1a),
   // with the abilities it would have there (614.12). Mana paid for any cost to cast it counts; a copy of a spell, or a
@@ -3291,6 +3313,12 @@ export function castProblem(
   const proposedCost = parseManaCost(d.manaCost);
   const limit = castLimitProblem(s, pid, d, choices?.faceDown ? 0 : defMv(d) + (proposedCost.hasX ? (x ?? 0) * xCount(proposedCost) : 0));
   if (limit) return limit;
+  // Grafdigger's Cage: "Players can't cast spells from graveyards or libraries" (the spell is cast from where the card is,
+  // CR 601.2a; a card exiled from a library is cast from exile, rulings). Soulless Jailer: noncreature spells only.
+  for (const b of s.battlefield) {
+    const ban = abilitiesOf(s, obj(s, b)).cantCastFrom;
+    if (ban && (ban.zones as string[]).includes(o.zone) && !(ban.noncreature && isType(d, "Creature"))) return `${characteristics(s, obj(s, b)).name}: players can't cast ${ban.noncreature ? "noncreature " : ""}spells from ${o.zone === "library" ? "libraries" : `${o.zone === "graveyard" ? "graveyards" : "exile"}`}`;
+  }
   // Drannith Magistrate: "Your opponents can't cast spells from anywhere other than their hands", commanders from the
   // command zone included (CR 101.2).
   if (o.zone !== "hand") {

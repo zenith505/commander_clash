@@ -4020,6 +4020,13 @@ export interface CompiledCard {
   drawEmptyWins?: true;
   /** "Your opponents can't cast spells from anywhere other than their hands." (Drannith Magistrate) */
   opponentsOnlyFromHand?: true;
+  /**
+   * "Creature cards in graveyards and libraries can't enter the battlefield." (Grafdigger's Cage), "Permanent cards in
+   * graveyards ..." (Soulless Jailer), "Nonland permanent cards ..." (Weathered Runestone): such a card stays where it is.
+   */
+  cantEnterFrom?: { zones: ("graveyard" | "library")[]; what: "creature" | "permanent" | "nonlandPermanent" };
+  /** "Players can't cast spells from graveyards or libraries." (Grafdigger's Cage), "... noncreature spells from graveyards or exile" (Soulless Jailer). */
+  cantCastFrom?: { zones: ("graveyard" | "library" | "exile")[]; noncreature?: true };
   /** Aven Mindcensor: "If an opponent would search a library, that player searches the top four cards of that library instead." (CR 614.1a) */
   opponentsSearchTop?: number;
   /** Opposition Agent: "You control your opponents while they're searching their libraries." (CR 723.2) */

@@ -1901,6 +1901,19 @@ export function compile(d: CardDef): CompiledCard {
       out.loyaltyAtInstantSpeed = true;
       continue;
     }
+    // Grafdigger's Cage, Kunoros, Soulless Jailer, Weathered Runestone (rulings on Grafdigger's Cage: the card as it is in
+    // that zone; a manifested card is a creature card as it's turned face down there, CR 701.40a, so it can't either).
+    const cage = /^(Creature|Permanent|Nonland permanent) cards in (graveyards|graveyards and libraries) can't enter the battlefield\.$/.exec(line);
+    if (cage) {
+      out.cantEnterFrom = { zones: cage[2] === "graveyards" ? ["graveyard"] : ["graveyard", "library"], what: cage[1] === "Creature" ? "creature" : cage[1] === "Permanent" ? "permanent" : "nonlandPermanent" };
+      continue;
+    }
+    // Playing a land from there is still allowed (rulings on Grafdigger's Cage): it isn't cast (CR 305.1).
+    const noCasting = /^Players can't cast (spells|noncreature spells) from (graveyards|graveyards or libraries|graveyards or exile)\.$/.exec(line);
+    if (noCasting) {
+      out.cantCastFrom = { zones: noCasting[2]!.split(" or ").map((z) => (z === "graveyards" ? "graveyard" : z === "libraries" ? "library" : "exile")), ...(noCasting[1] === "noncreature spells" ? { noncreature: true as const } : {}) };
+      continue;
+    }
     if (line === "Your opponents can't cast spells from anywhere other than their hands.") {
       out.opponentsOnlyFromHand = true;
       continue;

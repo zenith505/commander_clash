@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, cast, island, passUntil, putOnBattlefield, setup, target } from "./helpers";
-import { attackTaxPer, botActions, invalidateCharacteristics, isFullySupported, objIsType, power, toughness, isSuspended, planActivate, planCast, waitingOn, type Action, type GameState, type PlayerId } from "../src";
+import { attackTaxPer, botActions, invalidateCharacteristics, isFullySupported, objHasKeyword, objIsType, power, toughness, isSuspended, planActivate, planCast, waitingOn, type Action, type GameState, type PlayerId } from "../src";
 import { moveObject } from "../src/game";
 
 const run = (s: GameState, plan: Action[] | null) => {
@@ -551,5 +551,26 @@ describe("Slaughter the Strong", () => {
     const kept = [one, three, four].filter((id) => s.objects[id]!.zone === "battlefield");
     expect(kept.reduce((t, id) => t + power(s, s.objects[id]!), 0)).toBeLessThanOrEqual(4);
     expect(kept.length).toBeGreaterThan(0);
+  });
+});
+
+const silkguard = card("Silkguard", "Instant", "{X}{G}", {
+  oracleText:
+    "Put a +1/+1 counter on each of up to X target creatures you control.\nAuras, Equipment, and modified creatures you control gain hexproof until end of turn. (Equipment, Auras you control, and counters are modifications.)",
+});
+
+describe("Silkguard", () => {
+  it("counters on up to X; then your Auras, Equipment and modified creatures (counted after the counters) gain hexproof", () => {
+    expect(isFullySupported(silkguard)).toBe(true);
+    const { s: s0, ap, opp, ids } = setup([silkguard]);
+    const [a, b] = [putOnBattlefield(s0, ap, bear()), putOnBattlefield(s0, ap, bear())];
+    const eq = putOnBattlefield(s0, ap, card("Bone Saw", "Artifact — Equipment", "{0}", { oracleText: "Equipped creature gets +1/+0.\nEquip {1}" }));
+    const theirs = putOnBattlefield(s0, opp, bear());
+    s0.objects[theirs]!.counters["+1/+1"] = 1;
+    invalidateCharacteristics(s0);
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [target(a)], undefined, "auto", 1)));
+    expect(s.objects[a]!.counters["+1/+1"]).toBe(1);
+    const hex = (id: string) => objHasKeyword(s, s.objects[id]!, "Hexproof");
+    expect([hex(a), hex(b), hex(eq), hex(theirs)]).toEqual([true, false, true, false]);
   });
 });

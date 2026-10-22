@@ -527,6 +527,15 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   p = p.replace(/^((?:all |each )?)([a-z ]+?) that (?:aren't|are not|isn't|is not) legendary$/i, "$1nonlegendary $2");
   // "Each nonland permanent that's not historic" (Desynchronization): not an artifact, not legendary, not a Saga (CR 700.6).
   p = p.replace(/^((?:all |each )?)([a-z ]+?) that(?:'s| is| are|'re) not historic$/i, "$1nonartifact nonlegendary non-Saga $2");
+  // "Auras, Equipment, and modified creatures you control" (Silkguard): each permanent that's one of them (CR 700.9).
+  if (/^Auras, Equipment, and modified creatures you control$/i.test(p)) {
+    const anyOf: TargetSpec[] = [
+      { kind: "object", types: ["Enchantment"], subtypes: ["Aura"], text: "Aura" },
+      { kind: "object", types: ["Artifact"], subtypes: ["Equipment"], text: "Equipment" },
+      { kind: "object", types: ["Creature"], status: "modified", text: "modified creature" },
+    ];
+    return { filter: { kind: "object", types: ["Enchantment", "Artifact", "Creature"], notTypes: [], notColors: [], anyOf, controller: "you", text: phrase.trim().toLowerCase() }, other: false };
+  }
   const all = /^(all|each) /i.exec(p);
   if (all) p = p.slice(all[0].length);
   const other = /^other /i.test(p);

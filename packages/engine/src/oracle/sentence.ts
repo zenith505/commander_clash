@@ -226,6 +226,13 @@ export function parseChanges(text: string): Modification[] | null {
     else if ((m = /^becomes? (.+)$/i.exec(p))) {
       // Tezzeret the Seeker: "Artifacts you control become artifact creatures with base power and toughness 5/5": each
       // one a 5/5 artifact creature, in addition to its other types (rulings; layers 4 and 7b, CR 613.1d, 613.4b).
+      // Karn, the Great Creator: "becomes an artifact creature with power and toughness each equal to its mana value": each
+      // object's own, set in layer 7b (CR 613.4b).
+      if (/^an artifact creature with power and toughness each equal to its mana value$/.test(m[1]!)) {
+        const mv = { count: { kind: "affectedManaValue" as const } };
+        out.push(...parseBecomes("a 0/0 artifact creature")!.map((x) => (x.kind === "setPT" ? { kind: "setPT" as const, power: mv, toughness: mv } : x)));
+        continue;
+      }
       const plural = /^((?:artifact )?creature)s with base power and toughness (\d+)\/(\d+)$/.exec(m[1]!);
       const b = parseBecomes(plural ? `a ${plural[2]}/${plural[3]} ${plural[1]}` : m[1]!);
       if (!b) return null;

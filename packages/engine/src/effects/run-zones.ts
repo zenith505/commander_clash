@@ -1574,6 +1574,22 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     }
     case "chooseFromGraveyard": {
       if (e.who?.ref === "eachPlayer") return eachFromGraveyard(s, e, ctx, src);
+      if (e.fromExile) {
+        // Karn, the Great Creator: a face-up card you own in exile, into your hand (rulings: never a face-down one).
+        const p = player(s, ctx.controller);
+        const sc = (s.resolving!.scratch ??= {});
+        if (!sc.found) {
+          const cards = p.exile.filter((id) => obj(s, id).owner === p.id && !obj(s, id).faceDown && !obj(s, id).hiddenExile && (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))));
+          if (!cards.length) return;
+          const kind = e.filter?.text ?? "card";
+          s.pending = { kind: "searchLibrary", player: p.id, source: src, what: `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`, cards, min: e.upTo ? 0 : 1, max: 1, exiled: true, dig: { looked: cards, to: "to put into your hand", rest: "stay in exile" } };
+          return "paused";
+        }
+        const found = sc.found.filter((id) => p.exile.includes(id) && !obj(s, id).faceDown && !obj(s, id).hiddenExile);
+        if (found.length) log(s, `${p.name} puts ${found.map((id) => defOf(s, obj(s, id)).name).join(", ")} from exile into their hand.`);
+        for (const id of found) moveObject(s, id, "hand");
+        return;
+      }
       const pid = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
       if (pid === undefined || player(s, pid).lost) return;
       const p = player(s, pid);

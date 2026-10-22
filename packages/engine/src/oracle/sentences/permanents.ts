@@ -570,6 +570,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     // Anything else "until your next turn" is for the rules below.
     if (ok) return [{ type: "playerGains", keywords, untilYourNextTurn: true, ...(lifeCantChange ? { lifeCantChange: true as const } : {}) }];
   }
+  // "Until your next turn, up to one target noncreature artifact becomes an artifact creature ..." (Karn, the Great
+  // Creator): the same as with the duration after it.
+  if ((m = /^Until (end of turn|your next turn), ((?:up to one )?target .+?) ((?:gets?|gains?|loses?|has|becomes?) .+)$/.exec(s))) {
+    const what = parseObject(m[2]!, ctx);
+    const mods = what && parseChanges(m[3]!);
+    return what && mods ? [{ type: "continuous", what, mods, duration: m[1] === "end of turn" ? "endOfTurn" : "yourNextTurn" }] : null;
+  }
   if ((m = /^(.+?) ((?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) .+) until (end of turn|your next turn)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods = what && parseChanges(m[2]!);

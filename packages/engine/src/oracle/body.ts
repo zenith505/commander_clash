@@ -744,6 +744,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // Arcavios): players here have no sideboard (CR 100.4: one is optional) and nothing else outside the game (as for
   // learn), so it's the library and/or the graveyard, where every card is one you own.
   text = text.replace(/\b([Ss])earch your library, graveyard, and\/or outside the game for (an? [a-z ]+? card) you own, /, "$1earch your library and/or graveyard for $2, ");
+  // Karn, the Great Creator: "You may reveal an artifact card you own from outside the game or choose a face-up artifact
+  // card you own in exile. Put that card into your hand." Likewise only the exiled card (see zones.ts).
+  text = text.replace(/\b[Yy]ou may reveal an? ([A-Za-z ]+? card) you own from outside the game or choose a face-up \1 you own in exile\. Put that card into your hand\./g, "You may put a face-up $1 you own in exile into your hand.");
   // "Look at that many cards from the top of your library" (Doomskar Warrior), with "that many" made X by the trigger:
   // the same as "the top X cards".
   text = text.replace(/\b([Ll]ook at|[Rr]eveal) X cards from the top of your library\b/g, "$1 the top X cards of your library");

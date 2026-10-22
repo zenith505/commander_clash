@@ -225,6 +225,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (filter === null || !Number.isInteger(n) || n < 1) return null;
     return [{ type: "chooseFromGraveyard", n, ...(filter ? { filter } : {}), ...(/^up to /.test(m[1]!) ? { upTo: true as const } : {}) }];
   }
+  // Karn, the Great Creator; Coax from the Blind Eternities: "... or choose a face-up artifact card you own in exile. Put
+  // that card into your hand" (see parseBody): chosen as it resolves, never a face-down card (rulings on Karn).
+  if ((m = /^(?:[Yy]ou may )?[Pp]ut a face-up (.+?) you own in exile into your hand$/.exec(s))) {
+    const filter = parseSearchFilter(m[1]!);
+    return filter === null ? null : [{ type: "chooseFromGraveyard", n: 1, upTo: true, fromExile: true, ...(filter ? { filter } : {}) }];
+  }
   // Ripples of Undeath: "Mill three cards. Then you may pay {1} and 3 life. If you do, put a card from among those cards into
   // your hand": one of the cards just milled, still in your graveyard.
   if (ctx.afterMill && /^[Pp]ut a card from among (?:those cards|them) into your hand$/.test(s)) return [{ type: "chooseFromGraveyard", n: 1, milled: true }];

@@ -786,3 +786,27 @@ describe("Descendants' Path", () => {
     expect(other.s.players[ap]!.library.at(-1)).toBe(other.id);
   });
 });
+
+describe("Giggling Skitterspike", () => {
+  it("attacks, blocks, or becomes the target of a spell: its power to each opponent", () => {
+    const spike = card("Giggling Skitterspike", "Artifact Creature — Toy", "{4}", {
+      power: "1",
+      toughness: "1",
+      keywords: ["Indestructible"],
+      oracleText: "Indestructible\nWhenever this creature attacks, blocks, or becomes the target of a spell, it deals damage equal to its power to each opponent.\n{5}: Monstrosity 5. (If this creature isn't monstrous, put five +1/+1 counters on it and it becomes monstrous.)",
+    });
+    expect(isFullySupported(spike)).toBe(true);
+    const growth = card("Giant Growth", "Instant", "{G}", { oracleText: "Target creature gets +3/+3 until end of turn." });
+    const { s: s0, ap, ids } = setup([growth]);
+    const id = putOnBattlefield(s0, ap, spike);
+    s0.objects[id]!.counters["+1/+1"] = 1;
+    invalidateCharacteristics(s0);
+    const opps = s0.turnOrder.filter((p) => p !== ap);
+    const life = s0.players[opps[0]!]!.life;
+    let s = planCast(s0, ap, ids[0]!, [target(id)])!.reduce(act, s0);
+    s = passAll(s); // the trigger, above Giant Growth
+    for (const p of opps) expect(s.players[p]!.life).toBe(life - 2);
+    s = passAll(s);
+    expect(power(s, s.objects[id]!)).toBe(5);
+  });
+});

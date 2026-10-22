@@ -1112,6 +1112,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: inner });
       continue;
     }
+    // Starfall Invocation: "Destroy all creatures. If the gift was promised, return a creature card put into your graveyard
+    // this way to the battlefield under your control." One of the cards that died to it, chosen as it resolves (rulings).
+    const starfall = /^(If the gift was promised, )?[Rr]eturn a creature card put into your graveyard this way to the battlefield under your control$/.exec(s);
+    if (starfall && effects.some((e) => e.type === "destroy" && e.what.ref === "each")) {
+      const inner = parseOne("Return a creature card from your graveyard to the battlefield", ctx);
+      if (inner?.length !== 1 || inner[0]!.type !== "chooseFromGraveyard") return null;
+      const back: Effect = { ...inner[0]!, destroyedThisWay: true };
+      effects.push(starfall[1] ? { type: "if", cond: { kind: "gift" }, effects: [back] } : back);
+      continue;
+    }
     // "Each player sacrifices a creature of their choice. If you sacrificed a creature this way, you may return another
     // permanent card from your graveyard to the battlefield." (Rise of the Witch-king): chosen after the sacrifices, and
     // not the card you sacrificed (rulings).

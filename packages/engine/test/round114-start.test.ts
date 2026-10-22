@@ -782,3 +782,39 @@ describe("Invert Polarity", () => {
     expect(s.players[opp]!.life).toBe(life);
   });
 });
+
+describe("Starfall Invocation", () => {
+  const starfall = card("Starfall Invocation", "Sorcery", "{3}{W}{W}", {
+    oracleText:
+      "Gift a card (You may promise an opponent a gift as you cast this spell. If you do, they draw a card before its other effects.)\nDestroy all creatures. If the gift was promised, return a creature card put into your graveyard this way to the battlefield under your control.",
+  });
+  const giant = card("Hill Giant", "Creature — Giant", "{3}{R}", { power: "3", toughness: "3" });
+  function wrath(gift: boolean) {
+    const { s: s0, ap, opp, ids } = setup([starfall]);
+    for (let i = 0; i < 5; i++) putOnBattlefield(s0, ap, card("Plains", "Basic Land — Plains"));
+    const mine = putOnBattlefield(s0, ap, giant);
+    const theirs = putOnBattlefield(s0, opp, bear());
+    // A creature card already in your graveyard can't come back: only one put there this way.
+    const old = putOnBattlefield(s0, ap, bear());
+    moveObject(s0, old, "graveyard");
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "auto", undefined, gift ? { gift: opp } : {})));
+    return { s, ap, opp, mine, theirs, old };
+  }
+
+  it("plays", () => expect(isFullySupported(starfall)).toBe(true));
+
+  it("with the gift promised, you return a creature card that died to it (not one already there)", () => {
+    let { s, ap, mine, theirs, old } = wrath(true);
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap, cards: [mine] });
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: [mine] }));
+    expect(s.objects[mine]!.zone).toBe("battlefield");
+    expect(s.objects[theirs]!.zone).toBe("graveyard");
+    expect(s.objects[old]!.zone).toBe("graveyard");
+  });
+
+  it("without it, everything just dies", () => {
+    const { s, mine } = wrath(false);
+    expect(s.pending).toBeNull();
+    expect(s.objects[mine]!.zone).toBe("graveyard");
+  });
+});

@@ -782,4 +782,30 @@ describe("more popular cards", () => {
     s = settle(s);
     expect(s.players[opp]!.life).toBe(life);
   });
+  it("Beacon of Immortality doubles a life total and shuffles itself away; Fatal Push checks mana value and revolt as it resolves; Jumbo Cactuar's flavor word", () => {
+    const beacon = card("Beacon of Immortality", "Instant", "{5}{W}", { oracleText: "Double target player's life total. Shuffle Beacon of Immortality into its owner's library." });
+    const push = card("Fatal Push", "Instant", "{B}", { oracleText: "Destroy target creature if it has mana value 2 or less.\nRevolt — Destroy that creature if it has mana value 4 or less instead if a permanent left the battlefield under your control this turn." });
+    const cactuar = card("Jumbo Cactuar", "Creature — Plant", "{5}{G}{G}", { power: "1", toughness: "7", oracleText: "10,000 Needles — Whenever Jumbo Cactuar attacks, it gets +9999/+0 until end of turn." });
+    supported(beacon, push, cactuar);
+    const { s: s0, ap, opp } = setup([]);
+    const b = toHand(s0, ap, beacon);
+    s0.players[ap]!.life = 27;
+    let s = settle(run(s0, planCast(s0, ap, b, [{ kind: "player", id: ap }])));
+    expect(s.players[ap]!.life).toBe(54);
+    expect(s.objects[b]!.zone).toBe("library");
+    // Fatal Push: a 3-drop survives without revolt, dies with it.
+    const ogre = card("Test Ogre", "Creature — Ogre", "{2}{R}", { power: "3", toughness: "3", oracleText: "" });
+    for (const revolt of [false, true]) {
+      const { s: t0, ap: me, opp: them, ids } = setup([push]);
+      const target = putOnBattlefield(t0, them, ogre);
+      const p = ids[0]!;
+      if (revolt) {
+        const clue = putOnBattlefield(t0, me, bear({ name: "Leaver" }));
+        moveObject(t0, clue, "graveyard");
+      }
+      const t = settle(run(t0, planCast(t0, me, p, [{ kind: "object", id: target }])));
+      expect(t.objects[target]!.zone, `revolt ${revolt}`).toBe(revolt ? "graveyard" : "battlefield");
+    }
+    void opp;
+  });
 });

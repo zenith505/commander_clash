@@ -570,7 +570,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // CR 119.5: the player gains or loses the life it takes, which can't happen if they can't gain or lose life.
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
-        const diff = e.n - p.life;
+        const diff = (e.double ? 2 * p.life : e.n) - p.life;
         if (diff > 0 && canGainLife(s, pid)) {
           gainLife(s, pid, diff);
           log(s, `${p.name}'s life total becomes ${p.life} (${src}).`);

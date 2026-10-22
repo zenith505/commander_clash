@@ -228,6 +228,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = m[1]!.toLowerCase() === "your" ? ({ ref: "you" } as const) : parsePlayer(m[1]!.replace(/'s$/, "").toLowerCase(), ctx);
     return who ? [{ type: "setLife", who, n: Number(m[2]) }] : null;
   }
+  // Beacon of Immortality: "Double target player's life total": they gain (or, below 0, lose) as much life as it takes
+  // (CR 701.10d).
+  if ((m = /^Double (your|target player's|target opponent's|that player's|each player's) life total$/i.exec(s))) {
+    const who = m[1]!.toLowerCase() === "your" ? ({ ref: "you" } as const) : parsePlayer(m[1]!.replace(/'s$/, "").toLowerCase(), ctx);
+    return who ? [{ type: "setLife", who, n: 0, double: true }] : null;
+  }
   // Kazuul, Tyrant of the Cliffs: "create a 3/3 red Ogre creature token unless that creature's controller pays {3}": the
   // attacking creature's controller chooses as it resolves (rulings), as it last existed if it has left (CR 608.2h).
   if ((m = /^[Cc]reate (.+?) unless that creature's controller (pays? .+)$/.exec(s)) && ctx.subjectIt) {

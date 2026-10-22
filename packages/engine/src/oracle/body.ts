@@ -2672,6 +2672,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "if", cond: spent.cond, effects: fx, otherwise: [{ type: "if", cond: { kind: "targetIs", index: i, filter }, effects: structuredClone(fx) }] });
       continue;
     }
+    // Fatal Push: "Destroy target creature if it has mana value 2 or less. Revolt — Destroy that creature if it has mana
+    // value 4 or less instead if a permanent left the battlefield under your control this turn." Any creature can be
+    // targeted; its mana value and revolt are checked as it resolves (rulings).
+    const push = /^Destroy target creature if it has mana value (\d+) or less$/.exec(s);
+    const pushRevolt = push && /^Destroy that creature if it has mana value (\d+) or less instead if a permanent left the battlefield under your control this turn\.?$/.exec(sentences[si + 1] ?? "");
+    if (push && pushRevolt && ctx.spell) {
+      const index = addTarget(ctx, { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "target creature" });
+      const upTo = (n: string): Effect => ({ type: "if", cond: { kind: "targetIs", index, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], manaValue: { max: Number(n) }, text: `creature with mana value ${n} or less` } }, effects: [{ type: "destroy", what: { ref: "target", index } }] });
+      effects.push({ type: "if", cond: { kind: "state", cond: { kind: "revolt" } }, effects: [upTo(pushRevolt[1]!)], otherwise: [upTo(push[1]!)] });
+      si++;
+      continue;
+    }
     // "Destroy target nonblack creature if its toughness is less than or equal to the number of cards in your graveyard"
     // (Ghastly Demise), "Counter target spell if its mana value is less than or equal to ..." (Dispersal Shield): any such
     // object can be targeted, and the comparison is made as it resolves (rulings on Ghastly Demise, Prismatic Ending,

@@ -1666,6 +1666,8 @@ export type Effect =
       sacrificeOnLostControl?: true | { id: ObjectId; zc: number };
       /** "That creature is a black Zombie in addition to its other colors and types": an effect on the permanent from then on (CR 611.2c). */
       alsoMods?: Modification[];
+      /** "If X is 6 or more, those permanents are 4/4 creatures in addition to their other types" (Dance of the Manse): they enter that way (rulings) when the X is at least `x`. */
+      entersAs?: { mods: Modification[]; x: number };
       /** "Put that card onto the battlefield ... at the beginning of the next end step" (Seraph): a delayed trigger for each card (CR 603.7). */
       atNextEndStep?: true;
     }
@@ -3462,7 +3464,8 @@ export interface TriggeredAbility {
  */
 export interface BatchTrigger {
   /** `exiledFromLibraryOrGraveyard`: "cards are put into exile from your library and/or your graveyard" (Laelia). */
-  what: "enters" | "leaves" | "leavesGraveyard" | "toGraveyard" | "discards" | "exiledFromLibraryOrGraveyard";
+  /** `created`: "Whenever you create one or more creature tokens" (Staff of the Storyteller), tokens that player created (CR 111.2). */
+  what: "enters" | "leaves" | "leavesGraveyard" | "toGraveyard" | "discards" | "exiledFromLibraryOrGraveyard" | "created";
   /** What each object has to be ("creature card", "nontoken creature"); unset, any. */
   filter?: TargetSpec;
   whose?: "you" | "opponent";

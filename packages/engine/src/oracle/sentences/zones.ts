@@ -571,6 +571,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!, ctx);
     return what && (what.ref === "target" || what.ref === "self") ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() === "top" ? "top" : "bottom" }] : null;
   }
+  // Ugin's Labyrinth: "{T}: Return the exiled card to its owner's hand": the card its imprint ability exiled, while it's
+  // still in exile (CR 607.2a, 400.7); compile() links the two.
+  if (ctx.activated && /^Return the exiled card to its owner's hand$/.test(s)) return [{ type: "bounce", what: { ref: "linkedCard" } }];
   // "When ~ leaves the battlefield, return the exiled card to the battlefield under its owner's control" (Fiend
   // Hunter): the cards its own exile ability took (CR 607.2a); compile() links the two.
   if ((m = /^Return the exiled (?:card|cards|permanent|permanents|creature|creatures) to (the battlefield under (?:its|their) owners?'s? control|(?:its|their) owners?'s? hands?)$/i.exec(s)) && ctx.selfCard)

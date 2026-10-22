@@ -1688,7 +1688,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             continue;
           }
           log(s, `${src} puts ${d.name} onto the battlefield under ${player(s, under(o)).name}'s control${e.tapped ? ", tapped" : ""}${face ? (e.flipped ? " flipped" : " and transformed") : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
-          moveObject(s, o.id, "battlefield", { controller: under(o), tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}), ...(e.counters ? { counters: e.counters } : {}), ...(e.countersFromLast ? { counters: { [e.countersFromLast.kind]: Math.max(0, (s.lastKnown?.[o.id]?.counters?.[e.countersFromLast.kind] ?? 0) + e.countersFromLast.plus) } } : {}), ...(face ? { face } : {}), ...host }); // CR 110.2a
+          moveObject(s, o.id, "battlefield", { controller: under(o), tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}), ...(e.entersAs && (ctx.x ?? 0) >= e.entersAs.x ? { entersAs: e.entersAs.mods } : {}), ...(e.counters ? { counters: e.counters } : {}), ...(e.countersFromLast ? { counters: { [e.countersFromLast.kind]: Math.max(0, (s.lastKnown?.[o.id]?.counters?.[e.countersFromLast.kind] ?? 0) + e.countersFromLast.plus) } } : {}), ...(face ? { face } : {}), ...host }); // CR 110.2a
           // "That creature gains haste until end of turn. Exile it at the beginning of the next end step" (Corpse Dance): only
           // the permanent it became, while it's still that object (CR 400.7, rulings).
           if (o.zone !== "battlefield") continue;

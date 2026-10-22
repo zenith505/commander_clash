@@ -993,6 +993,12 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     batch = { what: m[2]!.startsWith("leaves") ? "leavesGraveyard" : "toGraveyard", ...(whose ? { whose } : {}), ...(filter ? { filter } : {}), ...(/other than the battlefield$/.test(m[2]!) ? { from: "notBattlefield" as const } : {}), each: true };
     rest = m[3]!;
     eachOwner = true;
+  } else if ((m = /^Whenever you create one or more (creature )?tokens( for the first time each turn)?, (.+)$/.exec(line))) {
+    // Staff of the Storyteller: once for each event in which you create any (CR 111.2, 603.2c), whoever controls them.
+    // Akim: "for the first time each turn", counting tokens created before it was on the battlefield.
+    if (m[1] && m[2]) return "fail";
+    batch = { what: "created", whose: "you", ...(m[1] ? { filter: { kind: "object" as const, types: ["Creature"], notTypes: [], notColors: [], text: "creature token" } } : {}), ...(m[2] ? { first: true as const } : {}) };
+    rest = m[3]!;
   } else if ((m = /^Whenever (you|one or more players) discards? one or more (?:(.+?) )?cards( for the first time each turn)?, (.+)$/.exec(line))) {
     const filter = batchCards(m[2]);
     if (filter === null) return "fail";

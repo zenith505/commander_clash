@@ -1443,6 +1443,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Satoru: not if any of them was cast with mana spent on it (rulings: mana for additional costs counts too).
         if (b.noneCastWithMana && matched.some((m) => s.objects[m.id]?.wasCast && (s.objects[m.id]!.manaSpent ?? 0) > 0)) continue;
         if (b.fromGraveyard && !matched.some((m) => s.objects[m.id]?.enteredFromGraveyard || s.objects[m.id]?.castFromGraveyard)) continue;
+        if (b.first && b.what === "created" && (s.turnLog?.tokensCreated ?? []).filter((c) => c.player === you).length > n) continue;
         if (b.first && b.what === "discards" && (s.turnLog?.discards ?? []).some((d) => (b.whose !== "you" || d.player === you) && d.cards.some((c) => !b.filter || printedMatches(b.filter, s.cards[c]!)))) continue;
         // "Whenever one or more creatures enter / die": caused by each of them entering or dying (CR 603.2d).
         const died = matched.filter((m) => m.from === "battlefield" && m.to === "graveyard" && m.snapshot && m.chars?.types.includes("Creature"));
@@ -1835,6 +1836,13 @@ function batchMoveMatches(s: GameState, b: BatchTrigger, m: ZoneMove, w: GameObj
     if (b.other && m.id === w.id && (gone || (w.zoneChanges ?? 0) === m.zc)) return false;
     return whose(m.controller) && (!b.filter || objectMatches(s, b.filter, m.snapshot, you, false, undefined, m.chars));
   }
+  if (b.what === "created") {
+    // As it is now, or as it was created if it's gone already.
+    const o = s.objects[m.id];
+    if (m.createdBy === undefined || !whose(m.createdBy)) return false;
+    return !b.filter || (o?.zone === "battlefield" && (o.zoneChanges ?? 0) === m.zc ? objectMatches(s, b.filter, o, you, false) : printedMatches(b.filter, s.cards[m.card]!));
+  }
+  if (m.createdBy !== undefined) return false;
   // The rest are about cards (not tokens or copies of spells, CR 111.1, 707.10), as they are in that zone.
   if (m.notCard) return false;
   const card = s.cards[m.card];

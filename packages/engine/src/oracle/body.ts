@@ -3542,12 +3542,35 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // addition to its other colors and types." (Rise from the Grave, Liliana, Death's Majesty, Dread Slaver): an effect on
     // the permanent the card became, from then on (CR 611.2c, 400.7); a later color or type change overwrites it (rulings).
     // "It's a Phyrexian in addition to its other types" (Portal to Phyrexia): the same.
+    // Settle the Wreckage: "Exile all attacking creatures target player controls. That player may search their library for
+    // that many basic land cards, put those cards onto the battlefield tapped, then shuffle": as many as were exiled
+    // (CR 608.2h); they may find fewer (rulings, CR 701.23b).
+    const settleLands = /^That player may search their library for that many (basic land cards), put (?:them|those cards) onto the battlefield tapped, then shuffle$/.exec(s);
+    if (settleLands) {
+      const prev = effects[effects.length - 1];
+      const fx = parseSearch(`Search your library for up to two ${settleLands[1]}, put them onto the battlefield tapped, then shuffle`);
+      const sr = fx?.length === 1 && fx[0]!.type === "search" ? fx[0]! : undefined;
+      if (prev?.type !== "exile" || prev.what.ref !== "each" || prev.what.of?.ref !== "target" || !sr || sr.type !== "search") return null;
+      const exiled: TargetSpec = { kind: "object", types: prev.what.filter.types, notTypes: [], notColors: [], text: "creature" };
+      effects.push({ type: "eachMay", who: prev.what.of, text: `search their library for that many ${settleLands[1]}`, effects: [{ ...sr, n: { count: { kind: "exiledThisWay", filter: exiled } }, who: { ref: "choseThisWay" } }] });
+      continue;
+    }
     const isAlso = /^(?:That creature is|It's|It is) (an? .+ in addition to its other (?:colors and )?types)$/.exec(s);
     if (isAlso) {
       const prev = effects[effects.length - 1];
       const mods = parseBecomes(isAlso[1]!);
       if (prev?.type !== "putOntoBattlefield" || !mods || (prev.what.ref === "target" && prev.what.n) || prev.alsoMods) return null;
       prev.alsoMods = mods;
+      continue;
+    }
+    // Dance of the Manse: "If X is 6 or more, those permanents are 4/4 creatures in addition to their other types": they
+    // enter as 4/4 creatures, not as noncreatures that then become creatures (rulings).
+    const xEntersAs = /^If X is (\d+) or more, those permanents are (\d+\/\d+) creatures in addition to their other types$/.exec(s);
+    if (xEntersAs) {
+      const prev = effects[effects.length - 1];
+      const mods = parseBecomes(`a ${xEntersAs[2]} creature in addition to its other types`);
+      if (!ctx.spell || ctx.whereX || prev?.type !== "putOntoBattlefield" || !mods || prev.alsoMods || prev.entersAs) return null;
+      prev.entersAs = { mods, x: Number(xEntersAs[1]) };
       continue;
     }
     // "Sacrifice the creature when you lose control of ~" (Seraph): about the permanent the card just put onto the

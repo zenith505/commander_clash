@@ -2605,6 +2605,14 @@ function linkExile(out: CompiledCard) {
     if (imprints.length !== 1 || others.length !== 1) out.unsupported.push("(its mana trigger can't be linked to one imprint ability)");
     else imprints[0]!.linked = true;
   }
+  // Ugin's Labyrinth: "If a card is exiled with ~" and "Return the exiled card to its owner's hand" are about the card its
+  // imprint ability exiled (CR 607.2a), its only exile.
+  if (out.activated.some((a) => allEffects(a.body.effects).some((e) => e.type === "bounce" && e.what.ref === "linkedCard"))) {
+    const imprints = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e) => e.type === "takeFromHand" && e.action === "exile");
+    const others = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)].flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse");
+    if (imprints.length !== 1 || others.length !== 1 || out.spell) out.unsupported.push("(returns an exiled card it can't link to one imprint ability)");
+    else (imprints[0] as Extract<Effect, { type: "takeFromHand" }>).linked = true;
+  }
   // Semblance Anvil: "the exiled card" its cost reduction compares with is the one its imprint ability exiled.
   if (out.costMods?.some((m) => m.sharesTypeWithLinked)) {
     const imprints = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e) => e.type === "takeFromHand" && e.action === "exile");
@@ -2664,7 +2672,7 @@ function linkExile(out: CompiledCard) {
   }
   // "Create a token that's a copy of a card exiled with ~" (Mimic Vat, The Cloning of Shredder): the cards its one exile
   // ability exiled (CR 607.2a), unless that's already linked (Mimic Vat's imprint).
-  if (bodies.some((b) => JSON.stringify(b).includes('"linkedCard"'))) {
+  if (bodies.some((b) => JSON.stringify(b).includes('"linkedCard"')) && !out.activated.some((a) => allEffects(a.body.effects).some((e) => e.type === "bounce" && e.what.ref === "linkedCard"))) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
     const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
     const others = all.some((e) => (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || (e.type === "discard" && !!e.exile));

@@ -622,6 +622,8 @@ export function moveObject(
     sacrificed?: boolean;
     /** "It's an enchantment": the card types it has from the moment it enters, for as long as it's there. */
     becomes?: { types: string[]; subtypes: string[] };
+    /** "Those permanents are 4/4 creatures in addition to their other types" (Dance of the Manse): it enters that way (rulings). */
+    entersAs?: Modification[];
     /** Manifested or cloaked: turned face down, then put onto the battlefield (CR 701.40a, 701.58a). */
     faceDown?: FaceDownKind;
     /** The face it enters with up: a modal double-faced land's (CR 712.12), "transformed" (712.14a). */
@@ -916,6 +918,8 @@ export function moveObject(
   if (to === "battlefield" && opts.meld) joinMeld(s, o, opts.meld.with, opts.meld.key);
   if (to === "battlefield" && opts.becomes)
     s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: defOf(s, o).name, duration: "game", affected: [id], mods: [{ kind: "setTypes", ...opts.becomes }] });
+  if (to === "battlefield" && opts.entersAs)
+    s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: defOf(s, o).name, duration: "game", affected: [id], mods: opts.entersAs });
   invalidateCharacteristics(s);
   // "Enters with N counters" is a replacement effect (CR 614.1c): N is counted before it's on the battlefield.
   const printedCounters = to === "battlefield" ? compileCard(defOf(s, o)).entersWithCounters : undefined;

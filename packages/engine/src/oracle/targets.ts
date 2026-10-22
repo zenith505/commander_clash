@@ -453,7 +453,9 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   if (totalM && totalM[2] === "X" && !(ctx.spell || ctx.activated || ctx.ownX || ctx.whereX)) return null;
   const total: TargetSpec["total"] | undefined = totalM ? { key: totalM[1] === "power" ? "power" : "manaValue", ...(totalM[2] === "X" ? { x: true as const } : { max: Number(totalM[2]) }) } : undefined;
   const mine = mine0.replace(/ controlled by different players$/, "").replace(/ that each have a different mana value (\d+|X) or less(?= from |$)/, " with mana value $1 or less").replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "").replace(/ with different names(?= from |$)/, "").replace(/ with total (?:mana value|power) (?:\d+|X) or less(?= from | in |$)/, "");
-  const parsed = differMv ? parseTargetPhrase(singularPhrase(mine), { x: true }) : n > 1 || many ? parseTargetPhrase(singularPhrase(mine)) : parseTargetPhrase(mine, { x: true, count: boundCount(ctx) });
+  // "Up to X target artifact cards each with mana value X or less" (Dance of the Manse): each one's, with the spell's X.
+  const each = (n > 1 || !!many) && / each with mana value X or less(?= from |$)/.test(mine);
+  const parsed = differMv || each ? parseTargetPhrase(singularPhrase(mine.replace(/ each with mana value X or less(?= from |$)/, " with mana value X or less")), { x: true }) : n > 1 || many ? parseTargetPhrase(singularPhrase(mine)) : parseTargetPhrase(mine, { x: true, count: boundCount(ctx) });
   if (!parsed || parsed.kind === "player" || parsed.kind === "spell" || (parsed.kind === "card") !== cards || (theirs && (parsed.kind !== "object" || parsed.controller))) return null;
   // "Up to one target creature card with mana value X or less": as for one target (see parseTarget).
   if (parsed.xRange && !ctx.whereX && !ctx.spell && !ctx.activated && !ctx.ownX) return null;
@@ -951,7 +953,9 @@ export function parseTargetPhrase(
   const quality = (a: string) => a.trim().split(/\s+/).some((w) => !TYPE_WORDS[w]);
   const leading = quality(alts[0] ?? "") && !alts.slice(1).every(quality);
   if (alts.length > 1 && typeWords.every((n) => n === 1) && alts.some(quality) && !leading && !isSpell && !extra.token && !extra.status && extra.commander === undefined) {
-    if (extra.anyOf || (inGraveyard && Object.keys(extra).length)) return null;
+    // A mana value is the whole card's ("artifact and/or non-Aura enchantment cards each with mana value X or less").
+    const cardWide = (k: string) => k === "xRange" || k === "manaValue";
+    if (extra.anyOf || (inGraveyard && !Object.keys(extra).every(cardWide))) return null;
     const anyOf: TargetSpec[] = [];
     for (const alt of alts) {
       const sub = parseTargetPhrase(alt);
@@ -961,7 +965,7 @@ export function parseTargetPhrase(
     }
     const types = [...new Set(anyOf.flatMap((a) => a.types ?? []))];
     // A card in a graveyard (Haven of the Spirit Dragon), matched by its printed characteristics.
-    if (inGraveyard) return { kind: "card", types, notTypes: [], notColors: [], anyOf, ...(owner ? { owner } : {}), ...(linkedExile ? { linkedExile: true as const } : {}), text };
+    if (inGraveyard) return { kind: "card", types, notTypes: [], notColors: [], anyOf, ...extra, ...(owner ? { owner } : {}), ...(linkedExile ? { linkedExile: true as const } : {}), text };
     return { kind: "object", types, notTypes: [], notColors: [], anyOf, ...extra, controller, ...(tapped !== undefined ? { tapped } : {}), text };
   }
   let outlaw = false;

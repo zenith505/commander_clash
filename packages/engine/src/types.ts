@@ -1279,6 +1279,8 @@ export interface ZoneMove {
   /** A land entering because it was played (CR 305.1), not put onto the battlefield. */
   played?: true;
   discardedBy?: PlayerId;
+  /** A token this player created (CR 111.2), for "whenever you create one or more creature tokens". */
+  createdBy?: PlayerId;
   /** Torpor Orb: the controllers whose abilities its entering can't trigger (`opponents`: only those of `by`'s opponents). */
   locks?: { by: PlayerId; opponents?: boolean }[];
   /** Leaving the battlefield: it as it last existed there, whether it had its abilities then, and those granted to it. */

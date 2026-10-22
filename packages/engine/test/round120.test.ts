@@ -6,7 +6,7 @@ import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
 import { abilityProblem, attackProblem, botActions, castProblem, isFullySupported, potentialAttackers, planActivate, planCast, power, spellCost, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 import { controllerOf, invalidateCharacteristics } from "../src/layers";
 import { moveObject } from "../src/game";
-import { defOf, objHasKeyword } from "../src/cards";
+import { defOf, objHasKeyword, objIsType, toughness } from "../src/cards";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const settle = (s: GameState, yes = true) => {
@@ -611,5 +611,100 @@ describe("more popular cards", () => {
     expect(s.objects[hitter]!.zone).toBe("graveyard");
     expect(s.objects[stayer]!.zone).toBe("battlefield");
     expect(s.players[ap]!.ring?.tempted).toBe(1);
+  });
+  it("Dance of the Manse returns artifact and non-Aura enchantment cards with mana value X or less, as 4/4 creatures if X is 6 or more", () => {
+    const dance = card("Dance of the Manse", "Sorcery", "{X}{W}{U}", { oracleText: "Return up to X target artifact and/or non-Aura enchantment cards each with mana value X or less from your graveyard to the battlefield. If X is 6 or more, those permanents are 4/4 creatures in addition to their other types." });
+    supported(dance);
+    const rock = card("Mind Stone", "Artifact", "{2}", { oracleText: "{T}: Add {C}." });
+    const glow = card("Test Glow", "Enchantment", "{1}{W}", { oracleText: "" });
+    const aura = card("Test Aura", "Enchantment — Aura", "{W}", { oracleText: "Enchant creature\nEnchanted creature gets +1/+1." });
+    for (const x of [2, 6]) {
+      const { s: s0, ap } = setup([]);
+      const ids = [rock, glow, aura].map((d) => {
+        const id = putOnBattlefield(s0, ap, d);
+        moveObject(s0, id, "graveyard");
+        return id;
+      });
+      for (let i = 0; i < x + 2; i++) putOnBattlefield(s0, ap, card(`Land ${i}`, "Land", "", { oracleText: "{T}: Add {W} or {U}." }));
+      const spell = toHand(s0, ap, dance);
+      // An Aura isn't a legal target: "non-Aura enchantment".
+      expect(planCast(s0, ap, spell, [{ kind: "object", id: ids[2]! }], undefined, "auto", x)).toBeNull();
+      let s = run(s0, planCast(s0, ap, spell, ids.slice(0, 2).map((id) => ({ kind: "object" as const, id })), undefined, "auto", x));
+      s = settle(s);
+      const back = [...named(s, "Mind Stone"), ...named(s, "Test Glow")];
+      expect(back.length).toBe(2);
+      for (const id of back) {
+        const o = s.objects[id]!;
+        expect(objIsType(s, o, "Creature"), `X=${x}`).toBe(x >= 6);
+        if (x >= 6) expect([power(s, o), toughness(s, o)]).toEqual([4, 4]);
+      }
+    }
+  });
+  it("Settle the Wreckage exiles the target player's attackers, then they may search for that many basic lands", () => {
+    const settleCard = card("Settle the Wreckage", "Instant", "{2}{W}{W}", { oracleText: "Exile all attacking creatures target player controls. That player may search their library for that many basic land cards, put those cards onto the battlefield tapped, then shuffle." });
+    supported(settleCard);
+    const { s: s0, ap, opp } = setup([]);
+    const spell = toHand(s0, ap, settleCard);
+    const a = putOnBattlefield(s0, opp, bear({ name: "Raider A" }));
+    const b = putOnBattlefield(s0, opp, bear({ name: "Raider B" }));
+    const home = putOnBattlefield(s0, opp, bear({ name: "Homebody" }));
+    let s = passUntil(s0, "declareAttackers", opp);
+    for (let i = 0; i < 5 && s.pending?.kind !== "declareAttackers"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = act(s, { type: "declareAttackers", player: opp, attacks: [{ attacker: a, defender: ap }, { attacker: b, defender: ap }] });
+    for (let i = 0; i < 5 && waitingOn(s) !== ap; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    const lands = s.battlefield.filter((id) => s.objects[id]!.controller === opp && objIsType(s, s.objects[id]!, "Land")).length;
+    s = run(s, planCast(s, ap, spell, [{ kind: "player", id: opp }]));
+    s = passToStack(s);
+    expect(s.pending?.kind).toBe("chooseMay");
+    s = settle(s);
+    expect([a, b].map((id) => s.objects[id]!.zone)).toEqual(["exile", "exile"]);
+    expect(s.objects[home]!.zone).toBe("battlefield");
+    const after = s.battlefield.filter((id) => s.objects[id]!.controller === opp && objIsType(s, s.objects[id]!, "Land"));
+    expect(after.length).toBe(lands + 2);
+    expect(after.filter((id) => s.objects[id]!.tapped).length).toBeGreaterThanOrEqual(2);
+  });
+  it("Staff of the Storyteller gets one story counter for each event that creates creature tokens; Akim makes a Bird only the first time each turn", () => {
+    const staff = card("Staff of the Storyteller", "Artifact", "{1}{W}", { oracleText: "When this artifact enters, create a 1/1 white Spirit creature token with flying.\nWhenever you create one or more creature tokens, put a story counter on this artifact.\n{W}, {T}, Remove a story counter from this artifact: Draw a card." });
+    const akim = card("Akim, the Soaring Wind", "Legendary Creature — Bird Dinosaur", "{2}{U}{R}{W}", { power: "3", toughness: "4", keywords: ["Flying"], oracleText: "Flying\nWhenever you create one or more tokens for the first time each turn, create a 1/1 white Bird creature token with flying.\n{3}{U}{R}{W}: Creature tokens you control gain double strike until end of turn." });
+    const alarm = card("Raise the Alarm", "Instant", "{1}{W}", { oracleText: "Create two 1/1 white Soldier creature tokens." });
+    supported(staff, akim, alarm);
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, akim);
+    const st = toHand(s0, ap, staff);
+    const spells = [toHand(s0, ap, alarm), toHand(s0, ap, alarm)];
+    let s = settle(run(s0, planCast(s0, ap, st)));
+    // The Spirit: a counter, and Akim's Bird (another creature token, another event: another counter).
+    expect(s.objects[st]!.counters?.story).toBe(2);
+    expect(named(s, "Bird Token").length).toBe(1);
+    for (const sp of spells) s = settle(run(s, planCast(s, ap, sp)));
+    expect(s.objects[st]!.counters?.story).toBe(4);
+    expect(named(s, "Soldier Token").length).toBe(4);
+    expect(named(s, "Bird Token").length).toBe(1);
+  });
+  it("Ugin's Labyrinth imprints a colorless 7+ card, taps for {C}{C} while it has one, and returns it to hand", () => {
+    const labyrinth = card("Ugin's Labyrinth", "Land", "", { oracleText: "Imprint — When this land enters, you may exile a colorless card with mana value 7 or greater from your hand.\n{T}: Add {C}. If a card is exiled with this land, add {C}{C} instead.\n{T}: Return the exiled card to its owner's hand." });
+    const titan = card("Test Titan", "Creature — Eldrazi", "{7}", { power: "7", toughness: "7", oracleText: "" });
+    supported(labyrinth);
+    const { s: s0, ap } = setup([]);
+    const land = toHand(s0, ap, labyrinth);
+    const big = toHand(s0, ap, titan);
+    let s = act(s0, { type: "playLand", player: ap, objectId: land });
+    s = passToStack(s);
+    // The imprint: "you may exile ..." then the card to exile.
+    for (let i = 0; i < 4 && s.pending; i++) s = s.pending.kind === "chooseMay" ? act(s, { type: "chooseMay", player: ap, yes: true }) : botActions(s, ap).reduce((x, a) => act(x, a), s);
+    s = settle(s);
+    expect(s.objects[big]!.zone).toBe("exile");
+    const before = s.players[ap]!.manaPool.C;
+    s = act(s, { type: "activateMana", player: ap, objectId: land, mana: "C", ability: 0 });
+    expect(s.players[ap]!.manaPool.C - before).toBe(2);
+    s.objects[land]!.tapped = false;
+    s = run(s, planActivate(s, ap, land, 0));
+    s = settle(s);
+    expect(s.objects[big]!.zone).toBe("hand");
+    // Nothing exiled now: {C}.
+    s.objects[land]!.tapped = false;
+    const now = s.players[ap]!.manaPool.C;
+    s = act(s, { type: "activateMana", player: ap, objectId: land, mana: "C", ability: 0 });
+    expect(s.players[ap]!.manaPool.C - now).toBe(1);
   });
 });

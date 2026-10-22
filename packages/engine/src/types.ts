@@ -551,6 +551,8 @@ export interface ManaLot {
   spentTrigger?: ManaSpentTrigger;
   /** "If any of that mana is spent on a creature spell, it gains haste ...": see ManaAbility.spentHaste. */
   haste?: "endOfTurn" | "game";
+  /** With `haste`: only for a creature spell of this creature type (ManaAbility.spentHasteType). */
+  hasteType?: string;
   /** Opal Palace's "if you spend this mana to cast your commander": see ManaAbility.spentCommanderCounters. */
   commanderCounters?: true;
   /** "Using mana produced by Tecutlan": the permanent that made it, "id#zoneChanges" (TriggeredAbility.cast.manaFromSelf). */

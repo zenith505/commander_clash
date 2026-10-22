@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, cast, passAll, passUntil, putOnBattlefield, setup } from "./helpers";
-import { abilityProblem, castProblem, characteristics, isFullySupported, planActivate, planCast, power, toughness, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
+import { abilityProblem, castProblem, characteristics, isFullySupported, objHasKeyword, planActivate, planCast, power, toughness, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const karn = card("Karn, the Great Creator", "Legendary Planeswalker — Karn", "{4}", {
@@ -407,4 +407,23 @@ describe("Teferi, Master of Time", () => {
     if (s.pending?.kind === "discard") s = act(s, { type: "discard", player: ap, objectIds: s.players[ap]!.hand.slice(0, 1) });
     expect(s.players[ap]!.hand.length).toBe(hand);
   });
+});
+
+const orb = card("Carnelian Orb of Dragonkind", "Artifact", "{2}{R}", {
+  oracleText: "{T}: Add {R}. If that mana is spent on a Dragon creature spell, it gains haste until end of turn.",
+});
+
+describe("Carnelian Orb of Dragonkind", () => {
+  it("is supported", () => expect(isFullySupported(orb)).toBe(true));
+
+  for (const [def, haste] of [[card("Whelp", "Creature — Dragon", "{R}", { power: "1", toughness: "1" }), true], [card("Goblin Guide Test", "Creature — Goblin", "{R}", { power: "2", toughness: "2" }), false]] as const)
+    it(`its mana gives ${def.name} ${haste ? "haste" : "nothing"}`, () => {
+      const { s: s0, ap, ids } = setup([def]);
+      const o = putOnBattlefield(s0, ap, orb);
+      let s = act(s0, { type: "activateMana", player: ap, objectId: o, mana: "R" });
+      for (const a of planCast(s, ap, ids[0]!)!) s = act(s, a);
+      s = passAll(s);
+      expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
+      expect(objHasKeyword(s, s.objects[ids[0]!]!, "Haste")).toBe(haste);
+    });
 });

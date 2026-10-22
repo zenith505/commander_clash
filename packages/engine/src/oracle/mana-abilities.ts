@@ -4,6 +4,7 @@ import { NUM, num, COUNTER, counterKind, ALL_COLORS, sacrificeSelf, singular } f
 import { energyIn } from "./activated";
 import { parseTargetPhrase, pickFilter } from "./targets";
 import { parseCount } from "./counts";
+import { CREATURE_TYPES } from "../keywords";
 import { parseOnlyClauses, parseStaticCondition } from "./statics";
 
 /**
@@ -66,7 +67,11 @@ export function parseManaAbility(line0: string): ManaAbility | null {
     const dmg = new RegExp(`^~ deals ${NUM} damage to you\\.$`).exec(extra);
     if (dmg) out.selfDamage = num(dmg[1]!);
     else if (extra === "~ doesn't untap during your next untap step.") out.skipNextUntap = true;
-    else if ((m2 = /^If (?:any of )?that mana is spent on a creature spell, it gains haste( until end of turn)?\.$/.exec(extra)) && !out.spentHaste) out.spentHaste = m2[1] ? "endOfTurn" : "game";
+    else if ((m2 = /^If (?:any of )?that mana is spent on an? (?:([A-Z][a-z]+) )?creature spell, it gains haste( until end of turn)?\.$/.exec(extra)) && !out.spentHaste && (!m2[1] || CREATURE_TYPES.has(m2[1]))) {
+      // "If that mana is spent on a Dragon creature spell, it gains haste until end of turn" (Carnelian Orb of Dragonkind).
+      out.spentHaste = m2[2] ? "endOfTurn" : "game";
+      if (m2[1]) out.spentHasteType = m2[1];
+    }
     else if (extra === "If you spend this mana to cast your commander, it enters with a number of additional +1/+1 counters on it equal to the number of times it's been cast from the command zone this game.") out.spentCommanderCounters = true;
     // Depletion lands: "Put a depletion counter on ~.", "If there are no depletion counters on ~, sacrifice it."
     else if ((m2 = new RegExp(`^Put an? ${COUNTER} counter on ~\\.$`).exec(extra)) && !out.putCounter) out.putCounter = counterKind(m2[1]!);

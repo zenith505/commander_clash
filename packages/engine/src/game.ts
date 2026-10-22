@@ -3121,7 +3121,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const spentTrigger = ab.spentTrigger && { sourceId: o.id, sourceCardId: cardIdOf(o), sourceZc: o.zoneChanges ?? 0, body: ab.spentTrigger.body, sharesCommanderType: true as const };
   // "Whenever you cast a permanent spell using mana produced by Tecutlan": its mana is kept apart, to tell.
   const source = abilitiesOf(s, o).triggers.some((t) => t.cast?.manaFromSelf) ? `${o.id}#${o.zoneChanges ?? 0}` : undefined;
-  addMana(s, p.id, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(source ? { source } : {}) });
+  addMana(s, p.id, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(source ? { source } : {}) });
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
   addTriggeredMana(s, p.id, picked);
   if (ab.skipNextUntap && o.zone === "battlefield") o.skipNextUntap = true;

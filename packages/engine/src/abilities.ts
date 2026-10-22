@@ -3462,6 +3462,8 @@ export interface ManaAbility {
    * off): a creature spell any of it pays any part of the total cost of (rulings), and the creature it becomes.
    */
   spentHaste?: "endOfTurn" | "game";
+  /** With `spentHaste`: only a creature spell of this creature type ("a Dragon creature spell", Carnelian Orb of Dragonkind). */
+  spentHasteType?: string;
   /**
    * Opal Palace: "If you spend this mana to cast your commander, it enters with a number of additional +1/+1 counters on
    * it equal to the number of times it's been cast from the command zone this game": that many for each such mana spent

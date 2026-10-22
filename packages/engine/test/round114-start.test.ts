@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { act, activate, bear, card, cast, passAll, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
 import { applyAction, botActions, characteristics, compileCard, defOf, manaValue, spellCost, invalidateCharacteristics, isFullySupported, isSuspended, objHasKeyword, manaAbilitiesOn, planCast, planUnlock, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 import { moveObject } from "../src/game";
+import { nextRandom } from "../src/rng";
 
 // Real oracle text (Scryfall).
 const klauth = card("Klauth, Unrivaled Ancient", "Legendary Creature — Dragon", "{5}{R}{G}", {
@@ -728,5 +729,56 @@ describe("Brainstealer Dragon", () => {
     expect(s.objects[v]).toMatchObject({ zone: "battlefield", owner: opp });
     expect(characteristics(s, s.objects[v]!).controller).toBe(ap);
     expect(s.players[opp]!.life).toBe(life - 2);
+  });
+});
+
+describe("Invert Polarity", () => {
+  const invert = card("Invert Polarity", "Instant", "{U}{U}{R}", {
+    oracleText: "Choose target spell, then flip a coin. If you win the flip, gain control of that spell and you may choose new targets for it. If you lose the flip, counter that spell.",
+  });
+  const bolt = card("Lightning Bolt", "Instant", "{R}", { oracleText: "Lightning Bolt deals 3 damage to any target." });
+  /** The next coin flip comes out as `win`. */
+  function rig(s: GameState, win: boolean) {
+    for (let x = 1; ; x++) {
+      if (nextRandom({ rngState: x } as GameState) < 0.5 === win) {
+        s.rngState = x;
+        return;
+      }
+    }
+  }
+  /** Ap Bolts opp; opp answers with Invert Polarity; the flip is rigged. */
+  function invertBolt(win: boolean) {
+    const { s: s0, ap, opp, ids } = setup([bolt]);
+    putOnBattlefield(s0, ap, card("Mountain", "Basic Land — Mountain"));
+    const inv = putOnBattlefield(s0, opp, invert);
+    moveObject(s0, inv, "hand");
+    for (const l of ["Island", "Island", "Mountain"]) putOnBattlefield(s0, opp, card(l, `Basic Land — ${l}`));
+    let s = run(s0, planCast(s0, ap, ids[0]!, [{ kind: "player", id: opp }]));
+    s = act(s, { type: "passPriority", player: ap });
+    s = run(s, planCast(s, opp, inv, [{ kind: "stack", id: s.stack.find((x) => x.objectId === ids[0])!.id }]));
+    rig(s, win);
+    for (let i = 0; i < 6 && s.stack.length > 1 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    return { s, ap, opp, boltId: ids[0]! };
+  }
+
+  it("plays", () => expect(isFullySupported(invert)).toBe(true));
+
+  it("winning the flip, its new controller may retarget the Bolt at its caster", () => {
+    let { s, ap, opp, boltId } = invertBolt(true);
+    expect(s.stack.find((x) => x.objectId === boltId)?.controller).toBe(opp);
+    expect(s.pending).toMatchObject({ player: opp });
+    expect(s.pending).toMatchObject({ kind: "newTargets", player: opp });
+    s = act(s, { type: "newTargets", player: opp, targets: [{ kind: "player", id: ap }] });
+    const life = s.players[ap]!.life;
+    s = settle(s);
+    expect(s.players[ap]!.life).toBe(life - 3);
+  });
+
+  it("losing the flip, the Bolt is countered", () => {
+    let { s, opp, boltId } = invertBolt(false);
+    const life = s.players[opp]!.life;
+    s = settle(s);
+    expect(s.objects[boltId]!.zone).toBe("graveyard");
+    expect(s.players[opp]!.life).toBe(life);
   });
 });

@@ -964,6 +964,26 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       prev.plot = true;
       continue;
     }
+    // Invert Polarity: "Choose target spell, then flip a coin. If you win the flip, gain control of that spell and you may
+    // choose new targets for it. If you lose the flip, counter that spell." New targets are chosen only after the flip is
+    // won (rulings); a spell that can't be countered still changes control (CR 110.2b, 101.2).
+    if (
+      s === "Choose target spell" &&
+      /^[Ff]lip a coin$/.test(sentences[si + 1] ?? "") &&
+      sentences[si + 2]?.replace(/\.$/, "") === "If you win the flip, gain control of that spell and you may choose new targets for it" &&
+      sentences[si + 3]?.replace(/\.$/, "") === "If you lose the flip, counter that spell"
+    ) {
+      const spec = parseTargetPhrase("spell");
+      if (spec?.kind !== "spell") return null;
+      const index = addTarget(ctx, { ...spec, text: "target spell" });
+      effects.push(
+        { type: "flipCoin" },
+        { type: "if", cond: { kind: "wonFlip" }, effects: [{ type: "controlSpell", index }, { type: "newTargets", index }] },
+        { type: "if", cond: { kind: "wonFlip", lost: true }, effects: [{ type: "counterSpell", index }] },
+      );
+      si += 3;
+      continue;
+    }
     // "Gain control of target spell. You may choose new targets for it." (Commandeer): after the change of control, so
     // its targets are chosen as its new controller's (rulings).
     if (/^You may choose new targets for it$/.test(s) && effects[effects.length - 1]?.type === "controlSpell") {

@@ -1348,6 +1348,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si++;
       continue;
     }
+    // "Each opponent may discard a card. If they don't, they lose 3 life." (Professor Onyx): a punisher, "loses 3 life
+    // unless they discard a card".
+    const mayOut = /^([Ee]ach opponent|[Tt]arget opponent|[Tt]arget player|[Tt]hat player) may (discard|sacrifice) (.+)$/.exec(s);
+    const mayLose = mayOut && new RegExp(`^If (?:they|that player|the player) (?:doesn't|don't), (?:they|that player|the player) loses? (\\d+) life$`).exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (mayOut && mayLose) {
+      const fx = parseOne(`${mayOut[1]!} loses ${mayLose[1]!} life unless they ${mayOut[2]!}s ${mayOut[3]!}`, ctx);
+      if (fx?.length !== 1 || fx[0]!.type !== "punisher") return null;
+      effects.push(...fx);
+      si++;
+      continue;
+    }
     // "Whenever an opponent draws a card, that player may pay {2}. If the player doesn't, you create a Treasure token."
     // (Smothering Tithe): a punisher whose only way out is the payment.
     const thatMay = /^([Tt]hat player|[Tt]hey|[Tt]arget opponent|[Tt]arget player|[Ee]ach opponent) may pay (.+)$/.exec(s);
@@ -1987,10 +1998,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     }
     // "Repeat this process once" after a punisher (Remorseless Punishment); "Repeat the following process X times" before
     // one (Torment of Hailfire): the whole process again, the same players each time (rulings).
-    if (/^Repeat this process once$/.test(s)) {
+    // "Repeat this process six more times" (Professor Onyx): seven in all.
+    const repeatN = /^Repeat this process (once|twice|(two|three|four|five|six) more times)$/.exec(s);
+    if (repeatN) {
       const prev = effects[effects.length - 1];
       if (prev?.type !== "punisher" || prev.times !== undefined) return null;
-      effects[effects.length - 1] = { ...prev, times: 2 };
+      const more = repeatN[1] === "once" ? 1 : repeatN[1] === "twice" ? 2 : ["two", "three", "four", "five", "six"].indexOf(repeatN[2]!) + 2;
+      effects[effects.length - 1] = { ...prev, times: more + 1 };
       continue;
     }
     // Ad Nauseam: "Reveal the top card of your library and put that card into your hand. You lose life equal to its mana

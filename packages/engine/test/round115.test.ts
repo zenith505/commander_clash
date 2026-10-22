@@ -847,3 +847,40 @@ describe("Ringsight", () => {
     expect(s.pending?.kind === "searchLibrary" ? (s.pending as { cards: string[] }).cards : []).toEqual([]);
   });
 });
+
+const onyx = card("Professor Onyx", "Legendary Planeswalker — Liliana", "{4}{B}{B}", {
+  loyalty: "5",
+  keywords: ["Magecraft"],
+  oracleText:
+    "Magecraft — Whenever you cast or copy an instant or sorcery spell, each opponent loses 2 life and you gain 2 life.\n+1: You lose 1 life. Look at the top three cards of your library. Put one of them into your hand and the rest into your graveyard.\n−3: Each opponent sacrifices a creature with the greatest power among creatures that player controls.\n−8: Each opponent may discard a card. If they don't, they lose 3 life. Repeat this process six more times.",
+});
+
+describe("Professor Onyx", () => {
+  it("−8: seven times, each opponent may discard a card or loses 3 life (an empty hand can't discard)", () => {
+    expect(isFullySupported(onyx)).toBe(true);
+    const { s: s0, ap } = setup([]);
+    const o = putOnBattlefield(s0, ap, onyx);
+    s0.objects[o]!.counters = { loyalty: 8 };
+    const opps = [1, 2, 3].map((i) => s0.turnOrder[(s0.turnOrder.indexOf(ap) + i) % 4]!);
+    const [discarder] = opps;
+    s0.players[discarder!]!.hand = s0.players[discarder!]!.hand.slice(0, 2);
+    const handBefore = s0.players[discarder!]!.hand.length;
+    expect(handBefore).toBe(2);
+    let s = run(s0, planActivate(s0, ap, o, 2));
+    let prompts = 0;
+    for (let i = 0; i < 300 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+      const p = s.pending;
+      if (p?.kind === "chooseOption" && p.what === "punisher") {
+        prompts++;
+        const labels = p.labels ?? [];
+        const want = p.player === discarder ? labels.findIndex((l) => /discard/i.test(l)) : -1;
+        s = act(s, { type: "chooseOption", player: p.player, choice: p.options[want >= 0 ? want : labels.length - 1]! });
+      } else if (p) s = act(s, botActions(s, p.player)[0]!);
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(s.players[discarder!]!.hand).toEqual([]);
+    expect(s.players[discarder!]!.life).toBe(40 - 5 * 3);
+    for (const p of opps.slice(1)) expect(s.players[p]!.life).toBe(40 - 7 * 3);
+    expect(prompts).toBeGreaterThanOrEqual(14);
+  });
+});

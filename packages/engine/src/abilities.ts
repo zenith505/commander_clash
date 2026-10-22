@@ -697,6 +697,8 @@ export type PlayerRef =
   | { ref: "eachOne" }
   /** "Choose an opponent. That player ...": the opponent chosen as this resolves (ChoiceKind "opponent"). */
   | { ref: "chosenPlayer" }
+  /** "The chosen player" of "As ~ enters, choose a player" (Stuffy Doll): its source's (CR 614.12), as it last existed. */
+  | { ref: "selfChosenPlayer" }
   /** "Whose controller was dealt combat damage by ~ this turn" (Steel Hellkite): the players this object dealt combat damage to this turn. */
   | { ref: "combatDamagedBySelf" };
 

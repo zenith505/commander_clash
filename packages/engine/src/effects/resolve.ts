@@ -416,6 +416,12 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const p = s.resolving?.chosen?.player;
       return p !== undefined && !player(s, p).lost ? [p] : [];
     }
+    case "selfChosenPlayer": {
+      // The source as this ability's source: none once it has left (it is a new object, CR 400.7).
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const p = me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? me.chosen?.player : undefined;
+      return p !== undefined && !player(s, p).lost ? [p] : [];
+    }
     case "combatDamagedBySelf": {
       // This object as the ability's source, the same one that dealt the damage (CR 400.7).
       const key = ctx.sourceId !== undefined ? `${ctx.sourceId}@${ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0}` : undefined;

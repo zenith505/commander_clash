@@ -105,6 +105,8 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (x === "each player") return { ref: "eachPlayer" };
   // "Choose an opponent. That player sacrifices a creature of their choice."
   if (x === "that player" && ctx.chosenOpponent) return { ref: "chosenPlayer" };
+  // Stuffy Doll: "the chosen player" of "As ~ enters, choose a player" (compile checks there is one).
+  if (x === "the chosen player") return { ref: "selfChosenPlayer" };
   // "Whenever ~ deals combat damage to a player, that player discards a card."
   if (x === "that player" && ctx.eventPlayer) return { ref: "eventPlayer" };
   // "Whenever ~ deals combat damage to an opponent, it deals that much damage to each other opponent" (Hydra Omnivore).

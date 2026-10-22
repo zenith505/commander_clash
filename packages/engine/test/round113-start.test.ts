@@ -882,3 +882,30 @@ describe("Sword of Light and Shadow", () => {
     expect(s.objects[dead]!.zone).toBe("hand");
   });
 });
+
+describe("Stuffy Doll", () => {
+  it("damage dealt to it is dealt to the chosen player; {T}: 1 damage to itself", () => {
+    const doll = card("Stuffy Doll", "Artifact Creature — Construct", "{5}", {
+      power: "0",
+      toughness: "1",
+      keywords: ["Indestructible"],
+      oracleText: "Indestructible\nAs this creature enters, choose a player.\nWhenever this creature is dealt damage, it deals that much damage to the chosen player.\n{T}: This creature deals 1 damage to itself.",
+    });
+    expect(isFullySupported(doll)).toBe(true);
+    // Without a player chosen as it enters, "the chosen player" means nothing.
+    expect(isFullySupported(card("Not a Doll", "Artifact Creature — Construct", "{5}", { power: "0", toughness: "1", oracleText: "Whenever this creature is dealt damage, it deals that much damage to the chosen player." }))).toBe(false);
+    const { s: s0, ap, ids, opp } = setup([card("Lava Spike", "Sorcery", "{R}", { oracleText: "Lava Spike deals 3 damage to target creature." })]);
+    const d = putOnBattlefield(s0, ap, doll);
+    s0.objects[d]!.chosen = { player: opp };
+    const life = s0.players[opp]!.life;
+    const settle = (x: GameState) => {
+      for (let i = 0; i < 20 && (x.stack.length || x.triggerQueue.length); i++) x = passAll(x);
+      return x;
+    };
+    let s = settle(planActivate(s0, ap, d, 0)!.reduce(act, s0));
+    expect(s.players[opp]!.life).toBe(life - 1);
+    expect(s.objects[d]!.zone).toBe("battlefield");
+    s = settle(cast(s, ap, ids[0]!, [target(d)]));
+    expect(s.players[opp]!.life).toBe(life - 4);
+  });
+});

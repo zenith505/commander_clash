@@ -3976,6 +3976,8 @@ function parseThen(s: string, ctx: Ctx): Effect[] | null {
 
 /** One sentence: a plain instruction, two joined by "and", or one with "for each" / "equal to" in it. */
 function parseOne(s: string, ctx: Ctx): Effect[] | null {
+  // "{T}: This creature deals 1 damage to itself" (Stuffy Doll): the source is the one dealt the damage.
+  s = s.replace(/^~ deals (\d+) damage to itself$/, "~ deals $1 damage to ~");
   // Support N (CR 701.41a): "other" target creatures on a permanent, any on an instant or sorcery.
   // Support X would need a variable number of targets: not supported.
   const support = /^[Ss]upport (\d+)$/.exec(s);

@@ -92,6 +92,13 @@ const gonti = card("Gonti, Lord of Luxury", "Legendary Creature — Aetherborn R
   oracleText:
     "Deathtouch\nWhen Gonti enters, look at the top four cards of target opponent's library, exile one of them face down, then put the rest on the bottom of that library in a random order. You may cast that card for as long as it remains exiled, and mana of any type can be spent to cast that spell.",
 });
+const shinobi = card("Fallen Shinobi", "Creature — Zombie Ninja", "{3}{U}{B}", {
+  power: "5",
+  toughness: "4",
+  keywords: ["Ninjutsu"],
+  oracleText:
+    "Ninjutsu {2}{U}{B} ({2}{U}{B}, Return an unblocked attacker you control to hand: Put this card onto the battlefield from your hand tapped and attacking.)\nWhenever Fallen Shinobi deals combat damage to a player, that player exiles the top two cards of their library. Until end of turn, you may play those cards without paying their mana costs.",
+});
 const treasure = card("Treasure", "Token Artifact — Treasure", "", { oracleText: "{T}, Sacrifice this token: Add one mana of any color." });
 
 /** Pass along, answering every pending choice the dull way, until `stop` holds. */
@@ -428,5 +435,28 @@ describe("Gonti, Lord of Luxury", () => {
     s = passAll(s);
     expect(s.objects[b]!.zone).toBe("battlefield");
     expect(s.objects[b]!.controller).toBe(ap);
+  });
+});
+
+describe("Fallen Shinobi", () => {
+  it("is supported: the player dealt damage exiles their top two; you may play them free this turn", () => {
+    expect(isFullySupported(shinobi)).toBe(true);
+    let { s, ap, opp } = setup([]);
+    const n = putOnBattlefield(s, ap, shinobi);
+    const lib = s.players[opp]!.library;
+    const i = lib.findIndex((id) => s.cards[s.objects[id]!.cardId]!.name === "Grizzly Bears");
+    lib.unshift(...lib.splice(i, 1));
+    const top2 = lib.slice(0, 2);
+    s = passUntil(s, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: n, defender: opp }] });
+    s = until(s, (x) => x.step === "main2");
+    expect(top2.map((id) => s.objects[id]!.zone)).toEqual(["exile", "exile"]);
+    // Every land of ours tapped: the Bears costs nothing.
+    for (const id of s.battlefield) if (s.objects[id]!.controller === ap) s.objects[id]!.tapped = true;
+    expect(castProblem(s, ap, top2[0]!)).toBeNull();
+    for (const a of planCast(s, ap, top2[0]!)!) s = act(s, a);
+    s = passAll(s);
+    expect(s.objects[top2[0]!]!.zone).toBe("battlefield");
+    expect(s.objects[top2[0]!]!.controller).toBe(ap);
   });
 });

@@ -1351,6 +1351,15 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "Exile the top card of that player's library. Until end of turn, you may cast that card." (Ragavan, after combat
     // damage to a player): that player's card, cast only (no land play, rulings), paying its costs.
     const theirTop = !exTop && !impulseIf && ctx.eventPlayer && /^[Ee]xile the top card of that player's library$/.test(s) ? /^(?:Until end of turn, you may cast that card|You may cast that card this turn)( and you may spend mana as though it were mana of any color to cast that spell)?$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    // Fallen Shinobi: "That player exiles the top two cards of their library. Until end of turn, you may play those cards
+    // without paying their mana costs." The permission is yours; a land is played as your land play (CR 305.1, rulings).
+    const theyExile = ctx.eventPlayer ? new RegExp(`^[Tt]hat player exiles the top (card|${NUMX} cards) of their library$`).exec(s) : null;
+    const theyPlay = theyExile && /^Until end of turn, you may play (?:that card|those cards) without paying (?:its mana cost|their mana costs)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (theyExile && theyPlay && (theyExile[1] === "card") === /that card/.test(sentences[si + 1]!)) {
+      effects.push({ type: "impulse", n: theyExile[1] === "card" ? 1 : amt(theyExile[2]!), until: "thisTurn", who: { ref: "eventPlayer" }, free: true });
+      si++;
+      continue;
+    }
     // Nashi, Moon Sage's Scion: "Exile the top card of each player's library. Until end of turn, you may play one of those
     // cards. If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost." One card in
     // all; a land is played with the usual timing and land drop (rulings).

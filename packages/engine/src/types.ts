@@ -1672,6 +1672,11 @@ export interface Resolving {
   item: StackItem;
   body: AbilityBody;
   legal: boolean[]; // which targets were legal as it began resolving (CR 608.2b)
+  /**
+   * The answers so far to the questions about the shields of the damage the current instruction deals (CR 616.1): it
+   * runs again from its start with them (resolve.ts runAsking).
+   */
+  shieldAnswers?: number[];
   /** Who controlled each targeted spell as resolution began, for "its controller" after it's countered (CR 608.2h). */
   spellControllers?: (PlayerId | null)[];
   /** The cards of targeted spells, for "its mana value" after it's countered (CR 608.2h). */

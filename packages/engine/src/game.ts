@@ -3616,7 +3616,9 @@ export function castProblem(
   if (plotted && !canActAtSorcerySpeed(s, pid)) return `a plotted card can only be cast at sorcery speed`;
   const spell = compileCard(d).spell;
   // A spell's colors and name are its card's (CR 702.16b, 201.2), and it's a spell ("can't be the target of spells").
-  const sq: SourceQuality = { colors: d.colors, types: d.types, subtypes: d.subtypes, name: d.name, spell: true };
+  // Its mana value counts the X announced for it (CR 202.3e, rulings on Reaver Titan).
+  const printedCost = parseManaCost(d.manaCost);
+  const sq: SourceQuality = { colors: d.colors, types: d.types, subtypes: d.subtypes, name: d.name, spell: true, manaValue: defMv(d) + (printedCost.hasX ? (x ?? 0) * xCount(printedCost) : 0) };
   if (spell?.modal) {
     if (modes === undefined) {
       if (!canChooseModes(s, spell, pid, sq)) return `${d.name} has no mode that can be chosen`;
@@ -5756,7 +5758,7 @@ export function copyTargetQuality(s: GameState): SourceQuality | undefined {
   const sc = s.resolving?.scratch?.copies;
   const orig = sc ? (s.stack.find((x) => x.id === sc.of) ?? s.castItems?.[sc.of] ?? s.epics?.[sc.of]) : undefined;
   const card = orig?.objectId ? s.objects[orig.objectId] : undefined;
-  return card ? spellQuality(s, cardIdOf(card)) : undefined;
+  return card ? spellQuality(s, cardIdOf(card), orig) : undefined;
 }
 
 /** A spell copy's targets (CR 707.10c): any it keeps may be illegal now; any it changes must be legal. */
@@ -5784,7 +5786,7 @@ function chooseCopyTargets(s: GameState, p: Player, targets?: TargetChoice[]) {
 /** What a spell or ability on the stack is, for its targets: the spell's own characteristics, or its source's (CR 113.7a). */
 export function stackItemQuality(s: GameState, item: StackItem): SourceQuality | undefined {
   const o = item.objectId ? s.objects[item.objectId] : undefined;
-  return o ? spellQuality(s, cardIdOf(o)) : sourceQuality(s, item.sourceId, item.sourceCardId);
+  return o ? spellQuality(s, cardIdOf(o), item) : sourceQuality(s, item.sourceId, item.sourceCardId);
 }
 
 /**
@@ -6067,9 +6069,17 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   if (pend.what === "damageShield") {
-    // Which damage a shield takes, or which shield applies first (CR 615.7, 616.1); combat damage waits for it.
-    s.damageBatch!.answers.push(Number(choice));
-    finishCombatDamage(s);
+    // Which damage a shield takes, or which shield applies first (CR 615.7, 616.1); combat damage waits for it. Damage
+    // a resolving spell or ability deals: its instruction runs again with the answers so far (resolve.ts runAsking).
+    if (s.damageBatch) {
+      s.damageBatch.answers.push(Number(choice));
+      finishCombatDamage(s);
+      return;
+    }
+    const answers = s.resolving?.shieldAnswers;
+    if (!answers) throw new RulesError("no damage is waiting on its shields");
+    answers.push(Number(choice));
+    continueResolution(s);
     return;
   }
   if (pend.what === "mutate") {

@@ -19,7 +19,7 @@ import { protectedFrom, toxicValue } from "./keywords";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
 import type { CardDef, Color, DamageRule, GameObject, GameState, ObjectId, PlayerId, RedirectShield } from "./types";
 import type { DamageMod, TargetSpec } from "./abilities";
-import { hasName } from "./faces";
+import { defMv, hasName } from "./faces";
 
 /** What a damage source looks like as it deals damage. */
 export interface DamageSource {
@@ -43,6 +43,8 @@ export interface DamageSource {
   spell?: true;
   /** The damage it deals can't be prevented (CR 615.12): all of it, or its combat damage. */
   unpreventable?: "all" | "combat";
+  /** Its mana value, a spell's with its X (CR 202.3), for protection from a mana value. */
+  manaValue?: number;
 }
 
 /**
@@ -52,7 +54,7 @@ export interface DamageSource {
 export function objectSource(s: GameState, o: GameObject): DamageSource {
   const c = characteristics(s, o);
   const zc = o.zone === "battlefield" ? (o.zoneChanges ?? 0) : (s.lastKnown?.[o.id]?.zc ?? o.zoneChanges ?? 0);
-  return { name: c.name, controller: controllerOf(s, o), colors: c.colors, types: c.types, subtypes: c.subtypes, keywords: c.keywords, id: o.id, ref: { object: o.id, zc }, ...(wasCastThisTurn(s, o) ? { castThisTurn: true as const } : {}), ...(o.isCommander ? { commanderId: commanderOf(s, o)?.id ?? o.id } : {}), ...(c.unpreventable ? { unpreventable: c.unpreventable } : {}) };
+  return { name: c.name, controller: controllerOf(s, o), colors: c.colors, types: c.types, subtypes: c.subtypes, keywords: c.keywords, manaValue: c.manaValue, id: o.id, ref: { object: o.id, zc }, ...(wasCastThisTurn(s, o) ? { castThisTurn: true as const } : {}), ...(o.isCommander ? { commanderId: commanderOf(s, o)?.id ?? o.id } : {}), ...(c.unpreventable ? { unpreventable: c.unpreventable } : {}) };
 }
 
 /** "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix). */
@@ -62,7 +64,7 @@ function spellDealt(s: GameState, src: DamageSource, to: { player?: PlayerId; ba
 }
 
 /** A spell, or an ability whose source is gone: the card's printed characteristics. */
-export const cardSource = (d: CardDef, controller: PlayerId, ref?: DamageSource["ref"]): DamageSource => ({ name: d.name, controller, colors: d.colors, types: d.types, subtypes: d.subtypes, keywords: d.keywords, ...(ref ? { ref } : {}) });
+export const cardSource = (d: CardDef, controller: PlayerId, ref?: DamageSource["ref"]): DamageSource => ({ name: d.name, controller, colors: d.colors, types: d.types, subtypes: d.subtypes, keywords: d.keywords, manaValue: defMv(d), ...(ref ? { ref } : {}) });
 
 /** Can't this source's damage be prevented (CR 615.12)? */
 export const unpreventable = (src: DamageSource, combat: boolean) => src.unpreventable === "all" || (src.unpreventable === "combat" && combat);
@@ -292,6 +294,8 @@ interface ShieldPlan {
   ask?: ShieldQuestion;
   ops: ShieldOp[];
   final: DamageEvent[];
+  /** How many of the answers it used. */
+  used?: number;
 }
 
 /** One of the shields around a permanent or player, as the planner sees it. */
@@ -593,7 +597,12 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
     }
     return out;
   };
-  const takes = (sh: PlanShield, e: DamageEvent) => (sh.kind !== "prevent" || prev(e)) && !(e.applied ?? []).includes(sh.key) && (!sh.rule || ruleTakes(s, sh.rule, e));
+  // Damage one "all damage that would be dealt to you is dealt to ~ instead" permanent took isn't sent on by another:
+  // with two Palisade Giants, the damage is dealt to either one, as its player chooses (rulings on Palisade Giant and
+  // Pariah).
+  const staticRedirect = (k: string) => k.startsWith("static-redirect:");
+  const takes = (sh: PlanShield, e: DamageEvent) =>
+    (sh.kind !== "prevent" || prev(e)) && !(e.applied ?? []).includes(sh.key) && !(staticRedirect(sh.key) && (e.applied ?? []).some(staticRedirect)) && (!sh.rule || ruleTakes(s, sh.rule, e));
   let queue = events.filter((e) => e.n > 0).map((e) => ({ ...e, applied: e.applied ?? [] }));
   const order = turnOrderFrom(s, s.activePlayer);
   // A rule's "next N damage" shield protecting several permanents and players (Harm's Way's "you and/or permanents you
@@ -623,7 +632,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         prompt: `${card}: ${rule.redirect ? "redirect" : "prevent"} 1 of the damage to which (${room} left)?`,
         labels: ranked.map(([k, x]) => `${nameOf(x.to)} (${x.n - got.get(k)!} damage)`),
       });
-      if (i === null) return { ask, ops, final };
+      if (i === null) return { ask, ops, final, used: next };
       const k = ranked[i]![0];
       got.set(k, got.get(k)! + 1);
     }
@@ -706,7 +715,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         // A bot gives it to the opponent with the most life (the first option).
         const ranked = [...opps].sort((a, b) => player(s, b).life - player(s, a).life);
         const i = choose({ player: me, prompt: `${toName}: which opponent gains control of it?`, labels: ranked.map((p) => player(s, p).name) });
-        if (i === null) return { ask, ops, final };
+        if (i === null) return { ask, ops, final, used: next };
         ops.push({ kind: "betrayer", id: betrayer.id, to: ranked[i]!, prevented: incoming.some(prev), toName });
         for (const e of incoming) if (prev(e)) ops.push({ kind: "preventAll", srcName: e.src.name, toName });
         incoming = incoming.filter((e) => !prev(e));
@@ -886,10 +895,10 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         opts = opts.filter((o) => o !== used);
       }
     }
-    if (paused) return { ask, ops, final };
+    if (paused) return { ask, ops, final, used: next };
     for (const [i, e] of incoming.entries()) if (left[i]! > 0) final.push({ ...e, n: left[i]! });
   }
-  if (ask) return { ask, ops, final };
+  if (ask) return { ask, ops, final, used: next };
   // One amount per source and permanent or player: damage redirected back to where it came from adds up.
   const out = new Map<string, DamageEvent>();
   for (const e of final) {
@@ -898,7 +907,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
     if (m) m.n += e.n;
     else out.set(k, { src: e.src, to: e.to, n: e.n, ...(e.combat ? { combat: true } : {}) });
   }
-  return { ops, final: [...out.values()] };
+  return { ops, final: [...out.values()], used: next };
 }
 
 /**
@@ -1091,13 +1100,63 @@ let creatureBatch: Extract<Parameters<typeof fireEvent>[1], { type: "damagedCrea
 export const excessThisTurn = (s: GameState, id: ObjectId, zc: number) => (s.turnLog?.excessDealt ?? []).reduce((a, e) => a + (e.id === id && e.zc === zc ? e.amount : 0), 0);
 
 /**
- * Deal damage that happens at the same time, after its shields (see planShields), choosing for the players the way
- * a bot would (only combat damage stops to ask; see game.ts). Returns what each source dealt to each permanent or
- * player.
+ * The players' answers about the shields of damage dealt while a spell or ability resolves (see resolve.ts
+ * runAsking): the damage effect is run again from the start once each answer is in, with `used` of them taken so far.
+ * Null elsewhere: the choices are made the way a bot makes them.
+ */
+let shieldAnswers: { answers: number[]; used: number; ask?: ShieldQuestion } | null = null;
+
+/** Thrown out of a resolving damage effect that needs a player's answer about its damage's shields (CR 616.1). */
+export class ShieldQuestionPause extends Error {}
+
+/** Run `fn` with these answers for the shield questions of the damage it deals; null runs it without asking. */
+export function withShieldAnswers<T>(answers: number[] | null, fn: (asked: () => ShieldQuestion | undefined) => T): T {
+  const outer = shieldAnswers;
+  const mine: typeof shieldAnswers = answers ? { answers, used: 0 } : null;
+  shieldAnswers = mine;
+  try {
+    return fn(() => mine?.ask);
+  } finally {
+    shieldAnswers = outer;
+  }
+}
+
+/**
+ * Could damage dealt now meet a choice about its shields (CR 616.1)? Only then does a resolving damage effect need to
+ * be able to stop and ask (resolve.ts). Cheap: anything that could make planShields ask.
+ */
+export function shieldChoicesPossible(s: GameState): boolean {
+  if (live(s).length || liveMods(s).length) return true;
+  if (s.turnOrder.some((p) => player(s, p).preventNext || player(s, p).redirectNext?.length)) return true;
+  return s.battlefield.some((id) => {
+    const o = obj(s, id);
+    const a = abilitiesOf(s, o);
+    return !!(o.preventNext || o.redirectNext?.length || a.damageToYouRedirect || a.preventCombatFromEach !== undefined || a.betrayer || a.damageToOpponentsMills);
+  });
+}
+
+/**
+ * The plan for damage dealt at the same time: inside a resolution that can stop to ask (withShieldAnswers), the
+ * players' own choices among the shields (CR 616.1), else the way a bot would choose.
+ */
+export function planDamage(s: GameState, events: DamageEvent[]): ShieldPlan {
+  const ask = shieldAnswers;
+  if (!ask) return planShields(s, events, [], true);
+  const plan = planShields(s, events, ask.answers.slice(ask.used));
+  if (plan.ask) {
+    ask.ask = plan.ask;
+    throw new ShieldQuestionPause(plan.ask.prompt);
+  }
+  ask.used += plan.used ?? 0;
+  return plan;
+}
+
+/**
+ * Deal damage that happens at the same time, after its shields (see planShields and planDamage). Returns what each
+ * source dealt to each permanent or player.
  */
 export function dealDamageBatch(s: GameState, events: DamageEvent[], opts: { lifelink?: { n: number } } = {}): (DamageEvent & { dealt: number })[] {
-  const plan = planShields(s, events, [], true);
-  return dealPlanned(s, plan, opts);
+  return dealPlanned(s, planDamage(s, events), opts);
 }
 
 /** Commit a finished plan and deal its damage. `lifelink`: add the life up for the caller instead of gaining it per event. */

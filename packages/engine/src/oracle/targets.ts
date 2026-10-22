@@ -1017,7 +1017,10 @@ export function parseTargetPhrase(
         if (alts.length > 1 || extra.suspected) return null;
         extra.suspected = true;
       } else if (w === "token" || w === "nontoken") {
-        if (alts.length > 1) return null;
+        // A leading one is for every alternative: "a nontoken creature or planeswalker" (Sheoldred) is a nontoken
+        // creature or a nontoken planeswalker, as "a legendary creature or planeswalker" is a legendary creature or a
+        // legendary planeswalker (CR 205.4e).
+        if (alts.length > 1 && !(alt === alts[0] && i === 0)) return null;
         extra.token = w === "token";
       } else if (w === "enchanted-or-equipped" && !extra.status) {
         if (alts.length > 1) return null;

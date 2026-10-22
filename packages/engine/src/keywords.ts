@@ -94,6 +94,8 @@ export interface SourceQuality {
   name?: string;
   /** A permanent that was cast this turn (it resolved as a spell this turn), for Emrakul, the World Anew's protection. */
   castThisTurn?: true;
+  /** Its mana value, a spell's with its X (CR 202.3e), for protection from a mana value (Reaver Titan); none is 0 (CR 202.3a). */
+  manaValue?: number;
 }
 
 /** "Goblins" -> "Goblin", "Elves" -> "Elf", "Sphinxes" -> "Sphinx": a creature type's plural, as protection names it. */
@@ -131,6 +133,7 @@ export function canonicalKeyword(text: string): string | undefined {
   if (q === "each color that's not in your commander's color identity") return IDENTITY_PROTECTION;
   if (q === "everything" || q === "multicolored" || q === "monocolored" || q === "colorless" || q === "each color" || q === "all colors" || q === "the chosen color") return q === "the chosen color" ? CHOSEN_PROTECTION : `Protection from ${q}`;
   if (PROTECTION_TYPES[q]) return `Protection from ${q}`;
+  if (/^mana value \d+ or (?:less|greater)$/.test(q)) return `Protection from ${q}`;
   const st = creatureTypeOfPlural(q);
   return st ? `Protection from ${text.trim().slice(-q.length).replace(/^./, (c) => c.toUpperCase())}` : undefined;
 }
@@ -218,6 +221,10 @@ export function protectedFrom(keywords: readonly string[], src: SourceQuality, h
     if (q === "monocolored" && src.colors.length === 1) return true;
     if (q === "colorless" && src.colors.length === 0) return true;
     if (PROTECTION_TYPES[q] && src.types?.includes(PROTECTION_TYPES[q])) return true;
+    // "Protection from mana value 3 or less" (Reaver Titan), "... 3 or greater" (Mistmeadow Skulk): an object with no mana
+    // cost has mana value 0 (CR 202.3a), a spell's counts its X (CR 202.3e, rulings on Reaver Titan).
+    const mv = /^mana value (\d+) or (less|greater)$/.exec(q);
+    if (mv && (mv[2] === "less" ? (src.manaValue ?? 0) <= Number(mv[1]) : (src.manaValue ?? 0) >= Number(mv[1]))) return true;
     const st = creatureTypeOfPlural(q);
     if (st && src.subtypes?.includes(st)) return true;
   }

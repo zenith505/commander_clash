@@ -88,6 +88,8 @@ export interface Characteristics {
   allCreatureTypes: boolean;
   colors: Color[];
   keywords: string[];
+  /** Its mana value (CR 202.3): its mana cost's, or a copy's (CR 707.2); 0 face down (CR 708.2). Not a spell's X (see spellManaValue). */
+  manaValue: number;
   /**
    * Keywords (lowercase) it has only from one effect that "doesn't remove" that effect's source (Cho-Manno's Blessing):
    * that protection doesn't make the source fall off (CR 702.16c), protection from anywhere else does.
@@ -229,6 +231,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     // "~ is all colors" (CR 604.3) applies first in layer 5 (613.3). A copy whose colors an exception set doesn't have it (707.9d).
     colors: compileCard(d).allColors ? ["W", "U", "B", "R", "G"] : [...d.colors],
     keywords: printedKeywords(d),
+    manaValue: o.faceDown ? 0 : defMv(d),
     hasPrintedAbilities: true,
     grantedAbilities: [],
     controller: o.controller,

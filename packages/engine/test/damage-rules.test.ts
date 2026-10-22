@@ -155,6 +155,13 @@ describe("prevention effects for the turn and sources of your choice (CR 615, 60
     ({ s } = casts(s, opp, harmsWay, [player(ap)]));
     s = chooseSource(passAll(s), "Pyroclasm");
     s = resolveTop(s);
+    // Harm's Way's controller chooses which 2 of Pyroclasm's damage it takes (rulings): 1 of each bear's.
+    for (let i = 0; i < 2; i++) {
+      const p = s.pending;
+      if (p?.kind !== "chooseOption" || p.what !== "damageShield") throw new Error(`not choosing for Harm's Way: ${JSON.stringify(p)}`);
+      expect(p.player).toBe(opp);
+      s = act(s, { type: "chooseOption", player: opp, choice: p.options[p.labels!.findIndex((l) => l === "Grizzly Bears (2 damage)")]! });
+    }
     // 1 of each bear's 2 damage is dealt to the caster instead (by Pyroclasm), so both bears live.
     expect(s.objects[b1]!.zone).toBe("battlefield");
     expect(s.objects[b2]!.zone).toBe("battlefield");

@@ -1,5 +1,5 @@
 import { allEffects, type AbilityBody, type BatchTrigger, type Effect, type TriggeredAbility, type SpellCondition, type SpentReq, type StaticCondition, type TargetSpec, type TriggerEvent } from "../abilities";
-import { COUNTER, differenceInHand, NUM, X, num, parseSpentReq, singularWord, SPENT } from "./words";
+import { COUNTER, differenceInHand, NUM, X, num, parseSpentReq, singular, singularWord, SPENT } from "./words";
 import { parseActivateCondition, parseStaticCondition } from "./statics";
 import { parseBody, replaceX } from "./body";
 import { parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
@@ -572,6 +572,8 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // "That land's controller", and "that player" after "an artifact an opponent controls": who controlled it as it last
   // existed (CR 603.10a).
   if (!attached) {
+    // "Whenever another creature you own dies, return it to your hand" (Athreos): your card, so its owner's hand.
+    if (/ you own$/.test(m![2]!)) bodyText = bodyText.replace(/^return it to your hand\b/, "return it to its owner's hand");
     bodyText = bodyText.replace(/\bthat (?:land|artifact|creature|permanent|enchantment)'s controller\b/g, "its controller");
     if (/ an opponent controls$/.test(m![2]!)) bodyText = bodyText.replace(/\bthat player\b/g, "its controller");
   }
@@ -786,6 +788,16 @@ function parseSacrificeTrigger(line: string): TriggeredAbility | "fail" | null {
   if (self) {
     const body = parseBody(self[1]!);
     return body ? { event: "youSacrifice", sacrifices: { filter: { kind: "object", text: "~" }, orSelf: true, self: true }, body } : "fail";
+  }
+  // "Whenever you sacrifice one or more Foods" (Camellia, the Seedmiser): once for each event that sacrificed any (CR
+  // 603.2c), the permanents as they last existed (CR 603.10a).
+  const batch = /^Whenever you sacrifice one or more (.+?), (.+)$/.exec(line);
+  if (batch) {
+    const other = batch[1]!.startsWith("other ");
+    const filter = parseTargetPhrase(singular(batch[1]!.replace(/^other /, "")));
+    const body = parseBody(batch[2]!);
+    if (!filter || filter.kind !== "object" || filter.controller || !body) return "fail";
+    return { event: "batch", batch: { what: "leaves", filter: { ...filter, text: batch[1]! }, whose: "you", sacrificed: true, ...(other ? { other: true as const } : {}) }, body };
   }
   const any = /^Whenever (a player|an opponent) sacrifices (an?|another) (.+?), (.+)$/.exec(line);
   const m = any ? [any[0], any[2], any[3], undefined, any[4]] : /^Whenever you sacrifice (~ or another|another|an?) (.+?)( during your turn)?, (.+)$/.exec(line);
@@ -1203,6 +1215,10 @@ const theyAreThatPlayer = (text: string) => text.replace(/^they (lose|draw|disca
  * opponent attacking that player does the same": each opponent of its controller with a creature attacking them).
  */
 function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | null {
+  // Paradox Haze: "At the beginning of enchanted player's first upkeep each turn, that player gets an additional upkeep
+  // step after this step" (CR 500.8; rulings: an upkeep skipped doesn't trigger it, two of them make two more).
+  const haze = /^At the beginning of enchanted player's first upkeep each turn, that player gets an additional upkeep step after this step\.$/.test(line);
+  if (haze) return { event: "eachUpkeep", body: { targets: [], effects: [{ type: "addUpkeepStep" }], text: "That player gets an additional upkeep step after this step." }, enchantedPlayersTurn: true, firstUpkeep: true };
   const step = /^At the beginning of enchanted (?:player|opponent)'s (upkeep|draw step|end step), (.+)$/.exec(line);
   if (step) {
     const event = step[1] === "upkeep" ? "eachUpkeep" : step[1] === "draw step" ? "eachDrawStep" : "eachEndStep";
@@ -1745,7 +1761,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "When you cycle ~" (CR 702.29c): "it" is the card, wherever it went.
   const cycled = /^When you cycle ~, (.+)$/.exec(line);
   if (cycled) {
-    const body = parseBody(cycled[1]!, { selfCard: true });
+    // Magmakin Artillerist: "it deals 1 damage to each opponent": the card is the source (CR 702.29c).
+    const body = parseBody(cycled[1]!.replace(/^it deals /, "~ deals "), { selfCard: true });
     return body ? { event: "selfCycled", body } : "fail";
   }
   // A state trigger (CR 603.8): "When you control no Islands, sacrifice ~."
@@ -1929,11 +1946,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       }
       // "When Leonardo enters, if his sneak cost was paid, ..." (CR 702.190a), "if its surge cost was paid" (702.117a),
       // "if its spectacle cost was paid" (702.137a).
-      let ifAlt: "sneak" | "surge" | "spectacle" | undefined;
-      const altPaid = /^if (?:its|his|her|their) (sneak|surge|spectacle) cost was paid, (.+)$/i.exec(body0);
+      // "When Spiders-Man enters, if they were cast using web-slinging, ..." (CR 702.188a).
+      let ifAlt: "sneak" | "surge" | "spectacle" | "webSlinging" | undefined;
+      const altPaid = /^if (?:its|his|her|their) (sneak|surge|spectacle) cost was paid, (.+)$/i.exec(body0) ?? /^if (?:it|he|she|they) (?:was|were) cast using (web-slinging), (.+)$/i.exec(body0);
       if (altPaid) {
         if (event !== "selfEnters") return "fail" as const;
-        ifAlt = altPaid[1]!.toLowerCase() as "sneak" | "surge" | "spectacle";
+        ifAlt = altPaid[1] === "web-slinging" ? "webSlinging" : (altPaid[1]!.toLowerCase() as "sneak" | "surge" | "spectacle");
         body0 = altPaid[2]!;
       }
       // "If a source would deal damage ..., it deals that much damage plus 2 instead" (Rankle and Torbran): that "that much"

@@ -889,6 +889,15 @@ export function compile(d: CardDef): CompiledCard {
       }
       continue;
     }
+    // "As Arachne enters, look at an opponent's hand, then choose a card type other than creature." (CR 614.12): an
+    // opponent, then their hand is seen, then a card type. Kindred is a card type too, but no kindred card plays here.
+    const lookThenType = /^As ~ enters, look at an opponent's hand, then choose a card type other than (\w+)\.$/.exec(line);
+    if (lookThenType && !out.entersChoosePlayer && !out.entersChoose?.some((c) => c.what === "cardType")) {
+      out.entersChoosePlayer = "opponent";
+      out.entersLookHand = true;
+      (out.entersChoose ??= []).push({ what: "cardType", options: Object.keys(CARD_TYPE_PLURAL).filter((t) => t !== capital(lookThenType[1]!)) });
+      continue;
+    }
     // "As this artifact enters, choose artifact, creature, enchantment, instant, or sorcery." (Cloud Key, CR 614.12): a
     // card type, kept as Chosen.cardType.
     const asCardType = /^As (?:~|it) enters, choose ((?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle)(?:, (?:or )?(?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle))+|a card type)\.$/.exec(line);
@@ -1201,6 +1210,15 @@ export function compile(d: CardDef): CompiledCard {
       out.landsFromGraveyard = true;
       continue;
     }
+    // Wrenn and Realmbreaker's emblem: "You may play lands and cast permanent spells from your graveyard." Any number,
+    // paying their mana costs (a card without one can't be cast this way, CR 118.6), following the usual timing rules.
+    const permYard = /^You may (play lands and )?cast permanent spells from your graveyard\.$/.exec(line);
+    if (permYard) {
+      if (permYard[1]) out.landsFromGraveyard = true;
+      const { owner: _, ...f } = parseTargetPhrase("permanent card from a graveyard")!;
+      (out.graveyardGrants ??= []).push({ filter: { ...f, text: "permanent cards" }, way: { kind: "permission", costs: [], exile: false } });
+      continue;
+    }
     // Underworld Breach, The Master of Keys, Lier, Return the Past, Six, Deeproot Historian: escape, flashback or retrace
     // for the cards in your graveyard (CR 702.138a, 702.34a, 702.81a). Each grant's cost is the card's own mana cost.
     const grant =
@@ -1421,9 +1439,18 @@ export function compile(d: CardDef): CompiledCard {
       out.preventCombatFromEach = coverN;
       continue;
     }
-    const tapTimes = /^If you tap a permanent for mana, it produces (twice|three times) as much of that mana instead\.$/.exec(line);
+    // Nowhere to Run: creatures its controller's opponents control can be targeted as though they didn't have hexproof
+    // (nor any "hexproof from", CR 702.11e), by anyone's spells and abilities; their ward abilities don't trigger (rulings).
+    if (line === "Creatures your opponents control can be the targets of spells and abilities as though they didn't have hexproof. Ward abilities of those creatures don't trigger.") {
+      out.exposesOpponentsCreatures = true;
+      continue;
+    }
+    // Virtue of Strength: "If you tap a basic land for mana": only mana that a basic land is tapped for.
+    const tapTimes = /^If you tap a (permanent|basic land) for mana, it produces (twice|three times) as much of that mana instead\.$/.exec(line);
     if (tapTimes) {
-      out.tapManaTimes = (out.tapManaTimes ?? 1) * (tapTimes[1] === "twice" ? 2 : 3);
+      const n = tapTimes[2] === "twice" ? 2 : 3;
+      if (tapTimes[1] === "basic land") out.tapBasicManaTimes = (out.tapBasicManaTimes ?? 1) * n;
+      else out.tapManaTimes = (out.tapManaTimes ?? 1) * n;
       continue;
     }
     const plusLife = /^If you would gain life, you gain that much life plus (\d+) instead\.$/.exec(line);
@@ -1563,6 +1590,19 @@ export function compile(d: CardDef): CompiledCard {
       (out.activationLess ??= []).push({ n: Number(activationLess[3]), filter: { ...lessFilter, text: `${activationLess[1]}${activationLess[2] ?? ""}` }, ...(activationLess[4] ? { atLeastOne: true as const } : {}) });
       continue;
     }
+    // Winter Orb, Winter Moon, Smoke, Static Orb, Mungha Wurm: a limit on what untaps in the untap step (CR 502.3).
+    const untapLimit = /^(As long as ~ is untapped, )?([Pp]layers|[Yy]ou) can't untap more than (one|two) (.+?) during (?:their|your) untap steps?\.$/.exec(line);
+    if (untapLimit) {
+      const filter = parseTargetPhrase(untapLimit[4]!.split(" ").map((w, i, a) => (i === a.length - 1 ? singularWord(w) : w)).join(" "));
+      if (filter?.kind !== "object" || filter.controller || filter.bound) out.unsupported.push(raw);
+      else (out.untapLimits ??= []).push({ n: num(untapLimit[3]!), filter: { ...filter, text: untapLimit[4]! }, ...(/^you$/i.test(untapLimit[2]!) ? { you: true as const } : {}), ...(untapLimit[1] ? { whileUntapped: true as const } : {}) });
+      continue;
+    }
+    const ninjutsuLess = /^Ninjutsu abilities you activate cost \{(\d+)\} less to activate\.$/.exec(line);
+    if (ninjutsuLess) {
+      out.ninjutsuLess = (out.ninjutsuLess ?? 0) + Number(ninjutsuLess[1]);
+      continue;
+    }
     const powerUpLess = /^Power-up abilities of other creatures you control cost \{(\d+)\} less to activate\.$/.exec(line);
     if (powerUpLess && !out.powerUpLess) {
       out.powerUpLess = Number(powerUpLess[1]);
@@ -1697,6 +1737,11 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "You may spend mana as though it were mana of any color.") {
       out.spendAnyColor = true;
+      continue;
+    }
+    const unlockLess = /^Unlock costs you pay cost \{(\d+)\} less\.$/.exec(line);
+    if (unlockLess) {
+      out.unlockLess = (out.unlockLess ?? 0) + Number(unlockLess[1]);
       continue;
     }
     const plotLess = /^Plotting cards from your hand costs \{(\d+)\} less\.$/.exec(line);
@@ -2111,6 +2156,14 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     if (aNumber) line = `~ enters with X ${aNumber[1]} counters on it, where X is ${aNumber[2]}.`;
+    // "Sensational Save — If Scarlet Spider was cast using web-slinging, he enters with X +1/+1 counters on him, where X
+    // is the mana value of the returned creature." (CR 702.188a; the returned creature as it last existed, rulings).
+    const slung = new RegExp(`^(?:[A-Z][\\w' ]+ — )?If ~ was cast using web-slinging, ~ enters(?: the battlefield)? with X ${COUNTER} counters on ~, where X is the mana value of the returned creature\\.$`).exec(line);
+    if (slung) {
+      if (out.entersWithCounters) out.unsupported.push(raw);
+      else out.entersWithCounters = { counter: counterKind(slung[1]!), n: { count: { kind: "webSlungMv" } }, ifWebSlung: true };
+      continue;
+    }
     const ewc = new RegExp(`^(?:(?:Raid|Morbid|Revolt) — )?~ enters(?: the battlefield)?( tapped)? with ${NUMX} ${COUNTER} counters? on it(?: for each (.+?)|, where X is (.+?)| if (.+?))?\\.$`).exec(line);
     if (ewc) {
       // "With a +1/+1 counter on it for each ...", "with X +1/+1 counters, where X is ...": counted as it enters.
@@ -2775,6 +2828,8 @@ function checkCastingLinks(out: CompiledCard) {
   // permanent's enters trigger.
   // "If the {1}{B} cost was paid": the card's one "rather than pay" cost, that mana (Baleful Mastery).
   const masteryMana = /\bIf the ((?:\{[^}]+\})+) cost was paid\b/.exec(out.spell?.text ?? "")?.[1];
+  // "If ~ was cast using web-slinging" needs its web-slinging cost (CR 702.188a).
+  if ((out.triggers.some((t) => t.ifAlt === "webSlinging") || out.entersWithCounters?.ifWebSlung) && !out.altCosts?.some((a) => a.webSlinging)) bad = true;
   for (const alt of ["surge", "spectacle", "alternative", "madness"] as const) {
     const altIn = (v: unknown) => JSON.stringify(v ?? null).includes(`"kind":"altPaid","alt":"${alt}"`);
     const alts = out.altCosts?.filter((a) => a.kind === alt) ?? [];

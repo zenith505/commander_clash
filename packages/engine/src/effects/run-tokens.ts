@@ -277,9 +277,11 @@ function createTokensFor(s: GameState, e0: Extract<Effect, { type: "createToken"
     // "Tapped and attacking" (CR 508.4): put onto the battlefield attacking, never declared as attackers.
     const defender = e.attacking ? attackDefault(s, pid, ctx.sourceId) : undefined;
     const counters = e.counters ? { [e.counters.counter]: amountNow(s, e.counters.n, ctx) } : undefined;
-    const opts = { tapped: e.tapped || e.attacking, attacking: defender, ...(counters ? { counters } : {}) };
+    const blocking = e.blocking ? objects(s, e.blocking, ctx)[0] : undefined;
+    const tapped = e.tapped || (e.attacking && !e.untapped);
+    const opts = { tapped, attacking: defender, ...(counters ? { counters } : {}), ...(blocking ? { blocking } : {}) };
     for (let i = 0; i < k; i++) createToken(s, pid, e.token, opts);
-    if (k) log(s, `${src} creates ${k === 1 ? "a" : k}${e.tapped || e.attacking ? " tapped" : ""}${defender !== undefined ? " and attacking" : ""} ${e.token.power !== undefined ? `${e.token.power}/${e.token.toughness} ` : ""}${e.token.name} token${k > 1 ? "s" : ""}${defender !== undefined && livingPlayers(s).length > 2 ? ` (attacking ${player(s, defender).name})` : ""}.`);
+    if (k) log(s, `${src} creates ${k === 1 ? "a" : k}${tapped ? " tapped" : ""}${defender !== undefined ? `${tapped ? " and" : ""} attacking` : ""}${blocking && blocking.attacking !== undefined ? ` blocking ${defOf(s, blocking).name}` : ""} ${e.token.power !== undefined ? `${e.token.power}/${e.token.toughness} ` : ""}${e.token.name} token${k > 1 ? "s" : ""}${defender !== undefined && livingPlayers(s).length > 2 ? ` (attacking ${player(s, defender).name})` : ""}.`);
     createExtraTokens(s, pid, extra, opts);
   }
 }
@@ -341,12 +343,18 @@ export function tokenDef(t: TokenSpec): CardDef {
   };
 }
 
-export function createToken(s: GameState, pid: PlayerId, t: TokenSpec, opts: { tapped?: boolean; attacking?: PlayerId; counters?: Record<string, number> } = {}): GameObject {
+export function createToken(s: GameState, pid: PlayerId, t: TokenSpec, opts: { tapped?: boolean; attacking?: PlayerId; counters?: Record<string, number>; blocking?: GameObject } = {}): GameObject {
   const o = newObject(s, tokenDef(t), pid, "exile");
   o.isToken = true;
   // It enters like any permanent, so ETB triggers see it, with any counters it's created with (CR 122.6, 614.1c).
   moveObject(s, o.id, "battlefield", { ...(opts.tapped ? { tapped: true } : {}), ...(opts.counters ? { counters: opts.counters } : {}) });
   if (opts.attacking !== undefined && o.zone === "battlefield") o.attacking = opts.attacking;
+  // Put onto the battlefield blocking (Brimaz): it blocks that attacker, never declared as a blocker (CR 509.1, rulings).
+  const at = opts.blocking;
+  if (at && o.zone === "battlefield" && at.zone === "battlefield" && at.attacking !== undefined) {
+    o.blocking = [at.id];
+    (at.blockedBy ??= []).push(o.id);
+  }
   s.resolving?.created?.push(o.id);
   noteCreated(s, pid, o);
   return o;
@@ -357,7 +365,7 @@ export function createToken(s: GameState, pid: PlayerId, t: TokenSpec, opts: { t
  * the same time. Anything else the effect says about its tokens (tapped, attacking, with counters, "exile it at end of
  * combat") applies to these too (rulings on Peregrin Took and Chatterfang).
  */
-export function createExtraTokens(s: GameState, pid: PlayerId, extra: TokenBatch["extra"], opts: { tapped?: boolean; attacking?: PlayerId; counters?: Record<string, number> } = {}) {
+export function createExtraTokens(s: GameState, pid: PlayerId, extra: TokenBatch["extra"], opts: { tapped?: boolean; attacking?: PlayerId; counters?: Record<string, number>; blocking?: GameObject } = {}) {
   for (const { token, n } of extra) {
     for (let i = 0; i < n; i++) createToken(s, pid, token, opts);
     log(s, `${player(s, pid).name} also creates ${n === 1 ? "a" : n}${opts.tapped ? " tapped" : ""} ${token.power !== undefined ? `${token.power}/${token.toughness} ` : ""}${token.name} token${n > 1 ? "s" : ""}.`);

@@ -4,11 +4,12 @@ import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
 import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, canBeSacrificed, defOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
-import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
+import { manaAbilitiesOn, manaActionAbility, manaChoices } from "./manaabilities";
 import { bindChosen, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, manySlot, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
   applyAction,
+  untapChoiceProblem,
   blockCost,
   livingPlayers,
   abilityProblem,
@@ -64,6 +65,7 @@ import {
   payZeroSource,
   legendBotKeep,
   unlockCost,
+  forageWays,
   castExtraCosts,
   lifeCostOffers,
   costsHaveX,
@@ -338,6 +340,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const saving = (id: string) => manaAbilitiesOn(s, obj(s, id)).some((ab) => ab.produces.kind === "removeX" && (obj(s, id).counters[ab.produces.counter] ?? 0) < 3);
       return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => s.effects.some((e) => e.whileTapped?.id === id) || saving(id)) }];
     }
+    // Winter Orb and the like: untap the most useful ones the limits allow (lands making a color we lack first).
+    if (pend.kind === "pickPermanents" && pend.action === "untapLimited") return [{ type: "pickPermanents", player: pid, ids: chooseLimitedUntap(s, pid, pend.options) }];
     // Ripples of Potential: phase out what an opponent's spell or ability on the stack is aimed at, to save it.
     if (pend.kind === "pickPermanents" && pend.action === "phaseOut") {
       const aimed = new Set(s.stack.filter((it) => it.controller !== pid).flatMap((it) => it.targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])));
@@ -599,8 +603,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   // like Spiketail Hatchling's. "Unless its controller pays" only if they can't pay.
   const top = s.stack[s.stack.length - 1];
   if (top && top.kind === "spell" && top.controller !== pid && top.objectId && mv(s, top.objectId) >= 3) {
+    // "End the turn" and nothing else (Time Stop, Discontinuity, Sundial of the Infinite on our turn) exiles every spell
+    // and ability on the stack (CR 724.1b): worth it when none of them is ours.
+    const theirs = s.stack.every((x) => x.controller !== pid) && !s.triggerQueue.some((t) => t.controller === pid);
     // Also a counter inside a branch (Invert Polarity's lost flip) and taking the spell over (Commandeer).
     const worthIt = (body: AbilityBody, sourceId: ObjectId, x = 0) => {
+      if (endsTurnOnly(body)) return theirs;
       const c = allEffects(body.effects).find((e) => e.type === "counterSpell" || e.type === "controlSpell");
       return !!c && (c.type !== "counterSpell" || !c.unless || !canPayUnless(s, top.controller, c.unless, pid, sourceId, x));
     };
@@ -620,7 +628,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
         if (free && free[free.length - 1]!.type === "castSpell") return free;
       }
       const plan = planCast(s, pid, id, targets, undefined, "auto", x);
-      if (plan && plan[plan.length - 1]!.type === "castSpell" && (plan[plan.length - 1] as { targets?: unknown }).targets) return plan;
+      if (plan && plan[plan.length - 1]!.type === "castSpell" && ((plan[plan.length - 1] as { targets?: unknown }).targets || endsTurnOnly(body))) return plan;
       // Its alternative cost when the mana isn't there: Force of Will's blue card, Daze's Island (CR 118.9).
       if (targets && altCost(d, "alternative") && !cost.hasX) {
         const extra = chooseExtraCosts(s, pid, id, targets, undefined, "alternative");
@@ -649,6 +657,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       }
     }
   }
+  const dial = chooseEndTurnEscape(s, pid);
+  if (dial) return dial;
   const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseTimed(s, pid);
   if (regen) return regen;
   if (canActAtSorcerySpeed(s, pid)) {
@@ -719,9 +729,100 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (s.step === "main2") {
       const act = chooseStation(s, pid) ?? chooseActivation(s, pid) ?? chooseCycling(s, pid);
       if (act) return act;
+      // Then a spell that ends the turn (Ultima, Day's Undoing): the last thing we do this turn.
+      const end = endTurnCast(s, pid);
+      if (end) return end;
     }
   }
   return [{ type: "passPriority", player: pid }];
+}
+
+/**
+ * How to forage (CR 701.61a): three cards from our graveyard that do nothing more there, else a Food that isn't a
+ * creature (a Food token first), else any three cards from the graveyard; null if we can't. Not what's in `busy`.
+ */
+function forageChoice(s: GameState, pid: PlayerId, o: GameObject, busy: ObjectId[]): CostChoices | null {
+  const ways = forageWays(s, pid, o);
+  const cards = ways.cards.filter((c) => !busy.includes(c)).sort((a, b) => (usefulInGraveyard(s, a) ? 1 : 0) - (usefulInGraveyard(s, b) ? 1 : 0));
+  if (cards.length >= 3 && !cards.slice(0, 3).some((c) => usefulInGraveyard(s, c))) return { exileCards: cards.slice(0, 3) };
+  const food = ways.foods
+    .map((x) => obj(s, x))
+    .filter((x) => !busy.includes(x.id) && x.id !== o.id && !objIsType(s, x, "Creature"))
+    .sort((a, b) => worth(s, pid, a) - worth(s, pid, b))[0];
+  if (food) return { sacrifice: [food.id] };
+  return cards.length >= 3 ? { exileCards: cards.slice(0, 3) } : null;
+}
+
+/** "End the turn" and nothing more (Time Stop, Discontinuity, Sundial of the Infinite). */
+function endsTurnOnly(body: AbilityBody): boolean {
+  return !body.targets.length && !body.modal && body.effects.length > 0 && body.effects.every((e) => e.type === "endTurn");
+}
+
+/** castPlan may plan a spell that ends the turn (endTurnCast). */
+let endingTurn = false;
+
+/**
+ * A spell that does something, then ends the turn (Ultima, Hurkyl's Final Meditation, Day's Undoing; CR 724.1): cast
+ * as the last thing in our second main phase, the most expensive first, judged like any other spell of its kind (a
+ * board wipe only when it hurts the opponents more). A wheel (Day's Undoing) only with two cards or fewer left in hand.
+ * "End the turn" alone waits for a spell to stop (see the counterspell response), and Glorious End would lose us the
+ * game: neither is cast here.
+ */
+function endTurnCast(s: GameState, pid: PlayerId): Action[] | null {
+  if (s.activePlayer !== pid || s.stack.length) return null;
+  const hand = player(s, pid).hand;
+  const cards = hand
+    .filter((id) => {
+      const body = compileCard(defOf(s, obj(s, id))).spell;
+      const all = allEffects(body?.effects ?? []);
+      if (!body || !all.some((e) => e.type === "endTurn") || endsTurnOnly(body)) return false;
+      if (all.some((e) => e.type === "loseGame" || (e.type === "delayed" && allEffects(e.effects).some((x) => x.type === "loseGame")))) return false;
+      return !all.some((e) => e.type === "shuffleZones" && e.hand) || hand.length - 1 <= 2;
+    })
+    .sort((a, b) => mv(s, b) - mv(s, a));
+  endingTurn = true;
+  try {
+    for (const id of cards) {
+      const plan = castPlan(s, pid, id, false);
+      if (plan) return plan;
+    }
+  } finally {
+    endingTurn = false;
+  }
+  return null;
+}
+
+/**
+ * Sundial of the Infinite in our end step: our own trigger on the stack would sacrifice, exile or bounce something of
+ * ours that's on the battlefield (Sneak Attack, unearth, Mimic Vat) or lose us the game, so we end the turn and it's
+ * exiled (CR 724.1b).
+ */
+function chooseEndTurnEscape(s: GameState, pid: PlayerId): Action[] | null {
+  if (s.activePlayer !== pid || (s.step !== "end" && s.step !== "endCombat")) return null;
+  const top = s.stack[s.stack.length - 1];
+  if (!top || top.kind !== "ability" || top.controller !== pid || !top.body) return null;
+  if (!s.stack.every((x) => x.controller === pid || x.kind === "ability")) return null;
+  const mine = (r: ObjRef | undefined) => {
+    if (!r) return false;
+    const id = r.ref === "subject" ? top.subject?.id : r.ref === "self" ? top.sourceId : undefined;
+    if (id) return s.objects[id]?.zone === "battlefield" && controllerOf(s, obj(s, id)) === pid;
+    return r.ref === "each" && s.battlefield.some((b) => controllerOf(s, obj(s, b)) === pid && objectMatches(s, r.filter, obj(s, b), pid, false));
+  };
+  const hurts = allEffects(top.body.effects).some(
+    (e) => (e.type === "loseGame" && e.who.ref === "you") || ((e.type === "sacrifice" || e.type === "exile" || e.type === "bounce" || e.type === "destroy") && "what" in e && mine(e.what as ObjRef)),
+  );
+  if (!hurts) return null;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid) continue;
+    const abilities = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      if (!endsTurnOnly(abilities[i]!.body)) continue;
+      const plan = planActivate(s, pid, id, i, []);
+      if (plan) return plan;
+    }
+  }
+  return null;
 }
 
 /**
@@ -732,6 +833,24 @@ function chooseExert(s: GameState, pid: PlayerId, options: ObjectId[]): ObjectId
   if (player(s, pid).life <= 10) return [];
   const onExert = s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).triggers.some((t) => t.event === "youExert"));
   return options.filter((id) => onExert || abilitiesOf(s, obj(s, id)).triggers.some((t) => t.event === "selfExerted"));
+}
+
+/**
+ * What to untap under Winter Orb, Static Orb, Smoke and the like (CR 502.3): the best first, each one the limits still
+ * allow, so the choice is as full as it can be. Lands making a color no other untapped land makes come first, then
+ * creatures by what they're worth, then the rest.
+ */
+function chooseLimitedUntap(s: GameState, pid: PlayerId, options: ObjectId[]): ObjectId[] {
+  const untapped = s.battlefield.filter((id) => !obj(s, id).tapped && controllerOf(s, obj(s, id)) === pid);
+  const colors = new Set(untapped.flatMap((id) => manaAbilitiesOn(s, obj(s, id)).flatMap((ab) => manaChoices(s, obj(s, id), ab))));
+  const value = (id: ObjectId) => {
+    const o = obj(s, id);
+    const fresh = manaAbilitiesOn(s, o).flatMap((ab) => manaChoices(s, o, ab)).filter((c) => !colors.has(c)).length;
+    return fresh * 100 + (objIsType(s, o, "Creature") ? targetWorth(s, pid, { kind: "object", id }, false, 0) : 0) + (objIsType(s, o, "Land") ? 20 : 0);
+  };
+  const chosen: ObjectId[] = [];
+  for (const id of [...options].sort((a, b) => value(b) - value(a))) if (!untapChoiceProblem(s, pid, [], [...chosen, id])) chosen.push(id);
+  return chosen;
 }
 
 /**
@@ -894,6 +1013,35 @@ function namedLike(s: GameState, spec: TargetSpec, out: TargetChoice[], t: Targe
   return spec.differentNameFrom.some((j) => { const c = out[j]; return c?.kind === "object" && sameName(defOf(s, obj(s, c.id)).name, name); });
 }
 
+/**
+ * When everything the instructions do hangs on "if" conditions about target `i` (and on conditions of the game we can
+ * check now, like revolt), the targets that would let some of it happen; undefined when the target always matters.
+ */
+function targetGuard(s: GameState, pid: PlayerId, effects: Effect[], i: number, sourceId?: string): ((t: TargetChoice) => boolean) | undefined {
+  if (!effects.length || !effects.every((e) => e.type === "if")) return undefined;
+  const tests: ((t: TargetChoice) => boolean)[] = [];
+  for (const e of effects as Extract<Effect, { type: "if" }>[]) {
+    let branch: Effect[];
+    let test: (t: TargetChoice) => boolean = () => true;
+    if (e.cond.kind === "targetIs" && e.cond.index === i && !e.cond.filter.bound && !e.otherwise?.length) {
+      const f = e.cond.filter;
+      test = (t) => {
+        if (t.kind === "stack") {
+          const item = s.stack.find((x) => x.id === t.id);
+          return !!item && spellMatches(s, f, item);
+        }
+        return t.kind === "object" && !!s.objects[t.id] && objectMatches(s, { ...f, kind: "object" }, obj(s, t.id), pid, false);
+      };
+      branch = e.effects;
+    } else if (e.cond.kind === "state" && sourceId) branch = staticConditionNow(s, e.cond.cond, sourceId, pid) ? e.effects : (e.otherwise ?? []);
+    else return undefined;
+    if (!branch.length) continue;
+    const inner = targetGuard(s, pid, branch, i, sourceId);
+    tests.push(inner ? (t) => test(t) && inner(t) : test);
+  }
+  return (t) => tests.some((f) => f(t));
+}
+
 export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody, forced = false, sourceId?: string, x = 0): TargetChoice[] | null {
   // "Any number of target creatures": each one there could be, as an "up to" target (CR 601.2c); none there, not worth it.
   const body = offerMany(s, printed, pid, x, sourceId ? botSource(s, sourceId) : undefined, sourceId);
@@ -958,16 +1106,10 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
     const chosenCounters = allEffects(body.effects).some((e) => e.type === "removeAnyCounters" && e.what.ref === "target" && refCovers(e.what, i));
     // "Move any number of counters from target permanent ... onto a second target permanent" (Resourceful Defense): bots don't.
     if (!forced && allEffects(body.effects).some((e) => e.type === "removeAnyCounters" && e.moveTo)) return null;
-    // "Counter target spell if it's blue" (Pyroblast): when that's all it does, only a target it holds for now.
-    const onlyIf = body.effects.length > 0 && body.effects.every((e) => e.type === "if" && e.cond.kind === "targetIs" && e.cond.index === i && !e.cond.filter.bound && !e.otherwise?.length) ? (body.effects[0] as { cond: { filter: TargetSpec } }).cond.filter : undefined;
-    const holds = (t: TargetChoice) => {
-      if (!onlyIf) return true;
-      if (t.kind === "stack") {
-        const item = s.stack.find((x) => x.id === t.id);
-        return !!item && spellMatches(s, onlyIf, item);
-      }
-      return t.kind === "object" && !!s.objects[t.id] && objectMatches(s, { ...onlyIf, kind: "object" }, obj(s, t.id), pid, false);
-    };
+    // "Counter target spell if it's blue" (Pyroblast), "Destroy target creature if it has mana value 2 or less" (Fatal
+    // Push, with revolt checked now): when that's all it does, only a target it holds for now.
+    const guard = targetGuard(s, pid, body.effects, i, sourceId);
+    const holds = (t: TargetChoice) => !guard || guard(t);
     const all = legalTargets(s, spec, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId).filter(
       (t) => !out.some((o) => sameTarget(o, t)) && !(spec.notSource && t.kind === "object" && t.id === sourceId) && totalOk(s, body.targets, out, i, t) && !namedLike(s, spec, out, t) && !(countersFrom && t.kind === "object" && !Object.entries(obj(s, t.id).counters).some(([k, n]) => n > 0 && (!chosenCounters || harmfulCounter(k) === (controllerOf(s, obj(s, t.id)) === pid)))) && holds(t),
     );
@@ -1289,8 +1431,8 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   // A Pact: only when our lands can pay its upkeep cost, and any other Pact's we still owe.
   const pact = pactCost(compileCard(d).spell?.effects ?? []);
   if (pact && pact + owedPacts(s, pid) > lands(s, pid)) return null;
-  // "End the turn" (Time Stop, Glorious End): bots don't plan around ending a turn (CR 724.1).
-  if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "endTurn")) return null;
+  // "End the turn" (CR 724.1): see endTurnCast.
+  if (!endingTurn && allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "endTurn")) return null;
   // A foretold card is cast for its foretell cost (CR 702.143a).
   if (!free && !via && alt === undefined && foretoldCast(s, pid, obj(s, id))) alt = "foretell";
   // Cast as madness or miracle resolves, for that cost (CR 702.35a, 702.94a): its X is paid then.
@@ -1945,6 +2087,12 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
   const d = defOf(s, obj(s, id));
   for (const c of castExtraCosts(d, { via, alt, costOr, objectId: id, ...(modes ? { modes } : {}), ...(buyback ? { buyback } : {}) }, x, s, pid)) {
     if (c.kind === "revealHand") continue; // nothing to choose
+    if (c.kind === "forage") {
+      const f = forageChoice(s, pid, obj(s, id), [...targeted].map(String));
+      if (!f) return null;
+      Object.assign(out, f);
+      continue;
+    }
     if (c.kind === "giveLife") {
       // Invigorate: the opponent with the least life gets it (the least threat to us); "each other player": nothing to choose.
       if (c.each) continue;
@@ -3288,7 +3436,11 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
   const out: CostChoices = {};
   const targeted = new Set(targets.flatMap((t) => (t.kind === "none" ? [] : [t.id])));
   for (const c of ab.costs) {
-    if (c.kind === "sacrifice") {
+    if (c.kind === "forage") {
+      const f = forageChoice(s, pid, o, [...[...targeted].map(String), ...(keep ? [keep] : [])]);
+      if (!f) return null;
+      Object.assign(out, f);
+    } else if (c.kind === "sacrifice") {
       const pool = s.battlefield
         .map((x) => obj(s, x))
         .filter((x) => controllerOf(s, x) === pid && x.id !== o.id && x.id !== keep && !x.isCommander && !targeted.has(x.id) && !out.sacrifice?.includes(x.id))

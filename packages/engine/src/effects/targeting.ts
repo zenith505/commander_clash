@@ -107,8 +107,9 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.commander !== undefined && !!o.isCommander !== spec.commander) return false;
   if (spec.status && !hasStatus(s, o, c, spec.status, view)) return false;
   if (spec.suspected && o.suspected === undefined) return false;
-  if (targeting && c.controller !== controller && objHasKeyword(s, o, "Hexproof")) return false;
-  if (targeting && src && c.controller !== controller && hexproofFrom(c.keywords, src)) return false; // CR 702.11d
+  const hexproof = targeting && c.controller !== controller && !exposed(s, o);
+  if (hexproof && objHasKeyword(s, o, "Hexproof")) return false;
+  if (hexproof && src && hexproofFrom(c.keywords, src)) return false; // CR 702.11d
   if (targeting && objHasKeyword(s, o, "Shroud")) return false; // CR 702.18a: not even its controller can target it
   if (targeting && c.untargetable?.some((u) => untargetableBy(u, controller, src))) return false;
   // Protection from the source's color: it can't be targeted (CR 702.16b), enchanted or equipped (702.16c-d). From a
@@ -117,6 +118,19 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (src && protectedFrom(c.keywords, { ...src, controller: src.controller ?? controller }, holder)) return false;
   if (!src && targeting && protectedFromPlayer(c.keywords, controller, holder)) return false;
   return true;
+}
+
+/**
+ * A creature an opponent of Nowhere to Run's controller controls: it can be targeted as though it didn't have hexproof,
+ * "hexproof from" included (CR 702.11e), and its ward abilities don't trigger.
+ */
+export function exposed(s: GameState, o: GameObject): boolean {
+  if (o.zone !== "battlefield" || !objIsType(s, o, "Creature")) return false;
+  const holder = controllerOf(s, o);
+  return s.battlefield.some((id) => {
+    const p = obj(s, id);
+    return !!abilitiesOf(s, p).exposesOpponentsCreatures && controllerOf(s, p) !== holder;
+  });
 }
 
 /**

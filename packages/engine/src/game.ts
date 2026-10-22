@@ -806,6 +806,7 @@ export function moveObject(
     o.manaSpent = undefined;
     o.spent = undefined;
     o.castAlt = undefined; // so is whether its evoke or dash cost was paid (CR 702.74a, 702.109a)
+    o.webSlung = undefined;
     o.bargained = undefined; // and whether it was bargained (CR 702.166b)
     o.evidence = undefined; // and whether evidence was collected for it (CR 701.59c)
     o.treasureSpent = undefined; // and the mana from Treasures spent to cast it
@@ -925,8 +926,8 @@ export function moveObject(
   const printedCounters = to === "battlefield" ? compileCard(defOf(s, o)).entersWithCounters : undefined;
   // Raid: "~ enters with a +1/+1 counter on it if you attacked this turn".
   // Counted after its "as ~ enters, choose" is answered when it counts what's chosen (afterChoice, see chooseOption).
-  const withCounters = (printedCounters?.if && !staticConditionNow(s, printedCounters.if, id, o.controller)) || (printedCounters?.castFromHand && !castFromHand) || (printedCounters?.ifCast && !(fromZone === "stack" && !o.spellCopy)) || printedCounters?.afterChoice ? undefined : printedCounters;
-  const counterN = withCounters ? Math.max(0, evalAmount(s, withCounters.n, { controller: o.controller, sourceId: id, x: opts.x, kicked: o.kicked, colorsSpent: o.colorsSpent?.length, manaSpent: o.manaSpent ?? 0, spent: o.spent })) * (withCounters.doubleIfXAtLeast !== undefined && (opts.x ?? 0) >= withCounters.doubleIfXAtLeast ? 2 : 1) : 0;
+  const withCounters = (printedCounters?.if && !staticConditionNow(s, printedCounters.if, id, o.controller)) || (printedCounters?.castFromHand && !castFromHand) || (printedCounters?.ifCast && !(fromZone === "stack" && !o.spellCopy)) || (printedCounters?.ifWebSlung && !(fromZone === "stack" && o.webSlung)) || printedCounters?.afterChoice ? undefined : printedCounters;
+  const counterN = withCounters ? Math.max(0, evalAmount(s, withCounters.n, { controller: o.controller, sourceId: id, x: opts.x, kicked: o.kicked, colorsSpent: o.colorsSpent?.length, manaSpent: o.manaSpent ?? 0, spent: o.spent, webSlungMv: o.webSlung?.manaValue })) * (withCounters.doubleIfXAtLeast !== undefined && (opts.x ?? 0) >= withCounters.doubleIfXAtLeast ? 2 : 1) : 0;
   const dest = zoneList(s, o);
   if (dest) opts.top || to === "battlefield" ? dest.unshift(id) : dest.push(id);
   if (to === "graveyard") noteToGraveyard(s, o); // its owner may arrange cards put there at the same time (CR 404.3)
@@ -940,7 +941,7 @@ export function moveObject(
       owner: o.owner,
       ...(o.isToken || o.spellCopy ? { notCard: true as const } : {}),
       card: fromZone === "battlefield" ? snapshotKey : o.cardId,
-      ...(fromZone === "battlefield" ? { controller: lastController, snapshot, chars: last, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}) } : {}),
+      ...(fromZone === "battlefield" ? { controller: lastController, snapshot, chars: last, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(opts.sacrificed ? { sacrificed: true as const } : {}) } : {}),
     });
   if (to === "graveyard" || to === "exile") o.justMovedForCommander = o.isCommander;
   if (merged) o.movedWith = scatterMerged(s, merged.parts.filter((x) => x !== id), partsTo, !!opts.top);
@@ -1089,12 +1090,14 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   // A Saga enters with a lore counter (CR 714.3a), or with read ahead, the number its controller chooses (714.3b).
   const saga = characteristics(s, o).subtypes.includes("Saga");
   if (saga && !printed.readAhead) putCounters(s, o, "lore", 1, true);
+  // "Look at an opponent's hand, then choose a card type" (Arachne): the opponent first.
+  if (printed.entersChoosePlayer && printed.entersLookHand) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "player", except: "you", lookHand: true });
   // "As ~ enters, choose a color": its controller chooses before anything else happens (CR 614.12).
   for (const c of printed.entersChoose ?? []) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, ...c });
   if (printed.entersAnchor) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "anchor" });
   // As a battle enters, its controller chooses its protector (CR 310.9a).
   if (isType(defOf(s, o), "Battle")) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "protector" });
-  if (printed.entersChoosePlayer) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "player", ...(printed.entersChoosePlayer === "opponent" ? { except: "you" } : {}), ...(printed.entersChooseSecret ? { secret: true as const } : {}) });
+  if (printed.entersChoosePlayer && !printed.entersLookHand) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "player", ...(printed.entersChoosePlayer === "opponent" ? { except: "you" } : {}), ...(printed.entersChooseSecret ? { secret: true as const } : {}) });
   // Devour, riot and unleash: how many +1/+1 counters it has is part of how it enters (CR 614.12), so what it
   // triggers waits for that choice (evolve compares its power as it entered, CR 702.100a).
   // Riot granted by another permanent ("Nontoken creatures you control have riot", Rhythm of the Wild) applies too: it has
@@ -1152,7 +1155,7 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
     return;
   }
   const ewc = printed.entersWithCounters?.afterChoice ? undefined : printed.entersWithCounters;
-  const n = ewc && !(ewc.if && !staticConditionNow(s, ewc.if, o.id, o.controller)) ? Math.max(0, evalAmount(s, ewc.n, { controller: o.controller, sourceId: o.id, x: opts.x, manaSpent: o.manaSpent ?? 0, spent: o.spent })) * (ewc.doubleIfXAtLeast !== undefined && (opts.x ?? 0) >= ewc.doubleIfXAtLeast ? 2 : 1) : 0;
+  const n = ewc && !(ewc.if && !staticConditionNow(s, ewc.if, o.id, o.controller)) && !(ewc.ifWebSlung && !o.webSlung) ? Math.max(0, evalAmount(s, ewc.n, { controller: o.controller, sourceId: o.id, x: opts.x, manaSpent: o.manaSpent ?? 0, spent: o.spent, webSlungMv: o.webSlung?.manaValue })) * (ewc.doubleIfXAtLeast !== undefined && (opts.x ?? 0) >= ewc.doubleIfXAtLeast ? 2 : 1) : 0;
   finishEntering(s, o, printed, opts, ewc && n ? { counter: ewc.counter, n } : undefined);
 }
 
@@ -2157,6 +2160,12 @@ function advanceStep(s: GameState): void {
   if (s.step === "cleanup") return startNextTurn(s);
   // "There is an additional end step after this step" (Y'shtola Rhul, CR 500.8): only an end step, no cleanup before it
   // (rulings).
+  // "That player gets an additional upkeep step after this step" (Paradox Haze, CR 500.8).
+  if (s.step === "upkeep" && s.extraUpkeeps) {
+    s.extraUpkeeps = s.extraUpkeeps > 1 ? s.extraUpkeeps - 1 : undefined;
+    log(s, "An additional upkeep step begins.");
+    return beginStep(s, "upkeep");
+  }
   if (s.step === "end" && s.extraEndSteps) {
     s.extraEndSteps = s.extraEndSteps > 1 ? s.extraEndSteps - 1 : undefined;
     log(s, "An additional end step begins.");
@@ -2220,6 +2229,7 @@ export function endTheTurn(s: GameState, item?: StackItem): void {
   s.addedPhases = undefined;
   s.resumeStep = undefined;
   s.extraEndSteps = undefined;
+  s.extraUpkeeps = undefined;
   s.cleanupAgain = undefined;
   beginStep(s, "cleanup");
 }
@@ -2364,6 +2374,7 @@ function startNextTurn(s: GameState, skipping = false) {
   s.damageThisTurn = undefined;
   s.turnLog = undefined;
   s.extraEndSteps = undefined;
+  s.extraUpkeeps = undefined;
   s.oneOfUsed = undefined;
   s.byTypeCast = undefined;
   s.diedThisTurn = undefined;
@@ -2403,9 +2414,47 @@ function startNextTurn(s: GameState, skipping = false) {
   beginStep(s, "untap");
 }
 
+/**
+ * The limits on what untaps in the active player's untap step (Winter Orb, Static Orb, Winter Moon, Smoke, Mungha Wurm):
+ * each its own, all of them holding at once (rulings on Winter Moon). Winter Orb's is looked at as the step begins: tapped
+ * then, it doesn't limit anything (rulings).
+ */
+export function untapLimitsNow(s: GameState, ap: PlayerId): { n: number; filter: TargetSpec }[] {
+  return s.battlefield.flatMap((id) => {
+    const o = obj(s, id);
+    return (abilitiesOf(s, o).untapLimits ?? []).filter((l) => (!l.you || controllerOf(s, o) === ap) && !(l.whileUntapped && o.tapped)).map((l) => ({ n: l.n, filter: l.filter }));
+  });
+}
+
+const UNTAP_WORDS = ["no", "one", "two"];
+
+/** Is `chosen` a choice of what untaps that keeps to every limit, with nothing more that could untap (CR 502.3)? */
+export function untapChoiceProblem(s: GameState, ap: PlayerId, options: ObjectId[], chosen: ObjectId[]): string | undefined {
+  const limits = untapLimitsNow(s, ap);
+  const fits = (ids: ObjectId[]) => limits.every((l) => ids.filter((id) => objectMatches(s, l.filter, obj(s, id), ap, false)).length <= l.n);
+  const over = limits.find((l) => chosen.filter((id) => objectMatches(s, l.filter, obj(s, id), ap, false)).length > l.n);
+  if (over) return `you can't untap more than ${UNTAP_WORDS[over.n] ?? over.n} ${over.filter.text}`;
+  const more = options.find((id) => !chosen.includes(id) && fits([...chosen, id]));
+  return more ? `${nameOf(s, more)} can untap too: untap as many as the limits allow` : undefined;
+}
+
 /** The untap step untaps the active player's permanents, except `keep` (CR 502.3), then ends (no priority, CR 502.4). */
-function untapStep(s: GameState, keep: ObjectId[]): void {
+function untapStep(s: GameState, keep: ObjectId[], limited?: ObjectId[]): void {
   const ap = s.activePlayer;
+  // "Players can't untap more than one land during their untap steps": the active player chooses which (CR 502.3).
+  if (!limited) {
+    const limits = untapLimitsNow(s, ap);
+    const would = s.battlefield.filter((id) => {
+      const o = obj(s, id);
+      return o.tapped && controllerOf(s, o) === ap && !o.skipNextUntap && !keep.includes(id) && !characteristics(s, o).doesntUntap;
+    });
+    const options = would.filter((id) => limits.some((l) => objectMatches(s, l.filter, obj(s, id), ap, false)));
+    if (limits.some((l) => options.filter((id) => objectMatches(s, l.filter, obj(s, id), ap, false)).length > l.n)) {
+      const what = limits.map((l) => `${UNTAP_WORDS[l.n] ?? l.n} ${l.filter.text}`).join(" and ");
+      s.pending = { kind: "pickPermanents", player: ap, source: "Untap step", action: "untapLimited", what, options, count: options.length, min: 0, ...(keep.length ? { kept: keep } : {}) };
+      return;
+    }
+  }
   for (const id of s.battlefield) {
     const o = obj(s, id);
     if (controllerOf(s, o) !== ap) {
@@ -2415,7 +2464,7 @@ function untapStep(s: GameState, keep: ObjectId[]): void {
       continue;
     }
     if (o.skipNextUntap) o.skipNextUntap = undefined;
-    else if (!keep.includes(id) && !characteristics(s, o).doesntUntap) untapPermanent(s, o); // CR 502.3
+    else if (!keep.includes(id) && !characteristics(s, o).doesntUntap && !(limited && untapLimitsNow(s, ap).some((l) => objectMatches(s, l.filter, o, ap, false)) && !limited.includes(id))) untapPermanent(s, o); // CR 502.3
   }
   return advanceStep(s);
 }
@@ -2466,6 +2515,7 @@ function beginStep(s: GameState, step: Step): void {
       const p = player(s, ap);
       p.lastUpkeepTurn = p.upkeepTurn;
       p.upkeepTurn = s.turn;
+      (s.turnLog ??= {}).upkeeps = (s.turnLog.upkeeps ?? 0) + 1;
       fireEvent(s, { type: "step", step: "upkeep", active: ap });
       break;
     }
@@ -3053,7 +3103,7 @@ export function mayPlayLandFromGraveyard(s: GameState, o: GameObject, pid: Playe
 
 /** Every land may be played from `pid`'s graveyard now: Crucible of Worlds, or an effect this turn (Yawgmoth's Will). */
 function landsFromGraveyardNow(s: GameState, pid: PlayerId): boolean {
-  return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).landsFromGraveyard) || !!s.graveyardTurn?.some((g) => g.player === pid && g.turn === s.turn && g.lands);
+  return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).landsFromGraveyard) || liveEmblems(s).some((e) => e.owner === pid && abilitiesOf(s, e).landsFromGraveyard) || !!s.graveyardTurn?.some((g) => g.player === pid && g.turn === s.turn && g.lands);
 }
 
 /** Muldrotha's "you may play a land ... from your graveyard" during each of your turns, if one isn't used yet this turn. */
@@ -4292,6 +4342,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   if (sacrificed.length) item.sacrificed = sacrificed;
   if (discarded.length) item.costDiscarded = discarded;
   if (choices.alt === "sneak") o.sneak = returned;
+  // Cast using web-slinging (CR 702.188a): the creature it returned, for "the returned creature".
+  if (choices.alt === "alternative" && altCost(d, "alternative")?.webSlinging) o.webSlung = returned;
   // Casualty: "you may sacrifice a creature with power N or greater" (CR 702.153a).
   if (choices.casualty) {
     log(s, `${p.name} sacrifices ${nameOf(s, choices.casualty)} (casualty).`);
@@ -4461,8 +4513,8 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId):
   const m = o.mayPlay;
   if (m && m.player === o.owner && m.zc === (o.zoneChanges ?? 0) && m.until === "thisTurn" && m.turn === s.turn && d.manaCost && !compileCard(d).fromGraveyard?.some((w) => w.kind === "permission" && !w.costs.length))
     out.push({ kind: "permission", mana: d.manaCost, costs: [], exile: false });
-  for (const id of s.battlefield) {
-    const p = obj(s, id);
+  // Permanents, and emblems in the command zone (Wrenn and Realmbreaker's, CR 114.4).
+  for (const p of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)]) {
     if (controllerOf(s, p) !== o.owner) continue;
     for (const g of abilitiesOf(s, p).graveyardGrants ?? []) {
       if (g.yourTurn && s.activePlayer !== o.owner) continue;
@@ -4831,7 +4883,7 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
   const p = player(s, pid);
   const given = (k: "sacrifice" | "discard" | "exileCards" | "returnToHand" | "tap" | "reveal" | "exileFromHand") => choices?.[k];
   for (const k of ["sacrifice", "discard", "exileCards", "returnToHand", "tap", "reveal", "exileFromHand"] as const)
-    if (given(k)?.length && !costs.some((c) => c.kind === (k === "exileCards" ? "exileFromGraveyard" : k))) return `${d.name} doesn't ask you to ${k === "exileCards" ? "exile cards" : k === "returnToHand" ? "return a permanent to hand" : k === "tap" ? "tap permanents" : k === "reveal" ? "reveal cards" : k === "exileFromHand" ? "exile cards from your hand" : k}`;
+    if (given(k)?.length && !costs.some((c) => c.kind === (k === "exileCards" ? "exileFromGraveyard" : k) || (c.kind === "forage" && (k === "sacrifice" || k === "exileCards")))) return `${d.name} doesn't ask you to ${k === "exileCards" ? "exile cards" : k === "returnToHand" ? "return a permanent to hand" : k === "tap" ? "tap permanents" : k === "reveal" ? "reveal cards" : k === "exileFromHand" ? "exile cards from your hand" : k}`;
   const both = [...(choices?.tap ?? []), ...(choices?.sacrifice ?? [])];
   if (new Set(both).size !== both.length) return "one permanent can't pay two costs";
   if (choices?.collect && !costs.some((c) => c.kind === "collectEvidence")) return `${d.name} doesn't ask you to collect evidence`;
@@ -4850,6 +4902,19 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       continue;
     }
     if (c.kind === "revealHand") continue; // always possible, even with an empty or already revealed hand (rulings)
+    if (c.kind === "forage") {
+      // CR 701.61a: three cards from your graveyard (the card itself isn't there while it's cast, CR 601.2a), or a Food.
+      const ways = forageWays(s, pid, o);
+      const sac = choices?.sacrifice;
+      const ex = choices?.exileCards;
+      if (sac?.length && ex?.length) return "forage one way: exile three cards from your graveyard or sacrifice a Food";
+      if (sac?.length) {
+        if (sac.length !== 1 || !ways.foods.includes(sac[0]!)) return "choose a Food to sacrifice to forage";
+      } else if (ex?.length) {
+        if (ex.length !== 3 || new Set(ex).size !== 3 || ex.some((id) => !ways.cards.includes(id))) return "choose three cards in your graveyard to exile to forage";
+      } else if (!ways.foods.length && ways.cards.length < 3) return `you need to forage (exile three cards from your graveyard or sacrifice a Food) to ${doing}`;
+      continue;
+    }
     if (c.kind === "removeCounters") {
       // Any mix of the counters on those permanents (CR 602.2b): as many as it says, each one there to remove.
       const pool = counterCostCandidates(s, pid, o, c);
@@ -4961,6 +5026,16 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
   return null;
 }
 
+const FOOD: TargetSpec = { kind: "object", types: ["Artifact"], subtypes: ["Food"], text: "Food" };
+
+/** What can pay forage (CR 701.61a): the cards in `pid`'s graveyard other than `o`, and the Foods they could sacrifice. */
+export function forageWays(s: GameState, pid: PlayerId, o?: GameObject): { cards: ObjectId[]; foods: ObjectId[] } {
+  return {
+    cards: player(s, pid).graveyard.filter((id) => id !== o?.id),
+    foods: s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, FOOD, obj(s, id), pid, false) && canBeSacrificed(s, obj(s, id))),
+  };
+}
+
 /**
  * What can be tapped for "Tap an untapped creature you control": untapped ones you control, summoning sick or not
  * (CR 302.6 restricts only {T} and {Q}). Not the source when the ability's {T} taps it already.
@@ -5042,11 +5117,29 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       closeZoneBatch(s);
       continue;
     }
+    if (c.kind === "forage") {
+      // CR 701.61a.
+      if (choices.sacrifice?.length) {
+        for (const id of choices.sacrifice) {
+          log(s, `${p.name} forages, sacrificing ${nameOf(s, id)}.`);
+          moveObject(s, id, "graveyard", { sacrificed: true });
+        }
+      } else {
+        const ids = choices.exileCards ?? [];
+        log(s, `${p.name} forages, exiling ${ids.map((id) => nameOf(s, id)).join(", ")} from their graveyard.`);
+        for (const id of ids) moveObject(s, id, "exile");
+      }
+      closeZoneBatch(s);
+      continue;
+    }
     if (c.kind === "returnToHand") {
       for (const id of choices.returnToHand ?? []) {
         if (returned) {
           returned.attacking = obj(s, id).attacking;
           returned.attackingPermanent = obj(s, id).attackingPermanent;
+          // "The mana value of the returned creature" (Scarlet Spider): as it last existed (rulings, CR 608.2h); face
+          // down, 0 (CR 708.2).
+          returned.manaValue = obj(s, id).faceDown ? 0 : defMv(defOf(s, obj(s, id)));
         }
         log(s, `${p.name} returns ${nameOf(s, id)} to ${player(s, obj(s, id).owner).name === p.name ? "their" : "its owner's"} hand.`);
         moveObject(s, id, "hand");
@@ -5332,7 +5425,7 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
   // 702.193a-b, 118.7).
   const powerUp = ab.keyword === "Power-up" && o.zone === "battlefield";
   const cost = powerUp && o.enteredTurn === s.turn ? reduceByManaCost(cost1, parseManaCost(defOf(s, o).manaCost ?? "")) : cost1;
-  if (!ab.equip && !ab.costLess && !powerUp) return cost;
+  if (!ab.equip && !ab.costLess && !powerUp && ab.keyword !== "Ninjutsu") return cost;
   let less = ab.costLess ? Math.max(0, evalAmount(s, ab.costLess, { controller: pid, sourceId: o.id })) : 0;
   // "For each color of the creature it targets": as the target is when the cost is worked out (CR 601.2f).
   const per = ab.costLessPerTarget;
@@ -5343,6 +5436,12 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
     const src = obj(s, id);
     const n = abilitiesOf(s, src).powerUpLess;
     if (n && src.id !== o.id && controllerOf(s, src) === pid && controllerOf(s, o) === pid && objIsType(s, o, "Creature")) less += n;
+  }
+  // "Ninjutsu abilities you activate cost {1} less to activate" (Silver-Fur Master): generic mana only.
+  for (const id of ab.keyword === "Ninjutsu" ? s.battlefield : []) {
+    const src = obj(s, id);
+    const n = controllerOf(s, src) === pid ? abilitiesOf(s, src).ninjutsuLess : undefined;
+    if (n) less += n;
   }
   const target = targets?.[0]?.kind === "object" ? targets[0].id : undefined;
   for (const id of ab.equip ? s.battlefield : []) {
@@ -5432,6 +5531,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // What pays each cost beyond mana is chosen as it's activated (CR 602.2b, 601.2h): an activation that doesn't say,
   // or says for one cost and not another, can't skip it. As for spells (castSpell).
   if (ab && activatedCosts(ab, x).some((c) => "n" in c && c.n > 0 && costNeedsPick(c) && !costs?.[costPickKey(c)]?.length)) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
+  if (ab?.costs?.some((c) => c.kind === "forage") && !costs?.sacrifice?.length && !costs?.exileCards?.length) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose how to forage: three cards in your graveyard to exile, or a Food to sacrifice");
   let body = ab ? settleDivided(s, withModes(ab.body, modes), { controller: p.id, sourceId: id, x: x ?? 0 }) : undefined;
   const problem = abilityProblem(s, p.id, id, index, body?.targets.length ? (targets ?? []) : undefined, ab?.body.modal ? modes : undefined, tapCreatures, x, costs ?? {});
   if (problem || !ab || !body) throw new RulesError(problem ?? "no such ability");
@@ -5736,7 +5836,7 @@ function chooseHandToTop(s: GameState, p: Player, ids: ObjectId[]) {
 function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
   const pend = s.pending;
   const r = s.resolving;
-  if (pend?.kind !== "pickPermanents" || pend.player !== p.id || (!pend.objectId && pend.action !== "unblocked" && pend.action !== "band" && pend.action !== "exert" && pend.action !== "keepTapped" && !r?.scratch?.queue)) throw new RulesError("nothing to pick");
+  if (pend?.kind !== "pickPermanents" || pend.player !== p.id || (!pend.objectId && pend.action !== "unblocked" && pend.action !== "band" && pend.action !== "exert" && pend.action !== "keepTapped" && pend.action !== "untapLimited" && !r?.scratch?.queue)) throw new RulesError("nothing to pick");
   if (ids.some((id) => !pend.options.includes(id))) throw new RulesError("choose from the permanents offered");
   const n = new Set(ids).size;
   if (n !== ids.length || n > pend.count || n < (pend.min ?? pend.count))
@@ -5750,6 +5850,14 @@ function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
     s.pending = null;
     if (ids.length) log(s, `${p.name} keeps ${ids.map((id) => nameOf(s, id)).join(", ")} tapped.`);
     untapStep(s, ids);
+    return;
+  }
+  if (pend.action === "untapLimited") {
+    const problem = untapChoiceProblem(s, p.id, pend.options, ids);
+    if (problem) throw new RulesError(problem);
+    s.pending = null;
+    log(s, `${p.name} untaps ${ids.length ? ids.map((id) => nameOf(s, id)).join(", ") : "none"} of ${pend.options.length} (${pend.what} at most).`);
+    untapStep(s, pend.kept ?? [], ids);
     return;
   }
   if (pend.action === "enlist") {
@@ -5997,6 +6105,10 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       // "Secretly choose an opponent": nobody else learns who until it's revealed (Guardian Archon).
       o.chosen = { ...o.chosen, player: pid, ...(entry?.secret ? { secret: true as const } : {}) };
       log(s, entry?.secret ? `${p.name} secretly chooses an opponent for ${pend.source}.` : `${p.name} chooses ${player(s, pid).name} for ${pend.source}.`);
+      if (entry?.lookHand) {
+        log(s, `${p.name} looks at ${player(s, pid).name}'s hand.`);
+        log(s, `${player(s, pid).name}'s hand: ${player(s, pid).hand.map((id) => defOf(s, obj(s, id)).name).join(", ") || "no cards"}.`, p.id);
+      }
       invalidateCharacteristics(s);
       return;
     }
@@ -8052,11 +8164,23 @@ function foretellCard(s: GameState, p: Player, id: ObjectId) {
   s.passedInSuccession = [];
 }
 
-/** A Room permanent's locked door's unlock cost: that half's mana cost (CR 709.5e), or undefined if there's none to unlock. */
+/**
+ * A Room permanent's locked door's unlock cost: that half's mana cost (CR 709.5e), less generic mana for each "Unlock
+ * costs you pay cost {1} less" its controller controls (Inquisitive Glimmer, CR 601.2f), or undefined if there's none
+ * to unlock.
+ */
 export function unlockCost(s: GameState, o: GameObject, door: number): string | undefined {
   const d = roomOf(s, o);
   if (o.zone !== "battlefield" || o.unlocked === undefined || o.unlocked.includes(door) || !d) return undefined;
-  return d.faces![door]?.manaCost;
+  const cost = d.faces![door]?.manaCost;
+  if (cost === undefined) return undefined;
+  const pid = controllerOf(s, o);
+  const less = s.battlefield.reduce((n, id) => n + (controllerOf(s, obj(s, id)) === pid ? (abilitiesOf(s, obj(s, id)).unlockLess ?? 0) : 0), 0);
+  const generic = /\{(\d+)\}/.exec(cost);
+  if (!less || !generic) return cost;
+  const left = Math.max(0, Number(generic[1]) - less);
+  const out = cost.replace(generic[0], left ? `{${left}}` : "");
+  return out || "{0}";
 }
 
 /**

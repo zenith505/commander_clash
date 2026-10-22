@@ -937,6 +937,12 @@ export function parseTargetPhrase(
     p = p.replace(/ or vehicle$/, "");
   }
   // "Each land and Ally you control" (Great Divide Guide): a land, or an Ally whatever its card types.
+  // "Artifact creature and/or Vehicle" (Iron Spider): every Vehicle is an artifact (CR 205.3g), so "artifact" is for both
+  // either way it's read: an artifact that's a creature or a Vehicle.
+  if (/^artifact creature (?:and\/)?or [Vv]ehicle$/.test(p) && !extra.anyOf) {
+    extra.anyOf = [{ kind: "object", types: ["Creature"], text: "artifact creature" }, { kind: "object", subtypes: ["Vehicle"], text: "Vehicle" }];
+    p = "artifact";
+  }
   const orKind = /^(land|artifact|enchantment) or ([a-z]+)$/.exec(p);
   if (orKind && !extra.orSubtypes && CREATURE_TYPES.has(capital(orKind[2]!))) {
     extra.orSubtypes = [capital(orKind[2]!)];

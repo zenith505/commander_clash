@@ -330,7 +330,7 @@ export function parseCostKeyword(
   if ((m = /^Web-slinging ((?:\{[^}]+\})+)$/.exec(line))) {
     if (!plainMana(m[1]!)) return "fail";
     const r = parseCostKeyword(`You may pay ${m[1]} and return a tapped creature you control to its owner's hand rather than pay ~'s mana cost`, d);
-    return r === "fail" || !r?.alt ? "fail" : { alt: { ...r.alt, text: `web-slinging: return a tapped creature you control to its owner's hand` } };
+    return r === "fail" || !r?.alt ? "fail" : { alt: { ...r.alt, text: `web-slinging: return a tapped creature you control to its owner's hand`, webSlinging: true } };
   }
   if (/^Web-slinging\b/.test(line)) return "fail";
   if (line === "Delve") return { delve: true };
@@ -494,6 +494,7 @@ export function parseAdditionalCost(text: string, allowX = false): AdditionalCos
   let m: RegExpExecArray | null;
   const isX = (w: string) => allowX && w === "X";
   const many = (w: string) => (isX(w) ? { n: 0, x: true as const } : { n: num(w) });
+  if (/^forage$/i.test(text)) return { kind: "forage" }; // CR 701.61a
   if ((m = new RegExp(`^sacrifice (${NUM.slice(1, -1)}|X) (.+)$`, "i").exec(text)) && (m[1] !== "X" || allowX)) {
     const n = many(m[1]!);
     const phrase = n.n === 1 && !n.x ? m[2]! : m[2]!.split(" ").map(singularWord).join(" ");
@@ -1003,6 +1004,7 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
         sacrificeSelf: false,
         sorcerySpeed: false,
         zone: "hand",
+        keyword: "Ninjutsu", // commander ninjutsu is a ninjutsu ability (CR 702.49d)
         ...(cmd ? { orCommand: true as const } : {}),
         costs: [{ kind: "returnToHand", filter: { kind: "object", types: ["Creature"], controller: "you", text: "unblocked attacker you control" }, n: 1, unblockedAttacker: true }],
         body: { targets: [], effects: [{ type: "ninjutsu" }], text: cmd ? "Put ~ onto the battlefield tapped and attacking." : "Put ~ onto the battlefield from your hand tapped and attacking." },

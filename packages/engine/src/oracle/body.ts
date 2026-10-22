@@ -1623,6 +1623,19 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si++;
       continue;
     }
+    // Bloodsoaked Insight: "Target opponent exiles the top three cards of their library. Until the end of your next turn,
+    // you may play those cards. If you cast a spell this way, mana of any type can be spent to cast it." Face up (CR
+    // 406.3), the permission yours; a land is played as your land play, a spell with mana of any type (CR 609.4b).
+    const tgtExile = !theyExile ? new RegExp(`^(Target opponent|Target player) exiles the top (card|${NUMX} cards) of their library$`).exec(s) : null;
+    const tgtPlay = tgtExile && /^(Until the end of your next turn|Until end of turn), you may play (?:that card|those cards)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (tgtExile && tgtPlay && (tgtExile[2] === "card") === /that card/.test(sentences[si + 1]!)) {
+      const any = /^(?:If you cast a spell this way, mana of any type can be spent to cast it|Mana of any type can be spent to cast (?:those spells|them))$/.test(sentences[si + 2]?.replace(/\.$/, "") ?? "");
+      const who = parsePlayer(tgtExile[1]!, ctx);
+      if (!who) return null;
+      effects.push({ type: "impulse", n: tgtExile[2] === "card" ? 1 : amt(tgtExile[3]!), until: /next turn/.test(tgtPlay[1]!) ? "nextTurn" : "thisTurn", who, ...(any ? { anyType: true as const } : {}) });
+      si += any ? 2 : 1;
+      continue;
+    }
     // Nashi, Moon Sage's Scion: "Exile the top card of each player's library. Until end of turn, you may play one of those
     // cards. If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost." One card in
     // all; a land is played with the usual timing and land drop (rulings).
@@ -4869,6 +4882,14 @@ function parseEqualTo(s: string, ctx: Ctx): Effect[] | null {
     [/^Put a number of ([+-]1\/[+-]1|[a-z]+) counters on (.+) equal to (.+)$/i, (m) => `Put X ${m[1]} counters on ${m[2]}`],
     [/^(?:You )?[Cc]reate a number of (.+?) tokens( with [^,]+?)? equal to (.+)$/, (m) => `Create X ${m[1]} tokens${m[2] ?? ""}`],
   ];
+  // "You gain life and draw cards equal to its power" (Lifeblood Hydra): both by that much.
+  const both = /^you gain life and draw cards equal to (.+)$/i.exec(s);
+  if (both) {
+    const gain = parseSentence("you gain X life", ctx);
+    const draw = parseSentence("draw X cards", ctx);
+    const def = parseCount(both[1]!, ctx);
+    return gain && draw && def ? replaceX([...gain, ...draw], def) : null;
+  }
   for (const [re, rewrite, group] of forms) {
     const m = re.exec(s);
     if (!m) continue;

@@ -471,6 +471,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // targeted (rulings); any creatures but ~, whoever controls them.
   if ((m = new RegExp(`^(?:[Yy]ou may )?[Mm]ove any number of ${COUNTER} counters from ~ onto other creatures$`).exec(s)))
     return [{ type: "distribute", counter: counterKind(m[1]!), n: { count: { kind: "counters", counter: counterKind(m[1]!), of: { ref: "self" } } }, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "other creatures" }, move: true }];
+  // Sovereign Okinec Ahau: "for each creature you control with power greater than that creature's base power, put a number
+  // of +1/+1 counters on that creature equal to the difference": each its own number, all worked out first.
+  if (/^[Ff]or each creature you control with power greater than that creature's base power, put a number of \+1\/\+1 counters on that creature equal to the difference$/.test(s))
+    return [{ type: "counters", what: { ref: "each", filter: { kind: "object", types: ["Creature"], controller: "you", powerAboveBase: true, text: "each creature you control with power greater than its base power" } }, counter: "+1/+1", n: 1, aboveBase: true }];
   // "Double the number of +1/+1 counters on each creature you control" (Kalonian Hydra), "... of each kind of counter on
   // any number of target permanents" (Deepglow Skate): as many more as each has as it resolves (CR 701.10e), put on it.
   if ((m = new RegExp(`^Double the number of (?:${COUNTER} counters|(each kind of) counter) on (.+)$`, "i").exec(s))) {

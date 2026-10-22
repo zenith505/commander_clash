@@ -36,6 +36,8 @@ export interface AmountCtx {
   colorsSpent?: number;
   /** The amount of mana spent to cast the spell its permanent was (Marath): 0 if it wasn't cast. */
   manaSpent?: number;
+  /** The mana value of the creature returned to cast it using web-slinging, as it last existed (Scarlet Spider). */
+  webSlungMv?: number;
   /** The mana spent to cast it by type (adamant, CR 601.2h). */
   spent?: ManaSpent;
   /** How much mana from Treasures was spent to cast the spell (or the spell its permanent was) or activate the ability (CR 106.3). */
@@ -287,6 +289,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return ctx.colorsSpent ?? 0;
     case "manaSpent":
       return ctx.manaSpent ?? 0;
+    case "webSlungMv":
+      return ctx.webSlungMv ?? 0;
     case "treasureSpent":
       return ctx.treasureSpent ?? 0;
     case "rollResult":
@@ -655,6 +659,8 @@ function describeCount(c: Count): string {
       return "colors of mana spent";
     case "manaSpent":
       return "mana spent to cast it";
+    case "webSlungMv":
+      return "the returned creature's mana value";
     case "greatestControlled":
       return `the greatest number of ${c.filter.text} ${c.opponents ? "an opponent" : "a player"} controls`;
     case "greatestDrawn":

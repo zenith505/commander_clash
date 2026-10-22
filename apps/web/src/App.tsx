@@ -13,6 +13,8 @@ import {
   castProblem,
   planTurnFaceUp,
   planUnlock,
+  forageWays,
+  untapChoiceProblem,
   unlockCost,
   unlockProblem,
   restingDef,
@@ -386,6 +388,9 @@ type EvidencePick = { label: string; n: number; candidates: string[]; optional: 
 /** Choosing how to pay "sacrifice a creature or pay {3}{B}" (CR 601.2b). */
 type CostOrPick = { draft: CastDraft; label: string; options: string[] };
 
+/** How to forage for an ability's cost (CR 701.61a): exile three cards from your graveyard or sacrifice a Food. */
+type ForagePick = { label: string } & ({ activate: ActivateDraft; draft?: undefined } | { draft: CastDraft; activate?: undefined });
+
 /** Choosing cards to exile for delve: any number up to `max`. */
 type DelvePick = { draft: CastDraft; label: string; max: number; candidates: string[]; chosen: string[] };
 
@@ -493,6 +498,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const [buybackPick, setBuybackPick] = useState<BuybackPick | null>(null);
   const [giftPick, setGiftPick] = useState<GiftPick | null>(null);
   const [costOrPick, setCostOrPick] = useState<CostOrPick | null>(null);
+  const [foragePick, setForagePick] = useState<ForagePick | null>(null);
   const [costPick, setCostPick] = useState<CostPick | null>(null);
   const [delvePick, setDelvePick] = useState<DelvePick | null>(null);
   const [evidencePick, setEvidencePick] = useState<EvidencePick | null>(null);
@@ -536,7 +542,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   const attackablePlaneswalker = (id: string) => !!s && !!aim && opponentWalkers.includes(id) && !attackProblem(s, s.objects[aim]!, defenderOf(id), true);
 
   // Space passes priority (or resolves); Escape cancels targeting or closes the ability menu.
-  const picking = !!(xPick || kickPick || costPick || costOrPick || delvePick || dividing || giftPick || buybackPick);
+  const picking = !!(xPick || kickPick || costPick || costOrPick || foragePick || delvePick || dividing || giftPick || buybackPick);
   const keys = useRef({ s, pending, targeting, modePick, tapPick, picking, dispatch });
   keys.current = { s, pending, targeting, modePick, tapPick, picking, dispatch };
   useEffect(() => {
@@ -551,6 +557,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         setKickPick(null);
         setCostPick(null);
         setCostOrPick(null);
+        setForagePick(null);
         setGiftPick(null);
         setAim(null);
         setBlocker(null);
@@ -699,6 +706,15 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (!s) return;
     const ab = abilitiesOf(s, s.objects[d.objectId]!).activated[d.index]!;
     for (const c of activatedCosts(ab, d.x)) {
+      if (c.kind === "forage") {
+        // Forage (CR 701.61a): three cards from your graveyard or a Food, whichever you can and choose.
+        if (d.sacrifice !== undefined || d.exileCards !== undefined) continue;
+        const label = cardOf(s, d.objectId).name;
+        const ways = forageWays(s, HUMAN, s.objects[d.objectId]);
+        if (ways.foods.length && ways.cards.length >= 3) return setForagePick({ activate: d, label });
+        if (ways.foods.length) return setCostPick({ activate: d, kind: "sacrifice", label, what: "sacrifice a Food to forage", n: 1, candidates: ways.foods, chosen: [] });
+        return setCostPick({ activate: d, kind: "exileCards", label, what: "exile three cards from your graveyard to forage", n: 3, candidates: ways.cards, chosen: [] });
+      }
       if ("x" in c && c.x && c.n === 0) continue; // X is 0: nothing to pick
       if (c.kind === "collectEvidence") {
         // "Collect evidence 3": click cards in your graveyard until their mana values add up (CR 701.59a).
@@ -877,6 +893,14 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       if (c.kind === "giveLife") {
         if (c.each || d.lifeTo !== undefined) continue;
         return setGiftPick({ draft: d, label: card.name, what: `have an opponent gain ${c.n} life`, options: opps.filter((p) => canGainLife(s, p)), life: c.n });
+      }
+      if (c.kind === "forage") {
+        // Forage (CR 701.61a), Feed the Cycle's way to pay: three cards from your graveyard or a Food.
+        if (d.sacrifice !== undefined || d.exileCards !== undefined) continue;
+        const ways = forageWays(s, HUMAN, s.objects[d.objectId]);
+        if (ways.foods.length && ways.cards.length >= 3) return setForagePick({ draft: d, label: card.name });
+        if (ways.foods.length) return setCostPick({ draft: d, kind: "sacrifice", label: card.name, what: "sacrifice a Food to forage", n: 1, candidates: ways.foods, chosen: [] });
+        return setCostPick({ draft: d, kind: "exileCards", label: card.name, what: "exile three cards from your graveyard to forage", n: 3, candidates: ways.cards, chosen: [] });
       }
       if (!c.n) continue; // "sacrifice X creatures" with X = 0
       if (c.kind === "exileFromGraveyard" && c.top) continue; // "the top three black cards of your graveyard": no choice
@@ -1598,6 +1622,29 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               </button>
             </div>
           )}
+          {foragePick && (
+            <div className="targeting forage-pick">
+              <span>
+                <strong>{foragePick.label}</strong>: forage by
+              </span>
+              {(["exileCards", "sacrifice"] as const).map((kind) => (
+                <button
+                  key={kind}
+                  onClick={() => {
+                    const ways = forageWays(s, HUMAN, s.objects[(foragePick.activate ?? foragePick.draft).objectId]);
+                    const pick = kind === "sacrifice" ? { kind, what: "sacrifice a Food to forage", n: 1, candidates: ways.foods } : { kind, what: "exile three cards from your graveyard to forage", n: 3, candidates: ways.cards };
+                    setForagePick(null);
+                    setCostPick({ ...(foragePick.activate ? { activate: foragePick.activate } : { draft: foragePick.draft! }), label: foragePick.label, ...pick, chosen: [] });
+                  }}
+                >
+                  {kind === "sacrifice" ? "Sacrificing a Food" : "Exiling three cards from your graveyard"}
+                </button>
+              ))}
+              <button className="ghost" onClick={() => setForagePick(null)}>
+                Cancel
+              </button>
+            </div>
+          )}
           {costOrPick && (
             <div className="targeting">
               <span>
@@ -1847,6 +1894,7 @@ const VIA_NAMES: Record<CastFromGraveyardKind, string> = { flashback: "Flashback
 function describeExtraCost(c: AdditionalCost): string {
   const n = (k: number, what: string) => (k === 1 ? `${/^[aeiou]/i.test(what) ? "an" : "a"} ${what}` : `${k} ${what}s`);
   if (c.kind === "payLife") return `pay ${c.n} life`;
+  if (c.kind === "forage") return "forage (exile three cards from your graveyard or sacrifice a Food)";
   if (c.kind === "sacrifice") return `${c.exile ? "exile" : "sacrifice"} ${c.oneOfEach ? `a ${c.filter.text}` : n(c.n, c.filter.text)}${c.exile ? " you control" : ""}`;
   if (c.kind === "discard") return `discard ${n(c.n, c.filter?.text ?? "card")}${c.random ? " at random" : ""}`;
   if (c.kind === "returnToHand") return `return ${n(c.n, c.filter.text)} to hand`;
@@ -4474,7 +4522,8 @@ function Controls({
     const n = discards.length;
     // Slaughter the Strong: the chosen creatures' total power, a negative power subtracting.
     const totalPower = pending.maxTotalPower !== undefined ? discards.reduce((t, id) => t + power(s, s.objects[id]!), 0) : 0;
-    const ok = (pending.min !== undefined ? n >= pending.min && n <= pending.count : n === pending.count) && !(pending.action === "band" && n === 1) && (pending.maxTotalPower === undefined || totalPower <= pending.maxTotalPower);
+    const untapProblem = pending.action === "untapLimited" ? untapChoiceProblem(s, HUMAN, pending.options, discards) : undefined;
+    const ok = (pending.min !== undefined ? n >= pending.min && n <= pending.count : n === pending.count) && !(pending.action === "band" && n === 1) && (pending.maxTotalPower === undefined || totalPower <= pending.maxTotalPower) && !untapProblem;
     return (
       <div className="controls">
         <span>
@@ -4501,6 +4550,8 @@ function Controls({
                 ? `choose any number of ${pending.what} to phase out: click them, then phase them out. They're treated as though they don't exist until your next untap step.`
                 : pending.action === "keepTapped"
                 ? `click the permanents you want to keep tapped (anything "for as long as it remains tapped" keeps going); the rest untap.`
+                : pending.action === "untapLimited"
+                ? `you can't untap more than ${pending.what}: click the ones to untap; the others stay tapped.${untapProblem && n ? ` (${untapProblem})` : ""}`
                 : pending.action === "exert"
                 ? `exert attacking creatures if you want: click them. An exerted creature doesn't untap during your next untap step, and its "when you do" ability triggers.`
                 : pending.action === "enlist"
@@ -4524,7 +4575,7 @@ function Controls({
                 : `click ${what} ${theirs ? `${theirs} controls` : "of yours"} to ${verb}.`}
         </span>
         <button disabled={!ok} onClick={() => dispatch([{ type: "pickPermanents", player: HUMAN, ids: discards }])}>
-          {pending.action === "attach" ? (n ? `Attach ${n}` : "Attach none") : pending.action === "keep" ? (n ? `Keep ${n}` : "Keep none") : pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "encode" ? (n ? "Encode" : "Don't encode") : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "keepTapped" ? (n ? `Keep ${n} tapped` : "Untap all") : pending.action === "phaseOut" ? (n ? `Phase out ${n}` : "Phase out none") : pending.action === "untap" ? (n ? `Untap ${n}` : "Untap none") : pending.action === "tap" ? (n ? `Tap ${n}` : "Tap none") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : pending.action === "choose" ? "Choose" : pending.action === "meld" ? "Meld" : pending.action === "unattach" ? "Unattach" : "Return"}
+          {pending.action === "attach" ? (n ? `Attach ${n}` : "Attach none") : pending.action === "keep" ? (n ? `Keep ${n}` : "Keep none") : pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "encode" ? (n ? "Encode" : "Don't encode") : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "keepTapped" ? (n ? `Keep ${n} tapped` : "Untap all") : pending.action === "untapLimited" ? `Untap ${n}` : pending.action === "phaseOut" ? (n ? `Phase out ${n}` : "Phase out none") : pending.action === "untap" ? (n ? `Untap ${n}` : "Untap none") : pending.action === "tap" ? (n ? `Tap ${n}` : "Tap none") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : pending.action === "choose" ? "Choose" : pending.action === "meld" ? "Meld" : pending.action === "unattach" ? "Unattach" : "Return"}
         </button>
       </div>
     );

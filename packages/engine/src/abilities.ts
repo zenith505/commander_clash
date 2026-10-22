@@ -35,7 +35,7 @@ export interface FaceDownPlay {
 /** "unblocked": blocked attackers that assign their combat damage as though they weren't blocked (CR 510.1). */
 /** "exert": attackers their controller exerts as they attack (CR 701.43d). */
 /** "choose": "Choose a creature you control. It gains indestructible until end of turn": only picked; "it" is that one. */
-export type PickAction = "attach" | "phaseOut" | "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "encode" | "keep" | "untap" | "tap" | "choose" | "meld" | "unattach";
+export type PickAction = "attach" | "phaseOut" | "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "untapLimited" | "encode" | "keep" | "untap" | "tap" | "choose" | "meld" | "unattach";
 
 /**
  * What "unless its controller pays ..." asks for (CR 118.12): a mana cost, plus generic mana counted
@@ -235,6 +235,8 @@ export type Count =
    * "enters with" (the spell it was); 0 if it wasn't cast.
    */
   | { kind: "manaSpent" }
+  /** "The mana value of the returned creature" (Scarlet Spider): the creature returned to cast it using web-slinging, as it last existed; only in an "enters with". */
+  | { kind: "webSlungMv" }
   /** "The greatest number of creatures a player controls" (Investigator's Journal), `opponents`: "an opponent controls". */
   | { kind: "greatestControlled"; filter: TargetSpec; opponents?: true }
   /** "The greatest number of cards an opponent has drawn this turn" (Thought Sponge). */
@@ -1228,6 +1230,13 @@ export type StaticCondition =
    */
   | { kind: "opponentEntered"; types: string[]; color?: Color; n: number }
   /**
+   * "If two or more creatures entered the battlefield under your control this turn" (Spider-UK), "if you had a land enter
+   * the battlefield under your control this turn", celebration's "two or more nonland permanents": permanents that
+   * entered under your control this turn, as they entered, even if they've left since; with all of `types`, none of
+   * `notTypes`, and `subtype`.
+   */
+  | { kind: "youEntered"; types: string[]; notTypes?: string[]; subtype?: string; n: number }
+  /**
    * "If a noncreature permanent under your control was destroyed this turn by a spell or ability an opponent controlled"
    * (Cobra Trap): only an effect that says "destroy" (rulings), not lethal damage or sacrifice.
    */
@@ -1767,7 +1776,7 @@ export type Effect =
    * `double`: "double the number of +1/+1 counters on each creature you control": each gets as many more as it has (CR
    * 701.10e), `n` aside; with `everyKind`, of each kind of counter it has ("double the number of each kind of counter").
    */
-  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true; double?: true; everyKind?: true; /** "That player ... puts a +1/+1 counter on it" (Alexios): who puts them, when not the ability's controller. */ by?: PlayerRef; /** With what "voted": each chosen permanent gets them from the player who chose it (Agitator Ant). */ byVoter?: true }
+  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true; /** As many as its power is above its base power, each its own (Sovereign Okinec Ahau). */ aboveBase?: true; double?: true; everyKind?: true; /** "That player ... puts a +1/+1 counter on it" (Alexios): who puts them, when not the ability's controller. */ by?: PlayerRef; /** With what "voted": each chosen permanent gets them from the player who chose it (Agitator Ant). */ byVoter?: true }
   /**
    * "Distribute X +1/+1 counters among any number of creatures you control" (no targets): its controller divides them
    * among the permanents like `filter` they control as it resolves (rulings on Blessing of Frost, CR 608.2d), each
@@ -2077,6 +2086,10 @@ export type Effect =
       token: TokenSpec;
       tapped?: boolean;
       attacking?: boolean;
+      /** "That's attacking" (Brimaz, King of Oreskos): attacking but not tapped (CR 508.4). */
+      untapped?: true;
+      /** "That's blocking that creature" (Brimaz): it enters blocking it, if that creature is still attacking (CR 509.1). */
+      blocking?: ObjRef;
       /** "For each opponent, create ... that's tapped and attacking that player": `n` for each opponent, attacking them. */
       attackingEach?: boolean;
       /** "... attacking that player or a planeswalker they control" (Adeline): its controller chooses which as they enter. */
@@ -2614,6 +2627,8 @@ export type Effect =
    * 500.8): only during the turn's first end step.
    */
   | { type: "addEndStep" }
+  /** "That player gets an additional upkeep step after this step" (Paradox Haze, CR 500.8): only during an upkeep. */
+  | { type: "addUpkeepStep" }
   | {
       type: "addPhases";
       /** "beginning": "there is an additional beginning phase after this phase" (Sphinx of the Second Sun): untap, upkeep and draw steps. */
@@ -3392,7 +3407,7 @@ export interface TriggeredAbility {
   /** Evoke's "if its evoke cost was paid" (CR 702.74a). */
   ifEvoked?: boolean;
   /** "When ~ enters, if his sneak cost was paid" (CR 702.190a), "if its surge / spectacle cost was paid" (702.117a, 702.137a). */
-  ifAlt?: "sneak" | "surge" | "spectacle";
+  ifAlt?: "sneak" | "surge" | "spectacle" | "webSlinging";
   /** Ravenous's "if X is 5 or more" (CR 702.156a): the X of the spell it was (CR 107.3m), which can't change. */
   ifX?: number;
   /** Casualty's "if a casualty cost was paid for it" (CR 702.153a). */
@@ -3451,6 +3466,8 @@ export interface TriggeredAbility {
   secondMain?: true;
   /** "At the beginning of enchanted player's upkeep": an "each" step trigger only on the turn of the player this Aura enchants. */
   enchantedPlayersTurn?: true;
+  /** "At the beginning of enchanted player's first upkeep each turn" (Paradox Haze): not an additional upkeep. */
+  firstUpkeep?: true;
   /** "Deals damage to an opponent": an opponent of this ability's controller (rulings on Curiosity). */
   toOpponent?: true;
   /** For "batch": what the event has to move, see BatchTrigger. */
@@ -3494,6 +3511,8 @@ export interface BatchTrigger {
   first?: true;
   /** "Lands enter ... without being played" (Deep Gnome Terramancer): not a land played (CR 305.1). */
   notPlayed?: true;
+  /** `leaves`: "Whenever you sacrifice one or more Foods" (Camellia): ones `whose` player sacrificed (CR 701.21a). */
+  sacrificed?: true;
 }
 
 export interface ActivatedAbility {
@@ -3543,7 +3562,7 @@ export interface ActivatedAbility {
    * The keyword written before it ("Exhaust — {2}{G}: ..."), which effects can refer to (CR 702.142b, 702.177b). A power-up
    * ability costs less by the permanent's mana cost if it entered this turn (CR 702.193a): see game.ts activationCost.
    */
-  keyword?: "Exhaust" | "Boast" | "Power-up";
+  keyword?: "Exhaust" | "Boast" | "Power-up" | "Ninjutsu";
   /** "Activate no more than twice each turn" (CR 602.5b). */
   maxPerTurn?: number;
   /** "X can't be 0." for an X in its costs ("Sacrifice X artifacts", Ruthless Technomancer). */
@@ -3832,6 +3851,11 @@ export interface CostMod {
  * cast (CR 107.3a, 601.2b); `n` is that X once `castExtraCosts` has it.
  */
 export type AdditionalCost =
+  /**
+   * Forage (CR 701.61a): exile three cards from your graveyard or sacrifice a Food, chosen as it's paid (CostChoices
+   * `exileCards` or `sacrifice`).
+   */
+  | { kind: "forage" }
   /** `other`: "sacrifice another creature", not the ability's source. */
   | { kind: "sacrifice"; filter: TargetSpec; n: number; other?: boolean; /** With `other`: the source itself may be sacrificed if it's one of these ("another creature or an artifact"). */ selfIf?: TargetSpec; x?: true; /** "Sacrifice half the lands you control, rounded up" (Tectonic Split): `n` is worked out as the cost is (CR 601.2f). */ half?: "up"; /** "Exile a creature you control" (The Soul Stone): chosen the same way, but exiled, not sacrificed (CR 701.21a doesn't apply). */ exile?: true; /** "You may sacrifice one or more creatures" (Plumb the Forbidden): X may be 0, and is how many. */ optional?: true; /** "Sacrifice a Swamp and a Forest" (Jarad): `n` permanents, each matching a different one of these (a land that's both is either, not both; rulings). */ oneOfEach?: TargetSpec[] }
   /** "discard a land card" (retrace); `random`: "discard a card at random", chosen by the game as it's paid (CR 701.9b). */
@@ -4081,6 +4105,8 @@ export interface CompiledCard {
   flashIfTargetsCommander?: true;
   /** "As ~ enters, choose a player" / "an opponent" (CR 614.12): kept while it's on the battlefield, as Chosen.player. */
   entersChoosePlayer?: "player" | "opponent";
+  /** "As Arachne enters, look at an opponent's hand, then choose ...": the opponent is chosen first, then their hand is seen (CR 614.12). */
+  entersLookHand?: true;
   /** "As ~ enters, choose Khans or Dragons" (CR 614.12b): the anchor words, one chosen as it enters (Chosen.anchor). */
   entersAnchor?: string[];
   /**
@@ -4113,7 +4139,7 @@ export interface CompiledCard {
    */
   entersAsCopy?: { filter: TargetSpec; except?: CopyExcept; untilEndOfTurn?: boolean; /** Vesuva: "enter tapped as a copy". */ tapped?: true };
   /** "~ enters with N +1/+1 counters on it." (a replacement effect, CR 614.1c); modular N too (CR 702.43a). */
-  entersWithCounters?: { counter: CounterKind; n: Amount; /** Raid: "if you attacked this turn". */ if?: StaticCondition; /** "If you cast it from your hand" (the Myojin). */ castFromHand?: true; /** "If you cast it" (Nine-Lives Familiar). */ ifCast?: true; /** "If X is 5 or more, it enters with an additional X" (Apocalypse Hydra): twice as many. */ doubleIfXAtLeast?: number; /** "As ~ enters, choose a creature type. ~ enters with a fellowship counter on it for each creature you control of the chosen type" (Banner of Kinship): counted once that choice, part of how it enters, is made (CR 614.12). */ afterChoice?: ChoiceKind };
+  entersWithCounters?: { counter: CounterKind; n: Amount; /** Raid: "if you attacked this turn". */ if?: StaticCondition; /** "If you cast it from your hand" (the Myojin). */ castFromHand?: true; /** "If you cast it" (Nine-Lives Familiar). */ ifCast?: true; /** "If ~ was cast using web-slinging" (Scarlet Spider, CR 702.188a). */ ifWebSlung?: true; /** "If X is 5 or more, it enters with an additional X" (Apocalypse Hydra): twice as many. */ doubleIfXAtLeast?: number; /** "As ~ enters, choose a creature type. ~ enters with a fellowship counter on it for each creature you control of the chosen type" (Banner of Kinship): counted once that choice, part of how it enters, is made (CR 614.12). */ afterChoice?: ChoiceKind };
   /** Bloodthirst N (CR 702.54a): enters with N +1/+1 counters if an opponent was dealt damage this turn. */
   bloodthirst?: number;
   /**
@@ -4263,6 +4289,13 @@ export interface CompiledCard {
    * 614.1a), the factor it multiplies by. Several multiply together (rulings).
    */
   tapManaTimes?: number;
+  /**
+   * "Creatures your opponents control can be the targets of spells and abilities as though they didn't have hexproof.
+   * Ward abilities of those creatures don't trigger." (Nowhere to Run, CR 702.11e).
+   */
+  exposesOpponentsCreatures?: true;
+  /** "If you tap a basic land for mana, it produces three times as much of that mana instead" (Virtue of Strength). */
+  tapBasicManaTimes?: number;
   /** "If you would gain life, you gain that much life plus 1 instead" (CR 614.1a): N for each. */
   lifeGainPlus?: number;
   /** "Damage that would reduce your life total to less than 1 reduces it to 1 instead" (Ali from Cairo): that number. */
@@ -4359,6 +4392,8 @@ export interface CompiledCard {
   lifeForBlack?: true;
   /** Doc Aurlock: "Plotting cards from your hand costs {2} less" (CR 702.170a, 601.2f): less generic mana, for its controller. */
   plotLess?: number;
+  /** Inquisitive Glimmer: "Unlock costs you pay cost {1} less" (CR 709.5e, 601.2f): less generic mana, for its controller's Rooms. */
+  unlockLess?: number;
   /** Chromatic Orrery: "You may spend mana as though it were mana of any color." (CR 609.4b), for its controller's costs. */
   spendAnyColor?: true;
   /** "Players may spend mana as though it were mana of any color" (Mycosynth Lattice): every player, for every cost (CR 609.4b). */
@@ -4438,6 +4473,14 @@ export interface CompiledCard {
    * permanents like `filter` on the battlefield from the source's controller's view; `atLeastOne`, never below one mana.
    */
   activationLess?: { n: number; filter: TargetSpec; atLeastOne?: true }[];
+  /**
+   * "Players can't untap more than one nonbasic land during their untap steps" (Winter Moon), "You can't untap more than
+   * one land during your untap step" (Mungha Wurm, `you`), "As long as ~ is untapped, players can't untap more than two
+   * permanents ..." (Static Orb, `whileUntapped`): the active player chooses which of them untap (CR 502.3).
+   */
+  untapLimits?: { n: number; filter: TargetSpec; you?: true; whileUntapped?: true }[];
+  /** "Ninjutsu abilities you activate cost {1} less to activate" (Silver-Fur Master, CR 602.2b applies 601.2f). */
+  ninjutsuLess?: number;
   /** "The "legend rule" doesn't apply to permanents you control" (CR 704.5j): to these, from the source's controller's view. */
   noLegendRule?: TargetSpec[];
   /**
@@ -4664,6 +4707,8 @@ export interface CompiledCard {
     text?: string;
     /** Security Rhox: "Spend only mana produced by Treasures to cast it this way" (CR 106.3, 106.6). */
     treasureOnly?: true;
+    /** Web-slinging (CR 702.188a), for "if ~ was cast using web-slinging". */
+    webSlinging?: true;
   }[];
   /** Madness [cost] (CR 702.35a): discarded, it's exiled instead, and its owner may cast it for this cost. */
   madness?: string;

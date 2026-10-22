@@ -146,9 +146,10 @@ export function parseGrants(text: string): Modification[] | null {
       out.push({ kind: "addAbility", text: `Firebending ${/\d+/.exec(w)![0]}` });
       continue;
     }
-    // Myriad too: several instances each trigger (CR 702.116b).
-    if (/^myriad$/i.test(w)) {
-      out.push({ kind: "addAbility", text: "Myriad" });
+    // Myriad too: several instances each trigger (CR 702.116b); prowess the same (CR 702.108b): "Other creatures you
+    // control have prowess" (Bria, Riptide Rogue).
+    if (/^(?:myriad|prowess)$/i.test(w)) {
+      out.push({ kind: "addAbility", text: w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() });
       continue;
     }
     // Persist and undying are triggered abilities (CR 702.79a, 702.93a): it dies with them, so they look back (603.10a).

@@ -510,8 +510,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "+1: Add {R} or {G}" (Domri, Anarch of Bolas): one mana of either, chosen as it resolves.
   if ((m = /^[Aa]dd \{([WUBRG])\} or \{([WUBRG])\}$/.exec(s)) && m[1] !== m[2]) return [{ type: "addMana", split: [m[1] as ManaType, m[2] as ManaType], times: 1 }];
   // "Add three mana in any combination of {R} and/or {G}" (Orcish Lumberjack): each of either, chosen as it resolves.
-  if ((m = new RegExp(`^[Aa]dd ${NUM} mana in any combination of \\{([WUBRG])\\} and/or \\{([WUBRG])\\}$`).exec(s)) && m[2] !== m[3])
-    return [{ type: "addMana", split: [m[2] as ManaType, m[3] as ManaType], times: num(m[1]!) }];
+  // "Add X mana in any combination of {B} and/or {R}, where X is the sacrificed creature's mana value" (Burnt Offering).
+  if ((m = new RegExp(`^[Aa]dd ${NUMX} mana in any combination of \\{([WUBRG])\\} and/or \\{([WUBRG])\\}$`).exec(s)) && m[2] !== m[3])
+    return [{ type: "addMana", split: [m[2] as ManaType, m[3] as ManaType], times: amt(m[1]!) }];
   if ((m = /^[Aa]dd \{([WUBRG])\} or \{([WUBRG])\} for each (.+)$/.exec(s)) && m[1] !== m[2]) {
     const times = parseCount(m[3]!, ctx, true);
     return times && [{ type: "addMana", split: [m[1] as ManaType, m[2] as ManaType], times }];
@@ -698,6 +699,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     ctx.eachOne = undefined;
     if (!to || !c || typeof c !== "object" || !("count" in c) || c.times || !JSON.stringify(c).includes('"eachOne"')) return null;
     return [{ type: "damage", amount: m[2] ? { ...c, times: 2 } : c, to }];
+  }
+  // "~ deals damage to each player equal to half that player's life total, rounded down" (Heartless Hidetsugu): each
+  // player half their own life total as it resolves, all dealt at once (CR 107.1a, 120.3).
+  if ((m = /^~ deals damage to (each player|each opponent) equal to half (?:that player's|their) life total(?:, rounded (up|down))?$/i.exec(s))) {
+    const to = parseDamageRecipient(m[1]!, ctx);
+    const half = roundOf(m[2], ctx);
+    return to && half ? [{ type: "damage", amount: { count: { kind: "life", who: { ref: "eachOne" } }, half }, to }] : null;
   }
   // Damage: "~ deals 3 damage to any target"; "it deals that much damage to each other opponent" after "Whenever a
   // commander you control deals combat damage to an opponent" (Kediss): that creature deals it.

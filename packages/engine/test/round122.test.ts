@@ -685,3 +685,202 @@ describe("Liliana of the Veil −6: two piles of permanents (CR 700.3)", () => {
     expect(mine.filter((id) => t.objects[id]!.zone === "battlefield")).toHaveLength(2);
   });
 });
+
+const bria = card("Bria, Riptide Rogue", "Legendary Creature — Otter Rogue", "{2}{U}{R}", { power: "3", toughness: "3", keywords: ["Prowess"], oracleText: "Prowess (Whenever you cast a noncreature spell, this creature gets +1/+1 until end of turn.)\nOther creatures you control have prowess. (If a creature has multiple instances of prowess, each triggers separately.)\nWhenever you cast a noncreature spell, target creature you control can't be blocked this turn." });
+const howlsquad = card("Howlsquad Heavy", "Creature — Goblin Mercenary", "{2}{R}", { power: "2", toughness: "3", oracleText: "Start your engines!\nOther Goblins you control have haste.\nAt the beginning of combat on your turn, create a 1/1 red Goblin creature token. That token attacks this combat if able.\nMax speed — {T}: Add {R} for each Goblin you control." });
+const hidetsugu = card("Heartless Hidetsugu", "Legendary Creature — Ogre Shaman", "{3}{R}{R}", { power: "4", toughness: "3", oracleText: "{T}: Heartless Hidetsugu deals damage to each player equal to half that player's life total, rounded down." });
+const toph = card("Toph, the Blind Bandit", "Legendary Creature — Human Warrior Ally", "{2}{G}", { power: "*", toughness: "3", oracleText: "When Toph enters, earthbend 2. (Target land you control becomes a 0/0 creature with haste that's still a land. Put two +1/+1 counters on it. When it dies or is exiled, return it to the battlefield tapped.)\nToph's power is equal to the number of +1/+1 counters on lands you control." });
+const hydraTrainer = card("Hydra Trainer", "Creature — Human Warrior", "{1}{G}", { power: "1", toughness: "1", oracleText: "You may exert this creature as it attacks. When you do, target creature gets +X/+X until end of turn, where X is the number of counters on permanents you control. (An exerted creature won't untap during your next untap step.)\n{2}{G}: Adapt 2. (If this creature has no +1/+1 counters on it, put two +1/+1 counters on it.)" });
+const tasha = card("Tasha's Hideous Laughter", "Sorcery", "{1}{U}{U}", { oracleText: "Each opponent exiles cards from the top of their library until that player has exiled cards with total mana value 20 or greater." });
+const fraying = card("Fraying Sanity", "Enchantment — Aura Curse", "{2}{U}", { oracleText: "Enchant player\nAt the beginning of each end step, enchanted player mills X cards, where X is the number of cards put into their graveyard from anywhere this turn." });
+
+describe("Bria, Howlsquad Heavy, Heartless Hidetsugu, Toph, Tasha's Hideous Laughter, Fraying Sanity", () => {
+  it("Bria: other creatures you control have prowess (CR 702.108b), each instance triggering", () => {
+    supported(bria, howlsquad, hidetsugu, toph, hydraTrainer, tasha, fraying);
+    const { s: s0, ap, ids, opp } = setup([bolt]);
+    putOnBattlefield(s0, ap, bria);
+    const b = putOnBattlefield(s0, ap, bear());
+    const theirs = putOnBattlefield(s0, opp, bear());
+    invalidateCharacteristics(s0);
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "player", id: opp }])));
+    expect(characteristics(s, s.objects[b]!).power).toBe(3);
+    expect(characteristics(s, s.objects[theirs]!).power).toBe(2);
+  });
+
+  it("Howlsquad Heavy: the Goblin token has haste and must attack this combat", () => {
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, howlsquad);
+    invalidateCharacteristics(s0);
+    let s = settle(passUntil(s0, "beginCombat", ap));
+    const tok = s.battlefield.find((id) => s.objects[id]!.isToken)!;
+    expect(characteristics(s, s.objects[tok]!).keywords).toContain("Haste");
+    s = passUntil(s, "declareAttackers", ap);
+    expect(() => act(s, { type: "declareAttackers", player: ap, attacks: [] })).toThrow();
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: tok, defender: opp }] });
+    expect(s.objects[tok]!.attacking).toBe(opp);
+  });
+
+  it("Heartless Hidetsugu: each player is dealt half their own life total, rounded down", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const h = putOnBattlefield(s0, ap, hidetsugu);
+    s0.players[opp]!.life = 15;
+    invalidateCharacteristics(s0);
+    const s = settle(run(s0, planActivate(s0, ap, h, 0)));
+    expect(s.players[ap]!.life).toBe(20);
+    expect(s.players[opp]!.life).toBe(8);
+  });
+
+  it("Toph: power is the number of +1/+1 counters on lands you control (not on creatures)", () => {
+    const { s: s0, ap } = setup([]);
+    const t = putOnBattlefield(s0, ap, toph);
+    const lands = s0.battlefield.filter((id) => s0.objects[id]!.controller === ap && characteristics(s0, s0.objects[id]!).types.includes("Land"));
+    s0.objects[lands[0]!]!.counters["+1/+1"] = 2;
+    s0.objects[lands[1]!]!.counters["+1/+1"] = 1;
+    const b = putOnBattlefield(s0, ap, bear());
+    s0.objects[b]!.counters["+1/+1"] = 5; // a creature's counters don't count
+    invalidateCharacteristics(s0);
+    expect(characteristics(s0, s0.objects[t]!).power).toBe(3);
+  });
+
+  it("Tasha's Hideous Laughter: each opponent exiles from the top until the mana values reach 20", () => {
+    const { s: s0, ap, ids, opp } = setup([tasha]);
+    const big = (n: number) => card(`Big ${n}`, "Creature — Giant", `{${n}}`, { power: "1", toughness: "1" });
+    const order = [big(9), forest, big(8), big(2), big(1), big(7)];
+    const placed = [...order].reverse().map((d) => onTop(s0, opp, d)).reverse();
+    invalidateCharacteristics(s0);
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    // 9 + 0 + 8 + 2 = 19, then 1 more: 20.
+    expect(placed.map((id) => s.objects[id]!.zone)).toEqual(["exile", "exile", "exile", "exile", "exile", "library"]);
+    // Every opponent, not only the first.
+    const other = s.turnOrder.find((p) => p !== ap && p !== opp)!;
+    expect(s.players[other]!.library.length).toBeLessThan(s0.players[other]!.library.length);
+  });
+
+  it("Fraying Sanity: at each end step, enchanted player mills as many as the cards put into their graveyard this turn (not tokens)", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const f = putOnBattlefield(s0, ap, fraying);
+    s0.objects[f]!.attachedToPlayer = opp;
+    const [x, y] = handOf(s0, opp, [bear(), bear()]);
+    moveObject(s0, x!, "graveyard");
+    moveObject(s0, y!, "graveyard");
+    const tok = putOnBattlefield(s0, opp, bear());
+    s0.objects[tok]!.isToken = true;
+    moveObject(s0, tok, "graveyard");
+    invalidateCharacteristics(s0);
+    const before = s0.players[opp]!.library.length;
+    const s = settle(passUntil(s0, "cleanup", ap));
+    expect(s.players[opp]!.library.length).toBe(before - 2);
+  });
+});
+
+const vengeance = card("Increasing Vengeance", "Instant", "{R}{R}", { oracleText: "Copy target instant or sorcery spell you control. If this spell was cast from a graveyard, copy that spell twice instead. You may choose new targets for the copies.\nFlashback {3}{R}{R} (You may cast this card from your graveyard for its flashback cost. Then exile it.)" });
+const oven = card("Witch's Oven", "Artifact", "{1}", { oracleText: "{T}, Sacrifice a creature: Create a Food token. If the sacrificed creature's toughness was 4 or greater, create two Food tokens instead. (They're artifacts with \"{2}, {T}, Sacrifice this token: You gain 3 life.\")" });
+const offering = card("Burnt Offering", "Instant", "{B}", { oracleText: "As an additional cost to cast this spell, sacrifice a creature.\nAdd X mana in any combination of {B} and/or {R}, where X is the sacrificed creature's mana value." });
+const glademuse = card("Glademuse", "Creature — Beast", "{2}{G}", { power: "2", toughness: "4", oracleText: "Whenever a player casts a spell, if it's not their turn, that player draws a card." });
+const scytheclaw = card("Scytheclaw Raptor", "Creature — Dinosaur", "{2}{R}", { power: "4", toughness: "3", oracleText: "Whenever a player casts a spell, if it's not their turn, this creature deals 4 damage to them." });
+const convocation = card("Lunar Convocation", "Enchantment", "{W}{B}", { oracleText: "At the beginning of your end step, if you gained life this turn, each opponent loses 1 life.\nAt the beginning of your end step, if you gained and lost life this turn, create a 1/1 black Bat creature token with flying.\n{1}{B}, Pay 2 life: Draw a card." });
+const repercussion = card("Repercussion", "Enchantment", "{1}{R}{R}", { oracleText: "Whenever a creature is dealt damage, this enchantment deals that much damage to that creature's controller." });
+const raptor = card("Marauding Raptor", "Creature — Dinosaur", "{1}{R}", { power: "2", toughness: "3", oracleText: "Creature spells you cast cost {1} less to cast.\nWhenever another creature you control enters, this creature deals 2 damage to it. If a Dinosaur is dealt damage this way, this creature gets +2/+0 until end of turn." });
+const tarPit = card("Creeping Tar Pit", "Land", "", { oracleText: "This land enters tapped.\n{T}: Add {U} or {B}.\n{1}{U}{B}: Until end of turn, this land becomes a 3/2 blue and black Elemental creature. It's still a land. It can't be blocked this turn." });
+
+describe("Increasing Vengeance, Witch's Oven, Burnt Offering, Glademuse, Scytheclaw Raptor, Lunar Convocation, Repercussion, Marauding Raptor, Creeping Tar Pit", () => {
+  const lifeLost = (a: GameState, b: GameState, ap: PlayerId) => b.turnOrder.filter((p) => p !== ap).reduce((n, p) => n + a.players[p]!.life - b.players[p]!.life, 0);
+  for (const fromYard of [false, true])
+    it(`Increasing Vengeance${fromYard ? " flashed back: two copies" : ": one copy"} of your Lightning Bolt`, () => {
+      supported(vengeance, oven, offering, glademuse, scytheclaw, convocation, repercussion, raptor, tarPit);
+      const { s: s0, ap, ids, opp } = setup([bolt, vengeance]);
+      if (fromYard) moveObject(s0, ids[1]!, "graveyard");
+      let s = run(s0, planCast(s0, ap, ids[0]!, [{ kind: "player", id: opp }]));
+      const boltItem = s.stack[s.stack.length - 1]!.id;
+      s = run(s, planCast(s, ap, ids[1]!, [{ kind: "stack", id: boltItem }], undefined, undefined, undefined, fromYard ? { via: "flashback" } : {}));
+      s = settle(s);
+      expect(lifeLost(s0, s, ap)).toBe(fromYard ? 9 : 6);
+    });
+
+  it("Witch's Oven: one Food, two for a creature with toughness 4 or greater", () => {
+    for (const toughness of [3, 4]) {
+      const { s: s0, ap } = setup([]);
+      const o = putOnBattlefield(s0, ap, oven);
+      const fodder = putOnBattlefield(s0, ap, bear({ name: "Wall", power: "0", toughness: String(toughness) }));
+      invalidateCharacteristics(s0);
+      const s = settle(run(s0, planActivate(s0, ap, o, 0, undefined, undefined, undefined, undefined, { sacrifice: [fodder] })));
+      expect(s.battlefield.filter((id) => s.objects[id]!.isToken && characteristics(s, s.objects[id]!).subtypes.includes("Food"))).toHaveLength(toughness === 4 ? 2 : 1);
+    }
+  });
+
+  it("Burnt Offering: as much mana as the sacrificed creature's mana value, in black and/or red", () => {
+    const { s: s0, ap, ids } = setup([offering]);
+    const big = putOnBattlefield(s0, ap, card("Ogre", "Creature — Ogre", "{3}{R}", { power: "4", toughness: "4" }));
+    invalidateCharacteristics(s0);
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, undefined, undefined, { sacrifice: [big] })));
+    const pool = s.players[ap]!.manaPool;
+    expect(pool.B + pool.R).toBe(4);
+    expect(pool.W + pool.U + pool.G + pool.C).toBe(0);
+  });
+
+  it("Glademuse and Scytheclaw Raptor: only a spell cast on someone else's turn", () => {
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, glademuse);
+    putOnBattlefield(s0, ap, scytheclaw);
+    const [b] = handOf(s0, opp, [bolt]);
+    putOnBattlefield(s0, opp, mountain);
+    const [mine] = handOf(s0, ap, [bolt]);
+    invalidateCharacteristics(s0);
+    // Your own spell on your turn: nothing.
+    let s = settle(run(s0, planCast(s0, ap, mine!, [{ kind: "player", id: opp }])));
+    const hand = s.players[opp]!.hand.length;
+    const life = s.players[opp]!.life;
+    expect(s.players[ap]!.hand.length).toBe(s0.players[ap]!.hand.length - 1);
+    // The opponent's Bolt on your turn: they draw a card and are dealt 4.
+    s = act(s, { type: "passPriority", player: ap });
+    expect(waitingOn(s)).toBe(opp);
+    s = run(s, planCast(s, opp, b!, [{ kind: "player", id: ap }]));
+    s = settle(s);
+    expect(s.players[opp]!.hand.length).toBe(hand - 1 + 1);
+    expect(s.players[opp]!.life).toBe(life - 4);
+  });
+
+  it("Lunar Convocation: a Bat only if you both gained and lost life this turn", () => {
+    for (const lost of [false, true]) {
+      const { s: s0, ap } = setup([]);
+      putOnBattlefield(s0, ap, convocation);
+      invalidateCharacteristics(s0);
+      s0.turnLog = { ...s0.turnLog, lifeGained: { [ap]: 2 } };
+      if (lost) loseLife(s0, ap, 1);
+      const s = settle(passUntil(s0, "cleanup", ap));
+      expect(s.battlefield.some((id) => s.objects[id]!.isToken && characteristics(s, s.objects[id]!).subtypes.includes("Bat"))).toBe(lost);
+    }
+  });
+
+  it("Repercussion: a creature dealt damage, its controller is dealt that much", () => {
+    const { s: s0, ap, ids, opp } = setup([bolt]);
+    putOnBattlefield(s0, ap, repercussion);
+    const theirs = putOnBattlefield(s0, opp, bear({ toughness: "5" }));
+    invalidateCharacteristics(s0);
+    const life = s0.players[opp]!.life;
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: theirs }])));
+    expect(s.players[opp]!.life).toBe(life - 3);
+  });
+
+  it("Marauding Raptor: 2 damage to each creature entering under your control; +2/+0 when it's a Dinosaur", () => {
+    for (const dino of [false, true]) {
+      const { s: s0, ap } = setup([]);
+      const r = putOnBattlefield(s0, ap, raptor);
+      const [c] = handOf(s0, ap, [dino ? card("Raptor Hatchling", "Creature — Dinosaur", "{1}{R}", { power: "1", toughness: "5" }) : bear({ toughness: "5" })]);
+      invalidateCharacteristics(s0);
+      const s = settle(run(s0, planCast(s0, ap, c!)));
+      expect(s.objects[c!]!.damage).toBe(2);
+      expect(characteristics(s, s.objects[r]!).power).toBe(dino ? 4 : 2);
+    }
+  });
+
+  it("Creeping Tar Pit: a 3/2 land creature that can't be blocked this turn", () => {
+    const { s: s0, ap } = setup([]);
+    const t = putOnBattlefield(s0, ap, tarPit);
+    invalidateCharacteristics(s0);
+    const s = settle(run(s0, planActivate(s0, ap, t, 0)));
+    const ch = characteristics(s, s.objects[t]!);
+    expect([ch.power, ch.toughness, ch.types.includes("Land"), ch.types.includes("Creature")]).toEqual([3, 2, true, true]);
+    expect(JSON.stringify(s.effects)).toContain("cantBeBlocked");
+  });
+});

@@ -151,7 +151,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         if (affectedName && (o.faceDown || !sameName(view(o)?.name, affectedName))) continue;
         const ch = view(o);
         if (!ch || (whose && !whose.includes(ch.controller)) || !objectMatches(s, filter, o, ctx.controller, false, undefined, ch, ctx.view)) continue;
-        if (!c.differentNames) n++;
+        if (c.counter) n += c.counter === ANY_COUNTER ? Object.values(o.counters).reduce((a, b) => a + (b ?? 0), 0) : (o.counters[c.counter] ?? 0);
+        else if (!c.differentNames) n++;
         else if (ch.name && !o.faceDown) names.add(ch.name);
       }
       return c.differentNames ? names.size : n;
@@ -265,6 +266,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.attackersThisTurn ?? 0;
     case "toGraveyardThisTurn":
       return s.toGraveyardThisTurn ?? 0;
+    case "cardsToGraveyardThisTurn":
+      return refPlayers(s, c.whose, ctx).reduce((n, pid) => n + (s.cardsToGraveyardThisTurn?.[pid] ?? 0), 0);
     case "commanderCasts":
       return Object.values(s.players[ctx.controller]?.commanderCasts ?? {}).reduce((a, b) => a + b, 0);
     case "party":
@@ -545,7 +548,7 @@ function describeCount(c: Count): string {
     case "x":
       return "X";
     case "permanents":
-      return `#${c.differentNames ? "differently named " : ""}${c.other ? "other " : ""}${c.filter.text.replace(/^target /, "")}`;
+      return `#${c.counter ? `${c.counter === ANY_COUNTER ? "" : `${c.counter} `}counters on ` : ""}${c.differentNames ? "differently named " : ""}${c.other ? "other " : ""}${c.filter.text.replace(/^target /, "")}`;
     case "cardsInHand":
       return "#cards in hand";
     case "timesAffectedAttacked":
@@ -630,6 +633,8 @@ function describeCount(c: Count): string {
       return "#creatures that attacked this turn";
     case "toGraveyardThisTurn":
       return "#permanents put into a graveyard this turn";
+    case "cardsToGraveyardThisTurn":
+      return "#cards put into that graveyard this turn";
     case "commanderCasts":
       return "#times you've cast your commander";
     case "party":

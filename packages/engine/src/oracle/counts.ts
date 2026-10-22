@@ -270,6 +270,17 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const of = whoseObject(m[2] === "~" ? "~'s" : m[2] === "it" ? "its" : "that creature's", ctx);
     return of && count({ kind: "counters", counter: counterKind(m[1]!), of });
   }
+  // "The number of +1/+1 counters on lands you control" (Toph, the Blind Bandit), "counters on permanents you control"
+  // (Hydra Trainer): the counters on those permanents added up.
+  if ((m = new RegExp(`^(?:${COUNTER} )?counters on ((?:creatures|lands|permanents|artifacts) you control)$`).exec(p))) {
+    const c = parseCount(m[2]!, ctx, each);
+    return c && typeof c === "object" && "count" in c && c.count.kind === "permanents" && !c.count.differentNames ? { count: { ...c.count, counter: m[1] ? counterKind(m[1]) : ANY_COUNTER } } : null;
+  }
+  // "Cards put into enchanted player's graveyard from anywhere this turn" (Fraying Sanity): tokens aren't cards.
+  if ((m = /^cards? put into (your|their|that player's|enchanted player's) graveyard from anywhere this turn$/i.exec(p))) {
+    const whose = whosePlayer(m[1]!, ctx);
+    return whose && count({ kind: "cardsToGraveyardThisTurn", whose });
+  }
   // "Aura attached to it", "Equipment attached to ~": only the permanent's own.
   // "Aura and Equipment attached to it" (Champion of the Flame): one of either.
   if ((m = /^(Aura|Equipment|Aura and Equipment)s? attached to (it|~)$/i.exec(p)) && (ctx === null || ctx.selfIt || /~/.test(m[2]!)))

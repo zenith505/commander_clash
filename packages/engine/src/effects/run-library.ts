@@ -39,6 +39,23 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         for (const id of ids) moveObject(s, id, "graveyard");
       }
       return;
+    case "exileUntilTotalMv":
+      // Tasha's Hideous Laughter: one card at a time, each player in turn order (CR 101.4), until the mana values of the
+      // cards they exiled this way add up to the total (a land's is 0, a split card's both halves' added, CR 202.3), or
+      // their library is empty.
+      for (const pid of apnap(s, players(s, e.who, ctx))) {
+        const p = player(s, pid);
+        const ids: ObjectId[] = [];
+        let total = 0;
+        while (total < e.total && p.library.length) {
+          const id = p.library[0]!;
+          total += defMv(defOf(s, obj(s, id)));
+          moveObject(s, id, "exile");
+          ids.push(id);
+        }
+        if (ids.length) log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of their library (total mana value ${total}).`);
+      }
+      return;
     case "mill":
       // Kept for "if a card with the chosen name was milled this way" (Predict).
       s.resolving!.milled = [];

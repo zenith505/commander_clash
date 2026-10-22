@@ -804,6 +804,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (!who || !among || among.kind !== "object" || !keep?.length || keep.some((k) => k.filter.kind !== "object")) return null;
     return [{ type: "keepRest", who, keep, among }];
   }
+  // "Each opponent exiles cards from the top of their library until that player has exiled cards with total mana value
+  // 20 or greater" (Tasha's Hideous Laughter).
+  if ((m = /^(Each opponent|Each player|Target opponent|Target player) exiles cards from the top of their library until (?:that player has|they have) exiled cards with total mana value (\d+) or greater$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who ? [{ type: "exileUntilTotalMv", who, total: Number(m[2]) }] : null;
+  }
   // "Separate all permanents target player controls into two piles. That player sacrifices all permanents in the pile
   // of their choice." (Liliana of the Veil; joined into one sentence in body.ts).
   if ((m = /^Separate all permanents (.+?) controls into two piles for that player to sacrifice the pile of their choice$/.exec(s))) {

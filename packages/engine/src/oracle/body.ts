@@ -935,6 +935,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   text = text.replace(/([Pp]ut all creature cards exiled with ~ onto the battlefield under your control)\. They gain decayed\./, "$1, and they gain decayed.");
   // "Until your next turn, it gains indestructible." (Hydaelyn) says the same as "It gains indestructible until your next turn."
   text = text.replace(/\bUntil your next turn, it gains ([a-z ]+)\./g, "It gains $1 until your next turn.");
+  // "Enchanted player mills X cards, where X is the number of cards put into their graveyard ..." (Fraying Sanity).
+  text = text.replace(/\b(enchanted player) mills X cards, where X is the number of cards put into their graveyard/g, "$1 mills X cards, where X is the number of cards put into enchanted player's graveyard");
   // Liliana of the Veil's two sentences are one effect: the piles, then the sacrifice of the chosen one (CR 700.3).
   text = text.replace(/\bSeparate all permanents (target player|target opponent) controls into two piles\. That player sacrifices all permanents in the pile of their choice\./g, "Separate all permanents $1 controls into two piles for that player to sacrifice the pile of their choice.");
   // "You may pay eight {E}. If you pay, ..." (Lightning Runner) says the same as "If you do".
@@ -2875,6 +2877,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects[effects.length - 1] = { type: "if", cond: { kind: "gift" }, effects: [giftExile], otherwise: [{ ...blink, what: giftExile.what }] };
       continue;
     }
+    // "~ deals 2 damage to it. If a Dinosaur is dealt damage this way, ~ gets +2/+0 until end of turn" (Marauding Raptor):
+    // only if damage was dealt (none if it was prevented), to a permanent that is one now.
+    const dealtIs = /^If an? ([A-Z][a-z]+|creature) is dealt damage this way, (.+)$/.exec(s);
+    if (dealtIs && effects.some((e) => e.type === "damage")) {
+      const filter = parseTargetPhrase(dealtIs[1]!);
+      const before = ctx.targets.length;
+      const fx = filter?.kind === "object" ? parseOne(dealtIs[2]!, ctx) : null;
+      if (!fx || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "damagedThisWayIs", filter: filter! }, effects: fx });
+      continue;
+    }
     const howCast = parseHowCast(s, ctx);
     // Once and Future's adamant, "instead return those cards to your hand and exile ~": done instead of all the spell's
     // instructions before it, so each target card goes to your hand whichever zone it was chosen for (CR 601.2c).
@@ -4386,6 +4399,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       last.mods = last.mods.map((x) => (x.kind === "setTypes" ? { kind: "addTypes", types: x.types, subtypes: x.subtypes, ...(x.supertypes ? { supertypes: x.supertypes } : {}) } : x));
       continue;
     }
+    // "Until end of turn, ~ becomes a 3/2 ... creature. It's still a land. It can't be blocked this turn." (Creeping Tar
+    // Pit): one more thing the same effect does, for the same turn.
+    const animated = effects[effects.length - 1];
+    if (/^It can't be blocked this turn$/.test(s) && animated?.type === "continuous" && animated.what.ref === "self" && animated.duration === "endOfTurn" && animated.mods.some((x) => x.kind === "addTypes" && x.types.includes("Creature"))) {
+      animated.mods = [...animated.mods, { kind: "cantBeBlocked" }];
+      continue;
+    }
     // 'It has "Sacrifice ~: Add {C}."' gives the tokens just created that ability (CR 111.3).
     const has = /^(?:It has|They have|They each have) "(.+)"$/.exec(s);
     if (has) {
@@ -4476,6 +4496,13 @@ function parseHowCast(s: string, ctx: Ctx): { cond: SpellCondition; not: boolean
   if (disc) {
     const filter = parseSearchFilter(disc[2]!.replace(/^an? /, ""));
     return filter ? { cond: { kind: "discardedIs", filter }, not: disc[1] === "wasn't", text: disc[3]!, noTargets: true } : null;
+  }
+  // "If the sacrificed creature's toughness was 4 or greater, create two Food tokens instead" (Witch's Oven): as it last
+  // existed (CR 608.2h); costs are paid after targets are chosen (CR 601.2c, 601.2h), so no target can depend on it.
+  const sacPT = /^If the sacrificed creature's (power|toughness|mana value) was (\d+) or greater, (.+)$/.exec(s);
+  if (sacPT) {
+    const kind = sacPT[1] === "mana value" ? "manaValue" : (sacPT[1] as "power" | "toughness");
+    return { cond: { kind: "amountNow", amount: { count: { kind, of: { ref: "sacrificed" } } }, min: Number(sacPT[2]) }, not: false, text: sacPT[3]!, noTargets: true };
   }
   for (const h of HOW_CAST) {
     if (h.spellOnly && !ctx.spell) continue;
@@ -4606,6 +4633,14 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
     const prev = previous[0];
     if (previous.length !== 1 || prev?.type !== "createTokenCopy") return null;
     return { effects: [{ ...prev, n: num(moreCopies[1]!) }], instead };
+  }
+  // "Copy target instant or sorcery spell you control. If ~ was cast from a graveyard, copy that spell twice instead"
+  // (Increasing Vengeance): more copies of the same spell.
+  const moreSpellCopies = instead ? /^Copy that spell (twice|three times)$/.exec(t) : null;
+  if (moreSpellCopies) {
+    const prev = previous[0];
+    if (previous.length !== 1 || prev?.type !== "copySpell" || prev.n !== 1) return null;
+    return { effects: [{ ...prev, n: moreSpellCopies[1] === "twice" ? 2 : 3 }], instead };
   }
   // "If {B}{R} was spent to cast ~, you choose the permanents for each player instead" (Mythos of Snapdax): the same
   // choices, all made by you, and still legal ones (rulings).

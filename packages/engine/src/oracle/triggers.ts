@@ -484,16 +484,19 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
  * Red Dragon): once for each such permanent, for all the damage dealt to it at the same time; "it" is that permanent.
  */
 function parseIsDealtDamageTrigger(line: string): TriggeredAbility | "fail" | null {
-  const m = /^Whenever an? (.+?) you control is dealt damage, (.+)$/.exec(line);
+  // "Whenever a creature is dealt damage, ~ deals that much damage to that creature's controller" (Repercussion): anyone's.
+  const m = /^Whenever an? (.+?) (?:(you control|an opponent controls) )?is dealt damage, (.+)$/.exec(line);
   if (!m) return null;
-  const filter = parseTargetPhrase(`${m[1]!} you control`);
+  const whose = m[2];
+  if (!whose && m[1] !== "creature") return null;
+  const filter = parseTargetPhrase(whose ? `${m[1]!} ${whose}` : m[1]!);
   if (filter?.kind !== "object") return "fail";
-  const thatMuch = /\bthat much\b/.test(m[2]!);
-  if (thatMuch && /\bX\b/.test(m[2]!)) return "fail";
-  let body = parseBody(thatMuch ? m[2]!.replace(/\bthat much\b/g, "X") : m[2]!, { subjectIt: true });
+  const thatMuch = /\bthat much\b/.test(m[3]!);
+  if (thatMuch && /\bX\b/.test(m[3]!)) return "fail";
+  let body = parseBody(thatMuch ? m[3]!.replace(/\bthat much\b/g, "X") : m[3]!, { subjectIt: true });
   if (!body) return "fail";
-  if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, m[2]!) };
-  return { event: "permanentIsDealtDamage", dealtFilter: { ...filter, text: `${m[1]!} you control` }, body };
+  if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, m[3]!) };
+  return { event: "permanentIsDealtDamage", dealtFilter: { ...filter, text: whose ? `${m[1]!} ${whose}` : m[1]! }, body };
 }
 
 /** Valgavoth, Harrower of Souls: "Whenever an opponent loses life for the first time during each of their turns, ..." */
@@ -1532,7 +1535,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // checked as the ability would trigger and again as it resolves, so it can't be an ordinary effect.
   const intervening = /^((?:When|Whenever|At)\b[^,]*), if ([^,]+), (.+)$/.exec(line);
   // "If it's attacking" is about the source only in an ability about the source itself.
-  const aboutIt = intervening && /^(it|~)\b(?!'s (?:your|the first) | isn't that player's turn$)/.test(intervening[2]!) && !/^(When|Whenever) ~ /.test(intervening[1]!) && !/^~ is enchanted by /.test(intervening[2]!);
+  const aboutIt = intervening && /^(it|~)\b(?!'s (?:your|the first) | isn't that player's turn$|'s not their turn$)/.test(intervening[2]!) && !/^(When|Whenever) ~ /.test(intervening[1]!) && !/^~ is enchanted by /.test(intervening[2]!);
   // "At the beginning of each opponent's upkeep, if that player has two or fewer cards in hand": whose upkeep it is.
   const thatHand = intervening && /^At the beginning of each (?:opponent|player)'s (?:upkeep|draw step|end step)$/.test(intervening[1]!) ? new RegExp(`^that player has (no|${NUM} or (fewer|more)) cards in hand$`).exec(intervening[2]!) : null;
   const handCond = thatHand && (thatHand[1] === "no" ? { max: 0 } : thatHand[3] === "fewer" ? { max: num(thatHand[2]!) } : { min: num(thatHand[2]!) });

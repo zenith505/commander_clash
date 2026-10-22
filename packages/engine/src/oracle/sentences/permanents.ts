@@ -595,6 +595,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const first = what && parseChanges(m[2]!);
     return what && first ? [{ type: "continuous", what, mods: [...first, { kind: "attacksIfAble", ...(m[3] === "combat" ? { combat: "this" as const } : {}) }], duration: "endOfTurn" }] : null;
   }
+  // "That token attacks this combat if able" (Howlsquad Heavy): the same requirement, nothing else gained.
+  if ((m = /^(That token|That creature|It) attacks this (turn|combat) if able$/i.exec(s))) {
+    const what = parseObject(m[1]!.replace(/^It$/, "it"), ctx);
+    return what ? [{ type: "continuous", what, mods: [{ kind: "attacksIfAble", ...(m[2]!.toLowerCase() === "combat" ? { combat: "this" as const } : {}) }], duration: "endOfTurn" }] : null;
+  }
   // "You gain shroud until end of turn" (Gilded Light), "You and permanents you control gain hexproof until end of turn"
   // (Lazotep Plating), "You and target permanent you control each gain protection from the chosen player until end of
   // turn" (Guardian Archon), "you gain protection from the chosen color" (Seht's Tiger): the player gains it too (CR

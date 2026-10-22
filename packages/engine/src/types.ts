@@ -1391,6 +1391,8 @@ export interface GameState {
   diedThisTurn?: PlayerId[];
   /** Permanents put into a graveyard from the battlefield this turn, tokens included (gravestorm, CR 702.69a). */
   toGraveyardThisTurn?: number;
+  /** Cards put into each player's graveyard from anywhere this turn, by owner (Fraying Sanity). */
+  cardsToGraveyardThisTurn?: Record<PlayerId, number>;
   /** Creatures declared as attackers this turn ("for each creature that attacked this turn"). */
   attackersThisTurn?: number;
   /** Combat phases begun this turn: "if it's the first combat phase of the turn" (CR 506.1, 500.8). */

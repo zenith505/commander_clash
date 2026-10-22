@@ -94,7 +94,7 @@ export type Count =
    * "The number of creatures you control", "for each other Elf you control". `filter.controller` is from the ability's controller's view;
    * `whose`: "creatures target player controls", controlled by those players.
    */
-  | { kind: "permanents"; filter: TargetSpec; other?: boolean; whose?: PlayerRef; /** "Differently named lands you control": each English name once (rulings); a face-down permanent has no name (CR 708.2). */ differentNames?: true; /** "Each other attacking creature that shares a creature type with it" (Shared Animosity): not the trigger's subject, and sharing a type with it. */ sharesTypeWithSubject?: true; /** "Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it" (Coat of Arms): not the permanent the static effect is applied to, and sharing a type with it. */ sharesTypeWithAffected?: true; /** "Each nontoken creature you control gets +1/+1 for each other creature you control with the same name as that creature" (Mirror Box): not the permanent the static effect is applied to, and with its name (a face-down permanent has none, CR 708.2). */ sameNameAsAffected?: true }
+  | { kind: "permanents"; filter: TargetSpec; other?: boolean; whose?: PlayerRef; /** "The number of +1/+1 counters on lands you control" (Toph, the Blind Bandit): their counters of this kind added up, not the permanents (ANY_COUNTER: every kind). */ counter?: CounterKind; /** "Differently named lands you control": each English name once (rulings); a face-down permanent has no name (CR 708.2). */ differentNames?: true; /** "Each other attacking creature that shares a creature type with it" (Shared Animosity): not the trigger's subject, and sharing a type with it. */ sharesTypeWithSubject?: true; /** "Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it" (Coat of Arms): not the permanent the static effect is applied to, and sharing a type with it. */ sharesTypeWithAffected?: true; /** "Each nontoken creature you control gets +1/+1 for each other creature you control with the same name as that creature" (Mirror Box): not the permanent the static effect is applied to, and with its name (a face-down permanent has none, CR 708.2). */ sameNameAsAffected?: true }
   /** "The number of cards in your hand", "in that player's hand". */
   | { kind: "cardsInHand"; who: PlayerRef }
   /** "Each creature you control gets +1/+0 for each time it has attacked this turn" (Moraug): the permanent the static effect is applied to (GameObject.attacked). */
@@ -273,6 +273,8 @@ export type Count =
   | { kind: "tokensCreatedThisTurn"; subtype?: string }
   /** Gravestorm's "each permanent put into a graveyard from the battlefield this turn", tokens and anyone's too (CR 702.69a, rulings). */
   | { kind: "toGraveyardThisTurn" }
+  /** "The number of cards put into their graveyard from anywhere this turn" (Fraying Sanity): that player's. */
+  | { kind: "cardsToGraveyardThisTurn"; whose: PlayerRef }
   /** "For each creature that attacked this turn": creatures declared as attackers this turn (CR 508.1). */
   | { kind: "attackersThisTurn" }
   /** "For each time you've cast your commander from the command zone this game": all of your commanders (CR 903.8, rulings). */
@@ -1972,6 +1974,8 @@ export type Effect =
    */
   /** "Each opponent reveals cards from the top of their library until they reveal a land card, then puts those cards into their graveyard" (Consuming Aberration). */
   | { type: "revealUntilLandToGraveyard"; who: PlayerRef }
+  /** "Each opponent exiles cards from the top of their library until that player has exiled cards with total mana value 20 or greater" (Tasha's Hideous Laughter). */
+  | { type: "exileUntilTotalMv"; who: PlayerRef; total: number }
   | {
       type: "revealUntil";
       filter: TargetSpec;
@@ -2904,6 +2908,8 @@ export type SpellCondition =
   | { kind: "amountsCompare"; a: Amount; atLeast: Amount }
   /** "If it's a creature" about target `index` (Mythos of Nethroi): that permanent as it is now, still a legal target. */
   | { kind: "targetIs"; index: number; filter: TargetSpec }
+  /** "If a Dinosaur is dealt damage this way" (Marauding Raptor): a permanent this resolution dealt damage to, as it is now. */
+  | { kind: "damagedThisWayIs"; filter: TargetSpec }
   /** "If that land is a Plains" (Emeria Shepherd): the trigger's subject as it is now, or as it last existed (CR 608.2h). */
   | { kind: "subjectIs"; filter: TargetSpec }
   /** "If it was attacking" (Zurgo Stormrender): the trigger's subject is attacking, or was as it last existed (CR 608.2h). */

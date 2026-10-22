@@ -880,6 +880,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runSpellsEffect(s, e, ctx, src);
     case "mill":
     case "revealUntilLandToGraveyard":
+    case "exileUntilTotalMv":
     case "exileTop":
     case "revealTopToHand":
     case "revealTop":

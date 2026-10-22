@@ -1034,3 +1034,19 @@ describe("Wavebreak Hippocamp", () => {
     expect(hand(s)).toBe(h0 - 2);
   });
 });
+
+const windsOfChange = card("Winds of Change", "Sorcery", "{R}", { oracleText: "Each player shuffles the cards from their hand into their library, then draws that many cards." });
+
+describe("Winds of Change", () => {
+  it("each player draws as many cards as they shuffled into their own library (rulings)", () => {
+    expect(isFullySupported(windsOfChange)).toBe(true);
+    const { s: s0, ap, ids, opp } = setup([windsOfChange]);
+    s0.players[opp]!.hand = s0.players[opp]!.hand.slice(0, 3);
+    const sizes = Object.fromEntries(s0.turnOrder.map((p) => [p, s0.players[p]!.hand.length - (p === ap ? 1 : 0)]));
+    const oldOpp = [...s0.players[opp]!.hand];
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [], undefined, "auto")));
+    for (const p of s.turnOrder) expect(s.players[p]!.hand.length).toBe(sizes[p]);
+    expect(s.players[opp]!.hand.length).toBe(3);
+    expect(oldOpp.every((id) => s.objects[id]!.zone === "library" || s.players[opp]!.hand.includes(id))).toBe(true);
+  });
+});

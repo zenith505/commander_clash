@@ -549,7 +549,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       return;
     }
-    case "shuffleZones":
+    case "shuffleZones": {
+      const shuffled: [PlayerId, number][] = [];
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
         const ids = [...(e.hand ? p.hand : []), ...(e.graveyard ? p.graveyard : [])].filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
@@ -562,9 +563,13 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         }
         for (const id of ids) moveObject(s, id, "library");
         shuffleLibrary(s, p);
+        shuffled.push([pid, ids.length]);
         log(s, `${p.name} shuffles ${e.filter ? `${ids.length === 1 ? "the" : `all ${ids.length}`} ${e.filter.text}${ids.length === 1 ? "" : "s"} from their graveyard` : `their ${e.hand && e.graveyard ? "hand and graveyard" : e.hand ? "hand" : "graveyard"}`} into their library.`);
       }
+      // Winds of Change: each draws as many as they shuffled into their own library (rulings).
+      if (e.drawThatMany) for (const [pid, n] of shuffled) if (n && !player(s, pid).lost) draw(s, pid, n);
       return;
+    }
     case "handToBottomDraw": {
       // Teferi's Puzzle Box, Mindmoil: the whole hand goes on the bottom in the order its owner chooses (CR 401.4), then
       // that many cards are drawn, which can be some of them if the library was short.

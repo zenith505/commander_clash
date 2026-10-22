@@ -2118,6 +2118,10 @@ export function compile(d: CardDef): CompiledCard {
       out.strive = strive[1]!;
       continue;
     }
+    // "Enchantment spells you cast have affinity for Auras" (Pearl-Ear): each such spell costs {1} less to cast for each
+    // Aura you control (CR 702.41a); two of them, {2} less (CR 702.41b, rulings).
+    const grantAffinity = /^((?:[A-Z][a-z]+ )?spells) you cast have affinity for ([A-Z][a-z]+s)\.$/.exec(line);
+    if (grantAffinity) line = `${grantAffinity[1]} you cast cost {1} less to cast for each ${grantAffinity[2]!.slice(0, -1)} you control.`;
     const cost = parseCostChange(line);
     if (cost) {
       if (cost === "fail") out.unsupported.push(raw);

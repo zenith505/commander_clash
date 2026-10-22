@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passAll, passUntil, putOnBattlefield, scry, setup } from "./helpers";
-import { castProblem, characteristics, invalidateCharacteristics, isFullySupported, power, toughness, objHasKeyword, planActivate, planCast, waitingOn, type GameState } from "../src";
+import { castProblem, characteristics, spellCost, invalidateCharacteristics, isFullySupported, power, toughness, objHasKeyword, planActivate, planCast, waitingOn, type GameState } from "../src";
 
 // Real oracle text (Scryfall).
 const singleCombat = card("Single Combat", "Sorcery", "{3}{W}{W}", {
@@ -77,6 +77,14 @@ const kozilek = card("Kozilek's Command", "Kindred Instant — Eldrazi", "{X}{C}
   oracleText:
     'Choose two —\n• Target player creates X 0/1 colorless Eldrazi Spawn creature tokens with "Sacrifice this token: Add {C}."\n• Target player scries X, then draws a card.\n• Exile target creature with mana value X or less.\n• Exile up to X target cards from graveyards.',
 });
+const pearlEar = card("Pearl-Ear, Imperial Advisor", "Legendary Creature — Fox Advisor", "{1}{W}{W}", {
+  power: "3",
+  toughness: "4",
+  keywords: ["Lifelink"],
+  oracleText:
+    "Lifelink\nEnchantment spells you cast have affinity for Auras. (They cost {1} less to cast for each Aura you control.)\nWhenever you cast an Aura spell that targets a modified permanent you control, draw a card. (Equipment, Auras you control, and counters are modifications.)",
+});
+const pacifism = card("Pacifism", "Enchantment — Aura", "{1}{W}", { oracleText: "Enchant creature\nEnchanted creature can't attack or block." });
 const treasure = card("Treasure", "Token Artifact — Treasure", "", { oracleText: "{T}, Sacrifice this token: Add one mana of any color." });
 
 /** Pass along, answering every pending choice the dull way, until `stop` holds. */
@@ -363,5 +371,25 @@ describe("Kozilek's Command", () => {
     s = until(s, (x) => x.stack.length === 0);
     expect(s.players[opp]!.hand.length).toBe(hand + 1);
     expect(yard.map((id) => s.objects[id]!.zone)).toEqual(["exile", "exile", "graveyard"]);
+  });
+});
+
+describe("Pearl-Ear, Imperial Advisor", () => {
+  it("is supported: enchantment spells cost {1} less for each Aura you control, not other spells", () => {
+    expect(isFullySupported(pearlEar)).toBe(true);
+    const { s, ap, ids, opp } = setup([card("Test Enchantment", "Enchantment", "{3}{W}", { oracleText: "Creatures you control get +1/+1." }), bear()]);
+    const before = [spellCost(s, ap, s.objects[ids[0]!]!), spellCost(s, ap, s.objects[ids[1]!]!)];
+    putOnBattlefield(s, ap, pearlEar);
+    for (let i = 0; i < 2; i++) {
+      const a = putOnBattlefield(s, ap, pacifism);
+      s.objects[a]!.attachedTo = putOnBattlefield(s, opp, bear());
+    }
+    // An Aura of another player's doesn't count.
+    const theirs = putOnBattlefield(s, opp, pacifism);
+    s.objects[theirs]!.attachedTo = putOnBattlefield(s, ap, bear());
+    invalidateCharacteristics(s);
+    const after = [spellCost(s, ap, s.objects[ids[0]!]!), spellCost(s, ap, s.objects[ids[1]!]!)];
+    expect(before[0]!.extra - after[0]!.extra).toBe(2);
+    expect(before[1]!.extra - after[1]!.extra).toBe(0);
   });
 });

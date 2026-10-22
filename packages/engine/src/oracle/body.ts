@@ -1176,11 +1176,24 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     }
     // "Search your library for a creature or land card and reveal it. Put it onto the battlefield tapped if it's a land
     // card. Otherwise, put it into your hand. Then shuffle." (Archdruid's Charm): one search, the land card's own destination.
-    const searchReveal = /^Search your library for (an? [a-z ]+? card) and reveal it$/.exec(s);
+    const searchReveal = /^Search your library for (an? [A-Za-z ]+? card) and reveal it$/.exec(s);
     if (searchReveal && sentences[si + 1] === "Put it onto the battlefield tapped if it's a land card" && sentences[si + 2] === "Otherwise, put it into your hand" && /^Then,? shuffle$/.test(sentences[si + 3] ?? "")) {
       const fx = parseOne(`Search your library for ${searchReveal[1]}, reveal it, put it into your hand, then shuffle`, ctx);
       if (fx?.length !== 1 || fx[0]!.type !== "search") return null;
       effects.push({ ...fx[0]!, landTo: { zone: "battlefield", tapped: true } });
+      si += 3;
+      continue;
+    }
+    // Scholar of New Horizons: "Search your library for a Plains card and reveal it. If an opponent controls more lands
+    // than you, you may put that card onto the battlefield tapped. If you don't put the card onto the battlefield, put it
+    // into your hand. Then shuffle." One search; the card found goes onto the battlefield instead only if the condition
+    // holds then, and the player wants it to (rulings).
+    const mayInstead = searchReveal && /^If (.+), you may put that card onto the battlefield( tapped)?$/.exec(sentences[si + 1] ?? "");
+    if (searchReveal && mayInstead && sentences[si + 2] === "If you don't put the card onto the battlefield, put it into your hand" && /^Then,? shuffle$/.test(sentences[si + 3] ?? "")) {
+      const fx = parseOne(`Search your library for ${searchReveal[1]}, reveal it, put it into your hand, then shuffle`, ctx);
+      const cond = parseStaticCondition(mayInstead[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      if (fx?.length !== 1 || fx[0]!.type !== "search" || !cond) return null;
+      effects.push({ ...fx[0]!, mayInstead: { dest: { zone: "battlefield", ...(mayInstead[2] ? { tapped: true } : {}) }, cond } });
       si += 3;
       continue;
     }

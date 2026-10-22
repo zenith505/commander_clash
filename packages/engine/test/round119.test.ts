@@ -2,7 +2,7 @@
 // prototyped spell; Aminatou's Augury asks which type a card with two is cast as), then the most played cards.
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, forest, passUntil, putOnBattlefield, setup } from "./helpers";
+import { act, bear, card, forest, passUntil, plains, putOnBattlefield, setup } from "./helpers";
 import { botActions, byTypeChoices, isFullySupported, objHasKeyword, planActivate, planCast, power, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 import { invalidateCharacteristics } from "../src/layers";
 import { moveObject, spellCost } from "../src/game";
@@ -228,5 +228,61 @@ describe("Chandra's Incinerator", () => {
     // The next turn, it's gone.
     s = passUntil(s, "upkeep", later(s, ap, 1));
     expect(spellCost(s, ap, s.objects[ids[0]!]!).extra).toBe(5);
+  });
+});
+
+const scholar = card("Scholar of New Horizons", "Creature — Human Scout", "{1}{W}", {
+  power: "1",
+  toughness: "1",
+  oracleText:
+    "This creature enters with a +1/+1 counter on it.\n{T}, Remove a counter from a permanent you control: Search your library for a Plains card and reveal it. If an opponent controls more lands than you, you may put that card onto the battlefield tapped. If you don't put the card onto the battlefield, put it into your hand. Then shuffle.",
+});
+
+describe("Scholar of New Horizons", () => {
+  const withScholar = (oppLands: number) => {
+    const { s: s0, ap } = setup([]);
+    const s = s0;
+    const sc = putOnBattlefield(s, ap, scholar);
+    s.objects[sc]!.counters = { "+1/+1": 1 };
+    const pl = toLibraryTop(s, ap, plains);
+    const opp = later(s, ap, 1);
+    for (let i = 0; i < oppLands; i++) putOnBattlefield(s, opp, forest);
+    invalidateCharacteristics(s);
+    return { s, ap, sc, pl };
+  };
+  const lands = (s: GameState, pid: PlayerId) => s.battlefield.filter((id) => s.objects[id]!.controller === pid && s.cards[s.objects[id]!.cardId]!.types.includes("Land")).length;
+
+  it("an opponent with more lands: the Plains may go onto the battlefield tapped", () => {
+    expect(isFullySupported(scholar)).toBe(true);
+    let { s, ap, sc, pl } = withScholar(20);
+    s = settle(run(s, planActivate(s, ap, sc, 0, undefined, undefined, undefined, undefined, { counters: [{ id: sc, kind: "+1/+1" }] })));
+    expect(s.objects[sc]!.counters["+1/+1"] ?? 0).toBe(0);
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap });
+    s = act(s, { type: "searchLibrary", player: ap, found: [pl] });
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    const before = lands(s, ap);
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect(s.objects[pl]!.zone).toBe("battlefield");
+    expect(s.objects[pl]!.tapped).toBe(true);
+    expect(lands(s, ap)).toBe(before + 1);
+  });
+
+  it("declined, or with no opponent ahead on lands, it goes to the hand", () => {
+    let { s, ap, sc, pl } = withScholar(20);
+    s = settle(run(s, planActivate(s, ap, sc, 0, undefined, undefined, undefined, undefined, { counters: [{ id: sc, kind: "+1/+1" }] })));
+    s = act(s, { type: "searchLibrary", player: ap, found: [pl] });
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: false }));
+    expect(s.objects[pl]!.zone).toBe("hand");
+    ({ s, ap, sc, pl } = withScholar(0));
+    s = settle(run(s, planActivate(s, ap, sc, 0, undefined, undefined, undefined, undefined, { counters: [{ id: sc, kind: "+1/+1" }] })));
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: [pl] }));
+    expect(s.pending).toBeNull();
+    expect(s.objects[pl]!.zone).toBe("hand");
+  });
+
+  it("no counter on a permanent you control: it can't be activated", () => {
+    const { s, ap, sc } = withScholar(0);
+    s.objects[sc]!.counters = {};
+    expect(planActivate(s, ap, sc, 0)).toBeNull();
   });
 });

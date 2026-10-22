@@ -1,6 +1,6 @@
 import type { Effect, PlayerRef, SearchDest } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, isPermanentCard, isType } from "../cards";
-import { controllerOf } from "../layers";
+import { controllerOf, staticConditionNow } from "../layers";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { castProblem, freeCastable, draw, gainLife, log, loseLife, millCount, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
@@ -693,7 +693,19 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (got === "paused") return "paused";
         picked = got;
       }
-      const dest = (pid: PlayerId, id: ObjectId): SearchDest => (exiledFor(pid) !== undefined ? { zone: "exile" } : picked.includes(id) ? e.split!.to : foundBy(pid).indexOf(id) > 0 && e.others ? e.others : e.landTo && isType(defOf(s, obj(s, id)), "Land") ? e.landTo : e.dest);
+      // Scholar of New Horizons: the one card found, onto the battlefield instead if the condition holds and the searcher
+      // wants it there; asked after the search, before the shuffle.
+      if (e.mayInstead && searchers.length === 1 && foundBy(searchers[0]!).length === 1 && exiledFor(searchers[0]!) === undefined && sc.mayInstead === undefined) {
+        sc.mayInstead = false;
+        if (staticConditionNow(s, e.mayInstead.cond, ctx.sourceId ?? r.item.objectId!, ctx.controller)) {
+          sc.may = undefined;
+          sc.mayInstead = true;
+          s.pending = { kind: "chooseMay", player: searchers[0]!, source: src, prompt: `put ${defOf(s, obj(s, foundBy(searchers[0]!)[0]!)).name} ${describeDest(e.mayInstead.dest)} (if you don't, ${describeDest(e.dest)})` };
+          return "paused";
+        }
+      }
+      const instead = !!sc.mayInstead && sc.may === true;
+      const dest = (pid: PlayerId, id: ObjectId): SearchDest => (instead ? e.mayInstead!.dest : exiledFor(pid) !== undefined ? { zone: "exile" } : picked.includes(id) ? e.split!.to : foundBy(pid).indexOf(id) > 0 && e.others ? e.others : e.landTo && isType(defOf(s, obj(s, id)), "Land") ? e.landTo : e.dest);
       const onto = searchers.flatMap((pid) => foundBy(pid).filter((id) => dest(pid, id).zone === "battlefield").map((id) => ({ o: obj(s, id), under: pid })));
       const hosts = chooseAuraHosts(s, onto, src);
       if (hosts === "paused") return "paused";

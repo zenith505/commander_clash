@@ -170,3 +170,26 @@ describe("Mindslaver, Worst Fears, Sorin Markov, Cruel Entertainment", () => {
     expect(deciderOf(s, a)).toBe(a);
   });
 });
+
+describe("Construct a Cosmic Cube", () => {
+  const cube = card("Construct a Cosmic Cube", "Enchantment — Plan", "{1}{B}{B}", {
+    oracleText:
+      "Whenever you draw your second card each turn, create a 2/1 black Villain creature token with menace and put a plan counter on this enchantment.\nWhen the seventh plan counter is put on this enchantment, sacrifice it. When you do, you control target opponent during their next turn. (You see all cards that player could see and make all decisions for them.)",
+  });
+  const divination = card("Divination", "Sorcery", "{2}{U}", { oracleText: "Draw two cards." });
+
+  it("the seventh plan counter sacrifices it, and you control the target opponent during their next turn", () => {
+    supported(cube);
+    const { s: s0, ap, ids } = setup([divination]);
+    const c = putOnBattlefield(s0, ap, cube);
+    s0.objects[c]!.counters.plan = 6;
+    const victim = next(s0, ap);
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    for (let i = 0; i < 40 && s.pending?.kind !== "chooseTargets"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.objects[c]!.zone).toBe("graveyard");
+    expect(s.battlefield.filter((id) => s.objects[id]!.isToken)).toHaveLength(1);
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: victim }] }));
+    s = passUntil(s, "main1", victim);
+    expect(deciderOf(s, victim)).toBe(ap);
+  });
+});

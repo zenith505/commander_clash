@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
-import { abilityProblem, altCostsFor, attackCost, invalidateCharacteristics, mayPlayFromTop, power, botActions, characteristics, graveyardWays, isFullySupported, planActivate, planCast, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
+import { abilityProblem, altCostsFor, spellCost, manaValue, attackCost, invalidateCharacteristics, mayPlayFromTop, power, botActions, characteristics, graveyardWays, isFullySupported, planActivate, planCast, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const urabrask = scry("transform", [
@@ -809,5 +809,62 @@ describe("Halo Fountain with a mana creature", () => {
     expect(s.objects[f]!.tapped).toBe(true);
     expect(s.objects[p]!.tapped).toBe(false);
     expect(s.battlefield.filter((id) => s.objects[id]!.isToken)).toHaveLength(1);
+  });
+});
+
+describe("Cards riding on this round's parsing", () => {
+  const karsus = card("Karsus Depthguard", "Creature — Lizard Warrior", "{2}{R}", {
+    power: "4",
+    toughness: "3",
+    keywords: ["Defender"],
+    oracleText: "Defender\nAs long as this creature's power is 5 or greater, it can attack as though it didn't have defender.",
+  });
+  const mascots = card("Mascot Exhibition", "Sorcery — Lesson", "{7}", {
+    oracleText: "Create a 2/1 white and black Inkling creature token with flying, a 3/2 red and white Spirit creature token, and a 4/4 blue and red Elemental creature token.",
+  });
+  const story = card("Into the Story", "Instant", "{5}{U}{U}", { oracleText: "This spell costs {3} less to cast if an opponent has seven or more cards in their graveyard.\nDraw four cards." });
+  const nimana = card("Nimana Skitter-Sneak", "Creature — Human Rogue", "{2}{B}", {
+    power: "3",
+    toughness: "2",
+    oracleText: "As long as an opponent has eight or more cards in their graveyard, this creature gets +1/+0 and has menace. (It can't be blocked except by two or more creatures.)",
+  });
+  const fill = (s: GameState, pid: PlayerId, n: number) => {
+    for (let i = 0; i < n; i++) toZone(s, pid, card(`Junk ${i}`, "Sorcery", "{1}"), "graveyard");
+  };
+
+  it("Karsus Depthguard attacks once its power is 5 or greater, counted after all the layers", () => {
+    supported(karsus, mascots, story, nimana);
+    const { s, ap } = setup([]);
+    const k = putOnBattlefield(s, ap, karsus);
+    expect(characteristics(s, s.objects[k]!).attackDespiteDefender).toBe(false);
+    s.objects[k]!.counters["+1/+1"] = 1;
+    invalidateCharacteristics(s);
+    expect(characteristics(s, s.objects[k]!).attackDespiteDefender).toBe(true);
+  });
+
+  it("Mascot Exhibition makes three different tokens, each with its own colors and keywords", () => {
+    const { s: s0, ap, ids } = setup([mascots]);
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    const tokens = s.battlefield.filter((id) => s.objects[id]!.isToken).map((id) => characteristics(s, s.objects[id]!));
+    expect(tokens.map((c) => `${c.subtypes.join("")} ${c.power}/${c.toughness} ${[...c.colors].sort().join("")} ${c.keywords.join("")}`).sort()).toEqual(["Elemental 4/4 RU ", "Inkling 2/1 BW Flying", "Spirit 3/2 RW "]);
+  });
+
+  it("Into the Story costs {3} less, and Nimana Skitter-Sneak gets +1/+0 and menace, with an opponent's graveyard full enough", () => {
+    const { s, ap, ids } = setup([story]);
+    const n = putOnBattlefield(s, ap, nimana);
+    const opp = next(s, ap);
+    const total = () => {
+      const c = spellCost(s, ap, s.objects[ids[0]!]!);
+      return manaValue(c.cost) + c.extra;
+    };
+    expect(total()).toBe(7);
+    fill(s, opp, 7);
+    invalidateCharacteristics(s);
+    expect(total()).toBe(4);
+    expect(power(s, s.objects[n]!)).toBe(3);
+    fill(s, opp, 1);
+    invalidateCharacteristics(s);
+    expect(power(s, s.objects[n]!)).toBe(4);
+    expect(characteristics(s, s.objects[n]!).keywords).toContain("Menace");
   });
 });

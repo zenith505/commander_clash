@@ -79,6 +79,8 @@ import {
   oneOfEachFits,
   abilityCostsHaveX,
   deciderOf,
+  landsAllowed,
+  landUntappedOffer,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
@@ -183,6 +185,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Ad Nauseam: another card while there's life to spare (a loss is a state-based action once it stops, CR 704.5a).
     if (pend.kind === "chooseMay" && pend.repeat) return [{ type: "chooseMay", player: pid, yes: player(s, pid).life > 15 && player(s, pid).hand.length < 12 }];
     if (pend.kind === "chooseMay" && pend.wheel !== undefined) return [{ type: "chooseMay", player: pid, yes: player(s, pid).hand.length < pend.wheel }];
+    // A land played as an effect resolves (Gix): untapped as we'd play it ourselves (see chooseLand).
+    if (pend.kind === "chooseMay" && pend.card && pend.prompt === landUntappedOffer(s, pid, pend.card)) return [{ type: "chooseMay", player: pid, yes: /^reveal/.test(pend.prompt) || player(s, pid).life >= 16 }];
     if (pend.kind === "chooseMay") return [{ type: "chooseMay", player: pid, yes: pend.card ? (revealedMay(s, pend.card) ?? millExplored(s, pid, pend.card)) : wantsMay(s, pid) }];
     if (pend.kind === "payUnless" && pend.discard) return [{ type: "payUnless", player: pid, pay: player(s, pid).hand.length >= pend.discard }];
     if (pend.kind === "payUnless") {
@@ -2760,8 +2764,10 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (o.attachedTo && ab.body.effects.some((e) => e.type === "attach")) continue; // already equipped
       // "Equip—Sacrifice a creature": bots don't give up a permanent to move an Equipment.
       if (ab.equip && ab.costs?.some((c) => c.kind === "sacrifice")) continue;
-      // "Sacrifice X Squirrels" (Chatterfang): bots don't weigh how many permanents to give up.
-      if (abilityCostsHaveX(ab)) continue;
+      // "Sacrifice X Squirrels" (Chatterfang): bots don't weigh how many permanents to give up. "Discard X cards" (Gix):
+      // the cards in hand we can do without (discardXCount).
+      const discardX = discardXCount(s, pid, id, ab);
+      if (abilityCostsHaveX(ab) && discardX === undefined) continue;
       if (ab.body.effects.some((e) => e.type === "unattachSelf")) continue; // reconfigured Equipment stays on
       // Saving a creature with a flip (Frenetic Efreet, Viashino Sandswimmer) waits for something to save it from (chooseFlipEscape).
       if (flips && flipEscape(flips)) continue;
@@ -2801,12 +2807,12 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if ((groupValue(s, pid, body, guessChosen(s, pid, defOf(s, o)), id) ?? 1) <= 0) continue;
       // An X ability: the biggest X we can pay for (never 0).
       const cost = parseManaCost(ab.manaCost);
-      const xs = cost.hasX ? xChoices(availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost), xCount(cost)) : [undefined];
+      const xs = discardX !== undefined ? [discardX] : cost.hasX ? xChoices(availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost), xCount(cost)) : [undefined];
       let plan: Action[] | null = null;
       for (const x of xs) {
         const targets = body.targets.length ? chooseTargets(s, pid, body, false, id, x) : [];
         if (!targets || pointlessAttach(s, body, targets, id)) continue;
-        const costs = abilityCosts(s, pid, o, ab, targets);
+        const costs = discardX !== undefined ? discardXCosts(s, pid, o, ab, targets, discardX) : abilityCosts(s, pid, o, ab, targets);
         if (costs === null) continue;
         if (flips && flipWorth(s, pid, o, ab, flips, targets) <= 0) continue;
         // Tree of Perdition, Tree of Redemption: only to lower an opponent's life total, or raise ours.
@@ -2826,6 +2832,32 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
     }
   }
   return null;
+}
+
+/**
+ * X for an ability whose only X is "Discard X cards" (Gix, Yawgmoth Praetor), or undefined when we'd rather not: in our
+ * main phase with an empty stack, every card in hand but the spells we could still cast after paying for it and a land
+ * to play this turn. At least two cards, so it's worth seven mana.
+ */
+function discardXCount(s: GameState, pid: PlayerId, id: ObjectId, ab: ActivatedAbility): number | undefined {
+  const xs = (ab.costs ?? []).filter((c) => "x" in c && c.x);
+  const c = xs[0];
+  if (xs.length !== 1 || c?.kind !== "discard" || c.filter || c.random || c.mvX || parseManaCost(ab.manaCost).hasX) return undefined;
+  if (s.activePlayer !== pid || (s.step !== "main1" && s.step !== "main2") || s.stack.length) return undefined;
+  const p = player(s, pid);
+  const mana = availableMana(s, pid) - manaValue(parseManaCost(ab.manaCost)) - (ab.tap ? 1 : 0);
+  const hand = p.hand.filter((x) => x !== id);
+  const isLand = (x: ObjectId) => isType(defOf(s, obj(s, x)), "Land");
+  const keep = hand.filter((x) => !isLand(x) && mv(s, x) <= mana).length + (p.landsPlayedThisTurn < landsAllowed(s, pid) && hand.some(isLand) ? 1 : 0);
+  const x = hand.length - keep;
+  return x >= 2 ? x : undefined;
+}
+
+/** The costs for discardXCount's X: the other costs as usual, and the X cards we'd most readily discard. */
+function discardXCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets: TargetChoice[], x: number): CostChoices | null {
+  const others = abilityCosts(s, pid, o, { ...ab, costs: (ab.costs ?? []).filter((c) => !("x" in c && c.x)) }, targets);
+  if (others === null) return null;
+  return { ...others, discard: chooseDiscards(s, pid, x, o.id) };
 }
 
 /** The exiled nonland cards an opponent owns with the counter `body`'s playExiled looks for (Dauthi Voidwalker). */

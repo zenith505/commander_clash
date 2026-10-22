@@ -85,12 +85,14 @@ export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | nul
 
 /** What a "pick" effect picks from: "creature", "nonland permanent", "two lands", "artifact or creature", "Forest". */
 export function pickFilter(phrase: string): TargetSpec | null {
-  const words = phrase.trim().replace(/ you control$/i, "").split(" ");
+  // "Permanents you don't own" (Agent of Treachery): whose they are comes after the noun.
+  const owned = / you (?:don't )?own$/.exec(phrase.trim().replace(/ you control$/i, ""))?.[0] ?? "";
+  const words = phrase.trim().replace(/ you control$/i, "").slice(0, owned ? -owned.length : undefined).split(" ");
   // "a Plains" is already singular; "two creatures" isn't.
-  const asIs = words.join(" ");
+  const asIs = words.join(" ") + owned;
   // "creatures with decayed": the noun before "with" is the plural one.
   const head = words.indexOf("with") > 0 ? words.indexOf("with") - 1 : words.length - 1;
-  const one = parseTargetPhrase(asIs) ? asIs : words.map((w, i) => (i === head ? singular(w) : w)).join(" ");
+  const one = parseTargetPhrase(asIs) ? asIs : words.map((w, i) => (i === head ? singular(w) : w)).join(" ") + owned;
   const spec = parseTargetPhrase(one);
   if (spec?.kind !== "object" || spec.controller) return null;
   return { ...spec, text: one };
@@ -775,6 +777,11 @@ export function parseTargetPhrase(
     owner = "you";
     p = p.replace(/ you own$/, "");
   }
+  // "Permanents you don't own" (Agent of Treachery): another player's, whoever controls it (CR 108.3).
+  if (!inGraveyard && / you don't own$/.test(p)) {
+    owner = "opponent";
+    p = p.replace(/ you don't own$/, "");
+  }
   if (/ (an opponent controls|you don't control)$/.test(p)) {
     controller = "opponent";
     p = p.replace(/ (an opponent controls|you don't control)$/, "");
@@ -873,6 +880,9 @@ export function parseTargetPhrase(
       } else if (w === "enchanted-or-equipped" && !extra.status) {
         if (alts.length > 1) return null;
         extra.status = "enchantedOrEquipped";
+      } else if (w === "goaded" && !extra.status) {
+        if (alts.length > 1) return null;
+        extra.status = "goaded";
       } else if ((w === "enchanted" || w === "equipped" || w === "modified") && !extra.status) {
         // "Enchanted creatures you control", "an equipped creature", "modified creature" (CR 700.9).
         if (alts.length > 1) return null;

@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
-import { altCostsFor, attackCost, mayPlayFromTop, botActions, characteristics, graveyardWays, isFullySupported, planActivate, planCast, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
+import { altCostsFor, attackCost, invalidateCharacteristics, mayPlayFromTop, power, botActions, characteristics, graveyardWays, isFullySupported, planActivate, planCast, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const urabrask = scry("transform", [
@@ -99,6 +99,49 @@ const drana = card("Drana and Linvala", "Legendary Creature — Vampire Angel", 
 });
 const skull = card("Crystal Skull, Isu Spyglass", "Legendary Artifact", "{2}{U}{U}", {
   oracleText: "You may look at the top card of your library any time.\nYou may play historic lands and cast historic spells from the top of your library. (Artifacts, legendaries, and Sagas are historic.)\n{T}: Add {U}.",
+});
+const tributeMage = card("Tribute Mage", "Creature — Human Wizard", "{2}{U}", {
+  power: "2",
+  toughness: "2",
+  oracleText: "When this creature enters, you may search your library for an artifact card with mana value 2, reveal that card, put it into your hand, then shuffle.",
+});
+const kitsa = card("Kitsa, Otterball Elite", "Legendary Creature — Otter Wizard", "{1}{U}", {
+  power: "1",
+  toughness: "3",
+  keywords: ["Vigilance", "Prowess"],
+  oracleText:
+    "Vigilance\nProwess (Whenever you cast a noncreature spell, this creature gets +1/+1 until end of turn.)\n{T}: Draw a card, then discard a card.\n{2}, {T}: Copy target instant or sorcery spell you control. You may choose new targets for the copy. Activate only if Kitsa's power is 3 or greater.",
+});
+const ruby = card("Ruby, Daring Tracker", "Legendary Creature — Human Scout", "{R}{G}", {
+  power: "1",
+  toughness: "2",
+  keywords: ["Haste"],
+  oracleText: "Haste (This creature can attack and {T} as soon as it comes under your control.)\nWhenever Ruby attacks while you control a creature with power 4 or greater, Ruby gets +2/+2 until end of turn.\n{T}: Add {R} or {G}.",
+});
+const agent = card("Agent of Treachery", "Creature — Human Rogue", "{5}{U}{U}", {
+  power: "2",
+  toughness: "3",
+  oracleText: "When this creature enters, gain control of target permanent.\nAt the beginning of your end step, if you control three or more permanents you don't own, draw three cards.",
+});
+const ancestor = card("Vengeful Ancestor", "Creature — Spirit Dragon", "{2}{R}{R}", {
+  power: "3",
+  toughness: "4",
+  keywords: ["Flying", "Goad"],
+  oracleText:
+    "Flying\nWhenever this creature enters or attacks, goad target creature. (Until your next turn, that creature attacks each combat if able and attacks a player other than you if able.)\nWhenever a goaded creature attacks, it deals 1 damage to its controller.",
+});
+const nivVisionary = card("Niv-Mizzet, Visionary", "Legendary Creature — Dragon Wizard", "{4}{U}{R}", {
+  power: "5",
+  toughness: "5",
+  keywords: ["Flying"],
+  oracleText: "Flying\nYou have no maximum hand size.\nWhenever a source you control deals noncombat damage to an opponent, you draw that many cards.",
+});
+const titan = card("Triplicate Titan", "Artifact Creature — Golem", "{9}", {
+  power: "9",
+  toughness: "9",
+  keywords: ["Flying", "Vigilance", "Trample"],
+  oracleText:
+    "Flying, vigilance, trample\nWhen this creature dies, create a 3/3 colorless Golem artifact creature token with flying, a 3/3 colorless Golem artifact creature token with vigilance, and a 3/3 colorless Golem artifact creature token with trample.",
 });
 // Test cards.
 const shock = card("Test Shock", "Instant", "{R}", { oracleText: "Test Shock deals 2 damage to any target." });
@@ -604,6 +647,109 @@ describe("Crystal Skull, Isu Spyglass", () => {
     expect(check(card("Test Relic", "Artifact", "{1}"))).toBe(true);
     expect(check(card("Test Saga", "Enchantment — Saga", "{1}", { oracleText: "I — Draw a card." }))).toBe(true);
     expect(check(card("Test Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }))).toBe(false);
+  });
+});
+
+describe("Tribute Mage, Kitsa, Ruby, Agent of Treachery, Vengeful Ancestor, Niv-Mizzet, Triplicate Titan", () => {
+  const bearOf = (name: string, p = "2") => card(name, "Creature — Bear", "{1}{G}", { power: p, toughness: p });
+  const mine = (s: GameState, pid: PlayerId) => s.battlefield.filter((id) => s.objects[id]!.controller === pid);
+
+  it("Tribute Mage finds only an artifact card with mana value exactly 2", () => {
+    supported(tributeMage, kitsa, ruby, agent, ancestor, nivVisionary, titan);
+    const { s: s0, ap, ids } = setup([tributeMage]);
+    const two = toZone(s0, ap, card("Two Relic", "Artifact", "{2}"), "library");
+    toZone(s0, ap, card("One Relic", "Artifact", "{1}"), "library");
+    toZone(s0, ap, card("Three Relic", "Artifact", "{3}"), "library");
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    for (let i = 0; i < 20 && s.pending?.kind !== "searchLibrary"; i++) s = s.pending?.kind === "chooseMay" ? act(s, { type: "chooseMay", player: ap, yes: true } as never) : act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", cards: [two] });
+  });
+
+  it("Kitsa copies a spell only while its power is 3 or greater", () => {
+    const { s: s0, ap, ids } = setup([shock]);
+    const k = putOnBattlefield(s0, ap, kitsa);
+    const opp = next(s0, ap);
+    let s = run(s0, planCast(s0, ap, ids[0]!, [{ kind: "player", id: opp }]));
+    const spell = s.stack.find((i) => i.objectId === ids[0])!;
+    // Prowess is still on the stack: Kitsa is 1/3.
+    expect(power(s, s.objects[k]!)).toBe(1);
+    expect(planActivate(s, ap, k, 1, [{ kind: "stack", id: spell.id }])).toBeNull();
+    s.objects[k]!.counters["+1/+1"] = 2;
+    invalidateCharacteristics(s);
+    expect(planActivate(s, ap, k, 1, [{ kind: "stack", id: spell.id }])).not.toBeNull();
+  });
+
+  it("Ruby gets +2/+2 when she attacks while you control a creature with power 4 or greater", () => {
+    const { s: s0, ap } = setup([]);
+    const r = putOnBattlefield(s0, ap, ruby);
+    const opp = next(s0, ap);
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = settle(act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: r, defender: opp }] }));
+    expect(power(s, s.objects[r]!)).toBe(1);
+    const { s: s1 } = setup([]);
+    const r1 = putOnBattlefield(s1, ap, ruby);
+    putOnBattlefield(s1, ap, bearOf("Big Bear", "4"));
+    s = passUntil(s1, "declareAttackers", ap);
+    s = settle(act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: r1, defender: opp }] }));
+    expect(power(s, s.objects[r1]!)).toBe(3);
+  });
+
+  it("Agent of Treachery draws three at your end step only with three or more permanents you don't own", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, agent);
+    const opp = next(s0, ap);
+    const theirs = [1, 2, 3].map((i) => putOnBattlefield(s0, opp, bearOf(`Their Bear ${i}`)));
+    for (const id of theirs.slice(0, 2)) s0.objects[id]!.controller = ap;
+    invalidateCharacteristics(s0);
+    const hand = (s: GameState) => s.players[ap]!.hand.length;
+    let s = passUntil(structuredClone(s0), "cleanup", ap);
+    expect(hand(s)).toBe(hand(s0));
+    s0.objects[theirs[2]!]!.controller = ap;
+    invalidateCharacteristics(s0);
+    s = passUntil(s0, "cleanup", ap);
+    expect(hand(s)).toBe(hand(s0) + 3);
+  });
+
+  it("Vengeful Ancestor: a goaded creature that attacks deals 1 damage to its controller", () => {
+    const { s: s0, ap } = setup([]);
+    const opp = next(s0, ap);
+    const anc = putOnBattlefield(s0, ap, ancestor);
+    const theirBear = putOnBattlefield(s0, opp, bearOf("Their Bear"));
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: anc, defender: opp }] });
+    // Its attack trigger goads their bear.
+    for (let i = 0; i < 10 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending?.kind).toBe("chooseTargets");
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: theirBear }] }));
+    expect(characteristics(s, s.objects[theirBear]!).goaded).toBe(true);
+    s = passUntil(s, "declareAttackers", opp);
+    const life = s.players[opp]!.life;
+    s = settle(act(s, { type: "declareAttackers", player: opp, attacks: [{ attacker: theirBear, defender: next(s, opp) }] }));
+    expect(s.players[opp]!.life).toBe(life - 1);
+  });
+
+  it("Niv-Mizzet, Visionary draws for noncombat damage to an opponent, not combat damage", () => {
+    const { s: s0, ap, ids } = setup([shock]);
+    const niv = putOnBattlefield(s0, ap, nivVisionary);
+    const opp = next(s0, ap);
+    const hand = s0.players[ap]!.hand.length - 1;
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "player", id: opp }])));
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
+    s = passUntil(s, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: niv, defender: opp }] });
+    const before = s.players[ap]!.hand.length;
+    s = passUntil(s, "endCombat", ap);
+    expect(s.players[opp]!.life).toBe(40 - 2 - 5);
+    expect(s.players[ap]!.hand.length).toBe(before);
+  });
+
+  it("Triplicate Titan dies: three Golems, one with each of its keywords", () => {
+    const { s: s0, ap } = setup([card("Test Murder", "Instant", "{0}", { oracleText: "Destroy target creature." })]);
+    const t0 = putOnBattlefield(s0, ap, titan);
+    const s = settle(run(s0, planCast(s0, ap, s0.players[ap]!.hand.at(-1)!, [{ kind: "object", id: t0 }])));
+    const golems = mine(s, ap).filter((id) => s.objects[id]!.isToken);
+    expect(golems).toHaveLength(3);
+    expect(golems.map((id) => characteristics(s, s.objects[id]!).keywords.join()).sort()).toEqual(["Flying", "Trample", "Vigilance"]);
   });
 });
 

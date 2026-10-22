@@ -430,7 +430,8 @@ export interface TargetSpec {
    * creature" (CR 700.9: a counter on it, equipped, or enchanted by an Aura its controller controls); "unenchanted":
    * "creatures that aren't enchanted".
    */
-  status?: "enchanted" | "equipped" | "enchantedOrEquipped" | "modified" | "unenchanted";
+  /** "Goaded creature" (Vengeful Ancestor): goaded by any player now (CR 701.15). */
+  status?: "enchanted" | "equipped" | "enchantedOrEquipped" | "modified" | "unenchanted" | "goaded";
   /** "Target Aura attached to a creature", "Aura or Equipment attached to a creature you control": what it's attached to. */
   attachedTo?: TargetSpec;
   /** "Suspected creature" (CR 701.60). */
@@ -1186,6 +1187,8 @@ export type StaticCondition =
   | { kind: "libraryAtMost"; n: number; yours?: true }
   /** Corrupted: "as long as an opponent has three or more poison counters" (CR 122.1f). */
   | { kind: "opponentPoison"; n: number }
+  /** "If an opponent has eight or more cards in their graveyard" (Sheoldred // The True Scriptures): one still in the game. */
+  | { kind: "opponentGraveyard"; n: number }
   /** Raid: "if you attacked this turn" (with one or more creatures); `not`: "if you didn't attack with a creature this turn" (Curious Obsession). */
   | { kind: "attackedThisTurn"; not?: true }
   /** "If you've committed a crime this turn" (CR 700.13). */
@@ -2767,6 +2770,8 @@ export type TriggerEvent =
   | "selfDealsCombatDamageToPlayer"
   /** "Whenever ~ deals damage to a player" (combat or not): once for each player dealt damage (CR 603.2c). */
   | "selfDealsDamageToPlayer"
+  /** "Whenever a source you control deals (noncombat) damage to an opponent" (Niv-Mizzet, Visionary): once for each source and player (CR 603.2c). */
+  | "sourceYouControlDamagesOpponent"
   /** "Whenever ~ deals damage": once per event, however many things it damaged at once; "that much" is the total. */
   | "selfDealsDamage"
   | "selfDealsCombatDamage"
@@ -3045,6 +3050,8 @@ export interface TriggeredAbility {
    * controller); `combat`: only combat damage.
    */
   damagesYou?: { by?: "you" | "opponent" | "any"; combat?: true };
+  /** For "sourceYouControlDamagesOpponent": only noncombat damage. */
+  noncombatOnly?: true;
   /** For "creaturesYouControlAttack": "Whenever you attack with two or more creatures", at least this many of them. */
   minAttackers?: number;
   /** For "creaturesYouControlAttack": "Whenever one or more creatures attack" (Duelist's Heritage), any player's, not only its controller's. */

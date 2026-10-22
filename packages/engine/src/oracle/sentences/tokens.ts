@@ -25,8 +25,9 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Create a 3/3 colorless Phyrexian Wurm artifact creature token with deathtouch and a 3/3 colorless Phyrexian Wurm
   // artifact creature token with lifelink" (Wurmcoil Engine): each of them, entering at the same time (CR 608.2f).
   if ((m = /^[Cc]reate (.+)$/.exec(s))) {
-    const parts = m[1]!.split(/ and (?=(?:an?|one|two|three|four|five) \d+\/\d+ )/);
-    if (parts.length === 2 && parts.every((x) => / tokens?(?: with .+)?$/.test(x))) {
+    // Triplicate Titan: "a ... token with flying, a ... token with vigilance, and a ... token with trample".
+    const parts = m[1]!.split(/,? and (?=(?:an?|one|two|three|four|five) \d+\/\d+ )|, (?=(?:an?|one|two|three|four|five) \d+\/\d+ )/);
+    if (parts.length >= 2 && parts.every((x) => / tokens?(?: with .+)?$/.test(x))) {
       const fx = parts.map((x) => parseSentence(`Create ${x}`, ctx));
       if (fx.some((x) => x?.length !== 1 || x[0]!.type !== "createToken" || x[0]!.attacking || x[0]!.attackingEach || x[0]!.attachTo)) return null;
       return [{ type: "together", effects: fx.map((x) => x![0]!) }];

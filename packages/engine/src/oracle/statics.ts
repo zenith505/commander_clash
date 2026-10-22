@@ -546,6 +546,12 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return { kind: "life", ...{ "greater than or equal to": { min: base }, "greater than": { min: base + 1 }, "less than or equal to": { max: base }, "less than": { max: base - 1 } }[m[1]!] };
   }
   if ((m = new RegExp(`^an opponent has ${NUM} or more poison counters$`).exec(text))) return { kind: "opponentPoison", n: num(m[1]!) };
+  if ((m = new RegExp(`^an opponent has ${NUM} or more cards in their graveyard$`).exec(text))) return { kind: "opponentGraveyard", n: num(m[1]!) };
+  // "Activate only if ~'s power is 3 or greater" (Kitsa, Otterball Elite): as it is now.
+  if ((m = new RegExp(`^(~'s (?:power|toughness)) is ${NUM} or (greater|less)$`).exec(text))) {
+    const amount = parseCount(m[1]!, null);
+    return amount ? { kind: "amount", amount, ...(m[3] === "greater" ? { min: num(m[2]!) } : { max: num(m[2]!) }) } : null;
+  }
   // Pestilence: "if no creatures are on the battlefield".
   if ((m = /^no (.+) (?:are|is) on the battlefield$/.exec(text))) {
     const g = parseGroup(`all ${m[1]}`);

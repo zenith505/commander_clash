@@ -2608,7 +2608,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const prev = effects[effects.length - 1];
       const destroy = prev?.type === "may" && prev.effects.length === 1 ? prev.effects[0] : prev;
       if (destroy?.type !== "destroy" || destroy.what.ref !== "target" || ctx.targets[destroy.what.index]?.types?.join() !== "Creature") return null;
-      const then = ifDestroyed[1]!.replace(/its/g, "that creature's");
+      const then = ifDestroyed[1]!.replace(/\bits\b/g, "that creature's");
       const inner = parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       effects.push({ type: "if", cond: { kind: "destroyedThisWay" }, effects: inner });
@@ -2694,7 +2694,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const put = last?.type === "may" && last.effects.length === 1 ? last.effects[0] : last;
       const filter = parseTargetPhrase(putThisWay[1]!);
       const inner = parseOne(putThisWay[2]!.charAt(0).toUpperCase() + putThisWay[2]!.slice(1), ctx);
-      if (put?.type !== "putFromHand" || put.who || put.any || filter?.kind !== "object" || !inner || /(?:it|its|that)/.test(putThisWay[2]!)) return null;
+      if (put?.type !== "putFromHand" || put.who || put.any || filter?.kind !== "object" || !inner || /\b(?:it|its|that)\b/.test(putThisWay[2]!)) return null;
       effects.push({ type: "if", cond: { kind: "putThisWayIs", filter }, effects: inner });
       continue;
     }

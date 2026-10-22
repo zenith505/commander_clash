@@ -45,6 +45,9 @@ export interface DamageRule {
   gainLife?: { colors?: Color[] };
   dealBack?: { colors?: Color[] };
   tokens?: TokenSpec;
+  /** The Mindskinner: only damage from a source its controller controls; and each opponent mills that much (CR 615.5). */
+  sourceYours?: true;
+  mill?: true;
 }
 
 /** Each player's starting life total in Commander (CR 903.7). */
@@ -548,6 +551,8 @@ export interface ManaLot {
   spentTrigger?: ManaSpentTrigger;
   /** "If any of that mana is spent on a creature spell, it gains haste ...": see ManaAbility.spentHaste. */
   haste?: "endOfTurn" | "game";
+  /** With `haste`: only for a creature spell of this creature type (ManaAbility.spentHasteType). */
+  hasteType?: string;
   /** Opal Palace's "if you spend this mana to cast your commander": see ManaAbility.spentCommanderCounters. */
   commanderCounters?: true;
   /** "Using mana produced by Tecutlan": the permanent that made it, "id#zoneChanges" (TriggeredAbility.cast.manaFromSelf). */
@@ -1097,7 +1102,7 @@ export type PendingDecision =
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "commander" | "drawUpTo" | "payX" | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | /** Eladamri: a card in the hand, or "top". */ "revealHandOrTop" | "pile" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom" | "searchZones" | "vote" | /** One of the words of "each opponent chooses fame or fortune". */ "word" | "mutate" | "either" | "payOrTop" | "counterKind" | /** "Remove up to three counters": the next one to remove, or "done". */ "removeCounter" | /** Which target of a spell or ability becomes ~ (Spellskite). */ "targetSlot" | /** Which legendary permanent of a group to keep (CR 704.5j); the options are their ids. */ "legend" | /** A number chosen secretly (Wheel of Misfortune): any whole number in `numberRange`. */ "secretNumber"; options: string[]; /** Any whole number from `min` to `max` may be chosen, not only `options`. */ numberRange?: { min: number; max: number }; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** "removeCounter": the permanent the counters are moved onto (Resourceful Defense). */ onto?: ObjectId; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId; /** "pile": the two piles, the first then the second (Fact or Fiction); `of`, the player whose hand the chosen one goes to. */ piles?: [ObjectId[], ObjectId[]] }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "commander" | "drawUpTo" | "payX" | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | /** "Then choose one of them. You may play that card this turn." (Party Thrasher): one of the exiled cards. */ "impulseChoice" | /** Eladamri: a card in the hand, or "top". */ "revealHandOrTop" | "pile" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom" | "searchZones" | "vote" | /** One of the words of "each opponent chooses fame or fortune". */ "word" | "mutate" | "either" | "payOrTop" | "counterKind" | /** "Remove up to three counters": the next one to remove, or "done". */ "removeCounter" | /** Which target of a spell or ability becomes ~ (Spellskite). */ "targetSlot" | /** Which legendary permanent of a group to keep (CR 704.5j); the options are their ids. */ "legend" | /** A number chosen secretly (Wheel of Misfortune): any whole number in `numberRange`. */ "secretNumber"; options: string[]; /** Any whole number from `min` to `max` may be chosen, not only `options`. */ numberRange?: { min: number; max: number }; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** "removeCounter": the permanent the counters are moved onto (Resourceful Defense). */ onto?: ObjectId; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId; /** "pile": the two piles, the first then the second (Fact or Fiction); `of`, the player whose hand the chosen one goes to. */ piles?: [ObjectId[], ObjectId[]] }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -1627,6 +1632,8 @@ export interface Resolving {
   exiledFromHand?: number;
   /** How many cards its revealFromHand instruction revealed ("for each card revealed this way"). */
   revealedFromHand?: number;
+  /** The land and nonland cards its parleyReveal instruction revealed ("for each nonland card revealed this way"). */
+  parley?: { land: number; nonland: number };
   /** The excess damage its damage instructions dealt to permanents (CR 120.10): "the excess damage dealt this way". */
   excessDamage?: number;
   /** "The damage dealt this way": all of it, so far in this resolution. */
@@ -1816,6 +1823,8 @@ export interface Resolving {
     faceDownPick?: true;
     /** moveLinked with `one`: the card is being chosen. */
     linkedPick?: true;
+    /** "Exile the top two cards ..., then choose one of them" (Party Thrasher): the cards exiled, and the one chosen. */
+    impulseChoice?: { ids: ObjectId[]; pick?: ObjectId };
     castAmong?: { ids: { id: ObjectId; zc: number }[]; budget?: number; maxMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true; /** How many were cast. */ cast?: number; /** `untilHits`: the cards that qualified; `handPick`, choosing which goes to the hand. */ hits?: ObjectId[]; handPick?: true; /** `copies`: the card the copy being cast is of. */ copyOf?: ObjectId; /** `lands`: the land picked to play, after asking whether it enters untapped. */ landPick?: ObjectId };
     topOrBottom?: string; // the owner's choice: "top" or "bottom"
     /** The player a creature put onto the battlefield attacking attacks (CR 508.4), as a PlayerId string. */

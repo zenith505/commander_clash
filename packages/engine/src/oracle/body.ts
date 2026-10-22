@@ -44,6 +44,8 @@ export interface Ctx {
   excessDamage?: boolean;
   /** A tapAnyNumber instruction came before, here or in the ability whose reflexive trigger this is: "for each creature tapped this way". */
   tappedThisWay?: boolean;
+  /** Parley's "each player reveals the top card of their library" came before: "for each nonland card revealed this way". */
+  parley?: boolean;
   /** An amass instruction came before, here or in the ability whose reflexive trigger this is: "the amassed Army" (CR 701.47c). */
   amassed?: boolean;
   /** Index of the most recent object target, for "it" / "its controller". */
@@ -211,6 +213,8 @@ const checkableMay = (e: Effect) =>
   // "You may put a card from your hand on the bottom of your library. If you do, draw a card." (Volcanic Spite): only
   // with a card in hand.
   (e.type === "handToTop" && e.n === 1) ||
+  // "You may exile a creature card from your graveyard. If you do, ..." (Masked Vandal): only with one there.
+  (e.type === "chooseFromGraveyard" && e.dest === "exile" && e.n === 1 && !e.upTo && !e.who && !e.milled && !e.eventGroup && !e.notSacrificed && e.totalMv === undefined && e.mvMax === undefined) ||
   // "You may create a Treasure token. When you do, ..." (Generous Plunderer): creating it is doing it.
   (e.type === "createToken" && e.who.ref === "you" && typeof e.n === "number" && e.n > 0 && !e.attachTo) ||
   (e.type === "sacrifice" && e.what.ref === "self") ||
@@ -726,6 +730,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     /\b([Rr])eveal the top (\w+(?: plus one)?) cards of your library and separate them into two piles\. An opponent chooses one of those piles\. Put that pile into your hand and the other into your graveyard\./g,
     (_, r, n) => `${r}eveal the top ${n} cards of your library; you separate them into two piles and an opponent chooses one; put one pile into your hand and the other into your graveyard.`,
   );
+  // Selvala, Explorer Returned (parley): "For each nonland card revealed this way, add {G} and you gain 1 life." is two
+  // instructions, each counting those cards (see parleyReveal).
+  text = text.replace(/\bFor each ((?:non)?land card revealed this way), add (\{[WUBRGC]\}) and you gain (\d+) life\./g, "Add $2 for each $1. You gain $3 life for each $1.");
   // "You may copy the exiled card. If you do, you may cast the copy without paying its mana cost." (Isochron Scepter):
   // copying without casting does nothing, so it's one choice.
   text = text.replace(/\b[Yy]ou may copy the exiled card\. If you do, you may cast the copy without paying its mana cost\./g, "You may cast a copy of the exiled card without paying its mana cost.");
@@ -739,6 +746,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // Arcavios): players here have no sideboard (CR 100.4: one is optional) and nothing else outside the game (as for
   // learn), so it's the library and/or the graveyard, where every card is one you own.
   text = text.replace(/\b([Ss])earch your library, graveyard, and\/or outside the game for (an? [a-z ]+? card) you own, /, "$1earch your library and/or graveyard for $2, ");
+  // Karn, the Great Creator: "You may reveal an artifact card you own from outside the game or choose a face-up artifact
+  // card you own in exile. Put that card into your hand." Likewise only the exiled card (see zones.ts).
+  text = text.replace(/\b[Yy]ou may reveal an? ([A-Za-z ]+? card) you own from outside the game or choose a face-up \1 you own in exile\. Put that card into your hand\./g, "You may put a face-up $1 you own in exile into your hand.");
   // "Look at that many cards from the top of your library" (Doomskar Warrior), with "that many" made X by the trigger:
   // the same as "the top X cards".
   text = text.replace(/\b([Ll]ook at|[Rr]eveal) X cards from the top of your library\b/g, "$1 the top X cards of your library");
@@ -837,9 +847,10 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // Not after "If you do,": all of it depends on the payment ("If you do, choose a color, then ...").
     // Not after a leading condition either: "If you control a blue creature, draw a card, then discard a card" (Statute
     // of Denial) is all conditional.
+    // Nor "exile the top two cards of your library, then choose one of them" (Party Thrasher): the choice is of those cards.
     // Nor "you may exile target creature you control, then return that card to the battlefield" (Conjurer's Closet): one
     // blink, all of it optional.
-    .flatMap((x) => (/^If [^,]+, /.test(x) || /^[Yy]ou may exile [^,]+, then return (?:it|that card) to the battlefield under (?:its owner's|your) control\.?$/.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then reveals the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|destroy the rest$|meld them into )/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
+    .flatMap((x) => (/^If [^,]+, /.test(x) || /^[Yy]ou may exile [^,]+, then return (?:it|that card) to the battlefield under (?:its owner's|your) control\.?$/.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then reveals the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|destroy the rest$|meld them into |choose one of them$)/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
     // "Target opponent reveals their hand and you choose a nonland card from it": two instructions, in order.
     .flatMap((x) => x.split(/(?<=reveals (?:their|his or her) hand) and (?=you choose )/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p)))
     .flatMap(splitSpentPair)
@@ -1345,6 +1356,14 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     if (/^Shuffle your library$/.test(s) && /^[Ee]xile the top card$/.test(sentences[si + 1] ?? "")) {
       effects.push({ type: "shuffle", who: { ref: "you" } });
       sentences[si + 1] = "Exile the top card of your library";
+      continue;
+    }
+    // "Exile the top two cards of your library, then choose one of them. You may play that card this turn." (Party
+    // Thrasher, Magmatic Channeler): only the chosen card may be played (Effect impulse `choose`).
+    const exChoose = !impulseIf && new RegExp(`^[Ee]xile the top (${NUM}) cards of your library, then choose one of them$`).exec(s);
+    if (exChoose && /^You may play that card this turn\.?$/.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "impulse", n: amt(exChoose[1]!), until: "thisTurn", choose: true });
+      si++;
       continue;
     }
     const exTop = exEqual ? (["", "X"] as unknown as RegExpExecArray) : new RegExp(`^[Ee]xile the top (?:card|${NUMX} cards) of your library$`).exec(impulseIf && !impulseIf.not ? impulseIf.text : s);
@@ -2152,6 +2171,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const nthAfter = new RegExp(`^(.+?),? if this is the ${ORD} time this ability has resolved this turn$`).exec(s);
     const nthOtherwise = nthSeen.length ? /^Otherwise, (.+)$/.exec(s) : null;
     if (nthSeen.length && !nthIf && !nthAfter && !nthOtherwise) return null;
+    // Nissa, Resurgent Animist: "Then if this is the second time this ability has resolved this turn, reveal cards from
+    // the top of your library until you reveal an Elf or Elemental card. Put that card into your hand and the rest on the
+    // bottom of your library in a random order." The second sentence finishes the first, under the same condition.
+    const nthUntil = nthIf && nthIf[1] && !nthSeen.length && /^reveal cards from the top of your library until you reveal /.test(nthIf[5]!) && /^Put that card into your hand and the rest on the bottom of your library in a random order\.?$/.test(sentences[si + 1] ?? "") && si + 2 === sentences.length;
+    if (nthUntil) {
+      const sub = parseBody(`R${nthIf[5]!.slice(1)}. ${sentences[si + 1]!.replace(/\.$/, "")}.`);
+      if (!sub || sub.targets.length || sub.effects.length !== 1 || sub.effects[0]!.type !== "revealUntil") return null;
+      effects.push({ type: "if", cond: { kind: "resolvedNth", n: [ORDINAL[nthIf[1]!]!, ...(nthIf[2] ? [ORDINAL[nthIf[2]]!] : [])] }, effects: sub.effects });
+      si++;
+      continue;
+    }
     if (nthIf && (nthIf[1] || nthSeen.length)) {
       const ns = [nthIf[1] ?? nthIf[3]!, nthIf[2] ?? nthIf[4]].filter((x): x is string => !!x).map((w) => ORDINAL[w]!);
       const cond: SpellCondition = { kind: "resolvedNth", n: ns };
@@ -2991,6 +3021,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const prev = effects[effects.length - 1];
       // "Sacrifice another creature. If you do, ..., where X is that creature's power" (Disciple of Bolas): you must if you can.
       const mustSac = ifDid[1] === "do" && prev?.type === "pick" && prev.action === "sacrifice" && prev.who.ref === "you" && prev.n === 1 && !prev.unless;
+      // Volatile Stormdrake: "Exchange control of ~ and target creature an opponent controls. If you do, you get {E}{E}{E}{E},
+      // then sacrifice that creature unless ...": both depend on the exchange having happened (rulings).
+      const energyThen = ifDid[1] === "do" && prev?.type === "exchangeControl" ? /^you get ((?:\{E\})+), then (.+)$/.exec(ifDid[2]!) : null;
+      if (energyThen) {
+        const rest = parseOne(capital(energyThen[2]!), ctx);
+        if (!rest) return null;
+        effects.push({ type: "if", cond: { kind: "youDid" }, effects: [{ type: "getEnergy", who: { ref: "you" }, n: energyThen[1]!.length / 3 }, ...rest] });
+        continue;
+      }
+      // "You may exile a creature card from your graveyard. If you do, exile target artifact or enchantment an opponent
+      // controls" (Masked Vandal): whether a card was exiled.
       if (!mustSac && (prev?.type !== "may" || prev.pay || !prev.effects.every(checkableMay))) return null;
       // "You may sacrifice an artifact, creature, ... If you do, each opponent may sacrifice a permanent of their choice that
       // shares a card type with it. For each opponent who doesn't, that player loses 2 life and you draw a card." (Braids,
@@ -3011,7 +3052,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const all = `${ifDid[2]!}${where ? `, where X is ${where[2]!}` : ""}`;
       const sacIt = sacPick && /\b(?:that|the sacrificed) creature's (?:power|toughness|mana value)\b/.test(all) && !/\bthat creature(?!'s (?:power|toughness|mana value)\b)/.test(all) && !ctx.sacrificedIt;
       if (sacIt) ctx.sacrificedIt = true;
-      const inner = parseOne(ifDid[2]!.charAt(0).toUpperCase() + ifDid[2]!.slice(1), ctx);
+      // Party Thrasher: "If you do, exile the top two cards of your library, then choose one of them. You may play that
+      // card this turn." The permission is about the card chosen, so it depends on the discard too.
+      const choosePlay = ifDid[1] === "do" && /^You may play that card this turn$/.test(sentences[si + 1] ?? "") ? new RegExp(`^exile the top (${NUM}) cards of your library, then choose one of them$`).exec(ifDid[2]!) : null;
+      if (choosePlay) si++;
+      const inner = choosePlay ? [{ type: "impulse" as const, n: amt(choosePlay[1]!), until: "thisTurn" as const, choose: true as const }] : parseOne(ifDid[2]!.charAt(0).toUpperCase() + ifDid[2]!.slice(1), ctx);
       if (inner) effects.push(ifDid[1] === "do" ? { type: "if", cond: { kind: sacIt || mustSac ? "sacrificedThisWay" : "youDid" }, effects: inner } : { type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner });
       // Its own "where X is ..." (CR 107.3c).
       const ok = !!inner && defineX();

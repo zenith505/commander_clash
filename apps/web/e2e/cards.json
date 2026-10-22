@@ -3690,6 +3690,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "5c8e5092-962e-49ef-ab82-8434e475e4e7",
+  "name": "Food Chain",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Exile a creature you control: Add X mana of any one color, where X is 1 plus the exiled creature's mana value. Spend this mana only to cast creature spells.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "2x2",
+  "releasedAt": "2022-07-08",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "956381ba-6d37-4a8a-846c-bad79222dbee",
   "name": "Force of Will",
   "manaCost": "{3}{U}{U}",
@@ -5438,6 +5471,33 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a20dd48d-d344-4db1-b0e9-a2b71c3cc9d1",
+  "name": "Karn, the Great Creator",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Legendary Planeswalker — Karn",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Karn"
+  ],
+  "oracleText": "Activated abilities of artifacts your opponents control can't be activated.\n+1: Until your next turn, up to one target noncreature artifact becomes an artifact creature with power and toughness each equal to its mana value.\n−2: You may reveal an artifact card you own from outside the game or choose a face-up artifact card you own in exile. Put that card into your hand.",
+  "loyalty": "5",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2021-01-01",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "2ac1c95c-2a9d-40bc-9cad-9cadfa3f19f7",
   "name": "Kazandu Mammoth // Kazandu Valley",
   "manaCost": "{1}{G}{G}",
@@ -6029,6 +6089,40 @@
   "set": "msc",
   "releasedAt": "2026-06-26",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "92301066-8904-41bc-84bd-4aa286cbab9c",
+  "name": "Liliana of the Dark Realms",
+  "manaCost": "{2}{B}{B}",
+  "cmc": 4,
+  "typeLine": "Legendary Planeswalker — Liliana",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Liliana"
+  ],
+  "oracleText": "+1: Search your library for a Swamp card, reveal it, put it into your hand, then shuffle.\n−3: Target creature gets +X/+X or -X/-X until end of turn, where X is the number of Swamps you control.\n−6: You get an emblem with \"Swamps you control have '{T}: Add {B}{B}{B}{B}.'\"",
+  "loyalty": "3",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2024-09-30",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -6740,6 +6834,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "17770eeb-ecbf-4510-af2d-acececfbe146",
+  "name": "Multiversal Passage",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "As this land enters, choose a basic land type. Then you may pay 2 life. If you don't, it enters tapped.\nThis land is the chosen type.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "spm",
+  "releasedAt": "2025-09-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "938b4e2c-88d9-4637-bc00-e228920c9a78",
   "name": "Murder",
   "manaCost": "{1}{B}{B}",
@@ -7328,6 +7444,37 @@
   "commanderLegal": "legal",
   "set": "frf",
   "releasedAt": "2015-01-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "03cd7583-d054-4359-8c94-7776c54198ed",
+  "name": "Party Thrasher",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Creature — Lizard Wizard",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Lizard",
+   "Wizard"
+  ],
+  "oracleText": "Noncreature spells you cast from exile have convoke. (Each creature you tap while casting a noncreature spell from exile pays for {1} or one mana of that creature's color.)\nAt the beginning of your first main phase, you may discard a card. If you do, exile the top two cards of your library, then choose one of them. You may play that card this turn.",
+  "power": "1",
+  "toughness": "4",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mh3",
+  "releasedAt": "2024-06-14",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -10879,6 +11026,40 @@
   "set": "fin",
   "releasedAt": "2025-06-13",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "08d64b16-9221-4532-890c-d5cdbf181e28",
+  "name": "Volatile Stormdrake",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Creature — Drake",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Drake"
+  ],
+  "oracleText": "Flying, hexproof from activated and triggered abilities\nWhen this creature enters, exchange control of this creature and target creature an opponent controls. If you do, you get {E}{E}{E}{E}, then sacrifice that creature unless you pay an amount of {E} equal to its mana value.",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying",
+   "Hexproof from",
+   "Hexproof"
+  ],
+  "commanderLegal": "legal",
+  "set": "mh3",
+  "releasedAt": "2024-06-14",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

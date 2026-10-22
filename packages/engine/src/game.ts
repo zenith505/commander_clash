@@ -580,6 +580,18 @@ export function enterTogether(s: GameState, run: () => void) {
 }
 
 /** Move an object between zones. It becomes a new object with no memory of its old one (CR 400.7). */
+/** The name of a permanent whose ability stops this card entering the battlefield from its graveyard or library. */
+export function cantEnterFromHere(s: GameState, o: GameObject, zone: "graveyard" | "library", faceDown = false): string | undefined {
+  const d = defOf(s, o);
+  for (const b of s.battlefield) {
+    const ban = abilitiesOf(s, obj(s, b)).cantEnterFrom;
+    if (!ban?.zones.includes(zone)) continue;
+    const hit = faceDown || (ban.what === "creature" ? isType(d, "Creature") : isPermanentCard(d) && (ban.what === "permanent" || !isType(d, "Land")));
+    if (hit) return characteristics(s, obj(s, b)).name;
+  }
+  return undefined;
+}
+
 export function moveObject(
   s: GameState,
   id: ObjectId,
@@ -623,6 +635,16 @@ export function moveObject(
   if (o.spellCopy && to !== "stack" && to !== "battlefield") {
     delete s.objects[id];
     return;
+  }
+  // Grafdigger's Cage: "Creature cards in graveyards and libraries can't enter the battlefield": it stays where it is,
+  // judged as the card is there (rulings), a manifested or cloaked card as the face-down 2/2 creature it's turned into
+  // (CR 701.40a, 701.58a; rulings on Grafdigger's Cage).
+  if (to === "battlefield" && (fromZone === "graveyard" || fromZone === "library")) {
+    const cage = cantEnterFromHere(s, o, fromZone, !!opts.faceDown);
+    if (cage) {
+      log(s, `${opts.faceDown ? "The face-down card" : defOf(s, o).name} can't enter the battlefield from ${fromZone === "graveyard" ? "a graveyard" : "a library"} (${cage}).`);
+      return;
+    }
   }
   // Primeval Spawn: "If ~ would enter and it wasn't cast or no mana was spent to cast it, exile it instead" (CR 614.1a),
   // with the abilities it would have there (614.12). Mana paid for any cost to cast it counts; a copy of a spell, or a
@@ -3099,7 +3121,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const spentTrigger = ab.spentTrigger && { sourceId: o.id, sourceCardId: cardIdOf(o), sourceZc: o.zoneChanges ?? 0, body: ab.spentTrigger.body, sharesCommanderType: true as const };
   // "Whenever you cast a permanent spell using mana produced by Tecutlan": its mana is kept apart, to tell.
   const source = abilitiesOf(s, o).triggers.some((t) => t.cast?.manaFromSelf) ? `${o.id}#${o.zoneChanges ?? 0}` : undefined;
-  addMana(s, p.id, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(source ? { source } : {}) });
+  addMana(s, p.id, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(source ? { source } : {}) });
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
   addTriggeredMana(s, p.id, picked);
   if (ab.skipNextUntap && o.zone === "battlefield") o.skipNextUntap = true;
@@ -3291,6 +3313,12 @@ export function castProblem(
   const proposedCost = parseManaCost(d.manaCost);
   const limit = castLimitProblem(s, pid, d, choices?.faceDown ? 0 : defMv(d) + (proposedCost.hasX ? (x ?? 0) * xCount(proposedCost) : 0));
   if (limit) return limit;
+  // Grafdigger's Cage: "Players can't cast spells from graveyards or libraries" (the spell is cast from where the card is,
+  // CR 601.2a; a card exiled from a library is cast from exile, rulings). Soulless Jailer: noncreature spells only.
+  for (const b of s.battlefield) {
+    const ban = abilitiesOf(s, obj(s, b)).cantCastFrom;
+    if (ban && (ban.zones as string[]).includes(o.zone) && !(ban.noncreature && isType(d, "Creature"))) return `${characteristics(s, obj(s, b)).name}: players can't cast ${ban.noncreature ? "noncreature " : ""}spells from ${o.zone === "library" ? "libraries" : `${o.zone === "graveyard" ? "graveyards" : "exile"}`}`;
+  }
   // Drannith Magistrate: "Your opponents can't cast spells from anywhere other than their hands", commanders from the
   // command zone included (CR 101.2).
   if (o.zone !== "hand") {
@@ -3524,6 +3552,8 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
       if (m.fromGraveyard && o.zone !== "graveyard") continue;
       if (m.fromZones && !m.fromZones.includes(o.zone as "graveyard" | "exile")) continue;
       if (m.notOwned && o.owner === pid) continue;
+      // Semblance Anvil: a card type (CR 205.2a) the spell shares with a card exiled with it (CR 607.2a).
+      if (m.sharesTypeWithLinked && !linkedExileCards(s, src).some((x) => defOf(s, obj(s, x)).types.some((t) => d.types.includes(t)))) continue;
       if (m.if && !staticConditionNow(s, m.if, src.id, c.controller)) continue;
       const { manaValue: range, power: pw, ...rest } = bindChosen(m.filter, src.chosen);
       if (!printedMatches(rest, d)) continue;
@@ -4799,6 +4829,10 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       log(s, `${p.name} pays ${c.n} life.`);
     } else if (c.kind === "sacrifice" && c.exile) {
       for (const id of choices.sacrifice ?? []) {
+        // "The exiled creature's mana value" (Food Chain): as it last existed (CR 608.2h).
+        const o = obj(s, id);
+        const ch = characteristics(s, o);
+        sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o) });
         log(s, `${p.name} exiles ${nameOf(s, id)}.`);
         moveObject(s, id, "exile");
       }
@@ -4870,7 +4904,9 @@ export function describeTargets(s: GameState, targets?: TargetChoice[]): string 
  * checks that legal targets exist; for a modal ability, without `modes` only that a mode can be chosen.
  */
 /** Teferi, Temporal Archmage's emblem: loyalty abilities any time you could cast an instant (you have priority). */
-const loyaltyAtInstantSpeed = (s: GameState, pid: PlayerId) =>
+const loyaltyAtInstantSpeed = (s: GameState, pid: PlayerId, o?: GameObject) =>
+  // Teferi, Master of Time: "You may activate loyalty abilities of ~ on any player's turn any time you could cast an instant."
+  (!!o && !!abilitiesOf(s, o).selfLoyaltyAtInstantSpeed) ||
   [...s.battlefield.map((x) => obj(s, x)).filter((x) => controllerOf(s, x) === pid), ...liveEmblems(s).filter((x) => x.owner === pid)].some((x) => abilitiesOf(s, x).loyaltyAtInstantSpeed);
 
 export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x?: number, costs?: CostChoices): string | null {
@@ -4897,7 +4933,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (s.priority !== pid || s.pending) return "you don't have priority";
     if (splitSecondOnStack(s)) return "a spell with split second is on the stack"; // CR 702.61a
   }
-  if (ab.sorcerySpeed && !canActAtSorcerySpeed(s, pid) && !((ab.loyalty !== undefined || ab.loyaltyX) && loyaltyAtInstantSpeed(s, pid)) && !(ab.equip && equipAtInstantSpeed(s, pid))) return "activate only as a sorcery";
+  if (ab.sorcerySpeed && !canActAtSorcerySpeed(s, pid) && !((ab.loyalty !== undefined || ab.loyaltyX) && loyaltyAtInstantSpeed(s, pid, o)) && !(ab.equip && equipAtInstantSpeed(s, pid))) return "activate only as a sorcery";
   if (ab.tap && o.tapped) return `${d.name} is tapped`;
   if (ab.tap && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${d.name} has summoning sickness`; // CR 602.5a
   if (ab.sacrificeSelf && o.zone === "battlefield" && !canBeSacrificed(s, o)) return `${d.name} can't be sacrificed`; // CR 701.21, 602.2b
@@ -4910,7 +4946,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.maxPerTurn && (o.activatedThisTurn?.filter((n) => n === index).length ?? 0) >= ab.maxPerTurn) return `${d.name}'s ability can be activated no more than ${ab.maxPerTurn === 2 ? "twice" : `${ab.maxPerTurn} times`} each turn`;
   if (ab.loyalty !== undefined || ab.loyaltyX) {
     // Loyalty abilities: as a sorcery, one per permanent per turn (CR 606.3); a negative cost needs that many counters (CR 606.6).
-    if (!loyaltyAtInstantSpeed(s, pid) && !canActAtSorcerySpeed(s, pid)) return "loyalty abilities can be activated only as a sorcery";
+    if (!loyaltyAtInstantSpeed(s, pid, o) && !canActAtSorcerySpeed(s, pid)) return "loyalty abilities can be activated only as a sorcery";
     // Gained loyalty abilities count too, and stay counted if the effect that gave them ends (rulings).
     const used = o.activatedThisTurn?.filter((n) => n === LOYALTY_USED).length ?? 0;
     if (used >= loyaltyPerTurn(s, o)) return `${used === 1 ? "a loyalty ability" : "two loyalty abilities"} of ${d.name} ${used === 1 ? "was" : "were"} already activated this turn`;
@@ -5761,6 +5797,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "revealHandOrTop") {
     if (!pend.options.includes(choice)) throw new RulesError("choose a card from your hand or the top card of your library");
     (r.scratch ??= {}).revealPick = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "impulseChoice") {
+    const st = r.scratch?.impulseChoice;
+    if (!st || !pend.options.includes(choice)) throw new RulesError("choose one of the exiled cards");
+    st.pick = choice;
     continueResolution(s);
     return;
   }

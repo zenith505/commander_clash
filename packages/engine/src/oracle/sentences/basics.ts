@@ -348,6 +348,14 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!pay || (pay.mana && !plainMana(pay.mana))) return null;
     return [{ type: "may", effects: [], pay, otherwise: [sacrificeSelf], keep: true, text: `Pay ${m[2]} to keep ~` }];
   }
+  // Volatile Stormdrake: "sacrifice that creature unless you pay an amount of {E} equal to its mana value", the creature
+  // it targeted (now yours): its mana value as this resolves.
+  if ((m = /^[Ss]acrifice (that creature) unless you pay an amount of \{E\} equal to its mana value$/.exec(s)) && ctx.lastObjectTarget !== undefined) {
+    const what = parseObject(m[1]!, ctx);
+    const n = parseCount("its mana value", ctx);
+    if (what?.ref !== "target" || !n) return null;
+    return [{ type: "may", effects: [], payEnergy: n, otherwise: [{ type: "sacrifice", what }], keep: true, text: "Pay {E} equal to that creature's mana value to keep it" }];
+  }
   // "Tap ~ unless you pay 1 life" (Carnophage): chosen as it resolves; paying while it's tapped is allowed and doesn't
   // untap it (rulings).
   if ((m = /^[Tt]ap ~ unless you pay (\d+ life)$/.exec(s))) {
@@ -451,6 +459,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return times && [{ type: "addMana", mana: m[1]!, times }];
   }
   if ((m = new RegExp(`^[Aa]dd ${NUM} mana of any (one )?color$`).exec(s)) && (num(m[1]!) === 1 || m[2])) return [{ type: "choose", choice: "color" }, { type: "addMana", chosen: num(m[1]!) }];
+  // "Add X mana of any one color, where X is 1 plus the exiled creature's mana value" (Food Chain): one color, chosen as
+  // it resolves (CR 605.3b), X of it.
+  if (/^[Aa]dd X mana of any one color$/.test(s)) return [{ type: "choose", choice: "color" }, { type: "addMana", chosen: 1, times: amt("X") }];
   // Energy (CR 107.14): "You get {E}{E}", "you get X {E}", "you get an amount of {E} equal to ~'s power".
   if ((m = /^(?:[Yy]ou )?[Gg]et ((?:\{E\})+)$/.exec(s))) return [{ type: "getEnergy", who: { ref: "you" }, n: m[1]!.length / 3 }];
   if ((m = new RegExp(`^(?:[Yy]ou )?[Gg]et ${NUMX} \\{E\\}$`).exec(s))) return [{ type: "getEnergy", who: { ref: "you" }, n: amt(m[1]!) }];

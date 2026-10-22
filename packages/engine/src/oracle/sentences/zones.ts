@@ -63,6 +63,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     ctx.revealedFromHand = true;
     return [{ type: "revealFromHand", ...(filter ? { filter } : {}) }];
   }
+  // Parley: "Each player reveals the top card of their library." Then "For each nonland card revealed this way, you create
+  // a Treasure token" is "create a Treasure token for each nonland card revealed this way" (Selvala's "add {G} and you gain
+  // 1 life" is split in parseBody).
+  if (/^[Ee]ach player reveals the top card of their library$/.test(s)) {
+    ctx.parley = true;
+    return [{ type: "parleyReveal" }];
+  }
+  if (ctx.parley && (m = /^For each ((?:non)?land card revealed this way), (?:you )?(.+)$/.exec(s))) return parseSentence(`${m[2]!.charAt(0).toUpperCase()}${m[2]!.slice(1)} for each ${m[1]}`, ctx);
   // "Put your commander into your hand from the command zone" (Command Beacon): one you own, of your choice with two
   // (rulings); nothing if none is there (CR 903.3).
   if (/^[Pp]ut your commander into your hand from the command zone$/.test(s)) return [{ type: "commanderToHand" }];
@@ -216,6 +224,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const n = num(m[1]!.replace(/^up to /, "").replace(/^an?$/, "one"));
     if (filter === null || !Number.isInteger(n) || n < 1) return null;
     return [{ type: "chooseFromGraveyard", n, ...(filter ? { filter } : {}), ...(/^up to /.test(m[1]!) ? { upTo: true as const } : {}) }];
+  }
+  // Karn, the Great Creator; Coax from the Blind Eternities: "... or choose a face-up artifact card you own in exile. Put
+  // that card into your hand" (see parseBody): chosen as it resolves, never a face-down card (rulings on Karn).
+  if ((m = /^(?:[Yy]ou may )?[Pp]ut a face-up (.+?) you own in exile into your hand$/.exec(s))) {
+    const filter = parseSearchFilter(m[1]!);
+    return filter === null ? null : [{ type: "chooseFromGraveyard", n: 1, upTo: true, fromExile: true, ...(filter ? { filter } : {}) }];
   }
   // Ripples of Undeath: "Mill three cards. Then you may pay {1} and 3 life. If you do, put a card from among those cards into
   // your hand": one of the cards just milled, still in your graveyard.

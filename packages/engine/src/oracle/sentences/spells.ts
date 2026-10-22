@@ -310,8 +310,10 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Copying an ability on the stack (CR 707.10, 707.10c): Strionic Resonator's "Copy target triggered ability you control.
   // You may choose new targets for the copy." (the copy is controlled by you, its source the same, CR 113.7a).
-  if ((m = /^Copy target ((?:activated or )?triggered ability|activated ability) you control$/i.exec(s))) {
-    const spec: TargetSpec = { ...stackSpec(m[1]!), controller: "you", text: `target ${m[1]!.toLowerCase()} you control` };
+  if ((m = /^Copy target ((?:activated or )?triggered ability|activated ability) you control( from an? (colorless|artifact|creature|enchantment|land|planeswalker) source)?$/i.exec(s))) {
+    const from = m[3]?.toLowerCase();
+    const abilityFrom = from === "colorless" ? { colorless: true as const } : from ? { types: [from[0]!.toUpperCase() + from.slice(1)] } : undefined;
+    const spec: TargetSpec = { ...stackSpec(m[1]!), controller: "you", ...(abilityFrom ? { abilityFrom } : {}), text: `target ${m[1]!.toLowerCase()} you control${m[2] ?? ""}` };
     return [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n: 1, newTargets: false }];
   }
   // Return the Favor: "Copy target instant spell, sorcery spell, activated ability, or triggered ability": a spell or an

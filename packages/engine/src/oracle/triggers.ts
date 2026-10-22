@@ -669,6 +669,14 @@ function parseAttackerTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!body) return "fail";
     return { event: "creatureYouControlAttacks", attacker: { filter: { kind: "object", types: ["Creature"], text: "creature an opponent controls" }, anyone: true, attacksYou: "orPlaneswalker" }, ifCond: { kind: "subjectAttackingYou" }, body };
   }
+  // "Whenever your commander attacks" (Tome of Legends, We Ride at Dawn): the commander you own (CR 903.3), whoever
+  // controls it; "it" is that creature.
+  const yours = m || any ? null : /^Whenever your commander attacks, (.+)$/.exec(line);
+  if (yours) {
+    const body = parseBody(yours[1]!.replace(/\bthat creature\b(?!'s)/g, "it"), { subjectIt: true, defending: true });
+    if (!body) return "fail";
+    return { event: "creatureYouControlAttacks", attacker: { filter: { kind: "object", commander: true, owner: "you", text: "your commander" }, anyone: true }, body };
+  }
   const w = m ?? any;
   if (!w) return null;
   // "A creature you control of the chosen type" (Kindred Discovery): the type chosen for this permanent.
@@ -735,6 +743,21 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   if (youAttackAPlayer) {
     perPlayer = true;
     line = `Whenever you attack${youAttackAPlayer[1] ?? ""}, ${line.slice(youAttackAPlayer[0].length)}`;
+  }
+  // "Whenever one or more Halflings you control attack a player" (Meriadoc Brandybuck, Attuma, Crimson Cowl): likewise
+  // once for each player those creatures attack, not a planeswalker or battle (rulings on Meriadoc Brandybuck).
+  const groupAttacksAPlayer = /^Whenever one or more (.+?) you control attack a player, /.exec(line);
+  if (groupAttacksAPlayer) {
+    perPlayer = true;
+    line = `Whenever one or more ${groupAttacksAPlayer[1]} you control attack, ${line.slice(groupAttacksAPlayer[0].length)}`;
+  }
+  // "Whenever you attack with ~ and/or your commander" (Ainok Strike Leader): once for the attack, if it or your commander
+  // (a commander you own, CR 903.3) is among the creatures you attacked with.
+  let selfOrCommander = false;
+  const withCommander = /^Whenever you attack with ~ and\/or your commander, /.exec(line);
+  if (withCommander) {
+    selfOrCommander = true;
+    line = `Whenever you attack, ${line.slice(withCommander[0].length)}`;
   }
   if ((m = /^Whenever (?:one or more (.+?) you control attack|you attack with (one|two|three|four|five) or more (.+?)|you attack), (.+)$/.exec(line))) {
     event = "creaturesYouControlAttack";
@@ -811,7 +834,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     const filter: TargetSpec = group ?? { kind: "object", types: ["Creature"], text: "creature" };
     body = { ...body, effects: [...body.effects, { type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "bounce", fromGroup: true }], text: `return one of those ${phrase} to its owner's hand` }], text: `${body.text} You may return one of those ${phrase} to its owner's hand.` };
   }
-  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}), ...(toOpponent ? { toOpponent: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(anyone ? { anyoneAttacks: true as const } : {}), ...(perPlayer ? { perPlayer: true as const } : {}) };
+  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}), ...(toOpponent ? { toOpponent: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(anyone ? { anyoneAttacks: true as const } : {}), ...(perPlayer ? { perPlayer: true as const } : {}), ...(selfOrCommander ? { selfOrCommander: true as const } : {}) };
 }
 
 /** "Other creatures you control", "tokens you control", "artifacts and/or creatures you control": what a batch trigger counts. */
@@ -1096,7 +1119,8 @@ const YARD_EVENTS: TriggerEvent[] = ["castSpell", "spellYouControlDealsDamage", 
 
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).
-  const line = differenceInHand(raw.replace(/^[A-Z][A-Za-z' -]+ — (?=(When|Whenever|At)\b)/, ""));
+  // "Whenever your commander enters" (Nakia, Tome of Legends): the commander you own (CR 903.3), whoever controls it.
+  const line = differenceInHand(raw.replace(/^[A-Z][A-Za-z' -]+ — (?=(When|Whenever|At)\b)/, "")).replace(/^Whenever your commander enters, /, "Whenever a commander you own enters, ");
   if (!/^(When|Whenever|At)\b/.test(line)) return null;
   // Springheart Nantuko: "Whenever a land you control enters, you may pay {1}{G} if ~ is attached to a creature you
   // control. If you do, create a token that's a copy of that creature. If you didn't create a token this way, create a

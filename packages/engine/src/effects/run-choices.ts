@@ -44,14 +44,16 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           return "paused";
         }
       }
+      // "An amount of {E} equal to its mana value" (Volatile Stormdrake): counted now (CR 608.2h).
+      const pay = e.payEnergy !== undefined ? { ...e.pay, energy: Math.max(0, amountNow(s, e.payEnergy, ctx)) } : e.pay;
       if (sc.may === undefined) {
         // Fabricate: with the permanent gone, the counters can't be put on it, so it's the tokens (rulings).
         const onSelf = e.effects.every((x) => "what" in x && x.what?.ref === "self") && (e.effects.length > 0 || !!e.otherwise?.every((x) => "what" in x && x.what?.ref === "self"));
         if (e.otherwise && onSelf && !objects(s, { ref: "self" }, ctx).length) sc.may = false;
-        else if (e.pay && !canPayNow(s, ctx.controller, e.pay)) sc.may = false; // can't pay, so can't do it
+        else if (pay && !canPayNow(s, ctx.controller, pay)) sc.may = false; // can't pay, so can't do it
         else if (!canDoNow(s, e.effects, ctx)) sc.may = false; // nothing to discard: "if you do" can't happen
         // Paying to untap what's already untapped gets nothing: not worth asking (unless not paying does something).
-        else if (e.pay && !e.otherwise?.length && ctx.sourceId && doesNothingNow(s, ctx.sourceId, { targets: [], effects: e.effects, text: "" })) sc.may = false;
+        else if (pay && !e.otherwise?.length && ctx.sourceId && doesNothingNow(s, ctx.sourceId, { targets: [], effects: e.effects, text: "" })) sc.may = false;
         else if (e.effects.length === 1 && e.effects[0]!.type === "collectEvidence") {
           // "You may collect evidence N": picking the cards is the answer, none is "no" (CR 701.59a).
           s.pending = { kind: "collectEvidence", player: ctx.controller, n: e.effects[0]!.n, source: src };
@@ -60,8 +62,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           // About the card "reveal/look at the top card" found: it's named, and shown (the controller has seen it).
           const rv = s.resolving?.revealed;
           const card = rv && allEffects(e.effects).some((x) => x.type === "revealRevealed" || ("what" in x && (x.what as { ref?: string } | undefined)?.ref === "revealed")) ? s.objects[rv.id] : undefined;
-          const prompt = card ? e.text.replace("the revealed card", defOf(s, card).name) : e.text;
-          s.pending = { kind: "chooseMay", player: ctx.controller, prompt: prompt.replace(/~/g, src), source: src, ...(card ? { card: card.id } : {}), ...(e.pay ? { pay: e.pay } : {}), ...(e.keep ? { keep: true } : {}) };
+          const prompt = card ? e.text.replace("the revealed card", defOf(s, card).name) : e.payEnergy !== undefined ? `${e.text} (${pay!.energy} energy)` : e.text;
+          s.pending = { kind: "chooseMay", player: ctx.controller, prompt: prompt.replace(/~/g, src), source: src, ...(card ? { card: card.id } : {}), ...(pay ? { pay } : {}), ...(e.keep ? { keep: true } : {}) };
           return "paused";
         }
       }
@@ -552,6 +554,7 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "discard" && e.who.ref === "you" && !e.hand && !player(s, ctx.controller).hand.some((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))) return false;
     if (e.type === "draw" && e.who.ref === "you" && !player(s, ctx.controller).library.length) return false;
     if (e.type === "handToTop" && !player(s, ctx.controller).hand.length) return false;
+    if (e.type === "chooseFromGraveyard" && e.dest === "exile" && !e.who && !player(s, ctx.controller).graveyard.some((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))) return false;
     if (e.type === "loseLife" && !players(s, e.who, ctx).some((pid) => !player(s, pid).lost && canLoseLife(s, pid))) return false;
     if (e.type === "sacrifice" && !objects(s, e.what, ctx).some((o) => e.byController || controllerOf(s, o) === ctx.controller)) return false;
     if (e.type === "exile" && e.what.ref === "selfCard" && !objects(s, e.what, ctx).length) return false;

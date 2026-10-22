@@ -570,6 +570,22 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     // Anything else "until your next turn" is for the rules below.
     if (ok) return [{ type: "playerGains", keywords, untilYourNextTurn: true, ...(lifeCantChange ? { lifeCantChange: true as const } : {}) }];
   }
+  // "Target creature gets +X/+X or -X/-X until end of turn" (Liliana of the Dark Realms): only the target is chosen as
+  // it's activated; which one, as it resolves (rulings; CR 608.2d), and X then too.
+  if ((m = /^(target creature) gets \+X\/\+X or -X\/-X until end of turn$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    const up = parseChanges("gets +X/+X");
+    const down = parseChanges("gets -X/-X");
+    if (!what || !up || !down) return null;
+    return [{ type: "either", options: [[{ type: "continuous", what, mods: up, duration: "endOfTurn" }], [{ type: "continuous", what, mods: down, duration: "endOfTurn" }]], labels: ["It gets +X/+X until end of turn", "It gets -X/-X until end of turn"] }];
+  }
+  // "Until your next turn, up to one target noncreature artifact becomes an artifact creature ..." (Karn, the Great
+  // Creator): the same as with the duration after it.
+  if ((m = /^Until (end of turn|your next turn), ((?:up to one )?target .+?) ((?:gets?|gains?|loses?|has|becomes?) .+)$/.exec(s))) {
+    const what = parseObject(m[2]!, ctx);
+    const mods = what && parseChanges(m[3]!);
+    return what && mods ? [{ type: "continuous", what, mods, duration: m[1] === "end of turn" ? "endOfTurn" : "yourNextTurn" }] : null;
+  }
   if ((m = /^(.+?) ((?:gets?|gains?|loses?|has|have|becomes?|assigns?|can attack) .+) until (end of turn|your next turn)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const mods = what && parseChanges(m[2]!);
@@ -596,9 +612,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // Oko, Thief of Crowns: "Exchange control of target artifact or creature you control and target creature an opponent
   // controls with power 3 or less" (CR 701.12b).
-  if ((m = /^Exchange control of (target .+? you control) and (target .+? an opponent controls(?: with .+)?)$/.exec(s))) {
-    const a = parseObject(m[1]!, ctx);
-    const b = a?.ref === "target" && !a.n ? parseObject(m[2]!, ctx) : null;
+  // Volatile Stormdrake: "Exchange control of ~ and target creature an opponent controls": ~ as it is (rulings: it must
+  // still be on the battlefield).
+  if ((m = /^[Ee]xchange control of (~|target .+? you control) and (target .+? an opponent controls(?: with .+)?)$/.exec(s))) {
+    const a: ObjRef | null = m[1] === "~" ? { ref: "self" } : parseObject(m[1]!, ctx);
+    const b = a?.ref === "self" || (a?.ref === "target" && !a.n) ? parseObject(m[2]!, ctx) : null;
     return a && b?.ref === "target" && !b.n ? [{ type: "exchangeControl", a, b }] : null;
   }
   // "Target artifact or creature loses all abilities and becomes a green Elk creature with base power and toughness 3/3"

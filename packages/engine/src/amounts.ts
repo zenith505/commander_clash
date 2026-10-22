@@ -107,6 +107,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return ctx.event?.amount ?? 0;
     case "eventExcess":
       return ctx.event?.excess ?? 0;
+    case "affectedManaValue": {
+      const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
+      return o ? manaValue(parseManaCost(defOf(s, o).manaCost)) : 0;
+    }
     case "timesAffectedAttacked": {
       // Counted for this object only (CR 400.7), even times before the static ability's source was on the battlefield (rulings on Moraug).
       const o = ctx.affected !== undefined ? s.objects[ctx.affected] : undefined;
@@ -207,6 +211,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.revealedFromHand ?? s.resolving?.item.revealed ?? 0;
     case "tappedThisWay":
       return s.resolving?.tappedThisWay ?? s.resolving?.item.tapped ?? 0;
+    case "parleyRevealed":
+      return (c.land ? s.resolving?.parley?.land : s.resolving?.parley?.nonland) ?? 0;
     case "damageThisWay":
       return s.resolving?.damageThisWay ?? 0;
     case "excessThisWay":
@@ -511,6 +517,8 @@ function describeCount(c: Count): string {
       return "#cards in hand";
     case "timesAffectedAttacked":
       return "#times it attacked this turn";
+    case "affectedManaValue":
+      return "its mana value";
     case "cardsInLibrary":
       return "#cards in library";
     case "discardedThisWay":
@@ -529,6 +537,8 @@ function describeCount(c: Count): string {
       return "#cards chosen";
     case "tappedThisWay":
       return "#tapped";
+    case "parleyRevealed":
+      return c.land ? "#land cards revealed" : "#nonland cards revealed";
     case "damageThisWay":
       return "the damage dealt";
     case "excessThisWay":

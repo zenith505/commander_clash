@@ -14,7 +14,7 @@ import { batchPlayerCounters, putPlayerCounters, putCounters, tokenBatch, withPu
 import { createExtraTokens, createToken } from "./effects/run-tokens";
 import { fireEvent } from "./effects";
 import { bindChosen, objectMatches, playerProtectedFrom } from "./effects/targeting";
-import { canPreventDamage, enterTogether, gainLife, log, loseLife, obj, player, syncControl, turnOrderFrom, useShieldCounter } from "./game";
+import { canPreventDamage, enterTogether, gainLife, log, loseLife, millCount, moveObject, obj, player, syncControl, turnOrderFrom, useShieldCounter } from "./game";
 import { protectedFrom, toxicValue } from "./keywords";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
 import type { CardDef, Color, DamageRule, GameObject, GameState, ObjectId, PlayerId, RedirectShield } from "./types";
@@ -275,12 +275,14 @@ const srcKey = (src: DamageSource) => src.id ?? `spell:${src.name}`;
 
 type ShieldOp =
   | { kind: "protection"; srcName: string; toName: string }
-  | { kind: "preventAll"; srcName: string; toName: string; /** A damage rule's, with what's prevented for its additional effect. */ rule?: string; n?: number; src?: DamageSource; /** Vigor's +1/+1 counters, one for each 1 damage prevented, put by `by`. */ plusOnes?: { id: ObjectId; n: number; by: PlayerId; card: string } }
+  | { kind: "preventAll"; srcName: string; toName: string; /** A damage rule's, with what's prevented for its additional effect. */ rule?: string; n?: number; src?: DamageSource; /** A static rule's card, for the log. */ card?: string; /** Vigor's +1/+1 counters, one for each 1 damage prevented, put by `by`. */ plusOnes?: { id: ObjectId; n: number; by: PlayerId; card: string } }
   | { kind: "shieldCounter"; id: ObjectId; srcName: string }
   | { kind: "prevent"; to: Rec; n: number; srcName: string; toName: string; rule?: string; src?: DamageSource; card?: string }
   | { kind: "redirect"; to: Rec; shield: string; n: number; srcName: string; fromName: string; toName: string; card: string; rule?: boolean }
   /** A damage amount replacement or a prevention effect that changes the amount (see DamageMod): `from` became `n`. */
   | { kind: "modify"; srcName: string; toName: string; from: number; n: number; card: string; prevent: boolean; /** A "next time" one, used up now. */ once?: string }
+  /** The Mindskinner's additional effect (CR 615.5): each opponent of `by` mills `n` cards, even if the damage couldn't be prevented (615.12). */
+  | { kind: "mill"; by: PlayerId; n: number; card: string }
   /** Khârn the Betrayer's additional effect (CR 615.5): `to` gains control of it, after any prevention. */
   | { kind: "betrayer"; id: ObjectId; to: PlayerId; prevented: boolean; toName: string };
 
@@ -316,6 +318,9 @@ function staticRules(s: GameState, events: DamageEvent[]): DamageRule[] {
   const out: DamageRule[] = [];
   for (const id of s.battlefield) {
     const cover = obj(s, id);
+    // The Mindskinner: "If a source you control would deal damage to an opponent, prevent that damage and each opponent
+    // mills that many cards."
+    if (abilitiesOf(s, cover).damageToOpponentsMills) out.push({ id: `static-mill:${id}`, turn: s.turn, controller: controllerOf(s, cover), cardId: cover.cardId, to: { players: "opponents" }, sourceYours: true, mill: true });
     const n = abilitiesOf(s, cover).preventCombatFromEach;
     if (n === undefined) continue;
     const you = controllerOf(s, cover);
@@ -374,6 +379,7 @@ function sourceMatches(s: GameState, spec: TargetSpec, src: DamageSource, contro
 /** Does the rule apply to this damage, apart from who'd be dealt it: combat or not, and its source (CR 609.7a-b)? */
 function ruleTakes(s: GameState, r: DamageRule, e: DamageEvent): boolean {
   if (r.combat && (r.combat === "only") !== !!e.combat) return false;
+  if (r.sourceYours && e.src.controller !== r.controller) return false;
   const c = r.by?.chosen;
   if (c) {
     const ref = e.src.ref;
@@ -618,10 +624,13 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
     const toName = nameOf(to);
     let incoming: DamageEvent[] = [];
     for (const e of here) {
+      // The Mindskinner's prevention can't prevent damage that can't be prevented, but its additional effect still
+      // happens, once for each such effect (CR 615.12, 615.12a); the damage is dealt.
+      if (!prev(e)) for (const r of allRules.filter((r) => r.mill && ruleCovers(s, r, to) && ruleTakes(s, r, e))) ops.push({ kind: "mill", by: r.controller, n: e.n, card: cardName(s, r) });
       // "Prevent all damage that would be dealt to / by ~" uses up no shield, so it's applied first (CR 615.1, 616.1).
       // One with an additional effect ("you gain life equal to the damage prevented this way") is the one picked.
       const rules = prev(e) ? allRules.filter((r) => preventsAll(r) && !(e.applied ?? []).includes(r.id) && ruleCovers(s, r, to) && ruleTakes(s, r, e)) : [];
-      const rule = rules.find((r) => (r.gainLife && colorsOk(r.gainLife, e.src)) || (r.dealBack && colorsOk(r.dealBack, e.src)) || r.tokens) ?? (preventedAll(s, e) ? undefined : rules[0]);
+      const rule = rules.find((r) => (r.gainLife && colorsOk(r.gainLife, e.src)) || (r.dealBack && colorsOk(r.dealBack, e.src)) || r.tokens || r.mill) ?? (preventedAll(s, e) ? undefined : rules[0]);
       if (rule) {
         // The player being dealt it may apply amount replacements first (CR 616.1): when the prevention gains its
         // controller life or deals that much back, they're applied first when that's who chooses, as the most it can be.
@@ -629,7 +638,8 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         const boost = allMods.filter((m) => !m.mod.prevent && modApplies(s, m, e, true));
         if ((rule.gainLife || rule.dealBack || rule.tokens) && boost.length && boost.length <= 6 && rule.controller === chooserOf(to))
           for (const order of permutations(boost)) n = Math.max(n, order.reduce((a, m) => (a > 0 ? modAmount(s, m, a) : 0), e.n));
-        ops.push({ kind: "preventAll", srcName: e.src.name, toName, rule: rule.id, n, src: e.src });
+        ops.push({ kind: "preventAll", srcName: e.src.name, toName, rule: rule.id, n, src: e.src, ...(rule.mill ? { card: cardName(s, rule) } : {}) });
+        if (rule.mill) ops.push({ kind: "mill", by: rule.controller, n, card: cardName(s, rule) });
         continue;
       }
       if (prev(e) && preventedAll(s, e)) {
@@ -966,7 +976,7 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
     if (op.kind === "protection") log(s, `Damage from ${op.srcName} to ${op.toName} is prevented (protection).`);
     else if (op.kind === "preventAll") {
       const r = op.rule ? s.damageRules?.find((x) => x.id === op.rule) : undefined;
-      log(s, `Damage from ${op.srcName} to ${op.toName} is prevented${r ? ` (${cardName(s, r)})` : op.plusOnes?.card ? ` (${op.plusOnes.card})` : ""}.`);
+      log(s, `Damage from ${op.srcName} to ${op.toName} is prevented${r ? ` (${cardName(s, r)})` : op.card ? ` (${op.card})` : op.plusOnes?.card ? ` (${op.plusOnes.card})` : ""}.`);
       if (op.plusOnes) plusOnesLater.push(op.plusOnes);
       if (r && op.n && op.src) {
         gainLater(r, op.n, op.src);
@@ -977,6 +987,13 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
       if (op.once) usedMods.add(op.once);
       if (op.prevent) log(s, `${op.from - op.n} damage from ${op.srcName} to ${op.toName} is prevented (${op.card}).`);
       else log(s, `${op.card}: ${op.srcName} deals ${op.n} damage to ${op.toName} instead of ${op.from}.`);
+    } else if (op.kind === "mill") {
+      for (const pid of turnOrderFrom(s, s.activePlayer).filter((q) => q !== op.by && !player(s, q).lost)) {
+        const p = player(s, pid);
+        const n = millCount(s, pid, op.n);
+        for (const id of p.library.slice(0, n)) moveObject(s, id, "graveyard");
+        log(s, `${p.name} mills ${n} card${n === 1 ? "" : "s"} (${op.card}).`);
+      }
     } else if (op.kind === "betrayer") {
       // A new controller each time it applies, each one noticed (rulings: the ability triggers once each time).
       const o = obj(s, op.id);

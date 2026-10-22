@@ -569,6 +569,10 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx): Mo
     // "Attacks this combat if able": the combat going on as it resolves.
     m.kind === "attacksIfAble" && m.combat === "this"
       ? { kind: "attacksIfAble", combat: s.combatsThisTurn ?? 0 }
+      : // "Power and toughness each equal to its mana value" (Karn, the Great Creator): each affected object's own, worked
+        // out in the layers (a permanent's mana value doesn't change but by a copy effect).
+        (m.kind === "modifyPT" || m.kind === "setPT") && [m.power, m.toughness].some((a) => typeof a === "object" && a.count.kind === "affectedManaValue")
+      ? m
       : m.kind === "modifyPT" || m.kind === "setPT"
       ? { ...m, power: evalAmount(s, m.power, c), toughness: evalAmount(s, m.toughness, c) }
       : // Odric, Lunarch Marshal: the keywords creatures its controller controls have now (CR 611.2c), variants included.
@@ -824,6 +828,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "exileTop":
     case "revealTopToHand":
     case "revealTop":
+    case "parleyReveal":
     case "revealRevealed":
     case "discard":
     case "takeFromHand":

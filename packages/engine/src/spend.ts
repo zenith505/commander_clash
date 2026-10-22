@@ -5,7 +5,7 @@ import type { ActivatedAbility, ManaSpend } from "./abilities";
 import { abilitiesOf, defOf, isType, objIsType } from "./cards";
 import { bindChosen, objectMatches, printedMatches } from "./effects";
 import { blackForLife, emptyPool, payFromPool, type CostSymbol, type ManaPool, type ParsedCost, type Payment } from "./mana";
-import { characteristics, controllerOf } from "./layers";
+import { characteristics, controllerOf, everyCreatureType } from "./layers";
 import type { CardDef, Color, GameObject, GameState, ManaLot, ManaOrigin, ManaSpentTrigger, ManaType, PlayerId } from "./types";
 
 /**
@@ -168,7 +168,10 @@ export function spendFromPool(s: GameState, pid: PlayerId, cost0: ParsedCost, us
   const creatureSpell = use !== "other" && "spell" in use && isType(use.spell, "Creature");
   const ownCommander = use !== "other" && "spell" in use && !!use.object?.isCommander && use.object.owner === pid;
   // Lower ranks are spent first; `plain` stands for the mana of that type in no lot.
-  const rank = (l: ManaLot, plain: boolean) => (l.keep ? 10 : 0) + (l.haste ? (creatureSpell ? -1 : 3) : 0) + (l.commanderCounters ? (ownCommander ? -1 : 3) : 0) + (l.only ? 0 : plain === (use === "other") ? 1 : 2);
+  // "A Dragon creature spell" (Carnelian Orb of Dragonkind): a creature spell of that type, changelings included (CR 702.73a).
+  const spellDef = use !== "other" && "spell" in use ? use.spell : undefined;
+  const hasteFits = (l: ManaLot) => creatureSpell && (!l.hasteType || (!!spellDef && (spellDef.subtypes.includes(l.hasteType) || everyCreatureType(spellDef))));
+  const rank = (l: ManaLot, plain: boolean) => (l.keep ? 10 : 0) + (l.haste ? (hasteFits(l) ? -1 : 3) : 0) + (l.commanderCounters ? (ownCommander ? -1 : 3) : 0) + (l.only ? 0 : plain === (use === "other") ? 1 : 2);
   for (const m of Object.keys(spent) as ManaType[]) {
     spent[m] = pool[m] - paid.pool[m];
     if (!spent[m]) continue;
@@ -180,7 +183,7 @@ export function spendFromPool(s: GameState, pid: PlayerId, cost0: ParsedCost, us
         l.n -= k;
         n -= k;
         if (k && l.only?.uncounterable) uncounterable = true;
-        if (k && l.haste && creatureSpell && haste !== "game") haste = l.haste;
+        if (k && l.haste && hasteFits(l) && haste !== "game") haste = l.haste;
         if (l.commanderCounters && ownCommander) commanderCounters += k;
         if (k && l.source) sources.add(l.source);
         if (l.spentTrigger && use !== "other" && "spell" in use) for (let j = 0; j < k; j++) spentTriggers.push(l.spentTrigger);
@@ -220,15 +223,15 @@ export function boundSpend(o: GameObject, only: ManaSpend | undefined): ManaSpen
  * Add mana to `pid`'s pool (CR 106.4): restricted if `only` says how it can be spent (106.6), `from` what its source was
  * (106.3), `keep` if it isn't lost as steps end (until end of turn, or until end of combat for firebending).
  */
-export function addMana(s: GameState, pid: PlayerId, mana: ManaType[], how: { only?: ManaSpend; from?: ManaOrigin[]; keep?: ManaLot["keep"]; spentTrigger?: ManaSpentTrigger; haste?: ManaLot["haste"]; commanderCounters?: true; source?: string } = {}): void {
+export function addMana(s: GameState, pid: PlayerId, mana: ManaType[], how: { only?: ManaSpend; from?: ManaOrigin[]; keep?: ManaLot["keep"]; spentTrigger?: ManaSpentTrigger; haste?: ManaLot["haste"]; hasteType?: string; commanderCounters?: true; source?: string } = {}): void {
   const p = s.players[pid]!;
   const from = how.from?.length ? [...new Set(how.from)].sort() : undefined;
   const trig = (t: ManaSpentTrigger | undefined) => (t ? `${t.sourceId}#${t.sourceZc}` : "");
   for (const m of mana) {
     p.manaPool[m]++;
     if (!how.only && !from && !how.keep && !how.spentTrigger && !how.haste && !how.commanderCounters && !how.source) continue;
-    const same = p.manaLots?.find((l) => l.mana === m && l.only?.text === how.only?.text && (l.from ?? []).join() === (from ?? []).join() && l.keep === how.keep && trig(l.spentTrigger) === trig(how.spentTrigger) && l.haste === how.haste && l.commanderCounters === how.commanderCounters && l.source === how.source);
+    const same = p.manaLots?.find((l) => l.mana === m && l.only?.text === how.only?.text && (l.from ?? []).join() === (from ?? []).join() && l.keep === how.keep && trig(l.spentTrigger) === trig(how.spentTrigger) && l.haste === how.haste && l.hasteType === how.hasteType && l.commanderCounters === how.commanderCounters && l.source === how.source);
     if (same) same.n++;
-    else (p.manaLots ??= []).push({ mana: m, n: 1, ...(how.only ? { only: how.only } : {}), ...(from ? { from } : {}), ...(how.keep ? { keep: how.keep } : {}), ...(how.spentTrigger ? { spentTrigger: how.spentTrigger } : {}), ...(how.haste ? { haste: how.haste } : {}), ...(how.commanderCounters ? { commanderCounters: true as const } : {}), ...(how.source ? { source: how.source } : {}) });
+    else (p.manaLots ??= []).push({ mana: m, n: 1, ...(how.only ? { only: how.only } : {}), ...(from ? { from } : {}), ...(how.keep ? { keep: how.keep } : {}), ...(how.spentTrigger ? { spentTrigger: how.spentTrigger } : {}), ...(how.haste ? { haste: how.haste, ...(how.hasteType ? { hasteType: how.hasteType } : {}) } : {}), ...(how.commanderCounters ? { commanderCounters: true as const } : {}), ...(how.source ? { source: how.source } : {}) });
   }
 }

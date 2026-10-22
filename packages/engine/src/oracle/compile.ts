@@ -1095,6 +1095,19 @@ export function compile(d: CardDef): CompiledCard {
       else out.unsupported.push(raw);
       continue;
     }
+    // Multiversal Passage: "As this land enters, choose a basic land type. Then you may pay 2 life. If you don't, it enters
+    // tapped." (CR 614.12) The choice is kept as Chosen.landType; then "This land is the chosen type." gives it that type,
+    // and with it the type's mana ability (CR 305.6). It has no land type to lose, so the type is added.
+    const landTypeChoice = /^As ~ enters, choose a basic land type\. Then (you may pay \d+ life\. If you don't, it enters tapped\.)$/.exec(line);
+    if (landTypeChoice && !out.entersTappedChoice && !out.entersChoose?.length && d.types.includes("Land") && !d.subtypes.length) {
+      out.entersChoose = [{ what: "basicLandType" }];
+      out.entersTappedChoice = parseEntersChoice(`As ~ enters, ${landTypeChoice[1]}`)!;
+      continue;
+    }
+    if (line === "~ is the chosen type." && out.entersChoose?.some((c) => c.what === "basicLandType")) {
+      out.statics.push({ affects: { kind: "self" }, mods: [{ kind: "addTypes", types: [], subtypes: [], chosenLandType: true }], text: raw });
+      continue;
+    }
     const choice = parseEntersChoice(line);
     if (choice) {
       out.entersTappedChoice = choice;
@@ -1483,7 +1496,9 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // As Foretold, Darksteel Monolith, Rooftop Storm: "pay {0} rather than pay the mana cost" for some spells (CR 118.9).
-    const payZero = /^(Once each turn, you|You) may pay \{0\} rather than pay the mana cost for (?:an? )?(.*?)spells? you cast( from your hand)?( with mana value X or less, where X is the number of ([a-z]+) counters on ~)?\.$/.exec(line);
+    // Dracogenesis: "You may cast Dragon spells without paying their mana costs": the same alternative cost of nothing,
+    // from wherever they may be cast (CR 118.9, 107.3b).
+    const payZero = /^(Once each turn, you|You) may pay \{0\} rather than pay the mana cost for (?:an? )?(.*?)spells? you cast( from your hand)?( with mana value X or less, where X is the number of ([a-z]+) counters on ~)?\.$/.exec(line.replace(/^You may cast ([A-Z][a-z]+) spells without paying their mana costs\.$/, "You may pay {0} rather than pay the mana cost for $1 spells you cast."));
     if (payZero) {
       const what = payZero[2]!.trim();
       const spec = what ? parseTargetPhrase(`${what} card from a graveyard`) : null;
@@ -1530,11 +1545,12 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "Noncreature spells you cast have convoke" (Caetus, Sea Tyrant of Segovia), "Multicolored spells you cast have
     // convoke" (Fallaji Wayfarer): the spell has it while it's being cast and paid for (CR 702.51a, 601.2g-h).
-    const giveConvoke = /^([A-Z][a-z]+(?: and [a-z]+)?) spells you cast have convoke\.$/.exec(line);
+    // "Noncreature spells you cast from exile have convoke" (Party Thrasher): those cast from exile.
+    const giveConvoke = /^([A-Z][a-z]+(?: and [a-z]+)?) spells you cast( from exile)? have convoke\.$/.exec(line);
     if (giveConvoke) {
       const f = parseTargetPhrase(`${giveConvoke[1]!.replace(/ and /g, " or ").toLowerCase()} spell`);
       if (f?.kind !== "spell") out.unsupported.push(raw);
-      else (out.spellsHaveConvoke ??= []).push({ filter: f, text: line });
+      else (out.spellsHaveConvoke ??= []).push({ filter: f, ...(giveConvoke[2] ? { fromExile: true as const } : {}), text: line });
       continue;
     }
     // "Spells you cast from exile have convoke" (Hoarding Broodlord): cast from exile, checked as they're paid for (CR 601.2g-h).
@@ -1833,6 +1849,11 @@ export function compile(d: CardDef): CompiledCard {
       out.phantom = true;
       continue;
     }
+    // The Mindskinner (CR 615.5, 615.12): see staticRules in damage.ts.
+    if (line === "If a source you control would deal damage to an opponent, prevent that damage and each opponent mills that many cards.") {
+      out.damageToOpponentsMills = true;
+      continue;
+    }
     if (line === "If damage would be dealt to ~, prevent that damage and an opponent of your choice gains control of it.") {
       out.betrayer = true;
       continue;
@@ -1883,8 +1904,25 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Teferi, Temporal Archmage's emblem: loyalty abilities when you could cast an instant, still one per permanent each
     // turn (CR 606.3, rulings).
+    if (line === "You may activate loyalty abilities of ~ on any player's turn any time you could cast an instant.") {
+      out.selfLoyaltyAtInstantSpeed = true;
+      continue;
+    }
     if (line === "You may activate loyalty abilities of planeswalkers you control on any player's turn any time you could cast an instant.") {
       out.loyaltyAtInstantSpeed = true;
+      continue;
+    }
+    // Grafdigger's Cage, Kunoros, Soulless Jailer, Weathered Runestone (rulings on Grafdigger's Cage: the card as it is in
+    // that zone; a manifested card is a creature card as it's turned face down there, CR 701.40a, so it can't either).
+    const cage = /^(Creature|Permanent|Nonland permanent) cards in (graveyards|graveyards and libraries) can't enter the battlefield\.$/.exec(line);
+    if (cage) {
+      out.cantEnterFrom = { zones: cage[2] === "graveyards" ? ["graveyard"] : ["graveyard", "library"], what: cage[1] === "Creature" ? "creature" : cage[1] === "Permanent" ? "permanent" : "nonlandPermanent" };
+      continue;
+    }
+    // Playing a land from there is still allowed (rulings on Grafdigger's Cage): it isn't cast (CR 305.1).
+    const noCasting = /^Players can't cast (spells|noncreature spells) from (graveyards|graveyards or libraries|graveyards or exile)\.$/.exec(line);
+    if (noCasting) {
+      out.cantCastFrom = { zones: noCasting[2]!.split(" or ").map((z) => (z === "graveyards" ? "graveyard" : z === "libraries" ? "library" : "exile")), ...(noCasting[1] === "noncreature spells" ? { noncreature: true as const } : {}) };
       continue;
     }
     if (line === "Your opponents can't cast spells from anywhere other than their hands.") {
@@ -2203,6 +2241,8 @@ export function compile(d: CardDef): CompiledCard {
       /^When ~ enters and (whenever (?!it )[^,]+), (.+)$/.exec(line) ??
       // "Whenever a creature you control of the chosen type enters or attacks, draw a card." (Kindred Discovery)
       /^Whenever (an? [^,]+? you control(?: of the chosen type)?) enters or attacks, (.+)$/.exec(line) ??
+      // "Whenever your commander enters or attacks, ..." (Tome of Legends, Search for Dagger).
+      /^Whenever (your commander) enters or attacks, (.+)$/.exec(line) ??
       // "Whenever another creature you control enters or dies, you gain 1 life." (Daxos, Blessed by the Sun)
       /^Whenever ((?:another|an?) [^,]+? you control) enters or dies, (.+)$/.exec(line) ??
       // Syr Konrad: "Whenever another creature dies, or a creature card is put into a graveyard from anywhere other than
@@ -2233,7 +2273,7 @@ export function compile(d: CardDef): CompiledCard {
               ? [`Whenever ~ attacks, ${effect}`, `Whenever ~ becomes the target of a spell, ${effect}`]
             : twice.length === 5
               ? twice.slice(1, 4).map((e) => `Whenever ${/^Whenever an opponent /.test(line) ? "an opponent " : ""}${e}, ${effect}`)
-            : /^Whenever an? [^,]+? enters or attacks, /.test(line)
+            : /^Whenever (?:an? [^,]+?|your commander) enters or attacks, /.test(line)
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} attacks, ${effect}`]
             : /^Whenever [^,]+? you control enters or dies, /.test(line)
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} dies, ${effect}`]
@@ -2457,6 +2497,13 @@ function linkExile(out: CompiledCard) {
     if (imprints.length !== 1 || others.length !== 1) out.unsupported.push("(its mana trigger can't be linked to one imprint ability)");
     else imprints[0]!.linked = true;
   }
+  // Semblance Anvil: "the exiled card" its cost reduction compares with is the one its imprint ability exiled.
+  if (out.costMods?.some((m) => m.sharesTypeWithLinked)) {
+    const imprints = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e) => e.type === "takeFromHand" && e.action === "exile");
+    const others = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)].flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown");
+    if (imprints.length !== 1 || others.length !== 1) out.unsupported.push("(its cost reduction can't be linked to one imprint ability)");
+    else (imprints[0] as Extract<Effect, { type: "takeFromHand" }>).linked = true;
+  }
   // Isochron Scepter: "copy the exiled card" is linked to the one ability that exiles a card from the hand as it enters.
   const copies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)].some((b) => allEffects(b.effects).some((e) => e.type === "castLinkedCopy"));
   if (copies) {
@@ -2537,6 +2584,7 @@ function checkCastingLinks(out: CompiledCard) {
       return;
     }
     if ((o.ref === "sacrificed" || o.kind === "sacrificedSuspected" || o.kind === "sacrificedLegendary") && !canSac) bad = true;
+    if (o.ref === "sacrificed" && o.exiledCost && !exileCost) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
     if (typeof o.chosen === "string") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" ? needs.add("number") : needs.add("creatureType"));
     if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen)) needs.add("color");
@@ -2550,11 +2598,14 @@ function checkCastingLinks(out: CompiledCard) {
   const choices = new Set<ChoiceKind>((out.entersChoose ?? []).map((c) => c.what));
   // "The sacrificed creature" refers to a sacrifice cost: the spell's, or the activated ability's own.
   let canSac = !!out.additionalCosts?.some((c) => c.kind === "sacrifice");
+  let exileCost = false;
   visit([out.spell, out.triggers, out.statics, out.mana]);
   for (const ab of out.activated) {
     canSac = !!ab.costs?.some((c) => c.kind === "sacrifice");
+    exileCost = !!ab.costs?.some((c) => c.kind === "sacrifice" && c.exile);
     visit(ab);
   }
+  exileCost = false;
   visit([out.costMods, out.activationTaxes]);
   if (out.nameBans || out.protectionFromChosenName) needs.add("cardName");
   if (out.noncreatureChosenMvCantBeCast) needs.add("number");

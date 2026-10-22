@@ -1574,6 +1574,22 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     }
     case "chooseFromGraveyard": {
       if (e.who?.ref === "eachPlayer") return eachFromGraveyard(s, e, ctx, src);
+      if (e.fromExile) {
+        // Karn, the Great Creator: a face-up card you own in exile, into your hand (rulings: never a face-down one).
+        const p = player(s, ctx.controller);
+        const sc = (s.resolving!.scratch ??= {});
+        if (!sc.found) {
+          const cards = p.exile.filter((id) => obj(s, id).owner === p.id && !obj(s, id).faceDown && !obj(s, id).hiddenExile && (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))));
+          if (!cards.length) return;
+          const kind = e.filter?.text ?? "card";
+          s.pending = { kind: "searchLibrary", player: p.id, source: src, what: `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`, cards, min: e.upTo ? 0 : 1, max: 1, exiled: true, dig: { looked: cards, to: "to put into your hand", rest: "stay in exile" } };
+          return "paused";
+        }
+        const found = sc.found.filter((id) => p.exile.includes(id) && !obj(s, id).faceDown && !obj(s, id).hiddenExile);
+        if (found.length) log(s, `${p.name} puts ${found.map((id) => defOf(s, obj(s, id)).name).join(", ")} from exile into their hand.`);
+        for (const id of found) moveObject(s, id, "hand");
+        return;
+      }
       const pid = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
       if (pid === undefined || player(s, pid).lost) return;
       const p = player(s, pid);
@@ -1983,6 +1999,30 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       const from = e.who ? players(s, e.who, ctx)[0] : p.id;
       if (from === undefined) return;
+      if (e.choose) {
+        // Party Thrasher: the cards exiled (face up, CR 406.3), then one of them chosen as this resolves (CR 608.2d); only
+        // that one may be played. The rest stay exiled.
+        const sc = (s.resolving!.scratch ??= {});
+        if (!sc.impulseChoice) {
+          const ids = player(s, from).library.slice(0, amountNow(s, e.n, ctx));
+          for (const id of ids) moveObject(s, id, "exile");
+          sc.impulseChoice = { ids };
+          if (ids.length) log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of their library.`);
+          if (ids.length > 1) {
+            s.pending = { kind: "chooseOption", player: p.id, source: src, what: "impulseChoice", options: ids, labels: ids.map((id) => defOf(s, obj(s, id)).name), prompt: `choose one of them; you may play it${e.until === "thisTurn" ? " this turn" : ""}` };
+            return "paused";
+          }
+        }
+        const st = sc.impulseChoice;
+        sc.impulseChoice = undefined;
+        const id = st.pick ?? st.ids[0];
+        const o = id ? s.objects[id] : undefined;
+        if (!o || o.zone !== "exile") return;
+        o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.castOnly ? { castOnly: true as const } : {}) };
+        if (s.resolving) (s.resolving.impulsed ??= []).push(o.id);
+        log(s, `${p.name} chooses ${defOf(s, o).name} and may play it${e.until === "thisTurn" ? " this turn" : ""}.`);
+        return;
+      }
       const ids = player(s, from).library.slice(0, amountNow(s, e.n, ctx));
       for (const id of ids) {
         moveObject(s, id, "exile");

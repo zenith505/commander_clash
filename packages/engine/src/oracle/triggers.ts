@@ -1153,7 +1153,7 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
 }
 
 /** The events that abilities of cards in graveyards see (fireEvent's `fromGraveyards`). */
-const YARD_EVENTS: TriggerEvent[] = ["castSpell", "spellYouControlDealsDamage", "youCommitCrime", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creaturesYouControlDealCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat"];
+const YARD_EVENTS: TriggerEvent[] = ["permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creaturesYouControlDealCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat"];
 
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).

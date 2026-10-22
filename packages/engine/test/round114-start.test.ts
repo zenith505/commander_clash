@@ -1255,3 +1255,47 @@ describe("Kindred Summons", () => {
     expect(forests.every((id) => s.objects[id]!.zone === "library")).toBe(true);
   });
 });
+
+describe("Nether Traitor, Escape to the Wilds", () => {
+  const traitor = card("Nether Traitor", "Creature — Spirit", "{B}{B}", {
+    power: "1",
+    toughness: "1",
+    keywords: ["Haste", "Shadow"],
+    oracleText: "Haste\nShadow (This creature can block or be blocked by only creatures with shadow.)\nWhenever another creature is put into your graveyard from the battlefield, you may pay {B}. If you do, return this card from your graveyard to the battlefield.",
+  });
+  const wilds = card("Escape to the Wilds", "Sorcery", "{3}{R}{G}", { oracleText: "Exile the top five cards of your library. You may play cards exiled this way until the end of your next turn.\nYou may play an additional land this turn." });
+  const murder = card("Murder", "Instant", "{1}{B}{B}", { oracleText: "Destroy target creature." });
+  const wrath = card("Day of Judgment", "Sorcery", "{2}{W}{W}", { oracleText: "Destroy all creatures." });
+
+  it("these cards play", () => {
+    for (const d of [traitor, wilds]) expect(isFullySupported(d)).toBe(true);
+  });
+
+  it("Nether Traitor returns from the graveyard when another creature of yours dies, for {B}", () => {
+    const { s: s0, ap, ids } = setup([murder]);
+    const t = putOnBattlefield(s0, ap, traitor);
+    moveObject(s0, t, "graveyard");
+    const b = putOnBattlefield(s0, ap, bear());
+    putOnBattlefield(s0, ap, card("Swamp", "Basic Land — Swamp"));
+    let s = s0;
+    for (const a of planCast(s, ap, ids[0]!, [target(b)])!) s = act(s, a);
+    for (let i = 0; i < 20 && s.pending?.kind !== "chooseMay"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    s.players[ap]!.manaPool.B = 1;
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect(s.objects[t]!.zone).toBe("battlefield");
+  });
+
+  it("not when it dies at the same time as the other creature (CR 603.10a)", () => {
+    const { s: s0, ap, ids } = setup([wrath]);
+    const t = putOnBattlefield(s0, ap, traitor);
+    putOnBattlefield(s0, ap, bear());
+    putOnBattlefield(s0, ap, card("Swamp", "Basic Land — Swamp"));
+    let s = s0;
+    for (const a of planCast(s, ap, ids[0]!)!) s = act(s, a);
+    s = passAll(s);
+    expect(s.pending).toBeFalsy();
+    expect(s.stack.length).toBe(0);
+    expect(s.objects[t]!.zone).toBe("graveyard");
+  });
+});

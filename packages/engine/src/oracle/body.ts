@@ -1486,7 +1486,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "Until your next end step, you may play it" (Yasmin Khan, Wiccan, Ob Nixilis): over as your next end step begins.
     // "Until end of turn, you may play that card without paying its mana cost" (Urza, CR 118.9): `free`.
     // "You may play that card for as long as it remains exiled" (Valakut Exploration): no duration, as above.
-    const playRe = /^(?:(Until the end of your next turn|Until end of turn|Until your next end step), you may play (?:that card|those cards|them|it)|You may play (?:that card|those cards|them|it)(?: (this turn|until the end of your next turn|until your next end step)| for as long as (?:it remains|they remain) exiled)?)( without paying its mana cost)?$/;
+    const playRe = /^(?:(Until the end of your next turn|Until end of turn|Until your next end step), you may play (?:that card|those cards|them|it)|You may play (?:that card|those cards|them|it|cards exiled this way)(?: (this turn|until the end of your next turn|until your next end step)| for as long as (?:it remains|they remain) exiled)?)( without paying its mana cost)?$/;
     const playIt = exTop && sentences[si + 1] && playRe.exec(sentences[si + 1]!.replace(/\.$/, ""));
     // "Exile the top card of your library. ~ gets +X/+0 until end of turn, where X is that card's mana value. You may play
     // that card this turn." (Tavern Brawler, Daredevil): the permission and the sentence between, about that card.

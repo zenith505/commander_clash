@@ -608,6 +608,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       }
       fromFloating((src, ctrl, triggers) => consider(src, ctrl, undefined, triggers));
       fromEmblems((src, owner) => consider(src, owner, undefined));
+      // "Whenever another creature is put into your graveyard from the battlefield, you may pay {B}. If you do, return ~
+      // from your graveyard to the battlefield" (Nether Traitor): a card already in the graveyard (CR 113.6m), not one that
+      // left the battlefield at the same time, which was still there then (CR 603.10a).
+      fromGraveyards((src, owner) => {
+        if (src.id !== ev.id && !s.leftTogether?.some((l) => l.id === src.id)) consider(src, owner, undefined);
+      });
     }
     // "Whenever you sacrifice a creature" isn't caused by its dying (rulings on Teysa Karlov).
     causedBy = null;

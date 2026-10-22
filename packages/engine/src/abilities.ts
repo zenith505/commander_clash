@@ -2125,6 +2125,11 @@ export type Effect =
       only?: ManaSpend;
       /** "Add {B} or {G} for each ...": `times` mana, each of either color (chosen as it resolves). */
       split?: [ManaType, ManaType];
+      /**
+       * "Add X mana in any combination of colors, where X is the total power of attacking creatures" (Klauth), "add two mana
+       * in any combination of colors" (Manamorphose): `times` mana, each of any color (CR 106.1b), chosen as it resolves.
+       */
+      anyColors?: true;
       /** Remember that this ability's source added mana this turn (StaticCondition addedManaThisTurn). */
       markSource?: true;
     }

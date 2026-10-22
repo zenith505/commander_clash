@@ -1955,7 +1955,7 @@ interface MixPick {
   colors?: Color[];
 }
 
-function ManaMixBar({ pick, onChange, onDone, onCancel }: { pick: MixPick; onChange: (counts: Partial<Record<Color, number>>) => void; onDone: () => void; onCancel: () => void }) {
+function ManaMixBar({ pick, onChange, onDone, onCancel }: { pick: Pick<MixPick, "n" | "label" | "counts" | "colors">; onChange: (counts: Partial<Record<Color, number>>) => void; onDone: () => void; onCancel?: () => void }) {
   const total = COLORS.reduce((a, c) => a + (pick.counts[c] ?? 0), 0);
   const set = (c: Color, k: number) => onChange({ ...pick.counts, [c]: Math.max(0, k) });
   return (
@@ -1981,10 +1981,24 @@ function ManaMixBar({ pick, onChange, onDone, onCancel }: { pick: MixPick; onCha
       <button disabled={total !== pick.n} onClick={onDone}>
         Add
       </button>
-      <button className="ghost" onClick={onCancel}>
-        Cancel
-      </button>
+      {onCancel && (
+        <button className="ghost" onClick={onCancel}>
+          Cancel
+        </button>
+      )}
     </div>
+  );
+}
+
+/** "Add X mana in any combination of colors" from a spell or a triggered ability (Klauth, Manamorphose), as it resolves. */
+function ManaMixChoice({ pending, dispatch }: { pending: Extract<NonNullable<GameState["pending"]>, { kind: "manaMix" }>; dispatch: ReturnType<typeof useGame>["dispatch"] }) {
+  const [counts, setCounts] = useState<Partial<Record<Color, number>>>({});
+  return (
+    <ManaMixBar
+      pick={{ n: pending.n, label: pending.source, counts, ...(pending.colors ? { colors: pending.colors } : {}) }}
+      onChange={setCounts}
+      onDone={() => dispatch([{ type: "manaMix", player: HUMAN, counts }])}
+    />
   );
 }
 
@@ -4306,6 +4320,7 @@ function Controls({
         ))}
       </div>
     );
+  if (pending?.kind === "manaMix" && pending.player === HUMAN) return <ManaMixChoice key={`${pending.source}:${pending.n}`} pending={pending} dispatch={dispatch} />;
   if (pending?.kind === "distribute" && pending.player === HUMAN)
     return <DistributeChoice key={`${pending.source}:${pending.total}:${pending.options.join(",")}`} s={s} pending={pending} dispatch={dispatch} onHover={onHover} />;
   if (pending?.kind === "pickPermanents" && pending.player === HUMAN) {

@@ -62,8 +62,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // "The total power of creatures you control" (Ghalta, Primal Hunger), "... of creatures you control with flying" (The
   // Lord of the Eagles): a sum, so a negative power takes some off (rulings).
-  if (!each && (m = /^the total (power|toughness) of (creatures you control(?: with [a-z]+)?)$/i.exec(p))) {
-    const spec = parseTargetPhrase(m[2]!.replace(/^creatures/, "creature"), { chosen: true });
+  // "The total power of attacking creatures" (Klauth): every player's attackers.
+  if (!each && (m = /^the total (power|toughness) of (creatures you control(?: with [a-z]+)?|attacking creatures)$/i.exec(p))) {
+    const spec = parseTargetPhrase(m[2]!.replace(/creatures/, "creature"), { chosen: true });
     if (spec?.kind !== "object") return null;
     return { count: { kind: "greatestPower", total: true, filter: { ...spec, text: m[2]! }, ...(m[1] === "toughness" ? { toughness: true as const } : {}) } };
   }

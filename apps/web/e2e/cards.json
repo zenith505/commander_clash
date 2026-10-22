@@ -5777,6 +5777,50 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8cefa5d6-5151-4e75-8b72-f210a4c751ea",
+  "name": "Klauth, Unrivaled Ancient",
+  "manaCost": "{5}{R}{G}",
+  "cmc": 7,
+  "typeLine": "Legendary Creature — Dragon",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dragon"
+  ],
+  "oracleText": "Flying, haste\nWhenever Klauth attacks, add X mana in any combination of colors, where X is the total power of attacking creatures. Spend this mana only to cast spells. Until end of turn, you don't lose this mana as steps and phases end.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "G",
+   "R"
+  ],
+  "colorIdentity": [
+   "G",
+   "R"
+  ],
+  "keywords": [
+   "Flying",
+   "Haste"
+  ],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "afc",
+  "releasedAt": "2021-07-23",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d69b1e68-8d8e-460b-9eb4-6a68be886197",
   "name": "Kodama of the West Tree",
   "manaCost": "{2}{G}",

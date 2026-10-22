@@ -395,6 +395,9 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "distribute":
       distributeChosen(s, p, action.parts);
       break;
+    case "manaMix":
+      manaMixChosen(s, p, action.counts);
+      break;
     case "chooseMay":
       chooseMay(s, p, action.yes);
       break;
@@ -5548,6 +5551,19 @@ function distributeChosen(s: GameState, p: Player, parts: Record<ObjectId, numbe
   s.pending = null;
   if (pend.move) log(s, sum ? `${p.name} moves ${sum} ${pend.counter} counter${sum > 1 ? "s" : ""}: ${given.map(([id, n]) => `${n} onto ${nameOf(s, id)}`).join(", ")}.` : `${p.name} moves no counters.`);
   else log(s, `${p.name} distributes ${pend.total} ${pend.counter} counter${pend.total > 1 ? "s" : ""}: ${given.map(([id, n]) => `${n} on ${nameOf(s, id)}`).join(", ")}.`);
+  continueResolution(s);
+}
+
+/** "Add X mana in any combination of colors": how much of each color, X in all (CR 106.1b, 608.2d). */
+function manaMixChosen(s: GameState, p: Player, counts: Partial<Record<Color, number>>) {
+  const pend = s.pending;
+  const r = s.resolving;
+  if (pend?.kind !== "manaMix" || pend.player !== p.id || !r) throw new RulesError("no mana to choose");
+  const given = Object.entries(counts).filter(([, n]) => n !== 0) as [Color, number][];
+  if (given.some(([c, n]) => !(pend.colors ?? COLORS).includes(c) || !Number.isInteger(n) || n < 0)) throw new RulesError(`choose ${pend.colors ? "among those colors" : "colors"} for the mana`);
+  if (given.reduce((a, [, n]) => a + n, 0) !== pend.n) throw new RulesError(`choose colors for all ${pend.n} mana`);
+  r.scratch = { ...r.scratch, manaMix: Object.fromEntries(given) };
+  s.pending = null;
   continueResolution(s);
 }
 

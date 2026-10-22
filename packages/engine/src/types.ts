@@ -1112,6 +1112,11 @@ export type PendingDecision =
   /** "Distribute X +1/+1 counters among any number of creatures you control": how many each of `options` gets, adding up to `total`. */
   /** `move`: moving the counters on the source, any number of them (Forgotten Ancient); otherwise all `total` are distributed. */
   | { kind: "distribute"; player: PlayerId; source: string; counter: CounterKind; total: number; options: ObjectId[]; what: string; move?: true }
+  /**
+   * "Add X mana in any combination of colors" from a spell or a non-mana ability (Klauth, Manamorphose): how much of each
+   * color, `n` in all, chosen as it resolves (CR 106.1b, 608.2d). `colors`: only these.
+   */
+  | { kind: "manaMix"; player: PlayerId; source: string; n: number; colors?: Color[] }
   /** `x`: the trigger's X (an enters trigger's is its spell's, CR 107.3m), which "up to X target ..." can't choose more than. */
   | { kind: "chooseTargets"; player: PlayerId; sourceId: ObjectId; specs: TargetSpec[]; description: string; x?: number }
   /**
@@ -1771,6 +1776,7 @@ export interface Resolving {
     n?: number; // an amount the effect worked out before waiting on a player (CR 608.2h)
     nFor?: Record<string, number>; // the same, for each player when it counts their own ("half the cards in their hand")
     distributed?: Record<ObjectId, number>; // how a "distribute" effect's counters were divided, as it resolves
+    manaMix?: Partial<Record<Color, number>>; // the colors chosen for "add X mana in any combination of colors"
     found?: ObjectId[]; // the cards a library search found
     picking?: true; // an opponent is choosing among revealed cards (Gifts Ungiven); `picked`, what they chose
     picked?: ObjectId[];
@@ -1898,6 +1904,8 @@ export type Action =
   | { type: "searchLibrary"; player: PlayerId; found: ObjectId[] }
   /** Answer to a distribute decision: how many counters each permanent gets (left out: none). */
   | { type: "distribute"; player: PlayerId; parts: Record<ObjectId, number> }
+  /** Answer to manaMix: how many mana of each color (left out: none), adding up to its `n`. */
+  | { type: "manaMix"; player: PlayerId; counts: Partial<Record<Color, number>> }
   /** Answer to pickPermanents. */
   | { type: "pickPermanents"; player: PlayerId; ids: ObjectId[] }
   /** Answer to chooseOption: one of its options. */

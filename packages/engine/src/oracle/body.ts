@@ -904,6 +904,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     })
     .filter(Boolean);
   let prevStart = 0;
+  /** The mana a "Spend this mana only ..." sentence restricted, for an "Until end of turn, you don't lose this mana" after it. */
+  let spendAdded: Extract<Effect, { type: "addMana" }>[] = [];
   let curStart = 0;
   // Where the sentence before started, counting the parts split off at ", then" as one sentence with it: "Draw a card,
   // then discard a card. If you have a full party, instead draw three cards." (The Destined Thief) replaces both.
@@ -1156,9 +1158,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     }
     // "Add {R}. Until end of turn, you don't lose this mana as steps and phases end" (CR 500.4): the mana the sentence
     // before added, unless it can only be spent some ways.
+    // After "Spend this mana only to cast spells" (Klauth): the mana the sentence before that one added, restricted and kept.
     if (/^Until end of turn, you don't lose this mana as steps and phases end$/.test(s)) {
-      const added = allEffects(effects.slice(prevStart)).filter((e): e is Extract<Effect, { type: "addMana" }> => e.type === "addMana");
-      if (!added.length || si === 0 || /[Ss]pend this mana only|can't be spent/.test(sentences[si - 1]!)) return null;
+      const spendBefore = si > 0 && /^[Ss]pend this mana only /.test(sentences[si - 1]!);
+      const added = spendBefore ? spendAdded : allEffects(effects.slice(prevStart)).filter((e): e is Extract<Effect, { type: "addMana" }> => e.type === "addMana");
+      if (!added.length || si === 0 || /can't be spent/.test(sentences[si - 1]!) || (!spendBefore && /[Ss]pend this mana only/.test(sentences[si - 1]!))) return null;
       for (const e of added) e.keep = "turn";
       continue;
     }
@@ -1169,6 +1173,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const only = parseManaSpend(`${s}.`);
       if (!added.length || !only || added.some((e) => e.only)) return null;
       for (const e of added) e.only = only;
+      spendAdded = added;
       continue;
     }
     // Cards exiled face down that you may look at and play (Three Wishes, Gonti, Outrageous Robbery, Intet; CR 406.3).

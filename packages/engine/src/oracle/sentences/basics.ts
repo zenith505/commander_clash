@@ -439,7 +439,7 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
       return [{ type: "addMana", mana: theirs[1]!, times: { count: { ...count.count, whose: who } }, who }];
     }
     const inner = who && parseSentence(`Add ${m[2]!}`, ctx);
-    if (!who || !inner?.length || !inner.every((e) => e.type === "addMana" || (e.type === "choose" && e.choice === "color"))) return null;
+    if (!who || !inner?.length || !inner.every((e) => (e.type === "addMana" && !e.anyColors) || (e.type === "choose" && e.choice === "color"))) return null;
     return inner.map((e) => ({ ...e, who }));
   }
   // "Add {R} for each card in target opponent's hand" (Jeska's Will): counted as it resolves.
@@ -462,6 +462,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Add X mana of any one color, where X is 1 plus the exiled creature's mana value" (Food Chain): one color, chosen as
   // it resolves (CR 605.3b), X of it.
   if (/^[Aa]dd X mana of any one color$/.test(s)) return [{ type: "choose", choice: "color" }, { type: "addMana", chosen: 1, times: amt("X") }];
+  // "Add two mana in any combination of colors" (Manamorphose), "add X mana in any combination of colors" (Klauth, with
+  // its "where X is ..."): the colors are chosen as it resolves (CR 106.1b, 608.2d).
+  if ((m = new RegExp(`^[Aa]dd ${NUMX} mana in any combination of colors$`).exec(s))) return [{ type: "addMana", anyColors: true, times: amt(m[1]!) }];
   // Energy (CR 107.14): "You get {E}{E}", "you get X {E}", "you get an amount of {E} equal to ~'s power".
   if ((m = /^(?:[Yy]ou )?[Gg]et ((?:\{E\})+)$/.exec(s))) return [{ type: "getEnergy", who: { ref: "you" }, n: m[1]!.length / 3 }];
   if ((m = new RegExp(`^(?:[Yy]ou )?[Gg]et ${NUMX} \\{E\\}$`).exec(s))) return [{ type: "getEnergy", who: { ref: "you" }, n: amt(m[1]!) }];

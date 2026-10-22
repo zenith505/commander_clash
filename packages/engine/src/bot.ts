@@ -88,7 +88,7 @@ import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { castingBody, compileCard } from "./oracle";
-import type { Action, CardDef, Chosen, Color, CostChoices, GameObject, GameState, ObjectId, PendingDecision, PlayerId, StackItem } from "./types";
+import { COLORS, type Action, type CardDef, type Chosen, type Color, type CostChoices, type GameObject, type GameState, type ObjectId, type PendingDecision, type PlayerId, type StackItem } from "./types";
 import { evalAmount } from "./amounts";
 import { CHOSEN_HEXPROOF, CHOSEN_PROTECTION } from "./keywords";
 import { groupValue, ofPlayerPick, ofPlayerTargets, worth } from "./value";
@@ -292,6 +292,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "searchLibrary", player: pid, found }];
     }
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
+    if (pend.kind === "manaMix") return [{ type: "manaMix", player: pid, counts: chooseManaMix(s, pid, pend.n, pend.colors) }];
     if (pend.kind === "distribute") return [{ type: "distribute", player: pid, parts: pend.move ? chooseCounterMove(s, pid, pend.options, pend.total, pend.counter) : chooseDistribution(s, pid, pend.options, pend.total, pend.counter) }];
     // Soulbond: always pair, with the best creature (the bonus lands on both).
     if (pend.kind === "pickPermanents" && pend.action === "pair") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, 1, "populate") }];
@@ -1256,7 +1257,7 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   // A ritual, a spell that only adds mana (Dark Ritual): worth it when what it nets lets us cast a card we can't yet.
   const effects = compileCard(d).spell?.effects ?? [];
   if (!free && effects.length && effects.every((e) => e.type === "addMana" || e.type === "choose")) {
-    const added = effects.reduce((n, e) => n + (e.type !== "addMana" ? 0 : (e.mana?.match(/\{/g)?.length ?? e.chosen ?? 0)), 0);
+    const added = effects.reduce((n, e) => n + (e.type !== "addMana" ? 0 : (e.mana?.match(/\{/g)?.length ?? e.chosen ?? (e.anyColors && typeof e.times === "number" ? e.times : 0))), 0);
     const avail = availableMana(s, pid);
     const gain = added - manaValue(cost);
     if (!player(s, pid).hand.some((h) => h !== id && !isType(defOf(s, obj(s, h)), "Land") && mv(s, h) > avail && mv(s, h) <= avail + gain)) return null;
@@ -2862,6 +2863,35 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
 }
 
 /** The cards in our hand and command zone we could cast now, the dearest first. */
+/**
+ * "Add X mana in any combination of colors" (Klauth, Manamorphose): the colored symbols of the cards in our hand and
+ * command zone, dearest first, each one's colors met before the next's; what's left goes to the color most asked for
+ * (our commander's first color if none is).
+ */
+function chooseManaMix(s: GameState, pid: PlayerId, n: number, colors?: Color[]): Partial<Record<Color, number>> {
+  const allowed = colors ?? [...COLORS];
+  const p = player(s, pid);
+  const cards = [...p.command, ...p.hand].map((id) => defOf(s, obj(s, id))).filter((d) => !isType(d, "Land")).sort((a, b) => manaValue(parseManaCost(b.manaCost)) - manaValue(parseManaCost(a.manaCost)));
+  const out: Partial<Record<Color, number>> = {};
+  const demand: Partial<Record<Color, number>> = {};
+  let left = n;
+  for (const d of cards) {
+    for (const c of allowed) {
+      const k = d.manaCost.split(`{${c}}`).length - 1;
+      demand[c] = (demand[c] ?? 0) + k;
+      const add = Math.min(left, Math.max(0, k - (out[c] ?? 0)));
+      if (add) out[c] = (out[c] ?? 0) + add;
+      left -= add;
+    }
+  }
+  if (left) {
+    const identity = p.command.length ? defOf(s, obj(s, p.command[0]!)).colorIdentity : [];
+    const best = [...allowed].sort((a, b) => (demand[b] ?? 0) - (demand[a] ?? 0) || Number(identity.includes(b)) - Number(identity.includes(a)))[0]!;
+    out[best] = (out[best] ?? 0) + left;
+  }
+  return out;
+}
+
 function castableNow(s: GameState, pid: PlayerId): ObjectId[] {
   const p = player(s, pid);
   return [...p.command, ...p.hand].filter((id) => !isType(defOf(s, obj(s, id)), "Land") && castPlan(s, pid, id, false)).sort((a, b) => mv(s, b) - mv(s, a));

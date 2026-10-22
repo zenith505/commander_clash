@@ -42,9 +42,12 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       const anyOf = specs as NonNullable<(typeof specs)[number]>[];
       Object.assign(dig, { count: 2, upTo: true, filter: { kind: "card", anyOf, text: `${m[1] ?? m[3]} and/or ${m[2] ?? m[4]}`.replace(/^an? /, "") }, oneOfEach: anyOf, into: "hand" });
     } else if ((m = /^You may (?:reveal (an? .+?) from among them and put it|put (an? .+?) from among them) into your hand$/.exec(s))) {
-      const filter = parseSearchFilter((m[1] ?? m[2])!.replace(/^an? /, ""));
-      if (!filter) return null;
-      Object.assign(dig, { count: 1, upTo: true, filter, into: "hand" });
+      // "A creature card of the chosen type" (Icon of Ancestry): the type chosen as the permanent entered (bindChosen).
+      const phrase = (m[1] ?? m[2])!.replace(/^an? /, "");
+      const ofChosen = / of the chosen type$/.exec(phrase);
+      const filter = parseSearchFilter(ofChosen ? phrase.slice(0, ofChosen.index) : phrase);
+      if (!filter || (ofChosen && (!ctx || ctx.spell || !filter.types?.includes("Creature")))) return null;
+      Object.assign(dig, { count: 1, upTo: true, filter: ofChosen ? { ...filter, chosen: "type", text: phrase } : filter, into: "hand" });
     } else if ((m = new RegExp(`^(You may put|Put) (an?|up to (?:one|two|three)|any number of|all) (.+?) from among them onto the battlefield( tapped)?(?: with an? ${COUNTER} counter on it)?(?: and the rest ${REST})?$`).exec(s))) {
       // "You may put a land card from among them onto the battlefield tapped" (Freestrider Lookout), "Put up to two creature
       // cards with mana value 3 or less from among them onto the battlefield" (Collected Company): several enter at the

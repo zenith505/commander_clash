@@ -24,7 +24,7 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Sacrifice all creatures you control" (CR 701.21a), "Each player sacrifices all permanents they control that are one or
   // more colors" (All Is Dust): every one of them, each by its controller (rulings: all at the same time).
-  if ((m = /^(Sacrifice|Each player sacrifices) all (.+?) (you|they) control( that .+)?$/.exec(s)) && (m[1] === "Sacrifice") === (m[3] === "you")) {
+  if ((m = /^([Ss]acrifice|[Ee]ach player sacrifices) all (.+?) (you|they) control( that .+)?$/.exec(s)) && /^sacrifice$/i.test(m[1]!) === (m[3] === "you")) {
     const what = parseObject(`all ${m[2]}${m[3] === "you" ? " you control" : ""}${m[4] ?? ""}`, ctx);
     if (what?.ref !== "each" || what.filter.kind !== "object" || (m[3] === "they" && what.filter.controller)) return null;
     return [{ type: "sacrifice", what, ...(m[3] === "they" ? { byController: true as const } : {}) }];

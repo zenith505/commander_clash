@@ -336,6 +336,18 @@ function parseFaceDownPlay(sentences: string[], at: number, ctx: Ctx): { effect:
   const look = !head && new RegExp(`^[Ll]ook at the top (card|${NUMX} cards) of ${LIB} library$`).exec(s);
   const lookThen = look && /^Exile (?:it|that card|those cards|them) face down$/.test(sentences[at + 1] ?? "");
   const they = new RegExp(`^(Target opponent|Target player|That player|Each opponent) exiles? the top (card|${NUMX} cards) of their library face down$`).exec(s);
+  // "Whenever a creature deals combat damage to one of your opponents, its controller looks at the top card of that
+  // opponent's library and exiles it face down. They may play that card ..." (Gonti, Night Minister): the creature's
+  // controller exiles it and may play it (as it last existed, CR 608.2h), "that opponent" being the player dealt damage.
+  const its = ctx.subjectIt && ctx.eventPlayer && !head && !lookThen && !they ? /^[Ii]ts controller looks at the top card of that (?:opponent|player)'s library and exiles it face down$/.exec(s) : null;
+  if (its) {
+    const t = sentences[at + 1];
+    const may = /^They may play that card for as long as it remains exiled$/.test(t ?? "");
+    if (!may) return "fail";
+    const anyType = /^Mana of any type can be spent to cast (?:a spell this way|that spell|it)$/.test(sentences[at + 2] ?? "");
+    const effect: Effect = { type: "exileFaceDown", from: "top", who: { ref: "eventPlayer" }, actor: { ref: "subjectController" }, play: { until: "exiled", ...(anyType ? { anyType: true as const } : {}) } };
+    return { effect, next: at + (anyType ? 3 : 2) };
+  }
   if (!head && !lookThen && !they) return null;
   let next = at + (lookThen ? 2 : 1);
   const m = head ?? (lookThen ? look : null);
@@ -501,9 +513,15 @@ function splitSentences(text: string): string[] {
   return out;
 }
 
+const LIM_DULS_VAULT =
+  "Look at the top five cards of your library. As many times as you choose, you may pay 1 life, put those cards on the bottom of your library in any order, then look at the top five cards of your library. Then shuffle and put the last cards you looked at this way on top in any order.";
+
 export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean } = {}): AbilityBody | null {
   // "Put a +1/+1 counter on ~ and untap it" (Gwenna): "it" is ~, the one thing named.
   text = differenceInHand(text).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~");
+  // Lim-Dûl's Vault: look at the top five; as many times as you choose, pay 1 life and put them on the bottom in any order,
+  // then look at the next five; then shuffle the rest and put the last five looked at on top in any order (rulings).
+  if (text.trim() === LIM_DULS_VAULT) return { targets: [], effects: [{ type: "vault", n: 5, life: 1 }], text };
   const modal = MODAL.exec(text.trim());
   if (modal) {
     const body = parseModal(modal[1]!, modal[3]!, text.trim(), opts);

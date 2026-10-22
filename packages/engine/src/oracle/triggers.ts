@@ -400,6 +400,10 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
     const z = fromM[1]!;
     from = /^anywhere/.test(z) ? "notHand" : /hand$/.test(z) ? "hand" : z === "exile" ? "exile" : z === "a graveyard" ? "graveyard" : z === "your graveyard" ? "ownGraveyard" : "ownLibrary";
   }
+  // "Whenever a player casts a spell they don't own" (Gonti, Night Minister): owned by someone other than its caster (CR
+  // 108.3), a card they took over or stole.
+  const notOwned = / (?:they|you) (?:don't|doesn't) own$/.exec(what);
+  if (notOwned) what = what.slice(0, notOwned.index);
   // Folk Hero's "Whenever you cast a spell that shares a creature type with this creature": one creature type in common,
   // a changeling having every one (CR 702.73a).
   const shares = / that shares a creature type with ~$/.exec(what);
@@ -453,7 +457,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   let body = parseBody(text, { castSpell: true, eventPlayer: true });
   if (!body) return "fail";
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: body.text.replace(/\bX\b/g, "that much") };
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(targets ? { targets } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(targets ? { targets } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}) }, body };
 }
 
 /**
@@ -583,7 +587,12 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // than the one that died, as it last existed (rulings on Scrap Trawler); fixed as the target is chosen (TargetSpec.bound).
   const lesser = !attached && / with lesser mana value\b/.test(bodyText);
   if (lesser) bodyText = bodyText.replace(/ with lesser mana value\b/, "").replace(/^return to your hand (target [a-z ]+ card) in your graveyard\.$/, "return $1 from your graveyard to your hand.");
-  let body = parseBody(bodyText, { subjectIt: true, subjectLeft: true, ...(attached?.[1] === "enchanted" ? { auraCard: true } : {}) });
+  // Mimic Vat: "you may exile that card. If you do, return each other card exiled with ~ to its owner's graveyard" (CR
+  // 607.2a). The card is exiled linked to ~; if it has left the graveyard, nothing happens and the other card stays (rulings).
+  const imprint = !attached && /^you may exile that card\. If you do, return each other card exiled with ~ to its owner's graveyard\.?$/.test(bodyText);
+  let body = imprint
+    ? { targets: [], effects: [{ type: "may" as const, effects: [{ type: "exile" as const, what: { ref: "subjectCard" as const, zone: "graveyard" as const }, linked: true }, { type: "moveLinked" as const, dest: "graveyard" as const, other: true as const, ifLinkedNow: true as const }], text: "exile that card (the other cards exiled with ~ go to their owners' graveyards)" }], text: bodyText }
+    : parseBody(bodyText, { subjectIt: true, subjectLeft: true, ...(attached?.[1] === "enchanted" ? { auraCard: true } : {}) });
   if (!body) return "fail";
   if (lesser) {
     const [t, ...more] = body.targets;

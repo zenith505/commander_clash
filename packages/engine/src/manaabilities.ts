@@ -264,6 +264,7 @@ export function manaTriggerResults(s: GameState, pid: PlayerId, o: GameObject, a
     if (t.madeType && !made.includes(t.madeType)) continue;
     const chosen = src?.chosen?.color;
     if (t.you && ctl !== pid) continue;
+    if (t.whileMonarch && s.monarch !== ctl) continue;
     if (t.attached && src?.attachedTo !== o.id) continue;
     if (t.filter && !objectMatches(s, t.filter, o, ctl, false)) continue;
     // Extraplanar Lens: no card exiled, nothing has its name (CR 607.2a); a face-down land has no name (CR 708.2).

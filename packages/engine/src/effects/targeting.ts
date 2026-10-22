@@ -2,7 +2,7 @@ import { ANY_COUNTER } from "../abilities";
 import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Modification, ObjRef, PickAction, Range, TargetChoice, TargetSpec, Untargetable } from "../abilities";
 import { compileCard } from "../oracle";
 import { manaValue, parseManaCost, xCount } from "../mana";
-import { abilitiesOf, basePowerNow, canBeSacrificed, defOf, objHasKeyword, objIsType, power, toughness } from "../cards";
+import { abilitiesOf, basePowerNow, canBeSacrificed, defOf, objHasKeyword, objIsType, power, toughness, withCastThisTurn } from "../cards";
 import { attackedPlaneswalker, creatureTypesOf, livingPlayers, obj, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, type Characteristics } from "../layers";
 import { expandMany, expandPerOpponent, manySlot, modeCountProblem } from "../modes";
@@ -202,7 +202,7 @@ export function withChoice(chosen: Chosen | undefined, what: ChoiceKind, choice:
  */
 export function sourceQuality(s: GameState, id?: ObjectId, cardId?: string): SourceQuality {
   const o = id ? s.objects[id] : undefined;
-  if (o) return characteristics(s, o);
+  if (o) return withCastThisTurn(s, o, characteristics(s, o));
   const d = cardId ? s.cards[cardId] : undefined;
   return d ? { colors: d.colors, types: d.types, subtypes: d.subtypes, name: d.name } : { colors: [] };
 }

@@ -164,6 +164,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // "You may collect evidence N": yes, with cards we don't need in the graveyard.
     if (pend.kind === "collectEvidence") return [{ type: "collectEvidence", player: pid, ids: spareEvidence(s, pid, pend.n, pend.not) ?? [] }];
+    // Lim-Dûl's Vault: keep five cards with at least two we'd like to draw; otherwise dig on while life allows, a few times.
+    if (pend.kind === "chooseMay" && pend.vault) {
+      const paid = s.resolving?.scratch?.vaultPaid ?? 0;
+      const good = pend.vault.filter((id) => wantOnTop(s, pid, id)).length;
+      const dig = good < Math.min(2, pend.vault.length) && paid < 4 && player(s, pid).life > (pend.pay?.life ?? 1) + 10 && player(s, pid).library.length > pend.vault.length;
+      return [{ type: "chooseMay", player: pid, yes: dig }];
+    }
     if (pend.kind === "chooseMay" && pend.pay && pend.keep) {
       // Echo and cumulative upkeep: keep it while the price stays reasonable (CR 702.30a, 702.24a).
       const { mana, life = 0, energy = 0 } = pend.pay;
@@ -629,7 +636,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       }
     }
   }
-  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseTimed(s, pid);
+  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseTimed(s, pid);
   if (regen) return regen;
   if (canActAtSorcerySpeed(s, pid)) {
     const land = chooseLand(s, pid);
@@ -2807,7 +2814,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
     const o = obj(s, id);
     if (controllerOf(s, o) !== pid) continue;
     const abilities = abilitiesOf(s, o).activated;
-    for (let i = 0; i < abilities.length; i++) {
+    // An energy-for-a-target ability before the others ("{1}, {T}: You get {E}" would spend the permanent first, HELIOS One).
+    const order = abilities.map((_, i) => i).sort((a, b) => Number(!!abilities[b]!.energyX) - Number(!!abilities[a]!.energyX));
+    for (const i of order) {
       const ab = abilities[i]!;
       if (only && !only(ab)) continue;
       // Mana abilities are for paying costs (autopay), not used on their own: the mana would just empty.
@@ -2824,7 +2833,13 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // Dauthi Voidwalker: sacrificed in our main phase, with the stack empty, for an exiled spell with a void counter
       // worth more than it (mana value 4 or more) to cast for free right away.
       const voidPlay = ab.sacrificeSelf && ab.body.effects.some((e) => e.type === "playExiled") && s.activePlayer === pid && (s.step === "main1" || s.step === "main2") && !s.stack.length && voidSpells(s, pid, ab.body).some((c) => mv(s, c) >= 4);
-      if ((ab.sacrificeSelf && !cashIn && !flips && !voidPlay) || ab.exileSelf || ab.returnSelf || (freeCost && !necro) || ab.station) continue;
+      // "Pay X {E}, Sacrifice this land: Destroy target nonland permanent with mana value X" (HELIOS One), "..., Return this
+      // enchantment to its owner's hand: Return target creature card with mana value X" (Chthonian Nightmare): the
+      // permanent is given up for a target with mana value 3 or more, paid for in energy (see energyTargetX).
+      const xTarget = !!ab.energyX && ab.body.targets.some((t) => t.xRange?.key === "manaValue");
+      const energyTargetX = xTarget ? Math.min(player(s, pid).energy ?? 0, 15) : 0;
+      if (((ab.sacrificeSelf && !cashIn && !flips && !voidPlay) || ab.returnSelf) && !(energyTargetX >= 3)) continue;
+      if (ab.exileSelf || (freeCost && !necro) || ab.station) continue;
       // "Pay half your life, rounded up" (Murderous Betrayal, Lurking Evil): only while that's a few life at most.
       if (halfLifeCost(s, pid, ab) > 3) continue;
       // Level up (CR 702.87a) past the last level symbol does nothing more.
@@ -2837,9 +2852,11 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // "Sacrifice X Squirrels" (Chatterfang): bots don't weigh how many permanents to give up. "Discard X cards" (Gix):
       // the cards in hand we can do without (discardXCount).
       // "Pay X {E}: Draw X cards" (Sphinx of the Revelation): all our energy, leaving cards in the library.
-      const energyX = ab.energyX && !ab.costs?.length ? Math.min(player(s, pid).energy ?? 0, player(s, pid).library.length - 2) : 0;
+      // "Pay X {E}, Sacrifice ...: ... target ... with mana value X" (Chthonian Nightmare, HELIOS One): the biggest X with
+      // a target worth it (mana value 3 or more), as much energy as we have at most.
+      const energyX = ab.energyX && !ab.costs?.length && !xTarget ? Math.min(player(s, pid).energy ?? 0, player(s, pid).library.length - 2) : 0;
       const discardX = discardXCount(s, pid, id, ab);
-      if (abilityCostsHaveX(ab) && discardX === undefined && !(energyX > 0)) continue;
+      if (abilityCostsHaveX(ab) && discardX === undefined && !(energyX > 0) && !(energyTargetX >= 3)) continue;
       if (ab.body.effects.some((e) => e.type === "unattachSelf")) continue; // reconfigured Equipment stays on
       // Saving a creature with a flip (Frenetic Efreet, Viashino Sandswimmer) waits for something to save it from (chooseFlipEscape).
       if (flips && flipEscape(flips)) continue;
@@ -2881,7 +2898,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if ((groupValue(s, pid, body, guessChosen(s, pid, defOf(s, o)), id) ?? 1) <= 0) continue;
       // An X ability: the biggest X we can pay for (never 0).
       const cost = parseManaCost(ab.manaCost);
-      const xs = discardX !== undefined ? [discardX] : energyX > 0 ? [energyX] : cost.hasX ? xChoices(availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost), xCount(cost)) : [undefined];
+      const xs = discardX !== undefined ? [discardX] : energyX > 0 ? [energyX] : energyTargetX >= 3 ? Array.from({ length: energyTargetX - 2 }, (_, k) => energyTargetX - k) : cost.hasX ? xChoices(availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost), xCount(cost)) : [undefined];
       let plan: Action[] | null = null;
       for (const x of xs) {
         const targets = body.targets.length ? chooseTargets(s, pid, body, false, id, x) : [];
@@ -3371,32 +3388,38 @@ function chooseRegeneration(s: GameState, pid: PlayerId): Action[] | null {
 }
 
 /**
+ * Is our permanent about to die: an opponent's spell or ability on top of the stack would destroy, exile or kill it, or
+ * once blockers are declared, the combat it's in would?
+ */
+function doomedNow(s: GameState, pid: PlayerId, o: GameObject): boolean {
+  const top = s.stack[s.stack.length - 1];
+  const hit = combatHits(s);
+  if (top) {
+    if (top.controller === pid) return false;
+    const body = top.body ?? (top.objectId && s.objects[top.objectId] ? compileCard(defOf(s, obj(s, top.objectId))).spell : undefined);
+    if (!body) return false;
+    const at = (top.targets ?? []).flatMap((t, i) => (!Array.isArray(t) && t.kind === "object" && t.id === o.id ? [i] : []));
+    const aimed = (r: { ref: string; index?: number } | undefined) => r?.ref === "target" && at.includes(r.index!);
+    return allEffects(body.effects).some(
+      (e) =>
+        (["destroy", "exile", "putInLibrary", "shuffleIntoLibrary"].includes(e.type) && "what" in e && aimed(e.what)) ||
+        (e.type === "damage" && "index" in e.to && aimed(e.to) && damageEstimate(s, top.sourceId && s.objects[top.sourceId] ? obj(s, top.sourceId) : o, { object: o.id }, estimate(e.amount), false) >= Math.max(1, lethalDamage(s, o))) ||
+        (e.type === "continuous" && aimed(e.what) && e.mods.reduce((n, m) => n + (m.kind === "modifyPT" ? estimate(m.toughness) : 0), 0) + lethalDamage(s, o) <= 0),
+    );
+  }
+  if (s.step !== "declareBlockers") return false;
+  const foes = o.blocking ? o.blocking : o.attacking !== undefined ? (o.blockedBy ?? []) : [];
+  const ids = Array.isArray(foes) ? foes : [foes];
+  return ids.reduce((n, f) => n + (s.objects[f]?.zone === "battlefield" ? hit(obj(s, f), o) : 0), 0) >= Math.max(1, lethalDamage(s, o)) || ids.some((f) => s.objects[f]?.zone === "battlefield" && objHasKeyword(s, obj(s, f), "Deathtouch") && hit(obj(s, f), o) > 0);
+}
+
+/**
  * A coin flip that only saves its source (Frenetic Efreet's "phases out", Viashino Sandswimmer's "return to its owner's
  * hand"; if lost, sacrificed): when an opponent's spell or ability would destroy, exile or kill it, or it's in a combat it
  * would die in, there's nothing to lose by flipping.
  */
 function chooseFlipEscape(s: GameState, pid: PlayerId): Action[] | null {
-  const top = s.stack[s.stack.length - 1];
-  const hit = combatHits(s);
-  const doomed = (o: GameObject) => {
-    if (top) {
-      if (top.controller === pid) return false;
-      const body = top.body ?? (top.objectId && s.objects[top.objectId] ? compileCard(defOf(s, obj(s, top.objectId))).spell : undefined);
-      if (!body) return false;
-      const at = (top.targets ?? []).flatMap((t, i) => (!Array.isArray(t) && t.kind === "object" && t.id === o.id ? [i] : []));
-      const aimed = (r: { ref: string; index?: number } | undefined) => r?.ref === "target" && at.includes(r.index!);
-      return allEffects(body.effects).some(
-        (e) =>
-          (["destroy", "exile", "putInLibrary", "shuffleIntoLibrary"].includes(e.type) && "what" in e && aimed(e.what)) ||
-          (e.type === "damage" && "index" in e.to && aimed(e.to) && damageEstimate(s, top.sourceId && s.objects[top.sourceId] ? obj(s, top.sourceId) : o, { object: o.id }, estimate(e.amount), false) >= Math.max(1, lethalDamage(s, o))) ||
-          (e.type === "continuous" && aimed(e.what) && e.mods.reduce((n, m) => n + (m.kind === "modifyPT" ? estimate(m.toughness) : 0), 0) + lethalDamage(s, o) <= 0),
-      );
-    }
-    if (s.step !== "declareBlockers") return false;
-    const foes = o.blocking ? o.blocking : o.attacking !== undefined ? (o.blockedBy ?? []) : [];
-    const ids = Array.isArray(foes) ? foes : [foes];
-    return ids.reduce((n, f) => n + (s.objects[f]?.zone === "battlefield" ? hit(obj(s, f), o) : 0), 0) >= Math.max(1, lethalDamage(s, o)) || ids.some((f) => s.objects[f]?.zone === "battlefield" && objHasKeyword(s, obj(s, f), "Deathtouch") && hit(obj(s, f), o) > 0);
-  };
+  const doomed = (o: GameObject) => doomedNow(s, pid, o);
   for (const id of s.battlefield) {
     const o = obj(s, id);
     if (controllerOf(s, o) !== pid || objHasKeyword(s, o, "Indestructible")) continue;
@@ -3408,6 +3431,36 @@ function chooseFlipEscape(s: GameState, pid: PlayerId): Action[] | null {
       if (problem && !/not enough mana/.test(problem)) continue;
       const plan = planActivate(s, pid, id, i);
       if (plan) return plan;
+    }
+  }
+  return null;
+}
+
+/**
+ * "Choose target creature with a counter on it. When that creature dies this turn, return that card to its owner's hand"
+ * (Together Forever): only for a creature of ours that's about to die (doomedNow), once for it this turn.
+ */
+function chooseDeathReturn(s: GameState, pid: PlayerId): Action[] | null {
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid) continue;
+    const abilities = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const ab = abilities[i]!;
+      if (ab.body.targets.length !== 1 || !ab.body.effects.length || !ab.body.effects.every((e) => e.type === "delayed" && e.when === "dies" && e.of?.ref === "target")) continue;
+      if (ab.tap || ab.sacrificeSelf || ab.costs?.length) continue;
+      const problem = abilityProblem(s, pid, id, i);
+      if (problem && !/not enough mana/.test(problem)) continue;
+      for (const c of legalTargets(s, ab.body.targets[0]!, pid, undefined, sourceQuality(s, id), id)) {
+        if (c.kind !== "object") continue;
+        const t = obj(s, c.id);
+        if (controllerOf(s, t) !== pid || !objIsType(s, t, "Creature") || objHasKeyword(s, t, "Indestructible") || t.isToken || !doomedNow(s, pid, t)) continue;
+        // Already set up for it this turn (the delayed trigger is waiting), or the activation is on the stack.
+        if ((s.delayed ?? []).some((d) => d.dies && d.subject.id === t.id && d.subject.zc === (t.zoneChanges ?? 0) && d.controller === pid)) continue;
+        if (s.stack.some((x) => x.controller === pid && x.sourceId === id && x.targets?.some((y) => !Array.isArray(y) && y.kind === "object" && y.id === t.id))) continue;
+        const plan = planActivate(s, pid, id, i, [{ kind: "object", id: t.id }]);
+        if (plan) return plan;
+      }
     }
   }
   return null;

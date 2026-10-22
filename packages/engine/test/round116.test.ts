@@ -1,0 +1,356 @@
+// Round 116, most played cards: Lim-Dûl's Vault, Mimic Vat (imprint and a token copy of the exiled card), Regal Behemoth
+// (a triggered mana ability while you're the monarch), Icon of Ancestry ("of the chosen type"), Emrakul, the World Anew
+// (protection from spells and from permanents that were cast this turn, CR 702.16) and Gonti, Night Minister.
+
+import { describe, expect, it } from "vitest";
+import { act, bear, card, cast, forest, passUntil, putOnBattlefield, setup, target } from "./helpers";
+import { botActions, compileCard, isFullySupported, planActivate, planCast, waitingOn, type Action, type GameState, type ManaType, type PlayerId } from "../src";
+import { blockProblem, moveObject } from "../src/game";
+import { wasCastThisTurn } from "../src/cards";
+
+const run = (s: GameState, plan: Action[] | null) => {
+  if (!plan) throw new Error("no plan");
+  for (const a of plan) s = act(s, a);
+  return s;
+};
+const settle = (s: GameState) => {
+  for (let i = 0; i < 80 && (s.stack.length || s.triggerQueue.length) && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  return s;
+};
+const toHand = (s: GameState, pid: PlayerId, def: ReturnType<typeof card>) => {
+  const id = putOnBattlefield(s, pid, def);
+  moveObject(s, id, "hand");
+  return id;
+};
+/** Put these cards on top of `pid`'s library, the first on top. */
+const stack = (s: GameState, pid: PlayerId, defs: ReturnType<typeof card>[]) => {
+  const ids = defs.map((d) => {
+    const id = putOnBattlefield(s, pid, d);
+    moveObject(s, id, "library");
+    return id;
+  });
+  const p = s.players[pid]!;
+  p.library = [...ids, ...p.library.filter((id) => !ids.includes(id))];
+  return ids;
+};
+const name = (s: GameState, id: string) => s.cards[s.objects[id]!.cardId]!.name;
+
+// Real oracle text (Scryfall).
+const vault = card("Lim-Dûl's Vault", "Instant", "{U}{B}", {
+  oracleText:
+    "Look at the top five cards of your library. As many times as you choose, you may pay 1 life, put those cards on the bottom of your library in any order, then look at the top five cards of your library. Then shuffle and put the last cards you looked at this way on top in any order.",
+});
+const mimicVat = card("Mimic Vat", "Artifact", "{3}", {
+  oracleText:
+    "Imprint — Whenever a nontoken creature dies, you may exile that card. If you do, return each other card exiled with this artifact to its owner's graveyard.\n{3}, {T}: Create a token that's a copy of a card exiled with this artifact. It gains haste. Exile it at the beginning of the next end step.",
+});
+const behemoth = card("Regal Behemoth", "Creature — Lizard", "{5}{G}", {
+  power: "5",
+  toughness: "5",
+  keywords: ["Trample"],
+  oracleText: "Trample\nWhen this creature enters, you become the monarch.\nWhenever you tap a land for mana while you're the monarch, add an additional one mana of any color.",
+});
+const icon = card("Icon of Ancestry", "Artifact", "{3}", {
+  oracleText:
+    "As this artifact enters, choose a creature type.\nCreatures you control of the chosen type get +1/+1.\n{3}, {T}: Look at the top three cards of your library. You may reveal a creature card of the chosen type from among them and put it into your hand. Put the rest on the bottom of your library in a random order.",
+});
+const emrakul = card("Emrakul, the World Anew", "Legendary Creature — Eldrazi", "{12}", {
+  power: "12",
+  toughness: "12",
+  keywords: ["Flying", "Madness", "Protection"],
+  oracleText:
+    "When you cast this spell, gain control of all creatures target player controls.\nFlying, protection from spells and from permanents that were cast this turn\nWhen Emrakul leaves the battlefield, sacrifice all creatures you control.\nMadness—Pay six {C}.",
+});
+const gonti = card("Gonti, Night Minister", "Legendary Creature — Aetherborn Rogue", "{2}{B}{B}", {
+  power: "3",
+  toughness: "4",
+  oracleText:
+    "Whenever a player casts a spell they don't own, that player creates a Treasure token.\nWhenever a creature deals combat damage to one of your opponents, its controller looks at the top card of that opponent's library and exiles it face down. They may play that card for as long as it remains exiled. Mana of any type can be spent to cast a spell this way.",
+});
+const doomBlade = card("Doom Blade", "Instant", "{1}{B}", { oracleText: "Destroy target nonblack creature." });
+const pyroclasm = card("Pyroclasm", "Sorcery", "{1}{R}", { oracleText: "Pyroclasm deals 2 damage to each creature." });
+const elf = card("Llanowar Elves", "Creature — Elf Druid", "{G}", { power: "1", toughness: "1", oracleText: "{T}: Add {G}." });
+const dragon = card("Shivan Dragon", "Creature — Dragon", "{4}{R}{R}", { power: "5", toughness: "5", keywords: ["Flying"], oracleText: "Flying" });
+const opt = card("Quick Study", "Instant", "{U}", { oracleText: "Draw a card." });
+
+describe("Lim-Dûl's Vault", () => {
+  const five = () => ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"].map((n) => card(`Card ${n}`, "Sorcery", "{1}"));
+  it("keeping the first five: the rest is shuffled and the five go back on top in the order chosen", () => {
+    expect(isFullySupported(vault)).toBe(true);
+    const { s: s0, ap, ids } = setup([vault]);
+    let s = s0;
+    const top = stack(s, ap, five()).slice(0, 5);
+    s = run(s, planCast(s, ap, ids[0]!));
+    s = settle(s);
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap, pay: { life: 1 }, vault: top });
+    const life = s.players[ap]!.life;
+    s = act(s, { type: "chooseMay", player: ap, yes: false });
+    expect(s.pending).toMatchObject({ kind: "arrangeTop", how: "order", cards: top });
+    const order = [top[4]!, top[2]!, top[0]!, top[1]!, top[3]!];
+    s = act(s, { type: "arrangeTop", player: ap, top: order, away: [] });
+    expect(s.players[ap]!.library.slice(0, 5)).toEqual(order);
+    expect(s.players[ap]!.life).toBe(life);
+  });
+
+  it("paying 1 life puts them on the bottom in any order and shows the next five", () => {
+    const { s: s0, ap, ids } = setup([vault]);
+    let s = s0;
+    const cards = stack(s, ap, five());
+    s = settle(run(s, planCast(s, ap, ids[0]!)));
+    const life = s.players[ap]!.life;
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect(s.players[ap]!.life).toBe(life - 1);
+    expect(s.pending).toMatchObject({ kind: "arrangeTop", how: "bottom" });
+    s = act(s, { type: "arrangeTop", player: ap, top: cards.slice(0, 5), away: [] });
+    expect(s.players[ap]!.library.slice(-5)).toEqual(cards.slice(0, 5));
+    expect(s.pending).toMatchObject({ kind: "chooseMay", vault: cards.slice(5, 10) });
+    s = act(s, { type: "chooseMay", player: ap, yes: false });
+    s = act(s, { type: "arrangeTop", player: ap, top: cards.slice(5, 10), away: [] });
+    expect(s.players[ap]!.library.slice(0, 5)).toEqual(cards.slice(5, 10));
+    expect(s.stack).toHaveLength(0);
+  });
+
+  it("a bot keeps five cards it wants and digs past five it doesn't", () => {
+    const { s: s0, ap, ids } = setup([vault]);
+    let s = s0;
+    stack(s, ap, [dragon, dragon, dragon, dragon, dragon, forest, bear(), bear(), forest, bear()]);
+    // Fourteen lands: a 6-drop is one we'd draw, so these five are kept.
+    s = settle(run(s, planCast(s, ap, ids[0]!)));
+    expect(botActions(s, ap)).toEqual([{ type: "chooseMay", player: ap, yes: false }]);
+    // With only two lands, five 6-drops aren't.
+    for (const id of s.battlefield.filter((id) => s.objects[id]!.controller === ap && s.cards[s.objects[id]!.cardId]!.types.includes("Land")).slice(2)) moveObject(s, id, "graveyard");
+    expect(botActions(s, ap)).toEqual([{ type: "chooseMay", player: ap, yes: true }]);
+  });
+});
+
+describe("Mimic Vat", () => {
+  it("exiles a creature card that died, sending the card exiled before it to its owner's graveyard", () => {
+    expect(isFullySupported(mimicVat)).toBe(true);
+    const { s: s0, ap, opp, ids } = setup([doomBlade, doomBlade]);
+    let s = s0;
+    const v = putOnBattlefield(s, ap, mimicVat);
+    const b1 = putOnBattlefield(s, opp, bear({ name: "First Bear" }));
+    const b2 = putOnBattlefield(s, opp, dragon);
+    s = settle(run(s, planCast(s, ap, ids[0]!, [target(b1)])));
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+    const first = s.players[opp]!.graveyard.length;
+    const exiled1 = Object.values(s.objects).find((o) => o.zone === "exile" && s.cards[o.cardId]!.name === "First Bear")!;
+    expect(exiled1).toBeTruthy();
+    s = settle(run(s, planCast(s, ap, ids[1]!, [target(b2)])));
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect(s.objects[exiled1.id]!.zone).toBe("graveyard");
+    expect(s.players[opp]!.graveyard.length).toBe(first + 1);
+    // The token copy of the exiled Shivan Dragon has haste and is exiled at the next end step.
+    s = run(s, planActivate(s, ap, v, 0));
+    s = settle(s);
+    const tok = s.battlefield.map((id) => s.objects[id]!).find((o) => o.isToken && name(s, o.id) === "Shivan Dragon")!;
+    expect(tok.controller).toBe(ap);
+    expect(compileCard(s.cards[tok.cardId]!).unsupported).toEqual([]);
+    s = settle(passUntil(s, "end", ap));
+    expect(s.objects[tok.id]?.zone === "battlefield").toBe(false);
+  });
+
+  it("declining keeps the card exiled before; with nothing exiled, no token", () => {
+    const { s: s0, ap, opp, ids } = setup([doomBlade]);
+    let s = s0;
+    const v = putOnBattlefield(s, ap, mimicVat);
+    s = run(s, planActivate(s, ap, v, 0));
+    s = settle(s);
+    expect(s.battlefield.some((id) => s.objects[id]!.isToken)).toBe(false);
+    const b1 = putOnBattlefield(s, opp, bear());
+    s.objects[v]!.tapped = false;
+    s = settle(run(s, planCast(s, ap, ids[0]!, [target(b1)])));
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: false }));
+    expect(s.objects[b1]!.zone).toBe("graveyard");
+  });
+});
+
+describe("Regal Behemoth", () => {
+  const pool = (s: GameState, pid: number) => Object.fromEntries(Object.entries(s.players[pid]!.manaPool).filter(([, n]) => n > 0));
+  it("tapping a land for mana while you're the monarch adds one more mana of any color", () => {
+    expect(isFullySupported(behemoth)).toBe(true);
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, behemoth);
+    const f = putOnBattlefield(s0, ap, forest);
+    // Not the monarch: just {G}.
+    let s = act(s0, { type: "activateMana", player: ap, objectId: f, mana: "G" });
+    expect(pool(s, ap)).toEqual({ G: 1 });
+    const t0 = structuredClone(s0);
+    t0.monarch = ap;
+    const t = act(t0, { type: "activateMana", player: ap, objectId: f, mana: "G", extra: ["R" as ManaType] });
+    expect(pool(t, ap)).toEqual({ G: 1, R: 1 });
+    // Another player as the monarch: nothing extra.
+    const u0 = structuredClone(s0);
+    u0.monarch = opp;
+    expect(pool(act(u0, { type: "activateMana", player: ap, objectId: f, mana: "G" }), ap)).toEqual({ G: 1 });
+  });
+});
+
+describe("Icon of Ancestry", () => {
+  it("reveals a creature card of the chosen type from the top three", () => {
+    expect(isFullySupported(icon)).toBe(true);
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const i = putOnBattlefield(s, ap, icon);
+    s.objects[i]!.chosen = { type: "Elf" };
+    const [e, b, f] = stack(s, ap, [elf, bear(), forest]);
+    s = settle(run(s, planActivate(s, ap, i, 0)));
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap, max: 1 });
+    // Only the Elf can be taken.
+    expect(() => act(s, { type: "searchLibrary", player: ap, found: [b!] })).toThrow();
+    s = act(s, { type: "searchLibrary", player: ap, found: [e!] });
+    expect(s.objects[e!]!.zone).toBe("hand");
+    expect(s.players[ap]!.library.slice(-2).sort()).toEqual([b!, f!].sort());
+  });
+});
+
+describe("Emrakul, the World Anew", () => {
+  it("compiles: protection from spells and from permanents cast this turn, madness for six {C}", () => {
+    expect(isFullySupported(emrakul)).toBe(true);
+    const c = compileCard(emrakul);
+    expect(c.madness).toBe("{C}{C}{C}{C}{C}{C}");
+    expect(c.textKeywords).toEqual(expect.arrayContaining(["Protection from spells", "Protection from permanents that were cast this turn"]));
+  });
+
+  it("spells can't target it or damage it", () => {
+    const { s: s0, ap, opp, ids } = setup([doomBlade, pyroclasm]);
+    let s = s0;
+    const e = putOnBattlefield(s, opp, emrakul);
+    const b = putOnBattlefield(s, opp, bear());
+    expect(planCast(s, ap, ids[0]!, [target(e)])).toBeNull();
+    s = cast(s, ap, ids[1]!);
+    s = settle(s);
+    expect(s.objects[e]!.damage).toBe(0);
+    expect(s.objects[b]!.zone).toBe("graveyard");
+  });
+
+  it("creatures cast this turn can't block it; one put onto the battlefield can", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const e = putOnBattlefield(s0, ap, emrakul);
+    const flyer = putOnBattlefield(s0, opp, card("Wind Drake", "Creature — Drake", "{2}{U}", { power: "2", toughness: "2", keywords: ["Flying"], oracleText: "Flying" }));
+    s0.objects[e]!.attacking = opp;
+    expect(blockProblem(s0, s0.objects[flyer]!, s0.objects[e]!)).toBeNull();
+    s0.objects[flyer]!.wasCast = true;
+    s0.objects[flyer]!.enteredTurn = s0.turn;
+    expect(blockProblem(s0, s0.objects[flyer]!, s0.objects[e]!)).toMatch(/protection/);
+    // Cast on an earlier turn: it can block.
+    s0.objects[flyer]!.enteredTurn = s0.turn - 1;
+    expect(blockProblem(s0, s0.objects[flyer]!, s0.objects[e]!)).toBeNull();
+  });
+
+  it("a creature spell that resolves was cast this turn", () => {
+    const { s: s0, ap, ids } = setup([bear()]);
+    const s = cast(s0, ap, ids[0]!);
+    expect(wasCastThisTurn(s, s.objects[ids[0]!]!)).toBe(true);
+  });
+
+  it("when it leaves the battlefield, its controller sacrifices all creatures they control", () => {
+    const { s: s0, ap, opp } = setup([]);
+    let s = s0;
+    const e = putOnBattlefield(s, ap, emrakul);
+    const mine = putOnBattlefield(s, ap, bear());
+    const theirs = putOnBattlefield(s, opp, bear());
+    moveObject(s, e, "hand");
+    s = settle(s);
+    expect(s.objects[mine]!.zone).toBe("graveyard");
+    expect(s.objects[theirs]!.zone).toBe("battlefield");
+  });
+});
+
+describe("Gonti, Night Minister", () => {
+  it("a player casting a spell they don't own creates a Treasure", () => {
+    expect(isFullySupported(gonti)).toBe(true);
+    const { s: s0, ap, opp } = setup([]);
+    let s = s0;
+    putOnBattlefield(s, opp, gonti);
+    const mine = toHand(s, ap, opt);
+    // Opp's card, exiled with a permission for ap to cast it (as Gonti's own exile gives).
+    const stolen = toHand(s, opp, opt);
+    moveObject(s, stolen, "exile");
+    s.objects[stolen]!.mayPlay = { player: ap, zc: s.objects[stolen]!.zoneChanges ?? 0, until: "exiled", turn: s.turn };
+    const treasures = (t: GameState) => t.battlefield.filter((id) => t.objects[id]!.isToken && t.objects[id]!.controller === ap).length;
+    s = settle(run(s, planCast(s, ap, mine)));
+    expect(treasures(s)).toBe(0);
+    s = settle(run(s, planCast(s, ap, stolen)));
+    expect(treasures(s)).toBe(1);
+  });
+
+  it("a creature dealing combat damage to an opponent: its controller exiles that player's top card face down and may play it", () => {
+    const { s: s0, ap, opp } = setup([]);
+    let s = s0;
+    const third = s.turnOrder.find((p) => p !== ap && p !== opp)!;
+    putOnBattlefield(s, third, gonti); // ap and opp are both opponents of Gonti's controller
+    const b = putOnBattlefield(s, ap, bear());
+    const [top] = stack(s, opp, [dragon]);
+    s = act(passUntil(s, "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks: [{ attacker: b, defender: opp }] });
+    s = settle(passUntil(settle(s), "endCombat"));
+    const o = s.objects[top!]!;
+    expect(o.zone).toBe("exile");
+    expect(o.hiddenExile?.seen).toEqual([ap]);
+    expect(o.mayPlay).toMatchObject({ player: ap, until: "exiled", anyType: true });
+  });
+});
+
+describe("bots use Together Forever, Chthonian Nightmare and HELIOS One", () => {
+  const together = card("Together Forever", "Enchantment", "{W}{W}", {
+    keywords: ["Support"],
+    oracleText: "When this enchantment enters, support 2. (Put a +1/+1 counter on each of up to two target creatures.)\n{1}: Choose target creature with a counter on it. When that creature dies this turn, return that card to its owner's hand.",
+  });
+  const nightmare = card("Chthonian Nightmare", "Enchantment", "{1}{B}", {
+    oracleText:
+      "When this enchantment enters, you get {E}{E}{E} (three energy counters).\nPay X {E}, Sacrifice a creature, Return this enchantment to its owner's hand: Return target creature card with mana value X from your graveyard to the battlefield. Activate only as a sorcery.",
+  });
+  const helios = card("HELIOS One", "Land", "", {
+    oracleText: "{T}: Add {C}.\n{1}, {T}: You get {E} (an energy counter).\n{3}, {T}, Pay X {E}, Sacrifice this land: Destroy target nonland permanent with mana value X. Activate only as a sorcery.",
+  });
+  const relic = card("Big Relic", "Artifact", "{4}", { oracleText: "" });
+
+  it("Together Forever: when an opponent's spell would destroy a creature with a counter on it", () => {
+    expect([together, nightmare, helios].every((d) => isFullySupported(d))).toBe(true);
+    const { s: s0, ap, opp } = setup([]);
+    let s = s0;
+    const tf = putOnBattlefield(s, opp, together);
+    const b = putOnBattlefield(s, opp, bear());
+    s.objects[b]!.counters["+1/+1"] = 1;
+    for (let i = 0; i < 3; i++) putOnBattlefield(s, opp, card("Plains", "Basic Land — Plains"));
+    // Nothing threatens it: no activation.
+    expect(botActions(s, opp).some((a) => a.type === "activateAbility" && a.objectId === tf)).toBe(false);
+    const blade = toHand(s, ap, doomBlade);
+    s = run(s, planCast(s, ap, blade, [target(b)]));
+    s = act(s, { type: "passPriority", player: ap });
+    expect(waitingOn(s)).toBe(opp);
+    const plan = botActions(s, opp);
+    expect(plan.find((a) => a.type === "activateAbility")).toMatchObject({ objectId: tf, targets: [target(b)] });
+    s = settle(run(s, plan));
+    expect(s.objects[b]!.zone).toBe("hand");
+  });
+
+  it("HELIOS One: destroys an opponent's permanent with mana value X, X paid in energy", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const s = s0;
+    for (const id of [...s.players[ap]!.hand]) moveObject(s, id, "library");
+    s.players[ap]!.command = []; // nothing to cast
+    const h = putOnBattlefield(s, ap, helios);
+    s.players[ap]!.energy = 4;
+    putOnBattlefield(s, opp, relic);
+    s.step = "main2"; // bots use activated abilities once they're done casting spells
+    const plan = botActions(s, ap);
+    expect(plan.find((a) => a.type === "activateAbility" && a.objectId === h)).toMatchObject({ x: 4 });
+  });
+
+  it("Chthonian Nightmare: returns a creature card with mana value X, sacrificing a lesser creature", () => {
+    const { s: s0, ap } = setup([]);
+    const s = s0;
+    for (const id of [...s.players[ap]!.hand]) moveObject(s, id, "library");
+    s.players[ap]!.command = []; // nothing to cast
+    const n = putOnBattlefield(s, ap, nightmare);
+    s.players[ap]!.energy = 6;
+    const big = putOnBattlefield(s, ap, dragon);
+    moveObject(s, big, "graveyard");
+    putOnBattlefield(s, ap, card("Saproling", "Creature — Saproling", "", { power: "1", toughness: "1" }));
+    s.step = "main2";
+    const plan = botActions(s, ap);
+    expect(plan.find((a) => a.type === "activateAbility" && a.objectId === n)).toMatchObject({ x: 6, targets: [target(big)] });
+  });
+});

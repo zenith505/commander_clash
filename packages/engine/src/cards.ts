@@ -213,6 +213,10 @@ export const isType = (d: CardDef, t: string) => d.types.includes(t);
 
 /** "Name: ability text", with the card's name where the text says "~" (itself). */
 export const describeAbility = (d: CardDef, text: string) => `${d.name}: ${text.replace(/~/g, d.name)}`;
+/** A permanent that was cast this turn: it entered as its spell resolved, this turn (Emrakul, the World Anew's protection). */
+export const wasCastThisTurn = (s: GameState, o: GameObject) => o.zone === "battlefield" && !!o.wasCast && o.enteredTurn === s.turn;
+/** Its characteristics as a source of protection-relevant quality, with whether it was cast this turn. */
+export const withCastThisTurn = <T extends object>(s: GameState, o: GameObject, c: T): T & { castThisTurn?: true } => (wasCastThisTurn(s, o) ? { ...c, castThisTurn: true as const } : c);
 export const isPermanentCard = (d: CardDef) =>
   ["Artifact", "Creature", "Enchantment", "Land", "Planeswalker", "Battle"].some((t) => d.types.includes(t));
 export const hasKeyword = (d: CardDef, k: SupportedKeyword) => d.keywords.some((x) => x.toLowerCase() === k.toLowerCase());

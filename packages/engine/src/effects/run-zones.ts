@@ -1116,7 +1116,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (me) (me.exiledUntilLeaves ??= []).push(l);
           // Linked to the source as it was when the ability triggered: if that object has already left, its
           // leaves ability has nothing to return, and the card stays exiled (CR 607.2a, rulings).
-          if (e.linked && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push(l);
+          if (e.linked && ctx.sourceId) {
+            ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push(l);
+            if (s.resolving) (s.resolving.linkedNow ??= []).push(l.id);
+          }
           const card = s.objects[l.id]!;
           if (e.ownerMay && !card.isToken) {
             const m = e.ownerMay;
@@ -1212,7 +1215,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     }
     case "exileFaceDown": {
-      const p = player(s, ctx.controller);
+      const actor = e.actor ? players(s, e.actor, ctx)[0] : ctx.controller;
+      if (actor === undefined) return;
+      const p = player(s, actor);
       const sc = (s.resolving!.scratch ??= {});
       let ids: ObjectId[];
       if (e.from === "handCard") {
@@ -1268,7 +1273,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const key = s.linkedExile?.[`${ctx.sourceId}@${zc}`] ? `${ctx.sourceId}@${zc}` : `${ctx.sourceId}@${zc - 1}`;
       const sc = (s.resolving!.scratch ??= {});
       const linked = (s.linkedExile?.[key] ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc);
-      let cards = linked.map((l) => obj(s, l.id)).filter((c) => (!e.yours || c.owner === ctx.controller) && !(e.other && s.resolving!.faceDownExiled?.includes(c.id)));
+      if (e.ifLinkedNow && !s.resolving!.linkedNow?.length) return;
+      let cards = linked.map((l) => obj(s, l.id)).filter((c) => (!e.yours || c.owner === ctx.controller) && !(e.other && s.resolving!.faceDownExiled?.includes(c.id)) && !(e.ifLinkedNow && s.resolving!.linkedNow?.includes(c.id)));
       const p = player(s, ctx.controller);
       if (e.one) {
         if (!sc.linkedPick) {

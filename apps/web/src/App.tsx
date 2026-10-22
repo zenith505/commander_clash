@@ -1383,6 +1383,17 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onDone={(top, away) => dispatch([{ type: "arrangeTop", player: HUMAN, top, away }])}
             />
           )}
+          {pending?.kind === "chooseMay" && pending.vault && pending.player === HUMAN && (
+            <VaultLook
+              key={pending.vault.join(",")}
+              s={s}
+              source={pending.source}
+              cards={pending.vault}
+              life={pending.pay?.life ?? 1}
+              onHover={setHover}
+              onDone={(yes) => dispatch([{ type: "chooseMay", player: HUMAN, yes }])}
+            />
+          )}
           {pending?.kind === "orderLibrary" && pending.player === HUMAN && (
             <ArrangeTop
               key={pending.cards.join(",")}
@@ -3154,6 +3165,40 @@ function GraveyardPicker({
  * whose leftmost card ends up on top. Also used to arrange cards put into your graveyard at the
  * same time (CR 404.3), or all of it ("reorder your graveyard as you choose").
  */
+/** Lim-Dûl's Vault: the cards looked at, and whether to pay life to put them on the bottom and look at the next ones. */
+function VaultLook({ s, source, cards, life, onHover, onDone }: { s: GameState; source: string; cards: string[]; life: number; onHover: (d: CardDef | null) => void; onDone: (yes: boolean) => void }) {
+  const canPay = s.players[HUMAN]!.life >= life;
+  return (
+    <div className="modal-backdrop">
+      <div className="modal arrange vault-look">
+        <header>
+          <strong>{source}: the top {cards.length === 1 ? "card" : `${cards.length} cards`} of your library</strong>
+          <button disabled={!canPay} onClick={() => onDone(true)}>
+            Pay {life} life: bottom, look again
+          </button>
+          <button className="ghost" onClick={() => onDone(false)}>
+            Keep these on top
+          </button>
+        </header>
+        <div className="modal-body">
+          <div className="modal-cards arrange-row">
+            {cards.map((id) => {
+              const d = cardOf(s, id);
+              return (
+                <div key={id} className="arrange-card">
+                  <div className="card big" data-vault={id} {...hoverProps(d, onHover)}>
+                    <CardFace d={d} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ArrangeTop({
   s,
   how,
@@ -4654,6 +4699,14 @@ function Controls({
       <div className="controls">
         <span>
           <strong>{pending.source}:</strong> {pending.what === "cardName" ? `${pending.prompt ?? "choose a card name"}.` : "choose a creature type."}
+        </span>
+      </div>
+    );
+  if (pending?.kind === "chooseMay" && pending.vault)
+    return (
+      <div className="controls">
+        <span>
+          <strong>{pending.source}:</strong> keep these cards or pay life to look at the next ones.
         </span>
       </div>
     );

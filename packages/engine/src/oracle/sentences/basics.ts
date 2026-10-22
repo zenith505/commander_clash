@@ -37,6 +37,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!.toLowerCase(), ctx);
     return who ? [{ type: "loseAllCounters", who }] : null;
   }
+  // Aetheric Amplifier: "Double the number of each kind of counter you have": that many more of each (CR 701.10e).
+  if ((m = /^Double the number of each kind of counter (you have|target player has)$/.exec(s))) {
+    const who = parsePlayer(m[1] === "you have" ? "you" : "target player", ctx);
+    return who ? [{ type: "doublePlayerCounters", who }] : null;
+  }
   // "Exchange life totals with target opponent" (Mirror Universe), "two target players exchange life totals" (Axis of
   // Mortality): CR 701.12c.
   if ((m = /^[Ee]xchange life totals with (target opponent|target player)$/.exec(s))) {

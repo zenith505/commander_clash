@@ -335,6 +335,17 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${p.name} loses all counters.`);
       }
       return;
+    case "doublePlayerCounters":
+      for (const pid of players(s, e.who, ctx)) {
+        const p = player(s, pid);
+        for (const kind of ["poison", "energy", "experience"] as const) {
+          const n = p[kind] ?? 0;
+          if (n <= 0) continue;
+          const put = putPlayerCounters(s, pid, kind, n);
+          if (put > 0) log(s, `${p.name} gets ${put} more ${kind === "energy" ? "energy" : `${kind}`} counter${put === 1 ? "" : "s"}.`);
+        }
+      }
+      return;
     case "emblem": {
       // Named for its source as it is now, or as it last existed (CR 114.3: most emblems have no name; this is for the log).
       const from = ctxSource(s, ctx).name.split(" // ")[0]!;

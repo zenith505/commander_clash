@@ -2310,6 +2310,8 @@ export type Effect =
   | { type: "poison"; who: PlayerRef; n: Amount; upTo?: number }
   /** "Each opponent loses all counters" (CR 122.1): poison and energy, the player counters there are here. */
   | { type: "loseAllCounters"; who: PlayerRef }
+  /** "Double the number of each kind of counter you have" (CR 701.10e): that many more of each. */
+  | { type: "doublePlayerCounters"; who: PlayerRef }
   /**
    * Doubling the power and/or toughness of each of a group until end of turn (CR 701.10b-c): each gets +X/+0, +0/+Y or
    * +X/+Y, X its power and Y its toughness as this resolves (negative ones make it -X or -Y).

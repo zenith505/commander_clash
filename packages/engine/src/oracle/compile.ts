@@ -2777,7 +2777,21 @@ function joinRollTables(lines: string[]): void {
  */
 function joinModes(lines: string[]): string[] {
   const out: string[] = [];
+  // "{4}, {T}: Choose one. Activate only as a sorcery." then the modes (Aetheric Amplifier): the restriction goes after
+  // the last mode, where the activated ability's parser reads it.
+  let restriction: string | undefined;
+  const close = () => {
+    if (restriction) out[out.length - 1] = `${out[out.length - 1]} ${restriction}`;
+    restriction = undefined;
+  };
   for (const line of lines) {
+    const before = out[out.length - 1];
+    const restricted = /^\s*•/.test(line) && !restriction && before !== undefined ? /: Choose one\.( Activate only [^.]+\.)+$/.exec(before) : null;
+    if (restricted) {
+      restriction = restricted[0].slice(": Choose one.".length).trim();
+      out[out.length - 1] = `${before!.slice(0, restricted.index)}: Choose one —`;
+    }
+    if (!/^\s*•/.test(line)) close();
     const prev = out[out.length - 1];
     // "..., choose one that hasn't been chosen this turn." followed by bullets (Lita): the same as with a dash.
     const dotted = prev !== undefined && /\bchoose one(?: that hasn't been chosen(?: this turn)?| at random)?\.$/i.test(prev);
@@ -2785,6 +2799,7 @@ function joinModes(lines: string[]): string[] {
     else if (/^\s*•/.test(line) && prev !== undefined && /—\s*(•.*)?$/.test(prev)) out[out.length - 1] = `${prev} ${line.trim()}`;
     else out.push(line);
   }
+  close();
   return out;
 }
 

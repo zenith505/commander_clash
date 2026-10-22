@@ -1145,3 +1145,39 @@ describe("Opalescence, Humility, March of the Machines, Starfield of Nyx (layers
     expect(isCreature(s, st)).toBe(false);
   });
 });
+
+describe("Aetheric Amplifier, Ezuri", () => {
+  const amp = card("Aetheric Amplifier", "Artifact", "{3}", {
+    oracleText: "{T}: Add one mana of any color.\n{4}, {T}: Choose one. Activate only as a sorcery.\n• Double the number of each kind of counter on target permanent.\n• Double the number of each kind of counter you have.",
+  });
+  const ezuri = card("Ezuri, Renegade Leader", "Legendary Creature — Elf Warrior", "{1}{G}{G}", { power: "2", toughness: "2", oracleText: "{G}: Regenerate another target Elf.\n{2}{G}{G}{G}: Elf creatures you control get +3/+3 and gain trample until end of turn." });
+
+  it("these cards play", () => {
+    for (const d of [amp, ezuri]) expect(isFullySupported(d)).toBe(true);
+    expect(compileCard(amp).activated.find((a) => a.body.modal)!.sorcerySpeed).toBe(true);
+  });
+
+  it("doubles each kind of counter you have (CR 701.10e)", () => {
+    const { s: s0, ap } = setup([]);
+    const id = putOnBattlefield(s0, ap, amp);
+    s0.players[ap]!.energy = 3;
+    s0.players[ap]!.experience = 2;
+    s0.players[ap]!.manaPool.C = 4;
+    const index = compileCard(amp).activated.findIndex((a) => a.body.modal);
+    let s = act(s0, { type: "activateAbility", player: ap, objectId: id, index, modes: [1] });
+    s = passAll(s);
+    expect(s.players[ap]!.energy).toBe(6);
+    expect(s.players[ap]!.experience).toBe(4);
+    expect(s.players[ap]!.poison ?? 0).toBe(0);
+  });
+
+  it("Ezuri can't regenerate itself", () => {
+    const { s, ap } = setup([]);
+    const e = putOnBattlefield(s, ap, ezuri);
+    const elf = putOnBattlefield(s, ap, card("Llanowar Elves", "Creature — Elf Druid", "{G}", { power: "1", toughness: "1", oracleText: "{T}: Add {G}." }));
+    s.players[ap]!.manaPool.G = 1;
+    expect(() => act(s, { type: "activateAbility", player: ap, objectId: e, index: 0, targets: [target(e)] })).toThrow();
+    const t = act(s, { type: "activateAbility", player: ap, objectId: e, index: 0, targets: [target(elf)] });
+    expect(t.stack.length).toBe(1);
+  });
+});

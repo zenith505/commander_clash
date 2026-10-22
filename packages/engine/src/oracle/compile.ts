@@ -309,9 +309,14 @@ export function normalizeSelf(d: CardDef): string {
   // Tuktuk the Explorer creates).
   const comma = full.split(",")[0]!;
   const ofThe = comma === full && d.supertypes?.includes("Legendary") ? /^(.+?) (?:of|the) /.exec(full)?.[1] : undefined;
-  const short = ofThe ?? comma;
+  // "Edgar" for "Edgar Markov": a legendary card's two-word name, when the first word isn't a type (CR 201.5c; not
+  // "Sliver" for "Sliver Queen").
+  const twoWords = comma === full && !ofThe && d.supertypes?.includes("Legendary") ? /^([A-Z][a-z]+) [A-Z][a-z]+$/.exec(full)?.[1] : undefined;
+  const first = twoWords && !CREATURE_TYPES.has(twoWords) && !/^(?:Artifact|Creature|Enchantment|Land|Planeswalker|Battle|Kindred|Tribal|Instant|Sorcery|Legendary|Basic|Snow|World)$/.test(twoWords) ? twoWords : undefined;
+  const short = ofThe ?? first ?? comma;
   if (short && short !== full) {
-    const re = new RegExp(`\\b${esc(short)}\\b${ofThe ? "(?! (?:of|the) [A-Z])" : ""}`, "g");
+    // Not "Nissa's Chosen" in Nissa Revane, another card's name.
+    const re = new RegExp(`\\b${esc(short)}\\b${ofThe ? "(?! (?:of|the) [A-Z])" : ""}${first ? "(?!'s [A-Z])" : ""}`, "g");
     t = t.replace(/"[^"]*"/g, (q) => q.replace(re, QUOTED_SOURCE_NAME));
     t = t.replace(re, "~");
   }
@@ -789,7 +794,8 @@ export function compile(d: CardDef): CompiledCard {
     }
     const othersUntapped = /^([A-Z][a-z]+) you control enter untapped\.$/.exec(line);
     if (othersUntapped) {
-      const g = parseGroup(`${othersUntapped[1]} you control`, true);
+      // "Gates you control" (Gond Gate): a land type isn't read as a plural, "each Gate you control" is the same group.
+      const g = othersUntapped[1] === "Gates" ? parseGroup("each Gate you control") : parseGroup(`${othersUntapped[1]} you control`, true);
       if (g && !g.other) {
         (out.othersEnterUntapped ??= []).push({ filter: g.filter, text: line });
         continue;
@@ -1312,13 +1318,14 @@ export function compile(d: CardDef): CompiledCard {
     const clone = /^(?:You may have ~ enter( tapped)? as|As ~ enters, you may have it become) a copy of (?:any |an? )?(.+?)( until end of turn)?(?:, except (.+?))?\.?$/.exec(line);
     if (clone) clone.splice(1, 1);
     const cloneTapped = /^You may have ~ enter tapped as/.test(line) ? { tapped: true as const } : {};
-    // "You may have this creature enter as a copy of any creature card in a graveyard, except ..." (Lazotep Convert): a
-    // card in any graveyard, by its printed characteristics.
-    const fromYard = clone && !clone[2] && /^creature card in a graveyard$/.exec(clone[1]!);
+    // "You may have this creature enter as a copy of any creature card in a graveyard, except ..." (Lazotep Convert), "You
+    // may have ~ enter tapped as a copy of any land card in a graveyard, except it's a Cave ..." (Echoing Deeps): a card in
+    // any graveyard, by its printed characteristics.
+    const fromYard = clone && !clone[2] ? /^(creature|land) card in a graveyard$/.exec(clone[1]!) : null;
     if (clone && fromYard) {
       const except = clone[3] ? parseCopyExcept(clone[3]) : undefined;
       if (except !== null && !except?.thisAbility) {
-        out.entersAsCopy = { filter: { kind: "card", types: ["Creature"], text: clone[1]! }, ...(except ? { except } : {}), ...cloneTapped };
+        out.entersAsCopy = { filter: { kind: "card", types: [fromYard[1] === "land" ? "Land" : "Creature"], text: clone[1]! }, ...(except ? { except } : {}), ...cloneTapped };
         continue;
       }
     }
@@ -1990,6 +1997,11 @@ export function compile(d: CardDef): CompiledCard {
     const combatCap = /^No more than (one|two) creatures? can (attack|block)( you| ~)? each combat\.$/.exec(line);
     if (combatCap && !(combatCap[3] && combatCap[2] === "block") && (combatCap[3] !== " ~" || d.types.includes("Planeswalker") || d.types.includes("Battle"))) {
       (out.combatLimit ??= {})[combatCap[3] === " you" ? "attackYou" : combatCap[3] ? "attackSelf" : (combatCap[2] as "attack" | "block")] = combatCap[1] === "one" ? 1 : 2;
+      continue;
+    }
+    // Mirri, Weatherlight Duelist: only while it's tapped (CR 508.1c).
+    if (line === "As long as ~ is tapped, no more than one creature can attack you each combat.") {
+      (out.combatLimit ??= {}).attackYouIfTapped = 1;
       continue;
     }
     if (line === "Each opponent can cast spells only any time they could cast a sorcery.") {

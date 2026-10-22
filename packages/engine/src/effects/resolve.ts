@@ -274,6 +274,10 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
       if (ctx.legal[i] && t?.kind === "object") out.push(obj(s, t.id));
     }
     if (ref.sameName && out[0]) out.push(...sameNamed(s, out[0], ref.sameName, ctx.controller));
+    if (ref.andSelf) {
+      const me = objects(s, { ref: "self" }, ctx)[0];
+      if (me && !out.includes(me)) out.unshift(me);
+    }
     return out;
   }
   if (ref.ref === "selfCard") {
@@ -749,6 +753,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "miracle":
     case "castFromHand":
     case "castFromAmong":
+    case "exileCastEachType":
     case "suspendTick":
     case "suspendCast":
     case "siegeDefeated":
@@ -779,6 +784,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "earthbend":
     case "mustBlockSource":
     case "cantBlockSource":
+    case "blockLimitThisCombat":
     case "phaseOut":
     case "proliferate":
     case "amass":

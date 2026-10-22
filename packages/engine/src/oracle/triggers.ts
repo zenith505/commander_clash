@@ -85,6 +85,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever an opponent plays a land, (.+)$/, "opponentPlaysLand"],
   [/^Whenever a player plays a land, (.+)$/, "playerPlaysLand"],
   [/^Whenever you're dealt damage, (.+)$/, "youAreDealtDamage"],
+  [/^Whenever damage that would be dealt to you is prevented, (.+)$/, "youDamagePrevented"],
   [/^Whenever an opponent is dealt damage, (.+)$/, "opponentIsDealtDamage"],
   [/^Whenever enchanted player is dealt damage, (.+)$/, "enchantedPlayerDealtDamage"],
   [/^At the beginning of your upkeep, (.+)$/, "yourUpkeep"],
@@ -676,7 +677,10 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
       ...(anyRecipient[3] ? { activeIf: { kind: "yourTurn" as const } } : {}),
     };
   }
-  const m = /^Whenever (another|an?) (.+?) you control deals combat damage to (a player(?: or battle)?|an opponent), (.+)$/.exec(line);
+  // "Whenever a creature you control with deathtouch deals combat damage to a player" (Fynn, the Fangbearer): the
+  // keyword as it deals the damage.
+  const withKw = /^(Whenever (?:another|an?) creature) you control (with [a-z]+) (deals combat damage to .+)$/.exec(line);
+  const m = /^Whenever (another|an?) (.+?) you control deals combat damage to (a player(?: or battle)?|an opponent), (.+)$/.exec(withKw ? `${withKw[1]} ${withKw[2]} you control ${withKw[3]}` : line);
   if (!m) return null;
   const filter = parseTargetPhrase(m[2]!);
   if (!filter || filter.kind !== "object" || filter.controller || !(filter.types?.includes("Creature") || filter.subtypes?.length || filter.allTypes?.includes("Creature") || filter.commander)) return "fail";
@@ -831,6 +835,8 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     selfOrCommander = true;
     line = `Whenever you attack, ${line.slice(withCommander[0].length)}`;
   }
+  // "Whenever one or more creatures you control with power 4 or greater attack" (The Earth King): the same group.
+  line = line.replace(/^(Whenever one or more creatures) (you control) (with power \d+ or greater) attack, /, "$1 $3 $2 attack, ");
   if ((m = /^Whenever (?:one or more (.+?) you control attack|you attack with (one|two|three|four|five) or more (.+?)|you attack), (.+)$/.exec(line))) {
     event = "creaturesYouControlAttack";
     phrase = m[1] ?? m[3];
@@ -882,7 +888,9 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   const meldThem = /\bIf ~ and an? \w+ named [^.]+ are attacking, and you both own and control them, exile ~ and the attacking \w+ named .+, then meld them into .+$/;
   // "Look at the top three cards of your library. Put one of them into your hand ..." is about those cards.
   const lookAt = /\b[Ll]ook at the top (?:two|three|four|five) cards of your library\. Put (?:one|two) of them [^.]+\./;
-  if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(meldThem, "").replace(lookAt, "")) && !/that player/.test(bodyText)) return "fail";
+  // "Search your library for up to that many basic land cards, put them onto the battlefield tapped" is about the cards.
+  const searched = /\b[Ss]earch your library for [^,.]+ cards, put them onto the battlefield( tapped)?, then shuffle\./;
+  if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(meldThem, "").replace(lookAt, "").replace(searched, "")) && !/that player/.test(bodyText)) return "fail";
   let group: TargetSpec | undefined;
   if (phrase && !/^creatures$/.test(phrase)) {
     const spec = parseTargetPhrase(phrase.split(/\s+/).map(singularWord).join(" "));
@@ -890,7 +898,9 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     group = { ...spec, text: phrase };
   }
   let text = bodyText;
-  const thatMuch = event === "creaturesYouControlDealCombatDamageToPlayer" && (/\bthat (?:much|many)\b/.test(text) || damageX);
+  // "Draw that many cards" (The Ur-Dragon), "search your library for up to that many basic land cards" (The Earth King):
+  // how many of the matching creatures attacked, as they were declared.
+  const thatMuch = (event === "creaturesYouControlDealCombatDamageToPlayer" || (event === "creaturesYouControlAttack" && !anyone && !perPlayer && !selfOrCommander)) && (/\bthat (?:much|many)\b/.test(text) || damageX);
   if (thatMuch && !damageX) {
     if (/\bX\b/.test(text)) return "fail";
     text = text.replace(/\bthat (?:much|many)\b/g, "X");
@@ -1391,6 +1401,15 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         text: "If it was a creature, return it to the battlefield under its owner's control. It's an enchantment.",
       },
     };
+  // Eminence (C17): "Whenever you cast another Vampire spell, if ~ is in the command zone or on the battlefield, ..." (Edgar
+  // Markov), "... This ability triggers only if ~ is in the command zone or on the battlefield" (Sahir): the ability
+  // works in the command zone too (CR 113.6), with an intervening if (CR 603.4) for the first.
+  const eminence = /^((?:When|Whenever|At)\b[^,]+), if ~ is in the command zone or on the battlefield, (.+)$/.exec(line) ?? /^((?:When|Whenever|At)\b[^,]+), (.+?) This ability triggers only if ~ is in the command zone or on the battlefield\.$/.exec(line);
+  if (eminence) {
+    const t = parseTrigger(`${eminence[1]}, ${eminence[2]}`);
+    if (!t || t === "fail" || t.zone || t.ifCond || t.host || /^(?:When|Whenever) ~ /.test(eminence[1]!)) return "fail";
+    return { ...t, eminence: true, ...(/This ability triggers only/.test(line) ? {} : { ifCond: { kind: "selfCommandOrBattlefield" as const } }) };
+  }
   // "At the beginning of your upkeep, if ~ is in your graveyard, you may pay {1}{B}{B}. If you do, return it to your hand"
   // (Pyre Zombie), "... with a creature card directly above it" (Krovikan Horror, Death Spark): an ability of the card
   // in the graveyard (CR 113.6b) with an intervening if (CR 603.4), so it does nothing if the card has left by then
@@ -1871,7 +1890,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // is the replaced damage's own, not the event's.
       let text = (self ? body0.replace(/^(?:it|he|she) (?=(?:gets|gains|deals|has|becomes|fights|explores)\b)/, "~ ").replace(/^(?:it|he|she) and (?=other )/, "~ and ") : body0).replace(/(would deal [^.]*?damage[^.]*?, it deals )that much( damage)/g, "$1THAT_MUCH$2");
       // "You gain that much life", "put that many +1/+1 counters on it": the damage the event dealt, or the life gained or lost.
-      const playerDealt = event === "youAreDealtDamage" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage";
+      const playerDealt = event === "youAreDealtDamage" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage" || event === "youDamagePrevented";
       const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfDealtDamageBySource" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentGainsLife" || event === "opponentLosesLife" || event === "youLoseLife" || playerDealt;
       // "With mana value less than or equal to that damage" (Aisha of Sparks and Smoke, Covert Technician): the damage dealt.
       const damage = amount && event !== "youGainLife" && event !== "opponentGainsLife" && event !== "opponentLosesLife" && event !== "youLoseLife" && !playerDealt;

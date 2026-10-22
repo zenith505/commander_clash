@@ -108,7 +108,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         }
         return;
       }
-      if (e.of) {
+      if (e.of && e.each !== "selfCard") {
         // About each of those permanents as it is now (CR 603.7c, 400.7).
         for (const o of objects(s, e.of, ctx)) if (o.zone === "battlefield") addDelayed(s, e.when, ctx.controller, o, body, id && s.objects[id] ? cardIdOf(s.objects[id]!) : cardIdOf(o));
         return;
@@ -138,7 +138,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         return;
       }
       if (e.each === "selfCard") {
-        for (const card of objects(s, { ref: "selfCard" }, ctx)) addDelayed(s, e.when, ctx.controller, card, body);
+        // An Aura's card that went to the graveyard as its creature died (Ghoulish Impetus): `of` says so.
+        for (const card of objects(s, e.of?.ref === "selfCard" ? e.of : { ref: "selfCard" }, ctx)) addDelayed(s, e.when, ctx.controller, card, body);
         return;
       }
       if (e.each === "subject") {
@@ -732,6 +733,7 @@ export function cantBeCountered(s: GameState, item: StackItem): boolean {
   if (compileCard(d).cantBeCountered || (o.uncounterableCast && !item.copy)) return true;
   // "Spells you control can't be countered this turn" (Veil of Summer): those on the stack already too (rulings).
   if ((s.turnRules ?? []).some((r) => r.turn === s.turn && r.player === item.controller && r.rule === "spellsUncounterable")) return true;
+  if (!item.copy && isType(d, "Creature") && (s.turnRules ?? []).some((r) => r.turn === s.turn && r.player === item.controller && r.rule === "creatureSpellsUncounterable")) return true;
   return s.battlefield.some((id) => {
     const p = obj(s, id);
     return !!abilitiesOf(s, p).uncounterable?.some((u) => (u.anyone || controllerOf(s, p) === item.controller) && printedMatches(u.filter, d));

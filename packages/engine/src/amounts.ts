@@ -221,6 +221,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.revealedFromHand ?? s.resolving?.item.revealed ?? 0;
     case "tappedThisWay":
       return s.resolving?.tappedThisWay ?? s.resolving?.item.tapped ?? 0;
+    case "manifestedThisWay":
+      return s.resolving?.manifestedThisWay ?? 0;
     case "parleyRevealed":
       return (c.land ? s.resolving?.parley?.land : s.resolving?.parley?.nonland) ?? 0;
     case "damageThisWay":
@@ -296,6 +298,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "players":
       if (c.lostLife) return s.turnOrder.filter((pid) => !(c.opponents && pid === ctx.controller) && (s.lostLifeThisTurn ?? []).includes(pid)).length;
       // Cut a Deal: each one that drew a card in the draw before, however many it drew (rulings).
+      // Aclazotz: an opponent with no card to discard (CR 701.9b) didn't discard one.
+      if (c.discardedNone) return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && !(s.resolving?.discarded?.[pid] ?? 0)).length;
       if (c.drewThisWay) return new Set((s.resolving?.drawnBefore ?? []).map((id) => s.objects[id]?.owner).filter((pid) => pid !== undefined && !(c.opponents && pid === ctx.controller))).size;
       // Summon: Yojimbo: opponents still in the game who control at least one such permanent now.
       if (c.controlling) {
@@ -554,6 +558,8 @@ function describeCount(c: Count): string {
       return "#cards chosen";
     case "tappedThisWay":
       return "#tapped";
+    case "manifestedThisWay":
+      return "#cards manifested";
     case "parleyRevealed":
       return c.land ? "#land cards revealed" : "#nonland cards revealed";
     case "damageThisWay":
@@ -599,7 +605,7 @@ function describeCount(c: Count): string {
     case "stateIf":
       return "1 if the condition holds";
     case "players":
-      return `#${c.opponents ? "opponents" : "players"}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}`;
+      return `#${c.opponents ? "opponents" : "players"}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.discardedNone ? " who couldn't discard" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}`;
     case "diedThisTurn":
       return "#creatures that died this turn";
     case "tokensCreatedThisTurn":

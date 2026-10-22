@@ -349,6 +349,12 @@ export interface GameObject {
     more?: number;
     /** "You may play one of those cards" (Nashi): the cards of one group, of which only one may be played (GameState.oneOfUsed). */
     oneOf?: string;
+    /**
+     * "For each nonland card type, you may cast a spell of that type from among the exiled cards" (Aminatou's Augury): the
+     * cards of one group, each cast as one of its nonland card types that no other card cast from the group was cast as
+     * (GameState.byTypeCast).
+     */
+    byType?: string;
     /** "Pay life equal to its mana value rather than paying its mana cost" (Nashi): an alternative cost, the only way. */
     life?: true;
   };
@@ -1036,7 +1042,7 @@ export type PendingDecision =
    * mana value N or more, or none to decline. `not`: a card that can't be one of them.
    */
   | { kind: "collectEvidence"; player: PlayerId; n: number; source: string; not?: ObjectId }
-  | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; /** One target of a "may" asked about each of its targets (Effect "may" `eachTarget`). */ eachTarget?: true; /** "Each player may discard their hand and draw this many cards". */ wheel?: number; pay?: PayCost; /** Pay to keep a permanent: echo, cumulative upkeep. */ keep?: boolean; /** Clash: put the revealed `card` on the bottom of the library (CR 701.30a)? */ clash?: boolean; /** "You may repeat this process" (Ad Nauseam). */ repeat?: true; /** Lim-Dûl's Vault: the cards looked at, shown with the question. */ vault?: ObjectId[] }
+  | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; /** One target of a "may" asked about each of its targets (Effect "may" `eachTarget`). */ eachTarget?: true; /** "Each player may discard their hand and draw this many cards". */ wheel?: number; pay?: PayCost; /** Pay to keep a permanent: echo, cumulative upkeep. */ keep?: boolean; /** Clash: put the revealed `card` on the bottom of the library (CR 701.30a)? */ clash?: boolean; /** "You may repeat this process" (Ad Nauseam). */ repeat?: true; /** Lim-Dûl's Vault: the cards looked at, shown with the question. */ vault?: ObjectId[]; /** Odric: pay `pay` for the blocks `chooser` declared for this player, or have them choose again (rulings). */ blockTax?: { chooser: PlayerId; blocks: { blocker: ObjectId; attacker: ObjectId }[]; remaining: PlayerId[] } }
   /**
    * "Counter that spell or ability unless its controller pays {2}" (ward, CR 702.21a). The player
    * may activate mana abilities first (CR 605.3a), then pays or declines.
@@ -1104,7 +1110,7 @@ export type PendingDecision =
    * Searching your library (CR 701.23): `cards` are the ones that match; pick between `min` and
    * `max` of them. With `firstTo`, the first one picked goes there and the rest to `othersTo`.
    */
-  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; /** "Exile a card from a graveyard" (Cemetery Prowler): `cards` are in every player's graveyard, not only yours. */ anyGraveyard?: true; /** Choosing from cards in exile (`dig.looked`, Dauthi Voidwalker). */ exiled?: true; min: number; max: number; firstTo?: string; othersTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string }; /** Not a search: cards in the hand to put onto the battlefield, or with `reveal` to reveal, with `bottom` to put on the bottom of the library. */ fromHand?: boolean; reveal?: true; bottom?: true; /** Not a search: cards in the graveyard to return to the hand, to exile, or to put onto the battlefield. */ fromGraveyard?: "hand" | "exile" | "battlefield" | "libraryTop"; /** "Cards with different mana values" (Seasons Past): no two found may share a mana value. */ distinctManaValues?: true; /** "With total mana value 4 or less" (Lively Dirge): the cards found together. */ totalMv?: number; /** "Basic land cards that share a land type" (Myriad Landscape): every card found shares a land type with each other one. */ shareLandType?: true; /** "A Forest card and a Plains card" (Krosan Verge): the cards found can each be one of these, a different one each. */ oneOfEach?: TargetSpec[]; /** The Leylines' "begin the game with it on the battlefield", before the first turn (CR 103.6a); with `exile`, the cards from the hand Gemstone Caverns exiles ("If you do, exile a card from your hand"). */ opening?: true; exile?: true; /** Choosing from this player's revealed hand ("You choose a nonland card from it"); `dig.looked` is the whole hand. */ hand?: PlayerId; /** Searching this player's graveyard, hand and library (Memoricide): `cards` are in any of them; `also`, the graveyard's that are found anyway ("all cards"). */ zonesOf?: PlayerId; also?: ObjectId[]; /** An opponent choosing from this player's revealed cards (Gifts Ungiven, Intuition); `helps` when where the chosen ones go is better for that player than where the rest go. */ forPlayer?: PlayerId; helps?: true; /** Separating `dig.looked` into two piles (CR 700.3): the cards chosen are the first pile, the rest the second. */ piles?: true; /** Opposition Agent (CR 723.2): `player` controls this player while they search their own library and chooses what they find; with `foundExiled`, what they find is exiled instead, and `player` may play it. */ controlling?: PlayerId; foundExiled?: true }
+  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; /** "Exile a card from a graveyard" (Cemetery Prowler): `cards` are in every player's graveyard, not only yours. */ anyGraveyard?: true; /** Choosing from cards in exile (`dig.looked`, Dauthi Voidwalker). */ exiled?: true; min: number; max: number; firstTo?: string; othersTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string }; /** Not a search: cards in the hand to put onto the battlefield, or with `reveal` to reveal, with `bottom` to put on the bottom of the library. */ fromHand?: boolean; reveal?: true; bottom?: true; /** From the hand: the cards are manifested (Kozilek, the Broken Reality). */ manifest?: true; /** Not a search: cards in the graveyard to return to the hand, to exile, or to put onto the battlefield. */ fromGraveyard?: "hand" | "exile" | "battlefield" | "libraryTop"; /** "Cards with different mana values" (Seasons Past): no two found may share a mana value. */ distinctManaValues?: true; /** "With total mana value 4 or less" (Lively Dirge): the cards found together. */ totalMv?: number; /** "Basic land cards that share a land type" (Myriad Landscape): every card found shares a land type with each other one. */ shareLandType?: true; /** "A Forest card and a Plains card" (Krosan Verge): the cards found can each be one of these, a different one each. */ oneOfEach?: TargetSpec[]; /** The Leylines' "begin the game with it on the battlefield", before the first turn (CR 103.6a); with `exile`, the cards from the hand Gemstone Caverns exiles ("If you do, exile a card from your hand"). */ opening?: true; exile?: true; /** Choosing from this player's revealed hand ("You choose a nonland card from it"); `dig.looked` is the whole hand. */ hand?: PlayerId; /** Searching this player's graveyard, hand and library (Memoricide): `cards` are in any of them; `also`, the graveyard's that are found anyway ("all cards"). */ zonesOf?: PlayerId; also?: ObjectId[]; /** An opponent choosing from this player's revealed cards (Gifts Ungiven, Intuition); `helps` when where the chosen ones go is better for that player than where the rest go. */ forPlayer?: PlayerId; helps?: true; /** Separating `dig.looked` into two piles (CR 700.3): the cards chosen are the first pile, the rest the second. */ piles?: true; /** Opposition Agent (CR 723.2): `player` controls this player while they search their own library and chooses what they find; with `foundExiled`, what they find is exiled instead, and `player` may play it. */ controlling?: PlayerId; foundExiled?: true }
   /**
    * Choosing a creature type or a color by name: as a permanent enters (`objectId`, CR 614.12) or
    * while a spell or ability resolves. `options` are the names allowed.
@@ -1374,6 +1380,8 @@ export interface GameState {
   /** "Your opponents can't cast spells this turn" (Silence): who can't cast what, until that turn ends (CR 101.2). */
   /** The "one of those cards" groups (GameObject.mayPlay.oneOf) a card of which has been played: the rest can't be. */
   oneOfUsed?: string[];
+  /** The nonland card types of each card cast with a "for each nonland card type" permission (GameObject.mayPlay.byType), by group. */
+  byTypeCast?: Record<string, string[][]>;
   cantCastThisTurn?: { player: PlayerId; turn: number; filter?: TargetSpec; source: string; /** Until the end of this player's next turn (Single Combat), kept past this turn's cleanup. */ untilEndOfTurnOf?: PlayerId }[];
   /** Players who can't play lands this turn (Moonhold), and what said so. */
   cantPlayLandsThisTurn?: { player: PlayerId; turn: number; source: string }[];
@@ -1481,6 +1489,8 @@ export interface GameState {
    * their combat damage as though they weren't blocked, and those creatures (CR 510.1).
    */
   unblockedChoice?: { turn: number; step: Step; asked: PlayerId[]; ids: ObjectId[] };
+  /** "Can't block with more than one creature this combat" (Mirri, Weatherlight Duelist): each player's limit, until the end of combat step ends. */
+  blockLimits?: { player: PlayerId; n: number }[];
   /** Attackers just declared, waiting on their enlist choices (CR 508.1g) before "whenever ~ attacks" triggers. */
   declaring?: { ids: ObjectId[]; /** Bands can still be declared (CR 508.1e). */ bands: boolean; enlist: ObjectId[]; enlisted: [ObjectId, ObjectId][]; /** Attackers that may still be exerted (CR 701.43d), and those that were. */ exert?: ObjectId[]; exerted?: ObjectId[] };
   pending: PendingDecision | null;
@@ -1572,7 +1582,8 @@ export interface TurnRule {
    * "spellsUncounterable": "Spells you control can't be countered this turn" (Veil of Summer, CR 101.2).
    */
   /** "cantWinGame": "players can't win the game this turn" (Everybody Lives!). */
-  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable";
+  /** "creatureSpellsUncounterable": "Creature spells you cast this turn can't be countered" (Domri, Anarch of Bolas): cast, so not a copy. */
+  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable" | "creatureSpellsUncounterable";
 }
 
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */
@@ -1632,6 +1643,8 @@ export interface Resolving {
   discarded?: Record<PlayerId, number>;
   /** The cards the last discard while this resolves put into a graveyard, as those objects ("the discarded card", Malcolm). */
   discardedCards?: { id: ObjectId; zc: number }[];
+  /** Every card discarded while this resolves, wherever it went (madness): "if an artifact card was discarded this way". */
+  discardedAll?: ObjectId[];
   /** The powers of the creature cards exiling graveyards exiled so far while this resolves ("exiled this way"). */
   exiledPowers?: number[];
   /**
@@ -1674,6 +1687,8 @@ export interface Resolving {
   excessToCreatures?: number;
   /** How many permanents its tapAnyNumber instruction tapped ("for each creature tapped this way"). */
   tappedThisWay?: number;
+  /** Cards a putFromHand with `manifest` put onto the battlefield face down: "for each card manifested this way". */
+  manifestedThisWay?: number;
   /** Whether the player paid its counterSpell instruction's "unless" cost ("If they do, ..."). */
   unlessPaid?: boolean;
   /** How many cards its takeFromHand instruction took ("You may choose a nonland card from it. If you do, ..."). */
@@ -1868,7 +1883,7 @@ export interface Resolving {
     vaultPaid?: number;
     /** "Exile the top two cards ..., then choose one of them" (Party Thrasher): the cards exiled, and the one chosen. */
     impulseChoice?: { ids: ObjectId[]; pick?: ObjectId };
-    castAmong?: { ids: { id: ObjectId; zc: number }[]; budget?: number; maxMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true; /** How many were cast. */ cast?: number; /** `untilHits`: the cards that qualified; `handPick`, choosing which goes to the hand. */ hits?: ObjectId[]; handPick?: true; /** `copies`: the card the copy being cast is of. */ copyOf?: ObjectId; /** `lands`: the land picked to play, after asking whether it enters untapped. */ landPick?: ObjectId; /** `opponentExcludes`: the opponent asked, and the card they chose (not to be cast). */ excludeBy?: PlayerId; excluded?: ObjectId };
+    castAmong?: { ids: { id: ObjectId; zc: number }[]; budget?: number; maxMv?: number; exactMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true; /** How many were cast. */ cast?: number; /** `untilHits`: the cards that qualified; `handPick`, choosing which goes to the hand. */ hits?: ObjectId[]; handPick?: true; /** `copies`: the card the copy being cast is of. */ copyOf?: ObjectId; /** `lands`: the land picked to play, after asking whether it enters untapped. */ landPick?: ObjectId; /** `opponentExcludes`: the opponent asked, and the card they chose (not to be cast). */ excludeBy?: PlayerId; excluded?: ObjectId };
     topOrBottom?: string; // the owner's choice: "top" or "bottom"
     /** The player a creature put onto the battlefield attacking attacks (CR 508.4), as a PlayerId string. */
     attackWhom?: string;

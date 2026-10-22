@@ -155,6 +155,38 @@
   ]
  },
  {
+  "oracleId": "abe377f8-35f0-4dea-a681-91d31a36815c",
+  "name": "Agitator Ant",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Insect",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Insect"
+  ],
+  "oracleText": "At the beginning of your end step, each player may put two +1/+1 counters on a creature they control. Goad each creature that had counters put on it this way. (Until your next turn, those creatures attack each combat if able and attack a player other than you if able.)",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Goad"
+  ],
+  "commanderLegal": "legal",
+  "set": "c20",
+  "releasedAt": "2020-04-17",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e101b744-9175-4aa5-bf80-d6944359e538",
   "name": "Airbending Lesson",
   "manaCost": "{2}{W}",
@@ -6116,6 +6148,36 @@
   "set": "chk",
   "releasedAt": "2004-10-01",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "39f4bf0e-47d5-4ae8-a504-71acda849850",
+  "name": "Kozilek, the Broken Reality",
+  "manaCost": "{9}",
+  "cmc": 9,
+  "typeLine": "Legendary Creature — Eldrazi",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Eldrazi"
+  ],
+  "oracleText": "When you cast this spell, up to two target players each manifest two cards from their hands. For each card manifested this way, you draw a card. (To manifest a card, put it onto the battlefield face down as a 2/2 creature. Turn it face up any time for its mana cost if it's a creature card.)\nOther colorless creatures you control get +3/+2.",
+  "power": "9",
+  "toughness": "9",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Manifest"
+  ],
+  "commanderLegal": "legal",
+  "set": "mh3",
+  "releasedAt": "2024-06-14",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -12208,6 +12270,43 @@
   "commanderLegal": "legal",
   "set": "usg",
   "releasedAt": "1998-10-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a7043fbd-1dfd-42cf-be4b-cc343d0949e5",
+  "name": "Yuriko, the Tiger's Shadow",
+  "manaCost": "{1}{U}{B}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Ninja",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Ninja"
+  ],
+  "oracleText": "Commander ninjutsu {U}{B} ({U}{B}, Return an unblocked attacker you control to hand: Put this card onto the battlefield from your hand or the command zone tapped and attacking.)\nWhenever a Ninja you control deals combat damage to a player, reveal the top card of your library and put that card into your hand. Each opponent loses life equal to that card's mana value.",
+  "power": "1",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Commander ninjutsu"
+  ],
+  "commanderLegal": "legal",
+  "set": "c18",
+  "releasedAt": "2018-08-10",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

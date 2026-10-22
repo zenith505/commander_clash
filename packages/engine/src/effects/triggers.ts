@@ -140,6 +140,8 @@ export type TriggerSourceEvent =
   | { type: "tokenCreated"; player: PlayerId; id: ObjectId }
   /** All the damage dealt to a player at the same time (CR 120.3a): "whenever you're dealt damage". */
   | { type: "playerDealtDamage"; player: PlayerId; amount: number }
+  /** Damage that would have been dealt to `player` was prevented, `amount` of it, all at the same time (Selfless Squire). */
+  | { type: "damagePreventedToPlayer"; player: PlayerId; amount: number }
   /** A player collected evidence (CR 701.59a), once for each time. */
   | { type: "evidenceCollected"; player: PlayerId }
   | { type: "proliferated"; player: PlayerId }
@@ -343,7 +345,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     o: GameObject,
     controller: PlayerId,
     pred: (event: string, t: TriggeredAbility) => boolean,
-    triggers = abilitiesOf(s, o).triggers,
+    triggersIn?: TriggeredAbility[],
     cause?: string,
     subject?: GameObject,
     lki?: LastKnown,
@@ -353,25 +355,33 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     colorsSpent?: number,
   ) => {
     if (locked?.(controller)) return;
+    // Passed-in abilities look back in time (a commander that left for the command zone still has its "leaves" trigger).
+    const triggers = triggersIn ?? abilitiesOf(s, o).triggers;
     const printed = compileCard(defOf(s, o)).triggers;
     // Two instances of one "triggers only once each turn" ability (two Dionus, Elvish Archdruid granting it) each
     // trigger once (rulings): the nth instance is used up once n of them have triggered this turn.
     const instance = new Map<string, number>();
+    const grantedAt = o.zone === "battlefield" ? characteristics(s, o).grantedAt : undefined;
     triggers.forEach((t, index) => {
       // "Whenever enchanted creature ..." is about the creature, not the Aura; "~ or equipped creature" about both.
       if (hosting ? !t.host : t.host === "attached") return;
       if ((t.zone === "graveyard") !== fromYard) return;
+      // In the command zone, only an eminence ability works (CR 113.6).
+      if (o.zone === "command" && !o.emblem && !t.eminence && !triggersIn) return;
       // An intervening "if" has to be true for it to trigger at all (CR 603.4).
       // "Max speed — Whenever ...": only while it has the ability (CR 702.178a).
       if (t.activeIf && !staticConditionNow(s, t.activeIf, o.id, controller)) return;
       // (Keyed by event too: "Whenever ~ enters or attacks, ..." is one ability compiled as two triggers.)
-      const nth = t.oncePerTurn ? (instance.get(`${t.event}|${t.body.text}`) ?? 0) : 0;
-      if (t.oncePerTurn) instance.set(`${t.event}|${t.body.text}`, nth + 1);
-      if (t.oncePerTurn && onceUsed(o, t.zone, t.body.text, nth)) return;
+      // A granted one is keyed by the granting effect's timestamp too: when Dionus, Elvish Archdruid leaves and returns
+      // (or another one enters), the ability it grants is a new one that can trigger again that turn (CR 400.7, rulings).
+      const onceKey = t.grant !== undefined && grantedAt?.[t.grant] !== undefined ? `${t.body.text}@${grantedAt[t.grant]}` : t.body.text;
+      const nth = t.oncePerTurn ? (instance.get(`${t.event}|${onceKey}`) ?? 0) : 0;
+      if (t.oncePerTurn) instance.set(`${t.event}|${onceKey}`, nth + 1);
+      if (t.oncePerTurn && onceUsed(o, t.zone, onceKey, nth)) return;
       const once = t.body.effects[0];
       if (once?.type === "may" && once.once && onceUsed(o, t.zone, `do:${once.text}`)) return; // CR 603.2h
       if (pred(t.event, t) && (!t.ifCond || staticConditionNow(s, t.ifCond, o.id, controller, event?.player, event?.amount, undefined, subject?.id, subject?.zoneChanges ?? 0))) {
-        if (t.oncePerTurn) (o.triggeredThisTurn ??= []).push(`${lookingBack(o, t.zone) ? (o.zoneChanges ?? 0) - 1 : (o.zoneChanges ?? 0)}|${t.body.text}`);
+        if (t.oncePerTurn) (o.triggeredThisTurn ??= []).push(`${lookingBack(o, t.zone) ? (o.zoneChanges ?? 0) - 1 : (o.zoneChanges ?? 0)}|${onceKey}`);
         const queued: PendingTrigger = {
           ...(t.ifCond ? { ifCond: t.ifCond } : {}),
           // An ability an effect gave it isn't on its card, so the trigger carries what it does.
@@ -440,6 +450,17 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
    */
   const fromEmblems = (f: (o: GameObject, owner: PlayerId) => void) => {
     for (const o of liveEmblems(s)) f(o, o.owner);
+    fromCommand(f);
+  };
+  /** Commanders in the command zone with an eminence ability, which works there (CR 113.6), controlled by their owner. */
+  const fromCommand = (f: (o: GameObject, owner: PlayerId) => void) => {
+    for (const p of s.players) {
+      if (p.lost) continue;
+      for (const id of p.command) {
+        const o = s.objects[id];
+        if (o?.zone === "command" && !o.emblem && compileCard(defOf(s, o)).triggers.some((t) => t.eminence)) f(o, p.id);
+      }
+    }
   };
   /**
    * The delayed triggered abilities with a duration still in effect (CR 603.7b), each with its source object, wherever it
@@ -776,6 +797,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const you = controllerOf(s, o);
       add(o, you, (e) => (e === "youAreDealtDamage" && you === ev.player) || (e === "opponentIsDealtDamage" && you !== ev.player) || (e === "enchantedPlayerDealtDamage" && o.attachedToPlayer === ev.player), undefined, undefined, undefined, undefined, undefined, undefined, info);
     }
+  } else if (ev.type === "damagePreventedToPlayer") {
+    // "Whenever damage that would be dealt to you is prevented, put that many +1/+1 counters on ~" (Selfless Squire).
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      const you = controllerOf(s, o);
+      if (you === ev.player) add(o, you, (e) => e === "youDamagePrevented", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
+    }
   } else if (ev.type === "ringTempted") {
     // "Whenever the Ring tempts you" (CR 701.54d), "if you chose a creature other than ~ as your Ring-bearer" (CR 603.4);
     // "whenever you choose a creature as your Ring-bearer".
@@ -936,7 +964,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // "Whenever another player attacks": the attacking player, and how many of those creatures attack this one's
         // controller, as they were declared (rulings on Firemane Commando).
         const watcher = controllerOf(s, o);
-        const attacked = t.anotherPlayer ? { player: ev.controller, amount: hit.filter(([x]) => obj(s, x).attacking === watcher && !obj(s, x).attackingPermanent).length } : undefined;
+        // Otherwise, "that many": how many of them attacked (The Ur-Dragon).
+        const attacked = t.anotherPlayer ? { player: ev.controller, amount: hit.filter(([x]) => obj(s, x).attacking === watcher && !obj(s, x).attackingPermanent).length } : ev.type === "groupAttack" && !anyone ? { amount: hit.length } : undefined;
         // "Whenever you attack a player": once for each player the matching creatures attack (CR 508.3e).
         if (t.perPlayer) {
           for (const p of s.turnOrder)
@@ -951,6 +980,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever one or more creatures attack" (Duelist's Heritage): every permanent's, whoever attacked.
     if (ev.type === "groupAttack") for (const id of s.battlefield) groupWatch(obj(s, id), true);
     fromGraveyards((o, owner) => owner === ev.controller && groupWatch(o));
+    fromCommand((o, owner) => owner === ev.controller && groupWatch(o));
     // "Whenever an opponent attacks you with two or more creatures" (Mangara): each of the attacker's opponents counts
     // the ones attacking them (and their planeswalkers, for Mangara).
     if (ev.type === "groupAttack") {

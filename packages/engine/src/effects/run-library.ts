@@ -1057,6 +1057,7 @@ export function toBottom(s: GameState, pid: PlayerId, ids: ObjectId[], src: stri
 export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how = "", quiet = false, cycled = false, cause?: PlayerId, /** The X chosen for a cycling cost (Shark Typhoon). */ cycledX?: number) {
   if (!ids.length) return;
   if (s.resolving) (s.resolving.discarded ??= {})[pid] = (s.resolving.discarded[pid] ?? 0) + ids.length;
+  if (s.resolving) (s.resolving.discardedAll ??= []).push(...ids);
   const names = ids.map((id) => defOf(s, obj(s, id)).name);
   if (!quiet) log(s, `${player(s, pid).name} discards ${names.join(", ")}${how}.`);
   const cards = ids.map((id) => defOf(s, obj(s, id)));

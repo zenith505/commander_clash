@@ -1130,7 +1130,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (o.zone === "hand" && isLand(s, o.id) && entersRulesOf(s, HUMAN, o.id).entersTappedChoice) return setMenu(o.id);
     if (o.zone === "hand" && isLand(s, o.id)) return dispatch([{ type: "playLand", player: HUMAN, objectId: o.id }]);
     // A commander with an alternative cost (sneak): choose how to cast it.
-    if (o.zone === "command" && o.owner === HUMAN && altCostsFor(s, HUMAN, o).length) return setMenu(o.id);
+    if (o.zone === "command" && o.owner === HUMAN && (altCostsFor(s, HUMAN, o).length || handAbilities(s, o.id).length)) return setMenu(o.id);
     if (o.zone === "hand" || o.zone === "command") return startCast(o.id);
     // Courser of Kruphix, Future Sight: play the top card of your library.
     if (o.zone === "library" && mayPlayFromTop(s, o, HUMAN)) {
@@ -1929,9 +1929,10 @@ function canCastAlt(s: GameState, id: string, alt: AltCostKind): boolean {
   return !!sac && s.battlefield.some((x) => controllerOf(s, s.objects[x]!) === HUMAN && objectMatches(s, sac.filter, s.objects[x]!, HUMAN, false) && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { alt, sacrifice: [x] }) !== null);
 }
 
-/** Indices of a card's abilities that work from your hand (cycling, CR 702.29a). */
+/** Indices of a card's abilities that work from your hand (cycling, CR 702.29a), or from the command zone for a commander (commander ninjutsu, CR 702.49d). */
 function handAbilities(s: GameState, id: string): number[] {
-  return abilitiesOf(s, s.objects[id]!).activated.flatMap((ab, i) => (ab.zone === "hand" ? [i] : []));
+  const o = s.objects[id]!;
+  return abilitiesOf(s, o).activated.flatMap((ab, i) => (ab.zone === "hand" && (o.zone !== "command" || ab.orCommand) ? [i] : []));
 }
 
 /** Could you cycle this card right now, tapping mana as needed? */
@@ -3578,6 +3579,8 @@ function LibrarySearch({
                 ? `${pending.source}: put ${pending.what} from your hand on the bottom of your library`
                 : pending.fromHand && pending.exile
                 ? `${pending.source}: exile ${pending.what} from your hand`
+                : pending.fromHand && pending.manifest
+                ? `${pending.source}: manifest ${pending.what} from your hand (each a face-down 2/2 creature)`
                 : pending.fromHand
                 ? `${pending.source}: ${pending.min ? "put" : "you may put"} ${pending.what} from your hand onto the battlefield`
                 : pending.fromGraveyard === "exile"
@@ -4090,7 +4093,8 @@ function AbilityMenu({
         })}
       {abilitiesOf(s, o).activated.map((ab, i) => {
         // From your hand, only cycling and the like; from your graveyard, unearth; on the battlefield, everything else.
-        if ((ab.zone ?? "battlefield") !== o.zone) return null;
+        // Commander ninjutsu works from the command zone too (CR 702.49d).
+        if ((ab.zone ?? "battlefield") !== o.zone && !(ab.orCommand && o.zone === "command")) return null;
         const problem = abilityProblem(s, HUMAN, objectId, i);
         const ok = !problem || (/not enough mana/.test(problem) && planActivate(s, HUMAN, objectId, i) !== null);
         // A mana ability with a choice of mana (CR 605.1a): a button for each, like a land's.
@@ -4325,10 +4329,10 @@ function Controls({
     // Archangel of Tithes: what blocking costs, paid from your lands as you declare (CR 509.1d-f); with a cost, no
     // requirement makes a creature block (CR 509.1c).
     const blockTax = blockCost(s, Object.keys(blocks).length);
-    // Odric, Master Tactician: choosing another player's blocks; ones that cost anything can't be chosen for them.
+    // Odric, Master Tactician: choosing another player's blocks; they decide whether to pay what blocking costs.
     const defender = pending.defender ?? HUMAN;
     const theirs = defender !== HUMAN ? s.players[defender]!.name : null;
-    const blockTaps = blockTax ? (theirs ? null : planMana(s, HUMAN, parseManaCost(blockTax))) : [];
+    const blockTaps = blockTax ? (theirs ? [] : planMana(s, HUMAN, parseManaCost(blockTax))) : [];
     const needed = alone ?? (blockCost(s, 1) ? null : blockRequirementProblem(s, defender, list));
     return (
       <div className="controls">
@@ -4345,7 +4349,7 @@ function Controls({
         </span>
         <button
           disabled={!!needed || !blockTaps}
-          title={blockTax && !blockTaps ? (theirs ? `Blocking costs ${blockTax}, which only ${theirs} could choose to pay` : `Blocking costs ${blockTax} and you can't pay it`) : undefined}
+          title={blockTax && !blockTaps ? `Blocking costs ${blockTax} and you can't pay it` : undefined}
           onClick={() =>
             dispatch([
               ...(blockTaps ?? []),
@@ -4357,7 +4361,7 @@ function Controls({
             ])
           }
         >
-          {Object.keys(blocks).length ? `Block with ${Object.keys(blocks).length}${blockTax ? ` (pay ${blockTax})` : ""}` : "No blocks"}
+          {Object.keys(blocks).length ? `Block with ${Object.keys(blocks).length}${blockTax ? (theirs ? ` (${theirs} may pay ${blockTax})` : ` (pay ${blockTax})`) : ""}` : "No blocks"}
         </button>
       </div>
     );

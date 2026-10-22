@@ -474,6 +474,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Add {B} or {G} for each permanent destroyed this way" (Culling Ritual): either color for each one, chosen as it
   // resolves (rulings: "You aren't limited to one color").
+  // "+1: Add {R} or {G}" (Domri, Anarch of Bolas): one mana of either, chosen as it resolves.
+  if ((m = /^[Aa]dd \{([WUBRG])\} or \{([WUBRG])\}$/.exec(s)) && m[1] !== m[2]) return [{ type: "addMana", split: [m[1] as ManaType, m[2] as ManaType], times: 1 }];
   if ((m = /^[Aa]dd \{([WUBRG])\} or \{([WUBRG])\} for each (.+)$/.exec(s)) && m[1] !== m[2]) {
     const times = parseCount(m[3]!, ctx, true);
     return times && [{ type: "addMana", split: [m[1] as ManaType, m[2] as ManaType], times }];
@@ -555,6 +557,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   if (/^Until your next turn, your opponents can't cast spells from anywhere other than their hands$/.test(s)) return [{ type: "opponentsHandOnlyUntilNextTurn" }];
   if (/^Spells you control can't be countered this turn$/i.test(s)) return [{ type: "turnRules", rules: ["spellsUncounterable"] }];
+  // Domri, Anarch of Bolas: "Creature spells you cast this turn can't be countered" (rulings: every one, after it resolves).
+  if (/^Creature spells you cast this turn can't be countered$/i.test(s)) return [{ type: "turnRules", rules: ["creatureSpellsUncounterable"] }];
   if ((m = /^(Players|Your opponents) can't gain life this turn$/i.exec(s))) return [{ type: "noLifeGain", players: /^players$/i.test(m[1]!) ? "all" : "opponents" }];
   if (/^Damage can't be prevented this turn$/i.test(s)) return [{ type: "noPrevention" }];
   // "Your opponents can't cast spells this turn" (Silence), "Target player can't ..." (Orim's Chant), "Its controller
@@ -811,8 +815,9 @@ export function parsePunisherOptions(text: string, ctx: Ctx): PunisherOption[] |
     let m: RegExpExecArray | null;
     if ((m = new RegExp(`^discards? ${NUM} cards?$`).exec(part))) out.push({ discard: num(m[1]!) });
     // "Sacrifice two creatures of their choice" (Prowling Pangolin).
-    else if ((m = /^sacrifices? (two|three) (creatures|lands)(?: of (?:their|his or her) choice)?$/.exec(part))) {
-      const filter = pickFilter(m[2]!.replace(/s$/, ""));
+    // "Two nonland, nontoken permanents of their choice" (Rakdos, Patron of Chaos).
+    else if ((m = /^sacrifices? (two|three) (creatures|lands|nonland, nontoken permanents)(?: of (?:their|his or her) choice)?$/.exec(part))) {
+      const filter = pickFilter(m[2]!.replace(/s$/, "").replace(/^nonland, nontoken/, "nonland nontoken"));
       if (!filter) return null;
       out.push({ sacrifice: filter, n: num(m[1]!) });
     }

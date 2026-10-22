@@ -708,7 +708,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // there as it resolves (CR 611.2c; Disrupt Decorum's ruling: creatures entering later aren't goaded).
   if ((m = /^Goad (target .+|(?:all|each) .+)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
-    return what?.ref === "target" || (what?.ref === "each" && /^(?:all|each) /i.test(m[1]!)) ? [{ type: "continuous", what, mods: [{ kind: "goad" }], duration: "yourNextTurn" }] : null;
+    return what?.ref === "target" || what?.ref === "countersPutThisWay" || (what?.ref === "each" && /^(?:all|each) /i.test(m[1]!)) ? [{ type: "continuous", what, mods: [{ kind: "goad" }], duration: "yourNextTurn" }] : null;
   }
   // "Choose up to one target creature. If it's suspected, exile it. Otherwise, suspect it." (Agrus Kos): the target alone;
   // what follows says what happens to it.

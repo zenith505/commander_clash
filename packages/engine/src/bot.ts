@@ -21,6 +21,7 @@ import {
   attackTaxOf,
   attackYouLimit,
   combatLimit,
+  playerBlockLimit,
   attackTaxPer,
   blockProblem,
   blockRequirementProblem,
@@ -166,6 +167,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // "You may collect evidence N": yes, with cards we don't need in the graveyard.
     if (pend.kind === "collectEvidence") return [{ type: "collectEvidence", player: pid, ids: spareEvidence(s, pid, pend.n, pend.not) ?? [] }];
     // Lim-Dûl's Vault: keep five cards with at least two we'd like to draw; otherwise dig on while life allows, a few times.
+    // Blocks an opponent chose for us with Odric: we don't pay for their plan; they choose again.
+    if (pend.kind === "chooseMay" && pend.blockTax) return [{ type: "chooseMay", player: pid, yes: false }];
     if (pend.kind === "chooseMay" && pend.vault) {
       const paid = s.resolving?.scratch?.vaultPaid ?? 0;
       const good = pend.vault.filter((id) => wantOnTop(s, pid, id)).length;
@@ -259,6 +262,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "searchLibrary" && pend.opening) {
       const names = new Set<string>();
       return [{ type: "searchLibrary", player: pid, found: pend.cards.filter((id) => { const n = defOf(s, obj(s, id)).name; return !names.has(n) && !!names.add(n); }) }];
+    }
+    // Manifesting (Kozilek, the Broken Reality): creature cards first, which can be turned face up later for their mana
+    // cost (CR 701.40b), the cheapest first; then the least costly of the rest.
+    if (pend.kind === "searchLibrary" && pend.fromHand && pend.manifest) {
+      const creature = (id: ObjectId) => (isType(defOf(s, obj(s, id)), "Creature") ? 0 : 1);
+      return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => creature(a) - creature(b) || mv(s, a) - mv(s, b)).slice(0, pend.max) }];
     }
     if (pend.kind === "searchLibrary" && pend.fromHand) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, pend.max) }];
     // "Put any number of ... from exile onto the battlefield under your control" (Oblivion Sower): all of them.
@@ -402,7 +411,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // A card in a graveyard (Lazotep Convert): the one with the highest mana value, not a legend we already have.
       const mine = (name: string) => s.battlefield.some((b) => controllerOf(s, obj(s, b)) === pid && characteristics(s, obj(s, b)).name === name);
       const ok = ids.filter((x) => (obj(s, x).zone === "graveyard" ? !(defOf(s, obj(s, x)).supertypes.includes("Legendary") && mine(defOf(s, obj(s, x)).name)) : !(characteristics(s, obj(s, x)).supertypes.includes("Legendary") && controllerOf(s, obj(s, x)) === pid)));
-      const value = (x: string) => (obj(s, x).zone === "graveyard" ? 0 : worth(s, pid, obj(s, x))) + mv(s, x);
+      // A land card (Echoing Deeps): a nonbasic one, the one with the most rules text.
+      const landValue = (x: string) => (defOf(s, obj(s, x)).supertypes.includes("Basic") ? 0 : 1 + (defOf(s, obj(s, x)).oracleText?.length ?? 0) / 1000);
+      const value = (x: string) => (obj(s, x).zone === "graveyard" ? (isType(defOf(s, obj(s, x)), "Land") ? landValue(x) : 0) : worth(s, pid, obj(s, x))) + mv(s, x);
       const best = ok.sort((a, b) => value(b) - value(a))[0];
       return [{ type: "chooseOption", player: pid, choice: best ?? "none" }];
     }
@@ -3176,11 +3187,12 @@ function chooseTimed(s: GameState, pid: PlayerId): Action[] | null {
  */
 function chooseNinjutsu(s: GameState, pid: PlayerId): Action[] | null {
   if (s.activePlayer !== pid || s.step !== "declareBlockers" || s.stack.length) return null;
-  for (const id of player(s, pid).hand) {
+  for (const id of [...player(s, pid).hand, ...player(s, pid).command]) {
     const abilities = abilitiesOf(s, obj(s, id)).activated;
     for (let i = 0; i < abilities.length; i++) {
       const ab = abilities[i]!;
-      const cost = ab.zone === "hand" ? ab.costs?.find((c) => c.kind === "returnToHand") : undefined;
+      // Commander ninjutsu works from the command zone too (CR 702.49d).
+      const cost = ab.zone === "hand" && (obj(s, id).zone === "hand" || ab.orCommand) ? ab.costs?.find((c) => c.kind === "returnToHand") : undefined;
       if (!cost || cost.kind !== "returnToHand") continue;
       const d = defOf(s, obj(s, id));
       const ninja = (Number.parseInt(d.power ?? "0", 10) || 0) + (Number.parseInt(d.toughness ?? "0", 10) || 0);
@@ -4111,7 +4123,8 @@ function payForBlocks(s: GameState, pid: PlayerId, a: Action): Action[] {
  * requirement makes some creature block (CR 509.1c), the blocks they'd choose themselves, which obey it.
  */
 function blocksForOpponent(s: GameState, pid: PlayerId, defender: PlayerId): Action {
-  if (!blockRequirementProblem(s, defender, [])) return { type: "declareBlockers", player: pid, blocks: [] };
+  // Blocks that cost mana (Archangel of Tithes) oblige no one (CR 509.1c): none, then.
+  if (blockCost(s, 1) || !blockRequirementProblem(s, defender, [])) return { type: "declareBlockers", player: pid, blocks: [] };
   const theirs = chooseBlocks(s, defender);
   return { type: "declareBlockers", player: pid, blocks: theirs.type === "declareBlockers" ? theirs.blocks : [] };
 }
@@ -4192,7 +4205,8 @@ function chooseBlocks(s: GameState, pid: PlayerId): Action {
   }
   // "No more than one creature can block each combat" (Silent Arbiter): the first blockers chosen (requirements came
   // first), then none on an attacker left with too few to block it.
-  const cap = combatLimit(s, "block") - s.battlefield.filter((id) => obj(s, id).blocking !== undefined).length;
+  // Mirri, Weatherlight Duelist: this player's own limit this combat too.
+  const cap = Math.min(combatLimit(s, "block") - s.battlefield.filter((id) => obj(s, id).blocking !== undefined).length, playerBlockLimit(s, pid) - s.battlefield.filter((id) => obj(s, id).blocking !== undefined && controllerOf(s, obj(s, id)) === pid).length);
   const blockers = [...new Set(blocks.map((b) => b.blocker))];
   if (blockers.length > cap) {
     const kept = new Set(blockers.slice(0, Math.max(0, cap)));

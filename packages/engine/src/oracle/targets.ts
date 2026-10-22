@@ -89,6 +89,12 @@ export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | nul
 
 /** What a "pick" effect picks from: "creature", "nonland permanent", "two lands", "artifact or creature", "Forest". */
 export function pickFilter(phrase: string): TargetSpec | null {
+  // "Artifacts, enchantments, and/or tokens" (Lich-Knights' Conquest): each permanent that's any of them.
+  const list = /^((?:[a-z]+s, )+)and\/or ([a-z]+s)$/.exec(phrase.trim());
+  if (list && /\btokens\b/.test(phrase)) {
+    const anyOf = [...list[1]!.split(", ").filter(Boolean), list[2]!].map((w) => pickFilter(w));
+    return anyOf.every((a): a is TargetSpec => !!a) ? { kind: "object", types: [], notTypes: [], notColors: [], anyOf, text: phrase.trim() } : null;
+  }
   // "Permanents you don't own" (Agent of Treachery): whose they are comes after the noun.
   const owned = / you (?:don't )?own$/.exec(phrase.trim().replace(/ you control$/i, ""))?.[0] ?? "";
   const words = phrase.trim().replace(/ you control$/i, "").slice(0, owned ? -owned.length : undefined).split(" ");
@@ -138,10 +144,13 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   const manyNow = ctx.manyPlayers !== undefined && ctx.lastPlayerTarget === ctx.manyPlayers;
   if (/^(?:each of )?those (?:players|opponents)$/.test(x) && manyNow) return { ref: "target", index: ctx.manyPlayers!, n: 2 };
   // "Two target players each draw a card" (Huddle Up), "Choose two target players. Each of them ..." (Scheming
-  // Symmetry): two different players (CR 115.3), then "each of them", "they" are both.
-  if (/^two target players(?: each)?$/.test(x) && !ctx.targets.some((t) => t.many) && ctx.manyPlayers === undefined) {
-    const first = addTarget(ctx, { kind: "player", text: "target player" });
-    addTarget(ctx, { kind: "player", text: "target player", distinctFrom: [first] });
+  // Symmetry): two different players (CR 115.3), then "each of them", "they" are both. "Up to two target players each
+  // ..." (Kozilek, the Broken Reality): either may be left unchosen (CR 115.6).
+  const twoPlayers = /^(up to )?two target players(?: each)?$/.exec(x);
+  if (twoPlayers && !ctx.targets.some((t) => t.many) && ctx.manyPlayers === undefined) {
+    const optional = twoPlayers[1] ? { optional: true as const } : {};
+    const first = addTarget(ctx, { kind: "player", text: "target player", ...optional });
+    addTarget(ctx, { kind: "player", text: "target player", distinctFrom: [first], ...optional });
     ctx.lastPlayerTarget = first;
     ctx.manyPlayers = first;
     return { ref: "target", index: first, n: 2 };
@@ -217,7 +226,9 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (ctx.vote?.choose && /^each permanent chosen this way$/i.test(x)) return { ref: "voted", any: true };
   // "Put a +1/+1 counter on target creature you control, then double the number of +1/+1 counters on each creature that had
   // a +1/+1 counter put on it this way" (Fangs of Kalonia).
-  if (/^each creature that had an? \+1\/\+1 counter put on it this way$/i.test(x)) return { ref: "countersPutThisWay", kind: "+1/+1" };
+  // "Goad each creature that had a double strike counter put on it this way" (Spectacular Showdown).
+  const hadPut = /^each creature that had an? (\+1\/\+1|double strike) counter put on it this way$/i.exec(x);
+  if (hadPut) return { ref: "countersPutThisWay", kind: hadPut[1]!.toLowerCase() };
   if (/^(?:each of )?(they|them|those creatures|those permanents|those cards)$/i.test(x)) return ctx.lastTargets ? { ref: "target", ...ctx.lastTargets } : /^(?:each of )?(they|them|those creatures)$/i.test(x) && ctx.lastGroup ? ctx.lastGroup : null;
   // "Tap each creature dealt damage this way" (Aurelia's Fury): what this spell's or ability's damage hit.
   const dealt = /^each (creature|planeswalker|permanent) dealt damage this way$/i.exec(x);
@@ -240,6 +251,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     const t = ctx.targets[ctx.lastObjectTarget];
     if (t?.kind === "object" && t.types?.length === 1 && t.types[0] === "Land") return { ref: "target", index: ctx.lastObjectTarget };
   }
+  // "~ and that creature each get +2/+0 and gain haste until end of turn" (Gogo, Mysterious Mime): the source and the target.
+  if (/^~ and that creature(?: each)?$/i.test(x) && !ctx.spell && !ctx.selfCard && ctx.lastObjectTarget !== undefined && !ctx.lastCreated) return { ref: "target", index: ctx.lastObjectTarget, andSelf: true };
   if (/^(it|that creature|that permanent)$/i.test(x)) {
     if (ctx.lastCreated && (/^it$/i.test(x) || (ctx.lastPut && /^that creature$/i.test(x)))) return { ref: "created" };
     if (ctx.lastObjectTarget !== undefined) return { ref: "target", index: ctx.lastObjectTarget };
@@ -889,6 +902,12 @@ export function parseTargetPhrase(
   if (p === "creature or vehicle") {
     extra.orSubtypes = ["Vehicle"];
     p = p.replace(/ or vehicle$/, "");
+  }
+  // "Each land and Ally you control" (Great Divide Guide): a land, or an Ally whatever its card types.
+  const orKind = /^(land|artifact|enchantment) or ([a-z]+)$/.exec(p);
+  if (orKind && !extra.orSubtypes && CREATURE_TYPES.has(capital(orKind[2]!))) {
+    extra.orSubtypes = [capital(orKind[2]!)];
+    p = orKind[1]!;
   }
   // "Angel, Demon, or Dragon creature card" (Kaalia of the Vast): a creature that's one of those creature types; only the
   // last one has the card type, so it's for all of them.

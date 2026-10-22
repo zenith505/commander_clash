@@ -93,6 +93,13 @@ export function parseManaAbility(line0: string): ManaAbility | null {
       if (!cond || p.mana.some((x) => x !== m2![3]) || num(m2[2]!) <= p.mana.length) return null;
       out.produces = { kind: "fixed", mana: [p.mana[0]!], n: { count: { kind: "stateIf", cond }, times: num(m2[2]!) - p.mana.length, plus: p.mana.length } };
     }
+    else if ((m2 = /^If ([^,]+), add (\{[WUBRGC]\}) instead\.$/.exec(extra)) && !out.insteadIf && out.produces.kind === "fixed" && out.produces.mana.length === 1 && !out.produces.n && !out.produces.count) {
+      // River of Tears: "Add {U}. If you played a land this turn, add {B} instead." Checked as it resolves.
+      const cond = parseStaticCondition(m2[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      const produces = parseManaProduced(m2[2]!);
+      if (!cond || !produces) return null;
+      out.insteadIf = { cond, produces };
+    }
     else if ((m2 = /^If ([^,]+), add three mana of that type instead\.$/.exec(extra)) && !out.insteadIf && out.produces.kind === "landsCouldProduce" && !out.produces.n) {
       // Incubation Druid: "If ~ has a +1/+1 counter on it, add three mana of that type instead."
       const cond = parseStaticCondition(m2[1]!, { affects: { kind: "self" }, mods: [], text: "" });
@@ -229,8 +236,8 @@ function parseManaProduced(text: string): ManaProduce | null {
   const any = new RegExp(`^${NUM} mana of any (?:one )?color$`).exec(text);
   if (any) return { kind: "oneOf", options: ALL_COLORS, amount: num(any[1]!) };
   if (text === "one mana of any color in your commander's color identity") return { kind: "commanderIdentity" };
-  const could = /^one mana of any (color|type) that a land (you control|an opponent controls) could produce$/.exec(text);
-  if (could) return { kind: "landsCouldProduce", whose: could[2] === "you control" ? "you" : "opponent", ...(could[1] === "type" ? { anyType: true } : {}) };
+  const could = /^one mana of any (color|type) that a (land|Gate) (you control|an opponent controls) could produce$/.exec(text);
+  if (could) return { kind: "landsCouldProduce", whose: could[3] === "you control" ? "you" : "opponent", ...(could[1] === "type" ? { anyType: true } : {}), ...(could[2] === "Gate" ? { subtype: "Gate" } : {}) };
   // "one mana of the chosen color", "{B} or one mana of the chosen color" (chosen as it entered).
   const chosen = /^(?:(\{[WUBRGC]\}) or )?one mana of the chosen color$/.exec(text);
   if (chosen) return { kind: "chosenColor", ...(chosen[1] ? { also: sym(chosen[1])! } : {}) };

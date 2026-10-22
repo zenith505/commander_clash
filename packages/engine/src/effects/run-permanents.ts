@@ -326,6 +326,15 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       return;
     }
+    case "blockLimitThisCombat": {
+      // Until this combat ends (CR 511.3); outside combat there's no combat for it to apply to.
+      if (!["beginCombat", "declareAttackers", "declareBlockers", "firstStrikeDamage", "combatDamage", "endCombat"].includes(s.step)) return;
+      for (const pid of players(s, e.who, ctx)) {
+        (s.blockLimits ??= []).push({ player: pid, n: e.n });
+        log(s, `${player(s, pid).name} can't block with more than ${e.n === 1 ? "one creature" : `${e.n} creatures`} this combat.`);
+      }
+      return;
+    }
     case "proliferate": {
       const times = proliferateTimes(s, ctx.controller, e.twice ? 2 : 1);
       if (!e.thenPhaseOut) {
@@ -463,6 +472,20 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
             const put = putCounters(s, o, kind, have);
             log(s, `${defOf(s, o).name} gets ${put} ${kind} counter${put > 1 ? "s" : ""}.`);
           }
+        }
+        return;
+      }
+      // Agitator Ant: each player's choice gets the counters from that player, all once everyone has chosen (rulings).
+      if (e.byVoter) {
+        const n = amountNow(s, e.n, ctx);
+        for (const { voter, choice } of n > 0 ? (s.resolving?.votes ?? []) : []) {
+          const [id, zc] = choice.split("@");
+          const o = id ? s.objects[id] : undefined;
+          if (o?.zone !== "battlefield" || String(o.zoneChanges ?? 0) !== zc) continue;
+          invalidateCharacteristics(s);
+          const put = withPutter(voter, () => putCounters(s, o, e.counter, n));
+          log(s, `${player(s, voter).name} puts ${put} ${e.counter} counter${put === 1 ? "" : "s"} on ${defOf(s, o).name}.`);
+          if (put > 0 && s.resolving) (s.resolving.countersPutThisWay ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, kind: e.counter });
         }
         return;
       }

@@ -146,6 +146,18 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: "dig", n, count: n, upTo: false, required: true, into, rest: "graveyard", reveal: false, ...(who ? { who } : {}) }];
   }
 
+  // "Up to two target players each manifest two cards from their hands" (Kozilek, the Broken Reality): each chooses that
+  // many cards from their hand (all of them with fewer, rulings), and they're put onto the battlefield face down
+  // (CR 701.40a). "For each card manifested this way" counts them.
+  if ((m = new RegExp(`^(.+?) (?:each )?manifests? (a card|${NUM} cards) from (?:their|your) hands?$`, "i").exec(s))) {
+    const who = /^manifest$/i.test(m[1]!) ? undefined : parsePlayer(m[1]!, ctx);
+    if (!who) return null;
+    const n = m[2] === "a card" ? 1 : num(m[3]!);
+    if (!Number.isInteger(n) || n < 1) return null;
+    ctx.manifested = true;
+    return [{ type: "putFromHand", who, may: false, manifest: n }];
+  }
+
   // An instant or sorcery that exiles itself as it resolves, so it isn't put into the graveyard (CR 608.2n);
   // with suspend, it's suspended again (Arc Blade). If it doesn't resolve, it isn't exiled.
   if ((m = new RegExp(`^Exile ~ with ${NUM} time counters? on it$`, "i").exec(s))) return ctx.spell ? [{ type: "exileSelfWithTime", n: num(m[1]!) }] : null;
@@ -297,6 +309,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const n = parseCount(counted[4]!, ctx); // COUNTER has a group of its own
     const fx = n && parseZonesSentence(`${counted[1]} with a ${counted[2]} counter on it`, ctx);
     return n && fx?.length === 1 && fx[0]!.type === "chooseFromGraveyard" && fx[0]!.counters ? [{ ...fx[0]!, countersN: n }] : null;
+  }
+  // "Return X creature cards from your graveyard to the battlefield", after "sacrifice any number of ..." (Lich-Knights'
+  // Conquest): that many, chosen as it resolves.
+  if ((m = /^[Rr]eturn X (creature cards) from your graveyard to the battlefield$/.exec(s))) {
+    const filter = parseSearchFilter(m[1]!);
+    return filter ? [{ type: "chooseFromGraveyard", n: 1, nAmount: amt("X"), dest: "battlefield", filter }] : null;
   }
   if ((m = new RegExp(`^[Rr]eturn (an?|one|two|up to one|up to two) (.+?) from your graveyard to the battlefield( tapped)?(?: with an? (${COUNTER}) counter on it)?$`).exec(s)) && !/\b(?:target|other|another|that|those|at random)\b/.test(m[2]!)) {
     // "... with mana value X or less ..., where X is the amount of {S} spent to cast this spell" (Blood on the Snow): X
@@ -642,12 +660,20 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (m[1] === "that Equipment" && !entered) return null;
     return what?.ref === "target" ? [{ type: "attach", what, ...(entered ? { source: { ref: "subject" as const } } : {}) }] : null;
   }
+  // Mirri, Weatherlight Duelist: "Each opponent can't block with more than one creature this combat" (CR 509.1b).
+  if (/^[Ee]ach opponent can't block with more than one creature this combat$/.test(s)) return [{ type: "blockLimitThisCombat", who: { ref: "eachOpponent" }, n: 1 }];
   // "Target creature can't block this turn", "~ can't attack or block this turn", "~ can't be blocked this
   // turn": until the turn ends.
   // "Target creature can't attack until your next turn" ends as your next turn begins (CR 611.2b).
   if ((m = /^Creatures( without flying)? can't block this turn$/.exec(s))) {
     const filter = parseTargetPhrase(m[1] ? "creature without flying" : "creature");
     return filter?.kind === "object" ? [{ type: "cantBlockRule", filter: { ...filter, text: m[1] ? "creatures without flying" : "creatures" } }] : null;
+  }
+  // "~ must be blocked each combat this turn if able" (Anzrag, the Quake-Mole): a blocking requirement (CR 509.1c) until
+  // the turn ends.
+  if ((m = /^(.+?) must be blocked (?:each combat )?this turn if able$/i.exec(s)) && !/ and$/.test(m[1]!)) {
+    const what = parseObject(m[1]!, ctx);
+    if (what) return [{ type: "continuous", what, mods: [{ kind: "mustBeBlocked" }], duration: "endOfTurn" }];
   }
   // "Target creature attacks this turn if able": in each combat this turn (CR 508.1d).
   if ((m = /^(.+?) attacks? (?:each combat )?this turn if able$/i.exec(s)) && !/ and$/.test(m[1]!)) {

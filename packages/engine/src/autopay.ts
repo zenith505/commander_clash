@@ -3,7 +3,7 @@ import { liveEmblems } from "./emblems";
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
 import { payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaOptions, manaPenalty } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
-import { abilityProblem, activationCost, applyAction, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
+import { abilityProblem, eminenceCommanders, activationCost, applyAction, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
 import { compileCard } from "./oracle";
 import { hopeValues, spendPlan } from "./value";
 import { abilityUse, boundSpend, payableCost, poolFor, spendAllows, usableTypes, type ManaUse } from "./spend";
@@ -403,7 +403,7 @@ function wantCosts(cost: ParsedCost, extra: number, reqs: SpentReq[]): { cost: P
 /** Does what this spell costs depend on what's on the battlefield (affinity, "costs {1} less", Thalia)? */
 function costDependsOnBoard(s: GameState, d: CardDef): boolean {
   const c = compileCard(d);
-  return !!(c.costLess?.length || c.costLessIf?.length || s.costModsThisTurn?.length) || s.battlefield.some((id) => !!abilitiesOf(s, obj(s, id)).costMods) || liveEmblems(s).some((o) => !!abilitiesOf(s, o).costMods);
+  return !!(c.costLess?.length || c.costLessIf?.length || s.costModsThisTurn?.length) || s.battlefield.some((id) => !!abilitiesOf(s, obj(s, id)).costMods) || liveEmblems(s).some((o) => !!abilitiesOf(s, o).costMods) || eminenceCommanders(s).length > 0;
 }
 
 /**

@@ -433,7 +433,7 @@ export function withGranted(base: CompiledCard, granted: readonly string[]): Com
     const extra = granted.map(compileGranted);
     hit = {
       ...base,
-      triggers: [...base.triggers, ...extra.flatMap((x) => x.triggers)],
+      triggers: [...base.triggers, ...extra.flatMap((x, i) => x.triggers.map((t) => (t.oncePerTurn ? { ...t, grant: i } : t)))],
       activated: [...base.activated, ...extra.flatMap((x) => x.activated)],
       mana: [...base.mana, ...extra.flatMap((x) => x.mana)],
     };

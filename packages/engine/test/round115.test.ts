@@ -1069,3 +1069,23 @@ describe("Harvest Season", () => {
     expect(found.every((id) => s.objects[id]!.zone === "battlefield" && s.objects[id]!.tapped)).toBe(true);
   });
 });
+
+const bladeOfBloodchief = card("Blade of the Bloodchief", "Artifact — Equipment", "{1}", {
+  oracleText: "Whenever a creature dies, put a +1/+1 counter on equipped creature. If equipped creature is a Vampire, put two +1/+1 counters on it instead.\nEquip {1}",
+});
+
+describe("Blade of the Bloodchief", () => {
+  for (const [kind, n] of [["Vampire", 2], ["Bear", 1]] as const)
+    it(`a creature dies: ${n} counter(s) on an equipped ${kind}`, () => {
+      expect(isFullySupported(bladeOfBloodchief)).toBe(true);
+      const { s: s0, ap, ids, opp } = setup([murder]);
+      const blade = putOnBattlefield(s0, ap, bladeOfBloodchief);
+      const v = putOnBattlefield(s0, ap, card(`A ${kind}`, `Creature — ${kind}`, "{1}{B}", { power: "1", toughness: "1" }));
+      s0.objects[blade]!.attachedTo = v;
+      invalidateCharacteristics(s0);
+      const victim = putOnBattlefield(s0, opp, bear());
+      const s = settle(run(s0, planCast(s0, ap, ids[0]!, [target(victim)], undefined, "auto")));
+      expect(s.objects[victim]!.zone).toBe("graveyard");
+      expect(s.objects[v]!.counters["+1/+1"]).toBe(n);
+    });
+});

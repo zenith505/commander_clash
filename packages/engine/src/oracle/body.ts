@@ -3420,6 +3420,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "if", cond: { kind: "targetIs", index: lastT, filter: { kind: "object", combat: "attackingBattle", text: "attacking a battle" } }, effects: inner, otherwise: previous });
       continue;
     }
+    // "Put a +1/+1 counter on equipped creature. If equipped creature is a Vampire, put two +1/+1 counters on it instead."
+    // (Blade of the Bloodchief): which one, by that creature as it is when this resolves (CR 608.2c).
+    const hostType = /^If (equipped|enchanted) creature is an? ([A-Z][a-z]+), put (\w+) (\+1\/\+1) counters on it instead$/.exec(s);
+    if (hostType && CREATURE_TYPES.has(hostType[2]!) && effects.length - prevWhole === 1 && /^[Pp]ut an? \+1\/\+1 counter on (?:equipped|enchanted) creature$/.test(sentences[si - 1] ?? "")) {
+      const inner = parseOne(`Put ${hostType[3]} ${hostType[4]} counters on ${hostType[1]} creature`, ctx);
+      if (!inner) return null;
+      const previous = effects.splice(prevWhole);
+      effects.push({ type: "if", cond: { kind: "state", cond: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], subtypes: [hostType[2]!], text: hostType[2]! } } }, effects: inner, otherwise: previous });
+      continue;
+    }
     const ifState = /^If ([^,]+), (.+)$/.exec(s);
     const stateCond = ifState && !/^(it|~)\b(?!'s (?:your|not your|the first) )/.test(ifState[1]!) && !/\binstead$/.test(ifState[2]!) ? parseStaticCondition(ifState[1]!, { affects: { kind: "self" }, mods: [], text: "" }) : null;
     // "Draw two cards. If you have the city's blessing, draw three cards instead.": the condition picks which of the

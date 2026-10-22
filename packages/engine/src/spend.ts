@@ -104,7 +104,10 @@ export function payableCost(s: GameState, pid: PlayerId, cost: ParsedCost, use?:
   const krrik = mine.some((o) => !!abilitiesOf(s, o).lifeForBlack);
   // Agatha's Soul Cauldron: "... to activate abilities of creatures you control".
   const creatureAbility = !!use && use !== "other" && "ability" in use && use.ability.zone === "battlefield" && controllerOf(s, use.ability) === pid && objIsType(s, use.ability, "Creature");
-  const orrery = (!!use && use !== "other" && "ability" in use && !!use.anyColor) || mine.some((o) => !!abilitiesOf(s, o).spendAnyColor || (creatureAbility && !!abilitiesOf(s, o).spendAnyColorCreatureAbilities));
+  const orrery =
+    (!!use && use !== "other" && "ability" in use && !!use.anyColor) ||
+    mine.some((o) => !!abilitiesOf(s, o).spendAnyColor || (creatureAbility && !!abilitiesOf(s, o).spendAnyColorCreatureAbilities)) ||
+    s.battlefield.some((id) => !!abilitiesOf(s, s.objects[id]!).spendAnyColorAll); // Mycosynth Lattice: every player
   const c = krrik ? blackForLife(cost) : cost;
   return orrery ? anyColorPays(c) : c;
 }

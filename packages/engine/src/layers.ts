@@ -325,6 +325,8 @@ interface Inst {
   fromGraveyard?: true;
   /** Its type change applies outside the battlefield too (StaticAbility.offField). */
   offField?: true;
+  /** Its color change applies to every card and spell outside the battlefield too (StaticAbility.offFieldAll). */
+  offFieldAll?: true;
   /** A stored effect for a group (ContinuousEffect.group): it needs no source. */
   live?: true;
 }
@@ -416,6 +418,7 @@ function gather(s: GameState): Inst[] {
         affects: st.affects,
         condition: st.condition,
         ...(st.offField ? { offField: true as const } : {}),
+        ...(st.offFieldAll ? { offFieldAll: true as const } : {}),
       }),
     );
   }
@@ -1297,6 +1300,9 @@ function computeLayers(s: GameState, counted: { yes: boolean }, grants: OffField
       // Once it applies in layer 4 it keeps applying, even if its source loses the ability in layer 6 (CR 613.6).
       if (pick.offField && layer === "4" && pick.sourceId)
         grants.push({ sourceId: pick.sourceId, controller: chars.get(pick.sourceId)?.controller ?? s.objects[pick.sourceId]!.controller, timestamp: pick.timestamp, mods: modsIn(pick, "4"), chosen: s.objects[pick.sourceId]?.chosen?.type });
+      // Mycosynth Lattice: as it applied in layer 5, to every card and spell outside the battlefield too.
+      if (pick.offFieldAll && layer === "5" && pick.sourceId)
+        grants.push({ sourceId: pick.sourceId, controller: chars.get(pick.sourceId)?.controller ?? s.objects[pick.sourceId]!.controller, timestamp: pick.timestamp, mods: modsIn(pick, "5"), everyone: true });
     }
     // "Can't have hexproof or shroud": gone whatever gave them, after every layer 6 effect.
     if (layer === "6")
@@ -1436,12 +1442,14 @@ interface OffFieldGrant {
   mods: Modification[];
   /** The creature type chosen as its source entered. */
   chosen?: string;
+  /** A color change for every card and spell outside the battlefield (Mycosynth Lattice), not only its controller's. */
+  everyone?: true;
 }
 
 let building: { grants: OffFieldGrant[] } | undefined;
 
 /** Does anything on the battlefield have such an ability? (Cheap: compiled cards are cached.) */
-const offFieldSources = (s: GameState) => s.battlefield.some((id) => compileCard(defOf(s, s.objects[id]!)).statics.some((st) => st.offField));
+const offFieldSources = (s: GameState) => s.battlefield.some((id) => compileCard(defOf(s, s.objects[id]!)).statics.some((st) => st.offField || st.offFieldAll));
 
 function offFieldGrants(s: GameState): OffFieldGrant[] {
   if (building) return building.grants;
@@ -1470,7 +1478,7 @@ const typedDefs = new Map<string, CardDef>();
 export function offFieldTyped(s: GameState, o: GameObject, d: CardDef): CardDef {
   // A phased-out permanent and a merged permanent's other cards are still on the battlefield (CR 702.26d, 730.2).
   if (o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged" || !d.types.includes("Creature")) return d;
-  const gs = offFieldGrants(s).filter((g) => (o.zone === "stack" ? o.controller === g.controller : o.owner === g.controller && !o.isToken));
+  const gs = offFieldGrants(s).filter((g) => !g.everyone && (o.zone === "stack" ? o.controller === g.controller : o.owner === g.controller && !o.isToken));
   if (!gs.length) return d;
   let subtypes = [...d.subtypes];
   let all = everyCreatureType(d);
@@ -1490,6 +1498,26 @@ export function offFieldTyped(s: GameState, o: GameObject, d: CardDef): CardDef 
   const key = `${d.oracleId}|${d.name}|${all}|${subtypes.join(",")}`;
   let out = typedDefs.get(key);
   if (!out) typedDefs.set(key, (out = { ...d, subtypes, everyCreatureType: all }));
+  return out;
+}
+
+const coloredDefs = new Map<string, CardDef>();
+
+/**
+ * `d`, the definition of `o` outside the battlefield, with the colors effects that apply to every card and spell there
+ * give it (Mycosynth Lattice: colorless, CR 613.1e), the latest one last (CR 613.7). Anything else is `d` itself.
+ */
+export function offFieldColored(s: GameState, o: GameObject, d: CardDef): CardDef {
+  if (o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged") return d;
+  const gs = offFieldGrants(s).filter((g) => g.everyone);
+  if (!gs.length) return d;
+  let colors = [...d.colors];
+  for (const g of [...gs].sort((a, b) => a.timestamp - b.timestamp))
+    for (const m of g.mods) if (m.kind === "setColors") colors = [...m.colors];
+  if (colors.length === d.colors.length && colors.every((c, i) => c === d.colors[i])) return d;
+  const key = `${d.oracleId}|${d.name}|${d.subtypes.join(",")}|${d.everyCreatureType ?? ""}|${colors.join("")}`;
+  let out = coloredDefs.get(key);
+  if (!out) coloredDefs.set(key, (out = { ...d, colors }));
   return out;
 }
 

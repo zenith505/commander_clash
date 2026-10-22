@@ -1,5 +1,5 @@
 import type { CompiledCard, ManaAbility, TargetSpec, TriggeredAbility } from "./abilities";
-import { characteristics, offFieldTyped, printedKeywords, type PTPart } from "./layers";
+import { characteristics, offFieldColored, offFieldTyped, printedKeywords, type PTPart } from "./layers";
 import { compileCard, compileGranted, overloadedText } from "./oracle";
 import { COLORS, type CardDef, type Color, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
 import { manaValue, parseManaCost } from "./mana";
@@ -88,7 +88,7 @@ export const defOf = (s: GameState, o: GameObject): CardDef => {
   const out = ownDefOf(s, o);
   if (o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged") return out;
   // Outside the battlefield, effects like Maskwood Nexus's change a creature card's or spell's creature types.
-  return offFieldTyped(s, o, offFieldCreatureDef(out));
+  return offFieldColored(s, o, offFieldTyped(s, o, offFieldCreatureDef(out)));
 };
 
 const offFieldCreatures = new Map<string, CardDef>();

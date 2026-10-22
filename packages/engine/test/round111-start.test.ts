@@ -45,6 +45,10 @@ const council = card("The Council of Four", "Legendary Creature — Human Noble"
   oracleText:
     "Whenever a player draws their second card during their turn, you draw a card.\nWhenever a player casts their second spell during their turn, you create a 2/2 white Knight creature token.",
 });
+const lattice = card("Mycosynth Lattice", "Artifact", "{6}", {
+  oracleText: "All permanents are artifacts in addition to their other types.\nAll cards that aren't on the battlefield, spells, and permanents are colorless.\nPlayers may spend mana as though it were mana of any color.",
+});
+const thranLens = card("Thran Lens", "Artifact", "{2}", { oracleText: "All permanents are colorless." });
 // Test cards.
 const opt = card("Test Opt", "Instant", "{U}", { oracleText: "Draw a card." });
 const ponder = card("Test Ponder", "Sorcery", "{U}", { oracleText: "Draw a card." });
@@ -305,5 +309,42 @@ describe("The Council of Four", () => {
     expect(s.players[opp]!.hand.length).toBe(hand + 1);
     s = passAll(passAll(run(s, planCast(s, ap, ids[2]!))));
     expect(knights(s)).toBe(1);
+  });
+});
+
+describe("Mycosynth Lattice", () => {
+  it("parse", () => supported(lattice, thranLens));
+
+  it("every permanent is an artifact; permanents, spells and cards everywhere else are colorless", () => {
+    const { s: s0, ap, opp, ids } = setup([opt]);
+    putOnBattlefield(s0, ap, lattice);
+    const b = putOnBattlefield(s0, opp, bear());
+    const yard = toZone(s0, opp, bear({ name: "Yard Bear" }), "graveyard");
+    expect(characteristics(s0, s0.objects[b]!).types).toEqual(["Creature", "Artifact"]);
+    expect(characteristics(s0, s0.objects[b]!).colors).toEqual([]);
+    expect(defOf(s0, s0.objects[ids[0]!]!).colors).toEqual([]);
+    expect(defOf(s0, s0.objects[yard]!).colors).toEqual([]);
+    // On the stack too.
+    const s = run(s0, planCast(s0, ap, ids[0]!));
+    const spell = s.stack[s.stack.length - 1]!;
+    expect(characteristics(s, s.objects[spell.objectId!]!).colors).toEqual([]);
+  });
+
+  it("any mana pays colored costs, for every player", () => {
+    const blue = card("Test Counsel", "Instant", "{U}{U}", { oracleText: "Draw a card." });
+    const { s: s0, ap, ids } = setup([blue]);
+    // Only Mountains to pay with.
+    for (const id of [...s0.battlefield]) if (s0.objects[id]!.controller === ap && s0.cards[s0.objects[id]!.cardId]!.subtypes.includes("Island")) s0.objects[id]!.tapped = true;
+    expect(planCast(s0, ap, ids[0]!)).toBeNull();
+    putOnBattlefield(s0, next(s0, ap), lattice);
+    expect(planCast(s0, ap, ids[0]!)).not.toBeNull();
+  });
+
+  it("Thran Lens: permanents only", () => {
+    const { s, ap, opp, ids } = setup([opt]);
+    putOnBattlefield(s, ap, thranLens);
+    const b = putOnBattlefield(s, opp, bear());
+    expect(characteristics(s, s.objects[b]!).colors).toEqual([]);
+    expect(defOf(s, s.objects[ids[0]!]!).colors).toEqual(["U"]);
   });
 });

@@ -1632,6 +1632,10 @@ export function compile(d: CardDef): CompiledCard {
       out.spendAnyColor = true;
       continue;
     }
+    if (line === "Players may spend mana as though it were mana of any color.") {
+      out.spendAnyColorAll = true;
+      continue;
+    }
     if (line === "You may spend mana as though it were mana of any color to activate abilities of creatures you control.") {
       out.spendAnyColorCreatureAbilities = true;
       continue;

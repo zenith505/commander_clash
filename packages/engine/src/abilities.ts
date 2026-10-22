@@ -988,6 +988,11 @@ export interface StaticAbility {
    * (Maskwood Nexus, Conspiracy): its type change applies to those too (layers.ts offFieldTyped).
    */
   offField?: true;
+  /**
+   * "All cards that aren't on the battlefield, spells, and permanents are colorless" (Mycosynth Lattice): its color change
+   * applies to every card and spell outside the battlefield too, whoever owns or controls it (layers.ts offFieldColored).
+   */
+  offFieldAll?: true;
 }
 
 /**
@@ -4045,6 +4050,8 @@ export interface CompiledCard {
   lifeForBlack?: true;
   /** Chromatic Orrery: "You may spend mana as though it were mana of any color." (CR 609.4b), for its controller's costs. */
   spendAnyColor?: true;
+  /** "Players may spend mana as though it were mana of any color" (Mycosynth Lattice): every player, for every cost (CR 609.4b). */
+  spendAnyColorAll?: true;
   /** Agatha's Soul Cauldron: "You may spend mana as though it were mana of any color to activate abilities of creatures you control" (CR 609.4b). */
   spendAnyColorCreatureAbilities?: true;
   /**

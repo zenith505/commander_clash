@@ -789,8 +789,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (got === "paused") return "paused";
       const rest = looked.filter((id) => !got.includes(id));
       enterTogether(s, () => {
-        for (const id of got) moveObject(s, id, e.to.zone === "libraryTop" ? "library" : e.to.zone, e.to.zone === "battlefield" ? { controller: p.id, ...(e.to.tapped ? { tapped: true } : {}) } : undefined);
-        if (e.rest) for (const id of rest) moveObject(s, id, e.rest.zone === "libraryTop" ? "library" : e.rest.zone);
+        const zone = (d: SearchDest) => (d.zone === "libraryTop" || d.zone === "cast" ? "library" : d.zone);
+        for (const id of got) moveObject(s, id, zone(e.to), e.to.zone === "battlefield" ? { controller: p.id, ...(e.to.tapped ? { tapped: true } : {}) } : undefined);
+        if (e.rest) for (const id of rest) moveObject(s, id, zone(e.rest));
       });
       return;
     }

@@ -8396,6 +8396,67 @@
   "gameChanger": false
  },
  {
+  "oracleId": "f38fe1e9-8997-4b63-9109-7513034bac88",
+  "name": "Palisade Giant",
+  "manaCost": "{4}{W}{W}",
+  "cmc": 6,
+  "typeLine": "Creature — Giant Soldier",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Giant",
+   "Soldier"
+  ],
+  "oracleText": "All damage that would be dealt to you and other permanents you control is dealt to this creature instead.",
+  "power": "2",
+  "toughness": "7",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "rtr",
+  "releasedAt": "2012-10-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2c5c8250-1860-42a1-a335-071f54830d37",
+  "name": "Pariah",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nAll damage that would be dealt to you is dealt to enchanted creature instead.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "otp",
+  "releasedAt": "2024-04-19",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "03cd7583-d054-4359-8c94-7776c54198ed",
   "name": "Party Thrasher",
   "manaCost": "{1}{R}",

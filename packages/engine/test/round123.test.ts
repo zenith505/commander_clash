@@ -174,3 +174,89 @@ describe("protection from a mana value (CR 702.16a)", () => {
     expect(s.objects[sk]!.damage).toBe(3);
   });
 });
+
+const wyll = card("Wyll's Reversal", "Instant", "{2}{R}", { oracleText: "Choose target spell or ability with one or more targets. Roll a d20 and add the greatest power among creatures you control.\n1—14 | You may choose new targets for that spell or ability.\n15+ | You may choose new targets for that spell or ability. Then copy it. You may choose new targets for the copy." });
+const giantPower = card("Test Colossus", "Creature — Giant", "{8}", { power: "20", toughness: "20" });
+const spellOnStack = (s: GameState, name: string) => ({ kind: "stack" as const, id: s.stack.find((x) => x.description.startsWith(name))!.id });
+
+describe("Wyll's Reversal", () => {
+  it("15+: new targets for the spell, then a copy with new targets of its own", () => {
+    supported(wyll);
+    const { s: s0, ap, ids, opp } = setup([bolt, wyll]);
+    const mine = putOnBattlefield(s0, ap, bear({ name: "My Bear" }));
+    const theirs = putOnBattlefield(s0, opp, bear({ name: "Their Bear" }));
+    putOnBattlefield(s0, ap, giantPower);
+    invalidateCharacteristics(s0);
+    let s = run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: mine }]));
+    // A spell with no targets can't be chosen.
+    s = run(s, planCast(s, ap, ids[1]!, [spellOnStack(s, "Lightning Bolt")]));
+    s = untilChoice(s);
+    expect(s.pending).toMatchObject({ kind: "newTargets", player: ap, source: "Wyll's Reversal" });
+    s = act(s, { type: "newTargets", player: ap, targets: [{ kind: "object", id: theirs }] });
+    expect(s.pending).toMatchObject({ kind: "copyTargets", player: ap });
+    s = settle(act(s, { type: "copyTargets", player: ap, targets: [{ kind: "player", id: opp }] }));
+    expect(s.objects[theirs]!.zone).toBe("graveyard");
+    expect(s.objects[mine]!.zone).toBe("battlefield");
+    expect(s.players[opp]!.life).toBe(37);
+  });
+
+  it("1—14: only new targets, no copy; a spell without targets can't be chosen", () => {
+    const counsel = card("Test Draw", "Sorcery", "{U}", { oracleText: "Draw a card." });
+    for (let seed = 1; seed < 40; seed++) {
+      const { s: s0, ap, ids, opp } = setup([bolt, wyll, counsel], seed);
+      const mine = putOnBattlefield(s0, ap, bear({ name: "My Bear", power: "0" }));
+      const theirs = putOnBattlefield(s0, opp, bear({ name: "Their Bear" }));
+      let s = run(s0, planCast(s0, ap, ids[2]!));
+      expect(castProblem(s, ap, ids[1]!, [spellOnStack(s, "Test Draw")])).toBeTruthy();
+      s = settle(s);
+      s = run(s, planCast(s, ap, ids[0]!, [{ kind: "object", id: mine }]));
+      s = untilChoice(run(s, planCast(s, ap, ids[1]!, [spellOnStack(s, "Lightning Bolt")])));
+      if (s.resolving!.rolled!.result > 14) continue;
+      s = act(s, { type: "newTargets", player: ap, targets: [{ kind: "object", id: theirs }] });
+      expect(s.pending?.kind).not.toBe("copyTargets");
+      s = settle(s);
+      expect(s.objects[theirs]!.zone).toBe("graveyard");
+      expect(s.players[opp]!.life).toBe(40);
+      return;
+    }
+    throw new Error("no low roll in 40 seeds");
+  });
+});
+
+const hero = card("Hero of Bladehold", "Creature — Human Knight", "{2}{W}{W}", { power: "3", toughness: "4", keywords: ["Battle cry"], oracleText: "Battle cry (Whenever this creature attacks, each other attacking creature gets +1/+0 until end of turn.)\nWhenever this creature attacks, create two 1/1 white Soldier creature tokens that are tapped and attacking." });
+
+describe("tokens entering attacking: \"All attack\" answers for every token at once (CR 508.4)", () => {
+  it("Hero of Bladehold: the first question offers \"All 2 attack\" each choice; one answer sends both", () => {
+    const { s: s0, ap } = setup([]);
+    const h = putOnBattlefield(s0, ap, hero);
+    const third = s0.turnOrder[(s0.turnOrder.indexOf(ap) + 2) % 4]!;
+    const opp = s0.turnOrder[(s0.turnOrder.indexOf(ap) + 1) % 4]!;
+    invalidateCharacteristics(s0);
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: h, defender: opp }] });
+    s = untilChoice(s);
+    const p = s.pending;
+    if (p?.kind !== "chooseOption" || p.what !== "attackWhom") throw new Error(`no attack question: ${JSON.stringify(p)}`);
+    const i = p.labels!.indexOf(`All 2 attack ${s.players[third]!.name}`);
+    expect(i).toBeGreaterThan(-1);
+    s = act(s, { type: "chooseOption", player: ap, choice: p.options[i]! });
+    expect(s.pending?.kind === "chooseOption" && s.pending.what === "attackWhom").toBe(false);
+    s = settle(s);
+    const tokens = s.battlefield.filter((id) => s.cards[s.objects[id]!.cardId]!.name === "Soldier Token");
+    expect(tokens.map((id) => s.objects[id]!.attacking)).toEqual([third, third]);
+  });
+
+  it("the last token's question has no \"All\" option", () => {
+    const { s: s0, ap } = setup([]);
+    const h = putOnBattlefield(s0, ap, hero);
+    const opp = s0.turnOrder[(s0.turnOrder.indexOf(ap) + 1) % 4]!;
+    invalidateCharacteristics(s0);
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: h, defender: opp }] });
+    s = untilChoice(s);
+    s = act(s, { type: "chooseOption", player: ap, choice: String(opp) });
+    const p = s.pending;
+    if (p?.kind !== "chooseOption") throw new Error("no second question");
+    expect(p.labels!.some((l) => l.startsWith("All"))).toBe(false);
+  });
+});

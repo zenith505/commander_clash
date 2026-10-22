@@ -5,7 +5,8 @@ import type { Effect, ObjRef } from "../../abilities";
 import { isGroup } from "../words";
 import { parseObject, parsePlayer } from "../targets";
 import { parseCopyExcept } from "../tokens";
-import type { Ctx } from "../body";
+import { addTarget, type Ctx } from "../body";
+import { stackSpec } from "./spells";
 
 const DURATIONS: Record<string, Extract<Effect, { type: "becomeCopy" }>["duration"]> = {
   "end of turn": "endOfTurn",
@@ -36,6 +37,13 @@ export function parseCopiesSentence(s: string, ctx: Ctx): Effect[] | null | unde
       const first = parseObject(two[1]!, ctx);
       const second = first && !isGroup(first) && parseObject(two[2]!, ctx);
       return second && !isGroup(second) ? [] : null;
+    }
+    // "Choose target spell or ability with one or more targets. ... You may choose new targets for that spell or ability"
+    // (Wyll's Reversal): a spell or ability on the stack that later sentences name.
+    const onStack = /^target (spell or ability|spell)( with one or more targets)?$/.exec(m[1]!);
+    if (onStack) {
+      addTarget(ctx, { ...stackSpec(onStack[1]!), ...(onStack[2] ? { hasTargets: true as const } : {}), text: m[1]! });
+      return [];
     }
     // "Choose target card in a graveyard other than a basic land card. Search its owner's ..." (Surgical Extraction).
     const what = parseObject(m[1]!, ctx, /^target (?:.+ )?card\b/.test(m[1]!));

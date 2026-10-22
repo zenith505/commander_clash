@@ -519,6 +519,8 @@ export interface TargetSpec {
    * still legal (rulings on Deflection).
    */
   singleTarget?: boolean;
+  /** "Target spell or ability with one or more targets" (Wyll's Reversal). */
+  hasTargets?: true;
   /**
    * For "spell" targets: abilities on the stack it can also target, "target spell, activated ability, or triggered
    * ability" (CR 115.1c-d; mana abilities never use the stack, 605.3a); `noSpells`: "target activated ability".

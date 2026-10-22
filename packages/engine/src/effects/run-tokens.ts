@@ -165,13 +165,12 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (choices.length > 1) {
         picks.push(...(sc.attackPicks ??= []));
         if (sc.attackWhom !== undefined) {
-          picks.push(sc.attackWhom);
+          takeAttackWhom(sc, picks, n);
           sc.attackPicks = [...picks];
-          sc.attackWhom = undefined;
         }
         if (picks.length < n) {
           const which = n > 1 ? ` (${picks.length + 1} of ${n})` : "";
-          s.pending = { kind: "chooseOption", player: who[0]!, source: src, what: "attackWhom", options: choices.map((a) => a.key), labels: choices.map((a) => a.label), prompt: `choose what the token copy of ${base.name} attacks${which}` };
+          s.pending = { kind: "chooseOption", player: who[0]!, source: src, what: "attackWhom", ...attackWhomOptions(choices, n - picks.length), prompt: `choose what the token copy of ${base.name} attacks${which}` };
           return "paused";
         }
         sc.attackPicks = undefined;
@@ -219,11 +218,10 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           while (mine.length < k) {
             if (sc.attackWhom === undefined) {
               const which = k > 1 ? ` (${mine.length + 1} of ${k})` : "";
-              s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "attackWhom", options: options.map((a) => a.key), labels: options.map((a) => a.label), prompt: `choose what the ${e.token.name} token for ${player(s, opp).name} attacks${which}` };
+              s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "attackWhom", ...attackWhomOptions(options, k - mine.length), prompt: `choose what the ${e.token.name} token for ${player(s, opp).name} attacks${which}` };
               return "paused";
             }
-            mine.push(sc.attackWhom);
-            sc.attackWhom = undefined;
+            takeAttackWhom(sc, mine, k);
           }
         }
       }
@@ -237,14 +235,11 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           const k = tokenBatch(s, who[0]!, e.token, n).same;
           const sc = (s.resolving!.scratch ??= {});
           const picks = [...(sc.attackPicks ?? [])];
-          if (sc.attackWhom !== undefined) {
-            picks.push(sc.attackWhom);
-            sc.attackWhom = undefined;
-          }
+          if (sc.attackWhom !== undefined) takeAttackWhom(sc, picks, k);
           sc.attackPicks = picks;
           if (picks.length < k) {
             const which = k > 1 ? ` (${picks.length + 1} of ${k})` : "";
-            s.pending = { kind: "chooseOption", player: who[0]!, source: src, what: "attackWhom", options: choices.map((a) => a.key), labels: choices.map((a) => a.label), prompt: `choose what the ${e.token.name} token attacks${which}` };
+            s.pending = { kind: "chooseOption", player: who[0]!, source: src, what: "attackWhom", ...attackWhomOptions(choices, k - picks.length), prompt: `choose what the ${e.token.name} token attacks${which}` };
             return "paused";
           }
           sc.attackPicks = undefined;
@@ -410,4 +405,27 @@ function noteCreated(s: GameState, pid: PlayerId, o: GameObject) {
   (s.zoneBatch ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, to: "battlefield", owner: o.owner, notCard: true, card: o.cardId, createdBy: pid });
   // "Whenever you create a token" (not a copy of a permanent spell becoming one, CR 111.12).
   fireEvent(s, { type: "tokenCreated", player: pid, id: o.id });
+}
+
+/** "All attack ...": the answer for every token still to be asked about, at once (an option with several tokens left). */
+const ALL_ATTACK = "all:";
+
+/**
+ * The options of the question what a token entering attacking attacks (CR 508.4): each player or planeswalker, and with
+ * `left` tokens still to ask about, the same once more for all of them.
+ */
+function attackWhomOptions(choices: { key: string; label: string }[], left: number): { options: string[]; labels: string[] } {
+  const all = left > 1 ? choices : [];
+  return { options: [...choices.map((a) => a.key), ...all.map((a) => `${ALL_ATTACK}${a.key}`)], labels: [...choices.map((a) => a.label), ...all.map((a) => `All ${left} attack ${a.label}`)] };
+}
+
+/** Record the answer to that question in `picks`, for every token left (up to `n`) if it was an "All attack" one. */
+function takeAttackWhom(sc: NonNullable<NonNullable<GameState["resolving"]>["scratch"]>, picks: string[], n: number): void {
+  const a = sc.attackWhom!;
+  sc.attackWhom = undefined;
+  if (!a.startsWith(ALL_ATTACK)) {
+    picks.push(a);
+    return;
+  }
+  while (picks.length < n) picks.push(a.slice(ALL_ATTACK.length));
 }

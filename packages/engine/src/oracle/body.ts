@@ -1123,6 +1123,12 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si += 3;
       continue;
     }
+    // Wyll's Reversal: "Choose target spell or ability ... You may choose new targets for that spell or ability" (CR 115.7d):
+    // whether to is part of choosing them (keeping them all is allowed).
+    if (/^You may choose new targets for that spell(?: or ability)?$/.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "spell") {
+      effects.push({ type: "newTargets", index: ctx.lastObjectTarget });
+      continue;
+    }
     // "Gain control of target spell. You may choose new targets for it." (Commandeer): after the change of control, so
     // its targets are chosen as its new controller's (rulings).
     if (/^You may choose new targets for it$/.test(s) && effects[effects.length - 1]?.type === "controlSpell") {

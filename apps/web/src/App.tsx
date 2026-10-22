@@ -4326,7 +4326,9 @@ function Controls({
               : pending.action === "band"
                 ? `put attacking creatures in a band if you want: click creatures with banding and up to one without, all attacking the same player. Blocking one blocks them all, and you divide blockers' damage among them.`
                 : pending.action === "tap"
-                ? `tap any number of ${pending.what}: click them, then tap them. Each one tapped counts for what comes next.`
+                ? pending.min === undefined
+                  ? `click ${pending.count} ${pending.what} of yours to tap.`
+                  : `tap any number of ${pending.what}: click them, then tap them. Each one tapped counts for what comes next.`
                 : pending.action === "untap"
                 ? `click up to ${pending.count} tapped land${pending.count === 1 ? "" : "s"} to untap (any player's), then untap them.`
                 : pending.action === "phaseOut"

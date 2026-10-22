@@ -1,7 +1,7 @@
 // Sentences that act on permanents: destroy, tap, connive, regenerate, counters, gaining control, continuous changes until end of turn.
 
 import type { Effect, ObjRef } from "../../abilities";
-import { NUM, NUMX, COUNTER, counterKind, amt, isGroup, num, capital } from "../words";
+import { NUM, NUMX, COUNTER, counterKind, amt, isGroup, num, capital, singular } from "../words";
 import { pickFilter, parseGroup, parseObject, parsePlayer, parseTargetPhrase } from "../targets";
 import { addTarget } from "../body";
 import { parseCount } from "../counts";
@@ -318,6 +318,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = /^Choose (an? .+?) you control$/i.exec(s))) {
     const filter = pickFilter(m[1]!.replace(/^an? /i, ""));
     return filter && [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "choose" }];
+  }
+  // "You may tap five untapped artifacts and/or creatures you control. If you do, transform ~." (Thousand Moons Smithy):
+  // picked as it resolves, not targeted, all of them or none (it can't be done with fewer, CR 101.3).
+  if ((m = /^[Tt]ap (two|three|four|five|six|seven) untapped (.+?s) you control$/.exec(s))) {
+    const filter = pickFilter(`untapped ${m[2]!.replace(/ and\/or /g, " or ").split(" ").map((w) => (w === "or" ? w : singular(w))).join(" ")}`);
+    return filter && [{ type: "pick", who: { ref: "you" }, filter, n: num(m[1]!), action: "tap" }];
   }
   // "Put a +1/+1 counter on a creature you control": picked as it resolves, not targeted.
   if ((m = new RegExp(`^Put ${NUMX} ${COUNTER} counters? on (an? .+?) you control$`, "i").exec(s))) {

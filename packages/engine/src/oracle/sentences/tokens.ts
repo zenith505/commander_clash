@@ -69,6 +69,13 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const named = m[8] ? { name: m[8], named: true as const } : {};
     return token && who ? [{ type: "createToken", who, n: amt(m[2]!), token: { ...token, ...named }, ...state }] : null;
   }
+  // "Create a white Gnome Soldier artifact creature token with "~'s power and toughness are each equal to the number of
+  // artifacts and/or creatures you control."" (Thousand Moons Smithy): no printed power and toughness, the quoted
+  // characteristic-defining ability sets them (CR 604.3, 613.4a).
+  if ((m = new RegExp(`^(?:You )?[Cc]reate ${NUMX} (.+?) creature tokens? with "(~'s power and toughness are each equal to [^"]+)"$`).exec(s))) {
+    const token = parseToken(0, 0, m[2]!, `"${m[3]!}"`);
+    return token ? [{ type: "createToken", who: { ref: "you" }, n: amt(m[1]!), token }] : null;
+  }
   // A named noncreature token with an ability of its own: "create eight colorless snow artifact tokens named Replicated Ring
   // with "{T}: Add one mana of any color."" (Replicating Ring, CR 111.4).
   if ((m = new RegExp(`^(?:You )?[Cc]reate ${NUMX} colorless (snow )?artifact tokens? named ((?:[A-Z][\\w'-]*)(?: [A-Z][\\w'-]*)*) with "([^"]+)"$`).exec(s))) {

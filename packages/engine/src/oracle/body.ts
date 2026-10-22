@@ -227,6 +227,9 @@ const checkableMay = (e: Effect) =>
   // "You may return another creature you control to its owner's hand. If you do, ...": only with one to return. "You may
   // sacrifice a Zombie. If you do, ..." (Wilhelt): only with one to sacrifice.
   (e.type === "pick" && e.who.ref === "you" && (e.action === "bounce" || e.action === "sacrifice") && e.n === 1 && !e.unless) ||
+  // "You may tap five untapped artifacts and/or creatures you control. If you do, ..." (Thousand Moons Smithy): only with
+  // that many untapped.
+  (e.type === "pick" && e.who.ref === "you" && e.action === "tap" && typeof e.n === "number" && !e.unless && !e.anyNumber) ||
   // "You may have it deal 3 damage to target creature. If you do, ...": done if that target is still legal.
   (e.type === "damage" && (e.to.ref === "target" || e.to.ref === "anyTarget") && !("n" in e.to && e.to.n) && !e.also && !e.divided) ||
   (e.type === "bite" && e.b.ref === "target" && !e.b.n && (e.a.ref === "self" || e.a.ref === "target")) ||

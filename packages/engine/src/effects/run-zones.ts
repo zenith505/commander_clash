@@ -1,7 +1,7 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType, objIsType, power } from "../cards";
 import { nameLandBan } from "../names";
-import { canPlayLandNow, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
+import { canPlayLandNow, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters, withPutter } from "../counters";
 import { manaValue } from "../mana";
@@ -167,6 +167,12 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
       if (o?.zone !== "battlefield") continue;
       if (e.action === "choose") {
         log(s, `${player(s, pid).name} chooses ${defOf(s, o).name}.`);
+        continue;
+      }
+      if (e.action === "tap") {
+        if (o.tapped) continue;
+        tapPermanent(s, o);
+        log(s, `${player(s, pid).name} taps ${defOf(s, o).name}.`);
         continue;
       }
       if (e.action === "populate") {

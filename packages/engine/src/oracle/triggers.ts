@@ -742,7 +742,6 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     bodyText = m[4]!;
     const n = m[2] ? num(m[2]) : 1;
     if (n > 1) min = n;
-    if (!perPlayer && /\bthat player\b/.test(bodyText)) return "fail";
   } else if ((m = /^Whenever another player attacks with (two|three|four|five) or more creatures, they draw a card if none of those creatures attacked you\.?$/.exec(line))) {
     // Firemane Commando: another player's attack, all of their attackers counted; they draw unless one of those creatures
     // attacked you (not your planeswalkers or battles), as they were declared (rulings).

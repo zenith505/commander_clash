@@ -2,8 +2,8 @@
 // Treasure token. When you do, ..."; "the number of artifacts they control" for the defending player).
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, passAll, passUntil, putOnBattlefield, setup } from "./helpers";
-import { invalidateCharacteristics, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type GameState } from "../src";
+import { act, bear, card, passAll, passUntil, putOnBattlefield, scry, setup } from "./helpers";
+import { characteristics, invalidateCharacteristics, isFullySupported, power, toughness, objHasKeyword, planActivate, planCast, waitingOn, type GameState } from "../src";
 
 // Real oracle text (Scryfall).
 const singleCombat = card("Single Combat", "Sorcery", "{3}{W}{W}", {
@@ -30,6 +30,22 @@ const horizon = card("Horizon Explorer", "Creature — Insect Scout", "{2}{G}", 
     "Lands you control enter untapped.\nWhenever you attack a player, create a Lander token. (It's an artifact with \"{2}, {T}, Sacrifice this token: Search your library for a basic land card, put it onto the battlefield tapped, then shuffle.\")",
 });
 const bonesplitter = card("Bonesplitter", "Artifact — Equipment", "{1}", { oracleText: "Equipped creature gets +2/+0.\nEquip {1}" });
+const smithy = scry("transform", [
+  {
+    name: "Thousand Moons Smithy",
+    mana_cost: "{2}{W}{W}",
+    type_line: "Legendary Artifact",
+    oracle_text:
+      'When Thousand Moons Smithy enters, create a white Gnome Soldier artifact creature token with "This token\'s power and toughness are each equal to the number of artifacts and/or creatures you control."\nAt the beginning of your first main phase, you may tap five untapped artifacts and/or creatures you control. If you do, transform Thousand Moons Smithy.',
+  },
+  {
+    name: "Barracks of the Thousand",
+    type_line: "Legendary Artifact Land",
+    color_indicator: ["W"],
+    oracle_text:
+      '(Transforms from Thousand Moons Smithy.)\n{T}: Add {W}.\nWhenever you cast an artifact or creature spell using mana produced by Barracks of the Thousand, create a white Gnome Soldier artifact creature token with "This token\'s power and toughness are each equal to the number of artifacts and/or creatures you control."',
+  },
+]);
 const treasure = card("Treasure", "Token Artifact — Treasure", "", { oracleText: "{T}, Sacrifice this token: Add one mana of any color." });
 
 /** Pass along, answering every pending choice the dull way, until `stop` holds. */
@@ -155,5 +171,43 @@ describe("Whenever you attack a player", () => {
     s = passUntil(s, "declareAttackers", ap);
     s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: b1!, defender: o1! }, { attacker: b2!, defender: o2! }] });
     expect(s.triggerQueue.length + s.stack.length).toBe(2);
+  });
+});
+
+describe("Thousand Moons Smithy", () => {
+  it("is supported; its Gnome counts artifacts and creatures, and tapping five transforms it", () => {
+    expect(isFullySupported(smithy)).toBe(true);
+    let { s, ap, ids } = setup([smithy]);
+    for (let i = 0; i < 3; i++) putOnBattlefield(s, ap, bear());
+    for (const a of planCast(s, ap, ids[0]!)!) s = act(s, a);
+    s = until(s, (x) => x.stack.length === 0 && x.triggerQueue.length === 0);
+    const gnome = s.battlefield.find((id) => s.cards[s.objects[id]!.cardId]!.name.startsWith("Gnome Soldier"))!;
+    expect(gnome).toBeDefined();
+    // Three Bears, the Smithy and the Gnome itself (rulings).
+    expect([power(s, s.objects[gnome]!), toughness(s, s.objects[gnome]!)]).toEqual([5, 5]);
+    putOnBattlefield(s, ap, bear());
+    expect(power(s, s.objects[gnome]!)).toBe(6);
+    const start = s.turn;
+    s = until(s, (x) => x.activePlayer === ap && x.turn > start && x.pending?.kind === "chooseMay");
+    expect(s.step).toBe("main1");
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", action: "tap", count: 5 });
+    const options = (s.pending as { options: string[] }).options;
+    expect(options.length).toBe(6);
+    s = act(s, { type: "pickPermanents", player: ap, ids: options.slice(0, 5) });
+    expect(options.slice(0, 5).every((id) => s.objects[id]!.tapped)).toBe(true);
+    const me = s.battlefield.find((id) => s.objects[id]!.cardId === smithy.oracleId)!;
+    expect(characteristics(s, s.objects[me]!).name).toBe("Barracks of the Thousand");
+  });
+
+  it("can't transform with fewer than five untapped", () => {
+    let { s, ap } = setup([]);
+    putOnBattlefield(s, ap, smithy);
+    for (let i = 0; i < 3; i++) putOnBattlefield(s, ap, bear());
+    const start = s.turn;
+    s = until(s, (x) => x.activePlayer === ap && x.turn > start && x.step === "main1");
+    expect(s.pending).toBeNull();
+    const me = s.battlefield.find((id) => s.objects[id]!.cardId === smithy.oracleId)!;
+    expect(characteristics(s, s.objects[me]!).name).toBe("Thousand Moons Smithy");
   });
 });

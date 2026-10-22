@@ -53,6 +53,13 @@ const nashi = card("Nashi, Moon Sage's Scion", "Legendary Creature — Rat Ninja
   oracleText:
     "Ninjutsu {3}{B} ({3}{B}, Return an unblocked attacker you control to hand: Put this card onto the battlefield from your hand tapped and attacking.)\nWhenever Nashi deals combat damage to a player, exile the top card of each player's library. Until end of turn, you may play one of those cards. If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost.",
 });
+const looter = card("Likeness Looter", "Creature — Faerie Shapeshifter", "{U}{B}", {
+  power: "1",
+  toughness: "1",
+  keywords: ["Flying"],
+  oracleText:
+    "Flying\n{T}: Draw a card, then discard a card.\n{X}: This creature becomes a copy of target creature card in your graveyard with mana value X, except it has flying and this ability. Activate only as a sorcery.",
+});
 const treasure = card("Treasure", "Token Artifact — Treasure", "", { oracleText: "{T}, Sacrifice this token: Add one mana of any color." });
 
 /** Pass along, answering every pending choice the dull way, until `stop` holds. */
@@ -246,5 +253,29 @@ describe("Nashi, Moon Sage's Scion", () => {
     expect(s.players[ap]!.life).toBe(life - 2);
     // One of those cards only.
     expect(castProblem(s, ap, mine, undefined, undefined, undefined, undefined, undefined, { alt: "citadel" })).not.toBeNull();
+  });
+});
+
+describe("Likeness Looter", () => {
+  it("is supported, and becomes a copy of a creature card in your graveyard with mana value X, with flying and the ability", () => {
+    expect(isFullySupported(looter)).toBe(true);
+    let { s, ap } = setup([]);
+    const l = putOnBattlefield(s, ap, looter);
+    const dead = putOnBattlefield(s, ap, bear());
+    s.battlefield.splice(s.battlefield.indexOf(dead), 1);
+    s.objects[dead]!.zone = "graveyard";
+    s.players[ap]!.graveyard.push(dead);
+    invalidateCharacteristics(s);
+    const t = [{ kind: "object" as const, id: dead }];
+    // X has to be the card's mana value.
+    expect(planActivate(s, ap, l, 1, t as never, undefined, undefined, 3)).toBeNull();
+    for (const a of planActivate(s, ap, l, 1, t as never, undefined, undefined, 2)!) s = act(s, a);
+    s = passAll(s);
+    const ch = characteristics(s, s.objects[l]!);
+    expect(ch.name).toBe("Grizzly Bears");
+    expect([power(s, s.objects[l]!), toughness(s, s.objects[l]!)]).toEqual([2, 2]);
+    expect(objHasKeyword(s, s.objects[l]!, "Flying")).toBe(true);
+    // It keeps the copying ability (its only activated ability now).
+    expect(planActivate(s, ap, l, 0, t as never, undefined, undefined, 2)).not.toBeNull();
   });
 });

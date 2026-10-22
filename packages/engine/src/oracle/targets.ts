@@ -704,6 +704,9 @@ export function parseTargetPhrase(
   let owner: TargetSpec["owner"];
   // "Target creature card exiled with ~" (The Darkness Crystal): a card in exile linked to the source (CR 607.2a).
   let linkedExile = false;
+  // "Target creature card in your graveyard with mana value X" (Likeness Looter): the same as "with mana value X in your graveyard".
+  const inWith = / in (your|a|an opponent's) graveyard( with mana value (?:\d+|x)(?: or (?:greater|less))?)$/i.exec(p);
+  if (inWith) p = `${p.slice(0, inWith.index)}${inWith[2]} in ${inWith[1]} graveyard`;
   const gy = / (?:from|in) (your|a|an opponent's) graveyard$/.exec(p) ?? / exiled with (?:~|it)$/.exec(p);
   if (gy) {
     p = p.slice(0, gy.index);

@@ -1,0 +1,235 @@
+// Round 121: round 120's gaps (bots ending the turn, Fatal Push's targets for bots, "if cast using web-slinging"), then
+// the most played cards.
+
+import { describe, expect, it } from "vitest";
+import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
+import { botActions, chooseTargets, compileCard, isFullySupported, planActivate, planCast, spellCost, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { invalidateCharacteristics } from "../src/layers";
+import { moveObject } from "../src/game";
+
+const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
+const settle = (s: GameState, yes = true) => {
+  for (let i = 0; i < 80 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+    const p = s.pending;
+    if (p?.kind === "chooseMay") s = act(s, { type: "chooseMay", player: p.player, yes });
+    else if (p) s = botActions(s, p.player).reduce((x, a) => act(x, a), s);
+    else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  }
+  return s;
+};
+const run = (s: GameState, plan: Action[] | null) => {
+  if (!plan) throw new Error("no plan");
+  for (const a of plan) s = act(s, a);
+  return s;
+};
+const toHand = (s: GameState, pid: PlayerId, d: CardDef) => {
+  const id = putOnBattlefield(s, pid, d);
+  moveObject(s, id, "hand");
+  return id;
+};
+const named = (s: GameState, name: string) => s.battlefield.filter((id) => s.cards[s.objects[id]!.cardId]!.name === name);
+/** The bot's actions, one plan after another, until one of them does what `want` looks for (or it passes). */
+const botUntil = (s: GameState, pid: PlayerId, want: (a: Action) => boolean) => {
+  for (let i = 0; i < 12; i++) {
+    const plan = botActions(s, pid);
+    if (plan.some(want)) return { s, plan };
+    if (plan.length === 1 && plan[0]!.type === "passPriority") {
+      if (!s.stack.length) break;
+      s = settle(s); // what it cast resolves
+      continue;
+    }
+    s = run(s, plan);
+  }
+  return { s, plan: null };
+};
+/** Pass priority until `pid` has it (or nothing's waiting). */
+const passTo = (s: GameState, pid: PlayerId) => {
+  for (let i = 0; i < 8 && waitingOn(s) !== pid && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  return s;
+};
+
+// Real oracle text (Scryfall).
+const timeStop = card("Time Stop", "Instant", "{4}{U}{U}", { oracleText: "End the turn. (Exile all spells and abilities, including this spell. The player whose turn it is discards down to their maximum hand size. Damage heals and \"this turn\" and \"until end of turn\" effects end.)" });
+const gloriousEnd = card("Glorious End", "Instant", "{2}{R}", { oracleText: "End the turn. (Exile all spells and abilities from the stack, including this card. The player whose turn it is discards down to their maximum hand size. Damage wears off, and \"this turn\" and \"until end of turn\" effects end.)\nAt the beginning of your next end step, you lose the game." });
+const ultima = card("Ultima", "Sorcery", "{3}{W}{W}", { oracleText: "Destroy all artifacts and creatures. End the turn. (Exile all spells and abilities from the stack, including this card. The player whose turn it is discards down to their maximum hand size. Damage wears off, and \"this turn\" and \"until end of turn\" effects end.)" });
+const sundial = card("Sundial of the Infinite", "Artifact", "{2}", { oracleText: "{1}, {T}: End the turn. Activate only during your turn. (Exile all spells and abilities from the stack. Discard down to your maximum hand size. Damage wears off, and \"this turn\" and \"until end of turn\" effects end.)" });
+const sneak = card("Sneak Attack", "Enchantment", "{3}{R}", { oracleText: "{R}: You may put a creature card from your hand onto the battlefield. That creature gains haste. Sacrifice the creature at the beginning of the next end step." });
+const giant = card("Test Giant", "Creature — Giant", "{4}{R}{R}", { power: "6", toughness: "6", oracleText: "" });
+const push = card("Fatal Push", "Instant", "{B}", { oracleText: "Destroy target creature if it has mana value 2 or less.\nRevolt — Destroy that creature if it has mana value 4 or less instead if a permanent left the battlefield under your control this turn." });
+const ogre = card("Test Ogre", "Creature — Ogre", "{2}{R}", { power: "3", toughness: "3", oracleText: "" });
+
+describe("bots end the turn", () => {
+  it("a bot casts Time Stop at an opponent's big spell, which is exiled, and the turn ends", () => {
+    supported(timeStop);
+    const { s: s0, ap, ids, opp } = setup([giant]);
+    // The bot (the next player) has Time Stop and six Islands.
+    const stop = toHand(s0, opp, timeStop);
+    const island = card("Island", "Basic Land — Island");
+    for (let i = 0; i < 6; i++) putOnBattlefield(s0, opp, island);
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    s = passTo(s, opp);
+    const plan = botActions(s, opp);
+    expect(plan.some((a) => a.type === "castSpell" && a.objectId === stop)).toBe(true);
+    s = settle(run(s, plan));
+    expect(s.objects[ids[0]!]!.zone).toBe("exile"); // CR 724.1b
+    expect(s.objects[stop]!.zone).toBe("exile");
+    expect(s.activePlayer).not.toBe(ap);
+  });
+
+  it("a bot doesn't end the turn while something of its own is on the stack, and never casts Glorious End", () => {
+    const { s: s0, ap, ids, opp } = setup([giant]);
+    const stop = toHand(s0, opp, timeStop);
+    const end = toHand(s0, opp, gloriousEnd);
+    const island = card("Island", "Basic Land — Island");
+    for (let i = 0; i < 6; i++) putOnBattlefield(s0, opp, island);
+    for (let i = 0; i < 3; i++) putOnBattlefield(s0, opp, card("Mountain", "Basic Land — Mountain"));
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    s = passTo(s, opp);
+    // A spell of the bot's own under the giant: ending the turn would exile it too.
+    s.stack.unshift({ ...s.stack[0]!, id: "mine", controller: opp, kind: "ability", objectId: undefined });
+    expect(botActions(s, opp).some((a) => a.type === "castSpell" && (a.objectId === stop || a.objectId === end))).toBe(false);
+    s.stack = s.stack.filter((x) => x.id !== "mine");
+    s.players[opp]!.hand = s.players[opp]!.hand.filter((x) => x !== stop);
+    expect(botActions(s, opp).some((a) => a.type === "castSpell" && a.objectId === end)).toBe(false);
+  });
+
+  it("a bot casts Ultima as the last thing in its second main phase, when it hurts the opponents more", () => {
+    supported(ultima);
+    const { s: s0, ap, ids, opp } = setup([ultima]);
+    for (let i = 0; i < 3; i++) putOnBattlefield(s0, opp, giant);
+    // Not in the first main phase.
+    expect(botActions(s0, ap).some((a) => a.type === "castSpell" && a.objectId === ids[0])).toBe(false);
+    const found = botUntil(passUntil(s0, "main2", ap), ap, (a) => a.type === "castSpell" && a.objectId === ids[0]);
+    expect(found.plan).not.toBeNull();
+    const s = settle(run(found.s, found.plan));
+    expect(named(s, "Test Giant").length).toBe(0);
+    expect(s.activePlayer).not.toBe(ap);
+    // With only its own creatures around, it keeps Ultima.
+    const { s: t0, ap: me, ids: mine } = setup([ultima]);
+    for (let i = 0; i < 3; i++) putOnBattlefield(t0, me, giant);
+    expect(botUntil(passUntil(t0, "main2", me), me, (a) => a.type === "castSpell" && a.objectId === mine[0]).plan).toBeNull();
+  });
+
+  it("a bot activates Sundial of the Infinite in its end step to keep a creature Sneak Attack would sacrifice", () => {
+    supported(sundial, sneak);
+    const { s: s0, ap } = setup([]);
+    const dial = putOnBattlefield(s0, ap, sundial);
+    const sa = putOnBattlefield(s0, ap, sneak);
+    const g = toHand(s0, ap, giant);
+    let s = run(s0, planActivate(s0, ap, sa, 0));
+    for (let i = 0; i < 10 && s.objects[g]!.zone !== "battlefield"; i++) {
+      const p = s.pending;
+      if (p?.kind === "searchLibrary") s = act(s, { type: "searchLibrary", player: ap, found: [g] });
+      else if (p?.kind === "chooseMay") s = act(s, { type: "chooseMay", player: p.player, yes: true });
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(s.objects[g]!.zone).toBe("battlefield");
+    // Nothing to escape yet: the bot doesn't end its turn in the second main phase.
+    s = passUntil(s, "main2", ap);
+    expect(botActions(s, ap).some((a) => a.type === "activateAbility" && a.objectId === dial)).toBe(false);
+    s = passUntil(s, "end", ap);
+    for (let i = 0; i < 6 && !s.stack.length; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.stack.length).toBe(1);
+    const plan = botActions(s, ap);
+    expect(plan.some((a) => a.type === "activateAbility" && a.objectId === dial)).toBe(true);
+    s = settle(run(s, plan));
+    expect(s.objects[g]!.zone).toBe("battlefield");
+    expect(s.activePlayer).not.toBe(ap);
+  });
+});
+
+describe("Fatal Push's targets for bots", () => {
+  it("only a creature it would destroy: mana value 2 or less, or 4 or less with revolt", () => {
+    const { s, ap, ids, opp } = setup([push]);
+    const o = putOnBattlefield(s, opp, ogre);
+    const body = compileCard(push).spell!;
+    expect(chooseTargets(s, ap, body, false, ids[0])).toBeNull();
+    const b = putOnBattlefield(s, opp, bear());
+    expect(chooseTargets(s, ap, body, false, ids[0])).toEqual([{ kind: "object", id: b }]);
+    moveObject(s, b, "graveyard");
+    expect(chooseTargets(s, ap, body, false, ids[0])).toBeNull();
+    // Revolt: a permanent of ours left the battlefield.
+    const leaver = putOnBattlefield(s, ap, bear({ name: "Leaver" }));
+    moveObject(s, leaver, "graveyard");
+    invalidateCharacteristics(s);
+    expect(chooseTargets(s, ap, body, false, ids[0])).toEqual([{ kind: "object", id: o }]);
+  });
+});
+
+const spidersMan = card("Spiders-Man, Heroic Horde", "Legendary Creature — Spider Hero", "{1}{G}", { power: "1", toughness: "1", oracleText: "Web-slinging {4}{G}{G} (You may cast this spell for {4}{G}{G} if you also return a tapped creature you control to its owner's hand.)\nWhen Spiders-Man enters, if they were cast using web-slinging, you gain 3 life and create two 2/1 green Spider creature tokens with reach." });
+const scarlet = card("Scarlet Spider, Ben Reilly", "Legendary Creature — Spider Human Hero", "{1}{R}{G}", { power: "4", toughness: "3", keywords: ["Trample", "Web-slinging"], oracleText: "Web-slinging {R}{G} (You may cast this spell for {R}{G} if you also return a tapped creature you control to its owner's hand.)\nTrample\nSensational Save — If Scarlet Spider was cast using web-slinging, he enters with X +1/+1 counters on him, where X is the mana value of the returned creature." });
+const spiderUK = card("Spider-UK", "Legendary Creature — Spider Human Hero", "{3}{W}", { power: "3", toughness: "4", oracleText: "Web-slinging {2}{W} (You may cast this spell for {2}{W} if you also return a tapped creature you control to its owner's hand.)\nAt the beginning of your end step, if two or more creatures entered the battlefield under your control this turn, you draw a card and gain 2 life." });
+const arachne = card("Arachne, Psionic Weaver", "Legendary Creature — Spider Human Hero", "{2}{W}", { power: "3", toughness: "3", oracleText: "Web-slinging {W} (You may cast this spell for {W} if you also return a tapped creature you control to its owner's hand.)\nAs Arachne enters, look at an opponent's hand, then choose a card type other than creature.\nSpells of the chosen type cost {1} more to cast." });
+
+describe("web-slinging", () => {
+  it("Spiders-Man's enters trigger only when cast using web-slinging", () => {
+    supported(spidersMan);
+    for (const slung of [true, false]) {
+      const { s: s0, ap, ids } = setup([spidersMan]);
+      const tired = putOnBattlefield(s0, ap, ogre);
+      s0.objects[tired]!.tapped = true;
+      const life = s0.players[ap]!.life;
+      const s = settle(run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "auto", undefined, slung ? { alt: "alternative", returnToHand: [tired] } : {})));
+      expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
+      expect(s.objects[tired]!.zone).toBe(slung ? "hand" : "battlefield");
+      expect(s.players[ap]!.life, `slung ${slung}`).toBe(life + (slung ? 3 : 0));
+      expect(s.battlefield.filter((id) => s.objects[id]!.isToken).length).toBe(slung ? 2 : 0);
+    }
+  });
+
+  it("Scarlet Spider enters with +1/+1 counters equal to the returned creature's mana value, only cast using web-slinging", () => {
+    supported(scarlet);
+    for (const slung of [true, false]) {
+      const { s: s0, ap, ids } = setup([scarlet]);
+      const tired = putOnBattlefield(s0, ap, ogre); // mana value 3
+      s0.objects[tired]!.tapped = true;
+      const s = settle(run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "auto", undefined, slung ? { alt: "alternative", returnToHand: [tired] } : {})));
+      expect(s.objects[ids[0]!]!.counters["+1/+1"] ?? 0, `slung ${slung}`).toBe(slung ? 3 : 0);
+    }
+  });
+
+  it("Spider-UK draws and gains life at your end step if two or more creatures entered under your control this turn", () => {
+    supported(spiderUK);
+    for (const n of [1, 2]) {
+      const { s: s0, ap } = setup([]);
+      putOnBattlefield(s0, ap, spiderUK);
+      // Creatures that entered this turn count even if they left since.
+      for (let i = 0; i < n; i++) {
+        const b = toHand(s0, ap, bear());
+        s0.players[ap]!.hand = s0.players[ap]!.hand.filter((x) => x !== b);
+        moveObject(s0, b, "battlefield");
+        if (i === 0) moveObject(s0, b, "graveyard");
+      }
+      // An opponent's creature doesn't count.
+      const theirs = putOnBattlefield(s0, s0.turnOrder[(s0.turnOrder.indexOf(ap) + 1) % 4]!, bear());
+      moveObject(s0, theirs, "hand");
+      moveObject(s0, theirs, "battlefield");
+      const life = s0.players[ap]!.life;
+      const hand = s0.players[ap]!.hand.length;
+      let s = passUntil(s0, "end", ap);
+      s = settle(s);
+      expect(s.players[ap]!.life, `${n} entered`).toBe(life + (n === 2 ? 2 : 0));
+      expect(s.players[ap]!.hand.length).toBe(hand + (n === 2 ? 1 : 0));
+    }
+  });
+
+  it("Arachne: choose an opponent, see their hand, then a card type other than creature; those spells cost {1} more", () => {
+    supported(arachne);
+    const { s: s0, ap, ids, opp } = setup([arachne]);
+    const secret = toHand(s0, opp, card("Secret Plan", "Sorcery", "{1}{U}", { oracleText: "Draw a card." }));
+    const before = spellCost(s0, opp, s0.objects[secret]!).extra;
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    s = passTo(s, ap);
+    for (let i = 0; i < 8 && s.pending?.kind !== "chooseOption"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "player" });
+    expect((s.pending as { options: string[] }).options).not.toContain(String(ap));
+    s = act(s, { type: "chooseOption", player: ap, choice: String(opp) });
+    expect(s.log.some((l) => l.text.startsWith(`${s.players[opp]!.name}'s hand: `) && l.text.includes("Secret Plan") && l.to === ap)).toBe(true);
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "cardType" });
+    expect((s.pending as { options: string[] }).options).not.toContain("Creature");
+    s = act(s, { type: "chooseOption", player: ap, choice: "Sorcery" });
+    s = settle(s);
+    expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
+    expect(spellCost(s, opp, s.objects[secret]!).extra).toBe(before + 1);
+  });
+});

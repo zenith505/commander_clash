@@ -455,6 +455,8 @@ export interface GameObject {
   castAlt?: AltCostKind;
   /** A spell cast for its sneak cost: whom the creature returned to pay it was attacking (CR 702.190b). */
   sneak?: LastKnown;
+  /** Cast using web-slinging (CR 702.188a), while a spell and as the permanent it became: the creature returned to pay for it, as it last existed. */
+  webSlung?: LastKnown;
   /** As a spell, and as the permanent it became: it was bargained (CR 702.166b). */
   bargained?: true;
   /** As a spell, and as the permanent it became: its "you may collect evidence N" additional cost was paid (CR 701.59c). */
@@ -1200,7 +1202,7 @@ export interface TurnLog {
   /** Each token created this turn (CR 111.2): who created it and its subtypes then ("Treasure tokens you created"). */
   tokensCreated?: { player: PlayerId; subtypes: string[] }[];
   /** Permanents that entered the battlefield, with their controller, card types and colors as they entered. */
-  entered?: { controller: PlayerId; types: string[]; colors: Color[] }[];
+  entered?: { controller: PlayerId; types: string[]; subtypes?: string[]; colors: Color[] }[];
   /** Noncreature permanents destroyed by a spell or ability: their controller and the destroying spell's or ability's (Cobra Trap). */
   destroyed?: { controller: PlayerId; by: PlayerId }[];
   /** For each player, the creatures (`id@zoneChanges`) that dealt them damage (Inferno Trap). */
@@ -1288,6 +1290,8 @@ export interface ZoneMove {
   chars?: Characteristics;
   hadAbilities?: boolean;
   granted?: string[];
+  /** Left the battlefield because its controller sacrificed it (CR 701.21a). */
+  sacrificed?: true;
 }
 
 export interface GameState {
@@ -1544,7 +1548,7 @@ export interface GameState {
   untilReturns?: { auras: { id: ObjectId; zc: number; under: PlayerId; source: string; asking?: true }[]; returned: ObjectId[] };
   /** Legends chosen to keep under the legend rule (CR 704.5j), until the state-based actions are next performed. */
   legendKeep?: ObjectId[];
-  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; names?: TargetSpec; purpose?: NamePurpose; options?: string[]; range?: { min: number; max: number }; secret?: true; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean } }[];
+  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; names?: TargetSpec; purpose?: NamePurpose; options?: string[]; range?: { min: number; max: number }; secret?: true; /** "Look at an opponent's hand" once that opponent is chosen (Arachne). */ lookHand?: true; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean } }[];
   nextId: number;
   /**
    * Resolutions in a row in this step with every player only passing priority, and the states they left (as hashes,

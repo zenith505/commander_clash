@@ -328,7 +328,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   // The Traps look back at what entered this turn, as it entered (after "as it enters" choices, CR 614.12).
   if (ev.type === "enters" && s.objects[ev.id]) {
     const c = characteristics(s, s.objects[ev.id]!);
-    ((s.turnLog ??= {}).entered ??= []).push({ controller: c.controller, types: [...c.types], colors: [...c.colors] });
+    ((s.turnLog ??= {}).entered ??= []).push({ controller: c.controller, types: [...c.types], subtypes: [...c.subtypes], colors: [...c.colors] });
   }
   // While set, `add` is looking at an Aura's or Equipment's abilities about this creature it's attached to.
   let hosting: GameObject | null = null;
@@ -547,7 +547,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       entering,
       you,
       // Soulbond's intervening if: there's another unpaired creature to pair it with (CR 702.95a, 603.4).
-      (e, t) => e === "selfEnters" && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifX || (ev.x ?? 0) >= t.ifX) && (!t.ifEvoked || entering.castAlt === "evoke") && (!t.ifAlt || entering.castAlt === t.ifAlt) && (!t.ifBargained || !!entering.bargained) && (!t.ifEvidence || !!entering.evidence) && (!t.ifTreasure || (entering.treasureSpent ?? 0) > 0) && (!t.ifSpent || spentMeets(entering.spent, t.ifSpent)) && (t.ifCastFromHand === undefined || !!entering.castFromHand === t.ifCastFromHand) && (!t.ifCast || !!entering.wasCast) && (!t.ifFromGraveyard || (!!entering.enteredFromGraveyard && (t.ifFromGraveyard === "any" || entering.owner === you))) && (!t.ifFromHand || (!!entering.enteredFromHand && entering.owner === you)) && (!t.ifEnteredUntapped || !entering.tapped) && (!t.ifGift || entering.gift !== undefined) && (!t.ifTributeUnpaid || !entering.tribute?.paid) && (!t.ifSoulbond || pairCandidates(s, entering, you).length > 0),
+      (e, t) => e === "selfEnters" && (!t.ifKicked || kickedMatches(entering.kicked, t.ifKicked)) && (!t.ifX || (ev.x ?? 0) >= t.ifX) && (!t.ifEvoked || entering.castAlt === "evoke") && (!t.ifAlt || (t.ifAlt === "webSlinging" ? !!entering.webSlung : entering.castAlt === t.ifAlt)) && (!t.ifBargained || !!entering.bargained) && (!t.ifEvidence || !!entering.evidence) && (!t.ifTreasure || (entering.treasureSpent ?? 0) > 0) && (!t.ifSpent || spentMeets(entering.spent, t.ifSpent)) && (t.ifCastFromHand === undefined || !!entering.castFromHand === t.ifCastFromHand) && (!t.ifCast || !!entering.wasCast) && (!t.ifFromGraveyard || (!!entering.enteredFromGraveyard && (t.ifFromGraveyard === "any" || entering.owner === you))) && (!t.ifFromHand || (!!entering.enteredFromHand && entering.owner === you)) && (!t.ifEnteredUntapped || !entering.tapped) && (!t.ifGift || entering.gift !== undefined) && (!t.ifTributeUnpaid || !entering.tribute?.paid) && (!t.ifSoulbond || pairCandidates(s, entering, you).length > 0),
       undefined,
       undefined,
       undefined,
@@ -1833,6 +1833,7 @@ function batchMoveMatches(s: GameState, b: BatchTrigger, m: ZoneMove, w: GameObj
     if (m.from !== "battlefield" || !m.snapshot || !m.chars) return false;
     if (b.dies && m.to !== "graveyard") return false;
     if (b.notDies && m.to === "graveyard" && m.chars.types.includes("Creature")) return false; // CR 700.4
+    if (b.sacrificed && !m.sacrificed) return false;
     if (b.other && m.id === w.id && (gone || (w.zoneChanges ?? 0) === m.zc)) return false;
     return whose(m.controller) && (!b.filter || objectMatches(s, b.filter, m.snapshot, you, false, undefined, m.chars));
   }

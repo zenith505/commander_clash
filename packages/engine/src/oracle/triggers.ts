@@ -1,5 +1,5 @@
 import { allEffects, type AbilityBody, type BatchTrigger, type Effect, type TriggeredAbility, type SpellCondition, type SpentReq, type StaticCondition, type TargetSpec, type TriggerEvent } from "../abilities";
-import { COUNTER, differenceInHand, NUM, X, num, parseSpentReq, singularWord, SPENT } from "./words";
+import { COUNTER, differenceInHand, NUM, X, num, parseSpentReq, singular, singularWord, SPENT } from "./words";
 import { parseActivateCondition, parseStaticCondition } from "./statics";
 import { parseBody, replaceX } from "./body";
 import { parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
@@ -786,6 +786,16 @@ function parseSacrificeTrigger(line: string): TriggeredAbility | "fail" | null {
   if (self) {
     const body = parseBody(self[1]!);
     return body ? { event: "youSacrifice", sacrifices: { filter: { kind: "object", text: "~" }, orSelf: true, self: true }, body } : "fail";
+  }
+  // "Whenever you sacrifice one or more Foods" (Camellia, the Seedmiser): once for each event that sacrificed any (CR
+  // 603.2c), the permanents as they last existed (CR 603.10a).
+  const batch = /^Whenever you sacrifice one or more (.+?), (.+)$/.exec(line);
+  if (batch) {
+    const other = batch[1]!.startsWith("other ");
+    const filter = parseTargetPhrase(singular(batch[1]!.replace(/^other /, "")));
+    const body = parseBody(batch[2]!);
+    if (!filter || filter.kind !== "object" || filter.controller || !body) return "fail";
+    return { event: "batch", batch: { what: "leaves", filter: { ...filter, text: batch[1]! }, whose: "you", sacrificed: true, ...(other ? { other: true as const } : {}) }, body };
   }
   const any = /^Whenever (a player|an opponent) sacrifices (an?|another) (.+?), (.+)$/.exec(line);
   const m = any ? [any[0], any[2], any[3], undefined, any[4]] : /^Whenever you sacrifice (~ or another|another|an?) (.+?)( during your turn)?, (.+)$/.exec(line);
@@ -1929,11 +1939,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       }
       // "When Leonardo enters, if his sneak cost was paid, ..." (CR 702.190a), "if its surge cost was paid" (702.117a),
       // "if its spectacle cost was paid" (702.137a).
-      let ifAlt: "sneak" | "surge" | "spectacle" | undefined;
-      const altPaid = /^if (?:its|his|her|their) (sneak|surge|spectacle) cost was paid, (.+)$/i.exec(body0);
+      // "When Spiders-Man enters, if they were cast using web-slinging, ..." (CR 702.188a).
+      let ifAlt: "sneak" | "surge" | "spectacle" | "webSlinging" | undefined;
+      const altPaid = /^if (?:its|his|her|their) (sneak|surge|spectacle) cost was paid, (.+)$/i.exec(body0) ?? /^if (?:it|he|she|they) (?:was|were) cast using (web-slinging), (.+)$/i.exec(body0);
       if (altPaid) {
         if (event !== "selfEnters") return "fail" as const;
-        ifAlt = altPaid[1]!.toLowerCase() as "sneak" | "surge" | "spectacle";
+        ifAlt = altPaid[1] === "web-slinging" ? "webSlinging" : (altPaid[1]!.toLowerCase() as "sneak" | "surge" | "spectacle");
         body0 = altPaid[2]!;
       }
       // "If a source would deal damage ..., it deals that much damage plus 2 instead" (Rankle and Torbran): that "that much"

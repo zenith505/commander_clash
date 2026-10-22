@@ -889,6 +889,15 @@ export function compile(d: CardDef): CompiledCard {
       }
       continue;
     }
+    // "As Arachne enters, look at an opponent's hand, then choose a card type other than creature." (CR 614.12): an
+    // opponent, then their hand is seen, then a card type. Kindred is a card type too, but no kindred card plays here.
+    const lookThenType = /^As ~ enters, look at an opponent's hand, then choose a card type other than (\w+)\.$/.exec(line);
+    if (lookThenType && !out.entersChoosePlayer && !out.entersChoose?.some((c) => c.what === "cardType")) {
+      out.entersChoosePlayer = "opponent";
+      out.entersLookHand = true;
+      (out.entersChoose ??= []).push({ what: "cardType", options: Object.keys(CARD_TYPE_PLURAL).filter((t) => t !== capital(lookThenType[1]!)) });
+      continue;
+    }
     // "As this artifact enters, choose artifact, creature, enchantment, instant, or sorcery." (Cloud Key, CR 614.12): a
     // card type, kept as Chosen.cardType.
     const asCardType = /^As (?:~|it) enters, choose ((?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle)(?:, (?:or )?(?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle))+|a card type)\.$/.exec(line);
@@ -1199,6 +1208,15 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "You may play lands from your graveyard.") {
       out.landsFromGraveyard = true;
+      continue;
+    }
+    // Wrenn and Realmbreaker's emblem: "You may play lands and cast permanent spells from your graveyard." Any number,
+    // paying their mana costs (a card without one can't be cast this way, CR 118.6), following the usual timing rules.
+    const permYard = /^You may (play lands and )?cast permanent spells from your graveyard\.$/.exec(line);
+    if (permYard) {
+      if (permYard[1]) out.landsFromGraveyard = true;
+      const { owner: _, ...f } = parseTargetPhrase("permanent card from a graveyard")!;
+      (out.graveyardGrants ??= []).push({ filter: { ...f, text: "permanent cards" }, way: { kind: "permission", costs: [], exile: false } });
       continue;
     }
     // Underworld Breach, The Master of Keys, Lier, Return the Past, Six, Deeproot Historian: escape, flashback or retrace
@@ -1699,6 +1717,11 @@ export function compile(d: CardDef): CompiledCard {
       out.spendAnyColor = true;
       continue;
     }
+    const unlockLess = /^Unlock costs you pay cost \{(\d+)\} less\.$/.exec(line);
+    if (unlockLess) {
+      out.unlockLess = (out.unlockLess ?? 0) + Number(unlockLess[1]);
+      continue;
+    }
     const plotLess = /^Plotting cards from your hand costs \{(\d+)\} less\.$/.exec(line);
     if (plotLess) {
       out.plotLess = (out.plotLess ?? 0) + Number(plotLess[1]);
@@ -2111,6 +2134,14 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     if (aNumber) line = `~ enters with X ${aNumber[1]} counters on it, where X is ${aNumber[2]}.`;
+    // "Sensational Save — If Scarlet Spider was cast using web-slinging, he enters with X +1/+1 counters on him, where X
+    // is the mana value of the returned creature." (CR 702.188a; the returned creature as it last existed, rulings).
+    const slung = new RegExp(`^(?:[A-Z][\\w' ]+ — )?If ~ was cast using web-slinging, ~ enters(?: the battlefield)? with X ${COUNTER} counters on ~, where X is the mana value of the returned creature\\.$`).exec(line);
+    if (slung) {
+      if (out.entersWithCounters) out.unsupported.push(raw);
+      else out.entersWithCounters = { counter: counterKind(slung[1]!), n: { count: { kind: "webSlungMv" } }, ifWebSlung: true };
+      continue;
+    }
     const ewc = new RegExp(`^(?:(?:Raid|Morbid|Revolt) — )?~ enters(?: the battlefield)?( tapped)? with ${NUMX} ${COUNTER} counters? on it(?: for each (.+?)|, where X is (.+?)| if (.+?))?\\.$`).exec(line);
     if (ewc) {
       // "With a +1/+1 counter on it for each ...", "with X +1/+1 counters, where X is ...": counted as it enters.
@@ -2775,6 +2806,8 @@ function checkCastingLinks(out: CompiledCard) {
   // permanent's enters trigger.
   // "If the {1}{B} cost was paid": the card's one "rather than pay" cost, that mana (Baleful Mastery).
   const masteryMana = /\bIf the ((?:\{[^}]+\})+) cost was paid\b/.exec(out.spell?.text ?? "")?.[1];
+  // "If ~ was cast using web-slinging" needs its web-slinging cost (CR 702.188a).
+  if ((out.triggers.some((t) => t.ifAlt === "webSlinging") || out.entersWithCounters?.ifWebSlung) && !out.altCosts?.some((a) => a.webSlinging)) bad = true;
   for (const alt of ["surge", "spectacle", "alternative", "madness"] as const) {
     const altIn = (v: unknown) => JSON.stringify(v ?? null).includes(`"kind":"altPaid","alt":"${alt}"`);
     const alts = out.altCosts?.filter((a) => a.kind === alt) ?? [];

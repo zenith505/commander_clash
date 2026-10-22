@@ -575,6 +575,12 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^an opponent searched their library this turn$/.test(text)) return { kind: "opponentSearched" };
   if ((m = new RegExp(`^an opponent had (?:an?|${NUM} or more) (?:(white|blue|black|red|green) )?(artifact|creature|land|enchantment|planeswalker)s? enter the battlefield under their control this turn$`).exec(text)))
     return { kind: "opponentEntered", types: [capital(m[3]!)], ...(m[2] ? { color: COLOR_WORDS[m[2]]! } : {}), n: m[1] ? num(m[1]) : 1 };
+  if ((m = new RegExp(`^(?:you had )?(?:an?|${NUM} or more) (nonland permanent|permanent|artifact|creature|land|enchantment|planeswalker|[A-Z][a-z]+)s? (?:entered|enter) (?:the battlefield )?under your control this turn$`).exec(text))) {
+    const what = m[2]!;
+    const kinds = ["nonland permanent", "permanent", "artifact", "creature", "land", "enchantment", "planeswalker"];
+    if (kinds.includes(what) || (subtypeSet(what) && subtypeSet(what) !== "Spell"))
+      return { kind: "youEntered", types: what === "nonland permanent" || what === "permanent" || !kinds.includes(what) ? [] : [capital(what)], ...(what === "nonland permanent" ? { notTypes: ["Land"] } : {}), ...(!kinds.includes(what) ? { subtype: what } : {}), n: m[1] ? num(m[1]) : 1 };
+  }
   if (/^a noncreature permanent under your control was destroyed this turn by a spell or ability an opponent controlled$/.test(text)) return { kind: "destroyedByOpponent" };
   if ((m = new RegExp(`^you've been dealt damage by ${NUM} or more creatures this turn$`).exec(text))) return { kind: "damagedByCreatures", n: num(m[1]!) };
   if (/^an opponent gained life this turn$/.test(text)) return { kind: "opponentGainedLife" };
@@ -846,6 +852,12 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^is a creature in addition to its other types and has base power and base toughness each equal to its mana value$|^is an artifact creature with power and toughness each equal to its mana value$/.test(rest)) {
     const mv = { count: { kind: "affectedManaValue" as const } };
     return [{ kind: "addTypes", types: ["Creature"], subtypes: [] }, { kind: "setPT", power: mv, toughness: mv }];
+  }
+  // Ygra, Eater of All: "are Food artifacts in addition to their other types and have "..."" (an artifact type and the
+  // artifact type in layer 4, CR 613.1d, 205.1b; the ability in layer 6).
+  if ((m = /^are ([A-Z][a-z]+) artifacts in addition to their other types(?:,? and ((?:has|have) .+))?$/.exec(rest)) && subtypeSet(m[1]!) === "Artifact") {
+    const more = m[2] ? parseStaticMods(m[2]) : [];
+    return more ? [{ kind: "addTypes", types: ["Artifact"], subtypes: [m[1]!] }, ...more] : null;
   }
   const IS = "is an? ([A-Z][a-z]+) in addition to its other types";
   if ((m = new RegExp(`^${IS}$`).exec(rest))) return typed(m[1]!, []);
@@ -1318,7 +1330,7 @@ function parseStaticLine(line: string): StaticAbility | null {
   // greater is checked as it assigns combat damage, which comes to the same thing as a group that changes with it.
   const greater = /^(.+?) with toughness greater than (?:its|their) power (assigns? .+)$/.exec(text);
   if (greater) text = `${greater[1]} ${greater[2]}`;
-  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|(?:is|are) all colors|can't .+|can block .+|can attack as though .+|can attack players who attacked you during their last turn as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:, .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses? all abilities(?: and (?:has|have) base power and toughness \d+\/\d+)?|loses? [a-z ,]+? and can't have or gain [a-z ,]+)$/.exec(text);
+  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|are [A-Z][a-z]+ artifacts in addition to their other types.*|(?:is|are) all colors|can't .+|can block .+|can attack as though .+|can attack players who attacked you during their last turn as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:, .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses? all abilities(?: and (?:has|have) base power and toughness \d+\/\d+)?|loses? [a-z ,]+? and can't have or gain [a-z ,]+)$/.exec(text);
   if (!m) return null;
   const affects = parseAffected(m[1]!);
   if (!affects) return null;

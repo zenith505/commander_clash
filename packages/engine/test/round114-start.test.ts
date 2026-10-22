@@ -472,3 +472,41 @@ describe("Eerie: whenever an enchantment you control enters and whenever you ful
     expect(s.players[ap]!.hand.length).toBe(hand + 2);
   });
 });
+
+describe("Dragonhawk, Fate's Tempest", () => {
+  const dragonhawk = card("Dragonhawk, Fate's Tempest", "Legendary Creature — Bird Dragon", "{3}{R}{R}", {
+    power: "5",
+    toughness: "5",
+    keywords: ["Flying"],
+    oracleText:
+      "Flying\nWhenever Dragonhawk enters or attacks, exile the top X cards of your library, where X is the number of creatures you control with power 4 or greater. You may play those cards until your next end step. At the beginning of your next end step, Dragonhawk deals 2 damage to each opponent for each of those cards that are still exiled.",
+  });
+  /** Ap attacks with Dragonhawk next to a 4/4; the trigger has resolved (X = 2: both have power 4 or greater). */
+  function attacked() {
+    const { s: s0, ap, opp } = setup([]);
+    const hawk = putOnBattlefield(s0, ap, dragonhawk);
+    putOnBattlefield(s0, ap, card("Big Bear", "Creature — Bear", "{3}{G}", { power: "4", toughness: "4" }));
+    putOnBattlefield(s0, ap, bear());
+    const top = s0.players[ap]!.library.slice(0, 2);
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: hawk, defender: opp }] });
+    s = settle(s);
+    return { s, ap, opp, top };
+  }
+
+  it("plays", () => expect(isFullySupported(dragonhawk)).toBe(true));
+
+  it("exiles X = 2 cards to play; at your next end step, 2 damage to each opponent for each still exiled", () => {
+    const { s: s1, ap, opp, top } = attacked();
+    for (const id of top) expect(s1.objects[id]).toMatchObject({ zone: "exile", mayPlay: { player: ap, until: "yourNextEndStep" } });
+    const lives = Object.fromEntries(s1.turnOrder.filter((p) => p !== ap).map((p) => [p, s1.players[p]!.life]));
+    let s = passUntil(s1, "main2", ap);
+    // Play one of them (a Forest) from exile; the other stays.
+    s = act(s, { type: "playLand", player: ap, objectId: top[0]! });
+    expect(s.objects[top[0]!]!.zone).toBe("battlefield");
+    s = passUntil(s, "end", ap);
+    s = settle(s);
+    // The Bird Dragon hit one opponent for 5 in combat; every opponent also takes 2 for the one card still exiled.
+    for (const p of Object.keys(lives)) expect(lives[p]! - s.players[p]!.life).toBe(p === String(opp) ? 7 : 2);
+  });
+});

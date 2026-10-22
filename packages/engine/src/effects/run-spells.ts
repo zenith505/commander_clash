@@ -83,6 +83,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // Glimpse the Impossible: the cards this spell exiled to play ("those cards").
       const impulsed = (s.resolving?.impulsed ?? []).map((x) => ({ id: x, zc: s.objects[x]?.zoneChanges ?? 0 }));
       const effects = e.effects.map((x): Effect => (x.type === "returnFaceDownExiled" ? { ...x, cards: exiled } : x.type === "exiledToGraveyard" ? { ...x, cards: impulsed } : x));
+      // Dragonhawk: "for each of those cards that are still exiled", the cards this ability exiled.
+      for (const x of effects) if (x.type === "damage" && typeof x.amount === "object" && x.amount.count.kind === "stillExiled") Object.assign(x, { amount: { ...x.amount, count: { kind: "stillExiled", cards: impulsed } } });
       const body = { targets: [], effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." };
       if (e.when === "dies") {
         // "When that creature dies this turn, flip ~" (Initiate of Blood): about that permanent as it is now (CR 603.7c,

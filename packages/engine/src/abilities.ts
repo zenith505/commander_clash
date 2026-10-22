@@ -134,6 +134,8 @@ export type Count =
   | { kind: "eventGroupPower" }
   /** How many cards the last "put all cards exiled with ~ into their owners' graveyards" moved (Valakut Exploration). */
   | { kind: "movedLinkedThisWay" }
+  /** "For each of those cards that are still exiled" (Dragonhawk): the cards the creating ability exiled, filled in when its delayed trigger is made (CR 400.7). */
+  | { kind: "stillExiled"; cards?: { id: ObjectId; zc: number }[] }
   /** "For each creature tapped this way", "the number of creatures tapped this way" after tapAnyNumber, or in its reflexive trigger. */
   | { kind: "tappedThisWay" }
   /**

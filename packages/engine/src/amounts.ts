@@ -176,6 +176,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     }
     case "movedLinkedThisWay":
       return s.resolving?.movedLinked ?? 0;
+    case "stillExiled":
+      return (c.cards ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc).length;
     case "eventGroupPower":
       return ctx.event?.groupPower ?? 0;
     case "lifeLostThisWay":
@@ -551,6 +553,8 @@ function describeCount(c: Count): string {
       return "#cards exiled with it";
     case "movedLinkedThisWay":
       return "#cards put into graveyards";
+    case "stillExiled":
+      return "#those cards still exiled";
     case "eventGroupPower":
       return "the total power of those creatures";
     case "lifeLostThisWay":

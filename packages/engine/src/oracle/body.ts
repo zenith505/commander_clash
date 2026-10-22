@@ -1372,7 +1372,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const impulseIf = /^If [^,]+, exile the top /.test(s) ? parseHowCast(s, ctx) : null;
     // "Exile cards from the top of your library equal to the excess damage dealt to that creature this way" (Archaic's
     // Agony): that many, counted as it resolves.
-    const exEqual = /^Exile cards from the top of your library equal to (.+)$/.exec(s);
+    // "Exile the top X cards of your library, where X is the number of creatures you control with power 4 or greater"
+    // (Dragonhawk, Fate's Tempest): X counted once, as it resolves (rulings).
+    const exEqual = /^Exile cards from the top of your library equal to (.+)$/.exec(s) ?? /^[Ee]xile the top X cards of your library, where X is (.+)$/.exec(s);
     const exEqualN = exEqual ? parseCount(exEqual[1]!, ctx) : null;
     if (exEqual && !exEqualN) return null;
     // "Shuffle your library, then exile the top card." (Urza, Lord High Artificer): the top card of your library, after.
@@ -3075,6 +3077,14 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       if (token?.type !== "createToken" || token.n !== 1) return null;
       effects.push({ type: "delayed", when: "nextEndStep", effects: [{ type: "exiledToGraveyard" }, { ...token, n: { count: { kind: "movedLinkedThisWay" } } }], text: `put those cards still exiled into your graveyard, then ${leftovers[1]!.replace(/^C/, "c")} for each card put into your graveyard this way` });
       si += 2;
+      continue;
+    }
+    // Dragonhawk, Fate's Tempest: "At the beginning of your next end step, ~ deals 2 damage to each opponent for each of
+    // those cards that are still exiled." A delayed trigger (CR 603.7) counting only the cards this ability exiled to play
+    // (rulings), as it resolves; one that left exile and came back is a new object (CR 400.7).
+    const stillEx = /^At the beginning of (your|the) next end step, (~ deals (\d+) damage to each opponent) for each of those cards that are still exiled$/.exec(s);
+    if (stillEx && effects[effects.length - 1]?.type === "impulse") {
+      effects.push({ type: "delayed", when: stillEx[1] === "your" ? "yourNextEndStep" : "nextEndStep", effects: [{ type: "damage", amount: { count: { kind: "stillExiled" }, times: Number(stillEx[3]) }, to: { ref: "eachOpponent" } }], text: `${stillEx[2]!} for each of those cards that are still exiled` });
       continue;
     }
     // Gustha's Scepter: "Exile a card from your hand face down. You may look at it for as long as it remains exiled."

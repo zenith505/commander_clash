@@ -310,6 +310,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const fx = n && parseZonesSentence(`${counted[1]} with a ${counted[2]} counter on it`, ctx);
     return n && fx?.length === 1 && fx[0]!.type === "chooseFromGraveyard" && fx[0]!.counters ? [{ ...fx[0]!, countersN: n }] : null;
   }
+  // "Return X creature cards from your graveyard to the battlefield", after "sacrifice any number of ..." (Lich-Knights'
+  // Conquest): that many, chosen as it resolves.
+  if ((m = /^[Rr]eturn X (creature cards) from your graveyard to the battlefield$/.exec(s))) {
+    const filter = parseSearchFilter(m[1]!);
+    return filter ? [{ type: "chooseFromGraveyard", n: 1, nAmount: amt("X"), dest: "battlefield", filter }] : null;
+  }
   if ((m = new RegExp(`^[Rr]eturn (an?|one|two|up to one|up to two) (.+?) from your graveyard to the battlefield( tapped)?(?: with an? (${COUNTER}) counter on it)?$`).exec(s)) && !/\b(?:target|other|another|that|those|at random)\b/.test(m[2]!)) {
     // "... with mana value X or less ..., where X is the amount of {S} spent to cast this spell" (Blood on the Snow): X
     // as it resolves.

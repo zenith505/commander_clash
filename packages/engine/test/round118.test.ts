@@ -689,3 +689,35 @@ describe("Ghoulish Impetus", () => {
     void other;
   });
 });
+
+const conquest = card("Lich-Knights' Conquest", "Sorcery", "{B}", {
+  oracleText: "Sacrifice any number of artifacts, enchantments, and/or tokens. Return that many creature cards from your graveyard to the battlefield.",
+});
+
+describe("Lich-Knights' Conquest", () => {
+  it("sacrifice any number of artifacts, enchantments and tokens; return that many creature cards", () => {
+    expect(isFullySupported(conquest)).toBe(true);
+    const { s: s0, ap, ids } = setup([conquest]);
+    let s = s0;
+    const relic = putOnBattlefield(s, ap, card("Relic", "Artifact", "{1}", { oracleText: "" }));
+    const charm = putOnBattlefield(s, ap, card("Charm", "Enchantment", "{1}", { oracleText: "" }));
+    const plainBear = putOnBattlefield(s, ap, bear());
+    const dead = [0, 1, 2].map((i) => {
+      const id = putOnBattlefield(s, ap, bear({ name: `Dead Bear ${i}` }));
+      moveObject(s, id, "graveyard");
+      return id;
+    });
+    s = run(s, planCast(s, ap, ids[0]!));
+    s = settle(s);
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", player: ap });
+    if (s.pending?.kind !== "pickPermanents") throw new Error();
+    // A nontoken creature isn't one of them.
+    expect(s.pending.options).toEqual(expect.arrayContaining([relic, charm]));
+    expect(s.pending.options).not.toContain(plainBear);
+    s = settle(act(s, { type: "pickPermanents", player: ap, ids: [relic, charm] }));
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", fromGraveyard: "battlefield", min: 2, max: 2 });
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: [dead[0]!, dead[2]!] }));
+    expect([relic, charm].map((id) => s.objects[id]!.zone)).toEqual(["graveyard", "graveyard"]);
+    expect(dead.map((id) => s.objects[id]!.zone)).toEqual(["battlefield", "graveyard", "battlefield"]);
+  });
+});

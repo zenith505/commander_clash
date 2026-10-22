@@ -1790,7 +1790,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const all = p.graveyard.filter((id) => milled(id) && (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (e.dest !== "battlefield" || isPermanentCard(defOf(s, obj(s, id)))) && (e.totalMv === undefined || defMv(defOf(s, obj(s, id))) <= e.totalMv));
         // "With different names": one card of each name is offered (cards of one name are alike).
         const cards = e.oneEach ? all.filter((id, i) => all.findIndex((x) => sameName(defOf(s, obj(s, x)).name, defOf(s, obj(s, id)).name)) === i) : all;
-        const max = e.distinctManaValues ? new Set(cards.map((id) => defMv(defOf(s, obj(s, id))))).size : Math.min(e.n, cards.length);
+        // "Return that many creature cards" (Lich-Knights' Conquest): counted as it resolves.
+        const count = e.nAmount !== undefined ? Math.max(0, amountNow(s, e.nAmount, ctx)) : e.n;
+        const max = e.distinctManaValues ? new Set(cards.map((id) => defMv(defOf(s, obj(s, id))))).size : Math.min(count, cards.length);
         // "If you don't" after a card from among the milled ones (Ainok Wayfarer): whether one was put into your hand.
         if (e.milled) s.resolving!.did = false;
         if (!max) return;
@@ -1799,9 +1801,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           ? `any number of ${kind.replace(/\bcard\b/, "cards")} with different mana values`
           : e.oneEach && e.upTo && e.n >= 99
             ? `any number of ${kind.replace(/\bcard\b/, "cards")} with different names`
-          : e.n === 1
+          : count === 1
             ? `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`
-            : `${e.upTo ? "up to " : ""}${e.n} ${kind.replace(/\bcard\b/, "cards")}${e.totalMv !== undefined ? ` with total mana value ${e.totalMv} or less` : ""}`;
+            : `${e.upTo ? "up to " : ""}${count} ${kind.replace(/\bcard\b/, "cards")}${e.totalMv !== undefined ? ` with total mana value ${e.totalMv} or less` : ""}`;
         s.pending = { kind: "searchLibrary", player: p.id, source: src, what, cards, min: e.upTo ? 0 : max, max, fromGraveyard: e.dest ?? "hand", ...(e.distinctManaValues ? { distinctManaValues: true as const } : {}), ...(e.totalMv !== undefined ? { totalMv: e.totalMv } : {}) };
         return "paused";
       }

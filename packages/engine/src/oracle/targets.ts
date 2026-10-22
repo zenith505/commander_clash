@@ -89,6 +89,12 @@ export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | nul
 
 /** What a "pick" effect picks from: "creature", "nonland permanent", "two lands", "artifact or creature", "Forest". */
 export function pickFilter(phrase: string): TargetSpec | null {
+  // "Artifacts, enchantments, and/or tokens" (Lich-Knights' Conquest): each permanent that's any of them.
+  const list = /^((?:[a-z]+s, )+)and\/or ([a-z]+s)$/.exec(phrase.trim());
+  if (list && /\btokens\b/.test(phrase)) {
+    const anyOf = [...list[1]!.split(", ").filter(Boolean), list[2]!].map((w) => pickFilter(w));
+    return anyOf.every((a): a is TargetSpec => !!a) ? { kind: "object", types: [], notTypes: [], notColors: [], anyOf, text: phrase.trim() } : null;
+  }
   // "Permanents you don't own" (Agent of Treachery): whose they are comes after the noun.
   const owned = / you (?:don't )?own$/.exec(phrase.trim().replace(/ you control$/i, ""))?.[0] ?? "";
   const words = phrase.trim().replace(/ you control$/i, "").slice(0, owned ? -owned.length : undefined).split(" ");

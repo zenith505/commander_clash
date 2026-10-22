@@ -1995,10 +1995,10 @@ function canCastAlt(s: GameState, id: string, alt: AltCostKind, prototyped?: tru
   return !!sac && s.battlefield.some((x) => controllerOf(s, s.objects[x]!) === HUMAN && objectMatches(s, sac.filter, s.objects[x]!, HUMAN, false) && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { alt, sacrifice: [x] }) !== null);
 }
 
-/** Indices of a card's abilities that work from your hand (cycling, CR 702.29a), or from the command zone for a commander (commander ninjutsu, CR 702.49d). */
+/** Indices of a card's abilities that work from your hand (cycling, CR 702.29a), or from the command zone for a commander (commander ninjutsu, CR 702.49d; Derevi's). */
 function handAbilities(s: GameState, id: string): number[] {
   const o = s.objects[id]!;
-  return abilitiesOf(s, o).activated.flatMap((ab, i) => (ab.zone === "hand" && (o.zone !== "command" || ab.orCommand) ? [i] : []));
+  return abilitiesOf(s, o).activated.flatMap((ab, i) => ((ab.zone === "hand" && (o.zone !== "command" || ab.orCommand)) || (ab.zone === "command" && o.zone === "command") ? [i] : []));
 }
 
 /** Could you cycle this card right now, tapping mana as needed? */

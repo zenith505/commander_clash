@@ -576,3 +576,51 @@ describe("cleave (CR 702.148)", () => {
     }
   });
 });
+
+const mazesEnd = card("Maze's End", "Land", "", { oracleText: "This land enters tapped.\n{T}: Add {C}.\n{3}, {T}, Return this land to its owner's hand: Search your library for a Gate card, put it onto the battlefield, then shuffle. If you control ten or more Gates with different names, you win the game." });
+const derevi = card("Derevi, Empyrial Tactician", "Legendary Creature — Bird Wizard", "{G}{W}{U}", { power: "2", toughness: "3", keywords: ["Flying"], oracleText: "Flying\nWhen Derevi enters and whenever a creature you control deals combat damage to a player, you may tap or untap target permanent.\n{1}{G}{W}{U}: Put Derevi onto the battlefield from the command zone." });
+
+describe("Maze's End, Derevi", () => {
+  it("Maze's End: the tenth differently named Gate wins the game", () => {
+    supported(mazesEnd, derevi);
+    const { s: s0, ap } = setup([]);
+    const m = putOnBattlefield(s0, ap, mazesEnd);
+    for (let i = 1; i <= 9; i++) putOnBattlefield(s0, ap, card(`Test Gate ${i}`, "Land — Gate", ""));
+    putOnBattlefield(s0, ap, card("Test Gate 1", "Land — Gate", "")); // the same name again doesn't count twice
+    onTop(s0, ap, card("Test Gate 10", "Land — Gate", ""));
+    invalidateCharacteristics(s0);
+    let s = run(s0, planActivate(s0, ap, m, 0));
+    for (let i = 0; i < 20 && s.pending?.kind !== "searchLibrary"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    const gate = s.players[ap]!.library.find((id) => s.cards[s.objects[id]!.cardId]!.name === "Test Gate 10")!;
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: [gate] }));
+    expect(s.objects[gate]!.zone).toBe("battlefield");
+    expect(s.winner).toBe(ap);
+  });
+
+  it("Derevi: put onto the battlefield from the command zone, not cast (no tax); not from anywhere else", () => {
+    const { s: s0, ap } = setup([]);
+    const d = putOnBattlefield(s0, ap, derevi);
+    s0.battlefield.splice(s0.battlefield.indexOf(d), 1);
+    Object.assign(s0.objects[d]!, { zone: "command", isCommander: true });
+    s0.players[ap]!.command.push(d);
+    invalidateCharacteristics(s0);
+    let s = settle(run(s0, planActivate(s0, ap, d, 0)), false);
+    expect(s.objects[d]!.zone).toBe("battlefield");
+    expect(s.players[ap]!.commanderCasts[d] ?? 0).toBe(0);
+    expect(s.log.some((l) => /Derevi.*cast/i.test(l.text) && !/activates/.test(l.text))).toBe(false);
+    expect(planActivate(s, ap, d, 0)).toBeNull();
+  });
+
+  it("a bot puts Derevi in with the ability once the tax makes casting it dearer", () => {
+    const { s: s0, ap } = setup([]);
+    for (const id of [...s0.players[ap]!.hand]) moveObject(s0, id, "library");
+    const d = putOnBattlefield(s0, ap, derevi);
+    s0.battlefield.splice(s0.battlefield.indexOf(d), 1);
+    Object.assign(s0.objects[d]!, { zone: "command", isCommander: true });
+    s0.players[ap]!.command = [d];
+    s0.players[ap]!.commanderCasts[d] = 2;
+    invalidateCharacteristics(s0);
+    const plan = botActions(s0, ap);
+    expect(plan.some((a) => a.type === "activateAbility" && a.objectId === d)).toBe(true);
+  });
+});

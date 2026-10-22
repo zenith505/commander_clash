@@ -5291,6 +5291,9 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   } else if (ab.zone === "graveyard") {
     // Unearth works only while the card is in your graveyard (CR 702.84a).
     if (o.zone !== "graveyard" || o.owner !== pid) return `${ab.text} works only from your graveyard`;
+  } else if (ab.zone === "command") {
+    // Derevi: only from the command zone (rulings).
+    if (o.zone !== "command" || o.owner !== pid) return `${ab.text} works only from the command zone`;
   } else if (o.zone !== "battlefield" || (controllerOf(s, o) !== pid && !ab.anyPlayer)) return "you don't control that permanent";
   else if (characteristics(s, o).cantActivate) return `${d.name}'s activated abilities can't be activated`; // Arrest
   const banned = nameActivationBan(s, o, !!ab.mana) ?? abolisherBan(s, pid, o); // Pithing Needle, in any zone (rulings); Grand Abolisher

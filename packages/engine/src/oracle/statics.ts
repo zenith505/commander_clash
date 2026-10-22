@@ -654,8 +654,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^(you|an opponent|defending player) controls? (.+)$/.exec(text))) {
     // "At least three other enchantments" (Ephara, Ever-Sheltering) is "three or more other enchantments".
     m[2] = m[2]!.replace(/^at least (\w+) /, "$1 or more ");
-    // "Seven or more lands with different names" (Field of the Dead): names counted once each.
-    const names = new RegExp(`^${NUM} or more (lands|creatures|artifacts) with (different names|the same name)$`).exec(m[2]!);
+    // "Seven or more lands with different names" (Field of the Dead), "ten or more Gates with different names" (Maze's End): names counted once each.
+    const names = new RegExp(`^${NUM} or more (lands|creatures|artifacts|Gates) with (different names|the same name)$`).exec(m[2]!);
     if (names && m[1] === "you") {
       const filter = pickFilter(names[2]!);
       return filter ? { kind: "control", who: "you", filter, min: num(names[1]!), ...(names[3] === "the same name" ? { sameName: true as const } : { differentNames: true as const }) } : null;

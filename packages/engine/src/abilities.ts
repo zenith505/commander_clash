@@ -3555,8 +3555,8 @@ export interface ActivatedAbility {
   text: string;
   /** An equip ability (CR 702.6a), for "Equip abilities you activate cost {1} less to activate". */
   equip?: true;
-  /** Works only while the card is in its owner's hand, like cycling (CR 702.29a), or graveyard, like unearth (CR 702.84a). Otherwise on the battlefield. */
-  zone?: "hand" | "graveyard";
+  /** Works only while the card is in its owner's hand, like cycling (CR 702.29a), or graveyard, like unearth (CR 702.84a), or the command zone (Derevi, CR 113.6k). Otherwise on the battlefield. */
+  zone?: "hand" | "graveyard" | "command";
   /** With `zone` "hand": from the command zone too (commander ninjutsu, CR 702.49d). */
   orCommand?: true;
   /** "Discard this card" is part of the cost (cycling, transmute). */

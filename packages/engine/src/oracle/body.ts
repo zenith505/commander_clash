@@ -184,7 +184,7 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx): Effect | null |
   if (either) {
     const trigger = parseTrigger(`Whenever ~ deals combat damage, ${[either[1]!, ...after.slice(1).map((x) => x.replace(/\.$/, ""))].join(". ")}.`);
     if (!trigger || trigger === "fail" || trigger.event !== "selfDealsCombatDamage" || Object.keys(trigger).some((k) => !FLOATING_KEYS.has(k))) return null;
-    const what = parseObject("up to two target creatures", ctx);
+    const what = parseObject("up to two target creatures", ctx!);
     if (what?.ref !== "target") return null;
     return { type: "floatingTrigger", trigger, until: "yourNextTurn", about: what.index, each: what.n ?? 1 };
   }

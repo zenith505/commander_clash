@@ -1,5 +1,6 @@
 // Round 122's prompts: a token put onto the battlefield attacking asks what it attacks (CR 508.4), one question per
-// token; cleave (CR 702.148a) is a "Cleave" cast button; Warped Space offers {0} for a card cast from exile.
+// token; cleave (CR 702.148a) is a "Cleave" cast button; Warped Space offers {0} for a card cast from exile; Derevi's
+// ability is in her command zone menu.
 import { expect, test } from "@playwright/test";
 import { applyAction } from "@cc/engine";
 import { LANDS, one, open, pageErrors, playUntil, scene } from "./scene";
@@ -50,5 +51,16 @@ test("Warped Space: a card you may play from exile is cast for {0}", async ({ pa
   await menu(page).getByRole("button", { name: "Cast it for 0" }).click();
   const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && st.objects[giant]!.zone === "battlefield");
   expect(after.objects[giant]!.controller).toBe(0);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Derevi: the command zone ability puts her onto the battlefield without casting her (no commander tax)", async ({ page }) => {
+  const s = scene({ commander: "Derevi, Empyrial Tactician", board: LANDS });
+  const derevi = one(s, "Derevi, Empyrial Tactician");
+  await open(page, s);
+  await card(page, "Derevi, Empyrial Tactician", s).click();
+  await menu(page).locator("button", { hasText: "onto the battlefield from the command zone" }).click();
+  const after = await resolveUntil(page, (st) => st.objects[derevi]!.zone === "battlefield" && st.stack.length === 0);
+  expect(after.players[0]!.commanderCasts[derevi] ?? 0).toBe(0);
   expect(pageErrors(page)).toEqual([]);
 });

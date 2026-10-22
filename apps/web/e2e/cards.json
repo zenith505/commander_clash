@@ -3163,6 +3163,45 @@
   "gameChanger": false
  },
  {
+  "oracleId": "afa49a09-146f-4439-850e-dd1938c93cef",
+  "name": "Derevi, Empyrial Tactician",
+  "manaCost": "{G}{W}{U}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Bird Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Bird",
+   "Wizard"
+  ],
+  "oracleText": "Flying\nWhen Derevi enters and whenever a creature you control deals combat damage to a player, you may tap or untap target permanent.\n{1}{G}{W}{U}: Put Derevi onto the battlefield from the command zone.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "G",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2026-09-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a7e97fa9-4b72-4548-b854-5be5f18a6f1a",
   "name": "Disenchant",
   "manaCost": "{1}{W}",

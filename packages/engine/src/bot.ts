@@ -63,6 +63,7 @@ import {
   evidenceProblem,
   altCostsFor,
   payZeroSource,
+  commanderTax,
   legendBotKeep,
   unlockCost,
   forageWays,
@@ -688,7 +689,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // Damage prevention waits for damage coming (chooseDamageShield).
       .filter((id) => !shieldBody(compileCard(defOf(s, obj(s, id))).spell))
       .map((id) => {
-        const plan = obj(s, id).zone === "graveyard" ? graveyardCastPlan(s, pid, id) : (facePlan(s, pid, id, false, "first") ?? freerunPlan(s, pid, id) ?? overloadPlan(s, pid, id) ?? awakenPlan(s, pid, id) ?? cheaperAltPlan(s, pid, id) ?? bestowPlan(s, pid, id) ?? freeAltPlan(s, pid, id) ?? castPlan(s, pid, id, false) ?? altCastPlan(s, pid, id) ?? facePlan(s, pid, id, false, "after"));
+        const plan = obj(s, id).zone === "graveyard" ? graveyardCastPlan(s, pid, id) : (commandZonePlan(s, pid, id) ?? facePlan(s, pid, id, false, "first") ?? freerunPlan(s, pid, id) ?? overloadPlan(s, pid, id) ?? awakenPlan(s, pid, id) ?? cheaperAltPlan(s, pid, id) ?? bestowPlan(s, pid, id) ?? freeAltPlan(s, pid, id) ?? castPlan(s, pid, id, false) ?? altCastPlan(s, pid, id) ?? facePlan(s, pid, id, false, "after"));
         return plan ? { plan, mv: mv(s, id) } : null;
       })
       .filter((x): x is { plan: Action[]; mv: number } => !!x)
@@ -3382,6 +3383,23 @@ function chooseTimed(s: GameState, pid: PlayerId): Action[] | null {
   }
   const timed = (ab: ActivatedAbility) => timedCondition(ab.activateIf);
   return chooseActivation(s, pid, timed) ?? chooseUnearth(s, pid, timed);
+}
+
+/**
+ * Derevi: "Put ~ onto the battlefield from the command zone" instead of casting it, when the commander tax has made
+ * casting it dearer than the ability, or it can't be cast now (it isn't a cast: no tax, rulings).
+ */
+function commandZonePlan(s: GameState, pid: PlayerId, id: ObjectId): Action[] | null {
+  const o = obj(s, id);
+  if (o.zone !== "command") return null;
+  const abilities = abilitiesOf(s, o).activated;
+  for (let i = 0; i < abilities.length; i++) {
+    if (abilities[i]!.zone !== "command") continue;
+    if (commanderTax(player(s, pid), o) < 2 && castPlan(s, pid, id, false)) return null;
+    const plan = planActivate(s, pid, id, i);
+    if (plan) return plan;
+  }
+  return null;
 }
 
 /**

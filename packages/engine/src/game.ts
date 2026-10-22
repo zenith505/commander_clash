@@ -2256,6 +2256,7 @@ function startNextTurn(s: GameState, skipping = false) {
   s.damagedThisTurn = undefined;
   s.damageThisTurn = undefined;
   s.turnLog = undefined;
+  s.oneOfUsed = undefined;
   s.diedThisTurn = undefined;
   s.toGraveyardThisTurn = undefined;
   s.attackersThisTurn = undefined;
@@ -2814,6 +2815,11 @@ function exilePermission(s: GameState, o: GameObject, pid: PlayerId): (Pick<NonN
   return how === "anyType" ? { anyType: true } : how === "life" ? { life: true } : undefined;
 }
 
+/** "You may play one of those cards" (Nashi): playing this exiled card uses up its group's permission. */
+function useOneOf(s: GameState, o: GameObject, pid: PlayerId): void {
+  if (o.zone === "exile" && o.mayPlay?.oneOf && ownExilePermission(s, o, pid)) (s.oneOfUsed ??= []).push(o.mayPlay.oneOf);
+}
+
 /** Valgavoth's permission is the one `pid` would cast this exiled card with: for life equal to its mana value, only. */
 export const castFromExileForLife = (s: GameState, o: GameObject, pid: PlayerId): boolean => o.zone === "exile" && !!exilePermission(s, o, pid)?.life;
 
@@ -2831,6 +2837,8 @@ function ownExilePermission(s: GameState, o: GameObject, pid: PlayerId): boolean
   // "For as long as Intet remains on the battlefield": that object (CR 400.7).
   if (m.until === "source" && !(m.source && s.objects[m.source.id]?.zone === "battlefield" && (s.objects[m.source.id]!.zoneChanges ?? 0) === m.source.zc)) return false;
   if (m.castOnly && isType(defOf(s, o), "Land")) return false;
+  // "You may play one of those cards" (Nashi): not once one of them has been played.
+  if (m.oneOf && s.oneOfUsed?.includes(m.oneOf)) return false;
   // A warped or plotted card: only on a later turn (CR 702.185a, 702.170d), and only cast, not played as a land.
   return !castOnlyFromExile(o) || (s.turn > o.mayPlay.turn && !isType(defOf(s, o), "Land"));
 }
@@ -3002,6 +3010,7 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
   const o = obj(s, id);
   const d = defOf(s, o);
   const choice = entersRulesOf(s, p.id, id).entersTappedChoice;
+  useOneOf(s, o, p.id);
   p.landsPlayedThisTurn++;
   if (untapped && choice?.kind === "payLife") {
     loseLife(s, p.id, choice.n);
@@ -3662,7 +3671,8 @@ export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: Play
   if (alt === "citadel") {
     const top = s && pid !== undefined ? s.objects[player(s, pid).library[0] ?? ""] : undefined;
     // Valgavoth's exiled cards too (castProblem checks the card is one).
-    const valgavoth = s && pid !== undefined && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).playLinkedForLife);
+    // Nashi's exiled cards: their own permission says so.
+    const valgavoth = s && pid !== undefined && (s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).playLinkedForLife) || s.turnOrder.some((q) => player(s, q).exile.some((id) => obj(s, id).mayPlay?.life && obj(s, id).mayPlay?.player === pid)));
     if (!valgavoth && (!top || !mayPlayFromTop(s!, top, pid!, "life"))) return undefined;
     const n = manaValue(parseManaCost(d.manaCost));
     return { kind: "citadel", mana: "", costs: [{ kind: "payLife", n }], text: `pay ${n} life` };
@@ -3922,6 +3932,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   }
   if (fromCommand) p.commanderCasts[o.id] = (p.commanderCasts[o.id] ?? 0) + 1;
   const castFrom = o.zone;
+  useOneOf(s, o, p.id);
   // A once-a-turn permission to cast from the top is used up (Johann).
   if (castFrom === "library") {
     const how = topPermission(s, o, p.id);

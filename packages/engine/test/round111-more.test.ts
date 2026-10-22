@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passAll, passUntil, putOnBattlefield, scry, setup } from "./helpers";
-import { characteristics, invalidateCharacteristics, isFullySupported, power, toughness, objHasKeyword, planActivate, planCast, waitingOn, type GameState } from "../src";
+import { castProblem, characteristics, invalidateCharacteristics, isFullySupported, power, toughness, objHasKeyword, planActivate, planCast, waitingOn, type GameState } from "../src";
 
 // Real oracle text (Scryfall).
 const singleCombat = card("Single Combat", "Sorcery", "{3}{W}{W}", {
@@ -46,6 +46,13 @@ const smithy = scry("transform", [
       '(Transforms from Thousand Moons Smithy.)\n{T}: Add {W}.\nWhenever you cast an artifact or creature spell using mana produced by Barracks of the Thousand, create a white Gnome Soldier artifact creature token with "This token\'s power and toughness are each equal to the number of artifacts and/or creatures you control."',
   },
 ]);
+const nashi = card("Nashi, Moon Sage's Scion", "Legendary Creature — Rat Ninja", "{1}{B}{B}", {
+  power: "3",
+  toughness: "2",
+  keywords: ["Ninjutsu"],
+  oracleText:
+    "Ninjutsu {3}{B} ({3}{B}, Return an unblocked attacker you control to hand: Put this card onto the battlefield from your hand tapped and attacking.)\nWhenever Nashi deals combat damage to a player, exile the top card of each player's library. Until end of turn, you may play one of those cards. If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost.",
+});
 const treasure = card("Treasure", "Token Artifact — Treasure", "", { oracleText: "{T}, Sacrifice this token: Add one mana of any color." });
 
 /** Pass along, answering every pending choice the dull way, until `stop` holds. */
@@ -209,5 +216,35 @@ describe("Thousand Moons Smithy", () => {
     expect(s.pending).toBeNull();
     const me = s.battlefield.find((id) => s.objects[id]!.cardId === smithy.oracleId)!;
     expect(characteristics(s, s.objects[me]!).name).toBe("Thousand Moons Smithy");
+  });
+});
+
+describe("Nashi, Moon Sage's Scion", () => {
+  it("is supported; exiles each player's top card, one of which may be played this turn, a spell for life", () => {
+    expect(isFullySupported(nashi)).toBe(true);
+    let { s, ap, opp } = setup([]);
+    const n = putOnBattlefield(s, ap, nashi);
+    // A Grizzly Bears on top of each library.
+    for (const pid of s.turnOrder) {
+      const lib = s.players[pid]!.library;
+      const i = lib.findIndex((id) => s.cards[s.objects[id]!.cardId]!.name === "Grizzly Bears");
+      lib.unshift(...lib.splice(i, 1));
+    }
+    const tops = s.turnOrder.map((pid) => s.players[pid]!.library[0]!);
+    s = passUntil(s, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: n, defender: opp }] });
+    s = until(s, (x) => x.step === "main2");
+    expect(tops.every((id) => s.objects[id]!.zone === "exile")).toBe(true);
+    const [mine, theirs] = [tops[s.turnOrder.indexOf(ap)]!, tops[s.turnOrder.indexOf(opp)]!];
+    // Only for life, equal to its mana value.
+    expect(castProblem(s, ap, theirs)).toMatch(/pay life/);
+    expect(castProblem(s, ap, theirs, undefined, undefined, undefined, undefined, undefined, { alt: "citadel" })).toBeNull();
+    const life = s.players[ap]!.life;
+    for (const a of planCast(s, ap, theirs, undefined, undefined, undefined, undefined, { alt: "citadel" })!) s = act(s, a);
+    s = until(s, (x) => x.stack.length === 0);
+    expect(s.objects[theirs]!.zone).toBe("battlefield");
+    expect(s.players[ap]!.life).toBe(life - 2);
+    // One of those cards only.
+    expect(castProblem(s, ap, mine, undefined, undefined, undefined, undefined, undefined, { alt: "citadel" })).not.toBeNull();
   });
 });

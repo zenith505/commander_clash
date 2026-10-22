@@ -1964,6 +1964,23 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "impulse": {
       // Exiled face up (CR 406.3); the permission belongs to this object only (CR 400.7).
       const p = player(s, ctx.controller);
+      // "Exile the top card of each player's library" (Nashi): each library in turn, all part of one group.
+      if (e.who?.ref === "eachPlayer") {
+        const oneOf = e.oneOf ? `g${s.nextId++}` : undefined;
+        const all: ObjectId[] = [];
+        for (const pid of apnap(s, players(s, e.who, ctx))) {
+          const ids = player(s, pid).library.slice(0, amountNow(s, e.n, ctx));
+          for (const id of ids) {
+            moveObject(s, id, "exile");
+            const o = obj(s, id);
+            o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.castOnly ? { castOnly: true as const } : {}), ...(oneOf ? { oneOf } : {}), ...(e.life ? { life: true as const } : {}) };
+          }
+          all.push(...ids);
+        }
+        if (s.resolving) (s.resolving.impulsed ??= []).push(...all);
+        if (all.length) log(s, `${p.name} exiles ${all.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of each library and may ${e.oneOf ? "play one of them" : "play them"}${e.life ? ", paying life rather than mana for a spell" : ""}${e.until === "thisTurn" ? " this turn" : ""}.`);
+        return;
+      }
       const from = e.who ? players(s, e.who, ctx)[0] : p.id;
       if (from === undefined) return;
       const ids = player(s, from).library.slice(0, amountNow(s, e.n, ctx));

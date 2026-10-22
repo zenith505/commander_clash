@@ -1351,6 +1351,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "Exile the top card of that player's library. Until end of turn, you may cast that card." (Ragavan, after combat
     // damage to a player): that player's card, cast only (no land play, rulings), paying its costs.
     const theirTop = !exTop && !impulseIf && ctx.eventPlayer && /^[Ee]xile the top card of that player's library$/.test(s) ? /^(?:Until end of turn, you may cast that card|You may cast that card this turn)( and you may spend mana as though it were mana of any color to cast that spell)?$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    // Nashi, Moon Sage's Scion: "Exile the top card of each player's library. Until end of turn, you may play one of those
+    // cards. If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost." One card in
+    // all; a land is played with the usual timing and land drop (rulings).
+    if (
+      /^[Ee]xile the top card of each player's library$/.test(s) &&
+      sentences[si + 1]?.replace(/\.$/, "") === "Until end of turn, you may play one of those cards" &&
+      sentences[si + 2]?.replace(/\.$/, "") === "If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost"
+    ) {
+      effects.push({ type: "impulse", n: 1, until: "thisTurn", who: { ref: "eachPlayer" }, oneOf: true, life: true });
+      si += 2;
+      continue;
+    }
     // Grenzo, Havoc Raiser: "... and you may spend mana as though it were mana of any color to cast that spell" (CR 609.4b).
     if (theirTop) {
       effects.push({ type: "impulse", n: 1, until: "thisTurn", who: { ref: "eventPlayer" }, castOnly: true, ...(theirTop[1] ? { anyType: true as const } : {}) });

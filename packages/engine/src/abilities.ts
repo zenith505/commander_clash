@@ -4155,6 +4155,8 @@ export interface CompiledCard {
   damageCantBePrevented?: true;
   /** "You have hexproof" / "you have shroud" (CR 702.11d, 702.18d): its controller can't be targeted by opponents / anyone. */
   youHave?: "hexproof" | "shroud" | "protection";
+  /** Serra's Emissary: its controller has protection from the card type chosen as it entered (CR 702.16b). */
+  youProtectedFromChosenType?: true;
   /**
    * Elvish Refueler: "During your turn, as long as you haven't activated an exhaust ability this turn, you may activate
    * exhaust abilities as though they haven't been activated" (CR 702.177b): see Player.exhaustTurn.

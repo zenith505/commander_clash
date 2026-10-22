@@ -2503,6 +2503,8 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
   if (what === "basicLandType") return chooseLandType(s, pid, options);
   if (what === "keyword") return chooseKeyword(s, pid, options);
   const c = card ? compileCard(card) : undefined;
+  // Serra's Emissary: protection from creatures for you and yours shuts off most attacks and blockers.
+  if (what === "cardType" && c?.youProtectedFromChosenType && options.includes("Creature")) return "Creature";
   if (what === "cardType") {
     // "Destroy all permanents of the chosen type": the type that costs the opponents the most, net of what we'd lose.
     const hurts = c ? choiceHurts(c) : true;

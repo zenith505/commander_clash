@@ -2,7 +2,7 @@ import { faceDef, hasFuse, isRoom, restingDef, roomDoorDefs } from "../faces";
 import { isMeldResult, meldPartnerName, meldResultDef } from "../meld-results";
 import { allEffects, GRANTED_WAY_COSTS } from "../abilities";
 import type { FromTop, AbilityBody, Count, ChoiceKind, TriggeredAbility, CompiledCard, Effect, AdditionalCost, CostOption, TargetSpec, ActivatedAbility, StaticCondition, SpentReq, StaticAbility, Affects } from "../abilities";
-import { CHOSEN_HEXPROOF, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CREATURE_TYPES, stripReminder } from "../keywords";
+import { CARD_TYPE_PLURAL, CHOSEN_HEXPROOF, CHOSEN_LAND_TYPE, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION, CREATURE_TYPES, stripReminder } from "../keywords";
 import { parseManaCost } from "../mana";
 import { substituteX } from "../amounts";
 import { withModes, gateTargets, type CastHow } from "../modes";
@@ -883,10 +883,11 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "As this artifact enters, choose artifact, creature, enchantment, instant, or sorcery." (Cloud Key, CR 614.12): a
     // card type, kept as Chosen.cardType.
-    const asCardType = /^As (?:~|it) enters, choose ((?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle)(?:, (?:or )?(?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle))+)\.$/.exec(line);
+    const asCardType = /^As (?:~|it) enters, choose ((?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle)(?:, (?:or )?(?:artifact|creature|enchantment|instant|sorcery|land|planeswalker|battle))+|a card type)\.$/.exec(line);
     if (asCardType) {
       if (out.entersChoose?.some((c) => c.what === "cardType")) out.unsupported.push(raw);
-      else (out.entersChoose ??= []).push({ what: "cardType", options: asCardType[1]!.split(/, (?:or )?/).map(capital) });
+      // "Choose a card type" (Serra's Emissary): any that a card here can have (rulings).
+      else (out.entersChoose ??= []).push({ what: "cardType", options: asCardType[1] === "a card type" ? Object.keys(CARD_TYPE_PLURAL) : asCardType[1]!.split(/, (?:or )?/).map(capital) });
       continue;
     }
     // "As ~ enters, choose a number between 1 and 10." (Talion), "choose a number." (Sanctum Prelate): a whole number, kept
@@ -1447,6 +1448,15 @@ export function compile(d: CardDef): CompiledCard {
       out.youHave = youAnd[3] as "hexproof" | "shroud";
       for (const st of youAndSt) out.statics.push({ ...st!, text: line });
       continue;
+    }
+    // Serra's Emissary: "You and creatures you control have protection from the chosen card type." (CR 702.16a, 702.16b).
+    if (line === "You and creatures you control have protection from the chosen card type." && out.entersChoose?.some((c) => c.what === "cardType") && !out.youProtectedFromChosenType) {
+      const st = parseStatic("Creatures you control have hexproof.");
+      if (st) {
+        out.youProtectedFromChosenType = true;
+        out.statics.push({ ...st, mods: [{ kind: "addKeywords", keywords: [CHOSEN_TYPE_PROTECTION] }], text: line });
+        continue;
+      }
     }
     const youHave = /^You have (hexproof|shroud|protection from each of your opponents)\.$/.exec(line);
     if (youHave && !out.youHave) {

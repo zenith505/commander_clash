@@ -1089,3 +1089,33 @@ describe("Blade of the Bloodchief", () => {
       expect(s.objects[v]!.counters["+1/+1"]).toBe(n);
     });
 });
+
+const serrasEmissary = card("Serra's Emissary", "Creature — Angel", "{4}{W}{W}{W}", {
+  power: "7",
+  toughness: "7",
+  keywords: ["Flying"],
+  oracleText: "Flying\nAs this creature enters, choose a card type.\nYou and creatures you control have protection from the chosen card type.",
+});
+const pinger = card("Pinger", "Creature — Human Wizard", "{1}{R}", { power: "1", toughness: "1", oracleText: "{T}: This creature deals 1 damage to any target." });
+
+describe("Serra's Emissary", () => {
+  it("as it enters, choose a card type: you and your creatures have protection from it, from your own sources too", () => {
+    expect(isFullySupported(serrasEmissary)).toBe(true);
+    const { s: s0, ap, ids, opp } = setup([serrasEmissary]);
+    const b = putOnBattlefield(s0, ap, bear());
+    const p = putOnBattlefield(s0, ap, pinger);
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [], undefined, "auto")));
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "cardType" });
+    expect((s.pending as { options: string[] }).options).toEqual(expect.arrayContaining(["Artifact", "Battle", "Creature", "Enchantment", "Instant", "Land", "Planeswalker", "Sorcery"]));
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: "Creature" }));
+    expect(objHasKeyword(s, s.objects[b]!, "Protection from creatures")).toBe(true);
+    expect(planActivate(s, ap, p, 0, [{ kind: "player", id: ap }])).toBeNull();
+    expect(planActivate(s, ap, p, 0, [target(b)])).toBeNull();
+    expect(planActivate(s, ap, p, 0, [{ kind: "player", id: opp }])).not.toBeNull();
+  });
+  it("a bot chooses creature", () => {
+    const { s: s0, ap, ids } = setup([serrasEmissary]);
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [], undefined, "auto")));
+    expect(botActions(s, ap)[0]).toMatchObject({ type: "chooseOption", choice: "Creature" });
+  });
+});

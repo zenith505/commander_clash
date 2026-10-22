@@ -1129,6 +1129,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "newTargets", index: ctx.lastObjectTarget });
       continue;
     }
+    // Silent-Blade Oni: "look at that player's hand. You may cast a spell from among those cards without paying its mana
+    // cost"; Mindclaw Shaman: "target opponent reveals their hand. You may cast an instant or sorcery spell from among
+    // those cards ...": cast from that hand as this resolves (CR 608.2g), the spell controlled by you (rulings).
+    const handCast = /^You may cast (a|an instant or sorcery) spell from among those cards without paying its mana cost$/.exec(s);
+    const looked = effects[effects.length - 1];
+    if (handCast && looked?.type === "lookAtHand" && !looked.atRandom) {
+      const filter: TargetSpec | undefined = handCast[1] === "a" ? undefined : { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" };
+      effects.push({ type: "castFromAmong", who: looked.who, n: 0, fromHand: true, max: 1, ...(filter ? { filter } : {}) });
+      continue;
+    }
     // "Gain control of target spell. You may choose new targets for it." (Commandeer): after the change of control, so
     // its targets are chosen as its new controller's (rulings).
     if (/^You may choose new targets for it$/.test(s) && effects[effects.length - 1]?.type === "controlSpell") {
@@ -2385,6 +2395,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [subjectType[1]!], text: subjectType[1]! };
       const pick: Effect = { type: "if", cond: { kind: "subjectIs", filter }, effects: [{ ...one, n: num(subjectType[2]!) }], otherwise: [one] };
       effects[effects.length - 1] = holder ? { ...holder, effects: [pick] } : pick;
+      continue;
+    }
+    // Toph, Hardheaded Teacher: "Whenever you cast a spell, earthbend 1. If that spell is a Lesson, put an additional +1/+1
+    // counter on that land." The land earthbending chose, the spell as it was cast.
+    const lessonIf = ctx.castSpell && /^If that spell is an? ([A-Z][a-z]+), put an additional \+1\/\+1 counter on that land$/.exec(s);
+    if (lessonIf) {
+      const prev = effects[effects.length - 1];
+      const filter = parseTargetPhrase(`${lessonIf[1]} spell`);
+      if (prev?.type !== "earthbend" || filter?.kind !== "spell") return null;
+      effects.push({ type: "if", cond: { kind: "causeSpellIs", filter: { ...filter, kind: "card" } }, effects: [{ type: "counters", what: prev.what, counter: "+1/+1", n: 1 }] });
       continue;
     }
     // Essence Flux: "Exile target creature you control, then return that card to the battlefield under its owner's

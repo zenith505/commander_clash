@@ -260,3 +260,78 @@ describe("tokens entering attacking: \"All attack\" answers for every token at o
     expect(p.labels!.some((l) => l.startsWith("All"))).toBe(false);
   });
 });
+
+const oni = card("Silent-Blade Oni", "Creature — Demon Ninja", "{3}{U}{U}{B}{B}", { power: "6", toughness: "5", keywords: ["Ninjutsu"], oracleText: "Ninjutsu {4}{U}{B} ({4}{U}{B}, Return an unblocked attacker you control to hand: Put this card onto the battlefield from your hand tapped and attacking.)\nWhenever this creature deals combat damage to a player, look at that player's hand. You may cast a spell from among those cards without paying its mana cost." });
+const mindclaw = card("Mindclaw Shaman", "Creature — Viashino Shaman", "{4}{R}", { power: "2", toughness: "2", oracleText: "When this creature enters, target opponent reveals their hand. You may cast an instant or sorcery spell from among those cards without paying its mana cost." });
+
+describe("casting a spell from another player's hand (Silent-Blade Oni, Mindclaw Shaman)", () => {
+  it("Silent-Blade Oni: you cast their Lightning Bolt free, from their hand, as your spell; lands aren't offered", () => {
+    supported(oni, mindclaw);
+    const { s: s0, ap, opp } = setup([]);
+    const o = putOnBattlefield(s0, ap, oni);
+    for (const id of [...s0.players[opp]!.hand]) {
+      s0.objects[id]!.zone = "library";
+      s0.players[opp]!.library.push(id);
+    }
+    s0.players[opp]!.hand = [];
+    const [theirBolt, theirLand] = [bolt, card("Forest", "Basic Land — Forest")].map((d) => {
+      const id = putOnBattlefield(s0, opp, d);
+      s0.battlefield.splice(s0.battlefield.indexOf(id), 1);
+      s0.objects[id]!.zone = "hand";
+      s0.players[opp]!.hand.push(id);
+      return id;
+    }) as [string, string];
+    invalidateCharacteristics(s0);
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: o, defender: opp }] });
+    s = passUntil(s, "combatDamage");
+    s = untilChoice(s);
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "castFromAmong", player: ap, options: [theirBolt, "none"] });
+    expect(theirLand).toBeTruthy();
+    s = act(s, { type: "chooseOption", player: ap, choice: theirBolt });
+    expect(s.pending).toMatchObject({ kind: "castFree", objectId: theirBolt });
+    s = run(s, planCast(s, ap, theirBolt, [{ kind: "player", id: opp }]));
+    expect(s.stack.find((x) => x.objectId === theirBolt)?.controller).toBe(ap);
+    s = settle(s);
+    expect(s.players[opp]!.life).toBe(40 - 6 - 3);
+    // An instant cast this way goes to its owner's graveyard (rulings).
+    expect(s.players[opp]!.graveyard).toContain(theirBolt);
+  });
+
+  it("Mindclaw Shaman offers only instants and sorceries", () => {
+    const { s: s0, ap, ids, opp } = setup([mindclaw]);
+    const theirs = [bolt, bear()].map((d) => {
+      const id = putOnBattlefield(s0, opp, d);
+      s0.battlefield.splice(s0.battlefield.indexOf(id), 1);
+      s0.objects[id]!.zone = "hand";
+      s0.players[opp]!.hand.push(id);
+      return id;
+    });
+    invalidateCharacteristics(s0);
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    for (let i = 0; i < 20 && !(s.pending?.kind === "chooseOption"); i++)
+      s = s.pending?.kind === "chooseTargets" ? act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] }) : act(s, { type: "passPriority", player: waitingOn(s)! });
+    const p = s.pending;
+    if (p?.kind !== "chooseOption") throw new Error("no pick");
+    expect(p.options).toContain(theirs[0]);
+    expect(p.options).not.toContain(theirs[1]);
+  });
+});
+
+const toph = card("Toph, Hardheaded Teacher", "Legendary Creature — Human Warrior Ally", "{2}{R}{G}", { power: "3", toughness: "4", keywords: ["Earthbend"], oracleText: "When Toph enters, you may discard a card. If you do, return target instant or sorcery card from your graveyard to your hand.\nWhenever you cast a spell, earthbend 1. If that spell is a Lesson, put an additional +1/+1 counter on that land. (Target land you control becomes a 0/0 creature with haste that's still a land. Put a +1/+1 counter on it. When it dies or is exiled, return it to the battlefield tapped.)" });
+const lesson = card("Test Lesson", "Sorcery — Lesson", "{1}", { oracleText: "Draw a card." });
+const plain = card("Test Sorcery", "Sorcery", "{1}", { oracleText: "Draw a card." });
+
+describe("Toph, Hardheaded Teacher", () => {
+  for (const [spell, n] of [[lesson, 2], [plain, 1]] as const)
+    it(`casting ${spell.name}: earthbend 1${n === 2 ? ", and an additional +1/+1 counter on that land for a Lesson" : " only"}`, () => {
+      supported(toph);
+      const { s: s0, ap, ids } = setup([spell]);
+      putOnBattlefield(s0, ap, toph);
+      invalidateCharacteristics(s0);
+      const s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+      const lands = s.battlefield.filter((id) => s.objects[id]!.counters["+1/+1"]);
+      expect(lands).toHaveLength(1);
+      expect(s.objects[lands[0]!]!.counters["+1/+1"]).toBe(n);
+    });
+});

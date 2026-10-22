@@ -339,6 +339,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "When you cast this spell, any player may sacrifice a creature of their choice. If a player does, counter ~" (Brain Gorgers).
   if (ctx.selfCastSpell && /^[Cc]ounter (?:~|it|this spell)$/.test(s)) return [{ type: "counterSpell", index: -1, cause: true }];
   if ((ctx.castSpell || ctx.selfCastSpell) && (m = /^[Cc]opy (?:it|that spell|this spell)( twice)?$/.exec(s))) return [{ type: "copySpell", spell: "cause", n: m[1] ? 2 : 1, newTargets: false }];
+  // Unbound Flourishing: "Whenever you cast a permanent spell with a mana cost that contains {X}, double the value of X":
+  // the X of that spell while it's on the stack (CR 107.3a); no more mana is paid (rulings).
+  if (ctx.castSpell && /^[Dd]ouble the value of X$/.test(s)) return [{ type: "doubleX" }];
   // Rings of Brighthearth: "copy that ability", the one activated (CR 707.10).
   if (ctx.activatedAbility && /^[Cc]opy that ability$/.test(s)) return [{ type: "copySpell", spell: "cause", n: 1, newTargets: false }];
   // Thousand-Year Storm: "copy it for each other instant and sorcery spell you've cast before it this turn": those cast

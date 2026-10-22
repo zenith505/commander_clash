@@ -434,6 +434,10 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // was cast; convoke from another permanent's "spells you cast have convoke" too (game.ts hasConvoke).
   const kwM = !pw ? / (?:with|that has) (convoke|flying|infect)$/.exec(what) : null;
   if (kwM) what = what.slice(0, kwM.index);
+  // "A spell with {X} in its mana cost", "a permanent spell with a mana cost that contains {X}" (Unbound Flourishing): the
+  // mana symbol {X} in the mana cost of the spell (the half cast, for a split card), not another X.
+  const xM = !pw && !kwM ? / with (?:\{X\} in its mana cost|a mana cost that contains \{X\})$/.exec(what) : null;
+  if (xM) what = what.slice(0, xM.index);
   // "a spell of the chosen color", "a creature spell of the chosen type": the choice made as this permanent entered.
   // "A noncreature spell with mana value less than ~'s power" (Pollywog Prodigy): worked out as it's cast (TargetSpec.bound).
   const parsed = /^spell$/.test(what) ? { kind: "spell" as const, text: "spell" } : parseTargetPhrase(/\bspell\b/.test(what) ? what : `${what} spell`, { chosen: true, count: (t) => (t === "~'s power" || t === "the number of experience counters you have" ? parseCount(t, null) : null) });
@@ -465,7 +469,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (!body) return "fail";
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: body.text.replace(/\bX\b/g, "that much") };
   if (short) body = { ...replaceX(body, { count: { kind: "castShortfall" } }), text: body.text.replace(/\bloses X life\b/, "loses life equal to the difference") };
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}) }, body };
 }
 
 /**
@@ -1073,17 +1077,19 @@ function parseActivatesTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(equipped[1]!, { activatedAbility: true });
     return body ? { event: "abilityActivated", activates: { by: "any", equipped: true }, body } : "fail";
   }
-  const m = /^Whenever (a player|an opponent|you) activates? an ability( of (?:an?|another) (.+?)(?: on the battlefield)?)?(?: that isn't a mana ability|, if it isn't a mana ability), (.+)$/.exec(line);
+  // "An ability with {X} in its activation cost" (Glava, Unbound Flourishing as compile.ts splits it).
+  const m = /^Whenever (a player|an opponent|you) activates? an ability( of (?:an?|another) (.+?)(?: on the battlefield)?| with \{X\} in its activation cost)?(?: that isn't a mana ability|, if it isn't a mana ability), (.+)$/.exec(line);
   if (!m) return /^Whenever (a player|an opponent|you) activates an? /.test(line) ? "fail" : null;
   let of: TargetSpec | undefined;
-  if (m[2]) {
+  const xCost = m[2] === " with {X} in its activation cost";
+  if (m[2] && !xCost) {
     const f = parseTargetPhrase(m[3]!);
     if (f?.kind !== "object") return "fail";
     of = f;
   }
   const body = parseBody(theyAreThatPlayer(m[4]!), { eventPlayer: true, activatedAbility: true });
   if (!body) return "fail";
-  return { event: "abilityActivated", activates: { by: m[1] === "an opponent" ? "opponent" : m[1] === "you" ? "you" : "any", ...(of ? { of } : {}) }, body };
+  return { event: "abilityActivated", activates: { by: m[1] === "an opponent" ? "opponent" : m[1] === "you" ? "you" : "any", ...(of ? { of } : {}), ...(xCost ? { xCost: true as const } : {}) }, body };
 }
 
 /**

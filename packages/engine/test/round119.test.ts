@@ -416,3 +416,51 @@ describe("Mari, the Killing Quill", () => {
     expect(s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === ap).length).toBe(2);
   });
 });
+
+const flourishing = card("Unbound Flourishing", "Enchantment", "{2}{G}", {
+  oracleText:
+    "Whenever you cast a permanent spell with a mana cost that contains {X}, double the value of X.\nWhenever you cast an instant or sorcery spell or activate an ability, if that spell's mana cost or that ability's activation cost contains {X}, copy that spell or ability. You may choose new targets for the copy.",
+});
+const endless = card("Endless One", "Creature — Eldrazi", "{X}", { power: "0", toughness: "0", oracleText: "This creature enters with X +1/+1 counters on it." });
+const blaze = card("Blaze", "Sorcery", "{X}{R}", { oracleText: "Blaze deals X damage to any target." });
+const font = card("Life Font", "Artifact", "{1}", { oracleText: "{X}, {T}: You gain X life." });
+
+describe("Unbound Flourishing", () => {
+  it("doubles the X of a permanent spell, without more mana paid", () => {
+    expect(isFullySupported(flourishing)).toBe(true);
+    const { s: s0, ap, ids } = setup([endless]);
+    let s = s0;
+    putOnBattlefield(s, ap, flourishing);
+    s = settle(run(s, planCast(s, ap, ids[0]!, undefined, undefined, undefined, 3)));
+    expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
+    expect(s.objects[ids[0]!]!.counters["+1/+1"]).toBe(6);
+  });
+
+  it("copies an instant or sorcery with {X}, with the same X", () => {
+    const { s: s0, ap, ids } = setup([blaze]);
+    let s = s0;
+    putOnBattlefield(s, ap, flourishing);
+    const opp = later(s, ap, 1);
+    const life = s.players[opp]!.life;
+    s = settle(run(s, planCast(s, ap, ids[0]!, [{ kind: "player", id: opp }], undefined, undefined, 2)));
+    if (s.pending?.kind === "copyTargets") s = settle(act(s, { type: "copyTargets", player: ap }));
+    expect(s.players[opp]!.life).toBe(life - 4);
+  });
+
+  it("copies an activated ability with {X} in its cost; not one without", () => {
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    putOnBattlefield(s, ap, flourishing);
+    const f = putOnBattlefield(s, ap, font);
+    const life = s.players[ap]!.life;
+    s = settle(run(s, planActivate(s, ap, f, 0, undefined, undefined, undefined, 3)));
+    expect(s.players[ap]!.life).toBe(life + 6);
+    // A spell without {X}: not copied.
+    const plain = putOnBattlefield(s, ap, card("Lava Dart", "Instant", "{R}", { oracleText: "Lava Dart deals 1 damage to any target." }));
+    moveObject(s, plain, "hand");
+    const opp = later(s, ap, 1);
+    const theirs = s.players[opp]!.life;
+    s = settle(run(s, planCast(s, ap, plain, [{ kind: "player", id: opp }])));
+    expect(s.players[opp]!.life).toBe(theirs - 1);
+  });
+});

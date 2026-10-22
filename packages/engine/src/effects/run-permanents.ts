@@ -1004,6 +1004,16 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       return;
     }
+    case "doubleX": {
+      // Unbound Flourishing: the spell's X on the stack (CR 107.3a), doubled; gone from the stack, nothing happens.
+      const item = s.stack.find((x) => x.id === ctx.cause && x.kind === "spell");
+      if (!item) return;
+      const x = (item.x ?? 0) * 2;
+      item.x = x;
+      item.description = item.description.replace(/\(X=\d+\)$/, `(X=${x})`);
+      log(s, `${src} doubles the value of X for ${item.description.replace(/ \(X=\d+\)$/, "")}: X is ${x}.`);
+      return;
+    }
     case "removeExiledCounter": {
       const options = exiledWithCounter(s, players(s, e.owner, ctx), e.counter);
       if (!options.length) return;

@@ -5507,7 +5507,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // Once it's activated (CR 602.2i), abilities that trigger on that do.
   // As it was activated, for "copy that ability" once it has left the stack (rulings on Rings of Brighthearth).
   (s.castItems ??= {})[stackId] = structuredClone(item);
-  fireEvent(s, { type: "activated", player: p.id, stackId, ...(activatedFrom ? { source: activatedFrom } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}) });
+  fireEvent(s, { type: "activated", player: p.id, stackId, ...(activatedFrom ? { source: activatedFrom } : {}), ...(paid.treasure ? { treasure: paid.treasure } : {}), ...(parseManaCost(ab.manaCost).hasX ? { xCost: true as const } : {}) });
   fireEvent(s, { type: "targeted", stackId });
   return false;
 }

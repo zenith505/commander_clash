@@ -8,7 +8,7 @@ import { fitMany, withModes } from "../modes";
 import { compileCard } from "../oracle";
 import type { CardDef, GameObject, ManaType, SpentMana, GameState, LastKnown, ObjectId, PendingTrigger, PlayerId, StackItem, TriggerEventInfo, ZoneMove, ZoneName } from "../types";
 import { RulesError } from "../types";
-import { spentMeets } from "../mana";
+import { parseManaCost, spentMeets } from "../mana";
 import { nextRandom } from "../rng";
 import { evalAmount } from "../amounts";
 import { objectMatches, bindBound, bindChosen, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, hasLegalTargets, legalModes, noteModesChosen, offerTargets, settleDivided } from "./targeting";
@@ -226,7 +226,7 @@ export type TriggerSourceEvent =
   /** A player tapped this permanent for mana: activated its mana ability with {T} in the cost (CR 106.12). */
   | { type: "tappedForMana"; id: ObjectId; player: PlayerId }
   /** A player activated an ability that isn't a mana ability; its source as it was then, if it was a permanent. */
-  | { type: "activated"; player: PlayerId; /** The ability on the stack ("copy that ability"). */ stackId?: string; source?: { snapshot: GameObject; chars: Characteristics }; /** A mana ability (CR 605.1a). */ mana?: true; /** Mana from Treasures spent to activate it (CR 106.3). */ treasure?: number }
+  | { type: "activated"; player: PlayerId; /** The ability on the stack ("copy that ability"). */ stackId?: string; source?: { snapshot: GameObject; chars: Characteristics }; /** A mana ability (CR 605.1a). */ mana?: true; /** Mana from Treasures spent to activate it (CR 106.3). */ treasure?: number; /** Its activation cost has the mana symbol {X} (Unbound Flourishing). */ xCost?: true }
   /**
    * A creature exploited `victim` (CR 702.110b). `watchers`: the permanents of its controller with exploit
    * triggers just before the sacrifice, with those abilities, since they look back in time (CR 603.10a).
@@ -1235,6 +1235,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.cast.sharesTypeWithSelf && !(spell && shareCreatureType(creatureTypesOf(s, o), creatureTypesOf(s, spell)))) return false;
         // "If it shares a card type with the exiled card" (Cemetery Protector, CR 603.4), checked again as it resolves.
         if (t.cast.sharesTypeWithLinked && !sharesTypeWithLinked(s, `${o.id}@${o.zoneChanges ?? 0}`, spell ? characteristics(s, spell).types : ev.card.types)) return false;
+        // "A spell with {X} in its mana cost": the half cast, for a split card (CR 709.3b); a copy has the same mana cost.
+        if (t.cast.xInCost && !(spell && parseManaCost(defOf(s, spell).manaCost).hasX)) return false;
         // "A spell that has convoke": printed, or given by "spells you cast have convoke" (rulings on Joyful Stormsculptor:
         // whether or not any creatures were tapped for it).
         if (t.cast.keyword && !(spell && (defOf(s, spell).keywords.includes(t.cast.keyword) || (t.cast.keyword === "Convoke" && hasConvoke(s, ev.controller, spell))))) return false;
@@ -1355,7 +1357,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Vazi: "Whenever an opponent casts a spell or activates an ability, if mana from a Treasure was spent to ...".
         if (e === "castSpell" && t.cast?.orActivates) return !!ev.treasure && (t.cast.by !== "opponent" || ev.player !== you) && (t.cast.by !== "you" || ev.player === you);
         const a = t.activates;
-        if (e !== "abilityActivated" || !a || ev.mana || (a.by === "opponent" && ev.player === you) || (a.by === "you" && ev.player !== you)) return false;
+        if (e !== "abilityActivated" || !a || ev.mana || (a.by === "opponent" && ev.player === you) || (a.by === "you" && ev.player !== you) || (a.xCost && !ev.xCost)) return false;
         if (a.equipped) {
           const host = o.attachedTo === undefined ? undefined : s.objects[o.attachedTo];
           if (!ev.source || !host || host.id !== ev.source.snapshot.id || host.zone !== "battlefield" || (host.zoneChanges ?? 0) !== (ev.source.snapshot.zoneChanges ?? 0)) return false;

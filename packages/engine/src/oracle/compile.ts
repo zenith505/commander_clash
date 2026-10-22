@@ -1792,6 +1792,15 @@ export function compile(d: CardDef): CompiledCard {
       (out.altCosts ??= []).push({ kind: "prototype", mana: proto[1]! });
       continue;
     }
+    // Unbound Flourishing: two events, each its own trigger; "if that spell's mana cost or that ability's activation cost
+    // contains {X}" can't change after it's cast or activated, so it's checked as it triggers (CR 603.4).
+    if (line === "Whenever you cast an instant or sorcery spell or activate an ability, if that spell's mana cost or that ability's activation cost contains {X}, copy that spell or ability. You may choose new targets for the copy.") {
+      const halves = ["Whenever you cast an instant or sorcery spell with {X} in its mana cost, copy that spell. You may choose new targets for the copy.", "Whenever you activate an ability with {X} in its activation cost that isn't a mana ability, copy that ability. You may choose new targets for the copy."].map((l) => parseTrigger(l));
+      if (halves.every((t) => t && t !== "fail")) {
+        for (const t of halves) out.triggers.push({ ...(t as TriggeredAbility), body: { ...(t as TriggeredAbility).body, text: "copy that spell or ability. You may choose new targets for the copy." } });
+        continue;
+      }
+    }
     // Tergrid, God of Fright: two events, each its own trigger; "that card" only while it's still in the graveyard it went
     // to (rulings: a commander put into the command zone, a card with madness exiled, isn't there).
     if (line === "Whenever an opponent sacrifices a nontoken permanent or discards a permanent card, you may put that card from a graveyard onto the battlefield under your control.") {

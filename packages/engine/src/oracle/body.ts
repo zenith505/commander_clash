@@ -230,7 +230,8 @@ const checkableMay = (e: Effect) =>
   (e.type === "putOntoBattlefield" && e.what.ref === "graveyardEnd" && !e.atEndStep && !e.haste) ||
   // "You may return another creature you control to its owner's hand. If you do, ...": only with one to return. "You may
   // sacrifice a Zombie. If you do, ..." (Wilhelt): only with one to sacrifice.
-  (e.type === "pick" && e.who.ref === "you" && (e.action === "bounce" || e.action === "sacrifice") && e.n === 1 && !e.unless) ||
+  // "You may choose a token you control. If you do, ..." (Brudiclad): only with one to choose.
+  (e.type === "pick" && e.who.ref === "you" && (e.action === "bounce" || e.action === "sacrifice" || e.action === "choose") && e.n === 1 && !e.unless) ||
   // "You may tap five untapped artifacts and/or creatures you control. If you do, ..." (Thousand Moons Smithy): only with
   // that many untapped.
   (e.type === "pick" && e.who.ref === "you" && e.action === "tap" && typeof e.n === "number" && !e.unless && !e.anyNumber) ||
@@ -3976,7 +3977,9 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
       (put?.type === "search" && put.n === 1 && !put.others && put.dest.zone === "battlefield" && put.who === undefined && put.library === undefined);
     // "Put a +1/+1 counter on a creature you control. It gains vigilance and trample until end of turn" (Season of
     // Gathering): the one creature picked (kept in `created` too).
-    const picked = last?.type === "pick" && (last.action === "counters" || last.action === "choose") && last.n === 1 && last.who.ref === "you" && !last.among;
+    // "You may choose a token you control. If you do, ... that token" (Brudiclad): the same, if one was.
+    const pk = last?.type === "may" && last.effects.length === 1 ? last.effects[0] : last;
+    const picked = pk?.type === "pick" && (pk.action === "counters" || pk.action === "choose") && pk.n === 1 && pk.who.ref === "you" && !pk.among;
     ctx.lastCreated = ((last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1) || (faceDown && last.count === 1) || ctx.lastPut || picked;
     ctx.lastCreatedAny = last?.type === "createToken" || last?.type === "createTokenCopy" || last?.type === "myriad" || faceDown || (last?.type === "returnAllFromGraveyard" && !last.toHand);
     if (last?.type === "amass") ctx.amassed = true;

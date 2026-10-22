@@ -216,3 +216,59 @@ describe("Archangel of Tithes", () => {
     expect(after.objects[wall]!.blocking).toEqual([b]);
   });
 });
+
+const brudiclad = card("Brudiclad, Telchor Engineer", "Legendary Artifact Creature — Phyrexian Artificer", "{4}{U}{R}", {
+  power: "4",
+  toughness: "4",
+  oracleText:
+    "Creature tokens you control have haste.\nAt the beginning of combat on your turn, create a 2/1 blue Phyrexian Myr artifact creature token. Then you may choose a token you control. If you do, each other token you control becomes a copy of that token.",
+});
+
+describe("Brudiclad, Telchor Engineer", () => {
+  it("is supported", () => expect(isFullySupported(brudiclad)).toBe(true));
+
+  const tokenOn = (s: GameState, pid: PlayerId, name: string, typeLine: string, pt?: [string, string]) => {
+    const id = putOnBattlefield(s, pid, card(name, typeLine, "", pt ? { power: pt[0], toughness: pt[1] } : {}));
+    s.objects[id]!.isToken = true;
+    return id;
+  };
+
+  /** Ap's beginning of combat with Brudiclad, a 4/4 Angel token and a Treasure; an opponent has a token too. */
+  function atCombat() {
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, brudiclad);
+    const angel = tokenOn(s0, ap, "Angel", "Creature — Angel", ["4", "4"]);
+    const treasure = tokenOn(s0, ap, "Treasure", "Artifact — Treasure");
+    const theirs = tokenOn(s0, opp, "Soldier", "Creature — Soldier", ["1", "1"]);
+    let s = act(s0, { type: "passPriority", player: ap });
+    for (let i = 0; i < 20 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    return { s, ap, opp, angel, treasure, theirs };
+  }
+
+  it("each other token you control becomes a copy of the chosen one, the new Myr too; others' tokens don't", () => {
+    let { s, ap, angel, treasure, theirs } = atCombat();
+    expect(s.pending?.kind).toBe("chooseMay");
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect(s.pending?.kind).toBe("pickPermanents");
+    if (s.pending?.kind !== "pickPermanents") return;
+    // Only our tokens can be chosen: the Angel, the Treasure and the Myr.
+    expect(s.pending.options).toHaveLength(3);
+    expect(s.pending.options).not.toContain(theirs);
+    s = act(s, { type: "pickPermanents", player: ap, ids: [angel] });
+    const myr = s.battlefield.find((id) => s.objects[id]!.isToken && s.objects[id]!.controller === ap && ![angel, treasure].includes(id))!;
+    for (const id of [treasure, myr]) {
+      const c = characteristics(s, s.objects[id]!);
+      expect(c.name, id).toBe("Angel");
+      expect([power(s, s.objects[id]!), toughness(s, s.objects[id]!)]).toEqual([4, 4]);
+    }
+    expect(characteristics(s, s.objects[theirs]!).name).toBe("Soldier");
+    expect(characteristics(s, s.objects[angel]!).name).toBe("Angel");
+  });
+
+  it("choosing nothing leaves them as they are", () => {
+    let { s, ap, treasure } = atCombat();
+    s = act(s, { type: "chooseMay", player: ap, yes: false });
+    expect(characteristics(s, s.objects[treasure]!).name).toBe("Treasure");
+    expect(s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === ap)).toHaveLength(3);
+  });
+});

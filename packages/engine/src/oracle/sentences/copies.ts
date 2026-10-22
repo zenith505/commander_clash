@@ -66,6 +66,12 @@ export function parseCopiesSentence(s: string, ctx: Ctx): Effect[] | null | unde
     what = of && parseWhat(whatText!, ctx);
   }
   if (!what || !of) return null;
+  // "Choose a token you control. Each other token you control becomes a copy of that token" (Brudiclad): other than the
+  // one chosen, not the source.
+  if (what.ref === "each" && what.other && of.ref === "created") {
+    const { other: _, ...rest } = what;
+    what = { ...rest, notCreated: true };
+  }
   return [{ type: "becomeCopy", what, of, ...(except ? { except } : {}), duration }];
 }
 

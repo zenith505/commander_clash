@@ -922,7 +922,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   let prevTargets = 0;
   let curTargets = 0;
   // "You may pay {2}" waits for the sentence after: "If you do, draw a card."
-  let payFirst: { pay: PayCost; text: string; payX?: { max?: Amount } } | null = null;
+  let payFirst: { pay: PayCost; text: string; payX?: { max?: Amount; color?: "W" | "U" | "B" | "R" | "G" } } | null = null;
   // "Look at the top four cards of your library" waits for what to do with them (see parseDig).
   let dig: Partial<Extract<Effect, { type: "dig" }>> | null = null;
   // The look's own "where X is ...", for "with mana value X or less" after it (Hatchery Spider).
@@ -2229,7 +2229,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const whenPaid = /^When you do, (.+)$/.exec(s);
       if (whenPaid) {
         // "You may pay {X}. When you do, ~ deals X damage to target player" (Electro): the reflexive ability's X is the X paid.
-        const reflexive = reflexiveBody([whenPaid[1]!, ...sentences.slice(si + 1)].join(". "), ctx);
+        // "You may pay any amount of {R}. When you do, it deals that much damage to any target" (Leyline Tyrant): that
+        // much is the X paid, and "it" the source.
+        const paidText = payFirst.payX?.color ? whenPaid[1]!.replace(/^it deals that much damage\b/, "~ deals X damage") : whenPaid[1]!;
+        if (payFirst.payX?.color && !/\bX\b/.test(paidText)) return null;
+        const reflexive = reflexiveBody([paidText, ...sentences.slice(si + 1)].join(". "), ctx);
         if (!reflexive) return null;
         effects.push({ type: "may", effects: [{ type: "reflexive", body: reflexive }], pay: payFirst.pay, ...(payFirst.payX ? { payX: payFirst.payX } : {}), text: `${payFirst.text}. When you do, ${[whenPaid[1]!, ...sentences.slice(si + 1)].join(". ")}` });
         payFirst = null;
@@ -2300,6 +2304,12 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const max = mayPayX[2] === "the amount of life you gained" ? { count: { kind: "eventAmount" as const } } : mayPayX[2] !== undefined ? parseCount(mayPayX[2]!, ctx) : undefined;
       if (max === null) return null;
       payFirst = { pay: { mana: mayPayX[1]! }, text: `pay ${mayPayX[1]}`, payX: max ? { max } : {} };
+      continue;
+    }
+    // "You may pay any amount of {R}" (Leyline Tyrant): X of that color, chosen as it resolves (CR 107.1c).
+    const payAny = /^[Yy]ou may pay any amount of \{([WUBRG])\}$/.exec(s);
+    if (payAny) {
+      payFirst = { pay: { mana: "{X}" }, text: `pay any amount of {${payAny[1]}}`, payX: { color: payAny[1] as "W" | "U" | "B" | "R" | "G" } };
       continue;
     }
     const mayPay = /^[Yy]ou may pay (.+)$/.exec(s);

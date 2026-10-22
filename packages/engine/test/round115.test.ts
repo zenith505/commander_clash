@@ -2,7 +2,7 @@
 // cards (Jhoira of the Ghitu, Kang Prime, CR 702.62).
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, island, passUntil, putOnBattlefield, setup } from "./helpers";
+import { act, bear, card, cast, island, passUntil, putOnBattlefield, setup, target } from "./helpers";
 import { attackTaxPer, botActions, isFullySupported, isSuspended, planActivate, planCast, waitingOn, type Action, type GameState, type PlayerId } from "../src";
 import { moveObject } from "../src/game";
 
@@ -406,5 +406,54 @@ describe("Arcane Bombardment", () => {
     const exiledNow = [ids[0]!, ids[1]!].filter((id) => s.objects[id]!.zone === "exile");
     expect(exiledNow.length).toBe(1);
     expect([...options].sort()).toEqual([d, exiledNow[0]!, "none"].sort());
+  });
+});
+
+const tyrant = card("Leyline Tyrant", "Creature — Dragon", "{2}{R}{R}", {
+  power: "4",
+  toughness: "4",
+  keywords: ["Flying"],
+  oracleText:
+    "Flying\nYou don't lose unspent red mana as steps and phases end.\nWhen Leyline Tyrant dies, you may pay any amount of {R}. When you do, it deals that much damage to any target.\nIf Leyline Tyrant is in your opening hand, you may begin the game with it on the battlefield.",
+});
+const tapMountains = (s: GameState, pid: PlayerId) => {
+  for (const id of s.battlefield) if (s.objects[id]!.controller === pid && s.cards[s.objects[id]!.cardId]!.name === "Mountain") s.objects[id]!.tapped = true;
+};
+const murder = card("Murder", "Instant", "{1}{B}{B}", { oracleText: "Destroy target creature." });
+
+describe("Leyline Tyrant", () => {
+  it("dies: X paid in red mana only, then that much damage to any target", () => {
+    expect(isFullySupported(tyrant)).toBe(true);
+    const { s: s0, ap, opp, ids } = setup([murder]);
+    const t = putOnBattlefield(s0, ap, tyrant);
+    Object.assign(s0.players[ap]!.manaPool, { B: 3, R: 2, U: 3 });
+    tapMountains(s0, ap);
+    let s = settle(cast(s0, ap, ids[0]!, [target(t)]));
+    expect(s.objects[t]!.zone).toBe("graveyard");
+    // Only the red mana counts: up to 2, though 3 blue is floating too.
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "payX", options: ["none", "0", "1", "2"] });
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: "2" }));
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap, pay: { mana: "{R}{R}" } });
+    const blue = s.players[ap]!.manaPool.U;
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect(s.players[ap]!.manaPool.R).toBe(0);
+    expect(s.players[ap]!.manaPool.U).toBe(blue);
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    const life = s.players[opp]!.life;
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] }));
+    expect(s.players[opp]!.life).toBe(life - 2);
+  });
+
+  it("a bot pays all the red it can and aims it", () => {
+    const { s: s0, ap, ids } = setup([murder]);
+    const t = putOnBattlefield(s0, ap, tyrant);
+    Object.assign(s0.players[ap]!.manaPool, { B: 4, R: 3 });
+    tapMountains(s0, ap);
+    let s = settle(cast(s0, ap, ids[0]!, [target(t)]));
+    // Murder's generic took one red, so two are left.
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "payX", options: ["none", "0", "1", "2"] });
+    for (let i = 0; i < 6 && s.pending; i++) s = settle(act(s, botActions(s, s.pending.player)[0]!));
+    const lost = Object.values(s.players).filter((p) => p.id !== ap).reduce((n, p) => n + (40 - p.life), 0);
+    expect(lost).toBe(2);
   });
 });

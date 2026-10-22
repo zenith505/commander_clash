@@ -5543,6 +5543,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "ad3f4ec9-9905-421b-98ed-78bb6fc9b450",
+  "name": "Jhoira of the Ghitu",
+  "manaCost": "{1}{U}{R}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Wizard"
+  ],
+  "oracleText": "{2}, Exile a nonland card from your hand: Put four time counters on the exiled card. If it doesn't have suspend, it gains suspend. (At the beginning of your upkeep, remove a time counter. When the last is removed, you may cast it without paying its mana cost. If it's a creature, it has haste.)",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "R",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dds",
+  "releasedAt": "2017-03-31",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "382bc554-d170-4c19-82dd-829f254e855e",
   "name": "Jilt",
   "manaCost": "{1}{U}",
@@ -6152,6 +6187,38 @@
   "set": "tmt",
   "releasedAt": "2026-03-06",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f92aaa00-6ece-4033-b3df-b2fc2c4718d9",
+  "name": "Leyline Tyrant",
+  "manaCost": "{2}{R}{R}",
+  "cmc": 4,
+  "typeLine": "Creature — Dragon",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dragon"
+  ],
+  "oracleText": "Flying\nYou don't lose unspent red mana as steps and phases end.\nWhen this creature dies, you may pay any amount of {R}. When you do, it deals that much damage to any target.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "znr",
+  "releasedAt": "2020-09-25",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -7341,6 +7408,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d39b9f64-dc9b-413f-8d05-e21ef46d6756",
+  "name": "Oblivion Sower",
+  "manaCost": "{6}",
+  "cmc": 6,
+  "typeLine": "Creature — Eldrazi",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Eldrazi"
+  ],
+  "oracleText": "When you cast this spell, target opponent exiles the top four cards of their library, then you may put any number of land cards that player owns from exile onto the battlefield under your control.",
+  "power": "5",
+  "toughness": "8",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bfz",
+  "releasedAt": "2015-10-02",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "730e39e6-c61d-48b5-8827-bfd952bf1be7",
   "name": "Omniscience",
   "manaCost": "{7}{U}{U}{U}",
@@ -7853,6 +7946,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9e769a65-7aa5-484d-9493-badb485b5964",
+  "name": "Plargg and Nassari",
+  "manaCost": "{3}{R}{R}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Orc Efreet",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Orc",
+   "Efreet"
+  ],
+  "oracleText": "At the beginning of your upkeep, each player exiles cards from the top of their library until they exile a nonland card. An opponent chooses a nonland card exiled this way. You may cast up to two spells from among the other cards exiled this way without paying their mana costs.",
+  "power": "5",
+  "toughness": "4",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mat",
+  "releasedAt": "2023-05-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "b099fc54-cdbc-46cb-b4e4-7c2ca77b115b",
   "name": "Plumb the Forbidden",
   "manaCost": "{1}{B}",
@@ -8012,6 +8138,38 @@
   "set": "pcy",
   "releasedAt": "2000-06-05",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "01635d21-aeda-4754-9d94-68fcd0cd6556",
+  "name": "Quilled Greatwurm",
+  "manaCost": "{4}{G}{G}",
+  "cmc": 6,
+  "typeLine": "Creature — Wurm",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Wurm"
+  ],
+  "oracleText": "Trample\nWhenever a creature you control deals combat damage during your turn, put that many +1/+1 counters on it. (It must survive to get the counters.)\nYou may cast this card from your graveyard by removing six counters from among creatures you control in addition to paying its other costs.",
+  "power": "7",
+  "toughness": "7",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "fdn",
+  "releasedAt": "2024-11-15",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -9254,6 +9412,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7a3569a0-a55f-40c9-9588-92db35e26567",
+  "name": "Slaughter the Strong",
+  "manaCost": "{1}{W}{W}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Each player chooses any number of creatures they control with total power 4 or less, then sacrifices all other creatures they control.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f64878c1-1fba-44f7-a24f-d24bef2e03ae",
   "name": "Slippery Bogle",
   "manaCost": "{G/U}",
@@ -9596,6 +9780,42 @@
   "commanderLegal": "legal",
   "set": "sld",
   "releasedAt": "2021-08-24",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9b8f6c6a-49a1-4061-a2c4-5be612e138fa",
+  "name": "Sphinx of the Revelation",
+  "manaCost": "{3}{W}{U}",
+  "cmc": 5,
+  "typeLine": "Artifact Creature — Sphinx",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Sphinx"
+  ],
+  "oracleText": "Flying, lifelink\nWhenever you gain life, you get that many {E} (energy counters).\n{W}{U}{U}, {T}, Pay X {E}: Draw X cards.",
+  "power": "4",
+  "toughness": "5",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Lifelink"
+  ],
+  "commanderLegal": "legal",
+  "set": "m3c",
+  "releasedAt": "2024-06-14",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -10262,6 +10482,40 @@
   "releasedAt": "2022-09-09",
   "rarity": "uncommon",
   "layout": "saga",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f509ac02-f22e-4d1a-9fe1-afa96dd7806d",
+  "name": "Thieving Skydiver",
+  "manaCost": "{1}{U}",
+  "cmc": 2,
+  "typeLine": "Creature — Merfolk Rogue",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Merfolk",
+   "Rogue"
+  ],
+  "oracleText": "Kicker {X}. X can't be 0. (You may pay an additional {X} as you cast this spell.)\nFlying\nWhen this creature enters, if it was kicked, gain control of target artifact with mana value X or less. If that artifact is an Equipment, attach it to this creature.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Kicker",
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "znr",
+  "releasedAt": "2020-09-25",
+  "rarity": "rare",
+  "layout": "normal",
   "gameChanger": false
  },
  {

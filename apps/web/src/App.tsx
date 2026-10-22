@@ -2043,7 +2043,8 @@ function KickPickBar({
   onCancel: () => void;
 }) {
   const d = pick.draft;
-  const can = (kicks: number[]) => planCast(s, HUMAN, d.objectId, undefined, d.modes, d.convoke ?? "auto", undefined, { ...(d.via ? { via: d.via } : {}), ...(kicks.length ? { kicks } : {}) }) !== null;
+  // "Kicker {X}. X can't be 0" (Thieving Skydiver): affordable with the smallest X allowed.
+  const can = (kicks: number[]) => [undefined, 1].some((x) => planCast(s, HUMAN, d.objectId, undefined, d.modes, d.convoke ?? "auto", x, { ...(d.via ? { via: d.via } : {}), ...(kicks.length ? { kicks } : {}) }) !== null);
   const cancel = (
     <button className="ghost" onClick={onCancel}>
       Cancel

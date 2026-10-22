@@ -348,6 +348,14 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!pay || (pay.mana && !plainMana(pay.mana))) return null;
     return [{ type: "may", effects: [], pay, otherwise: [sacrificeSelf], keep: true, text: `Pay ${m[2]} to keep ~` }];
   }
+  // Volatile Stormdrake: "sacrifice that creature unless you pay an amount of {E} equal to its mana value", the creature
+  // it targeted (now yours): its mana value as this resolves.
+  if ((m = /^[Ss]acrifice (that creature) unless you pay an amount of \{E\} equal to its mana value$/.exec(s)) && ctx.lastObjectTarget !== undefined) {
+    const what = parseObject(m[1]!, ctx);
+    const n = parseCount("its mana value", ctx);
+    if (what?.ref !== "target" || !n) return null;
+    return [{ type: "may", effects: [], payEnergy: n, otherwise: [{ type: "sacrifice", what }], keep: true, text: "Pay {E} equal to that creature's mana value to keep it" }];
+  }
   // "Tap ~ unless you pay 1 life" (Carnophage): chosen as it resolves; paying while it's tapped is allowed and doesn't
   // untap it (rulings).
   if ((m = /^[Tt]ap ~ unless you pay (\d+ life)$/.exec(s))) {

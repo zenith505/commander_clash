@@ -3038,6 +3038,14 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       if (sacIt) ctx.sacrificedIt = true;
       // Party Thrasher: "If you do, exile the top two cards of your library, then choose one of them. You may play that
       // card this turn." The permission is about the card chosen, so it depends on the discard too.
+      // Volatile Stormdrake: "If you do, you get {E}{E}{E}{E}, then sacrifice that creature unless ...": both depend on it.
+      const energyThen = ifDid[1] === "do" ? /^you get ((?:\{E\})+), then (.+)$/.exec(ifDid[2]!) : null;
+      if (energyThen) {
+        const rest = parseOne(capital(energyThen[2]!), ctx);
+        if (!rest) return null;
+        effects.push({ type: "if", cond: { kind: "youDid" }, effects: [{ type: "getEnergy", who: { ref: "you" }, n: energyThen[1]!.length / 3 }, ...rest] });
+        continue;
+      }
       const choosePlay = ifDid[1] === "do" && /^You may play that card this turn$/.test(sentences[si + 1] ?? "") ? new RegExp(`^exile the top (${NUM}) cards of your library, then choose one of them$`).exec(ifDid[2]!) : null;
       if (choosePlay) si++;
       const inner = choosePlay ? [{ type: "impulse" as const, n: amt(choosePlay[1]!), until: "thisTurn" as const, choose: true as const }] : parseOne(ifDid[2]!.charAt(0).toUpperCase() + ifDid[2]!.slice(1), ctx);

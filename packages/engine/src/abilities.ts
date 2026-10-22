@@ -2203,7 +2203,7 @@ export type Effect =
    * chooses X as it resolves (CR 107.1c, 608.2d), at most `max` ("where X is less than or equal to the amount of life you
    * gained", Well of Lost Dreams), then pays `pay` with that X; `effects` use it as X.
    */
-  | { type: "may"; effects: Effect[]; text: string; otherwise?: Effect[]; pay?: PayCost; keep?: boolean; once?: boolean; payX?: { max?: Amount } }
+  | { type: "may"; effects: Effect[]; text: string; otherwise?: Effect[]; pay?: PayCost; keep?: boolean; once?: boolean; payX?: { max?: Amount }; /** "Unless you pay an amount of {E} equal to its mana value" (Volatile Stormdrake): energy counted as it resolves. */ payEnergy?: Amount }
   /**
    * "Each player may discard their hand and draw five cards" (Will of the Jeskai): each of them decides in APNAP order,
    * knowing the earlier answers (CR 101.4), then `effects` happen to those who chose to ({ ref: "choseThisWay" }).

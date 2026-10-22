@@ -862,6 +862,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // Oko, Thief of Crowns). Otherwise each player gains control of the other's, at once, indefinitely.
       const a = objects(s, e.a, ctx)[0];
       const b = objects(s, e.b, ctx)[0];
+      // "If you do" after it (Volatile Stormdrake): whether the exchange happened.
+      if (s.resolving) s.resolving.did = false;
       if (!a || !b || a.zone !== "battlefield" || b.zone !== "battlefield") return;
       const [ca, cb] = [controllerOf(s, a), controllerOf(s, b)];
       if (ca === cb) {
@@ -871,6 +873,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       for (const [o, to] of [[a, cb], [b, ca]] as const) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: to, sourceName: src, sourceId: ctx.sourceId, duration: "game", affected: [o.id], mods: [{ kind: "control" }] });
       invalidateCharacteristics(s);
       log(s, `${player(s, ca).name} and ${player(s, cb).name} exchange control of ${defOf(s, a).name} and ${defOf(s, b).name}.`);
+      if (s.resolving) s.resolving.did = true;
       return;
     }
     case "ownersGainControl": {

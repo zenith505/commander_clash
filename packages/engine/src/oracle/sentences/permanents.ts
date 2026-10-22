@@ -596,8 +596,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // Oko, Thief of Crowns: "Exchange control of target artifact or creature you control and target creature an opponent
   // controls with power 3 or less" (CR 701.12b).
-  if ((m = /^Exchange control of (target .+? you control) and (target .+? an opponent controls(?: with .+)?)$/.exec(s))) {
-    const a = parseObject(m[1]!, ctx);
+  // Volatile Stormdrake: "Exchange control of ~ and target creature an opponent controls": ~ as it is (rulings: it must
+  // still be on the battlefield).
+  if ((m = /^Exchange control of (~|target .+? you control) and (target .+? an opponent controls(?: with .+)?)$/.exec(s))) {
+    const a: ObjRef | null = m[1] === "~" ? { ref: "self" } : parseObject(m[1]!, ctx);
     const b = a?.ref === "target" && !a.n ? parseObject(m[2]!, ctx) : null;
     return a && b?.ref === "target" && !b.n ? [{ type: "exchangeControl", a, b }] : null;
   }

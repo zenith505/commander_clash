@@ -984,3 +984,27 @@ describe("Primordial Hydra", () => {
     expect(objHasKeyword(s, s.objects[h]!, "Trample")).toBe(true);
   });
 });
+
+const rotcaller = card("Valley Rotcaller", "Creature — Squirrel Warlock", "{1}{B}", {
+  power: "1",
+  toughness: "3",
+  keywords: ["Menace"],
+  oracleText:
+    "Menace\nWhenever this creature attacks, each opponent loses X life and you gain X life, where X is the number of other Squirrels, Bats, Lizards, and Rats you control.",
+});
+
+describe("Valley Rotcaller", () => {
+  it("counts each other Squirrel, Bat, Lizard or Rat you control once", () => {
+    expect(isFullySupported(rotcaller)).toBe(true);
+    const { s: s0, ap, opp } = setup([]);
+    const v = putOnBattlefield(s0, ap, rotcaller);
+    putOnBattlefield(s0, ap, card("Rat Bat", "Creature — Rat Bat", "{B}", { power: "1", toughness: "1" }));
+    putOnBattlefield(s0, ap, card("Lizard", "Creature — Lizard", "{R}", { power: "1", toughness: "1" }));
+    putOnBattlefield(s0, ap, bear());
+    putOnBattlefield(s0, opp, card("Their Rat", "Creature — Rat", "{B}", { power: "1", toughness: "1" }));
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = settle(act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: v, defender: opp }] }));
+    expect(s.players[opp]!.life).toBe(38);
+    expect(s.players[ap]!.life).toBe(42);
+  });
+});

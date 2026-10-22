@@ -928,6 +928,10 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         p.lifeCantChangeTurn = s.turn;
         log(s, `${p.name}'s life total can't change this turn.`);
       }
+      if (e.attackTax) {
+        p.attackTaxUntil = [...(p.attackTaxUntil ?? []), e.attackTax];
+        log(s, `Until ${p.name}'s next turn, creatures can't attack them${e.attackTax.planeswalkers ? " or planeswalkers they control" : ""} unless their controller pays {${e.attackTax.n}} for each.`);
+      }
       if (!keywords.length) return;
       if (e.untilYourNextTurn) p.gainedUntilNextTurn = [...new Set([...(p.gainedUntilNextTurn ?? []), ...keywords])];
       else p.gained = [...new Set([...(p.gained ?? []), ...keywords])];

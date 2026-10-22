@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, island, passUntil, putOnBattlefield, setup } from "./helpers";
-import { botActions, isFullySupported, isSuspended, planActivate, planCast, waitingOn, type Action, type GameState, type PlayerId } from "../src";
+import { attackTaxPer, botActions, isFullySupported, isSuspended, planActivate, planCast, waitingOn, type Action, type GameState, type PlayerId } from "../src";
 import { moveObject } from "../src/game";
 
 const run = (s: GameState, plan: Action[] | null) => {
@@ -227,5 +227,62 @@ describe("Plargg and Nassari", () => {
     expect(s.objects[others[2]!]!.zone).toBe("exile");
     expect(s.objects[mine]!.zone).toBe("exile");
     for (const t of tops) expect(s.objects[t.land]!.zone).toBe("exile");
+  });
+});
+
+const yojimbo = card("Summon: Yojimbo", "Enchantment Creature — Saga Samurai", "{3}{W}", {
+  power: "5",
+  toughness: "5",
+  keywords: ["Vigilance"],
+  oracleText:
+    "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after IV.)\nI — Exile target artifact, enchantment, or tapped creature an opponent controls.\nII, III — Until your next turn, creatures can't attack you unless their controller pays {2} for each of those creatures.\nIV — Create X Treasure tokens, where X is the number of opponents who control a creature with power 4 or greater.\nVigilance",
+});
+const forbidding = card("Forbidding Spirit", "Creature — Spirit Cleric", "{1}{W}{W}", {
+  power: "3",
+  toughness: "3",
+  oracleText: "When this creature enters, until your next turn, creatures can't attack you or planeswalkers you control unless their controller pays {2} for each of those creatures.",
+});
+
+describe("attack taxes until your next turn", () => {
+  it("Forbidding Spirit: {2} for each creature attacking you or your planeswalkers, until your next turn", () => {
+    expect(isFullySupported(forbidding)).toBe(true);
+    const { s: s0, ap, opp, ids } = setup([forbidding]);
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(attackTaxPer(s, ap)).toBe(2);
+    expect(attackTaxPer(s, ap, true)).toBe(2);
+    s = passUntil(s, "main2", opp);
+    expect(attackTaxPer(s, ap)).toBe(2);
+    s = passUntil(s, "upkeep", ap);
+    expect(attackTaxPer(s, ap)).toBe(0);
+  });
+
+  it("Summon: Yojimbo: I exiles a tapped creature (not an untapped one); II taxes attacks on you only; IV counts opponents with a big creature", () => {
+    expect(isFullySupported(yojimbo)).toBe(true);
+    const { s: s0, ap, opp, ids } = setup([yojimbo]);
+    const untapped = putOnBattlefield(s0, opp, bear());
+    const tapped = putOnBattlefield(s0, opp, bear());
+    s0.objects[tapped]!.tapped = true;
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    s = settle(s);
+    expect(s.pending).toMatchObject({ kind: "chooseTargets" });
+    expect(() => act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: untapped }] })).toThrow();
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: tapped }] }));
+    expect(s.objects[tapped]!.zone).toBe("exile");
+    // Chapter II, after the next draw step.
+    s = settle(passUntil(passUntil(s, "upkeep", opp), "main1", ap));
+    expect(attackTaxPer(s, ap)).toBe(2);
+    expect(attackTaxPer(s, ap, true)).toBe(0);
+    // Two opponents with a creature with power 4 or greater: two Treasures at chapter IV.
+    const others = s.turnOrder.filter((p) => p !== ap);
+    putOnBattlefield(s, others[0]!, card("Big", "Creature — Giant", "{4}", { power: "4", toughness: "4" }));
+    putOnBattlefield(s, others[1]!, card("Big", "Creature — Giant", "{4}", { power: "5", toughness: "1" }));
+    const y = ids[0]!;
+    s.objects[y]!.counters.lore = 3;
+    const before = s.battlefield.length;
+    s = settle(passUntil(passUntil(s, "upkeep", others[0]!), "main1", ap));
+    const treasures = s.battlefield.filter((id) => s.objects[id]!.isToken && s.cards[s.objects[id]!.cardId]?.subtypes.includes("Treasure") && s.objects[id]!.controller === ap);
+    expect(treasures).toHaveLength(2);
+    expect(s.objects[y]!.zone).toBe("graveyard");
+    expect(before).toBeGreaterThan(0);
   });
 });

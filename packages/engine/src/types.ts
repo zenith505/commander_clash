@@ -613,6 +613,8 @@ export interface Player {
   gainedUntilNextTurn?: string[];
   /** "Until your next turn, your life total can't change" (Teferi's Protection): no life gained or lost (CR 119.7-8). */
   lifeCantChange?: true;
+  /** "Until your next turn, creatures can't attack you unless their controller pays {2} for each" (Summon: Yojimbo), one entry per effect. */
+  attackTaxUntil?: { n: number; planeswalkers?: true }[];
   /** "Until end of turn, your life total can't change" (Flare of Fortitude): the turn it's for (CR 119.7-8). */
   lifeCantChangeTurn?: number;
   /** "Until end of turn, damage that would reduce your life total to less than 1 reduces it to 1 instead" (Angel's Grace): the turn it's for. */

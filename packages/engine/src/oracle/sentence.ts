@@ -157,6 +157,10 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   // Angel's Grace, Angel of Grace: "Until end of turn, damage that would reduce your life total to less than 1 reduces it to
   // 1 instead": a replacement effect on damage dealt to you (CR 614.1a, rulings on Ali from Cairo).
   if (/^(?:Until end of turn, damage that would reduce your life total to less than 1 reduces it to 1 instead|Damage that would reduce your life total to less than 1 reduces it to 1 instead until end of turn)$/.test(s)) return [{ type: "playerGains", keywords: [], lifeFloorThisTurn: true }];
+  // Summon: Yojimbo, Forbidding Spirit: "Until your next turn, creatures can't attack you (or planeswalkers you control)
+  // unless their controller pays {2} for each of those creatures" (CR 508.1g-h).
+  if ((m = /^[Uu]ntil your next turn, creatures can't attack you( or planeswalkers you control)? unless their controller pays \{(\d+)\} for each of those creatures$/.exec(s)))
+    return [{ type: "playerGains", keywords: [], attackTax: { n: Number(m[2]), ...(m[1] ? { planeswalkers: true as const } : {}) } }];
   const whole = parseEveryPlayerZonesSentence(s, ctx);
   if (whole) return whole;
   const list = parseTargetList(s, ctx);

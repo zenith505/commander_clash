@@ -163,6 +163,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^(?:players?|opponents?) being attacked$/i.test(p)) return count({ kind: "playersAttacked" });
   // "For each opponent you have", "the number of opponents you have" (Inspired Sphinx).
   if (each && /^opponents?(?: you have)?$/i.test(p)) return count({ kind: "players", opponents: true });
+  // "The number of opponents who control a creature with power 4 or greater" (Summon: Yojimbo), "for each opponent who
+  // controls an artifact": opponents controlling at least one such permanent.
+  if (each && (m = /^opponents? who controls? (?:an?|one or more) (.+)$/i.exec(p))) {
+    const spec = parseTargetPhrase(m[1]!);
+    return spec?.kind === "object" && !spec.controller ? count({ kind: "players", opponents: true, controlling: { ...spec, text: m[1]! } }) : null;
+  }
   if (each && /^(?:of your opponents|opponent) who lost life this turn$/i.test(p)) return count({ kind: "players", opponents: true, lostLife: true });
   if (each && /^opponent who drew a card this way$/i.test(p)) return count({ kind: "players", opponents: true, drewThisWay: true });
   // Smuggler's Share: "for each opponent who drew two or more cards this turn", "... who had two or more lands enter the

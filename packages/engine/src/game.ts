@@ -2268,6 +2268,7 @@ function startNextTurn(s: GameState, skipping = false) {
     if (began.has(p.id)) {
       p.gainedUntilNextTurn = undefined;
       p.lifeCantChange = undefined;
+      p.attackTaxUntil = undefined;
     }
   if (s.namedBansUntil) s.namedBansUntil = s.namedBansUntil.filter((r) => !began.has(r.controller));
   if (!s.namedBansUntil?.length) s.namedBansUntil = undefined;
@@ -6370,6 +6371,8 @@ function attackTaxParts(s: GameState, defender: PlayerId, planeswalker: boolean)
     generic += planeswalker ? c.attackTaxPlaneswalkers : c.attackTax;
     mana.push(...(planeswalker ? c.attackTaxManaPlaneswalkers : c.attackTaxMana));
   }
+  // "Until your next turn, creatures can't attack you unless ..." (Summon: Yojimbo): the defender's own effects.
+  for (const t of s.players[defender]?.attackTaxUntil ?? []) if (!planeswalker || t.planeswalkers) generic += t.n;
   return { generic, mana };
 }
 

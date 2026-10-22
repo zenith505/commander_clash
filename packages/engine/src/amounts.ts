@@ -8,7 +8,7 @@ import type { Amount, AmountExpr, Count, ObjRef, PlayerRef } from "./abilities";
 import { ANY_COUNTER } from "./abilities";
 import { defOf } from "./cards";
 import { bindChosen, objectMatches, printedMatches, spellManaValue } from "./effects";
-import { characteristics, staticConditionNow, type Characteristics } from "./layers";
+import { characteristics, controllerOf, staticConditionNow, type Characteristics } from "./layers";
 import { manaValue, parseManaCost, snowSpent, spentMeets, type ManaSpent } from "./mana";
 import type { Chosen, GameObject, GameState, LastKnown, ObjectId, PlayerId, TriggerEventInfo } from "./types";
 import { defMv, sameName } from "./faces";
@@ -289,6 +289,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       if (c.lostLife) return s.turnOrder.filter((pid) => !(c.opponents && pid === ctx.controller) && (s.lostLifeThisTurn ?? []).includes(pid)).length;
       // Cut a Deal: each one that drew a card in the draw before, however many it drew (rulings).
       if (c.drewThisWay) return new Set((s.resolving?.drawnBefore ?? []).map((id) => s.objects[id]?.owner).filter((pid) => pid !== undefined && !(c.opponents && pid === ctx.controller))).size;
+      // Summon: Yojimbo: opponents still in the game who control at least one such permanent now.
+      if (c.controlling) {
+        const f = c.controlling;
+        return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === pid && objectMatches(s, f, s.objects[id]!, ctx.controller, false))).length;
+      }
       // Smuggler's Share: players still in the game, by what they did this turn.
       if (c.drewAtLeast !== undefined || c.landsEnteredAtLeast !== undefined)
         return s.turnOrder.filter((pid) => {
@@ -584,7 +589,7 @@ function describeCount(c: Count): string {
     case "stateIf":
       return "1 if the condition holds";
     case "players":
-      return `#${c.opponents ? "opponents" : "players"}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}`;
+      return `#${c.opponents ? "opponents" : "players"}${c.lostLife ? " who lost life this turn" : ""}${c.drewThisWay ? " who drew a card this way" : ""}${c.drewAtLeast ? ` who drew ${c.drewAtLeast}+ cards this turn` : ""}${c.landsEnteredAtLeast ? ` who had ${c.landsEnteredAtLeast}+ lands enter this turn` : ""}${c.controlling ? ` who control a ${c.controlling.text}` : ""}`;
     case "diedThisTurn":
       return "#creatures that died this turn";
     case "tokensCreatedThisTurn":

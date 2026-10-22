@@ -878,7 +878,8 @@ export function parseTargetPhrase(
     const anyOf: TargetSpec[] = [];
     for (const alt of alts) {
       const sub = parseTargetPhrase(alt);
-      if (sub?.kind !== "object" || sub.controller || sub.tapped !== undefined || sub.combat || sub.anyOf) return null;
+      // "Artifact, enchantment, or tapped creature" (Summon: Yojimbo): tapped is that alternative's own quality.
+      if (sub?.kind !== "object" || sub.controller || (sub.tapped !== undefined && tapped !== undefined) || sub.combat || sub.anyOf) return null;
       anyOf.push(sub);
     }
     const types = [...new Set(anyOf.flatMap((a) => a.types ?? []))];

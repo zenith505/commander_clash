@@ -263,7 +263,7 @@ export type Count =
   /** "For each player", "for each opponent (you have)": the players still in the game (CR 102.1, 800.4a). */
   /** `lostLife`: "for each of your opponents who lost life this turn" (Belbe): ones who lost the game since too (rulings). */
   /** `drewThisWay`: "for each opponent who drew a card this way" (Cut a Deal): those who drew a card in this resolution's draw before, once each. */
-  | { kind: "players"; opponents?: true; lostLife?: true; drewThisWay?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number }
+  | { kind: "players"; opponents?: true; lostLife?: true; drewThisWay?: true; /** "Who drew two or more cards this turn" (Smuggler's Share). */ drewAtLeast?: number; /** "Who had two or more lands enter the battlefield under their control this turn" (Smuggler's Share). */ landsEnteredAtLeast?: number; /** "Who control a creature with power 4 or greater" (Summon: Yojimbo). */ controlling?: TargetSpec }
   /** "For each charge counter on ~", "the number of +1/+1 counters on it": as it last existed if it's gone. */
   | { kind: "counters"; counter: CounterKind; of: ObjRef }
   /** Station's "the tapped creature's power" (CR 702.184a): as the ability resolves, or as it last existed (rulings). */
@@ -2566,6 +2566,11 @@ export type Effect =
       lifeFloorThisTurn?: true;
       /** "Players gain hexproof until end of turn" (Everybody Lives!): each player in the game, not only its controller. */
       everyone?: true;
+      /**
+       * "Until your next turn, creatures can't attack you (or planeswalkers you control) unless their controller pays {2}
+       * for each of those creatures" (Summon: Yojimbo, Forbidding Spirit): see Player.attackTaxUntil (CR 508.1g-h).
+       */
+      attackTax?: { n: number; planeswalkers?: true };
     }
   /**
    * "Starting with you, each player votes for death or taxes" (CR 701.38a): each player in turn order, from the

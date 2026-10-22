@@ -1540,7 +1540,8 @@ export interface TurnRule {
    * "flash": "You may cast spells this turn as though they had flash" (Borne Upon a Wind, Emergence Zone; CR 702.8a).
    * "spellsUncounterable": "Spells you control can't be countered this turn" (Veil of Summer, CR 101.2).
    */
-  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "flash" | "spellsUncounterable";
+  /** "cantWinGame": "players can't win the game this turn" (Everybody Lives!). */
+  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable";
 }
 
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */

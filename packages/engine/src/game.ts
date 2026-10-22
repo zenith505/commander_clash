@@ -7307,7 +7307,8 @@ export function syncControl(s: GameState) {
  */
 export function gameEndBlocked(s: GameState, pid: PlayerId, what: "lose" | "win"): boolean {
   // "You can't lose the game this turn and your opponents can't win the game this turn" (Courageous Resolve).
-  if (what === "lose" ? turnRule(s, pid, "cantLoseGame") : s.turnOrder.some((p) => p !== pid && turnRule(s, p, "opponentsCantWin"))) return true;
+  // "Players can't lose the game or win the game this turn" (Everybody Lives!).
+  if (what === "lose" ? turnRule(s, pid, "cantLoseGame") : turnRule(s, pid, "cantWinGame") || s.turnOrder.some((p) => p !== pid && turnRule(s, p, "opponentsCantWin"))) return true;
   return s.battlefield.some((id) => {
     const o = obj(s, id);
     const a = abilitiesOf(s, o);

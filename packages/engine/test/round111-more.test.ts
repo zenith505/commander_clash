@@ -60,6 +60,11 @@ const looter = card("Likeness Looter", "Creature — Faerie Shapeshifter", "{U}{
   oracleText:
     "Flying\n{T}: Draw a card, then discard a card.\n{X}: This creature becomes a copy of target creature card in your graveyard with mana value X, except it has flying and this ability. Activate only as a sorcery.",
 });
+const everybodyLives = card("Everybody Lives!", "Instant", "{1}{W}", {
+  oracleText:
+    "All creatures gain hexproof and indestructible until end of turn. Players gain hexproof until end of turn. Players can't lose life this turn and players can't lose the game or win the game this turn.",
+});
+const shock = card("Shock", "Instant", "{R}", { oracleText: "Shock deals 2 damage to any target." });
 const treasure = card("Treasure", "Token Artifact — Treasure", "", { oracleText: "{T}, Sacrifice this token: Add one mana of any color." });
 
 /** Pass along, answering every pending choice the dull way, until `stop` holds. */
@@ -277,5 +282,24 @@ describe("Likeness Looter", () => {
     expect(objHasKeyword(s, s.objects[l]!, "Flying")).toBe(true);
     // It keeps the copying ability (its only activated ability now).
     expect(planActivate(s, ap, l, 0, t as never, undefined, undefined, 2)).not.toBeNull();
+  });
+});
+
+describe("Everybody Lives!", () => {
+  it("is supported: every player gets hexproof and can't lose life, lose or win this turn", () => {
+    expect(isFullySupported(everybodyLives)).toBe(true);
+    let { s, ap, ids, opp } = setup([everybodyLives, shock]);
+    const b = putOnBattlefield(s, opp, bear());
+    for (const a of planCast(s, ap, ids[0]!)!) s = act(s, a);
+    s = passAll(s);
+    expect(s.objects[ids[0]!]!.zone).toBe("graveyard");
+    // Neither the player nor their creature can be targeted now.
+    expect(planCast(s, ap, ids[1]!, [{ kind: "player", id: opp }])).toBeNull();
+    expect(planCast(s, ap, ids[1]!, [{ kind: "object", id: b }])).toBeNull();
+    expect(objHasKeyword(s, s.objects[b]!, "Indestructible")).toBe(true);
+    // No one loses: at 0 life the opponent stays in the game this turn.
+    s.players[opp]!.life = 0;
+    s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.players[opp]!.lost).toBeFalsy();
   });
 });

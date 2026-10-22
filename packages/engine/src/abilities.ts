@@ -2345,7 +2345,8 @@ export type Effect =
   /** "Players can't gain life this turn", "Your opponents can't gain life this turn" (CR 119.7). */
   | { type: "noLifeGain"; players: "all" | "opponents" }
   /** "You can't lose life this turn, you can't lose the game this turn, and your opponents can't win the game this turn" (Courageous Resolve). */
-  | { type: "turnRules"; rules: TurnRule["rule"][] }
+  /** `everyone`: "Players can't lose life this turn" (Everybody Lives!), each player in the game as it resolves. */
+  | { type: "turnRules"; rules: TurnRule["rule"][]; everyone?: true }
   /** "Until your next turn, you may cast sorcery spells as though they had flash." (Teferi, Time Raveler; CR 702.8a) */
   | { type: "flashUntilNextTurn"; filter: TargetSpec }
   /**
@@ -2494,6 +2495,8 @@ export type Effect =
       lifeCantChangeThisTurn?: true;
       /** "Until end of turn, damage that would reduce your life total to less than 1 reduces it to 1 instead" (Angel's Grace): see Player.lifeFloorTurn. */
       lifeFloorThisTurn?: true;
+      /** "Players gain hexproof until end of turn" (Everybody Lives!): each player in the game, not only its controller. */
+      everyone?: true;
     }
   /**
    * "Starting with you, each player votes for death or taxes" (CR 701.38a): each player in turn order, from the

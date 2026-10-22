@@ -1,6 +1,6 @@
 import type { Effect, Modification, TokenSpec } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
-import { auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, log, moveObject, obj, opponents, player, removeFromCombat, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds } from "../game";
+import { auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, moveObject, obj, opponents, player, removeFromCombat, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putPlayerCounters, putCounters, tokenBatch, withPutter } from "../counters";
 import { compileCard } from "../oracle";
@@ -884,6 +884,15 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const mod = fixMods(s, [{ kind: "addKeywords", keywords: e.keywords }], ctx)[0];
       // "Protection from that player": the player this instruction is being done for (Noble Heritage).
       const keywords = (mod?.kind === "addKeywords" ? mod.keywords : []).flatMap((k) => (k !== THAT_PLAYER_PROTECTION ? [k] : ctx.eachOne !== undefined ? [protectionFromPlayer(ctx.eachOne)] : []));
+      // "Players gain hexproof until end of turn" (Everybody Lives!): each of them.
+      if (e.everyone) {
+        for (const pid of livingPlayers(s)) {
+          const q = player(s, pid);
+          q.gained = [...new Set([...(q.gained ?? []), ...keywords])];
+        }
+        log(s, `Players gain ${keywords.map((k) => k.toLowerCase()).join(" and ")} until end of turn.`);
+        return;
+      }
       const p = player(s, ctx.controller);
       if (e.lifeCantChange) {
         p.lifeCantChange = true;

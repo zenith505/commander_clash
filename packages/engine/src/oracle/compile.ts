@@ -1603,7 +1603,8 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Cascade for the spells you cast (CR 702.85a): "Sliver spells you cast have cascade", "Instant and sorcery spells you
     // cast from your hand have cascade", "The first spell you cast each turn has cascade" (Maelstrom Nexus).
-    const giveCascade = /^(?:(.+?) )?[Ss]pells you cast( from your hand)?( with mana value \d+ or (?:greater|less))? have cascade\.$/.exec(line);
+    // Zhulodok, Void Gorger: '... have "Cascade, cascade."': two cascade abilities, each triggering (CR 702.85c).
+    const giveCascade = /^(?:(.+?) )?[Ss]pells you cast( from your hand)?( with mana value \d+ or (?:greater|less))? have (cascade|"Cascade, cascade\.")\.?$/.exec(line);
     const firstCascade = /^The first spell you cast (from exile )?each turn( that mana from a Treasure was spent to cast)? has cascade\.$/.exec(line);
     if (/^Commander spells you cast have cascade\.$/.test(line)) {
       (out.spellsHaveCascade ??= []).push({ commander: true, text: line });
@@ -1639,7 +1640,7 @@ export function compile(d: CardDef): CompiledCard {
         filter = f;
       }
       const from = giveCascade?.[2] ? "hand" : firstCascade?.[1] ? "exile" : undefined;
-      (out.spellsHaveCascade ??= []).push({ ...(filter ? { filter } : {}), ...(from ? { from } : {}), ...(firstCascade ? { first: true as const } : {}), ...(firstCascade?.[2] ? { treasure: true as const } : {}), text: line });
+      (out.spellsHaveCascade ??= []).push({ ...(filter ? { filter } : {}), ...(from ? { from } : {}), ...(giveCascade?.[4]?.startsWith('"') ? { twice: true as const } : {}), ...(firstCascade ? { first: true as const } : {}), ...(firstCascade?.[2] ? { treasure: true as const } : {}), text: line });
       continue;
     }
     // "Instant and sorcery spells you cast have storm" (Prismari, the Inspiration; Ral's emblem), CR 702.40a.

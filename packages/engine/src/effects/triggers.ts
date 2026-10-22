@@ -1801,6 +1801,7 @@ function grantedCascades(s: GameState, item: StackItem, spell: GameObject, you: 
       // "The first spell you cast each turn ...": this one is the first of its kind this turn (it's already counted).
       if (g.first && cast.filter((c) => (!g.from || c.from === g.from) && (!g.treasure || c.treasure)).length !== 1) continue;
       out.push(g);
+      if (g.twice) out.push(g);
     }
   }
   return out;

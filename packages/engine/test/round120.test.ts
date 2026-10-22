@@ -519,4 +519,44 @@ describe("more popular cards", () => {
     expect(asFader.counters.time).toBe(3); // Chronozoa's own vanishing 3, not a second one
     expect([asBear.vanishing, asFader.vanishing]).toEqual([1, 1]);
   });
+  it("Zhulodok gives colorless spells with mana value 7 or more cast from the hand two cascade triggers", () => {
+    const zhulodok = card("Zhulodok, Void Gorger", "Legendary Creature — Eldrazi", "{5}{C}", { power: "7", toughness: "4", oracleText: "Colorless spells you cast from your hand with mana value 7 or greater have \"Cascade, cascade.\" (When you cast one, exile cards from the top of your library until you exile a nonland card that costs less. You may cast it without paying its mana cost. Put the exiled cards on the bottom in a random order. Then do it again.)" });
+    const titan = card("Test Titan", "Creature — Eldrazi", "{7}", { power: "7", toughness: "7" });
+    const dragon = card("Test Dragon", "Creature — Dragon", "{6}{R}", { power: "7", toughness: "7" });
+    supported(zhulodok);
+    const cascades = (d: CardDef) => {
+      const { s: s0, ap, ids } = setup([d]);
+      putOnBattlefield(s0, ap, zhulodok);
+      const s = run(s0, planCast(s0, ap, ids[0]!));
+      return [...s.stack, ...s.triggerQueue].filter((x) => x.body?.text.startsWith("Cascade")).length;
+    };
+    expect(cascades(titan)).toBe(2);
+    expect(cascades(dragon)).toBe(0);
+  });
+  it("Pain for All: the enchanted creature deals damage equal to its power to any other target", () => {
+    const pain = card("Pain for All", "Enchantment — Aura", "{2}{R}", { oracleText: "Enchant creature you control\nWhen this Aura enters, enchanted creature deals damage equal to its power to any other target.\nWhenever enchanted creature is dealt damage, it deals that much damage to each opponent." });
+    supported(pain);
+    const { s: s0, ap, ids, opp } = setup([pain]);
+    const giant = putOnBattlefield(s0, ap, bear({ name: "Hill Giant", power: "3", toughness: "3" }));
+    let s = run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: giant }]));
+    for (let i = 0; i < 10 && s.pending?.kind !== "chooseTargets"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    expect(() => act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: giant }] })).toThrow();
+    const life = s.players[opp]!.life;
+    s = passToStack(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] }));
+    expect(s.players[opp]!.life).toBe(life - 3);
+    expect(s.log.some((l) => /Hill Giant deals 3 damage/.test(l.text))).toBe(true);
+  });
+  it("Brokers Ascendancy puts a +1/+1 counter on each creature and a loyalty counter on each planeswalker at your end step", () => {
+    const brokers = card("Brokers Ascendancy", "Enchantment", "{G}{W}{U}", { oracleText: "At the beginning of your end step, put a +1/+1 counter on each creature you control and a loyalty counter on each planeswalker you control." });
+    supported(brokers);
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, brokers);
+    const b = putOnBattlefield(s0, ap, bear());
+    const w = putOnBattlefield(s0, ap, walker);
+    s0.objects[w]!.counters.loyalty = 3;
+    const s = settle(passUntil(s0, "end", ap));
+    expect(s.objects[b]!.counters["+1/+1"]).toBe(1);
+    expect(s.objects[w]!.counters.loyalty).toBe(4);
+  });
 });

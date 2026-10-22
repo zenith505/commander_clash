@@ -407,6 +407,8 @@ export interface TargetSpec {
   };
   /** "Another target creature" on a permanent's ability: not the source itself. */
   notSource?: boolean;
+  /** "Enchanted creature deals damage ... to any other target" (Pain for All): not the permanent the source is attached to. */
+  notSourceHost?: true;
   /**
    * Targets this one can't be the same as: the others of the same "two target creatures" (CR 115.3),
    * or the earlier ones for "another target".
@@ -1366,7 +1368,8 @@ export type Effect =
       /** "The damage can't be prevented." (CR 615.12) */ unpreventable?: true;
       /** "It deals ..." after "Whenever a commander you control deals combat damage" (Kediss): the trigger's creature deals it, as it last existed if it's gone (CR 608.2h). */
       /** `target`: "Target creature you control deals damage equal to its power to each other creature" (Chandra's Ignition): that target, if still legal. */
-      by?: "subject" | { target: number };
+      /** `attached`: "Enchanted creature deals damage equal to its power to any other target" (Pain for All): the permanent the source is attached to. */
+      by?: "subject" | "attached" | { target: number };
       /** "Excess damage is dealt to that creature's controller instead" (Flame Spill): the damage beyond lethal goes there (CR 120.4a). */
       excessToController?: true;
     }
@@ -4394,7 +4397,7 @@ export interface CompiledCard {
   spellsHaveImprovise?: { filter: TargetSpec; text: string }[];
   /** "Instant and sorcery spells you cast have storm" (Prismari, Ral's emblem): each such spell's own storm triggers (CR 702.40a). */
   spellsHaveStorm?: { filter: TargetSpec; text: string }[];
-  spellsHaveCascade?: { filter?: TargetSpec; from?: "hand" | "exile"; first?: true; treasure?: true; commander?: true; yourTurn?: true; maxMv?: Amount; text: string }[];
+  spellsHaveCascade?: { filter?: TargetSpec; from?: "hand" | "exile"; /** 'Have "Cascade, cascade."' (Zhulodok): two instances. */ twice?: true; first?: true; treasure?: true; commander?: true; yourTurn?: true; maxMv?: Amount; text: string }[];
   /** Shadow the Hedgehog: "Each spell you cast has split second if mana from an artifact was spent to cast it" (CR 702.61a, 106.3). */
   splitSecondIfArtifactMana?: true;
   /**

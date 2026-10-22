@@ -790,8 +790,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // be seen: the search, then the discard (at random from the whole hand, the found card included).
   text = text.replace(/^Search your library for a card, put that card into your hand, discard a card at random, then shuffle\.$/, "Search your library for a card, put that card into your hand, then shuffle. Discard a card at random.");
   // "Put a +1/+1 counter on each creature you control and a loyalty counter on each other planeswalker you control"
-  // (Ajani Steadfast): two kinds of counters on two groups, one after the other.
-  text = text.replace(/(^|\. )Put (an?|one|two|three) ([^.]*?counters?) on (each [^.]+?) and (an?|one|two|three) ([^.]*?counters?) on (each [^.]+?)\./g, "$1Put $2 $3 on $4. Put $5 $6 on $7.");
+  // (Ajani Steadfast), "put a +1/+1 counter on each creature you control and a loyalty counter on each planeswalker you
+  // control" (Brokers Ascendancy, in a trigger): two kinds of counters on two groups, one after the other.
+  text = text.replace(/(^|\. )[Pp]ut (an?|one|two|three) ([^.]*?counters?) on (each [^.]+?) and (an?|one|two|three) ([^.]*?counters?) on (each [^.]+?)\./g, "$1Put $2 $3 on $4. Put $5 $6 on $7.");
   // "Search your library for up to four cards with different names and reveal them. Target opponent chooses two of those
   // cards. Put the chosen cards into your graveyard and the rest into your hand. Then shuffle." (Gifts Ungiven), and
   // "Reveal the top three cards of your library. An opponent chooses one of them. Put that card into your graveyard and

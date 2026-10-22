@@ -276,6 +276,14 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
       return to ? [{ type: "damage", amount: { count: { kind: "power", of: { ref: "self" } } }, to }] : null;
     }
     const a = parseObject(m[1]!, ctx);
+    // "Enchanted creature deals damage equal to its power to any other target" (Pain for All): damage from that creature,
+    // which can't be the target.
+    if (a?.ref === "attached" && /^enchanted creature$/i.test(m[1]!) && /^any other target$/i.test(m[2]!)) {
+      const to = parseDamageRecipient("any target", ctx);
+      if (to?.ref !== "anyTarget") return null;
+      ctx.targets[to.index] = { ...ctx.targets[to.index]!, notSourceHost: true, text: "any other target" };
+      return [{ type: "damage", amount: { count: { kind: "power", of: a } }, to, by: "attached" }];
+    }
     // "Target creature you control deals damage equal to its power to any target" (Soul's Fire): damage from that creature.
     if (a?.ref === "target" && !a.n && /^any target$/i.test(m[2]!)) {
       const to = parseDamageRecipient(m[2]!, ctx);

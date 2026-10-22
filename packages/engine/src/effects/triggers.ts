@@ -996,6 +996,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       add(o, you, (e, t) => e === "selfDealsDamageToPlayer" && !(t.toOpponent && ev.player === you), undefined, undefined, undefined, undefined, undefined, undefined, info);
       addHosted(o, (e) => e === "selfDealsDamageToPlayer", undefined, o, info);
     }
+    // "Whenever a source you control deals noncombat damage to an opponent" (Niv-Mizzet, Visionary): the source's
+    // controller's permanents, once for each source and player.
+    if (ev.by !== ev.player)
+      for (const id of s.battlefield) {
+        const w = obj(s, id);
+        if (controllerOf(s, w) === ev.by) add(w, ev.by, (e, t) => e === "sourceYouControlDamagesOpponent" && !(t.noncombatOnly && ev.combat), undefined, undefined, undefined, undefined, undefined, undefined, info);
+      }
     // "Whenever a creature deals damage to you", "Whenever a source an opponent controls deals damage to you": the damaged
     // player's permanents, once for each source. A permanent source is the subject; whose source it is, the event player.
     const fromPermanent = o?.zone === "battlefield" ? o : undefined;

@@ -239,6 +239,9 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   text = text.replace(/^([A-Z][a-z]+) spells and ([A-Za-z]+) spells(?= )/, "$1 and $2 spells");
   const ofChosen = / of the chosen type costs? \{/.test(text);
   if (ofChosen) text = text.replace(/ of the chosen type(?= costs? \{)/, "");
+  // "Spells your opponents cast from graveyards or from exile cost {2} more to cast" (Aven Interrupter).
+  const zones = / from (graveyards or from exile|graveyards|exile)(?= costs? \{)/.exec(text);
+  if (zones) text = text.slice(0, zones.index) + text.slice(zones.index + zones[0].length);
   m = /^(?:(During your turn|During turns other than yours), )?(.+?)( you cast| your opponents cast)?( with (?:mana value|power) \d+ or (?:greater|less))?( from your graveyard)? costs? (\{\d+\}) (less|more) to cast$/.exec(text);
   if (!m || !/spells?$/i.test(m[2]!)) return null;
   const words = m[2]!.replace(/ ?spells?$/i, "").replace(/ and /g, " or ").trim();
@@ -249,7 +252,7 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   if (!parsed || parsed.kind !== "spell" || (pw && !parsed.types?.includes("Creature"))) return "fail";
   const filter: TargetSpec = pw ? { ...parsed, power: pw[2] === "greater" ? { min: Number(pw[1]) } : { max: Number(pw[1]) } } : parsed;
   const who = m[3] === " you cast" ? "you" : m[3] === " your opponents cast" ? "opponents" : "all";
-  if (m[5] && who !== "you") return "fail";
+  if ((m[5] && who !== "you") || (zones && (m[5] || !m[3]))) return "fail";
   const n = Number(/\d+/.exec(m[6]!)![0]) * (m[7] === "less" ? -1 : 1);
   return {
     costMod: {
@@ -258,6 +261,7 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
       n,
       ...(m[1] ? { turn: m[1] === "During your turn" ? "yours" : "notYours" } : {}),
       ...(m[5] ? { fromGraveyard: true } : {}),
+      ...(zones ? { fromZones: zones[1] === "exile" ? ["exile" as const] : zones[1] === "graveyards" ? ["graveyard" as const] : ["graveyard" as const, "exile" as const] } : {}),
       text: line,
     },
   };
@@ -441,7 +445,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return filter ? { kind: "castCount", n: 1, filter } : null;
   }
   if ((m = new RegExp(`^you've cast ${NUM} or more (.+) spells this turn$`).exec(text))) {
-    const filter = parseSearchFilter(`${m[2]!.replace(/ and /g, " or ")} card`);
+    const filter = parseSearchFilter(`${m[2]!.replace(/ and\/or /g, " or ").replace(/ and /g, " or ")} card`);
     return filter ? { kind: "castCount", n: num(m[1]!), filter } : null;
   }
   if ((m = new RegExp(`^there are ${NUM} colors among permanents you control$`).exec(text))) return { kind: "colorsAmong", n: num(m[1]!) };
@@ -542,6 +546,12 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return { kind: "life", ...{ "greater than or equal to": { min: base }, "greater than": { min: base + 1 }, "less than or equal to": { max: base }, "less than": { max: base - 1 } }[m[1]!] };
   }
   if ((m = new RegExp(`^an opponent has ${NUM} or more poison counters$`).exec(text))) return { kind: "opponentPoison", n: num(m[1]!) };
+  if ((m = new RegExp(`^an opponent has ${NUM} or more cards in their graveyard$`).exec(text))) return { kind: "opponentGraveyard", n: num(m[1]!) };
+  // "Activate only if ~'s power is 3 or greater" (Kitsa, Otterball Elite): as it is now.
+  if ((m = new RegExp(`^(~'s (?:power|toughness)) is ${NUM} or (greater|less)$`).exec(text))) {
+    const amount = parseCount(m[1]!, null);
+    return amount ? { kind: "amount", amount, ...(m[3] === "greater" ? { min: num(m[2]!) } : { max: num(m[2]!) }) } : null;
+  }
   // Pestilence: "if no creatures are on the battlefield".
   if ((m = /^no (.+) (?:are|is) on the battlefield$/.exec(text))) {
     const g = parseGroup(`all ${m[1]}`);
@@ -1110,6 +1120,9 @@ function parseStaticLine(line: string): StaticAbility | null {
     if (tax[3] && !amount) return null;
     return { affects: { kind: "self" }, mods: [{ kind: "attackTax", n: amount ? 0 : Number(tax[2]), ...(amount ? { amount } : {}), ...(tax[1] ? { planeswalkers: true as const } : {}) }], text: line };
   }
+  // Norn's Annex: a Phyrexian symbol per creature, its color or 2 life (CR 107.4f).
+  const phyTax = /^Creatures can't attack you( or planeswalkers you control)? unless their controller pays (\{[WUBRG]\/P\}) for each of those creatures$/.exec(text);
+  if (phyTax) return { affects: { kind: "self" }, mods: [{ kind: "attackTax", n: 0, mana: phyTax[2]!, ...(phyTax[1] ? { planeswalkers: true as const } : {}) }], text: line };
   // "Untap ~ during each other player's untap step", "Untap all permanents you control during ..." (Seedborn Muse):
   // they untap with the active player's permanents (CR 502.3); "doesn't untap during your untap step" doesn't apply.
   const untaps = /^Untap (~|all (.+?) you control|each (.+? you control(?: with .+)?)) during each other player's untap step$/.exec(text);

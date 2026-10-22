@@ -448,7 +448,7 @@ export function applyInPlace(s: GameState, action: Action): void {
       finishAssistedCast(s, p, action.cancel);
       break;
     case "dredge":
-      chooseDredge(s, p, action.objectId);
+      chooseDredge(s, p, action.objectId, action.abundance);
       break;
     case "drawLook":
       chooseDrawLook(s, p, action.objectId, action.instead);
@@ -1722,10 +1722,12 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", mad
       archives = archivesFor(s, pid);
     } else archives = made.shift()!;
     const options = dredgeOptions(s, pid);
-    if (options.length) {
+    // Abundance: "you may instead ..." for each draw (rulings), even with nothing left to draw.
+    const abundance = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawAbundance);
+    if (options.length || abundance) {
       // Dredge and an Archive could both replace this draw: the player picks which applies first (CR 616.1, Archive
       // ruling). Not dredging means the Archive's "draw two instead", which isn't optional.
-      s.pending = { kind: "dredge", player: pid, options, left: 1 + n + made.length, ...(made.length ? { made } : {}), ...(archives ? { archive: archives } : {}), ...(after ? { after } : {}) };
+      s.pending = { kind: "dredge", player: pid, options, left: 1 + n + made.length, ...(made.length ? { made } : {}), ...(archives ? { archive: archives } : {}), ...(abundance ? { abundance: nameOf(s, abundance) } : {}), ...(after ? { after } : {}) };
       return false;
     }
     if (archives) {
@@ -1948,12 +1950,48 @@ function dredgeInstead(s: GameState, p: Player, id: ObjectId) {
   log(s, `${p.name} dredges ${nameOf(s, id)} instead of drawing, milling ${n} card${n === 1 ? "" : "s"}.`);
 }
 
-function chooseDredge(s: GameState, p: Player, id?: ObjectId) {
+/**
+ * Abundance instead of a draw: reveal from the top until a land (or nonland) card, put it into the hand (not drawn,
+ * rulings), and the other revealed cards on the bottom in the order the player chooses (none found: all of them). Returns
+ * those other cards.
+ */
+function abundanceInstead(s: GameState, p: Player, kind: "land" | "nonland", source: string): ObjectId[] {
+  const i = p.library.findIndex((id) => isType(defOf(s, obj(s, id)), "Land") === (kind === "land"));
+  const seen = i < 0 ? [...p.library] : p.library.slice(0, i + 1);
+  log(s, `${p.name} chooses ${kind} and reveals ${seen.length ? seen.map((id) => nameOf(s, id)).join(", ") : "nothing"} instead of drawing (${source}).`);
+  const found = i < 0 ? undefined : seen[i];
+  if (found) {
+    moveObject(s, found, "hand");
+    log(s, `${p.name} puts ${nameOf(s, found)} into their hand.`);
+  } else log(s, `${p.name} reveals no ${kind} card.`);
+  const rest = seen.filter((id) => id !== found);
+  for (const id of rest) p.library.push(...p.library.splice(p.library.indexOf(id), 1));
+  return rest;
+}
+
+/** The draws left after one was replaced, then whatever was drawing: the draw step, or a resolving spell or ability. */
+export function continueDraws(s: GameState, pid: PlayerId, left: number, after: "drawStep" | undefined, made: number[]) {
+  if (!draw(s, pid, left, after, made)) return;
+  if (after === "drawStep") fireEvent(s, { type: "step", step: "draw", active: s.activePlayer });
+  else if (s.resolving) continueResolution(s);
+}
+
+function chooseDredge(s: GameState, p: Player, id?: ObjectId, abundance?: "land" | "nonland") {
   const pend = s.pending;
   if (pend?.kind !== "dredge" || pend.player !== p.id) throw new RulesError("no draw to replace");
   if (id !== undefined && !pend.options.includes(id)) throw new RulesError("that card can't be dredged");
+  if (abundance && (!pend.abundance || id !== undefined)) throw new RulesError("nothing lets you reveal instead");
   s.pending = null;
   const made = [...(pend.made ?? [])];
+  if (abundance) {
+    const rest = abundanceInstead(s, p, abundance, pend.abundance!);
+    const left = pend.left - 1 - (pend.made?.length ?? 0);
+    if (rest.length > 1) {
+      s.pending = { kind: "orderLibrary", player: p.id, cards: rest, bottom: true, source: pend.abundance!, thenDraw: { left, made, ...(pend.after ? { after: pend.after } : {}) } };
+      return;
+    }
+    return continueDraws(s, p.id, left, pend.after, made);
+  }
   if (id !== undefined) dredgeInstead(s, p, id);
   else if (pend.archive) {
     // The Archive first: two draws, which the other Archives and dredge can each still replace.
@@ -2096,6 +2134,33 @@ export function addPhases(s: GameState, phases: ("combat" | "main")[], after?: "
   return true;
 }
 
+/**
+ * The turn that's beginning is the one the player-controlling effects waiting for its player apply to (CR 723.1, 723.1b):
+ * the last one created works (723.1a), and each Emrakul among them makes an extra turn after it (rulings).
+ */
+function takeControl(s: GameState) {
+  const pid = s.activePlayer;
+  const mine = s.playerControls?.filter((c) => c.controlled === pid) ?? [];
+  if (!mine.length) return;
+  s.playerControls = s.playerControls!.filter((c) => c.controlled !== pid);
+  if (!s.playerControls.length) s.playerControls = undefined;
+  const controller = mine.filter((c) => !c.ended).pop()?.controller ?? pid;
+  const extraTurns = mine.filter((c) => c.extraTurnAfter).length;
+  s.controlledTurn = { controlled: pid, controller, ...(extraTurns ? { extraTurns } : {}) };
+  // Controlling yourself changes nothing (CR 723.9).
+  if (controller !== pid) log(s, `${player(s, controller).name} controls ${player(s, pid).name} during this turn.`);
+}
+
+/**
+ * Who makes `pid`'s choices and decisions right now: the player controlling them during their turn (CR 723.5), or
+ * themselves (723.8, 723.9). The engine still waits on `pid` (waitingOn), and actions name `pid`: only who chooses
+ * them changes, using `pid`'s resources (723.5a).
+ */
+export function deciderOf(s: GameState, pid: PlayerId): PlayerId {
+  const c = s.controlledTurn;
+  return c && c.controlled === pid && c.controller !== pid && !player(s, c.controller).lost ? c.controller : pid;
+}
+
 /** The combat phase's steps (CR 506.1). */
 export const inCombatPhase = (s: GameState) => ["beginCombat", "declareAttackers", "declareBlockers", "firstStrikeDamage", "combatDamage", "endCombat"].includes(s.step);
 
@@ -2103,6 +2168,11 @@ function startNextTurn(s: GameState, skipping = false) {
   const prev = s.activePlayer;
   // The turn just taken (not one skipped): who cast how many spells in it (CR 731.2).
   if (!skipping) s.lastTurn = { active: prev, cast: s.players.map((p) => (s.castThisTurn ?? []).filter((c) => c.player === p.id).length) };
+  // A player-controlling effect ends as the next turn begins (CR 723.1); Emrakul's "After that turn, that player takes
+  // an extra turn" is created now, so it's the most recently created and taken first (CR 500.7).
+  const controlled = s.controlledTurn;
+  s.controlledTurn = undefined;
+  for (let i = 0; i < (controlled?.extraTurns ?? 0); i++) (s.extraTurns ??= []).push({ player: controlled!.controlled });
   // An extra turn is taken directly after this one, the most recently created first (CR 500.7); one for a player who
   // left the game isn't taken (CR 800.4a). After them, the normal order goes on from the last normal turn.
   let extra: ExtraTurn | undefined;
@@ -2143,6 +2213,7 @@ function startNextTurn(s: GameState, skipping = false) {
     return startNextTurn(s, true);
   }
   s.extraTurn = extra;
+  takeControl(s);
   endCopyEffects(s, (e) => typeof e.until === "object" && began.has(e.until.turnOf));
   const ending = s.effects.filter((e) => e.duration === "yourNextTurn" && e.turnOf !== undefined && began.has(e.turnOf));
   if (ending.length) {
@@ -2818,7 +2889,7 @@ function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" 
     for (const top of abilitiesOf(s, src).fromTop ?? []) {
       // Bolas's Citadel's spells are cast for life (`way` "life"); the other permissions' for their mana costs.
       if (!land && way && !!top.payLife !== (way === "life")) continue;
-      if ((top.if && !staticConditionNow(s, top.if, src.id, pid)) || !(land ? top.lands : top.spells === "any" || !!top.spells?.some((f) => printedMatches(bindChosen(f, src.chosen), d)))) continue;
+      if ((top.if && !staticConditionNow(s, top.if, src.id, pid)) || !(land ? top.lands && (!top.landFilter || printedMatches(top.landFilter, d)) : top.spells === "any" || !!top.spells?.some((f) => printedMatches(bindChosen(f, src.chosen), d)))) continue;
       if (!top.once) return { by: src };
       if (src.topUsedTurn !== s.turn) once ??= src;
     }
@@ -3122,9 +3193,9 @@ export function castProblem(
   if (choices?.faceDown && (free || plotted || choices.via || choices.alt)) return "a face-down spell can't be cast that way";
   // An aftermath half can't be cast from any zone other than a graveyard (CR 702.127a).
   if (o.zone !== "graveyard" && compileCard(d).fromGraveyard?.some((g) => g.kind === "aftermath")) return `${d.name} can be cast only from a graveyard (aftermath)`;
-  const via = graveyardWay(s, o, choices?.via);
+  const via = graveyardWay(s, o, choices?.via, pid);
   if (choices?.via && !via) return `${d.name} doesn't have ${describeVia(choices.via)}`;
-  if (!free && via && (o.zone !== "graveyard" || o.owner !== pid)) return `${describeVia(via.kind)} works only from your graveyard`;
+  if (!free && via && (o.zone !== "graveyard" || (o.owner !== pid && !via.anyOwner))) return `${describeVia(via.kind)} works only from your graveyard`;
   if (via?.if && !staticConditionNow(s, via.if, o.id, pid)) return `you can't cast ${d.name} from your graveyard now`;
   if (via?.kind === "mayhem" && o.discardedTurn !== s.turn) return `mayhem works only if you discarded ${d.name} this turn`; // CR 702.187b
   if (choices?.permit !== undefined && (via?.kind !== "turnPermission" || !pickPermit(s, o, via.permits ?? [], choices.permit))) return `that permission doesn't let you cast ${d.name} now`;
@@ -3133,7 +3204,7 @@ export function castProblem(
   // Flashback and jump-start only if the resulting spell is an instant or sorcery (CR 702.34a, 702.133a).
   if (via && (via.kind === "flashback" || via.kind === "grantedFlashback" || via.kind === "jumpStart") && !isType(d, "Instant") && !isType(d, "Sorcery")) return `${d.name} isn't an instant or sorcery`;
   if (!free && !via && !mayPlayFromExile(s, o, pid) && !mayPlayFromTop(s, o, pid) && (!(o.zone === "hand" || (fromCommand && o.isCommander)) || o.owner !== pid))
-    return o.zone === "graveyard" && graveyardWays(s, o).length ? `choose how to cast ${d.name} from your graveyard` : "you can only cast spells from your hand or your commander";
+    return o.zone === "graveyard" && graveyardWays(s, o, pid).length ? `choose how to cast ${d.name} from ${o.owner === pid ? "your" : "a"} graveyard` : "you can only cast spells from your hand or your commander";
   if (choices?.buyback && compileCard(d).buyback === undefined) return `${d.name} doesn't have buyback`;
   // From the top of the library, a permission for this way of paying: Bolas's Citadel's spells for life (CR 118.9).
   // Valgavoth's exiled cards: for life equal to their mana value, and no other way (rulings).
@@ -3360,7 +3431,7 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // Airbend's "{2} rather than its mana cost" (CR 701.65a), an alternative cost.
   const airbent = !how.faceDown && !how.alt && freeCastOf(s, pid) !== o.id ? exiled?.cost : undefined;
   // From a graveyard with a permission that names no cost, an alternative cost replaces the mana cost (CastFromGraveyard).
-  const way = graveyardWay(s, o, how.via);
+  const way = graveyardWay(s, o, how.via, pid);
   const wayMana = way && !(how.alt && permissionWay(way)) ? way.mana : undefined;
   const base = how.faceDown ? "{3}" : (madness ?? wayMana ?? altCost(d, how.alt, s, pid)?.mana ?? airbent ?? d.manaCost);
   const mana = anyType(lessColored(parseManaCost(base + kickCost)));
@@ -3406,6 +3477,7 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
       if (m.who === "you" ? pid !== c.controller : m.who === "opponents" ? pid === c.controller : m.who === "enchanted" ? src.attachedToPlayer !== pid : false) continue;
       if (m.turn === "notCasters" ? s.activePlayer === pid : m.turn && (s.activePlayer === c.controller) !== (m.turn === "yours")) continue;
       if (m.fromGraveyard && o.zone !== "graveyard") continue;
+      if (m.fromZones && !m.fromZones.includes(o.zone as "graveyard" | "exile")) continue;
       if (m.notOwned && o.owner === pid) continue;
       if (m.if && !staticConditionNow(s, m.if, src.id, c.controller)) continue;
       const { manaValue: range, power: pw, ...rest } = bindChosen(m.filter, src.chosen);
@@ -3605,6 +3677,8 @@ export function payZeroSource(s: GameState, pid: PlayerId, o: GameObject): GameO
     if (!z || controllerOf(s, p) !== pid || !characteristics(s, p).hasPrintedAbilities) return false;
     if (z.once && used.includes(`${p.id}@${p.zoneChanges ?? 0}`)) return false;
     if (z.fromHand && o.zone !== "hand") return false;
+    if (z.yourTurn && s.activePlayer !== pid) return false;
+    if (z.fromHandOrTop && o.zone !== "hand" && !(o.zone === "library" && player(s, pid).library[0] === o.id)) return false;
     if (z.filter && !printedMatches(z.filter, d)) return false;
     return z.maxMvCounters === undefined || defMv(d) <= (p.counters[z.maxMvCounters] ?? 0);
   });
@@ -3817,7 +3891,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     const how = topPermission(s, o, p.id);
     if (how?.once) how.by.topUsedTurn = s.turn;
   }
-  const via = graveyardWay(s, o, choices.via);
+  const via = graveyardWay(s, o, choices.via, p.id);
   // A once-each-turn permission is used up (Karador; Muldrotha's slot for one of the spell's types).
   if (via?.kind === "turnPermission") {
     const permit = pickPermit(s, o, permitsForMv(s, via.permits ?? [], defMv(d) + (x ?? 0) * xCount(parseManaCost(d.manaCost))), choices.permit)!;
@@ -3851,6 +3925,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // A once-each-turn permission's own "exile it instead" (Maestros Ascendancy), not another's it shares the way with.
   const exiles = via?.kind === "turnPermission" ? !!choices.permit && permitExiles(s, choices.permit) : via?.exile;
   if (exiles || (castFrom === "graveyard" && compileCard(d).fromGraveyard?.some((g) => g.kind === "aftermath"))) o.exileIfLeaves = "stack";
+  if (via?.exileIfToGraveyard) o.exileIfToGraveyard = true;
   o.controller = p.id;
   o.timestamp = s.nextTimestamp++;
   const chosen = spell?.modal ? modes : undefined;
@@ -4046,29 +4121,30 @@ export function graveyardCast(d: CardDef, via?: CastFromGraveyardKind): CastFrom
 export const hasGrantedFlashback = (s: GameState, o: GameObject) => o.zone === "graveyard" && !!s.flashbackGrants?.some((g) => g.id === o.id && g.zc === (o.zoneChanges ?? 0));
 
 /** The ways to cast this card from a graveyard: its own (flashback, escape, ...), and flashback an effect gave it. */
-export function graveyardWays(s: GameState, o: GameObject): CastFromGraveyard[] {
+/** `caster`: who would cast it, for a permission to cast from any graveyard (The Great Work); its owner if left out. */
+export function graveyardWays(s: GameState, o: GameObject, caster?: PlayerId): CastFromGraveyard[] {
   // Cast transformed (disturb): the front face's ability is considered too (CR 712.11d).
   if (o.face !== undefined && layoutOf(s, o) === "transform") {
     const face = o.face;
     o.face = undefined;
     try {
-      return graveyardWays(s, o).filter((g) => g.face === face);
+      return graveyardWays(s, o, caster).filter((g) => g.face === face);
     } finally {
       o.face = face;
     }
   }
   // A split card in a graveyard is cast as one of its halves (CR 709.3): each half's ways, aftermath's among them
   // (702.127a), or flashback an effect gave the card, for that half's mana cost.
-  if (o.face === undefined && layoutOf(s, o) === "split") return castableFaces(s, o).flatMap((f) => asFace(s, o, f, () => graveyardWays(s, o)).map((g) => ({ ...g, face: f })));
+  if (o.face === undefined && layoutOf(s, o) === "split") return castableFaces(s, o).flatMap((f) => asFace(s, o, f, () => graveyardWays(s, o, caster)).map((g) => ({ ...g, face: f })));
   const d = defOf(s, o);
-  return [...(compileCard(d).fromGraveyard ?? []), ...(hasGrantedFlashback(s, o) ? [{ kind: "grantedFlashback" as const, mana: d.manaCost, costs: [], exile: true }] : []), ...grantedWays(s, o, d)];
+  return [...(compileCard(d).fromGraveyard ?? []), ...(hasGrantedFlashback(s, o) ? [{ kind: "grantedFlashback" as const, mana: d.manaCost, costs: [], exile: true }] : []), ...grantedWays(s, o, d, caster ?? o.owner)];
 }
 
 /**
  * Escape, flashback or retrace a permanent its owner controls gives this card in their graveyard (Underworld Breach,
  * Lier, Six), one of each kind; the cost is the card's mana cost, so a card without one can't be cast this way (rulings).
  */
-function grantedWays(s: GameState, o: GameObject, d: CardDef): CastFromGraveyard[] {
+function grantedWays(s: GameState, o: GameObject, d: CardDef, caster: PlayerId): CastFromGraveyard[] {
   if (o.zone !== "graveyard") return [];
   const out: CastFromGraveyard[] = [];
   // "You may cast that card this turn" (Emry): its owner, paying its mana cost; a card without one can't be cast.
@@ -4101,8 +4177,12 @@ function grantedWays(s: GameState, o: GameObject, d: CardDef): CastFromGraveyard
   }
   // "You may cast spells from your graveyard this turn" (Forgotten Cellar, Yawgmoth's Will): any number of them, paying
   // their mana costs (rulings), for the rest of the turn.
-  if (d.manaCost && s.graveyardTurn?.some((g) => g.player === o.owner && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) && !out.some((w) => w.kind === "permission"))
+  if (d.manaCost && s.graveyardTurn?.some((g) => !g.anyGraveyard && g.player === o.owner && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) && !out.some((w) => w.kind === "permission"))
     out.push({ kind: "permission", mana: d.manaCost, costs: [], exile: false });
+  // "Until end of turn, you may cast instant and sorcery spells from any graveyard" (The Great Work): for the player it
+  // gave the permission, whoever owns the card; "if a spell cast this way would be put into a graveyard, exile it instead".
+  const any = d.manaCost ? s.graveyardTurn?.find((g) => g.anyGraveyard && g.player === caster && g.turn === s.turn && g.cast && printedMatches(g.cast, d)) : undefined;
+  if (any && !out.some((w) => w.kind === "permission")) out.push({ kind: "permission", mana: d.manaCost, costs: [], exile: false, anyOwner: true, ...(any.exileCast ? { exileIfToGraveyard: true as const } : {}) });
   // "You may cast a creature spell from your graveyard this turn" (Chainer, Nightmare Adept): one spell for each, with
   // the once-each-turn permissions (rulings: each activation is a permission of its own).
   const used = s.turnLog?.gravePermits ?? [];
@@ -4179,8 +4259,8 @@ export function permitLabel(s: GameState, key: string): string {
 export const permissionWay = (g: CastFromGraveyard) => g.kind === "permission" || g.kind === "turnPermission";
 
 /** One way to cast it from a graveyard, if it has it. */
-export function graveyardWay(s: GameState, o: GameObject, via?: CastFromGraveyardKind): CastFromGraveyard | undefined {
-  return via ? graveyardWays(s, o).find((g) => g.kind === via) : undefined;
+export function graveyardWay(s: GameState, o: GameObject, via?: CastFromGraveyardKind, caster?: PlayerId): CastFromGraveyard | undefined {
+  return via ? graveyardWays(s, o, caster).find((g) => g.kind === via) : undefined;
 }
 
 export function describeVia(via: CastFromGraveyardKind | FaceDownKind): string {
@@ -4561,7 +4641,9 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       continue;
     }
     if (!chosen) {
-      if (c.n > 0 && (pool.length < c.n || !pool.some(fits))) return `you need to ${verb} ${full} to ${doing}`;
+      // Untapping: also what can be tapped for mana first (Halo Fountain).
+      const can = c.kind === "tap" && c.untap ? [...pool, ...untapViaMana(s, pid, o, c)] : pool;
+      if (c.n > 0 && (can.length < c.n || !can.some(fits))) return `you need to ${verb} ${full} to ${doing}`;
       continue;
     }
     if (chosen.length !== c.n || new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id)) || !chosen.some(fits)) return `choose ${full} to ${verb}`;
@@ -4579,6 +4661,19 @@ export function tapCostCandidates(s: GameState, pid: PlayerId, source: GameObjec
     // "Untap a tapped creature you control": tapped ones, but not one a stun counter would keep tapped (CR 122.1d).
     if (c.untap ? !x.tapped || (x.counters.stun ?? 0) > 0 : x.tapped) return false;
     return controllerOf(s, x) === pid && !(c.other && id === source.id) && objectMatches(s, c.filter, x, pid, false);
+  });
+}
+
+/**
+ * The untapped permanents "Untap a tapped creature you control" (Halo Fountain) can untap all the same: ones that can
+ * be tapped for mana while paying for the ability, then untapped for its cost, since mana abilities are activated
+ * before costs are paid (CR 601.2g-h, 602.2b; rulings on Halo Fountain). Not one with a stun counter (CR 122.1d).
+ */
+export function untapViaMana(s: GameState, pid: PlayerId, source: GameObject, c: Extract<AdditionalCost, { kind: "tap" }>): ObjectId[] {
+  return s.battlefield.filter((id) => {
+    const x = obj(s, id);
+    if (id === source.id || x.tapped || (x.counters.stun ?? 0) > 0 || controllerOf(s, x) !== pid || !objectMatches(s, c.filter, x, pid, false)) return false;
+    return manaAbilitiesOn(s, x).some((m, i) => m.tap && !m.manaCost && !m.tapCost && !m.sacrificeSelf && !manaAbilityProblem(s, pid, x, i, true)) || payableActivatedMana(s, pid, x).some((m) => m.ab.tap && !m.ab.manaCost && !m.ab.sacrificeSelf);
   });
 }
 
@@ -4828,7 +4923,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   const cost = activationCost(s, pid, o, ab, targets, x);
   const xp = ab.loyaltyX || abilityCostsHaveX(ab) ? (x !== undefined && (!Number.isInteger(x) || x < 0) ? "X must be a whole number, 0 or more" : (x ?? 0) < (ab.xMin ?? 0) ? "X can't be 0" : null) : xProblem(cost, x);
   if (xp) return xp;
-  if (!canPayFromPool(s, pid, cost, abilityUse(o, ab), ab.loyaltyX ? 0 : (x ?? 0) * xCount(cost), p.life)) return `not enough mana for ${d.name}'s ability`;
+  if (!canPayFromPool(s, pid, cost, abilityUse(o, ab, s), ab.loyaltyX ? 0 : (x ?? 0) * xCount(cost), p.life)) return `not enough mana for ${d.name}'s ability`;
   return null;
 }
 
@@ -5008,7 +5103,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // "Pay half your life, rounded up": worked out with the rest of the cost, before any of it is paid (CR 601.2f-h).
   const halfLife = halfLifeCost(s, p.id, ab);
   const lifeCost = activatedLifeCost(s, p.id, ab);
-  const paid = spendFromPool(s, p.id, abCost, abilityUse(o, ab), ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), payableLife(s, p.id) - halfLife - lifeCost)!;
+  const paid = spendFromPool(s, p.id, abCost, abilityUse(o, ab, s), ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), payableLife(s, p.id) - halfLife - lifeCost)!;
   // A Treasure's mana ability makes "mana from a Treasure" (CR 106.3), even though it's sacrificed as it's activated.
   const manaFrom = manaPick ? manaOriginsOf(s, o) : [];
   // The source as it is now, for "its power" after it's sacrificed as a cost (CR 608.2h).
@@ -6080,13 +6175,21 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
  * control" (Sphere of Safety); a battle they protect never is.
  */
 export function attackTaxPer(s: GameState, defender: PlayerId, planeswalker = false): number {
-  let n = 0;
+  const { generic, mana } = attackTaxParts(s, defender, planeswalker);
+  return generic + mana.length;
+}
+
+/** The generic mana and the other symbols ({W/P}, Norn's Annex) attacking `defender` costs for each creature. */
+function attackTaxParts(s: GameState, defender: PlayerId, planeswalker: boolean): { generic: number; mana: string[] } {
+  let generic = 0;
+  const mana: string[] = [];
   for (const id of s.battlefield) {
-    const o = obj(s, id);
-    const c = characteristics(s, o);
-    if (c.controller === defender) n += planeswalker ? c.attackTaxPlaneswalkers : c.attackTax;
+    const c = characteristics(s, obj(s, id));
+    if (c.controller !== defender) continue;
+    generic += planeswalker ? c.attackTaxPlaneswalkers : c.attackTax;
+    mana.push(...(planeswalker ? c.attackTaxManaPlaneswalkers : c.attackTaxMana));
   }
-  return n;
+  return { generic, mana };
 }
 
 /** What one attack costs: at a player, or at a planeswalker or battle (`planeswalker`, the permanent attacked). */
@@ -6096,9 +6199,22 @@ export function attackTaxOf(s: GameState, a: { defender: PlayerId; planeswalker?
   return pw && objIsType(s, pw, "Planeswalker") && controllerOf(s, pw) === a.defender ? attackTaxPer(s, a.defender, true) : 0;
 }
 
-/** The total attack tax for a declaration. */
+/** The total attack tax for a declaration: how many mana symbols (generic mana, and {W/P} each for Norn's Annex). */
 export function attackTax(s: GameState, attacks: { defender: PlayerId; planeswalker?: ObjectId }[]): number {
   return attacks.reduce((n, a) => n + attackTaxOf(s, a), 0);
+}
+
+/** The total attack cost of a declaration as a mana cost, "{4}{W/P}{W/P}" ("" when attacking is free). */
+export function attackCost(s: GameState, attacks: { defender: PlayerId; planeswalker?: ObjectId }[]): string {
+  let generic = 0;
+  const mana: string[] = [];
+  for (const a of attacks) {
+    if (!attackTaxOf(s, a)) continue;
+    const parts = attackTaxParts(s, a.defender, a.planeswalker !== undefined);
+    generic += parts.generic;
+    mana.push(...parts.mana);
+  }
+  return `${generic ? `{${generic}}` : ""}${mana.join("")}`;
 }
 
 export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, planeswalker = false, /** The planeswalker or battle attacked. */ attacked?: ObjectId): string | null {
@@ -6266,10 +6382,13 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     if (!a || a.planeswalker !== undefined || !able.includes(a.defender)) throw new RulesError(`${defOf(s, o).name} must attack ${able.map((d) => player(s, d).name).join(" or ")} if able`);
   }
   // Attack costs are totalled and paid, with mana abilities activated first (CR 508.1g-i).
-  const tax = attackTax(s, attacks);
+  // A Phyrexian symbol is paid with its color's mana from the pool, otherwise 2 life (CR 107.4f, 119.4).
+  const tax = attackCost(s, attacks);
   if (tax) {
-    if (!spendFromPool(s, p.id, parseManaCost(`{${tax}}`), "other")) throw new RulesError(`attacking these players costs {${tax}}: add the mana first`);
-    log(s, `${p.name} pays {${tax}} to attack.`);
+    const paid = spendFromPool(s, p.id, parseManaCost(tax), "other", 0, payableLife(s, p.id));
+    if (!paid) throw new RulesError(`attacking these players costs ${tax}: add the mana first`);
+    loseLife(s, p.id, paid.lifePaid);
+    log(s, `${p.name} pays ${tax}${paid.lifePaid ? ` (${paid.lifePaid} life)` : ""} to attack.`);
   }
   for (const a of attacks) {
     const o = obj(s, a.attacker);
@@ -7166,6 +7285,10 @@ export function playerLoses(s: GameState, pid: PlayerId, reason: string, concede
   // CR 800.4a: everything they own leaves the game, and effects giving them control of things end.
   s.stack = s.stack.filter((item) => item.controller !== pid);
   for (const e of s.effects) if (e.controller === pid) e.mods = e.mods.filter((m) => m.kind !== "control");
+  // ... and of players (CR 723): Emrakul's extra turn still comes.
+  if (s.controlledTurn?.controller === pid) s.controlledTurn = { ...s.controlledTurn, controller: s.controlledTurn.controlled };
+  s.playerControls = s.playerControls?.flatMap((c) => (c.controller !== pid ? [c] : c.extraTurnAfter ? [{ ...c, ended: true as const }] : []));
+  if (!s.playerControls?.length) s.playerControls = undefined;
   invalidateCharacteristics(s);
   for (const id of [...s.battlefield]) {
     const o = obj(s, id);

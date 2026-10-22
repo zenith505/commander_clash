@@ -463,7 +463,7 @@ export function compile(d: CardDef): CompiledCard {
     else if (!isSpell && /^Vivid — \{/.test(line)) line = line.replace(/^Vivid — /, "");
     if (!line) continue;
     // "~ has all activated abilities of ..." (CompiledCard.borrows).
-    const borrow = /^(?:As long as ~ is on the battlefield, it|~) has all activated abilities of (.+?)( except mana abilities)?\.$/.exec(line);
+    const borrow = /^(?:As long as ~ is on the battlefield, it|~) has all activated abilities of (.+?)( except mana abilities)?\.( You may spend mana as though it were mana of any color to activate those abilities\.)?$/.exec(line);
     if (borrow && !out.borrows) {
       const yard = /^all (.+?) cards in (all graveyards|your graveyard)$/.exec(borrow[1]!);
       const what = yard ? parseTargetPhrase(yard[1]!) : null;
@@ -471,7 +471,7 @@ export function compile(d: CardDef): CompiledCard {
       const group = yard ? null : parseGroup(same ? borrow[1]!.slice(0, same.index) : borrow[1]!);
       if (yard && what?.kind === "object" && !what.controller && Object.entries(what).every(([k, v]) => v === undefined || ["kind", "types", "notTypes", "notColors", "subtypes", "text"].includes(k)))
         out.borrows = { filter: { ...what, text: `${yard[1]} cards` }, graveyard: true, ...(yard[2] === "your graveyard" ? { yours: true as const } : {}), ...(borrow[2] ? { noMana: true as const } : {}) };
-      else if (group && group.filter.controller !== "enchanted") out.borrows = { filter: group.filter, ...(group.other ? { other: true } : {}), ...(same ? { notSameName: true as const } : {}), ...(borrow[2] ? { noMana: true as const } : {}) };
+      else if (group && group.filter.controller !== "enchanted") out.borrows = { filter: group.filter, ...(group.other ? { other: true } : {}), ...(same ? { notSameName: true as const } : {}), ...(borrow[2] ? { noMana: true as const } : {}), ...(borrow[3] ? { anyColor: true as const } : {}) };
       else out.unsupported.push(raw);
       continue;
     }
@@ -1409,6 +1409,10 @@ export function compile(d: CardDef): CompiledCard {
       out.drawEmptyWins = true;
       continue;
     }
+    if (line === "If you would draw a card, you may instead choose land or nonland and reveal cards from the top of your library until you reveal a card of the chosen kind. Put that card into your hand and put all other cards revealed this way on the bottom of your library in any order.") {
+      out.drawAbundance = true;
+      continue;
+    }
     if (line === "If you would draw a card except the first one you draw in each of your draw steps, draw two cards instead.") {
       out.drawTwoInstead = true;
       continue;
@@ -1486,6 +1490,12 @@ export function compile(d: CardDef): CompiledCard {
       const filter = spec?.kind === "card" ? (({ owner: _, ...rest }) => ({ ...rest, text: `${what} spell` }))(spec) : undefined;
       if (what && !filter) out.unsupported.push(raw);
       else out.payZero = { ...(filter ? { filter } : {}), ...(payZero[3] ? { fromHand: true as const } : {}), ...(/^Once/.test(payZero[1]!) ? { once: true as const } : {}), ...(payZero[5] ? { maxMvCounters: payZero[5] } : {}) };
+      continue;
+    }
+    // One with the Multiverse: casting without paying the mana cost is an alternative cost (CR 118.9), X is 0 (107.3b);
+    // once for each such permanent (a new object again, rulings), during your turn, following the normal timing rules.
+    if (line === "Once during each of your turns, you may cast a spell from your hand or the top of your library without paying its mana cost.") {
+      out.payZero = { once: true, yourTurn: true, fromHandOrTop: true };
       continue;
     }
     if (line === "You may pay {W}{U}{B}{R}{G} rather than pay the mana cost for spells you cast.") {
@@ -2699,13 +2709,16 @@ function parseCostOr(text: string): CostOption[] | null {
 export function parseFromTop(text: string): FromTop | null | undefined {
   // "You may play the top card of your library", "you may play cards from the top of your library": lands and spells.
   text = text.replace(/^(you may) play (?:the top card of your library|cards from the top of your library)$/i, "$1 play lands and cast spells from the top of your library");
-  const m = /^(Once each turn, )?[Yy]ou may (play lands|play lands and cast (.+)|cast (.+)) from the top of your library$/.exec(text);
+  // "Play historic lands" (Crystal Skull): only lands of that kind.
+  const m = /^(Once each turn, )?[Yy]ou may (?:play (?:([a-z]+) )?lands(?: and cast (.+))?|cast (.+)) from the top of your library$/.exec(text);
   if (!m) return undefined;
-  const lands = !!m[2]!.startsWith("play lands");
+  const lands = m[4] === undefined;
   const what = m[3] ?? m[4];
   if (m[1] && (lands || !what)) return null; // only "once each turn, you may cast ..." is modeled
-  if (!what) return { lands };
-  if (what === "spells") return m[1] ? null : { lands, spells: "any" };
+  const landFilter = m[2] ? parseSearchFilter(`${m[2]} land card`) : undefined;
+  if (m[2] && !landFilter) return null;
+  if (!what) return { lands, ...(landFilter ? { landFilter } : {}) };
+  if (what === "spells") return m[1] ? null : { lands, ...(landFilter ? { landFilter } : {}), spells: "any" };
   // "Creature spells", "an instant or sorcery spell", "a creature spell with power 2 or less", "Angel spells and Human
   // spells", "spells with mana value 4 or greater": each kind as a card filter.
   const parts = what.split(/ spells and (?=\S+ spells$)/).map((x) => x.replace(/^an? /, ""));
@@ -2720,7 +2733,7 @@ export function parseFromTop(text: string): FromTop | null | undefined {
     if (!f) return null;
     spells.push(chosen ? { ...f, chosen: "type", text: `${f.text} of the chosen type` } : f);
   }
-  return { lands, spells, ...(m[1] ? { once: true as const } : {}) };
+  return { lands, ...(landFilter ? { landFilter } : {}), spells, ...(m[1] ? { once: true as const } : {}) };
 }
 
 /**

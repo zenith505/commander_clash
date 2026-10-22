@@ -618,7 +618,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
         tos.push({ ref: "each", filter: { kind: "object", types: ["Battle"], protector: "opponent", text: "each battle they protect" } });
         continue;
       }
-      const to = parseDamageRecipient(part, ctx);
+      // "Target opponent and each creature they control" (The Great Work): that player's creatures.
+      const theirs = /^each creature they control$/i.test(part) && tos.length === 1 && tos[0]!.ref === "target" && ctx.lastPlayerTarget === tos[0]!.index;
+      const to = parseDamageRecipient(theirs ? "each creature that player controls" : part, ctx);
       if (!to) return null;
       tos.push(to);
     }

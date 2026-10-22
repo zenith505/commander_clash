@@ -26,6 +26,7 @@ import {
   obj,
   graveyardWays,
   waitingOn,
+  deciderOf,
   RulesError,
   timedCondition,
   type Action,
@@ -36,7 +37,25 @@ import {
   type TargetChoice,
 } from "@cc/engine";
 
-export const HUMAN: PlayerId = 0;
+/** Your seat. */
+export const YOU: PlayerId = 0;
+/**
+ * The player whose choices you're making now, and whose view of the table you get: you, or the player you control
+ * during their turn (CR 723.4, 723.5) while they decide something. The table sets it from the state each time it draws
+ * (`actAs`), so everything that reads it draws and acts for that player.
+ */
+export let HUMAN: PlayerId = YOU;
+export function actAs(s: GameState | null) {
+  HUMAN = s ? actingAs(s) : YOU;
+}
+/** See HUMAN: the controlled player while you decide for them, and while others answer during their turn. */
+export function actingAs(s: GameState): PlayerId {
+  const w = waitingOn(s);
+  if (w !== null && w !== YOU && deciderOf(s, w) === YOU) return w;
+  const c = s.controlledTurn;
+  if (w !== YOU && c && c.controlled !== YOU && deciderOf(s, c.controlled) === YOU) return c.controlled;
+  return YOU;
+}
 const BOT_DELAY_MS = 120;
 /** Bots pass more slowly while something is on the stack, so you can read it. */
 const STACK_DELAY_MS = 450;
@@ -60,7 +79,7 @@ export function newGame(bundle: DeckBundle, humanDeck: number, seed = Date.now()
   const s = createGame(
     order.map((di, seat) => {
       const d = bundle.decks[di]!;
-      return { name: seat === HUMAN ? "You" : d.commander.split(",")[0]!, commander: get(d.commander), ...(d.secondCommander ? { secondCommander: get(d.secondCommander) } : {}), deck: d.cards.map(get), isBot: seat !== HUMAN };
+      return { name: seat === YOU ? "You" : d.commander.split(",")[0]!, commander: get(d.commander), ...(d.secondCommander ? { secondCommander: get(d.secondCommander) } : {}), deck: d.cards.map(get), isBot: seat !== YOU };
     }),
     seed,
     { mulligans: true },
@@ -76,7 +95,7 @@ export function newGame(bundle: DeckBundle, humanDeck: number, seed = Date.now()
 function stackOpeningHand(s: GameState) {
   if (typeof location === "undefined") return;
   const wanted = new URLSearchParams(location.search).get("hand") ?? "";
-  const me = s.players[HUMAN]!;
+  const me = s.players[YOU]!;
   // Swap out spells first, so the hand keeps its lands.
   const slots = me.hand.map((id, i) => ({ i, land: isLand(s, id) })).sort((a, b) => Number(a.land) - Number(b.land)).map((x) => x.i);
   for (const name of wanted ? wanted.split("|") : []) {
@@ -162,10 +181,12 @@ function hasInstantPlay(s: GameState): boolean {
     if (o.faceDown && controllerOf(s, o) === HUMAN && planTurnFaceUp(s, HUMAN, id)) return true;
   }
   // Flashback and the like work from your graveyard, at instant speed for an instant (CR 702.34a).
-  for (const id of me.graveyard) {
+  // With The Great Work, from any graveyard.
+  const anyYard = s.graveyardTurn?.some((g) => g.anyGraveyard && g.player === HUMAN && g.turn === s.turn);
+  for (const id of anyYard ? s.players.flatMap((p) => p.graveyard) : me.graveyard) {
     const d = cardOf(s, id);
     if (!isType(d, "Instant")) continue;
-    for (const g of graveyardWays(s, obj(s, id))) if (planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { via: g.kind })) return true;
+    for (const g of graveyardWays(s, obj(s, id), HUMAN)) if (planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { via: g.kind })) return true;
   }
   for (const id of s.battlefield) {
     const o = obj(s, id);
@@ -418,11 +439,13 @@ export function useGame(initial: GameState | null) {
     if (!state || state.over) return;
     const who = waitingOn(state);
     if (who === null) return;
-    const isBot = state.players[who]!.isBot;
+    // A player someone else controls during their turn is played by whoever controls them (CR 723.5).
+    const isBot = state.players[deciderOf(state, who)]!.isBot;
+    actAs(state);
     if (!isBot && !shouldAutoPass(state, priorityMode, stops, loopRef.current)) return;
     const timers: ReturnType<typeof setTimeout>[] = [];
     const act = () => {
-      if (!isBot) return dispatch([{ type: "passPriority", player: HUMAN }]);
+      if (!isBot) return dispatch([{ type: "passPriority", player: who }]);
       const actions = botActions(state, who);
       const shown = intentOf(state, who, actions);
       if (!shown) return dispatch(actions);

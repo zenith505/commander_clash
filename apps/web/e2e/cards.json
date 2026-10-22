@@ -1,5 +1,31 @@
 [
  {
+  "oracleId": "eccc9a54-2b56-4a02-9926-258d5b2e25fb",
+  "name": "Abundance",
+  "manaCost": "{2}{G}{G}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "If you would draw a card, you may instead choose land or nonland and reveal cards from the top of your library until you reveal a card of the chosen kind. Put that card into your hand and put all other cards revealed this way on the bottom of your library in any order.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "40k",
+  "releasedAt": "2022-10-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "981b0e21-e5e6-4a1e-bfde-679d56623f7f",
   "name": "Ad Nauseam",
   "manaCost": "{3}{B}{B}",
@@ -560,6 +586,41 @@
   "commanderLegal": "legal",
   "set": "khm",
   "releasedAt": "2021-02-05",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "069f6530-e65c-4d52-85f3-e0a2acd148c5",
+  "name": "Avacyn's Pilgrim",
+  "manaCost": "{G}",
+  "cmc": 1,
+  "typeLine": "Creature — Human Monk",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Monk"
+  ],
+  "oracleText": "{T}: Add {W}.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G",
+   "W"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "isd",
+  "releasedAt": "2011-09-30",
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
@@ -2974,6 +3035,38 @@
   ]
  },
  {
+  "oracleId": "4e7a8817-1a66-45c3-ade9-eac79b40b89f",
+  "name": "Emrakul, the Promised End",
+  "manaCost": "{13}",
+  "cmc": 13,
+  "typeLine": "Legendary Creature — Eldrazi",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Eldrazi"
+  ],
+  "oracleText": "This spell costs {1} less to cast for each card type among cards in your graveyard.\nWhen you cast this spell, you gain control of target opponent during that player's next turn. After that turn, that player takes an extra turn.\nFlying, trample, protection from instants",
+  "power": "13",
+  "toughness": "13",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Flying",
+   "Protection",
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2023-10-02",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "da3e7d3d-2ca0-40c3-9602-fca37c92f507",
   "name": "Emry, Lurker of the Loch",
   "manaCost": "{2}{U}",
@@ -4297,6 +4390,32 @@
   "set": "all",
   "releasedAt": "1996-06-10",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "36a9de4c-8073-475d-8679-e50844eef09e",
+  "name": "Halo Fountain",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{W}, {T}, Untap a tapped creature you control: Create a 1/1 green and white Citizen creature token.\n{W}{W}, {T}, Untap two tapped creatures you control: Draw a card.\n{W}{W}{W}{W}{W}, {T}, Untap fifteen tapped creatures you control: You win the game.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "snc",
+  "releasedAt": "2022-04-29",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -6770,6 +6889,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9a1fbe72-4a17-42be-8e23-d7d30a5e59c1",
+  "name": "Norn's Annex",
+  "manaCost": "{3}{W/P}{W/P}",
+  "cmc": 5,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "({W/P} can be paid with either {W} or 2 life.)\nCreatures can't attack you or planeswalkers you control unless their controller pays {W/P} for each of those creatures.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "nph",
+  "releasedAt": "2011-05-13",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "730e39e6-c61d-48b5-8827-bfd952bf1be7",
   "name": "Omniscience",
   "manaCost": "{7}{U}{U}{U}",
@@ -6791,6 +6936,32 @@
   "commanderLegal": "legal",
   "set": "fdn",
   "releasedAt": "2024-11-15",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "06bb4272-25d1-46db-8585-15f919267e1e",
+  "name": "One with the Multiverse",
+  "manaCost": "{6}{U}{U}",
+  "cmc": 8,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "You may look at the top card of your library any time.\nYou may play lands and cast spells from the top of your library.\nOnce during each of your turns, you may cast a spell from your hand or the top of your library without paying its mana cost.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bro",
+  "releasedAt": "2022-11-18",
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
@@ -9142,6 +9313,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "10d482fd-e034-4187-b148-51fe15885360",
+  "name": "Sunbird's Invocation",
+  "manaCost": "{5}{R}",
+  "cmc": 6,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever you cast a spell from your hand, reveal the top X cards of your library, where X is that spell's mana value. You may cast a spell with mana value X or less from among cards revealed this way without paying its mana cost. Put the rest on the bottom of your library in a random order.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "blc",
+  "releasedAt": "2024-08-02",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "56719f6a-1a6c-4c0a-8d21-18f7d7350b68",
   "name": "Swamp",
   "manaCost": "",
@@ -10068,6 +10265,92 @@
   "rarity": "common",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "4b1da9aa-a30c-44b8-a10e-f9dc3fe70b6f",
+  "name": "Urabrask // The Great Work",
+  "manaCost": "{2}{R}{R}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Phyrexian Praetor // Enchantment — Saga",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Phyrexian",
+   "Praetor"
+  ],
+  "oracleText": "First strike\nWhenever you cast an instant or sorcery spell, Urabrask deals 1 damage to target opponent. Add {R}.\n{R}: Exile Urabrask, then return it to the battlefield transformed under its owner's control. Activate only as a sorcery and only if you've cast three or more instant and/or sorcery spells this turn.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Transform",
+   "First strike",
+   "Treasure"
+  ],
+  "producedMana": [
+   "R"
+  ],
+  "commanderLegal": "legal",
+  "set": "mom",
+  "releasedAt": "2023-04-21",
+  "rarity": "mythic",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Urabrask",
+    "manaCost": "{2}{R}{R}",
+    "typeLine": "Legendary Creature — Phyrexian Praetor",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Phyrexian",
+     "Praetor"
+    ],
+    "oracleText": "First strike\nWhenever you cast an instant or sorcery spell, Urabrask deals 1 damage to target opponent. Add {R}.\n{R}: Exile Urabrask, then return it to the battlefield transformed under its owner's control. Activate only as a sorcery and only if you've cast three or more instant and/or sorcery spells this turn.",
+    "power": "4",
+    "toughness": "4",
+    "colors": [
+     "R"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/7/1/712fb9e5-bd67-4173-a2d4-061aeb6253b5.jpg?1783916984",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/7/1/712fb9e5-bd67-4173-a2d4-061aeb6253b5.jpg?1783916984"
+   },
+   {
+    "name": "The Great Work",
+    "manaCost": "",
+    "typeLine": "Enchantment — Saga",
+    "supertypes": [],
+    "types": [
+     "Enchantment"
+    ],
+    "subtypes": [
+     "Saga"
+    ],
+    "oracleText": "(As this Saga enters and after your draw step, add a lore counter.)\nI — This Saga deals 3 damage to target opponent and each creature they control.\nII — Create three Treasure tokens.\nIII — Until end of turn, you may cast instant and sorcery spells from any graveyard. If a spell cast this way would be put into a graveyard, exile it instead. Exile this Saga, then return it to the battlefield (front face up).",
+    "colors": [
+     "R"
+    ],
+    "colorIndicator": [
+     "R"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/7/1/712fb9e5-bd67-4173-a2d4-061aeb6253b5.jpg?1783916984",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/7/1/712fb9e5-bd67-4173-a2d4-061aeb6253b5.jpg?1783916984"
+   }
+  ]
  },
  {
   "oracleId": "ff0ab867-b710-4b1a-baed-95fc3cf68f79",

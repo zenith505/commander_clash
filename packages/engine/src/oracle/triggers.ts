@@ -1,6 +1,6 @@
 import { allEffects, type AbilityBody, type BatchTrigger, type Effect, type TriggeredAbility, type SpellCondition, type SpentReq, type StaticCondition, type TargetSpec, type TriggerEvent } from "../abilities";
 import { COUNTER, differenceInHand, NUM, X, num, parseSpentReq, singularWord, SPENT } from "./words";
-import { parseStaticCondition } from "./statics";
+import { parseActivateCondition, parseStaticCondition } from "./statics";
 import { parseBody, replaceX } from "./body";
 import { parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
 import { CREATURE_TYPES } from "../keywords";
@@ -267,6 +267,24 @@ function parseDamagesCreatureTrigger(line: string): TriggeredAbility | "fail" | 
  * (Michiko Konda): once for each source (CR 603.2c). A creature or permanent is "it" and "that creature"; for a source of
  * any kind, "that player" is its controller and "that many" the damage.
  */
+function parseSourceDamagesOpponent(line: string): TriggeredAbility | "fail" | null {
+  // "Whenever a source you control deals noncombat damage to an opponent, you draw that many cards" (Niv-Mizzet,
+  // Visionary): "that player" is the opponent, "that many" the damage. Not from a graveyard (Asgardian Inspiration).
+  const m = /^Whenever a source you control deals (noncombat )?damage to an opponent, (.+)$/.exec(line);
+  if (!m) return null;
+  let text = m[2]!;
+  if (/\b(it|its|that source|that creature|from your graveyard)\b/.test(text)) return "fail";
+  const thatMuch = /\bthat (?:much|many|amount of)\b/.test(text);
+  if (thatMuch) {
+    if (/\bX\b/.test(text)) return "fail";
+    text = text.replace(/\bthat (?:much|many|amount of)\b/g, "X");
+  }
+  let body = parseBody(text, { eventPlayer: true });
+  if (!body) return "fail";
+  if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, m[2]!) };
+  return { event: "sourceYouControlDamagesOpponent", body, ...(m[1] ? { noncombatOnly: true as const } : {}) };
+}
+
 function parseDamagesYouTrigger(line: string): TriggeredAbility | "fail" | null {
   const m = /^Whenever (an?) (.+?) deals (combat )?damage to you, (.+)$/.exec(line);
   if (!m) return null;
@@ -1068,6 +1086,16 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (!t || t === "fail" || !insect || insect.targets.length) return "fail";
     const host: TargetSpec = { kind: "object", types: ["Creature"], controller: "you", text: "creature you control" };
     return { ...t, body: { targets: [], effects: [{ type: "if", cond: { kind: "state", cond: { kind: "attachedIs", filter: host } }, effects: t.body.effects }, { type: "if", cond: { kind: "createdNone" }, effects: insect.effects }], text: line.replace(/^[^,]+, /, "") } };
+  }
+  const sourceDamage = parseSourceDamagesOpponent(line);
+  if (sourceDamage) return sourceDamage;
+  // Ruby, Daring Tracker: "Whenever ~ attacks while you control a creature with power 4 or greater, ...": a condition on
+  // the event, checked as it attacks only (rulings), not an intervening if.
+  const attacksWhile = /^Whenever ~ attacks while (you control .+?), (.+)$/.exec(line);
+  if (attacksWhile) {
+    const cond = parseActivateCondition(attacksWhile[1]!);
+    const t = cond && parseTrigger(`Whenever ~ attacks, ${attacksWhile[2]}`);
+    return cond && t && t !== "fail" && !t.activeIf ? { ...t, activeIf: cond } : "fail";
   }
   // Wedding Ring: "Whenever an opponent who controls an artifact named ~ draws a card during their turn, you draw a card",
   // "... gains life during their turn, you gain that much life": any artifact with that name, not only the token copy

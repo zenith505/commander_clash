@@ -1072,6 +1072,8 @@ export type PendingDecision =
        * cards instead", rather than drawing.
        */
       archive?: number;
+      /** Abundance could replace this draw too (CR 616.1): the permanent's name; choosing land or nonland applies it. */
+      abundance?: string;
       after?: "drawStep";
     }
   /**
@@ -1127,7 +1129,7 @@ export type PendingDecision =
    * A merged permanent was put into its owner's library (CR 730.3a): its cards are `cards` there, top first, together on
    * top of the library or at the bottom, and the owner arranges them without revealing the order.
    */
-  | { kind: "orderLibrary"; player: PlayerId; cards: ObjectId[]; bottom?: true; source: string };
+  | { kind: "orderLibrary"; player: PlayerId; cards: ObjectId[]; bottom?: true; source: string; /** Abundance replaced a draw of several: the draws still to make once these are ordered (see `draw`). */ thenDraw?: { left: number; made: number[]; after?: "drawStep" } };
 
 export interface GameEvent {
   seq: number;
@@ -1371,7 +1373,7 @@ export interface GameState {
    * "if a card would be put into your graveyard from anywhere this turn, exile it instead" (Yawgmoth's Will, Forgotten
    * Cellar): what `player` may do with their graveyard during `turn` (Effect graveyardTurn).
    */
-  graveyardTurn?: { player: PlayerId; turn: number; cast?: TargetSpec; lands?: true; exileInstead?: true; source: string }[];
+  graveyardTurn?: { player: PlayerId; turn: number; cast?: TargetSpec; lands?: true; exileInstead?: true; /** From any graveyard, not only `player`'s (The Great Work). */ anyGraveyard?: true; exileCast?: true; source: string }[];
   handOnlyUntil?: { controller: PlayerId; source: string }[];
   /** The turn a "damage can't be prevented this turn" effect was made in (CR 615.12). */
   noPreventionTurn?: number;
@@ -1407,6 +1409,19 @@ export interface GameState {
   extraTurns?: ExtraTurn[];
   /** The extra turn being taken now, if this is one. */
   extraTurn?: ExtraTurn;
+  /**
+   * Player-controlling effects waiting for the controlled player's next turn (CR 723.1, 723.1b), in the order they were
+   * created: the last one for a player is the one that works (723.1a). `extraTurnAfter`: that player takes an extra turn
+   * after that turn (Emrakul, the Promised End: each one makes its own, rulings).
+   */
+  /** `ended`: its controller left the game (CR 800.4a), so only its extra turn is left. */
+  playerControls?: { controlled: PlayerId; controller: PlayerId; extraTurnAfter?: true; ended?: true }[];
+  /**
+   * The turn being taken now is controlled by another player (CR 723): `controller` makes all of the active player's
+   * choices and decisions until the next turn begins (723.1, 723.5). `extraTurns`: extra turns that player takes after
+   * this one.
+   */
+  controlledTurn?: { controlled: PlayerId; controller: PlayerId; extraTurns?: number };
   /** During extra turns: the player whose turn came before them in the normal order, who the next normal turn follows. */
   rotation?: PlayerId;
   /** The player who is the monarch (CR 725), once someone has become it. */
@@ -1889,7 +1904,7 @@ export type Action =
   /** Answer to assistCast: pay the rest of the cost and cast it, or `cancel` the cast (CR 733.1). */
   | { type: "finishAssistedCast"; player: PlayerId; cancel?: boolean }
   /** Answer to dredge: the card to dredge instead of drawing, or none to draw (CR 702.52a). */
-  | { type: "dredge"; player: PlayerId; objectId?: ObjectId }
+  | { type: "dredge"; player: PlayerId; objectId?: ObjectId; /** Abundance instead: reveal until a card of this kind. */ abundance?: "land" | "nonland" }
   /** Which of the cards looked at instead of drawing goes to the graveyard (Scion of Halaster). */
   | { type: "drawLook"; player: PlayerId; /** The card to put into the graveyard (none when fewer than two to look at). */ objectId?: ObjectId; /** Apply another replacement first (see the drawLook prompt). */ instead?: "archive" | { dredge: ObjectId } }
   /** Turn a face-down permanent face up by paying its morph or disguise cost: a special action (CR 116.2b, 702.37e). */

@@ -430,6 +430,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[3]!, ctx);
     return what ? [{ type: "counters", what, counter: counterKind(m[2]!), n: amt(m[1]!) }] : null;
   }
+  // Commandeer, Aethersnatch: "Gain control of target noncreature spell" (CR 110.2b: a permanent spell becomes a permanent
+  // under your control).
+  if ((m = /^Gain control of target ((?:noncreature )?spell)$/i.exec(s))) {
+    const spec = parseTargetPhrase(m[1]!);
+    if (spec?.kind !== "spell") return null;
+    return [{ type: "controlSpell", index: addTarget(ctx, { ...spec, text: `target ${m[1]!}` }) }];
+  }
   // Gaining control (layer 2). "Gain control of target creature until end of turn."
   if ((m = /^Gain control of ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+?)( until end of turn)?$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);

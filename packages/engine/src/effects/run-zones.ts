@@ -820,14 +820,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           for (let i = 0; i < lib.length && hits.length < e.untilHits.n; i++) if (printedMatches(e.untilHits.filter, defOf(s, obj(s, lib[i]!)))) (hits.push(lib[i]!), (at = i));
           ids = hits.length < e.untilHits.n ? [...lib] : lib.slice(0, at + 1);
         }
-        for (const id of ids) moveObject(s, id, "exile");
-        log(s, `${player(s, whose).name} exiles ${ids.length ? ids.map((id) => defOf(s, obj(s, id)).name).join(", ") : "nothing"} from the top of their library.`);
+        if (!e.reveal) for (const id of ids) moveObject(s, id, "exile");
+        log(s, `${player(s, whose).name} ${e.reveal ? "reveals" : "exiles"} ${ids.length ? ids.map((id) => defOf(s, obj(s, id)).name).join(", ") : "nothing"} from the top of their library.`);
         sc.castAmong = { ids: ids.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [], ...(e.totalMv !== undefined ? { budget: amountNow(s, e.totalMv, ctx) } : {}), ...(e.maxMv !== undefined ? { maxMv: amountNow(s, e.maxMv, ctx) } : {}), ...(hits ? { hits } : {}) };
       }
       const st = sc.castAmong;
       if (st.done) return;
       const mvOf = (id: ObjectId) => defMv(defOf(s, obj(s, id)));
-      const exiled = (id: ObjectId) => st.ids.some((x) => x.id === id && s.objects[id]?.zone === "exile" && (s.objects[id]!.zoneChanges ?? 0) === x.zc);
+      // Still where they were put: in exile, or revealed in the library (`reveal`).
+      const exiled = (id: ObjectId) => st.ids.some((x) => x.id === id && s.objects[id]?.zone === (e.reveal ? "library" : "exile") && (s.objects[id]!.zoneChanges ?? 0) === x.zc);
       // Done: the exiled cards that weren't cast go where `rest` says (rulings on Muse Vortex: all the instants and
       // sorceries to your hand if you cast none; on Epic Experiment: one that couldn't be cast goes too).
       const finish = (): "paused" | undefined => {
@@ -914,7 +915,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         .filter((id) => exiled(id) && !st.declined.includes(id) && !isType(defOf(s, obj(s, id)), "Land") && (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (st.maxMv === undefined || mvOf(id) <= st.maxMv) && (st.budget === undefined || mvOf(id) <= st.budget) && (!st.hits || st.hits.includes(id)) && castable(id));
       if (!options.length || (e.max !== undefined && (st.cast ?? 0) >= e.max)) return finish();
       const left = st.budget !== undefined ? ` (total mana value ${st.budget} left)` : "";
-      s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Done"], prompt: `cast a spell from among the exiled cards without paying its mana cost${left}?` };
+      s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Done"], prompt: `cast a spell from among the ${e.reveal ? "revealed" : "exiled"} cards without paying its mana cost${left}?` };
       return "paused";
     }
     case "suspendTick": {

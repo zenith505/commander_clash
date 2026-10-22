@@ -31,6 +31,7 @@ import {
   topVisible,
   topPlayable,
   handRevealed,
+  deciderOf,
   assistedRemaining,
   dungeonByName,
   commanderTax,
@@ -66,7 +67,7 @@ import {
   doesNothingNow,
   attackablePermanentProblem,
   attackProblem,
-  attackTax,
+  attackCost,
   attackTaxPer,
   blockProblem,
   blockRequirementProblem,
@@ -121,6 +122,7 @@ import {
   returnCandidates,
   linkedExileCards,
   tapCostCandidates,
+  untapViaMana,
   counterCostCandidates,
   ringBearer,
   power,
@@ -157,7 +159,7 @@ import {
   abilityCostsHaveX,
   spellManaValue,
 } from "@cc/engine";
-import { HUMAN, STOPPABLE, cardOf, seenCardOf, isCreature, isLand, loopReady, newGame, useGame, type DeckBundle, type LoopRecording, type PriorityMode } from "./useGame";
+import { HUMAN, YOU, actAs, STOPPABLE, cardOf, seenCardOf, isCreature, isLand, loopReady, newGame, useGame, type DeckBundle, type LoopRecording, type PriorityMode } from "./useGame";
 import { Arrows, targetSelectors as baseSelectors, type ArrowSpec } from "./Arrows";
 import { ManaCost, ManaPoolView, RulesText } from "./Mana";
 
@@ -460,6 +462,8 @@ function maxX(plan: (x: number) => unknown): number {
 
 function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) {
   const { state: s, dispatch, error, intent, priorityMode, setPriorityMode, stops, toggleStop, loop, startLoop, cancelLoop, repeatLoop, shortcutNote } = useGame(initial);
+  // While you control another player, you see the table as they do and act for them (CR 723.4, 723.5).
+  actAs(s);
   const [hover, setHover] = useState<CardDef | null>(null);
   const [attacks, setAttacks] = useState<Record<string, AttackTo>>({});
   /** The creature you've clicked to attack with, waiting for you to click the player it attacks. */
@@ -704,8 +708,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       if (c.kind === "tap") {
         // "Tap an untapped creature you control": click what to tap (CR 602.2b).
         if (d.tap !== undefined) continue;
-        // "Untap a tapped creature you control" (Halo Fountain) likewise.
-        return setCostPick({ activate: d, kind: "tap", ...(c.untap ? { untap: true as const } : {}), label: cardOf(s, d.objectId).name, what: `${c.untap ? "untap" : "tap"} ${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`, n: c.n, candidates: tapCostCandidates(s, HUMAN, s.objects[d.objectId]!, c).filter((id) => !d.sacrifice?.includes(id)), chosen: [] });
+        // "Untap a tapped creature you control" (Halo Fountain) likewise, or one to tap for mana first.
+        return setCostPick({ activate: d, kind: "tap", ...(c.untap ? { untap: true as const } : {}), label: cardOf(s, d.objectId).name, what: `${c.untap ? "untap" : "tap"} ${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`, n: c.n, candidates: [...tapCostCandidates(s, HUMAN, s.objects[d.objectId]!, c), ...(c.untap ? untapViaMana(s, HUMAN, s.objects[d.objectId]!, c) : [])].filter((id) => !d.sacrifice?.includes(id)), chosen: [] });
       }
       if (c.kind === "exileFromHand" && c.toLibrary) {
         // "Put a card from your hand on top of your library" (Penance): click the cards in your hand.
@@ -1211,7 +1215,16 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 {s.dayNight === "day" ? "☀ Day" : "☾ Night"}
               </span>
             )}
-            {waiting !== null && waiting !== HUMAN && <span className="thinking">{s.players[waiting]!.name} is thinking…</span>}
+            {waiting !== null && waiting !== HUMAN && (
+              <span className="thinking">{deciderOf(s, waiting) === waiting ? `${s.players[waiting]!.name} is thinking…` : `${s.players[deciderOf(s, waiting)]!.name} is thinking for ${waiting === YOU ? "you" : s.players[waiting]!.name}…`}</span>
+            )}
+            {s.controlledTurn && deciderOf(s, s.controlledTurn.controlled) !== s.controlledTurn.controlled && (
+              <span className="control-note" title="Controlling another player (CR 723): the controller makes all of that player's choices and decisions this turn, with that player's cards and mana.">
+                {s.controlledTurn.controller === YOU
+                  ? `You control ${s.players[s.controlledTurn.controlled]!.name} this turn`
+                  : `${s.players[s.controlledTurn.controller]!.name} controls ${s.controlledTurn.controlled === YOU ? "you" : s.players[s.controlledTurn.controlled]!.name} this turn`}
+              </span>
+            )}
           </div>
           <PhaseTrack s={s} stops={stops} onToggle={toggleStop} />
           {targeting && (
@@ -1683,7 +1696,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           view={viewing}
           onClose={() => setViewing(null)}
           onHover={setHover}
-          canPick={(id) => !pending && viewing.zone !== "hand" && (viewing.zone === "graveyard" ? viewing.pid === HUMAN && graveyardOptions(s, id) : exileOptions(s, id))}
+          canPick={(id) => !pending && viewing.zone !== "hand" && (viewing.zone === "graveyard" ? (viewing.pid === HUMAN || castsFromAnyGraveyard(s)) && graveyardOptions(s, id) : exileOptions(s, id))}
           onPick={(id) => {
             setViewing(null);
             setMenu(id);
@@ -1815,12 +1828,15 @@ function exileOptions(s: GameState, id: string): boolean {
   return (isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id) || canCastAlt(s, id, "citadel")) || canUseFace(s, id);
 }
 
-/** Does this card in your graveyard have something you could do with it now (flashback, unearth, ...)? */
+/** You may cast spells from other players' graveyards this turn (The Great Work). */
+const castsFromAnyGraveyard = (s: GameState) => !!s.graveyardTurn?.some((g) => g.anyGraveyard && g.player === HUMAN && g.turn === s.turn);
+
+/** Does this card in your graveyard (or another's, with The Great Work) have something you could do with it now (flashback, unearth, ...)? */
 function graveyardOptions(s: GameState, id: string): boolean {
   const d = cardOf(s, id);
   if (mayPlayLandFromGraveyard(s, s.objects[id]!, HUMAN) && canPlayLand(s, id)) return true; // Crucible of Worlds
   const o = s.objects[id]!;
-  if (graveyardWays(s, o).some((g) => canCastFromGraveyard(s, id, g.kind, g.face) || (permissionWay(g) && altCostsFor(s, HUMAN, o).some((a) => canCastFromGraveyard(s, id, g.kind, undefined, a.kind))))) return true;
+  if (graveyardWays(s, o, HUMAN).some((g) => canCastFromGraveyard(s, id, g.kind, g.face) || (permissionWay(g) && altCostsFor(s, HUMAN, o).some((a) => canCastFromGraveyard(s, id, g.kind, undefined, a.kind))))) return true;
   return abilitiesOf(s, s.objects[id]!).activated.some((ab, i) => ab.zone === "graveyard" && planActivate(s, HUMAN, id, i) !== null);
 }
 
@@ -2739,7 +2755,7 @@ function Seat({
   cardProps: CardProps;
 }) {
   const p = s.players[pid]!;
-  const yardPlayable = pid === HUMAN && !s.pending && p.graveyard.some((id) => graveyardOptions(s, id));
+  const yardPlayable = (pid === HUMAN || castsFromAnyGraveyard(s)) && !s.pending && p.graveyard.some((id) => graveyardOptions(s, id));
   const exilePlayableHere = !s.pending && p.exile.some((id) => exileOptions(s, id));
   // The top of a library is shown when it's revealed (CR 401.5), to you when you may look at it any time (Vizier of
   // the Menagerie), or when you may play it.
@@ -2854,8 +2870,8 @@ function Seat({
           </span>
         )}
         {pid !== HUMAN &&
-          (handRevealed(s, pid, HUMAN) ? (
-            <button className="hand-peek" data-hand={pid} onClick={(e) => (e.stopPropagation(), onViewZone("hand"))} title="This hand is revealed (Telepathy, Revelation). Click to see it.">
+          (handRevealed(s, pid, HUMAN) || pid === YOU ? (
+            <button className="hand-peek" data-hand={pid} onClick={(e) => (e.stopPropagation(), onViewZone("hand"))} title={pid === YOU && pid !== HUMAN ? "Your hand. Click to see it." : "This hand is revealed (Telepathy, Revelation). Click to see it."}>
               Hand {p.hand.length} 👁
             </button>
           ) : (
@@ -2967,7 +2983,7 @@ function ZoneViewer({
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <header>
           <strong>
-            {view.pid === HUMAN ? "Your" : `${p.name}'s`} {view.zone === "graveyard" ? "graveyard" : view.zone === "hand" ? "revealed hand" : "exile"}
+            {view.pid === HUMAN || view.pid === YOU ? "Your" : `${p.name}'s`} {view.zone === "graveyard" ? "graveyard" : view.zone === "hand" ? (view.pid === YOU ? "hand" : "revealed hand") : "exile"}
           </strong>
           <span className="muted"> {ids.length} card(s){view.zone === "hand" ? "" : ", newest first"}</span>
           <button onClick={onClose}>Close</button>
@@ -3906,17 +3922,30 @@ function AbilityMenu({
         </button>
       ))}
       {inYard &&
-        graveyardWays(s, o).flatMap((g) => {
+        graveyardWays(s, o, HUMAN).flatMap((g) => {
           // Muldrotha: an artifact creature can use the artifact or the creature permission, the player's choice (rulings).
+          // Each with the card's alternative costs too, which the permission doesn't rule out (rulings on Muldrotha).
           if (g.kind === "turnPermission" && (g.permits?.length ?? 0) > 1)
-            return g.permits!.map((permit) => {
+            return g.permits!.flatMap((permit) => {
               const problem = castProblem(s, HUMAN, objectId, undefined, undefined, undefined, undefined, undefined, { via: g.kind, permit });
               const ok = !problem || (/not enough mana/.test(problem) && planCast(s, HUMAN, objectId, undefined, undefined, "auto", undefined, { via: g.kind, permit }) !== null);
-              return (
+              const altOk = (alt: AltCostKind) => {
+                const p = castProblem(s, HUMAN, objectId, undefined, undefined, undefined, undefined, undefined, { via: g.kind, permit, alt });
+                return !p || (/not enough mana/.test(p) && planCast(s, HUMAN, objectId, undefined, undefined, "auto", undefined, { via: g.kind, permit, alt }) !== null);
+              };
+              return [
                 <button key={`permit-${permit}`} data-permit={permit} disabled={!ok} title={problem ?? ""} onClick={() => onCastVia(g.kind, undefined, permit)}>
                   Cast from graveyard with {permitLabel(s, permit)} <ManaCost cost={g.mana ?? d.manaCost} size="sm" />
-                </button>
-              );
+                </button>,
+                ...altCostsFor(s, HUMAN, o)
+                  .filter((a) => altOk(a.kind))
+                  .map((a) => (
+                    <button key={`permit-${permit}-${a.kind}`} data-permit={permit} data-alt={a.kind} title={ALT_NOTES[a.kind]} onClick={() => onCastVia(g.kind, undefined, permit, a.kind)}>
+                      Cast from graveyard with {permitLabel(s, permit)}: {a.text && !a.mana ? a.text : <>{ALT_NAMES[a.kind]} <ManaCost cost={a.mana} size="sm" /></>}
+                      {a.text && a.mana ? ` and ${a.text}` : ""}
+                    </button>
+                  )),
+              ];
             });
           const ok = canCastFromGraveyard(s, objectId, g.kind, g.face);
           const problem = ok ? "" : (castProblem(s, HUMAN, objectId, undefined, undefined, undefined, undefined, undefined, { via: g.kind, face: g.face }) ?? "");
@@ -4121,7 +4150,12 @@ function Controls({
     return (
       <div className="controls">
         <span>
-          <strong>Dredge:</strong> {pending.archive ? "Alhammarret's Archive would make this draw two cards. Dredge first instead, milling to return a card from your graveyard to your hand?" : "draw a card, or mill instead to return a card from your graveyard to your hand?"}
+          <strong>{options.length ? "Dredge" : pending.abundance}:</strong>{" "}
+          {pending.archive && options.length
+            ? "Alhammarret's Archive would make this draw two cards. Dredge first instead, milling to return a card from your graveyard to your hand?"
+            : options.length
+              ? "draw a card, or mill instead to return a card from your graveyard to your hand?"
+              : "draw a card, or instead reveal cards from the top of your library until a land or nonland card and put it into your hand?"}
           {pending.left > 1 ? ` (${pending.left} draws left)` : ""}
         </span>
         {options.map((id) => {
@@ -4132,6 +4166,12 @@ function Controls({
             </button>
           );
         })}
+        {pending.abundance &&
+          (["land", "nonland"] as const).map((kind) => (
+            <button key={kind} title={`${pending.abundance}: the other revealed cards go on the bottom of your library`} onClick={() => dispatch([{ type: "dredge", player: HUMAN, abundance: kind }])}>
+              Reveal until a {kind} card
+            </button>
+          ))}
         <button className="ghost" onClick={() => dispatch([{ type: "dredge", player: HUMAN }])}>
           {pending.archive ? "Draw two instead (Archive first)" : "Draw"}
         </button>
@@ -4153,8 +4193,8 @@ function Controls({
     const ids = Object.keys(attacks);
     // Ghostly Prison and the like: what attacking costs, paid from your lands as you declare (CR 508.1g-i).
     const declared = Object.entries(attacks).map(([attacker, a]) => ({ attacker, defender: a.defender, ...(a.planeswalker ? { planeswalker: a.planeswalker } : {}) }));
-    const tax = attackTax(s, declared);
-    const taxTaps = tax ? planMana(s, HUMAN, parseManaCost(`{${tax}}`)) : [];
+    const tax = attackCost(s, declared);
+    const taxTaps = tax ? planMana(s, HUMAN, parseManaCost(tax)) : [];
     const alone = ids.length === 1 && characteristics(s, s.objects[ids[0]!]!).cantAttackAlone ? `${cardOf(s, ids[0]!).name} can't attack alone.` : null;
     return (
       <div className="controls">
@@ -4173,10 +4213,10 @@ function Controls({
         </span>
         <button
           disabled={must.length > 0 || bound.length > 0 || !!alone || !taxTaps}
-          title={tax && !taxTaps ? `Attacking costs {${tax}} and you can't pay it` : undefined}
+          title={tax && !taxTaps ? `Attacking costs ${tax} and you can't pay it` : tax.includes("/P}") ? "Phyrexian mana: paid with mana in your pool, otherwise 2 life each" : undefined}
           onClick={() => dispatch([...(taxTaps ?? []), { type: "declareAttackers", player: HUMAN, attacks: declared }])}
         >
-          {Object.keys(attacks).length ? `Attack with ${Object.keys(attacks).length}${tax ? ` (pay {${tax}})` : ""}` : "No attacks"}
+          {Object.keys(attacks).length ? `Attack with ${Object.keys(attacks).length}${tax ? ` (pay ${tax})` : ""}` : "No attacks"}
         </button>
       </div>
     );

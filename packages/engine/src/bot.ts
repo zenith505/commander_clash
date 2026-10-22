@@ -15,7 +15,7 @@ import {
   returnCandidates,
   attackablePermanentProblem,
   attackProblem,
-  attackTax,
+  attackCost,
   attackTaxOf,
   attackYouLimit,
   combatLimit,
@@ -24,6 +24,7 @@ import {
   cantBlockNow,
   provokerOf,
   tapCostCandidates,
+  untapViaMana,
   counterCostCandidates,
   maxBlocks,
   blockersNeeded,
@@ -77,6 +78,7 @@ import {
   stackItemQuality,
   oneOfEachFits,
   abilityCostsHaveX,
+  deciderOf,
 } from "./game";
 import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
@@ -94,6 +96,13 @@ import { damageEstimate } from "./damage";
  */
 export function botActions(s: GameState, pid: PlayerId): Action[] {
   const pend = s.pending;
+  // A bot controlling another player's turn (CR 723.5) makes them do nothing they don't have to: no spells, abilities,
+  // land or attacks. The choices they must make (blocks, discards, what their own triggers target) are made for them
+  // as they'd make them.
+  if (deciderOf(s, pid) !== pid) {
+    if (!pend) return [{ type: "passPriority", player: pid }];
+    if (pend.player === pid && pend.kind === "declareAttackers") return [{ type: "declareAttackers", player: pid, attacks: [] }];
+  }
   if (pend?.player === pid) {
     if (pend.kind === "declareAttackers") return chooseAttacks(s, pid);
     if (pend.kind === "declareBlockers") return [chooseBlocks(s, pid)];
@@ -140,6 +149,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "dredge") {
       // With an Alhammarret's Archive too, the Archive first: each of the two draws it makes can still be dredged.
       const pick = pend.archive ? undefined : chooseDredge(s, pid, pend.options);
+      if (!pick && pend.abundance && !pend.archive) {
+        // Abundance: a land while we're short of them, otherwise a spell. Always when the library is empty: revealing
+        // nothing doesn't lose the game the way drawing from it would (CR 704.5b).
+        const me = s.players[pid]!;
+        const lands = s.battlefield.filter((id) => controllerOf(s, s.objects[id]!) === pid && objIsType(s, s.objects[id]!, "Land")).length + me.hand.filter((id) => isType(defOf(s, s.objects[id]!), "Land")).length;
+        return [{ type: "dredge", player: pid, abundance: lands < 5 && me.library.length ? "land" : "nonland" }];
+      }
       return [{ type: "dredge", player: pid, ...(pick ? { objectId: pick } : {}) }];
     }
     // "You may collect evidence N": yes, with cards we don't need in the graveyard.
@@ -575,7 +591,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       }
     }
     const p = player(s, pid);
-    const fromYard = p.graveyard.filter((id) => graveyardWays(s, obj(s, id)).length);
+    // With The Great Work, any graveyard's instants and sorceries.
+    const anyYard = s.graveyardTurn?.some((g) => g.anyGraveyard && g.player === pid && g.turn === s.turn);
+    const fromYard = (anyYard ? s.players.flatMap((q) => q.graveyard) : p.graveyard).filter((id) => graveyardWays(s, obj(s, id), pid).length);
     // Cards exiled with "you may play them until ..." first: they won't wait (impulse draw).
     const options = [...exilePlayable(s, pid), ...topPlayable(s, pid), ...p.command, ...p.hand, ...fromYard]
       // A land with an Adventure can still go on its adventure (CR 715.3).
@@ -1195,7 +1213,7 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   if (!free && !via && alt === undefined && foretoldCast(s, pid, obj(s, id))) alt = "foretell";
   // Cast as madness or miracle resolves, for that cost (CR 702.35a, 702.94a): its X is paid then.
   const paidAs = free ? madnessCastOf(s, pid, id) : undefined;
-  const cost = parseManaCost(paidAs ?? graveyardWay(s, obj(s, id), via)?.mana ?? altCost(d, alt)?.mana ?? d.manaCost);
+  const cost = parseManaCost(paidAs ?? graveyardWay(s, obj(s, id), via, pid)?.mana ?? altCost(d, alt)?.mana ?? d.manaCost);
   // X spells: as big an X as we can pay for. Cast for free, X is 0 (CR 107.3b), which is rarely worth it.
   if (cost.hasX && free && !paidAs) return null;
   // A ritual, a spell that only adds mana (Dark Ritual): worth it when what it nets lets us cast a card we can't yet.
@@ -1561,7 +1579,7 @@ function payTribute(s: GameState, id: ObjectId): boolean {
 
 /** Casting a card from our graveyard (flashback, escape, ...): the first way that works. */
 function graveyardCastPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
-  for (const g of graveyardWays(s, obj(s, id))) {
+  for (const g of graveyardWays(s, obj(s, id), pid)) {
     // A split card's half (an aftermath half): cast as that face.
     const plan = asFace(s, obj(s, id), g.face, () => castPlan(s, pid, id, false, g.kind));
     if (plan) return g.face === undefined ? plan : plan.map((a) => (a.type === "castSpell" && a.objectId === id ? { ...a, face: g.face } : a));
@@ -3023,7 +3041,8 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
       out.sacrifice = [...(out.sacrifice ?? []), ...pool.slice(0, c.n).map((x) => x.id)];
     } else if (c.kind === "tap" && c.untap) {
       // "Untap a tapped creature you control" (Halo Fountain): untapping is all gain, the most valuable first.
-      const pool = tapCostCandidates(s, pid, o, c).filter((x) => x !== keep && !out.sacrifice?.includes(x)).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a)));
+      // Then a mana creature, tapped for mana while paying and untapped for the cost (rulings).
+      const pool = [...tapCostCandidates(s, pid, o, c).sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))), ...untapViaMana(s, pid, o, c)].filter((x) => x !== keep && !out.sacrifice?.includes(x));
       if (pool.length < c.n) return null;
       out.tap = [...(out.tap ?? []), ...pool.slice(0, c.n)];
     } else if (c.kind === "tap") {
@@ -3777,8 +3796,10 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   // Ghostly Prison: pay what attacking costs if we can (CR 508.1g-i); otherwise send the weakest taxed attacker at
   // someone it costs nothing to attack, or keep it home. Nothing obliges paying for a requirement (CR 508.1d).
   for (;;) {
-    const tax = attackTax(s, declared);
-    const taps = tax ? planMana(s, pid, parseManaCost(`{${tax}}`)) : [];
+    const tax = attackCost(s, declared);
+    // Phyrexian symbols the pool can't pay take 2 life each (Norn's Annex): not down to 10 or less.
+    const symbols = parseManaCost(tax).symbols.filter((x) => x.kind === "phyrexian").length;
+    const taps = tax && !(symbols && player(s, pid).life - 2 * symbols <= 10) ? planMana(s, pid, parseManaCost(tax)) : tax ? null : [];
     if (taps) {
       if (declared.length === 1 && characteristics(s, obj(s, declared[0]!.attacker)).cantAttackAlone) declared = [];
       return [...(declared.length ? taps : []), { type: "declareAttackers", player: pid, attacks: declared }];

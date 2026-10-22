@@ -920,6 +920,20 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const last = effects[effects.length - 1];
     ctx.afterMill = last?.type === "mill" && last.who.ref === "you";
     if (last?.type === "discard" && last.who.ref === "you" && last.n === 1) ctx.discardedOne = true;
+    // "Exile target spell. It becomes plotted." (Aven Interrupter, CR 702.170c): its owner may cast it from exile on a later
+    // turn without paying its mana cost.
+    if (/^It becomes plotted$/.test(s)) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "counterSpell" || !prev.exileSpell || prev.n !== undefined || ctx.targets[prev.index]?.many) return null;
+      prev.plot = true;
+      continue;
+    }
+    // "Gain control of target spell. You may choose new targets for it." (Commandeer): after the change of control, so
+    // its targets are chosen as its new controller's (rulings).
+    if (/^You may choose new targets for it$/.test(s) && effects[effects.length - 1]?.type === "controlSpell") {
+      effects.push({ type: "newTargets", index: (effects[effects.length - 1] as Extract<Effect, { type: "controlSpell" }>).index });
+      continue;
+    }
     // "You may cast a creature spell from your graveyard this turn" (Chainer, Nightmare Adept): a permission, not a choice.
     const yardCast = /^You may cast an? (creature|artifact|instant|sorcery) spell from your graveyard this turn$/.exec(s.replace(/\.$/, ""));
     if (yardCast) {
@@ -941,6 +955,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       if (kind && spec?.kind !== "card") return null;
       const cast: TargetSpec | undefined = !castsAny ? undefined : spec?.kind === "card" ? (({ owner: _, ...rest }) => ({ ...rest, text: `${kind} card` }))(spec) : { kind: "card", types: [], notTypes: ["Land"], notColors: [], text: "card" };
       effects.push({ type: "graveyardTurn", ...(cast ? { cast } : {}), ...(lands ? { lands: true as const } : {}) });
+      continue;
+    }
+    // "Until end of turn, you may cast instant and sorcery spells from any graveyard. If a spell cast this way would be put
+    // into a graveyard, exile it instead." (The Great Work)
+    const anyYard = /^Until end of turn, you may cast (instant and sorcery|instant|sorcery|creature) spells from any graveyard$/.exec(s);
+    if (anyYard) {
+      const spec = parseTargetPhrase(`${anyYard[1] === "instant and sorcery" ? "instant or sorcery" : anyYard[1]} card from a graveyard`);
+      if (spec?.kind !== "card") return null;
+      const { owner: _, ...rest } = spec;
+      const exileCast = sentences[si + 1] === "If a spell cast this way would be put into a graveyard, exile it instead";
+      effects.push({ type: "graveyardTurn", cast: { ...rest, text: `${anyYard[1]} card` }, anyGraveyard: true, ...(exileCast ? { exileCast: true as const } : {}) });
+      if (exileCast) si++;
       continue;
     }
     if (/^If a card would be put into your graveyard from anywhere this turn, exile (?:it|that card) instead$/.test(s)) {
@@ -1446,6 +1472,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     if (untilMv && /^You may cast any number of spells from among them without paying their mana costs\.?$/.test(sentences[si + 1] ?? "")) {
       effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, untilMv: Number(untilMv[1]) });
       si++;
+      continue;
+    }
+    // Sunbird's Invocation, in a cast trigger: "Reveal the top X cards of your library, where X is that spell's mana value.
+    // You may cast a spell with mana value X or less from among cards revealed this way without paying its mana cost.
+    // Put the rest on the bottom of your library in a random order." Cast from the library, as this resolves (CR 608.2g).
+    const sunbird = /^[Rr]eveal the top X cards of your library, where X is (that spell's mana value)$/.exec(s);
+    if (sunbird && sentences[si + 1]?.replace(/\.$/, "") === "You may cast a spell with mana value X or less from among cards revealed this way without paying its mana cost" && sentences[si + 2]?.replace(/\.$/, "") === "Put the rest on the bottom of your library in a random order") {
+      const x = parseCount(sunbird[1]!, ctx);
+      if (!x) return null;
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: x, reveal: true, maxMv: x, max: 1, rest: { dest: "bottomRandom" } });
+      si += 2;
       continue;
     }
     if (castAmongHead && castAmong && (castAmongHead[2] || castAmongHead[3] || afterShuffle)) {
@@ -2372,11 +2409,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       continue;
     }
     // "Exile this Saga, then return it to the battlefield transformed under your control": its back face up (CR 712.14a).
-    const now = /^(?:[Tt]hen )?[Rr]eturn (?:it|that card|them|those cards) to the battlefield( transformed)? under (its owner's|their owners'|your) control$/.exec(s);
+    // "Exile this Saga, then return it to the battlefield (front face up)" (The Great Work): under the control of the
+    // player who puts it there (CR 110.2a).
+    const now = /^(?:[Tt]hen )?[Rr]eturn (?:it|that card|them|those cards) to the battlefield( transformed)?(?: under (its owner's|their owners'|your) control)?$/.exec(s);
     if (now && effects[effects.length - 1]?.type === "exile") {
       const prev = effects[effects.length - 1] as Extract<Effect, { type: "exile" }>;
-      if (prev.until || prev.linked || isGroup(prev.what) || (now[1] && prev.what.ref !== "self")) return null;
-      effects[effects.length - 1] = { type: "flicker", what: prev.what, under: now[2] === "your" ? "you" : "owner", ...(now[1] ? { transformed: true as const } : {}) };
+      if (prev.until || prev.linked || isGroup(prev.what) || (now[1] && prev.what.ref !== "self") || (!now[2] && prev.what.ref !== "self")) return null;
+      effects[effects.length - 1] = { type: "flicker", what: prev.what, under: !now[2] || now[2] === "your" ? "you" : "owner", ...(now[1] ? { transformed: true as const } : {}) };
       continue;
     }
     // Which exile it returns: the last exile in this ability ("Exile X target creatures, then investigate X times. Return the
@@ -2569,7 +2608,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const prev = effects[effects.length - 1];
       const destroy = prev?.type === "may" && prev.effects.length === 1 ? prev.effects[0] : prev;
       if (destroy?.type !== "destroy" || destroy.what.ref !== "target" || ctx.targets[destroy.what.index]?.types?.join() !== "Creature") return null;
-      const then = ifDestroyed[1]!.replace(/its/g, "that creature's");
+      const then = ifDestroyed[1]!.replace(/\bits\b/g, "that creature's");
       const inner = parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       effects.push({ type: "if", cond: { kind: "destroyedThisWay" }, effects: inner });
@@ -2655,7 +2694,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const put = last?.type === "may" && last.effects.length === 1 ? last.effects[0] : last;
       const filter = parseTargetPhrase(putThisWay[1]!);
       const inner = parseOne(putThisWay[2]!.charAt(0).toUpperCase() + putThisWay[2]!.slice(1), ctx);
-      if (put?.type !== "putFromHand" || put.who || put.any || filter?.kind !== "object" || !inner || /(?:it|its|that)/.test(putThisWay[2]!)) return null;
+      if (put?.type !== "putFromHand" || put.who || put.any || filter?.kind !== "object" || !inner || /\b(?:it|its|that)\b/.test(putThisWay[2]!)) return null;
       effects.push({ type: "if", cond: { kind: "putThisWayIs", filter }, effects: inner });
       continue;
     }
@@ -2708,6 +2747,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
         effects.push({ type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner });
         si++;
       }
+      continue;
+    }
+    // "Mill five cards, then return a creature card milled this way to your hand" (Zoological Study): one of them if
+    // any matches, not optional.
+    const returnMilled = /^[Rr]eturn an? (.+? card) milled this way to your hand$/.exec(s);
+    if (returnMilled) {
+      const prev = effects[effects.length - 1];
+      const filter = parseSearchFilter(returnMilled[1]!);
+      if (prev?.type !== "mill" || prev.who.ref !== "you" || filter === null) return null;
+      effects.push({ type: "chooseFromGraveyard", n: 1, milled: true, ...(filter ? { filter } : {}) });
       continue;
     }
     const otherwise = /^Otherwise, (.+)$/.exec(s);
@@ -3127,6 +3176,26 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si++;
       continue;
     }
+    // After "Destroy target creature" (Polymorph), "Exile target creature" (Transmogrify), "Destroy target permanent an
+    // opponent controls" (Wild Magic Surge): "Its controller reveals cards from the top of their library until they reveal
+    // a creature card", "... a permanent card that shares a card type with that permanent" (its types as it last existed,
+    // CR 608.2h), and they put that card onto the battlefield (under their control), then the rest. With none found, all
+    // the revealed cards are shuffled in, or go to the bottom (CR 701.20a).
+    const theirs = /^(Its controller|That creature's controller|That permanent's controller) reveals cards from the top of their library until they reveal (?:an? )?(.+? card)( that shares a card type with that permanent)?$/.exec(s);
+    const theirPut = /^(?:(?:The|That) player puts that card onto the battlefield, then shuffles (?:all other cards revealed this way|the rest) into their library|They put that card onto the battlefield and (the rest on the bottom of their library in a random order))$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (theirs && theirPut) {
+      const who = parsePlayer(theirs[1]!.toLowerCase(), ctx);
+      const filter = parseSearchFilter(theirs[2]!);
+      if (who?.ref !== "targetController" || ctx.targets[who.index]?.many || !filter || filter.kind !== "card") return null;
+      // Onto the battlefield: creature cards, or (sharing a type) any permanent card, an Aura enchanting what its new
+      // controller chooses (CR 303.4f).
+      const permanent = theirs[3] && theirs[2] === "permanent card";
+      const creature = !theirs[3] && filter.types?.length === 1 && filter.types[0] === "Creature" && !filter.anyOf;
+      if (!permanent && !creature) return null;
+      effects.push({ type: "revealUntil", filter, found: "battlefield", rest: theirPut[1] ? "bottom" : "shuffle", who, ...(theirs[3] ? { sharesTypeWith: who.index } : {}) });
+      si++;
+      continue;
+    }
     const until = /^[Rr]eveal cards from the top of your library until you reveal (?:an? )?(.+? card)$/.exec(s);
     const untilPut = /^Put that card (into your hand|onto the battlefield( tapped)?) and the rest on the bottom of your library in a random order$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
     if (until && untilPut && !/\b(?:named|chosen|that name)\b/.test(until[1]!)) {
@@ -3309,6 +3378,27 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const last = effects[effects.length - 1];
       if (last?.type !== "loseLife") return null;
       last.drain = true;
+      continue;
+    }
+    // Cruel Entertainment: each of two different target players (CR 115.3) controls the other during the other's next turn
+    // (CR 723).
+    if (
+      s === "Choose target player and another target player" &&
+      sentences[si + 1] === "The first player controls the second player during the second player's next turn, and the second player controls the first player during the first player's next turn"
+    ) {
+      const first = addTarget(ctx, { kind: "player", text: "target player" });
+      const second = addTarget(ctx, { kind: "player", text: "another target player", distinctFrom: [first] });
+      const [a, b] = [{ ref: "target" as const, index: first }, { ref: "target" as const, index: second }];
+      effects.push({ type: "controlPlayer", who: b, controller: a }, { type: "controlPlayer", who: a, controller: b });
+      si++;
+      continue;
+    }
+    // Emrakul, the Promised End: "... during that player's next turn. After that turn, that player takes an extra turn."
+    // The extra turn comes right after the controlled turn (rulings).
+    if (/^After that turn, that player takes an extra turn$/.test(s)) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "controlPlayer" || last.who.ref !== "target" || last.extraTurnAfter) return null;
+      last.extraTurnAfter = true;
       continue;
     }
     // "Take an extra turn after this one. At the beginning of that turn's end step, you lose the game." (Final Fortune)

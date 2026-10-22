@@ -54,7 +54,11 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
       if (hurts) mark(group.of.index, group.of.n);
     }
     if ((e.type === "loseLife" || e.type === "mill" || e.type === "poison" || e.type === "exileGraveyard" || e.type === "cantCast" || e.type === "cantPlayLands" || e.type === "exileNamed") && e.who.ref === "target") mark(e.who.index, e.who.n);
+    // Controlling a player's turn (CR 723): an opponent's, who then does what we like.
+    if (e.type === "controlPlayer" && e.who.ref === "target") mark(e.who.index);
     if (e.type === "counterSpell") mark(e.index);
+    // Taking a spell over: an opponent's.
+    if (e.type === "controlSpell") mark(e.index);
     // Haunt: the card does something again when the haunted creature dies, which an opponent's creature does when
     // it's removed or blocked, without costing its owner anything.
     if (e.type === "haunt") mark(0);

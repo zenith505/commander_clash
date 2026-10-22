@@ -12,11 +12,13 @@ import type { CardDef, Color, GameObject, GameState, ManaLot, ManaOrigin, ManaSp
  * What a payment is for: casting a spell (as it is on the stack: face down, bestowed), activating an ability of a
  * source, or anything else (a cost paid while something resolves, a special action, another player's spell).
  */
-export type ManaUse = { spell: CardDef; /** Security Rhox's "Spend only mana produced by Treasures to cast it this way". */ treasureOnly?: true; /** The card being cast, for "to cast your commander" (Opal Palace). */ object?: GameObject } | { ability: GameObject; /** "Spend only mana of the chosen color to activate this ability" (Throne of Eldraine): only mana of these types. */ onlyColors?: ManaType[] } | "other";
+export type ManaUse = { spell: CardDef; /** Security Rhox's "Spend only mana produced by Treasures to cast it this way". */ treasureOnly?: true; /** The card being cast, for "to cast your commander" (Opal Palace). */ object?: GameObject } | { ability: GameObject; /** "Spend only mana of the chosen color to activate this ability" (Throne of Eldraine): only mana of these types. */ onlyColors?: ManaType[]; /** Mana of any color pays its colored symbols (Drana and Linvala's borrowed abilities, CR 609.4b). */ anyColor?: true } | "other";
 
 /** What paying an activated ability's mana cost is for: its source, and only the chosen color's mana if it says so. */
-export function abilityUse(o: GameObject, ab: ActivatedAbility): ManaUse {
-  return ab.spendOnlyChosenColor ? { ability: o, onlyColors: o.chosen?.color ? [o.chosen.color] : [] } : { ability: o };
+export function abilityUse(o: GameObject, ab: ActivatedAbility, s?: GameState): ManaUse {
+  // A borrowed ability of Drana and Linvala's: "you may spend mana as though it were mana of any color to activate those abilities".
+  const anyColor = !!s && !!ab.borrowed && o.zone === "battlefield" && !!abilitiesOf(s, o).borrows?.anyColor && characteristics(s, o).hasPrintedAbilities;
+  return ab.spendOnlyChosenColor ? { ability: o, onlyColors: o.chosen?.color ? [o.chosen.color] : [], ...(anyColor ? { anyColor } : {}) } : { ability: o, ...(anyColor ? { anyColor } : {}) };
 }
 
 /** The mana types a payment may use (all of them unless it says otherwise). */
@@ -102,7 +104,7 @@ export function payableCost(s: GameState, pid: PlayerId, cost: ParsedCost, use?:
   const krrik = mine.some((o) => !!abilitiesOf(s, o).lifeForBlack);
   // Agatha's Soul Cauldron: "... to activate abilities of creatures you control".
   const creatureAbility = !!use && use !== "other" && "ability" in use && use.ability.zone === "battlefield" && controllerOf(s, use.ability) === pid && objIsType(s, use.ability, "Creature");
-  const orrery = mine.some((o) => !!abilitiesOf(s, o).spendAnyColor || (creatureAbility && !!abilitiesOf(s, o).spendAnyColorCreatureAbilities));
+  const orrery = (!!use && use !== "other" && "ability" in use && !!use.anyColor) || mine.some((o) => !!abilitiesOf(s, o).spendAnyColor || (creatureAbility && !!abilitiesOf(s, o).spendAnyColorCreatureAbilities));
   const c = krrik ? blackForLife(cost) : cost;
   return orrery ? anyColorPays(c) : c;
 }

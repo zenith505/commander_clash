@@ -157,8 +157,9 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
 }
 
 function plainFilter(p: string): TargetSpec | null {
-  // Only plain card qualities: "with different names", "with mana value X or less" and the like aren't modeled.
-  if (/ with (different|the same)| X /.test(p) || !/card( with (mana value|power|toughness) \d+ or (less|greater)| with an? (even|odd) mana value| with mana cost \{\d+\}(?: or \{\d+\})?| with (?!the |a |an |different )[a-z]+(?: strike)?)?$/i.test(p)) return null;
+  // Only plain card qualities: "with different names", "with mana value X or less" and the like aren't modeled. "With
+  // mana value 2" (Tribute Mage) is exactly that.
+  if (/ with (different|the same)| X /.test(p) || !/card( with (mana value|power|toughness) \d+(?: or (less|greater))?| with an? (even|odd) mana value| with mana cost \{\d+\}(?: or \{\d+\})?| with (?!the |a |an |different )[a-z]+(?: strike)?)?$/i.test(p)) return null;
   const spec = parseTargetPhrase(`${p} from your graveyard`);
   if (!spec || spec.kind !== "card") return null;
   const { owner: _owner, ...rest } = spec;

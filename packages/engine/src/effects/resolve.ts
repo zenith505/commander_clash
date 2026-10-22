@@ -648,6 +648,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "createdFightEach":
     case "bite":
     case "extraTurn":
+    case "controlPlayer":
     case "skip":
     case "addPhases":
     case "loseGame":
@@ -813,6 +814,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "counterEach":
     case "changeTarget":
     case "newTargets":
+    case "controlSpell":
       return runSpellsEffect(s, e, ctx, src);
     case "mill":
     case "revealUntilLandToGraveyard":

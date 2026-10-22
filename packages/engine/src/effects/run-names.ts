@@ -5,6 +5,9 @@ import { currentName } from "../names";
 import { shuffle, shuffleLibrary } from "../rng";
 import type { GameState, ObjectId } from "../types";
 import { bindChosen, printedMatches } from "./targeting";
+import { chooseAuraHosts } from "./run-zones";
+import type { AuraHost } from "../game";
+import { characteristics } from "../layers";
 import { ResolveCtx, amountNow, players } from "./resolve";
 
 /** Card names (CR 201): exiling the cards with a name from a player's graveyard, hand and library; revealing until one. */
@@ -54,20 +57,33 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "revealUntil": {
       // "Reveal cards from the top of your library until you reveal a card with the chosen name" (CR 701.20a): with none,
       // the whole library is revealed (rulings on Demonic Consultation).
-      const p = player(s, ctx.controller);
+      const who = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
+      if (who === undefined) return;
+      const p = player(s, who);
       const filter = bindChosen(e.filter, ctx.chosen);
+      // "Shares a card type with that permanent": its types as it last existed if it's gone (CR 608.2h).
+      const shared = e.sharesTypeWith === undefined ? undefined : targetTypes(s, ctx, e.sharesTypeWith);
+      if (shared && !shared.length) return;
+      const matches = (id: ObjectId) => printedMatches(filter, defOf(s, obj(s, id))) && (!shared || defOf(s, obj(s, id)).types.some((t) => shared.includes(t)));
       // "Until you reveal X land cards" (Open the Way): X of them, or as many as there are; with X = 0, none is revealed.
       const want = e.n === undefined ? 1 : Math.max(0, amountNow(s, e.n, ctx));
       const named = !(filter.chosen === "name" && ctx.chosen?.name === undefined);
       const hits: ObjectId[] = [];
       let end = want ? p.library.length : 0;
       for (let i = 0; named && i < end; i++)
-        if (printedMatches(filter, defOf(s, obj(s, p.library[i]!))) && hits.push(p.library[i]!) === want) end = i + 1;
+        if (matches(p.library[i]!) && hits.push(p.library[i]!) === want) end = i + 1;
       const seen = p.library.slice(0, end);
+      // An Aura found for the battlefield: its new controller chooses what it enchants as it enters (CR 303.4f), or it
+      // stays in the library (303.4g). Nothing has moved yet, so resuming reveals the same cards.
+      const hosts = e.found === "battlefield" ? chooseAuraHosts(s, hits.map((id) => ({ o: obj(s, id), under: p.id })), src) : new Map<ObjectId, AuraHost>();
+      if (hosts === "paused") return "paused";
+      const stays = hits.filter((id) => e.found === "battlefield" && defOf(s, obj(s, id)).subtypes.includes("Aura") && !hosts.has(id));
+      for (const id of stays) hits.splice(hits.indexOf(id), 1);
       const hit = hits[0];
       log(s, `${p.name} reveals ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${seen.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}${hit || !want ? "" : `, finding no ${filter.text}`}.`);
-      for (const id of hits) moveObject(s, id, e.found, e.tapped ? { tapped: true } : {});
-      const rest = seen.filter((id) => !hits.includes(id));
+      for (const id of stays) log(s, `${defOf(s, obj(s, id)).name} has nothing to enchant, so it stays in the library.`);
+      for (const id of hits) moveObject(s, id, e.found, { ...(e.tapped ? { tapped: true } : {}), ...(e.found === "battlefield" ? { controller: p.id, ...hosts.get(id) } : {}) });
+      const rest = seen.filter((id) => !hits.includes(id) && !stays.includes(id));
       if (e.rest === "bottom") {
         // "The rest on the bottom of your library in a random order" (CR 701.20a), every one of them if none was found.
         const order = [...rest];
@@ -77,6 +93,9 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           p.library.push(id);
         }
         if (order.length) log(s, `${p.name} puts ${order.length} card${order.length === 1 ? "" : "s"} on the bottom of their library in a random order.`);
+      } else if (e.rest === "shuffle") {
+        shuffleLibrary(s, p);
+        log(s, `${p.name} shuffles their library.`);
       } else for (const id of rest) moveObject(s, id, "exile");
       if (e.lifePerRest && rest.length) {
         loseLife(s, p.id, rest.length);
@@ -85,6 +104,17 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     }
   }
+}
+
+/** The card types of target `index`: as it is on the battlefield, or as it last existed there (CR 608.2h). */
+function targetTypes(s: GameState, ctx: ResolveCtx, index: number): string[] {
+  const t = ctx.targets[index];
+  if (!ctx.legal[index] || t?.kind !== "object") return [];
+  const o = s.objects[t.id];
+  if (!o) return [];
+  if (o.zone === "battlefield") return characteristics(s, o).types;
+  const lk = s.lastKnown?.[o.id];
+  return lk && lk.zc === (o.zoneChanges ?? 0) - 1 ? (lk.source?.types ?? []) : [];
 }
 
 /**

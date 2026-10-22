@@ -3911,6 +3911,8 @@ export interface CompiledCard {
    * of it" (CR 615.5): the control change happens right away, also when the damage can't be prevented (615.12).
    */
   betrayer?: true;
+  /** The Mindskinner: "If a source you control would deal damage to an opponent, prevent that damage and each opponent mills that many cards." (CR 615.5) */
+  damageToOpponentsMills?: true;
   /** "~ can't be countered." CR 101.2 */
   cantBeCountered?: boolean;
   /**

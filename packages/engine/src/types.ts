@@ -45,6 +45,9 @@ export interface DamageRule {
   gainLife?: { colors?: Color[] };
   dealBack?: { colors?: Color[] };
   tokens?: TokenSpec;
+  /** The Mindskinner: only damage from a source its controller controls; and each opponent mills that much (CR 615.5). */
+  sourceYours?: true;
+  mill?: true;
 }
 
 /** Each player's starting life total in Commander (CR 903.7). */

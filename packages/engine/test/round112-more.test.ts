@@ -339,3 +339,42 @@ describe("Food Chain", () => {
     expect(s.players[ap]!.manaLots?.filter((l) => l.mana === "G" && l.only).reduce((n, l) => n + l.n, 0)).toBe(5);
   });
 });
+
+const mindskinner = card("The Mindskinner", "Legendary Creature — Nightmare", "{U}{U}{U}", {
+  power: "10",
+  toughness: "1",
+  oracleText: "The Mindskinner can't be blocked.\nIf a source you control would deal damage to an opponent, prevent that damage and each opponent mills that many cards.",
+});
+
+describe("The Mindskinner", () => {
+  it("is supported", () => expect(isFullySupported(mindskinner)).toBe(true));
+
+  it("damage from a source you control to an opponent is prevented and each opponent mills that many", () => {
+    const { s: s0, ap, ids, opp } = setup([card("Lightning Bolt", "Instant", "{R}", { oracleText: "Lightning Bolt deals 3 damage to any target." })]);
+    putOnBattlefield(s0, ap, mindskinner);
+    const libs = s0.turnOrder.map((p) => s0.players[p]!.library.length);
+    const life = s0.players[opp]!.life;
+    const s = cast(s0, ap, ids[0]!, [{ kind: "player", id: opp }]);
+    expect(s.players[opp]!.life).toBe(life);
+    s.turnOrder.forEach((p, i) => expect(s.players[p]!.library.length, `player ${p}`).toBe(libs[i]! - (p === ap ? 0 : 3)));
+    expect(s.log.some((l) => /mills 3 cards \(The Mindskinner\)/.test(l.text))).toBe(true);
+  });
+
+  it("damage to you, to creatures, or from an opponent's source is dealt as usual", () => {
+    const { s: s0, ap, ids, opp } = setup([card("Lightning Bolt", "Instant", "{R}", { oracleText: "Lightning Bolt deals 3 damage to any target." })]);
+    putOnBattlefield(s0, opp, mindskinner);
+    const life = s0.players[opp]!.life;
+    const s = cast(s0, ap, ids[0]!, [{ kind: "player", id: opp }]);
+    expect(s.players[opp]!.life).toBe(life - 3);
+  });
+
+  it("damage that can't be prevented is dealt, and they mill too (CR 615.12)", () => {
+    const { s: s0, ap, ids, opp } = setup([card("Unpreventable Test", "Instant", "{R}", { oracleText: "Damage can't be prevented this turn. Unpreventable Test deals 3 damage to any target." })]);
+    putOnBattlefield(s0, ap, mindskinner);
+    const lib = s0.players[opp]!.library.length;
+    const life = s0.players[opp]!.life;
+    const s = cast(s0, ap, ids[0]!, [{ kind: "player", id: opp }]);
+    expect(s.players[opp]!.life).toBe(life - 3);
+    expect(s.players[opp]!.library.length).toBe(lib - 3);
+  });
+});

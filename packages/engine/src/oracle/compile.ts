@@ -1847,6 +1847,11 @@ export function compile(d: CardDef): CompiledCard {
       out.phantom = true;
       continue;
     }
+    // The Mindskinner (CR 615.5, 615.12): see staticRules in damage.ts.
+    if (line === "If a source you control would deal damage to an opponent, prevent that damage and each opponent mills that many cards.") {
+      out.damageToOpponentsMills = true;
+      continue;
+    }
     if (line === "If damage would be dealt to ~, prevent that damage and an opponent of your choice gains control of it.") {
       out.betrayer = true;
       continue;

@@ -921,7 +921,8 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
             if (obj(s, id).zone === "battlefield") r.created!.push(id);
           }
           else if (e.into === "battlefield") {
-            moveObject(s, id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...(e.counters ? { counters: { [e.counters.counter]: e.counters.n } } : {}), ...hosts.get(id) });
+            const extra = e.countersIfMv && manaValue(parseManaCost(defOf(s, obj(s, id)).manaCost)) <= e.countersIfMv.max ? e.countersIfMv : e.counters;
+            moveObject(s, id, "battlefield", { controller: p.id, ...(e.tapped ? { tapped: true } : {}), ...(extra ? { counters: { [extra.counter]: extra.n } } : {}), ...hosts.get(id) });
             if (obj(s, id).zone === "battlefield") r.created!.push(id); // "it" in what follows
           } else p.library = [id, ...p.library.filter((x) => x !== id)];
         }

@@ -94,6 +94,13 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
     } else return null;
     return dig.rest ? (dig as Extract<Effect, { type: "dig" }>) : "more";
   }
+  // Turntimber Symbiosis: "If that card has mana value 3 or less, it enters with three additional +1/+1 counters on it":
+  // a replacement for how it enters (CR 614.1c), checked as it's put there.
+  if ((m = /^If that card has mana value (\d+) or less, it enters with (one|two|three|four|five|an) additional \+1\/\+1 counters? on it$/.exec(s))) {
+    if (dig.into !== "battlefield" || dig.count !== 1 || dig.counters || dig.countersIfMv) return null;
+    Object.assign(dig, { countersIfMv: { max: Number(m[1]), counter: "+1/+1", n: m[2] === "an" ? 1 : num(m[2]!) } });
+    return "more";
+  }
   if ((m = new RegExp(`^Put (?:the rest|all cards revealed this way that weren't put onto the battlefield) ${REST}$`).exec(s))) return { ...(dig as Extract<Effect, { type: "dig" }>), ...restOf(m[1]!) };
   // "Then shuffle" (the "Then" is gone by now), "Then shuffle the rest into your library" (CR 701.20).
   if (/^Shuffle(?: the rest into your library)?$/.test(s)) return { ...(dig as Extract<Effect, { type: "dig" }>), rest: "shuffle" };

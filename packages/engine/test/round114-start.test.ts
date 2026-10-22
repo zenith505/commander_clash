@@ -1203,3 +1203,28 @@ describe("Neoform", () => {
     expect(s.objects[t]).toMatchObject({ zone: "battlefield", counters: { "+1/+1": 1 } });
   });
 });
+
+describe("Turntimber Symbiosis", () => {
+  const symbiosis = card("Turntimber Symbiosis", "Sorcery", "{4}{G}{G}{G}", {
+    oracleText: "Look at the top seven cards of your library. You may put a creature card from among them onto the battlefield. If that card has mana value 3 or less, it enters with three additional +1/+1 counters on it. Put the rest on the bottom of your library in a random order.",
+  });
+  const big = card("Big Beast", "Creature — Beast", "{3}{G}", { power: "4", toughness: "4" });
+
+  it("plays", () => expect(isFullySupported(symbiosis)).toBe(true));
+
+  for (const [label, small] of [["mana value 3 or less: three +1/+1 counters", true], ["mana value 4: none", false]] as const)
+    it(label, () => {
+      const { s: s0, ap, ids } = setup([symbiosis]);
+      const b = putOnBattlefield(s0, ap, small ? bear() : big);
+      moveObject(s0, b, "library");
+      const lib = s0.players[ap]!.library;
+      s0.players[ap]!.library = [b, ...lib.filter((x) => x !== b)];
+      let s = s0;
+      for (const a of planCast(s, ap, ids[0]!)!) s = act(s, a);
+      for (let i = 0; i < 10 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+      expect(s.pending?.kind).toBe("searchLibrary");
+      s = act(s, { type: "searchLibrary", player: ap, found: [b] });
+      expect(s.objects[b]!.zone).toBe("battlefield");
+      expect(s.objects[b]!.counters?.["+1/+1"] ?? 0).toBe(small ? 3 : 0);
+    });
+});

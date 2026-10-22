@@ -831,7 +831,7 @@ describe("more popular cards", () => {
     invalidateCharacteristics(s0);
     expect(objIsType(s0, s0.objects[forest]!, "Land")).toBe(true);
     expect(characteristics(s0, s0.objects[forest]!).subtypes).toEqual(expect.arrayContaining(["Forest", "Island"]));
-    for (const id of [lev, bears, bird]) s0.objects[id]!.summoningSick = false;
+    for (const id of [lev, bears, bird]) s0.objects[id]!.controlledSinceTurn = s0.turn - 1;
     const can = potentialAttackers(s0, ap).map((o) => o.id);
     expect(can).not.toContain(bears);
     expect(can).toEqual(expect.arrayContaining([lev, bird]));

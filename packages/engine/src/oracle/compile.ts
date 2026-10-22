@@ -1180,8 +1180,9 @@ export function compile(d: CardDef): CompiledCard {
       out.equipAtInstantSpeed = equipFast[1] ? "yourTurn" : "always";
       continue;
     }
-    if (line === "You may pay {0} rather than pay the equip cost of the first equip ability you activate during each of your turns.") {
-      out.firstEquipFree = true;
+    const firstEquip = /^You may pay \{0\} rather than pay the equip cost of the first equip ability you activate (during each of your turns|each turn)\.$/.exec(line);
+    if (firstEquip) {
+      out.firstEquipFree = firstEquip[1] === "each turn" ? "eachTurn" : "yourTurn";
       continue;
     }
     if (line === "You may play lands from your graveyard.") {

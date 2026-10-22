@@ -5110,12 +5110,16 @@ function equipAtInstantSpeed(s: GameState, pid: PlayerId): boolean {
 }
 
 /**
- * Forge Anew: {0} rather than the equip cost of the first equip ability `pid` activates during each of their turns (CR
- * 118.9; increases still apply, 601.2f). Taken whenever it applies, and only for an equip cost that's all mana.
+ * Forge Anew: {0} rather than the equip cost of the first equip ability `pid` activates during each of their turns;
+ * Bruenor Battlehammer: during each turn (CR 118.9; increases still apply, 601.2f). Taken whenever it applies, and only
+ * for an equip cost that's all mana.
  */
 export function freeEquip(s: GameState, pid: PlayerId, ab: ActivatedAbility): boolean {
-  if (!ab.equip || ab.costs?.length || ab.tap || s.activePlayer !== pid || s.turnLog?.equipped?.includes(pid)) return false;
-  return s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && !!abilitiesOf(s, obj(s, id)).firstEquipFree);
+  if (!ab.equip || ab.costs?.length || ab.tap || s.turnLog?.equipped?.includes(pid)) return false;
+  return s.battlefield.some((id) => {
+    const f = controllerOf(s, obj(s, id)) === pid ? abilitiesOf(s, obj(s, id)).firstEquipFree : undefined;
+    return f === "eachTurn" || (f === "yourTurn" && s.activePlayer === pid);
+  });
 }
 
 function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets?: TargetChoice[]): ParsedCost {

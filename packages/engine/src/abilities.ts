@@ -4267,8 +4267,11 @@ export interface CompiledCard {
   equipLess?: { n: number; targetSelf?: true; otherEquipment?: true; /** Only while this holds (a Class level's). */ if?: StaticCondition }[];
   /** "You may activate equip abilities any time you could cast an instant" (Leonin Shikari); Forge Anew's "During your turn, ...". */
   equipAtInstantSpeed?: "always" | "yourTurn";
-  /** Forge Anew: "You may pay {0} rather than pay the equip cost of the first equip ability you activate during each of your turns." */
-  firstEquipFree?: true;
+  /**
+   * Forge Anew: "You may pay {0} rather than pay the equip cost of the first equip ability you activate during each of your
+   * turns" (`"yourTurn"`); Bruenor Battlehammer: "... you activate each turn" (`"eachTurn"`).
+   */
+  firstEquipFree?: "yourTurn" | "eachTurn";
   /**
    * Torpor Orb: "Creatures entering don't cause abilities to trigger" (`types`: the entering permanent's, as it is on the
    * battlefield); Elesh Norn's "... abilities of permanents your opponents control" (`opponents`).

@@ -3,6 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, cast, island, passUntil, putOnBattlefield, setup, target } from "./helpers";
+import { abilityProblem } from "../src";
 import { attackTaxPer, botActions, invalidateCharacteristics, isFullySupported, objHasKeyword, objIsType, power, toughness, isSuspended, planActivate, planCast, waitingOn, type Action, type GameState, type PlayerId } from "../src";
 import { moveObject } from "../src/game";
 
@@ -572,5 +573,34 @@ describe("Silkguard", () => {
     expect(s.objects[a]!.counters["+1/+1"]).toBe(1);
     const hex = (id: string) => objHasKeyword(s, s.objects[id]!, "Hexproof");
     expect([hex(a), hex(b), hex(eq), hex(theirs)]).toEqual([true, false, true, false]);
+  });
+});
+
+const bruenor = card("Bruenor Battlehammer", "Legendary Creature — Dwarf Warrior", "{2}{R}{W}", {
+  power: "5",
+  toughness: "3",
+  oracleText: "Each creature you control gets +2/+0 for each Equipment attached to it.\nYou may pay {0} rather than pay the equip cost of the first equip ability you activate each turn.",
+});
+const shikari = card("Leonin Shikari", "Creature — Cat Soldier", "{1}{W}", { power: "2", toughness: "2", oracleText: "You may activate equip abilities any time you could cast an instant." });
+const splitter = card("Bonesplitter", "Artifact — Equipment", "{1}", { oracleText: "Equipped creature gets +2/+0.\nEquip {1}" });
+
+describe("Bruenor Battlehammer", () => {
+  it("the first equip each turn is free, on an opponent's turn too (unlike Forge Anew); the second costs its mana", () => {
+    expect(isFullySupported(bruenor)).toBe(true);
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, opp, bruenor);
+    putOnBattlefield(s0, opp, shikari);
+    const sw = putOnBattlefield(s0, opp, splitter);
+    const [a, b] = [putOnBattlefield(s0, opp, bear()), putOnBattlefield(s0, opp, bear())];
+    for (const id of s0.battlefield) if (s0.objects[id]!.controller === opp && objIsType(s0, s0.objects[id]!, "Land")) s0.objects[id]!.tapped = true;
+    let s = act(s0, { type: "passPriority", player: ap });
+    expect(waitingOn(s)).toBe(opp);
+    expect(abilityProblem(s, opp, sw, 0, [target(a)])).toBeNull();
+    s = settle(act(s, { type: "activateAbility", player: opp, objectId: sw, index: 0, targets: [target(a)] } as never));
+    expect(s.objects[sw]!.attachedTo).toBe(a);
+    // Bonesplitter's +2/+0 and Bruenor's +2/+0 for it.
+    expect(power(s, s.objects[a]!)).toBe(6);
+    if (waitingOn(s) !== opp) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(abilityProblem(s, opp, sw, 0, [target(b)])).toMatch(/mana/);
   });
 });

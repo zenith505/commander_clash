@@ -1436,6 +1436,12 @@ export function gainLife(s: GameState, pid: PlayerId, n: number) {
     log(s, `${player(s, pid).name} can't gain life.`); // CR 119.7
     return;
   }
+  // "That player gains no life instead" (Sulfuric Vortex, CR 614.1a): whatever order the player applies it in with the
+  // others below, no life is gained (CR 616.1). Unlike "can't gain life", it doesn't stop costs or exchanges.
+  if (s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).gainsNoLife)) {
+    log(s, `${player(s, pid).name} gains no life instead.`);
+    return;
+  }
   // "You gain that much life plus 1 instead" (rulings: one more for each), then "twice that much" (CR 614.1a): the
   // player gaining life chooses the order (CR 616.1, Alhammarret's Archive rulings); adding first gains the most.
   const plus = s.battlefield.reduce((a, id) => a + (controllerOf(s, obj(s, id)) === pid ? (abilitiesOf(s, obj(s, id)).lifeGainPlus ?? 0) : 0), 0);
@@ -3242,7 +3248,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const spentTrigger: ManaSpentTrigger | undefined = ab.spentTrigger && { ...ab.spentTrigger, sourceId: o.id, sourceCardId: cardIdOf(o), sourceZc: o.zoneChanges ?? 0 };
   // "Whenever you cast a permanent spell using mana produced by Tecutlan": its mana is kept apart, to tell.
   const source = abilitiesOf(s, o).triggers.some((t) => t.cast?.manaFromSelf) ? `${o.id}#${o.zoneChanges ?? 0}` : undefined;
-  addMana(s, p.id, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(source ? { source } : {}) });
+  addMana(s, p.id, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(ab.spentUncounterable ? { uncounterableInstantSorcery: true as const } : {}), ...(source ? { source } : {}) });
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
   addTriggeredMana(s, p.id, picked);
   if (ab.skipNextUntap && o.zone === "battlefield") o.skipNextUntap = true;

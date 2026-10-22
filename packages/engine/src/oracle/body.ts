@@ -104,6 +104,8 @@ export interface Ctx {
   exchanged?: boolean;
   /** "Whenever ~ deals combat damage to a player": "that player" is that player. */
   eventPlayer?: boolean;
+  /** While counting for "each player ... that player controls" (Price of Progress): "that player" is each of them in turn (PlayerRef eachOne). */
+  eachOne?: boolean;
   /** "Choose an opponent." came before: "that player" is the one chosen. */
   chosenOpponent?: boolean;
   /** "Roll two d8 and choose one result" came before: "that result" and "the other result" mean something. */
@@ -2251,6 +2253,19 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [landIs[1]!], text: landIs[1]! };
       const either: Effect = { type: "either", options: [[{ type: "putOntoBattlefield", what: back.what }], [back]], labels: ["Return it to the battlefield", "Return it to your hand"] };
       effects[effects.length - 1] = { type: "if", cond: { kind: "subjectIs", filter }, effects: [{ ...prev, effects: [either] }], otherwise: [prev] };
+      continue;
+    }
+    // Emiel the Blessed: "Whenever another creature you control enters, you may pay {G/W}. If you do, put a +1/+1 counter on
+    // it. If it's a Unicorn, put two +1/+1 counters on it instead.": the creature as it is when this resolves (CR 608.2c).
+    const subjectType = ctx.subjectIt ? /^If it's an? ([A-Z][a-z]+), put (two|three) \+1\/\+1 counters on it instead$/.exec(s) : null;
+    if (subjectType && CREATURE_TYPES.has(subjectType[1]!)) {
+      const prev = effects[effects.length - 1];
+      const holder = prev?.type === "may" && prev.effects.length === 1 ? prev : undefined;
+      const one = holder ? holder.effects[0] : prev;
+      if (one?.type !== "counters" || one.what.ref !== "subject" || one.counter !== "+1/+1" || one.n !== 1) return null;
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [subjectType[1]!], text: subjectType[1]! };
+      const pick: Effect = { type: "if", cond: { kind: "subjectIs", filter }, effects: [{ ...one, n: num(subjectType[2]!) }], otherwise: [one] };
+      effects[effects.length - 1] = holder ? { ...holder, effects: [pick] } : pick;
       continue;
     }
     // Essence Flux: "Exile target creature you control, then return that card to the battlefield under its owner's

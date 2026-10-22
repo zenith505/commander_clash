@@ -565,6 +565,8 @@ export interface ManaLot {
   hasteType?: string;
   /** Opal Palace's "if you spend this mana to cast your commander": see ManaAbility.spentCommanderCounters. */
   commanderCounters?: true;
+  /** Boseiju, Who Shelters All: see ManaAbility.spentUncounterable. */
+  uncounterableInstantSorcery?: true;
   /** "Using mana produced by Tecutlan": the permanent that made it, "id#zoneChanges" (TriggeredAbility.cast.manaFromSelf). */
   source?: string;
 }

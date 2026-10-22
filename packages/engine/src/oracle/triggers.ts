@@ -389,7 +389,8 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(nth[5]!, { castSpell: true, eventPlayer: true });
     return body ? { event: "castSpell", cast: { by: CAST_BY[nth[1] as keyof typeof CAST_BY], spell: kind, nth: nth[2] === "first" ? 1 : 2, ...(nth[3] ? { nthOfKind: true as const } : {}), ...(nth[4] === "during their turn" ? { ownTurn: true as const } : {}), ...(nth[4] === "during each opponent's turn" ? { opponentsTurn: true as const } : {}) }, body } : "fail";
   }
-  const m = CAST_TRIGGER.exec(line);
+  // "A creature spell with mana value 4, 5, or 6" (Kozilek's Unsealing): without the commas, as one phrase.
+  const m = CAST_TRIGGER.exec(line.replace(/ with mana value (\d+), (\d+), or (\d+),/, (all, a: string, b: string, c: string) => (Number(b) === Number(a) + 1 && Number(c) === Number(b) + 1 ? ` with mana value ${a} through ${c},` : all)));
   if (!m) return null;
   let what = m[3]!.replace(/^(?:an?|another) /, "");
   // "Whenever you cast a spell from exile", "... from anywhere other than your hand", "... from your graveyard": the zone
@@ -714,7 +715,10 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
  * declared as an attacker (CR 508.3a), not one put onto the battlefield attacking (508.4). "It" and "that creature" are
  * the attacker; "defending player" is the player it's attacking (CR 508.5a).
  */
-function parseAttackerTrigger(line: string): TriggeredAbility | "fail" | null {
+function parseAttackerTrigger(line0: string): TriggeredAbility | "fail" | null {
+  // "Whenever a creature you control that's enchanted or equipped attacks" (Reyav, Master Smith): one that's either as it
+  // attacks.
+  const line = line0.replace(/^Whenever a creature you control that's (enchanted or equipped|enchanted|equipped) attacks,/, (_, st: string) => `Whenever an ${st.replace(/ /g, "-")} creature you control attacks,`);
   // "Whenever a Zombie token you control with power 6 or greater attacks" (Dreadhorde Invasion): its power as it's declared.
   const m = /^Whenever (another|an?) (.+? you control(?: of the chosen type| with power \d+ or (?:greater|less))?) attacks, (.+)$/.exec(line);
   // "Whenever a creature attacks": anyone's, each one as it's declared as an attacker (Caltrops, Righteous Cause).
@@ -777,6 +781,12 @@ function parseAttackerTrigger(line: string): TriggeredAbility | "fail" | null {
 function parseSacrificeTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever a player sacrifices a permanent" (Mayhem Devil), "whenever an opponent sacrifices ...": "that player" is the
   // one who sacrificed it, its controller (CR 701.21a).
+  // "When you sacrifice ~" (Heaped Harvest): ~ itself, wherever it went.
+  const self = /^(?:When|Whenever) you sacrifice ~, (.+)$/.exec(line);
+  if (self) {
+    const body = parseBody(self[1]!);
+    return body ? { event: "youSacrifice", sacrifices: { filter: { kind: "object", text: "~" }, orSelf: true, self: true }, body } : "fail";
+  }
   const any = /^Whenever (a player|an opponent) sacrifices (an?|another) (.+?), (.+)$/.exec(line);
   const m = any ? [any[0], any[2], any[3], undefined, any[4]] : /^Whenever you sacrifice (~ or another|another|an?) (.+?)( during your turn)?, (.+)$/.exec(line);
   if (!m) return null;

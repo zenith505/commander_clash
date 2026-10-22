@@ -1388,6 +1388,10 @@ export function compile(d: CardDef): CompiledCard {
       out.cantGainLife = noGain[1] === "Players" ? "all" : noGain[1] === "Enchanted player" ? "enchanted" : "opponents";
       continue;
     }
+    if (line === "If a player would gain life, that player gains no life instead.") {
+      out.gainsNoLife = true;
+      continue;
+    }
     if (line === "Damage can't be prevented.") {
       out.damageCantBePrevented = true;
       continue;
@@ -1791,6 +1795,15 @@ export function compile(d: CardDef): CompiledCard {
     if (proto && parseManaCost(proto[1]!).supported && !parseManaCost(proto[1]!).hasX) {
       (out.altCosts ??= []).push({ kind: "prototype", mana: proto[1]! });
       continue;
+    }
+    // Heaped Harvest: "When ~ enters and when you sacrifice it, ...": two triggers doing the same.
+    const andSac = /^When ~ enters and when you sacrifice it, (.+)$/.exec(line);
+    if (andSac) {
+      const halves = [`When ~ enters, ${andSac[1]}`, `When you sacrifice ~, ${andSac[1]}`].map((l) => parseTrigger(l));
+      if (halves.every((t) => t && t !== "fail")) {
+        for (const t of halves) out.triggers.push(t as TriggeredAbility);
+        continue;
+      }
     }
     // Unbound Flourishing: two events, each its own trigger; "if that spell's mana cost or that ability's activation cost
     // contains {X}" can't change after it's cast or activated, so it's checked as it triggers (CR 603.4).

@@ -105,6 +105,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       return;
     case "damage": {
       const amount = amountNow(s, e.amount, ctx);
+      // Price of Progress: each player's own amount ("that player controls", PlayerRef eachOne).
+      const perPlayer = typeof e.amount === "object" && JSON.stringify(e.amount).includes('"eachOne"');
       // "Divided as you choose": each target is dealt its part; a part for an illegal target isn't dealt (CR 608.2b,
       // rulings on Arc Lightning).
       // "Divided evenly, rounded down": among the targets still legal (rulings on Fireball).
@@ -118,7 +120,9 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
               const t = ctx.targets[to.index + k];
               return { ...damageRecipients(s, { ref: "anyTarget", index: to.index + k }, ctx), n: t && t.kind !== "none" && t.kind !== "stack" ? (t.amount ?? 0) : 0 };
             })
-          : [{ ...damageRecipients(s, to, ctx), n: amount }];
+          : perPlayer
+            ? ((r) => r.pids.map((pid) => ({ objs: [], pids: [pid], n: amountNow(s, e.amount, { ...ctx, eachOne: pid }) })))(damageRecipients(s, to, ctx))
+            : [{ ...damageRecipients(s, to, ctx), n: amount }];
       const all = [e.to, ...(e.also ?? [])].flatMap(parts);
       const by = e.by === "subject" ? subjectSource(s, ctx) : e.by ? targetSource(s, ctx, e.by.target) : ctxSource(s, ctx);
       if (!by) return;

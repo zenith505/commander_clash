@@ -1706,7 +1706,7 @@ export type Effect =
   /** "It can't be regenerated this turn" (CR 701.19c): its regeneration shields don't apply this turn. */
   | { type: "noRegen"; what: ObjRef; ifCreature?: true }
   /** "Look at target opponent's hand" (only you see it, CR 402.3); `reveal`: "target player reveals their hand" (everyone sees it). */
-  | { type: "lookAtHand"; who: PlayerRef; reveal?: true }
+  | { type: "lookAtHand"; who: PlayerRef; reveal?: true; /** "Look at a card at random in target player's hand" (Urza's Bauble). */ atRandom?: true }
   /** "~ assigns no combat damage this turn" (CR 510.1). */
   | { type: "noCombatDamage"; what: ObjRef }
   | { type: "untap"; what: ObjRef }
@@ -3305,7 +3305,8 @@ export interface TriggeredAbility {
    * went. The card is the subject ("exile it").
    */
   /** `by`: "whenever a player sacrifices" (any), "whenever an opponent sacrifices" (opponent); otherwise "whenever you sacrifice". */
-  sacrifices?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; by?: "any" | "opponent" };
+  /** `self`: "When you sacrifice ~" (Heaped Harvest), only ~ itself. */
+  sacrifices?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; self?: true; by?: "any" | "opponent" };
   /** Persist/undying's "if it had no -1/-1 counters on it" (an intervening if, CR 603.4), from last known information; "any": "if it had no counters on it" (Unstoppable Slasher). */
   ifNoCounter?: "+1/+1" | "-1/-1" | "any";
   /** "When ~ dies, if it had a revival counter on it" (Nine-Lives Familiar): from last known information (CR 603.4, 603.10a). */
@@ -3655,6 +3656,8 @@ export interface ManaAbility {
    * off): a creature spell any of it pays any part of the total cost of (rulings), and the creature it becomes.
    */
   spentHaste?: "endOfTurn" | "game";
+  /** "If that mana is spent on an instant or sorcery spell, that spell can't be countered" (Boseiju, Who Shelters All). */
+  spentUncounterable?: true;
   /** With `spentHaste`: only a creature spell of this creature type ("a Dragon creature spell", Carnelian Orb of Dragonkind). */
   spentHasteType?: string;
   /**
@@ -4258,6 +4261,8 @@ export interface CompiledCard {
   roomsTwice?: number;
   /** "Players can't gain life." / "Your opponents can't gain life." (CR 119.7) */
   cantGainLife?: "all" | "opponents" | "enchanted";
+  /** "If a player would gain life, that player gains no life instead" (Sulfuric Vortex): a replacement (CR 614.1a), not "can't gain life". */
+  gainsNoLife?: true;
   /**
    * "If an opponent would begin an extra turn, that player skips that turn instead" (Trouble in Pairs, Stranglehold), "If a
    * player would ..." (Ugin's Nexus): a replacement effect skipping it as it would begin (CR 614.10, 500.7); one created

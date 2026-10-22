@@ -134,9 +134,10 @@ export function parseGrants(text: string): Modification[] | null {
       out.push({ kind: "addAbility", text: "Melee" });
       continue;
     }
-    // Annihilator too (CR 702.86b): "has trample and annihilator 2" (Eldrazi Conscription).
-    if (/^annihilator \d+$/i.test(w)) {
-      out.push({ kind: "addAbility", text: `Annihilator ${/\d+/.exec(w)![0]}` });
+    // Annihilator too (CR 702.86b): "has trample and annihilator 2" (Eldrazi Conscription); afflict (CR 702.130b) and
+    // bushido (CR 702.45b) the same: "Artifact creatures you control have afflict 3" (Cyberman Patrol).
+    if (/^(?:annihilator|afflict|bushido) \d+$/i.test(w)) {
+      out.push({ kind: "addAbility", text: `${w.charAt(0).toUpperCase()}${w.slice(1).toLowerCase()}` });
       continue;
     }
     // Firebending N too (CR 702.189a): "gains firebending 4 until end of turn" (Fire Nation Palace), each instance

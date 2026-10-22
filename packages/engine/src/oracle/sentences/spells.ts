@@ -75,6 +75,11 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!who || !half || (who.ref === "you") !== (m[2]!.toLowerCase() === "your")) return null;
     return [{ type: "mill", who, n: { count: { kind: "cardsInLibrary", who: { ref: "eachOne" } }, half } }];
   }
+  // "Each opponent mills cards equal to the number of cards in their hand" (Folio of Fancies): each their own hand.
+  if ((m = /^(.+?) mills? cards equal to the number of cards in (?:their|his or her) hand$/i.exec(s)) && !/^you$/i.test(m[1]!)) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who && who.ref !== "you" ? [{ type: "mill", who, n: { count: { kind: "cardsInHand", who: who.ref === "eachPlayer" || who.ref === "eachOpponent" ? { ref: "eachOne" } : who } } }] : null;
+  }
   // "Target player mills twice X cards" (Drown in Dreams), "mill twice X cards" (The Master of Keys).
   if ((m = /^(?:(.+?) mills|[Mm]ill) twice X cards$/.exec(s))) {
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
@@ -102,6 +107,10 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return filter ? [{ type: "discard", who: { ref: "you" }, n: 1, filter }] : null;
   }
   // "Look at target opponent's hand", "target player reveals their hand" (CR 402.3, 701.20).
+  if ((m = /^Look at a card at random in (.+?)'s? hand$/i.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who ? [{ type: "lookAtHand", who, atRandom: true }] : null;
+  }
   if ((m = /^Look at (.+?)'s? hand$/i.exec(s))) {
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "lookAtHand", who }] : null;

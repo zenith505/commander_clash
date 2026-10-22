@@ -681,7 +681,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // triggering for its own controller, "that player" being the one who sacrificed it.
       const byOk = (by: "any" | "opponent" | undefined, watcher: PlayerId) => (watcher === ev.controller ? by !== "opponent" : by === "any" || (by === "opponent" && opponents(s, watcher).includes(ev.controller)));
       const consider = (src: GameObject, watcher: PlayerId, triggers?: TriggeredAbility[]) =>
-        add(src, watcher, (e, t) => e === "youSacrifice" && !!t.sacrifices && byOk(t.sacrifices.by, watcher) && diesMatches(s, t.sacrifices, src.id, undefined, dying, ev.controller), triggers, undefined, o, lki, undefined, undefined, { player: ev.controller });
+        add(src, watcher, (e, t) => e === "youSacrifice" && !!t.sacrifices && (!t.sacrifices.self || src.id === ev.id) && byOk(t.sacrifices.by, watcher) && diesMatches(s, t.sacrifices, src.id, undefined, dying, ev.controller), triggers, undefined, o, lki, undefined, undefined, { player: ev.controller });
       for (const id of s.battlefield) consider(obj(s, id), controllerOf(s, obj(s, id)));
       for (const left of s.leftTogether ?? []) {
         const src = s.objects[left.id];

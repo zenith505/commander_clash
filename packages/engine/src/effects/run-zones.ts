@@ -2067,6 +2067,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "lookAtHand":
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
+        // One card chosen at random, seen only by the player looking.
+        if (e.atRandom) {
+          const id = p.hand.length ? p.hand[Math.floor(nextRandom(s) * p.hand.length)]! : undefined;
+          log(s, `${player(s, ctx.controller).name} looks at a card at random in ${p.name}'s hand.`);
+          if (id) log(s, `${p.name}'s card: ${defOf(s, obj(s, id)).name}.`, ctx.controller);
+          continue;
+        }
         const cards = p.hand.map((id) => defOf(s, obj(s, id)).name).join(", ") || "no cards";
         if (e.reveal) log(s, `${p.name} reveals their hand: ${cards}.`);
         else {

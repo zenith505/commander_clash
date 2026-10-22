@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
-import { altCostsFor, attackCost, invalidateCharacteristics, mayPlayFromTop, power, botActions, characteristics, graveyardWays, isFullySupported, planActivate, planCast, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
+import { abilityProblem, altCostsFor, attackCost, invalidateCharacteristics, mayPlayFromTop, power, botActions, characteristics, graveyardWays, isFullySupported, planActivate, planCast, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const urabrask = scry("transform", [
@@ -754,3 +754,60 @@ describe("Tribute Mage, Kitsa, Ruby, Agent of Treachery, Vengeful Ancestor, Niv-
 });
 
 void target;
+
+describe("Halo Fountain with a mana creature", () => {
+  const fountain = card("Halo Fountain", "Artifact", "{2}{W}", {
+    oracleText:
+      "{W}, {T}, Untap a tapped creature you control: Create a 1/1 green and white Citizen creature token.\n{W}{W}, {T}, Untap two tapped creatures you control: Draw a card.\n{W}{W}{W}{W}{W}, {T}, Untap fifteen tapped creatures you control: You win the game.",
+  });
+  const pilgrim = card("Avacyn's Pilgrim", "Creature — Human Monk", "{G}", { power: "1", toughness: "1", oracleText: "{T}: Add {W}." });
+  const prep = () => {
+    const { s, ap } = setup([]);
+    for (const id of s.battlefield) if (s.objects[id]!.controller === ap) s.objects[id]!.tapped = true;
+    const f = putOnBattlefield(s, ap, fountain);
+    const p = putOnBattlefield(s, ap, pilgrim);
+    return { s, ap, f, p };
+  };
+
+  it("taps Avacyn's Pilgrim for the {W}, then untaps it for the cost (rulings: mana abilities come before costs)", () => {
+    supported(fountain, pilgrim);
+    const { s: s0, ap, f, p } = prep();
+    // No tapped creature, but the Pilgrim can be tapped for mana first: only the mana is missing, which it makes.
+    expect(abilityProblem(s0, ap, f, 0)).toMatch(/not enough mana/);
+    const plan = planActivate(s0, ap, f, 0, undefined, undefined, undefined, undefined, { tap: [p] });
+    expect(plan?.map((a) => a.type)).toEqual(["activateMana", "activateAbility"]);
+    const s = settle(run(s0, plan));
+    expect(s.objects[p]!.tapped).toBe(false);
+    expect(s.objects[f]!.tapped).toBe(true);
+    const tokens = s.battlefield.filter((id) => s.objects[id]!.isToken);
+    expect(tokens).toHaveLength(1);
+    expect(characteristics(s, s.objects[tokens[0]!]!).subtypes).toContain("Citizen");
+  });
+
+  it("an untapped creature can't pay it as it is, and one that makes no mana can't be tapped for it", () => {
+    const { s, ap, f, p } = prep();
+    // Asked to untap the untapped Pilgrim without tapping it for mana first: not a tapped creature (CR 602.2b).
+    expect(() => act(s, { type: "activateAbility", player: ap, objectId: f, index: 0, costs: { tap: [p] } } as never)).toThrow();
+    const b = putOnBattlefield(s, ap, card("Plain Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    expect(planActivate(s, ap, f, 0, undefined, undefined, undefined, undefined, { tap: [b] })).toBeNull();
+    // A summoning-sick Pilgrim can't be tapped for mana (CR 302.6).
+    const sick = putOnBattlefield(s, ap, pilgrim, { sick: true });
+    expect(planActivate(s, ap, f, 0, undefined, undefined, undefined, undefined, { tap: [sick] })).toBeNull();
+  });
+
+  it("a bot taps its Pilgrim for mana and untaps it to make a Citizen", () => {
+    const { s: s0, ap, f, p } = prep();
+    const pl = s0.players[ap]!;
+    pl.command = [];
+    for (const id of pl.hand.splice(0)) {
+      s0.objects[id]!.zone = "library";
+      pl.library.push(id);
+    }
+    let s = passUntil(s0, "main2", ap);
+    for (const id of s.battlefield) if (s.objects[id]!.controller === ap && id !== f && id !== p) s.objects[id]!.tapped = true;
+    for (let i = 0; i < 6 && s.objects[f]!.tapped === false; i++) s = settle(act(s, botActions(s, ap)[0]!));
+    expect(s.objects[f]!.tapped).toBe(true);
+    expect(s.objects[p]!.tapped).toBe(false);
+    expect(s.battlefield.filter((id) => s.objects[id]!.isToken)).toHaveLength(1);
+  });
+});

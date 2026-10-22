@@ -591,6 +591,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "069f6530-e65c-4d52-85f3-e0a2acd148c5",
+  "name": "Avacyn's Pilgrim",
+  "manaCost": "{G}",
+  "cmc": 1,
+  "typeLine": "Creature — Human Monk",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Monk"
+  ],
+  "oracleText": "{T}: Add {W}.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G",
+   "W"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "isd",
+  "releasedAt": "2011-09-30",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e8df915f-f509-4c6c-9261-a5a16c3f06c5",
   "name": "Ballot Broker",
   "manaCost": "{2}{W}",
@@ -4355,6 +4390,32 @@
   "set": "all",
   "releasedAt": "1996-06-10",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "36a9de4c-8073-475d-8679-e50844eef09e",
+  "name": "Halo Fountain",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{W}, {T}, Untap a tapped creature you control: Create a 1/1 green and white Citizen creature token.\n{W}{W}, {T}, Untap two tapped creatures you control: Draw a card.\n{W}{W}{W}{W}{W}, {T}, Untap fifteen tapped creatures you control: You win the game.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "snc",
+  "releasedAt": "2022-04-29",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

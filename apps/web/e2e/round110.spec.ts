@@ -1,6 +1,7 @@
 // Round 110's prompts: The Great Work's chapter III lets you cast an instant from an opponent's graveyard (their
 // graveyard shows it as playable; it's exiled instead of going to a graveyard), and Abundance's "Reveal until a land /
-// nonland card" buttons on each draw, with the other revealed cards ordered on the bottom of your library.
+// nonland card" buttons on each draw, with the other revealed cards ordered on the bottom of your library, and more;
+// Halo Fountain's "Untap a tapped creature you control" also offers a mana creature that's tapped for the {W} first.
 import { expect, test } from "@playwright/test";
 import { type GameState } from "@cc/engine";
 import { LANDS, idsOf, one, open, pageErrors, playWithBots, scene } from "./scene";
@@ -104,5 +105,21 @@ test("One with the Multiverse: cast Serra Angel from the top of your library for
   // Used up for this turn: Hill Giant, now on top, can't be cast without lands.
   await page.locator(`[data-obj="${giant}"]`).first().click();
   await expect(menu(page).locator("button", { hasText: "Cast it for" })).toHaveCount(0);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Halo Fountain: click the untapped Avacyn's Pilgrim; it's tapped for the {W}, then untapped for the cost", async ({ page }) => {
+  const s = scene({ board: ["Halo Fountain", "Avacyn's Pilgrim"] });
+  const [fountain, pilgrim] = [one(s, "Halo Fountain"), one(s, "Avacyn's Pilgrim")];
+  await open(page, s);
+  await card(page, "Halo Fountain", s).click();
+  await menu(page).locator("button", { hasText: "Citizen" }).click();
+  const bar = page.locator(".targeting", { hasText: "untap a tapped creature you control" });
+  await expect(bar.getByRole("button", { name: "Untap and activate" })).toBeDisabled();
+  await page.locator(`[data-obj="${pilgrim}"]`).click();
+  await bar.getByRole("button", { name: "Untap and activate" }).click();
+  const after = await resolveUntil(page, (st) => st.stack.length === 0 && st.battlefield.some((id) => st.objects[id]!.isToken));
+  expect(after.objects[pilgrim]!.tapped).toBe(false);
+  expect(after.objects[fountain]!.tapped).toBe(true);
   expect(pageErrors(page)).toEqual([]);
 });

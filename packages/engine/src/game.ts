@@ -4641,7 +4641,9 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       continue;
     }
     if (!chosen) {
-      if (c.n > 0 && (pool.length < c.n || !pool.some(fits))) return `you need to ${verb} ${full} to ${doing}`;
+      // Untapping: also what can be tapped for mana first (Halo Fountain).
+      const can = c.kind === "tap" && c.untap ? [...pool, ...untapViaMana(s, pid, o, c)] : pool;
+      if (c.n > 0 && (can.length < c.n || !can.some(fits))) return `you need to ${verb} ${full} to ${doing}`;
       continue;
     }
     if (chosen.length !== c.n || new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id)) || !chosen.some(fits)) return `choose ${full} to ${verb}`;
@@ -4659,6 +4661,19 @@ export function tapCostCandidates(s: GameState, pid: PlayerId, source: GameObjec
     // "Untap a tapped creature you control": tapped ones, but not one a stun counter would keep tapped (CR 122.1d).
     if (c.untap ? !x.tapped || (x.counters.stun ?? 0) > 0 : x.tapped) return false;
     return controllerOf(s, x) === pid && !(c.other && id === source.id) && objectMatches(s, c.filter, x, pid, false);
+  });
+}
+
+/**
+ * The untapped permanents "Untap a tapped creature you control" (Halo Fountain) can untap all the same: ones that can
+ * be tapped for mana while paying for the ability, then untapped for its cost, since mana abilities are activated
+ * before costs are paid (CR 601.2g-h, 602.2b; rulings on Halo Fountain). Not one with a stun counter (CR 122.1d).
+ */
+export function untapViaMana(s: GameState, pid: PlayerId, source: GameObject, c: Extract<AdditionalCost, { kind: "tap" }>): ObjectId[] {
+  return s.battlefield.filter((id) => {
+    const x = obj(s, id);
+    if (id === source.id || x.tapped || (x.counters.stun ?? 0) > 0 || controllerOf(s, x) !== pid || !objectMatches(s, c.filter, x, pid, false)) return false;
+    return manaAbilitiesOn(s, x).some((m, i) => m.tap && !m.manaCost && !m.tapCost && !m.sacrificeSelf && !manaAbilityProblem(s, pid, x, i, true)) || payableActivatedMana(s, pid, x).some((m) => m.ab.tap && !m.ab.manaCost && !m.ab.sacrificeSelf);
   });
 }
 

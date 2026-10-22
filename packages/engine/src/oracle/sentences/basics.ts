@@ -459,6 +459,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return times && [{ type: "addMana", mana: m[1]!, times }];
   }
   if ((m = new RegExp(`^[Aa]dd ${NUM} mana of any (one )?color$`).exec(s)) && (num(m[1]!) === 1 || m[2])) return [{ type: "choose", choice: "color" }, { type: "addMana", chosen: num(m[1]!) }];
+  // "Add X mana of any one color, where X is 1 plus the exiled creature's mana value" (Food Chain): one color, chosen as
+  // it resolves (CR 605.3b), X of it.
+  if (/^[Aa]dd X mana of any one color$/.test(s)) return [{ type: "choose", choice: "color" }, { type: "addMana", chosen: 1, times: amt("X") }];
   // Energy (CR 107.14): "You get {E}{E}", "you get X {E}", "you get an amount of {E} equal to ~'s power".
   if ((m = /^(?:[Yy]ou )?[Gg]et ((?:\{E\})+)$/.exec(s))) return [{ type: "getEnergy", who: { ref: "you" }, n: m[1]!.length / 3 }];
   if ((m = new RegExp(`^(?:[Yy]ou )?[Gg]et ${NUMX} \\{E\\}$`).exec(s))) return [{ type: "getEnergy", who: { ref: "you" }, n: amt(m[1]!) }];

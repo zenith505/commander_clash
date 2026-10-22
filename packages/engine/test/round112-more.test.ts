@@ -319,3 +319,23 @@ describe("Liliana of the Dark Realms", () => {
       else expect(s.objects[b]!.zone).toBe("graveyard");
     });
 });
+
+const foodChain = card("Food Chain", "Enchantment", "{2}{G}", {
+  oracleText: "Exile a creature you control: Add X mana of any one color, where X is 1 plus the exiled creature's mana value. Spend this mana only to cast creature spells.",
+});
+
+describe("Food Chain", () => {
+  it("is supported", () => expect(isFullySupported(foodChain)).toBe(true));
+
+  it("exiling a creature adds 1 plus its mana value of one color, only for creature spells", () => {
+    let { s, ap } = setup([]);
+    const fc = putOnBattlefield(s, ap, foodChain);
+    const b = putOnBattlefield(s, ap, card("Hill Giant", "Creature — Giant", "{3}{R}", { power: "3", toughness: "3" }));
+    s = act(s, { type: "activateAbility", player: ap, objectId: fc, index: 0, costs: { sacrifice: [b] } });
+    expect(s.pending?.kind).toBe("chooseOption");
+    if (s.pending?.kind === "chooseOption") s = act(s, { type: "chooseOption", player: ap, choice: s.pending.options.find((o) => /green/i.test(o))! });
+    expect(s.objects[b]!.zone).toBe("exile");
+    expect(s.players[ap]!.manaPool.G).toBe(5);
+    expect(s.players[ap]!.manaLots?.filter((l) => l.mana === "G" && l.only).reduce((n, l) => n + l.n, 0)).toBe(5);
+  });
+});

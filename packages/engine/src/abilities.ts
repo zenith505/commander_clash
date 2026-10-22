@@ -604,8 +604,11 @@ export type ObjRef =
   | { ref: "created" }
   /** "The amassed Army" (CR 701.47c): the Army chosen by this ability's amass, or by the one whose reflexive trigger this is. */
   | { ref: "amassed" }
-  /** "The sacrificed creature": what was sacrificed to cast the spell, as it last existed (CR 608.2h). */
-  | { ref: "sacrificed" }
+  /**
+   * "The sacrificed creature": what was sacrificed to cast the spell, as it last existed (CR 608.2h). `exiledCost`: "the
+   * exiled creature" for an "Exile a creature you control" cost (Food Chain), likewise.
+   */
+  | { ref: "sacrificed"; exiledCost?: true }
   /** The card "reveal the top card of your library" revealed, while it's still where it was (CR 400.7). */
   | { ref: "revealed" }
   /** The one card "exile the top card of your library" exiled, while it's still that card in exile (CR 400.7). */

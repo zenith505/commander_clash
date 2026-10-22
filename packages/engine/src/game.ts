@@ -4829,6 +4829,10 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       log(s, `${p.name} pays ${c.n} life.`);
     } else if (c.kind === "sacrifice" && c.exile) {
       for (const id of choices.sacrifice ?? []) {
+        // "The exiled creature's mana value" (Food Chain): as it last existed (CR 608.2h).
+        const o = obj(s, id);
+        const ch = characteristics(s, o);
+        sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: { ...o.counters }, copyKey: cardIdOf(o) });
         log(s, `${p.name} exiles ${nameOf(s, id)}.`);
         moveObject(s, id, "exile");
       }

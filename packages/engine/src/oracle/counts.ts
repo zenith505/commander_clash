@@ -216,7 +216,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Multikicker: "for each time it was kicked", "the number of times ~ was kicked" (CR 702.33d).
   if (/^times? (?:~|it) was kicked$/i.test(p)) return count({ kind: "kicked" });
   // Power, toughness, mana value: "~'s power", "its power", "that creature's toughness".
-  if ((m = /^(~'s|its|that creature's|the creature's|that permanent's|that spell's|the spell's|that card's|the sacrificed (?:creature|artifact|permanent)'s|the amassed Army's) (power|toughness|mana value)$/i.exec(p))) {
+  if ((m = /^(~'s|its|that creature's|the creature's|that permanent's|that spell's|the spell's|that card's|the sacrificed (?:creature|artifact|permanent)'s|the exiled creature's|the amassed Army's) (power|toughness|mana value)$/i.exec(p))) {
     const of = whoseObject(m[1]!, ctx);
     const kind = m[2]!.toLowerCase() === "mana value" ? "manaValue" : (m[2]!.toLowerCase() as "power" | "toughness");
     if (of?.ref === "castSpell" && kind !== "manaValue") return null;
@@ -328,6 +328,8 @@ function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
   if (x === "~'s") return { ref: "self" };
   // What was sacrificed to cast the spell, as it last existed (CR 608.2h); compile() checks there's such a cost.
   if (/^the sacrificed (creature|artifact|permanent)'s$/.test(x)) return ctx ? { ref: "sacrificed" } : null;
+  // "The exiled creature's mana value" after an "Exile a creature you control" cost (Food Chain); compile() checks it has one.
+  if (x === "the exiled creature's") return ctx ? { ref: "sacrificed", exiledCost: true } : null;
   // A reflexive trigger after "you may sacrifice another creature": that creature, as it last existed (CR 608.2h).
   if (x === "that creature's" && ctx?.sacrificedIt) return { ref: "sacrificed" };
   // "Where X is the amassed Army's power" (CR 701.47c), after amassing.

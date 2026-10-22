@@ -2571,6 +2571,7 @@ function checkCastingLinks(out: CompiledCard) {
       return;
     }
     if ((o.ref === "sacrificed" || o.kind === "sacrificedSuspected" || o.kind === "sacrificedLegendary") && !canSac) bad = true;
+    if (o.ref === "sacrificed" && o.exiledCost && !exileCost) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
     if (typeof o.chosen === "string") (/olor/.test(o.chosen) ? needs.add("color") : o.chosen === "cardType" ? needs.add("cardType") : o.chosen === "name" ? needs.add("cardName") : o.chosen === "number" ? needs.add("number") : needs.add("creatureType"));
     if (o.kind === "chosenColor" || (o.kind === "setColors" && o.chosen)) needs.add("color");
@@ -2584,11 +2585,14 @@ function checkCastingLinks(out: CompiledCard) {
   const choices = new Set<ChoiceKind>((out.entersChoose ?? []).map((c) => c.what));
   // "The sacrificed creature" refers to a sacrifice cost: the spell's, or the activated ability's own.
   let canSac = !!out.additionalCosts?.some((c) => c.kind === "sacrifice");
+  let exileCost = false;
   visit([out.spell, out.triggers, out.statics, out.mana]);
   for (const ab of out.activated) {
     canSac = !!ab.costs?.some((c) => c.kind === "sacrifice");
+    exileCost = !!ab.costs?.some((c) => c.kind === "sacrifice" && c.exile);
     visit(ab);
   }
+  exileCost = false;
   visit([out.costMods, out.activationTaxes]);
   if (out.nameBans || out.protectionFromChosenName) needs.add("cardName");
   if (out.noncreatureChosenMvCantBeCast) needs.add("number");

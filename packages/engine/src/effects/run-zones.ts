@@ -1,7 +1,7 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType, objIsType, power } from "../cards";
 import { nameLandBan } from "../names";
-import { attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
+import { canPlayLandNow, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters, withPutter } from "../counters";
 import { manaValue } from "../mana";
@@ -885,10 +885,28 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         st.casting = undefined;
       }
       if (st.handPick) return finish();
+      if (st.landPick) {
+        // Gix: the land picked, played now; untapped if its controller paid for that (a shock land).
+        const id = st.landPick;
+        st.landPick = undefined;
+        const untapped = !!sc.may;
+        sc.may = undefined;
+        if (exiled(id) && canPlayLandNow(s, you.id, id)) playLandByEffect(s, you.id, id, untapped);
+        st.declined.push(id);
+      }
       if (st.pick !== undefined) {
         const pick = st.pick;
         st.pick = undefined;
         if (pick === "none" || !exiled(pick)) return finish();
+        if (e.lands && isType(defOf(s, obj(s, pick)), "Land")) {
+          st.landPick = pick;
+          const offer = landUntappedOffer(s, you.id, pick);
+          if (offer) {
+            s.pending = { kind: "chooseMay", player: you.id, prompt: offer, source: src, card: pick };
+            return "paused";
+          }
+          return runEffect(s, e, ctx);
+        }
         st.casting = pick;
         if (e.copies) {
           // "Copy it, and you may cast the copy without paying its mana cost": made in exile and cast now (CR 707.12).
@@ -910,12 +928,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         s.pending = null;
         return problem === null || /^not enough mana/.test(problem);
       };
+      const isLand = (id: ObjectId) => isType(defOf(s, obj(s, id)), "Land");
       const options = st.ids
         .map((x) => x.id)
-        .filter((id) => exiled(id) && !st.declined.includes(id) && !isType(defOf(s, obj(s, id)), "Land") && (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (st.maxMv === undefined || mvOf(id) <= st.maxMv) && (st.budget === undefined || mvOf(id) <= st.budget) && (!st.hits || st.hits.includes(id)) && castable(id));
+        .filter((id) => exiled(id) && !st.declined.includes(id) && (isLand(id) ? !!e.lands && canPlayLandNow(s, you.id, id) : (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (st.maxMv === undefined || mvOf(id) <= st.maxMv) && (st.budget === undefined || mvOf(id) <= st.budget) && (!st.hits || st.hits.includes(id)) && castable(id)));
       if (!options.length || (e.max !== undefined && (st.cast ?? 0) >= e.max)) return finish();
       const left = st.budget !== undefined ? ` (total mana value ${st.budget} left)` : "";
-      s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Done"], prompt: `cast a spell from among the ${e.reveal ? "revealed" : "exiled"} cards without paying its mana cost${left}?` };
+      s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Done"], prompt: `${e.lands ? "play a land or " : ""}cast a spell from among the ${e.reveal ? "revealed" : "exiled"} cards without paying its mana cost${left}?` };
       return "paused";
     }
     case "suspendTick": {
@@ -1079,11 +1098,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         log(s, `${d.name} can't be cast.`);
         return;
       }
-      if (isType(d, "Land") && sc.may) {
-        p.landsPlayedThisTurn++;
-        moveObject(s, card.id, "battlefield");
-        log(s, `${p.name} plays ${d.name} from ${e.revealed ? "their library" : "exile"}.`);
-      }
+      // Played: it counts as the turn's land play and triggers "whenever you play a land" (CR 305.2, 305.1).
+      if (isType(d, "Land") && sc.may && canPlayLandNow(s, p.id, card.id)) playLandByEffect(s, p.id, card.id);
       return;
     }
     case "exileFaceDown": {

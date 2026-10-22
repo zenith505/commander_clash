@@ -2966,6 +2966,35 @@ function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean, fac
   const choice = entersRulesOf(s, p.id, id).entersTappedChoice;
   if (untapped && !canEnterUntapped(s, p.id, id))
     throw new RulesError(choice?.kind === "payLife" ? `you can't pay ${choice.n} life` : choice ? `you have no ${choice.filter.text} to reveal` : `${d.name} has no choice to make as it enters`);
+  putLandPlayed(s, p, id, untapped, face);
+}
+
+/**
+ * A land played as an effect resolves ("You may play lands ... from among cards exiled this way", Gix; hideaway): only
+ * on the player's own turn with a land play left (CR 305.2, 305.3; rulings), timing otherwise ignored (CR 608.2g).
+ */
+export function canPlayLandNow(s: GameState, pid: PlayerId, id: ObjectId): boolean {
+  const d = defOf(s, obj(s, id));
+  return isType(d, "Land") && s.activePlayer === pid && player(s, pid).landsPlayedThisTurn < landsAllowed(s, pid) && !nameLandBan(s, pid, d);
+}
+
+/** What the player could do so a land they play now enters untapped ("pay 2 life", a shock land), or null. */
+export function landUntappedOffer(s: GameState, pid: PlayerId, id: ObjectId): string | null {
+  const choice = entersRulesOf(s, pid, id).entersTappedChoice;
+  if (!choice || !canEnterUntapped(s, pid, id)) return null;
+  const name = defOf(s, obj(s, id)).name;
+  return choice.kind === "payLife" ? `pay ${choice.n} life so ${name} enters untapped` : `reveal a ${choice.filter.text} from your hand so ${name} enters untapped`;
+}
+
+/** Plays a land as an effect resolves (see canPlayLandNow): it counts as the turn's land play (CR 305.2). */
+export function playLandByEffect(s: GameState, pid: PlayerId, id: ObjectId, untapped?: boolean): void {
+  putLandPlayed(s, player(s, pid), id, untapped && canEnterUntapped(s, pid, id));
+}
+
+function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean, face?: number): void {
+  const o = obj(s, id);
+  const d = defOf(s, o);
+  const choice = entersRulesOf(s, p.id, id).entersTappedChoice;
   p.landsPlayedThisTurn++;
   if (untapped && choice?.kind === "payLife") {
     loseLife(s, p.id, choice.n);
@@ -2976,7 +3005,7 @@ function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean, fac
   }
   // Muldrotha's land from the graveyard is used up, unless something lets every land be played from there (Crucible).
   if (o.zone === "graveyard" && !landsFromGraveyardNow(s, p.id)) ((s.turnLog ??= {}).gravePermits ??= []).push(landPermit(s, p.id)!);
-  const from = o.zone === "exile" || o.zone === "graveyard" ? ` from ${o.zone === "exile" ? "exile" : "their graveyard"}` : "";
+  const from = o.zone === "exile" || o.zone === "graveyard" || o.zone === "library" ? ` from ${o.zone === "exile" ? "exile" : o.zone === "library" ? "their library" : "their graveyard"}` : "";
   // Under the control of the player who plays it (CR 305.1, 110.2), an opponent's card from exile too (Opposition Agent).
   moveObject(s, id, "battlefield", { controller: p.id, untapped, ...(face !== undefined ? { face } : {}) });
   log(s, `${p.name} plays ${d.name}${from}${obj(s, id).tapped ? " (tapped)" : ""}.`);

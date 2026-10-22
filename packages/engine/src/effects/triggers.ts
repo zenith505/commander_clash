@@ -1083,6 +1083,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const dealerBy = controllerOf(s, o);
     const dealWatch = (w: GameObject) => add(w, dealerBy, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer && !(t.dealer.other && w.id === o.id) && objectMatches(s, t.dealer.filter, o, dealerBy, false) && !(t.toOpponent && ev.player === dealerBy), undefined, undefined, o, undefined, undefined, undefined, info);
     for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === dealerBy) dealWatch(obj(s, id));
+    // "Whenever a creature deals combat damage to one of your opponents" (Edric): anyone's creature, to an opponent of
+    // the watcher's controller (its own controller's watchers saw it above).
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      const wc = controllerOf(s, w);
+      if (wc !== dealerBy && ev.player !== wc) add(w, wc, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer?.anyone && objectMatches(s, t.dealer.filter, o, wc, false), undefined, undefined, o, undefined, undefined, undefined, info);
+    }
     fromEmblems((w, owner) => owner === dealerBy && dealWatch(w));
     // "Until end of turn, whenever ~ deals combat damage to a player" (Lyra), "... a creature you control" (Mistway Spy).
     fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "selfDealsCombatDamageToPlayer" && !(t.toOpponent && ev.player === ctrl), triggers, undefined, undefined, undefined, undefined, undefined, info), o);

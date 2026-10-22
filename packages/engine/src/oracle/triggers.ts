@@ -593,6 +593,15 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
  * "It" and "that creature" are the creature, "that player" the player, "that much" the damage.
  */
 function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
+  // "Whenever a creature deals combat damage to one of your opponents, its controller may draw a card" (Edric, Gix):
+  // anyone's creature, dealing it to an opponent of this permanent's controller; "its controller" is the creature's.
+  const any = /^Whenever a creature deals combat damage to one of your opponents, (.+)$/.exec(line);
+  if (any) {
+    if (/\b(?:that player|defending player|that much|that many|you|your)\b/i.test(any[1]!)) return "fail";
+    const body = parseBody(any[1]!, { subjectIt: true, eventPlayer: true });
+    if (!body) return "fail";
+    return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter: { kind: "object", types: ["Creature"], text: "creature" }, anyone: true }, body, toOpponent: true };
+  }
   const m = /^Whenever (another|an?) (.+?) you control deals combat damage to (a player(?: or battle)?|an opponent), (.+)$/.exec(line);
   if (!m) return null;
   const filter = parseTargetPhrase(m[2]!);

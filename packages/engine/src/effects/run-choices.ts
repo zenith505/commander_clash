@@ -88,6 +88,20 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       s.pending = { kind: "chooseMay", player: ctx.controller, prompt: `repeat: ${e.text}`, source: src, repeat: true };
       return "paused";
     }
+    case "repeatIf": {
+      // Grist: each pass, its instructions in order, then if the card milled qualifies, `then` and another pass; it ends
+      // when one misses (an empty library mills nothing). Even with ~ gone, the process goes on (rulings).
+      const sc = (s.resolving!.scratch ??= {});
+      for (let pass = 0; pass < 1000; pass++) {
+        for (sc.repeatStep ??= 0; sc.repeatStep < e.effects.length; sc.repeatStep++) if (runEffect(s, e.effects[sc.repeatStep]!, ctx) === "paused") return "paused";
+        sc.repeatStep = undefined;
+        const hit = (s.resolving!.milled ?? []).some(({ id }) => printedMatches(e.cond.filter, defOf(s, s.objects[id]!)));
+        if (!hit) return;
+        for (const inner of e.then) runEffect(s, inner, ctx);
+        log(s, `${src} repeats the process.`);
+      }
+      return;
+    }
     case "rollAgain": {
       // "You may roll again" (CR 706.3c): the same roll, with its modifiers, and the results table after it once more.
       // Asked after the row's other instructions are done (rulings on Delina: rolling again is optional).

@@ -1610,6 +1610,14 @@ export function compile(d: CardDef): CompiledCard {
       out.allColors = true;
       continue;
     }
+    // "As long as ~ isn't on the battlefield, it's a 1/1 Insect creature in addition to its other types." (Grist, the Hunger
+    // Tide): a static ability that works everywhere else (CR 113.6b), in its library, hand, graveyard, exile, the command
+    // zone and on the stack, so it's a creature card and a creature spell there (rulings); on the battlefield it isn't.
+    const offField = /^As long as ~ isn't on the battlefield, it's an? (\d+)\/(\d+) ([A-Z][a-z]+) creature in addition to its other types\.$/.exec(line);
+    if (offField && !d.types.includes("Creature")) {
+      out.offFieldCreature = { power: offField[1]!, toughness: offField[2]!, subtype: offField[3]! };
+      continue;
+    }
     // "You may activate the loyalty abilities of ~ twice each turn rather than only once" (Urza, Planeswalker; CR 606.3).
     const loyaltyTwice = /^You may activate the loyalty abilities of (~|planeswalkers you control) twice each turn rather than only once\.$/.exec(line);
     if (loyaltyTwice) {

@@ -1253,6 +1253,15 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si++;
       continue;
     }
+    // "Whenever a creature deals combat damage to one of your opponents, its controller may pay 1 life. If they do, they
+    // draw a card." (Gix): the creature's controller decides and pays as it resolves (CR 608.2d), as it last existed.
+    const itsPay = ctx.subjectIt ? /^[Ii]ts controller may pay (\d+) life$/.exec(s) : null;
+    const itsDraw = itsPay && /^If they do, they draw (a card|two cards)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (itsPay && itsDraw) {
+      effects.push({ type: "eachMay", who: { ref: "subjectController" }, pay: { life: Number(itsPay[1]) }, text: `pay ${itsPay[1]} life to draw ${itsDraw[1]}`, effects: [{ type: "draw", who: { ref: "choseThisWay" }, n: itsDraw[1] === "a card" ? 1 : 2 }] });
+      si++;
+      continue;
+    }
     // "Whenever an artifact or creature an opponent controls enters untapped, they may tap that permanent. If they don't,
     // you create a 1/1 white Vampire creature token with lifelink." (Charismatic Conqueror): its controller decides as it
     // resolves; one that's tapped or gone by then can't be tapped, so the token comes (rulings).
@@ -1425,7 +1434,10 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const castAmongHead = new RegExp(`^(?:[Ee]xile the top ${NUMX} cards(?: of (your|their|target player's|target opponent's) library)?|(Target player|Target opponent) exiles the top ${NUMX} cards of their library)$`).exec(s);
     // "You may cast an instant or sorcery spell with mana value X or less from among them ..." (Muse Vortex), "... up to
     // two sorcery spells ..." (Collected Conjuring): only so many, of those types.
-    const castAmong = castAmongHead && /^You may cast (?:(any number of|up to two|an?) )?(?:(instant or sorcery|instant and sorcery|sorcery|instant) )?spells?(?: with (total )?mana value (\d+|X) or less)? from among (?:them|cards exiled this way) without paying (?:their mana costs|its mana cost)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    // "You may play lands and cast spells from among cards exiled this way without paying their mana costs" (Gix): lands
+    // too, played as this resolves.
+    const lands = castAmongHead && /^You may play lands and cast spells from among (?:them|cards exiled this way) without paying their mana costs$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    const castAmong = castAmongHead && /^You may (?:play lands and )?cast (?:(any number of|up to two|an?) )?(?:(instant or sorcery|instant and sorcery|sorcery|instant) )?spells?(?: with (total )?mana value (\d+|X) or less)? from among (?:them|cards exiled this way) without paying (?:their mana costs|its mana cost)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
     // Improvisation Capstone: "Exile cards from the top of your library until you exile cards with total mana value 4 or
     // greater."
     const untilMv = /^Exile cards from the top of your library until you exile cards with total mana value (\d+) or greater$/.exec(s);
@@ -1493,7 +1505,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const [, many, kinds, total, mv] = castAmong;
       const one = many === "a" || many === "an";
       // Plain "spells" needs "any number of"; "instant and sorcery spells" says it without (Epic Experiment).
-      if (!many && kinds !== "instant and sorcery") return null;
+      if (!many && kinds !== "instant and sorcery" && !lands) return null;
       // "An instant or sorcery spell ... its mana cost", "spells ... their mana costs": the words agree.
       if (one !== /its mana cost$/.test(sentences[si + 1]!.replace(/\.$/, "")) || (one && total)) return null;
       const limit = mv ? amt(mv) : undefined;
@@ -1513,7 +1525,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
               ? { dest: "bottomRandom" }
               : undefined;
       if (rest?.dest === "bottomRandom" && who.ref !== "you") return null;
-      effects.push({ type: "castFromAmong", who, n: amt(n), ...(limit !== undefined ? (total ? { totalMv: limit } : { maxMv: limit }) : {}), ...(filter ? { filter } : {}), ...(one ? { max: 1 } : many === "up to two" ? { max: 2 } : {}), ...(rest ? { rest } : {}) });
+      effects.push({ type: "castFromAmong", who, n: amt(n), ...(lands ? { lands: true as const } : {}), ...(limit !== undefined ? (total ? { totalMv: limit } : { maxMv: limit }) : {}), ...(filter ? { filter } : {}), ...(one ? { max: 1 } : many === "up to two" ? { max: 2 } : {}), ...(rest ? { rest } : {}) });
       si += rest ? 2 : 1;
       continue;
     }
@@ -2657,6 +2669,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // cards. Otherwise, you draw a card." (Predict): about the cards that mill instruction put into the graveyard.
     // "Mill a card. If a land card was milled this way, ..." (Lorehold Excavation), several of them after one mill (Old
     // Rutstein): by its printed characteristics in the graveyard.
+    // Grist, the Hunger Tide: "Create a 1/1 black and green Insect creature token, then mill a card. If an Insect card was
+    // milled this way, put a loyalty counter on ~ and repeat this process." All of it again, for as long as it hits.
+    const milledRepeat = /^If an? ([A-Za-z]+ card) was milled this way, (.+) and repeat this process$/.exec(s);
+    if (milledRepeat) {
+      const filter = parseSearchFilter(milledRepeat[1]!);
+      const then = parseOne(capital(milledRepeat[2]!), ctx);
+      if (!filter || !then || then.some((e) => pauses(e)) || effects.length < 1 || effects[effects.length - 1]!.type !== "mill" || effects.some((e) => pauses(e)) || si + 1 !== sentences.length) return null;
+      effects.splice(0, effects.length, { type: "repeatIf", effects: [...effects], cond: { kind: "milledIs", filter }, then });
+      continue;
+    }
     const ifMilled = /^If a card with the chosen name was milled this way, (.+)$/.exec(s) ?? /^If an? ((?:[A-Za-z]+, )?[A-Za-z]+ card) (?:is|was) milled this way, (.+)$/.exec(s);
     if (ifMilled) {
       const then = ifMilled[ifMilled.length - 1]!;

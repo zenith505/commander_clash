@@ -2614,7 +2614,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "Exile this Saga, then return it to the battlefield (front face up)" (The Great Work): under the control of the
     // player who puts it there (CR 110.2a).
     // "... with a +1/+1 counter on it" (Planar Incision): it enters with it (CR 122.6).
-    const now = /^(?:[Tt]hen )?[Rr]eturn (?:it|that card|them|those cards) to the battlefield( transformed)?(?: under (its owner's|their owners'|your) control)?( with an? \+1\/\+1 counter on it)?$/.exec(s);
+    const now = /^(?:[Tt]hen )?[Rr]eturn (?:it|that card|them|those cards) to the battlefield( transformed)?(?: under (its owner's|their owner's|their owners'|your) control)?( with an? \+1\/\+1 counter on it)?$/.exec(s);
     if (now && effects[effects.length - 1]?.type === "exile") {
       const prev = effects[effects.length - 1] as Extract<Effect, { type: "exile" }>;
       if (prev.until || prev.linked || isGroup(prev.what) || (now[1] && prev.what.ref !== "self") || (!now[2] && prev.what.ref !== "self")) return null;

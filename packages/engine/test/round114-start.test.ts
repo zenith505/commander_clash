@@ -1038,3 +1038,110 @@ describe("Dance of the Dead", () => {
     expect(s.players[ap]!.manaPool.B).toBe(0);
   });
 });
+
+describe("flicker: return those cards under their owner's control", () => {
+  const displace = card("Displace", "Instant", "{2}{U}", { oracleText: "Exile up to two target creatures you control, then return those cards to the battlefield under their owner's control." });
+  const brago = card("Brago, King Eternal", "Legendary Creature — Spirit Noble", "{2}{W}{U}", { power: "2", toughness: "4", keywords: ["Flying"], oracleText: "Flying\nWhenever Brago deals combat damage to a player, exile any number of target nonland permanents you control, then return those cards to the battlefield under their owner's control." });
+
+  it("these cards play", () => {
+    for (const d of [displace, brago]) expect(isFullySupported(d)).toBe(true);
+  });
+
+  it("Displace: both creatures come back as new, untapped objects", () => {
+    const { s: s0, ap, ids } = setup([displace]);
+    const a = putOnBattlefield(s0, ap, bear());
+    const b = putOnBattlefield(s0, ap, bear());
+    s0.objects[a]!.tapped = true;
+    const zc = s0.objects[a]!.zoneChanges ?? 0;
+    const s = cast(s0, ap, ids[0]!, [target(a), target(b)]);
+    for (const x of [a, b]) expect(s.objects[x]).toMatchObject({ zone: "battlefield", controller: ap, tapped: false });
+    expect(s.objects[a]!.zoneChanges).toBe(zc + 2);
+  });
+});
+
+describe("Opalescence, Humility, March of the Machines, Starfield of Nyx (layers 4, 6 and 7b, CR 613)", () => {
+  const opalescence = card("Opalescence", "Enchantment", "{2}{W}{W}", { oracleText: "Each other non-Aura enchantment is a creature in addition to its other types and has base power and base toughness each equal to its mana value." });
+  const humility = card("Humility", "Enchantment", "{2}{W}{W}", { oracleText: "All creatures lose all abilities and have base power and toughness 1/1." });
+  const march = card("March of the Machines", "Enchantment", "{3}{U}", { oracleText: "Each noncreature artifact is an artifact creature with power and toughness each equal to its mana value." });
+  const starfield = card("Starfield of Nyx", "Enchantment", "{4}{W}", {
+    oracleText: "At the beginning of your upkeep, you may return target enchantment card from your graveyard to the battlefield.\nAs long as you control five or more enchantments, each other non-Aura enchantment you control is a creature in addition to its other types and has base power and base toughness each equal to its mana value.",
+  });
+  const worship = card("Worship", "Enchantment", "{3}{W}", { oracleText: "If you control a creature, damage that would reduce your life total to less than 1 reduces it to 1 instead." });
+  const glorious = card("Glorious Anthem", "Enchantment", "{1}{W}{W}", { oracleText: "Creatures you control get +1/+1." });
+  const aura = card("Pacifism", "Enchantment — Aura", "{1}{W}", { oracleText: "Enchant creature\nEnchanted creature can't attack or block." });
+  const isCreature = (s: GameState, id: string) => characteristics(s, s.objects[id]!).types.includes("Creature");
+  const ptOf = (s: GameState, id: string) => { const c = characteristics(s, s.objects[id]!); return `${c.power}/${c.toughness}`; };
+
+  it("these cards play", () => {
+    for (const d of [opalescence, humility, march, starfield, card("Dress Down", "Enchantment", "{1}{U}", { keywords: ["Flash"], oracleText: "Flash\nWhen this enchantment enters, draw a card.\nCreatures lose all abilities.\nAt the beginning of the end step, sacrifice this enchantment." })]) expect(isFullySupported(d)).toBe(true);
+  });
+
+  it("Opalescence animates each other non-Aura enchantment at its mana value, not itself", () => {
+    const { s, ap } = setup([]);
+    const o = putOnBattlefield(s, ap, opalescence);
+    const w = putOnBattlefield(s, ap, worship);
+    invalidateCharacteristics(s);
+    expect(isCreature(s, o)).toBe(false);
+    expect(isCreature(s, w)).toBe(true);
+    expect(ptOf(s, w)).toBe("4/4");
+  });
+
+  it("Opalescence, then Humility: all 1/1 (Humility's timestamp is later, rulings)", () => {
+    const { s, ap } = setup([]);
+    putOnBattlefield(s, ap, opalescence);
+    const h = putOnBattlefield(s, ap, humility);
+    const w = putOnBattlefield(s, ap, worship);
+    invalidateCharacteristics(s);
+    expect(ptOf(s, h)).toBe("1/1");
+    expect(ptOf(s, w)).toBe("1/1");
+    // Worship lost its ability (layer 6) but Humility's own effect keeps applying to it (CR 613.6).
+    expect(characteristics(s, s.objects[h]!).types).toContain("Creature");
+  });
+
+  it("Humility, then Opalescence: Humility and Worship are 4/4", () => {
+    const { s, ap } = setup([]);
+    const h = putOnBattlefield(s, ap, humility);
+    putOnBattlefield(s, ap, opalescence);
+    const w = putOnBattlefield(s, ap, worship);
+    invalidateCharacteristics(s);
+    expect(ptOf(s, h)).toBe("4/4");
+    expect(ptOf(s, w)).toBe("4/4");
+  });
+
+  it("Humility removes a creature's abilities and sets it 1/1; anthems still apply after (layer 7c)", () => {
+    const { s, ap } = setup([]);
+    putOnBattlefield(s, ap, humility);
+    putOnBattlefield(s, ap, glorious);
+    const flyer = putOnBattlefield(s, ap, card("Serra Angel", "Creature — Angel", "{3}{W}{W}", { power: "4", toughness: "4", keywords: ["Flying", "Vigilance"], oracleText: "Flying, vigilance" }));
+    invalidateCharacteristics(s);
+    expect(ptOf(s, flyer)).toBe("2/2");
+    expect(objHasKeyword(s, s.objects[flyer]!, "Flying")).toBe(false);
+  });
+
+  it("March of the Machines: a noncreature artifact is a creature at its mana value; a 0 one dies", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, march);
+    const rock = putOnBattlefield(s0, ap, card("Mind Stone", "Artifact", "{2}", { oracleText: "{T}: Add {C}.\n{1}, {T}, Sacrifice this artifact: Draw a card." }));
+    const zero = putOnBattlefield(s0, ap, card("Mox Opal", "Legendary Artifact", "{0}", { oracleText: "Metalcraft — {T}: Add one mana of any color. Activate only if you control three or more artifacts." }));
+    invalidateCharacteristics(s0);
+    expect(isCreature(s0, rock)).toBe(true);
+    expect(ptOf(s0, rock)).toBe("2/2");
+    const s = passAll(s0);
+    expect(s.objects[zero]!.zone).toBe("graveyard");
+  });
+
+  it("Starfield of Nyx: only with five or more enchantments; Auras stay Auras", () => {
+    const { s, ap } = setup([]);
+    const st = putOnBattlefield(s, ap, starfield);
+    const w = putOnBattlefield(s, ap, worship);
+    putOnBattlefield(s, ap, glorious);
+    putOnBattlefield(s, ap, humility);
+    invalidateCharacteristics(s);
+    expect(isCreature(s, w)).toBe(false);
+    const p = putOnBattlefield(s, ap, aura);
+    invalidateCharacteristics(s);
+    expect(isCreature(s, w)).toBe(true);
+    expect(isCreature(s, p)).toBe(false);
+    expect(isCreature(s, st)).toBe(false);
+  });
+});

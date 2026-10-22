@@ -1119,3 +1119,25 @@ describe("Serra's Emissary", () => {
     expect(botActions(s, ap)[0]).toMatchObject({ type: "chooseOption", choice: "Creature" });
   });
 });
+
+const bloodlineBidding = card("Bloodline Bidding", "Sorcery", "{6}{B}{B}", {
+  keywords: ["Convoke"],
+  oracleText: "Convoke (Your creatures can help cast this spell. Each creature you tap while casting this spell pays for {1} or one mana of that creature's color.)\nChoose a creature type. Return all creature cards of the chosen type from your graveyard to the battlefield.",
+});
+
+describe("Bloodline Bidding", () => {
+  it("returns every creature card of the chosen type from your graveyard, and no other", () => {
+    expect(isFullySupported(bloodlineBidding)).toBe(true);
+    const { s: s0, ap, ids } = setup([bloodlineBidding]);
+    const [b1, b2] = [putOnBattlefield(s0, ap, bear()), putOnBattlefield(s0, ap, bear())];
+    const elf = putOnBattlefield(s0, ap, card("Some Elf", "Creature — Elf", "{G}", { power: "1", toughness: "1" }));
+    for (const id of [b1, b2, elf]) moveObject(s0, id, "graveyard");
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [], undefined, "auto")));
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "creatureType" });
+    // A bot names the type it has the most of in its graveyard.
+    expect(botActions(s, ap)[0]).toMatchObject({ choice: "Bear" });
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: "Bear" }));
+    expect([b1, b2].map((id) => s.objects[id]!.zone)).toEqual(["battlefield", "battlefield"]);
+    expect(s.objects[elf]!.zone).toBe("graveyard");
+  });
+});

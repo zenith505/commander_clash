@@ -345,6 +345,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (spec?.kind !== "card" || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
     return [{ type: "returnAllFromGraveyard", who: { ref: "eachPlayer" }, filter: { ...spec, text: `${ofChosen[1]} card of a type chosen this way` }, owners: true }];
   }
+  // "Choose a creature type. Return all creature cards of the chosen type from your graveyard to the battlefield."
+  // (Bloodline Bidding).
+  if ((m = /^[Rr]eturn all (creature) cards of the chosen type from your graveyard to (the battlefield|your hand)$/.exec(s))) {
+    const spec = parseTargetPhrase(`${m[1]} card of the chosen type from a graveyard`, { chosen: true });
+    if (spec?.kind !== "card" || spec.chosen !== "type") return null;
+    return [{ type: "returnAllFromGraveyard", who: { ref: "you" }, filter: { ...spec, text: `${m[1]} card of the chosen type` }, ...(m[2] === "your hand" ? { toHand: true as const } : {}) }];
+  }
   // "Put all creature cards from all graveyards onto the battlefield under your control" (Rise of the Dark Realms).
   const yours = /^(?:Put|Return) all (.+?) cards from all graveyards (?:onto|to) the battlefield( tapped)? under your control$/.exec(s);
   if (yours) {

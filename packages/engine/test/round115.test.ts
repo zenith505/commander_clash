@@ -796,3 +796,22 @@ describe("can't attack you or planeswalkers you control", () => {
     expect(attackProblem(s, s.objects[walker]!, ap)).toBeNull();
   });
 });
+
+const bow = card("Bow of Nylea", "Legendary Enchantment Artifact", "{1}{G}{G}", {
+  oracleText:
+    "Attacking creatures you control have deathtouch.\n{1}{G}, {T}: Choose one —\n• Put a +1/+1 counter on target creature.\n• Bow of Nylea deals 2 damage to target creature with flying.\n• You gain 3 life.\n• Put up to four target cards from your graveyard on the bottom of your library in any order.",
+});
+
+describe("Bow of Nylea", () => {
+  it("puts up to four target cards from your graveyard on the bottom of your library, in the order chosen", () => {
+    expect(isFullySupported(bow)).toBe(true);
+    const { s: s0, ap } = setup([]);
+    const b = putOnBattlefield(s0, ap, bow);
+    const [x, y] = [putOnBattlefield(s0, ap, bear()), putOnBattlefield(s0, ap, bear())];
+    for (const id of [x, y]) moveObject(s0, id, "graveyard");
+    let s = passUntil(s0, "main1", ap);
+    s = settle(run(s, planActivate(s, ap, b, 0, [target(y), target(x), { kind: "none" }, { kind: "none" }], [3])));
+    const lib = s.players[ap]!.library;
+    expect(lib.slice(-2)).toEqual([y, x]);
+  });
+});

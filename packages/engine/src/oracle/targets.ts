@@ -209,6 +209,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // "They", "those creatures": the targets of an earlier "up to two target creatures".
   // "Create two 1/1 colorless Spirit creature tokens. They gain haste until end of turn": the tokens just created.
   if (ctx.lastCreatedAny && /^(?:each of )?(they|them|those tokens|the tokens)$/i.test(x)) return { ref: "created" };
+  // "Put all land cards from among them onto the battlefield tapped ... untap those lands" (Animist's Awakening).
+  if (ctx.lastDugLands && /^those lands$/i.test(x)) return { ref: "created" };
   // "Exile each permanent with the most votes or tied for most votes" (Council's Judgment): what the vote chose.
   if (ctx.vote?.among && !ctx.vote.choose && /^each (?:permanent|card) with the most votes or tied for most votes$/i.test(x)) return { ref: "voted" };
   // "Destroy each permanent chosen this way" (Druid of Purification): every one a player chose.

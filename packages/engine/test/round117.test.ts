@@ -5,7 +5,7 @@
 // choose how the defending players block).
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, passAll, passUntil, putOnBattlefield, setup, target } from "./helpers";
+import { act, bear, card, forest, passAll, passUntil, putOnBattlefield, setup, target } from "./helpers";
 import { abilitiesOf, botActions, isFullySupported, planActivate, planCast, plotCost, spellCost, waitingOn, type Action, type GameState, type PlayerId } from "../src";
 import { moveObject, tapPermanent } from "../src/game";
 import { characteristics, invalidateCharacteristics as invalidate } from "../src/layers";
@@ -419,5 +419,43 @@ describe("Tinybones, the Pickpocket", () => {
     s = settle(run(s, planCast(s, ap, knight)));
     expect(s.objects[knight]!.zone).toBe("battlefield");
     expect(characteristics(s, s.objects[knight]!).controller).toBe(ap);
+  });
+});
+
+const awakening = card("Animist's Awakening", "Sorcery", "{X}{G}", {
+  oracleText:
+    "Reveal the top X cards of your library. Put all land cards from among them onto the battlefield tapped and the rest on the bottom of your library in a random order.\nSpell mastery — If there are two or more instant and/or sorcery cards in your graveyard, untap those lands.",
+});
+const onTop = (s: GameState, pid: PlayerId, defs: ReturnType<typeof card>[]) => {
+  const ids = defs.map((d) => {
+    const id = putOnBattlefield(s, pid, d);
+    s.battlefield.splice(s.battlefield.indexOf(id), 1);
+    s.objects[id]!.zone = "library";
+    return id;
+  });
+  s.players[pid]!.library.unshift(...ids);
+  return ids;
+};
+
+describe("Animist's Awakening", () => {
+  const play = (mastery: boolean) => {
+    const { s: s0, ap, ids } = setup([awakening]);
+    let s = s0;
+    const [l1, b, l2, deep] = onTop(s, ap, [forest, bear(), forest, forest]);
+    if (mastery) for (const t of ["Instant", "Sorcery"]) toYard(s, ap, card(`Old ${t}`, t, "{1}", { oracleText: "Draw a card." }));
+    s = settle(run(s, planCast(s, ap, ids[0]!, undefined, undefined, undefined, 3)));
+    return { s, l1: l1!, b: b!, l2: l2!, deep: deep!, ap };
+  };
+  it("puts the land cards among the top X onto the battlefield tapped, the rest on the bottom", () => {
+    expect(isFullySupported(awakening)).toBe(true);
+    const { s, l1, b, l2, deep, ap } = play(false);
+    for (const l of [l1, l2]) expect(s.objects[l]).toMatchObject({ zone: "battlefield", tapped: true });
+    expect(s.objects[deep]!.zone).toBe("library");
+    expect(s.objects[b]!.zone).toBe("library");
+    expect(s.players[ap]!.library.at(-1)).toBe(b);
+  });
+  it("spell mastery: with two instant and/or sorcery cards in your graveyard, those lands are untapped", () => {
+    const { s, l1, l2 } = play(true);
+    for (const l of [l1, l2]) expect(s.objects[l]).toMatchObject({ zone: "battlefield", tapped: false });
   });
 });

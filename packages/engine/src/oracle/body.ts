@@ -80,6 +80,8 @@ export interface Ctx {
   lastPut?: boolean;
   /** The last sentence created tokens, any number: "Sacrifice them at the beginning of the next end step". */
   lastCreatedAny?: boolean;
+  /** "Put all land cards from among them onto the battlefield tapped": "those lands" after (Animist's Awakening). */
+  lastDugLands?: boolean;
   /** The instruction before was "mill N cards" (yours): "those cards" in what follows can be the milled cards (Ripples of Undeath). */
   afterMill?: boolean;
   /** An instruction before discarded one card of yours: "the discarded card" is that card (Malcolm). */
@@ -2331,6 +2333,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       if (done === "more") continue;
       if (digPaid) effects.push({ type: "may", effects: [done], pay: digPaid.pay, text: digPaid.text });
       else effects.push(done);
+      noteLast(ctx, [done]);
       dig = null;
       digPaid = null;
       continue;
@@ -4381,6 +4384,7 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
     const picked = pk?.type === "pick" && (pk.action === "counters" || pk.action === "choose") && pk.n === 1 && pk.who.ref === "you" && !pk.among;
     ctx.lastCreated = ((last?.type === "createToken" || last?.type === "createTokenCopy") && last.n === 1) || (faceDown && last.count === 1) || ctx.lastPut || picked;
     ctx.lastCreatedAny = last?.type === "createToken" || last?.type === "createTokenCopy" || last?.type === "myriad" || faceDown || (last?.type === "returnAllFromGraveyard" && !last.toHand);
+    ctx.lastDugLands = last?.type === "dig" && last.into === "battlefield" && last.filter?.kind === "card" && last.filter.types?.length === 1 && last.filter.types[0] === "Land" && !last.filter.notTypes?.length;
     if (last?.type === "amass") ctx.amassed = true;
     if (last?.type === "damage" || last?.type === "bite" || last?.type === "fight") ctx.excessDamage = true;
     // "Creatures you control get +1/+1 until end of turn. Untap those creatures": the ones it changed (CR 611.2c).

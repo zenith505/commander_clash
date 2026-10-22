@@ -414,8 +414,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^there are ${NUM} or more permanent cards in your graveyard$`).exec(text))) return { kind: "graveyardPermanents", n: num(m[1]!) };
   // "If there are four or more land cards in your graveyard" (Titania, Voice of Gaea).
   // "If you have four or more creature cards in your graveyard" (Oversold Cemetery): the same.
-  if ((m = new RegExp(`^(?:there are|you have) ${NUM} or more (\\w+) cards in your graveyard$`).exec(text))) {
-    const amount = parseCount(`the number of ${m[2]} cards in your graveyard`, null);
+  // Spell mastery: "If there are two or more instant and/or sorcery cards in your graveyard" (each card counted once).
+  if ((m = new RegExp(`^(?:there are|you have) ${NUM} or more (\\w+|instant and/or sorcery) cards in your graveyard$`).exec(text))) {
+    const amount = parseCount(`the number of ${m[2] === "instant and/or sorcery" ? "instant and sorcery" : m[2]} cards in your graveyard`, null);
     return amount ? { kind: "amount", amount, min: num(m[1]!) } : null;
   }
   // "Your devotion to black is less than five" (Theros gods, CR 700.5), "... is five or greater".

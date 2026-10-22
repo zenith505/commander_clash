@@ -280,9 +280,22 @@ function parseRevealedIf(sentences0: string[], at: number, ctx: Ctx): { effect: 
   if (!filter || !then) return null;
   let next = at + 1;
   const other = /^Otherwise, (.+)$/.exec(sentences[next] ?? "");
-  const otherwise = other ? revealedAction(other[1]!, ctx) : undefined;
+  let otherwise = other ? revealedAction(other[1]!, ctx) : undefined;
   if (otherwise === null) return null;
   if (other) next++;
+  // "If it's a land card, you may put it onto the battlefield tapped. If you don't put the card onto the battlefield, put
+  // it into your hand." (Risen Reef), "If you didn't put a card onto the battlefield this way, create ..." (Rulik Mons):
+  // when it isn't one, or when you choose not to.
+  const notPut = !other && /^If you (?:don't put the card onto the battlefield|didn't put a card onto the battlefield this way), (.+)$/.exec(sentences[next] ?? "");
+  if (notPut) {
+    const may = then.length === 1 && then[0]!.type === "may" && !then[0]!.otherwise && !then[0]!.pay && then[0]!.effects.length === 1 && then[0]!.effects[0]!.type === "putOntoBattlefield" ? then[0]! : null;
+    const before = ctx.targets.length;
+    const rest = may && (revealedAction(notPut[1]!, ctx) ?? parseOne(capital(notPut[1]!), ctx));
+    if (!may || !rest || ctx.targets.length !== before || rest.some((e) => pauses(e) && e.type !== "may")) return null;
+    then[0] = { ...may, otherwise: rest };
+    otherwise = structuredClone(rest);
+    next++;
+  }
   // "That creature gains haste. Sacrifice it at the beginning of the next end step." (Impromptu Raid, Killer Instinct):
   // about the permanent the one "put it onto the battlefield" made.
   const puts = [...then, ...(otherwise ?? [])].flatMap((e) => (e.type === "putOntoBattlefield" ? [e] : e.type === "may" ? e.effects.filter((x) => x.type === "putOntoBattlefield") : [])) as Extract<Effect, { type: "putOntoBattlefield" }>[];
@@ -2959,8 +2972,19 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si = sentences.length;
       // What the "you may" sacrificed, if the reflexive trigger is about it.
       const sacPick = mayDo && prev.effects.length === 1 && prev.effects[0]!.type === "pick" && prev.effects[0]!.action === "sacrifice";
-      const reflexive = reflexiveBody(whenText, ctx, sacPick || sacrificing, roleOn !== undefined || returned);
+      // "Put a quest counter on ~. When you do, if it has four or more quest counters on it, put a +1/+1 counter on target
+      // creature you control." (Earthbender Ascension): an intervening "if" (CR 603.4), checked as the reflexive ability
+      // triggers and again as it resolves.
+      const ifHas = counted ? new RegExp(`^if it has ${NUM} or more ${COUNTER} counters on it, (.+)$`).exec(whenText) : null;
+      const ifHasCond = ifHas ? parseStaticCondition(`~ has ${ifHas[1]!} or more ${ifHas[2]!} counters on it`, { affects: { kind: "self" }, mods: [], text: "" }) : null;
+      if (ifHas && !ifHasCond) return null;
+      const reflexive = reflexiveBody(ifHas ? ifHas[3]! : whenText, ctx, sacPick || sacrificing, roleOn !== undefined || returned);
       if (!reflexive) return null;
+      if (ifHasCond) {
+        reflexive.effects = [{ type: "if", cond: { kind: "state", cond: ifHasCond }, effects: reflexive.effects }];
+        effects.push({ type: "if", cond: { kind: "selfHere" }, effects: [{ type: "if", cond: { kind: "state", cond: ifHasCond }, effects: [{ type: "reflexive", body: reflexive }] }] });
+        continue;
+      }
       if (sacrificing) {
         effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: [{ type: "reflexive", body: reflexive, sacrificed: true }] });
         continue;
@@ -3262,9 +3286,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const then = ifState[2]!.replace(/^(that creature|that player|it|~) also (?=(?:gains?|gets?|deals?|has|loses?) )/i, "$1 ").replace(/^draw another card$/, "draw a card");
       // "If there are four or more charge counters on ~, you may remove all charge counters from ~ and transform ~" (Primal
       // Amulet): optional, decided as it resolves (CR 608.2d).
+      // Other "you may" sentences that read on their own come first ("you may cast the discarded card ...", Malcolm).
       const mayThen = /^you may (.+)$/.exec(then);
-      const inner0 = parseOne(capital(mayThen ? mayThen[1]! : then), ctx);
-      const inner: Effect[] | null = mayThen && inner0 ? [{ type: "may", effects: inner0, text: mayThen[1]! }] : inner0;
+      const own = attempt(ctx, () => parseOne(capital(then), ctx));
+      const mayInner = !own && mayThen ? parseOne(capital(mayThen[1]!), ctx) : null;
+      const inner: Effect[] | null = own ?? (mayInner ? [{ type: "may", effects: mayInner, text: mayThen![1]! }] : null);
       // Its instructions run one at a time, so one may wait on a player ("draw a card, then discard a card", see the "if"
       // effect).
       if (!inner) return null;

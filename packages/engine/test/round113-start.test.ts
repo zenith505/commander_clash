@@ -410,3 +410,84 @@ describe("Glimpse the Impossible", () => {
     expect(spawns(s, ap)).toHaveLength(0);
   });
 });
+
+const risenReef = card("Risen Reef", "Creature — Elemental", "{1}{G}{U}", {
+  power: "1",
+  toughness: "1",
+  oracleText:
+    "Whenever this creature or another Elemental you control enters, look at the top card of your library. If it's a land card, you may put it onto the battlefield tapped. If you don't put the card onto the battlefield, put it into your hand.",
+});
+
+describe("Risen Reef", () => {
+  it("is supported", () => expect(isFullySupported(risenReef)).toBe(true));
+
+  /** Cast Risen Reef with a land (or not) on top of the library; answer its "may" with `yes`. */
+  function reef(landOnTop: boolean, yes?: boolean) {
+    const { s: s0, ap, ids } = setup([risenReef]);
+    const lib = s0.players[ap]!.library;
+    const top = lib.find((id) => s0.cards[s0.objects[id]!.cardId]!.types.includes("Land") === landOnTop)!;
+    lib.splice(lib.indexOf(top), 1);
+    lib.unshift(top);
+    let s = planCast(s0, ap, ids[0]!)!.reduce(act, s0);
+    for (let i = 0; i < 20 && !s.pending && (s.stack.length || s.triggerQueue.length); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    if (yes !== undefined) {
+      expect(s.pending?.kind).toBe("chooseMay");
+      s = act(s, { type: "chooseMay", player: ap, yes });
+    }
+    return { s, top };
+  }
+
+  it("a land on top may go onto the battlefield tapped", () => {
+    const { s, top } = reef(true, true);
+    expect(s.objects[top]!.zone).toBe("battlefield");
+    expect(s.objects[top]!.tapped).toBe(true);
+  });
+
+  it("a land not put onto the battlefield goes into your hand", () => {
+    const { s, top } = reef(true, false);
+    expect(s.objects[top]!.zone).toBe("hand");
+  });
+
+  it("a nonland card goes into your hand, nothing asked", () => {
+    const { s, top } = reef(false);
+    expect(s.pending).toBeNull();
+    expect(s.objects[top]!.zone).toBe("hand");
+  });
+});
+
+const earthbenderAscension = card("Earthbender Ascension", "Enchantment", "{2}{G}", {
+  oracleText:
+    "When this enchantment enters, earthbend 2. Then search your library for a basic land card, put it onto the battlefield tapped, then shuffle.\nLandfall — Whenever a land you control enters, put a quest counter on this enchantment. When you do, if it has four or more quest counters on it, put a +1/+1 counter on target creature you control. It gains trample until end of turn.",
+});
+
+describe("Earthbender Ascension", () => {
+  it("is supported", () => expect(isFullySupported(earthbenderAscension)).toBe(true));
+
+  /** Play a land with the Ascension at `counters` quest counters; the reflexive ability, if any, targets the Bear. */
+  function landfall(counters: number) {
+    const { s: s0, ap, ids } = setup([forest]);
+    const asc = putOnBattlefield(s0, ap, earthbenderAscension);
+    s0.objects[asc]!.counters.quest = counters;
+    const b = putOnBattlefield(s0, ap, bear());
+    let s = act(s0, { type: "playLand", player: ap, objectId: ids[0]! });
+    for (let i = 0; i < 20 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+      if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: b }] });
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    return { s, asc, b };
+  }
+
+  it("the fourth quest counter puts a +1/+1 counter on target creature you control, which gains trample", () => {
+    const { s, asc, b } = landfall(3);
+    expect(s.objects[asc]!.counters.quest).toBe(4);
+    expect(s.objects[b]!.counters["+1/+1"]).toBe(1);
+    expect(objHasKeyword(s, s.objects[b]!, "Trample")).toBe(true);
+  });
+
+  it("with fewer than four, only the quest counter", () => {
+    const { s, asc, b } = landfall(1);
+    expect(s.objects[asc]!.counters.quest).toBe(2);
+    expect(s.objects[b]!.counters["+1/+1"] ?? 0).toBe(0);
+    expect(objHasKeyword(s, s.objects[b]!, "Trample")).toBe(false);
+  });
+});

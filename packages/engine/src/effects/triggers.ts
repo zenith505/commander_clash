@@ -1020,6 +1020,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (o?.zone === "battlefield") {
       add(o, controllerOf(s, o), (e) => e === "selfDealsDamage" || (ev.combat && e === "selfDealsCombatDamage"), undefined, undefined, undefined, undefined, undefined, undefined, { amount: ev.amount });
       addHosted(o, (e) => e === "selfDealsDamage" || (ev.combat && e === "selfDealsCombatDamage"), undefined, o, { amount: ev.amount });
+      // "Whenever a creature you control deals combat damage" (Quilled Greatwurm): the creature is the subject.
+      const dealerBy = controllerOf(s, o);
+      if (ev.combat)
+        for (const id of s.battlefield) {
+          const w = obj(s, id);
+          if (controllerOf(s, w) === dealerBy) add(w, dealerBy, (e, t) => e === "creatureYouControlDealsCombatDamage" && !!t.dealer && !(t.dealer.other && w.id === o.id) && objectMatches(s, t.dealer.filter, o, dealerBy, false), undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
+        }
     }
   } else if (ev.type === "damagedPlayer") {
     // "Whenever ~ deals damage to a player / an opponent": once for each player dealt damage (CR 603.2c).

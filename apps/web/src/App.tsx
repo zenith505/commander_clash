@@ -332,6 +332,8 @@ type CastDraft = {
   lifeFor?: string[];
   /** Untapped creatures tapped for Lashknife's alternative cost. */
   tap?: string[];
+  /** Counters removed for Quilled Greatwurm's "removing six counters from among creatures you control". */
+  counters?: { id: string; kind: string }[];
   /** Cast from your graveyard this way (flashback, escape, ...). */
   via?: CastFromGraveyardKind;
   buyback?: boolean;
@@ -372,7 +374,7 @@ type CastDraft = {
  * spell (its optional additional cost, or Conspiracy Unraveler's alternative cost), or activate an ability.
  */
 /** "Remove three counters from among ... you control" (Tekuthal): which counters, as the ability is activated. */
-type CounterPick = { activate: ActivateDraft; label: string; what: string; n: number; candidates: { id: string; kind: string; n: number }[] };
+type CounterPick = { label: string; what: string; n: number; candidates: { id: string; kind: string; n: number }[] } & ({ activate: ActivateDraft; draft?: undefined } | { draft: CastDraft; activate?: undefined });
 type EvidencePick = { label: string; n: number; candidates: string[]; optional: boolean } & ({ draft: CastDraft; key: "evidence" | "collect"; activate?: undefined } | { activate: ActivateDraft; draft?: undefined; key?: undefined });
 
 /** Choosing how to pay "sacrifice a creature or pay {3}{B}" (CR 601.2b). */
@@ -864,7 +866,11 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       }
       if (!c.n) continue; // "sacrifice X creatures" with X = 0
       if (c.kind === "exileFromGraveyard" && c.top) continue; // "the top three black cards of your graveyard": no choice
-      if (c.kind === "removeCounters") continue; // only activated abilities have this cost so far (oracle/activated.ts)
+      // "Removing six counters from among creatures you control" (Quilled Greatwurm): pick them (CR 601.2h).
+      if (c.kind === "removeCounters") {
+        if (d.counters !== undefined) continue;
+        return setCounterPick({ draft: d, label: card.name, what: `remove ${c.n} ${c.counter ? `${c.counter} ` : ""}counter${c.n === 1 ? "" : "s"} from among ${c.filter.text}`, n: c.n, candidates: counterCostCandidates(s, HUMAN, s.objects[d.objectId]!, c) });
+      }
       const key = c.kind === "exileFromGraveyard" ? "exileCards" : c.kind;
       if (d[key] !== undefined) continue;
       if (c.kind === "returnToHand")
@@ -932,6 +938,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       ...(d.exileFromHand?.length ? { exileFromHand: d.exileFromHand } : {}),
       ...(d.lifeFor?.length ? { lifeFor: d.lifeFor } : {}),
       ...(d.tap?.length ? { tap: d.tap } : {}),
+      ...(d.counters?.length ? { counters: d.counters } : {}),
       ...(d.delve?.length ? { delve: d.delve } : {}),
     };
     // Delve: pick cards to exile from your graveyard, suggesting just enough to pay (CR 702.66a).
@@ -1629,7 +1636,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onHover={setHover}
               onDone={(counters) => {
                 setCounterPick(null);
-                continueActivate({ ...counterPick.activate, counters });
+                if (counterPick.draft) continueCast({ ...counterPick.draft, counters });
+                else continueActivate({ ...counterPick.activate, counters });
               }}
               onCancel={() => setCounterPick(null)}
             />

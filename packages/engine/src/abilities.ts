@@ -3023,6 +3023,8 @@ export type TriggerEvent =
   | "creatureYouControlExploits"
   /** "Whenever a creature you control deals combat damage to a player": see TriggeredAbility.dealer; the creature is the subject. */
   | "creatureYouControlDealsCombatDamageToPlayer"
+  /** "Whenever a creature you control deals combat damage" (Quilled Greatwurm): to anything, once per combat damage step, "that many" its total (CR 510.2). */
+  | "creatureYouControlDealsCombatDamage"
   /** "Whenever one or more creatures you control attack" / "Whenever you attack": once per declaration, see TriggeredAbility.group. */
   | "creaturesYouControlAttack"
   /** "Whenever one or more creatures you control deal combat damage to a player": once per player dealt damage. */

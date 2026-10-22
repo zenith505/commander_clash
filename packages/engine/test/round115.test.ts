@@ -457,3 +457,30 @@ describe("Leyline Tyrant", () => {
     expect(lost).toBe(2);
   });
 });
+
+const whelming = card("Whelming Wave", "Sorcery", "{2}{U}{U}", { oracleText: "Return all creatures to their owners' hands except for Krakens, Leviathans, Octopuses, and Serpents." });
+const scourglass = card("Scourglass", "Artifact", "{1}{W}{W}", { oracleText: "{T}, Sacrifice Scourglass: Destroy all permanents except for artifacts and lands. Activate only during your upkeep." });
+
+describe("all ... except for", () => {
+  it("Whelming Wave returns every creature but Krakens, Leviathans, Octopuses and Serpents", () => {
+    expect(isFullySupported(whelming)).toBe(true);
+    const { s: s0, ap, opp, ids } = setup([whelming]);
+    const b = putOnBattlefield(s0, opp, bear());
+    const octo = putOnBattlefield(s0, opp, card("Lorthos Copy", "Creature — Octopus", "{5}{U}{U}", { power: "5", toughness: "5" }));
+    const serp = putOnBattlefield(s0, ap, card("Sea Serpent", "Creature — Serpent", "{5}{U}", { power: "5", toughness: "5" }));
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    expect([b, octo, serp].map((id) => s.objects[id]!.zone)).toEqual(["hand", "battlefield", "battlefield"]);
+  });
+
+  it("Scourglass destroys every permanent but artifacts and lands", () => {
+    expect(isFullySupported(scourglass)).toBe(true);
+    const { s: s0, ap, opp } = setup([]);
+    const g = putOnBattlefield(s0, ap, scourglass);
+    const b = putOnBattlefield(s0, opp, bear());
+    const art = putOnBattlefield(s0, opp, card("Mind Stone Copy", "Artifact Creature — Golem", "{2}", { power: "2", toughness: "2" }));
+    let s = passUntil(s0, "upkeep", ap);
+    s = settle(run(s, planActivate(s, ap, g, 0)));
+    expect([b, art, g].map((id) => s.objects[id]!.zone)).toEqual(["graveyard", "battlefield", "graveyard"]);
+    expect(s.battlefield.some((id) => s.objects[id]!.controller === ap && s.cards[s.objects[id]!.cardId]!.name === "Island")).toBe(true);
+  });
+});

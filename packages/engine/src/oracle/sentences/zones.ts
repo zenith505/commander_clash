@@ -1,7 +1,8 @@
 // Sentences that move cards between zones (graveyard, library, exile until it leaves), attach, "can't block this turn", and picking your own permanents.
 
 import type { Effect, Modification, ObjRef, PlayerRef, TargetSpec } from "../../abilities";
-import { NUM, NUMX, COUNTER, BASIC_TYPES, amt, counterKind, num, singularWord } from "../words";
+import { NUM, NUMX, COUNTER, BASIC_TYPES, amt, capital, counterKind, num, singularWord } from "../words";
+import { CREATURE_TYPES } from "../../keywords";
 import { parseSearchFilter } from "../search";
 import { parseSentence } from "../sentence";
 import { parseBoundCount, parseCount, roundOf } from "../counts";
@@ -79,6 +80,20 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "Return to their owners' hands all creatures with ..." (Engulf the Shore), "Return to the battlefield target ... card in
   // your graveyard" (Squirming Emergence): the destination first, for a long object; the same instruction.
   if ((m = /^Return to (their owners' hands|its owner's hand|the battlefield) ((?:all|each|target) .+)$/.exec(s))) return parseSentence(`Return ${m[2]!} to ${m[1]!}`, ctx);
+  // "Return all creatures to their owners' hands except for Krakens, Leviathans, Octopuses, and Serpents" (Whelming Wave),
+  // "... all permanents ... except for Giants, Wizards, and lands", "Destroy all permanents except for artifacts and lands":
+  // every one that has none of those subtypes or card types.
+  if ((m = /^([Rr]eturn all (?:creatures|permanents) to their owners' hands|[Dd]estroy all (?:creatures|permanents)) except for (.+)$/.exec(s))) {
+    const names = m[2]!.split(/,? and |, /).map((w) => (/^(Octopus|Platypus)es$/.test(w) ? w.slice(0, -2) : singularWord(w)));
+    const types = names.filter((w) => PERMANENT_TYPES.includes(capital(w) as never)).map(capital);
+    const subtypes = names.filter((w) => CREATURE_TYPES.has(w));
+    if (types.length + subtypes.length !== names.length) return null;
+    const fx = parseSentence(m[1]!, ctx);
+    const e = fx?.length === 1 ? fx[0] : undefined;
+    if (!e || (e.type !== "bounce" && e.type !== "destroy") || e.what.ref !== "each" || e.what.filter.kind !== "object") return null;
+    const f = e.what.filter;
+    return [{ ...e, what: { ...e.what, filter: { ...f, notTypes: [...f.notTypes, ...types], ...(subtypes.length ? { notSubtypes: [...(f.notSubtypes ?? []), ...subtypes] } : {}), text: `${f.text} except ${m[2]}` } } } as Effect];
+  }
   // Meld (CR 701.42a), as normalizeSelf words it: "exile ~ and the creature named Bruna, the Fading Light, then meld them
   // into Brisela, Voice of Nightmares", after "if you both own and control ~ and a creature named ..." (checked again as
   // it melds) or "if ~ and a creature named ... are attacking, and you both own and control them" (with "tapped and

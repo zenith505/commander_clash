@@ -3978,6 +3978,8 @@ function parseThen(s: string, ctx: Ctx): Effect[] | null {
 function parseOne(s: string, ctx: Ctx): Effect[] | null {
   // "{T}: This creature deals 1 damage to itself" (Stuffy Doll): the source is the one dealt the damage.
   s = s.replace(/^~ deals (\d+) damage to itself$/, "~ deals $1 damage to ~");
+  // "~ deals 1 damage to each opponent and each creature and planeswalker they control" (End the Festivities): theirs.
+  s = s.replace(/^(~ deals (?:\d+|X) damage to each opponent and each [a-z ]+?) they control$/, "$1 your opponents control");
   // Support N (CR 701.41a): "other" target creatures on a permanent, any on an instant or sorcery.
   // Support X would need a variable number of targets: not supported.
   const support = /^[Ss]upport (\d+)$/.exec(s);
@@ -4319,7 +4321,7 @@ function parseConjunction(s: string, ctx: Ctx): Effect[] | null {
  * order. A target is chosen once; the second verb is about the same player ("that player").
  */
 function parseSharedSubject(s: string, ctx: Ctx): Effect[] | null {
-  const VERB = String.raw`(?:draws?|loses?|gains?|discards?|mills?|sacrifices?|exiles)`;
+  const VERB = String.raw`(?:draws?|loses?|gains?|discards?|mills?|sacrifices?|exiles|gets?(?= (?:a|an|one|two|three) poison counters?))`;
   const m = new RegExp(`^(.+?) (${VERB} .+?),? and (${VERB} .+|scry \\d+|surveil \\d+)$`).exec(s);
   if (!m) return null;
   const subject = m[1]!;

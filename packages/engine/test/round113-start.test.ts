@@ -934,3 +934,29 @@ describe("Saskia the Unyielding", () => {
     expect(s.players[other]!.life).toBe(38);
   });
 });
+
+describe("each opponent and what they control", () => {
+  it("End the Festivities: 1 damage to each opponent and each creature and planeswalker they control, not yours", () => {
+    const end = card("End the Festivities", "Instant", "{R}", { oracleText: "End the Festivities deals 1 damage to each opponent and each creature and planeswalker they control." });
+    expect(isFullySupported(end)).toBe(true);
+    const { s: s0, ap, ids, opp } = setup([end]);
+    const elf = putOnBattlefield(s0, opp, card("Elf", "Creature — Elf", "{G}", { power: "1", toughness: "1" }));
+    const mine = putOnBattlefield(s0, ap, card("My Elf", "Creature — Elf", "{G}", { power: "1", toughness: "1" }));
+    const s = cast(s0, ap, ids[0]!, []);
+    expect(s.objects[elf]!.zone).toBe("graveyard");
+    expect(s.objects[mine]!.zone).toBe("battlefield");
+    for (const p of s.turnOrder.filter((p) => p !== ap)) expect(s.players[p]!.life).toBe(39);
+    expect(s.players[ap]!.life).toBe(40);
+  });
+
+  it("Vraska's Fall: each opponent sacrifices a creature or planeswalker and gets a poison counter", () => {
+    const fall = card("Vraska's Fall", "Instant", "{2}{B}", { oracleText: "Each opponent sacrifices a creature or planeswalker of their choice and gets a poison counter." });
+    expect(isFullySupported(fall)).toBe(true);
+    const { s: s0, ap, ids, opp } = setup([fall]);
+    const b = putOnBattlefield(s0, opp, bear());
+    let s = cast(s0, ap, ids[0]!, []);
+    for (let i = 0; i < 10 && s.pending; i++) s = act(s, botActions(s, s.pending.player)[0]!);
+    expect(s.objects[b]!.zone).toBe("graveyard");
+    for (const p of s.turnOrder.filter((p) => p !== ap)) expect(s.players[p]!.poison).toBe(1);
+  });
+});

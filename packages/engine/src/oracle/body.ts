@@ -554,6 +554,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // "Search your library for up to X basic land cards, where X is .... Put those cards onto the battlefield tapped, then
   // shuffle." (Traverse the Outlands): the same as "... put them onto the battlefield tapped, then shuffle, where X is ...".
   text = text.replace(/(^|\. )Search your library for up to X ([^.,]+), where X is ([^.]+)\. Put those cards onto the battlefield( tapped)?, then shuffle\./, "$1Search your library for up to X $2, put them onto the battlefield$4, then shuffle, where X is $3.");
+  // Harvest Season: "Search your library for up to X basic land cards, where X is ..., put those cards onto the
+  // battlefield tapped, then shuffle." The same.
+  text = text.replace(/(^|\. )Search your library for up to X ([^.,]+), where X is ([^.,]+), put those cards onto the battlefield( tapped)?, then shuffle\./, "$1Search your library for up to X $2, put them onto the battlefield$4, then shuffle, where X is $3.");
   // Avatar's Wrath: "Choose up to one target creature, then airbend all other creatures": the target only says which one
   // isn't airbent (CR 701.65a), the same as two sentences.
   // "Put a night counter on ~. Then if it has eight or more night counters on it, remove all of them and create ..."

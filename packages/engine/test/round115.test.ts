@@ -1052,3 +1052,20 @@ describe("Winds of Change", () => {
     expect(oldOpp.every((id) => s.objects[id]!.zone === "library" || s.players[opp]!.hand.includes(id))).toBe(true);
   });
 });
+
+const harvestSeason = card("Harvest Season", "Sorcery", "{2}{G}", {
+  oracleText: "Search your library for up to X basic land cards, where X is the number of tapped creatures you control, put those cards onto the battlefield tapped, then shuffle.",
+});
+
+describe("Harvest Season", () => {
+  it("up to X basic lands, X the tapped creatures you control", () => {
+    expect(isFullySupported(harvestSeason)).toBe(true);
+    const { s: s0, ap, ids } = setup([harvestSeason]);
+    for (const tapped of [true, true, false]) s0.objects[putOnBattlefield(s0, ap, bear())]!.tapped = tapped;
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [], undefined, "auto")));
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", max: 2 });
+    const found = (s.pending as { cards: string[] }).cards.slice(0, 2);
+    s = settle(act(s, { type: "searchLibrary", player: ap, found }));
+    expect(found.every((id) => s.objects[id]!.zone === "battlefield" && s.objects[id]!.tapped)).toBe(true);
+  });
+});

@@ -899,3 +899,27 @@ describe("Eldrazi Confluence", () => {
     expect(s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === ap)).toHaveLength(1);
   });
 });
+
+describe("Expropriate bots", () => {
+  it("the caster votes time; an opponent with a valuable permanent votes time too, one with nothing votes money", () => {
+    const { s: s0, ap, ids } = setup([expropriate]);
+    let s = s0;
+    const [p1, p2] = [later(s, ap, 1), later(s, ap, 2)];
+    putOnBattlefield(s, p1, card("Big Dragon", "Creature — Dragon", "{6}{R}{R}", { power: "8", toughness: "8", keywords: ["Flying"], oracleText: "Flying" }));
+    for (const id of [...s.battlefield]) if (s.objects[id]!.owner === p2) moveObject(s, id, "graveyard");
+    s = run(s, planCast(s, ap, ids[0]!));
+    const votes: Record<number, string> = {};
+    for (let i = 0; i < 40 && (s.stack.length || s.pending); i++) {
+      const pend = s.pending;
+      if (pend?.kind === "chooseOption" && pend.what === "vote") {
+        const a = botActions(s, pend.player)[0]!;
+        votes[pend.voter ?? pend.player] = (a as { choice: string }).choice;
+        s = act(s, a);
+      } else if (pend) s = act(s, botActions(s, pend.player)[0]!);
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(votes[ap]).toBe("time");
+    expect(votes[p1]).toBe("time");
+    expect(votes[p2]).toBe("money");
+  });
+});

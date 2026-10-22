@@ -50,6 +50,11 @@ function wordScore(s: GameState, pid: PlayerId, controller: PlayerId, effects: E
         if (e.cond.option === option) v += effectsValue(s, pid, controller, e.effects);
         continue;
       }
+      // Expropriate's money vote: the caster takes one of the voter's permanents (the best one, say).
+      if (e.type === "controlFromEach" && e.votedFor === option) {
+        if (pid !== controller) v -= Math.max(0, ...s.battlefield.map((id) => obj(s, id)).filter((o) => o.owner === pid).map((o) => worth(s, pid, o)));
+        continue;
+      }
       // "For each strength vote": what one more vote for it adds.
       if (JSON.stringify(e).includes(`"option":${JSON.stringify(option)}`)) v += effectsValue(s, pid, controller, [e]);
     }

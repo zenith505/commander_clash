@@ -743,6 +743,14 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     perPlayer = true;
     line = `Whenever one or more ${groupAttacksAPlayer[1]} you control attack, ${line.slice(groupAttacksAPlayer[0].length)}`;
   }
+  // "Whenever you attack with ~ and/or your commander" (Ainok Strike Leader): once for the attack, if it or your commander
+  // (a commander you own, CR 903.3) is among the creatures you attacked with.
+  let selfOrCommander = false;
+  const withCommander = /^Whenever you attack with ~ and\/or your commander, /.exec(line);
+  if (withCommander) {
+    selfOrCommander = true;
+    line = `Whenever you attack, ${line.slice(withCommander[0].length)}`;
+  }
   if ((m = /^Whenever (?:one or more (.+?) you control attack|you attack with (one|two|three|four|five) or more (.+?)|you attack), (.+)$/.exec(line))) {
     event = "creaturesYouControlAttack";
     phrase = m[1] ?? m[3];
@@ -818,7 +826,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     const filter: TargetSpec = group ?? { kind: "object", types: ["Creature"], text: "creature" };
     body = { ...body, effects: [...body.effects, { type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "bounce", fromGroup: true }], text: `return one of those ${phrase} to its owner's hand` }], text: `${body.text} You may return one of those ${phrase} to its owner's hand.` };
   }
-  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}), ...(toOpponent ? { toOpponent: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(anyone ? { anyoneAttacks: true as const } : {}), ...(perPlayer ? { perPlayer: true as const } : {}) };
+  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}), ...(toOpponent ? { toOpponent: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(anyone ? { anyoneAttacks: true as const } : {}), ...(perPlayer ? { perPlayer: true as const } : {}), ...(selfOrCommander ? { selfOrCommander: true as const } : {}) };
 }
 
 /** "Other creatures you control", "tokens you control", "artifacts and/or creatures you control": what a batch trigger counts. */

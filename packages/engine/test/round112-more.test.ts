@@ -1,7 +1,7 @@
 // Round 112, more of the most played cards: Karn, the Great Creator, ...
 
 import { describe, expect, it } from "vitest";
-import { act, card, passAll, putOnBattlefield, setup } from "./helpers";
+import { act, bear, card, passAll, putOnBattlefield, setup } from "./helpers";
 import { characteristics, isFullySupported, planActivate, power, toughness, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
@@ -118,5 +118,56 @@ describe("Karn, the Great Creator", () => {
     putOnBattlefield(s, opp, karn);
     const stone = putOnBattlefield(s, ap, vault);
     expect(planActivate(s, ap, stone, 0)).toBeNull();
+  });
+});
+
+const ainok = card("Ainok Strike Leader", "Creature — Dog Warrior", "{1}{W}", {
+  power: "2",
+  toughness: "2",
+  oracleText:
+    "Whenever you attack with this creature and/or your commander, for each opponent, create a 1/1 red Goblin creature token that's tapped and attacking that player.\nSacrifice this creature: Creature tokens you control gain indestructible until end of turn.",
+});
+
+const attackWith = (s: GameState, ap: PlayerId, attackers: string[]) => {
+  const defender = s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % s.turnOrder.length]!;
+  while (s.pending?.kind !== "declareAttackers") s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  return act(s, { type: "declareAttackers", player: ap, attacks: attackers.map((attacker) => ({ attacker, defender })) });
+};
+const goblins = (s: GameState, ap: PlayerId) => s.battlefield.map((id) => s.objects[id]!).filter((o) => o.isToken && o.controller === ap && characteristics(s, o).subtypes.includes("Goblin"));
+
+describe("Ainok Strike Leader", () => {
+  it("is supported", () => expect(isFullySupported(ainok)).toBe(true));
+
+  it("attacking with it: a tapped Goblin attacking each opponent", () => {
+    let { s, ap } = setup([]);
+    const a = putOnBattlefield(s, ap, ainok);
+    s = attackWith(s, ap, [a]);
+    s = passAll(s);
+    const gs = goblins(s, ap);
+    expect(gs.length).toBe(3);
+    expect(gs.every((g) => g.tapped)).toBe(true);
+    expect(new Set(gs.map((g) => g.attacking))).toEqual(new Set(s.turnOrder.filter((p) => p !== ap)));
+  });
+
+  it("attacking with your commander only: it triggers too, once", () => {
+    let { s, ap } = setup([]);
+    putOnBattlefield(s, ap, ainok);
+    const cmd = putOnBattlefield(s, ap, bear({ name: "Commander Bear" }));
+    s.objects[cmd]!.isCommander = true;
+    s = attackWith(s, ap, [cmd]);
+    s = passAll(s);
+    expect(goblins(s, ap).length).toBe(3);
+  });
+
+  it("not for another creature, nor for a commander you don't own", () => {
+    let { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, ainok);
+    const other = putOnBattlefield(s, ap, bear());
+    const borrowed = putOnBattlefield(s, ap, bear({ name: "Their Commander" }));
+    s.objects[borrowed]!.isCommander = true;
+    s.objects[borrowed]!.owner = opp;
+    s = attackWith(s, ap, [other, borrowed]);
+    s = passAll(s);
+    expect(goblins(s, ap).length).toBe(0);
   });
 });

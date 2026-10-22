@@ -3099,6 +3099,8 @@ export interface TriggeredAbility {
   anyoneAttacks?: true;
   /** For "creaturesYouControlAttack": "Whenever you attack a player", once for each player attacked (CR 508.3e); the event's player is that player. */
   perPlayer?: true;
+  /** "Whenever you attack with ~ and/or your commander" (Ainok Strike Leader): once, if it or a commander you own is among the attackers. */
+  selfOrCommander?: true;
   /** With `anyoneAttacks`: "Whenever another player attacks" (Firemane Commando), not its controller. The event's player is the attacking player, its amount how many of the attackers attack its controller (not their planeswalkers or battles). */
   anotherPlayer?: true;
   /** For "opponentAttacksYou": at least `min` attackers at you, or (`orPlaneswalkers`, an intervening if, CR 603.4) at your planeswalkers too. */

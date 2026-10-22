@@ -1953,6 +1953,20 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
         continue;
       }
     }
+    // Forge of Heroes: "Choose target commander that entered this turn. Put a +1/+1 counter on it if it's a creature and a
+    // loyalty counter on it if it's a planeswalker." Its types as it resolves (CR 608.2c): both, if it's both.
+    if (s === "Put a +1/+1 counter on it if it's a creature and a loyalty counter on it if it's a planeswalker") {
+      const i = ctx.targets.length - 1;
+      if (ctx.targets[i]?.kind !== "object" || ctx.targets[i]!.many) return null;
+      const both: Effect[] = [];
+      for (const [counter, type] of [["+1/+1", "Creature"], ["loyalty", "Planeswalker"]] as const) {
+        const fx = parseOne(`Put a ${counter} counter on it`, ctx);
+        if (!fx || ctx.targets.length !== i + 1 || !fx.every((e) => mentionsTarget(e, i))) return null;
+        both.push({ type: "if", cond: { kind: "targetIs", index: i, filter: { kind: "object", types: [type], notTypes: [], notColors: [], text: type.toLowerCase() } }, effects: fx });
+      }
+      effects.push(...both);
+      continue;
+    }
     // "You gain life equal to the damage prevented this way": part of the prevention effect before it (CR 615.5).
     // Inkshield: "For each 1 damage prevented this way, create a 2/1 ... token": also part of the prevention (CR 615.5).
     const perDamage = /^For each 1 damage prevented this way, (create an? [^.]+ token(?: with [a-z ]+)?)$/.exec(s);

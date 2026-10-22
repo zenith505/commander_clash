@@ -644,3 +644,30 @@ describe("Sepulchral Primordial", () => {
     void c;
   });
 });
+
+describe("Forge of Heroes", () => {
+  const forge = card("Forge of Heroes", "Land", "", {
+    oracleText: "{T}: Add {C}.\n{T}: Choose target commander that entered this turn. Put a +1/+1 counter on it if it's a creature and a loyalty counter on it if it's a planeswalker.",
+  });
+  const gideon = card("Gideon Commander", "Legendary Planeswalker Creature — Gideon", "{3}{W}", { power: "4", toughness: "4", loyalty: "4" });
+  it("a commander that entered this turn: +1/+1 if a creature, loyalty if a planeswalker, both if both (rulings)", () => {
+    expect(isFullySupported(forge)).toBe(true);
+    const { s: s0, ap, opp } = setup([]);
+    const f = putOnBattlefield(s0, ap, forge);
+    const mine = putOnBattlefield(s0, ap, bear({ name: "My Commander" }), { commander: true });
+    const theirs = putOnBattlefield(s0, opp, gideon, { commander: true });
+    const old = putOnBattlefield(s0, opp, bear({ name: "Old Commander" }), { commander: true });
+    const plain = putOnBattlefield(s0, ap, bear());
+    for (const id of [mine, theirs, plain]) s0.objects[id]!.enteredTurn = s0.turn;
+    s0.objects[old]!.enteredTurn = s0.turn - 1;
+    s0.objects[theirs]!.counters.loyalty = 4;
+    expect(planActivate(s0, ap, f, 0, [target(old)])).toBeNull();
+    expect(planActivate(s0, ap, f, 0, [target(plain)])).toBeNull();
+    let s = passAll(planActivate(s0, ap, f, 0, [target(mine)])!.reduce(act, s0));
+    expect(s.objects[mine]!.counters["+1/+1"]).toBe(1);
+    s.objects[f]!.tapped = false;
+    s = passAll(planActivate(s, ap, f, 0, [target(theirs)])!.reduce(act, s));
+    expect(s.objects[theirs]!.counters["+1/+1"]).toBe(1);
+    expect(s.objects[theirs]!.counters.loyalty).toBe(5);
+  });
+});

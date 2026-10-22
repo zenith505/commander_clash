@@ -3543,6 +3543,8 @@ export interface CostMod {
   fromZones?: ("graveyard" | "exile")[];
   /** "Spells you cast but don't own" (Gonti, Canny Acquisitor). */
   notOwned?: true;
+  /** "Spells you cast that share a card type with the exiled card" (Semblance Anvil): with a card its imprint ability exiled (CR 607.2a). */
+  sharesTypeWithLinked?: true;
   /** "The first creature spell you cast each turn", "the second spell you cast each turn": only the nth matching spell. */
   nth?: number;
   /** Only while this holds: a Class level's (CR 716.2a). */

@@ -2,8 +2,8 @@
 // and the shock land played from among the cards it exiled).
 
 import { describe, expect, it } from "vitest";
-import { act, card, passAll, passUntil, putOnBattlefield, setup, swamp } from "./helpers";
-import { botActions, characteristics, compileCard, isFullySupported, manaAbilitiesOn, planActivate, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { act, bear, card, cast, passAll, passUntil, putOnBattlefield, setup, swamp } from "./helpers";
+import { botActions, characteristics, compileCard, isFullySupported, manaAbilitiesOn, manaValue, spellCost, planActivate, waitingOn, type Action, type CardDef, type GameObject, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const gix = card("Gix, Yawgmoth Praetor", "Legendary Creature — Phyrexian Praetor", "{1}{B}{B}", {
@@ -18,6 +18,13 @@ const shockland = card("Blood Crypt", "Land — Swamp Mountain", "", {
 const passage = card("Multiversal Passage", "Land", "", {
   oracleText: "As this land enters, choose a basic land type. Then you may pay 2 life. If you don't, it enters tapped.\nThis land is the chosen type.",
 });
+const anvil = card("Semblance Anvil", "Artifact", "{3}", {
+  oracleText: "Imprint — When this artifact enters, you may exile a nonland card from your hand.\nSpells you cast that share a card type with the exiled card cost {2} less to cast.",
+});
+const bolt = card("Lightning Bolt", "Instant", "{R}", { oracleText: "Lightning Bolt deals 3 damage to any target." });
+const shock = card("Shock", "Instant", "{R}", { oracleText: "Shock deals 2 damage to any target." });
+const artifactCreature = card("Steel Overseer", "Artifact Creature — Construct", "{2}", { power: "1", toughness: "1" });
+const ogre = card("Hill Giant", "Creature — Giant", "{3}{R}", { power: "3", toughness: "3" });
 const big = (name: string) => card(name, "Creature — Giant", "{20}", { power: "9", toughness: "9" });
 
 const toZone = (s: GameState, pid: PlayerId, def: CardDef, zone: "graveyard" | "library" | "hand") => {
@@ -138,5 +145,58 @@ describe("Multiversal Passage", () => {
     for (let i = 0; i < 4 && s.pending; i++) for (const a of botActions(s, waitingOn(s)!)) s = act(s, a);
     expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
     expect(characteristics(s, s.objects[ids[0]!]!).subtypes).toHaveLength(1);
+  });
+});
+
+/** What casting it costs in all: its colored mana and the generic mana (CR 601.2f). */
+const total = (s: GameState, pid: PlayerId, o: GameObject) => {
+  const c = spellCost(s, pid, o);
+  return manaValue(c.cost) + c.extra;
+};
+
+describe("Semblance Anvil", () => {
+  it("parse", () => expect(isFullySupported(anvil)).toBe(true));
+
+  it("imprints a creature card: creature spells cost {2} less, an artifact creature too, an instant not, and never colored mana", () => {
+    const { s: s0, ap, ids } = setup([anvil, bear(), ogre, artifactCreature, bolt]);
+    const [a, bearId, ogreId, steel, boltId] = ids as [string, string, string, string, string];
+    onlyInHand(s0, ap, ids);
+    let s = passAll(cast(s0, ap, a));
+    for (let i = 0; i < 6 && s.pending?.kind !== "searchLibrary"; i++) {
+      if (s.pending?.kind === "chooseMay") s = act(s, { type: "chooseMay", player: ap, yes: true });
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    // Any nonland card from the hand.
+    expect((s.pending as { cards: string[] }).cards.sort()).toEqual([bearId, ogreId, steel, boltId].sort());
+    s = passAll(act(s, { type: "searchLibrary", player: ap, found: [bearId] }));
+    expect(s.objects[bearId]!.zone).toBe("exile");
+    expect(total(s, ap, s.objects[ogreId]!)).toBe(2); // {3}{R} -> {1}{R}
+    expect(total(s, ap, s.objects[steel]!)).toBe(0); // shares Creature
+    expect(total(s, ap, s.objects[boltId]!)).toBe(1); // {R}: no creature, and no colored mana off
+    // An opponent's spells aren't affected.
+    const opp = s.turnOrder.find((p) => p !== ap)!;
+    const theirs = putOnBattlefield(s, opp, ogre);
+    s.objects[theirs]!.zone = "hand";
+    s.battlefield.splice(s.battlefield.indexOf(theirs), 1);
+    s.players[opp]!.hand.push(theirs);
+    expect(total(s, opp, s.objects[theirs]!)).toBe(4);
+  });
+
+  it("imprints an instant: instants cost {2} less (but not below their colored mana); with nothing exiled, nothing", () => {
+    const { s: s0, ap, ids } = setup([bolt, shock]);
+    const anv = putOnBattlefield(s0, ap, anvil);
+    expect(manaValue(spellCost(s0, ap, s0.objects[ids[1]!]!).cost)).toBe(1);
+    // Exiled with it, linked (CR 607.2a).
+    const key = `${anv}@${s0.objects[anv]!.zoneChanges ?? 0}`;
+    s0.objects[ids[0]!]!.zone = "exile";
+    s0.players[ap]!.hand = s0.players[ap]!.hand.filter((x) => x !== ids[0]);
+    s0.players[ap]!.exile.push(ids[0]!);
+    s0.linkedExile = { [key]: [{ id: ids[0]!, zc: s0.objects[ids[0]!]!.zoneChanges ?? 0 }] };
+    expect(manaValue(spellCost(s0, ap, s0.objects[ids[1]!]!).cost)).toBe(1);
+    const ogreId = putOnBattlefield(s0, ap, card("Brute Force", "Instant", "{3}{R}", { oracleText: "Target creature gets +3/+3 until end of turn." }));
+    s0.objects[ogreId]!.zone = "hand";
+    s0.battlefield.splice(s0.battlefield.indexOf(ogreId), 1);
+    s0.players[ap]!.hand.push(ogreId);
+    expect(total(s0, ap, s0.objects[ogreId]!)).toBe(2);
   });
 });

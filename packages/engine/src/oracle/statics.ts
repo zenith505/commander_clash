@@ -245,6 +245,10 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   // "Blue spells and red spells you cast cost {1} less to cast" (Nightscape Familiar): a spell that's both gets {1} less,
   // not {2} (rulings), as "Blue and red spells".
   text = text.replace(/^([A-Z][a-z]+) spells and ([A-Za-z]+) spells(?= )/, "$1 and $2 spells");
+  // Semblance Anvil: "Spells you cast that share a card type with the exiled card cost {2} less to cast." Sharing several
+  // still takes off {2} (rulings); the exiled card is the one its imprint ability exiled (linked in compile.ts).
+  if ((m = /^Spells you cast that share a card type with the exiled card cost \{(\d+)\} less to cast$/.exec(text)))
+    return { costMod: { who: "you", filter: { kind: "spell", text: "spells that share a card type with the exiled card" }, n: -Number(m[1]), sharesTypeWithLinked: true, text: line } };
   const ofChosen = / of the chosen type costs? \{/.test(text);
   if (ofChosen) text = text.replace(/ of the chosen type(?= costs? \{)/, "");
   // "Spells your opponents cast from graveyards or from exile cost {2} more to cast" (Aven Interrupter).

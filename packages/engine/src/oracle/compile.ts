@@ -2008,6 +2008,11 @@ export function compile(d: CardDef): CompiledCard {
       }
       continue;
     }
+    // The Immortal Sun: "Players can't activate planeswalkers' loyalty abilities." (CR 606.3), see loyaltyBan.
+    if (line === "Players can't activate planeswalkers' loyalty abilities.") {
+      out.noLoyaltyAbilities = true;
+      continue;
+    }
     if (line === "During your turn, your opponents can't cast spells or activate abilities of artifacts, creatures, or enchantments.") {
       out.opponentsCantCastYourTurn = true;
       out.opponentsCantActivateYourTurn = true;

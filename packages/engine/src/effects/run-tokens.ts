@@ -246,7 +246,7 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
 function createTokensFor(s: GameState, e0: Extract<Effect, { type: "createToken" }>, n: number, ctx: ResolveCtx, src: string) {
   // "An X/X token": X worked out now, once (rulings on Inscription of Insight); the token's printed power and toughness.
   const xx = e0.pt !== undefined ? amountNow(s, e0.pt, ctx) : undefined;
-  const e = xx !== undefined ? { ...e0, token: { ...e0.token, power: xx, toughness: xx } } : e0;
+  const e = xx !== undefined ? { ...e0, token: { ...e0.token, power: xx, toughness: e0.ptPowerOnly ? e0.token.toughness : xx } } : e0;
   // One group for each opponent, attacking that opponent if it's this player's combat (CR 508.4), tapped either way.
   if (e.attackingEach) {
     const pid = ctx.controller;

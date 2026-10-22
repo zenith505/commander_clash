@@ -1774,11 +1774,14 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const sc = (s.resolving!.scratch ??= {});
       if (!sc.found) {
         sc.found = [];
+        // "With mana value X or less": this spell's X (TargetSpec.xRange).
+        const { xRange, ...rest } = bindChosen(e.filter, ctx.chosen);
+        const filter: TargetSpec = xRange ? { ...rest, manaValue: { max: ctx.x ?? 0 } } : rest;
         // The active player chooses for their Auras first, then the others in turn order (APNAP, Open the Vaults rulings).
         for (const pid of apnap(s, players(s, e.who, ctx)))
           for (const id of player(s, pid).graveyard) {
             const d = defOf(s, s.objects[id]!);
-            if (isPermanentCard(d) && printedMatches(bindChosen(e.filter, ctx.chosen), d)) sc.found.push(id);
+            if (isPermanentCard(d) && printedMatches(filter, d)) sc.found.push(id);
           }
       }
       const cards = sc.found.map((id) => obj(s, id)).filter((o) => o.zone === "graveyard");

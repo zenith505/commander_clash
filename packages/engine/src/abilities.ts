@@ -2007,6 +2007,8 @@ export type Effect =
        * on Inscription of Insight); `token.power` and `token.toughness` are placeholders then.
        */
       pt?: Amount;
+      /** "An X/1 ... token": `pt` is its power only; its toughness is the token's own. */
+      ptPowerOnly?: true;
       /**
        * An Aura token "attached to" this object (a Role, CR 303.7): one for each object it means. It isn't created if it
        * couldn't legally enchant that object (rulings on Roles).
@@ -2716,7 +2718,8 @@ export type SpellCondition =
   | { kind: "bargained" }
   /** "If this spell was cast from a graveyard" (Sevinne's Reclamation): a copy wasn't cast (rulings, CR 707.10). */
   /** `exile`: "if ~ was cast from exile" (Delayed Blast Fireball) instead. A copy wasn't cast (CR 707.10). */
-  | { kind: "castFromGraveyard"; exile?: true }
+  /** `hand`: "if ~ was cast from your hand" (Transpose). */
+  | { kind: "castFromGraveyard"; exile?: true; hand?: true }
   /** Approach of the Second Sun: "If ~ was cast from your hand and you've cast another spell named ~ this game". */
   | { kind: "castFromHandAndAnotherNamed" }
   /** "If you cast this spell during your main phase" (addendum, CR 207.2c): a copy wasn't cast (CR 707.10). */
@@ -3641,7 +3644,8 @@ export type EntersCondition =
  * "As ~ enters, you may pay 2 life / reveal a Dragon card from your hand. If you don't, it enters
  * tapped." The choice is made as it enters (CR 614.12).
  */
-export type EntersChoice = { kind: "payLife"; n: number } | { kind: "reveal"; filter: TargetSpec };
+/** `orControl`: "or you control a Dragon" (Temple of the Dragon Queen): untapped then with nothing revealed. */
+export type EntersChoice = { kind: "payLife"; n: number } | { kind: "reveal"; filter: TargetSpec; orControl?: TargetSpec };
 
 /**
  * "Instant and sorcery spells you cast cost {1} less to cast", "Noncreature spells cost {1} more to cast",
@@ -4057,6 +4061,8 @@ export interface CompiledCard {
    * Abolisher): permanents on the battlefield only, mana abilities too (rulings); see abolisherBan.
    */
   opponentsCantActivateYourTurn?: true;
+  /** "Players can't activate planeswalkers' loyalty abilities." (The Immortal Sun): while it's on the battlefield. */
+  noLoyaltyAbilities?: true;
   /** "Creatures you control can boast twice during each of your turns rather than once." (Birgi, CR 702.142a) */
   boastTwice?: true;
   /**

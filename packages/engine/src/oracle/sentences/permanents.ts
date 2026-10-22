@@ -611,6 +611,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     if (!what || !up || !down) return null;
     return [{ type: "either", options: [[{ type: "continuous", what, mods: up, duration: "endOfTurn" }], [{ type: "continuous", what, mods: down, duration: "endOfTurn" }]], labels: ["It gets +X/+X until end of turn", "It gets -X/-X until end of turn"] }];
   }
+  // "Enchanted creature gets +1/-1 or -1/+1 until end of turn" (Pemmin's Aura): which one is chosen as it resolves
+  // (CR 608.2d), like the above.
+  if ((m = /^(enchanted creature|~) gets ([+-]\d+\/[+-]\d+) or ([+-]\d+\/[+-]\d+) until end of turn$/i.exec(s))) {
+    const what = parseObject(m[1]!.toLowerCase() === "~" ? "~" : m[1]!.toLowerCase(), ctx);
+    const a = parseChanges(`gets ${m[2]}`);
+    const b = parseChanges(`gets ${m[3]}`);
+    if (!what || !a || !b) return null;
+    return [{ type: "either", options: [[{ type: "continuous", what, mods: a, duration: "endOfTurn" }], [{ type: "continuous", what, mods: b, duration: "endOfTurn" }]], labels: [`It gets ${m[2]} until end of turn`, `It gets ${m[3]} until end of turn`] }];
+  }
   // "Until your next turn, up to one target noncreature artifact becomes an artifact creature ..." (Karn, the Great
   // Creator): the same as with the duration after it.
   if ((m = /^Until (end of turn|your next turn), ((?:up to one )?target .+?) ((?:gets?|gains?|loses?|has|becomes?) .+)$/.exec(s))) {

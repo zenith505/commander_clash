@@ -43,6 +43,12 @@ export function parseEntersChoice(line: string): EntersChoice | null {
     if (!subtypes.every((x) => BASIC_TYPES.includes(x) || CREATURE_TYPES.has(x))) return null;
     return { kind: "reveal", filter: { kind: "card", subtypes, text: `${m[1]} card` } };
   }
+  // Temple of the Dragon Queen: "... enters tapped unless you revealed a Dragon card this way or you control a Dragon."
+  // Controlling one as it enters is enough, with nothing revealed (CR 614.1d).
+  if ((m = /^As ~ enters(?: the battlefield)?, you may reveal an? ([A-Z][a-z]+) card from your hand\. ~ enters(?: the battlefield)? tapped unless you revealed an? ([A-Z][a-z]+) card this way or you control an? ([A-Z][a-z]+)\.$/.exec(line))) {
+    if (m[1] !== m[2] || m[1] !== m[3] || !CREATURE_TYPES.has(m[1]!)) return null;
+    return { kind: "reveal", filter: { kind: "card", subtypes: [m[1]!], text: `${m[1]} card` }, orControl: { kind: "object", subtypes: [m[1]!], controller: "you", text: m[1]! } };
+  }
   return null;
 }
 

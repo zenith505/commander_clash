@@ -359,11 +359,17 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (spec?.kind !== "card" || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
     return [{ type: "returnAllFromGraveyard", who: { ref: "eachPlayer" }, filter: { ...spec, text: `${yours[1]} card` }, ...(yours[2] ? { tapped: true } : {}) }];
   }
-  if ((m = /^[Rr]eturn all (.+?) cards from (your graveyard|all graveyards) to the battlefield( tapped)?( under their owners' control)?$/.exec(s)) && (m[2] === "your graveyard") === !m[4]) {
+  if ((m = /^[Rr]eturn all (.+? cards(?: with mana value X or less)?) from (your graveyard|all graveyards) to the battlefield( tapped)?( under their owners' control)?$/.exec(s)) && (m[2] === "your graveyard") === !m[4]) {
+    m[1] = m[1]!.replace(/ cards( with mana value X or less)?$/, "$1");
+    // "Return all creature and planeswalker cards with mana value X or less from your graveyard to the battlefield"
+    // (Ascend from Avernus): the X it was cast with (TargetSpec.xRange).
     const kinds = m[1]!.replace(/,? and /g, " or ").replace(/, /g, " or ");
-    const spec = parseTargetPhrase(`${kinds.split(/\s+/).map(singularWord).join(" ")} card from a graveyard`, { chosen: true });
+    const withX = / with mana value X or less$/.exec(kinds);
+    const words = withX ? kinds.slice(0, withX.index) : kinds;
+    const spec = parseTargetPhrase(`${words.split(/\s+/).map(singularWord).join(" ")} card${withX ? " with mana value X or less" : ""} from a graveyard`, { chosen: true, x: !!withX });
     if (spec?.kind !== "card" || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
-    return [{ type: "returnAllFromGraveyard", who: { ref: m[4] ? "eachPlayer" : "you" }, filter: { ...spec, text: `${m[1]} card` }, ...(m[3] ? { tapped: true } : {}), ...(m[4] ? { owners: true as const } : {}) }];
+    if (withX && (spec.xRange?.key !== "manaValue" || spec.xRange.at !== "most" || !ctx.spell)) return null;
+    return [{ type: "returnAllFromGraveyard", who: { ref: m[4] ? "eachPlayer" : "you" }, filter: { ...spec, text: withX ? `${m[1]!.slice(0, -withX[0].length)} card with mana value X or less` : `${m[1]} card` }, ...(m[3] ? { tapped: true } : {}), ...(m[4] ? { owners: true as const } : {}) }];
   }
   // "Return all instant and sorcery cards from your graveyard to your hand" (Wisdom of Ages), "Return all cards from your
   // graveyard to your hand" (Praetor's Counsel), "Return all creature cards with power 2 or less from your graveyard to

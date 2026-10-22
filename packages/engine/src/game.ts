@@ -1,5 +1,5 @@
 import { kickerName } from "./abilities";
-import type { AbilityBody, ActivatedAbility, AdditionalCost, ManaAbility, AltCostKind, ChoiceKind, CounterKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
+import type { AbilityBody, ActivatedAbility, AdditionalCost, ManaAbility, AltCostKind, ChoiceKind, CounterKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersChoice, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { mergeSpell } from "./mutate";
 import { battleSBAs, isSiege, protectorOptions, setProtector } from "./battles";
 import { joinMeld } from "./meld";
@@ -1351,8 +1351,13 @@ function othersMakeItEnterTapped(s: GameState, o: GameObject): boolean {
 
 function entersTappedNow(s: GameState, o: GameObject, printed: CompiledCard, choice?: boolean): boolean {
   if (printed.entersTappedUnless) return !conditionHolds(s, printed.entersTappedUnless, o.controller, o.id);
-  if (printed.entersTappedChoice) return !choice;
+  if (printed.entersTappedChoice) return !choice && !controlsForEntry(s, o.controller, printed.entersTappedChoice, o.id);
   return false;
+}
+
+/** Temple of the Dragon Queen's "or you control a Dragon": a permanent other than the land itself, as it enters. */
+function controlsForEntry(s: GameState, pid: PlayerId, choice: EntersChoice, landId: ObjectId): boolean {
+  return choice.kind === "reveal" && !!choice.orControl && s.battlefield.some((id) => id !== landId && controllerOf(s, obj(s, id)) === pid && objectMatches(s, choice.orControl!, obj(s, id), pid, false));
 }
 
 export function conditionHolds(s: GameState, cond: EntersCondition, you: PlayerId, self?: ObjectId): boolean {
@@ -1416,6 +1421,7 @@ export function canEnterUntapped(s: GameState, pid: PlayerId, landId: ObjectId):
   if (!choice) return false;
   const p = player(s, pid);
   if (choice.kind === "payLife") return payableLife(s, pid) >= choice.n;
+  if (controlsForEntry(s, pid, choice, landId)) return true;
   return p.hand.some((id) => id !== landId && printedMatches(choice.filter, defOf(s, obj(s, id))));
 }
 
@@ -3047,7 +3053,7 @@ export function canPlayLandNow(s: GameState, pid: PlayerId, id: ObjectId): boole
 /** What the player could do so a land they play now enters untapped ("pay 2 life", a shock land), or null. */
 export function landUntappedOffer(s: GameState, pid: PlayerId, id: ObjectId): string | null {
   const choice = entersRulesOf(s, pid, id).entersTappedChoice;
-  if (!choice || !canEnterUntapped(s, pid, id)) return null;
+  if (!choice || !canEnterUntapped(s, pid, id) || controlsForEntry(s, pid, choice, id)) return null;
   const name = defOf(s, obj(s, id)).name;
   return choice.kind === "payLife" ? `pay ${choice.n} life so ${name} enters untapped` : `reveal a ${choice.filter.text} from your hand so ${name} enters untapped`;
 }
@@ -3066,7 +3072,7 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
   if (untapped && choice?.kind === "payLife") {
     loseLife(s, p.id, choice.n);
     log(s, `${p.name} pays ${choice.n} life so ${d.name} enters untapped.`);
-  } else if (untapped && choice?.kind === "reveal") {
+  } else if (untapped && choice?.kind === "reveal" && !controlsForEntry(s, p.id, choice, id)) {
     const shown = p.hand.find((x) => x !== id && printedMatches(choice.filter, defOf(s, obj(s, x))))!;
     log(s, `${p.name} reveals ${nameOf(s, shown)} so ${d.name} enters untapped.`);
   }
@@ -4985,6 +4991,11 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   else if (characteristics(s, o).cantActivate) return `${d.name}'s activated abilities can't be activated`; // Arrest
   const banned = nameActivationBan(s, o, !!ab.mana) ?? abolisherBan(s, pid, o); // Pithing Needle, in any zone (rulings); Grand Abolisher
   if (banned) return banned;
+  // The Immortal Sun: no loyalty abilities (CR 606.3) while it's on the battlefield.
+  if (ab.loyalty !== undefined || ab.loyaltyX) {
+    const sun = s.battlefield.find((id) => abilitiesOf(s, obj(s, id)).noLoyaltyAbilities);
+    if (sun) return `${characteristics(s, obj(s, sun)).name}: players can't activate planeswalkers' loyalty abilities`;
+  }
   if (ab.mana) {
     // A mana ability: with priority, or while paying mana for something (CR 605.3a), even under split second (702.61b).
     if (!(s.priority === pid && !s.pending) && !(paysManaNow(s) && waitingOn(s) === pid)) return "you can't activate mana abilities now";

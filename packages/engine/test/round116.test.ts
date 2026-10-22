@@ -553,3 +553,130 @@ describe("more of the most played: Lair of the Hydra, PuPu UFO, Alandra, Tinder 
     expect(s.objects[f]!.zone).toBe("graveyard");
   });
 });
+
+describe("more of the most played: Ascend from Avernus, Urabrask's Forge, Karn, Pemmin's Aura, The Immortal Sun, Transpose, Twinferno, Temple of the Dragon Queen", () => {
+  const ascend = card("Ascend from Avernus", "Sorcery", "{X}{W}{W}{W}", { oracleText: "Return all creature and planeswalker cards with mana value X or less from your graveyard to the battlefield. Exile Ascend from Avernus." });
+  const forge = card("Urabrask's Forge", "Artifact", "{2}{R}", {
+    oracleText: "At the beginning of combat on your turn, put an oil counter on this artifact, then create an X/1 red Phyrexian Horror creature token with trample and haste, where X is the number of oil counters on this artifact. Sacrifice that token at the beginning of the next end step.",
+  });
+  const karn = card("Karn, Legacy Reforged", "Legendary Artifact Creature — Golem", "{5}", {
+    power: "*",
+    toughness: "*",
+    oracleText: "Karn's power and toughness are each equal to the greatest mana value among artifacts you control.\nAt the beginning of your upkeep, add {C} for each artifact you control. This mana can't be spent to cast nonartifact spells. Until end of turn, you don't lose this mana as steps and phases end.",
+  });
+  const pemmin = card("Pemmin's Aura", "Enchantment — Aura", "{1}{U}{U}", {
+    keywords: ["Enchant"],
+    oracleText: "Enchant creature\n{U}: Untap enchanted creature.\n{U}: Enchanted creature gains flying until end of turn.\n{U}: Enchanted creature gains shroud until end of turn. (It can't be the target of spells or abilities.)\n{1}: Enchanted creature gets +1/-1 or -1/+1 until end of turn.",
+  });
+  const sun = card("The Immortal Sun", "Legendary Artifact", "{6}", { oracleText: "Players can't activate planeswalkers' loyalty abilities.\nAt the beginning of your draw step, draw an additional card.\nSpells you cast cost {1} less to cast.\nCreatures you control get +1/+1." });
+  const transpose = card("Transpose", "Instant", "{2}{B}", {
+    keywords: ["Rebound"],
+    oracleText:
+      'Draw a card, then discard a card. You lose 1 life. If this spell was cast from your hand, create a 0/1 black Wizard creature token with "Whenever you cast a noncreature spell, this token deals 1 damage to each opponent."\nRebound (If you cast this spell from your hand, exile it as it resolves. At the beginning of your next upkeep, you may cast this card from exile without paying its mana cost.)',
+  });
+  const twinferno = card("Twinferno", "Instant", "{1}{R}", {
+    oracleText: "Choose one —\n• When you cast your next instant or sorcery spell this turn, copy that spell. You may choose new targets for the copy.\n• Target creature you control gains double strike until end of turn. (It deals both first-strike and regular combat damage.)",
+  });
+  const temple = card("Temple of the Dragon Queen", "Land", "", { oracleText: "As this land enters, you may reveal a Dragon card from your hand. This land enters tapped unless you revealed a Dragon card this way or you control a Dragon.\nAs this land enters, choose a color.\n{T}: Add one mana of the chosen color." });
+  const walker = card("Walker Test", "Legendary Planeswalker — Test", "{3}", { loyalty: "3", oracleText: "+1: You gain 1 life." });
+  const dragon = card("Shivan Dragon", "Creature — Dragon", "{4}{R}{R}", { power: "5", toughness: "5", keywords: ["Flying"], oracleText: "Flying" });
+  const shock = card("Shock", "Instant", "{R}", { oracleText: "Shock deals 2 damage to any target." });
+
+  it("all eight compile", () => {
+    for (const c of [ascend, forge, karn, pemmin, sun, transpose, twinferno, temple]) expect(isFullySupported(c), c.name).toBe(true);
+  });
+
+  it("Ascend from Avernus: creatures and planeswalkers with mana value X or less come back; it's exiled", () => {
+    const { s: s0, ap, ids } = setup([ascend]);
+    const small = toHand(s0, ap, bear());
+    const pw = toHand(s0, ap, walker);
+    const big = toHand(s0, ap, dragon);
+    for (const id of [small, pw, big]) moveObject(s0, id, "graveyard");
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, undefined, 3)));
+    expect(s.objects[small]!.zone).toBe("battlefield");
+    expect(s.objects[pw]!.zone).toBe("battlefield");
+    expect(s.objects[big]!.zone).toBe("graveyard");
+    expect(s.objects[ids[0]!]!.zone).toBe("exile");
+  });
+
+  it("Urabrask's Forge: an X/1 Horror, X the oil counters, sacrificed at the next end step", () => {
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const f = putOnBattlefield(s, ap, forge);
+    s.objects[f]!.counters.oil = 2;
+    s = settle(passUntil(s, "beginCombat", ap));
+    expect(s.objects[f]!.counters.oil).toBe(3);
+    const tok = s.battlefield.find((id) => s.objects[id]!.isToken && s.objects[id]!.controller === ap)!;
+    expect(pt(s, tok)).toBe("3/1");
+    s = settle(passUntil(s, "end", ap));
+    expect(s.objects[tok]?.zone === "battlefield").toBe(false);
+  });
+
+  it("Karn, Legacy Reforged: {C} for each artifact at upkeep, kept for the turn, only for artifact spells", () => {
+    expect(compileCard(karn).triggers[0]!.body.effects[0]).toMatchObject({ type: "addMana", keep: "turn", only: { other: true, spells: { types: ["Artifact"] } } });
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    putOnBattlefield(s, ap, karn);
+    putOnBattlefield(s, ap, forge);
+    s = settle(passUntil(s, "upkeep", s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % 4]!));
+    s = settle(passUntil(s, "upkeep", ap));
+    s = settle(passUntil(s, "draw", ap));
+    const lots = s.players[ap]!.manaLots ?? [];
+    expect(lots.reduce((a, l) => a + (l.mana === "C" ? l.n : 0), 0)).toBe(2);
+    expect(lots.every((l) => l.keep === "turn" && l.only?.other)).toBe(true);
+  });
+
+  it("Pemmin's Aura: +1/-1 or -1/+1, chosen as it resolves", () => {
+    const { s: s0, ap } = setup([]);
+    const b = putOnBattlefield(s0, ap, bear());
+    const a = putOnBattlefield(s0, ap, pemmin);
+    s0.objects[a]!.attachedTo = b;
+    let s = settle(run(s0, planActivate(s0, ap, a, 3)));
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "either", labels: ["It gets +1/-1 until end of turn", "It gets -1/+1 until end of turn"] });
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: "1" }));
+    expect(pt(s, b)).toBe("1/3");
+  });
+
+  it("The Immortal Sun: no loyalty abilities while it's on the battlefield", () => {
+    const { s: s0, ap } = setup([]);
+    const w = putOnBattlefield(s0, ap, walker);
+    s0.objects[w]!.counters.loyalty = 3;
+    expect(planActivate(s0, ap, w, 0)).not.toBeNull();
+    putOnBattlefield(s0, ap, sun);
+    expect(planActivate(s0, ap, w, 0)).toBeNull();
+  });
+
+  it("Transpose: the Wizard only when cast from your hand", () => {
+    const { s: s0, ap, ids } = setup([transpose]);
+    let s = settle(cast(s0, ap, ids[0]!));
+    if (s.pending?.kind === "discard") s = settle(act(s, { type: "discard", player: ap, objectIds: [s.players[ap]!.hand[0]!] }));
+    const wizards = (t: GameState) => t.battlefield.filter((id) => t.objects[id]!.isToken && t.cards[t.objects[id]!.cardId]!.name.includes("Wizard")).length;
+    expect(wizards(s)).toBe(1);
+    // Rebound: cast again from exile at the next upkeep, not from the hand, so no second Wizard.
+    expect(s.objects[ids[0]!]!.zone).toBe("exile");
+  });
+
+  it("Twinferno: the next instant or sorcery this turn is copied", () => {
+    const { s: s0, ap, opp, ids } = setup([twinferno, shock]);
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, undefined, [0])));
+    const life = s.players[opp]!.life;
+    s = settle(run(s, planCast(s, ap, ids[1]!, [{ kind: "player", id: opp }])));
+    // Keep the copy's target.
+    expect(s.pending).toMatchObject({ kind: "copyTargets", player: ap, copyOf: "Shock" });
+    s = settle(act(s, { type: "copyTargets", player: ap }));
+    expect(s.players[opp]!.life).toBe(life - 4);
+  });
+
+  it("Temple of the Dragon Queen: untapped if you reveal a Dragon or control one, tapped otherwise", () => {
+    const one = (setupFn: (s: GameState, ap: PlayerId) => void, untapped?: boolean) => {
+      const { s: s0, ap, ids } = setup([temple]);
+      setupFn(s0, ap);
+      let s = act(s0, { type: "playLand", player: ap, objectId: ids[0]!, ...(untapped ? { untapped } : {}) });
+      if (s.pending?.kind === "chooseOption") s = act(s, { type: "chooseOption", player: ap, choice: s.pending.options[0]! });
+      return s.objects[ids[0]!]!.tapped;
+    };
+    expect(one(() => {})).toBe(true);
+    expect(one((s, ap) => void toHand(s, ap, dragon), true)).toBe(false);
+    expect(one((s, ap) => void putOnBattlefield(s, ap, dragon))).toBe(false);
+  });
+});

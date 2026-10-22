@@ -1230,15 +1230,15 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // before added, unless it can only be spent some ways.
     // After "Spend this mana only to cast spells" (Klauth): the mana the sentence before that one added, restricted and kept.
     if (/^Until end of turn, you don't lose this mana as steps and phases end$/.test(s)) {
-      const spendBefore = si > 0 && /^[Ss]pend this mana only /.test(sentences[si - 1]!);
+      const spendBefore = si > 0 && /^(?:[Ss]pend this mana only |This mana can't be spent to cast non)/.test(sentences[si - 1]!);
       const added = spendBefore ? spendAdded : allEffects(effects.slice(prevStart)).filter((e): e is Extract<Effect, { type: "addMana" }> => e.type === "addMana");
-      if (!added.length || si === 0 || /can't be spent/.test(sentences[si - 1]!) || (!spendBefore && /[Ss]pend this mana only/.test(sentences[si - 1]!))) return null;
+      if (!added.length || si === 0 || (!spendBefore && /can't be spent/.test(sentences[si - 1]!)) || (!spendBefore && /[Ss]pend this mana only/.test(sentences[si - 1]!))) return null;
       for (const e of added) e.keep = "turn";
       continue;
     }
     // "Add {U}{R}. Spend this mana only to cast instant and sorcery spells" (Abstract Paintmage, CR 106.6): the mana the
     // sentence before added.
-    if (/^Spend this mana only /.test(s)) {
+    if (/^(?:Spend this mana only |This mana can't be spent to cast non)/.test(s)) {
       const added = allEffects(effects.slice(prevStart)).filter((e): e is Extract<Effect, { type: "addMana" }> => e.type === "addMana");
       const only = parseManaSpend(`${s}.`);
       if (!added.length || !only || added.some((e) => e.only)) return null;
@@ -4001,6 +4001,7 @@ const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true
   { re: "~ was bargained", cond: { kind: "bargained" }, spellOnly: true },
   { re: "~ was cast from a graveyard", cond: { kind: "castFromGraveyard" }, spellOnly: true, noTargets: true },
   { re: "~ was cast from exile", cond: { kind: "castFromGraveyard", exile: true }, spellOnly: true, noTargets: true },
+  { re: "~ was cast from your hand", cond: { kind: "castFromGraveyard", hand: true }, spellOnly: true, noTargets: true },
   { re: "~ was cast using teamwork", cond: { kind: "teamwork" }, spellOnly: true },
   // Addendum (CR 207.2c). Its targets are chosen whenever it's cast; they're only not acted on (Return to Dust rulings).
   { re: "you cast ~ during your main phase", cond: { kind: "castInMain" }, spellOnly: true, ungated: true },

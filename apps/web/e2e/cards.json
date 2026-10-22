@@ -2343,6 +2343,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "cc187110-1148-4090-bbb8-e205694a39f5",
+  "name": "Counterspell",
+  "manaCost": "{U}{U}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Counter target spell.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ema",
+  "releasedAt": "2016-06-10",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "46779609-4fa7-4fd2-b5b4-7d4d749339e6",
   "name": "Courser of Kruphix",
   "manaCost": "{1}{G}{G}",
@@ -2931,6 +2957,32 @@
   "set": "dom",
   "releasedAt": "2018-04-27",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "59e7f2ae-4535-4191-98be-3e65b6b2befa",
+  "name": "Doom Blade",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Destroy target nonblack creature.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -6366,6 +6418,34 @@
   "set": "sld",
   "releasedAt": "2024-09-30",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "3f8e7a45-4c6e-4ee6-93d0-b7de9715ec97",
+  "name": "Lim-Dûl's Vault",
+  "manaCost": "{U}{B}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Look at the top five cards of your library. As many times as you choose, you may pay 1 life, put those cards on the bottom of your library in any order, then look at the top five cards of your library. Then shuffle and put the last cards you looked at this way on top in any order.",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "slc",
+  "releasedAt": "2022-11-01",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -11804,6 +11884,38 @@
   "set": "tdc",
   "releasedAt": "2025-04-11",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d6ffdaf0-ac08-4de9-bbce-2eab2f86bcca",
+  "name": "Wind Drake",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Drake",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Drake"
+  ],
+  "oracleText": "Flying",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "kld",
+  "releasedAt": "2016-09-30",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },

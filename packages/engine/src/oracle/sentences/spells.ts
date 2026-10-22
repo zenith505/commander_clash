@@ -275,6 +275,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Counterspells, maybe "unless its controller pays {2}" (CR 118.12)
   // "When you next cast an instant or sorcery spell this turn, copy that spell" (a delayed trigger, CR 603.7).
+  // "When you cast your next instant or sorcery spell this turn, ..." (Twinferno): the same.
+  if ((m = /^[Ww]hen you cast your next (.+? spell) this turn, (.+)$/.exec(s))) s = `When you next cast ${/^[aeiou]/.test(m[1]!) ? "an" : "a"} ${m[1]} this turn, ${m[2]}`;
   if ((m = /^[Ww]hen you next cast (an? .+?)( from your hand)? this turn, (.+?)(?:,? and you may choose new targets for the cop(?:y|ies))?$/.exec(s))) {
     const fromHand = !!m[2];
     m.splice(2, 1);

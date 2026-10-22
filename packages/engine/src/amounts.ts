@@ -249,6 +249,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.life, 0);
     case "experience":
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (s.players[pid]!.experience ?? 0), 0);
+    case "rad":
+      return (c.who ? refPlayers(s, c.who, ctx) : s.players.filter((p) => !p.lost).map((p) => p.id)).reduce((n, pid) => n + (s.players[pid]!.rad ?? 0), 0);
     case "speed":
       return s.players[ctx.controller]?.speed ?? 0; // CR 702.179f
     case "punished":
@@ -299,6 +301,12 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.rolled?.other ?? 0;
     case "flipsWon":
       return s.resolving?.flipped?.wins ?? 0;
+    case "drawnThisWay":
+      return s.resolving?.drawnBefore?.length ?? 0;
+    case "asCast":
+      return s.resolving?.item.asCast ?? evalCount(s, c.of, ctx);
+    case "discardedTypes":
+      return new Set((s.resolving?.discardedAll ?? []).flatMap((id) => (s.objects[id] ? defOf(s, s.objects[id]!).types : []))).size;
     case "snowSpent":
       return snowSpent(ctx.spent);
     case "players":
@@ -604,6 +612,8 @@ function describeCount(c: Count): string {
       return "life";
     case "experience":
       return "experience counters";
+    case "rad":
+      return "rad counters";
     case "speed":
       return "speed";
     case "punished":
@@ -677,6 +687,12 @@ function describeCount(c: Count): string {
       return "the result";
     case "rollOther":
       return "the other result";
+    case "drawnThisWay":
+      return "#cards drawn this way";
+    case "asCast":
+      return `${describeCount(c.of)} as cast`;
+    case "discardedTypes":
+      return "#card types discarded";
     case "flipsWon":
       return "flips won";
     case "mutations":

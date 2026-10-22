@@ -18,6 +18,21 @@ import { emblemAbilityOk } from "../grants";
 export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | undefined {
   let m: RegExpExecArray | null;
 
+  // Rad counters (CR 728): "target player gets two rad counters", "each player gets X", "that player gets twice that many"
+  // (twice X), "each opponent gets a number of rad counters equal to its power", "you get half X rad counters, rounded up".
+  if ((m = /^(.+?) gets? half X rad counters, rounded (up|down)$/.exec(s))) {
+    const who = parsePlayer(m[1]!.replace(/^[A-Z]/, (c) => c.toLowerCase()), ctx);
+    return who && [{ type: "getRad", who, n: { count: { kind: "x" }, half: m[2] as "up" | "down" } }];
+  }
+  if ((m = new RegExp(`^(.+?) gets? (?:(twice) )?(?:${NUMX}|(a number of)) rad counters?(?: equal to (.+))?$`).exec(s))) {
+    const who = parsePlayer(m[1]!.replace(/^[A-Z]/, (c) => c.toLowerCase()), ctx);
+    if (!who || !!m[4] !== !!m[5]) return null;
+    let n: Amount | null = m[5] ? parseCount(m[5], ctx) : /^an?$/.test(m[3]!) ? 1 : amt(m[3]!);
+    if (n === null) return null;
+    if (m[2]) n = typeof n === "number" ? 2 * n : { ...n, times: 2 * (n.times ?? 1) };
+    return [{ type: "getRad", who, n }];
+  }
+
   // "You get an emblem with "..."", "Each opponent gets an emblem with ...", "Target opponent gets ..." (CR 114.2), one
   // or more quoted abilities ('with "..." and "..."'). "This emblem" in them is the emblem; a quoted ability inside one
   // is in single quotes ("Mountains you control have '{T}: This land deals 1 damage to any target.'").

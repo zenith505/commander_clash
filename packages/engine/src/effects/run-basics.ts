@@ -1,7 +1,7 @@
 import type { DamageRecipient, Effect, PlayerRef } from "../abilities";
 import { putPlayerCounters } from "../counters";
-import { cardIdOf, defOf, objHasKeyword, objIsType, power, toughness } from "../cards";
-import { addPhases, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, livingPlayers, log, loseLife, obj, player, playerLoses, winGame } from "../game";
+import { cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
+import { addPhases, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, livingPlayers, log, loseLife, millCount, moveObject, obj, player, playerLoses, winGame } from "../game";
 import { MONARCH } from "../oracle";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { cardSource, dealDamage, dealDamageBatch, dealPlanned, excessOver, lethalAmounts, objectSource, planShields, type DamageEvent, type DamageSource } from "../damage";
@@ -248,6 +248,12 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (e.exileInstead) log(s, `${src}: cards that would be put into ${player(s, ctx.controller).name}'s graveyard this turn are exiled instead.`);
       return;
     }
+    case "topTurn": {
+      const list = (s.topTurn = (s.topTurn ?? []).filter((g) => g.turn === s.turn));
+      list.push({ player: ctx.controller, turn: s.turn, top: e.top, source: src });
+      log(s, `${player(s, ctx.controller).name} may look at the top card of their library any time and play cards from the top of their library this turn${e.top.payLife ? ", paying life rather than mana costs for spells" : ""} (${src}).`);
+      return;
+    }
     case "graveyardCastThisTurn":
       (s.graveGrants ??= []).push({ key: `grant${s.nextId++}`, player: ctx.controller, turn: s.turn, filter: e.filter, source: src });
       log(s, `${player(s, ctx.controller).name} may cast a ${e.filter.text.replace(/ card$/, "")} spell from their graveyard this turn (${src}).`);
@@ -348,17 +354,18 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "loseAllCounters":
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
-        if (!p.poison && !p.energy && !p.experience) continue;
+        if (!p.poison && !p.energy && !p.experience && !p.rad) continue;
         p.poison = 0;
         p.energy = 0;
         p.experience = 0;
+        p.rad = 0;
         log(s, `${p.name} loses all counters.`);
       }
       return;
     case "doublePlayerCounters":
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
-        for (const kind of ["poison", "energy", "experience"] as const) {
+        for (const kind of ["poison", "energy", "experience", "rad"] as const) {
           const n = p[kind] ?? 0;
           if (n <= 0) continue;
           const put = putPlayerCounters(s, pid, kind, n);
@@ -384,6 +391,31 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${p.name} gets ${"{E}".repeat(Math.min(n, 10))}${n > 10 ? ` (${n})` : ""}.`);
       }
       return;
+    case "getRad":
+      for (const pid of players(s, e.who, ctx)) {
+        const n = putPlayerCounters(s, pid, "rad", amountNow(s, e.n, { ...ctx, eachOne: pid }));
+        if (n > 0) log(s, `${player(s, pid).name} gets ${n === 1 ? "a rad counter" : `${n} rad counters`}.`);
+      }
+      return;
+    case "radiation": {
+      // CR 728.1: "if that player has one or more rad counters" (checked again now, CR 603.4), they mill that many; for each
+      // nonland card milled this way, they lose 1 life and remove a rad counter.
+      const p = player(s, ctx.controller);
+      const n = millCount(s, p.id, p.rad ?? 0);
+      if (n <= 0) return;
+      const milled: ObjectId[] = [];
+      for (const id of p.library.slice(0, n)) {
+        moveObject(s, id, "graveyard");
+        if (obj(s, id).zone === "graveyard") milled.push(id);
+      }
+      const k = milled.filter((id) => !isType(defOf(s, obj(s, id)), "Land")).length;
+      log(s, `${p.name} mills ${n} card${n === 1 ? "" : "s"} from radiation${k ? `, ${k} of them nonland` : ""}.`);
+      if (!k) return;
+      loseLife(s, p.id, k);
+      p.rad = Math.max(0, (p.rad ?? 0) - k);
+      log(s, `${p.name} removes ${k === 1 ? "a rad counter" : `${k} rad counters`}.`);
+      return;
+    }
     case "getExperience":
       for (const pid of players(s, e.who, ctx)) {
         const n = putPlayerCounters(s, pid, "experience", amountNow(s, e.n, ctx));

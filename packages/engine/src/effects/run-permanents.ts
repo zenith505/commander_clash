@@ -104,7 +104,10 @@ export function proliferate(s: GameState, you: PlayerId, src: string): ObjectId[
     if (p.id === you) {
       if (p.energy) putPlayerCounters(s, p.id, "energy", 1), names.push(`${p.name} (energy)`);
       if (p.experience) putPlayerCounters(s, p.id, "experience", 1), names.push(`${p.name} (experience)`);
-    } else if (p.poison) putPlayerCounters(s, p.id, "poison", 1), names.push(`${p.name} (poison)`);
+    } else {
+      if (p.poison) putPlayerCounters(s, p.id, "poison", 1), names.push(`${p.name} (poison)`);
+      if (p.rad) putPlayerCounters(s, p.id, "rad", 1), names.push(`${p.name} (rad)`);
+    }
   }
   log(s, `${src}: ${player(s, you).name} proliferates${names.length ? ` (${names.join(", ")})` : ""}.`);
   fireEvent(s, { type: "proliferated", player: you });

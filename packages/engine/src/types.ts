@@ -1,4 +1,4 @@
-import type { AbilityBody, Affects, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CostMod, NamePurpose, CounterKind, DamageMod, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec, TokenSpec, ManaTrigger, TriggeredAbility, TriggerDuration, SpentFor } from "./abilities";
+import type { AbilityBody, Affects, FromTop, AltCostKind, DamageRuleSpec, ManaSpend, CastFromGraveyardKind, ChoiceKind, CostMod, NamePurpose, CounterKind, DamageMod, EntersOption, Modification, PayCost, PickAction, PunisherOption, StaticCondition, TargetChoice, TargetSpec, TokenSpec, ManaTrigger, TriggeredAbility, TriggerDuration, SpentFor } from "./abilities";
 import type { DamageEvent } from "./damage";
 import type { Characteristics } from "./layers";
 
@@ -506,6 +506,8 @@ export interface GameObject {
   miracleRevealed?: { turn: number; zc: number };
   /** A spell cast for its overload cost (CR 702.96a): "target" in its text is "each" while it's on the stack. */
   overloaded?: true;
+  /** A spell cast for its cleave cost (CR 702.148a): the words in square brackets are gone from its text on the stack. */
+  cleaved?: true;
   /**
    * The card this champion exiled (CR 702.72a), as it is in exile, and the champion's zoneChanges on the battlefield
    * then: its leaves-the-battlefield trigger returns it only if that's the permanent that left (CR 607.2a).
@@ -643,6 +645,8 @@ export interface Player {
   energy?: number;
   /** Experience counters (CR 122.1; Meren of Clan Nel Toth). */
   experience?: number;
+  /** Rad counters (CR 728): each of their precombat main phases, a triggered ability mills that many. */
+  rad?: number;
   /** The turns this player's current and previous upkeeps began, for echo's "since the beginning of your last upkeep" (CR 702.30a). */
   upkeepTurn?: number;
   lastUpkeepTurn?: number;
@@ -757,6 +761,8 @@ export interface StackItem {
    * the stack by the time something asks (a countered spell's cascade uses its last known information, CR 113.7a).
    */
   castMv?: number;
+  /** An amount "as you cast this spell" (Count asCast), counted as it became cast (rulings on Lifestream's Blessing). */
+  asCast?: number;
   /** Kicker costs paid (CR 702.33d), for a spell or its permanent's enters trigger. */
   kicked?: number[];
   /** For its permanent's enters trigger: how many colors of mana were spent to cast it (converge, CR 207.2c). */
@@ -1453,6 +1459,11 @@ export interface GameState {
    * Cellar): what `player` may do with their graveyard during `turn` (Effect graveyardTurn).
    */
   graveyardTurn?: { player: PlayerId; turn: number; cast?: TargetSpec; lands?: true; exileInstead?: true; /** From any graveyard, not only `player`'s (The Great Work). */ anyGraveyard?: true; exileCast?: true; source: string }[];
+  /**
+   * "Until end of turn, you may look at the top card of your library any time and you may play cards from the top of
+   * your library" (Gwenom, Remorseless; Effect topTurn): `player` may, during `turn`, as a permanent's FromTop lets them.
+   */
+  topTurn?: { player: PlayerId; turn: number; top: FromTop; source: string }[];
   handOnlyUntil?: { controller: PlayerId; source: string }[];
   /** The turn a "damage can't be prevented this turn" effect was made in (CR 615.12). */
   noPreventionTurn?: number;
@@ -1887,6 +1898,8 @@ export interface Resolving {
     flickered?: { id: ObjectId; zc: number }[]; // cards a flicker exiled, to return once Auras' hosts are chosen
     /** A delayed "return the exiled card" waiting on an Aura's host: the cards it returns (Phelia's "if it entered under your control"). */
     returning?: { id: ObjectId; zc: number }[];
+    /** returnHeld paused for an Aura's host: the cards it returns. */
+    returningHeld?: { id: ObjectId; zc: number }[];
     playLinked?: true; // "you may play the exiled card" (or cast the cipher copy) was asked
     cipherCopy?: ObjectId; // the copy of an encoded card offered to cast (CR 702.99a)
     looked?: ObjectId[]; // the top cards a "look at the top N" effect is choosing from

@@ -699,6 +699,12 @@ export function parseTargetPhrase(
     extra.colorCount = two[1] ? "notTwo" : "two";
     p = p.slice(0, two.index) + p.slice(two.index + two[0].length);
   }
+  // "Spell that wasn't cast from its owner's hand" (Wash Away): a copy was never cast (rulings).
+  const notFromHand = / that wasn't cast from its owner's hand$/.exec(p);
+  if (notFromHand) {
+    extra.notCastFromHand = true;
+    p = p.slice(0, notFromHand.index);
+  }
   // "Historic spells", "a historic permanent": artifacts, legendaries and Sagas (CR 700.6), any of them (TargetSpec.anyOf).
   if (/(?:^|\s)historic\s/.test(p)) {
     if (extra.anyOf || / or |, /.test(p)) return null;
@@ -1079,7 +1085,7 @@ export function parseTargetPhrase(
     if (isSpell || tapped !== undefined || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status) return null;
     return { kind: "card", ...filters, ...(otherThanBasic ? { notSupertypes: [...(filters.notSupertypes ?? []), "Basic"] } : {}), ...(owner ? { owner } : {}), ...(linkedExile ? { linkedExile: true as const } : {}), text };
   }
-  if (otherThanBasic) return null;
+  if (otherThanBasic || (extra.notCastFromHand && !isSpell)) return null;
   if (owner && (isSpell || controller)) return null;
   // A historic spell, a legendary spell: its printed card types, supertypes and subtypes (printedMatches), which the stack
   // doesn't change. Only "legendary" among supertypes.

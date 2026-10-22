@@ -1,5 +1,5 @@
 import { kickerName } from "./abilities";
-import type { AbilityBody, ActivatedAbility, AdditionalCost, ManaAbility, AltCostKind, ChoiceKind, CounterKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersChoice, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
+import type { AbilityBody, ActivatedAbility, Count, AdditionalCost, ManaAbility, AltCostKind, ChoiceKind, CounterKind, CastFromGraveyard, CastFromGraveyardKind, CompiledCard, EntersChoice, EntersCondition, EntersOption, Modification, TargetChoice, TargetSpec } from "./abilities";
 import { mergeSpell } from "./mutate";
 import { battleSBAs, isSiege, protectorOptions, setProtector } from "./battles";
 import { joinMeld } from "./meld";
@@ -9,7 +9,7 @@ import { asFace, castableFaces, defMv, hasName, isRoom, landFaces, layoutOf, reg
 import { checkDayNight, dayNightUntapCheck } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
-import { abilitiesOf, canBeSacrificed, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
+import { abilitiesOf, canBeSacrificed, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
 import { bindBound, pickOptions, playerProtectedFrom, spellManaValue, targetsMatch } from "./effects/targeting";
@@ -820,6 +820,7 @@ export function moveObject(
     o.mutating = undefined; // so is a mutating creature spell (CR 702.140a-b)
     o.prototyped = undefined; // only on the stack and the battlefield (CR 718.4)
     o.overloaded = undefined; // the text change lasts while it's a spell (CR 702.96a)
+    o.cleaved = undefined; // so does cleave's (CR 702.148a)
     o.suspendHaste = undefined; // suspend's haste is the spell's and the permanent's it becomes (CR 702.62a)
     // The face up on the stack stays up as it resolves into a permanent (CR 712.13); anywhere else it's a new object.
     o.face = undefined;
@@ -2676,12 +2677,14 @@ function finishCleanup(s: GameState) {
   s.floatingTriggers = s.floatingTriggers?.filter((f) => !(f.until === "endOfTurn" || (f.until === "endOfYourNextTurn" && s.activePlayer === f.controller && s.turn > f.turn)));
   if (!s.floatingTriggers?.length) s.floatingTriggers = undefined;
   s.flashbackGrants = undefined;
+  s.topTurn = undefined; // Gwenom's "until end of turn" (CR 514.2)
   s.manaTriggersThisTurn = undefined;
   endCopyEffects(s, (e) => e.until === "endOfTurn");
   invalidateCharacteristics(s);
   for (const id of [...s.battlefield, ...(s.phasedOut ?? [])]) {
     const o = obj(s, id);
-    o.damage = 0; // CR 514.2, phased-out permanents too
+    // CR 514.2, phased-out permanents too; not from a permanent whose damage isn't removed (Ancient Adamantoise).
+    if (!(o.zone === "battlefield" && abilitiesOf(s, o).keepsDamage)) o.damage = 0;
     o.damagedBy = undefined;
     o.wasDealtDamage = undefined;
     o.deathtouchDamage = false;
@@ -3131,10 +3134,16 @@ export function mayPlayFromTop(s: GameState, o: GameObject, pid: PlayerId, way?:
  * The permanent whose permission lets `pid` play `o` from the top of their library: one without "once each turn" if
  * there is one, so a once-a-turn permission is kept for later (Johann). "Of the chosen type" is the permanent's choice.
  */
-function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" | "life"): { by: GameObject; once?: true } | undefined {
+function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" | "life"): { by?: GameObject; once?: true } | undefined {
   if (o.zone !== "library" || o.owner !== pid || player(s, pid).library[0] !== o.id) return undefined;
   const d = defOf(s, o);
   const land = isType(d, "Land");
+  // A resolved effect's, for the rest of the turn (Gwenom).
+  for (const g of s.topTurn ?? []) {
+    const top = g.top;
+    if (g.player !== pid || g.turn !== s.turn || (!land && way && !!top.payLife !== (way === "life"))) continue;
+    if (land ? top.lands && (!top.landFilter || printedMatches(top.landFilter, d)) : top.spells === "any" || !!top.spells?.some((f) => printedMatches(f, d))) return {};
+  }
   let once: GameObject | undefined;
   for (const id of s.battlefield) {
     const src = obj(s, id);
@@ -3154,6 +3163,7 @@ function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" 
 export function topVisible(s: GameState, pid: PlayerId, viewer: PlayerId): boolean {
   return (
     topRevealed(s, pid) ||
+    (pid === viewer && !!s.topTurn?.some((g) => g.player === pid && g.turn === s.turn)) ||
     (pid === viewer &&
       s.battlefield.some((id) => {
         const a = controllerOf(s, obj(s, id)) === pid ? abilitiesOf(s, obj(s, id)) : undefined;
@@ -3452,6 +3462,16 @@ export function castProblem(
       return castProblem(s, pid, id, targets, modes, convoke, improvise, x, choices);
     } finally {
       o.prototyped = undefined;
+    }
+  }
+  if (choices?.alt === "cleave" && !o.cleaved) {
+    // Cast for its cleave cost, the words in square brackets are gone from the moment it's proposed (CR 702.148a, 601.2b).
+    if (!altCost(defOf(s, o), "cleave")) return `${defOf(s, o).name} doesn't have cleave`;
+    o.cleaved = true;
+    try {
+      return castProblem(s, pid, id, targets, modes, convoke, improvise, x, choices);
+    } finally {
+      o.cleaved = undefined;
     }
   }
   if (choices?.alt === "overload" && !o.overloaded) {
@@ -3999,7 +4019,9 @@ const controlsPayWUBRG = (s: GameState, pid: PlayerId, what: "payWUBRG" | "castF
     if (!compileCard(defOf(s, o))[what]) return false;
     const c = characteristics(s, o);
     return c.controller === pid && c.hasPrintedAbilities;
-  });
+  }) ||
+  // Tamiyo, Field Researcher's emblem (CR 114.4).
+  (what === "castFromHandFree" && liveEmblems(s).some((e) => e.controller === pid && compileCard(defOf(s, e)).castFromHandFree));
 
 /**
  * Conspiracy Unraveler's "You may collect evidence 10 rather than pay the mana cost for spells you cast": the N, the
@@ -4030,6 +4052,7 @@ export function payZeroSource(s: GameState, pid: PlayerId, o: GameObject): GameO
     if (!z || controllerOf(s, p) !== pid || !characteristics(s, p).hasPrintedAbilities) return false;
     if (z.once && used.includes(`${p.id}@${p.zoneChanges ?? 0}`)) return false;
     if (z.fromHand && o.zone !== "hand") return false;
+    if (z.fromExile && o.zone !== "exile") return false;
     if (z.yourTurn && s.activePlayer !== pid) return false;
     if (z.fromHandOrTop && o.zone !== "hand" && !(o.zone === "library" && player(s, pid).library[0] === o.id)) return false;
     if (z.filter && !printedMatches(z.filter, d)) return false;
@@ -4101,7 +4124,7 @@ const ALL_PAID: CastHow = { kicks: [0, 1], bargained: true, teamwork: true, gift
  * an overloaded cast, its "each" text (702.96a).
  */
 export const castDef = (s: GameState, id: ObjectId, alt?: AltCostKind): CardDef =>
-  alt === "mutate" && !obj(s, id).mutating ? mutatingDef(defOf(s, obj(s, id)), obj(s, id).owner) : alt === "bestow" ? bestowedDef(defOf(s, obj(s, id))) : alt === "prototype" ? prototypedDef(defOf(s, obj(s, id))) : alt === "overload" && !obj(s, id).overloaded ? overloadedDef(defOf(s, obj(s, id))) : defOf(s, obj(s, id));
+  alt === "mutate" && !obj(s, id).mutating ? mutatingDef(defOf(s, obj(s, id)), obj(s, id).owner) : alt === "bestow" ? bestowedDef(defOf(s, obj(s, id))) : alt === "prototype" ? prototypedDef(defOf(s, obj(s, id))) : alt === "overload" && !obj(s, id).overloaded ? overloadedDef(defOf(s, obj(s, id))) : alt === "cleave" && !obj(s, id).cleaved ? cleavedDef(defOf(s, obj(s, id))) : defOf(s, obj(s, id));
 
 /**
  * "You may cast sorcery spells as though they had flash" (Hypersonic Dragon), "... spells ..." (Vedalken Orrery): a
@@ -4147,6 +4170,11 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     const problem = castProblem(s, p.id, id, targets, modes, convoke, improvise, x, choices);
     if (problem) throw new RulesError(problem);
     o.overloaded = true; // CR 702.96a
+  }
+  if (choices.alt === "cleave" && !o.cleaved) {
+    const problem = castProblem(s, p.id, id, targets, modes, convoke, improvise, x, choices);
+    if (problem) throw new RulesError(problem);
+    o.cleaved = true; // CR 702.148a
   }
   if (choices.alt === "mutate" && !o.mutating) {
     const problem = castProblem(s, p.id, id, targets, modes, convoke, improvise, x, choices);
@@ -4247,7 +4275,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // A once-a-turn permission to cast from the top is used up (Johann).
   if (castFrom === "library") {
     const how = topPermission(s, o, p.id);
-    if (how?.once) how.by.topUsedTurn = s.turn;
+    if (how?.once && how.by) how.by.topUsedTurn = s.turn;
   }
   const via = graveyardWay(s, o, choices.via, p.id);
   // A once-each-turn permission is used up (Karador; Muldrotha's slot for one of the spell's types).
@@ -4386,6 +4414,10 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     log(s, `${p.name} promises ${player(s, choices.gift).name} a gift (${compileCard(d).gift!.what}).`);
     o.gift = choices.gift;
   }
+  // "Where X is ... as you cast this spell": counted now, as it becomes cast (rulings on Lifestream's Blessing); a copy
+  // copies it (CR 707.10).
+  const asCast = findAsCast(compileCard(d).spell);
+  if (asCast) item.asCast = evalAmount(s, { count: asCast.of }, { controller: p.id, sourceId: o.id });
   // Storm counts the spells cast before it (CR 702.40a); a copy of it made later copies it as it was cast (707.10).
   item.castNth = s.spellsCastThisTurn ?? 0;
   s.spellsCastThisTurn = item.castNth + 1;
@@ -8339,3 +8371,14 @@ export function availableMana(s: GameState, pid: PlayerId): number {
   return n;
 }
 
+
+/** The first "as you cast this spell" count in a spell's text (Count asCast), if any. */
+function findAsCast(x: unknown): { kind: "asCast"; of: Count } | undefined {
+  if (!x || typeof x !== "object") return undefined;
+  if ((x as { kind?: string }).kind === "asCast") return x as { kind: "asCast"; of: Count };
+  for (const v of Object.values(x)) {
+    const f = findAsCast(v);
+    if (f) return f;
+  }
+  return undefined;
+}

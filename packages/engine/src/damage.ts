@@ -323,6 +323,23 @@ function staticRules(s: GameState, events: DamageEvent[]): DamageRule[] {
     // The Mindskinner: "If a source you control would deal damage to an opponent, prevent that damage and each opponent
     // mills that many cards."
     if (abilitiesOf(s, cover).damageToOpponentsMills) out.push({ id: `static-mill:${id}`, turn: s.turn, controller: controllerOf(s, cover), cardId: cover.cardId, to: { players: "opponents" }, sourceYours: true, mill: true });
+    // Pariah, Palisade Giant (CR 614.9): all damage that would be dealt to its controller (and their other permanents) is
+    // dealt to it or the creature it's attached to instead. Several of them: the player being dealt the damage chooses
+    // which applies (CR 616.1, rulings on Palisade Giant).
+    const red = abilitiesOf(s, cover).damageToYouRedirect;
+    const dest = red ? (red.to === "self" ? cover : cover.attachedTo ? s.objects[cover.attachedTo] : undefined) : undefined;
+    if (red && dest && !(red.untapped && cover.tapped)) {
+      const you = controllerOf(s, cover);
+      out.push({
+        id: `static-redirect:${id}`,
+        turn: s.turn,
+        controller: you,
+        cardId: cover.cardId,
+        to: { players: "you", ...(red.others ? { objects: { kind: "object", types: [], controller: "you", text: "permanent you control" } } : {}) },
+        redirect: { object: dest.id, zc: dest.zoneChanges ?? 0 },
+        ...(red.by ? { by: { filter: red.by } } : {}),
+      });
+    }
     const n = abilitiesOf(s, cover).preventCombatFromEach;
     if (n === undefined) continue;
     const you = controllerOf(s, cover);
@@ -346,6 +363,8 @@ const cardName = (s: GameState, r: DamageRule) => s.cards[r.cardId]?.name ?? "a 
 function ruleCovers(s: GameState, r: DamageRule, to: Rec): boolean {
   const t = r.to;
   if (!t) return true;
+  // "You and other permanents you control": not the permanent the damage is dealt to instead.
+  if (r.redirect && "object" in r.redirect && "object" in to && r.redirect.object === to.object) return false;
   if ("player" in to) return t.player === to.player || t.players === "all" || (t.players === "you" && to.player === r.controller) || (t.players === "opponents" && to.player !== r.controller);
   const o = s.objects[to.object];
   if (!o || o.zone !== "battlefield") return false;

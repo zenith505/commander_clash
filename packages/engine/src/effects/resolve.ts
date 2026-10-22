@@ -656,6 +656,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "opponentsHandOnlyUntilNextTurn":
     case "graveyardCastThisTurn":
     case "graveyardTurn":
+    case "topTurn":
     case "cantCast":
     case "cantPlayLands":
     case "noPrevention":
@@ -665,6 +666,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "drawUpTo":
     case "getEnergy":
     case "getExperience":
+    case "getRad":
+    case "radiation":
     case "poison":
     case "loseAllCounters":
     case "doublePlayerCounters":
@@ -742,6 +745,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "returnFaceDownExiled":
     case "exiledToGraveyard":
     case "flicker":
+    case "returnHeld":
     case "returnExiled":
     case "exileIfDies":
     case "exileIfLeaves":

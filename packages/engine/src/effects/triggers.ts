@@ -14,7 +14,7 @@ import { evalAmount } from "../amounts";
 import { objectMatches, bindBound, bindChosen, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, hasLegalTargets, legalModes, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
 import { monarchTrigger } from "./run-basics";
 import { initiativeTrigger } from "./run-dungeons";
-import { INITIATIVE } from "../oracle";
+import { INITIATIVE, RAD } from "../oracle";
 import { isRingBearer, ringTrigger } from "./run-ring";
 import { kickedMatches } from "./run-spells";
 import { hasSuspend, isSuspended } from "./run-zones";
@@ -1034,7 +1034,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           const at = ev.ids.filter((x) => attackingYouNow(s, x, you, !!t.attacksYou!.orPlaneswalkers));
           if (at.length < t.attacksYou.min) continue;
           const group = at.map((x) => ({ id: x, zc: obj(s, x).zoneChanges ?? 0 }));
-          const info = { player: ev.controller, group, ...(t.attacksYou.recheck ? { attackingYou: { you, min: t.attacksYou.min, orPlaneswalkers: true as const } } : {}) };
+          const info = { player: ev.controller, group, amount: at.length, ...(t.attacksYou.recheck ? { attackingYou: { you, min: t.attacksYou.min, orPlaneswalkers: true as const } } : {}) };
           add(o, you, (e, tt) => e === "opponentAttacksYou" && tt.body.text === t.body.text, undefined, undefined, undefined, undefined, undefined, undefined, info);
         }
       }
@@ -1097,6 +1097,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (o?.zone === "battlefield") {
       add(o, controllerOf(s, o), (e) => e === "selfDealsDamage" || (ev.combat && e === "selfDealsCombatDamage"), undefined, undefined, undefined, undefined, undefined, undefined, { amount: ev.amount });
       addHosted(o, (e) => e === "selfDealsDamage" || (ev.combat && e === "selfDealsCombatDamage"), undefined, o, { amount: ev.amount });
+      // "Until your next turn, whenever either of those creatures deals combat damage" (Tamiyo, Field Researcher).
+      if (ev.combat) fromFloating((src, ctrl, triggers) => add(src, ctrl, (e) => e === "selfDealsCombatDamage", triggers, undefined, undefined, undefined, undefined, undefined, { amount: ev.amount }), o);
       // "Whenever a creature you control deals combat damage" (Quilled Greatwurm): the creature is the subject.
       const dealerBy = controllerOf(s, o);
       if (ev.combat)
@@ -1513,6 +1515,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
     // "At the beginning of the monarch's end step, that player draws a card" (CR 725.2).
     if (ev.step === "end" && s.monarch === ev.active) monarchTrigger(s, 0);
+    // Rad counters (CR 728.1): at the beginning of a player's precombat main phase, if they have one or more.
+    if (ev.step === "main1" && (player(s, ev.active).rad ?? 0) > 0) {
+      s.cards[RAD.oracleId] ??= RAD;
+      s.triggerQueue.push({ sourceId: "", sourceCardId: RAD.oracleId, controller: ev.active, index: 0 });
+    }
     // "At the beginning of the upkeep of the player who has the initiative, that player ventures into Undercity" (CR 726.2).
     if (ev.step === "upkeep" && s.initiative === ev.active) initiativeTrigger(s, 0, ev.active);
     // Suspend's second ability works in exile (CR 702.62a): "At the beginning of your upkeep, if this card is

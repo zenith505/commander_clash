@@ -1368,7 +1368,21 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         sc.linkedPick = undefined;
         cards = cards.filter((c) => sc.found?.includes(c.id));
       }
+      if (e.filter) cards = cards.filter((c) => printedMatches(e.filter!, defOf(s, c)));
       if (!cards.length) return;
+      if (e.dest === "battlefield") {
+        // All at once (CR 608.2f), under this ability's controller's control.
+        log(s, `${p.name} puts ${cards.map((c) => defOf(s, c).name).join(", ")} onto the battlefield from exile (${src}).`);
+        const ids = cards.map((c) => c.id);
+        enterTogether(s, () => {
+          for (const c of cards) moveObject(s, c.id, "battlefield", { controller: p.id });
+        });
+        const now = ids.filter((id) => obj(s, id).zone === "battlefield");
+        if (e.gain && now.length) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: p.id, sourceName: src, duration: "game", affected: now, mods: [{ kind: "addKeywords", keywords: e.gain }] });
+        invalidateCharacteristics(s);
+        if (s.linkedExile?.[key]) s.linkedExile[key] = s.linkedExile[key]!.filter((l) => !ids.includes(l.id));
+        return;
+      }
       if (e.dest === "hand") log(s, `${p.name} puts ${cards.length === 1 ? "a card" : `${cards.length} cards`} exiled with ${src} into their hand.`);
       else log(s, `${cards.map((c) => defOf(s, c).name).join(", ")} ${cards.length === 1 ? "goes" : "go"} from exile to ${cards.length === 1 ? "its owner's graveyard" : "their owners' graveyards"} (${src}).`);
       for (const c of cards) moveObject(s, c.id, e.dest);
@@ -2041,6 +2055,40 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         invalidateCharacteristics(s);
       }
+      return;
+    }
+    case "returnHeld": {
+      const sc = (s.resolving!.scratch ??= {});
+      const list = sc.returningHeld ?? (s.resolving!.held ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc);
+      s.resolving!.held = undefined;
+      if (!list.length) return;
+      if (e.at) {
+        const first = s.objects[list[0]!.id]!;
+        const names = list.map((l) => defOf(s, s.objects[l.id]!).name).join(", ");
+        addDelayed(s, "nextEndStep", ctx.controller, first, {
+          targets: [],
+          effects: [{ type: "returnExiled", under: e.under, ...(list.length > 1 ? { cards: list } : {}) }],
+          text: `Return ${names} to the battlefield under ${e.under === "owner" ? (list.length > 1 ? "their owners'" : "its owner's") : "your"} control.`,
+        }, cardIdOf(first));
+        return;
+      }
+      const back = list.map((l) => s.objects[l.id]!).filter((o) => o.zone === "exile");
+      if (returnFromExile(s, back, (c) => (e.under === "owner" ? c.owner : ctx.controller), src) === "paused") {
+        sc.returningHeld = list;
+        return "paused";
+      }
+      sc.returningHeld = undefined;
+      if (!e.thenExile) return;
+      // "Then exile them again": the permanents those cards became (CR 400.7), held for the next instruction.
+      const held: { id: ObjectId; zc: number }[] = [];
+      for (const l of list) {
+        const o = s.objects[l.id];
+        if (!o || o.zone !== "battlefield" || (o.zoneChanges ?? 0) !== l.zc + 1) continue;
+        log(s, `${src} exiles ${defOf(s, o).name} again.`);
+        moveObject(s, o.id, "exile");
+        for (const n of newObjects(o)) if (!s.objects[n.id]?.isToken) held.push(n);
+      }
+      s.resolving!.held = held;
       return;
     }
     case "returnExiled": {

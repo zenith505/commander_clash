@@ -420,7 +420,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Counter target spell with mana value 4 or less", "... with mana value X" (Spell Blast: the X it's cast with).
   // "Counter up to one target creature spell" (Repel Intruders): none at all is fine too (CR 115.6).
   // "Counter target spell with the chosen name" (Declaration of Naught): the name chosen as its source entered.
-  if ((m = /^Counter (up to one )?target (.*?spell(?: with mana value (?:\d+|X)(?: or (?:less|greater))?| with the chosen name| with mana value less than or equal to the number of cards in its controller's graveyard)?(?: you don't control| an opponent controls)?)(?: unless its controller pays (.+))?$/i.exec(s))) {
+  // "Counter target spell that wasn't cast from its owner's hand" (Wash Away).
+  if ((m = /^Counter (up to one )?target (.*?spell(?: with mana value (?:\d+|X)(?: or (?:less|greater))?| with the chosen name| with mana value less than or equal to the number of cards in its controller's graveyard| that wasn't cast from its owner's hand)?(?: you don't control| an opponent controls)?)(?: unless its controller pays (.+))?$/i.exec(s))) {
     const spec = parseTargetPhrase(m[2]!, { x: true, chosen: !!ctx.activated && / with the chosen name\b/.test(m[2]!) });
     const unless = m[3] === undefined ? undefined : parseUnlessPays(m[3], ctx);
     // An ability's X: one announced for its cost (Kozilek, the Great Distortion; checked in oracle/activated.ts).

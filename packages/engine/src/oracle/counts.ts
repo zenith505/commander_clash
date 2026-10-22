@@ -186,6 +186,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Aclazotz: "Each opponent discards a card. For each opponent who can't, you draw a card": those with no card to discard.
   if (each && ctx?.opponentsDiscarded && /^opponent who can't$/i.test(p)) return count({ kind: "players", opponents: true, discardedNone: true });
   if (each && /^opponent who drew a card this way$/i.test(p)) return count({ kind: "players", opponents: true, drewThisWay: true });
+  // Kefka, Court Mage: "for each card type among cards discarded this way" (CR 205.2a: card types, not supertypes or subtypes).
+  if (each && /^card type among cards discarded this way$/i.test(p)) return count({ kind: "discardedTypes" });
+  // Struggle for Project Purity: "Each opponent draws a card. You draw a card for each card drawn this way."
+  if (each && /^card drawn this way$/i.test(p)) return count({ kind: "drawnThisWay" });
   // Smuggler's Share: "for each opponent who drew two or more cards this turn", "... who had two or more lands enter the
   // battlefield under their control this turn".
   if (each && (m = /^opponent who drew (two|three|four) or more cards this turn$/i.exec(p))) return count({ kind: "players", opponents: true, drewAtLeast: num(m[1]!) });

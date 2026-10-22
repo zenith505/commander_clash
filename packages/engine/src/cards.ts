@@ -1,6 +1,6 @@
 import type { CompiledCard, ManaAbility, TargetSpec, TriggeredAbility } from "./abilities";
 import { characteristics, offFieldColored, offFieldTyped, printedKeywords, type PTPart } from "./layers";
-import { compileCard, compileGranted, overloadedText } from "./oracle";
+import { cleavedText, compileCard, compileGranted, overloadedText } from "./oracle";
 import { COLORS, type CardDef, type Color, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
 import { manaValue, parseManaCost } from "./mana";
 import { faceKey, isRoom, registerFace, registerRoom, restingDef, roomKey, sameName } from "./faces";
@@ -125,7 +125,7 @@ export const ownDefOf = (s: GameState, o: GameObject): CardDef => {
   if (!found) throw new Error(`missing card def ${key}`);
   // A card with faces has its resting characteristics unless a face is up (CR 709.4, 712.8a, 715.4).
   const d = restingDef(found);
-  return o.bestowed ? bestowedDef(d) : o.prototyped ? prototypedDef(d) : o.overloaded ? overloadedDef(d) : o.mutating ? mutatingDef(d, o.owner) : d;
+  return o.bestowed ? bestowedDef(d) : o.prototyped ? prototypedDef(d) : o.overloaded ? overloadedDef(d) : o.cleaved ? cleavedDef(d) : o.mutating ? mutatingDef(d, o.owner) : d;
 };
 
 const mutatingDefs = new Map<string, CardDef>();
@@ -154,6 +154,17 @@ export function overloadedDef(d: CardDef): CardDef {
   if (hit) return hit;
   const out: CardDef = { ...d, oracleId: `${d.oracleId}|overloaded`, oracleText: overloadedText(d.oracleText) };
   overloaded.set(d.oracleId, out);
+  return out;
+}
+
+const cleaved = new Map<string, CardDef>();
+
+/** A spell cast for its cleave cost (CR 702.148a): its text without the words in square brackets. */
+export function cleavedDef(d: CardDef): CardDef {
+  const hit = cleaved.get(d.oracleId);
+  if (hit) return hit;
+  const out: CardDef = { ...d, oracleId: `${d.oracleId}|cleaved`, oracleText: cleavedText(d.oracleText) };
+  cleaved.set(d.oracleId, out);
   return out;
 }
 

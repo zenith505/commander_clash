@@ -649,6 +649,16 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (d?.type !== "damage" || typeof d.amount === "number" || d.amount.count.kind !== "x" || d.amount.plus || d.amount.times) return null;
     return [{ ...d, amount: { ...d.amount, times: m[2] === "twice" ? 2 : num(m[2]!.replace(/ times$/, "")) } }];
   }
+  // "~ deals damage to each player equal to twice the number of nonbasic lands that player controls" (Price of
+  // Progress): each player their own amount, all dealt at once (CR 120.3).
+  if ((m = /^~ deals damage to (each player|each opponent) equal to (twice )?the number of (.+)$/i.exec(s))) {
+    const to = parseDamageRecipient(m[1]!, ctx);
+    ctx.eachOne = true;
+    const c = parseCount(m[3]!, ctx);
+    ctx.eachOne = undefined;
+    if (!to || !c || typeof c !== "object" || !("count" in c) || c.times || !JSON.stringify(c).includes('"eachOne"')) return null;
+    return [{ type: "damage", amount: m[2] ? { ...c, times: 2 } : c, to }];
+  }
   // Damage: "~ deals 3 damage to any target"; "it deals that much damage to each other opponent" after "Whenever a
   // commander you control deals combat damage to an opponent" (Kediss): that creature deals it.
   const bySubject = ctx.subjectIt && !ctx.selfIt ? new RegExp(`^(?:it|that creature) deals ${NUMX} damage to (.+)$`, "i").exec(s) : null;

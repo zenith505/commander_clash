@@ -380,17 +380,20 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (spec?.kind !== "card" || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
     return [{ type: "returnAllFromGraveyard", who: { ref: "eachPlayer" }, filter: { ...spec, text: `${yours[1]} card` }, ...(yours[2] ? { tapped: true } : {}) }];
   }
-  if ((m = /^[Rr]eturn all (.+? cards(?: with mana value X or less)?) from (your graveyard|all graveyards) to the battlefield( tapped)?( under their owners' control)?$/.exec(s)) && (m[2] === "your graveyard") === !m[4]) {
-    m[1] = m[1]!.replace(/ cards( with mana value X or less)?$/, "$1");
+  // "Return all creature cards with mana value 2 or less from your graveyard to the battlefield" (Raise the Past).
+  if ((m = /^[Rr]eturn all (.+? cards(?: with mana value (?:X|\d+) or less)?) from (your graveyard|all graveyards) to the battlefield( tapped)?( under their owners' control)?$/.exec(s)) && (m[2] === "your graveyard") === !m[4]) {
+    m[1] = m[1]!.replace(/ cards( with mana value (?:X|\d+) or less)?$/, "$1");
     // "Return all creature and planeswalker cards with mana value X or less from your graveyard to the battlefield"
     // (Ascend from Avernus): the X it was cast with (TargetSpec.xRange).
     const kinds = m[1]!.replace(/,? and /g, " or ").replace(/, /g, " or ");
-    const withX = / with mana value X or less$/.exec(kinds);
+    const withN = / with mana value (\d+) or less$/.exec(kinds);
+    const withX = / with mana value X or less$/.exec(kinds) ?? withN;
     const words = withX ? kinds.slice(0, withX.index) : kinds;
-    const spec = parseTargetPhrase(`${words.split(/\s+/).map(singularWord).join(" ")} card${withX ? " with mana value X or less" : ""} from a graveyard`, { chosen: true, x: !!withX });
+    const spec = parseTargetPhrase(`${words.split(/\s+/).map(singularWord).join(" ")} card${withX ? ` with mana value ${withN ? withN[1] : "X"} or less` : ""} from a graveyard`, { chosen: true, x: !!withX && !withN });
+    if (withN && spec?.kind === "card" && spec.manaValue?.max !== Number(withN[1])) return null;
     if (spec?.kind !== "card" || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
-    if (withX && (spec.xRange?.key !== "manaValue" || spec.xRange.at !== "most" || !ctx.spell)) return null;
-    return [{ type: "returnAllFromGraveyard", who: { ref: m[4] ? "eachPlayer" : "you" }, filter: { ...spec, text: withX ? `${m[1]!.slice(0, -withX[0].length)} card with mana value X or less` : `${m[1]} card` }, ...(m[3] ? { tapped: true } : {}), ...(m[4] ? { owners: true as const } : {}) }];
+    if (withX && !withN && (spec.xRange?.key !== "manaValue" || spec.xRange.at !== "most" || !ctx.spell)) return null;
+    return [{ type: "returnAllFromGraveyard", who: { ref: m[4] ? "eachPlayer" : "you" }, filter: { ...spec, text: withX ? `${m[1]!.slice(0, -withX[0].length)} card${withX[0]}` : `${m[1]} card` }, ...(m[3] ? { tapped: true } : {}), ...(m[4] ? { owners: true as const } : {}) }];
   }
   // "Return all instant and sorcery cards from your graveyard to your hand" (Wisdom of Ages), "Return all cards from your
   // graveyard to your hand" (Praetor's Counsel), "Return all creature cards with power 2 or less from your graveyard to
@@ -549,6 +552,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const spec = ctx.targets[what.index];
     if (!spec || spec.kind !== "object") return null; // a permanent, not a spell or a card in a graveyard
     return [{ type: "putInLibrary", what, position: "ownersChoice" }];
+  }
+  // Aetherspouts: "For each attacking creature, its owner puts it on their choice of the top or bottom of their library":
+  // one at a time, each owner choosing for each of theirs (their order among them being the order they're put there).
+  if (/^For each attacking creature, its owner puts it on their choice of the top or bottom of their library$/.test(s)) {
+    const what = parseObject("each attacking creature", ctx);
+    return what?.ref === "each" ? [{ type: "putInLibrary", what, position: "ownersChoice" }] : null;
   }
   // "Put target creature into its owner's library second from the top" (Bury in Books), "third from the top" (Teferi,
   // Hero of Dominaria; Shattered Ego's "enchanted creature").

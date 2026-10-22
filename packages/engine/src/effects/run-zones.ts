@@ -1,7 +1,7 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType, objIsType, power } from "../cards";
 import { nameLandBan } from "../names";
-import { canPlayLandNow, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType } from "../game";
+import { freeCastable, canPlayLandNow, opponents, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, creatureTypesOf, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters, withPutter } from "../counters";
 import { manaValue } from "../mana";
@@ -761,7 +761,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (o.zone !== "graveyard" || done.includes(o.id)) continue;
         sc.castingTarget = o.id;
         s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src };
-        if (castProblem(s, ctx.controller, o.id) === null) return "paused";
+        if (freeCastable(s, ctx.controller, o.id)) return "paused";
         s.pending = null;
         sc.castingTarget = undefined;
         done.push(o.id);
@@ -779,7 +779,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (sc.may !== undefined) return; // asked already
       sc.may = false;
       s.pending = { kind: "castFree", player: p.id, objectId: o.id, source: src };
-      if (castProblem(s, p.id, o.id) === null) return "paused";
+      if (freeCastable(s, p.id, o.id)) return "paused";
       s.pending = null;
       log(s, `${src} can't be cast.`);
       return;
@@ -993,6 +993,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         st.casting = undefined;
       }
+      // "With mana value X or less", "the same mana value", what's left of a total: the spell as it's cast (a split
+      // card's half, a prototyped spell), checked as it's cast (CR 202.3, 709.3, 718.3b; rulings on Powerbalance).
+      const maxMv = st.maxMv === undefined ? st.budget : st.budget === undefined ? st.maxMv : Math.min(st.maxMv, st.budget);
+      const mv = maxMv === undefined && st.exactMv === undefined ? undefined : { ...(maxMv !== undefined ? { max: maxMv } : {}), ...(st.exactMv !== undefined ? { exact: st.exactMv } : {}) };
+      const freeCast = (id: ObjectId) => ({ kind: "castFree" as const, player: you.id, objectId: id, source: src, ...(mv ? { mv } : {}) });
       if (st.handPick) return finish();
       // Plargg and Nassari: an opponent chosen by you picks one of the nonland cards; the others may be cast (rulings).
       if (e.opponentExcludes && !st.excluded) {
@@ -1048,20 +1053,20 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           s.pending = { kind: "castFree", player: you.id, objectId: copy.id, source: src };
           return "paused";
         }
-        s.pending = { kind: "castFree", player: you.id, objectId: pick, source: src };
+        s.pending = freeCast(pick);
         return "paused";
       }
       const castable = (id: ObjectId) => {
-        s.pending = { kind: "castFree", player: you.id, objectId: id, source: src };
-        const problem = castProblem(s, you.id, id);
+        s.pending = freeCast(id);
+        const ok = freeCastable(s, you.id, id, true);
         s.pending = null;
-        return problem === null || /^not enough mana/.test(problem);
+        return ok;
       };
       const isLand = (id: ObjectId) => isType(defOf(s, obj(s, id)), "Land");
       const sharesType = (id: ObjectId) => s.battlefield.some((b) => controllerOf(s, obj(s, b)) === you.id && objIsType(s, obj(s, b), "Creature") && shareCreatureType(creatureTypesOf(s, obj(s, id)), creatureTypesOf(s, obj(s, b))));
       const options = st.ids
         .map((x) => x.id)
-        .filter((id) => exiled(id) && !st.declined.includes(id) && id !== st.excluded && (isLand(id) ? !!e.lands && canPlayLandNow(s, you.id, id) : (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (st.maxMv === undefined || mvOf(id) <= st.maxMv) && (st.exactMv === undefined || mvOf(id) === st.exactMv) && (st.budget === undefined || mvOf(id) <= st.budget) && (!st.hits || st.hits.includes(id)) && (!e.sharesTypeWithYours || sharesType(id)) && castable(id)));
+        .filter((id) => exiled(id) && !st.declined.includes(id) && id !== st.excluded && (isLand(id) ? !!e.lands && canPlayLandNow(s, you.id, id) : (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (!st.hits || st.hits.includes(id)) && (!e.sharesTypeWithYours || sharesType(id)) && castable(id)));
       if (!options.length || (e.max !== undefined && (st.cast ?? 0) >= e.max)) return finish();
       const left = st.budget !== undefined ? ` (total mana value ${st.budget} left)` : "";
       s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Done"], prompt: `${e.lands ? "play a land or " : ""}cast a spell from among the ${e.reveal ? "revealed" : "exiled"} cards without paying its mana cost${left}?` };
@@ -1116,7 +1121,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (sc.may !== undefined) return; // asked already
       sc.may = false;
       s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src, how: "suspend" };
-      if (castProblem(s, ctx.controller, o.id) === null) return "paused";
+      if (freeCastable(s, ctx.controller, o.id)) return "paused";
       s.pending = null;
       log(s, `${defOf(s, o).name} can't be cast; it stays in exile.`);
       return;
@@ -1199,6 +1204,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             const more = m.more && (!m.moreOpponents || card.owner !== ctx.controller) ? m.more : undefined;
             card.mayPlay = { player: card.owner, zc: card.zoneChanges ?? 0, until: m.until ?? "exiled", turn: s.turn, ...(m.play ? {} : { castOnly: true as const }), ...(m.free ? { free: true as const } : {}), ...(m.cost ? { cost: m.cost } : {}), ...(more ? { more } : {}) };
           }
+          // Mari, Tinybones: the counter goes on the card in exile (a token ceases to exist, CR 704.5d).
+          if (e.counters && !card.isToken) for (const [k, n] of Object.entries(e.counters)) card.counters[k] = (card.counters[k] ?? 0) + n;
           // Suspend: the card gets its time counters and suspend (CR 702.62); a token ceases to exist (CR 704.5d).
           if (e.suspend && !card.isToken) suspendExiled(s, card, e.suspend);
           // Hostage Taker: its controller may cast the card, not a token (rulings), for as long as it remains exiled.
@@ -1278,7 +1285,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           return "paused";
         }
         s.pending = { kind: "castFree", player: p.id, objectId: card.id, source: src };
-        if (castProblem(s, p.id, card.id) === null) return "paused";
+        if (freeCastable(s, p.id, card.id)) return "paused";
         s.pending = null;
         log(s, `${d.name} can't be cast.`);
         return;
@@ -2060,6 +2067,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "lookAtHand":
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
+        // One card chosen at random, seen only by the player looking.
+        if (e.atRandom) {
+          const id = p.hand.length ? p.hand[Math.floor(nextRandom(s) * p.hand.length)]! : undefined;
+          log(s, `${player(s, ctx.controller).name} looks at a card at random in ${p.name}'s hand.`);
+          if (id) log(s, `${p.name}'s card: ${defOf(s, obj(s, id)).name}.`, ctx.controller);
+          continue;
+        }
         const cards = p.hand.map((id) => defOf(s, obj(s, id)).name).join(", ") || "no cards";
         if (e.reveal) log(s, `${p.name} reveals their hand: ${cards}.`);
         else {

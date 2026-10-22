@@ -825,6 +825,9 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const n = parseCount(m[1]!, null);
     return n ? [{ kind: "setPT", power: n, toughness: n }] : null;
   }
+  // Aettir and Priwen: "has base power and toughness X/X, where X is your life total": the same, layer 7b (the "where X
+  // is" is read with the rest of the line).
+  if (/^(?:has|have) base power and toughness X\/X$/.test(rest)) return [{ kind: "setPT", power: { count: { kind: "x" } }, toughness: { count: { kind: "x" } } }];
   // Maha, Its Feathers Night: "have base toughness 1" (layer 7b, CR 613.4b).
   if ((m = /^(?:has|have) base toughness (\d+)$/.exec(rest))) return [{ kind: "setToughness", toughness: Number(m[1]) }];
   // Opalescence: "is a creature in addition to its other types and has base power and base toughness each equal to its

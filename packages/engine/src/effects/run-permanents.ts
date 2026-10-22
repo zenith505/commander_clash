@@ -9,6 +9,7 @@ import { setFace } from "../faces";
 import { becomePrepared } from "../prepare";
 import { objectMatches, playerProtectedFrom } from "./targeting";
 import { ResolveCtx, convokedFor, objects, amountNow, fixMods, players, runEffect } from "./resolve";
+import { exiledWithCounter } from "./run-choices";
 import { createExtraTokens, createToken } from "./run-tokens";
 import { discardCards } from "./run-library";
 import { describeMods } from "./describe";
@@ -1000,6 +1001,68 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         if (!o || o.zone !== "battlefield") continue;
         if (host) attachTo(s, o, host);
         else attachToPlayer(s, o, (t as { id: PlayerId }).id);
+      }
+      return;
+    }
+    case "doubleX": {
+      // Unbound Flourishing: the spell's X on the stack (CR 107.3a), doubled; gone from the stack, nothing happens.
+      const item = s.stack.find((x) => x.id === ctx.cause && x.kind === "spell");
+      if (!item) return;
+      const x = (item.x ?? 0) * 2;
+      item.x = x;
+      item.description = item.description.replace(/\(X=\d+\)$/, `(X=${x})`);
+      log(s, `${src} doubles the value of X for ${item.description.replace(/ \(X=\d+\)$/, "")}: X is ${x}.`);
+      return;
+    }
+    case "removeExiledCounter": {
+      const options = exiledWithCounter(s, players(s, e.owner, ctx), e.counter);
+      if (!options.length) return;
+      const sc = (s.resolving!.scratch ??= {});
+      const picked = (sc.auraHosts ??= {});
+      const key = "exiledCounter";
+      // Which card only matters when they have different numbers of them.
+      const counts = new Set(options.map((id) => obj(s, id).counters[e.counter]));
+      if (picked[key] === undefined) {
+        if (counts.size > 1) {
+          sc.auraAsking = key;
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "enchant", options, labels: options.map((id) => `${defOf(s, obj(s, id)).name} (${obj(s, id).counters[e.counter]})`), prompt: `remove a ${e.counter} counter from which card?` };
+          return "paused";
+        }
+        picked[key] = options[0]!;
+      }
+      const o = s.objects[picked[key]!];
+      if (!o || !options.includes(o.id)) return;
+      const left = (o.counters[e.counter] ?? 0) - 1;
+      if (left > 0) o.counters[e.counter] = left;
+      else delete o.counters[e.counter];
+      log(s, `${player(s, ctx.controller).name} removes a ${e.counter} counter from ${defOf(s, o).name} in exile.`);
+      return;
+    }
+    case "attachLastKnown": {
+      const host = objects(s, e.what, ctx).find((o) => o.zone === "battlefield");
+      if (!host) return;
+      // Still the same objects (CR 400.7), still Equipment, and able to be attached to it (CR 701.3b).
+      const options = (ctx.lki?.equipment ?? [])
+        .map((x) => s.objects[x.id])
+        .filter((o): o is GameObject => !!o && o.zone === "battlefield" && characteristics(s, o).subtypes.includes("Equipment") && canAttachTo(s, o, host))
+        .filter((o) => ctx.lki!.equipment!.some((x) => x.id === o.id && x.zc === (o.zoneChanges ?? 0)))
+        .map((o) => o.id);
+      if (!options.length) return;
+      const sc = (s.resolving!.scratch ??= {});
+      const picked = (sc.auraHosts ??= {});
+      const key = "lastKnownEquipment";
+      if (picked[key] === undefined) {
+        if (options.length > 1) {
+          sc.auraAsking = key;
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "enchant", options, labels: options.map((id) => defOf(s, obj(s, id)).name), prompt: `choose an Equipment to attach to ${defOf(s, host).name}` };
+          return "paused";
+        }
+        picked[key] = options[0]!;
+      }
+      const me = s.objects[picked[key]!];
+      if (me && options.includes(me.id)) {
+        attachTo(s, me, host);
+        log(s, `${defOf(s, me).name} is attached to ${defOf(s, host).name}.`);
       }
       return;
     }

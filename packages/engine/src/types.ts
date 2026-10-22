@@ -262,6 +262,8 @@ export interface GameObject {
    * over (CR 400.7), and one that just left the battlefield still remembers (see onceUsed).
    */
   triggeredThisTurn?: string[];
+  /** When counters were last put on it (turn, and its zoneChanges then): "for the first time each turn". */
+  countersPutAt?: { turn: number; zc: number };
   /**
    * "Choose one that hasn't been chosen [this turn]" (Demonic Pact, Gala Greeters): the modes chosen so far for each such
    * ability of this object, keyed by the ability's text, with the turn for "this turn". Any player's choices count, and a
@@ -565,6 +567,8 @@ export interface ManaLot {
   hasteType?: string;
   /** Opal Palace's "if you spend this mana to cast your commander": see ManaAbility.spentCommanderCounters. */
   commanderCounters?: true;
+  /** Boseiju, Who Shelters All: see ManaAbility.spentUncounterable. */
+  uncounterableInstantSorcery?: true;
   /** "Using mana produced by Tecutlan": the permanent that made it, "id#zoneChanges" (TriggeredAbility.cast.manaFromSelf). */
   source?: string;
 }
@@ -849,6 +853,9 @@ export interface PendingTrigger {
   sourceZc?: number; // the source's zoneChanges when it triggered
   modes?: number[]; // once chosen, for a modal trigger (CR 603.3c)
   cause?: string; // the stack item that triggered it, see StackItem.cause
+  /** Firebender Ascension: this trigger's tag, and the tag of the trigger whose stack item becomes `cause` once it's put on the stack. */
+  tag?: string;
+  causeTag?: string;
   /** The object the event was about, as it was then ("that creature" for exalted). */
   subject?: { id: ObjectId; zc: number };
   /** A delayed trigger: how many times its source had transformed when it was made (CR 701.27f). */
@@ -903,6 +910,8 @@ export interface LastKnown {
   legendary?: true;
   /** The player chosen for it as it entered ("the chosen player"), as it last existed. */
   chosenPlayer?: PlayerId;
+  /** The Equipment attached to it as it last existed (Zack Fair: "an Equipment that was attached to ~"). */
+  equipment?: { id: ObjectId; zc: number }[];
   /**
    * A merged permanent `of` that left the battlefield (an ability triggered by its leaving): the other cards it became
    * (CR 730.3c), which an effect finding the new object `of` finds too.
@@ -949,6 +958,8 @@ export interface CostChoices {
   casualty?: ObjectId;
   /** Cast with a once-each-turn graveyard permission (CastFromGraveyard.permits): which one (Muldrotha's slot for the spell). */
   permit?: string;
+  /** Aminatou's Augury: the nonland card type it's cast as, of its own (GameObject.mayPlay.byType); unset, `defaultByType`'s. */
+  asType?: string;
   /** The artifact, enchantment, or token sacrificed for bargain (CR 702.166a), if any. */
   bargain?: ObjectId;
   /** "As an additional cost to cast this spell, you may collect evidence N": the cards exiled for it, if it's paid (CR 701.59a). */
@@ -1059,7 +1070,7 @@ export type PendingDecision =
   | { kind: "assist"; player: PlayerId; caster: PlayerId; source: string; max: number; cast: Extract<Action, { type: "castSpell" }> }
   /** Assist: `helper` will pay `n`; now the caster may activate mana abilities and pay the rest, or not cast it. */
   | { kind: "assistCast"; player: PlayerId; helper: PlayerId; source: string; n: number; cast: Extract<Action, { type: "castSpell" }> }
-  | { kind: "castFree"; player: PlayerId; objectId: ObjectId; source: string; /** Madness: for its madness cost instead (CR 702.35a), miracle for its miracle cost (702.94a); suspend: free, and a creature gains haste (702.62a). */ how?: "madness" | "suspend" | "miracle" | /** "You may cast that card" as it resolves (Conduit of Worlds): for its mana cost, timing ignored (CR 608.2g, 601.2). */ "paid" | /** Discover (CR 701.57a): if it isn't cast, it goes to the hand. */ "discover" | /** A defeated Siege: only transformed (CR 310.12b). */ "transformed"; /** "Mana of any type can be spent to cast that spell" (Tinybones, CR 609.4b). */ anyType?: true }
+  | { kind: "castFree"; player: PlayerId; objectId: ObjectId; source: string; /** Madness: for its madness cost instead (CR 702.35a), miracle for its miracle cost (702.94a); suspend: free, and a creature gains haste (702.62a). */ how?: "madness" | "suspend" | "miracle" | /** "You may cast that card" as it resolves (Conduit of Worlds): for its mana cost, timing ignored (CR 608.2g, 601.2). */ "paid" | /** Discover (CR 701.57a): if it isn't cast, it goes to the hand. */ "discover" | /** A defeated Siege: only transformed (CR 310.12b). */ "transformed"; /** "Mana of any type can be spent to cast that spell" (Tinybones, CR 609.4b). */ anyType?: true; /** "A spell with mana value X or less" (Sunbird's Invocation), "the same mana value" (Powerbalance): the spell as it's cast, a split card's half or a prototyped spell (CR 202.3, 709.3, 718.3b). */ mv?: { max?: number; exact?: number } }
   /**
    * A draw that dredge could replace (CR 702.52a): dredge one of `options` (cards in the player's graveyard), or draw.
    * `left` counts this draw and the ones after it; `after`: the draw step's turn-based draw, whose triggers wait.
@@ -1183,6 +1194,8 @@ export interface TurnLog {
   destroyed?: { controller: PlayerId; by: PlayerId }[];
   /** For each player, the creatures (`id@zoneChanges`) that dealt them damage (Inferno Trap). */
   damagedBy?: Record<number, string[]>;
+  /** Noncombat damage each player was dealt this turn (Chandra's Incinerator), also after they lost the game (rulings). */
+  noncombatDamage?: Record<number, number>;
   /** For each player, the sources (`id@zoneChanges`) that dealt them combat damage (Steel Hellkite). */
   combatDamagedBy?: Record<number, string[]>;
   /**
@@ -1764,6 +1777,8 @@ export interface Resolving {
     moved?: boolean; // a dig already moved the cards it took, and waits on the order of the rest (CR 401.4)
     ripple?: { revealed: ObjectId[]; queue: ObjectId[] }; // ripple's revealed cards, and those it may still cast (CR 702.60a)
     may?: boolean; // the answer to "you may ..."
+    /** Scholar of New Horizons (Effect search `mayInstead`): asked whether the found card goes there instead (the answer is `may`). */
+    mayInstead?: boolean;
     castNow?: { id: ObjectId }; // the card "you may cast that card" offered (Effect castNow)
     /** A vote (Effect "vote"): players still to vote in turn order, the votes left for the one voting, and their pick. */
     vote?: { queue: PlayerId[]; left?: number; may?: number; pick?: string; /** "Each player may choose ..." (Druid of Purification): one optional pick each, not a vote. */ choose?: true };

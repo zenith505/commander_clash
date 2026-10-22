@@ -23,6 +23,7 @@ import {
   graveyardWays,
   permissionWay,
   permitLabel,
+  byTypeChoices,
   castExtraCosts,
   costsHaveX,
   mayPlayFromExile,
@@ -315,6 +316,8 @@ type CastDraft = {
   objectId: string;
   /** Which once-each-turn graveyard permission it's cast with (Muldrotha's artifact or creature slot). */
   permit?: string;
+  /** Aminatou's Augury: the card type it's cast as. */
+  asType?: string;
   /** The face of a card with several it's cast as: a split card's half, an Adventure, a modal double-faced card's back. */
   face?: number;
   convoke?: string[];
@@ -792,7 +795,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const card = cardOf(s, d.objectId);
     const compiled = compileCard(card);
     const free = freeCastOf(s, HUMAN) === d.objectId;
-    const how = { ...(d.face !== undefined ? { face: d.face } : {}), ...(d.via ? { via: d.via } : {}), ...(d.buyback ? { buyback: true } : {}), ...(d.splice?.length ? { splice: d.splice } : {}), ...(d.alt ? { alt: d.alt } : {}), ...(d.costOr !== undefined ? { costOr: d.costOr } : {}), ...(d.teamwork?.length ? { teamwork: d.teamwork } : {}), ...(d.harmonize ? { harmonize: d.harmonize } : {}), ...(d.permit ? { permit: d.permit } : {}), ...(d.exileFromHand?.length && compiled.exiledReduction ? { exileFromHand: d.exileFromHand } : {}), ...(d.lifeFor?.length ? { lifeFor: d.lifeFor } : {}) };
+    const how = { ...(d.face !== undefined ? { face: d.face } : {}), ...(d.via ? { via: d.via } : {}), ...(d.buyback ? { buyback: true } : {}), ...(d.splice?.length ? { splice: d.splice } : {}), ...(d.alt ? { alt: d.alt } : {}), ...(d.costOr !== undefined ? { costOr: d.costOr } : {}), ...(d.teamwork?.length ? { teamwork: d.teamwork } : {}), ...(d.harmonize ? { harmonize: d.harmonize } : {}), ...(d.permit ? { permit: d.permit } : {}), ...(d.asType ? { asType: d.asType } : {}), ...(d.exileFromHand?.length && compiled.exiledReduction ? { exileFromHand: d.exileFromHand } : {}), ...(d.lifeFor?.length ? { lifeFor: d.lifeFor } : {}) };
     const kicks = { ...how, ...(d.kicks?.length ? { kicks: d.kicks } : {}) };
     // Harmonize: which creature to tap is chosen as the cost is (CR 702.180b), first of all.
     if (d.via === "harmonize" && d.harmonize === undefined) {
@@ -1454,6 +1457,10 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
                 setMenu(null);
                 startCast(menu, undefined, undefined, undefined, undefined, face);
               }}
+              onCastAsType={(asType) => {
+                setMenu(null);
+                continueCast({ objectId: menu, asType });
+              }}
               onPlayFace={(face, untapped) => {
                 setMenu(null);
                 dispatch([{ type: "playLand", player: HUMAN, objectId: menu, face, ...(untapped ? { untapped } : {}) }]);
@@ -1711,7 +1718,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               onCancel={() => setCostPick(null)}
             />
           )}
-          {!targeting && !modePick && !tapPick && !picking && pending?.kind !== "chooseModes" && <Controls s={s} pending={pending} attacks={attacks} aim={aim} blocks={blocks} blocker={blocker} discards={discards} dispatch={dispatch} onCastFree={(id, face) => startCast(id, undefined, undefined, undefined, undefined, face)} onHover={setHover} />}
+          {!targeting && !modePick && !tapPick && !picking && pending?.kind !== "chooseModes" && <Controls s={s} pending={pending} attacks={attacks} aim={aim} blocks={blocks} blocker={blocker} discards={discards} dispatch={dispatch} onCastFree={(id, face, alt) => startCast(id, undefined, undefined, alt, undefined, face)} onHover={setHover} />}
           <PriorityToggle mode={priorityMode} onChange={setPriorityMode} />
           {!s.over && <LoopBar s={s} loop={loop} note={shortcutNote} onStart={startLoop} onCancel={cancelLoop} onRepeat={repeatLoop} />}
           {error && <div className="error">{error}</div>}
@@ -3817,6 +3824,7 @@ function AbilityMenu({
   onPlay,
   onCastVia,
   onCastFace,
+  onCastAsType,
   onPlayFace,
   onCastAlt,
   onCastAssist,
@@ -3841,6 +3849,8 @@ function AbilityMenu({
   onCastVia: (via: CastFromGraveyardKind, face?: number, permit?: string, alt?: AltCostKind) => void;
   /** For a card with several faces: cast it as this one (a split card's half, an Adventure, a modal double-faced card's back). */
   onCastFace: (face: number) => void;
+  /** Aminatou's Augury: cast it as this one of its card types. */
+  onCastAsType: (asType: string) => void;
   /** For a modal double-faced card: play it as this land face (`untapped`: pay life or reveal so it enters untapped). */
   onPlayFace: (face: number, untapped?: boolean) => void;
   /** For a card in hand: cast it for its evoke or dash cost. */
@@ -3884,6 +3894,7 @@ function AbilityMenu({
   const choice = inHand && land ? entersRulesOf(s, HUMAN, objectId).entersTappedChoice : undefined;
   // Airbend's "{2} rather than its mana cost", "without paying its mana cost" (Release to the Wind).
   const exiledFor = o.zone === "exile" && o.mayPlay?.player === HUMAN ? o.mayPlay : undefined;
+  const asTypes = byTypeChoices(s, o, HUMAN);
   // Another player's permanent: only its abilities any player may activate (CR 602.2), which you'd control (CR 113.8).
   if (o.zone === "battlefield" && controllerOf(s, o) !== HUMAN)
     return (
@@ -3917,7 +3928,17 @@ function AbilityMenu({
           Cast it for its foretell cost <ManaCost cost={foretold} size="sm" />
         </button>
       )}
-      {inHand && !foretold && !split && (
+      {/* Aminatou's Augury: cast as one of its card types still free (rulings: an artifact creature as either). */}
+      {inHand &&
+        !foretold &&
+        !split &&
+        asTypes.length > 1 &&
+        asTypes.map((t) => (
+          <button key={`as-${t}`} data-as-type={t} disabled={!playable} onClick={() => onCastAsType(t)}>
+            Cast it as {/^[AEIOU]/.test(t) ? "an" : "a"} {t.toLowerCase()} without paying its mana cost
+          </button>
+        ))}
+      {inHand && !foretold && !split && asTypes.length < 2 && (
         <button disabled={!playable} onClick={() => onPlay()}>
           {land ? (choice ? "Play it tapped" : "Play it") : plottedCast(s, HUMAN, o) ? "Cast it free (plotted)" : exiledFor?.cost ? <>Cast it for <ManaCost cost={exiledFor.cost} size="sm" /></> : exiledFor?.free ? "Cast it without paying its mana cost" : <>Cast it <ManaCost cost={d.manaCost} size="sm" /></>}
         </button>
@@ -4144,7 +4165,7 @@ function Controls({
   discards: string[];
   dispatch: ReturnType<typeof useGame>["dispatch"];
   /** Cascade's free cast: go through modes and targets as usual. */
-  onCastFree: (id: string, face?: number) => void;
+  onCastFree: (id: string, face?: number, alt?: AltCostKind) => void;
   onHover: (d: CardDef | null) => void;
 }) {
   if (s.over) return null;
@@ -4155,6 +4176,7 @@ function Controls({
     // A defeated Siege is cast transformed only (CR 310.12b).
     const transformed = pending.how === "transformed";
     const faces = transformed ? [1] : castableFaces(s, o).filter((f) => !isType(s.cards[registerFace(s, o, f)]!, "Land"));
+    const prototype = !pending.how && !!altCost(d, "prototype");
     return (
       <div className="controls">
         <span onMouseEnter={() => onHover(d)} onMouseLeave={() => onHover(null)}>
@@ -4191,11 +4213,17 @@ function Controls({
         </span>
         {s.cards[o.cardId]?.layout !== "split" && !transformed && (
           <button
-            disabled={(pending.how === "madness" || pending.how === "miracle" || pending.how === "paid") && planCast(s, HUMAN, pending.objectId, undefined, undefined, "auto") === null}
-            title={pending.how === "madness" || pending.how === "miracle" || pending.how === "paid" ? (castProblem(s, HUMAN, pending.objectId) ?? "") : ""}
+            disabled={((pending.how === "madness" || pending.how === "miracle" || pending.how === "paid") && planCast(s, HUMAN, pending.objectId, undefined, undefined, "auto") === null) || (!!pending.mv && /mana value/.test(castProblem(s, HUMAN, pending.objectId) ?? ""))}
+            title={pending.how === "madness" || pending.how === "miracle" || pending.how === "paid" || pending.mv ? (castProblem(s, HUMAN, pending.objectId) ?? "") : ""}
             onClick={() => onCastFree(pending.objectId)}
           >
             Cast it
+          </button>
+        )}
+        {/* Prototyped isn't an alternative cost (CR 718.3): a free cast may be prototyped. */}
+        {prototype && (
+          <button data-alt="prototype" disabled={/mana value/.test(castProblem(s, HUMAN, pending.objectId, undefined, undefined, undefined, undefined, undefined, { alt: "prototype" }) ?? "")} onClick={() => onCastFree(pending.objectId, undefined, "prototype")}>
+            Cast it prototyped <ManaCost cost={altCost(d, "prototype")!.mana} size="sm" />
           </button>
         )}
         {faces.map((face) => (

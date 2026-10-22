@@ -639,7 +639,8 @@ export function parseTargetPhrase(
     count?: (text: string) => AmountExpr | null;
   } = {},
 ): TargetSpec | null {
-  let p = subtypeClause(phrase.trim()).toLowerCase();
+  // "A creature you control that's enchanted or equipped" (Reyav, Master Smith): "enchanted-or-equipped creature you control".
+  let p = subtypeClause(phrase.trim()).toLowerCase().replace(/^(creature)( you control)? that's (enchanted or equipped|enchanted|equipped)$/, (_, k: string, w: string | undefined, st: string) => `${st.replace(/ /g, "-")} ${k}${w ?? ""}`);
   const text = `target ${phrase.trim().toLowerCase()}`;
   const extra: Partial<TargetSpec> = {};
   // Drown in the Loch: each candidate's own controller's graveyard.
@@ -802,6 +803,10 @@ export function parseTargetPhrase(
     extra.powerAboveBase = true;
     p = p.slice(0, m.index);
   }
+  if ((m = / with toughness greater than its power$/.exec(p))) {
+    extra.toughnessAbovePower = true;
+    p = p.slice(0, m.index);
+  }
   // "Creatures you control with power or toughness 1 or less" (Tetsuko Umezawa): either one (TargetSpec.anyOf).
   if ((m = / with power or toughness (\d+) or (greater|less)$/.exec(p)) && !extra.anyOf) {
     const r = m[2] === "greater" ? { min: Number(m[1]) } : { max: Number(m[1]) };
@@ -821,6 +826,11 @@ export function parseTargetPhrase(
       const n = Number(m[2]);
       extra[key] = m[3] === "greater" ? { min: n } : m[3] === "less" ? { max: n } : { min: n, max: n };
     }
+    p = p.slice(0, m.index);
+  } else if ((m = / with mana value (\d+), (\d+), or (\d+)$/.exec(p) ?? / with mana value (\d+) through (\d+)$/.exec(p)) && (m[3] === undefined || (Number(m[2]) === Number(m[1]) + 1 && Number(m[3]) === Number(m[2]) + 1))) {
+    // "A creature spell with mana value 4, 5, or 6" (Kozilek's Unsealing): one in that range ("4 through 6" once a cast
+    // trigger's commas are taken out).
+    extra.manaValue = { min: Number(m[1]), max: Number(m[3] ?? m[2]) };
     p = p.slice(0, m.index);
   } else if ((m = / with mana cost ((?:\{[0-9WUBRGC]+\})+)(?: or ((?:\{[0-9WUBRGC]+\})+))?$/.exec(p))) {
     extra.manaCostIn = [m[1]!, ...(m[2] ? [m[2]] : [])];

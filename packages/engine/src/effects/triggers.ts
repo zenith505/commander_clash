@@ -8,7 +8,7 @@ import { fitMany, withModes } from "../modes";
 import { compileCard } from "../oracle";
 import type { CardDef, GameObject, ManaType, SpentMana, GameState, LastKnown, ObjectId, PendingTrigger, PlayerId, StackItem, TriggerEventInfo, ZoneMove, ZoneName } from "../types";
 import { RulesError } from "../types";
-import { spentMeets } from "../mana";
+import { parseManaCost, spentMeets } from "../mana";
 import { nextRandom } from "../rng";
 import { evalAmount } from "../amounts";
 import { objectMatches, bindBound, bindChosen, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, hasLegalTargets, legalModes, noteModesChosen, offerTargets, settleDivided } from "./targeting";
@@ -226,7 +226,7 @@ export type TriggerSourceEvent =
   /** A player tapped this permanent for mana: activated its mana ability with {T} in the cost (CR 106.12). */
   | { type: "tappedForMana"; id: ObjectId; player: PlayerId }
   /** A player activated an ability that isn't a mana ability; its source as it was then, if it was a permanent. */
-  | { type: "activated"; player: PlayerId; /** The ability on the stack ("copy that ability"). */ stackId?: string; source?: { snapshot: GameObject; chars: Characteristics }; /** A mana ability (CR 605.1a). */ mana?: true; /** Mana from Treasures spent to activate it (CR 106.3). */ treasure?: number }
+  | { type: "activated"; player: PlayerId; /** The ability on the stack ("copy that ability"). */ stackId?: string; source?: { snapshot: GameObject; chars: Characteristics }; /** A mana ability (CR 605.1a). */ mana?: true; /** Mana from Treasures spent to activate it (CR 106.3). */ treasure?: number; /** Its activation cost has the mana symbol {X} (Unbound Flourishing). */ xCost?: true }
   /**
    * A creature exploited `victim` (CR 702.110b). `watchers`: the permanents of its controller with exploit
    * triggers just before the sacrifice, with those abilities, since they look back in time (CR 603.10a).
@@ -404,9 +404,37 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         s.triggerQueue.push(queued);
         // "That ability triggers an additional time" (CR 603.2d): only a permanent's (or one leaving's) own abilities.
         // Not delayed triggered abilities (CR 603.2d).
-        if (!fromYard && !floating) for (let n = triggersAgain(s, o, controller, causedBy); n > 0; n--) s.triggerQueue.push({ ...queued });
+        const again = !fromYard && !floating ? triggersAgain(s, o, controller, causedBy) : 0;
+        attackCaused(queued);
+        for (let n = again; n > 0; n--) {
+          const more: PendingTrigger = { ...queued };
+          delete more.tag;
+          s.triggerQueue.push(more);
+          attackCaused(more);
+        }
       }
     });
+  };
+  /**
+   * Firebender Ascension: "Whenever a creature you control attacking causes a triggered ability of that creature to
+   * trigger": an ability of the attacking creature itself (not of an Aura or Equipment on it, nor a delayed one). Its
+   * trigger goes on the stack just above that ability (rulings), which becomes its `cause` once it's there.
+   */
+  const attackCaused = (q: PendingTrigger) => {
+    if (fromYard || floating || hosting || causedBy?.event !== "attacks" || !causedBy.objs.some((x) => x.o.id === q.sourceId)) return;
+    const creature = s.objects[q.sourceId];
+    if (creature?.zone !== "battlefield" || !objIsType(s, creature, "Creature") || controllerOf(s, creature) !== q.controller) return;
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      const wc = controllerOf(s, w);
+      if (wc !== q.controller || locked?.(wc)) continue;
+      abilitiesOf(s, w).triggers.forEach((t, index) => {
+        if (t.event !== "attackCausesTrigger" || (t.activeIf && !staticConditionNow(s, t.activeIf, id, wc))) return;
+        q.tag ??= `t${s.nextId++}`;
+        const printed = compileCard(defOf(s, w)).triggers;
+        s.triggerQueue.push({ sourceId: id, sourceCardId: cardIdOf(w), controller: wc, index, sourceZc: w.zoneChanges ?? 0, causeTag: q.tag, ...(printed[index] !== t ? { body: t.body } : {}) });
+      });
+    }
   };
   /**
    * The same event for the Auras and Equipment attached to `host` (TriggeredAbility.host): `subject` is the creature
@@ -653,7 +681,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // triggering for its own controller, "that player" being the one who sacrificed it.
       const byOk = (by: "any" | "opponent" | undefined, watcher: PlayerId) => (watcher === ev.controller ? by !== "opponent" : by === "any" || (by === "opponent" && opponents(s, watcher).includes(ev.controller)));
       const consider = (src: GameObject, watcher: PlayerId, triggers?: TriggeredAbility[]) =>
-        add(src, watcher, (e, t) => e === "youSacrifice" && !!t.sacrifices && byOk(t.sacrifices.by, watcher) && diesMatches(s, t.sacrifices, src.id, undefined, dying, ev.controller), triggers, undefined, o, lki, undefined, undefined, { player: ev.controller });
+        add(src, watcher, (e, t) => e === "youSacrifice" && !!t.sacrifices && (!t.sacrifices.self || src.id === ev.id) && byOk(t.sacrifices.by, watcher) && diesMatches(s, t.sacrifices, src.id, undefined, dying, ev.controller), triggers, undefined, o, lki, undefined, undefined, { player: ev.controller });
       for (const id of s.battlefield) consider(obj(s, id), controllerOf(s, obj(s, id)));
       for (const left of s.leftTogether ?? []) {
         const src = s.objects[left.id];
@@ -851,7 +879,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const info = { amount: ev.amount };
     const after = o.counters[ev.counter] ?? 0;
     const reached = (t: TriggeredAbility) => t.countersReach === undefined || (after - ev.amount < t.countersReach && after >= t.countersReach);
-    add(o, controllerOf(s, o), (e, t) => e === "selfCountersPut" && !t.countersEach && kindOk(t, controllerOf(s, o)) && reached(t), undefined, undefined, undefined, undefined, undefined, undefined, info);
+    // "For the first time each turn": counters put on this object earlier this turn count, whatever had the ability then.
+    const zc = o.zoneChanges ?? 0;
+    const first = !(o.countersPutAt && o.countersPutAt.turn === s.turn && o.countersPutAt.zc === zc);
+    o.countersPutAt = { turn: s.turn, zc };
+    add(o, controllerOf(s, o), (e, t) => e === "selfCountersPut" && !t.countersEach && kindOk(t, controllerOf(s, o)) && reached(t) && (!t.countersFirstTime || first), undefined, undefined, undefined, undefined, undefined, undefined, info);
     // "Whenever a +1/+1 counter is put on ~" (Fathom Mage): once for each counter (rulings).
     for (let i = 0; i < ev.amount; i++) add(o, controllerOf(s, o), (e, t) => e === "selfCountersPut" && !!t.countersEach && kindOk(t, controllerOf(s, o)), undefined, undefined, undefined, undefined, undefined, undefined, { amount: 1 });
     // Chapter abilities: "if the number of lore counters on it was less than N and became at least N" (CR 714.2b).
@@ -993,7 +1025,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           const at = ev.ids.filter((x) => attackingYouNow(s, x, you, !!t.attacksYou!.orPlaneswalkers));
           if (at.length < t.attacksYou.min) continue;
           const group = at.map((x) => ({ id: x, zc: obj(s, x).zoneChanges ?? 0 }));
-          const info = { player: ev.controller, group, ...(t.attacksYou.orPlaneswalkers ? { attackingYou: { you, min: t.attacksYou.min, orPlaneswalkers: true as const } } : {}) };
+          const info = { player: ev.controller, group, ...(t.attacksYou.recheck ? { attackingYou: { you, min: t.attacksYou.min, orPlaneswalkers: true as const } } : {}) };
           add(o, you, (e, tt) => e === "opponentAttacksYou" && tt.body.text === t.body.text, undefined, undefined, undefined, undefined, undefined, undefined, info);
         }
       }
@@ -1235,6 +1267,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.cast.sharesTypeWithSelf && !(spell && shareCreatureType(creatureTypesOf(s, o), creatureTypesOf(s, spell)))) return false;
         // "If it shares a card type with the exiled card" (Cemetery Protector, CR 603.4), checked again as it resolves.
         if (t.cast.sharesTypeWithLinked && !sharesTypeWithLinked(s, `${o.id}@${o.zoneChanges ?? 0}`, spell ? characteristics(s, spell).types : ev.card.types)) return false;
+        // "A spell with {X} in its mana cost": the half cast, for a split card (CR 709.3b); a copy has the same mana cost.
+        if (t.cast.xInCost && !(spell && parseManaCost(defOf(s, spell).manaCost).hasX)) return false;
         // "A spell that has convoke": printed, or given by "spells you cast have convoke" (rulings on Joyful Stormsculptor:
         // whether or not any creatures were tapped for it).
         if (t.cast.keyword && !(spell && (defOf(s, spell).keywords.includes(t.cast.keyword) || (t.cast.keyword === "Convoke" && hasConvoke(s, ev.controller, spell))))) return false;
@@ -1355,7 +1389,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Vazi: "Whenever an opponent casts a spell or activates an ability, if mana from a Treasure was spent to ...".
         if (e === "castSpell" && t.cast?.orActivates) return !!ev.treasure && (t.cast.by !== "opponent" || ev.player !== you) && (t.cast.by !== "you" || ev.player === you);
         const a = t.activates;
-        if (e !== "abilityActivated" || !a || ev.mana || (a.by === "opponent" && ev.player === you) || (a.by === "you" && ev.player !== you)) return false;
+        if (e !== "abilityActivated" || !a || ev.mana || (a.by === "opponent" && ev.player === you) || (a.by === "you" && ev.player !== you) || (a.xCost && !ev.xCost)) return false;
         if (a.equipped) {
           const host = o.attachedTo === undefined ? undefined : s.objects[o.attachedTo];
           if (!ev.source || !host || host.id !== ev.source.snapshot.id || host.zone !== "battlefield" || (host.zoneChanges ?? 0) !== (ev.source.snapshot.zoneChanges ?? 0)) return false;
@@ -1697,6 +1731,8 @@ export function pushTrigger(s: GameState, t: PendingTrigger, chosen: TargetChoic
     // Whether its source transforms before it resolves, or for a delayed trigger since it was made (CR 701.27f).
     ...((t.transformsAt ?? s.objects[t.sourceId]?.transforms) ? { sourceTransforms: t.transformsAt ?? s.objects[t.sourceId]!.transforms } : {}),
   });
+  // Firebender Ascension's trigger is about this one, now on the stack.
+  if (t.tag) for (const q of s.triggerQueue) if (q.causeTag === t.tag) q.cause = s.stack[s.stack.length - 1]!.id;
   log(s, `${def.name}'s ability triggers (${body.text.replace(/~/g, def.name).replace(/\.$/, "")})${describeTargets(s, targets)}.`);
   if (targets.length) fireEvent(s, { type: "targeted", stackId: s.stack[s.stack.length - 1]!.id });
 }

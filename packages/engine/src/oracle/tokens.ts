@@ -71,7 +71,8 @@ export function parseToken(power: number, toughness: number, desc: string, withT
   const kwText = quoted ? quoted[1] : withText;
   // "A 1/1 white Monk creature token with prowess" (Monastery Mentor): a triggered keyword (CR 702.108a) is an ability
   // of the token's, as if printed.
-  if (!quoted && kwText === "prowess" && subtypes.length) return { name: subtypes.join(" "), power, toughness, colors, types, subtypes, keywords: [], abilities: "Prowess" };
+  // "With firebending 1" (Firebender Ascension): the same, "Whenever this creature attacks, add {R}" (CR 702.189a).
+  if (!quoted && (kwText === "prowess" || /^firebending \d+$/.test(kwText ?? "")) && subtypes.length) return { name: subtypes.join(" "), power, toughness, colors, types, subtypes, keywords: [], abilities: kwText!.charAt(0).toUpperCase() + kwText!.slice(1) };
   const keywords = kwText ? parseKeywordList(kwText) : [];
   if (!keywords || !subtypes.length) return null;
   return { name: subtypes.join(" "), power, toughness, colors, types, subtypes, keywords, ...(quoted ? { abilities: quoted[2]! } : {}) };
@@ -140,6 +141,9 @@ export function parseCountMod(line: string): CountMod | undefined {
     return { what: "counters", putter: "you", op: "plusOne", putOn: "permanentYouControl" };
   if (line === "If an opponent would put one or more counters on a permanent or player, they put half that many of each of those kinds of counters on that permanent or player instead, rounded down.")
     return { what: "counters", putter: "opponent", op: "halfDown" };
+  // Loading Zone: any kind, on a creature, Spacecraft, or Planet (artifact subtypes, CR 205.3g).
+  if (line === "If one or more counters would be put on a creature, Spacecraft, or Planet you control, twice that many of each of those kinds of counters are put on it instead.")
+    return { what: "counters", on: "creatureSpacecraftOrPlanet", who: "you", op: "double" };
   m = /^If an effect would put one or more counters on a permanent you control, it puts twice that many of those counters on that permanent instead\.$/.exec(line);
   if (m) return { what: "counters", on: "permanent", who: "you", op: "double" };
   return undefined;

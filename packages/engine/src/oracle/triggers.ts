@@ -389,7 +389,8 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(nth[5]!, { castSpell: true, eventPlayer: true });
     return body ? { event: "castSpell", cast: { by: CAST_BY[nth[1] as keyof typeof CAST_BY], spell: kind, nth: nth[2] === "first" ? 1 : 2, ...(nth[3] ? { nthOfKind: true as const } : {}), ...(nth[4] === "during their turn" ? { ownTurn: true as const } : {}), ...(nth[4] === "during each opponent's turn" ? { opponentsTurn: true as const } : {}) }, body } : "fail";
   }
-  const m = CAST_TRIGGER.exec(line);
+  // "A creature spell with mana value 4, 5, or 6" (Kozilek's Unsealing): without the commas, as one phrase.
+  const m = CAST_TRIGGER.exec(line.replace(/ with mana value (\d+), (\d+), or (\d+),/, (all, a: string, b: string, c: string) => (Number(b) === Number(a) + 1 && Number(c) === Number(b) + 1 ? ` with mana value ${a} through ${c},` : all)));
   if (!m) return null;
   let what = m[3]!.replace(/^(?:an?|another) /, "");
   // "Whenever you cast a spell from exile", "... from anywhere other than your hand", "... from your graveyard": the zone
@@ -434,6 +435,10 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // was cast; convoke from another permanent's "spells you cast have convoke" too (game.ts hasConvoke).
   const kwM = !pw ? / (?:with|that has) (convoke|flying|infect)$/.exec(what) : null;
   if (kwM) what = what.slice(0, kwM.index);
+  // "A spell with {X} in its mana cost", "a permanent spell with a mana cost that contains {X}" (Unbound Flourishing): the
+  // mana symbol {X} in the mana cost of the spell (the half cast, for a split card), not another X.
+  const xM = !pw && !kwM ? / with (?:\{X\} in its mana cost|a mana cost that contains \{X\})$/.exec(what) : null;
+  if (xM) what = what.slice(0, xM.index);
   // "a spell of the chosen color", "a creature spell of the chosen type": the choice made as this permanent entered.
   // "A noncreature spell with mana value less than ~'s power" (Pollywog Prodigy): worked out as it's cast (TargetSpec.bound).
   const parsed = /^spell$/.test(what) ? { kind: "spell" as const, text: "spell" } : parseTargetPhrase(/\bspell\b/.test(what) ? what : `${what} spell`, { chosen: true, count: (t) => (t === "~'s power" || t === "the number of experience counters you have" ? parseCount(t, null) : null) });
@@ -465,7 +470,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (!body) return "fail";
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: body.text.replace(/\bX\b/g, "that much") };
   if (short) body = { ...replaceX(body, { count: { kind: "castShortfall" } }), text: body.text.replace(/\bloses X life\b/, "loses life equal to the difference") };
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}) }, body };
 }
 
 /**
@@ -710,7 +715,10 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
  * declared as an attacker (CR 508.3a), not one put onto the battlefield attacking (508.4). "It" and "that creature" are
  * the attacker; "defending player" is the player it's attacking (CR 508.5a).
  */
-function parseAttackerTrigger(line: string): TriggeredAbility | "fail" | null {
+function parseAttackerTrigger(line0: string): TriggeredAbility | "fail" | null {
+  // "Whenever a creature you control that's enchanted or equipped attacks" (Reyav, Master Smith): one that's either as it
+  // attacks.
+  const line = line0.replace(/^Whenever a creature you control that's (enchanted or equipped|enchanted|equipped) attacks,/, (_, st: string) => `Whenever an ${st.replace(/ /g, "-")} creature you control attacks,`);
   // "Whenever a Zombie token you control with power 6 or greater attacks" (Dreadhorde Invasion): its power as it's declared.
   const m = /^Whenever (another|an?) (.+? you control(?: of the chosen type| with power \d+ or (?:greater|less))?) attacks, (.+)$/.exec(line);
   // "Whenever a creature attacks": anyone's, each one as it's declared as an attacker (Caltrops, Righteous Cause).
@@ -773,6 +781,12 @@ function parseAttackerTrigger(line: string): TriggeredAbility | "fail" | null {
 function parseSacrificeTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever a player sacrifices a permanent" (Mayhem Devil), "whenever an opponent sacrifices ...": "that player" is the
   // one who sacrificed it, its controller (CR 701.21a).
+  // "When you sacrifice ~" (Heaped Harvest): ~ itself, wherever it went.
+  const self = /^(?:When|Whenever) you sacrifice ~, (.+)$/.exec(line);
+  if (self) {
+    const body = parseBody(self[1]!);
+    return body ? { event: "youSacrifice", sacrifices: { filter: { kind: "object", text: "~" }, orSelf: true, self: true }, body } : "fail";
+  }
   const any = /^Whenever (a player|an opponent) sacrifices (an?|another) (.+?), (.+)$/.exec(line);
   const m = any ? [any[0], any[2], any[3], undefined, any[4]] : /^Whenever you sacrifice (~ or another|another|an?) (.+?)( during your turn)?, (.+)$/.exec(line);
   if (!m) return null;
@@ -1073,17 +1087,19 @@ function parseActivatesTrigger(line: string): TriggeredAbility | "fail" | null {
     const body = parseBody(equipped[1]!, { activatedAbility: true });
     return body ? { event: "abilityActivated", activates: { by: "any", equipped: true }, body } : "fail";
   }
-  const m = /^Whenever (a player|an opponent|you) activates? an ability( of (?:an?|another) (.+?)(?: on the battlefield)?)?(?: that isn't a mana ability|, if it isn't a mana ability), (.+)$/.exec(line);
+  // "An ability with {X} in its activation cost" (Glava, Unbound Flourishing as compile.ts splits it).
+  const m = /^Whenever (a player|an opponent|you) activates? an ability( of (?:an?|another) (.+?)(?: on the battlefield)?| with \{X\} in its activation cost)?(?: that isn't a mana ability|, if it isn't a mana ability), (.+)$/.exec(line);
   if (!m) return /^Whenever (a player|an opponent|you) activates an? /.test(line) ? "fail" : null;
   let of: TargetSpec | undefined;
-  if (m[2]) {
+  const xCost = m[2] === " with {X} in its activation cost";
+  if (m[2] && !xCost) {
     const f = parseTargetPhrase(m[3]!);
     if (f?.kind !== "object") return "fail";
     of = f;
   }
   const body = parseBody(theyAreThatPlayer(m[4]!), { eventPlayer: true, activatedAbility: true });
   if (!body) return "fail";
-  return { event: "abilityActivated", activates: { by: m[1] === "an opponent" ? "opponent" : m[1] === "you" ? "you" : "any", ...(of ? { of } : {}) }, body };
+  return { event: "abilityActivated", activates: { by: m[1] === "an opponent" ? "opponent" : m[1] === "you" ? "you" : "any", ...(of ? { of } : {}), ...(xCost ? { xCost: true as const } : {}) }, body };
 }
 
 /**
@@ -1145,10 +1161,15 @@ function parseDiscardTrigger(line: string): TriggeredAbility | "fail" | null {
   // "... If you do, until the end of your next turn, you may play that card" (Moonstone): that card, the object it
   // became in exile (CR 400.7), by you, its owner.
   const exileIt = m[1] === "you" && m[2] === "discard" && m[3] === "a" && m[4] === "card" ? /^(you may )?exile that card from your graveyard(?:\. If you do, (you may play that card this turn|until the end of your next turn, you may play that card))?\.$/.exec(m[5]!) : null;
+  // Tinybones: "Whenever an opponent discards a card, exile it from their graveyard with a stash counter on it": the
+  // discarded card, if it's there (rulings on Necropotence), with the counter on it in exile.
+  const exileTheirs = m[1] !== "you" && m[2] === "discards" && m[3] === "a" && m[4] === "card" ? new RegExp(`^exile it from their graveyard with an? ${COUNTER} counter on it\\.$`).exec(m[5]!) : null;
   const exile: Effect | undefined = exileIt
     ? { type: "exile", what: { ref: "subjectCard", zone: "graveyard" }, ...(exileIt[2] ? { ownerMay: { play: true, until: /next turn/.test(exileIt[2]) ? ("nextTurn" as const) : ("thisTurn" as const) } } : {}) }
-    : undefined;
-  const body = exile ? { targets: [], effects: [exileIt![1] ? { type: "may" as const, effects: [exile], text: m[5]!.replace(/^you may /, "").replace(/\.$/, "") } : exile], text: m[5]! } : parseBody(m[5]!, { eventPlayer: true });
+    : exileTheirs
+      ? { type: "exile", what: { ref: "subjectCard", zone: "graveyard" }, counters: { [exileTheirs[1]!]: 1 } }
+      : undefined;
+  const body = exile ? { targets: [], effects: [exileIt?.[1] ? { type: "may" as const, effects: [exile], text: m[5]!.replace(/^you may /, "").replace(/\.$/, "") } : exile], text: m[5]! } : parseBody(m[5]!, { eventPlayer: true });
   if (!body) return "fail";
   const by = m[1] === "you" ? "you" : m[1] === "an opponent" ? "opponent" : "any";
   return { event: "playerDiscards", discards: { by, ...(/^cycles?$/.test(m[2]!) ? { cycled: true as const } : {}), ...(m[3] === "another" ? { other: true as const } : {}), ...(filter ? { filter } : {}) }, body };
@@ -1598,7 +1619,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // controller of a wither or infect source, and for a permanent entering with counters its controller). It triggers
   // once for each permanent they're put on at the same time (rulings on Hapatra).
   const youPut = /^Whenever you put one or more ((?:\+1\/\+1|-1\/-1|loyalty|time|[a-z]+) )?counters on (~|this (?:creature|artifact|enchantment|permanent)|another creature you control|a creature you control|a creature you don't control|a creature|another creature|a permanent you control|a permanent or player|a planeswalker|another [a-z]+ creature|an? [A-Z][a-z]+(?:, [A-Z][a-z]+,)? or [A-Z][a-z]+ you control), (.+)$/.exec(line);
-  const put = youPut ?? /^Whenever one or more (\+1\/\+1 )?counters are put on (~|another creature you control|a creature you control), (.+)$/.exec(line);
+  // Danny Pink grants "Whenever one or more counters are put on this creature for the first time each turn".
+  const firstTime = !youPut && /^Whenever one or more counters are put on ~ for the first time each turn, /.test(line);
+  const put = youPut ?? /^Whenever one or more (\+1\/\+1 )?counters are put on (~|another creature you control|a creature you control), (.+)$/.exec(firstTime ? line.replace(" for the first time each turn,", ",") : line);
   if (put) {
     const self = /^(?:~|this [a-z]+)$/.test(put[2]!);
     const byYou = youPut ? { countersByYou: true as const } : {};
@@ -1612,7 +1635,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (!body) return "fail";
     if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, put[3]!) };
     const kind = put[1] ? { countersKind: put[1].trim() } : {};
-    if (self) return { event: "selfCountersPut", body, ...kind, ...byYou };
+    if (self) return { event: "selfCountersPut", body, ...kind, ...byYou, ...(firstTime ? { countersFirstTime: true as const } : {}) };
     // All Will Be One: "on a permanent or player", once for each permanent or player they're put on.
     const orPlayer = put[2] === "a permanent or player" ? { countersOrPlayer: true as const } : {};
     const filter = parseTargetPhrase(put[2]!.replace(/ or player$/, "").replace(/^another (creature)?/, (_m, c) => (c ? "creature" : "")).replace(/^an? /, ""));
@@ -1641,11 +1664,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (firstLoss) return firstLoss;
   const draws = parseDrawTrigger(line);
   if (draws) return draws;
-  const attacked = /^Whenever an opponent attacks (?:you with two or more creatures|with creatures, if two or more of those creatures are attacking you and\/or planeswalkers you control), (.+)$/.exec(line);
+  // Cunning Rhetoric: "Whenever an opponent attacks you and/or one or more planeswalkers you control": once each combat that
+  // opponent attacks with one or more creatures attacking you or your planeswalkers (CR 508.3e).
+  const attacked = /^Whenever an opponent attacks (you with two or more creatures|with creatures, if two or more of those creatures are attacking you and\/or planeswalkers you control|you and\/or one or more planeswalkers you control), (.+)$/.exec(line);
   if (attacked) {
-    const body = parseBody(attacked[1]!.replace(/\bthat opponent\b/g, "that player"), { eventPlayer: true });
+    const body = parseBody(attacked[2]!.replace(/\bthat opponent\b/g, "that player"), { eventPlayer: true });
     if (!body) return "fail";
-    return { event: "opponentAttacksYou", attacksYou: { min: 2, ...(/planeswalkers you control/.test(line) ? { orPlaneswalkers: true as const } : {}) }, body: { ...body, text: attacked[1]! } };
+    return { event: "opponentAttacksYou", attacksYou: { min: /two or more/.test(attacked[1]!) ? 2 : 1, ...(/planeswalkers you control/.test(attacked[1]!) ? { orPlaneswalkers: true as const } : {}), ...(/^with creatures, if /.test(attacked[1]!) ? { recheck: true as const } : {}) }, body: { ...body, text: attacked[2]! } };
   }
   // Breena: "Whenever a player attacks one of your opponents, if that opponent has more life than another of your
   // opponents, ...": once for each player attacking each of your opponents (CR 508.3e); "that attacking player" is the one
@@ -1676,6 +1701,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   }
   const activates = parseActivatesTrigger(line);
   if (activates) return activates;
+  // Firebender Ascension: "that ability" is the creature's triggered ability, put on the stack just below this one (rulings).
+  const attackCauses = /^Whenever a creature you control attacking causes a triggered ability of that creature to trigger, (.+)$/.exec(line);
+  if (attackCauses) {
+    const body = parseBody(attackCauses[1]!, { activatedAbility: true });
+    return body ? { event: "attackCausesTrigger", body } : "fail";
+  }
   const manaTap = parseManaTapTrigger(line);
   if (manaTap) return manaTap;
   const dies = parseDiesTrigger(line);

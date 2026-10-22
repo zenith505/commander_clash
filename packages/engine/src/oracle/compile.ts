@@ -1264,6 +1264,12 @@ export function compile(d: CardDef): CompiledCard {
       else out.playLinkedForLife = true;
       continue;
     }
+    const stash = /^During your turn, you may play cards you don't own with ([a-z]+) counters on them from exile, and mana of any type can be spent to cast those spells\.$/.exec(line);
+    if (stash) {
+      if (out.playCountered) out.unsupported.push(raw);
+      else out.playCountered = stash[1]!;
+      continue;
+    }
     if (line === "You may play cards exiled with ~, and you may spend mana as though it were mana of any color to cast those spells.") {
       if (out.playLinked) out.unsupported.push(raw);
       else out.playLinked = true;
@@ -1380,6 +1386,10 @@ export function compile(d: CardDef): CompiledCard {
     const noGain = /^(Players|Your opponents|Enchanted player) can't gain life\.$/.exec(line);
     if (noGain) {
       out.cantGainLife = noGain[1] === "Players" ? "all" : noGain[1] === "Enchanted player" ? "enchanted" : "opponents";
+      continue;
+    }
+    if (line === "If a player would gain life, that player gains no life instead.") {
+      out.gainsNoLife = true;
       continue;
     }
     if (line === "Damage can't be prevented.") {
@@ -1785,6 +1795,24 @@ export function compile(d: CardDef): CompiledCard {
     if (proto && parseManaCost(proto[1]!).supported && !parseManaCost(proto[1]!).hasX) {
       (out.altCosts ??= []).push({ kind: "prototype", mana: proto[1]! });
       continue;
+    }
+    // Heaped Harvest: "When ~ enters and when you sacrifice it, ...": two triggers doing the same.
+    const andSac = /^When ~ enters and when you sacrifice it, (.+)$/.exec(line);
+    if (andSac) {
+      const halves = [`When ~ enters, ${andSac[1]}`, `When you sacrifice ~, ${andSac[1]}`].map((l) => parseTrigger(l));
+      if (halves.every((t) => t && t !== "fail")) {
+        for (const t of halves) out.triggers.push(t as TriggeredAbility);
+        continue;
+      }
+    }
+    // Unbound Flourishing: two events, each its own trigger; "if that spell's mana cost or that ability's activation cost
+    // contains {X}" can't change after it's cast or activated, so it's checked as it triggers (CR 603.4).
+    if (line === "Whenever you cast an instant or sorcery spell or activate an ability, if that spell's mana cost or that ability's activation cost contains {X}, copy that spell or ability. You may choose new targets for the copy.") {
+      const halves = ["Whenever you cast an instant or sorcery spell with {X} in its mana cost, copy that spell. You may choose new targets for the copy.", "Whenever you activate an ability with {X} in its activation cost that isn't a mana ability, copy that ability. You may choose new targets for the copy."].map((l) => parseTrigger(l));
+      if (halves.every((t) => t && t !== "fail")) {
+        for (const t of halves) out.triggers.push({ ...(t as TriggeredAbility), body: { ...(t as TriggeredAbility).body, text: "copy that spell or ability. You may choose new targets for the copy." } });
+        continue;
+      }
     }
     // Tergrid, God of Fright: two events, each its own trigger; "that card" only while it's still in the graveyard it went
     // to (rulings: a commander put into the command zone, a card with madness exiled, isn't there).

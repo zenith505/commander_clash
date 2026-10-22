@@ -817,6 +817,9 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "playerGains":
     case "attach":
     case "attachAny":
+    case "attachLastKnown":
+    case "doubleX":
+    case "removeExiledCounter":
     case "attachElsewhere":
     case "attachToChosen":
     case "unattach":

@@ -104,6 +104,8 @@ export interface Ctx {
   exchanged?: boolean;
   /** "Whenever ~ deals combat damage to a player": "that player" is that player. */
   eventPlayer?: boolean;
+  /** While counting for "each player ... that player controls" (Price of Progress): "that player" is each of them in turn (PlayerRef eachOne). */
+  eachOne?: boolean;
   /** "Choose an opponent." came before: "that player" is the one chosen. */
   chosenOpponent?: boolean;
   /** "Roll two d8 and choose one result" came before: "that result" and "the other result" mean something. */
@@ -232,6 +234,8 @@ const checkableMay = (e: Effect) =>
   (e.type === "exile" && e.what.ref === "selfCard") ||
   // "You may tap it. When you do, ..." (The Fire Nation Drill): only an untapped permanent can be tapped (CR 701.26a).
   (e.type === "tap" && e.what.ref === "self") ||
+  // "You may remove a hit counter from a card that player owns in exile. If you do, ..." (Mari): only with one there.
+  e.type === "removeExiledCounter" ||
   // "You may remove a charge counter from ~. If you do, you gain 1 life" (Sun Droplet): only with that many on it.
   (e.type === "removeCounters" && e.what.ref === "self" && typeof e.n === "number") ||
   // "You may put the top creature card of defending player's graveyard onto the battlefield. If you do, ..." (Bone Dancer).
@@ -294,6 +298,10 @@ function parseRevealedIf(sentences0: string[], at: number, ctx: Ctx): { effect: 
   let otherwise = other ? revealedAction(other[1]!, ctx) : undefined;
   if (otherwise === null) return null;
   if (other) next++;
+  // Fecund Greenshell: "If it's a land card, you may put it onto the battlefield tapped. Otherwise, put it into your
+  // hand.": a land you choose not to put onto the battlefield goes to your hand too (rulings).
+  const mayPut = then.length === 1 && then[0]!.type === "may" && !then[0]!.otherwise && !then[0]!.pay && then[0]!.effects.length === 1 && then[0]!.effects[0]!.type === "putOntoBattlefield" ? then[0]! : null;
+  if (other && mayPut && otherwise && /^put it into your hand$/.test(other[1]!)) then[0] = { ...mayPut, otherwise: structuredClone(otherwise) };
   // "If it's a land card, you may put it onto the battlefield tapped. If you don't put the card onto the battlefield, put
   // it into your hand." (Risen Reef), "If you didn't put a card onto the battlefield this way, create ..." (Rulik Mons):
   // when it isn't one, or when you choose not to.
@@ -597,6 +605,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // Brass's Tunnel-Grinder: "Then if there are three or more bore counters on it, remove those counters and transform it."
   // Primal Amulet: "..., you may remove those counters and transform it."
   text = text.replace(/^([Pp]ut an? ([a-z]+) counter on ~\.) Then if (?:it has|there are) ([a-z]+) or more \2 counters on it, (you may )?remove (?:all of them|those counters) and /, (_, put: string, kind: string, n: string, may?: string) => `${put} If there are ${n} or more ${kind} counters on ~, ${may ?? ""}remove all ${kind} counters from ~ and `);
+  // Firebender Ascension: "Put a quest counter on ~. Then if it has four or more quest counters on it, you may copy that
+  // ability": the same check of ~'s counters as it resolves.
+  text = text.replace(/^([Pp]ut an? ([a-z]+) counter on ~\.) Then if it has ([a-z]+) or more \2 counters on it, (you may copy that ability\.)/, "$1 If there are $3 or more $2 counters on ~, $4");
   text = text.replace(/^([Pp]ut an? [a-z]+ counter on ~\. If there are [a-z]+ or more [a-z]+ counters on ~, (?:you may )?remove all [a-z]+ counters from ~ and transform) it\.$/, "$1 ~.");
   text = text.replace(/^Choose (up to one target [a-z]+), then (airbend|exile|destroy) all other ([a-z]+)\./, (_, t: string, verb: string, what: string) => `Choose ${t}. ${verb.charAt(0).toUpperCase()}${verb.slice(1)} all other ${what}.`);
   // "Transform ~, then untap it" (Westvale Abbey): the same permanent, now its back face (CR 712.18).
@@ -1176,11 +1187,24 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     }
     // "Search your library for a creature or land card and reveal it. Put it onto the battlefield tapped if it's a land
     // card. Otherwise, put it into your hand. Then shuffle." (Archdruid's Charm): one search, the land card's own destination.
-    const searchReveal = /^Search your library for (an? [a-z ]+? card) and reveal it$/.exec(s);
+    const searchReveal = /^Search your library for (an? [A-Za-z ]+? card) and reveal it$/.exec(s);
     if (searchReveal && sentences[si + 1] === "Put it onto the battlefield tapped if it's a land card" && sentences[si + 2] === "Otherwise, put it into your hand" && /^Then,? shuffle$/.test(sentences[si + 3] ?? "")) {
       const fx = parseOne(`Search your library for ${searchReveal[1]}, reveal it, put it into your hand, then shuffle`, ctx);
       if (fx?.length !== 1 || fx[0]!.type !== "search") return null;
       effects.push({ ...fx[0]!, landTo: { zone: "battlefield", tapped: true } });
+      si += 3;
+      continue;
+    }
+    // Scholar of New Horizons: "Search your library for a Plains card and reveal it. If an opponent controls more lands
+    // than you, you may put that card onto the battlefield tapped. If you don't put the card onto the battlefield, put it
+    // into your hand. Then shuffle." One search; the card found goes onto the battlefield instead only if the condition
+    // holds then, and the player wants it to (rulings).
+    const mayInstead = searchReveal && /^If (.+), you may put that card onto the battlefield( tapped)?$/.exec(sentences[si + 1] ?? "");
+    if (searchReveal && mayInstead && sentences[si + 2] === "If you don't put the card onto the battlefield, put it into your hand" && /^Then,? shuffle$/.test(sentences[si + 3] ?? "")) {
+      const fx = parseOne(`Search your library for ${searchReveal[1]}, reveal it, put it into your hand, then shuffle`, ctx);
+      const cond = parseStaticCondition(mayInstead[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      if (fx?.length !== 1 || fx[0]!.type !== "search" || !cond) return null;
+      effects.push({ ...fx[0]!, mayInstead: { dest: { zone: "battlefield", ...(mayInstead[2] ? { tapped: true } : {}) }, cond } });
       si += 3;
       continue;
     }
@@ -1610,6 +1634,15 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
         si++;
         continue;
       }
+    }
+    // Cunning Rhetoric: "exile the top card of that player's library. You may play that card for as long as it remains
+    // exiled, and you may spend mana as though it were mana of any color to cast it." Face up (CR 406.3), a land played
+    // as your land play (rulings), mana of any type for a spell (CR 609.4b).
+    if (!exTop && !impulseIf && ctx.eventPlayer && /^[Ee]xile the top card of that player's library$/.test(s) && /^You may play that card for as long as it remains exiled(, and you may spend mana as though it were mana of any color to cast it)?$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      effects.push({ type: "impulse", n: 1, until: "exiled", who: { ref: "eventPlayer" }, ...(/any color/.test(sentences[si + 1]!) ? { anyType: true as const } : {}) });
+      ctx.exiledTop = true;
+      si++;
+      continue;
     }
     // Grenzo, Havoc Raiser: "... and you may spend mana as though it were mana of any color to cast that spell" (CR 609.4b).
     if (theirTop) {
@@ -2224,6 +2257,19 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [landIs[1]!], text: landIs[1]! };
       const either: Effect = { type: "either", options: [[{ type: "putOntoBattlefield", what: back.what }], [back]], labels: ["Return it to the battlefield", "Return it to your hand"] };
       effects[effects.length - 1] = { type: "if", cond: { kind: "subjectIs", filter }, effects: [{ ...prev, effects: [either] }], otherwise: [prev] };
+      continue;
+    }
+    // Emiel the Blessed: "Whenever another creature you control enters, you may pay {G/W}. If you do, put a +1/+1 counter on
+    // it. If it's a Unicorn, put two +1/+1 counters on it instead.": the creature as it is when this resolves (CR 608.2c).
+    const subjectType = ctx.subjectIt ? /^If it's an? ([A-Z][a-z]+), put (two|three) \+1\/\+1 counters on it instead$/.exec(s) : null;
+    if (subjectType && CREATURE_TYPES.has(subjectType[1]!)) {
+      const prev = effects[effects.length - 1];
+      const holder = prev?.type === "may" && prev.effects.length === 1 ? prev : undefined;
+      const one = holder ? holder.effects[0] : prev;
+      if (one?.type !== "counters" || one.what.ref !== "subject" || one.counter !== "+1/+1" || one.n !== 1) return null;
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [subjectType[1]!], text: subjectType[1]! };
+      const pick: Effect = { type: "if", cond: { kind: "subjectIs", filter }, effects: [{ ...one, n: num(subjectType[2]!) }], otherwise: [one] };
+      effects[effects.length - 1] = holder ? { ...holder, effects: [pick] } : pick;
       continue;
     }
     // Essence Flux: "Exile target creature you control, then return that card to the battlefield under its owner's
@@ -2954,9 +3000,10 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
         for (const e of both) if (e.type === "copySpell") e.newTargets = true;
         continue;
       }
-      // Wandering Archaic: "If they don't, you may copy that spell. You may choose new targets for the copy."
+      // Wandering Archaic: "If they don't, you may copy that spell. You may choose new targets for the copy."; Firebender
+      // Ascension: "Then if it has four or more quest counters on it, you may copy that ability. ..."
       const only = both.length === 1 && both[0]!.type === "may" && both[0]!.effects.length === 1 ? both[0]!.effects[0] : undefined;
-      if (only?.type === "copySpell" && prev?.type === "if" && prev.cond.kind === "theyChose") {
+      if (only?.type === "copySpell" && prev?.type === "if") {
         only.newTargets = true;
         continue;
       }
@@ -4612,6 +4659,12 @@ export function parseUnlessPays(text: string, ctx: Ctx): UnlessPays | null {
   if ((m = /^((?:\{(?:\d+|[WUBRGC])\})+)(?: and (\d+) life)?$/.exec(text))) return { cost: m[1]!, ...(m[2] ? { life: Number(m[2]) } : {}) };
   // "Pay 5 life" (Dash Hopes): only with that much life (CR 119.4).
   if ((m = /^(\d+) life$/.exec(text))) return { cost: "", life: Number(m[1]) };
+  // "Unless its controller pays mana equal to the greatest power among creatures you control" (Repulsive Mutation):
+  // generic mana, counted as it resolves.
+  if ((m = /^mana equal to (.+)$/.exec(text))) {
+    const n = parseCount(m[1]!, ctx);
+    return n && typeof n === "object" ? { cost: "", generic: n } : null;
+  }
   if ((m = /^\{(\d+)\} for each (.+)$/.exec(text))) {
     const per = parseCount(m[2]!, ctx, true);
     const generic = per && scaleAmount(Number(m[1]), per);

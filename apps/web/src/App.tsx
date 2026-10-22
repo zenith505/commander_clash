@@ -1311,7 +1311,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
             <GraveyardPicker
               s={s}
               label={targeting.label}
-              spec={nextSpec}
+              // "For each opponent, ... from that player's graveyard": every opponent's cards, each click to its owner's slot.
+              spec={inRun ? (({ controlledBy: _c, ...rest }) => rest)(nextSpec) : nextSpec}
               sourceId={targetSource}
               allowed={(id) => canTarget({ kind: "object", id })}
               onSkip={nextSpec.optional ? skipTargets : undefined}

@@ -113,7 +113,8 @@ export function canonicalKeyword(text: string): string | undefined {
   if (k) return k;
   if (p === CHOSEN_KEYWORD) return CHOSEN_KEYWORD;
   // "Hexproof from blue" (CR 702.11d): from a color, or from all of them, one or more than one.
-  const hx = /^hexproof from (white|blue|black|red|green|each color|monocolored|multicolored)$/.exec(p);
+  // "Hexproof from activated and triggered abilities" (Volatile Stormdrake): from abilities, not spells.
+  const hx = /^hexproof from (white|blue|black|red|green|each color|monocolored|multicolored|activated and triggered abilities)$/.exec(p);
   if (hx) return `Hexproof from ${hx[1]}`;
   if (p === "hexproof from the chosen color") return CHOSEN_HEXPROOF;
   // "Gains toxic 1" (Skrelv): a keyword with a number (CR 702.164a).
@@ -222,6 +223,8 @@ export function hexproofFrom(keywords: readonly string[], src: SourceQuality): b
     if (q === "each color" && src.colors.length > 0) return true; // CR 702.11g
     if (q === "multicolored" && src.colors.length > 1) return true;
     if (q === "monocolored" && src.colors.length === 1) return true;
+    // Volatile Stormdrake: any ability that targets is an activated or triggered one (spells' own abilities are the spell).
+    if (q === "activated and triggered abilities" && !src.spell) return true;
   }
   return false;
 }

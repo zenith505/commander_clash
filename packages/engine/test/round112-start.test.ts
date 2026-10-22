@@ -3,7 +3,8 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, cast, passAll, passUntil, pt, putOnBattlefield, setup, swamp } from "./helpers";
-import { botActions, characteristics, compileCard, isFullySupported, manaAbilitiesOn, manaValue, spellCost, planActivate, waitingOn, type Action, type CardDef, type GameObject, type GameState, type PlayerId } from "../src";
+import { legalTargets, sourceQuality, spellQuality } from "../src/effects/targeting";
+import { botActions, characteristics, compileCard, controllerOf, isFullySupported, manaAbilitiesOn, manaValue, spellCost, planActivate, waitingOn, type Action, type CardDef, type GameObject, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const gix = card("Gix, Yawgmoth Praetor", "Legendary Creature — Phyrexian Praetor", "{1}{B}{B}", {
@@ -461,5 +462,78 @@ describe("whenever one or more creatures you control attack a player", () => {
     s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: a, defender: p1 }, { attacker: merfolk, defender: p2 }] });
     s = passAll(passAll(s));
     expect(s.players[ap]!.hand.length).toBe(hand + 2);
+  });
+});
+
+const stormdrake = card("Volatile Stormdrake", "Creature — Drake", "{1}{U}", {
+  power: "3",
+  toughness: "2",
+  keywords: ["Flying", "Hexproof from"],
+  oracleText:
+    "Flying, hexproof from activated and triggered abilities\nWhen this creature enters, exchange control of this creature and target creature an opponent controls. If you do, you get {E}{E}{E}{E}, then sacrifice that creature unless you pay an amount of {E} equal to its mana value.",
+});
+
+describe("Volatile Stormdrake", () => {
+  const enter = (big = false) => {
+    const { s: s0, ap, opp, ids } = setup([stormdrake]);
+    const theirs = putOnBattlefield(s0, opp, big ? card("Craw Wurm", "Creature — Wurm", "{4}{G}{G}", { power: "6", toughness: "4" }) : bear());
+    let s = passAll(cast(s0, ap, ids[0]!));
+    // The enters trigger: its target.
+    expect(s.pending).toMatchObject({ kind: "chooseTargets" });
+    s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: theirs }] } as Action);
+    return { s, ap, opp, drake: ids[0]!, theirs };
+  };
+
+  it("parse; hexproof from activated and triggered abilities", () => {
+    expect(isFullySupported(stormdrake)).toBe(true);
+  });
+
+  it("exchanges control, gives four energy, and you pay the creature's mana value in energy to keep it", () => {
+    let { s, ap, opp, drake, theirs } = enter();
+    s = passAll(s);
+    expect(controllerOf(s, s.objects[drake]!)).toBe(opp);
+    expect(controllerOf(s, s.objects[theirs]!)).toBe(ap);
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap, pay: { energy: 2 } });
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect(s.players[ap]!.energy).toBe(2);
+    expect(s.objects[theirs]!.zone).toBe("battlefield");
+  });
+
+  it("not paying, or not having enough energy, sacrifices it", () => {
+    let { s, ap, theirs } = enter();
+    s = act(passAll(s), { type: "chooseMay", player: ap, yes: false });
+    expect(s.objects[theirs]!.zone).toBe("graveyard");
+    expect(s.players[ap]!.energy).toBe(4);
+    const big = enter(true);
+    s = passAll(big.s);
+    // Mana value 6, four energy: it can't be paid, so it's sacrificed without asking.
+    expect(s.pending?.kind).not.toBe("chooseMay");
+    expect(s.objects[big.theirs]!.zone).toBe("graveyard");
+    expect(s.players[big.ap]!.energy).toBe(4);
+  });
+
+  it("with the Stormdrake gone before the trigger resolves, nothing happens: no exchange, no energy", () => {
+    let { s, ap, drake, theirs, opp } = enter();
+    const o = s.objects[drake]!;
+    s.battlefield.splice(s.battlefield.indexOf(drake), 1);
+    o.zone = "graveyard";
+    o.zoneChanges = (o.zoneChanges ?? 0) + 1;
+    s.players[ap]!.graveyard.push(drake);
+    s = passAll(s);
+    expect(controllerOf(s, s.objects[theirs]!)).toBe(opp);
+    expect(s.players[ap]!.energy ?? 0).toBe(0);
+  });
+
+  it("can't be the target of an opponent's activated or triggered abilities, but can be of their spells", () => {
+    const { s, opp } = setup([]);
+    const drake = putOnBattlefield(s, s.activePlayer, stormdrake);
+    const pinger = putOnBattlefield(s, opp, card("Prodigal Pyromancer", "Creature — Human Wizard", "{2}{R}", { power: "1", toughness: "1", oracleText: "{T}: Prodigal Pyromancer deals 1 damage to any target." }));
+    const spec = { kind: "object" as const, types: ["Creature"], notTypes: [], notColors: [], text: "creature" };
+    const ability = legalTargets(s, spec, opp, undefined, sourceQuality(s, pinger), pinger).map((t) => (t as { id: string }).id);
+    expect(ability).not.toContain(drake);
+    const spell = legalTargets(s, spec, opp, undefined, spellQuality(s, bolt.oracleId)).map((t) => (t as { id: string }).id);
+    expect(spell).toContain(drake);
+    // Its controller's own abilities can.
+    expect(legalTargets(s, spec, s.activePlayer, undefined, sourceQuality(s, pinger), pinger).map((t) => (t as { id: string }).id)).toContain(drake);
   });
 });

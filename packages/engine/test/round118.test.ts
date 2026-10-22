@@ -300,3 +300,81 @@ describe("Gogo, Mysterious Mime", () => {
     expect(characteristics(s, s.objects[k]!).power).toBe(4);
   });
 });
+
+const deeps = card("Echoing Deeps", "Land — Cave", "", {
+  oracleText: "You may have this land enter tapped as a copy of any land card in a graveyard, except it's a Cave in addition to its other types.\n{T}: Add {C}.",
+});
+const crossroads = card("Kabira Crossroads", "Land", "", { oracleText: "Kabira Crossroads enters tapped.\nWhen Kabira Crossroads enters, you gain 2 life.\n{T}: Add {W}." });
+
+describe("Echoing Deeps", () => {
+  it("enters tapped as a copy of a land card in a graveyard, a Cave too; its enters ability triggers", () => {
+    expect(isFullySupported(deeps)).toBe(true);
+    const { s: s0, ap, ids } = setup([deeps]);
+    let s = s0;
+    const opp = later(s, ap, 2);
+    const yard = putOnBattlefield(s, opp, crossroads);
+    moveObject(s, yard, "graveyard");
+    s = act(s, { type: "playLand", player: ap, objectId: ids[0]! });
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "copy", options: [yard, "none"] });
+    expect(botActions(s, ap)).toEqual([{ type: "chooseOption", player: ap, choice: yard }]);
+    const life = s.players[ap]!.life;
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: yard }));
+    const c = characteristics(s, s.objects[ids[0]!]!);
+    expect(c.name).toBe("Kabira Crossroads");
+    expect(c.subtypes).toContain("Cave");
+    expect(s.objects[ids[0]!]!.tapped).toBe(true);
+    expect(s.players[ap]!.life).toBe(life + 2);
+  });
+
+  it("not copying anything, it enters untapped", () => {
+    const { s: s0, ap, ids } = setup([deeps]);
+    let s = s0;
+    const yard = putOnBattlefield(s, ap, crossroads);
+    moveObject(s, yard, "graveyard");
+    s = act(s, { type: "playLand", player: ap, objectId: ids[0]! });
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: "none" }));
+    expect(s.objects[ids[0]!]!.tapped).toBe(false);
+    expect(characteristics(s, s.objects[ids[0]!]!).name).toBe("Echoing Deeps");
+  });
+});
+
+const powerbalance = card("Powerbalance", "Enchantment", "{R}{R}", {
+  oracleText:
+    "Whenever an opponent casts a spell, you may reveal the top card of your library. If you do, you may cast that card without paying its mana cost if the two spells have the same mana value.",
+});
+
+describe("Powerbalance", () => {
+  const withTop = (top: ReturnType<typeof card>) => {
+    const { s: s0, ap, ids } = setup([bear({ name: "Cast Bear" })]);
+    let s = s0;
+    const b = later(s, ap, 1);
+    putOnBattlefield(s, b, powerbalance);
+    const t = putOnBattlefield(s, b, top);
+    moveObject(s, t, "library");
+    s.players[b]!.library = [t, ...s.players[b]!.library.filter((x) => x !== t)];
+    s = run(s, planCast(s, ap, ids[0]!));
+    for (let i = 0; i < 10 && s.pending?.kind !== "chooseMay"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    return { s, ap, b, t };
+  };
+
+  it("an opponent's spell with mana value 2: you may cast the revealed top card with mana value 2 for free", () => {
+    expect(isFullySupported(powerbalance)).toBe(true);
+    let { s, b, t } = withTop(bear({ name: "Free Bear" }));
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: b });
+    s = act(s, { type: "chooseMay", player: b, yes: true });
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "castFromAmong", player: b, options: [t, "none"] });
+    s = act(s, { type: "chooseOption", player: b, choice: t });
+    expect(s.pending).toMatchObject({ kind: "castFree", objectId: t });
+    s = run(s, planCast(s, b, t));
+    expect(s.objects[t]!.zone).toBe("stack");
+    s = settle(s);
+    expect(s.objects[t]!.zone).toBe("battlefield");
+  });
+
+  it("a card with another mana value stays on top", () => {
+    let { s, b, t } = withTop(card("Big Thing", "Creature — Beast", "{4}{G}", { power: "5", toughness: "5" }));
+    s = settle(act(s, { type: "chooseMay", player: b, yes: true }));
+    expect(s.objects[t]!.zone).toBe("library");
+    expect(s.players[b]!.library[0]).toBe(t);
+  });
+});

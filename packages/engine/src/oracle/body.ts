@@ -1772,6 +1772,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si += 2;
       continue;
     }
+    // Powerbalance, in an opponent's cast trigger: "You may reveal the top card of your library. If you do, you may cast
+    // that card without paying its mana cost if the two spells have the same mana value." Cast from the library as this
+    // resolves (CR 608.2g, rulings), its mana value compared with the spell's (X as chosen for that spell, CR 202.3e).
+    if (/^[Yy]ou may reveal the top card of your library$/.test(s) && ctx.castSpell && sentences[si + 1]?.replace(/\.$/, "") === "If you do, you may cast that card without paying its mana cost if the two spells have the same mana value") {
+      const mv = parseCount("that spell's mana value", ctx);
+      if (!mv) return null;
+      effects.push({ type: "may", effects: [{ type: "castFromAmong", who: { ref: "you" }, n: 1, reveal: true, exactMv: mv, max: 1 }], text: "reveal the top card of your library" });
+      si++;
+      continue;
+    }
     const sunbird = /^[Rr]eveal the top X cards of your library, where X is (that spell's mana value)$/.exec(s);
     if (sunbird && sentences[si + 1]?.replace(/\.$/, "") === "You may cast a spell with mana value X or less from among cards revealed this way without paying its mana cost" && sentences[si + 2]?.replace(/\.$/, "") === "Put the rest on the bottom of your library in a random order") {
       const x = parseCount(sunbird[1]!, ctx);

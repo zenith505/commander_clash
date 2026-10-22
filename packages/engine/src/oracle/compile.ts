@@ -1312,13 +1312,14 @@ export function compile(d: CardDef): CompiledCard {
     const clone = /^(?:You may have ~ enter( tapped)? as|As ~ enters, you may have it become) a copy of (?:any |an? )?(.+?)( until end of turn)?(?:, except (.+?))?\.?$/.exec(line);
     if (clone) clone.splice(1, 1);
     const cloneTapped = /^You may have ~ enter tapped as/.test(line) ? { tapped: true as const } : {};
-    // "You may have this creature enter as a copy of any creature card in a graveyard, except ..." (Lazotep Convert): a
-    // card in any graveyard, by its printed characteristics.
-    const fromYard = clone && !clone[2] && /^creature card in a graveyard$/.exec(clone[1]!);
+    // "You may have this creature enter as a copy of any creature card in a graveyard, except ..." (Lazotep Convert), "You
+    // may have ~ enter tapped as a copy of any land card in a graveyard, except it's a Cave ..." (Echoing Deeps): a card in
+    // any graveyard, by its printed characteristics.
+    const fromYard = clone && !clone[2] ? /^(creature|land) card in a graveyard$/.exec(clone[1]!) : null;
     if (clone && fromYard) {
       const except = clone[3] ? parseCopyExcept(clone[3]) : undefined;
       if (except !== null && !except?.thisAbility) {
-        out.entersAsCopy = { filter: { kind: "card", types: ["Creature"], text: clone[1]! }, ...(except ? { except } : {}), ...cloneTapped };
+        out.entersAsCopy = { filter: { kind: "card", types: [fromYard[1] === "land" ? "Land" : "Creature"], text: clone[1]! }, ...(except ? { except } : {}), ...cloneTapped };
         continue;
       }
     }

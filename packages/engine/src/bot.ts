@@ -404,7 +404,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // A card in a graveyard (Lazotep Convert): the one with the highest mana value, not a legend we already have.
       const mine = (name: string) => s.battlefield.some((b) => controllerOf(s, obj(s, b)) === pid && characteristics(s, obj(s, b)).name === name);
       const ok = ids.filter((x) => (obj(s, x).zone === "graveyard" ? !(defOf(s, obj(s, x)).supertypes.includes("Legendary") && mine(defOf(s, obj(s, x)).name)) : !(characteristics(s, obj(s, x)).supertypes.includes("Legendary") && controllerOf(s, obj(s, x)) === pid)));
-      const value = (x: string) => (obj(s, x).zone === "graveyard" ? 0 : worth(s, pid, obj(s, x))) + mv(s, x);
+      // A land card (Echoing Deeps): a nonbasic one, the one with the most rules text.
+      const landValue = (x: string) => (defOf(s, obj(s, x)).supertypes.includes("Basic") ? 0 : 1 + (defOf(s, obj(s, x)).oracleText?.length ?? 0) / 1000);
+      const value = (x: string) => (obj(s, x).zone === "graveyard" ? (isType(defOf(s, obj(s, x)), "Land") ? landValue(x) : 0) : worth(s, pid, obj(s, x))) + mv(s, x);
       const best = ok.sort((a, b) => value(b) - value(a))[0];
       return [{ type: "chooseOption", player: pid, choice: best ?? "none" }];
     }

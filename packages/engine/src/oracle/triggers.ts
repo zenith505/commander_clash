@@ -677,7 +677,10 @@ function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
       ...(anyRecipient[3] ? { activeIf: { kind: "yourTurn" as const } } : {}),
     };
   }
-  const m = /^Whenever (another|an?) (.+?) you control deals combat damage to (a player(?: or battle)?|an opponent), (.+)$/.exec(line);
+  // "Whenever a creature you control with deathtouch deals combat damage to a player" (Fynn, the Fangbearer): the
+  // keyword as it deals the damage.
+  const withKw = /^(Whenever (?:another|an?) creature) you control (with [a-z]+) (deals combat damage to .+)$/.exec(line);
+  const m = /^Whenever (another|an?) (.+?) you control deals combat damage to (a player(?: or battle)?|an opponent), (.+)$/.exec(withKw ? `${withKw[1]} ${withKw[2]} you control ${withKw[3]}` : line);
   if (!m) return null;
   const filter = parseTargetPhrase(m[2]!);
   if (!filter || filter.kind !== "object" || filter.controller || !(filter.types?.includes("Creature") || filter.subtypes?.length || filter.allTypes?.includes("Creature") || filter.commander)) return "fail";

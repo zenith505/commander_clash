@@ -733,6 +733,7 @@ export function cantBeCountered(s: GameState, item: StackItem): boolean {
   if (compileCard(d).cantBeCountered || (o.uncounterableCast && !item.copy)) return true;
   // "Spells you control can't be countered this turn" (Veil of Summer): those on the stack already too (rulings).
   if ((s.turnRules ?? []).some((r) => r.turn === s.turn && r.player === item.controller && r.rule === "spellsUncounterable")) return true;
+  if (!item.copy && isType(d, "Creature") && (s.turnRules ?? []).some((r) => r.turn === s.turn && r.player === item.controller && r.rule === "creatureSpellsUncounterable")) return true;
   return s.battlefield.some((id) => {
     const p = obj(s, id);
     return !!abilitiesOf(s, p).uncounterable?.some((u) => (u.anyone || controllerOf(s, p) === item.controller) && printedMatches(u.filter, d));

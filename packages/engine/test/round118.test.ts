@@ -882,3 +882,60 @@ describe("more popular cards", () => {
     expect(s.players[ap]!.hand.length).toBe(hand + 2);
   });
 });
+
+const fynn = card("Fynn, the Fangbearer", "Legendary Creature — Human Warrior", "{1}{G}", {
+  power: "1",
+  toughness: "3",
+  keywords: ["Deathtouch"],
+  oracleText: "Deathtouch\nWhenever a creature you control with deathtouch deals combat damage to a player, that player gets two poison counters.",
+});
+const domri = card("Domri, Anarch of Bolas", "Legendary Planeswalker — Domri", "{1}{R}{G}", {
+  loyalty: "3",
+  oracleText: "Creatures you control get +1/+0.\n+1: Add {R} or {G}. Creature spells you cast this turn can't be countered.\n−2: Target creature you control fights target creature you don't control.",
+});
+const guide = card("Great Divide Guide", "Creature — Human Scout Ally", "{1}{G}", {
+  power: "2",
+  toughness: "3",
+  oracleText: 'Each land and Ally you control has "{T}: Add one mana of any color."',
+});
+
+describe("more popular cards, 2", () => {
+  it("Fynn: a creature with deathtouch that deals combat damage to a player gives two poison counters", () => {
+    expect(isFullySupported(fynn)).toBe(true);
+    const { s: s0, ap, opp } = setup([]);
+    let s = s0;
+    putOnBattlefield(s, ap, fynn);
+    const dt = putOnBattlefield(s, ap, bear({ name: "Deadly Bear", keywords: ["Deathtouch"], oracleText: "Deathtouch" }));
+    const plain = putOnBattlefield(s, ap, bear());
+    s = passUntil(s, "declareAttackers", ap);
+    s = settle(act(s, { type: "declareAttackers", player: ap, attacks: [dt, plain].map((attacker) => ({ attacker, defender: opp })) }));
+    s = passUntil(s, "main2", ap);
+    expect(s.players[opp]!.poison).toBe(2);
+  });
+
+  it("Domri, Anarch of Bolas +1: {R} or {G}, and creature spells you cast this turn can't be countered", () => {
+    expect(isFullySupported(domri)).toBe(true);
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const d = putOnBattlefield(s, ap, domri);
+    s = settle(run(s, planActivate(s, ap, d, 0)));
+    if (s.pending) s = settle(run(s, botActions(s, ap)));
+    const pool = s.players[ap]!.manaPool;
+    expect((pool.R ?? 0) + (pool.G ?? 0)).toBe(1);
+    expect((s.turnRules ?? []).some((r) => r.rule === "creatureSpellsUncounterable" && r.player === ap)).toBe(true);
+  });
+
+  it("Great Divide Guide: lands and Allies you control tap for any color", () => {
+    expect(isFullySupported(guide)).toBe(true);
+    const { s: s0, ap } = setup([]);
+    const s = s0;
+    const g = putOnBattlefield(s, ap, guide);
+    const ally = putOnBattlefield(s, ap, bear({ name: "Ally Bear", subtypes: ["Bear", "Ally"] }));
+    const other = putOnBattlefield(s, ap, bear());
+    invalidateCharacteristics(s);
+    const abilities = (id: string) => characteristics(s, s.objects[id]!).grantedAbilities?.length ?? 0;
+    expect(abilities(ally)).toBeGreaterThan(0);
+    expect(abilities(g)).toBeGreaterThan(0);
+    expect(abilities(other)).toBe(0);
+  });
+});

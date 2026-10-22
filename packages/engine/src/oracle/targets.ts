@@ -903,6 +903,12 @@ export function parseTargetPhrase(
     extra.orSubtypes = ["Vehicle"];
     p = p.replace(/ or vehicle$/, "");
   }
+  // "Each land and Ally you control" (Great Divide Guide): a land, or an Ally whatever its card types.
+  const orKind = /^(land|artifact|enchantment) or ([a-z]+)$/.exec(p);
+  if (orKind && !extra.orSubtypes && CREATURE_TYPES.has(capital(orKind[2]!))) {
+    extra.orSubtypes = [capital(orKind[2]!)];
+    p = orKind[1]!;
+  }
   // "Angel, Demon, or Dragon creature card" (Kaalia of the Vast): a creature that's one of those creature types; only the
   // last one has the card type, so it's for all of them.
   // "Nonland, nontoken permanent" (Mistmeadow Vanisher): one object that's neither, like "nonland nontoken permanent".

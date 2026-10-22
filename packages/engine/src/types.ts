@@ -1582,7 +1582,8 @@ export interface TurnRule {
    * "spellsUncounterable": "Spells you control can't be countered this turn" (Veil of Summer, CR 101.2).
    */
   /** "cantWinGame": "players can't win the game this turn" (Everybody Lives!). */
-  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable";
+  /** "creatureSpellsUncounterable": "Creature spells you cast this turn can't be countered" (Domri, Anarch of Bolas): cast, so not a copy. */
+  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable" | "creatureSpellsUncounterable";
 }
 
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */

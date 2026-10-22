@@ -258,7 +258,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.named !== undefined && !hasName(d.name, spec.named)) return false;
   if (spec.doubleFaced && !isDoubleFacedDef(d)) return false;
   if (spec.manaAbility && !(compileCard(d).mana.length || compileCard(d).manaTriggers?.length)) return false;
-  if (spec.transformed || spec.powerAboveBase) return false;
+  if (spec.transformed || spec.powerAboveBase || spec.colorOfYourLegend) return false;
   return true;
 }
 

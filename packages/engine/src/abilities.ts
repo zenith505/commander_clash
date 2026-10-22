@@ -305,6 +305,8 @@ export interface TargetSpec {
   notTypes?: string[];
   /** Excluded colors, e.g. "nonblack creature" -> ["B"]. */
   notColors?: Color[];
+  /** "A card that shares a color with a legendary creature you control" (Ringsight): a color of one of them as the search is made; none if they're colorless (rulings). */
+  colorOfYourLegend?: true;
   /** At least one of these colors, e.g. "blue permanent", "red or green creature". */
   colors?: Color[];
   /** "Multicolored spell" (two or more colors, CR 105.4), "monocolored" (exactly one), "colorless" (none, CR 105.2c). */

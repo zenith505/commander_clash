@@ -88,6 +88,7 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
     return { ...(head ?? { kind: "card" }), bound: spec.bound, text: p };
   }
   if (/^card$/i.test(p)) return undefined;
+  if (p === "card that shares a color with a legendary creature you control") return { kind: "card", colorOfYourLegend: true, text: p };
   // "If it's a land or double-faced card" (Invasion of Pyrulea, CR 712.1).
   if (p === "double-faced card") return { kind: "card", doubleFaced: true, text: p };
   const dfc = /^(.+) or double-faced card$/.exec(p);

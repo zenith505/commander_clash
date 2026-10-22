@@ -6,7 +6,7 @@ import { act, bear, card, cast, island, passUntil, putOnBattlefield, setup, targ
 import { abilityProblem, castProblem } from "../src";
 import { controllerOf } from "../src/layers";
 import { manaAbilityProblem } from "../src/manaabilities";
-import { attackTaxPer, botActions, invalidateCharacteristics, isFullySupported, objHasKeyword, objIsType, power, toughness, isSuspended, planActivate, planCast, waitingOn, type Action, type GameState, type PlayerId } from "../src";
+import { attackTaxPer, botActions, invalidateCharacteristics, isFullySupported, objHasKeyword, objIsType, power, toughness, isSuspended, planActivate, planCast, ringBearer, waitingOn, type Action, type GameState, type PlayerId } from "../src";
 import { attackProblem, moveObject } from "../src/game";
 
 const run = (s: GameState, plan: Action[] | null) => {
@@ -813,5 +813,37 @@ describe("Bow of Nylea", () => {
     s = settle(run(s, planActivate(s, ap, b, 0, [target(y), target(x), { kind: "none" }, { kind: "none" }], [3])));
     const lib = s.players[ap]!.library;
     expect(lib.slice(-2)).toEqual([y, x]);
+  });
+});
+
+const ringsight = card("Ringsight", "Sorcery", "{1}{U}{B}", {
+  oracleText:
+    "The Ring tempts you. Search your library for a card that shares a color with a legendary creature you control, reveal it, put it into your hand, then shuffle.",
+});
+const blueGuy = card("Blue Guy", "Creature — Human", "{1}{U}", { power: "1", toughness: "1" });
+
+describe("Ringsight", () => {
+  it("finds a card sharing a color with a legendary creature you control; your Ring-bearer is legendary (rulings)", () => {
+    expect(isFullySupported(ringsight)).toBe(true);
+    const { s: s0, ap, ids } = setup([ringsight]);
+    const g = putOnBattlefield(s0, ap, bear());
+    const u = putOnBattlefield(s0, ap, blueGuy);
+    moveObject(s0, u, "library");
+    let s = run(s0, planCast(s0, ap, ids[0]!, [], undefined, "auto"));
+    s = settle(s);
+    // The only creature: it's the Ring-bearer without a choice.
+    expect(s.pending?.kind).toBe("searchLibrary");
+    expect(ringBearer(s, ap)?.id).toBe(g);
+    const found = (s.pending as { cards: string[] }).cards;
+    expect(found.length).toBeGreaterThan(0);
+    expect(found.every((id) => s.cards[s.objects[id]!.cardId]!.name === "Grizzly Bears")).toBe(true);
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: [found[0]!] }));
+    expect(s.players[ap]!.hand).toContain(found[0]);
+  });
+  it("a colorless legendary creature shares no color: nothing is found", () => {
+    const { s: s0, ap, ids } = setup([ringsight]);
+    putOnBattlefield(s0, ap, card("Legend Golem", "Legendary Artifact Creature — Golem", "{4}", { power: "3", toughness: "3" }));
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [], undefined, "auto")));
+    expect(s.pending?.kind === "searchLibrary" ? (s.pending as { cards: string[] }).cards : []).toEqual([]);
   });
 });

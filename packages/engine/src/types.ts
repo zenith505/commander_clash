@@ -1627,6 +1627,8 @@ export interface Resolving {
   exiledFromHand?: number;
   /** How many cards its revealFromHand instruction revealed ("for each card revealed this way"). */
   revealedFromHand?: number;
+  /** The land and nonland cards its parleyReveal instruction revealed ("for each nonland card revealed this way"). */
+  parley?: { land: number; nonland: number };
   /** The excess damage its damage instructions dealt to permanents (CR 120.10): "the excess damage dealt this way". */
   excessDamage?: number;
   /** "The damage dealt this way": all of it, so far in this resolution. */

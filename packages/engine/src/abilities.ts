@@ -108,6 +108,8 @@ export type Count =
   | { kind: "sacrificedThisWayCount" }
   /** "For each card revealed this way", "the number of cards revealed this way" after revealFromHand, or in its reflexive trigger. */
   | { kind: "revealedFromHand" }
+  /** Parley: "for each nonland card revealed this way" after "each player reveals the top card of their library" (`land`: land cards instead). */
+  | { kind: "parleyRevealed"; land?: true }
   | { kind: "bottomedFromHand" }
   /** How many cards "you may choose a nonland card from it" chose (0 or 1): for "If you do" and "If you don't". */
   | { kind: "tookFromHand" }
@@ -1989,6 +1991,8 @@ export type Effect =
   | { type: "controlFromEach"; chose: string; duration: "endOfTurn" }
   /** "Reveal the top card of your library" (CR 701.20a): what follows ("If it's a creature card, put it into your hand") is about it (ObjRef "revealed"). */
   /** "Reveal the top card of your library" (CR 701.20a), or with `look` only look at it, for an "if it's a ... card" after it. */
+  /** Parley: "Each player reveals the top card of their library." (ResolvingState.parley counts them.) */
+  | { type: "parleyReveal" }
   | { type: "revealTop"; look?: true; /** "Reveal a card at random from your hand" (Cursed Scroll) instead. */ randomFromHand?: true; /** Whose library: "reveals the top card of their library" (Chaos Warp: the target's owner). Yours if left out. */ who?: PlayerRef }
   /** "Reveal it": the card "look at the top card" looked at (Frost Augur). */
   | { type: "revealRevealed" }

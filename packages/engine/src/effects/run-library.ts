@@ -69,6 +69,20 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (id) log(s, e.look ? `${p.name} looks at the top card of their library.` : `${p.name} reveals ${defOf(s, obj(s, id)).name} from the top of their library.`);
       return;
     }
+    case "parleyReveal": {
+      // Parley: each player reveals the top card of their library, in turn order (CR 101.4); an empty library reveals nothing.
+      const counts = { land: 0, nonland: 0 };
+      for (const pid of apnap(s, s.turnOrder.filter((p) => !player(s, p).lost))) {
+        const p = player(s, pid);
+        const id = p.library[0];
+        if (!id) continue;
+        const d = defOf(s, obj(s, id));
+        counts[isType(d, "Land") ? "land" : "nonland"]++;
+        log(s, `${p.name} reveals ${d.name} from the top of their library.`);
+      }
+      s.resolving!.parley = counts;
+      return;
+    }
     case "revealRevealed": {
       const rv = s.resolving?.revealed;
       const o = rv && s.objects[rv.id];

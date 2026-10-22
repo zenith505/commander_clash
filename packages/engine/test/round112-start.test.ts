@@ -2,7 +2,7 @@
 // and the shock land played from among the cards it exiled).
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, cast, passAll, passUntil, putOnBattlefield, setup, swamp } from "./helpers";
+import { act, bear, card, cast, passAll, passUntil, pt, putOnBattlefield, setup, swamp } from "./helpers";
 import { botActions, characteristics, compileCard, isFullySupported, manaAbilitiesOn, manaValue, spellCost, planActivate, waitingOn, type Action, type CardDef, type GameObject, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
@@ -198,5 +198,104 @@ describe("Semblance Anvil", () => {
     s0.battlefield.splice(s0.battlefield.indexOf(ogreId), 1);
     s0.players[ap]!.hand.push(ogreId);
     expect(total(s0, ap, s0.objects[ogreId]!)).toBe(2);
+  });
+});
+
+const selvala = card("Selvala, Explorer Returned", "Legendary Creature — Elf Scout", "{1}{G}{W}", {
+  power: "2",
+  toughness: "4",
+  oracleText:
+    "Parley — {T}: Each player reveals the top card of their library. For each nonland card revealed this way, add {G} and you gain 1 life. Then each player draws a card. (Activate only as an instant.)",
+});
+const woodvine = card("Woodvine Elemental", "Creature — Elemental", "{4}{G}{W}", {
+  power: "4",
+  toughness: "4",
+  keywords: ["Trample"],
+  oracleText:
+    "Trample\nParley — Whenever this creature attacks, each player reveals the top card of their library. For each nonland card revealed this way, attacking creatures you control get +1/+1 until end of turn. Then each player draws a card.",
+});
+const phabine = card("Phabine, Boss's Confidant", "Legendary Creature — Cat Advisor", "{3}{R}{G}{W}", {
+  power: "3",
+  toughness: "6",
+  oracleText:
+    "Creature tokens you control have haste.\nParley — At the beginning of combat on your turn, each player reveals the top card of their library. For each land card revealed this way, you create a 1/1 green and white Citizen creature token. Then creatures you control get +1/+1 until end of turn for each nonland card revealed this way. Then each player draws a card.",
+});
+const negotiator = card("Cutthroat Negotiator", "Creature — Orc Pirate", "{2}{U}{R}", {
+  power: "4",
+  toughness: "3",
+  oracleText:
+    "Parley — Whenever this creature attacks, each player reveals the top card of their library. For each nonland card revealed this way, you create a tapped Treasure token. Then each player draws a card.",
+});
+
+/** Declare these attackers at the next player. */
+const attackWith = (s: GameState, ap: PlayerId, attackers: string[]) => {
+  const defender = s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % s.turnOrder.length]!;
+  while (s.pending?.kind !== "declareAttackers") s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  return act(s, { type: "declareAttackers", player: ap, attacks: attackers.map((attacker) => ({ attacker, defender })) });
+};
+
+/** The top of each player's library, in turn order from `ap`: a land (true) or a nonland card (false). */
+const tops = (s: GameState, ap: PlayerId, lands: boolean[]) => {
+  const order = [...s.turnOrder.slice(s.turnOrder.indexOf(ap)), ...s.turnOrder.slice(0, s.turnOrder.indexOf(ap))];
+  return order.map((pid, i) => toZone(s, pid, lands[i] ? swamp : bear({ name: `Top Bear ${i}` }), "library"));
+};
+
+describe("parley", () => {
+  it("parse", () => {
+    for (const d of [selvala, woodvine, phabine, negotiator]) expect(isFullySupported(d), d.name).toBe(true);
+  });
+
+  it("Selvala: {G} and 1 life for each nonland card revealed, then each player draws the card they revealed; not a mana ability", () => {
+    const { s: s0, ap } = setup([]);
+    const sel = putOnBattlefield(s0, ap, selvala);
+    const top = tops(s0, ap, [false, true, false, false]);
+    const hands = s0.turnOrder.map((p) => s0.players[p]!.hand.length);
+    let s = act(s0, { type: "activateAbility", player: ap, objectId: sel, index: 0 } as Action);
+    // It uses the stack (rulings: not a mana ability).
+    expect(s.stack).toHaveLength(1);
+    s = passAll(s);
+    expect(s.players[ap]!.manaPool.G).toBe(3);
+    expect(s.players[ap]!.life).toBe(43);
+    expect(s.turnOrder.map((p) => s.players[p]!.hand.length)).toEqual(hands.map((n) => n + 1));
+    for (const id of top) expect(s.objects[id]!.zone).toBe("hand");
+    expect(s.log.slice(-12).filter((l) => / reveals .* from the top of their library\./.test(l.text))).toHaveLength(4);
+  });
+
+  it("Cutthroat Negotiator: a tapped Treasure for each nonland card", () => {
+    const { s: s0, ap } = setup([]);
+    const neg = putOnBattlefield(s0, ap, negotiator);
+    tops(s0, ap, [true, false, true, false]);
+    let s = attackWith(s0, ap, [neg]);
+    s = passAll(s);
+    const treasures = s.battlefield.filter((id) => s.objects[id]!.isToken && characteristics(s, s.objects[id]!).subtypes.includes("Treasure"));
+    expect(treasures).toHaveLength(2);
+    expect(treasures.every((id) => s.objects[id]!.tapped)).toBe(true);
+  });
+
+  it("Woodvine Elemental: attacking creatures get +1/+1 for each nonland card, for the rest of the turn", () => {
+    const { s: s0, ap } = setup([]);
+    const wood = putOnBattlefield(s0, ap, woodvine);
+    const other = putOnBattlefield(s0, ap, bear());
+    const home = putOnBattlefield(s0, ap, bear({ name: "Home Bear" }));
+    tops(s0, ap, [false, false, true, false]);
+    let s = attackWith(s0, ap, [wood, other]);
+    s = passAll(s);
+    expect([wood, other, home].map((id) => pt(s, id))).toEqual(["7/7", "5/5", "2/2"]);
+    // The revealed cards were drawn; the bonus stays (CR 608.2h: the number is locked in as it resolves).
+    expect(s.resolving).toBeNull();
+    expect(pt(s, wood)).toBe("7/7");
+  });
+
+  it("Phabine: a Citizen for each land card, then creatures you control (the new ones too) get +1/+1 for each nonland card", () => {
+    const { s: s0, ap } = setup([]);
+    const ph = putOnBattlefield(s0, ap, phabine);
+    tops(s0, ap, [true, true, false, true]);
+    let s = s0;
+    for (let i = 0; i < 200 && !(s.step === "beginCombat" && s.stack.length); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = passAll(s);
+    const citizens = s.battlefield.filter((id) => s.objects[id]!.isToken && characteristics(s, s.objects[id]!).subtypes.includes("Citizen"));
+    expect(citizens).toHaveLength(3);
+    expect(citizens.map((id) => pt(s, id))).toEqual(["2/2", "2/2", "2/2"]);
+    expect(pt(s, ph)).toBe("4/7");
   });
 });

@@ -63,6 +63,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     ctx.revealedFromHand = true;
     return [{ type: "revealFromHand", ...(filter ? { filter } : {}) }];
   }
+  // Parley: "Each player reveals the top card of their library." Then "For each nonland card revealed this way, you create
+  // a Treasure token" is "create a Treasure token for each nonland card revealed this way" (Selvala's "add {G} and you gain
+  // 1 life" is split in parseBody).
+  if (/^[Ee]ach player reveals the top card of their library$/.test(s)) {
+    ctx.parley = true;
+    return [{ type: "parleyReveal" }];
+  }
+  if (ctx.parley && (m = /^For each ((?:non)?land card revealed this way), (?:you )?(.+)$/.exec(s))) return parseSentence(`${m[2]!.charAt(0).toUpperCase()}${m[2]!.slice(1)} for each ${m[1]}`, ctx);
   // "Put your commander into your hand from the command zone" (Command Beacon): one you own, of your choice with two
   // (rulings); nothing if none is there (CR 903.3).
   if (/^[Pp]ut your commander into your hand from the command zone$/.test(s)) return [{ type: "commanderToHand" }];

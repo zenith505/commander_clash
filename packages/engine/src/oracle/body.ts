@@ -44,6 +44,8 @@ export interface Ctx {
   excessDamage?: boolean;
   /** A tapAnyNumber instruction came before, here or in the ability whose reflexive trigger this is: "for each creature tapped this way". */
   tappedThisWay?: boolean;
+  /** Parley's "each player reveals the top card of their library" came before: "for each nonland card revealed this way". */
+  parley?: boolean;
   /** An amass instruction came before, here or in the ability whose reflexive trigger this is: "the amassed Army" (CR 701.47c). */
   amassed?: boolean;
   /** Index of the most recent object target, for "it" / "its controller". */
@@ -726,6 +728,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     /\b([Rr])eveal the top (\w+(?: plus one)?) cards of your library and separate them into two piles\. An opponent chooses one of those piles\. Put that pile into your hand and the other into your graveyard\./g,
     (_, r, n) => `${r}eveal the top ${n} cards of your library; you separate them into two piles and an opponent chooses one; put one pile into your hand and the other into your graveyard.`,
   );
+  // Selvala, Explorer Returned (parley): "For each nonland card revealed this way, add {G} and you gain 1 life." is two
+  // instructions, each counting those cards (see parleyReveal).
+  text = text.replace(/\bFor each ((?:non)?land card revealed this way), add (\{[WUBRGC]\}) and you gain (\d+) life\./g, "Add $2 for each $1. You gain $3 life for each $1.");
   // "You may copy the exiled card. If you do, you may cast the copy without paying its mana cost." (Isochron Scepter):
   // copying without casting does nothing, so it's one choice.
   text = text.replace(/\b[Yy]ou may copy the exiled card\. If you do, you may cast the copy without paying its mana cost\./g, "You may cast a copy of the exiled card without paying its mana cost.");

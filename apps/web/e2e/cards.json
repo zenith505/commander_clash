@@ -6152,6 +6152,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "39f4bf0e-47d5-4ae8-a504-71acda849850",
+  "name": "Kozilek, the Broken Reality",
+  "manaCost": "{9}",
+  "cmc": 9,
+  "typeLine": "Legendary Creature — Eldrazi",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Eldrazi"
+  ],
+  "oracleText": "When you cast this spell, up to two target players each manifest two cards from their hands. For each card manifested this way, you draw a card. (To manifest a card, put it onto the battlefield face down as a 2/2 creature. Turn it face up any time for its mana cost if it's a creature card.)\nOther colorless creatures you control get +3/+2.",
+  "power": "9",
+  "toughness": "9",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Manifest"
+  ],
+  "commanderLegal": "legal",
+  "set": "mh3",
+  "releasedAt": "2024-06-14",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4c1c1537-e519-4e2f-9bc2-d34b289d4487",
   "name": "Kozilek, the Great Distortion",
   "manaCost": "{8}{C}{C}",
@@ -12240,6 +12270,43 @@
   "commanderLegal": "legal",
   "set": "usg",
   "releasedAt": "1998-10-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a7043fbd-1dfd-42cf-be4b-cc343d0949e5",
+  "name": "Yuriko, the Tiger's Shadow",
+  "manaCost": "{1}{U}{B}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Human Ninja",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Ninja"
+  ],
+  "oracleText": "Commander ninjutsu {U}{B} ({U}{B}, Return an unblocked attacker you control to hand: Put this card onto the battlefield from your hand or the command zone tapped and attacking.)\nWhenever a Ninja you control deals combat damage to a player, reveal the top card of your library and put that card into your hand. Each opponent loses life equal to that card's mana value.",
+  "power": "1",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Commander ninjutsu"
+  ],
+  "commanderLegal": "legal",
+  "set": "c18",
+  "releasedAt": "2018-08-10",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

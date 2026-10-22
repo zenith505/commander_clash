@@ -43,6 +43,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const c = parseCount(m[2]!, ctx);
     return c && { ...c, plus: (c.plus ?? 0) + num(m[1]!) };
   }
+  // "The number of creatures you control plus the number of planeswalkers you control" (Ajani, Strength of the Pride).
+  if ((m = /^(the number of .+?) plus (the number of .+)$/i.exec(p))) {
+    const [a, b] = [parseCount(m[1]!, ctx), parseCount(m[2]!, ctx)];
+    return a && b && typeof a === "object" && typeof b === "object" && "count" in a && "count" in b && !a.times && !a.plus && !b.times && !b.plus && !a.half && !b.half ? { count: { kind: "sum", of: [a.count, b.count] } } : null;
+  }
   if ((m = new RegExp(`^${NUM} minus (.+)$`, "i").exec(p))) {
     const c = parseCount(m[2]!, ctx);
     return c && { count: c.count, times: -(c.times ?? 1), plus: num(m[1]!) - (c.plus ?? 0) };

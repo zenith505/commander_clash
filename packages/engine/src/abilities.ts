@@ -273,6 +273,8 @@ export type Count =
   | { kind: "tokensCreatedThisTurn"; subtype?: string }
   /** Gravestorm's "each permanent put into a graveyard from the battlefield this turn", tokens and anyone's too (CR 702.69a, rulings). */
   | { kind: "toGraveyardThisTurn" }
+  /** "The number of creatures you control plus the number of planeswalkers you control" (Ajani, Strength of the Pride): each counted on its own, so a creature planeswalker counts twice. */
+  | { kind: "sum"; of: Count[] }
   /** "The number of cards put into their graveyard from anywhere this turn" (Fraying Sanity): that player's. */
   | { kind: "cardsToGraveyardThisTurn"; whose: PlayerRef }
   /** "For each creature that attacked this turn": creatures declared as attackers this turn (CR 508.1). */
@@ -721,6 +723,8 @@ export type ObjRef =
 /** Which player(s) an effect touches. */
 export type PlayerRef =
   | { ref: "you" }
+  /** "Each player ~ attacked this turn" (Angel of Destiny): the players (not planeswalkers) the source attacked this turn, as this object. */
+  | { ref: "attackedThisTurnBySelf" }
   | { ref: "subjectController" } // the controller of the object the trigger was about, or as it last existed
   | { ref: "subjectOwner" } // "its owner": whose the object the trigger was about is (CR 108.3)
   /** `n`: "any number of target players" covers the targets from `index` on (TargetSpec.many). */

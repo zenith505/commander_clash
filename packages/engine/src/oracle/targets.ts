@@ -329,6 +329,13 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     const g = parseGroup(andOthers[1]!.startsWith("other ") ? andOthers[1]! : `other ${andOthers[1]!}`);
     return g?.other && !/ (?:with|that|who|which) /i.test(andOthers[1]!.replace(/ you control$/, "")) ? { ref: "each", filter: g.filter, other: true, andSelf: true, ...(andOthers[2] ? { sharesTypeWithSelf: true as const } : {}) } : null;
   }
+  // "Exile ~ and each artifact and creature your opponents control" (Ajani, Strength of the Pride): all at once, the source
+  // while it's still there.
+  const andTheirs = !ctx.spell ? /^~ and ((?:each|all) .+ (?:your opponents control|an opponent controls))$/i.exec(x) : null;
+  if (andTheirs) {
+    const g = parseGroup(andTheirs[1]!);
+    return g && !g.other && g.filter.kind === "object" && g.filter.controller === "opponent" ? { ref: "each", filter: g.filter, andSelf: true } : null;
+  }
   // "All creatures with toughness less than or equal to the number of Islands you control": counted as it resolves.
   const group = parseGroup(x, false, (t) => parseBoundCount(t, ctx));
   if (group && group.other && ctx.spell) {

@@ -409,6 +409,10 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       return opponents(s, ctx.controller);
     case "eachPlayer":
       return livingPlayers(s);
+    case "attackedThisTurnBySelf": {
+      const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      return o?.attacked?.turn === s.turn ? livingPlayers(s).filter((p) => o.attacked!.players?.includes(p)) : [];
+    }
     case "target": {
       // "Any number of target players": each of them still a legal target (CR 608.2b).
       const out: PlayerId[] = [];

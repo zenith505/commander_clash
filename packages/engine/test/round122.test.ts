@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { act, bear, card, forest, mountain, passUntil, putOnBattlefield, scry, setup } from "./helpers";
 import { altCostsFor, botActions, castProblem, isFullySupported, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 import { characteristics, invalidateCharacteristics } from "../src/layers";
-import { loseLife, moveObject, topVisible } from "../src/game";
+import { gainLife, loseLife, moveObject, topVisible } from "../src/game";
 import { proliferate } from "../src/effects/run-permanents";
 import { nextRandom } from "../src/rng";
 
@@ -882,5 +882,63 @@ describe("Increasing Vengeance, Witch's Oven, Burnt Offering, Glademuse, Scythec
     const ch = characteristics(s, s.objects[t]!);
     expect([ch.power, ch.toughness, ch.types.includes("Land"), ch.types.includes("Creature")]).toEqual([3, 2, true, true]);
     expect(JSON.stringify(s.effects)).toContain("cantBeBlocked");
+  });
+});
+
+const ajani = card("Ajani, Strength of the Pride", "Legendary Planeswalker — Ajani", "{2}{W}{W}", { loyalty: "5", oracleText: "+1: You gain life equal to the number of creatures you control plus the number of planeswalkers you control.\n−2: Create a 2/2 white Cat Soldier creature token named Ajani's Pridemate with \"Whenever you gain life, put a +1/+1 counter on this token.\"\n0: If you have at least 15 life more than your starting life total, exile Ajani and each artifact and creature your opponents control." });
+const destiny = card("Angel of Destiny", "Creature — Angel Cleric", "{3}{W}{W}", { power: "2", toughness: "6", keywords: ["Flying", "Double strike"], oracleText: "Flying, double strike\nWhenever a creature you control deals combat damage to a player, you and that player each gain that much life.\nAt the beginning of your end step, if you have at least 15 life more than your starting life total, each player this creature attacked this turn loses the game." });
+
+describe("Ajani, Strength of the Pride and Angel of Destiny", () => {
+  it("Ajani +1: life for each creature and each planeswalker; −2: Ajani's Pridemate grows as you gain life", () => {
+    supported(ajani, destiny);
+    const { s: s0, ap } = setup([]);
+    const a = putOnBattlefield(s0, ap, ajani);
+    s0.objects[a]!.counters.loyalty = 5;
+    putOnBattlefield(s0, ap, bear());
+    putOnBattlefield(s0, ap, bear());
+    invalidateCharacteristics(s0);
+    const life = s0.players[ap]!.life;
+    let s = settle(run(s0, planActivate(s0, ap, a, 0)));
+    expect(s.players[ap]!.life).toBe(life + 3);
+    // The next turn round, the −2.
+    s = settle(passUntil(passUntil(s, "end", ap), "main1", ap));
+    s = settle(run(s, planActivate(s, ap, a, 1)));
+    const cat = s.battlefield.find((id) => s.objects[id]!.isToken)!;
+    expect(characteristics(s, s.objects[cat]!).name).toBe("Ajani's Pridemate");
+    gainLife(s, ap, 2);
+    s = settle(s);
+    expect(s.objects[cat]!.counters["+1/+1"]).toBe(1);
+  });
+
+  it("Ajani 0: with 15 more life than at the start, exiles itself and the opponents' artifacts and creatures", () => {
+    for (const life of [54, 55]) {
+      const { s: s0, ap, opp } = setup([]);
+      const a = putOnBattlefield(s0, ap, ajani);
+      s0.objects[a]!.counters.loyalty = 5;
+      const mine = putOnBattlefield(s0, ap, bear());
+      const theirs = putOnBattlefield(s0, opp, bear());
+      const rock = putOnBattlefield(s0, opp, card("Mind Stone", "Artifact", "{2}"));
+      s0.players[ap]!.life = life;
+      invalidateCharacteristics(s0);
+      const s = settle(run(s0, planActivate(s0, ap, a, 2)));
+      const gone = life >= 55;
+      expect([a, theirs, rock].map((id) => s.objects[id]!.zone)).toEqual(gone ? ["exile", "exile", "exile"] : ["battlefield", "battlefield", "battlefield"]);
+      expect(s.objects[mine]!.zone).toBe("battlefield");
+    }
+  });
+
+  it("Angel of Destiny: at your end step with 15 more life, each player it attacked this turn loses", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const angel = putOnBattlefield(s0, ap, destiny);
+    s0.players[ap]!.life = 52;
+    invalidateCharacteristics(s0);
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: angel, defender: opp }] });
+    s = settle(passUntil(s, "end", ap));
+    // Double strike: 2 + 2 combat damage, and each time both gain that much: 52 + 4 = 56.
+    expect(s.players[ap]!.life).toBe(56);
+    s = settle(passUntil(s, "cleanup", ap));
+    expect(s.players[opp]!.lost).toBe(true);
+    expect(s.turnOrder.filter((p) => p !== ap && p !== opp).every((p) => !s.players[p]!.lost)).toBe(true);
   });
 });

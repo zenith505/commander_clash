@@ -750,6 +750,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!, ctx);
     return who ? [{ type: "draw", who, n: amt(m[2]!) }] : null;
   }
+  // "Each player ~ attacked this turn loses the game" (Angel of Destiny, CR 104.3e).
+  if (/^[Ee]ach player ~ attacked this turn loses the game$/.test(s)) return [{ type: "loseGame", who: { ref: "attackedThisTurnBySelf" } }];
   // Life. "You may gain 1 life" leaves "Gain 1 life": yours.
   if ((m = new RegExp(`^Gain ${NUMX} life$`).exec(s))) return [{ type: "gainLife", who: { ref: "you" }, n: amt(m[1]!) }];
   // "You lose half your life, rounded up", "each opponent loses half their life, rounded up": each of them half their own

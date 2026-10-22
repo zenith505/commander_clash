@@ -1197,3 +1197,28 @@ describe("Wrenn and Seven", () => {
     expect([power(s, tree), toughness(s, tree)]).toEqual([lands, lands]);
   });
 });
+
+const soulsFire = card("Soul's Fire", "Instant", "{2}{R}", { oracleText: "Target creature you control deals damage equal to its power to any target." });
+
+describe("Soul's Fire", () => {
+  it("your creature deals damage equal to its power to any target, as the source", () => {
+    expect(isFullySupported(soulsFire)).toBe(true);
+    const { s: s0, ap, ids, opp } = setup([soulsFire]);
+    const b = putOnBattlefield(s0, ap, bear());
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [target(b), { kind: "player", id: opp }], undefined, "auto")));
+    expect(s.players[opp]!.life).toBe(38);
+    expect(s.log.some((l) => /Grizzly Bears deals 2 damage/.test(typeof l === "string" ? l : JSON.stringify(l)))).toBe(true);
+  });
+});
+
+const debtToTheDeathless = card("Debt to the Deathless", "Sorcery", "{X}{W}{W}{B}{B}", { oracleText: "Each opponent loses two times X life. You gain life equal to the life lost this way." });
+
+describe("Debt to the Deathless", () => {
+  it("each opponent loses two times X life; you gain what they lost", () => {
+    expect(isFullySupported(debtToTheDeathless)).toBe(true);
+    const { s: s0, ap, ids } = setup([debtToTheDeathless]);
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [], undefined, "auto", 2)));
+    for (const p of s.turnOrder.filter((p) => p !== ap)) expect(s.players[p]!.life).toBe(36);
+    expect(s.players[ap]!.life).toBe(52);
+  });
+});

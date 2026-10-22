@@ -265,6 +265,11 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
       return to ? [{ type: "damage", amount: { count: { kind: "power", of: { ref: "self" } } }, to }] : null;
     }
     const a = parseObject(m[1]!, ctx);
+    // "Target creature you control deals damage equal to its power to any target" (Soul's Fire): damage from that creature.
+    if (a?.ref === "target" && !a.n && /^any target$/i.test(m[2]!)) {
+      const to = parseDamageRecipient(m[2]!, ctx);
+      return to ? [{ type: "damage", amount: { count: { kind: "power", of: a } }, to, by: { target: a.index } }] : null;
+    }
     const b = a && parseObject(m[2]!, ctx);
     return a && b && !isGroup(a) && !isGroup(b) && !isSeveral(a) ? [{ type: "bite", a, b }] : null;
   }

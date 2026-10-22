@@ -787,6 +787,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // (Ragavan): two instructions, the second an impulse with its permission.
   text = text.replace(/(^|\. )([Cc]reate an? [^.]+? token) and exile the top card of (your|that player's) library\. (?=(?:Until end of turn, )?[Yy]ou may (?:cast|play) that card)/, "$1$2. Exile the top card of $3 library. ");
   // "..., then shuffle and you gain 1 life" (Brokers Hideout): the search, then the life.
+  // "Loses two times X life" (Debt to the Deathless) is "loses twice X life".
+  text = text.replace(/\bloses two times X life\b/g, "loses twice X life");
   text = text.replace(/, then shuffle and you gain (\d+) life\./g, ", then shuffle. You gain $1 life.");
   // "You gain 7 life, draw seven cards, then put up to seven ..." (Ugin, the Spirit Dragon): three instructions in order.
   text = text.replace(/^You gain (\d+) life, draw (\w+) cards?, then /, "You gain $1 life. Draw $2 cards, then ");

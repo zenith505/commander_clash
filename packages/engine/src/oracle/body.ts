@@ -1860,6 +1860,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si += 2;
       continue;
     }
+    // Mind's Dilation, in an opponent's cast trigger: "that player exiles the top card of their library. If it's a nonland
+    // card, you may cast it without paying its mana cost." Cast as this resolves (CR 608.2g); a land, or a card not cast,
+    // stays exiled (rulings).
+    if (/^[Tt]hat player exiles the top card of their library$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "If it's a nonland card, you may cast it without paying its mana cost") {
+      const who = parsePlayer("that player", ctx);
+      if (!who || who.ref === "you") return null;
+      effects.push({ type: "castFromAmong", who, n: 1, filter: { kind: "card", types: [], notTypes: ["Land"], notColors: [], text: "nonland card" }, max: 1 });
+      si++;
+      continue;
+    }
     // Powerbalance, in an opponent's cast trigger: "You may reveal the top card of your library. If you do, you may cast
     // that card without paying its mana cost if the two spells have the same mana value." Cast from the library as this
     // resolves (CR 608.2g, rulings), its mana value compared with the spell's (X as chosen for that spell, CR 202.3e).

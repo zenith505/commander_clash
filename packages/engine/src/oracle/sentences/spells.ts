@@ -41,6 +41,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
     return who ? [{ type: "extraTurn", who, n: m[2] === "an" ? 1 : m[2] === "two" ? 2 : 3 }] : null;
   }
+  // "End the turn." (CR 724.1): Sundial of the Infinite, Time Stop.
+  if (/^End the turn$/i.test(s)) return [{ type: "endTurn" }];
   // Controlling another player (CR 723): "You control target player during that player's next turn" (Mindslaver),
   // "you gain control of target opponent during that player's next turn" (Emrakul), "... during their next turn".
   if ((m = /^You (?:gain control of|control) (target player|target opponent) during (?:that player's|their) next turn$/i.exec(s))) {

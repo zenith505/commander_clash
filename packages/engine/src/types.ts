@@ -1717,6 +1717,8 @@ export interface Resolving {
   manifestedThisWay?: number;
   /** Whether the player paid its counterSpell instruction's "unless" cost ("If they do, ..."). */
   unlessPaid?: boolean;
+  /** Its endTurn instruction ran: the turn ends once it's done resolving (CR 724.1). */
+  endTurn?: true;
   /** How many cards its takeFromHand instruction took ("You may choose a nonland card from it. If you do, ..."). */
   tookFromHand?: number;
   /** The card its discover instruction discovered (CR 701.57c), cast or put into the hand, and that card's mana value. */

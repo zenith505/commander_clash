@@ -50,6 +50,9 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       return;
     }
+    case "endTurn":
+      if (s.resolving) s.resolving.endTurn = true; // CR 724.1: once it's done resolving (continueResolution)
+      return;
     case "extraTurn":
       // CR 500.7: taken directly after this turn; the most recently created first.
       for (const pid of players(s, e.who, ctx)) {

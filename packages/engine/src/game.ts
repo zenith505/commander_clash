@@ -2105,7 +2105,7 @@ function manaKeeping(s: GameState, pid: PlayerId): { all: boolean; colors: Set<M
   return out;
 }
 
-function advanceStep(s: GameState): void {
+function emptyManaPools(s: GameState): void {
   for (const p of s.players) {
     // Mana empties as each step ends (CR 500.4), except firebending's red until end of combat (702.189a), mana kept
     // "until end of turn", lost as the cleanup step ends (514.2), and mana a permanent keeps (manaKeeping). Kept mana keeps
@@ -2139,6 +2139,10 @@ function advanceStep(s: GameState): void {
     p.manaPool = pool;
     p.manaLots = kept.length ? kept : undefined;
   }
+}
+
+function advanceStep(s: GameState): void {
+  emptyManaPools(s);
   if (s.step === "cleanup" && s.cleanupAgain) {
     s.cleanupAgain = undefined;
     return beginStep(s, "cleanup"); // CR 514.3a
@@ -2181,6 +2185,36 @@ function advanceStep(s: GameState): void {
     }
   }
   beginStep(s, next);
+}
+
+/**
+ * "End the turn" (CR 724.1), after the spell or ability doing it has finished resolving (`item`): abilities waiting to
+ * go on the stack cease to exist (724.1a); every object on the stack is exiled, the resolving spell too (724.1b); state-
+ * based actions are checked with no priority and no triggers put on the stack (724.1c); the current step ends, combat
+ * with it, and the game skips straight to the cleanup step (724.1d), so no end step and no "at the beginning of the end
+ * step" (724.1e). Abilities that trigger from here on go on the stack in the cleanup step, which then happens again
+ * (724.1f, 514.3a).
+ */
+export function endTheTurn(s: GameState, item?: StackItem): void {
+  s.triggerQueue = [];
+  const spells = [...(item?.kind === "spell" && item.objectId ? [item.objectId] : []), ...s.stack.flatMap((x) => (x.kind === "spell" && x.objectId ? [x.objectId] : []))];
+  s.stack = [];
+  for (const id of spells) if (s.objects[id]?.zone === "stack") moveObject(s, id, "exile");
+  log(s, `The turn ends${spells.length ? `: ${spells.map((id) => nameOf(s, id)).join(", ")} ${spells.length === 1 ? "is" : "are"} exiled from the stack` : ""}.`);
+  runStateBasedActions(s, true);
+  emptyManaPools(s);
+  s.thatCombat = undefined;
+  for (const o of attackersAndBlockers(s)) clearCombat(o);
+  for (const id of s.battlefield) if (obj(s, id).provokedBy?.turn === undefined) obj(s, id).provokedBy = undefined;
+  for (const id of s.battlefield) obj(s, id).provokedAlso = undefined;
+  s.unblockedChoice = undefined;
+  s.blockLimits = undefined;
+  // The phases and steps skipped go with the ones added after them (CR 500.8) and the end steps added to this one.
+  s.addedPhases = undefined;
+  s.resumeStep = undefined;
+  s.extraEndSteps = undefined;
+  s.cleanupAgain = undefined;
+  beginStep(s, "cleanup");
 }
 
 /** The last step of each phase that can have phases added after it (CR 500.8): beginning, main, combat. */
@@ -3631,6 +3665,8 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast: a bestowed creature card is
   // an Aura spell (CR 702.103b, Hero of Iroas rulings).
   const mods = costModsFor(s, pid, o, how.alt === "bestow" && !o.bestowed && !how.faceDown ? bestowedDef(d) : d, x, how.lifeFor);
+  // "During your turn, ~ costs {2}{U}{U} less to cast" (Discontinuity): its colored part.
+  for (const c of compileCard(d).costLessIf ?? []) if (c.colored && staticConditionNow(s, c.cond, o.id, pid)) mods.lessColored.push(...c.colored);
   // Colored reductions (Morophon) after the costs are added up, on any of their colored mana (CR 601.2f, rulings).
   const lessColored = (c: ParsedCost) => reduceColored(c, mods.lessColored);
   // "~ costs {2} less to cast if it's bargained" (a cost reduction, CR 601.2f).

@@ -1289,6 +1289,8 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   // A Pact: only when our lands can pay its upkeep cost, and any other Pact's we still owe.
   const pact = pactCost(compileCard(d).spell?.effects ?? []);
   if (pact && pact + owedPacts(s, pid) > lands(s, pid)) return null;
+  // "End the turn" (Time Stop, Glorious End): bots don't plan around ending a turn (CR 724.1).
+  if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "endTurn")) return null;
   // A foretold card is cast for its foretell cost (CR 702.143a).
   if (!free && !via && alt === undefined && foretoldCast(s, pid, obj(s, id))) alt = "foretell";
   // Cast as madness or miracle resolves, for that cost (CR 702.35a, 702.94a): its X is paid then.
@@ -2892,6 +2894,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const discardX = discardXCount(s, pid, id, ab);
       if (abilityCostsHaveX(ab) && discardX === undefined && !(energyX > 0) && !(energyTargetX >= 3)) continue;
       if (ab.body.effects.some((e) => e.type === "unattachSelf")) continue; // reconfigured Equipment stays on
+      if (ab.body.effects.some((e) => e.type === "endTurn")) continue; // Sundial of the Infinite: bots don't end their turn early
       // Saving a creature with a flip (Frenetic Efreet, Viashino Sandswimmer) waits for something to save it from (chooseFlipEscape).
       if (flips && flipEscape(flips)) continue;
       // Gustha's Scepter: in our second main phase, hide a card from a hand we'd discard from in the cleanup step

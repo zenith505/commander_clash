@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { abilityProblem, botActions, castProblem, isFullySupported, planActivate, planCast, power, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { abilityProblem, botActions, castProblem, isFullySupported, planActivate, planCast, power, spellCost, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 import { invalidateCharacteristics } from "../src/layers";
 import { moveObject } from "../src/game";
 
@@ -317,5 +317,142 @@ describe("round 120 cards from the brief", () => {
     const s = settle(run(s0, planCast(s0, ap, ids[0]!)));
     expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
     expect(s.battlefield.filter((x) => s.objects[x]!.isToken).length).toBe(0);
+  });
+});
+
+// "End the turn" (CR 724.1).
+const sundial = card("Sundial of the Infinite", "Artifact", "{2}", { oracleText: "{1}, {T}: End the turn. Activate only during your turn. (Exile all spells and abilities from the stack. Discard down to your maximum hand size. Damage wears off, and \"this turn\" and \"until end of turn\" effects end.)" });
+const gloriousEnd = card("Glorious End", "Instant", "{2}{R}", { oracleText: "End the turn. (Exile all spells and abilities from the stack, including this card. The player whose turn it is discards down to their maximum hand size. Damage wears off, and \"this turn\" and \"until end of turn\" effects end.)\nAt the beginning of your next end step, you lose the game." });
+const discontinuity = card("Discontinuity", "Instant", "{3}{U}{U}", { oracleText: "During your turn, this spell costs {2}{U}{U} less to cast.\nEnd the turn. (Exile all spells and abilities from the stack, including this card. The player whose turn it is discards down to their maximum hand size. Damage wears off, and \"this turn\" and \"until end of turn\" effects end.)" });
+const hurkyl = card("Hurkyl's Final Meditation", "Sorcery", "{3}{U}{U}{U}", { oracleText: "During turns other than yours, this spell costs {3} more to cast.\nReturn all nonland permanents to their owners' hands. End the turn. (Exile all spells and abilities from the stack, including this card. The player whose turn it is discards down to their maximum hand size. Damage wears off, and \"this turn\" and \"until end of turn\" effects end.)" });
+const divination = card("Divination", "Sorcery", "{2}{U}", { oracleText: "Draw two cards." });
+const endDraw = card("End Step Scribe", "Enchantment", "{1}", { oracleText: "At the beginning of your end step, draw a card." });
+
+describe("ending the turn", () => {
+  it("Sundial of the Infinite exiles the spell on the stack, skips the end step and its triggers, and the next turn begins", () => {
+    supported(sundial, divination, endDraw);
+    const { s: s0, ap, ids, opp } = setup([divination]);
+    const dial = putOnBattlefield(s0, ap, sundial);
+    putOnBattlefield(s0, ap, endDraw);
+    const giant = putOnBattlefield(s0, opp, bear());
+    s0.objects[giant]!.damage = 1;
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    expect(s.stack.length).toBe(1);
+    s = run(s, planActivate(s, ap, dial, 0));
+    const hand = s.players[ap]!.hand.length;
+    s = passToStack(s);
+    expect(s.objects[ids[0]!]!.zone).toBe("exile"); // CR 724.1b: exiled, not countered
+    expect(s.stack.length).toBe(0);
+    expect(s.step).toBe("cleanup");
+    expect(s.pending?.kind).toBe("discardToHandSize"); // CR 514.1
+    s = settle(s);
+    expect(s.activePlayer).toBe(opp); // the cleanup step happened, then the next turn
+    expect(s.objects[giant]!.damage).toBe(0); // CR 514.2
+    expect(s.players[ap]!.hand.length).toBe(7); // neither Divination nor the end step trigger drew
+    expect(hand).toBeGreaterThan(7);
+    expect(s.log.some((l) => /The turn ends: Divination is exiled from the stack/.test(l.text))).toBe(true);
+  });
+
+  it("Sundial of the Infinite can only be activated during your turn", () => {
+    const { s: s0, opp } = setup([]);
+    const dial = putOnBattlefield(s0, opp, sundial);
+    s0.priority = opp;
+    expect(abilityProblem(s0, opp, dial, 0)).toMatch(/can't be activated now/);
+  });
+
+  it("Glorious End ends the turn, then you lose at your next end step", () => {
+    supported(gloriousEnd);
+    const { s: s0, ap, ids, opp } = setup([gloriousEnd]);
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.objects[ids[0]!]!.zone).toBe("exile");
+    expect(s.activePlayer).toBe(opp);
+    expect(s.players[ap]!.lost).toBeFalsy();
+    s = passUntil(s, "end", ap);
+    s = settle(s);
+    expect(s.players[ap]!.lost).toBe(true);
+  });
+
+  it("Discontinuity costs {1} during your turn; Hurkyl's Final Meditation costs {3} more during others'", () => {
+    supported(discontinuity, hurkyl);
+    const { s, ap, ids } = setup([discontinuity, hurkyl]);
+    const disc = spellCost(s, ap, s.objects[ids[0]!]!);
+    expect(disc.cost.symbols.filter((y) => y.kind === "colored").length).toBe(0);
+    expect(disc.extra + disc.cost.symbols.reduce((n, y) => n + (y.kind === "generic" ? y.amount : 0), 0)).toBe(1);
+    const mine = spellCost(s, ap, s.objects[ids[1]!]!).extra;
+    s.activePlayer = later(s, ap, 1);
+    expect(spellCost(s, ap, s.objects[ids[0]!]!).cost.symbols.filter((y) => y.kind === "colored").length).toBe(2);
+    expect(spellCost(s, ap, s.objects[ids[1]!]!).extra - mine).toBe(3);
+  });
+
+  it("Ultima: the dies triggers it caused cease to exist as the turn ends (CR 724.1a); bots don't cast it", () => {
+    const ultima = card("Ultima", "Sorcery", "{3}{W}{B}", { oracleText: "Destroy all artifacts and creatures. End the turn. (Exile all spells and abilities from the stack, including this card. The player whose turn it is discards down to their maximum hand size. Damage wears off, and \"this turn\" and \"until end of turn\" effects end.)" });
+    const mourner = card("Mourner", "Creature — Human", "{1}", { power: "1", toughness: "1", oracleText: "When this creature dies, draw a card." });
+    supported(ultima, mourner);
+    const { s: s0, ap, ids, opp } = setup([ultima]);
+    const m = putOnBattlefield(s0, ap, mourner);
+    expect(botActions(s0, ap).some((a) => a.type === "castSpell" && a.objectId === ids[0])).toBe(false);
+    const library = s0.players[ap]!.library.length;
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.objects[m]!.zone).toBe("graveyard");
+    expect(s.activePlayer).toBe(opp);
+    expect(s.players[ap]!.library.length).toBe(library);
+  });
+
+  it("Hurkyl's Final Meditation bounces every nonland permanent, then the turn ends", () => {
+    const { s: s0, ap, ids, opp } = setup([hurkyl]);
+    const b = putOnBattlefield(s0, opp, bear());
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.objects[b]!.zone).toBe("hand");
+    expect(s.objects[ids[0]!]!.zone).toBe("exile");
+    expect(s.activePlayer).toBe(opp);
+  });
+});
+
+describe("more popular cards", () => {
+  it("Worldsoul's Rage puts up to X land cards from the hand and graveyard onto the battlefield tapped", () => {
+    const rage = card("Worldsoul's Rage", "Sorcery", "{X}{R}{G}", { oracleText: "Worldsoul's Rage deals X damage to any target. Put up to X land cards from your hand and/or graveyard onto the battlefield tapped." });
+    const land = card("Wastes", "Basic Land", "", { oracleText: "{T}: Add {C}." });
+    supported(rage);
+    const { s: s0, ap, ids, opp } = setup([rage, land, land, land]);
+    const yard = putOnBattlefield(s0, ap, land);
+    moveObject(s0, yard, "graveyard");
+    const life = s0.players[opp]!.life;
+    let s = passToStack(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "player", id: opp }], undefined, undefined, 2)));
+    const p = s.pending;
+    expect(p?.kind).toBe("searchLibrary");
+    if (p?.kind !== "searchLibrary") return;
+    expect(p.max).toBe(2);
+    expect(p.what).toBe("up to 2 land cards from your hand and/or graveyard");
+    expect(p.cards).toContain(yard);
+    s = act(s, { type: "searchLibrary", player: ap, found: [ids[1]!, yard] });
+    expect(s.players[opp]!.life).toBe(life - 2);
+    for (const id of [ids[1]!, yard]) expect([s.objects[id]!.zone, s.objects[id]!.tapped]).toEqual(["battlefield", true]);
+    expect(s.objects[ids[2]!]!.zone).toBe("hand");
+  });
+  it("Mind's Dilation: an opponent's first spell each turn exiles their top card, and you may cast it free", () => {
+    const dilation = card("Mind's Dilation", "Enchantment", "{5}{U}{U}", { oracleText: "Whenever an opponent casts their first spell each turn, that player exiles the top card of their library. If it's a nonland card, you may cast it without paying its mana cost." });
+    const thopter = card("Ornithopter", "Artifact Creature — Thopter", "{0}", { power: "0", toughness: "2", keywords: ["Flying"], oracleText: "Flying" });
+    supported(dilation);
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, dilation);
+    let s = passUntil(s0, "main1", opp);
+    const [a, b] = [toHand(s, opp, thopter), toHand(s, opp, thopter)];
+    const top = putOnBattlefield(s, opp, divination);
+    moveObject(s, top, "library", { top: true });
+    expect(s.players[opp]!.library[0]).toBe(top);
+    const hand = s.players[ap]!.hand.length;
+    s = run(s, planCast(s, opp, a));
+    for (let i = 0; i < 10 && s.pending?.kind !== "chooseOption"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.objects[top]!.zone).toBe("exile");
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "castFromAmong", player: ap, options: [top, "none"] });
+    s = act(s, { type: "chooseOption", player: ap, choice: top });
+    expect(s.pending).toMatchObject({ kind: "castFree", objectId: top, player: ap });
+    s = settle(run(s, planCast(s, ap, top)));
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
+    expect(s.objects[top]!.zone).toBe("graveyard");
+    // The second spell that turn doesn't trigger it.
+    const next = s.players[opp]!.library[0]!;
+    s = settle(run(s, planCast(s, opp, b)));
+    expect(s.objects[next]!.zone).toBe("library");
   });
 });

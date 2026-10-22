@@ -1600,7 +1600,7 @@ export type Effect =
    * player owns; `anyType`: "and mana of any type can be spent to cast that spell" (CR 609.4b).
    */
   | { type: "castNow"; what: ObjRef; thenNoMore?: true; unlessCast?: true; anyOwner?: true; anyType?: true }
-  | { type: "putFromHand"; who?: PlayerRef; filter?: TargetSpec; tapped?: boolean; attacking?: boolean; may: boolean; any?: boolean; /** With `any`: "up to seven" (Ugin, the Spirit Dragon). */ upTo?: number; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand"; /** "If you do, draw a card and repeat this process" (Cultivator Colossus): after each card put, a draw, then again until you put none (rulings). */ drawRepeat?: true; /** "Each manifest two cards from their hands" (Kozilek, the Broken Reality): exactly this many (all with fewer), face down (CR 701.40a). */ manifest?: number }
+  | { type: "putFromHand"; who?: PlayerRef; filter?: TargetSpec; tapped?: boolean; attacking?: boolean; may: boolean; any?: boolean; /** With `any`: "up to seven" (Ugin, the Spirit Dragon), "up to X" (Worldsoul's Rage). */ upTo?: Amount; /** "From your hand and/or graveyard" (Worldsoul's Rage): cards from either, together. */ orGraveyard?: true; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand"; /** "If you do, draw a card and repeat this process" (Cultivator Colossus): after each card put, a draw, then again until you put none (rulings). */ drawRepeat?: true; /** "Each manifest two cards from their hands" (Kozilek, the Broken Reality): exactly this many (all with fewer), face down (CR 701.40a). */ manifest?: number }
   /**
    * "Return all land cards from your graveyard to the battlefield tapped" (CR 110.2a: under your control), "from all graveyards
    * ... under their owners' control". All at once. Never Auras: those need a choice of what they enchant (CR 303.4f).
@@ -1902,6 +1902,8 @@ export type Effect =
   | { type: "moveCounter"; counter: CounterKind | "any"; from: ObjRef; to: ObjRef }
   /** Ichormoon Gauntlet: "choose a counter on target permanent. Put an additional counter of that kind on that permanent." */
   | { type: "counterOfKindOnIt"; what: ObjRef }
+  /** "End the turn." (CR 724.1, Sundial of the Infinite): its last instruction; the rest happens as it finishes resolving. */
+  | { type: "endTurn" }
   /** Cascade (CR 702.85a), resolving: exile until a cheaper nonland card, maybe cast it free, the rest to the bottom. */
   | { type: "cascade" }
   /**
@@ -4572,7 +4574,8 @@ export interface CompiledCard {
    */
   costLess?: Amount[];
   /** "This spell costs {2} less to cast if you control a Wizard": the reduction while the condition holds. */
-  costLessIf?: { n: number; cond: StaticCondition }[];
+  /** A negative `n` costs that much more (Hurkyl's Final Meditation); `colored` takes off colored mana too (Discontinuity). */
+  costLessIf?: { n: number; cond: StaticCondition; colored?: Color[] }[];
   /** "This spell costs {3} less to cast if it targets a tapped creature" (CR 601.2f). */
   costLessIfTargets?: { n: number; filter: TargetSpec }[];
   /** Strive: "This spell costs {2}{G} more to cast for each target beyond the first", an additional cost (CR 601.2f, rulings). */

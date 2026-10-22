@@ -1030,7 +1030,7 @@ export interface ContinuousEffect {
    * out (CR 702.26f) or comes under another player's control, and doesn't start again if `controller` regains it (rulings
    * on Dragonlord Silumgar, Aegis Angel).
    */
-  whileControlled?: { id: ObjectId; zc: number; controller: PlayerId };
+  whileControlled?: { id: ObjectId; zc: number; controller?: PlayerId };
   /** "For as long as it has a vow counter on it" (CR 611.2b): it applies only to those of `affected` with one (Promise of Loyalty). */
   whileCounter?: string;
   affected: ObjectId[];
@@ -1691,6 +1691,8 @@ export interface Resolving {
   linkedNow?: ObjectId[];
   /** Spells with an X its counter instructions countered, as the cards they became, and the X they had (CR 202.3e). */
   countered?: Record<ObjectId, { zc: number; x: number }>;
+  /** The source of an activated or triggered ability its counter instructions countered (Tishana's Tidebinder). */
+  counteredSource?: { id: ObjectId; zc: number };
   /** The card its "reveal the top card of your library" revealed (CR 701.20a), for "if it's a creature card, put it ...". */
   revealed?: { id: ObjectId; zc: number };
   /** The one card an "exile the top card of your library" exiled, for "that card's mana value" (Tavern Brawler). */

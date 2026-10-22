@@ -1641,7 +1641,7 @@ export function endWhileTapped(s: GameState): boolean {
 
 export function whileControlledHolds(s: GameState, w: NonNullable<ContinuousEffect["whileControlled"]>): boolean {
   const o = s.objects[w.id];
-  return !!o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === w.zc && controllerOf(s, o) === w.controller;
+  return !!o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === w.zc && (w.controller === undefined || controllerOf(s, o) === w.controller);
 }
 
 export function whileTappedHolds(s: GameState, w: NonNullable<ContinuousEffect["whileTapped"]>): boolean {

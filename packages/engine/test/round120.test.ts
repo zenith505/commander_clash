@@ -707,4 +707,53 @@ describe("more popular cards", () => {
     s = act(s, { type: "activateMana", player: ap, objectId: land, mana: "C", ability: 0 });
     expect(s.players[ap]!.manaPool.C - now).toBe(1);
   });
+  it("Tragic Arrogance: you choose an artifact, a creature, an enchantment and a planeswalker for each player; the other nonland permanents are sacrificed", () => {
+    const arrogance = card("Tragic Arrogance", "Sorcery", "{3}{W}{W}", { oracleText: "For each player, you choose from among the permanents that player controls an artifact, a creature, an enchantment, and a planeswalker. Then each player sacrifices all other nonland permanents they control." });
+    supported(arrogance);
+    const { s: s0, ap, opp } = setup([]);
+    const spell = toHand(s0, ap, arrogance);
+    const rock = card("Test Rock", "Artifact", "{1}", { oracleText: "" });
+    const mine = [putOnBattlefield(s0, ap, bear({ name: "Mine A" })), putOnBattlefield(s0, ap, bear({ name: "Mine B" }))];
+    const theirs = [putOnBattlefield(s0, opp, bear({ name: "Theirs A" })), putOnBattlefield(s0, opp, bear({ name: "Theirs B" }))];
+    const rocks = [putOnBattlefield(s0, opp, rock), putOnBattlefield(s0, opp, rock)];
+    let s = run(s0, planCast(s0, ap, spell));
+    s = passToStack(s);
+    const asked: (PlayerId | undefined)[] = [];
+    for (let i = 0; i < 12 && s.pending; i++) {
+      const p = s.pending;
+      if (p.kind !== "pickPermanents") break;
+      expect(p.player).toBe(ap); // you choose for everyone
+      asked.push(p.of);
+      s = act(s, { type: "pickPermanents", player: ap, ids: [p.options[0]!] });
+    }
+    s = settle(s);
+    expect(asked).toContain(opp);
+    expect(mine.filter((id) => s.objects[id]!.zone === "battlefield").length).toBe(1);
+    expect(theirs.filter((id) => s.objects[id]!.zone === "battlefield").length).toBe(1);
+    expect(rocks.filter((id) => s.objects[id]!.zone === "battlefield").length).toBe(1);
+    expect(s.battlefield.filter((id) => s.objects[id]!.controller === ap && objIsType(s, s.objects[id]!, "Land")).length).toBeGreaterThan(5);
+  });
+  it("Tishana's Tidebinder counters an activated ability, and its creature loses all abilities while the Tidebinder stays", () => {
+    const tidebinder = card("Tishana's Tidebinder", "Creature — Merfolk Wizard", "{2}{U}", { power: "3", toughness: "2", keywords: ["Flash"], oracleText: "Flash\nWhen this creature enters, counter up to one target activated or triggered ability. If an ability of an artifact, creature, or planeswalker is countered this way, that permanent loses all abilities for as long as this creature remains on the battlefield. (Mana abilities can't be targeted.)" });
+    const pinger = card("Test Healer", "Creature — Cleric", "{1}{W}", { power: "1", toughness: "1", keywords: ["Vigilance"], oracleText: "Vigilance\n{T}: You gain 1 life." });
+    supported(tidebinder, pinger);
+    const { s: s0, ap, opp } = setup([]);
+    const healer = putOnBattlefield(s0, opp, pinger);
+    const tb = toHand(s0, ap, tidebinder);
+    s0.priority = opp;
+    const life = s0.players[opp]!.life;
+    let s = run(s0, planActivate(s0, opp, healer, 0));
+    const ability = s.stack[s.stack.length - 1]!.id;
+    for (let i = 0; i < 4 && waitingOn(s) !== ap; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = run(s, planCast(s, ap, tb));
+    for (let i = 0; i < 10 && s.pending?.kind !== "chooseTargets"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "stack", id: ability }] });
+    s = settle(s);
+    expect(s.players[opp]!.life).toBe(life);
+    expect(objHasKeyword(s, s.objects[healer]!, "Vigilance")).toBe(false);
+    expect(abilityProblem(s, opp, healer, 0)).toBeTruthy();
+    moveObject(s, tb, "graveyard");
+    invalidateCharacteristics(s);
+    expect(objHasKeyword(s, s.objects[healer]!, "Vigilance")).toBe(true);
+  });
 });

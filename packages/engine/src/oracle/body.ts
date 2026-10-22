@@ -2131,6 +2131,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si++;
       continue;
     }
+    // Tragic Arrogance: "For each player, you choose from among the permanents that player controls an artifact, a creature,
+    // an enchantment, and a planeswalker. Then each player sacrifices all other nonland permanents they control." Like
+    // Cataclysmic Gearhulk's, but you choose for everyone, not targeting (rulings).
+    const arrogance = /^For each player, you choose from among the permanents that player controls (an artifact, a creature, an enchantment, and a planeswalker)$/.exec(s);
+    if (arrogance && /^Then each player sacrifices all other nonland permanents they control\.?$/.test(sentences[si + 1] ?? "")) {
+      const fx = parseSentence(`Each player chooses ${arrogance[1]} from among the nonland permanents they control, then sacrifices the rest`, ctx);
+      if (fx?.length !== 1 || fx[0]!.type !== "keepRest") return null;
+      effects.push({ ...fx[0]!, youChoose: true });
+      si++;
+      continue;
+    }
     const eachYard = /^For each player, choose an? (.+? card) in that player's graveyard$/.exec(s);
     if (eachYard && /^Put those cards onto the battlefield under your control$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
       const filter = parseSearchFilter(eachYard[1]!);
@@ -3542,6 +3553,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // addition to its other colors and types." (Rise from the Grave, Liliana, Death's Majesty, Dread Slaver): an effect on
     // the permanent the card became, from then on (CR 611.2c, 400.7); a later color or type change overwrites it (rulings).
     // "It's a Phyrexian in addition to its other types" (Portal to Phyrexia): the same.
+    // Tishana's Tidebinder: "If an ability of an artifact, creature, or planeswalker is countered this way, that permanent
+    // loses all abilities for as long as ~ remains on the battlefield": the ability's source, if it's one of those as this
+    // resolves (rulings), from then on while ~ stays (CR 611.2b), whoever controls it.
+    if (/^If an ability of an artifact, creature, or planeswalker is countered this way, that permanent loses all abilities for as long as ~ remains on the battlefield$/.test(s)) {
+      const prev = effects[effects.length - 1];
+      if (ctx.spell || prev?.type !== "counterSpell" || prev.unless || !ctx.targets[prev.index]?.noSpells) return null;
+      const filter: TargetSpec = { kind: "object", types: ["Artifact", "Creature", "Planeswalker"], notTypes: [], notColors: [], text: "artifact, creature, or planeswalker" };
+      effects.push({ type: "continuous", what: { ref: "counteredSource", filter }, mods: [{ kind: "loseAllAbilities" }], duration: "whileControlled", whileOnBattlefield: true });
+      continue;
+    }
     // Settle the Wreckage: "Exile all attacking creatures target player controls. That player may search their library for
     // that many basic land cards, put those cards onto the battlefield tapped, then shuffle": as many as were exiled
     // (CR 608.2h); they may find fewer (rulings, CR 701.23b).

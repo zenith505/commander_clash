@@ -310,6 +310,11 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
     const key = s.linkedExile?.[`${ctx.sourceId}@${zc}`] ? `${ctx.sourceId}@${zc}` : `${ctx.sourceId}@${zc - 1}`;
     return (s.linkedExile?.[key] ?? []).flatMap((l) => (s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc ? [s.objects[l.id]!] : []));
   }
+  if (ref.ref === "counteredSource") {
+    const c = s.resolving?.counteredSource;
+    const o = c && s.objects[c.id];
+    return o && o.zone === "battlefield" && (o.zoneChanges ?? 0) === c.zc && objectMatches(s, ref.filter, o, ctx.controller, false) ? [o] : [];
+  }
   if (ref.ref === "costExiled") return (s.resolving?.item.costExiled ?? []).flatMap((c) => (s.objects[c.id]?.zone === "exile" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc ? [s.objects[c.id]!] : []));
   if (ref.ref === "amassed") {
     const a = s.resolving?.amassed ?? s.resolving?.item.amassed;

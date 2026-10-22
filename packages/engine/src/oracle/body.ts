@@ -1602,6 +1602,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si += rest ? 2 : 1;
       continue;
     }
+    // Diluvian Primordial, after its "for each opponent, you may cast ...": the spells cast this way.
+    if (/^If a spell cast this way would be put into a graveyard, exile it instead$/.test(s)) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "castTargetFree" || last.exileAfter) return null;
+      last.exileAfter = true;
+      continue;
+    }
     // "You may cast target instant card from your graveyard without paying its mana cost. If that spell would be put into
     // your graveyard, exile it instead." (Torrential Gearhulk): cast as it resolves (CR 608.2g), or not.
     const castTarget = /^[Yy]ou may cast (target .+? card(?: with .+?)? from your graveyard) without paying its mana cost$/.exec(s);
@@ -4103,10 +4110,16 @@ function parsePerOpponent(s: string, ctx: Ctx): Effect[] | null {
   const inner = card ? ` ${m[1]!}`.replace(yard, ` target ${t[1]} from an opponent's graveyard`).trim() : ` ${m[1]!}`.replace(who, ` target ${t[1]} an opponent controls`).trim();
   if (/\b(?:that player|that opponent|they|their)\b/.test(inner)) return null;
   const before = ctx.targets.length;
-  // "For each opponent, you may put ...": one choice, for all of them, as it resolves.
+  // "For each opponent, you may put ...": a choice for each of them, as it resolves.
   const may = /^you may (.+)$/.exec(inner);
-  const one = parseSentence(capital(may ? may[1]! : inner), ctx);
-  const fx = one && may ? [{ type: "may" as const, effects: one, text: may[1]! }] : one;
+  // "For each opponent, you may cast up to one target instant or sorcery card from that player's graveyard without paying
+  // its mana cost" (Diluvian Primordial): each one cast, or not, one at a time as it resolves (CR 608.2g; rulings).
+  const castIt = /^cast (target .+? card) from an opponent's graveyard without paying its mana cost$/.exec(may?.[1] ?? "");
+  const castWhat = castIt ? parseCardTarget(`${castIt[1]!} from an opponent's graveyard`, ctx) : null;
+  const castSpec = castWhat && ctx.targets[before];
+  if (castIt && (!castSpec || castSpec.kind !== "card" || !castSpec.types?.length || castSpec.types.includes("Land"))) return null;
+  const one = castWhat ? [{ type: "castTargetFree" as const, what: castWhat }] : parseSentence(capital(may ? may[1]! : inner), ctx);
+  const fx = one && may && !castWhat ? [{ type: "may" as const, effects: one, text: may[1]!, eachTarget: true as const }] : one;
   if (!fx || ctx.targets.length !== before + 1) return null;
   const spec = ctx.targets[before]!;
   if (card ? spec.kind !== "card" || spec.owner !== "opponent" || spec.linkedExile : spec.kind !== "object" || spec.controller !== "opponent") return null;

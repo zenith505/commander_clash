@@ -1027,7 +1027,7 @@ export type PendingDecision =
    * mana value N or more, or none to decline. `not`: a card that can't be one of them.
    */
   | { kind: "collectEvidence"; player: PlayerId; n: number; source: string; not?: ObjectId }
-  | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; /** "Each player may discard their hand and draw this many cards". */ wheel?: number; pay?: PayCost; /** Pay to keep a permanent: echo, cumulative upkeep. */ keep?: boolean; /** Clash: put the revealed `card` on the bottom of the library (CR 701.30a)? */ clash?: boolean; /** "You may repeat this process" (Ad Nauseam). */ repeat?: true }
+  | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; /** One target of a "may" asked about each of its targets (Effect "may" `eachTarget`). */ eachTarget?: true; /** "Each player may discard their hand and draw this many cards". */ wheel?: number; pay?: PayCost; /** Pay to keep a permanent: echo, cumulative upkeep. */ keep?: boolean; /** Clash: put the revealed `card` on the bottom of the library (CR 701.30a)? */ clash?: boolean; /** "You may repeat this process" (Ad Nauseam). */ repeat?: true }
   /**
    * "Counter that spell or ability unless its controller pays {2}" (ward, CR 702.21a). The player
    * may activate mana abilities first (CR 605.3a), then pays or declines.
@@ -1777,6 +1777,9 @@ export interface Resolving {
     nFor?: Record<string, number>; // the same, for each player when it counts their own ("half the cards in their hand")
     distributed?: Record<ObjectId, number>; // how a "distribute" effect's counters were divided, as it resolves
     manaMix?: Partial<Record<Color, number>>; // the colors chosen for "add X mana in any combination of colors"
+    /** A "may" asked about each of its targets (Effect "may" `eachTarget`): the next target slot to ask about, and the ones accepted; `mayAnswer`, the last answer. */
+    mayEach?: { at: number; yes: number[] };
+    mayAnswer?: boolean;
     found?: ObjectId[]; // the cards a library search found
     picking?: true; // an opponent is choosing among revealed cards (Gifts Ungiven); `picked`, what they chose
     picked?: ObjectId[];
@@ -1842,6 +1845,8 @@ export interface Resolving {
     searchZones?: string;
     /** The card a "you may cast target card ... without paying its mana cost" offered (castTargetFree). */
     castingTarget?: ObjectId;
+    /** castTargetFree with several targets: the ones offered already. */
+    castTargetsDone?: ObjectId[];
     /** castLinkedCopy: the copy of the exiled card offered to be cast. */
     linkedCopy?: ObjectId;
     damageSource?: string; // the source of damage chosen as it resolves (CR 609.7a): an object id, or "none" if there was none to choose

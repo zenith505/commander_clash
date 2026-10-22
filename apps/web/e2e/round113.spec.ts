@@ -35,7 +35,10 @@ test("Sepulchral Primordial: Ana's Hill Giant and Cy's Grizzly Bears come back u
   await modal(page).locator(`[data-pick="${giant}"]`).click();
   await modal(page).locator(`[data-pick="${bears}"]`).click();
   await modal(page).getByRole("button", { name: "Done" }).click();
-  await resolveUntil(page, (st) => st.pending?.kind === "chooseMay" && st.pending.player === 0);
+  // Asked about each card (round 114).
+  await resolveUntil(page, (st) => st.pending?.kind === "chooseMay" && st.pending.player === 0 && st.pending.card === giant);
+  await controls(page).getByRole("button", { name: "Yes" }).click();
+  await resolveUntil(page, (st) => st.pending?.kind === "chooseMay" && st.pending.player === 0 && st.pending.card === bears);
   await controls(page).getByRole("button", { name: "Yes" }).click();
   const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && st.objects[giant]!.zone === "battlefield");
   expect(after.objects[primordial]!.zone).toBe("battlefield");

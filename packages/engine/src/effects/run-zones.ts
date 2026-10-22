@@ -695,20 +695,27 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "castTargetFree": {
       // Cast as this resolves, or not (CR 608.2g); then "if that spell would be put into your graveyard, exile it
       // instead" applies to the spell it became.
+      // Several targets (Diluvian Primordial's one for each opponent): offered one at a time, in order (rulings).
       const sc = (s.resolving!.scratch ??= {});
+      const done = (sc.castTargetsDone ??= []);
       if (sc.castingTarget !== undefined) {
         const o = s.objects[sc.castingTarget];
         const d = o && defOf(s, o);
         if (o?.zone === "stack" && e.exileAfter && (e.exileAfter === true || isType(d!, "Instant") || isType(d!, "Sorcery"))) o.exileIfToGraveyard = true;
-        return;
+        done.push(sc.castingTarget);
+        sc.castingTarget = undefined;
       }
-      const o = objects(s, e.what, ctx)[0];
-      if (!o || o.zone !== "graveyard") return;
-      sc.castingTarget = o.id;
-      s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src };
-      if (castProblem(s, ctx.controller, o.id) === null) return "paused";
-      s.pending = null;
-      log(s, `${defOf(s, o).name} can't be cast.`);
+      for (const o of objects(s, e.what, ctx)) {
+        if (o.zone !== "graveyard" || done.includes(o.id)) continue;
+        sc.castingTarget = o.id;
+        s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src };
+        if (castProblem(s, ctx.controller, o.id) === null) return "paused";
+        s.pending = null;
+        sc.castingTarget = undefined;
+        done.push(o.id);
+        log(s, `${defOf(s, o).name} can't be cast.`);
+      }
+      sc.castTargetsDone = undefined;
       return;
     }
     case "castFromExileFree": {

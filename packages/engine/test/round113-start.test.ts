@@ -633,7 +633,10 @@ describe("Sepulchral Primordial", () => {
     expect(() => applyAction(s, { type: "chooseTargets", player: ap, targets: [target(b1), target(b2), { kind: "none" }] })).toThrow();
     expect(() => applyAction(s, { type: "chooseTargets", player: ap, targets: [target(mine), { kind: "none" }, { kind: "none" }] })).toThrow();
     s = settle(act(s, { type: "chooseTargets", player: ap, targets: [target(b1), { kind: "none" }, target(d1)] }));
-    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    // Asked about each card (round 114).
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap, card: b1 });
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap, card: d1 });
     s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
     for (const id of [b1, d1]) {
       expect(s.objects[id]!.zone).toBe("battlefield");

@@ -189,6 +189,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseMay" && pend.wheel !== undefined) return [{ type: "chooseMay", player: pid, yes: player(s, pid).hand.length < pend.wheel }];
     // A land played as an effect resolves (Gix): untapped as we'd play it ourselves (see chooseLand).
     if (pend.kind === "chooseMay" && pend.card && pend.prompt === landUntappedOffer(s, pid, pend.card)) return [{ type: "chooseMay", player: pid, yes: /^reveal/.test(pend.prompt) || player(s, pid).life >= 16 }];
+    // Sepulchral Primordial: each opponent's creature card comes back under our control.
+    if (pend.kind === "chooseMay" && pend.eachTarget) return [{ type: "chooseMay", player: pid, yes: true }];
     if (pend.kind === "chooseMay") return [{ type: "chooseMay", player: pid, yes: pend.card ? (revealedMay(s, pend.card) ?? millExplored(s, pid, pend.card)) : wantsMay(s, pid) }];
     if (pend.kind === "payUnless" && pend.discard) return [{ type: "payUnless", player: pid, pay: player(s, pid).hand.length >= pend.discard }];
     if (pend.kind === "payUnless") {

@@ -1,4 +1,4 @@
-import { allEffects, type Effect, type PayCost, type PunisherOption, type TargetSpec } from "../abilities";
+import { allEffects, type Effect, type ObjRef, type PayCost, type PunisherOption, type TargetSpec } from "../abilities";
 import { manaValue, parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
@@ -42,6 +42,29 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           const pay = { ...e.pay, mana: e.pay.mana.replace("{X}", `{${sc.payX}}`) };
           s.pending = { kind: "chooseMay", player: ctx.controller, prompt: `pay ${describePay(pay)}`, source: src, pay };
           return "paused";
+        }
+      }
+      // Each target in turn (Sepulchral Primordial); the ones turned down are left alone, as if no longer legal.
+      if (e.eachTarget && sc.may === undefined) {
+        const ref = allEffects(e.effects).map((x) => ("what" in x ? (x.what as ObjRef | undefined) : undefined)).find((w): w is Extract<ObjRef, { ref: "target" }> => w?.ref === "target");
+        if (ref) {
+          const each = (sc.mayEach ??= { at: ref.index, yes: [] as number[] });
+          if (sc.mayAnswer !== undefined) {
+            if (sc.mayAnswer) each.yes.push(each.at - 1);
+            sc.mayAnswer = undefined;
+          }
+          for (; each.at < ref.index + (ref.n ?? 1); each.at++) {
+            const t = ctx.targets[each.at];
+            if (!ctx.legal[each.at] || t?.kind !== "object") continue;
+            const name = defOf(s, obj(s, t.id)).name;
+            const prompt = e.text.replace(/\btarget .+? (?:from an opponent's graveyard|an opponent controls)\b/, name);
+            s.pending = { kind: "chooseMay", player: ctx.controller, prompt: (prompt === e.text ? `${e.text}: ${name}` : prompt).replace(/~/g, src), source: src, card: t.id, eachTarget: true };
+            each.at++;
+            return "paused";
+          }
+          for (let i = ref.index; i < ref.index + (ref.n ?? 1); i++) if (!each.yes.includes(i)) ctx.legal[i] = false;
+          sc.mayEach = undefined;
+          sc.may = each.yes.length > 0;
         }
       }
       // "An amount of {E} equal to its mana value" (Volatile Stormdrake): counted now (CR 608.2h).

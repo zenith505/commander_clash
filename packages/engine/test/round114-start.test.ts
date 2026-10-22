@@ -2,8 +2,9 @@
 // ability (Klauth, Manamorphose), with a color-split choice as it resolves (CR 106.1b, 608.2d).
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, cast, passAll, passUntil, putOnBattlefield, setup } from "./helpers";
-import { applyAction, botActions, isFullySupported, planCast, waitingOn, type GameState, type PlayerId } from "../src";
+import { act, bear, card, cast, passAll, passUntil, putOnBattlefield, setup, target } from "./helpers";
+import { applyAction, botActions, isFullySupported, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { moveObject } from "../src/game";
 
 // Real oracle text (Scryfall).
 const klauth = card("Klauth, Unrivaled Ancient", "Legendary Creature — Dragon", "{5}{R}{G}", {
@@ -115,5 +116,100 @@ describe("add X mana in any combination of colors", () => {
     expect(a).toEqual({ type: "manaMix", player: ap, counts: { U: 2 } });
     s = applyAction(s, a!);
     expect(s.pending).toBeNull();
+  });
+});
+
+const settle = (s: GameState) => {
+  for (let i = 0; i < 60 && (s.stack.length || s.triggerQueue.length) && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  return s;
+};
+const run = (s: GameState, plan: Action[] | null) => {
+  expect(plan).not.toBeNull();
+  return plan!.reduce((x, a) => act(x, a), s);
+};
+const inGraveyard = (s: GameState, pid: PlayerId, def: CardDef) => {
+  const id = putOnBattlefield(s, pid, def);
+  moveObject(s, id, "graveyard");
+  return id;
+};
+/** The opponents after `ap` in turn order. */
+const opponentsOf = (s: GameState, ap: PlayerId) => [1, 2, 3].map((k) => s.turnOrder[(s.turnOrder.indexOf(ap) + k) % 4]!) as [PlayerId, PlayerId, PlayerId];
+
+describe("for each opponent, you may ... up to one target card from that player's graveyard", () => {
+  const sepulchral = card("Sepulchral Primordial", "Creature — Avatar", "{5}{B}{B}", {
+    power: "5",
+    toughness: "4",
+    keywords: ["Intimidate"],
+    oracleText: "Intimidate (This creature can't be blocked except by artifact creatures and/or creatures that share a color with it.)\nWhen this creature enters, for each opponent, you may put up to one target creature card from that player's graveyard onto the battlefield under your control.",
+  });
+  const diluvian = card("Diluvian Primordial", "Creature — Avatar", "{5}{U}{U}", {
+    power: "5",
+    toughness: "5",
+    keywords: ["Flying"],
+    oracleText: "Flying\nWhen this creature enters, for each opponent, you may cast up to one target instant or sorcery card from that player's graveyard without paying its mana cost. If a spell cast this way would be put into a graveyard, exile it instead.",
+  });
+  const bolt = card("Lightning Bolt", "Instant", "{R}", { oracleText: "Lightning Bolt deals 3 damage to any target." });
+  const divination = card("Divination", "Sorcery", "{2}{U}", { oracleText: "Draw two cards." });
+
+  it("Sepulchral Primordial: asked about each card; the ones turned down stay, the others enter together", () => {
+    const { s: s0, ap, ids } = setup([sepulchral]);
+    const [b, , d] = opponentsOf(s0, ap);
+    const b1 = inGraveyard(s0, b, bear({ name: "Bear B" }));
+    const d1 = inGraveyard(s0, d, bear({ name: "Bear D" }));
+    let s = settle(passAll(cast(s0, ap, ids[0]!)));
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [target(b1), { kind: "none" }, target(d1)] }));
+    expect(s.pending).toMatchObject({ kind: "chooseMay", card: b1, prompt: "put Bear B onto the battlefield under your control" });
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: false }));
+    expect(s.pending).toMatchObject({ kind: "chooseMay", card: d1, prompt: "put Bear D onto the battlefield under your control" });
+    // Nothing has moved yet.
+    expect(s.objects[d1]!.zone).toBe("graveyard");
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect(s.objects[b1]!.zone).toBe("graveyard");
+    expect(s.objects[d1]!.zone).toBe("battlefield");
+    expect(s.objects[d1]!.controller).toBe(ap);
+  });
+
+  it("Sepulchral Primordial: both turned down, nothing happens", () => {
+    const { s: s0, ap, ids } = setup([sepulchral]);
+    const [b, c] = opponentsOf(s0, ap);
+    const b1 = inGraveyard(s0, b, bear({ name: "Bear B" }));
+    const c1 = inGraveyard(s0, c, bear({ name: "Bear C" }));
+    let s = settle(passAll(cast(s0, ap, ids[0]!)));
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [target(b1), target(c1), { kind: "none" }] }));
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: false }));
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: false }));
+    expect(s.pending).toBeNull();
+    expect([b1, c1].map((id) => s.objects[id]!.zone)).toEqual(["graveyard", "graveyard"]);
+  });
+
+  it("Diluvian Primordial: each opponent's card cast one at a time, then exiled; one turned down stays", () => {
+    expect(isFullySupported(diluvian)).toBe(true);
+    const { s: s0, ap, ids } = setup([diluvian]);
+    const [b, c, d] = opponentsOf(s0, ap);
+    const bb = inGraveyard(s0, b, bolt);
+    const cd = inGraveyard(s0, c, divination);
+    const db = inGraveyard(s0, d, bolt);
+    const life = s0.players[d]!.life;
+    const hand = s0.players[ap]!.hand.length - 1;
+    let s = settle(passAll(cast(s0, ap, ids[0]!)));
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [target(bb), target(cd), target(db)] }));
+    expect(s.pending).toMatchObject({ kind: "castFree", objectId: bb });
+    s = run(s, planCast(s, ap, bb, [{ kind: "player", id: d }]));
+    expect(s.pending).toMatchObject({ kind: "castFree", objectId: cd });
+    s = run(s, planCast(s, ap, cd));
+    expect(s.pending).toMatchObject({ kind: "castFree", objectId: db });
+    s = act(s, { type: "chooseMay", player: ap, yes: false });
+    // The last one cast resolves first (rulings).
+    expect(s.stack.map((x) => x.objectId)).toEqual([bb, cd]);
+    s = settle(s);
+    expect(s.players[d]!.life).toBe(life - 3);
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
+    expect(s.objects[bb]!.zone).toBe("exile");
+    expect(s.objects[cd]!.zone).toBe("exile");
+    expect(s.objects[db]!.zone).toBe("graveyard");
+  });
+
+  it("without the exile rider the cast isn't read from an opponent's graveyard alone", () => {
+    expect(isFullySupported(card("Odd Primordial", "Creature — Avatar", "{5}{U}{U}", { power: "5", toughness: "5", oracleText: "When this creature enters, you may cast target instant card from an opponent's graveyard without paying its mana cost." }))).toBe(false);
   });
 });

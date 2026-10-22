@@ -1181,3 +1181,25 @@ describe("Aetheric Amplifier, Ezuri", () => {
     expect(t.stack.length).toBe(1);
   });
 });
+
+describe("Neoform", () => {
+  const neoform = card("Neoform", "Sorcery", "{G}{U}", {
+    oracleText: "As an additional cost to cast this spell, sacrifice a creature.\nSearch your library for a creature card with mana value equal to 1 plus the sacrificed creature's mana value, put that card onto the battlefield with an additional +1/+1 counter on it, then shuffle.",
+  });
+  const three = card("Three Drop", "Creature — Beast", "{2}{G}", { power: "3", toughness: "3" });
+
+  it("plays", () => expect(isFullySupported(neoform)).toBe(true));
+
+  it("finds a creature with mana value 1 more and puts it onto the battlefield with a +1/+1 counter", () => {
+    const { s: s0, ap, ids } = setup([neoform]);
+    const fodder = putOnBattlefield(s0, ap, bear());
+    const t = putOnBattlefield(s0, ap, three);
+    moveObject(s0, t, "library");
+    let s = s0;
+    for (const a of planCast(s, ap, ids[0]!, undefined, undefined, undefined, undefined, { sacrifice: [fodder] })!) s = act(s, a);
+    for (let i = 0; i < 10 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", cards: [t] });
+    s = act(s, { type: "searchLibrary", player: ap, found: [t] });
+    expect(s.objects[t]).toMatchObject({ zone: "battlefield", counters: { "+1/+1": 1 } });
+  });
+});

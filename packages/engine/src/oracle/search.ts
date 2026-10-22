@@ -4,12 +4,14 @@ import { NUMBER_WORDS, X, BASIC_TYPES } from "./words";
 import { parseTargetPhrase } from "./targets";
 
 const SEARCH_PRONOUN = "(?:it|them|that card|those cards|the card|those cards)";
-const SEARCH_DEST = "(into your hand|onto the battlefield(?: tapped)?|into your graveyard)";
+// "... onto the battlefield with an additional +1/+1 counter on it" (Neoform): it enters with it (CR 614.1c).
+const SEARCH_DEST = "(into your hand|onto the battlefield(?: tapped)?(?: with an additional \\+1/\\+1 counter on it)?|into your graveyard)";
 
 function searchDest(text: string): SearchDest {
   if (text === "into your hand") return { zone: "hand" };
   if (text === "into your graveyard") return { zone: "graveyard" };
-  return { zone: "battlefield", ...(text.endsWith("tapped") ? { tapped: true } : {}) };
+  const counter = text.endsWith(" with an additional +1/+1 counter on it");
+  return { zone: "battlefield", ...(/ tapped(?: with|$)/.test(text) ? { tapped: true } : {}), ...(counter ? { counters: { counter: "+1/+1" as const, n: 1 } } : {}) };
 }
 
 /**

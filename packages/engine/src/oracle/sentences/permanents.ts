@@ -33,6 +33,21 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     if (!what || !isGroup(what)) return null;
     return [{ type: "doublePT", what, power: m[1] !== "toughness", toughness: m[1] !== "power" }];
   }
+  // "Double ~'s power until end of turn" (Tifa Lockhart), "double target creature's power and toughness": the same, for
+  // one creature.
+  if ((m = /^[Dd]ouble (~'s|target creature's|that creature's|its) (power|toughness|power and toughness) until end of turn$/.exec(s))) {
+    const what = parseObject(m[1] === "its" ? "it" : m[1]!.slice(0, -2), ctx);
+    if (!what || isGroup(what)) return null;
+    return [{ type: "doublePT", what, power: m[2] !== "toughness", toughness: m[2] !== "power" }];
+  }
+  // "Until end of turn, ~'s base power becomes equal to the number of Towns you control" (PuPu UFO): its power set in
+  // layer 7b (CR 613.4b), the number counted as it resolves (rulings).
+  // The body has moved the "Until end of turn, " to the end.
+  if ((m = /^~'s base power becomes equal to (the number of .+) until end of turn$/.exec(s))) {
+    const n = parseCount(m[1]!, ctx);
+    if (!n) return null;
+    return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "setPower", power: n }], duration: "endOfTurn" }];
+  }
 
   // "Tap any number of untapped creatures you control" (Devout Invocation), "you may tap any number of untapped Gates you
   // control" (Guild Summit): chosen as it resolves, none allowed, so "you may" changes nothing (CR 608.2d). Followed by
@@ -595,6 +610,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const down = parseChanges("gets -X/-X");
     if (!what || !up || !down) return null;
     return [{ type: "either", options: [[{ type: "continuous", what, mods: up, duration: "endOfTurn" }], [{ type: "continuous", what, mods: down, duration: "endOfTurn" }]], labels: ["It gets +X/+X until end of turn", "It gets -X/-X until end of turn"] }];
+  }
+  // "Enchanted creature gets +1/-1 or -1/+1 until end of turn" (Pemmin's Aura): which one is chosen as it resolves
+  // (CR 608.2d), like the above.
+  if ((m = /^(enchanted creature|~) gets ([+-]\d+\/[+-]\d+) or ([+-]\d+\/[+-]\d+) until end of turn$/i.exec(s))) {
+    const what = parseObject(m[1]!.toLowerCase() === "~" ? "~" : m[1]!.toLowerCase(), ctx);
+    const a = parseChanges(`gets ${m[2]}`);
+    const b = parseChanges(`gets ${m[3]}`);
+    if (!what || !a || !b) return null;
+    return [{ type: "either", options: [[{ type: "continuous", what, mods: a, duration: "endOfTurn" }], [{ type: "continuous", what, mods: b, duration: "endOfTurn" }]], labels: [`It gets ${m[2]} until end of turn`, `It gets ${m[3]} until end of turn`] }];
   }
   // "Until your next turn, up to one target noncreature artifact becomes an artifact creature ..." (Karn, the Great
   // Creator): the same as with the duration after it.

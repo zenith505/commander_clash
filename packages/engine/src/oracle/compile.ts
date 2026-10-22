@@ -705,7 +705,8 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // "Protection from black and from red" is two protection abilities (CR 702.16g).
-    const kwLine = line.replace(/(protection|hexproof) from (\w+) and from (\w+)/gi, "$1 from $2, $1 from $3");
+    // "Protection from spells and from permanents that were cast this turn" (Emrakul, the World Anew): the same, two.
+    const kwLine = line.replace(/(protection|hexproof) from (\w+) and from (\w+|permanents that were cast this turn)/gi, "$1 from $2, $1 from $3");
     if (isKeywordLine(kwLine)) {
       out.textKeywords.push(...textKeywords(kwLine));
       continue;
@@ -1651,6 +1652,12 @@ export function compile(d: CardDef): CompiledCard {
       out.allColors = true;
       continue;
     }
+    // "~ is every nonbasic land type" (Planar Nexus): a characteristic-defining ability (CR 604.3), so it works in every
+    // zone and applies first in layer 4 (613.3).
+    if (line === "~ is every nonbasic land type.") {
+      out.allNonbasicLandTypes = true;
+      continue;
+    }
     // "As long as ~ isn't on the battlefield, it's a 1/1 Insect creature in addition to its other types." (Grist, the Hunger
     // Tide): a static ability that works everywhere else (CR 113.6b), in its library, hand, graveyard, exile, the command
     // zone and on the stack, so it's a creature card and a creature spell there (rulings); on the battlefield it isn't.
@@ -1889,7 +1896,9 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "Cast this spell only during combat", "... only during your end step", "... only during the declare attackers step
     // and only if you've been attacked this step" (CR 506.8, 601.3).
-    const castOnly = /^Cast ~ only ((?:during|if|before|after) [^.]+)\.$/.exec(line);
+    // "You can't cast ~ unless an opponent lost life this turn" (Rakdos, Lord of Riots): the same as "cast ~ only if" (CR 601.3).
+    const cantUnless = /^You can't cast ~ unless ([^.]+)\.$/.exec(line);
+    const castOnly = cantUnless ? ([line, `if ${cantUnless[1]}`] as unknown as RegExpExecArray) : /^Cast ~ only ((?:during|if|before|after) [^.]+)\.$/.exec(line);
     if (castOnly) {
       const clauses = parseOnlyClauses(castOnly[1]!);
       if (!clauses?.cond || clauses.once || clauses.sorcery || out.castOnly) out.unsupported.push(raw);
@@ -1999,6 +2008,11 @@ export function compile(d: CardDef): CompiledCard {
       }
       continue;
     }
+    // The Immortal Sun: "Players can't activate planeswalkers' loyalty abilities." (CR 606.3), see loyaltyBan.
+    if (line === "Players can't activate planeswalkers' loyalty abilities.") {
+      out.noLoyaltyAbilities = true;
+      continue;
+    }
     if (line === "During your turn, your opponents can't cast spells or activate abilities of artifacts, creatures, or enchantments.") {
       out.opponentsCantCastYourTurn = true;
       out.opponentsCantActivateYourTurn = true;
@@ -2051,13 +2065,15 @@ export function compile(d: CardDef): CompiledCard {
       // died this turn" (morbid), "... if you cast it from your hand": checked as it enters.
       const [, tapped, count, kind, each, where, ifText] = ewc;
       const fromHand = ifText === "you cast it from your hand";
-      const cond = ifText && !fromHand ? parseStaticCondition(ifText, { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
+      // "If you cast it" (Nine-Lives Familiar): it enters from the stack as the spell it was, not a copy (CR 601.2i).
+      const ifCast = ifText === "you cast it";
+      const cond = ifText && !fromHand && !ifCast ? parseStaticCondition(ifText, { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
       const per = each ? parseCount(each, null, true) : null;
       const def = where ? parseCount(where, null) : null;
       const n = per ? scaleAmount(amt(count!), per) : def ? substituteX(amt(count!), def) : amt(count!);
       if ((each && !per) || (where && !def) || cond === null || !n || out.entersWithCounters) out.unsupported.push(raw);
       else {
-        out.entersWithCounters = { counter: counterKind(kind!), n, ...(cond ? { if: cond } : {}), ...(fromHand ? { castFromHand: true as const } : {}) };
+        out.entersWithCounters = { counter: counterKind(kind!), n, ...(cond ? { if: cond } : {}), ...(fromHand ? { castFromHand: true as const } : {}), ...(ifCast ? { ifCast: true as const } : {}) };
         if (tapped) out.entersTapped = true;
       }
       continue;
@@ -2581,6 +2597,15 @@ function linkExile(out: CompiledCard) {
     const others = bodies.flatMap((b) => allEffects(b.effects)).some((e) => e.type === "exile" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
     if (others || impulses.length !== 1) out.unsupported.push("(refers to cards exiled with it that it can't link to one exile ability)");
     else impulses[0]!.linked = true;
+  }
+  // "Create a token that's a copy of a card exiled with ~" (Mimic Vat, The Cloning of Shredder): the cards its one exile
+  // ability exiled (CR 607.2a), unless that's already linked (Mimic Vat's imprint).
+  if (bodies.some((b) => JSON.stringify(b).includes('"linkedCard"'))) {
+    const all = bodies.flatMap((b) => allEffects(b.effects));
+    const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
+    const others = all.some((e) => (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || (e.type === "discard" && !!e.exile));
+    if (others || out.spell || exiles.length !== 1) out.unsupported.push("(copies a card exiled with it that it can't link to one exile ability)");
+    else exiles[0]!.linked = true;
   }
   const returns = out.triggers.filter((t) => allEffects(t.body.effects).some((e) => e.type === "returnLinked" || e.type === "linkedExileToken"));
   if (!returns.length) return;

@@ -92,6 +92,8 @@ export interface SourceQuality {
   spell?: true;
   /** Its name, for protection from a card name (Runed Halo, CR 702.16a). */
   name?: string;
+  /** A permanent that was cast this turn (it resolved as a spell this turn), for Emrakul, the World Anew's protection. */
+  castThisTurn?: true;
 }
 
 /** "Goblins" -> "Goblin", "Elves" -> "Elf", "Sphinxes" -> "Sphinx": a creature type's plural, as protection names it. */
@@ -124,6 +126,7 @@ export function canonicalKeyword(text: string): string | undefined {
   if (!m) return undefined;
   const q = m[1]!;
   if (q === "each of your opponents") return PROTECTION_FROM_OPPONENTS;
+  if (q === "spells" || q === "permanents that were cast this turn") return `Protection from ${q}`;
   if (q === "the chosen player") return CHOSEN_PLAYER_PROTECTION;
   if (q === "each color that's not in your commander's color identity") return IDENTITY_PROTECTION;
   if (q === "everything" || q === "multicolored" || q === "monocolored" || q === "colorless" || q === "each color" || q === "all colors" || q === "the chosen color") return q === "the chosen color" ? CHOSEN_PROTECTION : `Protection from ${q}`;
@@ -206,6 +209,10 @@ export function protectedFrom(keywords: readonly string[], src: SourceQuality, h
     const q = m[1]!.toLowerCase();
     if (PROTECTION_COLOR[q] && src.colors.includes(PROTECTION_COLOR[q])) return true;
     if (q === "everything") return true;
+    // Emrakul, the World Anew (CR 702.16a, 702.16g): "protection from spells" (the spell itself, or a spell's ability,
+    // which is the spell), "from permanents that were cast this turn" (a permanent that resolved as a cast spell this turn).
+    if (q === "spells" && src.spell) return true;
+    if (q === "permanents that were cast this turn" && src.castThisTurn && !src.spell) return true;
     if ((q === "each color" || q === "all colors") && src.colors.length > 0) return true;
     if (q === "multicolored" && src.colors.length > 1) return true;
     if (q === "monocolored" && src.colors.length === 1) return true;
@@ -301,7 +308,7 @@ export const CREATURE_TYPES: ReadonlySet<string> = new Set([
 ]);
 
 // Other subtype lists (CR 205.3g-k), to tell which card type a subtype goes with.
-const LAND_TYPES = new Set(["Plains", "Island", "Swamp", "Mountain", "Forest", "Desert", "Gate", "Lair", "Locus", "Mine", "Power-Plant", "Tower", "Urza's", "Cave", "Sphere", "Town"]);
+const LAND_TYPES = new Set(["Plains", "Island", "Swamp", "Mountain", "Forest", "Desert", "Gate", "Lair", "Locus", "Mine", "Power-Plant", "Tower", "Urza's", "Cave", "Sphere", "Town", "Planet"]);
 const ARTIFACT_TYPES = new Set(["Attraction", "Blood", "Bobblehead", "Clue", "Contraption", "Equipment", "Food", "Fortification", "Gold", "Incubator", "Infinity", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Spacecraft", "Stone", "Terminus", "Treasure", "Vehicle"]);
 const ENCHANTMENT_TYPES = new Set(["Aura", "Background", "Cartouche", "Case", "Class", "Curse", "Role", "Room", "Rune", "Saga", "Shard", "Shrine"]);
 const SPELL_TYPES = new Set(["Adventure", "Arcane", "Chorus", "Lesson", "Omen", "Trap"]);

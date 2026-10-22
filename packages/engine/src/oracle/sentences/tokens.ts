@@ -61,11 +61,13 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   if ((m = new RegExp(`^(?:(.+?) creates|(?:You )?[Cc]reate) ${NUMX} (tapped (?:and attacking )?)?(\\d+|X)/(\\d+|X) (.+?) creature tokens?(?: with (.+?))?(?: named ([A-Z][\\w'-]*(?: (?:of |the )?[A-Z][\\w'-]*)*))?(?: that(?:'s| are) (tapped(?: and attacking)?))?$`, "i").exec(s))) {
     const xx = m[4] === "X" || m[5] === "X";
-    if (xx && (m[4] !== "X" || m[5] !== "X")) return null;
+    // "An X/1 red Phyrexian Horror creature token" (Urabrask's Forge): only its power is X.
+    const xPower = m[4] === "X" && m[5] !== "X";
+    if (xx && m[4] !== "X") return null;
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
-    const token = parseToken(xx ? 0 : Number(m[4]), xx ? 0 : Number(m[5]), m[6]!, m[7]);
+    const token = parseToken(xx ? 0 : Number(m[4]), xx && !xPower ? 0 : Number(m[5]), m[6]!, m[7]);
     const how = `${m[3] ?? ""} ${m[9] ?? ""}`;
-    const state = { ...(/tapped/.test(how) ? { tapped: true } : {}), ...(/attacking/.test(how) ? { attacking: true } : {}), ...(xx ? { pt: X } : {}) };
+    const state = { ...(/tapped/.test(how) ? { tapped: true } : {}), ...(/attacking/.test(how) ? { attacking: true } : {}), ...(xx ? { pt: X } : {}), ...(xPower ? { ptPowerOnly: true as const } : {}) };
     const named = m[8] ? { name: m[8], named: true as const } : {};
     return token && who ? [{ type: "createToken", who, n: amt(m[2]!), token: { ...token, ...named }, ...state }] : null;
   }
@@ -115,7 +117,9 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     // "A copy of it" after "exile target creature card from a graveyard": that card, now in exile (The Scarab God).
     const cardTargets = ctx.targets.flatMap((t, i) => (t.kind === "card" && !t.many ? [i] : []));
     const ofCard = /^(?:it|that card)$/.test(m[4]!) && ctx.lastObjectTarget === undefined && !ctx.lastCreated && cardTargets.length === 1 && cardTargets[0] === ctx.targets.length - 1;
-    const what = ofCard ? { ref: "target" as const, index: cardTargets[0]!, card: true as const } : parseObject(m[4]!, ctx, /\bcard\b/.test(m[4]!) && /^target /.test(m[4]!));
+    // "A copy of a card exiled with ~" (Mimic Vat): one of the cards linked to this object (CR 607.2a).
+    const linkedCard = m[4] === "a card exiled with ~" && !ctx.spell;
+    const what = ofCard ? { ref: "target" as const, index: cardTargets[0]!, card: true as const } : linkedCard ? { ref: "linkedCard" as const } : parseObject(m[4]!, ctx, /\bcard\b/.test(m[4]!) && /^target /.test(m[4]!));
     const except = m[5] ? parseCopyExcept(m[5], ctx.halfRound) : undefined;
     if (!who || !what || except === null || isGroup(what)) return null;
     const state = { ...(m[3] ? { tapped: true } : {}), ...(m[3] && /attacking/.test(m[3]) ? { attacking: true } : {}) };

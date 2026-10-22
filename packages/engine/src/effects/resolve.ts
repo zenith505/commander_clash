@@ -294,6 +294,12 @@ export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[
   }
   if (ref.ref === "damagedThisWay") return [...new Set(s.resolving?.damagedThisWay ?? [])].map((id) => obj(s, id)).filter((o) => o.zone === "battlefield" && (!ref.filter || objectMatches(s, ref.filter, o, ctx.controller, false)));
   if (ref.ref === "sacrificed") return []; // gone: only its last known information is used
+  if (ref.ref === "linkedCard") {
+    // Linked to the source as it is, or as it was if it has left since (CR 607.2a, 400.7).
+    const zc = ctx.sourceZc ?? 0;
+    const key = s.linkedExile?.[`${ctx.sourceId}@${zc}`] ? `${ctx.sourceId}@${zc}` : `${ctx.sourceId}@${zc - 1}`;
+    return (s.linkedExile?.[key] ?? []).flatMap((l) => (s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc ? [s.objects[l.id]!] : []));
+  }
   if (ref.ref === "costExiled") return (s.resolving?.item.costExiled ?? []).flatMap((c) => (s.objects[c.id]?.zone === "exile" && (s.objects[c.id]!.zoneChanges ?? 0) === c.zc ? [s.objects[c.id]!] : []));
   if (ref.ref === "amassed") {
     const a = s.resolving?.amassed ?? s.resolving?.item.amassed;
@@ -403,6 +409,8 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       return ctx.event?.attacker !== undefined && !player(s, ctx.event.attacker).lost ? [ctx.event.attacker] : [];
     case "otherOpponents":
       return opponents(s, ctx.controller).filter((p) => p !== ctx.event?.player);
+    case "otherPlayers":
+      return livingPlayers(s).filter((p) => p !== ctx.event?.player);
     case "enchantedPlayer": {
       // The player this Aura is attached to, or was as it last existed (CR 608.2h).
       const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
@@ -587,6 +595,8 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx): Mo
       ? m
       : m.kind === "modifyPT" || m.kind === "setPT"
       ? { ...m, power: evalAmount(s, m.power, c), toughness: evalAmount(s, m.toughness, c) }
+      : m.kind === "setPower"
+      ? { ...m, power: evalAmount(s, m.power, c) }
       : // Odric, Lunarch Marshal: the keywords creatures its controller controls have now (CR 611.2c), variants included.
         m.kind === "addKeywords" && m.sharedAmongYours
         ? { kind: "addKeywords", keywords: sharedKeywords(s, ctx.controller, m.keywords) }
@@ -865,6 +875,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "revealPick":
     case "piles":
     case "dig":
+    case "vault":
       return runLibraryEffect(s, e, ctx, src);
     case "exileNamed":
     case "revealUntil":

@@ -211,6 +211,9 @@ export function printedKeywords(d: CardDef): string[] {
   return [...own.filter((k) => k !== "Protection" && k !== "Toxic" && !(hexFrom && (k === "Hexproof" || k === "Hexproof from"))), ...fromText];
 }
 
+/** The nonbasic land types (CR 205.3i). */
+const NONBASIC_LAND_TYPES = ["Cave", "Desert", "Gate", "Lair", "Locus", "Mine", "Planet", "Power-Plant", "Sphere", "Tower", "Town", "Urza's"];
+
 /** Characteristics straight from the card, with no effects applied. */
 function printed(s: GameState, o: GameObject): Characteristics {
   const d = defOf(s, o);
@@ -218,7 +221,8 @@ function printed(s: GameState, o: GameObject): Characteristics {
     name: d.name,
     supertypes: [...d.supertypes],
     types: [...d.types],
-    subtypes: [...d.subtypes],
+    // "~ is every nonbasic land type" (CR 604.3) applies first in layer 4 (613.3); the land types are those of CR 205.3i.
+    subtypes: compileCard(d).allNonbasicLandTypes ? [...new Set([...d.subtypes, ...NONBASIC_LAND_TYPES])] : [...d.subtypes],
     allCreatureTypes: everyCreatureType(d),
     // "~ is all colors" (CR 604.3) applies first in layer 5 (613.3). A copy whose colors an exception set doesn't have it (707.9d).
     colors: compileCard(d).allColors ? ["W", "U", "B", "R", "G"] : [...d.colors],
@@ -554,7 +558,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return (cond.min === undefined || n >= cond.min) && (cond.max === undefined || n <= cond.max);
     }
     case "monarch":
-      return s.monarch === you;
+      return cond.opponent ? s.monarch !== undefined && s.monarch !== you : s.monarch === you;
     case "initiative":
       return s.initiative === you;
     case "completedDungeon": {
@@ -676,7 +680,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "opponentLostLife":
       // Paid life counts too (CR 119.4); gaining life doesn't take any back (rulings on Bloodchief Ascension).
-      if (cond.n !== undefined) return Object.entries(s.turnLog?.lifeLost ?? {}).some(([p, v]) => Number(p) !== you && v >= cond.n!);
+      if (cond.n !== undefined) return Object.entries(s.turnLog?.lifeLost ?? {}).some(([p, v]) => (cond.anyPlayer || Number(p) !== you) && v >= cond.n!);
       return (s.lostLifeThisTurn ?? []).some((p) => p !== you);
     case "noCombatDamageSinceLastTurn": {
       const p = s.players[you];

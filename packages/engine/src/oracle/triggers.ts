@@ -400,6 +400,10 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
     const z = fromM[1]!;
     from = /^anywhere/.test(z) ? "notHand" : /hand$/.test(z) ? "hand" : z === "exile" ? "exile" : z === "a graveyard" ? "graveyard" : z === "your graveyard" ? "ownGraveyard" : "ownLibrary";
   }
+  // "Whenever a player casts a spell they don't own" (Gonti, Night Minister): owned by someone other than its caster (CR
+  // 108.3), a card they took over or stole.
+  const notOwned = / (?:they|you) (?:don't|doesn't) own$/.exec(what);
+  if (notOwned) what = what.slice(0, notOwned.index);
   // Folk Hero's "Whenever you cast a spell that shares a creature type with this creature": one creature type in common,
   // a changeling having every one (CR 702.73a).
   const shares = / that shares a creature type with ~$/.exec(what);
@@ -453,7 +457,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   let body = parseBody(text, { castSpell: true, eventPlayer: true });
   if (!body) return "fail";
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: body.text.replace(/\bX\b/g, "that much") };
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(targets ? { targets } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(targets ? { targets } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}) }, body };
 }
 
 /**
@@ -583,7 +587,12 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // than the one that died, as it last existed (rulings on Scrap Trawler); fixed as the target is chosen (TargetSpec.bound).
   const lesser = !attached && / with lesser mana value\b/.test(bodyText);
   if (lesser) bodyText = bodyText.replace(/ with lesser mana value\b/, "").replace(/^return to your hand (target [a-z ]+ card) in your graveyard\.$/, "return $1 from your graveyard to your hand.");
-  let body = parseBody(bodyText, { subjectIt: true, subjectLeft: true, ...(attached?.[1] === "enchanted" ? { auraCard: true } : {}) });
+  // Mimic Vat: "you may exile that card. If you do, return each other card exiled with ~ to its owner's graveyard" (CR
+  // 607.2a). The card is exiled linked to ~; if it has left the graveyard, nothing happens and the other card stays (rulings).
+  const imprint = !attached && /^you may exile that card\. If you do, return each other card exiled with ~ to its owner's graveyard\.?$/.test(bodyText);
+  let body = imprint
+    ? { targets: [], effects: [{ type: "may" as const, effects: [{ type: "exile" as const, what: { ref: "subjectCard" as const, zone: "graveyard" as const }, linked: true }, { type: "moveLinked" as const, dest: "graveyard" as const, other: true as const, ifLinkedNow: true as const }], text: "exile that card (the other cards exiled with ~ go to their owners' graveyards)" }], text: bodyText }
+    : parseBody(bodyText, { subjectIt: true, subjectLeft: true, ...(attached?.[1] === "enchanted" ? { auraCard: true } : {}) });
   if (!body) return "fail";
   if (lesser) {
     const [t, ...more] = body.targets;
@@ -628,6 +637,9 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
  * "It" and "that creature" are the creature, "that player" the player, "that much" the damage.
  */
 function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
+  // "Whenever a creature you control with a +1/+1 counter on it deals combat damage to a player" (Bred for the Hunt): the
+  // counter is on it as it deals the damage.
+  line = line.replace(/^Whenever (an?|another) (\w+) you control (with an? [^ ]+ counter on it) deals combat damage /, "Whenever $1 $2 $3 you control deals combat damage ");
   // "Whenever a creature deals combat damage to one of your opponents, its controller may draw a card" (Edric, Gix):
   // anyone's creature, dealing it to an opponent of this permanent's controller; "its controller" is the creature's.
   const any = /^Whenever a creature deals combat damage to one of your opponents, (.+)$/.exec(line);
@@ -1085,13 +1097,13 @@ function parseManaTapTrigger(line: string): TriggeredAbility | "fail" | null {
 function parseDrawTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever a player draws their second card during their turn" (The Council of Four): only cards drawn in their own
   // turn count, the second of that turn.
-  const m = /^Whenever (you|an opponent|a player|enchanted player|enchanted opponent) draws? (a card(?: except the first one (?:they|you) draw in each of (?:their|your) draw steps)?|(?:your|their) (first|second|third) card (?:each|during their) turn), (.+)$/.exec(line);
+  const m = /^Whenever (you|an opponent|a player|enchanted player|enchanted opponent) draws? (a card(?: except the first one (?:they|you) draw in each of (?:their|your) draw steps)?|(?:your|their) (first|second|third|fourth|fifth) card (?:each|during their) turn), (.+)$/.exec(line);
   if (!m) return null;
   const ownTurn = / during their turn$/.test(m[2]!);
   const body = parseBody(theyAreThatPlayer(m[4]!), { eventPlayer: true });
   if (!body) return "fail";
   const by = m[1] === "you" ? "you" : m[1] === "an opponent" ? "opponent" : /^enchanted /.test(m[1]!) ? "enchanted" : "any";
-  const nth = m[3] ? { first: 1, second: 2, third: 3 }[m[3] as "first"] : undefined;
+  const nth = m[3] ? { first: 1, second: 2, third: 3, fourth: 4, fifth: 5 }[m[3] as "first"] : undefined;
   const except = / except the first one /.test(m[2]!);
   return { event: "playerDraws", draws: { by, ...(nth ? { nth } : {}), ...(except ? { notFirstInDrawStep: true as const } : {}), ...(ownTurn ? { ownTurn: true as const } : {}) }, body };
 }
@@ -1789,6 +1801,24 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         ifNoCounters = true;
         body0 = noCounters[1]!;
       }
+      // "When ~ dies, if it had a revival counter on it, return it to the battlefield with one fewer revival counter on it
+      // at the beginning of the next end step" (Nine-Lives Familiar): an intervening if (CR 603.4) on the creature as it
+      // last existed (CR 603.10a), and the counters it comes back with counted from that too.
+      let ifHadCounter: string | undefined;
+      const hadKind = /^if it had an? ([a-z]+) counter on it, (.+)$/.exec(body0);
+      if (hadKind) {
+        if (event !== "selfDies") return "fail" as const;
+        ifHadCounter = hadKind[1]!;
+        body0 = hadKind[2]!;
+      }
+      let fewer: string | undefined;
+      const fewerM = / with one fewer ([a-z]+) counter on it\b/.exec(body0);
+      if (fewerM) {
+        if (fewerM[1] !== ifHadCounter) return "fail" as const;
+        fewer = fewerM[1]!;
+        // Under the control of the player who puts it there, this ability's controller (CR 110.2a).
+        body0 = body0.replace(fewerM[0], "").replace(/^return it to the battlefield at the beginning of the next end step(\.?)$/, "return it to the battlefield under your control at the beginning of the next end step$1");
+      }
       // "When ~ dies, if it's not a token, ..." (Vaultborn Tyrant): an intervening if (CR 603.4) on the creature as it last
       // existed (CR 603.10a).
       let ifNotToken = false;
@@ -1850,6 +1880,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       if (event === "eachUpkeep") text = text.replace(/^(that player gains control of ~[^.]*\.) It gains /, "$1 ~ gains ");
       let body = parseBody(text, { selfIt: self && !left, selfCard: left, eventPlayer: event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "eachUpkeep" || event === "eachDrawStep" || event === "eachFirstMain" || event === "eachPostcombatMain" || event === "opponentLosesLife" || event === "opponentGainsLife" || event === "selfDealtDamageBySource" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage" || event === "opponentPlaysLand" || event === "playerPlaysLand", defending: event === "selfAttacks" || event === "selfBecomesBlocked" || event === "selfAttacksUnblocked" || event === "selfAttacksAlone", selfCastSpell: event === "selfCast", ownX: event === "selfEnters" || event === "selfCast" });
       if (body && thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, body0) };
+      if (body && fewer) {
+        // The one return of the card itself, maybe delayed to the next end step.
+        const effs = body.effects.length === 1 && body.effects[0]!.type === "delayed" ? body.effects[0]!.effects : body.effects;
+        const ret = effs.length === 1 && effs[0]!.type === "putOntoBattlefield" && ["selfCard", "subjectCard"].includes(effs[0]!.what.ref) ? effs[0]! : undefined;
+        if (!ret || ret.type !== "putOntoBattlefield" || ret.counters) return "fail" as const;
+        ret.countersFromLast = { kind: fewer, plus: -1 };
+      }
       const attacksPlayer = /^Whenever ~ attacks (?:a player|an opponent), /.test(line);
       const attacksBattle = /^Whenever ~ attacks a battle, /.test(line);
       // "To a player or planeswalker": "that player" could be either's (a planeswalker's controller isn't dealt it).
@@ -1864,7 +1901,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // Enigma Sphinx).
       const ownGraveyard = event === "selfToGraveyard" && /^When(?:ever)? ~ is put into your graveyard/.test(line);
       return body
-        ? { event, body, ...(ownGraveyard ? { ownGraveyard } : {}), ...(ifNoCounters ? { ifNoCounter: "any" as const } : {}), ...(ifNotToken ? { ifNotToken } : {}), ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifSpent ? { ifSpent } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifCast ? { ifCast } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(attacksBattle ? { attacksBattle } : {}), ...(orPlaneswalker ? { orPlaneswalker: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}), ...(onField ? { ifCond: { kind: "self" as const, is: "onBattlefield" as const } } : {}) }
+        ? { event, body, ...(ownGraveyard ? { ownGraveyard } : {}), ...(ifNoCounters ? { ifNoCounter: "any" as const } : {}), ...(ifHadCounter ? { ifHadCounter } : {}), ...(ifNotToken ? { ifNotToken } : {}), ...(ifKicked ? { ifKicked } : {}), ...(ifAlt ? { ifAlt } : {}), ...(ifBargained ? { ifBargained } : {}), ...(ifEvidence ? { ifEvidence } : {}), ...(ifTreasure ? { ifTreasure } : {}), ...(ifSpent ? { ifSpent } : {}), ...(ifCastFromHand !== undefined ? { ifCastFromHand } : {}), ...(ifCast ? { ifCast } : {}), ...(ifGift ? { ifGift } : {}), ...(ifTributeUnpaid ? { ifTributeUnpaid } : {}), ...(attacksPlayer ? { attacksPlayer } : {}), ...(attacksBattle ? { attacksBattle } : {}), ...(orPlaneswalker ? { orPlaneswalker: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(firstAttack ? { firstAttack } : {}), ...(saddled ? { activeIf: { kind: "self" as const, is: "saddled" as const } } : {}), ...(onField ? { ifCond: { kind: "self" as const, is: "onBattlefield" as const } } : {}) }
         : ("fail" as const);
     }
   }

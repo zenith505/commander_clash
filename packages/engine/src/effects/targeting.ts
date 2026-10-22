@@ -2,7 +2,7 @@ import { ANY_COUNTER } from "../abilities";
 import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Modification, ObjRef, PickAction, Range, TargetChoice, TargetSpec, Untargetable } from "../abilities";
 import { compileCard } from "../oracle";
 import { manaValue, parseManaCost, xCount } from "../mana";
-import { abilitiesOf, basePowerNow, canBeSacrificed, defOf, objHasKeyword, objIsType, power, toughness } from "../cards";
+import { abilitiesOf, basePowerNow, canBeSacrificed, defOf, objHasKeyword, objIsType, power, toughness, withCastThisTurn } from "../cards";
 import { attackedPlaneswalker, creatureTypesOf, livingPlayers, obj, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, type Characteristics } from "../layers";
 import { expandMany, expandPerOpponent, manySlot, modeCountProblem } from "../modes";
@@ -202,7 +202,7 @@ export function withChoice(chosen: Chosen | undefined, what: ChoiceKind, choice:
  */
 export function sourceQuality(s: GameState, id?: ObjectId, cardId?: string): SourceQuality {
   const o = id ? s.objects[id] : undefined;
-  if (o) return characteristics(s, o);
+  if (o) return withCastThisTurn(s, o, characteristics(s, o));
   const d = cardId ? s.cards[cardId] : undefined;
   return d ? { colors: d.colors, types: d.types, subtypes: d.subtypes, name: d.name } : { colors: [] };
 }
@@ -638,6 +638,14 @@ export function linkedCards(s: GameState, sourceId: ObjectId | undefined, zc?: n
 export function lesserPowerOk(s: GameState, spec: TargetSpec, t: TargetChoice, sourceId: ObjectId | undefined, sourceZc?: number): boolean {
   // "Target card exiled with ~": one of the cards linked to the source (CR 607.2a).
   if (spec.linkedExile && t.kind === "object" && !linkedCards(s, sourceId, sourceZc).some((l) => l.id === t.id)) return false;
+  if (spec.blockedBySource && t.kind === "object") {
+    const me = sourceId ? s.objects[sourceId] : undefined;
+    if (!me) return false;
+    const onField = me.zone === "battlefield" && (sourceZc === undefined || (me.zoneChanges ?? 0) === sourceZc);
+    const lk = s.lastKnown?.[me.id];
+    const blocking = onField ? me.blocking : lk && (sourceZc === undefined || lk.zc === sourceZc) ? lk.blocking : undefined;
+    if (!blocking?.includes(t.id) || s.objects[t.id]?.attacking === undefined) return false;
+  }
   if (!spec.lesserPowerThanSource || t.kind !== "object" || !sourceId) return true; // without the source, checked later
   const me = s.objects[sourceId];
   const mine = me?.zone === "battlefield" ? power(s, me) : s.lastKnown?.[sourceId]?.power;

@@ -838,6 +838,65 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       });
       return;
     }
+    case "vault": {
+      // Lim-Dûl's Vault (rulings): look at the top five. Each time the player pays 1 life, those go to the bottom in the
+      // order they choose and they look at the top five again (the same ones with five or fewer cards). When they stop,
+      // the rest of the library is shuffled and those five go back on top in any order. Paying life with 0 or less is
+      // allowed only as far as they have life to pay (CR 119.4).
+      const p = player(s, ctx.controller);
+      const sc = (s.resolving!.scratch ??= {});
+      const names = (ids: ObjectId[]) => ids.map((id) => defOf(s, obj(s, id)).name).join(", ");
+      for (let guard = 0; guard < 500; guard++) {
+        if (!sc.vault) {
+          const looked = p.library.slice(0, e.n);
+          if (!looked.length) return;
+          sc.vault = { stage: "ask", looked };
+          log(s, `${p.name} looks at the top ${looked.length === 1 ? "card" : `${looked.length} cards`} of their library.`);
+          log(s, `You look at ${names(looked)} (${src}).`, p.id);
+        }
+        const v = sc.vault;
+        if (v.stage === "ask") {
+          if (sc.may === undefined) {
+            if (payableLife(s, p.id) < e.life) v.stage = "top";
+            else {
+              s.pending = { kind: "chooseMay", player: p.id, prompt: `pay ${e.life} life to put these cards on the bottom of your library and look at the top ${e.n} again`, source: src, pay: { life: e.life }, vault: v.looked };
+              return "paused";
+            }
+          } else {
+            v.stage = sc.may ? "bottom" : "top";
+            if (sc.may) sc.vaultPaid = (sc.vaultPaid ?? 0) + 1;
+            sc.may = undefined;
+            sc.arranged = undefined;
+          }
+        }
+        if (v.stage === "bottom") {
+          if (toBottom(s, p.id, v.looked, src, false) === "paused") return "paused";
+          sc.arranged = undefined;
+          sc.vault = undefined;
+          continue;
+        }
+        // "Then shuffle and put the last cards you looked at this way on top in any order."
+        const looked = v.looked.filter((id) => obj(s, id).zone === "library" && obj(s, id).owner === p.id);
+        if (!sc.arranged) {
+          p.library = p.library.filter((id) => !looked.includes(id));
+          shuffleLibrary(s, p);
+          log(s, `${p.name} shuffles their library.`);
+          p.library = [...looked, ...p.library];
+          if (looked.length > 1) {
+            s.pending = { kind: "arrangeTop", player: p.id, how: "order", cards: looked, source: src };
+            return "paused";
+          }
+        } else {
+          const order = sc.arranged.top.filter((id) => looked.includes(id));
+          p.library = [...order, ...p.library.filter((id) => !order.includes(id))];
+          sc.arranged = undefined;
+        }
+        log(s, `${p.name} puts ${looked.length === 1 ? "a card" : `${looked.length} cards`} on top of their library.`);
+        sc.vault = undefined;
+        return;
+      }
+      return;
+    }
     case "dig": {
       if (e.each) {
         // "Each player looks at the top five cards of their library and may reveal ..." (Explore the Vastlands): one after
@@ -871,7 +930,9 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         if (!sc.looked.length) return;
         // "With mana value X or less": the X it was cast or activated with (TargetSpec.xRange), or an amount counted now
         // (TargetSpec.bound: Hatchery Spider's "where X is the number of creature cards in your graveyard").
-        const filter = e.filter?.xRange ? (({ xRange: _, ...r }) => ({ ...r, manaValue: { max: ctx.x ?? 0 } }))(e.filter) : e.filter && bindBound(s, e.filter, amountCtx(s, ctx));
+        // "Of the chosen type" (Icon of Ancestry): the choice made as the permanent entered; none chosen, none matches.
+        const chosenFilter = e.filter?.chosen ? bindChosen(e.filter, ctx.chosen) : e.filter;
+        const filter = chosenFilter?.xRange ? (({ xRange: _, ...r }) => ({ ...r, manaValue: { max: ctx.x ?? 0 } }))(chosenFilter) : chosenFilter && bindBound(s, chosenFilter, amountCtx(s, ctx));
         const mvMax = filter?.manaValue?.max ?? ctx.x ?? 0;
         const options = sc.looked.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
         const max = Math.max(0, Math.min(e.count, options.length, sc.looked.length - (e.minRest ?? 0)));

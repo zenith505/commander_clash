@@ -197,7 +197,12 @@ export function parseCostKeyword(
   // Miracle [cost] (CR 702.94a): a mana cost, without an X the mana cost doesn't have.
   if ((m = /^Miracle ((?:\{[^}]+\})+)$/.exec(line))) return parseManaCost(m[1]!).supported && (!/\{X\}/.test(m[1]!) || /\{X\}/.test(d.manaCost)) ? { miracle: m[1]! } : "fail";
   if (/^Miracle\b/.test(line)) return "fail";
-  if ((m = /^Madness(?: |—)(.+?)\.?$/.exec(line))) return /^(\{[^}]+\})+$/.test(m[1]!) && plainMana(m[1]!) ? { madness: m[1]! } : "fail";
+  if ((m = /^Madness(?: |—)(.+?)\.?$/.exec(line))) {
+    // "Madness—Pay six {C}" (Emrakul, the World Anew): that many {C}, a mana cost (CR 107.4c, 202.1).
+    const pay = new RegExp(`^Pay ${NUM} (\\{C\\})$`).exec(m[1]!);
+    const cost = pay ? pay[2]!.repeat(num(pay[1]!)) : m[1]!;
+    return /^(\{[^}]+\})+$/.test(cost) && plainMana(cost) ? { madness: cost } : "fail";
+  }
   // Suspend N—[cost] (CR 702.62a); "Suspend X—{X}{U}. X can't be 0." isn't modeled.
   if ((m = /^Suspend (\d+)—((?:\{[^}]+\})+)$/.exec(line))) return plainMana(m[2]!) ? { suspend: { n: Number(m[1]), cost: m[2]! } } : "fail";
   if (/^Suspend\b/.test(line)) return "fail";

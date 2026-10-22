@@ -336,6 +336,18 @@ function parseFaceDownPlay(sentences: string[], at: number, ctx: Ctx): { effect:
   const look = !head && new RegExp(`^[Ll]ook at the top (card|${NUMX} cards) of ${LIB} library$`).exec(s);
   const lookThen = look && /^Exile (?:it|that card|those cards|them) face down$/.test(sentences[at + 1] ?? "");
   const they = new RegExp(`^(Target opponent|Target player|That player|Each opponent) exiles? the top (card|${NUMX} cards) of their library face down$`).exec(s);
+  // "Whenever a creature deals combat damage to one of your opponents, its controller looks at the top card of that
+  // opponent's library and exiles it face down. They may play that card ..." (Gonti, Night Minister): the creature's
+  // controller exiles it and may play it (as it last existed, CR 608.2h), "that opponent" being the player dealt damage.
+  const its = ctx.subjectIt && ctx.eventPlayer && !head && !lookThen && !they ? /^[Ii]ts controller looks at the top card of that (?:opponent|player)'s library and exiles it face down$/.exec(s) : null;
+  if (its) {
+    const t = sentences[at + 1];
+    const may = /^They may play that card for as long as it remains exiled$/.test(t ?? "");
+    if (!may) return "fail";
+    const anyType = /^Mana of any type can be spent to cast (?:a spell this way|that spell|it)$/.test(sentences[at + 2] ?? "");
+    const effect: Effect = { type: "exileFaceDown", from: "top", who: { ref: "eventPlayer" }, actor: { ref: "subjectController" }, play: { until: "exiled", ...(anyType ? { anyType: true as const } : {}) } };
+    return { effect, next: at + (anyType ? 3 : 2) };
+  }
   if (!head && !lookThen && !they) return null;
   let next = at + (lookThen ? 2 : 1);
   const m = head ?? (lookThen ? look : null);
@@ -501,9 +513,15 @@ function splitSentences(text: string): string[] {
   return out;
 }
 
+const LIM_DULS_VAULT =
+  "Look at the top five cards of your library. As many times as you choose, you may pay 1 life, put those cards on the bottom of your library in any order, then look at the top five cards of your library. Then shuffle and put the last cards you looked at this way on top in any order.";
+
 export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean } = {}): AbilityBody | null {
   // "Put a +1/+1 counter on ~ and untap it" (Gwenna): "it" is ~, the one thing named.
   text = differenceInHand(text).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~");
+  // Lim-Dûl's Vault: look at the top five; as many times as you choose, pay 1 life and put them on the bottom in any order,
+  // then look at the next five; then shuffle the rest and put the last five looked at on top in any order (rulings).
+  if (text.trim() === LIM_DULS_VAULT) return { targets: [], effects: [{ type: "vault", n: 5, life: 1 }], text };
   const modal = MODAL.exec(text.trim());
   if (modal) {
     const body = parseModal(modal[1]!, modal[3]!, text.trim(), opts);
@@ -578,7 +596,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // battlefield. Otherwise, exile it." The choice is at random, so who makes it changes nothing: one instruction.
   // Flubs, the Fool: "draw a card if you have no cards in hand. Otherwise, discard a card." is "If you have no cards in
   // hand, draw a card. Otherwise, discard a card."
-  text = text.replace(/(^|\. )([Dd])raw a card if you have no cards in hand\. Otherwise,/, (_, lead: string) => `${lead}If you have no cards in hand, draw a card. Otherwise,`);
+  // Momentous Fall: "You draw cards equal to the sacrificed creature's power, then you gain life equal to its toughness":
+  // "its" is the sacrificed creature, as it last existed (CR 608.2h).
+  text = text.replace(/(equal to the sacrificed (creature|artifact|permanent)'s (?:power|toughness|mana value), then [^.]*? equal to) its (power|toughness|mana value)\b/, "$1 the sacrificed $2's $3");
+  // Cosmos Elixir: "draw a card if your life total is greater than your starting life total. Otherwise, you gain 2 life."
+  text = text.replace(/(^|\. )[Dd]raw a card if (you have no cards in hand|your life total is greater than your starting life total)\. Otherwise,/, (_, lead: string, cond: string) => `${lead}If ${cond}, draw a card. Otherwise,`);
   text = text.replace(/An opponent chooses a card at random in your graveyard\. If it's a creature card, put it onto the battlefield\. Otherwise, exile it\./, "Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it.");
   // Goblin Welder: the card is in the graveyard of the artifact's controller ("that player"); both targets must still be
   // legal as it resolves (rulings), and that player does both at once.
@@ -790,6 +812,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // "Loses two times X life" (Debt to the Deathless) is "loses twice X life".
   text = text.replace(/\bloses two times X life\b/g, "loses twice X life");
   text = text.replace(/, then shuffle and you gain (\d+) life\./g, ", then shuffle. You gain $1 life.");
+  // "Search your library for two cards. Put one into your hand and the other into your graveyard. Then shuffle." (Final
+  // Parting): one search, as Cultivate's.
+  text = text.replace(/\bSearch your library for two cards\. Put one (into your hand|onto the battlefield) and the other into your graveyard\. Then shuffle\./g, "Search your library for two cards, put one $1 and the other into your graveyard, then shuffle.");
   // "You gain 7 life, draw seven cards, then put up to seven ..." (Ugin, the Spirit Dragon): three instructions in order.
   text = text.replace(/^You gain (\d+) life, draw (\w+) cards?, then /, "You gain $1 life. Draw $2 cards, then ");
   // "Sacrifice ~, search your library for up to two creature cards, put those cards onto the battlefield, then shuffle"
@@ -813,6 +838,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   text = text.replace(/\b(deals \w+ damage to) each of your opponents\b/g, "$1 each opponent");
   // "~ deals 4 damage to target creature and you gain life equal to the damage dealt this way" (Enter the God-Eternals).
   text = text.replace(/^(~ deals [^.]+? damage to [^.]+?) and you gain life equal to the damage dealt this way\./, "$1. You gain life equal to the damage dealt this way.");
+  // "~ deals damage to that player equal to the number of cards in their hand and you gain 1 life for each card in your
+  // hand" (Sword of War and Peace): the damage, then the life; the cards counted as each part happens (CR 608.2c).
+  text = text.replace(/^(~ deals damage to that player equal to the number of cards in their hand) and (you gain 1 life for each card in your hand)\./, "$1. $2.");
   // "Destroy all creatures you don't control and all planeswalkers you don't control" (In Garruk's Wake).
   text = text.replace(/\ball creatures you don't control and all planeswalkers you don't control\b/g, "all creatures and planeswalkers you don't control");
   // "Destroy all creatures other than ~" (Magister of Worth) is "destroy all other creatures".
@@ -1202,15 +1230,15 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // before added, unless it can only be spent some ways.
     // After "Spend this mana only to cast spells" (Klauth): the mana the sentence before that one added, restricted and kept.
     if (/^Until end of turn, you don't lose this mana as steps and phases end$/.test(s)) {
-      const spendBefore = si > 0 && /^[Ss]pend this mana only /.test(sentences[si - 1]!);
+      const spendBefore = si > 0 && /^(?:[Ss]pend this mana only |This mana can't be spent to cast non)/.test(sentences[si - 1]!);
       const added = spendBefore ? spendAdded : allEffects(effects.slice(prevStart)).filter((e): e is Extract<Effect, { type: "addMana" }> => e.type === "addMana");
-      if (!added.length || si === 0 || /can't be spent/.test(sentences[si - 1]!) || (!spendBefore && /[Ss]pend this mana only/.test(sentences[si - 1]!))) return null;
+      if (!added.length || si === 0 || (!spendBefore && /can't be spent/.test(sentences[si - 1]!)) || (!spendBefore && /[Ss]pend this mana only/.test(sentences[si - 1]!))) return null;
       for (const e of added) e.keep = "turn";
       continue;
     }
     // "Add {U}{R}. Spend this mana only to cast instant and sorcery spells" (Abstract Paintmage, CR 106.6): the mana the
     // sentence before added.
-    if (/^Spend this mana only /.test(s)) {
+    if (/^(?:Spend this mana only |This mana can't be spent to cast non)/.test(s)) {
       const added = allEffects(effects.slice(prevStart)).filter((e): e is Extract<Effect, { type: "addMana" }> => e.type === "addMana");
       const only = parseManaSpend(`${s}.`);
       if (!added.length || !only || added.some((e) => e.only)) return null;
@@ -3110,7 +3138,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     if (otherwise) {
       const prev = effects[effects.length - 1];
       // "If you have no cards in hand, draw a card. Otherwise, discard a card." (Flubs, the Fool): checked as it resolves.
-      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "noneInHand");
+      // "If your life total is greater than your starting life total, draw a card. Otherwise, you gain 2 life." (Cosmos Elixir).
+      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "life");
       if (prev?.type !== "if" || (prev.cond.kind !== "wonClash" && prev.cond.kind !== "suspected" && prev.cond.kind !== "milledIs" && prev.cond.kind !== "targetCardWas" && !stateElse) || prev.otherwise) return null;
       const inner = parseOne(otherwise[1]!.charAt(0).toUpperCase() + otherwise[1]!.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
@@ -3972,6 +4001,7 @@ const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true
   { re: "~ was bargained", cond: { kind: "bargained" }, spellOnly: true },
   { re: "~ was cast from a graveyard", cond: { kind: "castFromGraveyard" }, spellOnly: true, noTargets: true },
   { re: "~ was cast from exile", cond: { kind: "castFromGraveyard", exile: true }, spellOnly: true, noTargets: true },
+  { re: "~ was cast from your hand", cond: { kind: "castFromGraveyard", hand: true }, spellOnly: true, noTargets: true },
   { re: "~ was cast using teamwork", cond: { kind: "teamwork" }, spellOnly: true },
   // Addendum (CR 207.2c). Its targets are chosen whenever it's cast; they're only not acted on (Return to Dust rulings).
   { re: "you cast ~ during your main phase", cond: { kind: "castInMain" }, spellOnly: true, ungated: true },

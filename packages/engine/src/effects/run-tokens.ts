@@ -1,5 +1,5 @@
 import type { Effect, ObjRef, TokenSpec } from "../abilities";
-import { defOf, isType, power, toughness } from "../cards";
+import { defOf, isPermanentCard, isType, power, toughness } from "../cards";
 import { auraHostOptions, enterTogether, livingPlayers, log, moveObject, nameOf, newObject, opponents, player } from "../game";
 import { tokenBatch, type TokenBatch } from "../counters";
 import { copiableDef, copyEnterCounters, tokenCopyKey, type CopyExcept } from "../copies";
@@ -117,7 +117,30 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // The copiable values of what it copies as it is now, or as it last existed (CR 707.2, 608.2h): a card in
       // a graveyard is copied as that card; "a copy of it" for a creature that has left is of it as it last was
       // (offspring and squad rulings).
-      const base = e.ofSource ? ctx.sourceDef : copiedValues(s, e.what, ctx);
+      let base = e.ofSource ? ctx.sourceDef : e.what.ref === "linkedCard" ? undefined : copiedValues(s, e.what, ctx);
+      if (e.what.ref === "linkedCard") {
+        // "A copy of a card exiled with ~" (Mimic Vat): the cards exiled with it as this resolves; its controller picks one
+        // if there are several (a melded pair, rulings). A nonpermanent card can't be a token, so none is made (rulings).
+        const sc = (s.resolving!.scratch ??= {});
+        const cards = objects(s, e.what, ctx).filter((c) => isPermanentCard(defOf(s, c)));
+        let pick = cards[0];
+        if (cards.length > 1) {
+          if (!sc.linkedCopyPick) {
+            sc.linkedCopyPick = true;
+            delete sc.found;
+            const ids = cards.map((c) => c.id);
+            s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what: `a card exiled with ${src} to copy`, cards: ids, min: 1, max: 1, dig: { looked: ids, to: "to make a token copy of", rest: "stay exiled" } };
+            return "paused";
+          }
+          sc.linkedCopyPick = undefined;
+          pick = cards.find((c) => sc.found?.includes(c.id)) ?? cards[0];
+        }
+        if (!pick) {
+          log(s, `No permanent card is exiled with ${src}, so no token is created.`);
+          return;
+        }
+        base = copiableDef(s, pick);
+      }
       if (!base) return;
       if (e.except?.halfPT) {
         // Half its power and toughness as it last existed on the battlefield (Saw in Half rulings, CR 608.2h).
@@ -223,7 +246,7 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
 function createTokensFor(s: GameState, e0: Extract<Effect, { type: "createToken" }>, n: number, ctx: ResolveCtx, src: string) {
   // "An X/X token": X worked out now, once (rulings on Inscription of Insight); the token's printed power and toughness.
   const xx = e0.pt !== undefined ? amountNow(s, e0.pt, ctx) : undefined;
-  const e = xx !== undefined ? { ...e0, token: { ...e0.token, power: xx, toughness: xx } } : e0;
+  const e = xx !== undefined ? { ...e0, token: { ...e0.token, power: xx, toughness: e0.ptPowerOnly ? e0.token.toughness : xx } } : e0;
   // One group for each opponent, attacking that opponent if it's this player's combat (CR 508.4), tapped either way.
   if (e.attackingEach) {
     const pid = ctx.controller;

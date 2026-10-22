@@ -159,8 +159,11 @@ export function parseManaTrigger(line: string): ManaTrigger | "fail" | null {
     what = m[2]!;
     if (m[3]) out.ofChosen = true;
     adds = m[4]!;
-  } else if ((m = /^Whenever (a player taps|you tap) an? (.+?) for (mana|\{[WUBRGC]\}), (that player adds|add) (?:an additional )?(.+)\.$/.exec(line))) {
-    if ((m[1] === "you tap") !== (m[4] === "add")) return "fail";
+  } else if ((m = /^Whenever (a player taps|you tap) an? (.+?) for (mana|\{[WUBRGC]\})( while you're the monarch)?, (that player adds|add) (?:an additional )?(.+)\.$/.exec(line))) {
+    if ((m[1] === "you tap") !== (m[5] === "add") || (m[4] && m[1] !== "you tap")) return "fail";
+    // "While you're the monarch" (Regal Behemoth): only then does it trigger (CR 725).
+    if (m[4]) out.whileMonarch = true;
+    m = [m[0], m[1], m[2], m[3], m[5], m[6]] as unknown as RegExpExecArray;
     if (m[1] === "you tap") out.you = true;
     // "Whenever you tap a permanent for {C}" (Forsaken Monument): only when it made one or more {C}.
     if (m[3] !== "mana") out.madeType = m[3]![1] as ManaType;
@@ -300,6 +303,12 @@ function parseManaProduced(text: string): ManaProduce | null {
  * ("of the chosen type", "on costs that contain {X}", "and that spell can't be countered", "... source").
  */
 export function parseManaSpend(sentence: string): ManaSpend | null {
+  // "This mana can't be spent to cast nonartifact spells" (Karn, Legacy Reforged): on anything but those spells (CR 106.6).
+  const cant = /^This mana can't be spent to cast (?:an? )?non([a-z]+) spells?\.$/.exec(sentence);
+  if (cant) {
+    const spells = spellFilter(cant[1]!);
+    return spells?.types?.length ? { spells, abilities: "any", other: true, text: sentence } : null;
+  }
   // "Spend this mana only to cast monocolored spells of that color" (Throne of Eldraine): of the color chosen for its source.
   if (sentence === "Spend this mana only to cast monocolored spells of that color.") return { text: sentence, spells: { kind: "spell", colorCount: "monocolored", chosen: "color", text: "monocolored spells of the chosen color" } };
   // "Only to cast a Dragon spell or an Omen spell" (Maelstrom of the Spirit Dragon): a spell with either subtype (an Omen

@@ -1116,7 +1116,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (me) (me.exiledUntilLeaves ??= []).push(l);
           // Linked to the source as it was when the ability triggered: if that object has already left, its
           // leaves ability has nothing to return, and the card stays exiled (CR 607.2a, rulings).
-          if (e.linked && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push(l);
+          if (e.linked && ctx.sourceId) {
+            ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push(l);
+            if (s.resolving) (s.resolving.linkedNow ??= []).push(l.id);
+          }
           const card = s.objects[l.id]!;
           if (e.ownerMay && !card.isToken) {
             const m = e.ownerMay;
@@ -1212,7 +1215,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       return;
     }
     case "exileFaceDown": {
-      const p = player(s, ctx.controller);
+      const actor = e.actor ? players(s, e.actor, ctx)[0] : ctx.controller;
+      if (actor === undefined) return;
+      const p = player(s, actor);
       const sc = (s.resolving!.scratch ??= {});
       let ids: ObjectId[];
       if (e.from === "handCard") {
@@ -1268,7 +1273,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const key = s.linkedExile?.[`${ctx.sourceId}@${zc}`] ? `${ctx.sourceId}@${zc}` : `${ctx.sourceId}@${zc - 1}`;
       const sc = (s.resolving!.scratch ??= {});
       const linked = (s.linkedExile?.[key] ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc);
-      let cards = linked.map((l) => obj(s, l.id)).filter((c) => (!e.yours || c.owner === ctx.controller) && !(e.other && s.resolving!.faceDownExiled?.includes(c.id)));
+      if (e.ifLinkedNow && !s.resolving!.linkedNow?.length) return;
+      let cards = linked.map((l) => obj(s, l.id)).filter((c) => (!e.yours || c.owner === ctx.controller) && !(e.other && s.resolving!.faceDownExiled?.includes(c.id)) && !(e.ifLinkedNow && s.resolving!.linkedNow?.includes(c.id)));
       const p = player(s, ctx.controller);
       if (e.one) {
         if (!sc.linkedPick) {
@@ -1600,7 +1606,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             continue;
           }
           log(s, `${src} puts ${d.name} onto the battlefield under ${player(s, under(o)).name}'s control${e.tapped ? ", tapped" : ""}${face ? (e.flipped ? " flipped" : " and transformed") : ""}${host ? ` enchanting ${auraHostName(s, host)}` : ""}.`);
-          moveObject(s, o.id, "battlefield", { controller: under(o), tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}), ...(e.counters ? { counters: e.counters } : {}), ...(face ? { face } : {}), ...host }); // CR 110.2a
+          moveObject(s, o.id, "battlefield", { controller: under(o), tapped: e.tapped, ...(e.becomes ? { becomes: e.becomes } : {}), ...(e.counters ? { counters: e.counters } : {}), ...(e.countersFromLast ? { counters: { [e.countersFromLast.kind]: Math.max(0, (s.lastKnown?.[o.id]?.counters?.[e.countersFromLast.kind] ?? 0) + e.countersFromLast.plus) } } : {}), ...(face ? { face } : {}), ...host }); // CR 110.2a
           // "That creature gains haste until end of turn. Exile it at the beginning of the next end step" (Corpse Dance): only
           // the permanent it became, while it's still that object (CR 400.7, rulings).
           if (o.zone !== "battlefield") continue;
@@ -1768,11 +1774,14 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const sc = (s.resolving!.scratch ??= {});
       if (!sc.found) {
         sc.found = [];
+        // "With mana value X or less": this spell's X (TargetSpec.xRange).
+        const { xRange, ...rest } = bindChosen(e.filter, ctx.chosen);
+        const filter: TargetSpec = xRange ? { ...rest, manaValue: { max: ctx.x ?? 0 } } : rest;
         // The active player chooses for their Auras first, then the others in turn order (APNAP, Open the Vaults rulings).
         for (const pid of apnap(s, players(s, e.who, ctx)))
           for (const id of player(s, pid).graveyard) {
             const d = defOf(s, s.objects[id]!);
-            if (isPermanentCard(d) && printedMatches(bindChosen(e.filter, ctx.chosen), d)) sc.found.push(id);
+            if (isPermanentCard(d) && printedMatches(filter, d)) sc.found.push(id);
           }
       }
       const cards = sc.found.map((id) => obj(s, id)).filter((o) => o.zone === "graveyard");

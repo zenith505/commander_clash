@@ -388,6 +388,8 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     if (o.zone !== (spec.linkedExile ? "exile" : "graveyard") || s.players[o.owner]?.lost) return false;
     if (spec.owner === "you" && o.owner !== controller) return false;
     if (spec.owner === "opponent" && o.owner === controller) return false;
+    // One opponent's slot of "for each opponent, ... from that player's graveyard" (TargetSpec.perOpponent): their card.
+    if (spec.controlledBy !== undefined && o.owner !== spec.controlledBy) return false;
     return printedMatches(spec, defOf(s, o));
   }
   if (spec.kind === "any") {

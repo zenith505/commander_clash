@@ -4051,16 +4051,23 @@ function parsePerOpponent(s: string, ctx: Ctx): Effect[] | null {
   const m = /^[Ff]or each opponent, (.+)$/.exec(s);
   if (!m || ctx.targets.some((t) => t.many || t.perOpponent)) return null;
   const who = / up to one target (.+?) (?:that player|that opponent|they) controls?\b/;
-  const t = who.exec(` ${m[1]!}`);
+  // "Up to one target creature card from that player's graveyard" (Sepulchral Primordial): owned by that opponent.
+  const yard = / up to one target (.+? card) from that player's graveyard\b/;
+  const t = who.exec(` ${m[1]!}`) ?? yard.exec(` ${m[1]!}`);
   if (!t) return null;
-  const inner = ` ${m[1]!}`.replace(who, ` target ${t[1]} an opponent controls`).trim();
+  const card = !who.test(` ${m[1]!}`);
+  const inner = card ? ` ${m[1]!}`.replace(yard, ` target ${t[1]} from an opponent's graveyard`).trim() : ` ${m[1]!}`.replace(who, ` target ${t[1]} an opponent controls`).trim();
   if (/\b(?:that player|that opponent|they|their)\b/.test(inner)) return null;
   const before = ctx.targets.length;
-  const fx = parseSentence(inner.charAt(0).toUpperCase() + inner.slice(1), ctx);
+  // "For each opponent, you may put ...": one choice, for all of them, as it resolves.
+  const may = /^you may (.+)$/.exec(inner);
+  const one = parseSentence(capital(may ? may[1]! : inner), ctx);
+  const fx = one && may ? [{ type: "may" as const, effects: one, text: may[1]! }] : one;
   if (!fx || ctx.targets.length !== before + 1) return null;
   const spec = ctx.targets[before]!;
-  if (spec.kind !== "object" || spec.controller !== "opponent" || spec.optional || spec.distinctFrom || spec.notSource) return null;
-  ctx.targets[before] = { ...spec, perOpponent: true, text: `target ${t[1]} that player controls` };
+  if (card ? spec.kind !== "card" || spec.owner !== "opponent" || spec.linkedExile : spec.kind !== "object" || spec.controller !== "opponent") return null;
+  if (spec.optional || spec.distinctFrom || spec.notSource) return null;
+  ctx.targets[before] = { ...spec, perOpponent: true, text: card ? `target ${t[1]} from that player's graveyard` : `target ${t[1]} that player controls` };
   ctx.lastObjectTarget = undefined;
   ctx.lastTargets = { index: before, n: 2 };
   return fx;

@@ -1,8 +1,8 @@
 // Round 113, the first of the most played cards: bots and Food Chain, ...
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, cast, forest, passAll, passUntil, putOnBattlefield, scry, setup } from "./helpers";
-import { blockCost, botActions, moveObject, manaAbilitiesOn, planCast, characteristics, invalidateCharacteristics, isFullySupported, objHasKeyword, parseManaCost, planActivate, planMana, power, toughness, waitingOn, type Action, type GameState, type PlayerId } from "../src";
+import { act, bear, card, cast, forest, target, passAll, passUntil, putOnBattlefield, scry, setup } from "./helpers";
+import { applyAction, blockCost, botActions, moveObject, manaAbilitiesOn, planCast, characteristics, invalidateCharacteristics, isFullySupported, objHasKeyword, parseManaCost, planActivate, planMana, power, toughness, waitingOn, type Action, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const foodChain = card("Food Chain", "Enchantment", "{2}{G}", {
@@ -597,5 +597,50 @@ describe("legendary spells (Serah Farron)", () => {
     expect(generic(s0, ids[1]!)).toBe(2);
     const s = cast(s0, ap, ids[1]!);
     expect(generic(s, ids[2]!)).toBe(4);
+  });
+});
+
+describe("Sepulchral Primordial", () => {
+  const primordial = card("Sepulchral Primordial", "Creature — Avatar", "{5}{B}{B}", {
+    power: "5",
+    toughness: "4",
+    keywords: ["Intimidate"],
+    oracleText: "Intimidate (This creature can't be blocked except by artifact creatures and/or creatures that share a color with it.)\nWhen this creature enters, for each opponent, you may put up to one target creature card from that player's graveyard onto the battlefield under your control.",
+  });
+  const settle = (s: GameState) => {
+    for (let i = 0; i < 60 && (s.stack.length || s.triggerQueue.length) && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    return s;
+  };
+  it("one creature card from each opponent's graveyard, under your control", () => {
+    expect(isFullySupported(primordial)).toBe(true);
+    const { s: s0, ap, ids } = setup([primordial]);
+    const i = s0.turnOrder.indexOf(ap);
+    const [b, c, d] = [1, 2, 3].map((k) => s0.turnOrder[(i + k) % 4]!);
+    const yard = (pid: PlayerId, name: string) => {
+      const id = putOnBattlefield(s0, pid, bear({ name }));
+      moveObject(s0, id, "graveyard");
+      return id;
+    };
+    const b1 = yard(b, "Bear B1");
+    const b2 = yard(b, "Bear B2");
+    const d1 = yard(d, "Bear D1");
+    const mine = yard(ap, "My Bear");
+    let s = settle(passAll(cast(s0, ap, ids[0]!)));
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    if (s.pending?.kind !== "chooseTargets") throw new Error("no targets");
+    expect(s.pending.specs.map((t) => t.controlledBy)).toEqual([b, c, d]);
+    // Two from one graveyard, or your own card, can't be chosen.
+    expect(() => applyAction(s, { type: "chooseTargets", player: ap, targets: [target(b1), target(b2), { kind: "none" }] })).toThrow();
+    expect(() => applyAction(s, { type: "chooseTargets", player: ap, targets: [target(mine), { kind: "none" }, { kind: "none" }] })).toThrow();
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [target(b1), { kind: "none" }, target(d1)] }));
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+    for (const id of [b1, d1]) {
+      expect(s.objects[id]!.zone).toBe("battlefield");
+      expect(s.objects[id]!.controller).toBe(ap);
+    }
+    expect(s.objects[b2]!.zone).toBe("graveyard");
+    expect(s.objects[mine]!.zone).toBe("graveyard");
+    void c;
   });
 });

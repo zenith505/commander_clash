@@ -810,3 +810,30 @@ describe("Giggling Skitterspike", () => {
     expect(power(s, s.objects[id]!)).toBe(5);
   });
 });
+
+describe("Jetmir, Nexus of Revels", () => {
+  it("+1/+0 and vigilance at three, also +1/+0 and trample at six, also double strike at nine", () => {
+    const jetmir = card("Jetmir, Nexus of Revels", "Legendary Creature — Cat Demon", "{1}{R}{G}{W}", {
+      power: "5",
+      toughness: "4",
+      oracleText: "Creatures you control get +1/+0 and have vigilance as long as you control three or more creatures.\nCreatures you control also get +1/+0 and have trample as long as you control six or more creatures.\nCreatures you control also get +1/+0 and have double strike as long as you control nine or more creatures.",
+    });
+    expect(isFullySupported(jetmir)).toBe(true);
+    const { s, ap } = setup([]);
+    putOnBattlefield(s, ap, jetmir);
+    const b = putOnBattlefield(s, ap, bear());
+    putOnBattlefield(s, ap, bear());
+    invalidateCharacteristics(s);
+    expect(power(s, s.objects[b]!)).toBe(3);
+    expect(objHasKeyword(s, s.objects[b]!, "Vigilance")).toBe(true);
+    expect(objHasKeyword(s, s.objects[b]!, "Trample")).toBe(false);
+    for (let i = 0; i < 3; i++) putOnBattlefield(s, ap, bear());
+    invalidateCharacteristics(s);
+    expect(power(s, s.objects[b]!)).toBe(4);
+    expect(objHasKeyword(s, s.objects[b]!, "Trample")).toBe(true);
+    for (let i = 0; i < 3; i++) putOnBattlefield(s, ap, bear());
+    invalidateCharacteristics(s);
+    expect(power(s, s.objects[b]!)).toBe(5);
+    expect(objHasKeyword(s, s.objects[b]!, "Double strike")).toBe(true);
+  });
+});

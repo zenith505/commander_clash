@@ -2191,7 +2191,10 @@ export function compile(d: CardDef): CompiledCard {
       out.triggers.push({ event: "castSpell", cast: { by: "you", spell: { kind: "spell", text: "spell" } }, body: rippleBody(Number(grantedRipple[1]), "cause") });
       continue;
     }
-    const st = parseStatic(line) ?? parseConditionalStatic(line);
+    // Jetmir: "Creatures you control also get +1/+0 and have trample as long as ...": "also" only says it adds to the line
+    // before it; each line is its own static ability (CR 604.1).
+    const also = /^(Creatures you control) also (get .+ as long as .+)$/.exec(line);
+    const st = also ? parseConditionalStatic(`${also[1]} ${also[2]}`) : parseStatic(line) ?? parseConditionalStatic(line);
     if (st) {
       out.statics.push(st);
       continue;

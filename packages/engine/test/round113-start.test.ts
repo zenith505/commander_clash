@@ -909,3 +909,28 @@ describe("Stuffy Doll", () => {
     expect(s.players[opp]!.life).toBe(life - 4);
   });
 });
+
+describe("Saskia the Unyielding", () => {
+  it("combat damage to a player is dealt again to the chosen player, by that creature, even once Saskia is gone (CR 608.2h)", () => {
+    const saskia = card("Saskia the Unyielding", "Legendary Creature — Human Soldier", "{B}{R}{G}{W}", {
+      power: "3",
+      toughness: "4",
+      keywords: ["Vigilance", "Haste"],
+      oracleText: "Vigilance, haste\nAs Saskia enters, choose a player.\nWhenever a creature you control deals combat damage to a player, it deals that much damage to the chosen player.",
+    });
+    expect(isFullySupported(saskia)).toBe(true);
+    const { s: s0, ap, opp } = setup([]);
+    const other = s0.turnOrder.find((p) => p !== ap && p !== opp)!;
+    const sk = putOnBattlefield(s0, ap, saskia);
+    s0.objects[sk]!.chosen = { player: other };
+    const b = putOnBattlefield(s0, ap, bear());
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: b, defender: opp }] });
+    for (let i = 0; i < 100 && !s.stack.length; i++) s = act(s, s.pending?.kind === "declareBlockers" ? { type: "declareBlockers", player: s.pending.player, blocks: [] } : { type: "passPriority", player: waitingOn(s)! });
+    expect(s.players[opp]!.life).toBe(38);
+    moveObject(s, sk, "graveyard");
+    invalidateCharacteristics(s);
+    s = passAll(s);
+    expect(s.players[other]!.life).toBe(38);
+  });
+});

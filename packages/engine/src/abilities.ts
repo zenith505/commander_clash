@@ -2068,7 +2068,11 @@ export type Effect =
    * who chose `chose`, in APNAP order, its controller chooses one of that player's creatures (not targeted); then it gains
    * control of all of them for the duration. Afterwards "those creatures" are they (ObjRef created).
    */
-  | { type: "controlFromEach"; chose: string; duration: "endOfTurn" }
+  /**
+   * `votedFor`: "For each money vote, choose a permanent owned by the voter and gain control of it" (Expropriate): one
+   * permanent that voter owns for each such vote, for good.
+   */
+  | { type: "controlFromEach"; chose?: string; votedFor?: string; duration: "endOfTurn" | "game" }
   /** "Reveal the top card of your library" (CR 701.20a): what follows ("If it's a creature card, put it into your hand") is about it (ObjRef "revealed"). */
   /** "Reveal the top card of your library" (CR 701.20a), or with `look` only look at it, for an "if it's a ... card" after it. */
   /** Parley: "Each player reveals the top card of their library." (ResolvingState.parley counts them.) */
@@ -2530,7 +2534,7 @@ export type Effect =
   | { type: "venture"; undercity?: true }
   /** "Take an extra turn after this one", "target player takes two extra turns after this one" (CR 500.7). */
   /** `loseAtEnd`: "At the beginning of that turn's end step, you lose the game." */
-  | { type: "extraTurn"; who: PlayerRef; n: number; loseAtEnd?: true }
+  | { type: "extraTurn"; who: PlayerRef; /** "For each time vote, take an extra turn after this one" (Expropriate): counted as it resolves. */ n: Amount; loseAtEnd?: true }
   /**
    * "You control target player during that player's next turn" (CR 723): `controller` makes all of `who`'s choices and
    * decisions during the next turn `who` actually takes (723.1, 723.1b). `extraTurnAfter`: "After that turn, that player

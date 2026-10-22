@@ -53,7 +53,9 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "extraTurn":
       // CR 500.7: taken directly after this turn; the most recently created first.
       for (const pid of players(s, e.who, ctx)) {
-        for (let i = 0; i < e.n; i++) {
+        const n = amountNow(s, e.n, ctx);
+        if (n <= 0) continue;
+        for (let i = 0; i < n; i++) {
           // The delayed trigger's source: the spell (or the permanent whose ability this is).
           const item = s.resolving?.item;
           const id = ctx.sourceId ?? (item?.kind === "spell" ? item.objectId : undefined);
@@ -63,7 +65,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
             ...(e.loseAtEnd && card ? { loseAtEnd: { controller: ctx.controller, sourceCardId: cardIdOf(card), subject: { id: card.id, zc: card.zoneChanges ?? 0 } } } : {}),
           });
         }
-        log(s, `${player(s, pid).name} will take ${e.n === 1 ? "an extra turn" : `${e.n} extra turns`} after this one.`);
+        log(s, `${player(s, pid).name} will take ${n === 1 ? "an extra turn" : `${n} extra turns`} after this one.`);
       }
       return;
     case "controlPlayer": {

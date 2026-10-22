@@ -839,3 +839,38 @@ describe("Mnemonic Betrayal", () => {
     expect(s.players[later(s, ap, 2)]!.graveyard).toContain(third);
   });
 });
+
+const expropriate = card("Expropriate", "Sorcery", "{7}{U}{U}", {
+  oracleText:
+    "Council's dilemma — Starting with you, each player votes for time or money. For each time vote, take an extra turn after this one. For each money vote, choose a permanent owned by the voter and gain control of it. Exile Expropriate.",
+});
+
+describe("Expropriate", () => {
+  it("an extra turn for each time vote; a permanent owned by each money voter, for each money vote", () => {
+    expect(isFullySupported(expropriate)).toBe(true);
+    const { s: s0, ap, ids } = setup([expropriate]);
+    let s = s0;
+    const [p1, p2, p3] = [later(s, ap, 1), later(s, ap, 2), later(s, ap, 3)];
+    const ring = putOnBattlefield(s, p2, card("Sol Ring", "Artifact", "{1}", { oracleText: "{T}: Add {C}{C}." }));
+    const theirBear = putOnBattlefield(s, p2, bear());
+    const p3Bear = putOnBattlefield(s, p3, bear({ name: "Lone Bear" }));
+    const word: Record<number, string> = { [ap]: "time", [p1]: "time", [p2]: "money", [p3]: "money" };
+    s = run(s, planCast(s, ap, ids[0]!));
+    for (let i = 0; i < 40 && (s.stack.length || s.pending); i++) {
+      const pend = s.pending;
+      if (pend?.kind === "chooseOption" && pend.what === "vote") s = act(s, { type: "chooseOption", player: pend.player, choice: word[pend.voter ?? pend.player]! });
+      else if (pend?.kind === "pickPermanents") {
+        expect(pend).toMatchObject({ player: ap, of: p2 });
+        expect(pend.options).toEqual(expect.arrayContaining([ring, theirBear]));
+        s = act(s, { type: "pickPermanents", player: ap, ids: [ring] } as Action);
+      } else if (pend) throw new Error(pend.kind);
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(s.objects[ids[0]!]!.zone).toBe("exile");
+    expect(s.extraTurns?.filter((t) => t.player === ap)).toHaveLength(2);
+    expect(characteristics(s, s.objects[ring]!).controller).toBe(ap);
+    expect(characteristics(s, s.objects[theirBear]!).controller).toBe(p2);
+    // Only one permanent that player owns: no question.
+    expect(characteristics(s, s.objects[p3Bear]!).controller).toBe(ap);
+  });
+});

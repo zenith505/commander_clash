@@ -2,7 +2,7 @@
 // don't control": a button for each, and "Choose nothing"), Odric, Master Tactician (you choose the defending
 // player's blocks: click their creatures, then your attackers), Armored Skyhunter (you may attach the Equipment it
 // put onto the battlefield to a creature you control), Protean Hulk (a library search with a total mana value limit) and
-// Currency Converter (pick one of the cards exiled with it).
+// Currency Converter (pick one of the cards exiled with it); Expropriate (a permanent the money voter owns).
 import { expect, test } from "@playwright/test";
 import { applyAction, planActivate, planCast, waitingOn } from "@cc/engine";
 import { idsOf, LANDS, one, open, pageErrors, playUntil, scene } from "./scene";
@@ -122,5 +122,32 @@ test("Currency Converter: pick a card exiled with it to put into the graveyard; 
   expect(after.objects[forest]!.zone).toBe("graveyard");
   expect(after.objects[bears]!.zone).toBe("exile");
   expect(after.battlefield.some((id) => after.cards[after.objects[id]!.cardId]!.name === "Treasure Token")).toBe(true);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Expropriate: you vote money, then click a permanent you own to gain control of", async ({ page }) => {
+  let s = scene({ hand: ["Expropriate"], board: [...LANDS, "Sol Ring"] }, [{ board: ["Grizzly Bears"] }]);
+  const ring = one(s, "Sol Ring");
+  s = playUntil(s, (st) => st.step === "main1" && waitingOn(st) === 0 && !st.pending);
+  for (const a of planCast(s, 0, one(s, "Expropriate"))!) s = applyAction(s, a);
+  s = playUntil(s, (st) => st.pending?.kind === "chooseOption" && st.pending.what === "vote");
+  s = applyAction(s, { type: "chooseOption", player: 0, choice: "money" });
+  s = playUntil(s, (st) => st.pending?.kind === "pickPermanents");
+  expect(s.pending).toMatchObject({ player: 0, of: 0, owned: true });
+  await open(page, s);
+  const bar = controls(page);
+  await expect(bar).toContainText("Expropriate: click a permanent you own (whoever controls it) to gain control of it.");
+  await page.locator(`[data-obj="${ring}"]`).click();
+  await bar.getByRole("button", { name: "Choose", exact: true }).click();
+  // A bot's money vote: one of theirs, the same way.
+  for (let i = 0; i < 3; i++) {
+    const st = await resolveUntil(page, (x) => x.pending?.kind === "pickPermanents" || (x.stack.length === 0 && !x.pending));
+    if (st.pending?.kind !== "pickPermanents") break;
+    await page.locator(`[data-obj="${st.pending.options[0]}"]`).click();
+    await bar.getByRole("button", { name: "Choose", exact: true }).click();
+  }
+  const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending);
+  expect(after.objects[one(s, "Expropriate")]!.zone).toBe("exile");
+  expect(after.log.some((l) => /gains control of .*Sol Ring/.test(l.text))).toBe(true);
   expect(pageErrors(page)).toEqual([]);
 });

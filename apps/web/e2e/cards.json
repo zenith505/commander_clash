@@ -3583,6 +3583,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a69265b2-0e37-4d86-866e-e4a923233b4d",
+  "name": "Expropriate",
+  "manaCost": "{7}{U}{U}",
+  "cmc": 9,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Council's dilemma — Starting with you, each player votes for time or money. For each time vote, take an extra turn after this one. For each money vote, choose a permanent owned by the voter and gain control of it. Exile Expropriate.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Council's dilemma"
+  ],
+  "commanderLegal": "legal",
+  "set": "cn2",
+  "releasedAt": "2016-08-26",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "437b2dab-15e0-4b9a-a204-58622d37a3b3",
   "name": "Fact or Fiction",
   "manaCost": "{3}{U}",

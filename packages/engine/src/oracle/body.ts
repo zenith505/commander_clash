@@ -2953,6 +2953,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     }
     // "For each player who chose fame, gain control of a creature that player controls until end of turn": a creature of
     // each of theirs, chosen as it resolves (not targeted); "those creatures" are then those.
+    // Expropriate: "For each money vote, choose a permanent owned by the voter and gain control of it" (for good).
+    const perVote = ctx.vote && !ctx.vote.among && !ctx.vote.choose ? /^For each ([a-z]+) vote, choose a permanent owned by the voter and gain control of it$/.exec(s) : null;
+    if (perVote) {
+      if (!ctx.vote!.options?.includes(perVote[1]!)) return null;
+      effects.push({ type: "controlFromEach", votedFor: perVote[1]!, duration: "game" });
+      continue;
+    }
     const fromEach = /^For each player who chose ([a-z]+), gain control of a creature that player controls until end of turn$/.exec(s);
     if (fromEach) {
       if (!ctx.chooseWords?.includes(fromEach[1]!) || ctx.fromEach) return null;
@@ -4582,8 +4589,9 @@ function scaleEffect(e: Effect, per: AmountExpr): Effect | null {
     case "scry":
     case "surveil":
     case "preventNext":
+    case "extraTurn":
     case "pick": {
-      if (e.type === "counters" && (e.perLastKnownCounter || e.double)) return null;
+      if ((e.type === "counters" && (e.perLastKnownCounter || e.double)) || (e.type === "extraTurn" && (e.n !== 1 || e.loseAtEnd))) return null;
       const n = sc(e.n);
       return n === null ? null : ({ ...e, n } as Effect);
     }

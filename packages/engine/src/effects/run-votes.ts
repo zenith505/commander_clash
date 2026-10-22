@@ -110,7 +110,10 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // as it resolves (not targeted); then control of all of them changes at once.
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
-      const st = (sc.fromEach ??= { queue: apnap(s, Object.entries(r.chose ?? {}).filter(([, w]) => w === e.chose).map(([k]) => Number(k) as PlayerId)), ids: [] });
+      const st = (sc.fromEach ??= {
+        queue: e.votedFor !== undefined ? (r.votes ?? []).filter((v) => v.choice === e.votedFor).map((v) => v.voter) : apnap(s, Object.entries(r.chose ?? {}).filter(([, w]) => w === e.chose).map(([k]) => Number(k) as PlayerId)),
+        ids: [],
+      });
       while (st.queue.length) {
         const pid = st.queue[0]!;
         // The answer to the question asked for this player (game.ts pickPermanents keeps it as the chooser's pick).
@@ -121,21 +124,22 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           st.queue.shift();
           continue;
         }
-        const options = player(s, pid).lost ? [] : s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature"));
+        // A permanent the voter owns, whoever controls it now (Expropriate); the same one may be chosen again.
+        const options = player(s, pid).lost ? [] : s.battlefield.filter((id) => (e.votedFor !== undefined ? obj(s, id).owner === pid : controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature")));
         if (options.length > 1) {
           sc.queue = [ctx.controller];
           sc.chosen = {};
-          s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "choose", what: "creature", options, count: 1, of: pid };
+          s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "choose", what: e.votedFor !== undefined ? "permanent" : "creature", options, count: 1, of: pid, ...(e.votedFor !== undefined ? { owned: true as const } : {}) };
           return "paused";
         }
         st.ids.push(...options);
         st.queue.shift();
       }
       sc.queue = undefined;
-      const ids = st.ids.filter((id) => s.objects[id]?.zone === "battlefield");
+      const ids = [...new Set(st.ids)].filter((id) => s.objects[id]?.zone === "battlefield");
       r.created = ids;
       if (!ids.length) return;
-      log(s, `${player(s, ctx.controller).name} gains control of ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} until end of turn.`);
+      log(s, `${player(s, ctx.controller).name} gains control of ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")}${e.duration === "endOfTurn" ? " until end of turn" : ""}.`);
       return runEffect(s, { type: "continuous", what: { ref: "created" }, mods: [{ kind: "control" }], duration: e.duration }, ctx);
     }
     case "vote": {

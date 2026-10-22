@@ -2529,11 +2529,12 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "Exile this Saga, then return it to the battlefield transformed under your control": its back face up (CR 712.14a).
     // "Exile this Saga, then return it to the battlefield (front face up)" (The Great Work): under the control of the
     // player who puts it there (CR 110.2a).
-    const now = /^(?:[Tt]hen )?[Rr]eturn (?:it|that card|them|those cards) to the battlefield( transformed)?(?: under (its owner's|their owners'|your) control)?$/.exec(s);
+    // "... with a +1/+1 counter on it" (Planar Incision): it enters with it (CR 122.6).
+    const now = /^(?:[Tt]hen )?[Rr]eturn (?:it|that card|them|those cards) to the battlefield( transformed)?(?: under (its owner's|their owners'|your) control)?( with an? \+1\/\+1 counter on it)?$/.exec(s);
     if (now && effects[effects.length - 1]?.type === "exile") {
       const prev = effects[effects.length - 1] as Extract<Effect, { type: "exile" }>;
       if (prev.until || prev.linked || isGroup(prev.what) || (now[1] && prev.what.ref !== "self") || (!now[2] && prev.what.ref !== "self")) return null;
-      effects[effects.length - 1] = { type: "flicker", what: prev.what, under: !now[2] || now[2] === "your" ? "you" : "owner", ...(now[1] ? { transformed: true as const } : {}) };
+      effects[effects.length - 1] = { type: "flicker", what: prev.what, under: !now[2] || now[2] === "your" ? "you" : "owner", ...(now[1] ? { transformed: true as const } : {}), ...(now[3] ? { counter: "+1/+1" as const } : {}) };
       continue;
     }
     // Which exile it returns: the last exile in this ability ("Exile X target creatures, then investigate X times. Return the

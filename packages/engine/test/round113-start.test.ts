@@ -837,3 +837,21 @@ describe("Jetmir, Nexus of Revels", () => {
     expect(objHasKeyword(s, s.objects[b]!, "Double strike")).toBe(true);
   });
 });
+
+describe("Planar Incision", () => {
+  it("exiled and back under its owner's control with a +1/+1 counter, a new object", () => {
+    const incision = card("Planar Incision", "Instant", "{1}{W}", { oracleText: "Exile target artifact or creature, then return it to the battlefield under its owner's control with a +1/+1 counter on it." });
+    expect(isFullySupported(incision)).toBe(true);
+    const { s: s0, ap, ids, opp } = setup([incision]);
+    const b = putOnBattlefield(s0, opp, bear());
+    s0.objects[b]!.controller = ap;
+    s0.objects[b]!.counters["-1/-1"] = 1;
+    invalidateCharacteristics(s0);
+    const s = cast(s0, ap, ids[0]!, [target(b)]);
+    const back = s.battlefield.find((id) => s.objects[id]!.cardId === s0.objects[b]!.cardId)!;
+    expect(back).toBeDefined();
+    expect(s.objects[back]!.controller).toBe(opp);
+    expect(s.objects[back]!.counters).toEqual({ "+1/+1": 1 });
+    expect(power(s, s.objects[back]!)).toBe(3);
+  });
+});

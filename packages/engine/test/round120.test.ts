@@ -808,4 +808,16 @@ describe("more popular cards", () => {
     }
     void opp;
   });
+  it("Farmer Cotton creates X Halflings and X Foods; The Goose Mother creates half X Foods, rounded up", () => {
+    const cotton = card("Farmer Cotton", "Legendary Creature — Halfling Peasant", "{X}{G}{W}", { power: "1", toughness: "1", oracleText: "When Farmer Cotton enters, create X 1/1 white Halfling creature tokens and X Food tokens." });
+    const goose = card("The Goose Mother", "Legendary Creature — Bird Hydra", "{X}{G}{U}", { power: "2", toughness: "2", keywords: ["Flying"], oracleText: "Flying\nThe Goose Mother enters with X +1/+1 counters on it.\nWhen The Goose Mother enters, create half X Food tokens, rounded up.\nWhenever The Goose Mother attacks, you may sacrifice a Food. If you do, draw a card." });
+    supported(cotton, goose);
+    const { s: s0, ap, ids } = setup([cotton, goose]);
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "auto", 2)));
+    expect(named(s, "Halfling Token").length).toBe(2);
+    expect(named(s, "Food Token").length).toBe(2);
+    s = settle(run(s, planCast(s, ap, ids[1]!, undefined, undefined, "auto", 3)));
+    expect(s.objects[ids[1]!]!.counters["+1/+1"]).toBe(3);
+    expect(named(s, "Food Token").length).toBe(4);
+  });
 });

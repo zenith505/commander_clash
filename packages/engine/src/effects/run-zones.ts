@@ -1598,6 +1598,27 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         for (const id of found) moveObject(s, id, "hand");
         return;
       }
+      if (e.anyGraveyard) {
+        // "Exile a card from a graveyard" (Cemetery Prowler): you choose one in any graveyard as it resolves (CR 608.2c);
+        // it's linked to this source (CR 607.2a).
+        const sc = (s.resolving!.scratch ??= {});
+        const yards = () => livingPlayers(s).flatMap((pid) => player(s, pid).graveyard);
+        if (!sc.found) {
+          const cards = yards();
+          if (!cards.length) return;
+          s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what: "a card", cards, min: 1, max: 1, fromGraveyard: "exile", anyGraveyard: true };
+          return "paused";
+        }
+        const found = sc.found.filter((id) => yards().includes(id));
+        sc.found = undefined;
+        for (const id of found) {
+          const o = obj(s, id);
+          log(s, `${player(s, ctx.controller).name} exiles ${defOf(s, o).name} from ${o.owner === ctx.controller ? "their" : `${player(s, o.owner).name}'s`} graveyard.`);
+          moveObject(s, id, "exile");
+          if (e.linked && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: obj(s, id).zoneChanges ?? 0 });
+        }
+        return;
+      }
       const pid = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
       if (pid === undefined || player(s, pid).lost) return;
       const p = player(s, pid);

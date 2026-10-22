@@ -2514,6 +2514,15 @@ function linkExile(out: CompiledCard) {
     if (imprints.length !== 1 || others.length !== 1) out.unsupported.push("(its cost reduction can't be linked to one imprint ability)");
     else (imprints[0] as Extract<Effect, { type: "takeFromHand" }>).linked = true;
   }
+  // Cemetery Prowler, Protector, Gatekeeper: "cards exiled with ~", "the exiled card" are the ones its "exile a card from a
+  // graveyard" ability exiled (CR 607.2a); it has no other exile instruction.
+  if (out.costMods?.some((m) => m.perTypeSharedWithLinked) || out.triggers.some((t) => t.cast?.sharesTypeWithLinked)) {
+    const all = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects));
+    const yards = all.filter((e): e is Extract<Effect, { type: "chooseFromGraveyard" }> => e.type === "chooseFromGraveyard" && !!e.anyGraveyard);
+    const others = all.filter((e) => e.type === "exile" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "chooseFromGraveyard" && e.dest === "exile" && !e.anyGraveyard));
+    if (!yards.length || others.length) out.unsupported.push("(compares with exiled cards it can't link to one exile ability)");
+    else for (const e of yards) e.linked = true;
+  }
   // Isochron Scepter: "copy the exiled card" is linked to the one ability that exiles a card from the hand as it enters.
   const copies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)].some((b) => allEffects(b.effects).some((e) => e.type === "castLinkedCopy"));
   if (copies) {

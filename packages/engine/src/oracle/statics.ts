@@ -199,6 +199,10 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     const c = parseCount(m[2]!, null, true);
     return c ? { less: { ...c, times: (c.times ?? 1) * Number(m[1]) } } : "fail";
   }
+  // Cemetery Prowler: "Spells you cast cost {1} less to cast for each card type they share with cards exiled with ~"
+  // (linked in compile.ts).
+  if ((m = /^Spells you cast cost \{(\d+)\} less to cast for each card type they share with cards exiled with ~$/.exec(text)))
+    return { costMod: { who: "you", filter: { kind: "spell", text: "spells" }, n: -Number(m[1]), perTypeSharedWithLinked: true, text: line } };
   // "Instant and sorcery spells you cast cost {1} less to cast for each experience counter you have" (Mizzix): that much
   // less for each, counted as the spell is cast (CR 601.2f).
   // "Angel spells and Human spells you cast cost {1} less to cast for each +1/+1 counter on ~" (Herald of War).

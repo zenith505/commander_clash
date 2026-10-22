@@ -258,6 +258,9 @@ export function parseBecomes(text: string): Modification[] | null {
   if (/^the chosen color$/i.test(rest)) return [{ kind: "setColors", colors: [], chosen: true }];
   if (/^the chosen basic land type$/i.test(rest)) return [{ kind: "setLandTypes", subtypes: [CHOSEN_LAND_TYPE] }];
   if ((m = /^an? (Plains|Island|Swamp|Mountain|Forest)$/.exec(rest))) return [{ kind: "setLandTypes", subtypes: [m[1]!] }];
+  // "Becomes an Island in addition to its other types" (Xolatoyac's flood counters): the land keeps its types and abilities
+  // and has the basic land type's mana ability too (CR 305.6, 305.7; rulings).
+  if ((m = /^an? (Plains|Island|Swamp|Mountain|Forest) in addition to its other types$/.exec(rest))) return [{ kind: "addTypes", types: [], subtypes: [m[1]!] }];
   // The creature type chosen as it resolves (see parseBody): it replaces the other creature types (CR 205.1b), unless
   // "in addition to its other types".
   if ((m = /^the chosen creature type( in addition to its other types)?$/i.exec(rest)))

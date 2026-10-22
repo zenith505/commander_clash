@@ -261,6 +261,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Hideaway: the most expensive card, to play for free later.
     if (pend.kind === "searchLibrary" && pend.dig && /hideaway/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, 1) }];
     if (pend.kind === "searchLibrary" && pend.dig && /face down/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: chooseManifest(s, pid, pend.cards, pend.max) }];
+    // "Exile a card from a graveyard" (Cemetery Prowler): an opponent's card if there is one, the one sharing the most card
+    // types with the cards in our hand (the exiled card's types matter to these cards), the dearest first.
+    if (pend.kind === "searchLibrary" && pend.fromGraveyard === "exile" && pend.cards.some((id) => obj(s, id).owner !== pid)) {
+      const ours = player(s, pid).hand.flatMap((id) => defOf(s, obj(s, id)).types);
+      const score = (id: ObjectId) => defOf(s, obj(s, id)).types.reduce((n, t) => n + ours.filter((x) => x === t).length, 0);
+      const theirs = pend.cards.filter((id) => obj(s, id).owner !== pid).sort((a, b) => score(b) - score(a) || mv(s, b) - mv(s, a));
+      return [{ type: "searchLibrary", player: pid, found: theirs.slice(0, pend.min) }];
+    }
     // Exiling cards from our own graveyard: the ones we have no use for there, the cheapest first.
     if (pend.kind === "searchLibrary" && pend.fromGraveyard === "exile")
       return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => Number(usefulInGraveyard(s, a)) - Number(usefulInGraveyard(s, b)) || mv(s, a) - mv(s, b)).slice(0, pend.min) }];

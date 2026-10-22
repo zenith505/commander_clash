@@ -2627,7 +2627,13 @@ function resolveTop(s: GameState) {
     // Mangara: those attackers still at you or your planeswalkers, or gone from the battlefield (as they last were, rulings).
     const still = item.event?.attackingYou;
     const atYou = still && (item.event!.group ?? []).filter((g) => { const a = s.objects[g.id]; return !a || a.zone !== "battlefield" || (a.zoneChanges ?? 0) !== g.zc || attackingYouNow(s, g.id, still.you, !!still.orPlaneswalkers); }).length;
-    if ((still && atYou! < still.min) || (item.ifCond && item.sourceId && !staticConditionNow(s, item.ifCond, item.sourceId, item.controller, item.event?.player, item.event?.amount, item.sourceZc, item.subject?.id, item.subject?.zc))) {
+    // Cemetery Protector: the spell or land played, as it is now (or as the card it was, once gone), still shares a card
+    // type with the exiled card (CR 603.4).
+    const trig = item.event?.played && item.body ? compileCard(def).triggers.find((t) => t.body.text === item.body!.text) : undefined;
+    const played = item.event?.played;
+    const playedNow = played && s.objects[played.id];
+    const sharesNo = trig?.cast?.sharesTypeWithLinked && played && !sharesTypeWithLinked(s, `${item.sourceId}@${item.sourceZc ?? 0}`, playedNow && (playedNow.zoneChanges ?? 0) === played.zc ? characteristics(s, playedNow).types : playedNow ? defOf(s, playedNow).types : []);
+    if (sharesNo || (still && atYou! < still.min) || (item.ifCond && item.sourceId && !staticConditionNow(s, item.ifCond, item.sourceId, item.controller, item.event?.player, item.event?.amount, item.sourceZc, item.subject?.id, item.subject?.zc))) {
       log(s, `${def.name}'s ability does nothing (its "if" condition is no longer true).`); // CR 603.4
       return;
     }
@@ -3591,7 +3597,9 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
         lessColored.push(...m.colored);
         continue;
       }
-      const n = m.times ? m.n * Math.max(0, evalAmount(s, m.times, { controller: c.controller, sourceId: src.id })) : m.n;
+      // Cemetery Prowler: once for each card type of the spell among the cards exiled with it (rulings: not per card).
+      const shared = m.perTypeSharedWithLinked ? new Set(linkedExileCards(s, src).flatMap((x) => defOf(s, obj(s, x)).types)) : undefined;
+      const n = shared ? m.n * d.types.filter((t) => shared.has(t)).length : m.times ? m.n * Math.max(0, evalAmount(s, m.times, { controller: c.controller, sourceId: src.id })) : m.n;
       if (n > 0) more += n;
       else less -= n;
     }
@@ -4788,6 +4796,14 @@ export function counterCostCandidates(s: GameState, pid: PlayerId, source: GameO
 }
 
 /** The cards still exiled with `o` by its linked exile ability, as this object (CR 607.2a, 400.7): Jester's Scepter's cost. */
+/**
+ * "If it shares a card type with the exiled card" (Cemetery Protector): one of `types` is a card type (CR 205.2a) of a card
+ * the linked ability of the source exiled (its key in `s.linkedExile`, "id@zoneChanges"), still in exile (CR 607.2a).
+ */
+export function sharesTypeWithLinked(s: GameState, key: string, types: readonly string[]): boolean {
+  return (s.linkedExile?.[key] ?? []).some((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc && defOf(s, s.objects[l.id]!).types.some((t) => types.includes(t)));
+}
+
 export function linkedExileCards(s: GameState, o: GameObject): ObjectId[] {
   return (s.linkedExile?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc).map((l) => l.id);
 }

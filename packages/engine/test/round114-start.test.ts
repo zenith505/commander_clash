@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, cast, passAll, passUntil, putOnBattlefield, setup, target } from "./helpers";
-import { applyAction, botActions, isFullySupported, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { applyAction, botActions, characteristics, manaValue, spellCost, invalidateCharacteristics, isFullySupported, manaAbilitiesOn, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 import { moveObject } from "../src/game";
 
 // Real oracle text (Scryfall).
@@ -211,5 +211,180 @@ describe("for each opponent, you may ... up to one target card from that player'
 
   it("without the exile rider the cast isn't read from an opponent's graveyard alone", () => {
     expect(isFullySupported(card("Odd Primordial", "Creature — Avatar", "{5}{U}{U}", { power: "5", toughness: "5", oracleText: "When this creature enters, you may cast target instant card from an opponent's graveyard without paying its mana cost." }))).toBe(false);
+  });
+});
+
+describe("flood counters: an Island in addition to its other types for as long as it has one", () => {
+  const xolatoyac = card("Xolatoyac, the Smiling Flood", "Legendary Creature — Salamander Serpent", "{4}{G}{U}", {
+    power: "6",
+    toughness: "6",
+    oracleText: "Whenever Xolatoyac enters or attacks, put a flood counter on target land. That land is an Island in addition to its other types for as long as it has a flood counter on it.\nAt the beginning of your end step, untap each permanent you control with a counter on it.",
+  });
+  const aquitect = card("Aquitect's Will", "Kindred Sorcery — Merfolk", "{U}", {
+    oracleText: "Put a flood counter on target land. That land is an Island in addition to its other types for as long as it has a flood counter on it. If you control a Merfolk, draw a card.",
+  });
+  const mountain = card("Mountain", "Basic Land — Mountain");
+
+  it("Xolatoyac: the land keeps its types and abilities and taps for {U} too, until the counter is gone, even with Xolatoyac gone (rulings)", () => {
+    expect(isFullySupported(xolatoyac)).toBe(true);
+    const { s: s0, ap, opp, ids } = setup([xolatoyac]);
+    const m = putOnBattlefield(s0, opp, mountain);
+    let s = settle(passAll(cast(s0, ap, ids[0]!)));
+    if (s.pending?.kind === "chooseTargets") s = settle(act(s, { type: "chooseTargets", player: ap, targets: [target(m)] }));
+    expect(s.objects[m]!.counters.flood).toBe(1);
+    const ch = characteristics(s, s.objects[m]!);
+    expect(ch.subtypes).toEqual(expect.arrayContaining(["Mountain", "Island"]));
+    expect(ch.types).toEqual(["Land"]);
+    expect(manaAbilitiesOn(s, s.objects[m]!).map((a) => JSON.stringify(a.produces))).toEqual(expect.arrayContaining([expect.stringContaining('"R"'), expect.stringContaining('"U"')]));
+    // Xolatoyac leaves: still an Island.
+    s = structuredClone(s);
+    moveObject(s, ids[0]!, "graveyard");
+    invalidateCharacteristics(s);
+    expect(characteristics(s, s.objects[m]!).subtypes).toContain("Island");
+    // The counter is removed: no longer an Island, for good (CR 611.2b).
+    s.objects[m]!.counters.flood = 0;
+    invalidateCharacteristics(s);
+    s = passAll(s);
+    expect(characteristics(s, s.objects[m]!).subtypes).toEqual(["Mountain"]);
+    s.objects[m]!.counters.flood = 1;
+    invalidateCharacteristics(s);
+    expect(characteristics(s, s.objects[m]!).subtypes).toEqual(["Mountain"]);
+  });
+
+  it("Aquitect's Will: draws only with a Merfolk", () => {
+    expect(isFullySupported(aquitect)).toBe(true);
+    const { s: s0, ap, ids } = setup([aquitect]);
+    const m = putOnBattlefield(s0, ap, mountain);
+    const hand = s0.players[ap]!.hand.length - 1;
+    const s = settle(cast(s0, ap, ids[0]!, [target(m)]));
+    expect(characteristics(s, s.objects[m]!).subtypes).toEqual(expect.arrayContaining(["Mountain", "Island"]));
+    expect(s.players[ap]!.hand.length).toBe(hand);
+  });
+});
+
+describe("exile a card from a graveyard, and the exiled card's card types (Cemetery cards)", () => {
+  const protector = card("Cemetery Protector", "Creature — Human Soldier", "{2}{W}{W}", {
+    power: "3",
+    toughness: "4",
+    keywords: ["Flash"],
+    oracleText: "Flash\nWhen this creature enters, exile a card from a graveyard.\nWhenever you play a land or cast a spell, if it shares a card type with the exiled card, create a 1/1 white Human creature token.",
+  });
+  const gatekeeper = card("Cemetery Gatekeeper", "Creature — Vampire", "{1}{R}", {
+    power: "2",
+    toughness: "1",
+    keywords: ["First strike"],
+    oracleText: "First strike\nWhen this creature enters, exile a card from a graveyard.\nWhenever a player plays a land or casts a spell, if it shares a card type with the exiled card, this creature deals 2 damage to that player.",
+  });
+  const prowler = card("Cemetery Prowler", "Creature — Wolf", "{1}{G}{G}", {
+    power: "3",
+    toughness: "4",
+    keywords: ["Vigilance"],
+    oracleText: "Vigilance\nWhenever this creature enters or attacks, exile a card from a graveyard.\nSpells you cast cost {1} less to cast for each card type they share with cards exiled with this creature.",
+  });
+  const golem = card("Test Golem", "Artifact Creature — Golem", "{4}", { power: "3", toughness: "3" });
+  const ogre = card("Gray Ogre", "Creature — Ogre", "{2}{R}", { power: "2", toughness: "2" });
+  const mountain = card("Mountain", "Basic Land — Mountain");
+  const humans = (s: GameState, pid: PlayerId) => s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === pid).length;
+  const toHand = (s: GameState, pid: PlayerId, def: CardDef) => {
+    const id = putOnBattlefield(s, pid, def);
+    s.objects[id]!.zone = "hand";
+    s.battlefield.splice(s.battlefield.indexOf(id), 1);
+    s.players[pid]!.hand.push(id);
+    return id;
+  };
+
+  it("these cards play; the exile is linked", () => {
+    for (const d of [protector, gatekeeper, prowler]) expect(isFullySupported(d), d.name).toBe(true);
+  });
+
+  it("Cemetery Protector: you choose the card from any graveyard; then a creature spell or a creature land makes a Human", () => {
+    const { s: s0, ap, ids } = setup([protector, ogre]);
+    const [b, c] = opponentsOf(s0, ap);
+    const giant = inGraveyard(s0, b, bear({ name: "Their Bear" }));
+    const spell = inGraveyard(s0, c, card("Opt", "Instant", "{U}"));
+    let s = settle(cast(s0, ap, ids[0]!));
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap, fromGraveyard: "exile" });
+    if (s.pending?.kind !== "searchLibrary") throw new Error("no pick");
+    expect(s.pending.cards).toEqual(expect.arrayContaining([giant, spell]));
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: [giant] }));
+    expect(s.objects[giant]!.zone).toBe("exile");
+    expect(s.objects[spell]!.zone).toBe("graveyard");
+    // A creature spell: a Human.
+    s = settle(cast(s, ap, ids[1]!));
+    expect(humans(s, ap)).toBe(1);
+    // A land doesn't share a type with a creature card.
+    const m = toHand(s, ap, mountain);
+    s.players[ap]!.landsPlayedThisTurn = 0;
+    s = settle(act(s, { type: "playLand", player: ap, objectId: m }));
+    expect(humans(s, ap)).toBe(1);
+  });
+
+  it("Cemetery Protector: a land exiled, playing a land makes a Human; the exiled card gone before it resolves, nothing (CR 603.4)", () => {
+    const { s: s0, ap, ids } = setup([protector, ogre]);
+    const [b] = opponentsOf(s0, ap);
+    const land = inGraveyard(s0, b, mountain);
+    let s = settle(cast(s0, ap, ids[0]!));
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: [land] }));
+    const m = toHand(s, ap, mountain);
+    s.players[ap]!.landsPlayedThisTurn = 0;
+    s = act(s, { type: "playLand", player: ap, objectId: m });
+    expect(s.stack.length).toBe(1);
+    const gone = structuredClone(s);
+    moveObject(gone, land, "graveyard");
+    expect(humans(settle(gone), ap)).toBe(0);
+    expect(humans(settle(s), ap)).toBe(1);
+  });
+
+  it("Cemetery Gatekeeper: any player's matching spell or land deals 2 damage to that player", () => {
+    const { s: s0, ap, ids } = setup([gatekeeper]);
+    const [b] = opponentsOf(s0, ap);
+    const land = inGraveyard(s0, b, mountain);
+    let s = settle(cast(s0, ap, ids[0]!));
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: [land] }));
+    const life = s.players[ap]!.life;
+    const m = toHand(s, ap, mountain);
+    s.players[ap]!.landsPlayedThisTurn = 0;
+    s = settle(act(s, { type: "playLand", player: ap, objectId: m }));
+    // Its controller is a player too.
+    expect(s.players[ap]!.life).toBe(life - 2);
+  });
+
+  it("Cemetery Prowler: {1} less for each card type shared with the exiled cards, not for each card (rulings)", () => {
+    const { s: s0, ap, ids } = setup([prowler]);
+    const [b] = opponentsOf(s0, ap);
+    const g1 = inGraveyard(s0, b, golem);
+    const g2 = inGraveyard(s0, b, bear({ name: "Other Bear" }));
+    const golemInHand = toHand(s0, ap, golem);
+    const ogreInHand = toHand(s0, ap, ogre);
+    const bolt = toHand(s0, ap, card("Lightning Bolt", "Instant", "{R}"));
+    let s = settle(cast(s0, ap, ids[0]!));
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: [g1] }));
+    const cost = (id: string) => {
+      const c = spellCost(s, ap, s.objects[id]!);
+      return manaValue(c.cost) + c.extra;
+    };
+    expect(cost(golemInHand)).toBe(2); // Artifact and Creature
+    expect(cost(ogreInHand)).toBe(2); // Creature: {2}{R} -> {1}{R}
+    expect(cost(bolt)).toBe(1);
+    // A second creature card exiled with it: still {1} for Creature.
+    const key = `${ids[0]}@${s.objects[ids[0]!]!.zoneChanges ?? 0}`;
+    moveObject(s, g2, "exile");
+    s.linkedExile![key]!.push({ id: g2, zc: s.objects[g2]!.zoneChanges ?? 0 });
+    expect(cost(ogreInHand)).toBe(2);
+  });
+
+  it("a bot exiles an opponent's card, the one sharing the most card types with its hand", () => {
+    const { s: s0, ap, ids } = setup([prowler]);
+    const [b, c] = opponentsOf(s0, ap);
+    s0.players[ap]!.hand = s0.players[ap]!.hand.filter((x) => x === ids[0]);
+    toHand(s0, ap, ogre);
+    const mine = inGraveyard(s0, ap, ogre);
+    const spell = inGraveyard(s0, b, card("Opt", "Instant", "{U}"));
+    const theirBear = inGraveyard(s0, c, bear({ name: "Their Bear" }));
+    const s = settle(cast(s0, ap, ids[0]!));
+    expect(s.pending?.kind).toBe("searchLibrary");
+    const [a] = botActions(s, ap);
+    expect(a).toEqual({ type: "searchLibrary", player: ap, found: [theirBear] });
+    expect([mine, spell]).not.toContain((a as { found: string[] }).found[0]);
   });
 });

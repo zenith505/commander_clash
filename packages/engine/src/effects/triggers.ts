@@ -2,7 +2,7 @@ import { defMv, restingDef } from "../faces";
 import { isSiege, siegeTrigger } from "../battles";
 import type { AbilityBody, BatchTrigger, CompiledCard, TargetChoice, TargetSpec, TriggeredAbility, TriggerEvent } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, power, toughness } from "../cards";
-import { checkAscend, creatureTypesOf, describeTargets, draw, hasConvoke, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER } from "../game";
+import { checkAscend, sharesTypeWithLinked, creatureTypesOf, describeTargets, draw, hasConvoke, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
 import { fitMany, withModes } from "../modes";
 import { compileCard } from "../oracle";
@@ -717,8 +717,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
       // "Whenever you play a land or cast a spell (from exile)": the land played, from that zone.
-      const asCast = (t: TriggeredAbility) => !!t.cast?.orPlaysLand && you === ev.player && printedMatches(t.cast.orPlaysLand, defOf(s, obj(s, ev.id))) && (!t.cast.from || castFromMatches(t.cast.from, { castFrom: ev.from } as GameObject, ev.player));
-      add(o, you, (e, t) => e === "playerPlaysLand" || (e === "youPlayLand" && you === ev.player) || (e === "youPlayAnotherLand" && you === ev.player && ev.id !== o.id) || (e === "opponentPlaysLand" && you !== ev.player) || (e === "castSpell" && asCast(t)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+      // "Whenever a player plays a land or casts a spell" (Cemetery Gatekeeper): anyone's.
+      const land = obj(s, ev.id);
+      const asCast = (t: TriggeredAbility) =>
+        !!t.cast?.orPlaysLand &&
+        (t.cast.by === "any" || you === ev.player) &&
+        printedMatches(t.cast.orPlaysLand, defOf(s, land)) &&
+        (!t.cast.from || castFromMatches(t.cast.from, { castFrom: ev.from } as GameObject, ev.player)) &&
+        (!t.cast.sharesTypeWithLinked || sharesTypeWithLinked(s, `${o.id}@${o.zoneChanges ?? 0}`, characteristics(s, land).types));
+      add(o, you, (e, t) => e === "playerPlaysLand" || (e === "youPlayLand" && you === ev.player) || (e === "youPlayAnotherLand" && you === ev.player && ev.id !== o.id) || (e === "opponentPlaysLand" && you !== ev.player) || (e === "castSpell" && asCast(t)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, played: { id: land.id, zc: land.zoneChanges ?? 0 } });
     }
   } else if (ev.type === "evidenceCollected" || ev.type === "proliferated") {
     const kind = ev.type === "proliferated" ? "youProliferate" : "youCollectEvidence";
@@ -1152,13 +1159,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Where it was cast from (CR 601.2a); a copy wasn't cast from anywhere.
         if (t.cast.from && !castFromMatches(t.cast.from, ev.copy ? undefined : spell, ev.controller)) return false;
         if (t.cast.sharesTypeWithSelf && !(spell && shareCreatureType(creatureTypesOf(s, o), creatureTypesOf(s, spell)))) return false;
+        // "If it shares a card type with the exiled card" (Cemetery Protector, CR 603.4), checked again as it resolves.
+        if (t.cast.sharesTypeWithLinked && !sharesTypeWithLinked(s, `${o.id}@${o.zoneChanges ?? 0}`, spell ? characteristics(s, spell).types : ev.card.types)) return false;
         // "A spell that has convoke": printed, or given by "spells you cast have convoke" (rulings on Joyful Stormsculptor:
         // whether or not any creatures were tapped for it).
         if (t.cast.keyword && !(spell && (defOf(s, spell).keywords.includes(t.cast.keyword) || (t.cast.keyword === "Convoke" && hasConvoke(s, ev.controller, spell))))) return false;
         // As the spell is on the stack: its mana value with X (CR 202.3e), its power from a "*" ability (604.3).
         const spec = bindBound(s, bindChosen(t.cast.spell, o.chosen), { controller: you, sourceId: o.id });
         return item?.objectId ? spellMatches(s, spec, item) : printedMatches(spec, ev.card);
-      }, triggers, ev.stackId, undefined, spell ? { copyKey: cardIdOf(spell) } : undefined, undefined, undefined, { player: ev.controller, ...(ev.manaSpent !== undefined ? { amount: ev.manaSpent } : {}), ...(ev.treasureSpent ? { treasureSpent: ev.treasureSpent } : {}), ...(ev.spent && !ev.copy ? { spent: ev.spent } : {}) }); // "counter it unless" that player pays" acts on the spell cast
+      }, triggers, ev.stackId, undefined, spell ? { copyKey: cardIdOf(spell) } : undefined, undefined, undefined, { player: ev.controller, ...(spell && !ev.copy ? { played: { id: spell.id, zc: spell.zoneChanges ?? 0 } } : {}), ...(ev.manaSpent !== undefined ? { amount: ev.manaSpent } : {}), ...(ev.treasureSpent ? { treasureSpent: ev.treasureSpent } : {}), ...(ev.spent && !ev.copy ? { spent: ev.spent } : {}) }); // "counter it unless" that player pays" acts on the spell cast
     // Veyran (CR 603.2d): casting or copying an instant or sorcery spell, as the spell is.
     const instantOrSorcery = spell ? characteristics(s, spell).types.some((t) => t === "Instant" || t === "Sorcery") : ev.card.types.some((t) => t === "Instant" || t === "Sorcery");
     causedBy = instantOrSorcery ? { event: "castOrCopy", caster: ev.controller } : null;

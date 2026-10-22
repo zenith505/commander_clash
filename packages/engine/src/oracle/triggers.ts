@@ -1185,6 +1185,17 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "Whenever you play a land or cast a spell" (Infernal Sovereign), "... a card from exile" (Prosper), "a land from exile or
   // cast a spell from exile" (Urianger), "a legendary land or cast a legendary spell" (Shanid): the cast trigger, which
   // playing a land (CR 305.1) that matches also triggers, from the same zone. Not one that looks at "it" (the card played).
+  // "Whenever you play a land or cast a spell, if it shares a card type with the exiled card, ..." (Cemetery Protector),
+  // "Whenever a player plays a land or casts a spell, if ..., ~ deals 2 damage to that player" (Cemetery Gatekeeper).
+  const sharesM = /^Whenever (you play a land or cast|a player plays a land or casts) a spell, if it shares a card type with the exiled card, (.+)$/.exec(line);
+  if (sharesM) {
+    const anyone = sharesM[1]!.startsWith("a player");
+    if (/\b(it|its|that card|that spell)\b/.test(sharesM[2]!)) return "fail";
+    const t = parseTrigger(`Whenever ${anyone ? "a player casts" : "you cast"} a spell, ${sharesM[2]}`);
+    if (!t || t === "fail" || t.event !== "castSpell" || !t.cast || t.cast.orCopy || t.ifCond || t.cast.from) return "fail";
+    const land = parseTargetPhrase("land");
+    return land?.kind === "object" ? { ...t, cast: { ...t.cast, orPlaysLand: { ...land, text: "land" }, sharesTypeWithLinked: true } } : "fail";
+  }
   const playM = /^Whenever you play (a card|a land( from exile)? or cast a spell|a legendary land or cast a legendary spell)( from exile| from anywhere other than your hand)?, (.+)$/.exec(line);
   if (playM && !(playM[2] && !playM[3]) && !(playM[2] && playM[3] !== " from exile")) {
     const legendary = /legendary/.test(playM[1]!);

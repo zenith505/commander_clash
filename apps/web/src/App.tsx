@@ -3469,8 +3469,10 @@ function LibrarySearch({
   // Memoricide's search of a player's graveyard, hand and library: the cards by the zone they're in.
   const zones = pending.zonesOf !== undefined;
   const ZONE_ORDER = ["graveyard", "hand", "library"];
+  // "Exile a card from a graveyard" (Cemetery Prowler): cards of one name in different graveyards stay apart, by owner.
+  const owned = (id: string) => (pending.anyGraveyard ? `${s.objects[id]!.owner}\u0000` : "");
   for (const id of dig ? [] : pending.cards) {
-    const name = zones ? s.objects[id]!.zone : cardOf(s, id).name;
+    const name = zones ? s.objects[id]!.zone : owned(id) + cardOf(s, id).name;
     groups.set(name, [...(groups.get(name) ?? []), id]);
   }
   const sorted = [...groups].sort((a, b) => (zones ? ZONE_ORDER.indexOf(a[0]) - ZONE_ORDER.indexOf(b[0]) : a[0].localeCompare(b[0])));
@@ -3506,7 +3508,7 @@ function LibrarySearch({
                 : pending.fromHand
                 ? `${pending.source}: ${pending.min ? "put" : "you may put"} ${pending.what} from your hand onto the battlefield`
                 : pending.fromGraveyard === "exile"
-                  ? `${pending.source}: ${pending.min ? "exile" : "you may exile"} ${pending.what} from your graveyard`
+                  ? `${pending.source}: ${pending.min ? "exile" : "you may exile"} ${pending.what} from ${pending.anyGraveyard ? "a" : "your"} graveyard`
                   : pending.fromGraveyard === "libraryTop"
                   ? `${pending.source}: ${pending.min ? "put" : "you may put"} ${pending.what} from your graveyard on top of your library`
                   : pending.fromGraveyard
@@ -3585,7 +3587,7 @@ function LibrarySearch({
               </div>
             </>
           )}
-          {!dig && <h4>{zones ? `${whose}'s graveyard, hand and library` : pending.fromGraveyard ? "Your graveyard" : pending.fromHand ? "Your hand" : "Your library"}</h4>}
+          {!dig && <h4>{zones ? `${whose}'s graveyard, hand and library` : pending.anyGraveyard ? "Graveyards" : pending.fromGraveyard ? "Your graveyard" : pending.fromHand ? "Your hand" : "Your library"}</h4>}
           <div className="modal-cards">
             {!dig && sorted.length === 0 && <span className="muted">No cards in your library match.</span>}
             {sorted.map(([name, ids]) => {
@@ -3597,6 +3599,11 @@ function LibrarySearch({
                   <CardFace d={d} />
                   {ids.length > 1 && <span className="zone-count">×{left}</span>}
                   {zones && <span className="muted small" data-zone={name}>in {name}</span>}
+                  {pending.anyGraveyard && (
+                    <span className="muted small" data-owner={s.objects[ids[0]!]!.owner}>
+                      {s.objects[ids[0]!]!.owner === HUMAN ? "yours" : `${s.players[s.objects[ids[0]!]!.owner]!.name}'s`}
+                    </span>
+                  )}
                 </div>
               );
             })}

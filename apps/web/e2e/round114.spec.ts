@@ -1,9 +1,10 @@
 // Round 114's prompts: "add X mana in any combination of colors" from a triggered ability (Klauth, Unrivaled Ancient):
 // as it resolves, a bar to pick how much of each color (CR 106.1b, 608.2d), with no Cancel (the ability is resolving);
 // Sepulchral Primordial's "for each opponent, you may put up to one target creature card ...", asked card by card.
+// Cemetery Prowler's "exile a card from a graveyard": any player's, each card marked with its owner.
 import { expect, test } from "@playwright/test";
 import { applyAction, type GameState } from "@cc/engine";
-import { LANDS, one, open, pageErrors, playUntil, scene, state } from "./scene";
+import { LANDS, idsOf, one, open, pageErrors, playUntil, scene, state } from "./scene";
 import { card, controls, modal, resolveUntil } from "./ui";
 
 test("Klauth attacks with Grizzly Bears: add 6 mana in any combination of colors, kept for spells this turn", async ({ page }) => {
@@ -49,5 +50,25 @@ test("Sepulchral Primordial asks about each card: yes to Ana's Hill Giant, no to
   const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && st.objects[giant]!.zone === "battlefield");
   expect(after.objects[giant]!.controller).toBe(0);
   expect(after.objects[bears]!.zone).toBe("graveyard");
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Cemetery Prowler: exile a card from a graveyard, picking Ana's Hill Giant over your own", async ({ page }) => {
+  const s = scene({ hand: ["Cemetery Prowler"], board: LANDS, yard: ["Hill Giant"] }, [{ yard: ["Hill Giant", "Lightning Bolt"] }]);
+  const [mine, theirs] = idsOf(s, "Hill Giant", "graveyard");
+  const ana = s.objects[theirs!]!.owner === 1 ? theirs! : mine!;
+  const own = ana === theirs ? mine! : theirs!;
+  await open(page, s);
+  await card(page, "Cemetery Prowler", s).click();
+  await resolveUntil(page, (st) => st.pending?.kind === "searchLibrary" && st.pending.player === 0);
+  const m = modal(page);
+  await expect(m).toContainText("Cemetery Prowler: exile a card from a graveyard");
+  await expect(m.locator(`[data-pick="${own}"] [data-owner="0"]`)).toContainText("yours");
+  await expect(m.locator(`[data-pick="${ana}"] [data-owner="1"]`)).toContainText("Ana's");
+  await m.locator(`[data-pick="${ana}"]`).click();
+  await m.getByRole("button", { name: "Done" }).click();
+  const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && st.objects[ana]!.zone === "exile");
+  expect(after.objects[own]!.zone).toBe("graveyard");
+  expect(after.objects[one(after, "Cemetery Prowler")]!.zone).toBe("battlefield");
   expect(pageErrors(page)).toEqual([]);
 });

@@ -1709,6 +1709,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "fa53cc50-f06f-44b0-850f-cfa6e0caa4c5",
+  "name": "Cemetery Prowler",
+  "manaCost": "{1}{G}{G}",
+  "cmc": 3,
+  "typeLine": "Creature — Wolf",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Wolf"
+  ],
+  "oracleText": "Vigilance\nWhenever this creature enters or attacks, exile a card from a graveyard.\nSpells you cast cost {1} less to cast for each card type they share with cards exiled with this creature.",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Vigilance"
+  ],
+  "commanderLegal": "legal",
+  "set": "dbl",
+  "releasedAt": "2022-01-28",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "8785f42f-87b9-4a0a-89ce-ea423649ba9c",
   "name": "Chain Lightning",
   "manaCost": "{R}",

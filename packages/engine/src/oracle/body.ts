@@ -569,6 +569,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   text = text.replace(/ gains flashback until end of turn\. (?:The|Its) flashback cost is equal to (?:its|that card's) mana cost\./g, " gains flashback with its mana cost until end of turn.");
   // Search for Survivors: "An opponent chooses a card at random in your graveyard. If it's a creature card, put it onto the
   // battlefield. Otherwise, exile it." The choice is at random, so who makes it changes nothing: one instruction.
+  // Flubs, the Fool: "draw a card if you have no cards in hand. Otherwise, discard a card." is "If you have no cards in
+  // hand, draw a card. Otherwise, discard a card."
+  text = text.replace(/(^|\. )([Dd])raw a card if you have no cards in hand\. Otherwise,/, (_, lead: string) => `${lead}If you have no cards in hand, draw a card. Otherwise,`);
   text = text.replace(/An opponent chooses a card at random in your graveyard\. If it's a creature card, put it onto the battlefield\. Otherwise, exile it\./, "Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it.");
   // Goblin Welder: the card is in the graveyard of the artifact's controller ("that player"); both targets must still be
   // legal as it resolves (rulings), and that player does both at once.
@@ -2954,7 +2957,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const otherwise = /^Otherwise, (.+)$/.exec(s);
     if (otherwise) {
       const prev = effects[effects.length - 1];
-      if (prev?.type !== "if" || (prev.cond.kind !== "wonClash" && prev.cond.kind !== "suspected" && prev.cond.kind !== "milledIs" && prev.cond.kind !== "targetCardWas" && !(prev.cond.kind === "state" && prev.cond.cond.kind === "subjectPT")) || prev.otherwise) return null;
+      // "If you have no cards in hand, draw a card. Otherwise, discard a card." (Flubs, the Fool): checked as it resolves.
+      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "noneInHand");
+      if (prev?.type !== "if" || (prev.cond.kind !== "wonClash" && prev.cond.kind !== "suspected" && prev.cond.kind !== "milledIs" && prev.cond.kind !== "targetCardWas" && !stateElse) || prev.otherwise) return null;
       const inner = parseOne(otherwise[1]!.charAt(0).toUpperCase() + otherwise[1]!.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       prev.otherwise = inner;
@@ -3077,7 +3082,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // 611.2b). Read as the "until end of turn" effect it would be, with that duration instead.
     const whileCtr =
       new RegExp(`^For as long as (that creature|that land|that permanent|it) has an? ${COUNTER} counter on it, (?:it's|it is) (.+)$`).exec(s) ??
-      new RegExp(`^(That creature|That land|That permanent|It) is (.+) for as long as it has an? ${COUNTER} counter on it$`).exec(s);
+      new RegExp(`^(That creature|That land|That permanent|It)(?: is|'s) (.+) for as long as it has an? ${COUNTER} counter on it$`).exec(s);
     if (whileCtr) {
       const [subject, counterWord, rest] = whileCtr[0]!.startsWith("For") ? [whileCtr[1]!, whileCtr[2]!, whileCtr[3]!] : [whileCtr[1]!, whileCtr[3]!, whileCtr[2]!];
       const prev = effects[effects.length - 1];

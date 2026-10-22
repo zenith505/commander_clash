@@ -294,6 +294,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (who === null || filter === null || !Number.isInteger(n)) return null;
     return [{ type: "chooseFromGraveyard", n, dest: "exile", ...(who ? { who } : {}), ...(filter ? { filter } : {}) }];
   }
+  // "Exile a card from a graveyard" (Cemetery Prowler): any player's, chosen as it resolves (not targeted).
+  if (/^[Ee]xile a card from a graveyard$/.test(s)) return [{ type: "chooseFromGraveyard", n: 1, dest: "exile", anyGraveyard: true }];
   if (/^Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it$/.test(s)) return [{ type: "randomFromGraveyard", dest: "creatureOrExile" }];
   if ((m = /^Reorder your graveyard (as you choose|at random)$/.exec(s))) return [{ type: "reorderGraveyard", ...(m[1] === "at random" ? { random: true as const } : {}) }];
   if ((m = /^Put the top card of your graveyard on (top|the bottom) of your library$/i.exec(s))) return [{ type: "putInLibrary", what: { ref: "graveyardEnd", who: { ref: "you" } }, position: m[1] === "top" ? "top" : "bottom" }];

@@ -1624,6 +1624,15 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
         continue;
       }
     }
+    // Cunning Rhetoric: "exile the top card of that player's library. You may play that card for as long as it remains
+    // exiled, and you may spend mana as though it were mana of any color to cast it." Face up (CR 406.3), a land played
+    // as your land play (rulings), mana of any type for a spell (CR 609.4b).
+    if (!exTop && !impulseIf && ctx.eventPlayer && /^[Ee]xile the top card of that player's library$/.test(s) && /^You may play that card for as long as it remains exiled(, and you may spend mana as though it were mana of any color to cast it)?$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
+      effects.push({ type: "impulse", n: 1, until: "exiled", who: { ref: "eventPlayer" }, ...(/any color/.test(sentences[si + 1]!) ? { anyType: true as const } : {}) });
+      ctx.exiledTop = true;
+      si++;
+      continue;
+    }
     // Grenzo, Havoc Raiser: "... and you may spend mana as though it were mana of any color to cast that spell" (CR 609.4b).
     if (theirTop) {
       effects.push({ type: "impulse", n: 1, until: "thisTurn", who: { ref: "eventPlayer" }, castOnly: true, ...(theirTop[1] ? { anyType: true as const } : {}) });

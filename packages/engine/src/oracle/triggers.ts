@@ -1641,11 +1641,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (firstLoss) return firstLoss;
   const draws = parseDrawTrigger(line);
   if (draws) return draws;
-  const attacked = /^Whenever an opponent attacks (?:you with two or more creatures|with creatures, if two or more of those creatures are attacking you and\/or planeswalkers you control), (.+)$/.exec(line);
+  // Cunning Rhetoric: "Whenever an opponent attacks you and/or one or more planeswalkers you control": once each combat that
+  // opponent attacks with one or more creatures attacking you or your planeswalkers (CR 508.3e).
+  const attacked = /^Whenever an opponent attacks (you with two or more creatures|with creatures, if two or more of those creatures are attacking you and\/or planeswalkers you control|you and\/or one or more planeswalkers you control), (.+)$/.exec(line);
   if (attacked) {
-    const body = parseBody(attacked[1]!.replace(/\bthat opponent\b/g, "that player"), { eventPlayer: true });
+    const body = parseBody(attacked[2]!.replace(/\bthat opponent\b/g, "that player"), { eventPlayer: true });
     if (!body) return "fail";
-    return { event: "opponentAttacksYou", attacksYou: { min: 2, ...(/planeswalkers you control/.test(line) ? { orPlaneswalkers: true as const } : {}) }, body: { ...body, text: attacked[1]! } };
+    return { event: "opponentAttacksYou", attacksYou: { min: /two or more/.test(attacked[1]!) ? 2 : 1, ...(/planeswalkers you control/.test(attacked[1]!) ? { orPlaneswalkers: true as const } : {}), ...(/^with creatures, if /.test(attacked[1]!) ? { recheck: true as const } : {}) }, body: { ...body, text: attacked[2]! } };
   }
   // Breena: "Whenever a player attacks one of your opponents, if that opponent has more life than another of your
   // opponents, ...": once for each player attacking each of your opponents (CR 508.3e); "that attacking player" is the one

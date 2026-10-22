@@ -3273,7 +3273,7 @@ export interface TriggeredAbility {
   /** With `anyoneAttacks`: "Whenever another player attacks" (Firemane Commando), not its controller. The event's player is the attacking player, its amount how many of the attackers attack its controller (not their planeswalkers or battles). */
   anotherPlayer?: true;
   /** For "opponentAttacksYou": at least `min` attackers at you, or (`orPlaneswalkers`, an intervening if, CR 603.4) at your planeswalkers too. */
-  attacksYou?: { min: number; orPlaneswalkers?: true };
+  attacksYou?: { min: number; orPlaneswalkers?: true; /** Mangara's intervening "if two or more of those creatures are attacking you": checked again as it resolves (CR 603.4). */ recheck?: true };
   /**
    * For "permanentEnters": what has to enter (the subject, "that creature"), relative to this permanent's
    * controller. "Another" leaves this permanent out; "~ or another" counts it whatever it is. Without

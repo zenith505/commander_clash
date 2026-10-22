@@ -993,7 +993,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           const at = ev.ids.filter((x) => attackingYouNow(s, x, you, !!t.attacksYou!.orPlaneswalkers));
           if (at.length < t.attacksYou.min) continue;
           const group = at.map((x) => ({ id: x, zc: obj(s, x).zoneChanges ?? 0 }));
-          const info = { player: ev.controller, group, ...(t.attacksYou.orPlaneswalkers ? { attackingYou: { you, min: t.attacksYou.min, orPlaneswalkers: true as const } } : {}) };
+          const info = { player: ev.controller, group, ...(t.attacksYou.recheck ? { attackingYou: { you, min: t.attacksYou.min, orPlaneswalkers: true as const } } : {}) };
           add(o, you, (e, tt) => e === "opponentAttacksYou" && tt.body.text === t.body.text, undefined, undefined, undefined, undefined, undefined, undefined, info);
         }
       }

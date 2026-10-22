@@ -874,3 +874,28 @@ describe("Expropriate", () => {
     expect(characteristics(s, s.objects[p3Bear]!).controller).toBe(ap);
   });
 });
+
+const eldraziConfluence = card("Eldrazi Confluence", "Instant", "{2}{C}{C}", {
+  oracleText:
+    'Choose three. You may choose the same mode more than once.\n• Target creature gets +3/-3 until end of turn.\n• Exile target nonland permanent, then return it to the battlefield tapped under its owner\'s control.\n• Create a 1/1 colorless Eldrazi Scion creature token with "Sacrifice this token: Add {C}."',
+});
+
+describe("Eldrazi Confluence", () => {
+  it("the blink mode returns the permanent tapped, under its owner's control; modes may repeat", () => {
+    expect(isFullySupported(eldraziConfluence)).toBe(true);
+    const { s: s0, ap, opp, ids } = setup([eldraziConfluence]);
+    let s = s0;
+    // Colorless mana for {C}{C}: two Wastes-like lands.
+    const wastes = card("Wastes", "Basic Land", "", { oracleText: "{T}: Add {C}." });
+    putOnBattlefield(s, ap, wastes);
+    putOnBattlefield(s, ap, wastes);
+    const theirs = putOnBattlefield(s, opp, bear());
+    const zc = s.objects[theirs]!.zoneChanges ?? 0;
+    // The same target twice (rulings): the second blink finds a new object, so it does nothing (CR 400.7, 608.2b).
+    s = run(s, planCast(s, ap, ids[0]!, [target(theirs), target(theirs)], [1, 1, 2], "auto"));
+    s = settle(s);
+    expect(s.objects[theirs]).toMatchObject({ zone: "battlefield", tapped: true, zoneChanges: zc + 2 });
+    expect(characteristics(s, s.objects[theirs]!).controller).toBe(opp);
+    expect(s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === ap)).toHaveLength(1);
+  });
+});

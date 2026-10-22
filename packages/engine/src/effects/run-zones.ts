@@ -1911,8 +1911,15 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         sc.flickered = [];
         const later: { id: ObjectId; zc: number }[] = [];
         let first: GameObject | undefined;
+        // A target that already left and came back this resolution is a new object, no longer the target (CR 400.7):
+        // Eldrazi Confluence's blink chosen twice for the same permanent blinks it once (rulings).
+        const stamped = (o: GameObject) => {
+          if (e.what.ref !== "target") return true;
+          const t = ctx.targets.slice(e.what.index, e.what.index + (e.what.n ?? 1)).find((x) => x?.kind === "object" && x.id === o.id);
+          return t?.kind !== "object" || t.zc === undefined || t.zc === (o.zoneChanges ?? 0);
+        };
         for (const o of objects(s, e.what, ctx)) {
-          if (o.zone !== "battlefield") continue;
+          if (o.zone !== "battlefield" || !stamped(o)) continue;
           const d = defOf(s, o);
           log(s, `${src} exiles ${d.name}${e.at || e.hold ? "" : " and returns it"}.`);
           moveObject(s, o.id, "exile");

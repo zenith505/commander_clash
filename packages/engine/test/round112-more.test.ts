@@ -1,8 +1,8 @@
 // Round 112, more of the most played cards: Karn, the Great Creator, ...
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, cast, passAll, putOnBattlefield, setup } from "./helpers";
-import { castProblem, characteristics, isFullySupported, planActivate, planCast, power, toughness, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
+import { act, bear, card, cast, passAll, passUntil, putOnBattlefield, setup } from "./helpers";
+import { abilityProblem, castProblem, characteristics, isFullySupported, planActivate, planCast, power, toughness, waitingOn, type CardDef, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const karn = card("Karn, the Great Creator", "Legendary Planeswalker — Karn", "{4}", {
@@ -376,5 +376,35 @@ describe("The Mindskinner", () => {
     const s = cast(s0, ap, ids[0]!, [{ kind: "player", id: opp }]);
     expect(s.players[opp]!.life).toBe(life - 3);
     expect(s.players[opp]!.library.length).toBe(lib - 3);
+  });
+});
+
+const teferi = card("Teferi, Master of Time", "Legendary Planeswalker — Teferi", "{2}{U}{U}", {
+  loyalty: "3",
+  oracleText:
+    "You may activate loyalty abilities of Teferi, Master of Time on any player's turn any time you could cast an instant.\n+1: Draw a card, then discard a card.\n−3: Target creature you don't control phases out.\n−10: Take two extra turns after this one.",
+});
+
+describe("Teferi, Master of Time", () => {
+  it("is supported", () => expect(isFullySupported(teferi)).toBe(true));
+
+  it("its loyalty abilities can be activated on another player's turn, still once a turn; other planeswalkers' can't", () => {
+    let { s, ap } = setup([]);
+    const t = putOnBattlefield(s, ap, teferi);
+    s.objects[t]!.counters.loyalty = 3;
+    const other = putOnBattlefield(s, ap, liliana);
+    s.objects[other]!.counters.loyalty = 3;
+    const next = s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % 4]!;
+    s = passUntil(s, "upkeep", next);
+    while (waitingOn(s) !== ap) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(abilityProblem(s, ap, other, 0)).toMatch(/sorcery/);
+    expect(abilityProblem(s, ap, t, 0)).toBeNull();
+    const hand = s.players[ap]!.hand.length;
+    s = act(s, { type: "activateAbility", player: ap, objectId: t, index: 0 });
+    expect(s.objects[t]!.counters.loyalty).toBe(4);
+    expect(abilityProblem(s, ap, t, 0)).toMatch(/already activated/);
+    s = passAll(s);
+    if (s.pending?.kind === "discard") s = act(s, { type: "discard", player: ap, objectIds: s.players[ap]!.hand.slice(0, 1) });
+    expect(s.players[ap]!.hand.length).toBe(hand);
   });
 });

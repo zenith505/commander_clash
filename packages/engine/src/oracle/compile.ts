@@ -1902,6 +1902,10 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Teferi, Temporal Archmage's emblem: loyalty abilities when you could cast an instant, still one per permanent each
     // turn (CR 606.3, rulings).
+    if (line === "You may activate loyalty abilities of ~ on any player's turn any time you could cast an instant.") {
+      out.selfLoyaltyAtInstantSpeed = true;
+      continue;
+    }
     if (line === "You may activate loyalty abilities of planeswalkers you control on any player's turn any time you could cast an instant.") {
       out.loyaltyAtInstantSpeed = true;
       continue;

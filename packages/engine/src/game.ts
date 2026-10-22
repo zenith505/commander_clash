@@ -4904,7 +4904,9 @@ export function describeTargets(s: GameState, targets?: TargetChoice[]): string 
  * checks that legal targets exist; for a modal ability, without `modes` only that a mode can be chosen.
  */
 /** Teferi, Temporal Archmage's emblem: loyalty abilities any time you could cast an instant (you have priority). */
-const loyaltyAtInstantSpeed = (s: GameState, pid: PlayerId) =>
+const loyaltyAtInstantSpeed = (s: GameState, pid: PlayerId, o?: GameObject) =>
+  // Teferi, Master of Time: "You may activate loyalty abilities of ~ on any player's turn any time you could cast an instant."
+  (!!o && !!abilitiesOf(s, o).selfLoyaltyAtInstantSpeed) ||
   [...s.battlefield.map((x) => obj(s, x)).filter((x) => controllerOf(s, x) === pid), ...liveEmblems(s).filter((x) => x.owner === pid)].some((x) => abilitiesOf(s, x).loyaltyAtInstantSpeed);
 
 export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index: number, targets?: TargetChoice[], modes?: number[], tapCreatures?: ObjectId[], x?: number, costs?: CostChoices): string | null {
@@ -4931,7 +4933,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (s.priority !== pid || s.pending) return "you don't have priority";
     if (splitSecondOnStack(s)) return "a spell with split second is on the stack"; // CR 702.61a
   }
-  if (ab.sorcerySpeed && !canActAtSorcerySpeed(s, pid) && !((ab.loyalty !== undefined || ab.loyaltyX) && loyaltyAtInstantSpeed(s, pid)) && !(ab.equip && equipAtInstantSpeed(s, pid))) return "activate only as a sorcery";
+  if (ab.sorcerySpeed && !canActAtSorcerySpeed(s, pid) && !((ab.loyalty !== undefined || ab.loyaltyX) && loyaltyAtInstantSpeed(s, pid, o)) && !(ab.equip && equipAtInstantSpeed(s, pid))) return "activate only as a sorcery";
   if (ab.tap && o.tapped) return `${d.name} is tapped`;
   if (ab.tap && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${d.name} has summoning sickness`; // CR 602.5a
   if (ab.sacrificeSelf && o.zone === "battlefield" && !canBeSacrificed(s, o)) return `${d.name} can't be sacrificed`; // CR 701.21, 602.2b
@@ -4944,7 +4946,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.maxPerTurn && (o.activatedThisTurn?.filter((n) => n === index).length ?? 0) >= ab.maxPerTurn) return `${d.name}'s ability can be activated no more than ${ab.maxPerTurn === 2 ? "twice" : `${ab.maxPerTurn} times`} each turn`;
   if (ab.loyalty !== undefined || ab.loyaltyX) {
     // Loyalty abilities: as a sorcery, one per permanent per turn (CR 606.3); a negative cost needs that many counters (CR 606.6).
-    if (!loyaltyAtInstantSpeed(s, pid) && !canActAtSorcerySpeed(s, pid)) return "loyalty abilities can be activated only as a sorcery";
+    if (!loyaltyAtInstantSpeed(s, pid, o) && !canActAtSorcerySpeed(s, pid)) return "loyalty abilities can be activated only as a sorcery";
     // Gained loyalty abilities count too, and stay counted if the effect that gave them ends (rulings).
     const used = o.activatedThisTurn?.filter((n) => n === LOYALTY_USED).length ?? 0;
     if (used >= loyaltyPerTurn(s, o)) return `${used === 1 ? "a loyalty ability" : "two loyalty abilities"} of ${d.name} ${used === 1 ? "was" : "were"} already activated this turn`;

@@ -3936,6 +3936,8 @@ export interface CompiledCard {
   combatLimit?: { attack?: number; block?: number; attackYou?: number; /** "No more than one creature can attack ~ each combat" (The Eternal Wanderer). */ attackSelf?: number };
   /** "You may activate loyalty abilities of planeswalkers you control on any player's turn any time you could cast an instant." (Teferi, Temporal Archmage's emblem) */
   loyaltyAtInstantSpeed?: true;
+  /** Teferi, Master of Time: "You may activate loyalty abilities of ~ on any player's turn any time you could cast an instant." Still once each turn (CR 606.3). */
+  selfLoyaltyAtInstantSpeed?: true;
   /** "Your opponents can't cast spells with mana value 3 or less." (Brisela, Voice of Nightmares): this many or less. */
   opponentsCantCastMvAtMost?: number;
   /** "Your opponents can't cast spells with even mana values." (Void Winnower). */

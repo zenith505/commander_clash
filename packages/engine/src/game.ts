@@ -3055,11 +3055,12 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
   }
   // Muldrotha's land from the graveyard is used up, unless something lets every land be played from there (Crucible).
   if (o.zone === "graveyard" && !landsFromGraveyardNow(s, p.id)) ((s.turnLog ??= {}).gravePermits ??= []).push(landPermit(s, p.id)!);
+  const fromZone = o.zone;
   const from = o.zone === "exile" || o.zone === "graveyard" || o.zone === "library" ? ` from ${o.zone === "exile" ? "exile" : o.zone === "library" ? "their library" : "their graveyard"}` : "";
   // Under the control of the player who plays it (CR 305.1, 110.2), an opponent's card from exile too (Opposition Agent).
   moveObject(s, id, "battlefield", { controller: p.id, untapped, ...(face !== undefined ? { face } : {}) });
   log(s, `${p.name} plays ${d.name}${from}${obj(s, id).tapped ? " (tapped)" : ""}.`);
-  fireEvent(s, { type: "landPlayed", player: p.id, id });
+  fireEvent(s, { type: "landPlayed", player: p.id, id, from: fromZone });
 }
 
 /** "Remove N counters from ~" paid as a cost (CR 602.2b); removing the last time counter triggers vanishing. */

@@ -145,7 +145,8 @@ export type TriggerSourceEvent =
   | { type: "proliferated"; player: PlayerId }
   /** A spell was countered by a spell or ability `by` controls (CR 701.6a). */
   | { type: "spellCountered"; by: PlayerId }
-  | { type: "landPlayed"; player: PlayerId; id: ObjectId }
+  /** `from`: the zone it was played from. */
+  | { type: "landPlayed"; player: PlayerId; id: ObjectId; from: ZoneName }
   | { type: "dungeonCompleted"; player: PlayerId }
   /** A player rolled dice (CR 706): each die that counts (706.6), its natural result and its result. */
   | { type: "diceRolled"; player: PlayerId; sides: number; dice: { natural: number; result: number }[]; result: number }
@@ -715,7 +716,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
-      add(o, you, (e) => e === "playerPlaysLand" || (e === "youPlayLand" && you === ev.player) || (e === "youPlayAnotherLand" && you === ev.player && ev.id !== o.id) || (e === "opponentPlaysLand" && you !== ev.player), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+      // "Whenever you play a land or cast a spell (from exile)": the land played, from that zone.
+      const asCast = (t: TriggeredAbility) => !!t.cast?.orPlaysLand && you === ev.player && printedMatches(t.cast.orPlaysLand, defOf(s, obj(s, ev.id))) && (!t.cast.from || castFromMatches(t.cast.from, { castFrom: ev.from } as GameObject, ev.player));
+      add(o, you, (e, t) => e === "playerPlaysLand" || (e === "youPlayLand" && you === ev.player) || (e === "youPlayAnotherLand" && you === ev.player && ev.id !== o.id) || (e === "opponentPlaysLand" && you !== ev.player) || (e === "castSpell" && asCast(t)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
   } else if (ev.type === "evidenceCollected" || ev.type === "proliferated") {
     const kind = ev.type === "proliferated" ? "youProliferate" : "youCollectEvidence";

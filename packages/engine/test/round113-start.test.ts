@@ -1,8 +1,8 @@
 // Round 113, the first of the most played cards: bots and Food Chain, ...
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, forest, passAll, passUntil, putOnBattlefield, scry, setup } from "./helpers";
-import { blockCost, botActions, manaAbilitiesOn, planCast, characteristics, invalidateCharacteristics, isFullySupported, objHasKeyword, parseManaCost, planActivate, planMana, power, toughness, waitingOn, type Action, type GameState, type PlayerId } from "../src";
+import { act, bear, card, cast, forest, passAll, passUntil, putOnBattlefield, scry, setup } from "./helpers";
+import { blockCost, botActions, moveObject, manaAbilitiesOn, planCast, characteristics, invalidateCharacteristics, isFullySupported, objHasKeyword, parseManaCost, planActivate, planMana, power, toughness, waitingOn, type Action, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const foodChain = card("Food Chain", "Enchantment", "{2}{G}", {
@@ -489,5 +489,113 @@ describe("Earthbender Ascension", () => {
     expect(s.objects[asc]!.counters.quest).toBe(2);
     expect(s.objects[b]!.counters["+1/+1"] ?? 0).toBe(0);
     expect(objHasKeyword(s, s.objects[b]!, "Trample")).toBe(false);
+  });
+});
+
+describe("whenever you play a land or cast a spell (Prosper, Infernal Sovereign, Shanid, Reki)", () => {
+  const prosper = card("Prosper, Tome-Bound", "Legendary Creature — Tiefling Warlock", "{2}{B}{R}", {
+    power: "1",
+    toughness: "4",
+    keywords: ["Deathtouch"],
+    oracleText: "Deathtouch\nMystic Arcanum — At the beginning of your end step, exile the top card of your library. Until the end of your next turn, you may play that card.\nPact Boon — Whenever you play a card from exile, create a Treasure token.",
+  });
+  const sovereign = card("Infernal Sovereign", "Creature — Demon", "{4}{B}{B}", {
+    power: "6",
+    toughness: "6",
+    keywords: ["Flying", "Trample"],
+    oracleText: "Flying, trample\nSkip your draw step.\nWhenever you play a land or cast a spell, you draw a card and you lose 1 life.",
+  });
+  const shanid = card("Shanid, Sleepers' Scourge", "Legendary Creature — Human Knight", "{1}{R}{W}{B}", {
+    power: "2",
+    toughness: "4",
+    keywords: ["Menace"],
+    oracleText: "Menace\nOther legendary creatures you control have menace.\nWhenever you play a legendary land or cast a legendary spell, you draw a card and you lose 1 life.",
+  });
+  const reki = card("Reki, the History of Kamigawa", "Legendary Creature — Human Shaman", "{2}{G}", { power: "1", toughness: "2", oracleText: "Whenever you cast a legendary spell, draw a card." });
+  const legendLand = card("Minamo, School at Water's Edge", "Legendary Land", "", { oracleText: "{T}: Add {U}.\n{U}, {T}: Untap target legendary permanent." });
+  const legendBear = card("Legend Bear", "Legendary Creature — Bear", "{1}{G}", { power: "2", toughness: "2" });
+  const treasures = (s: GameState, pid: PlayerId) => s.battlefield.filter((id) => s.objects[id]!.controller === pid && s.cards[s.objects[id]!.cardId]!.subtypes.includes("Treasure")).length;
+  /** Plays the land, and resolves what that triggered. */
+  const play = (s: GameState, pid: PlayerId, id: string) => {
+    const t = act(s, { type: "playLand", player: pid, objectId: id });
+    return t.stack.length ? passAll(t) : t;
+  };
+  const toExile = (s: GameState, pid: PlayerId, id: string) => {
+    moveObject(s, id, "exile");
+    s.objects[id]!.mayPlay = { player: pid, zc: s.objects[id]!.zoneChanges ?? 0, until: "thisTurn", turn: s.turn };
+  };
+
+  it("supports the cards", () => {
+    for (const c of [prosper, sovereign, shanid, reki]) expect(isFullySupported(c)).toBe(true);
+  });
+
+  it("Prosper: a land played from exile and a spell cast from exile each make a Treasure, not one from the hand", () => {
+    const { s: s0, ap, ids } = setup([forest, bear(), bear()]);
+    putOnBattlefield(s0, ap, prosper);
+    s0.players[ap]!.landsPlayedThisTurn = 0;
+    toExile(s0, ap, ids[0]!);
+    toExile(s0, ap, ids[1]!);
+    let s = play(s0, ap, ids[0]!);
+    expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
+    expect(treasures(s, ap)).toBe(1);
+    s = cast(s, ap, ids[1]!);
+    while (s.stack.length) s = passAll(s);
+    expect(s.objects[ids[1]!]!.zone).toBe("battlefield");
+    expect(treasures(s, ap)).toBe(2);
+    s = cast(s, ap, ids[2]!);
+    while (s.stack.length) s = passAll(s);
+    expect(treasures(s, ap)).toBe(2);
+  });
+
+  it("Infernal Sovereign: a land from the hand and a spell each draw a card and lose 1 life", () => {
+    const { s: s0, ap, ids } = setup([forest, bear()]);
+    putOnBattlefield(s0, ap, sovereign);
+    s0.players[ap]!.landsPlayedThisTurn = 0;
+    const hand = s0.players[ap]!.hand.length;
+    const life = s0.players[ap]!.life;
+    let s = play(s0, ap, ids[0]!);
+    expect(s.players[ap]!.hand.length).toBe(hand); // played one, drew one
+    expect(s.players[ap]!.life).toBe(life - 1);
+    s = cast(s, ap, ids[1]!);
+    expect(s.players[ap]!.life).toBe(life - 2);
+  });
+
+  it("Shanid: only a legendary land or a legendary spell; Reki: only a legendary spell", () => {
+    const { s: s0, ap, ids } = setup([forest, legendLand, bear(), legendBear]);
+    putOnBattlefield(s0, ap, shanid);
+    putOnBattlefield(s0, ap, reki);
+    s0.players[ap]!.landsPlayedThisTurn = 0;
+    const life = s0.players[ap]!.life;
+    let s = play(s0, ap, ids[0]!);
+    expect(s.players[ap]!.life).toBe(life);
+    s.players[ap]!.landsPlayedThisTurn = 0;
+    s = play(s, ap, ids[1]!);
+    expect(s.players[ap]!.life).toBe(life - 1);
+    const hand = s.players[ap]!.hand.length;
+    s = cast(s, ap, ids[2]!);
+    expect(s.players[ap]!.life).toBe(life - 1);
+    expect(s.players[ap]!.hand.length).toBe(hand - 1);
+    s = cast(s, ap, ids[3]!);
+    while (s.stack.length) s = passAll(s);
+    expect(s.players[ap]!.life).toBe(life - 2);
+    expect(s.players[ap]!.hand.length).toBe(hand); // cast one, drew two (Shanid and Reki)
+  });
+});
+
+describe("legendary spells (Serah Farron)", () => {
+  const serah = scry("transform", [
+    { name: "Serah Farron", mana_cost: "{1}{G}{W}", type_line: "Legendary Creature — Human Citizen", oracle_text: "The first legendary creature spell you cast each turn costs {2} less to cast.\nAt the beginning of combat on your turn, if you control two or more other legendary creatures, you may transform Serah Farron.", power: "2", toughness: "2", colors: ["G", "W"] },
+    { name: "Crystallized Serah", mana_cost: "", type_line: "Legendary Artifact", oracle_text: "The first legendary creature spell you cast each turn costs {2} less to cast.\nLegendary creatures you control get +2/+2.", colors: ["G", "W"] },
+  ]);
+  const legend = (n: number) => card(`Legend ${n}`, "Legendary Creature — Bear", "{3}{G}", { power: "2", toughness: "2" });
+  it("the first legendary creature spell costs {2} less, not a nonlegendary one or the second", () => {
+    expect(isFullySupported(serah)).toBe(true);
+    const { s: s0, ap, ids } = setup([card("Plain Bear", "Creature — Bear", "{3}{G}", { power: "2", toughness: "2" }), legend(1), legend(2)]);
+    putOnBattlefield(s0, ap, serah);
+    const generic = (s: GameState, id: string) => planCast(s, ap, id)!.filter((a) => a.type === "activateMana").length;
+    expect(generic(s0, ids[0]!)).toBe(4);
+    expect(generic(s0, ids[1]!)).toBe(2);
+    const s = cast(s0, ap, ids[1]!);
+    expect(generic(s, ids[2]!)).toBe(4);
   });
 });

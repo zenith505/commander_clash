@@ -1182,6 +1182,19 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     if (!t || t === "fail" || !t.cast?.treasure || /\b(it|that spell|that player)\b/.test(orActivates[2]!)) return "fail";
     return { ...t, cast: { ...t.cast, orActivates: true } };
   }
+  // "Whenever you play a land or cast a spell" (Infernal Sovereign), "... a card from exile" (Prosper), "a land from exile or
+  // cast a spell from exile" (Urianger), "a legendary land or cast a legendary spell" (Shanid): the cast trigger, which
+  // playing a land (CR 305.1) that matches also triggers, from the same zone. Not one that looks at "it" (the card played).
+  const playM = /^Whenever you play (a card|a land( from exile)? or cast a spell|a legendary land or cast a legendary spell)( from exile| from anywhere other than your hand)?, (.+)$/.exec(line);
+  if (playM && !(playM[2] && !playM[3]) && !(playM[2] && playM[3] !== " from exile")) {
+    const legendary = /legendary/.test(playM[1]!);
+    const body = playM[4]!;
+    if (/(it|its|that card|that spell)/.test(body)) return "fail";
+    const t = parseTrigger(`Whenever you cast a ${legendary ? "legendary " : ""}spell${playM[3] ?? ""}, ${body}`);
+    if (!t || t === "fail" || t.event !== "castSpell" || !t.cast || t.cast.orCopy || t.ifCond) return "fail";
+    const land = parseTargetPhrase(legendary ? "legendary land" : "land");
+    return land?.kind === "object" ? { ...t, cast: { ...t.cast, orPlaysLand: { ...land, text: legendary ? "legendary land" : "land" } } } : "fail";
+  }
   // Tecutlan, The Myriad Pools, Barracks of the Thousand: "Whenever you cast a permanent spell using mana produced by ~":
   // some of the mana spent to cast it (CR 601.2h) came from this permanent.
   const usingMana = /^Whenever you cast (an? .+? spell) using mana produced by ~, (.+)$/.exec(line);

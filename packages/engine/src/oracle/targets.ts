@@ -957,8 +957,9 @@ export function parseTargetPhrase(
   }
   if (otherThanBasic) return null;
   if (owner && (isSpell || controller)) return null;
-  // A historic spell: its printed card types, supertypes and subtypes (printedMatches), which the stack doesn't change.
-  if (isSpell) return extra.keywords || extra.notKeywords || (extra.anyOf && extra.anyOf !== HISTORIC) || extra.power || extra.toughness || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status || supertypes.length ? null : { kind: "spell", ...filters, ...(controller ? { controller } : {}), text };
+  // A historic spell, a legendary spell: its printed card types, supertypes and subtypes (printedMatches), which the stack
+  // doesn't change. Only "legendary" among supertypes.
+  if (isSpell) return extra.keywords || extra.notKeywords || (extra.anyOf && extra.anyOf !== HISTORIC) || extra.power || extra.toughness || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status || supertypes.some((t) => t !== "Legendary") ? null : { kind: "spell", ...filters, ...(controller ? { controller } : {}), text };
   return { kind: "object", ...filters, controller, ...(tapped !== undefined ? { tapped } : {}), ...(owner ? { owner } : {}), text };
 }
 

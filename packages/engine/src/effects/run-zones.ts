@@ -621,6 +621,9 @@ function runMeld(s: GameState, e: Extract<Effect, { type: "meld" }>, ctx: Resolv
 
 export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
   switch (e.type) {
+    case "suspendCard":
+      for (const o of objects(s, e.what, ctx)) if (!o.isToken) suspendExiled(s, o, e.n);
+      return;
     case "commanderToHand": {
       // "Your commander" is a commander you own (CR 903.3); in the command zone as this resolves, or nothing happens.
       const p = player(s, ctx.controller);

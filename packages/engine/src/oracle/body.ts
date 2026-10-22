@@ -428,6 +428,10 @@ function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect:
       : /^You may cast that card this turn$/.test(cast)
         ? "thisTurn"
         : undefined;
+  // "Put two time counters on that card. If it doesn't have suspend, it gains suspend." (Kang Prime, CR 702.62).
+  const suspend = exile && !then ? new RegExp(`^Put ${NUM} time counters? on that card$`).exec(cast) : null;
+  if (suspend && /^If it doesn't have suspend, it gains suspend$/.test(sentences[next + 1] ?? ""))
+    return { effect: { type: "exileUntilNonland", then: "suspend", suspend: Number(amt(suspend[1]!)) }, next: next + 2 };
   if (!then) return null;
   const who = they ? parsePlayer(they[1]!, ctx) : undefined;
   if (they && !who) return "fail";
@@ -3803,6 +3807,14 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       if (ex?.type !== "exile" || ex.until || ex.linked || ex.ownerMay || ex.youMay || ctx.targets.length > before + 1) return null;
       effects.push({ ...ex, suspend: Number(amt(susp[2] ?? susp[3]!)) });
       if (!susp[4]) si++;
+      continue;
+    }
+    // "Put four time counters on the exiled card. If it doesn't have suspend, it gains suspend." (Jhoira of the Ghitu): the
+    // card its "Exile a nonland card from your hand" cost exiled (checked in compile.ts).
+    const suspendCost = new RegExp(`^Put ${NUM} time counters? on the exiled card$`).exec(s);
+    if (suspendCost && /^If it doesn't have suspend, it gains suspend\.?$/.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "suspendCard", what: { ref: "costExiled" }, n: Number(amt(suspendCost[1]!)) });
+      si++;
       continue;
     }
     // Delay: "If the spell is countered this way, exile it with three time counters on it instead of putting it into its

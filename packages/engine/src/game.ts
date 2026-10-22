@@ -4833,7 +4833,7 @@ export function returnCandidates(s: GameState, pid: PlayerId, c: Extract<Additio
  * Pay costs beyond mana, for a spell or an ability; returns what was sacrificed as it last existed (CR 608.2h).
  * `returned` gets whom a creature returned to hand was attacking (ninjutsu, CR 702.49c).
  */
-function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices: CostChoices, returned?: LastKnown, moved?: string[], discarded?: string[]) {
+function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices: CostChoices, returned?: LastKnown, moved?: string[], discarded?: string[], exiled?: { id: ObjectId; zc: number }[]) {
   const sacrificed: LastKnown[] = [];
   for (const c of costs) {
     if (c.kind === "exileFromGraveyard" && c.linked) {
@@ -4920,7 +4920,10 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       const ids = choices.exileFromHand ?? [];
       if (!ids.length) continue;
       log(s, `${p.name} exiles ${ids.map((id) => nameOf(s, id)).join(", ")} from their hand.`);
-      for (const id of ids) moveObject(s, id, "exile");
+      for (const id of ids) {
+        moveObject(s, id, "exile");
+        exiled?.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
+      }
     } else if (c.kind === "collectEvidence") collectEvidence(s, p, choices.collect ?? autoEvidence(s, p.id, c.n), c.n);
     else {
       const ids = c.kind === "exileFromGraveyard" && c.top ? topGraveyardCards(s, p.id, c.n, c.filter) : (choices.exileCards ?? []);
@@ -5292,7 +5295,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const stamped = stampTargets(s, targets);
   const costCardNames: string[] = [];
   const costDiscarded: string[] = [];
-  const sacrificed = ab.costs?.length ? payExtraCosts(s, p, activatedCosts(ab, x), costs ?? {}, lki, costCardNames, costDiscarded) : [];
+  const costExiled: { id: ObjectId; zc: number }[] = [];
+  const sacrificed = ab.costs?.length ? payExtraCosts(s, p, activatedCosts(ab, x), costs ?? {}, lki, costCardNames, costDiscarded, costExiled) : [];
   if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard", { sacrificed: true });
   if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling, undefined, ab.cycling ? x : undefined);
   // Scavenge (CR 702.97a) from the graveyard; "Exile ~" on the battlefield, if it's still the same object (CR 400.7).
@@ -5315,6 +5319,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(sacrificed.length ? { sacrificed } : {}),
     ...(costCardNames.length ? { costCardNames } : {}),
     ...(costDiscarded.length ? { costDiscarded } : {}),
+    ...(costExiled.length ? { costExiled } : {}),
     ...(ab.station ? { stationed: { id: tapCreatures![0]!, zc: obj(s, tapCreatures![0]!).zoneChanges ?? 0, power: power(s, obj(s, tapCreatures![0]!)) } } : {}),
     ...(o.tapped ? { sourceUntaps: o.untaps ?? 0 } : {}),
     ...(o.transforms ? { sourceTransforms: o.transforms } : {}),

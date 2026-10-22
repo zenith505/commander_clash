@@ -464,6 +464,10 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const caster = e.ownerCasts ? pid : ctx.controller;
         sc.untilNonland = { ...(hit ? { hit } : {}), caster, ...(e.restBottom ? { seen } : {}) };
         if (!hit) return bottomRest(s, sc.untilNonland.seen);
+        if (e.then === "suspend") {
+          suspendExiled(s, obj(s, hit), e.suspend ?? 0);
+          return;
+        }
         if (e.then !== "castFree") {
           // "Until end of turn, you may cast that card (without paying its mana cost)": with its usual timing (rulings).
           const o = obj(s, hit);

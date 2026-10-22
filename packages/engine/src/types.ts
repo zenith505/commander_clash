@@ -753,6 +753,8 @@ export interface StackItem {
   costCardNames?: string[];
   /** The cards a discard cost discarded (keys into `cards`): "if the discarded card wasn't a land card" (Grab the Prize). */
   costDiscarded?: string[];
+  /** The cards an "Exile a card from your hand" cost exiled, as the objects they became there: "the exiled card" (Jhoira of the Ghitu). */
+  costExiled?: { id: ObjectId; zc: number }[];
   /**
    * An activated mana ability resolving right away, never on the stack (CR 605.3b): `index`, the ability; `tapped`, {T}
    * was in its cost, so it tapped its source for mana (CR 106.12); `extra`, the mana picked for what that triggers.

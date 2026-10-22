@@ -568,8 +568,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   // like Spiketail Hatchling's. "Unless its controller pays" only if they can't pay.
   const top = s.stack[s.stack.length - 1];
   if (top && top.kind === "spell" && top.controller !== pid && top.objectId && mv(s, top.objectId) >= 3) {
+    // Also a counter inside a branch (Invert Polarity's lost flip) and taking the spell over (Commandeer).
     const worthIt = (body: AbilityBody, sourceId: ObjectId, x = 0) => {
-      const c = body.effects.find((e) => e.type === "counterSpell");
+      const c = allEffects(body.effects).find((e) => e.type === "counterSpell" || e.type === "controlSpell");
       return !!c && (c.type !== "counterSpell" || !c.unless || !canPayUnless(s, top.controller, c.unless, pid, sourceId, x));
     };
     for (const id of player(s, pid).hand) {
@@ -841,7 +842,7 @@ function canAlsoPayWard(s: GameState, pid: PlayerId, plan: Action[], targets: Ta
   const used = plan.flatMap((a) => (a.type === "activateMana" ? [a.objectId] : a.type === "castSpell" ? (a.convoke ?? []) : []));
   return !!planMana(s, pid, parseManaCost(ward), 0, undefined, used);
 }
-const isCounterOnly = (b: AbilityBody) => b.effects.some((e) => e.type === "counterSpell");
+const isCounterOnly = (b: AbilityBody) => allEffects(b.effects).some((e) => e.type === "counterSpell" || e.type === "controlSpell");
 /** A battle: we don't aim spells at them, only creatures (damage to a Siege helps its controller flip it, CR 310.12b). */
 const isBattleTarget = (s: GameState, t: ChosenTarget) => t.kind === "object" && !!s.objects[t.id] && objIsType(s, obj(s, t.id), "Battle");
 /**
@@ -2655,6 +2656,10 @@ function modeValue(s: GameState, pid: PlayerId, body: AbilityBody, targets: Targ
       case "counterSpell":
         v += 9;
         break;
+      // Jhoira of the Ghitu: a card we can't afford now, cast for free in a few turns.
+      case "suspendCard":
+        v += 4;
+        break;
       case "discard":
         v += e.who.ref === "you" ? -2 * estimate(e.n) : 3 * estimate(e.n);
         break;
@@ -3263,6 +3268,14 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
         .sort((a, b) => mv(s, a) - mv(s, b));
       if (pool.length < c.n) return null;
       out.exileCards = [...(out.exileCards ?? []), ...pool.slice(0, c.n)];
+    } else if (c.kind === "exileFromHand" && !c.toLibrary && !c.anyNumber && c.n === 1 && ab.body.effects.some((e) => e.type === "suspendCard")) {
+      // Jhoira of the Ghitu: the dearest nonland card we couldn't cast with the mana we have, suspended for later.
+      const mana = availableMana(s, pid);
+      const pick = player(s, pid)
+        .hand.filter((x) => x !== o.id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x)))) && mv(s, x) > mana)
+        .sort((a, b) => mv(s, b) - mv(s, a))[0];
+      if (!pick) return null;
+      out.exileFromHand = [pick];
     } else if (c.kind === "mill") {
       // Mill only with plenty of library left: not toward decking ourselves.
       if (player(s, pid).library.length < c.n + 10) return null;

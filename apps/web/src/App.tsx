@@ -717,6 +717,12 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         if (d.exileFromHand !== undefined) continue;
         return setCostPick({ activate: d, kind: "exileFromHand", label: cardOf(s, d.objectId).name, what: `put ${c.n === 1 ? "a card" : `${c.n} cards`} from your hand on top of your library`, n: c.n, candidates: s.players[HUMAN]!.hand.filter((id) => id !== d.objectId), chosen: [] });
       }
+      if (c.kind === "exileFromHand" && !c.anyNumber && !c.mvX) {
+        // "Exile a nonland card from your hand" (Jhoira of the Ghitu): click the cards in your hand.
+        if (d.exileFromHand !== undefined) continue;
+        const what = c.filter?.text ?? "card";
+        return setCostPick({ activate: d, kind: "exileFromHand", label: cardOf(s, d.objectId).name, what: `exile from your hand ${c.n === 1 ? (/^[aeiou]/i.test(what) ? "an" : "a") : c.n} ${what}${c.n > 1 ? "s" : ""}`, n: c.n, candidates: s.players[HUMAN]!.hand.filter((id) => id !== d.objectId && (!c.filter || printedMatches(c.filter, cardOf(s, id)))), chosen: [] });
+      }
       if (c.kind === "exileFromGraveyard" && c.linked) {
         // Jester's Scepter: pick one of the cards exiled with it (you may look at them) to put into its owner's graveyard.
         if (d.exileCards !== undefined) continue;

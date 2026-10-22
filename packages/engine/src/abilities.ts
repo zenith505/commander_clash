@@ -618,6 +618,8 @@ export type ObjRef =
    * exiled creature" for an "Exile a creature you control" cost (Food Chain), likewise.
    */
   | { ref: "sacrificed"; exiledCost?: true }
+  /** "The exiled card" of an "Exile a nonland card from your hand" cost (Jhoira of the Ghitu), while it's still that card in exile (CR 400.7). */
+  | { ref: "costExiled" }
   /** The card "reveal the top card of your library" revealed, while it's still where it was (CR 400.7). */
   | { ref: "revealed" }
   /** The one card "exile the top card of your library" exiled, while it's still that card in exile (CR 400.7). */
@@ -1885,7 +1887,9 @@ export type Effect =
       who?: PlayerRef;
       reveal?: true;
       shuffleFirst?: true;
-      then: "castFree" | "freeThisTurn" | "thisTurn" | "hand";
+      then: "castFree" | "freeThisTurn" | "thisTurn" | "hand" | "suspend";
+      /** `then` "suspend": "Put two time counters on that card. If it doesn't have suspend, it gains suspend." (Kang Prime). */
+      suspend?: number;
       ownerCasts?: true;
       /** Tibalt's Trickery: "Choose 1, 2, or 3 at random. Its controller mills that many cards, then exiles ...". */
       millFirst?: number;
@@ -2227,6 +2231,11 @@ export type Effect =
    * becomes a permanent under their control (CR 110.2b). An instant or sorcery still goes to its owner's graveyard.
    */
   | { type: "controlSpell"; index: number }
+  /**
+   * "Put four time counters on the exiled card. If it doesn't have suspend, it gains suspend." (Jhoira of the Ghitu): a
+   * card in exile gets time counters and suspend's abilities (CR 702.62a), so it's suspended (CR 702.62b).
+   */
+  | { type: "suspendCard"; what: ObjRef; n: number }
   /**
    * Counter the spell or ability that triggered this unless its controller pays: ward (CR 702.21a),
    * "Whenever a player casts a spell, counter it unless that player pays {1}".

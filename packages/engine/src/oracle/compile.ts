@@ -2068,7 +2068,9 @@ export function compile(d: CardDef): CompiledCard {
       else out.unsupported.push(raw);
       continue;
     }
-    const equip = /^Equip (\{[^}]+\}(?:\{[^}]+\})*)$/.exec(line);
+    // "Equip {4}. This ability costs {1} less to activate for each color of the creature it targets." (Dragonfire Blade)
+    const equipLessPer = /^Equip (\{[^}]+\}(?:\{[^}]+\})*)\. This ability costs \{(\d+)\} less to activate for each (color of|\+1\/\+1 counter on) the creature it targets\.$/.exec(line);
+    const equip = /^Equip (\{[^}]+\}(?:\{[^}]+\})*)$/.exec(line) ?? equipLessPer;
     if (equip && d.subtypes.includes("Equipment")) {
       // CR 702.6a: "[Cost]: Attach this permanent to target creature you control. Activate only as a sorcery."
       out.activated.push({
@@ -2079,6 +2081,7 @@ export function compile(d: CardDef): CompiledCard {
         body: { targets: [{ kind: "object", types: ["Creature"], controller: "you", text: "target creature you control" }], effects: [{ type: "attach", what: { ref: "target", index: 0 } }], text: "Attach to target creature you control." },
         text: line,
         equip: true,
+        ...(equipLessPer ? { costLessPerTarget: { n: Number(equipLessPer[2]), each: equipLessPer[3] === "color of" ? ("color" as const) : ("+1/+1" as const) } } : {}),
       });
       continue;
     }

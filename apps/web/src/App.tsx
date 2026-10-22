@@ -69,6 +69,7 @@ import {
   attackProblem,
   attackCost,
   attackTaxPer,
+  blockCost,
   blockProblem,
   blockRequirementProblem,
   maxBlocks,
@@ -4226,7 +4227,11 @@ function Controls({
     const list = Object.entries(blocks).flatMap(([b, atts]) => atts.map((attacker) => ({ blocker: b, attacker })));
     const earlier = s.battlefield.some((id) => s.objects[id]!.blocking !== undefined);
     const alone = Object.keys(blocks).length === 1 && !earlier && characteristics(s, s.objects[list[0]!.blocker]!).cantBlockAlone ? `${cardOf(s, list[0]!.blocker).name} can't block alone.` : null;
-    const needed = alone ?? blockRequirementProblem(s, HUMAN, list);
+    // Archangel of Tithes: what blocking costs, paid from your lands as you declare (CR 509.1d-f); with a cost, no
+    // requirement makes a creature block (CR 509.1c).
+    const blockTax = blockCost(s, Object.keys(blocks).length);
+    const blockTaps = blockTax ? planMana(s, HUMAN, parseManaCost(blockTax)) : [];
+    const needed = alone ?? (blockCost(s, 1) ? null : blockRequirementProblem(s, HUMAN, list));
     return (
       <div className="controls">
         <span>
@@ -4239,9 +4244,11 @@ function Controls({
               : "Click one of your untapped creatures, then the attacker it blocks."}
         </span>
         <button
-          disabled={!!needed}
+          disabled={!!needed || !blockTaps}
+          title={blockTax && !blockTaps ? `Blocking costs ${blockTax} and you can't pay it` : undefined}
           onClick={() =>
             dispatch([
+              ...(blockTaps ?? []),
               {
                 type: "declareBlockers",
                 player: HUMAN,
@@ -4250,7 +4257,7 @@ function Controls({
             ])
           }
         >
-          {Object.keys(blocks).length ? `Block with ${Object.keys(blocks).length}` : "No blocks"}
+          {Object.keys(blocks).length ? `Block with ${Object.keys(blocks).length}${blockTax ? ` (pay ${blockTax})` : ""}` : "No blocks"}
         </button>
       </div>
     );

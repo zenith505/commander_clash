@@ -509,11 +509,11 @@ export function madnessCastOf(s: GameState, pid: PlayerId, id: ObjectId): string
  * A decision that asks for a mana payment, during which mana abilities can be activated (CR 605.3a): paying a cost
  * mid-resolution, like ward's; casting a card for its madness cost as madness's trigger resolves (CR 702.35a, 601.2g);
  * helping to pay for a spell with assist, or paying the rest of it (CR 702.132a); declaring attackers, to pay what
- * attacking costs (CR 508.1i).
+ * attacking costs (CR 508.1i); declaring blockers, to pay what blocking costs (CR 509.1f).
  */
 export function paysManaNow(s: GameState): boolean {
   const pd = s.pending;
-  return pd?.kind === "payUnless" || pd?.kind === "declareAttackers" || pd?.kind === "assist" || pd?.kind === "assistCast" || (pd?.kind === "chooseMay" && !!pd.pay?.mana) || (pd?.kind === "castFree" && (pd.how === "madness" || pd.how === "miracle" || pd.how === "paid"));
+  return pd?.kind === "payUnless" || pd?.kind === "declareAttackers" || (pd?.kind === "declareBlockers" && !!blockCost(s, 1)) || pd?.kind === "assist" || pd?.kind === "assistCast" || (pd?.kind === "chooseMay" && !!pd.pay?.mana) || (pd?.kind === "castFree" && (pd.how === "madness" || pd.how === "miracle" || pd.how === "paid"));
 }
 
 function requireNoPending(s: GameState) {
@@ -1592,8 +1592,19 @@ export function untapPermanent(s: GameState, o: GameObject) {
  * as long as you control ~" effects whose permanent left, phased out or changed control.
  */
 export function endWhileTapped(s: GameState): boolean {
-  const ended = s.effects.filter((e) => (e.whileTapped && !whileTappedHolds(s, e.whileTapped)) || (e.whileControlled && !whileControlledHolds(s, e.whileControlled)));
-  if (!ended.length) return false;
+  // "For as long as it has a shadow counter on it" (CR 611.2b): over for a permanent once it has none, even if one is
+  // put on it again later.
+  let lost = false;
+  for (const e of s.effects) {
+    if (!e.whileCounter) continue;
+    const kept = e.affected.filter((id) => (s.objects[id]?.counters[e.whileCounter!] ?? 0) > 0);
+    if (kept.length < e.affected.length) [e.affected, lost] = [kept, true];
+  }
+  const ended = s.effects.filter((e) => (e.whileTapped && !whileTappedHolds(s, e.whileTapped)) || (e.whileControlled && !whileControlledHolds(s, e.whileControlled)) || (e.whileCounter && !e.affected.length));
+  if (!ended.length) {
+    if (lost) invalidateCharacteristics(s);
+    return lost;
+  }
   s.effects = s.effects.filter((e) => !ended.includes(e));
   invalidateCharacteristics(s);
   return true;
@@ -5078,6 +5089,10 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
   const cost = powerUp && o.enteredTurn === s.turn ? reduceByManaCost(cost1, parseManaCost(defOf(s, o).manaCost ?? "")) : cost1;
   if (!ab.equip && !ab.costLess && !powerUp) return cost;
   let less = ab.costLess ? Math.max(0, evalAmount(s, ab.costLess, { controller: pid, sourceId: o.id })) : 0;
+  // "For each color of the creature it targets": as the target is when the cost is worked out (CR 601.2f).
+  const per = ab.costLessPerTarget;
+  const aim = per && targets?.[0]?.kind === "object" ? s.objects[targets[0].id] : undefined;
+  if (per && aim) less += per.n * (per.each === "color" ? characteristics(s, aim).colors.length : (aim.counters["+1/+1"] ?? 0));
   // "Power-up abilities of other creatures you control cost {3} less to activate." (Hulk, Gamma Goliath)
   for (const id of powerUp ? s.battlefield : []) {
     const src = obj(s, id);
@@ -6303,6 +6318,12 @@ export function attackTaxOf(s: GameState, a: { defender: PlayerId; planeswalker?
   return pw && objIsType(s, pw, "Planeswalker") && controllerOf(s, pw) === a.defender ? attackTaxPer(s, a.defender, true) : 0;
 }
 
+/** What blocking with `n` creatures costs, "{2}" ("" when blocking is free): Archangel of Tithes (CR 509.1d). */
+export function blockCost(s: GameState, n: number): string {
+  const per = s.battlefield.reduce((t, id) => t + characteristics(s, obj(s, id)).blockTax, 0);
+  return per && n ? `{${per * n}}` : "";
+}
+
 /** The total attack tax for a declaration: how many mana symbols (generic mana, and {W/P} each for Norn's Annex). */
 export function attackTax(s: GameState, attacks: { defender: PlayerId; planeswalker?: ObjectId }[]): number {
   return attacks.reduce((n, a) => n + attackTaxOf(s, a), 0);
@@ -6690,8 +6711,18 @@ function declareBlockers(s: GameState, p: Player, blocks: { blocker: ObjectId; a
     const at = characteristics(s, obj(s, b.attacker));
     return at.allMustBlock || at.mustBeBlocked || characteristics(s, obj(s, b.blocker)).mustBlock || provokerOf(s, obj(s, b.blocker))?.id === b.attacker;
   };
-  const req = earlier + seen.size >= limit && blocks.some(obeys) ? null : blockRequirementProblem(s, p.id, blocks);
+  // When every block costs mana (Archangel of Tithes), no requirement makes a creature block: nothing obliges paying a
+  // cost to block (CR 509.1c).
+  const taxed = !!blockCost(s, 1);
+  const req = taxed || (earlier + seen.size >= limit && blocks.some(obeys)) ? null : blockRequirementProblem(s, p.id, blocks);
   if (req) throw new RulesError(req);
+  // Block costs are totalled and paid, with mana abilities activated first (CR 509.1d-f).
+  const tax = blockCost(s, seen.size);
+  if (tax) {
+    const paid = spendFromPool(s, p.id, parseManaCost(tax), "other", 0, payableLife(s, p.id));
+    if (!paid) throw new RulesError(`blocking with ${seen.size === 1 ? "this creature" : `these ${seen.size} creatures`} costs ${tax}: add the mana first`);
+    log(s, `${p.name} pays ${tax} to block.`);
+  }
   for (const b of blocks) {
     const bl = obj(s, b.blocker);
     const at = obj(s, b.attacker);

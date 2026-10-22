@@ -9,6 +9,7 @@ import { bindChosen, canChooseTarget, changeTargetOptions, harmfulCounter, trigg
 import { withModes, manySlot, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
   applyAction,
+  blockCost,
   livingPlayers,
   abilityProblem,
   faceUpWays,
@@ -108,7 +109,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   }
   if (pend?.player === pid) {
     if (pend.kind === "declareAttackers") return chooseAttacks(s, pid);
-    if (pend.kind === "declareBlockers") return [chooseBlocks(s, pid)];
+    if (pend.kind === "declareBlockers") return payForBlocks(s, pid, chooseBlocks(s, pid));
     if (pend.kind === "chooseModes") {
       const t = s.triggerQueue[0]!;
       const body = triggerBody(s, t);
@@ -3945,6 +3946,25 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
     const o = obj(s, taxed.attacker);
     const elsewhere = opps.find((d) => !attackTaxPer(s, d) && !attackProblem(s, o, d) && !characteristics(s, o).goadedBy.includes(d));
     declared = declared.flatMap((a) => (a !== taxed ? [a] : elsewhere !== undefined ? [{ attacker: a.attacker, defender: elsewhere }] : []));
+  }
+}
+
+/**
+ * Archangel of Tithes: the mana for blocking (CR 509.1d-f), tapped before the declaration. Blockers we can't pay for are
+ * left out, the last chosen first (the chump blocks and extras), with any attacker then left with too few blockers.
+ */
+function payForBlocks(s: GameState, pid: PlayerId, a: Action): Action[] {
+  if (a.type !== "declareBlockers" || !blockCost(s, 1)) return [a];
+  let blocks = a.blocks;
+  for (;;) {
+    const blockers = [...new Set(blocks.map((b) => b.blocker))];
+    const taps = blockers.length ? planMana(s, pid, parseManaCost(blockCost(s, blockers.length))) : [];
+    if (taps) return [...taps, { ...a, blocks }];
+    const drop = blockers[blockers.length - 1]!;
+    blocks = blocks.filter((b) => b.blocker !== drop);
+    blocks = blocks.filter((b) => blocks.filter((x) => x.attacker === b.attacker).length >= blockersNeeded(s, obj(s, b.attacker)));
+    const earlier = s.battlefield.some((id) => obj(s, id).blocking !== undefined);
+    if (blocks.length === 1 && !earlier && characteristics(s, obj(s, blocks[0]!.blocker)).cantBlockAlone) blocks = [];
   }
 }
 

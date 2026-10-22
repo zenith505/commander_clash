@@ -2996,6 +2996,23 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects[effects.length - 1] = { ...prev, look: true };
       continue;
     }
+    // "Put a shadow counter on target creature. For as long as that creature has a shadow counter on it, it's a Wraith in
+    // addition to its other types" (Minas Morgul), "That land is an Island for as long as it has a flood counter on it"
+    // (Quicksilver Fountain): an effect on what the counter was just put on, for as long as it has one of them (CR
+    // 611.2b). Read as the "until end of turn" effect it would be, with that duration instead.
+    const whileCtr =
+      new RegExp(`^For as long as (that creature|that land|that permanent|it) has an? ${COUNTER} counter on it, (?:it's|it is) (.+)$`).exec(s) ??
+      new RegExp(`^(That creature|That land|That permanent|It) is (.+) for as long as it has an? ${COUNTER} counter on it$`).exec(s);
+    if (whileCtr) {
+      const [subject, counterWord, rest] = whileCtr[0]!.startsWith("For") ? [whileCtr[1]!, whileCtr[2]!, whileCtr[3]!] : [whileCtr[1]!, whileCtr[3]!, whileCtr[2]!];
+      const prev = effects[effects.length - 1];
+      const counter = counterKind(counterWord);
+      const fx = parseSentence(`${capital(subject)} becomes ${rest} until end of turn`, ctx);
+      const e = fx?.length === 1 ? fx[0]! : undefined;
+      if (prev?.type !== "counters" || prev.counter !== counter || e?.type !== "continuous" || e.duration !== "endOfTurn" || JSON.stringify(e.what) !== JSON.stringify(prev.what)) return null;
+      effects.push({ ...e, duration: "game", whileCounter: counter });
+      continue;
+    }
     // "Put target creature card from a graveyard onto the battlefield under your control. That creature is a black Zombie in
     // addition to its other colors and types." (Rise from the Grave, Liliana, Death's Majesty, Dread Slaver): an effect on
     // the permanent the card became, from then on (CR 611.2c, 400.7); a later color or type change overwrites it (rulings).

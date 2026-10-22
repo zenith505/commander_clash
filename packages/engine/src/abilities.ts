@@ -882,6 +882,8 @@ export type Modification =
    * attacking you" (CR 508.1g-h): generic mana per creature attacking its controller.
    */
   /** Ghostly Prison: {n} per attacker; Sphere of Safety: {X}, a count (`amount`), attacking your planeswalkers too. */
+  /** "Creatures can't block unless their controller pays {1} for each of those creatures" (Archangel of Tithes, CR 509.1d). */
+  | { kind: "blockTax"; n: number }
   | { kind: "attackTax"; n: number; amount?: Amount; planeswalkers?: true; /** A symbol other than generic mana per creature, "{W/P}" (Norn's Annex). */ mana?: string }
   /** "Untap ~ during each other player's untap step" (CR 502.3). */
   | { kind: "untapsDuringOthers" }
@@ -3290,6 +3292,12 @@ export interface ActivatedAbility {
   discardSelf?: boolean;
   /** "This ability costs {1} less to activate for each legendary creature you control" (CR 602.2b, 601.2f): generic mana only. */
   costLess?: Amount;
+  /**
+   * "This ability costs {1} less to activate for each color of the creature it targets" (Dragonfire Blade), "... for each
+   * +1/+1 counter on the creature it targets" (Warrior's Blades): `n` less for each, once the target is chosen (CR
+   * 602.2b, 601.2f).
+   */
+  costLessPerTarget?: { n: number; each: "color" | "+1/+1" };
   /** It's a cycling ability (CR 702.29a, 702.29f): discarding this card to pay for it is cycling it. */
   cycling?: boolean;
   /** Crew N (CR 702.122a): the cost is tapping other untapped creatures you control with total power N or more. */

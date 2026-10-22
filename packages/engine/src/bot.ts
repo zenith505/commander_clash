@@ -63,6 +63,7 @@ import {
   evidenceProblem,
   altCostsFor,
   payZeroSource,
+  commanderTax,
   legendBotKeep,
   unlockCost,
   forageWays,
@@ -241,6 +242,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Separating cards into two piles (Fact or Fiction): as even as can be, by what the cards are worth in that player's
     // hand. An opponent choosing for them takes the worse pile, they take the better one, so both ways the evener the better.
     if (pend.kind === "searchLibrary" && pend.piles) return [{ type: "searchLibrary", player: pid, found: evenPiles(s, pend.forPlayer ?? pid, pend.cards) }];
+    // Another player's permanents into two piles, for them to sacrifice one: as even as can be, so either pile costs them half.
+    if (pend.kind === "pickPermanents" && pend.action === "pile") return [{ type: "pickPermanents", player: pid, ids: evenPiles(s, pid, pend.options, (id) => permanentWorth(s, pid, id)) }];
     // Choosing among an opponent's revealed cards (Gifts Ungiven, Intuition): the ones they'd least like where the chosen
     // ones go, by how they'd rank them for themselves.
     if (pend.kind === "searchLibrary" && pend.forPlayer !== undefined) {
@@ -509,8 +512,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "counterKind") return [{ type: "chooseOption", player: pid, choice: pend.options.includes("+1/+1") ? "+1/+1" : pend.options[0]! }];
     // Two piles: the better one for our own hand, the worse one for an opponent's.
     if (pend.kind === "chooseOption" && pend.what === "pile" && pend.piles) {
-      const [a, b] = pend.piles.map((pile) => pile.reduce((n, id) => n + handWorth(s, id), 0));
-      const mine = pend.of === pid;
+      // Our own permanents to sacrifice (Liliana of the Veil): the pile worth less.
+      const worth = pend.sacrificePile ? (id: string) => permanentWorth(s, pid, id) : (id: string) => handWorth(s, id);
+      const [a, b] = pend.piles.map((pile) => pile.reduce((n, id) => n + worth(id), 0));
+      const mine = pend.of === pid && !pend.sacrificePile;
       return [{ type: "chooseOption", player: pid, choice: (mine ? a! >= b! : a! <= b!) ? "0" : "1" }];
     }
     // Liliana of the Dark Realms: +X/+X for our own creature, -X/-X for anyone else's.
@@ -688,7 +693,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // Damage prevention waits for damage coming (chooseDamageShield).
       .filter((id) => !shieldBody(compileCard(defOf(s, obj(s, id))).spell))
       .map((id) => {
-        const plan = obj(s, id).zone === "graveyard" ? graveyardCastPlan(s, pid, id) : (facePlan(s, pid, id, false, "first") ?? freerunPlan(s, pid, id) ?? overloadPlan(s, pid, id) ?? awakenPlan(s, pid, id) ?? cheaperAltPlan(s, pid, id) ?? bestowPlan(s, pid, id) ?? freeAltPlan(s, pid, id) ?? castPlan(s, pid, id, false) ?? altCastPlan(s, pid, id) ?? facePlan(s, pid, id, false, "after"));
+        const plan = obj(s, id).zone === "graveyard" ? graveyardCastPlan(s, pid, id) : (commandZonePlan(s, pid, id) ?? facePlan(s, pid, id, false, "first") ?? freerunPlan(s, pid, id) ?? overloadPlan(s, pid, id) ?? awakenPlan(s, pid, id) ?? cheaperAltPlan(s, pid, id) ?? bestowPlan(s, pid, id) ?? freeAltPlan(s, pid, id) ?? castPlan(s, pid, id, false) ?? altCastPlan(s, pid, id) ?? facePlan(s, pid, id, false, "after"));
         return plan ? { plan, mv: mv(s, id) } : null;
       })
       .filter((x): x is { plan: Action[]; mv: number } => !!x)
@@ -697,7 +702,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (expiring) return expiring.plan;
     if (options[0]) return options[0].plan;
     // Food Chain, Ashnod's Altar: a creature given up for mana, to cast a card that does more.
-    const fed = chooseCreatureForMana(s, pid);
+    const fed = chooseCreatureForMana(s, pid) ?? chooseForageForMana(s, pid);
     if (fed) return fed;
     // A loyalty ability of each planeswalker we control, once spells are cast (CR 606.3).
     const loyalty = chooseLoyalty(s, pid);
@@ -3211,6 +3216,36 @@ function chooseCreatureForMana(s: GameState, pid: PlayerId): Action[] | null {
 }
 
 /**
+ * An activated mana ability whose only cost besides {T} is forage (Thornvault Forager, CR 701.61a), when nothing in our
+ * hand or command zone can be cast without it: foraged the way forageChoice picks, and only when a card can then be
+ * cast (checked by activating it and choosing its mana as we would).
+ */
+function chooseForageForMana(s: GameState, pid: PlayerId): Action[] | null {
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid) continue;
+    const abilities = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const ab = abilities[i]!;
+      if (!ab.mana || ab.costs?.length !== 1 || ab.costs[0]!.kind !== "forage" || ab.manaCost || ab.sacrificeSelf) continue;
+      const costs = forageChoice(s, pid, o, []);
+      if (!costs || abilityProblem(s, pid, id, i, undefined, undefined, undefined, undefined, costs)) continue;
+      const action: Action = { type: "activateAbility", player: pid, objectId: id, index: i, costs };
+      let after: GameState;
+      try {
+        after = applyAction(s, action);
+        for (let k = 0; k < 4 && after.pending?.player === pid; k++) after = botActions(after, pid).reduce((x, a) => applyAction(x, a), after);
+      } catch {
+        continue;
+      }
+      if (after.pending) continue;
+      if (castableNow(after, pid).length) return [action];
+    }
+  }
+  return null;
+}
+
+/**
  * X for an ability whose only X is "Discard X cards" (Gix, Yawgmoth Praetor), or undefined when we'd rather not: in our
  * main phase with an empty stack, every card in hand but the spells we could still cast after paying for it and a land
  * to play this turn. At least two cards, so it's worth seven mana.
@@ -3352,6 +3387,23 @@ function chooseTimed(s: GameState, pid: PlayerId): Action[] | null {
   }
   const timed = (ab: ActivatedAbility) => timedCondition(ab.activateIf);
   return chooseActivation(s, pid, timed) ?? chooseUnearth(s, pid, timed);
+}
+
+/**
+ * Derevi: "Put ~ onto the battlefield from the command zone" instead of casting it, when the commander tax has made
+ * casting it dearer than the ability, or it can't be cast now (it isn't a cast: no tax, rulings).
+ */
+function commandZonePlan(s: GameState, pid: PlayerId, id: ObjectId): Action[] | null {
+  const o = obj(s, id);
+  if (o.zone !== "command") return null;
+  const abilities = abilitiesOf(s, o).activated;
+  for (let i = 0; i < abilities.length; i++) {
+    if (abilities[i]!.zone !== "command") continue;
+    if (commanderTax(player(s, pid), o) < 2 && castPlan(s, pid, id, false)) return null;
+    const plan = planActivate(s, pid, id, i);
+    if (plan) return plan;
+  }
+  return null;
 }
 
 /**
@@ -3973,10 +4025,15 @@ function handWorth(s: GameState, id: string): number {
   return isType(defOf(s, obj(s, id)), "Land") ? 1.5 : 1 + Math.min(mv(s, id), 7) * 0.5;
 }
 
+/** What a permanent is worth to its controller, for piles of permanents. */
+function permanentWorth(s: GameState, pid: PlayerId, id: string): number {
+  return targetWorth(s, pid, { kind: "object", id }, false, 0);
+}
+
 /** The first of two piles that splits `cards` as evenly as can be by handWorth (every split tried, up to 12 cards). */
-function evenPiles(s: GameState, pid: PlayerId, cards: string[]): string[] {
+function evenPiles(s: GameState, pid: PlayerId, cards: string[], worthOf: (id: string) => number = (id) => handWorth(s, id)): string[] {
   void pid;
-  const worth = cards.map((id) => handWorth(s, id));
+  const worth = cards.map(worthOf);
   const total = worth.reduce((a, b) => a + b, 0);
   if (cards.length > 12) {
     // Greedy: the most valuable cards first, each into the lighter pile.

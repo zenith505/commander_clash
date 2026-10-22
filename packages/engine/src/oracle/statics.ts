@@ -457,7 +457,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^it's your turn$/.test(text)) return { kind: "yourTurn" };
   // "If there are cards exiled with ~" (Valakut Exploration): the cards this object's linked exile took (CR 607.2a).
   if (/^(?:there are cards|a card is) exiled with ~$/.test(text)) return { kind: "amount", amount: { count: { kind: "linkedExiled" } }, min: 1 };
-  if (/^it isn't that player's turn$/.test(text)) return { kind: "eventPlayersTurn", not: true };
+  // "Whenever a player casts a spell, if it's not their turn" (Scytheclaw Raptor): the caster's.
+  if (/^it(?: isn't that player's|'s not their| isn't their) turn$/.test(text)) return { kind: "eventPlayersTurn", not: true };
   if (/^it's not your turn$/.test(text)) return { kind: "yourTurn", not: true };
   // "If four or more creatures are attacking", "if exactly one creature is attacking", "if a white creature is attacking"
   // (the traps): attacking creatures, anyone's.
@@ -508,6 +509,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^no spells were cast last turn$/.test(text)) return { kind: "castLastTurn", none: true };
   if ((m = new RegExp(`^a player cast ${NUM} or more spells last turn$`).exec(text))) return { kind: "castLastTurn", onePlayer: num(m[1]!) };
   if (/^you(?:'ve)? gained life this turn$/.test(text)) return { kind: "lifeGainedThisTurn", n: 1 };
+  // "If you gained and lost life this turn" (Lunar Convocation): both, whatever the net change (rulings).
+  if (/^you gained and lost life this turn$/.test(text)) return { kind: "allOf", conds: [{ kind: "lifeGainedThisTurn", n: 1 }, { kind: "amount", amount: { count: { kind: "lifeLostThisTurn", who: { ref: "you" } } }, min: 1 }] };
   // "If you created a token this turn" (Bennie Bracks, Zoologist).
   if (/^you created a token this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "tokensCreatedThisTurn" } }, min: 1 };
   // "If you gained 3 or more life this turn" (The Gaffer, Resplendent Angel).
@@ -654,8 +657,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = /^(you|an opponent|defending player) controls? (.+)$/.exec(text))) {
     // "At least three other enchantments" (Ephara, Ever-Sheltering) is "three or more other enchantments".
     m[2] = m[2]!.replace(/^at least (\w+) /, "$1 or more ");
-    // "Seven or more lands with different names" (Field of the Dead): names counted once each.
-    const names = new RegExp(`^${NUM} or more (lands|creatures|artifacts) with (different names|the same name)$`).exec(m[2]!);
+    // "Seven or more lands with different names" (Field of the Dead), "ten or more Gates with different names" (Maze's End): names counted once each.
+    const names = new RegExp(`^${NUM} or more (lands|creatures|artifacts|Gates) with (different names|the same name)$`).exec(m[2]!);
     if (names && m[1] === "you") {
       const filter = pickFilter(names[2]!);
       return filter ? { kind: "control", who: "you", filter, min: num(names[1]!), ...(names[3] === "the same name" ? { sameName: true as const } : { differentNames: true as const }) } : null;

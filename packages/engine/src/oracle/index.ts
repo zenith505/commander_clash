@@ -18,7 +18,7 @@
 //   tokens.ts            token descriptions, copy exceptions
 //   words.ts             shared regex pieces and word tables
 
-export { compileCard, overloadedText, MONARCH, RING, INITIATIVE, isFullySupported, spellTargetSpecs, castingBody, normalizeSelf, mutateTarget } from "./compile";
+export { compileCard, overloadedText, cleavedText, MONARCH, RING, INITIATIVE, RAD, isFullySupported, spellTargetSpecs, castingBody, normalizeSelf, mutateTarget } from "./compile";
 export { parseManaAbility } from "./mana-abilities";
 export { parseBody, usesX } from "./body";
 export { parseCount } from "./counts";

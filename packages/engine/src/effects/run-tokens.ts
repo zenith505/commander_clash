@@ -227,6 +227,30 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           }
         }
       }
+      // "That's attacking" (Brimaz, Hero of Bladehold): its controller chooses what each one attacks as it's created
+      // (CR 508.4; rulings on Brimaz: not necessarily what the source attacks), asked for each before they're all created.
+      let attackAt: ReturnType<typeof attackChoices> | undefined;
+      if (e.attacking && !e.attackingEach && !e.attachTo) {
+        const who = players(s, e.who, ctx);
+        const choices = who.length === 1 ? attackChoices(s, who[0]!, ctx.sourceId) : [];
+        if (choices.length > 1) {
+          const k = tokenBatch(s, who[0]!, e.token, n).same;
+          const sc = (s.resolving!.scratch ??= {});
+          const picks = [...(sc.attackPicks ?? [])];
+          if (sc.attackWhom !== undefined) {
+            picks.push(sc.attackWhom);
+            sc.attackWhom = undefined;
+          }
+          sc.attackPicks = picks;
+          if (picks.length < k) {
+            const which = k > 1 ? ` (${picks.length + 1} of ${k})` : "";
+            s.pending = { kind: "chooseOption", player: who[0]!, source: src, what: "attackWhom", options: choices.map((a) => a.key), labels: choices.map((a) => a.label), prompt: `choose what the ${e.token.name} token attacks${which}` };
+            return "paused";
+          }
+          sc.attackPicks = undefined;
+          attackAt = picks.flatMap((key) => choices.filter((a) => a.key === key));
+        }
+      }
       // "Attached to it": what was just put onto the battlefield, found before this list starts over.
       const hosts = e.attachTo && objects(s, e.attachTo, ctx).map((o) => o.id);
       if (s.resolving) s.resolving.created = [];
@@ -236,14 +260,14 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       // Token doublers apply per player (CR 614.1a): "twice that many of those tokens". The tokens enter at the same time,
       // each player's too (CR 608.2f), so they see each other enter (CR 603.6a).
-      enterTogether(s, () => createTokensFor(s, e, n, ctx, src));
+      enterTogether(s, () => createTokensFor(s, e, n, ctx, src, attackAt));
       return;
     }
   }
 }
 
 /** "Create N ... tokens" for each player it names. */
-function createTokensFor(s: GameState, e0: Extract<Effect, { type: "createToken" }>, n: number, ctx: ResolveCtx, src: string) {
+function createTokensFor(s: GameState, e0: Extract<Effect, { type: "createToken" }>, n: number, ctx: ResolveCtx, src: string, /** What each attacking one attacks, as chosen (attackChoices). */ attackAt?: ReturnType<typeof attackChoices>) {
   // "An X/X token": X worked out now, once (rulings on Inscription of Insight); the token's printed power and toughness.
   const xx = e0.pt !== undefined ? amountNow(s, e0.pt, ctx) : undefined;
   const e = xx !== undefined ? { ...e0, token: { ...e0.token, power: xx, toughness: e0.ptPowerOnly ? e0.token.toughness : xx } } : e0;
@@ -280,8 +304,16 @@ function createTokensFor(s: GameState, e0: Extract<Effect, { type: "createToken"
     const blocking = e.blocking ? objects(s, e.blocking, ctx)[0] : undefined;
     const tapped = e.tapped || (e.attacking && !e.untapped);
     const opts = { tapped, attacking: defender, ...(counters ? { counters } : {}), ...(blocking ? { blocking } : {}) };
-    for (let i = 0; i < k; i++) createToken(s, pid, e.token, opts);
-    if (k) log(s, `${src} creates ${k === 1 ? "a" : k}${tapped ? " tapped" : ""}${defender !== undefined ? `${tapped ? " and" : ""} attacking` : ""}${blocking && blocking.attacking !== undefined ? ` blocking ${defOf(s, blocking).name}` : ""} ${e.token.power !== undefined ? `${e.token.power}/${e.token.toughness} ` : ""}${e.token.name} token${k > 1 ? "s" : ""}${defender !== undefined && livingPlayers(s).length > 2 ? ` (attacking ${player(s, defender).name})` : ""}.`);
+    const whom = new Set<string>();
+    for (let i = 0; i < k; i++) {
+      const at = attackAt?.[i];
+      const o = createToken(s, pid, e.token, { ...opts, ...(at ? { attacking: at.player } : {}) });
+      // A planeswalker or battle chosen for it, if it's still there to be attacked (CR 506.3c).
+      const pw = at?.planeswalker !== undefined ? s.objects[at.planeswalker] : undefined;
+      if (pw && o.zone === "battlefield" && o.attacking !== undefined && pw.zone === "battlefield") o.attackingPermanent = { id: pw.id, zc: pw.zoneChanges ?? 0 };
+      if (o.zone === "battlefield" && o.attacking !== undefined) whom.add(o.attackingPermanent ? `${defOf(s, s.objects[o.attackingPermanent.id]!).name} (${player(s, o.attacking).name})` : player(s, o.attacking).name);
+    }
+    if (k) log(s, `${src} creates ${k === 1 ? "a" : k}${tapped ? " tapped" : ""}${defender !== undefined ? `${tapped ? " and" : ""} attacking` : ""}${blocking && blocking.attacking !== undefined ? ` blocking ${defOf(s, blocking).name}` : ""} ${e.token.power !== undefined ? `${e.token.power}/${e.token.toughness} ` : ""}${e.token.name} token${k > 1 ? "s" : ""}${whom.size && livingPlayers(s).length > 2 ? ` (attacking ${[...whom].join(" and ")})` : ""}.`);
     createExtraTokens(s, pid, extra, opts);
   }
 }

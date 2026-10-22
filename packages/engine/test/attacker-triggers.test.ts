@@ -85,8 +85,10 @@ describe("Whenever a creature you control attacks", () => {
     putOnBattlefield(s0, ap, mardu);
     const a = putOnBattlefield(s0, ap, bear());
     let s = act(passUntil(s0, "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks: [{ attacker: a, defender: opp }] });
-    for (let i = 0; i < 60 && (s.stack.length || s.triggerQueue.length); i++) {
-      if (s.pending) break;
+    for (let i = 0; i < 60 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+      // The token's controller chooses what it attacks (CR 508.4): the player the bear attacks.
+      if (s.pending?.kind === "chooseOption" && s.pending.what === "attackWhom") s = act(s, { type: "chooseOption", player: s.pending.player, choice: s.pending.options[0]! });
+      else if (s.pending) break;
       else s = act(s, { type: "passPriority", player: waitingOn(s)! });
     }
     const goblins = s.battlefield.filter((id) => s.objects[id]!.isToken);

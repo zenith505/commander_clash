@@ -6,7 +6,13 @@ import { abilityProblem, isFullySupported, legalTargets, planActivate, planCast,
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.oracleText).toBe(true));
 const settle = (s: GameState) => {
-  for (let i = 0; i < 60 && (s.stack.length || s.triggerQueue.length) && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  for (let i = 0; i < 60 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+    // A token put onto the battlefield attacking: its controller chooses what it attacks (CR 508.4); the first option is
+    // what the creature that made it attacks.
+    if (s.pending?.kind === "chooseOption" && s.pending.what === "attackWhom") s = act(s, { type: "chooseOption", player: s.pending.player, choice: s.pending.options[0]! });
+    else if (s.pending) break;
+    else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  }
   return s;
 };
 const attack = (s: GameState, ap: PlayerId, attacks: { attacker: string; defender: PlayerId }[]) =>

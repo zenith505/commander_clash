@@ -1368,7 +1368,21 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         sc.linkedPick = undefined;
         cards = cards.filter((c) => sc.found?.includes(c.id));
       }
+      if (e.filter) cards = cards.filter((c) => printedMatches(e.filter!, defOf(s, c)));
       if (!cards.length) return;
+      if (e.dest === "battlefield") {
+        // All at once (CR 608.2f), under this ability's controller's control.
+        log(s, `${p.name} puts ${cards.map((c) => defOf(s, c).name).join(", ")} onto the battlefield from exile (${src}).`);
+        const ids = cards.map((c) => c.id);
+        enterTogether(s, () => {
+          for (const c of cards) moveObject(s, c.id, "battlefield", { controller: p.id });
+        });
+        const now = ids.filter((id) => obj(s, id).zone === "battlefield");
+        if (e.gain && now.length) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: p.id, sourceName: src, duration: "game", affected: now, mods: [{ kind: "addKeywords", keywords: e.gain }] });
+        invalidateCharacteristics(s);
+        if (s.linkedExile?.[key]) s.linkedExile[key] = s.linkedExile[key]!.filter((l) => !ids.includes(l.id));
+        return;
+      }
       if (e.dest === "hand") log(s, `${p.name} puts ${cards.length === 1 ? "a card" : `${cards.length} cards`} exiled with ${src} into their hand.`);
       else log(s, `${cards.map((c) => defOf(s, c).name).join(", ")} ${cards.length === 1 ? "goes" : "go"} from exile to ${cards.length === 1 ? "its owner's graveyard" : "their owners' graveyards"} (${src}).`);
       for (const c of cards) moveObject(s, c.id, e.dest);
@@ -2041,6 +2055,70 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         }
         invalidateCharacteristics(s);
       }
+      return;
+    }
+    case "permanentPiles": {
+      // CR 700.3: you separate every permanent the player controls into two piles (one can be empty, and an Aura can go
+      // in a different pile from what it enchants: rulings); that player chooses one, and all of it is sacrificed at once.
+      const sc = (s.resolving!.scratch ??= {});
+      const pid = players(s, e.who, ctx)[0];
+      if (pid === undefined) return;
+      if (!sc.looked) {
+        sc.looked = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid);
+        if (!sc.looked.length) return;
+        sc.queue = [ctx.controller];
+        sc.chosen = {};
+        s.pending = { kind: "pickPermanents", player: ctx.controller, source: src, action: "pile", what: "permanent", options: sc.looked, count: sc.looked.length, min: 0, anyNumber: true, of: pid };
+        return "paused";
+      }
+      const names = (ids: ObjectId[]) => (ids.length ? ids.map((id) => defOf(s, obj(s, id)).name).join(", ") : "no permanents");
+      const one = sc.chosen?.[ctx.controller] ?? [];
+      const two = sc.looked.filter((id) => !one.includes(id));
+      if (sc.pileChoice === undefined) {
+        log(s, `${player(s, ctx.controller).name} separates ${player(s, pid).name}'s permanents into two piles: ${names(one)}; and ${names(two)}.`);
+        s.pending = { kind: "chooseOption", player: pid, source: src, what: "pile", options: ["0", "1"], labels: [`Pile 1: ${names(one)}`, `Pile 2: ${names(two)}`], piles: [one, two], of: pid, sacrificePile: true, prompt: "choose the pile of your permanents to sacrifice" };
+        return "paused";
+      }
+      for (const id of sc.pileChoice === 0 ? one : two) {
+        const o = s.objects[id];
+        if (o?.zone !== "battlefield" || controllerOf(s, o) !== pid || !canBeSacrificed(s, o)) continue;
+        log(s, `${player(s, pid).name} sacrifices ${defOf(s, o).name}.`);
+        moveObject(s, id, "graveyard", { sacrificed: true });
+      }
+      return;
+    }
+    case "returnHeld": {
+      const sc = (s.resolving!.scratch ??= {});
+      const list = sc.returningHeld ?? (s.resolving!.held ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc);
+      s.resolving!.held = undefined;
+      if (!list.length) return;
+      if (e.at) {
+        const first = s.objects[list[0]!.id]!;
+        const names = list.map((l) => defOf(s, s.objects[l.id]!).name).join(", ");
+        addDelayed(s, "nextEndStep", ctx.controller, first, {
+          targets: [],
+          effects: [{ type: "returnExiled", under: e.under, ...(list.length > 1 ? { cards: list } : {}) }],
+          text: `Return ${names} to the battlefield under ${e.under === "owner" ? (list.length > 1 ? "their owners'" : "its owner's") : "your"} control.`,
+        }, cardIdOf(first));
+        return;
+      }
+      const back = list.map((l) => s.objects[l.id]!).filter((o) => o.zone === "exile");
+      if (returnFromExile(s, back, (c) => (e.under === "owner" ? c.owner : ctx.controller), src) === "paused") {
+        sc.returningHeld = list;
+        return "paused";
+      }
+      sc.returningHeld = undefined;
+      if (!e.thenExile) return;
+      // "Then exile them again": the permanents those cards became (CR 400.7), held for the next instruction.
+      const held: { id: ObjectId; zc: number }[] = [];
+      for (const l of list) {
+        const o = s.objects[l.id];
+        if (!o || o.zone !== "battlefield" || (o.zoneChanges ?? 0) !== l.zc + 1) continue;
+        log(s, `${src} exiles ${defOf(s, o).name} again.`);
+        moveObject(s, o.id, "exile");
+        for (const n of newObjects(o)) if (!s.objects[n.id]?.isToken) held.push(n);
+      }
+      s.resolving!.held = held;
       return;
     }
     case "returnExiled": {

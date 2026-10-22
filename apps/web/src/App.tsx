@@ -1859,7 +1859,7 @@ function canUseFace(s: GameState, id: string) {
 
 /** Alternative costs that aren't the card's own, which a prototype card may be cast prototyped for (CR 718.3). */
 const PROTOTYPE_WITH: AltCostKind[] = ["payZero", "wubrg", "omniscience", "citadel"];
-const ALT_NAMES: Record<AltCostKind, string> = { payZero: "Cast it for", impending: "Impending", citadel: "Cast it:", foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate", convert: "More Than Meets the Eye", omniscience: "Cast it:" };
+const ALT_NAMES: Record<AltCostKind, string> = { payZero: "Cast it for", impending: "Impending", citadel: "Cast it:", foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate", convert: "More Than Meets the Eye", omniscience: "Cast it:", cleave: "Cleave" };
 const ALT_NOTES: Record<AltCostKind, string> = {
   impending: "enters with time counters and isn't a creature until the last is removed (one at each of your end steps)",
   citadel: "life equal to its mana value instead of its mana cost (Bolas's Citadel, Valgavoth); X is 0",
@@ -1880,6 +1880,7 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   surge: "only if you've cast another spell this turn",
   spectacle: "only if an opponent lost life this turn",
   overload: "\"target\" in its text becomes \"each\": no targets, it affects all of them",
+  cleave: "the words in square brackets are gone from its text",
   awaken: "also put +1/+1 counters on target land you control: it becomes a 0/0 Elemental creature with haste",
   miracle: "",
   mutate: "target a non-Human creature you own: it merges with it, on top or underneath, and the merged creature has the abilities of both",
@@ -1924,7 +1925,8 @@ function exileOptions(s: GameState, id: string): boolean {
   if (!mayPlayFromExile(s, s.objects[id]!, HUMAN)) return false;
   if (foretoldCast(s, HUMAN, s.objects[id]!)) return canCastAlt(s, id, "foretell");
   // Valgavoth's cards: only for life (its "pay life equal to its mana value").
-  return (isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id) || canCastAlt(s, id, "citadel")) || canUseFace(s, id);
+  // An alternative cost: Valgavoth's life, Warped Space's {0}.
+  return (isLand(s, id) ? canPlayLand(s, id) : canCastWithTaps(s, id) || altCostsFor(s, HUMAN, s.objects[id]!).some((a) => canCastAlt(s, id, a.kind))) || canUseFace(s, id);
 }
 
 /** You may cast spells from other players' graveyards this turn (The Great Work). */
@@ -1993,10 +1995,10 @@ function canCastAlt(s: GameState, id: string, alt: AltCostKind, prototyped?: tru
   return !!sac && s.battlefield.some((x) => controllerOf(s, s.objects[x]!) === HUMAN && objectMatches(s, sac.filter, s.objects[x]!, HUMAN, false) && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { alt, sacrifice: [x] }) !== null);
 }
 
-/** Indices of a card's abilities that work from your hand (cycling, CR 702.29a), or from the command zone for a commander (commander ninjutsu, CR 702.49d). */
+/** Indices of a card's abilities that work from your hand (cycling, CR 702.29a), or from the command zone for a commander (commander ninjutsu, CR 702.49d; Derevi's). */
 function handAbilities(s: GameState, id: string): number[] {
   const o = s.objects[id]!;
-  return abilitiesOf(s, o).activated.flatMap((ab, i) => (ab.zone === "hand" && (o.zone !== "command" || ab.orCommand) ? [i] : []));
+  return abilitiesOf(s, o).activated.flatMap((ab, i) => ((ab.zone === "hand" && (o.zone !== "command" || ab.orCommand)) || (ab.zone === "command" && o.zone === "command") ? [i] : []));
 }
 
 /** Could you cycle this card right now, tapping mana as needed? */
@@ -2979,6 +2981,11 @@ function Seat({
             ★ XP {p.experience}
           </span>
         )}
+        {(p.rad ?? 0) > 0 && (
+          <span className="poison" title={`${p.rad} rad counter${p.rad === 1 ? "" : "s"}: at the beginning of their precombat main phase they mill that many cards, then lose 1 life and remove a rad counter for each nonland card milled.`}>
+            ☢ {p.rad}
+          </span>
+        )}
         {p.speed !== undefined && (
           <span className="energy" title={`Speed ${p.speed}${p.speed === 4 ? " (max speed)" : ""}: it increases once on each of their turns when an opponent loses life. Max speed is 4.`}>
             🏁 {p.speed === 4 ? "Max speed" : `Speed ${p.speed}`}
@@ -3567,11 +3574,11 @@ function PilePicker({
           {(pending.piles ?? [[], []]).map((pile, i) => (
             <div key={i} data-pile={i}>
               <h4>
-                Pile {i + 1} ({pile.length === 1 ? "1 card" : `${pile.length} cards`}){" "}
-                <button onClick={() => onDone(String(i))}>{`Put pile ${i + 1} into ${whose} hand`}</button>
+                Pile {i + 1} ({pile.length === 1 ? `1 ${pending.sacrificePile ? "permanent" : "card"}` : `${pile.length} ${pending.sacrificePile ? "permanents" : "cards"}`}){" "}
+                <button onClick={() => onDone(String(i))}>{pending.sacrificePile ? `Sacrifice pile ${i + 1}` : `Put pile ${i + 1} into ${whose} hand`}</button>
               </h4>
               <div className="modal-cards">
-                {pile.length === 0 && <span className="muted">No cards</span>}
+                {pile.length === 0 && <span className="muted">{pending.sacrificePile ? "No permanents" : "No cards"}</span>}
                 {pile.map((id) => {
                   const d = cardOf(s, id);
                   return (
@@ -4564,6 +4571,8 @@ function Controls({
                 ? `cipher: click a creature of yours to exile ${pending.source} encoded on it. Whenever that creature deals combat damage to a player, you may cast a copy of ${pending.source} for free.`
                 : pending.action === "unattach"
                 ? `click an Equipment to unattach from the creature of yours it's attached to. That creature becomes tapped and gains indestructible until end of turn.`
+                : pending.action === "pile"
+                ? `separate all permanents ${theirs ?? "you"} control${theirs ? "s" : ""} into two piles: click the ones for the first pile (the rest form the second). ${theirs ?? "You"} sacrifice${theirs ? "s" : ""} all permanents in the pile of ${theirs ? "their" : "your"} choice.`
                 : pending.action === "meld"
                 ? `meld: click the ${pending.what} to exile with ${pending.source} and meld them into one permanent. A token or a copy can't meld and stays in exile.`
                 : pending.action === "keep" && pending.maxTotalPower !== undefined
@@ -4575,7 +4584,7 @@ function Controls({
                 : `click ${what} ${theirs ? `${theirs} controls` : "of yours"} to ${verb}.`}
         </span>
         <button disabled={!ok} onClick={() => dispatch([{ type: "pickPermanents", player: HUMAN, ids: discards }])}>
-          {pending.action === "attach" ? (n ? `Attach ${n}` : "Attach none") : pending.action === "keep" ? (n ? `Keep ${n}` : "Keep none") : pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "encode" ? (n ? "Encode" : "Don't encode") : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "keepTapped" ? (n ? `Keep ${n} tapped` : "Untap all") : pending.action === "untapLimited" ? `Untap ${n}` : pending.action === "phaseOut" ? (n ? `Phase out ${n}` : "Phase out none") : pending.action === "untap" ? (n ? `Untap ${n}` : "Untap none") : pending.action === "tap" ? (n ? `Tap ${n}` : "Tap none") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : pending.action === "choose" ? "Choose" : pending.action === "meld" ? "Meld" : pending.action === "unattach" ? "Unattach" : "Return"}
+          {pending.action === "attach" ? (n ? `Attach ${n}` : "Attach none") : pending.action === "keep" ? (n ? `Keep ${n}` : "Keep none") : pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "encode" ? (n ? "Encode" : "Don't encode") : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "keepTapped" ? (n ? `Keep ${n} tapped` : "Untap all") : pending.action === "untapLimited" ? `Untap ${n}` : pending.action === "phaseOut" ? (n ? `Phase out ${n}` : "Phase out none") : pending.action === "untap" ? (n ? `Untap ${n}` : "Untap none") : pending.action === "tap" ? (n ? `Tap ${n}` : "Tap none") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.action === "pile" ? `First pile: ${n}, second pile: ${pending.count - n}` : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : pending.action === "choose" ? "Choose" : pending.action === "meld" ? "Meld" : pending.action === "unattach" ? "Unattach" : "Return"}
         </button>
       </div>
     );

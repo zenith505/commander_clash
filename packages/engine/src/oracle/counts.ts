@@ -43,6 +43,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     const c = parseCount(m[2]!, ctx);
     return c && { ...c, plus: (c.plus ?? 0) + num(m[1]!) };
   }
+  // "The number of creatures you control plus the number of planeswalkers you control" (Ajani, Strength of the Pride).
+  if ((m = /^(the number of .+?) plus (the number of .+)$/i.exec(p))) {
+    const [a, b] = [parseCount(m[1]!, ctx), parseCount(m[2]!, ctx)];
+    return a && b && typeof a === "object" && typeof b === "object" && "count" in a && "count" in b && !a.times && !a.plus && !b.times && !b.plus && !a.half && !b.half ? { count: { kind: "sum", of: [a.count, b.count] } } : null;
+  }
   if ((m = new RegExp(`^${NUM} minus (.+)$`, "i").exec(p))) {
     const c = parseCount(m[2]!, ctx);
     return c && { count: c.count, times: -(c.times ?? 1), plus: num(m[1]!) - (c.plus ?? 0) };
@@ -186,6 +191,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Aclazotz: "Each opponent discards a card. For each opponent who can't, you draw a card": those with no card to discard.
   if (each && ctx?.opponentsDiscarded && /^opponent who can't$/i.test(p)) return count({ kind: "players", opponents: true, discardedNone: true });
   if (each && /^opponent who drew a card this way$/i.test(p)) return count({ kind: "players", opponents: true, drewThisWay: true });
+  // Kefka, Court Mage: "for each card type among cards discarded this way" (CR 205.2a: card types, not supertypes or subtypes).
+  if (each && /^card type among cards discarded this way$/i.test(p)) return count({ kind: "discardedTypes" });
+  // Struggle for Project Purity: "Each opponent draws a card. You draw a card for each card drawn this way."
+  if (each && /^card drawn this way$/i.test(p)) return count({ kind: "drawnThisWay" });
   // Smuggler's Share: "for each opponent who drew two or more cards this turn", "... who had two or more lands enter the
   // battlefield under their control this turn".
   if (each && (m = /^opponent who drew (two|three|four) or more cards this turn$/i.exec(p))) return count({ kind: "players", opponents: true, drewAtLeast: num(m[1]!) });
@@ -265,6 +274,17 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = new RegExp(`^${COUNTER} counters? on (~|it|that creature)$`).exec(p))) {
     const of = whoseObject(m[2] === "~" ? "~'s" : m[2] === "it" ? "its" : "that creature's", ctx);
     return of && count({ kind: "counters", counter: counterKind(m[1]!), of });
+  }
+  // "The number of +1/+1 counters on lands you control" (Toph, the Blind Bandit), "counters on permanents you control"
+  // (Hydra Trainer): the counters on those permanents added up.
+  if ((m = new RegExp(`^(?:${COUNTER} )?counters on ((?:creatures|lands|permanents|artifacts) you control)$`).exec(p))) {
+    const c = parseCount(m[2]!, ctx, each);
+    return c && typeof c === "object" && "count" in c && c.count.kind === "permanents" && !c.count.differentNames ? { count: { ...c.count, counter: m[1] ? counterKind(m[1]) : ANY_COUNTER } } : null;
+  }
+  // "Cards put into enchanted player's graveyard from anywhere this turn" (Fraying Sanity): tokens aren't cards.
+  if ((m = /^cards? put into (your|their|that player's|enchanted player's) graveyard from anywhere this turn$/i.exec(p))) {
+    const whose = whosePlayer(m[1]!, ctx);
+    return whose && count({ kind: "cardsToGraveyardThisTurn", whose });
   }
   // "Aura attached to it", "Equipment attached to ~": only the permanent's own.
   // "Aura and Equipment attached to it" (Champion of the Flame): one of either.

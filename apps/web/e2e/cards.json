@@ -2058,6 +2058,68 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9f50ec9f-78e6-403f-8f41-84d603fee0eb",
+  "name": "Charred Foyer // Warped Space",
+  "manaCost": "{3}{R} // {4}{R}{R}",
+  "cmc": 10,
+  "typeLine": "Enchantment — Room // Enchantment — Room",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Room"
+  ],
+  "oracleText": "At the beginning of your upkeep, exile the top card of your library. You may play it this turn.\n(You may cast either half. That door unlocks on the battlefield. As a sorcery, you may pay the mana cost of a locked door to unlock it.)",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dsk",
+  "releasedAt": "2024-09-27",
+  "rarity": "mythic",
+  "layout": "split",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Charred Foyer",
+    "manaCost": "{3}{R}",
+    "typeLine": "Enchantment — Room",
+    "supertypes": [],
+    "types": [
+     "Enchantment"
+    ],
+    "subtypes": [
+     "Room"
+    ],
+    "oracleText": "At the beginning of your upkeep, exile the top card of your library. You may play it this turn.\n(You may cast either half. That door unlocks on the battlefield. As a sorcery, you may pay the mana cost of a locked door to unlock it.)",
+    "colors": [
+     "R"
+    ]
+   },
+   {
+    "name": "Warped Space",
+    "manaCost": "{4}{R}{R}",
+    "typeLine": "Enchantment — Room",
+    "supertypes": [],
+    "types": [
+     "Enchantment"
+    ],
+    "subtypes": [
+     "Room"
+    ],
+    "oracleText": "Once each turn, you may pay {0} rather than pay the mana cost for a spell you cast from exile.\n(You may cast either half. That door unlocks on the battlefield. As a sorcery, you may pay the mana cost of a locked door to unlock it.)",
+    "colors": [
+     "R"
+    ]
+   }
+  ]
+ },
+ {
   "oracleId": "df2738fe-9cd1-4347-8808-105fcfde1190",
   "name": "Circle of Protection: Red",
   "manaCost": "{1}{W}",
@@ -3097,6 +3159,45 @@
   "set": "isd",
   "releasedAt": "2011-09-30",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "afa49a09-146f-4439-850e-dd1938c93cef",
+  "name": "Derevi, Empyrial Tactician",
+  "manaCost": "{G}{W}{U}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Bird Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Bird",
+   "Wizard"
+  ],
+  "oracleText": "Flying\nWhen Derevi enters and whenever a creature you control deals combat damage to a player, you may tap or untap target permanent.\n{1}{G}{W}{U}: Put Derevi onto the battlefield from the command zone.",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "G",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2026-09-14",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -5277,6 +5378,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "454a8902-8120-4373-96ee-bbf352b04e8d",
+  "name": "Hero of Bladehold",
+  "manaCost": "{2}{W}{W}",
+  "cmc": 4,
+  "typeLine": "Creature — Human Knight",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Knight"
+  ],
+  "oracleText": "Battle cry (Whenever this creature attacks, each other attacking creature gets +1/+0 until end of turn.)\nWhenever this creature attacks, create two 1/1 white Soldier creature tokens that are tapped and attacking.",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Battle Cry"
+  ],
+  "commanderLegal": "legal",
+  "set": "moc",
+  "releasedAt": "2023-04-21",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a1c7cd7a-0795-4135-b787-effeb981d95b",
   "name": "Hidden Volcano",
   "manaCost": "",
@@ -6785,6 +6919,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0ba134d8-ee7d-48ec-8dc6-57942b8e9261",
+  "name": "Liliana of the Veil",
+  "manaCost": "{1}{B}{B}",
+  "cmc": 3,
+  "typeLine": "Legendary Planeswalker — Liliana",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Liliana"
+  ],
+  "oracleText": "+1: Each player discards a card.\n−2: Target player sacrifices a creature.\n−6: Separate all permanents target player controls into two piles. That player sacrifices all permanents in the pile of their choice.",
+  "loyalty": "3",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dmu",
+  "releasedAt": "2022-09-09",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3f8e7a45-4c6e-4ee6-93d0-b7de9715ec97",
   "name": "Lim-Dûl's Vault",
   "manaCost": "{U}{B}",
@@ -8257,6 +8422,35 @@
   "commanderLegal": "legal",
   "set": "mh3",
   "releasedAt": "2024-06-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d41987b0-2ea0-4cc7-8608-70c486db76eb",
+  "name": "Path of Peril",
+  "manaCost": "{1}{B}{B}",
+  "cmc": 3,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Cleave {4}{W}{B} (You may cast this spell for its cleave cost. If you do, remove the words in square brackets.)\nDestroy all creatures [with mana value 2 or less].",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B",
+   "W"
+  ],
+  "keywords": [
+   "Cleave"
+  ],
+  "commanderLegal": "legal",
+  "set": "dbl",
+  "releasedAt": "2022-01-28",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

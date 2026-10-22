@@ -151,7 +151,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
         if (affectedName && (o.faceDown || !sameName(view(o)?.name, affectedName))) continue;
         const ch = view(o);
         if (!ch || (whose && !whose.includes(ch.controller)) || !objectMatches(s, filter, o, ctx.controller, false, undefined, ch, ctx.view)) continue;
-        if (!c.differentNames) n++;
+        if (c.counter) n += c.counter === ANY_COUNTER ? Object.values(o.counters).reduce((a, b) => a + (b ?? 0), 0) : (o.counters[c.counter] ?? 0);
+        else if (!c.differentNames) n++;
         else if (ch.name && !o.faceDown) names.add(ch.name);
       }
       return c.differentNames ? names.size : n;
@@ -249,6 +250,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + s.players[pid]!.life, 0);
     case "experience":
       return refPlayers(s, c.who, ctx).reduce((n, pid) => n + (s.players[pid]!.experience ?? 0), 0);
+    case "rad":
+      return (c.who ? refPlayers(s, c.who, ctx) : s.players.filter((p) => !p.lost).map((p) => p.id)).reduce((n, pid) => n + (s.players[pid]!.rad ?? 0), 0);
     case "speed":
       return s.players[ctx.controller]?.speed ?? 0; // CR 702.179f
     case "punished":
@@ -263,6 +266,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.attackersThisTurn ?? 0;
     case "toGraveyardThisTurn":
       return s.toGraveyardThisTurn ?? 0;
+    case "sum":
+      return c.of.reduce((n, x) => n + evalCount(s, x, ctx), 0);
+    case "cardsToGraveyardThisTurn":
+      return refPlayers(s, c.whose, ctx).reduce((n, pid) => n + (s.cardsToGraveyardThisTurn?.[pid] ?? 0), 0);
     case "commanderCasts":
       return Object.values(s.players[ctx.controller]?.commanderCasts ?? {}).reduce((a, b) => a + b, 0);
     case "party":
@@ -299,6 +306,12 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.rolled?.other ?? 0;
     case "flipsWon":
       return s.resolving?.flipped?.wins ?? 0;
+    case "drawnThisWay":
+      return s.resolving?.drawnBefore?.length ?? 0;
+    case "asCast":
+      return s.resolving?.item.asCast ?? evalCount(s, c.of, ctx);
+    case "discardedTypes":
+      return new Set((s.resolving?.discardedAll ?? []).flatMap((id) => (s.objects[id] ? defOf(s, s.objects[id]!).types : []))).size;
     case "snowSpent":
       return snowSpent(ctx.spent);
     case "players":
@@ -537,7 +550,7 @@ function describeCount(c: Count): string {
     case "x":
       return "X";
     case "permanents":
-      return `#${c.differentNames ? "differently named " : ""}${c.other ? "other " : ""}${c.filter.text.replace(/^target /, "")}`;
+      return `#${c.counter ? `${c.counter === ANY_COUNTER ? "" : `${c.counter} `}counters on ` : ""}${c.differentNames ? "differently named " : ""}${c.other ? "other " : ""}${c.filter.text.replace(/^target /, "")}`;
     case "cardsInHand":
       return "#cards in hand";
     case "timesAffectedAttacked":
@@ -604,6 +617,8 @@ function describeCount(c: Count): string {
       return "life";
     case "experience":
       return "experience counters";
+    case "rad":
+      return "rad counters";
     case "speed":
       return "speed";
     case "punished":
@@ -620,6 +635,10 @@ function describeCount(c: Count): string {
       return "#creatures that attacked this turn";
     case "toGraveyardThisTurn":
       return "#permanents put into a graveyard this turn";
+    case "sum":
+      return c.of.map(describeCount).join(" + ");
+    case "cardsToGraveyardThisTurn":
+      return "#cards put into that graveyard this turn";
     case "commanderCasts":
       return "#times you've cast your commander";
     case "party":
@@ -677,6 +696,12 @@ function describeCount(c: Count): string {
       return "the result";
     case "rollOther":
       return "the other result";
+    case "drawnThisWay":
+      return "#cards drawn this way";
+    case "asCast":
+      return `${describeCount(c.of)} as cast`;
+    case "discardedTypes":
+      return "#card types discarded";
     case "flipsWon":
       return "flips won";
     case "mutations":

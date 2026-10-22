@@ -616,6 +616,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (/^Exile all cards from your hand face down$/i.test(s)) return [{ type: "exileFaceDown", from: "hand" }];
     if (/^Exile a card from your hand face down$/i.test(s)) return [{ type: "exileFaceDown", from: "handCard" }];
     if (/^Put all cards exiled with ~ into their owners?'s? graveyards?$/i.test(s)) return [{ type: "moveLinked", dest: "graveyard" }];
+    if ((m = /^Put all (creature )?cards exiled with ~ onto the battlefield under your control(, and they gain decayed)?$/i.exec(s)))
+      return [{ type: "moveLinked", dest: "battlefield", ...(m[1] ? { filter: { kind: "card", types: ["Creature"], text: "creature card" } } : {}), ...(m[2] ? { gain: ["Decayed"] } : {}) }];
     if (/^Put all other cards you own exiled with ~ into your hand$/i.test(s)) return [{ type: "moveLinked", dest: "hand", yours: true, other: true }];
     if (/^Return a card you own exiled with ~ to your hand$/i.test(s)) return [{ type: "moveLinked", dest: "hand", yours: true, one: true }];
     // Currency Converter: one of them, chosen as it resolves.
@@ -801,6 +803,18 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     }
     if (!who || !among || among.kind !== "object" || !keep?.length || keep.some((k) => k.filter.kind !== "object")) return null;
     return [{ type: "keepRest", who, keep, among }];
+  }
+  // "Each opponent exiles cards from the top of their library until that player has exiled cards with total mana value
+  // 20 or greater" (Tasha's Hideous Laughter).
+  if ((m = /^(Each opponent|Each player|Target opponent|Target player) exiles cards from the top of their library until (?:that player has|they have) exiled cards with total mana value (\d+) or greater$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who ? [{ type: "exileUntilTotalMv", who, total: Number(m[2]) }] : null;
+  }
+  // "Separate all permanents target player controls into two piles. That player sacrifices all permanents in the pile
+  // of their choice." (Liliana of the Veil; joined into one sentence in body.ts).
+  if ((m = /^Separate all permanents (.+?) controls into two piles for that player to sacrifice the pile of their choice$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who && who.ref === "target" ? [{ type: "permanentPiles", who }] : null;
   }
   // "Each opponent sacrifices a creature with the greatest power among creatures they control", "... a creature they
   // control with the greatest power" (Szat's Will), "a creature or planeswalker with the greatest mana value among

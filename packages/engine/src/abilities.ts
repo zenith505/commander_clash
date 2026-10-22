@@ -35,7 +35,7 @@ export interface FaceDownPlay {
 /** "unblocked": blocked attackers that assign their combat damage as though they weren't blocked (CR 510.1). */
 /** "exert": attackers their controller exerts as they attack (CR 701.43d). */
 /** "choose": "Choose a creature you control. It gains indestructible until end of turn": only picked; "it" is that one. */
-export type PickAction = "attach" | "phaseOut" | "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "untapLimited" | "encode" | "keep" | "untap" | "tap" | "choose" | "meld" | "unattach";
+export type PickAction = "attach" | "phaseOut" | "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "untapLimited" | "encode" | "keep" | "untap" | "tap" | "choose" | "meld" | "unattach" | /** Liliana of the Veil: the permanents for the first of two piles. */ "pile";
 
 /**
  * What "unless its controller pays ..." asks for (CR 118.12): a mana cost, plus generic mana counted
@@ -88,11 +88,13 @@ export interface AmountExpr {
 export type Count =
   /** The X chosen while casting or activating it (CR 107.3a), or the spell's X for its permanent's ETB (CR 107.3m). */
   | { kind: "x" }
+  /** "Where X is the greatest power among creatures you controlled as you cast this spell" (Lifestream's Blessing): counted once, as it's cast (StackItem.asCast). */
+  | { kind: "asCast"; of: Count }
   /**
    * "The number of creatures you control", "for each other Elf you control". `filter.controller` is from the ability's controller's view;
    * `whose`: "creatures target player controls", controlled by those players.
    */
-  | { kind: "permanents"; filter: TargetSpec; other?: boolean; whose?: PlayerRef; /** "Differently named lands you control": each English name once (rulings); a face-down permanent has no name (CR 708.2). */ differentNames?: true; /** "Each other attacking creature that shares a creature type with it" (Shared Animosity): not the trigger's subject, and sharing a type with it. */ sharesTypeWithSubject?: true; /** "Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it" (Coat of Arms): not the permanent the static effect is applied to, and sharing a type with it. */ sharesTypeWithAffected?: true; /** "Each nontoken creature you control gets +1/+1 for each other creature you control with the same name as that creature" (Mirror Box): not the permanent the static effect is applied to, and with its name (a face-down permanent has none, CR 708.2). */ sameNameAsAffected?: true }
+  | { kind: "permanents"; filter: TargetSpec; other?: boolean; whose?: PlayerRef; /** "The number of +1/+1 counters on lands you control" (Toph, the Blind Bandit): their counters of this kind added up, not the permanents (ANY_COUNTER: every kind). */ counter?: CounterKind; /** "Differently named lands you control": each English name once (rulings); a face-down permanent has no name (CR 708.2). */ differentNames?: true; /** "Each other attacking creature that shares a creature type with it" (Shared Animosity): not the trigger's subject, and sharing a type with it. */ sharesTypeWithSubject?: true; /** "Each creature gets +1/+1 for each other creature on the battlefield that shares at least one creature type with it" (Coat of Arms): not the permanent the static effect is applied to, and sharing a type with it. */ sharesTypeWithAffected?: true; /** "Each nontoken creature you control gets +1/+1 for each other creature you control with the same name as that creature" (Mirror Box): not the permanent the static effect is applied to, and with its name (a face-down permanent has none, CR 708.2). */ sameNameAsAffected?: true }
   /** "The number of cards in your hand", "in that player's hand". */
   | { kind: "cardsInHand"; who: PlayerRef }
   /** "Each creature you control gets +1/+0 for each time it has attacked this turn" (Moraug): the permanent the static effect is applied to (GameObject.attacked). */
@@ -167,6 +169,12 @@ export type Count =
   | { kind: "life"; who: PlayerRef }
   /** "The number of experience counters you have" (CR 122.1). */
   | { kind: "experience"; who: PlayerRef }
+  /** "For each card type among cards discarded this way" (Kefka, Court Mage): every card discarded while this resolves. */
+  | { kind: "discardedTypes" }
+  /** "For each card drawn this way": the cards drawn in this resolution's draw before (Struggle for Project Purity). */
+  | { kind: "drawnThisWay" }
+  /** "The number of rad counters you have", "the total number of rad counters among players" (`who` unset; CR 728). */
+  | { kind: "rad"; who?: PlayerRef }
   /** "Your speed": 0 if you have none (CR 702.179f). */
   | { kind: "speed" }
   /** "The number of creatures in your party" (CR 700.8): 0 to 4. */
@@ -265,6 +273,10 @@ export type Count =
   | { kind: "tokensCreatedThisTurn"; subtype?: string }
   /** Gravestorm's "each permanent put into a graveyard from the battlefield this turn", tokens and anyone's too (CR 702.69a, rulings). */
   | { kind: "toGraveyardThisTurn" }
+  /** "The number of creatures you control plus the number of planeswalkers you control" (Ajani, Strength of the Pride): each counted on its own, so a creature planeswalker counts twice. */
+  | { kind: "sum"; of: Count[] }
+  /** "The number of cards put into their graveyard from anywhere this turn" (Fraying Sanity): that player's. */
+  | { kind: "cardsToGraveyardThisTurn"; whose: PlayerRef }
   /** "For each creature that attacked this turn": creatures declared as attackers this turn (CR 508.1). */
   | { kind: "attackersThisTurn" }
   /** "For each time you've cast your commander from the command zone this game": all of your commanders (CR 903.8, rulings). */
@@ -316,6 +328,8 @@ export interface TargetSpec {
   toughnessAbovePower?: true;
   /** Excluded card types, e.g. "nonland permanent" -> ["Land"]. */
   notTypes?: string[];
+  /** For spells: "that wasn't cast from its owner's hand" (Wash Away); a copy was never cast. */
+  notCastFromHand?: true;
   /** Excluded colors, e.g. "nonblack creature" -> ["B"]. */
   notColors?: Color[];
   /** "A card that shares a color with a legendary creature you control" (Ringsight): a color of one of them as the search is made; none if they're colorless (rulings). */
@@ -709,6 +723,8 @@ export type ObjRef =
 /** Which player(s) an effect touches. */
 export type PlayerRef =
   | { ref: "you" }
+  /** "Each player ~ attacked this turn" (Angel of Destiny): the players (not planeswalkers) the source attacked this turn, as this object. */
+  | { ref: "attackedThisTurnBySelf" }
   | { ref: "subjectController" } // the controller of the object the trigger was about, or as it last existed
   | { ref: "subjectOwner" } // "its owner": whose the object the trigger was about is (CR 108.3)
   /** `n`: "any number of target players" covers the targets from `index` on (TargetSpec.many). */
@@ -1498,7 +1514,11 @@ export type Effect =
    * exiled with ~ to your hand" (`one`, `yours`), "put all other cards you own exiled with ~ into your hand" (`other`:
    * not those exiled earlier in this resolution).
    */
-  | { type: "moveLinked"; dest: "hand" | "graveyard"; one?: true; yours?: true; other?: true; /** "You may exile that card. If you do, return each other card exiled with ~ to its owner's graveyard" (Mimic Vat): only if this resolution linked a card, and not those. */ ifLinkedNow?: true }
+  /**
+   * `dest` "battlefield": "Put all creature cards exiled with ~ onto the battlefield under your control. They gain
+   * decayed." (Gisa, Glorious Resurrector): those matching `filter`, all at once, gaining `gain` for good.
+   */
+  | { type: "moveLinked"; dest: "hand" | "graveyard" | "battlefield"; filter?: TargetSpec; gain?: string[]; one?: true; yours?: true; other?: true; /** "You may exile that card. If you do, return each other card exiled with ~ to its owner's graveyard" (Mimic Vat): only if this resolution linked a card, and not those. */ ifLinkedNow?: true }
   /**
    * Memory Jar: "At the beginning of the next end step, each player ... returns to their hand each card they exiled this
    * way": the cards the ability exiled face down (`cards`, filled in as the delayed trigger is made), if they're still
@@ -1719,6 +1739,14 @@ export type Effect =
   /** `transformed`: "return it to the battlefield transformed" (CR 712.14a). */
   /** `counterIf`: "If it's a Spirit, put a +1/+1 counter on it" (Essence Flux), each returned permanent that matches, once it's back. */
   | { type: "flicker"; what: ObjRef; under: "owner" | "you"; /** With `at` and `counter`: "If it enters as a creature, it enters with an additional +1/+1 counter on it" (Teferi's Time Twist). */ counterIfCreature?: true; /** With `counterIfCreature`: "and an additional loyalty counter on it if it's a planeswalker" (Semester's End). */ loyaltyIfPlaneswalker?: true; /** `ownersNextEndStep`: "at the beginning of that player's next end step", the card's owner's (one card only). */ at?: "nextEndStep" | "ownersNextEndStep"; /** With `at`: "If it entered under your control, put a +1/+1 counter on ~" (Phelia), on the source as it is then. */ selfCounterIfYours?: CounterKind; counter?: CounterKind; tapped?: true; transformed?: true; counterIf?: { counter: CounterKind; filter: TargetSpec }; /** Exiled now, returned by the search after it (Sword of Hearth and Home: "Put both cards onto the battlefield"), kept in Resolving.held. */ hold?: true }
+  /**
+   * "Return those cards to the battlefield under their owner's control" after a held flicker (Lae'zel's Acrobatics): the
+   * cards it exiled (Resolving.held) that are still those objects in exile; now, or with `at` by one delayed trigger (CR
+   * 603.7). `thenExile`: "then exile them again", the new objects (CR 400.7) held in their place.
+   */
+  | { type: "returnHeld"; under: "owner" | "you"; at?: "nextEndStep"; thenExile?: true }
+  /** "Separate all permanents target player controls into two piles. That player sacrifices all permanents in the pile of their choice." (Liliana of the Veil, CR 700.3). */
+  | { type: "permanentPiles"; who: PlayerRef }
   /** A delayed flicker's return: the exiled card, while it's still in exile as that object. */
   /** A delayed flicker's return: its subject, or with `cards` each of those cards, if still the same objects in exile. */
   /** "Each opponent can't block with more than one creature this combat" (Mirri, Weatherlight Duelist; CR 509.1b): for each of those players, until the combat ends. */
@@ -1897,7 +1925,7 @@ export type Effect =
    */
   /** `about`: its "~" is this target (Hunter's Insight's "that creature"), the object it was as this resolved (CR 603.7c). */
   /** `aboutPlayer`: only for combat damage to the player of that target (Great Train Heist). */
-  | { type: "floatingTrigger"; trigger: TriggeredAbility; until: TriggerDuration; about?: number; aboutPlayer?: number }
+  | { type: "floatingTrigger"; trigger: TriggeredAbility; until: TriggerDuration; about?: number; aboutPlayer?: number; /** With `about`: that many targets in a row from it, one for each ("either of those creatures", Tamiyo). */ each?: number }
   /**
    * Copy a spell (CR 707.10): the one whose casting triggered this ("cause": storm, replicate, "copy that spell") or a
    * target. `n`: "storm" is the spells cast before it this turn, "kicked" the times its replicate cost was paid.
@@ -1929,7 +1957,7 @@ export type Effect =
   /** "End the turn." (CR 724.1, Sundial of the Infinite): its last instruction; the rest happens as it finishes resolving. */
   | { type: "endTurn" }
   /** Cascade (CR 702.85a), resolving: exile until a cheaper nonland card, maybe cast it free, the rest to the bottom. */
-  | { type: "cascade" }
+  | { type: "cascade"; legendary?: true }
   /**
    * "Search target player's graveyard, hand, and library for any number of cards with that name and exile them. Then that
    * player shuffles." (Memoricide, CR 701.23): the ability's controller finds them. `all`: "for all cards" (Cranial
@@ -1950,6 +1978,8 @@ export type Effect =
    */
   /** "Each opponent reveals cards from the top of their library until they reveal a land card, then puts those cards into their graveyard" (Consuming Aberration). */
   | { type: "revealUntilLandToGraveyard"; who: PlayerRef }
+  /** "Each opponent exiles cards from the top of their library until that player has exiled cards with total mana value 20 or greater" (Tasha's Hideous Laughter). */
+  | { type: "exileUntilTotalMv"; who: PlayerRef; total: number }
   | {
       type: "revealUntil";
       filter: TargetSpec;
@@ -2438,6 +2468,10 @@ export type Effect =
   /** "Defending player gets a poison counter", "each opponent gets two poison counters" (CR 122.1f; ten lose, 704.5c). */
   /** `upTo`: as many as it takes to have that many ("equal to the difference", Vraska, Betrayal's Sting); `n` is unused. */
   | { type: "poison"; who: PlayerRef; n: Amount; upTo?: number }
+  /** "Target player gets two rad counters" (CR 728). */
+  | { type: "getRad"; who: PlayerRef; n: Amount }
+  /** Rad counters' inherent triggered ability (CR 728.1), for the player whose precombat main phase it is (its controller). */
+  | { type: "radiation" }
   /** "Each opponent loses all counters" (CR 122.1): poison and energy, the player counters there are here. */
   | { type: "loseAllCounters"; who: PlayerRef }
   /** "Double the number of each kind of counter you have" (CR 701.10e): that many more of each. */
@@ -2554,6 +2588,8 @@ export type Effect =
    * a land is still their land play, CR 305.2); `exileInstead`: "if a card would be put into your graveyard from anywhere
    * this turn, exile it instead" (CR 614.1a), not a token (rulings).
    */
+  /** "Until end of turn, you may look at the top card of your library any time and you may play ... from the top of your library" (Gwenom): GameState.topTurn. */
+  | { type: "topTurn"; top: FromTop }
   | { type: "graveyardTurn"; cast?: TargetSpec; lands?: true; exileInstead?: true; /** "From any graveyard" (The Great Work). */ anyGraveyard?: true; /** "If a spell cast this way would be put into a graveyard, exile it instead." */ exileCast?: true }
   /** "Artifact, instant, and sorcery spells you cast this turn cost {2} less to cast" (Urza, Planeswalker): `mod`'s "you" is the ability's controller (CR 601.2f, 611.2a). */
   | { type: "costModThisTurn"; mod: CostMod }
@@ -2876,6 +2912,8 @@ export type SpellCondition =
   | { kind: "amountsCompare"; a: Amount; atLeast: Amount }
   /** "If it's a creature" about target `index` (Mythos of Nethroi): that permanent as it is now, still a legal target. */
   | { kind: "targetIs"; index: number; filter: TargetSpec }
+  /** "If a Dinosaur is dealt damage this way" (Marauding Raptor): a permanent this resolution dealt damage to, as it is now. */
+  | { kind: "damagedThisWayIs"; filter: TargetSpec }
   /** "If that land is a Plains" (Emeria Shepherd): the trigger's subject as it is now, or as it last existed (CR 608.2h). */
   | { kind: "subjectIs"; filter: TargetSpec }
   /** "If it was attacking" (Zurgo Stormrender): the trigger's subject is attacking, or was as it last existed (CR 608.2h). */
@@ -3048,6 +3086,7 @@ export type TriggerEvent =
   | "yourEndStep" // At the beginning of your end step
   | "yourBeginCombat" // At the beginning of combat on your turn (CR 507.1)
   | "eachBeginCombat" // At the beginning of each combat
+  | "radiation" // rad counters' inherent triggered ability (CR 728.1)
   | "yourEndCombat" // At end of combat on your turn
   | "eachEndCombat" // At end of combat (CR 511.2)
   /** "At the beginning of your first (precombat) main phase": only the turn's first main phase is one (CR 505.1a). */
@@ -3528,8 +3567,8 @@ export interface ActivatedAbility {
   text: string;
   /** An equip ability (CR 702.6a), for "Equip abilities you activate cost {1} less to activate". */
   equip?: true;
-  /** Works only while the card is in its owner's hand, like cycling (CR 702.29a), or graveyard, like unearth (CR 702.84a). Otherwise on the battlefield. */
-  zone?: "hand" | "graveyard";
+  /** Works only while the card is in its owner's hand, like cycling (CR 702.29a), or graveyard, like unearth (CR 702.84a), or the command zone (Derevi, CR 113.6k). Otherwise on the battlefield. */
+  zone?: "hand" | "graveyard" | "command";
   /** With `zone` "hand": from the command zone too (commander ninjutsu, CR 702.49d). */
   orCommand?: true;
   /** "Discard this card" is part of the cost (cycling, transmute). */
@@ -3935,7 +3974,7 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
 /** `evidence`: Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" (CompiledCard.payEvidence). */
 /** `citadel`: Bolas's Citadel's "pay life equal to its mana value rather than pay its mana cost" for the top card of your library. */
 /** `payZero`: "you may pay {0} rather than pay the mana cost" for some spells you cast (CompiledCard.payZero: As Foretold, Rooftop Storm). */
-export type AltCostKind = "payZero" | "impending" | "citadel" | "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle" | "convert" | "omniscience";
+export type AltCostKind = "payZero" | "impending" | "citadel" | "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle" | "convert" | "omniscience" | "cleave";
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
 /** `aftermath`: the half of a split card with aftermath (CR 702.127a), cast only from a graveyard. */
@@ -4189,6 +4228,14 @@ export interface CompiledCard {
   betrayer?: true;
   /** The Mindskinner: "If a source you control would deal damage to an opponent, prevent that damage and each opponent mills that many cards." (CR 615.5) */
   damageToOpponentsMills?: true;
+  /**
+   * "All damage that would be dealt to you is dealt to enchanted creature instead" (Pariah, CR 614.9): `to` is where it
+   * goes (this permanent, or the creature it's attached to); `others`: "you and other permanents you control" (Palisade
+   * Giant); `untapped`: "as long as ~ is untapped"; `by`: only damage from such sources ("by artifacts").
+   */
+  damageToYouRedirect?: { to: "self" | "attached"; others?: true; untapped?: true; by?: TargetSpec };
+  /** "Damage isn't removed from ~ during cleanup steps" (Ancient Adamantoise, CR 514.2). */
+  keepsDamage?: true;
   /** "~ can't be countered." CR 101.2 */
   cantBeCountered?: boolean;
   /**
@@ -4529,6 +4576,8 @@ export interface CompiledCard {
   payZero?: {
     filter?: TargetSpec;
     fromHand?: true;
+    /** Warped Space: "for a spell you cast from exile". */
+    fromExile?: true;
     once?: true;
     maxMvCounters?: string;
     /** One with the Multiverse: "once during each of your turns, you may cast a spell from your hand or the top of your library without paying its mana cost". */

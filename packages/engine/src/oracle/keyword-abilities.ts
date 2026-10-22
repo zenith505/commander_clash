@@ -309,6 +309,13 @@ export function parseCostKeyword(
     return m[1] === "Surge" ? { alt: { kind: "surge", mana: m[2]!, if: { kind: "castAnother" } } } : { alt: { kind: "spectacle", mana: m[2]!, if: { kind: "opponentLostLife" } } };
   }
   if (/^(Surge|Spectacle)\b/.test(line)) return "fail";
+  // Cleave [cost] (CR 702.148a): an alternative cost for an instant or sorcery; cast for it, the words in square brackets
+  // are gone from its text (compile checks that text too).
+  if ((m = /^Cleave ((?:\{[^}]+\})+)$/.exec(line))) {
+    if (!plainMana(m[1]!) || /\{X\}/.test(m[1]!) || !d.types.some((ty) => ty === "Instant" || ty === "Sorcery")) return "fail";
+    return { alt: { kind: "cleave", mana: m[1]! } };
+  }
+  if (/^Cleave\b/.test(line)) return "fail";
   // Overload [cost] (CR 702.96a): an alternative cost for an instant or sorcery; compile checks its "each" text.
   if ((m = /^Overload ((?:\{[^}]+\})+)$/.exec(line))) {
     // An overload cost with {X} (Street Spasm's {X}{X}{R}{R}): X is announced and paid for each {X} in it (CR 107.3a,

@@ -484,16 +484,19 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
  * Red Dragon): once for each such permanent, for all the damage dealt to it at the same time; "it" is that permanent.
  */
 function parseIsDealtDamageTrigger(line: string): TriggeredAbility | "fail" | null {
-  const m = /^Whenever an? (.+?) you control is dealt damage, (.+)$/.exec(line);
+  // "Whenever a creature is dealt damage, ~ deals that much damage to that creature's controller" (Repercussion): anyone's.
+  const m = /^Whenever an? (.+?) (?:(you control|an opponent controls) )?is dealt damage, (.+)$/.exec(line);
   if (!m) return null;
-  const filter = parseTargetPhrase(`${m[1]!} you control`);
+  const whose = m[2];
+  if (!whose && m[1] !== "creature") return null;
+  const filter = parseTargetPhrase(whose ? `${m[1]!} ${whose}` : m[1]!);
   if (filter?.kind !== "object") return "fail";
-  const thatMuch = /\bthat much\b/.test(m[2]!);
-  if (thatMuch && /\bX\b/.test(m[2]!)) return "fail";
-  let body = parseBody(thatMuch ? m[2]!.replace(/\bthat much\b/g, "X") : m[2]!, { subjectIt: true });
+  const thatMuch = /\bthat much\b/.test(m[3]!);
+  if (thatMuch && /\bX\b/.test(m[3]!)) return "fail";
+  let body = parseBody(thatMuch ? m[3]!.replace(/\bthat much\b/g, "X") : m[3]!, { subjectIt: true });
   if (!body) return "fail";
-  if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, m[2]!) };
-  return { event: "permanentIsDealtDamage", dealtFilter: { ...filter, text: `${m[1]!} you control` }, body };
+  if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, m[3]!) };
+  return { event: "permanentIsDealtDamage", dealtFilter: { ...filter, text: whose ? `${m[1]!} ${whose}` : m[1]! }, body };
 }
 
 /** Valgavoth, Harrower of Souls: "Whenever an opponent loses life for the first time during each of their turns, ..." */
@@ -1259,6 +1262,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "Whenever your commander enters" (Nakia, Tome of Legends): the commander you own (CR 903.3), whoever controls it.
   const line = differenceInHand(raw.replace(/^[A-Z][A-Za-z' -]+ — (?=(When|Whenever|At)\b)/, "")).replace(/^Whenever your commander enters, /, "Whenever a commander you own enters, ");
   if (!/^(When|Whenever|At)\b/.test(line)) return null;
+  // Kefka, Ruler of Ruin: "Whenever an opponent loses life during your turn, you draw that many cards": it triggers only
+  // during its controller's turn.
+  const lossOnYourTurn = /^Whenever an opponent loses life during your turn, (.+)$/.exec(line);
+  if (lossOnYourTurn) {
+    const t = parseTrigger(`Whenever an opponent loses life, ${lossOnYourTurn[1]}`);
+    return t && t !== "fail" && !t.activeIf ? { ...t, activeIf: { kind: "yourTurn" } } : "fail";
+  }
   // Springheart Nantuko: "Whenever a land you control enters, you may pay {1}{G} if ~ is attached to a creature you
   // control. If you do, create a token that's a copy of that creature. If you didn't create a token this way, create a
   // 1/1 green Insect creature token." Not paying, or not being attached then, makes the Insect (rulings).
@@ -1525,7 +1535,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // checked as the ability would trigger and again as it resolves, so it can't be an ordinary effect.
   const intervening = /^((?:When|Whenever|At)\b[^,]*), if ([^,]+), (.+)$/.exec(line);
   // "If it's attacking" is about the source only in an ability about the source itself.
-  const aboutIt = intervening && /^(it|~)\b(?!'s (?:your|the first) | isn't that player's turn$)/.test(intervening[2]!) && !/^(When|Whenever) ~ /.test(intervening[1]!) && !/^~ is enchanted by /.test(intervening[2]!);
+  const aboutIt = intervening && /^(it|~)\b(?!'s (?:your|the first) | isn't that player's turn$|'s not their turn$)/.test(intervening[2]!) && !/^(When|Whenever) ~ /.test(intervening[1]!) && !/^~ is enchanted by /.test(intervening[2]!);
   // "At the beginning of each opponent's upkeep, if that player has two or fewer cards in hand": whose upkeep it is.
   const thatHand = intervening && /^At the beginning of each (?:opponent|player)'s (?:upkeep|draw step|end step)$/.test(intervening[1]!) ? new RegExp(`^that player has (no|${NUM} or (fewer|more)) cards in hand$`).exec(intervening[2]!) : null;
   const handCond = thatHand && (thatHand[1] === "no" ? { max: 0 } : thatHand[3] === "fewer" ? { max: num(thatHand[2]!) } : { min: num(thatHand[2]!) });
@@ -1694,10 +1704,16 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (draws) return draws;
   // Cunning Rhetoric: "Whenever an opponent attacks you and/or one or more planeswalkers you control": once each combat that
   // opponent attacks with one or more creatures attacking you or your planeswalkers (CR 508.3e).
-  const attacked = /^Whenever an opponent attacks (you with two or more creatures|with creatures, if two or more of those creatures are attacking you and\/or planeswalkers you control|you and\/or one or more planeswalkers you control), (.+)$/.exec(line);
-  if (attacked) {
-    const body = parseBody(attacked[2]!.replace(/\bthat opponent\b/g, "that player"), { eventPlayer: true });
+  // Struggle for Project Purity: "Whenever a player attacks you with one or more creatures, that player gets twice that
+  // many rad counters": only an opponent can attack you (CR 506.2); "that many" is how many were declared attacking you
+  // (rulings).
+  const attacked = /^Whenever (?:an opponent|a player) attacks (you with (?:two|one) or more creatures|with creatures, if two or more of those creatures are attacking you and\/or planeswalkers you control|you and\/or one or more planeswalkers you control), (.+)$/.exec(line);
+  if (attacked && (/^Whenever a player/.test(line) ? /^you with one or more creatures$/.test(attacked[1]!) : true)) {
+    const thatMany = /\bthat many\b/.test(attacked[2]!);
+    if (thatMany && (/\bX\b/.test(attacked[2]!) || !/^you with/.test(attacked[1]!))) return "fail";
+    let body = parseBody(attacked[2]!.replace(/\bthat opponent\b/g, "that player").replace(/\bthat many\b/g, "X"), { eventPlayer: true });
     if (!body) return "fail";
+    if (thatMany) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: attacked[2]! };
     return { event: "opponentAttacksYou", attacksYou: { min: /two or more/.test(attacked[1]!) ? 2 : 1, ...(/planeswalkers you control/.test(attacked[1]!) ? { orPlaneswalkers: true as const } : {}), ...(/^with creatures, if /.test(attacked[1]!) ? { recheck: true as const } : {}) }, body: { ...body, text: attacked[2]! } };
   }
   // Breena: "Whenever a player attacks one of your opponents, if that opponent has more life than another of your

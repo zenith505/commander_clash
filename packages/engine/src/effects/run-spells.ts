@@ -31,6 +31,7 @@ function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId, targe
   o.bestowed = card.bestowed; // a copy of a bestowed Aura spell is one too (CR 702.103c)
   o.prototyped = card.prototyped; // and of a prototyped spell (CR 718.3c)
   o.overloaded = card.overloaded; // a copy copies the alternative cost paid, and so its text change (CR 707.10, 702.96a)
+  o.cleaved = card.cleaved; // and cleave's (CR 707.10, 702.148a)
   // Decisions about additional costs are copied too (CR 707.10): bargain, evidence, teamwork, and the gift's opponent.
   o.bargained = card.bargained;
   o.evidence = card.evidence;
@@ -366,23 +367,25 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const id = spell ? item.objectId : ctx.sourceId;
       const o = id ? s.objects[id] : undefined;
       if (!id || !o) return;
-      const about = e.about !== undefined ? objects(s, { ref: "target", index: e.about }, ctx).find((x) => x.zone === "battlefield") : undefined;
-      if (e.about !== undefined && !about) return;
+      const abouts = e.about !== undefined ? objects(s, { ref: "target", index: e.about, ...(e.each ? { n: e.each } : {}) }, ctx).filter((x) => x.zone === "battlefield") : [undefined];
+      if (!abouts.length) return;
       const toPlayer = e.aboutPlayer !== undefined ? players(s, { ref: "target", index: e.aboutPlayer }, ctx)[0] : undefined;
       if (e.aboutPlayer !== undefined && toPlayer === undefined) return;
-      (s.floatingTriggers ??= []).push({
-        ...(about ? { about: { id: about.id, zc: about.zoneChanges ?? 0 } } : {}),
-        ...(toPlayer !== undefined ? { toPlayer } : {}),
-        id: `f${s.nextId++}`,
-        controller: ctx.controller,
-        sourceId: id,
-        sourceCardId: cardIdOf(o),
-        sourceZc: spell ? (o.zoneChanges ?? 0) : (ctx.sourceZc ?? o.zoneChanges ?? 0),
-        ...(spell || item?.fromSpell ? { fromSpell: true as const } : {}),
-        trigger: e.trigger,
-        until: e.until,
-        turn: s.turn,
-      });
+      for (const about of e.each ? abouts : abouts.slice(0, 1)) {
+        (s.floatingTriggers ??= []).push({
+          ...(about ? { about: { id: about.id, zc: about.zoneChanges ?? 0 } } : {}),
+          ...(toPlayer !== undefined ? { toPlayer } : {}),
+          id: `f${s.nextId++}`,
+          controller: ctx.controller,
+          sourceId: id,
+          sourceCardId: cardIdOf(o),
+          sourceZc: spell ? (o.zoneChanges ?? 0) : (ctx.sourceZc ?? o.zoneChanges ?? 0),
+          ...(spell || item?.fromSpell ? { fromSpell: true as const } : {}),
+          trigger: e.trigger,
+          until: e.until,
+          turn: s.turn,
+        });
+      }
       return;
     }
     case "cascade": {
@@ -401,7 +404,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           closeZoneBatch(s); // one at a time: each exile is an event of its own (rulings on Laelia)
           exiled.push(id);
           const d = defOf(s, obj(s, id));
-          if (!isType(d, "Land") && defMv(d) < limit) {
+          // Jodah, the Unifier: the same, but only a legendary card stops it.
+          if (!isType(d, "Land") && defMv(d) < limit && (!e.legendary || d.supertypes.includes("Legendary"))) {
             hit = id;
             break;
           }

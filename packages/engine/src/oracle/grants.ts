@@ -146,9 +146,10 @@ export function parseGrants(text: string): Modification[] | null {
       out.push({ kind: "addAbility", text: `Firebending ${/\d+/.exec(w)![0]}` });
       continue;
     }
-    // Myriad too: several instances each trigger (CR 702.116b).
-    if (/^myriad$/i.test(w)) {
-      out.push({ kind: "addAbility", text: "Myriad" });
+    // Myriad too: several instances each trigger (CR 702.116b); prowess the same (CR 702.108b): "Other creatures you
+    // control have prowess" (Bria, Riptide Rogue).
+    if (/^(?:myriad|prowess)$/i.test(w)) {
+      out.push({ kind: "addAbility", text: w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() });
       continue;
     }
     // Persist and undying are triggered abilities (CR 702.79a, 702.93a): it dies with them, so they look back (603.10a).
@@ -208,15 +209,15 @@ export const EMBLEM_EVENTS = new Set<TriggeredAbility["event"]>([
  * Can an emblem have this ability (CR 114.3), with "this emblem" in it written "~"? A triggered ability for one of
  * EMBLEM_EVENTS, a static ability about the permanents its controller controls or others (applied by the layers),
  * "spells you cast cost less", "you have no maximum hand size", or "you may play lands and cast permanent spells from your
- * graveyard". The emblem itself is no permanent, so nothing about
+ * graveyard", or "you may cast spells from your hand without paying their mana costs" (Tamiyo, Field Researcher's). The emblem itself is no permanent, so nothing about
  * "~" being tapped, attacking or enchanting something can apply.
  */
 export function emblemAbilityOk(text: string): boolean {
   if (text.includes(QUOTED_SOURCE_NAME)) return false;
   const c = compileGranted(text);
-  const { triggers, activated, mana, statics, entersTapped, unsupported, textKeywords, costMods, noMaxHandSize, opponentsCantCast, loyaltyAtInstantSpeed, spellsHaveStorm, landsFromGraveyard, graveyardGrants, ...rest } = c;
+  const { triggers, activated, mana, statics, entersTapped, unsupported, textKeywords, costMods, noMaxHandSize, opponentsCantCast, loyaltyAtInstantSpeed, spellsHaveStorm, landsFromGraveyard, graveyardGrants, castFromHandFree, ...rest } = c;
   if (unsupported.length || textKeywords.length || entersTapped || activated.length || mana.length || Object.keys(rest).length) return false;
-  if (!triggers.length && !statics.length && !costMods?.length && noMaxHandSize !== true && !opponentsCantCast && !loyaltyAtInstantSpeed && !spellsHaveStorm?.length && !landsFromGraveyard && !graveyardGrants?.length) return false;
+  if (!triggers.length && !statics.length && !costMods?.length && noMaxHandSize !== true && !opponentsCantCast && !loyaltyAtInstantSpeed && !spellsHaveStorm?.length && !landsFromGraveyard && !graveyardGrants?.length && !castFromHandFree) return false;
   // "You may play lands and cast permanent spells from your graveyard" (Wrenn and Realmbreaker's): permissions for its
   // owner's graveyard, read from emblems as well as permanents (game.ts).
   if (graveyardGrants?.some((g) => g.way.kind !== "permission" || g.once || g.yourTurn || g.if)) return false;

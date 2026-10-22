@@ -128,6 +128,8 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   // "Whenever ~ deals combat damage to a player, they lose half their life" (Unstoppable Slasher): that player, while no
   // other player has been named.
   if (x === "they" && ctx.eventPlayer && ctx.lastPlayerTarget === undefined && !ctx.chosenOpponent) return { ref: "eventPlayer" };
+  // "Whenever a player casts a spell, if it's not their turn, ~ deals 4 damage to them" (Scytheclaw Raptor): the same.
+  if (x === "them" && ctx.eventPlayer && ctx.lastPlayerTarget === undefined && !ctx.chosenOpponent && !ctx.lastGroup && !ctx.lastCreatedAny && !ctx.lastTargets) return { ref: "eventPlayer" };
   if (x === "defending player" && ctx.defending) return { ref: "eventPlayer" };
   if (x === "enchanted player" || x === "enchanted opponent") return { ref: "enchantedPlayer" };
   // "Any number of target players each mill two cards" (CR 601.2c, 115.6): one entry for them all until it's cast
@@ -326,6 +328,13 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   if (andOthers) {
     const g = parseGroup(andOthers[1]!.startsWith("other ") ? andOthers[1]! : `other ${andOthers[1]!}`);
     return g?.other && !/ (?:with|that|who|which) /i.test(andOthers[1]!.replace(/ you control$/, "")) ? { ref: "each", filter: g.filter, other: true, andSelf: true, ...(andOthers[2] ? { sharesTypeWithSelf: true as const } : {}) } : null;
+  }
+  // "Exile ~ and each artifact and creature your opponents control" (Ajani, Strength of the Pride): all at once, the source
+  // while it's still there.
+  const andTheirs = !ctx.spell ? /^~ and ((?:each|all) .+ (?:your opponents control|an opponent controls))$/i.exec(x) : null;
+  if (andTheirs) {
+    const g = parseGroup(andTheirs[1]!);
+    return g && !g.other && g.filter.kind === "object" && g.filter.controller === "opponent" ? { ref: "each", filter: g.filter, andSelf: true } : null;
   }
   // "All creatures with toughness less than or equal to the number of Islands you control": counted as it resolves.
   const group = parseGroup(x, false, (t) => parseBoundCount(t, ctx));
@@ -698,6 +707,12 @@ export function parseTargetPhrase(
   if (two) {
     extra.colorCount = two[1] ? "notTwo" : "two";
     p = p.slice(0, two.index) + p.slice(two.index + two[0].length);
+  }
+  // "Spell that wasn't cast from its owner's hand" (Wash Away): a copy was never cast (rulings).
+  const notFromHand = / that wasn't cast from its owner's hand$/.exec(p);
+  if (notFromHand) {
+    extra.notCastFromHand = true;
+    p = p.slice(0, notFromHand.index);
   }
   // "Historic spells", "a historic permanent": artifacts, legendaries and Sagas (CR 700.6), any of them (TargetSpec.anyOf).
   if (/(?:^|\s)historic\s/.test(p)) {
@@ -1079,7 +1094,7 @@ export function parseTargetPhrase(
     if (isSpell || tapped !== undefined || extra.combat || extra.token !== undefined || extra.commander !== undefined || extra.status) return null;
     return { kind: "card", ...filters, ...(otherThanBasic ? { notSupertypes: [...(filters.notSupertypes ?? []), "Basic"] } : {}), ...(owner ? { owner } : {}), ...(linkedExile ? { linkedExile: true as const } : {}), text };
   }
-  if (otherThanBasic) return null;
+  if (otherThanBasic || (extra.notCastFromHand && !isSpell)) return null;
   if (owner && (isSpell || controller)) return null;
   // A historic spell, a legendary spell: its printed card types, supertypes and subtypes (printedMatches), which the stack
   // doesn't change. Only "legendary" among supertypes.

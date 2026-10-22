@@ -32,9 +32,26 @@ export const overloadedText = (text: string): string =>
     .map((l) => (/^Overload\b/.test(l) ? l : l.replace(/\btarget\b/g, "each").replace(/\bTarget\b/g, "Each")))
     .join("\n");
 
+/** Does this card have cleave, with words in square brackets (CR 702.148a)? */
+export const hasCleave = (d: CardDef): boolean => /^Cleave\b/m.test(d.oracleText) && /\[/.test(d.oracleText);
+
+/** A spell cast for its cleave cost (CR 702.148a): its text without the words in square brackets. */
+export const cleavedText = (text: string): string =>
+  text
+    .split("\n")
+    .map((l) => (/^Cleave\b/.test(l) ? l : l.replace(/ ?\[[^\]]*\]/g, "")))
+    .join("\n");
+
+/** The cleaved text of each card with cleave compiled, by oracle id (its text as compiled has the brackets taken out). */
+const cleavedTexts = new Map<string, string>();
+
 export function compileCard(card: CardDef): CompiledCard {
   // A card with faces as it is in the card data: its resting characteristics, the ones it has in a game (CR 709.4, 712.8a).
-  const d = restingDef(card);
+  const d0 = restingDef(card);
+  // Cleave: not cast for its cleave cost, the words in square brackets are the spell's text (CR 702.148a).
+  const cleaves = hasCleave(d0) && !d0.oracleId.endsWith("|cleaved");
+  if (cleaves) cleavedTexts.set(d0.oracleId, cleavedText(d0.oracleText));
+  const d = cleaves ? { ...d0, oracleText: d0.oracleText.replace(/[[\]]/g, "") } : d0;
   const hit = cache.get(d.oracleId);
   if (hit) return hit;
   const doors = d.roomDoors ? roomDoorDefs(d) : undefined;
@@ -45,6 +62,7 @@ export function compileCard(card: CardDef): CompiledCard {
   if (d.oracleId === MONARCH.oracleId) out.triggers = MONARCH_TRIGGERS;
   if (d.oracleId === RING.oracleId) out.triggers = RING_TRIGGERS;
   if (d.oracleId === INITIATIVE.oracleId) out.triggers = INITIATIVE_TRIGGERS;
+  if (d.oracleId === RAD.oracleId) out.triggers = RAD_TRIGGERS;
   const rooms = dungeonTriggers(d.oracleId);
   if (rooms) out.triggers = rooms;
   cache.set(d.oracleId, out);
@@ -115,6 +133,18 @@ const INITIATIVE_TRIGGERS: TriggeredAbility[] = [
     },
   },
   { event: "ventureRoom", body: { targets: [], effects: [{ type: "venture", undercity: true }], text: "Whenever a player takes the initiative, that player ventures into Undercity." } },
+];
+
+/**
+ * Stands in as the "source" of rad counters' inherent triggered ability, which has none and is controlled by the active
+ * player (CR 728.1).
+ */
+export const RAD: CardDef = { ...MONARCH, oracleId: "rad-counters", name: "Rad counters" };
+const RAD_TRIGGERS: TriggeredAbility[] = [
+  {
+    event: "radiation",
+    body: { targets: [], effects: [{ type: "radiation" }], text: "At the beginning of each player's precombat main phase, if that player has one or more rad counters, that player mills a number of cards equal to the number of rad counters they have. For each nonland card milled this way, that player loses 1 life and removes one rad counter from themselves." },
+  },
 ];
 
 /**
@@ -1162,7 +1192,9 @@ export function compile(d: CardDef): CompiledCard {
     if (exileDies) {
       const filter = exileDies[1] === "~" ? undefined : parseTargetPhrase(exileDies[2]!.trim());
       if (exileDies[1] === "~" && !exileDies[2]) out.exileInsteadOfDying = { self: true };
-      else if (filter?.kind === "object" && !filter.combat) out.exileInsteadOfDying = { filter, ...(exileDies[1] === "another" ? { other: true as const } : {}) };
+      // Gisa, Glorious Resurrector: "put all creature cards exiled with ~ ...": the cards exiled this way are linked to it
+      // (CR 607.2a).
+      else if (filter?.kind === "object" && !filter.combat) out.exileInsteadOfDying = { filter, ...(exileDies[1] === "another" ? { other: true as const } : {}), ...(all.some((l) => l.includes("exiled with ~")) ? { linked: true as const } : {}) };
       else out.unsupported.push(raw);
       continue;
     }
@@ -1559,15 +1591,16 @@ export function compile(d: CardDef): CompiledCard {
       continue;
     }
     // As Foretold, Darksteel Monolith, Rooftop Storm: "pay {0} rather than pay the mana cost" for some spells (CR 118.9).
+    // Warped Space: "Once each turn, you may pay {0} rather than pay the mana cost for a spell you cast from exile."
     // Dracogenesis: "You may cast Dragon spells without paying their mana costs": the same alternative cost of nothing,
     // from wherever they may be cast (CR 118.9, 107.3b).
-    const payZero = /^(Once each turn, you|You) may pay \{0\} rather than pay the mana cost for (?:an? )?(.*?)spells? you cast( from your hand)?( with mana value X or less, where X is the number of ([a-z]+) counters on ~)?\.$/.exec(line.replace(/^You may cast ([A-Z][a-z]+) spells without paying their mana costs\.$/, "You may pay {0} rather than pay the mana cost for $1 spells you cast."));
+    const payZero = /^(Once each turn, you|You) may pay \{0\} rather than pay the mana cost for (?:an? )?(.*?)spells? you cast( from your hand| from exile)?( with mana value X or less, where X is the number of ([a-z]+) counters on ~)?\.$/.exec(line.replace(/^You may cast ([A-Z][a-z]+) spells without paying their mana costs\.$/, "You may pay {0} rather than pay the mana cost for $1 spells you cast."));
     if (payZero) {
       const what = payZero[2]!.trim();
       const spec = what ? parseTargetPhrase(`${what} card from a graveyard`) : null;
       const filter = spec?.kind === "card" ? (({ owner: _, ...rest }) => ({ ...rest, text: `${what} spell` }))(spec) : undefined;
       if (what && !filter) out.unsupported.push(raw);
-      else out.payZero = { ...(filter ? { filter } : {}), ...(payZero[3] ? { fromHand: true as const } : {}), ...(/^Once/.test(payZero[1]!) ? { once: true as const } : {}), ...(payZero[5] ? { maxMvCounters: payZero[5] } : {}) };
+      else out.payZero = { ...(filter ? { filter } : {}), ...(payZero[3] === " from your hand" ? { fromHand: true as const } : payZero[3] ? { fromExile: true as const } : {}), ...(/^Once/.test(payZero[1]!) ? { once: true as const } : {}), ...(payZero[5] ? { maxMvCounters: payZero[5] } : {}) };
       continue;
     }
     // One with the Multiverse: casting without paying the mana cost is an alternative cost (CR 118.9), X is 0 (107.3b);
@@ -1973,6 +2006,21 @@ export function compile(d: CardDef): CompiledCard {
     // The Mindskinner (CR 615.5, 615.12): see staticRules in damage.ts.
     if (line === "If a source you control would deal damage to an opponent, prevent that damage and each opponent mills that many cards.") {
       out.damageToOpponentsMills = true;
+      continue;
+    }
+    // Pariah, Palisade Giant, Martyrs of Korlis (CR 614.9): see staticRules in damage.ts.
+    const redirect = /^(?:As long as ~ is untapped, a|A)ll damage that would be dealt to you( and other permanents you control)?( by artifacts)? is dealt to (~|enchanted creature|equipped creature) instead\.$/.exec(line);
+    if (redirect) {
+      out.damageToYouRedirect = {
+        to: redirect[3] === "~" ? "self" : "attached",
+        ...(redirect[1] ? { others: true as const } : {}),
+        ...(line.startsWith("As long as") ? { untapped: true as const } : {}),
+        ...(redirect[2] ? { by: { kind: "object" as const, types: ["Artifact"], text: "artifact" } } : {}),
+      };
+      continue;
+    }
+    if (line === "Damage isn't removed from ~ during cleanup steps.") {
+      out.keepsDamage = true; // CR 514.2
       continue;
     }
     if (line === "If damage would be dealt to ~, prevent that damage and an opponent of your choice gains control of it.") {
@@ -2579,6 +2627,12 @@ export function compile(d: CardDef): CompiledCard {
     const v = compileCard({ ...d, oracleId: `${d.oracleId}|overloaded`, oracleText: overloadedText(d.oracleText) });
     const targets = (b?: AbilityBody) => !!b && (b.targets.length > 0 || !!b.modal?.modes.some((m) => m.targets.length));
     if (!out.spell || v.unsupported.length || !v.spell || targets(v.spell)) out.unsupported.push(`Overload ${overload.mana}`);
+  }
+  // Cleave (CR 702.148a): cast for that cost, the spell's text without the words in square brackets.
+  const cleave = out.altCosts?.find((a) => a.kind === "cleave");
+  if (cleave && !d.oracleId.endsWith("|cleaved")) {
+    const v = compileCard({ ...d, oracleId: `${d.oracleId}|cleaved`, oracleText: cleavedTexts.get(d.oracleId) ?? cleavedText(d.oracleText) });
+    if (!out.spell || v.unsupported.length || !v.spell) out.unsupported.push(`Cleave ${cleave.mana}`);
   }
   linkExile(out);
   // "Attached to enchanted creature" (Mantle of the Ancients): only an Aura that enchants a creature has one.

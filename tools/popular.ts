@@ -6,6 +6,7 @@
 
 import { readFileSync } from "node:fs";
 import { compileCard, isFullySupported, registerMeldResults, type CardDef } from "../packages/engine/src";
+import { faceDef, restingDef } from "../packages/engine/src/faces";
 import { loadRanks } from "./popularity";
 
 type Card = CardDef & { commanderLegal?: string };
@@ -20,5 +21,14 @@ const out = [...ranks].sort((a, b) => a[1] - b[1]).flatMap(([name, rank]) => {
 });
 for (const { rank, c } of out.slice(0, Number(process.argv[2] ?? 60))) {
   console.log(`${rank}\t${c.name}`);
-  for (const l of compileCard(c).unsupported) console.log(`\t\t${l.replaceAll(c.name, "~")}`);
+  const lines = compileCard(c).unsupported.map((l) => l.replaceAll(c.name, "~"));
+  // A card with faces: each face's lines, named by face.
+  if (!lines.length && c.faces?.length) {
+    const d = restingDef(c);
+    d.faces!.forEach((_, i) => {
+      const f = faceDef(d, i);
+      for (const l of compileCard(f).unsupported) lines.push(`${f.name}: ${l.replaceAll(f.name, "~")}`);
+    });
+  }
+  for (const l of lines) console.log(`\t\t${l}`);
 }

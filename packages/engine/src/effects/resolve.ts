@@ -409,6 +409,10 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       return opponents(s, ctx.controller);
     case "eachPlayer":
       return livingPlayers(s);
+    case "attackedThisTurnBySelf": {
+      const o = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      return o?.attacked?.turn === s.turn ? livingPlayers(s).filter((p) => o.attacked!.players?.includes(p)) : [];
+    }
     case "target": {
       // "Any number of target players": each of them still a legal target (CR 608.2b).
       const out: PlayerId[] = [];
@@ -656,6 +660,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "opponentsHandOnlyUntilNextTurn":
     case "graveyardCastThisTurn":
     case "graveyardTurn":
+    case "topTurn":
     case "cantCast":
     case "cantPlayLands":
     case "noPrevention":
@@ -665,6 +670,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "drawUpTo":
     case "getEnergy":
     case "getExperience":
+    case "getRad":
+    case "radiation":
     case "poison":
     case "loseAllCounters":
     case "doublePlayerCounters":
@@ -742,6 +749,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "returnFaceDownExiled":
     case "exiledToGraveyard":
     case "flicker":
+    case "returnHeld":
+    case "permanentPiles":
     case "returnExiled":
     case "exileIfDies":
     case "exileIfLeaves":
@@ -875,6 +884,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runSpellsEffect(s, e, ctx, src);
     case "mill":
     case "revealUntilLandToGraveyard":
+    case "exileUntilTotalMv":
     case "exileTop":
     case "revealTopToHand":
     case "revealTop":

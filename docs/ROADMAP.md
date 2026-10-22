@@ -1,7 +1,7 @@
 # Roadmap
 
-23,109 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,225 of 4,988 (84%).
+23,185 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,264 of 4,988 (85%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,22 +22,25 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 121, most played first: Sheoldred // The True Scriptures
+00. Most played first (`npm run popular`). Out after round 122, most played first: Sheoldred // The True Scriptures
    ("a nontoken creature or planeswalker": whether "nontoken" covers both isn't settled by a ruling), Deadpool, Trading
-   Card (exchanging text boxes, a text-changing effect, CR 612), Gwenom, Struggle for Project Purity, Lae'zel's
-   Acrobatics, Gisa, Glorious Resurrector, Jodah, the Unifier, Kefka, Court Mage, Tamiyo, Field Researcher, Wyll's
-   Reversal, Lifestream's Blessing (an X counted "as you cast ~"), Silent-Blade Oni, Twilight Diviner, Toph, Hardheaded
-   Teacher, Fraying Sanity (the cards put into one player's graveyard this turn), Pariah (damage redirected to a
-   creature, also Empyrial Archangel, Ancient Adamantoise and Heroic Sacrifice), Wash Away (cleave), Duplicant, Machine
-   God's Effigy, Angel of Destiny, Maze's End, Derevi, Ultima, Origin of Oblivion, Tasha's Hideous Laughter, Underrealm
-   Lich, Doppelgang, Yenna, Liliana of the Veil, Emet-Selch, Comeuppance, Repercussion, Library of Leng, Biophagus,
-   Rottenmouth Viper, Zellix, Xantcha, Howlsquad Heavy, Marauding Raptor, Tiamat, Treasure Map, Abdel Adrian.
-   Arahbo, Inalla, Sahir and The Ur-Sphinx have eminence now but other lines keep them out. Smaller gaps from round
-   121: bots and autopay never forage for Thornvault Forager's mana (mana abilities with extra costs); "you may forage.
-   If you do" (Bushy Bodyguard, Treetop Sentries, Curious Forager) and "whenever you forage" (Corpseberry Cultivator)
-   are out; a token put onto the battlefield attacking (Brimaz, Parhelion II) attacks what its source attacks, though
-   CR 508.4 lets its controller choose; bots never cast Glorious End and end the turn only with nothing of their own on
-   the stack; Arachne's card types leave out Kindred. Smaller gaps from round 120: bots don't plan around The Chain
+   Card (exchanging text boxes, a text-changing effect, CR 612), Wyll's Reversal, Silent-Blade Oni (casting from an
+   opponent's hand), Twilight Diviner, The Unagi of Kyoshi Island (ward—waterbend), Toph, Hardheaded Teacher, Duplicant,
+   Machine God's Effigy, Ultima, Origin of Oblivion, Underrealm Lich, Doppelgang, Yenna, Rivaz, Emet-Selch, Comeuppance,
+   Library of Leng, Biophagus, Rottenmouth Viper, Zellix, Xantcha, The Legend of Kyoshi, Tiamat, Treasure Map, Abdel
+   Adrian, Tectonic Giant, Abyssal Harvester, Surge of Salvation, Blowfly Infestation, Collective Inferno, Reaver Titan
+   (protection from a mana value: protection's source qualities have no mana value yet), Fertilid, Gluntch, Splash
+   Portal, Elspeth Conquers Death, Canopy Gargantuan, Master of Ceremonies, Crawling Sensation, Keen Duelist, Geode Golem,
+   Master Biomancer, Frontier Warmonger, Etchings of the Chosen. Smaller gaps from round 122: two "dealt to ... instead"
+   redirections that apply to the same damage (Pariah and Palisade Giant both on you) apply in the order the engine
+   finds them, not the affected player's choice (CR 616.1); Veteran Bodyguard and Weathered Bodyguards are out; autopay
+   never forages for mana (on purpose: what to forage is the player's choice; bots do); "you may forage. If you do"
+   (Bushy Bodyguard, Treetop Sentries, Curious Forager) and "whenever you forage" (Corpseberry Cultivator) are still out;
+   Nuclear Fallout and the other rad cards with milled-card triggers are out; Alchemist's Gambit, Inspired Idea and
+   Lantern Flare (cleave with other lines) are out; Dream Harvest (exile until mana value 5, then cast them free) and
+   Rumbling Ruin are out; bots separate Liliana of the Veil's piles by a rough worth of each permanent; bots never cast
+   Glorious End and end the turn only with nothing of their own on the stack; Arachne's card types leave out Kindred.
+   Arahbo, Inalla, Sahir and The Ur-Sphinx have eminence but other lines keep them out. Smaller gaps from round 120: bots don't plan around The Chain
    Veil or Ichormoon Gauntlet; bots never use One with the Multiverse's free cast to cast a prototype card prototyped;
    the attack screen doesn't pre-filter whom Weathered Sentinels may attack (the engine refuses the others). Smaller gaps from round 119: Zaxara, Geometer's Arthropod, Glava, Nev, Owlin Spiralmancer and
    Elementalist's Palette (their {X} lines) are

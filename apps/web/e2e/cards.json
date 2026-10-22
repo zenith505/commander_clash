@@ -302,6 +302,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c9160997-0305-47f5-9a2f-77588d167da0",
+  "name": "Aminatou's Augury",
+  "manaCost": "{6}{U}{U}",
+  "cmc": 8,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Exile the top eight cards of your library. You may put a land card from among them onto the battlefield. Until end of turn, for each nonland card type, you may cast a spell of that type from among the exiled cards without paying its mana cost.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "dsc",
+  "releasedAt": "2024-09-27",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "7d79fb4e-2ca0-404a-9663-1f5abce6e733",
   "name": "Ancient Brass Dragon",
   "manaCost": "{5}{B}{B}",
@@ -1802,6 +1828,37 @@
   "set": "dbl",
   "releasedAt": "2022-01-28",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2f5bf099-2e01-4e1c-9ebf-0ce0ac66939e",
+  "name": "Centaur Courser",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Creature — Centaur Warrior",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Centaur",
+   "Warrior"
+  ],
+  "oracleText": "",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m10",
+  "releasedAt": "2009-07-17",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -6745,6 +6802,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "5f1fdc23-9af0-41a1-aeba-7288f9642734",
+  "name": "Mari, the Killing Quill",
+  "manaCost": "{1}{B}{B}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Vampire Assassin",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Vampire",
+   "Assassin"
+  ],
+  "oracleText": "Whenever a creature an opponent controls dies, exile it with a hit counter on it.\nAssassins, Mercenaries, and Rogues you control have deathtouch and \"Whenever this creature deals combat damage to a player, you may remove a hit counter from a card that player owns in exile. If you do, draw a card and create two Treasure tokens.\"",
+  "power": "3",
+  "toughness": "2",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Treasure"
+  ],
+  "commanderLegal": "legal",
+  "set": "ncc",
+  "releasedAt": "2022-04-29",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f79f84c9-2023-4348-863b-a3b4bc382904",
   "name": "Meditate",
   "manaCost": "{2}{U}",
@@ -8320,6 +8412,32 @@
   "set": "dsc",
   "releasedAt": "2024-09-27",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "8be368dc-6212-4627-989e-077eea78f30d",
+  "name": "Powerbalance",
+  "manaCost": "{R}{R}",
+  "cmc": 2,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever an opponent casts a spell, you may reveal the top card of your library. If you do, you may cast that card without paying its mana cost if the two spells have the same mana value.",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mh3",
+  "releasedAt": "2024-06-14",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -10986,6 +11104,39 @@
   "set": "avr",
   "releasedAt": "2012-05-04",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "fd335b2f-e6a2-45ac-949e-a67278b21cb6",
+  "name": "Tinybones, Bauble Burglar",
+  "manaCost": "{1}{B}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Skeleton Rogue",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Skeleton",
+   "Rogue"
+  ],
+  "oracleText": "Whenever an opponent discards a card, exile it from their graveyard with a stash counter on it.\nDuring your turn, you may play cards you don't own with stash counters on them from exile, and mana of any type can be spent to cast those spells.\n{3}{B}, {T}: Each opponent discards a card. Activate only as a sorcery.",
+  "power": "1",
+  "toughness": "3",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "fdn",
+  "releasedAt": "2024-11-15",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

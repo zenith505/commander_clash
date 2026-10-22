@@ -1607,6 +1607,14 @@ export function compile(d: CardDef): CompiledCard {
       (out.spellsHaveCascade ??= []).push({ ...(filter ? { filter } : {}), ...(from ? { from } : {}), ...(firstCascade ? { first: true as const } : {}), ...(firstCascade?.[2] ? { treasure: true as const } : {}), text: line });
       continue;
     }
+    // "Instant and sorcery spells you cast have storm" (Prismari, the Inspiration; Ral's emblem), CR 702.40a.
+    const giveStorm = /^([A-Z][a-z]+(?: and [a-z]+)?) spells you cast have storm\.$/.exec(line);
+    if (giveStorm) {
+      const f = parseTargetPhrase(`${giveStorm[1]!.replace(/ and /g, " or ").toLowerCase()} spell`);
+      if (f?.kind !== "spell") out.unsupported.push(raw);
+      else (out.spellsHaveStorm ??= []).push({ filter: f, text: line });
+      continue;
+    }
     // Shadow the Hedgehog (after its flavor word, CR 207.2d): spells its controller casts get split second (CR 702.61a).
     if (/^(?:[A-Z][A-Za-z' ]* — )?Each spell you cast has split second if mana from an artifact was spent to cast it\.$/.test(line)) {
       out.splitSecondIfArtifactMana = true;

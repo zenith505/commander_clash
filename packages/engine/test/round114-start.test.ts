@@ -2,7 +2,7 @@
 // ability (Klauth, Manamorphose), with a color-split choice as it resolves (CR 106.1b, 608.2d).
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, cast, passAll, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
+import { act, activate, bear, card, cast, passAll, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
 import { applyAction, botActions, characteristics, compileCard, defOf, manaValue, spellCost, invalidateCharacteristics, isFullySupported, isSuspended, objHasKeyword, manaAbilitiesOn, planCast, planUnlock, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 import { moveObject } from "../src/game";
 
@@ -647,5 +647,52 @@ describe("Imposter Mech: a copy that's a Vehicle artifact with crew 3 and loses 
     expect([c.power, c.toughness]).toEqual([4, 4]);
     expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
     expect(compileCard(defOf(s, s.objects[ids[0]!]!)).activated.some((a) => a.crew === 3)).toBe(true);
+  });
+});
+
+describe("instant and sorcery spells you cast have storm (CR 702.40a)", () => {
+  const prismari = card("Prismari, the Inspiration", "Legendary Creature — Elder Dragon", "{5}{U}{R}", {
+    power: "7",
+    toughness: "7",
+    keywords: ["Flying", "Ward"],
+    oracleText: "Flying\nWard—Pay 5 life.\nInstant and sorcery spells you cast have storm. (Whenever you cast an instant or sorcery spell, copy it for each spell cast before it this turn. You may choose new targets for the copies.)",
+  });
+  const ral = card("Ral, Crackling Wit", "Legendary Planeswalker — Ral", "{2}{U}{R}", {
+    loyalty: "4",
+    oracleText:
+      "Whenever you cast a noncreature spell, put a loyalty counter on Ral.\n+1: Create a 1/1 blue and red Otter creature token with prowess.\n−3: Draw three cards, then discard two cards.\n−10: Draw three cards. You get an emblem with \"Instant and sorcery spells you cast have storm.\" (Whenever you cast an instant or sorcery spell, copy it for each spell cast before it this turn.)",
+  });
+  const divination = card("Divination", "Sorcery", "{2}{U}", { oracleText: "Draw two cards." });
+  const island = card("Island", "Basic Land — Island");
+
+  it("plays", () => {
+    expect(isFullySupported(prismari)).toBe(true);
+    expect(isFullySupported(ral)).toBe(true);
+  });
+
+  /** Ap casts Divination twice; how many cards they drew. */
+  function twice(s0: GameState, ap: PlayerId, ids: string[]) {
+    for (let i = 0; i < 6; i++) putOnBattlefield(s0, ap, island);
+    const hand = s0.players[ap]!.hand.length - 2;
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    s = settle(run(s, planCast(s, ap, ids[1]!)));
+    return s.players[ap]!.hand.length - hand;
+  }
+
+  it("with Prismari, the second Divination is copied once: six cards", () => {
+    const { s, ap, ids } = setup([divination, divination]);
+    putOnBattlefield(s, ap, prismari);
+    expect(twice(s, ap, ids)).toBe(6);
+  });
+
+  it("Ral's −10 gives the emblem; it does the same, and with Prismari too each storm triggers: eight cards", () => {
+    const { s: s0, ap, ids } = setup([divination, divination]);
+    const r = putOnBattlefield(s0, ap, ral);
+    s0.objects[r]!.counters.loyalty = 10;
+    const s = settle(activate(s0, ap, r, 2));
+    expect(s.emblems?.length).toBe(1);
+    expect(twice(structuredClone(s), ap, ids)).toBe(6);
+    putOnBattlefield(s, ap, prismari);
+    expect(twice(s, ap, ids)).toBe(8);
   });
 });

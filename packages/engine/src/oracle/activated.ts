@@ -223,7 +223,9 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     }
   }
   const life = /Pay (\d+) life/.exec(costs);
-  const energy = energyIn(costs);
+  // "Pay X {E}" (Sphinx of the Revelation): X announced as it's activated (CR 107.3a, 107.14).
+  const energyX = /Pay X \{E\}/.test(costs);
+  const energy = energyX ? 0 : energyIn(costs);
   if (energy < 0) return "fail";
   const symbols = [...costs.replace(/Pay (?:\{E\})+|Pay \w+ \{E\}/, "").matchAll(/\{([^}]+)\}/g)].map((x) => x[1]!);
   if (symbols.some((x) => x === "E")) return "fail";
@@ -273,7 +275,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   if (mana === "fail" || (mana === "mana" && (fromHand || exileOwn || bounceOwn || keyword || halfLife || untapSelf))) return "fail";
   if (exileFromHand && (mana !== "mana" || anyPlayer || sorcerySpeed || oncePerTurn || activateIf || extra.length)) return "fail";
   // X in the effect is the X paid in the cost (CR 107.3a); with none to pay, it isn't defined.
-  if (usesX(body) && !symbols.includes("X") && !extra.some((c) => ("x" in c && c.x) || (c.kind === "discard" && c.mvX))) return "fail";
+  if (usesX(body) && !symbols.includes("X") && !energyX && !extra.some((c) => ("x" in c && c.x) || (c.kind === "discard" && c.mvX))) return "fail";
   // Any player's: only costs any player can pay (mana, life, their own cards and permanents), not ones that tap,
   // sacrifice, exile or change the permanent itself, which only its controller could do (CR 701.21a, 602.2).
   // Only the chosen color's mana pays it: an ability of a permanent that chose one, with a mana cost, not a mana ability.
@@ -309,6 +311,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     ...(/Pay life equal to the number of colors in your commanders' color identity/.test(costs) ? { lifeCostIdentity: true as const } : {}),
     ...(halfLife ? { halfLifeCost: halfLife[1] as "up" | "down" } : {}),
     ...(energy ? { energyCost: energy } : {}),
+    ...(energyX ? { energyX: true as const } : {}),
     ...(extra.length ? { costs: extra } : {}),
     ...(removeCounters ? { removeCounters } : {}),
     ...(putCounters ? { putCounters } : {}),

@@ -673,3 +673,57 @@ describe("Kicker {X}: Thieving Skydiver", () => {
     expect(controllerOf(s, s.objects[sw2]!)).toBe(b.ap);
   });
 });
+
+const sphinxRev = card("Sphinx of the Revelation", "Creature — Sphinx", "{3}{W}{U}{U}", {
+  power: "5",
+  toughness: "5",
+  keywords: ["Flying", "Lifelink"],
+  oracleText: "Flying, lifelink\nWhenever you gain life, you get that much {E} (energy counter).\n{W}{U}{U}, {T}, Pay X {E}: Draw X cards.",
+});
+const nightmare = card("Chthonian Nightmare", "Enchantment", "{1}{B}", {
+  oracleText:
+    "When this enchantment enters, you get {E}{E}{E} (three energy counters).\nPay X {E}, Sacrifice a creature, Return this enchantment to its owner's hand: Return target creature card with mana value X from your graveyard to the battlefield. Activate only as a sorcery.",
+});
+
+describe("Pay X {E}", () => {
+  it("Sphinx of the Revelation: X energy for X cards, no more than you have; a bot uses it", () => {
+    expect(isFullySupported(sphinxRev)).toBe(true);
+    const { s: s0, ap } = setup([]);
+    const sx = putOnBattlefield(s0, ap, sphinxRev);
+    s0.players[ap]!.energy = 3;
+    let s = passUntil(s0, "main1", ap);
+    expect(abilityProblem(s, ap, sx, 0, undefined, undefined, undefined, 4)).toMatch(/energy/);
+    const hand = s.players[ap]!.hand.length;
+    s = settle(run(s, planActivate(s, ap, sx, 0, undefined, undefined, undefined, 2)));
+    expect(s.players[ap]!.energy).toBe(1);
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
+    // A bot spends all of it.
+    const b = setup([]);
+    const bx = putOnBattlefield(b.s, b.ap, sphinxRev);
+    b.s.players[b.ap]!.energy = 2;
+    b.s.players[b.ap]!.hand = [];
+    b.s.players[b.ap]!.command = [];
+    let t = passUntil(b.s, "main2", b.ap);
+    const use = botActions(t, b.ap).find((a) => a.type === "activateAbility");
+    expect(use).toMatchObject({ objectId: bx, x: 2 });
+    t = settle(run(t, botActions(t, b.ap)));
+    expect(t.players[b.ap]!.energy).toBe(0);
+  });
+
+  it("Chthonian Nightmare: X energy returns a creature card with mana value X", () => {
+    expect(isFullySupported(nightmare)).toBe(true);
+    const { s: s0, ap } = setup([]);
+    const n = putOnBattlefield(s0, ap, nightmare);
+    const fodder = putOnBattlefield(s0, ap, bear());
+    const three = putOnBattlefield(s0, ap, card("Three Drop", "Creature — Ox", "{2}{G}", { power: "3", toughness: "3" }));
+    moveObject(s0, three, "graveyard");
+    s0.players[ap]!.energy = 3;
+    let s = passUntil(s0, "main1", ap);
+    expect(abilityProblem(s, ap, n, 0, [target(three)], undefined, undefined, 2, { sacrifice: [fodder] })).not.toBeNull();
+    s = settle(run(s, planActivate(s, ap, n, 0, [target(three)], undefined, undefined, 3, { sacrifice: [fodder] })));
+    expect(s.objects[three]!.zone).toBe("battlefield");
+    expect(s.objects[n]!.zone).toBe("hand");
+    expect(s.objects[fodder]!.zone).toBe("graveyard");
+    expect(s.players[ap]!.energy).toBe(0);
+  });
+});

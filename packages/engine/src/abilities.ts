@@ -3401,6 +3401,8 @@ export interface ActivatedAbility {
   halfLifeCost?: "up" | "down";
   /** "Pay {E}{E}" as part of the cost (CR 107.14). */
   energyCost?: number;
+  /** "Pay X {E}" (Sphinx of the Revelation): X energy, X announced as it's activated (CR 107.3a). */
+  energyX?: true;
   /** "Exile this card from your graveyard" is part of the cost: scavenge (CR 702.97a); on the battlefield, "Exile ~" (Relic of Progenitus). */
   exileSelf?: boolean;
   /** "Return ~ to its owner's hand" is part of the cost (Shigeki, Jukai Visionary; CR 602.2b). */

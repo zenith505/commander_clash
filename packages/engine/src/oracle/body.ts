@@ -1549,6 +1549,14 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // Sunbird's Invocation, in a cast trigger: "Reveal the top X cards of your library, where X is that spell's mana value.
     // You may cast a spell with mana value X or less from among cards revealed this way without paying its mana cost.
     // Put the rest on the bottom of your library in a random order." Cast from the library, as this resolves (CR 608.2g).
+    // Descendants' Path: "Reveal the top card of your library. If it's a creature card that shares a creature type with a
+    // creature you control, you may cast it without paying its mana cost. If you don't cast it, put it on the bottom of your
+    // library." Cast from the library as this resolves (CR 608.2g); the types compared then.
+    if (/^[Rr]eveal the top card of your library$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "If it's a creature card that shares a creature type with a creature you control, you may cast it without paying its mana cost" && sentences[si + 2]?.replace(/\.$/, "") === "If you don't cast it, put it on the bottom of your library") {
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 1, reveal: true, filter: { kind: "card", types: ["Creature"], notTypes: [], notColors: [], text: "creature card" }, sharesTypeWithYours: true, max: 1, rest: { dest: "bottomRandom" } });
+      si += 2;
+      continue;
+    }
     const sunbird = /^[Rr]eveal the top X cards of your library, where X is (that spell's mana value)$/.exec(s);
     if (sunbird && sentences[si + 1]?.replace(/\.$/, "") === "You may cast a spell with mana value X or less from among cards revealed this way without paying its mana cost" && sentences[si + 2]?.replace(/\.$/, "") === "Put the rest on the bottom of your library in a random order") {
       const x = parseCount(sunbird[1]!, ctx);

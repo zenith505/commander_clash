@@ -742,3 +742,47 @@ describe("the number of creatures they control (the target player's)", () => {
     for (const id of [...theirs, mine]) expect(s.objects[id]!.zone).toBe("graveyard");
   });
 });
+
+describe("Descendants' Path", () => {
+  const path = card("Descendants' Path", "Enchantment", "{2}{G}", {
+    oracleText: "At the beginning of your upkeep, reveal the top card of your library. If it's a creature card that shares a creature type with a creature you control, you may cast it without paying its mana cost. If you don't cast it, put it on the bottom of your library.",
+  });
+  const elf = (name: string, cost = "{G}") => card(name, "Creature — Elf Druid", cost, { power: "1", toughness: "1" });
+  const toUpkeep = (s0: GameState, ap: PlayerId, top: ReturnType<typeof card>) => {
+    const id = putOnBattlefield(s0, ap, top);
+    moveObject(s0, id, "library");
+    const lib = s0.players[ap]!.library;
+    lib.splice(lib.indexOf(id), 1);
+    lib.unshift(id);
+    let s = passUntil(passUntil(s0, "upkeep", s0.turnOrder[(s0.turnOrder.indexOf(ap) + 1) % 4]), "upkeep", ap);
+    for (let i = 0; i < 10 && !s.pending && (s.stack.length || s.triggerQueue.length); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    return { s, id };
+  };
+
+  it("a creature card that shares a type with one of yours: cast free from the library", () => {
+    expect(isFullySupported(path)).toBe(true);
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, path);
+    putOnBattlefield(s0, ap, elf("Llanowar Elves"));
+    const { s: s1, id } = toUpkeep(s0, ap, elf("Big Elf", "{5}{G}{G}"));
+    expect(s1.pending).toMatchObject({ kind: "chooseOption", what: "castFromAmong", options: [id, "none"] });
+    let s = act(s1, { type: "chooseOption", player: ap, choice: id });
+    expect(s.pending).toMatchObject({ kind: "castFree", objectId: id });
+    s = planCast(s, ap, id)!.reduce(act, s);
+    expect(s.objects[id]!.zone).toBe("stack");
+    s = passAll(s);
+    expect(s.objects[id]!.zone).toBe("battlefield");
+  });
+
+  it("not cast, or not sharing a type: it goes to the bottom", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, path);
+    putOnBattlefield(s0, ap, elf("Llanowar Elves"));
+    const declined = toUpkeep(structuredClone(s0), ap, elf("Big Elf", "{5}{G}{G}"));
+    const s = act(declined.s, { type: "chooseOption", player: ap, choice: "none" });
+    expect(s.players[ap]!.library.at(-1)).toBe(declined.id);
+    const other = toUpkeep(s0, ap, bear({ name: "Not an Elf" }));
+    expect(other.s.pending).toBeNull();
+    expect(other.s.players[ap]!.library.at(-1)).toBe(other.id);
+  });
+});

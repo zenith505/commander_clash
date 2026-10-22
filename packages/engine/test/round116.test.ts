@@ -3,10 +3,11 @@
 // (protection from spells and from permanents that were cast this turn, CR 702.16) and Gonti, Night Minister.
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, cast, forest, passUntil, putOnBattlefield, setup, target } from "./helpers";
+import { act, bear, card, cast, forest, passUntil, pt, putOnBattlefield, setup, target } from "./helpers";
 import { botActions, compileCard, isFullySupported, planActivate, planCast, waitingOn, type Action, type GameState, type ManaType, type PlayerId } from "../src";
 import { blockProblem, moveObject } from "../src/game";
 import { wasCastThisTurn } from "../src/cards";
+import { characteristics } from "../src/layers";
 
 const run = (s: GameState, plan: Action[] | null) => {
   if (!plan) throw new Error("no plan");
@@ -348,9 +349,117 @@ describe("bots use Together Forever, Chthonian Nightmare and HELIOS One", () => 
     s.players[ap]!.energy = 6;
     const big = putOnBattlefield(s, ap, dragon);
     moveObject(s, big, "graveyard");
-    putOnBattlefield(s, ap, card("Saproling", "Creature — Saproling", "", { power: "1", toughness: "1" }));
+    // Bots sacrifice only a small token for a cost.
+    const sap = putOnBattlefield(s, ap, card("Saproling", "Creature — Saproling", "", { power: "1", toughness: "1" }));
+    s.objects[sap]!.isToken = true;
     s.step = "main2";
     const plan = botActions(s, ap);
     expect(plan.find((a) => a.type === "activateAbility" && a.objectId === n)).toMatchObject({ x: 6, targets: [target(big)] });
+  });
+});
+
+describe("more of the most played: Murkfiend Liege, Zenith Chronicler, Tifa Lockhart, Sword of War and Peace, Planar Nexus, Final Parting", () => {
+  const liege = card("Murkfiend Liege", "Creature — Horror", "{2}{G/U}{G/U}{G/U}", {
+    power: "4",
+    toughness: "4",
+    oracleText: "Other green creatures you control get +1/+1.\nOther blue creatures you control get +1/+1.\nUntap all green and/or blue creatures you control during each other player's untap step.",
+  });
+  const chronicler = card("Zenith Chronicler", "Artifact Creature — Phyrexian Construct", "{2}", { power: "3", toughness: "1", oracleText: "Whenever a player casts their first multicolored spell each turn, each other player draws a card." });
+  const tifa = card("Tifa Lockhart", "Legendary Creature — Human Monk", "{1}{G}", { power: "1", toughness: "2", keywords: ["Trample", "Landfall"], oracleText: "Trample\nLandfall — Whenever a land you control enters, double Tifa Lockhart's power until end of turn." });
+  const sword = card("Sword of War and Peace", "Artifact — Equipment", "{3}", {
+    keywords: ["Equip"],
+    oracleText: "Equipped creature gets +2/+2 and has protection from red and from white.\nWhenever equipped creature deals combat damage to a player, this Equipment deals damage to that player equal to the number of cards in their hand and you gain 1 life for each card in your hand.\nEquip {2}",
+  });
+  const nexus = card("Planar Nexus", "Land", "", { oracleText: "This land is every nonbasic land type. (Nonbasic land types include Cave, Desert, Gate, Lair, Locus, Mine, Power-Plant, Sphere, Tower, and Urza's.)\n{T}: Add {C}.\n{1}, {T}: Add one mana of any color." });
+  const tower = card("Urza's Tower", "Land — Urza's Tower", "", { oracleText: "{T}: Add {C}. If you control an Urza's Mine and an Urza's Power-Plant, add {C}{C}{C} instead." });
+  const parting = card("Final Parting", "Sorcery", "{3}{B}{B}", { oracleText: "Search your library for two cards. Put one into your hand and the other into your graveyard. Then shuffle." });
+  const gold = card("Gold Insight", "Instant", "{U}{B}", { colors: ["U", "B"], oracleText: "Draw a card." });
+
+  it("all six compile", () => {
+    for (const c of [liege, chronicler, tifa, sword, nexus, parting]) expect(isFullySupported(c), c.name).toBe(true);
+  });
+
+  it("Murkfiend Liege: green and blue creatures get +1/+1 (both colors +2/+2), and untap in each other player's untap step", () => {
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    putOnBattlefield(s, ap, liege);
+    const g = putOnBattlefield(s, ap, bear({ colors: ["G"] }));
+    const gu = putOnBattlefield(s, ap, bear({ name: "Hybrid Bear", colors: ["G", "U"] }));
+    const r = putOnBattlefield(s, ap, bear({ name: "Red Bear", colors: ["R"] }));
+    expect([pt(s, g), pt(s, gu), pt(s, r)]).toEqual(["3/3", "4/4", "2/2"]);
+    for (const id of [g, r]) s.objects[id]!.tapped = true;
+    const next = s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % 4]!;
+    s = passUntil(s, "upkeep", next);
+    expect(s.objects[g]!.tapped).toBe(false);
+    expect(s.objects[r]!.tapped).toBe(true);
+  });
+
+  it("Zenith Chronicler: a player's first multicolored spell each turn makes each other player draw", () => {
+    const { s: s0, ap, ids } = setup([gold, gold]);
+    let s = s0;
+    putOnBattlefield(s, ap, chronicler);
+    const hands = (t: GameState) => t.turnOrder.map((p) => t.players[p]!.hand.length);
+    const before = hands(s);
+    s = settle(cast(s, ap, ids[0]!));
+    // ap: cast one, drew one from the spell; everyone else: one from the trigger.
+    expect(hands(s)).toEqual(s.turnOrder.map((p, i) => before[i]! + (p === ap ? 0 : 1)));
+    const mid = hands(s);
+    s = settle(cast(s, ap, ids[1]!));
+    expect(hands(s)).toEqual(mid);
+  });
+
+  it("Tifa Lockhart: each land doubles its power until end of turn", () => {
+    const { s: s0, ap, ids } = setup([forest]);
+    let s = s0;
+    const t = putOnBattlefield(s, ap, tifa);
+    s.objects[ids[0]!]!.zone = "hand";
+    s = settle(act(s, { type: "playLand", player: ap, objectId: ids[0]! }));
+    expect(pt(s, t)).toBe("2/2");
+    // A land put onto the battlefield by an effect is landfall too.
+    moveObject(s, toHand(s, ap, forest), "battlefield");
+    s = settle(s);
+    expect(pt(s, t)).toBe("4/2");
+    s = passUntil(s, "upkeep", s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % 4]!);
+    expect(pt(s, t)).toBe("1/2");
+  });
+
+  it("Sword of War and Peace: damage equal to the cards in that player's hand, life for each card in yours", () => {
+    const { s: s0, ap, opp } = setup([]);
+    let s = s0;
+    const b = putOnBattlefield(s, ap, bear());
+    const sw = putOnBattlefield(s, ap, sword);
+    s.objects[sw]!.attachedTo = b;
+    for (let i = 0; i < 3; i++) toHand(s, ap, bear());
+    while (s.players[opp]!.hand.length < 5) toHand(s, opp, bear());
+    const oppHand = s.players[opp]!.hand.length;
+    const myHand = s.players[ap]!.hand.length;
+    const [lifeA, lifeO] = [s.players[ap]!.life, s.players[opp]!.life];
+    s = act(passUntil(s, "declareAttackers", ap), { type: "declareAttackers", player: ap, attacks: [{ attacker: b, defender: opp }] });
+    s = settle(passUntil(settle(s), "endCombat"));
+    expect(s.players[opp]!.life).toBe(lifeO - 4 - oppHand);
+    expect(s.players[ap]!.life).toBe(lifeA + myHand);
+  });
+
+  it("Planar Nexus: every nonbasic land type, so Urza's Tower makes {C}{C}{C}", () => {
+    const { s: s0, ap } = setup([]);
+    const n = putOnBattlefield(s0, ap, nexus);
+    const sub = characteristics(s0, s0.objects[n]!).subtypes;
+    expect(sub).toEqual(expect.arrayContaining(["Cave", "Desert", "Gate", "Lair", "Locus", "Mine", "Planet", "Power-Plant", "Sphere", "Tower", "Town", "Urza's"]));
+    expect(sub).not.toContain("Forest");
+    const t = putOnBattlefield(s0, ap, tower);
+    const s = act(s0, { type: "activateMana", player: ap, objectId: t, mana: "C" });
+    expect(s.players[ap]!.manaPool.C).toBe(3);
+  });
+
+  it("Final Parting: two cards, one to hand and the other to the graveyard", () => {
+    const { s: s0, ap, ids } = setup([parting]);
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    s = settle(s);
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", min: 2, max: 2 });
+    const lib = s.players[ap]!.library;
+    const [a, b] = [lib[10]!, lib[20]!];
+    s = act(s, { type: "searchLibrary", player: ap, found: [a, b] });
+    expect(s.objects[a]!.zone).toBe("hand");
+    expect(s.objects[b]!.zone).toBe("graveyard");
   });
 });

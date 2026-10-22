@@ -1652,6 +1652,12 @@ export function compile(d: CardDef): CompiledCard {
       out.allColors = true;
       continue;
     }
+    // "~ is every nonbasic land type" (Planar Nexus): a characteristic-defining ability (CR 604.3), so it works in every
+    // zone and applies first in layer 4 (613.3).
+    if (line === "~ is every nonbasic land type.") {
+      out.allNonbasicLandTypes = true;
+      continue;
+    }
     // "As long as ~ isn't on the battlefield, it's a 1/1 Insect creature in addition to its other types." (Grist, the Hunger
     // Tide): a static ability that works everywhere else (CR 113.6b), in its library, hand, graveyard, exile, the command
     // zone and on the stack, so it's a creature card and a creature spell there (rulings); on the battlefield it isn't.
@@ -1890,7 +1896,9 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "Cast this spell only during combat", "... only during your end step", "... only during the declare attackers step
     // and only if you've been attacked this step" (CR 506.8, 601.3).
-    const castOnly = /^Cast ~ only ((?:during|if|before|after) [^.]+)\.$/.exec(line);
+    // "You can't cast ~ unless an opponent lost life this turn" (Rakdos, Lord of Riots): the same as "cast ~ only if" (CR 601.3).
+    const cantUnless = /^You can't cast ~ unless ([^.]+)\.$/.exec(line);
+    const castOnly = cantUnless ? ([line, `if ${cantUnless[1]}`] as unknown as RegExpExecArray) : /^Cast ~ only ((?:during|if|before|after) [^.]+)\.$/.exec(line);
     if (castOnly) {
       const clauses = parseOnlyClauses(castOnly[1]!);
       if (!clauses?.cond || clauses.once || clauses.sorcery || out.castOnly) out.unsupported.push(raw);

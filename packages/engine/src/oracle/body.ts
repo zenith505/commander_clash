@@ -596,7 +596,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // battlefield. Otherwise, exile it." The choice is at random, so who makes it changes nothing: one instruction.
   // Flubs, the Fool: "draw a card if you have no cards in hand. Otherwise, discard a card." is "If you have no cards in
   // hand, draw a card. Otherwise, discard a card."
-  text = text.replace(/(^|\. )([Dd])raw a card if you have no cards in hand\. Otherwise,/, (_, lead: string) => `${lead}If you have no cards in hand, draw a card. Otherwise,`);
+  // Momentous Fall: "You draw cards equal to the sacrificed creature's power, then you gain life equal to its toughness":
+  // "its" is the sacrificed creature, as it last existed (CR 608.2h).
+  text = text.replace(/(equal to the sacrificed (creature|artifact|permanent)'s (?:power|toughness|mana value), then [^.]*? equal to) its (power|toughness|mana value)\b/, "$1 the sacrificed $2's $3");
+  // Cosmos Elixir: "draw a card if your life total is greater than your starting life total. Otherwise, you gain 2 life."
+  text = text.replace(/(^|\. )[Dd]raw a card if (you have no cards in hand|your life total is greater than your starting life total)\. Otherwise,/, (_, lead: string, cond: string) => `${lead}If ${cond}, draw a card. Otherwise,`);
   text = text.replace(/An opponent chooses a card at random in your graveyard\. If it's a creature card, put it onto the battlefield\. Otherwise, exile it\./, "Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it.");
   // Goblin Welder: the card is in the graveyard of the artifact's controller ("that player"); both targets must still be
   // legal as it resolves (rulings), and that player does both at once.
@@ -808,6 +812,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // "Loses two times X life" (Debt to the Deathless) is "loses twice X life".
   text = text.replace(/\bloses two times X life\b/g, "loses twice X life");
   text = text.replace(/, then shuffle and you gain (\d+) life\./g, ", then shuffle. You gain $1 life.");
+  // "Search your library for two cards. Put one into your hand and the other into your graveyard. Then shuffle." (Final
+  // Parting): one search, as Cultivate's.
+  text = text.replace(/\bSearch your library for two cards\. Put one (into your hand|onto the battlefield) and the other into your graveyard\. Then shuffle\./g, "Search your library for two cards, put one $1 and the other into your graveyard, then shuffle.");
   // "You gain 7 life, draw seven cards, then put up to seven ..." (Ugin, the Spirit Dragon): three instructions in order.
   text = text.replace(/^You gain (\d+) life, draw (\w+) cards?, then /, "You gain $1 life. Draw $2 cards, then ");
   // "Sacrifice ~, search your library for up to two creature cards, put those cards onto the battlefield, then shuffle"
@@ -831,6 +838,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   text = text.replace(/\b(deals \w+ damage to) each of your opponents\b/g, "$1 each opponent");
   // "~ deals 4 damage to target creature and you gain life equal to the damage dealt this way" (Enter the God-Eternals).
   text = text.replace(/^(~ deals [^.]+? damage to [^.]+?) and you gain life equal to the damage dealt this way\./, "$1. You gain life equal to the damage dealt this way.");
+  // "~ deals damage to that player equal to the number of cards in their hand and you gain 1 life for each card in your
+  // hand" (Sword of War and Peace): the damage, then the life; the cards counted as each part happens (CR 608.2c).
+  text = text.replace(/^(~ deals damage to that player equal to the number of cards in their hand) and (you gain 1 life for each card in your hand)\./, "$1. $2.");
   // "Destroy all creatures you don't control and all planeswalkers you don't control" (In Garruk's Wake).
   text = text.replace(/\ball creatures you don't control and all planeswalkers you don't control\b/g, "all creatures and planeswalkers you don't control");
   // "Destroy all creatures other than ~" (Magister of Worth) is "destroy all other creatures".
@@ -3128,7 +3138,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     if (otherwise) {
       const prev = effects[effects.length - 1];
       // "If you have no cards in hand, draw a card. Otherwise, discard a card." (Flubs, the Fool): checked as it resolves.
-      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "noneInHand");
+      // "If your life total is greater than your starting life total, draw a card. Otherwise, you gain 2 life." (Cosmos Elixir).
+      const stateElse = prev?.type === "if" && prev.cond.kind === "state" && (prev.cond.cond.kind === "subjectPT" || prev.cond.cond.kind === "noneInHand" || prev.cond.cond.kind === "life");
       if (prev?.type !== "if" || (prev.cond.kind !== "wonClash" && prev.cond.kind !== "suspected" && prev.cond.kind !== "milledIs" && prev.cond.kind !== "targetCardWas" && !stateElse) || prev.otherwise) return null;
       const inner = parseOne(otherwise[1]!.charAt(0).toUpperCase() + otherwise[1]!.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;

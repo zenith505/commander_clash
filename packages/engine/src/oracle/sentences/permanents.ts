@@ -33,6 +33,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     if (!what || !isGroup(what)) return null;
     return [{ type: "doublePT", what, power: m[1] !== "toughness", toughness: m[1] !== "power" }];
   }
+  // "Double ~'s power until end of turn" (Tifa Lockhart), "double target creature's power and toughness": the same, for
+  // one creature.
+  if ((m = /^[Dd]ouble (~'s|target creature's|that creature's|its) (power|toughness|power and toughness) until end of turn$/.exec(s))) {
+    const what = parseObject(m[1] === "its" ? "it" : m[1]!.slice(0, -2), ctx);
+    if (!what || isGroup(what)) return null;
+    return [{ type: "doublePT", what, power: m[2] !== "toughness", toughness: m[2] !== "power" }];
+  }
 
   // "Tap any number of untapped creatures you control" (Devout Invocation), "you may tap any number of untapped Gates you
   // control" (Guild Summit): chosen as it resolves, none allowed, so "you may" changes nothing (CR 608.2d). Followed by

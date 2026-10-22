@@ -688,6 +688,8 @@ export type PlayerRef =
   | { ref: "attackingPlayer" }
   /** "Each other opponent" after "Whenever ~ deals combat damage to an opponent": this ability's controller's opponents but that one. */
   | { ref: "otherOpponents" }
+  /** "Each other player" after a trigger about a player (Zenith Chronicler): every player in the game but that one. */
+  | { ref: "otherPlayers" }
   /** The player this Aura is attached to ("enchanted player", CR 702.5d), as it last existed if it's gone. */
   | { ref: "enchantedPlayer" }
   /** "Each opponent attacking that player": each opponent of this ability's controller attacking the event player. */
@@ -1119,7 +1121,7 @@ export type StaticCondition =
    */
   | { kind: "beforeAttackers" }
   /** "As long as you're the monarch" (CR 725). */
-  | { kind: "monarch" }
+  | { kind: "monarch"; /** "If an opponent is the monarch" (Queen Marchesa). */ opponent?: true }
   /** "If ~ is suspected" (CR 701.60); `not`: "if it's not suspected". */
   | { kind: "suspected"; not?: true }
   /** "If you have the initiative" (CR 726.1). */
@@ -1158,7 +1160,7 @@ export type StaticCondition =
   | { kind: "onBattlefield"; filter: TargetSpec; max?: number; min?: number }
   /** "If an opponent lost life this turn". */
   /** "If an opponent lost life this turn"; `n`: "lost 2 or more life this turn", one opponent alone (rulings on Bloodchief Ascension). */
-  | { kind: "opponentLostLife"; n?: number }
+  | { kind: "opponentLostLife"; n?: number; /** "If a player lost 4 or more life this turn" (Y'shtola, Night's Blessed): any player, you too. */ anyPlayer?: true }
   /**
    * "If you haven't been dealt combat damage since your last turn" (Marchesa, Resolute Monarch): none from the start of
    * your previous turn (Player.lastTurnBegan; the whole game if you haven't had one) until now.
@@ -4222,6 +4224,8 @@ export interface CompiledCard {
    * layer 5 before any other effect (613.3). The card data's colors already have it everywhere else (CR 604.3a).
    */
   allColors?: true;
+  /** "~ is every nonbasic land type" (Planar Nexus): a characteristic-defining ability (CR 604.3), applied first in layer 4 (613.3). */
+  allNonbasicLandTypes?: true;
   /**
    * Unspent mana not lost as steps and phases end (CR 500.4): kept by `who` (only mana of `color`, if given: Leyline
    * Tyrant's red), or with `becomes`, a replacement effect: it becomes that type of mana instead and is kept (Kruphix's

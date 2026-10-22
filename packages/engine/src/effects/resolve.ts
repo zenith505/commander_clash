@@ -409,6 +409,8 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       return ctx.event?.attacker !== undefined && !player(s, ctx.event.attacker).lost ? [ctx.event.attacker] : [];
     case "otherOpponents":
       return opponents(s, ctx.controller).filter((p) => p !== ctx.event?.player);
+    case "otherPlayers":
+      return livingPlayers(s).filter((p) => p !== ctx.event?.player);
     case "enchantedPlayer": {
       // The player this Aura is attached to, or was as it last existed (CR 608.2h).
       const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;

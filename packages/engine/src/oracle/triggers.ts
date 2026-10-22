@@ -637,6 +637,9 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
  * "It" and "that creature" are the creature, "that player" the player, "that much" the damage.
  */
 function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
+  // "Whenever a creature you control with a +1/+1 counter on it deals combat damage to a player" (Bred for the Hunt): the
+  // counter is on it as it deals the damage.
+  line = line.replace(/^Whenever (an?|another) (\w+) you control (with an? [^ ]+ counter on it) deals combat damage /, "Whenever $1 $2 $3 you control deals combat damage ");
   // "Whenever a creature deals combat damage to one of your opponents, its controller may draw a card" (Edric, Gix):
   // anyone's creature, dealing it to an opponent of this permanent's controller; "its controller" is the creature's.
   const any = /^Whenever a creature deals combat damage to one of your opponents, (.+)$/.exec(line);

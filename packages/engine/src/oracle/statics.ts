@@ -480,6 +480,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^a library has ${NUM} or fewer cards in it$`).exec(text))) return { kind: "libraryAtMost", n: num(m[1]!) };
   if (/^your library has no cards in it$/.test(text)) return { kind: "libraryAtMost", n: 0, yours: true };
   if (/^you're the monarch$/.test(text)) return { kind: "monarch" };
+  // "If an opponent is the monarch" (Queen Marchesa, CR 725).
+  if (/^an opponent is the monarch$/.test(text)) return { kind: "monarch", opponent: true };
   if (/^you have the initiative$/.test(text)) return { kind: "initiative" }; // CR 726.1
   if (/^you've completed a dungeon$/.test(text)) return { kind: "completedDungeon" }; // CR 309.7
   if ((m = /^you (have|haven't) completed (Lost Mine of Phandelver|Dungeon of the Mad Mage|Tomb of Annihilation|Undercity)$/.exec(text)))
@@ -530,6 +532,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^a permanent was put into a graveyard from the battlefield this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "toGraveyardThisTurn" } }, min: 1 };
   if (/^an opponent lost life this turn$/.test(text)) return { kind: "opponentLostLife" };
   if ((m = new RegExp(`^an opponent lost ${NUM} or more life this turn$`).exec(text))) return { kind: "opponentLostLife", n: num(m[1]!) };
+  if ((m = new RegExp(`^a player lost ${NUM} or more life this turn$`).exec(text))) return { kind: "opponentLostLife", n: num(m[1]!), anyPlayer: true };
   if (/^you haven't been dealt combat damage since your last turn$/.test(text)) return { kind: "noCombatDamageSinceLastTurn" };
   // The Traps' "this turn" conditions (see StaticCondition opponentSearched).
   if (/^an opponent searched their library this turn$/.test(text)) return { kind: "opponentSearched" };
@@ -694,8 +697,10 @@ export function parseAffected(subject: string): Affects | null {
     let legendary: boolean | undefined;
     let status: TargetSpec["status"];
     let nontoken = false;
-    for (const w of words) {
+    for (const [i, w] of words.entries()) {
       if (COLOR_WORDS[w.toLowerCase()]) colors.push(COLOR_WORDS[w.toLowerCase()]!);
+      // "Green or blue creatures you control" (Murkfiend Liege): colors already match any of the listed ones.
+      else if (w.toLowerCase() === "or" && i === 1 && words.length === 3 && COLOR_WORDS[words[0]!.toLowerCase()] && COLOR_WORDS[words[2]!.toLowerCase()]) continue;
       // "Artifact creatures you control get +1/+1", "Land creatures you control have vigilance": both card types.
       else if (/^(artifact|enchantment|land)$/i.test(w) && !types.includes(capital(w.toLowerCase()))) types.push(capital(w.toLowerCase()));
       else if (CREATURE_TYPES.has(w)) subtypes.push(w);
@@ -1184,7 +1189,9 @@ function parseStaticLine(line: string): StaticAbility | null {
   // they untap with the active player's permanents (CR 502.3); "doesn't untap during your untap step" doesn't apply.
   const untaps = /^Untap (~|all (.+?) you control|each (.+? you control(?: with .+)?)) during each other player's untap step$/.exec(text);
   if (untaps) {
-    const affects = untaps[1] === "~" ? { kind: "self" as const } : parseAffected(untaps[2] ? `${untaps[2].charAt(0).toUpperCase()}${untaps[2].slice(1)} you control` : `Each ${untaps[3]}`);
+    // "All green and/or blue creatures you control" (Murkfiend Liege): either color, or both.
+    const all = untaps[2]?.replace(/^(\w+) and\/or (\w+) /, "$1 or $2 ");
+    const affects = untaps[1] === "~" ? { kind: "self" as const } : parseAffected(all ? `${all.charAt(0).toUpperCase()}${all.slice(1)} you control` : `Each ${untaps[3]}`);
     if (!affects || (affects.kind === "filter" && affects.controller !== "you" && affects.spec?.controller !== "you")) return null;
     return { affects, mods: [{ kind: "untapsDuringOthers" }], text: line };
   }

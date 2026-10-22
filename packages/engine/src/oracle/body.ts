@@ -1875,6 +1875,19 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push(...more);
       continue;
     }
+    // Emeria Shepherd: "You may return target nonland permanent card from your graveyard to your hand. If that land is a
+    // Plains, you may return that nonland permanent card to the battlefield instead." With a Plains, one of the two (or
+    // neither), chosen as it resolves; the land as it is then, or as it last existed (CR 608.2h).
+    const landIs = /^If that land is an? (Plains|Island|Swamp|Mountain|Forest), you may return that [a-z ]+ card to the battlefield instead$/.exec(s);
+    if (landIs) {
+      const prev = effects[effects.length - 1];
+      const back = prev?.type === "may" && prev.effects.length === 1 && prev.effects[0]!.type === "bounce" && prev.effects[0]!.what.ref === "target" ? prev.effects[0]! : undefined;
+      if (!prev || prev.type !== "may" || !back || back.type !== "bounce" || !ctx.subject) return null;
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [landIs[1]!], text: landIs[1]! };
+      const either: Effect = { type: "either", options: [[{ type: "putOntoBattlefield", what: back.what }], [back]], labels: ["Return it to the battlefield", "Return it to your hand"] };
+      effects[effects.length - 1] = { type: "if", cond: { kind: "subjectIs", filter }, effects: [{ ...prev, effects: [either] }], otherwise: [prev] };
+      continue;
+    }
     // Essence Flux: "Exile target creature you control, then return that card to the battlefield under its owner's
     // control. If it's a Spirit, put a +1/+1 counter on it.": checked once it has returned (rulings).
     const fluxIf = /^If it's an? ([A-Z][a-z]+), put a \+1\/\+1 counter on it$/.exec(s);

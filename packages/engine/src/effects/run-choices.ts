@@ -362,6 +362,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (s.resolving!.milled ?? []).some(({ id }) => printedMatches(bindChosen((e.cond as { filter: TargetSpec }).filter, ctx.chosen), defOf(s, s.objects[id]!)))
             : e.cond.kind === "targetIs"
             ? targetIs(s, ctx, e.cond.index, e.cond.filter)
+            : e.cond.kind === "subjectIs"
+            ? ((f) => objects(s, { ref: "subject" }, ctx).some((o) => objectMatches(s, f, o, ctx.controller, false)))(e.cond.filter)
             : e.cond.kind === "targetCardWas"
             ? targetCardWas(s, ctx, e.cond.index, e.cond.filter)
             : e.cond.kind === "unlessPaid"

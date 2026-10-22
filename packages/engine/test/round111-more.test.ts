@@ -111,6 +111,13 @@ const leveler = card("Cityscape Leveler", "Artifact Creature — Construct", "{8
   oracleText:
     "Trample\nWhen you cast this spell and whenever Cityscape Leveler attacks, destroy up to one target nonland permanent. Its controller creates a tapped Powerstone token. (It's an artifact with \"{T}: Add {C}. This mana can't be spent to cast a nonartifact spell.\")\nUnearth {8}",
 });
+const shepherd = card("Emeria Shepherd", "Creature — Angel", "{5}{W}{W}", {
+  power: "4",
+  toughness: "4",
+  keywords: ["Flying", "Landfall"],
+  oracleText:
+    "Flying\nLandfall — Whenever a land you control enters, you may return target nonland permanent card from your graveyard to your hand. If that land is a Plains, you may return that nonland permanent card to the battlefield instead.",
+});
 const treasure = card("Treasure", "Token Artifact — Treasure", "", { oracleText: "{T}, Sacrifice this token: Add one mana of any color." });
 
 /** Pass along, answering every pending choice the dull way, until `stop` holds. */
@@ -529,5 +536,36 @@ describe("Cityscape Leveler", () => {
     s = until(s, (x) => x.stack.length === 0 && x.triggerQueue.length === 0);
     expect(s.objects[b2]!.zone).toBe("graveyard");
     expect(stones().length).toBe(2);
+  });
+});
+
+describe("Emeria Shepherd", () => {
+  function play(land: "Plains" | "Island") {
+    const d = card(land, `Basic Land — ${land}`);
+    let { s, ap, ids } = setup([d]);
+    putOnBattlefield(s, ap, shepherd);
+    const dead = putOnBattlefield(s, ap, bear());
+    s.battlefield.splice(s.battlefield.indexOf(dead), 1);
+    s.objects[dead]!.zone = "graveyard";
+    s.players[ap]!.graveyard.push(dead);
+    invalidateCharacteristics(s);
+    s = act(s, { type: "playLand", player: ap, objectId: ids[0]! });
+    s = until(s, (x) => x.pending?.kind === "chooseTargets");
+    s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: dead }] } as never);
+    s = until(s, (x) => x.pending?.kind === "chooseMay");
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    return { s, ap, dead };
+  }
+  it("is supported: after a Plains, the card may come back to the battlefield instead", () => {
+    expect(isFullySupported(shepherd)).toBe(true);
+    let { s, ap, dead } = play("Plains");
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "either", labels: ["Return it to the battlefield", "Return it to your hand"] });
+    s = act(s, { type: "chooseOption", player: ap, choice: "0" });
+    expect(s.objects[dead]!.zone).toBe("battlefield");
+  });
+  it("after another land, to the hand", () => {
+    const { s, dead } = play("Island");
+    expect(s.pending?.kind).not.toBe("chooseOption");
+    expect(s.objects[dead]!.zone).toBe("hand");
   });
 });

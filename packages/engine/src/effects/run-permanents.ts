@@ -1003,6 +1003,34 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       return;
     }
+    case "attachLastKnown": {
+      const host = objects(s, e.what, ctx).find((o) => o.zone === "battlefield");
+      if (!host) return;
+      // Still the same objects (CR 400.7), still Equipment, and able to be attached to it (CR 701.3b).
+      const options = (ctx.lki?.equipment ?? [])
+        .map((x) => s.objects[x.id])
+        .filter((o): o is GameObject => !!o && o.zone === "battlefield" && characteristics(s, o).subtypes.includes("Equipment") && canAttachTo(s, o, host))
+        .filter((o) => ctx.lki!.equipment!.some((x) => x.id === o.id && x.zc === (o.zoneChanges ?? 0)))
+        .map((o) => o.id);
+      if (!options.length) return;
+      const sc = (s.resolving!.scratch ??= {});
+      const picked = (sc.auraHosts ??= {});
+      const key = "lastKnownEquipment";
+      if (picked[key] === undefined) {
+        if (options.length > 1) {
+          sc.auraAsking = key;
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "enchant", options, labels: options.map((id) => defOf(s, obj(s, id)).name), prompt: `choose an Equipment to attach to ${defOf(s, host).name}` };
+          return "paused";
+        }
+        picked[key] = options[0]!;
+      }
+      const me = s.objects[picked[key]!];
+      if (me && options.includes(me.id)) {
+        attachTo(s, me, host);
+        log(s, `${defOf(s, me).name} is attached to ${defOf(s, host).name}.`);
+      }
+      return;
+    }
     case "attachElsewhere": {
       // "Attach target Aura attached to a creature to another creature" (Crown of the Ages): the creature is chosen as
       // it resolves, not targeted (rulings), among those the Aura could enchant (CR 303.4d, 702.16c).

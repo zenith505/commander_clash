@@ -413,6 +413,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = m[1] === "~" ? ({ ref: "self" } as const) : parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [{ type: "lastKnownCounters", what }] : null;
   }
+  // Zack Fair, after "{1}, Sacrifice ~: Target creature you control gains indestructible until end of turn.": "Put ~'s
+  // counters on that creature and attach an Equipment that was attached to ~ to that creature": as many of each kind as
+  // it had as it was sacrificed, put on, not moved (rulings); one of the Equipment that was attached to it.
+  if ((m = /^Put ~'s counters on (that creature)(?: and attach an Equipment that was attached to ~ to that creature)?$/i.exec(s)) && ctx.activated) {
+    const what = parseObject(m[1]!, ctx);
+    return what && !isGroup(what) ? [{ type: "lastKnownCounters", what }, ...(/attach/.test(s) ? [{ type: "attachLastKnown" as const, what }] : [])] : null;
+  }
   // "When ~ dies, put its counters on target creature you control": as many of each kind as it had as it last
   // existed, put on, not moved (rulings on Dockworker Drone); "its +1/+1 counters" only that kind.
   if ((m = new RegExp(`^Put its (?:${COUNTER} )?counters on (.+)$`, "i").exec(s)) && ctx.selfCard) {

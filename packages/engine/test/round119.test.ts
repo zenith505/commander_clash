@@ -2,9 +2,10 @@
 // prototyped spell; Aminatou's Augury asks which type a card with two is cast as), then the most played cards.
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, forest, putOnBattlefield, setup } from "./helpers";
-import { botActions, byTypeChoices, isFullySupported, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
-import { moveObject } from "../src/game";
+import { act, bear, card, forest, passUntil, putOnBattlefield, setup } from "./helpers";
+import { botActions, byTypeChoices, isFullySupported, objHasKeyword, planActivate, planCast, power, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { invalidateCharacteristics } from "../src/layers";
+import { moveObject, spellCost } from "../src/game";
 
 const settle = (s: GameState) => {
   for (let i = 0; i < 80 && (s.stack.length || s.triggerQueue.length) && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
@@ -148,5 +149,84 @@ describe("Aminatou's Augury: the type a card is cast as", () => {
     s = settle(run(s, planCast(s, ap, top[0]!)));
     expect(planCast(s, ap, top[1]!, undefined, undefined, undefined, undefined, { asType: "Creature" })).toBeNull();
     expect(planCast(s, ap, top[1]!, undefined, undefined, undefined, undefined, { asType: "Artifact" })).not.toBeNull();
+  });
+});
+
+const zack = card("Zack Fair", "Legendary Creature — Human Soldier", "{W}", {
+  power: "0",
+  toughness: "1",
+  oracleText:
+    "Zack Fair enters with a +1/+1 counter on it.\n{1}, Sacrifice Zack Fair: Target creature you control gains indestructible until end of turn. Put Zack Fair's counters on that creature and attach an Equipment that was attached to Zack Fair to that creature.",
+});
+const bonesplitter = card("Bonesplitter", "Artifact — Equipment", "{1}", { oracleText: "Equipped creature gets +2/+0.\nEquip {1}" });
+const shield = card("Leonin Scimitar", "Artifact — Equipment", "{1}", { oracleText: "Equipped creature gets +1/+1.\nEquip {1}" });
+
+describe("Zack Fair", () => {
+  const withZack = (equipment: CardDef[]) => {
+    const { s: s0, ap } = setup([]);
+    const s = s0;
+    const z = putOnBattlefield(s, ap, zack);
+    s.objects[z]!.counters = { "+1/+1": 1, charge: 2 };
+    const eq = equipment.map((d) => {
+      const id = putOnBattlefield(s, ap, d);
+      s.objects[id]!.attachedTo = z;
+      return id;
+    });
+    const b = putOnBattlefield(s, ap, bear());
+    invalidateCharacteristics(s);
+    return { s, ap, z, b, eq };
+  };
+
+  it("the target gains indestructible, gets each of Zack's counters, and Zack's Equipment", () => {
+    expect(isFullySupported(zack)).toBe(true);
+    let { s, ap, z, b, eq } = withZack([bonesplitter]);
+    s = settle(run(s, planActivate(s, ap, z, 0, [{ kind: "object", id: b }])));
+    expect(s.objects[z]!.zone).toBe("graveyard");
+    expect(s.objects[b]!.counters).toMatchObject({ "+1/+1": 1, charge: 2 });
+    expect(s.objects[eq[0]!]!.attachedTo).toBe(b);
+    expect(power(s, s.objects[b]!)).toBe(5);
+    expect(objHasKeyword(s, s.objects[b]!, "Indestructible")).toBe(true);
+  });
+
+  it("with two Equipment attached, one is chosen and attached; the other stays unattached", () => {
+    let { s, ap, z, b, eq } = withZack([bonesplitter, shield]);
+    s = settle(run(s, planActivate(s, ap, z, 0, [{ kind: "object", id: b }])));
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "enchant" });
+    expect((s.pending as { options: string[] }).options.sort()).toEqual([...eq].sort());
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: eq[1]! }));
+    expect(s.objects[eq[1]!]!.attachedTo).toBe(b);
+    expect(s.objects[eq[0]!]!.attachedTo).toBeUndefined();
+  });
+
+  it("no Equipment: only the counters and indestructible", () => {
+    let { s, ap, z, b } = withZack([]);
+    s = settle(run(s, planActivate(s, ap, z, 0, [{ kind: "object", id: b }])));
+    expect(s.objects[b]!.counters).toMatchObject({ "+1/+1": 1 });
+    expect(power(s, s.objects[b]!)).toBe(3);
+  });
+});
+
+const incinerator = card("Chandra's Incinerator", "Creature — Elemental", "{5}{R}", {
+  power: "6",
+  toughness: "6",
+  keywords: ["Trample"],
+  oracleText:
+    "This spell costs {X} less to cast, where X is the total amount of noncombat damage dealt to your opponents this turn.\nTrample\nWhenever a source you control deals noncombat damage to an opponent, this creature deals that much damage to target creature or planeswalker that player controls.",
+});
+const lavaSpike = card("Lava Spike", "Sorcery — Arcane", "{R}", { oracleText: "Lava Spike deals 3 damage to target player or planeswalker." });
+
+describe("Chandra's Incinerator", () => {
+  it("costs {X} less, X the noncombat damage dealt to opponents this turn; not damage dealt to you", () => {
+    expect(isFullySupported(incinerator)).toBe(true);
+    const { s: s0, ap, ids, opp } = setup([incinerator, lavaSpike, lavaSpike]);
+    let s = s0;
+    expect(spellCost(s, ap, s.objects[ids[0]!]!).extra).toBe(5);
+    s = settle(run(s, planCast(s, ap, ids[1]!, [{ kind: "player", id: opp }])));
+    expect(spellCost(s, ap, s.objects[ids[0]!]!).extra).toBe(2);
+    s = settle(run(s, planCast(s, ap, ids[2]!, [{ kind: "player", id: ap }])));
+    expect(spellCost(s, ap, s.objects[ids[0]!]!).extra).toBe(2);
+    // The next turn, it's gone.
+    s = passUntil(s, "upkeep", later(s, ap, 1));
+    expect(spellCost(s, ap, s.objects[ids[0]!]!).extra).toBe(5);
   });
 });

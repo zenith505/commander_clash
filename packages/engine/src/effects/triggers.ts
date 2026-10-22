@@ -357,6 +357,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // Two instances of one "triggers only once each turn" ability (two Dionus, Elvish Archdruid granting it) each
     // trigger once (rulings): the nth instance is used up once n of them have triggered this turn.
     const instance = new Map<string, number>();
+    const grantedAt = o.zone === "battlefield" ? characteristics(s, o).grantedAt : undefined;
     triggers.forEach((t, index) => {
       // "Whenever enchanted creature ..." is about the creature, not the Aura; "~ or equipped creature" about both.
       if (hosting ? !t.host : t.host === "attached") return;
@@ -365,13 +366,16 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       // "Max speed — Whenever ...": only while it has the ability (CR 702.178a).
       if (t.activeIf && !staticConditionNow(s, t.activeIf, o.id, controller)) return;
       // (Keyed by event too: "Whenever ~ enters or attacks, ..." is one ability compiled as two triggers.)
-      const nth = t.oncePerTurn ? (instance.get(`${t.event}|${t.body.text}`) ?? 0) : 0;
-      if (t.oncePerTurn) instance.set(`${t.event}|${t.body.text}`, nth + 1);
-      if (t.oncePerTurn && onceUsed(o, t.zone, t.body.text, nth)) return;
+      // A granted one is keyed by the granting effect's timestamp too: when Dionus, Elvish Archdruid leaves and returns
+      // (or another one enters), the ability it grants is a new one that can trigger again that turn (CR 400.7, rulings).
+      const onceKey = t.grant !== undefined && grantedAt?.[t.grant] !== undefined ? `${t.body.text}@${grantedAt[t.grant]}` : t.body.text;
+      const nth = t.oncePerTurn ? (instance.get(`${t.event}|${onceKey}`) ?? 0) : 0;
+      if (t.oncePerTurn) instance.set(`${t.event}|${onceKey}`, nth + 1);
+      if (t.oncePerTurn && onceUsed(o, t.zone, onceKey, nth)) return;
       const once = t.body.effects[0];
       if (once?.type === "may" && once.once && onceUsed(o, t.zone, `do:${once.text}`)) return; // CR 603.2h
       if (pred(t.event, t) && (!t.ifCond || staticConditionNow(s, t.ifCond, o.id, controller, event?.player, event?.amount, undefined, subject?.id, subject?.zoneChanges ?? 0))) {
-        if (t.oncePerTurn) (o.triggeredThisTurn ??= []).push(`${lookingBack(o, t.zone) ? (o.zoneChanges ?? 0) - 1 : (o.zoneChanges ?? 0)}|${t.body.text}`);
+        if (t.oncePerTurn) (o.triggeredThisTurn ??= []).push(`${lookingBack(o, t.zone) ? (o.zoneChanges ?? 0) - 1 : (o.zoneChanges ?? 0)}|${onceKey}`);
         const queued: PendingTrigger = {
           ...(t.ifCond ? { ifCond: t.ifCond } : {}),
           // An ability an effect gave it isn't on its card, so the trigger carries what it does.

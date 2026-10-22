@@ -4325,10 +4325,10 @@ function Controls({
     // Archangel of Tithes: what blocking costs, paid from your lands as you declare (CR 509.1d-f); with a cost, no
     // requirement makes a creature block (CR 509.1c).
     const blockTax = blockCost(s, Object.keys(blocks).length);
-    // Odric, Master Tactician: choosing another player's blocks; ones that cost anything can't be chosen for them.
+    // Odric, Master Tactician: choosing another player's blocks; they decide whether to pay what blocking costs.
     const defender = pending.defender ?? HUMAN;
     const theirs = defender !== HUMAN ? s.players[defender]!.name : null;
-    const blockTaps = blockTax ? (theirs ? null : planMana(s, HUMAN, parseManaCost(blockTax))) : [];
+    const blockTaps = blockTax ? (theirs ? [] : planMana(s, HUMAN, parseManaCost(blockTax))) : [];
     const needed = alone ?? (blockCost(s, 1) ? null : blockRequirementProblem(s, defender, list));
     return (
       <div className="controls">
@@ -4345,7 +4345,7 @@ function Controls({
         </span>
         <button
           disabled={!!needed || !blockTaps}
-          title={blockTax && !blockTaps ? (theirs ? `Blocking costs ${blockTax}, which only ${theirs} could choose to pay` : `Blocking costs ${blockTax} and you can't pay it`) : undefined}
+          title={blockTax && !blockTaps ? `Blocking costs ${blockTax} and you can't pay it` : undefined}
           onClick={() =>
             dispatch([
               ...(blockTaps ?? []),
@@ -4357,7 +4357,7 @@ function Controls({
             ])
           }
         >
-          {Object.keys(blocks).length ? `Block with ${Object.keys(blocks).length}${blockTax ? ` (pay ${blockTax})` : ""}` : "No blocks"}
+          {Object.keys(blocks).length ? `Block with ${Object.keys(blocks).length}${blockTax ? (theirs ? ` (${theirs} may pay ${blockTax})` : ` (pay ${blockTax})`) : ""}` : "No blocks"}
         </button>
       </div>
     );

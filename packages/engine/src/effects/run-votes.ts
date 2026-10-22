@@ -160,7 +160,14 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           v.left = e.choose ? 0 : 1 + extra.get;
           v.may = e.choose ? 1 : extra.may;
         }
-        const options = voteOptions(s, e, ctx);
+        const options = voteOptions(s, e, ctx, voter);
+        // "A creature they control" with none: that player isn't asked (CR 101.3); the others still choose.
+        if (!options.length && e.theirs) {
+          v.queue.shift();
+          v.left = undefined;
+          v.may = undefined;
+          continue;
+        }
         if (!options.length) {
           // Nothing to vote for (no permanent of that kind): no votes, so nothing has the most (rulings on Council's Judgment).
           v.queue = [];
@@ -232,10 +239,10 @@ function extraVotes(s: GameState, pid: PlayerId): { get: number; may: number } {
  * permanent you don't control"). They aren't targeted (rulings on Council's Judgment). An object is "id@zc", so a vote
  * is for that object only (CR 400.7).
  */
-export function voteOptions(s: GameState, e: Extract<Effect, { type: "vote" }>, ctx: ResolveCtx): string[] {
+export function voteOptions(s: GameState, e: Extract<Effect, { type: "vote" }>, ctx: ResolveCtx, voter?: PlayerId): string[] {
   if (e.options) return e.options;
   const among = e.among!;
-  return voteCandidates(s, among, ctx.controller).map((o) => `${o.id}@${o.zoneChanges ?? 0}`);
+  return voteCandidates(s, among, e.theirs && voter !== undefined ? voter : ctx.controller).map((o) => `${o.id}@${o.zoneChanges ?? 0}`);
 }
 
 function voteCandidates(s: GameState, among: TargetSpec, controller: PlayerId): GameObject[] {

@@ -6271,6 +6271,21 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
     continueResolution(s);
     return;
   }
+  if (pend?.kind === "chooseMay" && pend.player === p.id && pend.blockTax) {
+    const bt = pend.blockTax;
+    const chooser = player(s, bt.chooser);
+    if (!yes) {
+      // Odric: "If that player decides to not pay that cost, you must propose a new set of blocking creatures" (rulings).
+      log(s, `${p.name} doesn't pay for those blocks; ${chooser.name} chooses again.`);
+      s.pending = chooser.lost ? { kind: "declareBlockers", player: p.id, remaining: bt.remaining } : { kind: "declareBlockers", player: chooser.id, remaining: bt.remaining, defender: p.id };
+      return;
+    }
+    const paid = spendFromPool(s, p.id, parseManaCost(pend.pay!.mana!), "other", 0, payableLife(s, p.id));
+    if (!paid) throw new RulesError(`blocking costs ${pend.pay!.mana}: add the mana first`);
+    log(s, `${p.name} pays ${pend.pay!.mana} to block.`);
+    blocksDeclared(s, chooser, p, bt.blocks, bt.remaining);
+    return;
+  }
   if (pend?.kind !== "chooseMay" || pend.player !== p.id || !r) throw new RulesError("nothing to decide");
   if (yes && pend.pay) {
     // "You may pay {2}. If you do, ...": paid now, from the mana pool (mana abilities first, CR 605.3a).
@@ -6843,14 +6858,29 @@ function declareBlockers(s: GameState, chooser: Player, blocks: { blocker: Objec
   if (req) throw new RulesError(req);
   // Block costs are totalled and paid, with mana abilities activated first (CR 509.1d-f).
   const tax = blockCost(s, seen.size);
-  // Odric: the blocks' controller may refuse to pay a block's cost, and then another set must be chosen (rulings);
-  // here only the set that costs nothing can be chosen for them.
-  if (tax && p.id !== chooser.id) throw new RulesError(`blocking costs ${tax}, which only ${p.name} could choose to pay`);
+  // Odric: the blocks' controller chooses whether to pay their cost; if they don't, another set must be proposed (rulings).
+  if (tax && p.id !== chooser.id) {
+    s.pending = {
+      kind: "chooseMay",
+      player: p.id,
+      prompt: `pay ${tax} for the blocks ${chooser.name} chose (${blocks.map((b) => `${nameOf(s, b.blocker)} blocks ${nameOf(s, b.attacker)}`).join(", ")})`,
+      source: "Blocking",
+      pay: { mana: tax },
+      blockTax: { chooser: chooser.id, blocks, remaining: pend.remaining },
+    };
+    log(s, `${chooser.name} chooses blocks for ${p.name}, which cost ${tax}.`);
+    return;
+  }
   if (tax) {
     const paid = spendFromPool(s, p.id, parseManaCost(tax), "other", 0, payableLife(s, p.id));
     if (!paid) throw new RulesError(`blocking with ${seen.size === 1 ? "this creature" : `these ${seen.size} creatures`} costs ${tax}: add the mana first`);
     log(s, `${p.name} pays ${tax} to block.`);
   }
+  blocksDeclared(s, chooser, p, blocks, pend.remaining);
+}
+
+/** The blocks are declared (and paid for): each blocks, then the next defending player declares (CR 509.1). */
+function blocksDeclared(s: GameState, chooser: Player, p: Player, blocks: { blocker: ObjectId; attacker: ObjectId }[], remaining: PlayerId[]) {
   for (const b of blocks) {
     const bl = obj(s, b.blocker);
     const at = obj(s, b.attacker);
@@ -6871,7 +6901,7 @@ function declareBlockers(s: GameState, chooser: Player, blocks: { blocker: Objec
       log(s, `${defOf(s, bl).name} also blocks ${defOf(s, m).name} (banding).`);
     }
   }
-  const [next, ...rest] = pend.remaining;
+  const [next, ...rest] = remaining;
   s.pending = next !== undefined ? blockersPending(s, next, rest) : null;
   if (!s.pending) {
     // Once every defending player has declared, "blocks" and "becomes blocked" abilities trigger (CR 509.3).

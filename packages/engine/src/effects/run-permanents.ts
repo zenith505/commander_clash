@@ -466,6 +466,20 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         }
         return;
       }
+      // Agitator Ant: each player's choice gets the counters from that player, all once everyone has chosen (rulings).
+      if (e.byVoter) {
+        const n = amountNow(s, e.n, ctx);
+        for (const { voter, choice } of n > 0 ? (s.resolving?.votes ?? []) : []) {
+          const [id, zc] = choice.split("@");
+          const o = id ? s.objects[id] : undefined;
+          if (o?.zone !== "battlefield" || String(o.zoneChanges ?? 0) !== zc) continue;
+          invalidateCharacteristics(s);
+          const put = withPutter(voter, () => putCounters(s, o, e.counter, n));
+          log(s, `${player(s, voter).name} puts ${put} ${e.counter} counter${put === 1 ? "" : "s"} on ${defOf(s, o).name}.`);
+          if (put > 0 && s.resolving) (s.resolving.countersPutThisWay ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, kind: e.counter });
+        }
+        return;
+      }
       const base = amountNow(s, e.n, ctx);
       const n = e.perLastKnownCounter ? base * (ctx.lki?.counters?.[e.perLastKnownCounter] ?? 0) : base;
       if (n <= 0) return;

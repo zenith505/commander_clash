@@ -219,15 +219,19 @@ describe("Agitator Ant", () => {
     const cb = putOnBattlefield(s, c, bear({ name: "C Bear" }));
     s = passUntil(s, "end", ap);
     s = settle(s);
-    const answer = (pid: PlayerId, yes: boolean) => {
-      expect(s.pending).toMatchObject({ kind: "chooseMay", player: pid });
-      s = act(s, { type: "chooseMay", player: pid, yes });
+    // Starting with the Ant's controller, each player chooses one of their own creatures or nothing (rulings); no
+    // counters are put until everyone has chosen.
+    const answer = (pid: PlayerId, id: string | null) => {
+      expect(s.pending).toMatchObject({ kind: "chooseOption", what: "vote", player: pid });
+      const opts = (s.pending as { options: string[] }).options;
+      expect(opts.every((o) => o === "none" || s.objects[o.split("@")[0]!]!.controller === pid)).toBe(true);
+      s = act(s, { type: "chooseOption", player: pid, choice: id ? opts.find((o) => o.startsWith(`${id}@`))! : "none" });
     };
-    answer(ap, false);
-    answer(b, true);
-    answer(c, false);
-    // D has no creature (beyond none), so isn't asked; B's one creature is the one.
-    while (s.pending?.kind === "pickPermanents") s = act(s, { type: "pickPermanents", player: s.pending.player, ids: [s.pending.options[0]!] });
+    answer(ap, null);
+    answer(b, bb);
+    expect(s.objects[bb]!.counters["+1/+1"] ?? 0).toBe(0);
+    answer(c, null);
+    // D has no creature, so isn't asked.
     s = settle(s);
     expect(s.objects[bb]!.counters["+1/+1"]).toBe(2);
     expect(characteristics(s, s.objects[bb]!).goadedBy).toContain(ap);

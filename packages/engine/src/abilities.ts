@@ -1727,7 +1727,7 @@ export type Effect =
    * `double`: "double the number of +1/+1 counters on each creature you control": each gets as many more as it has (CR
    * 701.10e), `n` aside; with `everyKind`, of each kind of counter it has ("double the number of each kind of counter").
    */
-  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true; double?: true; everyKind?: true; /** "That player ... puts a +1/+1 counter on it" (Alexios): who puts them, when not the ability's controller. */ by?: PlayerRef }
+  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true; double?: true; everyKind?: true; /** "That player ... puts a +1/+1 counter on it" (Alexios): who puts them, when not the ability's controller. */ by?: PlayerRef; /** With what "voted": each chosen permanent gets them from the player who chose it (Agitator Ant). */ byVoter?: true }
   /**
    * "Distribute X +1/+1 counters among any number of creatures you control" (no targets): its controller divides them
    * among the permanents like `filter` they control as it resolves (rulings on Blessing of Frost, CR 608.2d), each
@@ -2648,7 +2648,16 @@ export type Effect =
    * Purification): not a vote (no extra votes, nobody chooses for another), each player in turn order picks one of
    * `among` or nothing, knowing the earlier picks (rulings); "each permanent chosen this way" is ObjRef "voted" `any`.
    */
-  | { type: "vote"; options?: string[]; among?: TargetSpec; secret?: true; choose?: true; text: string }
+  | {
+      type: "vote";
+      options?: string[];
+      among?: TargetSpec;
+      secret?: true;
+      choose?: true;
+      /** "Each player may put two +1/+1 counters on a creature they control" (Agitator Ant): each one chooses among `among` as they see it (their own creatures); one with nothing to choose isn't asked. */
+      theirs?: true;
+      text: string;
+    }
   | { type: "choose"; choice: ChoiceKind; /** "Each player chooses a creature type" (Patriarch's Bidding): every player in turn order, starting with the active player, into Chosen.types. */ each?: true; /** With "opponent": "a player with the most life or tied for most life" (The Black Gate), checked as it resolves; you can be one. */ mostLife?: true; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose };
 
 /** What a player chooses by name: a creature type (CR 205.3m) or a color (CR 105.1). */
@@ -3122,6 +3131,8 @@ export interface TriggeredAbility {
   firstOnTheirTurn?: true;
   /** "This ability triggers only once each turn": see GameObject.triggeredThisTurn. */
   oncePerTurn?: boolean;
+  /** An ability an effect gave it: its index among the object's granted abilities (cards.ts withGranted). */
+  grant?: number;
   /** For "selfBecomesLevel": the level. */
   level?: number;
   /**

@@ -1477,9 +1477,12 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const goadFx = goadPut ? parseOffer(offer[2]!, ctx) : null;
     if (offer && goadFx) {
       const one = goadFx.length === 1 ? goadFx[0]! : undefined;
-      if (one?.type !== "pick" || one.action !== "counters") return null;
+      if (one?.type !== "pick" || one.action !== "counters" || !one.counter || offer[1] !== "player") return null;
+      // Starting with you, each one chooses a creature of theirs or none, knowing the earlier choices; then each chosen
+      // creature gets its counters (rulings).
       effects.push(
-        { type: "eachMay", who: { ref: offer[1] === "player" ? "eachPlayer" : "eachOpponent" }, effects: goadFx, text: offer[2]!.replace(/\btheir\b/g, "your").replace(/\bthey\b/g, "you"), each: true, need: { zone: "battlefield", filter: one.filter } },
+        { type: "vote", among: { ...one.filter, controller: "you" }, choose: true, theirs: true, text: offer[2]!.replace(/\btheir\b/g, "your").replace(/\bthey\b/g, "you") },
+        { type: "counters", what: { ref: "voted", any: true }, counter: one.counter.kind, n: one.counter.n, byVoter: true },
         { type: "continuous", what: { ref: "countersPutThisWay" }, mods: [{ kind: "goad" }], duration: "yourNextTurn" },
       );
       si++;

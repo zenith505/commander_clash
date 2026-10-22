@@ -166,6 +166,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // "You may collect evidence N": yes, with cards we don't need in the graveyard.
     if (pend.kind === "collectEvidence") return [{ type: "collectEvidence", player: pid, ids: spareEvidence(s, pid, pend.n, pend.not) ?? [] }];
     // Lim-Dûl's Vault: keep five cards with at least two we'd like to draw; otherwise dig on while life allows, a few times.
+    // Blocks an opponent chose for us with Odric: we don't pay for their plan; they choose again.
+    if (pend.kind === "chooseMay" && pend.blockTax) return [{ type: "chooseMay", player: pid, yes: false }];
     if (pend.kind === "chooseMay" && pend.vault) {
       const paid = s.resolving?.scratch?.vaultPaid ?? 0;
       const good = pend.vault.filter((id) => wantOnTop(s, pid, id)).length;
@@ -4111,7 +4113,8 @@ function payForBlocks(s: GameState, pid: PlayerId, a: Action): Action[] {
  * requirement makes some creature block (CR 509.1c), the blocks they'd choose themselves, which obey it.
  */
 function blocksForOpponent(s: GameState, pid: PlayerId, defender: PlayerId): Action {
-  if (!blockRequirementProblem(s, defender, [])) return { type: "declareBlockers", player: pid, blocks: [] };
+  // Blocks that cost mana (Archangel of Tithes) oblige no one (CR 509.1c): none, then.
+  if (blockCost(s, 1) || !blockRequirementProblem(s, defender, [])) return { type: "declareBlockers", player: pid, blocks: [] };
   const theirs = chooseBlocks(s, defender);
   return { type: "declareBlockers", player: pid, blocks: theirs.type === "declareBlockers" ? theirs.blocks : [] };
 }

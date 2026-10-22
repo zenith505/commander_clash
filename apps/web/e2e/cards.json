@@ -155,6 +155,38 @@
   ]
  },
  {
+  "oracleId": "abe377f8-35f0-4dea-a681-91d31a36815c",
+  "name": "Agitator Ant",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Insect",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Insect"
+  ],
+  "oracleText": "At the beginning of your end step, each player may put two +1/+1 counters on a creature they control. Goad each creature that had counters put on it this way. (Until your next turn, those creatures attack each combat if able and attack a player other than you if able.)",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Goad"
+  ],
+  "commanderLegal": "legal",
+  "set": "c20",
+  "releasedAt": "2020-04-17",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e101b744-9175-4aa5-bf80-d6944359e538",
   "name": "Airbending Lesson",
   "manaCost": "{2}{W}",

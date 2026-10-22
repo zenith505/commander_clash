@@ -1213,6 +1213,10 @@ const theyAreThatPlayer = (text: string) => text.replace(/^they (lose|draw|disca
  * opponent attacking that player does the same": each opponent of its controller with a creature attacking them).
  */
 function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | null {
+  // Paradox Haze: "At the beginning of enchanted player's first upkeep each turn, that player gets an additional upkeep
+  // step after this step" (CR 500.8; rulings: an upkeep skipped doesn't trigger it, two of them make two more).
+  const haze = /^At the beginning of enchanted player's first upkeep each turn, that player gets an additional upkeep step after this step\.$/.test(line);
+  if (haze) return { event: "eachUpkeep", body: { targets: [], effects: [{ type: "addUpkeepStep" }], text: "That player gets an additional upkeep step after this step." }, enchantedPlayersTurn: true, firstUpkeep: true };
   const step = /^At the beginning of enchanted (?:player|opponent)'s (upkeep|draw step|end step), (.+)$/.exec(line);
   if (step) {
     const event = step[1] === "upkeep" ? "eachUpkeep" : step[1] === "draw step" ? "eachDrawStep" : "eachEndStep";

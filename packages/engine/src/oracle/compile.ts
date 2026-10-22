@@ -1439,9 +1439,18 @@ export function compile(d: CardDef): CompiledCard {
       out.preventCombatFromEach = coverN;
       continue;
     }
-    const tapTimes = /^If you tap a permanent for mana, it produces (twice|three times) as much of that mana instead\.$/.exec(line);
+    // Nowhere to Run: creatures its controller's opponents control can be targeted as though they didn't have hexproof
+    // (nor any "hexproof from", CR 702.11e), by anyone's spells and abilities; their ward abilities don't trigger (rulings).
+    if (line === "Creatures your opponents control can be the targets of spells and abilities as though they didn't have hexproof. Ward abilities of those creatures don't trigger.") {
+      out.exposesOpponentsCreatures = true;
+      continue;
+    }
+    // Virtue of Strength: "If you tap a basic land for mana": only mana that a basic land is tapped for.
+    const tapTimes = /^If you tap a (permanent|basic land) for mana, it produces (twice|three times) as much of that mana instead\.$/.exec(line);
     if (tapTimes) {
-      out.tapManaTimes = (out.tapManaTimes ?? 1) * (tapTimes[1] === "twice" ? 2 : 3);
+      const n = tapTimes[2] === "twice" ? 2 : 3;
+      if (tapTimes[1] === "basic land") out.tapBasicManaTimes = (out.tapBasicManaTimes ?? 1) * n;
+      else out.tapManaTimes = (out.tapManaTimes ?? 1) * n;
       continue;
     }
     const plusLife = /^If you would gain life, you gain that much life plus (\d+) instead\.$/.exec(line);
@@ -1579,6 +1588,19 @@ export function compile(d: CardDef): CompiledCard {
     const lessFilter = activationLess && parseTargetPhrase(`${activationLess[1]!.replace(/s$/, "")}${activationLess[2] ?? ""}`);
     if (activationLess && lessFilter?.kind === "object") {
       (out.activationLess ??= []).push({ n: Number(activationLess[3]), filter: { ...lessFilter, text: `${activationLess[1]}${activationLess[2] ?? ""}` }, ...(activationLess[4] ? { atLeastOne: true as const } : {}) });
+      continue;
+    }
+    // Winter Orb, Winter Moon, Smoke, Static Orb, Mungha Wurm: a limit on what untaps in the untap step (CR 502.3).
+    const untapLimit = /^(As long as ~ is untapped, )?([Pp]layers|[Yy]ou) can't untap more than (one|two) (.+?) during (?:their|your) untap steps?\.$/.exec(line);
+    if (untapLimit) {
+      const filter = parseTargetPhrase(untapLimit[4]!.split(" ").map((w, i, a) => (i === a.length - 1 ? singularWord(w) : w)).join(" "));
+      if (filter?.kind !== "object" || filter.controller || filter.bound) out.unsupported.push(raw);
+      else (out.untapLimits ??= []).push({ n: num(untapLimit[3]!), filter: { ...filter, text: untapLimit[4]! }, ...(/^you$/i.test(untapLimit[2]!) ? { you: true as const } : {}), ...(untapLimit[1] ? { whileUntapped: true as const } : {}) });
+      continue;
+    }
+    const ninjutsuLess = /^Ninjutsu abilities you activate cost \{(\d+)\} less to activate\.$/.exec(line);
+    if (ninjutsuLess) {
+      out.ninjutsuLess = (out.ninjutsuLess ?? 0) + Number(ninjutsuLess[1]);
       continue;
     }
     const powerUpLess = /^Power-up abilities of other creatures you control cost \{(\d+)\} less to activate\.$/.exec(line);

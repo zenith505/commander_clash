@@ -161,12 +161,15 @@ export function manaCombos(s: GameState, o: GameObject, ab: ManaAbility): ManaTy
  * permanents they control that say "If you tap a permanent for mana, it produces twice as much of that mana instead"
  * (CR 106.12b). They multiply together (rulings on Mana Reflection), so the order they apply in doesn't matter (616.1).
  */
-export function tapManaTimes(s: GameState, pid: PlayerId): number {
+export function tapManaTimes(s: GameState, pid: PlayerId, tapped?: GameObject): number {
   let n = 1;
+  const basic = !!tapped && tapped.zone === "battlefield" && characteristics(s, tapped).supertypes.includes("Basic") && objIsType(s, tapped, "Land");
   for (const id of s.battlefield) {
     const o = obj(s, id);
-    const times = abilitiesOf(s, o).tapManaTimes;
-    if (times && controllerOf(s, o) === pid) n *= times;
+    if (controllerOf(s, o) !== pid) continue;
+    const ab = abilitiesOf(s, o);
+    if (ab.tapManaTimes) n *= ab.tapManaTimes;
+    if (basic && ab.tapBasicManaTimes) n *= ab.tapBasicManaTimes;
   }
   return n;
 }
@@ -180,7 +183,7 @@ export const timesAsMuch = (mana: ManaType[], n: number): ManaType[] => (n === 1
  */
 export function manaProduced(s: GameState, o: GameObject, ab: ManaAbility, choice: ManaType, combo?: number): ManaType[] {
   const made = baseManaProduced(s, o, ab, choice, combo);
-  return ab.tap && made.length ? timesAsMuch(made, tapManaTimes(s, controllerOf(s, o))) : made;
+  return ab.tap && made.length ? timesAsMuch(made, tapManaTimes(s, controllerOf(s, o), o)) : made;
 }
 
 function baseManaProduced(s: GameState, o: GameObject, ab: ManaAbility, choice: ManaType, combo?: number): ManaType[] {

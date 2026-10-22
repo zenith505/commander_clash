@@ -483,6 +483,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // resolves (rulings: "You aren't limited to one color").
   // "+1: Add {R} or {G}" (Domri, Anarch of Bolas): one mana of either, chosen as it resolves.
   if ((m = /^[Aa]dd \{([WUBRG])\} or \{([WUBRG])\}$/.exec(s)) && m[1] !== m[2]) return [{ type: "addMana", split: [m[1] as ManaType, m[2] as ManaType], times: 1 }];
+  // "Add three mana in any combination of {R} and/or {G}" (Orcish Lumberjack): each of either, chosen as it resolves.
+  if ((m = new RegExp(`^[Aa]dd ${NUM} mana in any combination of \\{([WUBRG])\\} and/or \\{([WUBRG])\\}$`).exec(s)) && m[2] !== m[3])
+    return [{ type: "addMana", split: [m[2] as ManaType, m[3] as ManaType], times: num(m[1]!) }];
   if ((m = /^[Aa]dd \{([WUBRG])\} or \{([WUBRG])\} for each (.+)$/.exec(s)) && m[1] !== m[2]) {
     const times = parseCount(m[3]!, ctx, true);
     return times && [{ type: "addMana", split: [m[1] as ManaType, m[2] as ManaType], times }];

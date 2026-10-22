@@ -35,7 +35,7 @@ export interface FaceDownPlay {
 /** "unblocked": blocked attackers that assign their combat damage as though they weren't blocked (CR 510.1). */
 /** "exert": attackers their controller exerts as they attack (CR 701.43d). */
 /** "choose": "Choose a creature you control. It gains indestructible until end of turn": only picked; "it" is that one. */
-export type PickAction = "attach" | "phaseOut" | "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "encode" | "keep" | "untap" | "tap" | "choose" | "meld" | "unattach";
+export type PickAction = "attach" | "phaseOut" | "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "untapLimited" | "encode" | "keep" | "untap" | "tap" | "choose" | "meld" | "unattach";
 
 /**
  * What "unless its controller pays ..." asks for (CR 118.12): a mana cost, plus generic mana counted
@@ -1776,7 +1776,7 @@ export type Effect =
    * `double`: "double the number of +1/+1 counters on each creature you control": each gets as many more as it has (CR
    * 701.10e), `n` aside; with `everyKind`, of each kind of counter it has ("double the number of each kind of counter").
    */
-  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true; double?: true; everyKind?: true; /** "That player ... puts a +1/+1 counter on it" (Alexios): who puts them, when not the ability's controller. */ by?: PlayerRef; /** With what "voted": each chosen permanent gets them from the player who chose it (Agitator Ant). */ byVoter?: true }
+  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true; /** As many as its power is above its base power, each its own (Sovereign Okinec Ahau). */ aboveBase?: true; double?: true; everyKind?: true; /** "That player ... puts a +1/+1 counter on it" (Alexios): who puts them, when not the ability's controller. */ by?: PlayerRef; /** With what "voted": each chosen permanent gets them from the player who chose it (Agitator Ant). */ byVoter?: true }
   /**
    * "Distribute X +1/+1 counters among any number of creatures you control" (no targets): its controller divides them
    * among the permanents like `filter` they control as it resolves (rulings on Blessing of Frost, CR 608.2d), each
@@ -2623,6 +2623,8 @@ export type Effect =
    * 500.8): only during the turn's first end step.
    */
   | { type: "addEndStep" }
+  /** "That player gets an additional upkeep step after this step" (Paradox Haze, CR 500.8): only during an upkeep. */
+  | { type: "addUpkeepStep" }
   | {
       type: "addPhases";
       /** "beginning": "there is an additional beginning phase after this phase" (Sphinx of the Second Sun): untap, upkeep and draw steps. */
@@ -3460,6 +3462,8 @@ export interface TriggeredAbility {
   secondMain?: true;
   /** "At the beginning of enchanted player's upkeep": an "each" step trigger only on the turn of the player this Aura enchants. */
   enchantedPlayersTurn?: true;
+  /** "At the beginning of enchanted player's first upkeep each turn" (Paradox Haze): not an additional upkeep. */
+  firstUpkeep?: true;
   /** "Deals damage to an opponent": an opponent of this ability's controller (rulings on Curiosity). */
   toOpponent?: true;
   /** For "batch": what the event has to move, see BatchTrigger. */
@@ -3554,7 +3558,7 @@ export interface ActivatedAbility {
    * The keyword written before it ("Exhaust — {2}{G}: ..."), which effects can refer to (CR 702.142b, 702.177b). A power-up
    * ability costs less by the permanent's mana cost if it entered this turn (CR 702.193a): see game.ts activationCost.
    */
-  keyword?: "Exhaust" | "Boast" | "Power-up";
+  keyword?: "Exhaust" | "Boast" | "Power-up" | "Ninjutsu";
   /** "Activate no more than twice each turn" (CR 602.5b). */
   maxPerTurn?: number;
   /** "X can't be 0." for an X in its costs ("Sacrifice X artifacts", Ruthless Technomancer). */
@@ -4281,6 +4285,13 @@ export interface CompiledCard {
    * 614.1a), the factor it multiplies by. Several multiply together (rulings).
    */
   tapManaTimes?: number;
+  /**
+   * "Creatures your opponents control can be the targets of spells and abilities as though they didn't have hexproof.
+   * Ward abilities of those creatures don't trigger." (Nowhere to Run, CR 702.11e).
+   */
+  exposesOpponentsCreatures?: true;
+  /** "If you tap a basic land for mana, it produces three times as much of that mana instead" (Virtue of Strength). */
+  tapBasicManaTimes?: number;
   /** "If you would gain life, you gain that much life plus 1 instead" (CR 614.1a): N for each. */
   lifeGainPlus?: number;
   /** "Damage that would reduce your life total to less than 1 reduces it to 1 instead" (Ali from Cairo): that number. */
@@ -4458,6 +4469,14 @@ export interface CompiledCard {
    * permanents like `filter` on the battlefield from the source's controller's view; `atLeastOne`, never below one mana.
    */
   activationLess?: { n: number; filter: TargetSpec; atLeastOne?: true }[];
+  /**
+   * "Players can't untap more than one nonbasic land during their untap steps" (Winter Moon), "You can't untap more than
+   * one land during your untap step" (Mungha Wurm, `you`), "As long as ~ is untapped, players can't untap more than two
+   * permanents ..." (Static Orb, `whileUntapped`): the active player chooses which of them untap (CR 502.3).
+   */
+  untapLimits?: { n: number; filter: TargetSpec; you?: true; whileUntapped?: true }[];
+  /** "Ninjutsu abilities you activate cost {1} less to activate" (Silver-Fur Master, CR 602.2b applies 601.2f). */
+  ninjutsuLess?: number;
   /** "The "legend rule" doesn't apply to permanents you control" (CR 704.5j): to these, from the source's controller's view. */
   noLegendRule?: TargetSpec[];
   /**

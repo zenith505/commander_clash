@@ -9523,6 +9523,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "39451b4d-cd7a-40da-b457-cb51b609173f",
+  "name": "Seat of the Synod",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Artifact Land",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {U}.",
+  "colors": [],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "U"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2021-10-15",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a53baf90-8d0c-4900-9f24-893ad31628ec",
   "name": "Secret Door",
   "manaCost": "{U}",
@@ -11966,6 +11994,34 @@
   "gameChanger": true
  },
  {
+  "oracleId": "09496421-74e4-466a-9546-56f2a0c8eef4",
+  "name": "Vault of Whispers",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Artifact Land",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Add {B}.",
+  "colors": [],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B"
+  ],
+  "commanderLegal": "legal",
+  "set": "40k",
+  "releasedAt": "2022-10-07",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f83a768c-162d-46f0-8ebd-d9c6b2c69322",
   "name": "Vein Ripper",
   "manaCost": "{3}{B}{B}{B}",
@@ -12512,6 +12568,28 @@
   "set": "kld",
   "releasedAt": "2016-09-30",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "b922f057-1c91-43eb-b74a-8a933b1be2d2",
+  "name": "Winter Moon",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Players can't untap more than one nonbasic land during their untap steps.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mh3",
+  "releasedAt": "2024-06-14",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

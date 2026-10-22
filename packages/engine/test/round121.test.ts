@@ -2,11 +2,11 @@
 // the most played cards.
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, passUntil, putOnBattlefield, scry, setup } from "./helpers";
-import { botActions, castProblem, characteristics, chooseTargets, compileCard, isFullySupported, planActivate, planCast, spellCost, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
+import { act, bear, card, forest, passUntil, putOnBattlefield, scry, setup } from "./helpers";
+import { botActions, castProblem, characteristics, chooseTargets, compileCard, isFullySupported, manaOptions, planActivate, planCast, spellCost, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
 import { invalidateCharacteristics } from "../src/layers";
 import { abilitiesOf } from "../src/cards";
-import { moveObject, unlockCost } from "../src/game";
+import { activationCost, moveObject, unlockCost } from "../src/game";
 import { createEmblem } from "../src/emblems";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -410,5 +410,204 @@ describe("celebration", () => {
     s = settle(run(s, planCast(s, ap, ids[1]!)));
     expect(characteristics(s, s.objects[g]!).power).toBe(3);
     expect(characteristics(s, s.objects[g]!).keywords).toContain("Trample");
+  });
+});
+
+const virtue = scry("adventure", [
+  { name: "Virtue of Strength", mana_cost: "{5}{G}{G}", type_line: "Enchantment", oracle_text: "If you tap a basic land for mana, it produces three times as much of that mana instead." },
+  { name: "Garenbrig Growth", mana_cost: "{G}", type_line: "Sorcery — Adventure", oracle_text: "Return target creature or land card from your graveyard to your hand. (Then exile this card. You may cast the enchantment later from exile.)" },
+]);
+const grove = card("Test Grove", "Land", "", { oracleText: "{T}: Add {G}." });
+const manaPool = (s: GameState, pid: PlayerId) => Object.entries(s.players[pid]!.manaPool).flatMap(([m, n]) => Array<string>(n).fill(m)).join("");
+
+describe("Virtue of Strength", () => {
+  it("a basic land you tap for mana produces three times as much; a nonbasic land doesn't, nor an opponent's basic", () => {
+    supported(virtue);
+    const { s: s0, ap, opp } = setup([]);
+    for (const id of s0.battlefield) s0.objects[id]!.tapped = true;
+    putOnBattlefield(s0, ap, virtue);
+    const f = putOnBattlefield(s0, ap, forest);
+    const g = putOnBattlefield(s0, ap, grove);
+    const theirs = putOnBattlefield(s0, opp, forest);
+    expect(manaOptions(s0, s0.objects[f]!).map((x) => x.adds.join(""))).toEqual(["GGG"]);
+    let s = act(s0, { type: "activateMana", player: ap, objectId: f, mana: "G" });
+    expect(manaPool(s, ap)).toBe("GGG");
+    s = act(s, { type: "activateMana", player: ap, objectId: g, mana: "G" });
+    expect(manaPool(s, ap)).toBe("GGGG");
+    expect(manaOptions(s0, s0.objects[theirs]!).map((x) => x.adds.join(""))).toEqual(["G"]);
+  });
+});
+
+const nowhere = card("Nowhere to Run", "Enchantment", "{1}{B}", { keywords: ["Flash"], oracleText: "Flash\nWhen this enchantment enters, target creature an opponent controls gets -3/-3 until end of turn.\nCreatures your opponents control can be the targets of spells and abilities as though they didn't have hexproof. Ward abilities of those creatures don't trigger." });
+const hexBear = card("Hexproof Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2", keywords: ["Hexproof"], oracleText: "Hexproof" });
+const wardBear = card("Ward Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2", keywords: ["Ward"], oracleText: "Ward {2}" });
+const bolt = card("Test Bolt", "Instant", "{R}", { oracleText: "Test Bolt deals 3 damage to any target." });
+
+describe("Nowhere to Run", () => {
+  it("your opponents' creatures can be targeted as though they didn't have hexproof, and their ward doesn't trigger", () => {
+    supported(nowhere);
+    const { s: s0, ap, ids, opp } = setup([bolt, bolt]);
+    const hex = putOnBattlefield(s0, opp, hexBear);
+    const ward = putOnBattlefield(s0, opp, wardBear);
+    invalidateCharacteristics(s0);
+    expect(castProblem(s0, ap, ids[0]!, [{ kind: "object", id: hex }])).toMatch(/target/);
+    // Without it, ward triggers.
+    const warded = run(s0, planCast(s0, ap, ids[1]!, [{ kind: "object", id: ward }]));
+    expect(warded.triggerQueue.length + warded.stack.filter((x) => x.kind !== "spell").length).toBe(1);
+    putOnBattlefield(s0, ap, nowhere);
+    invalidateCharacteristics(s0);
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: hex }])));
+    expect(s.objects[hex]!.zone).toBe("graveyard");
+    s = run(s, planCast(s, ap, ids[1]!, [{ kind: "object", id: ward }]));
+    expect(s.triggerQueue.length + s.stack.filter((x) => x.kind !== "spell").length).toBe(0);
+    s = settle(s);
+    expect(s.objects[ward]!.zone).toBe("graveyard");
+  });
+});
+
+const haze = card("Paradox Haze", "Enchantment — Aura", "{2}{U}", { keywords: ["Enchant"], oracleText: "Enchant player\nAt the beginning of enchanted player's first upkeep each turn, that player gets an additional upkeep step after this step." });
+const upkeepDrain = card("Test Upkeeper", "Enchantment", "{1}{B}", { oracleText: "At the beginning of your upkeep, you lose 1 life." });
+
+describe("Paradox Haze", () => {
+  it("the enchanted player gets one additional upkeep after their first, so their upkeep triggers happen twice", () => {
+    supported(haze);
+    const { s: s0, ap, opp } = setup([]);
+    const h = putOnBattlefield(s0, ap, haze);
+    s0.objects[h]!.attachedToPlayer = opp;
+    putOnBattlefield(s0, opp, upkeepDrain);
+    invalidateCharacteristics(s0);
+    const life = s0.players[opp]!.life;
+    let s = s0;
+    for (let i = 0; i < 400 && !(s.activePlayer === opp && s.step === "draw"); i++) s = s.pending ? botActions(s, s.pending.player).reduce((x, a) => act(x, a), s) : act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.activePlayer).toBe(opp);
+    expect(s.turnLog?.upkeeps).toBe(2);
+    expect(s.players[opp]!.life).toBe(life - 2);
+    expect(s.log.filter((l) => l.text === "An additional upkeep step begins.").length).toBe(1);
+  });
+});
+
+const okinec = card("Sovereign Okinec Ahau", "Legendary Creature — Cat Noble", "{2}{G}{W}", { power: "3", toughness: "4", keywords: ["Ward"], oracleText: "Ward {2}\nWhenever Sovereign Okinec Ahau attacks, for each creature you control with power greater than that creature's base power, put a number of +1/+1 counters on that creature equal to the difference." });
+
+describe("Sovereign Okinec Ahau", () => {
+  it("when it attacks, each creature you control above its base power gets counters equal to the difference", () => {
+    supported(okinec);
+    const { s: s0, ap, opp } = setup([]);
+    const ok = putOnBattlefield(s0, ap, okinec);
+    const big = putOnBattlefield(s0, ap, bear());
+    const plain = putOnBattlefield(s0, ap, bear());
+    const theirs = putOnBattlefield(s0, opp, bear());
+    s0.objects[big]!.counters["+1/+1"] = 2;
+    s0.objects[theirs]!.counters["+1/+1"] = 1;
+    invalidateCharacteristics(s0);
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: ok, defender: opp }] });
+    s = settle(s);
+    expect(s.objects[big]!.counters["+1/+1"]).toBe(4);
+    expect(s.objects[plain]!.counters["+1/+1"] ?? 0).toBe(0);
+    expect(s.objects[ok]!.counters["+1/+1"] ?? 0).toBe(0);
+    expect(s.objects[theirs]!.counters["+1/+1"]).toBe(1);
+  });
+});
+
+const silverFur = card("Silver-Fur Master", "Creature — Rat Ninja", "{U}{B}", { power: "2", toughness: "2", keywords: ["Ninjutsu"], oracleText: "Ninjutsu {U}{B} ({U}{B}, Return an unblocked attacker you control to hand: Put this card onto the battlefield from your hand tapped and attacking.)\nNinjutsu abilities you activate cost {1} less to activate.\nOther Ninja and Rogue creatures you control get +1/+1." });
+const infiltrator = card("Ingenious Infiltrator", "Creature — Vedalken Ninja", "{2}{U}{B}", { power: "2", toughness: "3", keywords: ["Ninjutsu"], oracleText: "Ninjutsu {U}{B} ({U}{B}, Return an unblocked attacker you control to hand: Put this card onto the battlefield from your hand tapped and attacking.)\nWhenever a Ninja you control deals combat damage to a player, draw a card." });
+const rogue = card("Test Rogue", "Creature — Human Rogue", "{1}{B}", { power: "2", toughness: "2", oracleText: "" });
+
+describe("Silver-Fur Master", () => {
+  it("other Ninjas and Rogues get +1/+1 (a Ninja Rogue once); ninjutsu costs {1} less, only generic mana", () => {
+    supported(silverFur, infiltrator);
+    const { s: s0, ap, ids } = setup([infiltrator, silverFur]);
+    const r = putOnBattlefield(s0, ap, rogue);
+    const b = putOnBattlefield(s0, ap, bear());
+    const ninjutsu = (s: GameState, id: string) => activationCost(s, ap, s.objects[id]!, abilitiesOf(s, s.objects[id]!).activated.find((a) => a.keyword === "Ninjutsu")!).symbols;
+    const before = ninjutsu(s0, ids[0]!);
+    const sf = putOnBattlefield(s0, ap, silverFur);
+    invalidateCharacteristics(s0);
+    expect(characteristics(s0, s0.objects[r]!).power).toBe(3);
+    expect(characteristics(s0, s0.objects[b]!).power).toBe(2);
+    expect(characteristics(s0, s0.objects[sf]!).power).toBe(2);
+    // {U}{B} has no generic mana to take off.
+    expect(ninjutsu(s0, ids[0]!)).toEqual(before);
+    const pricey = card("Test Ninja", "Creature — Human Ninja", "{3}{U}", { power: "3", toughness: "3", keywords: ["Ninjutsu"], oracleText: "Ninjutsu {2}{U} ({2}{U}, Return an unblocked attacker you control to hand: Put this card onto the battlefield from your hand tapped and attacking.)" });
+    const pn = toHand(s0, ap, pricey);
+    expect(ninjutsu(s0, pn)).toEqual(expect.arrayContaining([{ kind: "generic", amount: 1 }]));
+  });
+});
+
+const lumberjack = card("Orcish Lumberjack", "Creature — Orc", "{R}", { power: "1", toughness: "1", oracleText: "{T}, Sacrifice a Forest: Add three mana in any combination of {R} and/or {G}." });
+
+describe("Orcish Lumberjack", () => {
+  it("sacrifice a Forest: three mana, as much {R} and {G} as you choose", () => {
+    supported(lumberjack);
+    const { s: s0, ap } = setup([]);
+    const lj = putOnBattlefield(s0, ap, lumberjack);
+    const f = s0.battlefield.find((id) => s0.objects[id]!.controller === ap && s0.cards[s0.objects[id]!.cardId]!.name === "Forest")!;
+    invalidateCharacteristics(s0);
+    const before = manaPool(s0, ap);
+    let s = run(s0, planActivate(s0, ap, lj, 0, undefined, undefined, undefined, undefined, { sacrifice: [f] }));
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "either" });
+    s = act(s, { type: "chooseOption", player: ap, choice: "1" });
+    expect(s.objects[f]!.zone).toBe("graveyard");
+    expect(manaPool(s, ap).length - before.length).toBe(3);
+    expect(s.players[ap]!.manaPool.R).toBe(1);
+    expect(s.players[ap]!.manaPool.G).toBe(2);
+  });
+});
+
+const winterMoon = card("Winter Moon", "Artifact", "{2}", { oracleText: "Players can't untap more than one nonbasic land during their untap steps." });
+const winterOrb = card("Winter Orb", "Artifact", "{2}", { oracleText: "As long as this artifact is untapped, players can't untap more than one land during their untap steps." });
+const staticOrb = card("Static Orb", "Artifact", "{3}", { oracleText: "As long as this artifact is untapped, players can't untap more than two permanents during their untap steps." });
+const nonbasic = (n: number) => card(`Test Vale ${n}`, "Land", "", { oracleText: "{T}: Add {G}." });
+
+describe("untap limits (Winter Moon, Winter Orb, Static Orb)", () => {
+  const nextUntap = (s: GameState, pid: PlayerId) => {
+    for (let i = 0; i < 2000 && !(s.pending?.kind === "pickPermanents" && s.pending.action === "untapLimited") && !(s.activePlayer === pid && s.step === "upkeep"); i++)
+      s = s.pending ? botActions(s, s.pending.player).reduce((x, a) => act(x, a), s) : act(s, { type: "passPriority", player: waitingOn(s)! });
+    return s;
+  };
+
+  it("Winter Moon: the active player untaps one nonbasic land of their choice; basics untap as usual", () => {
+    supported(winterMoon, winterOrb, staticOrb);
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, winterMoon);
+    const vales = [nonbasic(1), nonbasic(2), nonbasic(3)].map((d) => putOnBattlefield(s0, ap, d));
+    for (const id of s0.battlefield) if (s0.objects[id]!.controller === ap) s0.objects[id]!.tapped = true;
+    s0.objects[s0.battlefield.find((id) => s0.cards[s0.objects[id]!.cardId]!.name === "Winter Moon")!]!.tapped = false;
+    // Passed around to ap's next untap step, where it asks.
+    let s = nextUntap(s0, ap);
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", action: "untapLimited", player: ap, what: "one nonbasic land" });
+    expect([...(s.pending as { options: string[] }).options].sort()).toEqual([...vales].sort());
+    expect(() => act(s, { type: "pickPermanents", player: ap, ids: vales.slice(0, 2) })).toThrow(/can't untap more than one nonbasic land/);
+    expect(() => act(s, { type: "pickPermanents", player: ap, ids: [] })).toThrow(/can untap too/);
+    s = act(s, { type: "pickPermanents", player: ap, ids: [vales[1]!] });
+    expect(vales.map((id) => s.objects[id]!.tapped)).toEqual([true, false, true]);
+    const basics = s.battlefield.filter((id) => s.objects[id]!.controller === ap && /Basic/.test(s.cards[s.objects[id]!.cardId]!.typeLine));
+    expect(basics.every((id) => !s.objects[id]!.tapped)).toBe(true);
+  });
+
+  it("Winter Orb only while untapped (as the step begins); Static Orb's two permanents and Winter Orb's one land at once", () => {
+    const { s: s0, ap } = setup([]);
+    const orb = putOnBattlefield(s0, ap, winterOrb);
+    for (const id of s0.battlefield) if (s0.objects[id]!.controller === ap) s0.objects[id]!.tapped = true;
+    // Tapped: everything untaps (rulings).
+    let s = nextUntap(s0, ap);
+    expect(s.pending).toBeNull();
+    expect(s.battlefield.filter((id) => s.objects[id]!.controller === ap).every((id) => !s.objects[id]!.tapped)).toBe(true);
+    // Untapped Winter Orb and Static Orb: two permanents, at most one a land; the bot keeps to both.
+    const { s: t0, ap: bp } = setup([]);
+    putOnBattlefield(t0, bp, winterOrb);
+    putOnBattlefield(t0, bp, staticOrb);
+    const b1 = putOnBattlefield(t0, bp, bear());
+    for (const id of t0.battlefield) if (t0.objects[id]!.controller === bp && t0.cards[t0.objects[id]!.cardId]!.name !== "Winter Orb" && t0.cards[t0.objects[id]!.cardId]!.name !== "Static Orb") t0.objects[id]!.tapped = true;
+    let t = nextUntap(t0, bp);
+    expect(t.pending).toMatchObject({ action: "untapLimited" });
+    expect((t.pending as { what: string }).what.split(" and ").sort()).toEqual(["one land", "two permanents"]);
+    const pick = botActions(t, bp);
+    t = pick.reduce((x, a) => act(x, a), t);
+    const untapped = t.battlefield.filter((id) => t.objects[id]!.controller === bp && !t.objects[id]!.tapped && !/Orb/.test(t.cards[t.objects[id]!.cardId]!.name));
+    expect(untapped.length).toBe(2);
+    expect(untapped.filter((id) => /Land/.test(t.cards[t.objects[id]!.cardId]!.typeLine)).length).toBe(1);
+    expect(untapped).toContain(b1);
+    expect(s.objects[orb]!.tapped).toBe(false);
   });
 });

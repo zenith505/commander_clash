@@ -4,11 +4,12 @@ import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
 import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, canBeSacrificed, defOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
-import { manaAbilitiesOn, manaActionAbility } from "./manaabilities";
+import { manaAbilitiesOn, manaActionAbility, manaChoices } from "./manaabilities";
 import { bindChosen, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, manySlot, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
   applyAction,
+  untapChoiceProblem,
   blockCost,
   livingPlayers,
   abilityProblem,
@@ -339,6 +340,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const saving = (id: string) => manaAbilitiesOn(s, obj(s, id)).some((ab) => ab.produces.kind === "removeX" && (obj(s, id).counters[ab.produces.counter] ?? 0) < 3);
       return [{ type: "pickPermanents", player: pid, ids: pend.options.filter((id) => s.effects.some((e) => e.whileTapped?.id === id) || saving(id)) }];
     }
+    // Winter Orb and the like: untap the most useful ones the limits allow (lands making a color we lack first).
+    if (pend.kind === "pickPermanents" && pend.action === "untapLimited") return [{ type: "pickPermanents", player: pid, ids: chooseLimitedUntap(s, pid, pend.options) }];
     // Ripples of Potential: phase out what an opponent's spell or ability on the stack is aimed at, to save it.
     if (pend.kind === "pickPermanents" && pend.action === "phaseOut") {
       const aimed = new Set(s.stack.filter((it) => it.controller !== pid).flatMap((it) => it.targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])));
@@ -830,6 +833,24 @@ function chooseExert(s: GameState, pid: PlayerId, options: ObjectId[]): ObjectId
   if (player(s, pid).life <= 10) return [];
   const onExert = s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).triggers.some((t) => t.event === "youExert"));
   return options.filter((id) => onExert || abilitiesOf(s, obj(s, id)).triggers.some((t) => t.event === "selfExerted"));
+}
+
+/**
+ * What to untap under Winter Orb, Static Orb, Smoke and the like (CR 502.3): the best first, each one the limits still
+ * allow, so the choice is as full as it can be. Lands making a color no other untapped land makes come first, then
+ * creatures by what they're worth, then the rest.
+ */
+function chooseLimitedUntap(s: GameState, pid: PlayerId, options: ObjectId[]): ObjectId[] {
+  const untapped = s.battlefield.filter((id) => !obj(s, id).tapped && controllerOf(s, obj(s, id)) === pid);
+  const colors = new Set(untapped.flatMap((id) => manaAbilitiesOn(s, obj(s, id)).flatMap((ab) => manaChoices(s, obj(s, id), ab))));
+  const value = (id: ObjectId) => {
+    const o = obj(s, id);
+    const fresh = manaAbilitiesOn(s, o).flatMap((ab) => manaChoices(s, o, ab)).filter((c) => !colors.has(c)).length;
+    return fresh * 100 + (objIsType(s, o, "Creature") ? targetWorth(s, pid, { kind: "object", id }, false, 0) : 0) + (objIsType(s, o, "Land") ? 20 : 0);
+  };
+  const chosen: ObjectId[] = [];
+  for (const id of [...options].sort((a, b) => value(b) - value(a))) if (!untapChoiceProblem(s, pid, [], [...chosen, id])) chosen.push(id);
+  return chosen;
 }
 
 /**

@@ -82,6 +82,9 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       return;
     }
+    case "addUpkeepStep":
+      if (s.step === "upkeep") s.extraUpkeeps = (s.extraUpkeeps ?? 0) + 1;
+      return;
     case "addEndStep":
       if (s.step === "end" && (s.turnLog?.endSteps ?? 0) === 1) s.extraEndSteps = (s.extraEndSteps ?? 0) + 1;
       return;
@@ -435,8 +438,11 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         }
         const k = Math.max(0, Math.min(n, sc.either));
         delete sc.either;
-        for (const m of mix(k).matchAll(/\{([WUBRGC])\}/g)) addMana(s, p.id, [m[1] as ManaType], { from: manaSourceOrigins(s, ctx) });
-        log(s, `${p.name} adds ${mix(k)}.`);
+        // Tapped for mana (Orcish Lumberjack): Mana Reflection's replacement multiplies it (CR 106.12b).
+        const made = [...mix(k).matchAll(/\{([WUBRGC])\}/g)].map((m) => m[1] as ManaType);
+        const added = s.resolving?.item.manaAbility?.tapped ? timesAsMuch(made, tapManaTimes(s, ctx.controller, ctx.sourceId ? s.objects[ctx.sourceId] : undefined)) : made;
+        for (const m of added) addMana(s, p.id, [m], { from: manaSourceOrigins(s, ctx) });
+        log(s, `${p.name} adds ${added.map((m) => `{${m}}`).join("")}.`);
         return;
       }
       if (e.anyColors) {
@@ -463,7 +469,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (marked) (marked.triggeredThisTurn ??= []).push(`${ctx.sourceZc ?? marked.zoneChanges ?? 0}|addedMana`);
       // An activated mana ability with {T} in its cost taps its source for mana (CR 106.12): Mana Reflection's
       // replacement effect multiplies what it produces (106.12b).
-      if (s.resolving?.item.manaAbility?.tapped) added = timesAsMuch([...added.matchAll(/\{([WUBRGC])\}/g)].map((m) => m[1] as ManaType), tapManaTimes(s, ctx.controller)).map((m) => `{${m}}`).join("");
+      if (s.resolving?.item.manaAbility?.tapped) added = timesAsMuch([...added.matchAll(/\{([WUBRGC])\}/g)].map((m) => m[1] as ManaType), tapManaTimes(s, ctx.controller, ctx.sourceId ? s.objects[ctx.sourceId] : undefined)).map((m) => `{${m}}`).join("");
       // What the mana's source was (CR 106.3): a mana ability's source as it was activated, else a snow spell, or the
       // ability's source (snow mana, CR 107.4h; mana from a creature).
       const from = s.resolving?.item.manaAbility ? (s.resolving.item.manaAbility.from ?? []) : manaSourceOrigins(s, ctx);

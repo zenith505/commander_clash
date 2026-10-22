@@ -2160,6 +2160,12 @@ function advanceStep(s: GameState): void {
   if (s.step === "cleanup") return startNextTurn(s);
   // "There is an additional end step after this step" (Y'shtola Rhul, CR 500.8): only an end step, no cleanup before it
   // (rulings).
+  // "That player gets an additional upkeep step after this step" (Paradox Haze, CR 500.8).
+  if (s.step === "upkeep" && s.extraUpkeeps) {
+    s.extraUpkeeps = s.extraUpkeeps > 1 ? s.extraUpkeeps - 1 : undefined;
+    log(s, "An additional upkeep step begins.");
+    return beginStep(s, "upkeep");
+  }
   if (s.step === "end" && s.extraEndSteps) {
     s.extraEndSteps = s.extraEndSteps > 1 ? s.extraEndSteps - 1 : undefined;
     log(s, "An additional end step begins.");
@@ -2223,6 +2229,7 @@ export function endTheTurn(s: GameState, item?: StackItem): void {
   s.addedPhases = undefined;
   s.resumeStep = undefined;
   s.extraEndSteps = undefined;
+  s.extraUpkeeps = undefined;
   s.cleanupAgain = undefined;
   beginStep(s, "cleanup");
 }
@@ -2367,6 +2374,7 @@ function startNextTurn(s: GameState, skipping = false) {
   s.damageThisTurn = undefined;
   s.turnLog = undefined;
   s.extraEndSteps = undefined;
+  s.extraUpkeeps = undefined;
   s.oneOfUsed = undefined;
   s.byTypeCast = undefined;
   s.diedThisTurn = undefined;
@@ -2406,9 +2414,47 @@ function startNextTurn(s: GameState, skipping = false) {
   beginStep(s, "untap");
 }
 
+/**
+ * The limits on what untaps in the active player's untap step (Winter Orb, Static Orb, Winter Moon, Smoke, Mungha Wurm):
+ * each its own, all of them holding at once (rulings on Winter Moon). Winter Orb's is looked at as the step begins: tapped
+ * then, it doesn't limit anything (rulings).
+ */
+export function untapLimitsNow(s: GameState, ap: PlayerId): { n: number; filter: TargetSpec }[] {
+  return s.battlefield.flatMap((id) => {
+    const o = obj(s, id);
+    return (abilitiesOf(s, o).untapLimits ?? []).filter((l) => (!l.you || controllerOf(s, o) === ap) && !(l.whileUntapped && o.tapped)).map((l) => ({ n: l.n, filter: l.filter }));
+  });
+}
+
+const UNTAP_WORDS = ["no", "one", "two"];
+
+/** Is `chosen` a choice of what untaps that keeps to every limit, with nothing more that could untap (CR 502.3)? */
+export function untapChoiceProblem(s: GameState, ap: PlayerId, options: ObjectId[], chosen: ObjectId[]): string | undefined {
+  const limits = untapLimitsNow(s, ap);
+  const fits = (ids: ObjectId[]) => limits.every((l) => ids.filter((id) => objectMatches(s, l.filter, obj(s, id), ap, false)).length <= l.n);
+  const over = limits.find((l) => chosen.filter((id) => objectMatches(s, l.filter, obj(s, id), ap, false)).length > l.n);
+  if (over) return `you can't untap more than ${UNTAP_WORDS[over.n] ?? over.n} ${over.filter.text}`;
+  const more = options.find((id) => !chosen.includes(id) && fits([...chosen, id]));
+  return more ? `${nameOf(s, more)} can untap too: untap as many as the limits allow` : undefined;
+}
+
 /** The untap step untaps the active player's permanents, except `keep` (CR 502.3), then ends (no priority, CR 502.4). */
-function untapStep(s: GameState, keep: ObjectId[]): void {
+function untapStep(s: GameState, keep: ObjectId[], limited?: ObjectId[]): void {
   const ap = s.activePlayer;
+  // "Players can't untap more than one land during their untap steps": the active player chooses which (CR 502.3).
+  if (!limited) {
+    const limits = untapLimitsNow(s, ap);
+    const would = s.battlefield.filter((id) => {
+      const o = obj(s, id);
+      return o.tapped && controllerOf(s, o) === ap && !o.skipNextUntap && !keep.includes(id) && !characteristics(s, o).doesntUntap;
+    });
+    const options = would.filter((id) => limits.some((l) => objectMatches(s, l.filter, obj(s, id), ap, false)));
+    if (limits.some((l) => options.filter((id) => objectMatches(s, l.filter, obj(s, id), ap, false)).length > l.n)) {
+      const what = limits.map((l) => `${UNTAP_WORDS[l.n] ?? l.n} ${l.filter.text}`).join(" and ");
+      s.pending = { kind: "pickPermanents", player: ap, source: "Untap step", action: "untapLimited", what, options, count: options.length, min: 0, ...(keep.length ? { kept: keep } : {}) };
+      return;
+    }
+  }
   for (const id of s.battlefield) {
     const o = obj(s, id);
     if (controllerOf(s, o) !== ap) {
@@ -2418,7 +2464,7 @@ function untapStep(s: GameState, keep: ObjectId[]): void {
       continue;
     }
     if (o.skipNextUntap) o.skipNextUntap = undefined;
-    else if (!keep.includes(id) && !characteristics(s, o).doesntUntap) untapPermanent(s, o); // CR 502.3
+    else if (!keep.includes(id) && !characteristics(s, o).doesntUntap && !(limited && untapLimitsNow(s, ap).some((l) => objectMatches(s, l.filter, o, ap, false)) && !limited.includes(id))) untapPermanent(s, o); // CR 502.3
   }
   return advanceStep(s);
 }
@@ -2469,6 +2515,7 @@ function beginStep(s: GameState, step: Step): void {
       const p = player(s, ap);
       p.lastUpkeepTurn = p.upkeepTurn;
       p.upkeepTurn = s.turn;
+      (s.turnLog ??= {}).upkeeps = (s.turnLog.upkeeps ?? 0) + 1;
       fireEvent(s, { type: "step", step: "upkeep", active: ap });
       break;
     }
@@ -5378,7 +5425,7 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
   // 702.193a-b, 118.7).
   const powerUp = ab.keyword === "Power-up" && o.zone === "battlefield";
   const cost = powerUp && o.enteredTurn === s.turn ? reduceByManaCost(cost1, parseManaCost(defOf(s, o).manaCost ?? "")) : cost1;
-  if (!ab.equip && !ab.costLess && !powerUp) return cost;
+  if (!ab.equip && !ab.costLess && !powerUp && ab.keyword !== "Ninjutsu") return cost;
   let less = ab.costLess ? Math.max(0, evalAmount(s, ab.costLess, { controller: pid, sourceId: o.id })) : 0;
   // "For each color of the creature it targets": as the target is when the cost is worked out (CR 601.2f).
   const per = ab.costLessPerTarget;
@@ -5389,6 +5436,12 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
     const src = obj(s, id);
     const n = abilitiesOf(s, src).powerUpLess;
     if (n && src.id !== o.id && controllerOf(s, src) === pid && controllerOf(s, o) === pid && objIsType(s, o, "Creature")) less += n;
+  }
+  // "Ninjutsu abilities you activate cost {1} less to activate" (Silver-Fur Master): generic mana only.
+  for (const id of ab.keyword === "Ninjutsu" ? s.battlefield : []) {
+    const src = obj(s, id);
+    const n = controllerOf(s, src) === pid ? abilitiesOf(s, src).ninjutsuLess : undefined;
+    if (n) less += n;
   }
   const target = targets?.[0]?.kind === "object" ? targets[0].id : undefined;
   for (const id of ab.equip ? s.battlefield : []) {
@@ -5783,7 +5836,7 @@ function chooseHandToTop(s: GameState, p: Player, ids: ObjectId[]) {
 function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
   const pend = s.pending;
   const r = s.resolving;
-  if (pend?.kind !== "pickPermanents" || pend.player !== p.id || (!pend.objectId && pend.action !== "unblocked" && pend.action !== "band" && pend.action !== "exert" && pend.action !== "keepTapped" && !r?.scratch?.queue)) throw new RulesError("nothing to pick");
+  if (pend?.kind !== "pickPermanents" || pend.player !== p.id || (!pend.objectId && pend.action !== "unblocked" && pend.action !== "band" && pend.action !== "exert" && pend.action !== "keepTapped" && pend.action !== "untapLimited" && !r?.scratch?.queue)) throw new RulesError("nothing to pick");
   if (ids.some((id) => !pend.options.includes(id))) throw new RulesError("choose from the permanents offered");
   const n = new Set(ids).size;
   if (n !== ids.length || n > pend.count || n < (pend.min ?? pend.count))
@@ -5797,6 +5850,14 @@ function pickPermanents(s: GameState, p: Player, ids: ObjectId[]) {
     s.pending = null;
     if (ids.length) log(s, `${p.name} keeps ${ids.map((id) => nameOf(s, id)).join(", ")} tapped.`);
     untapStep(s, ids);
+    return;
+  }
+  if (pend.action === "untapLimited") {
+    const problem = untapChoiceProblem(s, p.id, pend.options, ids);
+    if (problem) throw new RulesError(problem);
+    s.pending = null;
+    log(s, `${p.name} untaps ${ids.length ? ids.map((id) => nameOf(s, id)).join(", ") : "none"} of ${pend.options.length} (${pend.what} at most).`);
+    untapStep(s, pend.kept ?? [], ids);
     return;
   }
   if (pend.action === "enlist") {

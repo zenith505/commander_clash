@@ -1004,6 +1004,7 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
         sacrificeSelf: false,
         sorcerySpeed: false,
         zone: "hand",
+        keyword: "Ninjutsu", // commander ninjutsu is a ninjutsu ability (CR 702.49d)
         ...(cmd ? { orCommand: true as const } : {}),
         costs: [{ kind: "returnToHand", filter: { kind: "object", types: ["Creature"], controller: "you", text: "unblocked attacker you control" }, n: 1, unblockedAttacker: true }],
         body: { targets: [], effects: [{ type: "ninjutsu" }], text: cmd ? "Put ~ onto the battlefield tapped and attacking." : "Put ~ onto the battlefield from your hand tapped and attacking." },

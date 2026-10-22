@@ -3,7 +3,7 @@
 // their hand, then asks for a card type other than creature.
 import { expect, test } from "@playwright/test";
 import { spellCost } from "@cc/engine";
-import { LANDS, one, open, pageErrors, scene } from "./scene";
+import { LANDS, idsOf, one, open, pageErrors, playUntil, scene } from "./scene";
 import { card, controls, menu, modal, resolveUntil } from "./ui";
 
 test("Camellia: forage by sacrificing a Food, chosen over exiling three cards; the sacrifice makes a Squirrel", async ({ page }) => {
@@ -66,5 +66,27 @@ test("Arachne, Psionic Weaver: choose Ana, see her hand, then name sorcery (crea
   const after = await resolveUntil(page, (st) => !st.pending && st.objects[arachne]!.zone === "battlefield" && st.stack.length === 0);
   expect(after.objects[arachne]!.chosen?.cardType).toBe("Sorcery");
   expect(spellCost(after, 1, after.objects[one(s, "Night's Whisper")]!).extra).toBe(2); // {1}{B}, one more
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Winter Moon: in your untap step you pick the one nonbasic land that untaps; your basics all untap", async ({ page }) => {
+  const s = scene({ board: ["Forest", "Island", "Winter Moon", "Seat of the Synod", "Vault of Whispers"] });
+  const [seat, vault] = [one(s, "Seat of the Synod"), one(s, "Vault of Whispers")];
+  for (const id of s.battlefield) if (s.objects[id]!.controller === 0 && s.cards[s.objects[id]!.cardId]!.name !== "Winter Moon") s.objects[id]!.tapped = true;
+  // Round the table (in the engine, for speed) to your next untap step.
+  const now = playUntil(s, (st) => st.pending?.kind === "pickPermanents" && st.pending.action === "untapLimited" && st.pending.player === 0);
+  await open(page, now);
+  const bar = controls(page);
+  await expect(bar).toContainText("Untap step: you can't untap more than one nonbasic land: click the ones to untap");
+  await expect(bar.getByRole("button", { name: "Untap 0" })).toBeDisabled(); // one of them can untap
+  await page.locator(`[data-obj="${seat}"]`).click();
+  await page.locator(`[data-obj="${vault}"]`).click();
+  await expect(bar.getByRole("button", { name: "Untap 2" })).toBeDisabled();
+  await page.locator(`[data-obj="${seat}"]`).click();
+  await bar.getByRole("button", { name: "Untap 1" }).click();
+  const after = await resolveUntil(page, (st) => st.step === "main1" && st.activePlayer === 0);
+  expect(after.objects[vault]!.tapped).toBe(false);
+  expect(after.objects[seat]!.tapped).toBe(true);
+  expect(after.objects[idsOf(s, "Forest", "battlefield", 0)[0]!]!.tapped).toBe(false);
   expect(pageErrors(page)).toEqual([]);
 });

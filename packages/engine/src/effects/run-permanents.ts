@@ -1,5 +1,5 @@
 import type { Effect, Modification, TokenSpec } from "../abilities";
-import { abilitiesOf, cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
+import { abilitiesOf, basePowerNow, cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
 import { auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, provokersOf, moveObject, obj, opponents, player, removeFromCombat, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putPlayerCounters, putCounters, tokenBatch, withPutter } from "../counters";
@@ -473,6 +473,17 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
             const put = putCounters(s, o, kind, have);
             log(s, `${defOf(s, o).name} gets ${put} ${kind} counter${put > 1 ? "s" : ""}.`);
           }
+        }
+        return;
+      }
+      // Sovereign Okinec Ahau: each creature's difference between its power and base power, all found before any are put.
+      if (e.aboveBase) {
+        const each = objects(s, e.what, ctx).map((o) => [o, power(s, o) - basePowerNow(s, o)] as const);
+        for (const [o, n] of each) {
+          if (n <= 0 || o.zone !== "battlefield") continue;
+          invalidateCharacteristics(s);
+          const put = putCounters(s, o, e.counter, n);
+          log(s, `${defOf(s, o).name} gets ${put} ${e.counter} counter${put > 1 ? "s" : ""}.`);
         }
         return;
       }

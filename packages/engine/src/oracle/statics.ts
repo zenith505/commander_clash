@@ -723,10 +723,12 @@ export function parseAffected(subject: string): Affects | null {
     return { kind: "filter", types: x.includes("creatures") ? ["Creature"] : [], controller: "you", spec: { kind: "object", commander: true, text: "commander" } };
   // "Other snow and Zombie creatures you control" (Narfi): creatures that are snow or Zombies; a snow Zombie gets it once
   // (rulings).
-  const either = /^(Other )?snow and ([A-Z][a-z]+) creatures you control$/.exec(x);
-  if (either && CREATURE_TYPES.has(either[2]!)) {
-    const anyOf: TargetSpec[] = [{ kind: "object", supertypes: ["Snow"], text: "snow creature" }, { kind: "object", subtypes: [either[2]!], text: `${either[2]} creature` }];
-    return { kind: "filter", types: ["Creature"], controller: "you", other: !!either[1], spec: { kind: "object", anyOf, text: `snow and ${either[2]} creature` } };
+  // "Other Ninja and Rogue creatures you control" (Silver-Fur Master): Ninjas or Rogues, a Ninja Rogue once.
+  const either = /^(Other )?(snow|[A-Z][a-z]+) and ([A-Z][a-z]+) creatures you control$/.exec(x);
+  if (either && CREATURE_TYPES.has(either[3]!) && (either[2] === "snow" || CREATURE_TYPES.has(either[2]!))) {
+    const first: TargetSpec = either[2] === "snow" ? { kind: "object", supertypes: ["Snow"], text: "snow creature" } : { kind: "object", subtypes: [either[2]!], text: `${either[2]} creature` };
+    const anyOf: TargetSpec[] = [first, { kind: "object", subtypes: [either[3]!], text: `${either[3]} creature` }];
+    return { kind: "filter", types: ["Creature"], controller: "you", other: !!either[1], spec: { kind: "object", anyOf, text: `${either[2]} and ${either[3]} creature` } };
   }
   let m = /^(Other )?((?:[A-Z]?[a-z]+ )*?)creatures (you control|your opponents control)$/i.exec(x);
   if (m) {

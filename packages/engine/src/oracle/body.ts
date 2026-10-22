@@ -211,6 +211,8 @@ const checkableMay = (e: Effect) =>
   // "You may put a card from your hand on the bottom of your library. If you do, draw a card." (Volcanic Spite): only
   // with a card in hand.
   (e.type === "handToTop" && e.n === 1) ||
+  // "You may create a Treasure token. When you do, ..." (Generous Plunderer): creating it is doing it.
+  (e.type === "createToken" && e.who.ref === "you" && typeof e.n === "number" && e.n > 0 && !e.attachTo) ||
   (e.type === "sacrifice" && e.what.ref === "self") ||
   // "Whenever a Goblin or Orc you control deals combat damage to a player, you may sacrifice it." (Gorbag): the subject.
   (e.type === "sacrifice" && e.what.ref === "subject") ||

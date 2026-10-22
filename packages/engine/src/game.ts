@@ -2271,7 +2271,14 @@ function startNextTurn(s: GameState, skipping = false) {
   s.descendedThisTurn = undefined;
   s.noLifeGain = undefined;
   s.turnRules = undefined;
-  s.cantCastThisTurn = undefined;
+  // "Until the end of your next turn" (Single Combat): kept until that player's next turn has ended, or they've left the
+  // game (as other such effects, below).
+  s.cantCastThisTurn = s.cantCastThisTurn?.filter((c) => {
+    if (c.untilEndOfTurnOf === undefined) return false;
+    const by = player(s, c.untilEndOfTurnOf);
+    return !by.lost && !(by.id !== s.activePlayer && (by.turnBegan ?? 0) > c.turn);
+  });
+  if (!s.cantCastThisTurn?.length) s.cantCastThisTurn = undefined;
   s.cantPlayLandsThisTurn = undefined;
   s.spellsCastThisTurn = undefined;
   s.castThisTurn = undefined;
@@ -4105,7 +4112,7 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
   if (named) return named;
   // "Your opponents can't cast spells this turn" (Silence) and the like.
   for (const c of s.cantCastThisTurn ?? [])
-    if (c.player === pid && c.turn === s.turn && (!c.filter || printedMatches(c.filter, d))) return `${c.source}: you can't cast ${c.filter ? `${c.filter.text.replace(/ spell$/, "")} ` : ""}spells this turn`;
+    if (c.player === pid && (c.turn === s.turn || c.untilEndOfTurnOf !== undefined) && (!c.filter || printedMatches(c.filter, d))) return `${c.source}: you can't cast ${c.filter ? `${c.filter.text.replace(/ spell$/, "")} ` : ""}spells ${c.untilEndOfTurnOf !== undefined ? "for now" : "this turn"}`;
   // Permanents, and emblems in the command zone (CR 114.4).
   for (const o of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)]) {
     // "Each opponent can cast spells only any time they could cast a sorcery" (Teferi, Time Raveler).

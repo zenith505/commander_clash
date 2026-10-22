@@ -2371,7 +2371,7 @@ export type Effect =
    * noncreature spells this turn" (Calamity's Wake): those players, chosen as it resolves, until the turn ends; `filter`
    * is the kind of spell.
    */
-  | { type: "cantCast"; who: PlayerRef; filter?: TargetSpec }
+  | { type: "cantCast"; who: PlayerRef; filter?: TargetSpec; /** "Until the end of your next turn" (Single Combat), not just this turn. */ untilYourNextTurnEnds?: true }
   /** "Target player can't play lands this turn" (Moonhold): no land plays for them until the turn ends (CR 305.2, 101.2). */
   | { type: "cantPlayLands"; who: PlayerRef }
   /**

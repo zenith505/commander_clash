@@ -620,7 +620,10 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     const q = CONTROL_COUNT.exec(m[2]!.replace(/^(an? \S+) or an? (?=\S+$)/, "$1 or "));
     if (!q) return null;
     // NUM is a group of its own: q[1] the word, q[2] "N or more", q[3] "N or fewer", q[4] what.
-    const filter = pickFilter(q[4]!);
+    // "Three or more tapped Pirates and/or Vehicles" (The Indomitable): each permanent with either subtype.
+    const either = /^(tapped )?([A-Z][a-z]+) and\/or ([A-Z][a-z]+)$/.exec(q[4]!);
+    const kinds = either ? [singular(either[2]!), singular(either[3]!)] : [];
+    const filter: TargetSpec | null = either ? (kinds.every((k) => CREATURE_TYPES.has(k) || k === "Vehicle") ? { kind: "object", types: [], subtypes: kinds, ...(either[1] ? { tapped: true } : {}), text: q[4]!.toLowerCase() } : null) : pickFilter(q[4]!);
     if (!filter) return null;
     if (q[1] === "no") return { kind: "control", who, filter, max: 0 };
     if (q[1] === "another") return { kind: "control", who, filter, min: 1, other: true };

@@ -751,3 +751,29 @@ describe("Together Forever", () => {
     void opp;
   });
 });
+
+const indomitable = card("The Indomitable", "Legendary Artifact — Vehicle", "{2}{U}{U}", {
+  power: "6",
+  toughness: "6",
+  keywords: ["Crew", "Trample"],
+  oracleText: "Trample\nWhenever a creature you control deals combat damage to a player, draw a card.\nCrew 3\nYou may cast this card from your graveyard as long as you control three or more tapped Pirates and/or Vehicles.",
+});
+
+describe("The Indomitable", () => {
+  it("castable from your graveyard only while you control three or more tapped Pirates and/or Vehicles", () => {
+    expect(isFullySupported(indomitable)).toBe(true);
+    const { s, ap, ids } = setup([indomitable]);
+    moveObject(s, ids[0]!, "graveyard");
+    const pirate = () => putOnBattlefield(s, ap, card("Deck Hand", "Creature — Human Pirate", "{1}", { power: "1", toughness: "1" }));
+    const [p1, p2] = [pirate(), pirate()];
+    const v = putOnBattlefield(s, ap, card("Skiff", "Artifact — Vehicle", "{1}", { power: "2", toughness: "2", oracleText: "Crew 1" }));
+    for (const id of [p1, p2]) s.objects[id]!.tapped = true;
+    invalidateCharacteristics(s);
+    const can = () => castProblem(s, ap, ids[0]!, undefined, undefined, undefined, undefined, undefined, { via: "permission" });
+    Object.assign(s.players[ap]!.manaPool, { U: 4 });
+    expect(can()).toMatch(/graveyard|can't/);
+    s.objects[v]!.tapped = true;
+    invalidateCharacteristics(s);
+    expect(can()).toBeNull();
+  });
+});

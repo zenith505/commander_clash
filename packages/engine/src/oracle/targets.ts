@@ -240,6 +240,8 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     const t = ctx.targets[ctx.lastObjectTarget];
     if (t?.kind === "object" && t.types?.length === 1 && t.types[0] === "Land") return { ref: "target", index: ctx.lastObjectTarget };
   }
+  // "~ and that creature each get +2/+0 and gain haste until end of turn" (Gogo, Mysterious Mime): the source and the target.
+  if (/^~ and that creature(?: each)?$/i.test(x) && !ctx.spell && !ctx.selfCard && ctx.lastObjectTarget !== undefined && !ctx.lastCreated) return { ref: "target", index: ctx.lastObjectTarget, andSelf: true };
   if (/^(it|that creature|that permanent)$/i.test(x)) {
     if (ctx.lastCreated && (/^it$/i.test(x) || (ctx.lastPut && /^that creature$/i.test(x)))) return { ref: "created" };
     if (ctx.lastObjectTarget !== undefined) return { ref: "target", index: ctx.lastObjectTarget };

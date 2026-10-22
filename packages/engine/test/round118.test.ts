@@ -245,3 +245,58 @@ describe("Selfless Squire", () => {
     expect(s.objects[sq]!.counters["+1/+1"]).toBe(4);
   });
 });
+
+const gogo = card("Gogo, Mysterious Mime", "Legendary Creature — Wizard", "{3}{R}", {
+  power: "1",
+  toughness: "3",
+  oracleText:
+    "At the beginning of combat on your turn, you may have Gogo become a copy of another target creature you control until end of turn, except its name is Gogo, Mysterious Mime. If you do, Gogo and that creature each get +2/+0 and gain haste until end of turn and attack this turn if able.",
+});
+const knight = card("Legendary Knight", "Legendary Creature — Human Knight", "{2}{W}{W}", { power: "4", toughness: "4", keywords: ["Vigilance"], oracleText: "Vigilance" });
+
+describe("Gogo, Mysterious Mime", () => {
+  const atCombat = () => {
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const g = putOnBattlefield(s, ap, gogo, { sick: true });
+    const k = putOnBattlefield(s, ap, knight, { sick: true });
+    s = passUntil(s, "beginCombat", ap);
+    for (let i = 0; i < 10 && s.pending?.kind !== "chooseTargets" && !s.stack.length; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    return { s, ap, g, k };
+  };
+
+  it("becomes a copy named Gogo; both get +2/+0, haste and must attack; the legend rule doesn't apply", () => {
+    expect(isFullySupported(gogo)).toBe(true);
+    let { s, ap, g, k } = atCombat();
+    if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: k }] });
+    for (let i = 0; i < 20 && s.pending?.kind !== "chooseMay"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+    const gc = characteristics(s, s.objects[g]!);
+    expect(gc.name).toBe("Gogo, Mysterious Mime");
+    expect(gc.power).toBe(6);
+    expect(gc.toughness).toBe(4);
+    expect(gc.keywords).toEqual(expect.arrayContaining(["Vigilance", "Haste"]));
+    expect(characteristics(s, s.objects[k]!).power).toBe(6);
+    expect(characteristics(s, s.objects[k]!).keywords).toContain("Haste");
+    expect(s.objects[g]!.zone).toBe("battlefield");
+    expect(s.objects[k]!.zone).toBe("battlefield");
+    // Both must attack (they have haste although they came this turn).
+    s = passUntil(s, "declareAttackers", ap);
+    const opp = later(s, ap, 1);
+    expect(() => act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: g, defender: opp }] })).toThrow();
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [g, k].map((attacker) => ({ attacker, defender: opp })) });
+    expect(s.objects[g]!.attacking).toBe(opp);
+    // Until end of turn only.
+    s = passUntil(s, "upkeep", later(s, ap, 1));
+    expect(characteristics(s, s.objects[g]!).power).toBe(1);
+  });
+
+  it("declining changes nothing", () => {
+    let { s, ap, g, k } = atCombat();
+    if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: k }] });
+    for (let i = 0; i < 20 && s.pending?.kind !== "chooseMay"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: false }));
+    expect(characteristics(s, s.objects[g]!).power).toBe(1);
+    expect(characteristics(s, s.objects[k]!).power).toBe(4);
+  });
+});

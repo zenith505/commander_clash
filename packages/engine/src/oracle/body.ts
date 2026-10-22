@@ -244,7 +244,10 @@ const checkableMay = (e: Effect) =>
   (e.type === "bite" && e.b.ref === "target" && !e.b.n && (e.a.ref === "self" || e.a.ref === "target")) ||
   // "You may have target creature you control get +2/+0 and gain haste until end of turn. If you do, ..." (Hazoret's
   // Favor), "you may have it get +4/+0 until end of turn" (Attack-in-the-Box): done if that permanent is still there.
-  (e.type === "continuous" && (e.what.ref === "self" || (e.what.ref === "target" && !e.what.n)) && e.duration === "endOfTurn");
+  (e.type === "continuous" && (e.what.ref === "self" || (e.what.ref === "target" && !e.what.n)) && e.duration === "endOfTurn") ||
+  // "You may have ~ become a copy of another target creature you control until end of turn ... If you do, ..." (Gogo,
+  // Mysterious Mime): done if it and that target are both still there.
+  (e.type === "becomeCopy" && e.what.ref === "self" && e.of.ref === "target" && !e.of.n && e.duration === "endOfTurn");
 
 /**
  * What a card name chosen as it resolves is for, from the instructions after it (bots, see NamePurpose): to find in your

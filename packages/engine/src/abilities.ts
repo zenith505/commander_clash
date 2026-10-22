@@ -597,6 +597,8 @@ export type ObjRef =
        * name (CR 708.2a), so it shares one with nothing.
        */
       sameName?: { filter: TargetSpec; of?: true };
+      /** "~ and that creature each get +2/+0" (Gogo, Mysterious Mime): the source too, while it's still that permanent. */
+      andSelf?: true;
       /**
        * "Exile target creature card from a graveyard. Create a token that's a copy of it" (The Scarab God): the targeted
        * card wherever this spell or ability has put it since (CR 400.7), copied as that card (rulings).

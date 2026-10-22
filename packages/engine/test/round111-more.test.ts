@@ -1,0 +1,571 @@
+// Round 111, more cards: Single Combat ("until the end of your next turn"), Generous Plunderer ("you may create a
+// Treasure token. When you do, ..."; "the number of artifacts they control" for the defending player).
+
+import { describe, expect, it } from "vitest";
+import { act, bear, card, passAll, passUntil, putOnBattlefield, scry, setup } from "./helpers";
+import { castProblem, characteristics, controllerOf, spellCost, invalidateCharacteristics, isFullySupported, power, toughness, objHasKeyword, planActivate, planCast, waitingOn, type GameState } from "../src";
+
+// Real oracle text (Scryfall).
+const singleCombat = card("Single Combat", "Sorcery", "{3}{W}{W}", {
+  oracleText:
+    "Each player chooses a creature or planeswalker they control, then sacrifices the rest. Players can't cast creature or planeswalker spells until the end of your next turn.",
+});
+const plunderer = card("Generous Plunderer", "Creature — Human Rogue", "{1}{R}", {
+  power: "2",
+  toughness: "2",
+  keywords: ["Menace"],
+  oracleText:
+    "Menace\nAt the beginning of your upkeep, you may create a Treasure token. When you do, target opponent creates a tapped Treasure token.\nWhenever this creature attacks, it deals damage to defending player equal to the number of artifacts they control.",
+});
+const akiri = card("Akiri, Fearless Voyager", "Legendary Creature — Kor Warrior", "{1}{R}{W}", {
+  power: "3",
+  toughness: "3",
+  oracleText:
+    "Whenever you attack a player with one or more equipped creatures, draw a card.\n{W}: You may unattach an Equipment from a creature you control. If you do, tap that creature and it gains indestructible until end of turn.",
+});
+const horizon = card("Horizon Explorer", "Creature — Insect Scout", "{2}{G}", {
+  power: "2",
+  toughness: "4",
+  oracleText:
+    "Lands you control enter untapped.\nWhenever you attack a player, create a Lander token. (It's an artifact with \"{2}, {T}, Sacrifice this token: Search your library for a basic land card, put it onto the battlefield tapped, then shuffle.\")",
+});
+const bonesplitter = card("Bonesplitter", "Artifact — Equipment", "{1}", { oracleText: "Equipped creature gets +2/+0.\nEquip {1}" });
+const smithy = scry("transform", [
+  {
+    name: "Thousand Moons Smithy",
+    mana_cost: "{2}{W}{W}",
+    type_line: "Legendary Artifact",
+    oracle_text:
+      'When Thousand Moons Smithy enters, create a white Gnome Soldier artifact creature token with "This token\'s power and toughness are each equal to the number of artifacts and/or creatures you control."\nAt the beginning of your first main phase, you may tap five untapped artifacts and/or creatures you control. If you do, transform Thousand Moons Smithy.',
+  },
+  {
+    name: "Barracks of the Thousand",
+    type_line: "Legendary Artifact Land",
+    color_indicator: ["W"],
+    oracle_text:
+      '(Transforms from Thousand Moons Smithy.)\n{T}: Add {W}.\nWhenever you cast an artifact or creature spell using mana produced by Barracks of the Thousand, create a white Gnome Soldier artifact creature token with "This token\'s power and toughness are each equal to the number of artifacts and/or creatures you control."',
+  },
+]);
+const nashi = card("Nashi, Moon Sage's Scion", "Legendary Creature — Rat Ninja", "{1}{B}{B}", {
+  power: "3",
+  toughness: "2",
+  keywords: ["Ninjutsu"],
+  oracleText:
+    "Ninjutsu {3}{B} ({3}{B}, Return an unblocked attacker you control to hand: Put this card onto the battlefield from your hand tapped and attacking.)\nWhenever Nashi deals combat damage to a player, exile the top card of each player's library. Until end of turn, you may play one of those cards. If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost.",
+});
+const looter = card("Likeness Looter", "Creature — Faerie Shapeshifter", "{U}{B}", {
+  power: "1",
+  toughness: "1",
+  keywords: ["Flying"],
+  oracleText:
+    "Flying\n{T}: Draw a card, then discard a card.\n{X}: This creature becomes a copy of target creature card in your graveyard with mana value X, except it has flying and this ability. Activate only as a sorcery.",
+});
+const everybodyLives = card("Everybody Lives!", "Instant", "{1}{W}", {
+  oracleText:
+    "All creatures gain hexproof and indestructible until end of turn. Players gain hexproof until end of turn. Players can't lose life this turn and players can't lose the game or win the game this turn.",
+});
+const shock = card("Shock", "Instant", "{R}", { oracleText: "Shock deals 2 damage to any target." });
+const constrictor = card("Winding Constrictor", "Creature — Snake", "{B}{G}", {
+  power: "2",
+  toughness: "3",
+  oracleText:
+    "If one or more counters would be put on an artifact or creature you control, that many plus one of each of those kinds of counters are put on that permanent instead.\nIf you would get one or more counters, you get that many plus one of each of those kinds of counters instead.",
+});
+const counterSpell = card("Test Counters", "Sorcery", "{G}", { oracleText: "Put a +1/+1 counter and a lifelink counter on target creature." });
+const energySpell = card("Test Energy", "Sorcery", "{G}", { oracleText: "You get {E}{E}." });
+const kozilek = card("Kozilek's Command", "Kindred Instant — Eldrazi", "{X}{C}{C}", {
+  oracleText:
+    'Choose two —\n• Target player creates X 0/1 colorless Eldrazi Spawn creature tokens with "Sacrifice this token: Add {C}."\n• Target player scries X, then draws a card.\n• Exile target creature with mana value X or less.\n• Exile up to X target cards from graveyards.',
+});
+const pearlEar = card("Pearl-Ear, Imperial Advisor", "Legendary Creature — Fox Advisor", "{1}{W}{W}", {
+  power: "3",
+  toughness: "4",
+  keywords: ["Lifelink"],
+  oracleText:
+    "Lifelink\nEnchantment spells you cast have affinity for Auras. (They cost {1} less to cast for each Aura you control.)\nWhenever you cast an Aura spell that targets a modified permanent you control, draw a card. (Equipment, Auras you control, and counters are modifications.)",
+});
+const pacifism = card("Pacifism", "Enchantment — Aura", "{1}{W}", { oracleText: "Enchant creature\nEnchanted creature can't attack or block." });
+const gonti = card("Gonti, Lord of Luxury", "Legendary Creature — Aetherborn Rogue", "{2}{B}{B}", {
+  power: "2",
+  toughness: "3",
+  keywords: ["Deathtouch"],
+  oracleText:
+    "Deathtouch\nWhen Gonti enters, look at the top four cards of target opponent's library, exile one of them face down, then put the rest on the bottom of that library in a random order. You may cast that card for as long as it remains exiled, and mana of any type can be spent to cast that spell.",
+});
+const shinobi = card("Fallen Shinobi", "Creature — Zombie Ninja", "{3}{U}{B}", {
+  power: "5",
+  toughness: "4",
+  keywords: ["Ninjutsu"],
+  oracleText:
+    "Ninjutsu {2}{U}{B} ({2}{U}{B}, Return an unblocked attacker you control to hand: Put this card onto the battlefield from your hand tapped and attacking.)\nWhenever Fallen Shinobi deals combat damage to a player, that player exiles the top two cards of their library. Until end of turn, you may play those cards without paying their mana costs.",
+});
+const oko = card("Oko, Thief of Crowns", "Legendary Planeswalker — Oko", "{1}{G}{U}", {
+  loyalty: "4",
+  oracleText:
+    "+2: Create a Food token. (It's an artifact with \"{2}, {T}, Sacrifice this token: You gain 3 life.\")\n+1: Target artifact or creature loses all abilities and becomes a green Elk creature with base power and toughness 3/3.\n−5: Exchange control of target artifact or creature you control and target creature an opponent controls with power 3 or less.",
+});
+const leveler = card("Cityscape Leveler", "Artifact Creature — Construct", "{8}", {
+  power: "8",
+  toughness: "8",
+  keywords: ["Trample", "Unearth"],
+  oracleText:
+    "Trample\nWhen you cast this spell and whenever Cityscape Leveler attacks, destroy up to one target nonland permanent. Its controller creates a tapped Powerstone token. (It's an artifact with \"{T}: Add {C}. This mana can't be spent to cast a nonartifact spell.\")\nUnearth {8}",
+});
+const shepherd = card("Emeria Shepherd", "Creature — Angel", "{5}{W}{W}", {
+  power: "4",
+  toughness: "4",
+  keywords: ["Flying", "Landfall"],
+  oracleText:
+    "Flying\nLandfall — Whenever a land you control enters, you may return target nonland permanent card from your graveyard to your hand. If that land is a Plains, you may return that nonland permanent card to the battlefield instead.",
+});
+const treasure = card("Treasure", "Token Artifact — Treasure", "", { oracleText: "{T}, Sacrifice this token: Add one mana of any color." });
+
+/** Pass along, answering every pending choice the dull way, until `stop` holds. */
+function until(s: GameState, stop: (s: GameState) => boolean, max = 3000) {
+  for (let i = 0; i < max && !stop(s); i++) {
+    const pid = waitingOn(s)!;
+    const p = s.pending;
+    if (p?.kind === "declareAttackers") s = act(s, { type: "declareAttackers", player: pid, attacks: [] });
+    else if (p?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: pid, blocks: [] });
+    else if (p?.kind === "discardToHandSize") s = act(s, { type: "discard", player: pid, objectIds: s.players[pid]!.hand.slice(0, p.count) });
+    else if (p?.kind === "chooseMay") s = act(s, { type: "chooseMay", player: pid, yes: false });
+    else s = act(s, { type: "passPriority", player: pid });
+  }
+  if (!stop(s)) throw new Error("never stopped");
+  return s;
+}
+
+describe("Single Combat", () => {
+  it("is supported, and no one casts creature spells until the end of the caster's next turn", () => {
+    expect(isFullySupported(singleCombat)).toBe(true);
+    let { s, ap, ids, opp } = setup([singleCombat, bear()]);
+    const theirBear = putOnBattlefield(s, opp, bear());
+    for (const a of planCast(s, ap, ids[0]!)!) s = act(s, a);
+    s = passAll(s);
+    expect(s.objects[theirBear]!.zone).toBe("battlefield");
+    expect(planCast(s, ap, ids[1]!)).toBeNull();
+    const start = s.turn;
+    // An opponent's turn: still can't, and a creature put in their hand can't be cast either.
+    s = until(s, (x) => x.activePlayer === opp && x.step === "main1");
+    expect(s.cantCastThisTurn?.length).toBe(4);
+    // The caster's next turn: still can't.
+    s = until(s, (x) => x.activePlayer === ap && x.step === "main1" && x.turn > start);
+    expect(planCast(s, ap, ids[1]!)).toBeNull();
+    // After it: they can again.
+    s = until(s, (x) => x.activePlayer === opp && x.step === "main1" && x.turn > start + 4);
+    expect(s.cantCastThisTurn).toBeUndefined();
+  });
+});
+
+describe("Generous Plunderer", () => {
+  it("is supported; a Treasure for you means a tapped one for the opponent, and the attack counts their artifacts", () => {
+    expect(isFullySupported(plunderer)).toBe(true);
+    let { s, ap, opp } = setup([]);
+    const p = putOnBattlefield(s, ap, plunderer);
+    putOnBattlefield(s, opp, treasure);
+    const start = s.turn;
+    s = until(s, (x) => x.activePlayer === ap && x.turn > start && x.pending?.kind === "chooseMay");
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    // The reflexive trigger targets an opponent.
+    for (let i = 0; i < 20 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    const pend = s.pending as { kind: string };
+    expect(pend.kind).toBe("chooseTargets");
+    s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] } as never);
+    s = until(s, (x) => x.step === "main1" && x.activePlayer === ap);
+    const treasures = (pid: number) => s.battlefield.filter((id) => s.objects[id]!.controller === pid && s.cards[s.objects[id]!.cardId]!.name.startsWith("Treasure"));
+    expect(treasures(ap).length).toBe(1);
+    expect(treasures(opp).length).toBe(2);
+    expect(treasures(opp).filter((id) => s.objects[id]!.tapped).length).toBe(1);
+    s = passUntil(s, "declareAttackers", ap);
+    const life = s.players[opp]!.life;
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: p, defender: opp }] });
+    for (let i = 0; i < 20 && s.players[opp]!.life === life; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.players[opp]!.life).toBe(life - 2);
+  });
+});
+
+/** Attach `eq` to `to`. */
+function equip(s: GameState, eq: string, to: string) {
+  s.objects[eq]!.attachedTo = to;
+  invalidateCharacteristics(s);
+}
+
+describe("Akiri, Fearless Voyager", () => {
+  it("is supported, and draws a card for each player attacked by an equipped creature", () => {
+    expect(isFullySupported(akiri)).toBe(true);
+    let { s, ap } = setup([]);
+    putOnBattlefield(s, ap, akiri);
+    const [b1, b2, b3] = [putOnBattlefield(s, ap, bear()), putOnBattlefield(s, ap, bear()), putOnBattlefield(s, ap, bear())];
+    equip(s, putOnBattlefield(s, ap, bonesplitter), b1!);
+    equip(s, putOnBattlefield(s, ap, bonesplitter), b2!);
+    const [o1, o2, o3] = s.turnOrder.filter((p) => p !== ap);
+    s = passUntil(s, "declareAttackers", ap);
+    const hand = s.players[ap]!.hand.length;
+    // Two equipped creatures at one player, one at another, an unequipped one at the third: two cards.
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: b1!, defender: o1! }, { attacker: b2!, defender: o2! }, { attacker: b3!, defender: o3! }] });
+    expect(s.triggerQueue.length + s.stack.length).toBe(2);
+    s = until(s, (x) => x.stack.length === 0 && x.triggerQueue.length === 0);
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
+  });
+
+  it("unattaches an Equipment as the ability resolves; the creature taps and gains indestructible", () => {
+    let { s, ap } = setup([]);
+    const a = putOnBattlefield(s, ap, akiri);
+    const b1 = putOnBattlefield(s, ap, bear());
+    const b2 = putOnBattlefield(s, ap, bear());
+    const e1 = putOnBattlefield(s, ap, bonesplitter);
+    const e2 = putOnBattlefield(s, ap, bonesplitter);
+    equip(s, e1, b1);
+    equip(s, e2, b2);
+    for (const x of planActivate(s, ap, a, 0)!) s = act(s, x);
+    s = passAll(s);
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", action: "unattach", });
+    expect([...(s.pending as { options: string[] }).options].sort()).toEqual([e1, e2].sort());
+    s = act(s, { type: "pickPermanents", player: ap, ids: [e2] });
+    expect(s.objects[e2]!.attachedTo).toBeUndefined();
+    expect(s.objects[e2]!.zone).toBe("battlefield");
+    expect(s.objects[e1]!.attachedTo).toBe(b1);
+    expect(s.objects[b2]!.tapped).toBe(true);
+    expect(s.objects[b1]!.tapped).toBe(false);
+    expect(objHasKeyword(s, s.objects[b2]!, "Indestructible")).toBe(true);
+    expect(objHasKeyword(s, s.objects[b1]!, "Indestructible")).toBe(false);
+  });
+});
+
+describe("Whenever you attack a player", () => {
+  it("triggers once for each player attacked (Horizon Explorer)", () => {
+    let { s, ap } = setup([]);
+    putOnBattlefield(s, ap, horizon);
+    const [b1, b2] = [putOnBattlefield(s, ap, bear()), putOnBattlefield(s, ap, bear())];
+    const [o1, o2] = s.turnOrder.filter((p) => p !== ap);
+    s = passUntil(s, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: b1!, defender: o1! }, { attacker: b2!, defender: o2! }] });
+    expect(s.triggerQueue.length + s.stack.length).toBe(2);
+  });
+});
+
+describe("Thousand Moons Smithy", () => {
+  it("is supported; its Gnome counts artifacts and creatures, and tapping five transforms it", () => {
+    expect(isFullySupported(smithy)).toBe(true);
+    let { s, ap, ids } = setup([smithy]);
+    for (let i = 0; i < 3; i++) putOnBattlefield(s, ap, bear());
+    for (const a of planCast(s, ap, ids[0]!)!) s = act(s, a);
+    s = until(s, (x) => x.stack.length === 0 && x.triggerQueue.length === 0);
+    const gnome = s.battlefield.find((id) => s.cards[s.objects[id]!.cardId]!.name.startsWith("Gnome Soldier"))!;
+    expect(gnome).toBeDefined();
+    // Three Bears, the Smithy and the Gnome itself (rulings).
+    expect([power(s, s.objects[gnome]!), toughness(s, s.objects[gnome]!)]).toEqual([5, 5]);
+    putOnBattlefield(s, ap, bear());
+    expect(power(s, s.objects[gnome]!)).toBe(6);
+    const start = s.turn;
+    s = until(s, (x) => x.activePlayer === ap && x.turn > start && x.pending?.kind === "chooseMay");
+    expect(s.step).toBe("main1");
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", action: "tap", count: 5 });
+    const options = (s.pending as { options: string[] }).options;
+    expect(options.length).toBe(6);
+    s = act(s, { type: "pickPermanents", player: ap, ids: options.slice(0, 5) });
+    expect(options.slice(0, 5).every((id) => s.objects[id]!.tapped)).toBe(true);
+    const me = s.battlefield.find((id) => s.objects[id]!.cardId === smithy.oracleId)!;
+    expect(characteristics(s, s.objects[me]!).name).toBe("Barracks of the Thousand");
+  });
+
+  it("can't transform with fewer than five untapped", () => {
+    let { s, ap } = setup([]);
+    putOnBattlefield(s, ap, smithy);
+    for (let i = 0; i < 3; i++) putOnBattlefield(s, ap, bear());
+    const start = s.turn;
+    s = until(s, (x) => x.activePlayer === ap && x.turn > start && x.step === "main1");
+    expect(s.pending).toBeNull();
+    const me = s.battlefield.find((id) => s.objects[id]!.cardId === smithy.oracleId)!;
+    expect(characteristics(s, s.objects[me]!).name).toBe("Thousand Moons Smithy");
+  });
+});
+
+describe("Nashi, Moon Sage's Scion", () => {
+  it("is supported; exiles each player's top card, one of which may be played this turn, a spell for life", () => {
+    expect(isFullySupported(nashi)).toBe(true);
+    let { s, ap, opp } = setup([]);
+    const n = putOnBattlefield(s, ap, nashi);
+    // A Grizzly Bears on top of each library.
+    for (const pid of s.turnOrder) {
+      const lib = s.players[pid]!.library;
+      const i = lib.findIndex((id) => s.cards[s.objects[id]!.cardId]!.name === "Grizzly Bears");
+      lib.unshift(...lib.splice(i, 1));
+    }
+    const tops = s.turnOrder.map((pid) => s.players[pid]!.library[0]!);
+    s = passUntil(s, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: n, defender: opp }] });
+    s = until(s, (x) => x.step === "main2");
+    expect(tops.every((id) => s.objects[id]!.zone === "exile")).toBe(true);
+    const [mine, theirs] = [tops[s.turnOrder.indexOf(ap)]!, tops[s.turnOrder.indexOf(opp)]!];
+    // Only for life, equal to its mana value.
+    expect(castProblem(s, ap, theirs)).toMatch(/pay life/);
+    expect(castProblem(s, ap, theirs, undefined, undefined, undefined, undefined, undefined, { alt: "citadel" })).toBeNull();
+    const life = s.players[ap]!.life;
+    for (const a of planCast(s, ap, theirs, undefined, undefined, undefined, undefined, { alt: "citadel" })!) s = act(s, a);
+    s = until(s, (x) => x.stack.length === 0);
+    expect(s.objects[theirs]!.zone).toBe("battlefield");
+    expect(s.players[ap]!.life).toBe(life - 2);
+    // One of those cards only.
+    expect(castProblem(s, ap, mine, undefined, undefined, undefined, undefined, undefined, { alt: "citadel" })).not.toBeNull();
+  });
+});
+
+describe("Likeness Looter", () => {
+  it("is supported, and becomes a copy of a creature card in your graveyard with mana value X, with flying and the ability", () => {
+    expect(isFullySupported(looter)).toBe(true);
+    let { s, ap } = setup([]);
+    const l = putOnBattlefield(s, ap, looter);
+    const dead = putOnBattlefield(s, ap, bear());
+    s.battlefield.splice(s.battlefield.indexOf(dead), 1);
+    s.objects[dead]!.zone = "graveyard";
+    s.players[ap]!.graveyard.push(dead);
+    invalidateCharacteristics(s);
+    const t = [{ kind: "object" as const, id: dead }];
+    // X has to be the card's mana value.
+    expect(planActivate(s, ap, l, 1, t as never, undefined, undefined, 3)).toBeNull();
+    for (const a of planActivate(s, ap, l, 1, t as never, undefined, undefined, 2)!) s = act(s, a);
+    s = passAll(s);
+    const ch = characteristics(s, s.objects[l]!);
+    expect(ch.name).toBe("Grizzly Bears");
+    expect([power(s, s.objects[l]!), toughness(s, s.objects[l]!)]).toEqual([2, 2]);
+    expect(objHasKeyword(s, s.objects[l]!, "Flying")).toBe(true);
+    // It keeps the copying ability (its only activated ability now).
+    expect(planActivate(s, ap, l, 0, t as never, undefined, undefined, 2)).not.toBeNull();
+  });
+});
+
+describe("Everybody Lives!", () => {
+  it("is supported: every player gets hexproof and can't lose life, lose or win this turn", () => {
+    expect(isFullySupported(everybodyLives)).toBe(true);
+    let { s, ap, ids, opp } = setup([everybodyLives, shock]);
+    const b = putOnBattlefield(s, opp, bear());
+    for (const a of planCast(s, ap, ids[0]!)!) s = act(s, a);
+    s = passAll(s);
+    expect(s.objects[ids[0]!]!.zone).toBe("graveyard");
+    // Neither the player nor their creature can be targeted now.
+    expect(planCast(s, ap, ids[1]!, [{ kind: "player", id: opp }])).toBeNull();
+    expect(planCast(s, ap, ids[1]!, [{ kind: "object", id: b }])).toBeNull();
+    expect(objHasKeyword(s, s.objects[b]!, "Indestructible")).toBe(true);
+    // No one loses: at 0 life the opponent stays in the game this turn.
+    s.players[opp]!.life = 0;
+    s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.players[opp]!.lost).toBeFalsy();
+  });
+});
+
+describe("Winding Constrictor", () => {
+  it("is supported: one more of each kind on your artifacts and creatures, and on you", () => {
+    expect(isFullySupported(constrictor)).toBe(true);
+    let { s, ap, ids, opp } = setup([counterSpell, energySpell, counterSpell]);
+    putOnBattlefield(s, ap, constrictor);
+    const b = putOnBattlefield(s, ap, bear());
+    const theirs = putOnBattlefield(s, opp, bear());
+    for (const a of planCast(s, ap, ids[0]!, [{ kind: "object", id: b }])!) s = act(s, a);
+    s = passAll(s);
+    expect(s.objects[b]!.counters).toMatchObject({ "+1/+1": 2, lifelink: 2 });
+    for (const a of planCast(s, ap, ids[1]!)!) s = act(s, a);
+    s = passAll(s);
+    expect(s.players[ap]!.energy).toBe(3);
+    // Not on another player's creature.
+    for (const a of planCast(s, ap, ids[2]!, [{ kind: "object", id: theirs }])!) s = act(s, a);
+    s = passAll(s);
+    expect(s.objects[theirs]!.counters).toMatchObject({ "+1/+1": 1, lifelink: 1 });
+  });
+});
+
+describe("Kozilek's Command", () => {
+  it("is supported: the target player scries X and draws; up to X cards from graveyards are exiled", () => {
+    expect(isFullySupported(kozilek)).toBe(true);
+    let { s, ap, ids, opp } = setup([kozilek]);
+    // Its colorless mana: four Wastes.
+    for (let i = 0; i < 4; i++) putOnBattlefield(s, ap, card("Wastes", "Basic Land", "", { oracleText: "{T}: Add {C}." }));
+    const yard = [bear(), bear(), bear()].map((d) => {
+      const id = putOnBattlefield(s, opp, d);
+      s.battlefield.splice(s.battlefield.indexOf(id), 1);
+      s.objects[id]!.zone = "graveyard";
+      s.players[opp]!.graveyard.push(id);
+      return id;
+    });
+    invalidateCharacteristics(s);
+    const t = [{ kind: "player" as const, id: opp }, ...yard.map((id) => ({ kind: "object" as const, id }))];
+    expect(planCast(s, ap, ids[0]!, t, [1, 3], "auto", 2)).toBeNull();
+    const hand = s.players[opp]!.hand.length;
+    for (const a of planCast(s, ap, ids[0]!, t.slice(0, 3), [1, 3], "auto", 2)!) s = act(s, a);
+    s = passAll(s);
+    // The opponent scries 2.
+    expect(s.pending).toMatchObject({ kind: "arrangeTop", player: opp });
+    const cards = (s.pending as { cards: string[] }).cards;
+    expect(cards.length).toBe(2);
+    s = act(s, { type: "arrangeTop", player: opp, top: cards, away: [] });
+    s = until(s, (x) => x.stack.length === 0);
+    expect(s.players[opp]!.hand.length).toBe(hand + 1);
+    expect(yard.map((id) => s.objects[id]!.zone)).toEqual(["exile", "exile", "graveyard"]);
+  });
+});
+
+describe("Pearl-Ear, Imperial Advisor", () => {
+  it("is supported: enchantment spells cost {1} less for each Aura you control, not other spells", () => {
+    expect(isFullySupported(pearlEar)).toBe(true);
+    const { s, ap, ids, opp } = setup([card("Test Enchantment", "Enchantment", "{3}{W}", { oracleText: "Creatures you control get +1/+1." }), bear()]);
+    const before = [spellCost(s, ap, s.objects[ids[0]!]!), spellCost(s, ap, s.objects[ids[1]!]!)];
+    putOnBattlefield(s, ap, pearlEar);
+    for (let i = 0; i < 2; i++) {
+      const a = putOnBattlefield(s, ap, pacifism);
+      s.objects[a]!.attachedTo = putOnBattlefield(s, opp, bear());
+    }
+    // An Aura of another player's doesn't count.
+    const theirs = putOnBattlefield(s, opp, pacifism);
+    s.objects[theirs]!.attachedTo = putOnBattlefield(s, ap, bear());
+    invalidateCharacteristics(s);
+    const after = [spellCost(s, ap, s.objects[ids[0]!]!), spellCost(s, ap, s.objects[ids[1]!]!)];
+    expect(before[0]!.extra - after[0]!.extra).toBe(2);
+    expect(before[1]!.extra - after[1]!.extra).toBe(0);
+  });
+});
+
+describe("Gonti, Lord of Luxury", () => {
+  it("is supported: one of the opponent's top four exiled face down, castable by Gonti's controller with any mana", () => {
+    expect(isFullySupported(gonti)).toBe(true);
+    let { s, ap, ids, opp } = setup([gonti]);
+    putOnBattlefield(s, ap, card("Swamp", "Basic Land — Swamp"));
+    const lib = s.players[opp]!.library;
+    const i = lib.findIndex((id) => s.cards[s.objects[id]!.cardId]!.name === "Grizzly Bears");
+    lib.unshift(...lib.splice(i, 1));
+    const top4 = lib.slice(0, 4);
+    for (const a of planCast(s, ap, ids[0]!)!) s = act(s, a);
+    s = until(s, (x) => x.pending?.kind === "chooseTargets");
+    s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] } as never);
+    s = until(s, (x) => x.pending?.kind === "searchLibrary");
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap, cards: top4 });
+    s = act(s, { type: "searchLibrary", player: ap, found: [top4[0]!] });
+    const b = top4[0]!;
+    expect(s.objects[b]!.zone).toBe("exile");
+    expect(s.objects[b]!.hiddenExile?.seen).toEqual([ap]);
+    // The rest went to the bottom.
+    expect(s.players[opp]!.library.slice(-3).sort()).toEqual(top4.slice(1).sort());
+    s = until(s, (x) => x.stack.length === 0);
+    // Cast with mana of any type: only Islands and Plains left untapped would do too.
+    for (const id of s.battlefield) if (s.objects[id]!.controller === ap && /Forest|Swamp|Mountain/.test(s.cards[s.objects[id]!.cardId]!.name)) s.objects[id]!.tapped = true;
+    for (const a of planCast(s, ap, b)!) s = act(s, a);
+    s = passAll(s);
+    expect(s.objects[b]!.zone).toBe("battlefield");
+    expect(s.objects[b]!.controller).toBe(ap);
+  });
+});
+
+describe("Fallen Shinobi", () => {
+  it("is supported: the player dealt damage exiles their top two; you may play them free this turn", () => {
+    expect(isFullySupported(shinobi)).toBe(true);
+    let { s, ap, opp } = setup([]);
+    const n = putOnBattlefield(s, ap, shinobi);
+    const lib = s.players[opp]!.library;
+    const i = lib.findIndex((id) => s.cards[s.objects[id]!.cardId]!.name === "Grizzly Bears");
+    lib.unshift(...lib.splice(i, 1));
+    const top2 = lib.slice(0, 2);
+    s = passUntil(s, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: n, defender: opp }] });
+    s = until(s, (x) => x.step === "main2");
+    expect(top2.map((id) => s.objects[id]!.zone)).toEqual(["exile", "exile"]);
+    // Every land of ours tapped: the Bears costs nothing.
+    for (const id of s.battlefield) if (s.objects[id]!.controller === ap) s.objects[id]!.tapped = true;
+    expect(castProblem(s, ap, top2[0]!)).toBeNull();
+    for (const a of planCast(s, ap, top2[0]!)!) s = act(s, a);
+    s = passAll(s);
+    expect(s.objects[top2[0]!]!.zone).toBe("battlefield");
+    expect(s.objects[top2[0]!]!.controller).toBe(ap);
+  });
+});
+
+describe("Oko, Thief of Crowns", () => {
+  it("is supported: +1 makes an artifact a 3/3 green Elk creature with no abilities, for good", () => {
+    expect(isFullySupported(oko)).toBe(true);
+    let { s, ap, opp } = setup([]);
+    const o = putOnBattlefield(s, ap, oko);
+    s.objects[o]!.counters.loyalty = 4;
+    const t = putOnBattlefield(s, opp, treasure);
+    for (const a of planActivate(s, ap, o, 1, [{ kind: "object", id: t }])!) s = act(s, a);
+    s = passAll(s);
+    const ch = characteristics(s, s.objects[t]!);
+    expect(ch.types).toEqual(["Creature"]);
+    expect(ch.subtypes).toEqual(["Elk"]);
+    expect(ch.colors).toEqual(["G"]);
+    expect([power(s, s.objects[t]!), toughness(s, s.objects[t]!)]).toEqual([3, 3]);
+    // Still so on later turns.
+    s = until(s, (x) => x.turn > s.turn && x.step === "main1");
+    expect(characteristics(s, s.objects[t]!).subtypes).toEqual(["Elk"]);
+  });
+
+  it("−5 exchanges control of our artifact and their creature with power 3 or less", () => {
+    let { s, ap, opp } = setup([]);
+    const o = putOnBattlefield(s, ap, oko);
+    s.objects[o]!.counters.loyalty = 6;
+    const mine = putOnBattlefield(s, ap, treasure);
+    const theirs = putOnBattlefield(s, opp, bear());
+    const big = putOnBattlefield(s, opp, card("Big", "Creature — Giant", "{4}", { power: "4", toughness: "4" }));
+    expect(planActivate(s, ap, o, 2, [{ kind: "object", id: mine }, { kind: "object", id: big }])).toBeNull();
+    for (const a of planActivate(s, ap, o, 2, [{ kind: "object", id: mine }, { kind: "object", id: theirs }])!) s = act(s, a);
+    s = passAll(s);
+    expect(controllerOf(s, s.objects[theirs]!)).toBe(ap);
+    expect(controllerOf(s, s.objects[mine]!)).toBe(opp);
+  });
+});
+
+describe("Cityscape Leveler", () => {
+  it("is supported: as it's cast and as it attacks, a nonland permanent is destroyed and its controller gets a tapped Powerstone", () => {
+    expect(isFullySupported(leveler)).toBe(true);
+    let { s, ap, ids, opp } = setup([leveler]);
+    const [b1, b2] = [putOnBattlefield(s, opp, bear()), putOnBattlefield(s, opp, bear())];
+    for (const a of planCast(s, ap, ids[0]!)!) s = act(s, a);
+    s = until(s, (x) => x.pending?.kind === "chooseTargets");
+    s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: b1 }] } as never);
+    s = until(s, (x) => x.stack.length === 0);
+    expect(s.objects[b1]!.zone).toBe("graveyard");
+    expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
+    const stones = () => s.battlefield.filter((id) => s.cards[s.objects[id]!.cardId]!.name.startsWith("Powerstone"));
+    expect(stones().map((id) => [controllerOf(s, s.objects[id]!), s.objects[id]!.tapped])).toEqual([[opp, true]]);
+    // Its next attack.
+    s.objects[ids[0]!]!.controlledSinceTurn = -1;
+    s = passUntil(s, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: ids[0]!, defender: opp }] });
+    s = until(s, (x) => x.pending?.kind === "chooseTargets");
+    s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: b2 }] } as never);
+    s = until(s, (x) => x.stack.length === 0 && x.triggerQueue.length === 0);
+    expect(s.objects[b2]!.zone).toBe("graveyard");
+    expect(stones().length).toBe(2);
+  });
+});
+
+describe("Emeria Shepherd", () => {
+  function play(land: "Plains" | "Island") {
+    const d = card(land, `Basic Land — ${land}`);
+    let { s, ap, ids } = setup([d]);
+    putOnBattlefield(s, ap, shepherd);
+    const dead = putOnBattlefield(s, ap, bear());
+    s.battlefield.splice(s.battlefield.indexOf(dead), 1);
+    s.objects[dead]!.zone = "graveyard";
+    s.players[ap]!.graveyard.push(dead);
+    invalidateCharacteristics(s);
+    s = act(s, { type: "playLand", player: ap, objectId: ids[0]! });
+    s = until(s, (x) => x.pending?.kind === "chooseTargets");
+    s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: dead }] } as never);
+    s = until(s, (x) => x.pending?.kind === "chooseMay");
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    return { s, ap, dead };
+  }
+  it("is supported: after a Plains, the card may come back to the battlefield instead", () => {
+    expect(isFullySupported(shepherd)).toBe(true);
+    let { s, ap, dead } = play("Plains");
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "either", labels: ["Return it to the battlefield", "Return it to your hand"] });
+    s = act(s, { type: "chooseOption", player: ap, choice: "0" });
+    expect(s.objects[dead]!.zone).toBe("battlefield");
+  });
+  it("after another land, to the hand", () => {
+    const { s, dead } = play("Island");
+    expect(s.pending?.kind).not.toBe("chooseOption");
+    expect(s.objects[dead]!.zone).toBe("hand");
+  });
+});

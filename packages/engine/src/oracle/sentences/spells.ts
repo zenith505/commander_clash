@@ -190,6 +190,11 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Scry and surveil (CR 701.22, 701.25)
   if ((m = new RegExp(`^(Scry|Surveil) ${NUMX}$`, "i").exec(s))) return [{ type: m[1]!.toLowerCase() === "scry" ? "scry" : "surveil", n: amt(m[2]!) }];
+  // "Target player scries X, then draws a card" (Kozilek's Command, CR 701.22): that player looks and chooses.
+  if ((m = new RegExp(`^(Target player|Target opponent) scries ${NUMX}$`).exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    return who ? [{ type: "scry", n: amt(m[2]!), who }] : null;
+  }
   // "Discover 4" (CR 701.57a): exile until a nonland card with mana value 4 or less, cast it free or put it into your hand.
   // "Discover X, where X is its toughness": X is worked out as the instruction starts (body.ts defineX).
   if ((m = /^(?:[Yy]ou )?[Dd]iscover (\d+|X)$/.exec(s))) return [{ type: "discover", n: amt(m[1]!) }];

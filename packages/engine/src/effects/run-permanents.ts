@@ -1,6 +1,6 @@
 import type { Effect, Modification, TokenSpec } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
-import { auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, log, moveObject, obj, opponents, player, removeFromCombat, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds } from "../game";
+import { auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, moveObject, obj, opponents, player, removeFromCombat, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putPlayerCounters, putCounters, tokenBatch, withPutter } from "../counters";
 import { compileCard } from "../oracle";
@@ -857,6 +857,22 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       log(s, `${names.length > 2 ? `${names.length} creatures` : names.join(" and ")} ${describeMods(s, mods, ctx.controller, names.length > 1)}${e.duration === "endOfTurn" ? " until end of turn" : e.duration === "yourNextTurn" ? ` until ${player(s, ctx.controller).name}'s next turn` : e.duration === "endOfYourNextTurn" ? ` until the end of ${player(s, ctx.controller).name}'s next turn` : e.duration === "whileTapped" ? ` for as long as ${src} remains tapped` : e.duration === "whileControlled" ? ` for as long as ${player(s, ctx.controller).name} controls ${src}` : ""}.`);
       return;
     }
+    case "exchangeControl": {
+      // CR 701.12b: with either target gone or illegal, or both under one player's control, nothing happens (rulings on
+      // Oko, Thief of Crowns). Otherwise each player gains control of the other's, at once, indefinitely.
+      const a = objects(s, e.a, ctx)[0];
+      const b = objects(s, e.b, ctx)[0];
+      if (!a || !b || a.zone !== "battlefield" || b.zone !== "battlefield") return;
+      const [ca, cb] = [controllerOf(s, a), controllerOf(s, b)];
+      if (ca === cb) {
+        log(s, `${src}: ${defOf(s, a).name} and ${defOf(s, b).name} have the same controller, so nothing is exchanged.`);
+        return;
+      }
+      for (const [o, to] of [[a, cb], [b, ca]] as const) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: to, sourceName: src, sourceId: ctx.sourceId, duration: "game", affected: [o.id], mods: [{ kind: "control" }] });
+      invalidateCharacteristics(s);
+      log(s, `${player(s, ca).name} and ${player(s, cb).name} exchange control of ${defOf(s, a).name} and ${defOf(s, b).name}.`);
+      return;
+    }
     case "ownersGainControl": {
       // Each owner's own effect, for the permanents of theirs others control (CR 613.1b, 613.7b).
       const byOwner = new Map<PlayerId, ObjectId[]>();
@@ -884,6 +900,15 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const mod = fixMods(s, [{ kind: "addKeywords", keywords: e.keywords }], ctx)[0];
       // "Protection from that player": the player this instruction is being done for (Noble Heritage).
       const keywords = (mod?.kind === "addKeywords" ? mod.keywords : []).flatMap((k) => (k !== THAT_PLAYER_PROTECTION ? [k] : ctx.eachOne !== undefined ? [protectionFromPlayer(ctx.eachOne)] : []));
+      // "Players gain hexproof until end of turn" (Everybody Lives!): each of them.
+      if (e.everyone) {
+        for (const pid of livingPlayers(s)) {
+          const q = player(s, pid);
+          q.gained = [...new Set([...(q.gained ?? []), ...keywords])];
+        }
+        log(s, `Players gain ${keywords.map((k) => k.toLowerCase()).join(" and ")} until end of turn.`);
+        return;
+      }
       const p = player(s, ctx.controller);
       if (e.lifeCantChange) {
         p.lifeCantChange = true;

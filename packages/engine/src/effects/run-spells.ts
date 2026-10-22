@@ -151,6 +151,20 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       return;
     }
+    case "castSearched": {
+      // "Search your library for ... and cast that card without paying its mana cost" (Sunforger): cast from the library
+      // as this resolves (CR 608.2g); X is 0 (CR 107.3b). One that can't be cast stays there, to be shuffled. Not casting
+      // it is offered too, as finding nothing was (CR 701.23b).
+      const sc = (s.resolving!.scratch ??= {});
+      const id = s.resolving!.searchCast;
+      if (sc.playLinked || !id || s.objects[id]?.zone !== "library") return;
+      sc.playLinked = true;
+      s.pending = { kind: "castFree", player: ctx.controller, objectId: id, source: src };
+      if (castProblem(s, ctx.controller, id) === null) return "paused";
+      s.pending = null;
+      log(s, `${defOf(s, obj(s, id)).name} can't be cast.`);
+      return;
+    }
     case "castCipher": {
       // "You may copy the encoded card and you may cast the copy without paying its mana cost" (CR 702.99a): the copy
       // is made in exile, where the card is, then cast (CR 707.12); if it isn't cast it ceases to exist (CR 704.5e).

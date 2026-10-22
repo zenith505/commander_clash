@@ -241,6 +241,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // Permanents: "creature you control", "other Elf you control", "land on the battlefield", "artifacts your opponents control".
   // "Creatures target player controls" (Will of the Mardu), "that player controls": that player's permanents.
+  // "Damage to defending player equal to the number of artifacts they control" (Generous Plunderer): the defending player's.
+  if (ctx?.defending) p = p.replace(/ (?:they control|defending player controls)$/, " that player controls");
   if ((m = /^(other )?(.+?) (you control|on the battlefield|your opponents control|an opponent controls|target player controls|target opponent controls|that player controls|those players control|those opponents control)(?: ((?:with|of the chosen|of that|that aren't|that's attached to|that are attached to) .+))?$/i.exec(p))) {
     const words = m[2]!.split(/\s+/).map(singularWord).join(" ");
     const who = m[3]!.toLowerCase();
@@ -314,7 +316,7 @@ function whosePlayer(w: string, ctx: Ctx | null): PlayerRef | null {
   if (x === "that player's" && ctx.chosenOpponent) return { ref: "chosenPlayer" };
   if ((x === "that player's" || x === "their") && ctx.lastPlayerTarget !== undefined) return { ref: "target", index: ctx.lastPlayerTarget };
   // "At the beginning of each opponent's upkeep, ~ deals X damage to that player, where X is the number of cards in their hand".
-  if ((x === "that player's" || x === "their") && ctx.eventPlayer) return { ref: "eventPlayer" };
+  if ((x === "that player's" || x === "their") && (ctx.eventPlayer || ctx.defending)) return { ref: "eventPlayer" };
   if (x === "enchanted player's" || x === "enchanted opponent's") return { ref: "enchantedPlayer" };
   return null;
 }

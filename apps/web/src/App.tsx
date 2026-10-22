@@ -4257,14 +4257,14 @@ function Controls({
   }
   // "You may cast a spell with mana value 3 or less from your hand without paying its mana cost": which card, or none;
   // and the legend rule's "keep which one?" (CR 704.5j): hovering shows each card.
-  if (pending?.kind === "chooseOption" && (pending.what === "castFromHand" || pending.what === "castFromAmong" || pending.what === "legend") && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "castFromHand" || pending.what === "castFromAmong" || pending.what === "legend" || pending.what === "revealHandOrTop") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>
           <strong>{pending.source}:</strong> {pending.prompt}
         </span>
         {pending.options.map((o, i) => (
-          <button key={o} className={o === "none" ? "ghost" : ""} onMouseEnter={() => o !== "none" && onHover(cardOf(s, o))} onMouseLeave={() => onHover(null)} onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
+          <button key={o} className={o === "none" ? "ghost" : ""} onMouseEnter={() => o !== "none" && o !== "top" && onHover(cardOf(s, o))} onMouseLeave={() => onHover(null)} onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
             {pending.labels?.[i] ?? o}
           </button>
         ))}
@@ -4326,7 +4326,9 @@ function Controls({
               : pending.action === "band"
                 ? `put attacking creatures in a band if you want: click creatures with banding and up to one without, all attacking the same player. Blocking one blocks them all, and you divide blockers' damage among them.`
                 : pending.action === "tap"
-                ? `tap any number of ${pending.what}: click them, then tap them. Each one tapped counts for what comes next.`
+                ? pending.min === undefined
+                  ? `click ${pending.count} ${pending.what} of yours to tap.`
+                  : `tap any number of ${pending.what}: click them, then tap them. Each one tapped counts for what comes next.`
                 : pending.action === "untap"
                 ? `click up to ${pending.count} tapped land${pending.count === 1 ? "" : "s"} to untap (any player's), then untap them.`
                 : pending.action === "phaseOut"
@@ -4343,6 +4345,8 @@ function Controls({
                 ? `champion: click another ${pending.what} of yours to exile until ${pending.source} leaves the battlefield, or exile none and sacrifice ${pending.source}.`
                 : pending.action === "encode"
                 ? `cipher: click a creature of yours to exile ${pending.source} encoded on it. Whenever that creature deals combat damage to a player, you may cast a copy of ${pending.source} for free.`
+                : pending.action === "unattach"
+                ? `click an Equipment to unattach from the creature of yours it's attached to. That creature becomes tapped and gains indestructible until end of turn.`
                 : pending.action === "meld"
                 ? `meld: click the ${pending.what} to exile with ${pending.source} and meld them into one permanent. A token or a copy can't meld and stays in exile.`
                 : pending.action === "keep"
@@ -4350,7 +4354,7 @@ function Controls({
                 : `click ${what} ${theirs ? `${theirs} controls` : "of yours"} to ${verb}.`}
         </span>
         <button disabled={!ok} onClick={() => dispatch([{ type: "pickPermanents", player: HUMAN, ids: discards }])}>
-          {pending.action === "attach" ? (n ? `Attach ${n}` : "Attach none") : pending.action === "keep" ? (n ? `Keep ${n}` : "Keep none") : pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "encode" ? (n ? "Encode" : "Don't encode") : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "keepTapped" ? (n ? `Keep ${n} tapped` : "Untap all") : pending.action === "phaseOut" ? (n ? `Phase out ${n}` : "Phase out none") : pending.action === "untap" ? (n ? `Untap ${n}` : "Untap none") : pending.action === "tap" ? (n ? `Tap ${n}` : "Tap none") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : pending.action === "choose" ? "Choose" : pending.action === "meld" ? "Meld" : "Return"}
+          {pending.action === "attach" ? (n ? `Attach ${n}` : "Attach none") : pending.action === "keep" ? (n ? `Keep ${n}` : "Keep none") : pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "encode" ? (n ? "Encode" : "Don't encode") : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "keepTapped" ? (n ? `Keep ${n} tapped` : "Untap all") : pending.action === "phaseOut" ? (n ? `Phase out ${n}` : "Phase out none") : pending.action === "untap" ? (n ? `Untap ${n}` : "Untap none") : pending.action === "tap" ? (n ? `Tap ${n}` : "Tap none") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : pending.action === "choose" ? "Choose" : pending.action === "meld" ? "Meld" : pending.action === "unattach" ? "Unattach" : "Return"}
         </button>
       </div>
     );

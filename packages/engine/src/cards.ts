@@ -1,5 +1,5 @@
 import type { CompiledCard, ManaAbility, TargetSpec, TriggeredAbility } from "./abilities";
-import { characteristics, offFieldTyped, printedKeywords, type PTPart } from "./layers";
+import { characteristics, offFieldColored, offFieldTyped, printedKeywords, type PTPart } from "./layers";
 import { compileCard, compileGranted, overloadedText } from "./oracle";
 import { COLORS, type CardDef, type Color, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
 import { manaValue, parseManaCost } from "./mana";
@@ -86,9 +86,30 @@ export const cardIdOf = (o: GameObject): string => (o.faceDown ? (withWard(o) ? 
 /** The card definition an object uses right now: its own, what it copies, or a face-down one (CR 613.2, 708.2). */
 export const defOf = (s: GameState, o: GameObject): CardDef => {
   const out = ownDefOf(s, o);
+  if (o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged") return out;
   // Outside the battlefield, effects like Maskwood Nexus's change a creature card's or spell's creature types.
-  return o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged" ? out : offFieldTyped(s, o, out);
+  return offFieldColored(s, o, offFieldTyped(s, o, offFieldCreatureDef(out)));
 };
+
+const offFieldCreatures = new Map<string, CardDef>();
+
+/**
+ * Grist, the Hunger Tide anywhere but the battlefield: "it's a 1/1 Insect creature in addition to its other types" (its
+ * own static ability, which works in every other zone, CR 113.6b; rulings: a Legendary Planeswalker Creature — Grist
+ * Insect).
+ */
+export function offFieldCreatureDef(d: CardDef): CardDef {
+  const off = compileCard(d).offFieldCreature;
+  if (!off) return d;
+  const hit = offFieldCreatures.get(d.oracleId);
+  if (hit) return hit;
+  const types = [...d.types.filter((t) => t !== "Creature"), "Creature"] as CardDef["types"];
+  const subtypes = [...d.subtypes, off.subtype];
+  const typeLine = `${[...d.supertypes, ...types].join(" ")} — ${subtypes.join(" ")}`;
+  const out: CardDef = { ...d, types, subtypes, typeLine, power: off.power, toughness: off.toughness };
+  offFieldCreatures.set(d.oracleId, out);
+  return out;
+}
 
 /**
  * Its definition without the type changes that work outside the battlefield (defOf): what a copy of it copies, since

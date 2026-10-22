@@ -1,7 +1,7 @@
 import type { DamageRecipient, Effect, PlayerRef } from "../abilities";
 import { putPlayerCounters } from "../counters";
 import { cardIdOf, defOf, objHasKeyword, objIsType, power, toughness } from "../cards";
-import { addPhases, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, log, loseLife, obj, player, playerLoses, winGame } from "../game";
+import { addPhases, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, livingPlayers, log, loseLife, obj, player, playerLoses, winGame } from "../game";
 import { MONARCH } from "../oracle";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { cardSource, dealDamage, dealDamageBatch, dealPlanned, excessOver, lethalAmounts, objectSource, planShields, type DamageEvent, type DamageSource } from "../damage";
@@ -193,8 +193,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       return;
     case "cantCast":
       for (const pid of players(s, e.who, ctx)) {
-        (s.cantCastThisTurn ??= []).push({ player: pid, turn: s.turn, ...(e.filter ? { filter: e.filter } : {}), source: src });
-        log(s, `${player(s, pid).name} can't cast ${e.filter ? `${e.filter.text.replace(/ spell$/, "")} ` : ""}spells this turn.`);
+        (s.cantCastThisTurn ??= []).push({ player: pid, turn: s.turn, ...(e.filter ? { filter: e.filter } : {}), source: src, ...(e.untilYourNextTurnEnds ? { untilEndOfTurnOf: ctx.controller } : {}) });
+        log(s, `${player(s, pid).name} can't cast ${e.filter ? `${e.filter.text.replace(/ spell$/, "")} ` : ""}spells ${e.untilYourNextTurnEnds ? `until the end of ${player(s, ctx.controller).name}'s next turn` : "this turn"}.`);
       }
       return;
     case "cantPlayLands":
@@ -204,6 +204,11 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       return;
     case "turnRules":
+      if (e.everyone) {
+        for (const pid of livingPlayers(s)) for (const rule of e.rules) (s.turnRules ??= []).push({ turn: s.turn, player: pid, rule });
+        log(s, `Players${e.rules.map((r) => (r === "cantLoseLife" ? " can't lose life" : r === "cantLoseGame" ? " can't lose the game" : r === "cantWinGame" ? " can't win the game" : "")).join(",")} this turn.`);
+        return;
+      }
       for (const rule of e.rules) (s.turnRules ??= []).push({ turn: s.turn, player: ctx.controller, rule });
       log(s, `${player(s, ctx.controller).name}${e.rules.map((r) => (r === "cantLoseLife" ? " can't lose life" : r === "cantLoseGame" ? " can't lose the game" : r === "flash" ? " may cast spells as though they had flash" : r === "spellsUncounterable" ? "'s spells can't be countered" : "'s opponents can't win the game")).join(",")} this turn.`);
       return;

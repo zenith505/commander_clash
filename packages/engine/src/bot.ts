@@ -405,6 +405,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const pick = cards.sort((a, b) => mv(s, b) - mv(s, a))[0];
       return [{ type: "chooseOption", player: pid, choice: pick ?? "none" }];
     }
+    // Eladamri: the biggest creature card in hand, else the top card of the library (it may be one).
+    if (pend.kind === "chooseOption" && pend.what === "revealHandOrTop") {
+      const creatures = pend.options.filter((o) => o !== "top" && isType(defOf(s, obj(s, o)), "Creature"));
+      const pick = creatures.sort((a, b) => mv(s, b) - mv(s, a))[0];
+      return [{ type: "chooseOption", player: pid, choice: pick ?? (pend.options.includes("top") ? "top" : pend.options[0]!) }];
+    }
     // "You may cast any number of spells ... from among them": the biggest each time, until none is left or worth it.
     if (pend.kind === "chooseOption" && pend.what === "castFromAmong") {
       const cards = pend.options.filter((o) => o !== "none" && !isCounterOnly(compileCard(defOf(s, obj(s, o))).spell ?? { targets: [], effects: [], text: "" }));
@@ -2053,6 +2059,8 @@ function chooseWord(s: GameState, pid: PlayerId, options: string[]): string {
 function choosePicks(s: GameState, pid: PlayerId, options: ObjectId[], count: number, action: PickAction, counter?: CounterKind): ObjectId[] {
   const self = s.resolving?.item.sourceId;
   if (action === "attach") return attachPicks(s, pid, options);
+  // Akiri, Fearless Voyager: save our best creature (it's tapped and indestructible).
+  if (action === "unattach") return [...options].sort((a, b) => worth(s, pid, obj(s, obj(s, b).attachedTo!)) - worth(s, pid, obj(s, obj(s, a).attachedTo!))).slice(0, count);
   // Good counters go on the best creature; stun and -1/-1 counters on the least useful one.
   if (action === "populate" || action === "pair" || action === "choose" || (action === "counters" && (counter === "+1/+1" || counter === "shield" || counter === "loyalty"))) return [...options].sort((a, b) => worth(s, pid, obj(s, b)) - worth(s, pid, obj(s, a))).slice(0, count);
   // Meld (CR 701.42b): the card of the pair itself, not a token or a Clone, which would stay in exile; of those, the one

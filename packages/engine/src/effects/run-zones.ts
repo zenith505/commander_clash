@@ -1,7 +1,7 @@
 import type { Amount, CounterKind, Effect, TargetSpec, TokenSpec } from "../abilities";
 import { abilitiesOf, canBeSacrificed, cardIdOf, defOf, isPermanentCard, isType, objIsType, power } from "../cards";
 import { nameLandBan } from "../names";
-import { attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
+import { canPlayLandNow, tapPermanent, landUntappedOffer, playLandByEffect, attackablePermanentProblem, attackedName, attackedPlaneswalker, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, castProblem, draw, destroyPermanent, landsAllowed, livingPlayers, log, moveObject, enterTogether, nameOf, newObject, obj, pairable, pairCandidates, pairCreatures, player } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putCounters, withPutter } from "../counters";
 import { manaValue } from "../mana";
@@ -143,12 +143,36 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
   }
   // "Put a +1/+1 counter on a creature you control. It gains ...": "it" is the one picked, while it's that object (CR 400.7).
   if ((e.action === "counters" || e.action === "choose") && s.resolving) s.resolving.created = apnap(s, who).flatMap((pid) => sc.chosen?.[pid] ?? []).filter((id) => s.objects[id]?.zone === "battlefield");
+  // "Unattach an Equipment from a creature you control. If you do, tap that creature" (Akiri, Fearless Voyager): it stays
+  // on the battlefield, attached to nothing (CR 701.3d); "that creature" is the one it was attached to.
+  if (e.action === "unattach") {
+    const hosts: ObjectId[] = [];
+    for (const pid of apnap(s, who))
+      for (const id of sc.chosen?.[pid] ?? []) {
+        const o = s.objects[id];
+        if (o?.zone !== "battlefield" || !o.attachedTo) continue;
+        const host = o.attachedTo;
+        log(s, `${player(s, pid).name} unattaches ${defOf(s, o).name} from ${defOf(s, obj(s, host)).name}.`);
+        fireEvent(s, { type: "unattached", id, host });
+        o.attachedTo = undefined;
+        invalidateCharacteristics(s);
+        hosts.push(host);
+      }
+    if (s.resolving) s.resolving.created = hosts;
+    return;
+  }
   for (const pid of apnap(s, who))
     for (const id of sc.chosen?.[pid] ?? []) {
       const o = s.objects[id];
       if (o?.zone !== "battlefield") continue;
       if (e.action === "choose") {
         log(s, `${player(s, pid).name} chooses ${defOf(s, o).name}.`);
+        continue;
+      }
+      if (e.action === "tap") {
+        if (o.tapped) continue;
+        tapPermanent(s, o);
+        log(s, `${player(s, pid).name} taps ${defOf(s, o).name}.`);
         continue;
       }
       if (e.action === "populate") {
@@ -885,10 +909,28 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         st.casting = undefined;
       }
       if (st.handPick) return finish();
+      if (st.landPick) {
+        // Gix: the land picked, played now; untapped if its controller paid for that (a shock land).
+        const id = st.landPick;
+        st.landPick = undefined;
+        const untapped = !!sc.may;
+        sc.may = undefined;
+        if (exiled(id) && canPlayLandNow(s, you.id, id)) playLandByEffect(s, you.id, id, untapped);
+        st.declined.push(id);
+      }
       if (st.pick !== undefined) {
         const pick = st.pick;
         st.pick = undefined;
         if (pick === "none" || !exiled(pick)) return finish();
+        if (e.lands && isType(defOf(s, obj(s, pick)), "Land")) {
+          st.landPick = pick;
+          const offer = landUntappedOffer(s, you.id, pick);
+          if (offer) {
+            s.pending = { kind: "chooseMay", player: you.id, prompt: offer, source: src, card: pick };
+            return "paused";
+          }
+          return runEffect(s, e, ctx);
+        }
         st.casting = pick;
         if (e.copies) {
           // "Copy it, and you may cast the copy without paying its mana cost": made in exile and cast now (CR 707.12).
@@ -910,12 +952,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         s.pending = null;
         return problem === null || /^not enough mana/.test(problem);
       };
+      const isLand = (id: ObjectId) => isType(defOf(s, obj(s, id)), "Land");
       const options = st.ids
         .map((x) => x.id)
-        .filter((id) => exiled(id) && !st.declined.includes(id) && !isType(defOf(s, obj(s, id)), "Land") && (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (st.maxMv === undefined || mvOf(id) <= st.maxMv) && (st.budget === undefined || mvOf(id) <= st.budget) && (!st.hits || st.hits.includes(id)) && castable(id));
+        .filter((id) => exiled(id) && !st.declined.includes(id) && (isLand(id) ? !!e.lands && canPlayLandNow(s, you.id, id) : (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (st.maxMv === undefined || mvOf(id) <= st.maxMv) && (st.budget === undefined || mvOf(id) <= st.budget) && (!st.hits || st.hits.includes(id)) && castable(id)));
       if (!options.length || (e.max !== undefined && (st.cast ?? 0) >= e.max)) return finish();
       const left = st.budget !== undefined ? ` (total mana value ${st.budget} left)` : "";
-      s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Done"], prompt: `cast a spell from among the ${e.reveal ? "revealed" : "exiled"} cards without paying its mana cost${left}?` };
+      s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Done"], prompt: `${e.lands ? "play a land or " : ""}cast a spell from among the ${e.reveal ? "revealed" : "exiled"} cards without paying its mana cost${left}?` };
       return "paused";
     }
     case "suspendTick": {
@@ -1051,6 +1094,26 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       log(s, `${defOf(s, card).name} is exiled haunting ${defOf(s, host).name}.`);
       return;
     }
+    case "revealHandOrTop": {
+      // Eladamri: the card picked as it resolves, revealed; a creature card goes onto the battlefield under your control.
+      const p = player(s, ctx.controller);
+      const sc = (s.resolving!.scratch ??= {});
+      const options = [...p.hand, ...(p.library.length ? ["top"] : [])];
+      if (sc.revealPick === undefined) {
+        if (!options.length) return;
+        s.pending = { kind: "chooseOption", player: p.id, source: src, what: "revealHandOrTop", options, labels: [...p.hand.map((id) => defOf(s, obj(s, id)).name), ...(p.library.length ? ["Top card of your library"] : [])], prompt: `reveal a card from your hand or the top card of your library (a ${e.filter.text} is put onto the battlefield)` };
+        return "paused";
+      }
+      const id = sc.revealPick === "top" ? p.library[0] : p.hand.includes(sc.revealPick) ? sc.revealPick : undefined;
+      sc.revealPick = undefined;
+      if (!id) return;
+      const d = defOf(s, obj(s, id));
+      log(s, `${p.name} reveals ${d.name} from their ${obj(s, id).zone === "hand" ? "hand" : "library"}.`);
+      if (!printedMatches(e.filter, d)) return;
+      moveObject(s, id, "battlefield", { controller: p.id });
+      if (obj(s, id).zone === "battlefield") log(s, `${p.name} puts ${d.name} onto the battlefield.`);
+      return;
+    }
     case "playLinked": {
       // The card this permanent's hideaway exiled, still the same object in exile (CR 400.7, 607.2a), played as this
       // resolves (rulings: it can't wait). Asked once; a land goes through "you may" since it isn't cast.
@@ -1079,11 +1142,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         log(s, `${d.name} can't be cast.`);
         return;
       }
-      if (isType(d, "Land") && sc.may) {
-        p.landsPlayedThisTurn++;
-        moveObject(s, card.id, "battlefield");
-        log(s, `${p.name} plays ${d.name} from ${e.revealed ? "their library" : "exile"}.`);
-      }
+      // Played: it counts as the turn's land play and triggers "whenever you play a land" (CR 305.2, 305.1).
+      if (isType(d, "Land") && sc.may && canPlayLandNow(s, p.id, card.id)) playLandByEffect(s, p.id, card.id);
       return;
     }
     case "exileFaceDown": {
@@ -1904,6 +1964,23 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "impulse": {
       // Exiled face up (CR 406.3); the permission belongs to this object only (CR 400.7).
       const p = player(s, ctx.controller);
+      // "Exile the top card of each player's library" (Nashi): each library in turn, all part of one group.
+      if (e.who?.ref === "eachPlayer") {
+        const oneOf = e.oneOf ? `g${s.nextId++}` : undefined;
+        const all: ObjectId[] = [];
+        for (const pid of apnap(s, players(s, e.who, ctx))) {
+          const ids = player(s, pid).library.slice(0, amountNow(s, e.n, ctx));
+          for (const id of ids) {
+            moveObject(s, id, "exile");
+            const o = obj(s, id);
+            o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.castOnly ? { castOnly: true as const } : {}), ...(oneOf ? { oneOf } : {}), ...(e.life ? { life: true as const } : {}) };
+          }
+          all.push(...ids);
+        }
+        if (s.resolving) (s.resolving.impulsed ??= []).push(...all);
+        if (all.length) log(s, `${p.name} exiles ${all.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of each library and may ${e.oneOf ? "play one of them" : "play them"}${e.life ? ", paying life rather than mana for a spell" : ""}${e.until === "thisTurn" ? " this turn" : ""}.`);
+        return;
+      }
       const from = e.who ? players(s, e.who, ctx)[0] : p.id;
       if (from === undefined) return;
       const ids = player(s, from).library.slice(0, amountNow(s, e.n, ctx));

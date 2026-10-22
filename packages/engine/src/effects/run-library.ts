@@ -221,11 +221,14 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // the permanent as it was when the ability triggered (CR 607.2a): a new object can't play it.
       const p = player(s, ctx.controller);
       const sc = (s.resolving!.scratch ??= {});
+      const fromId = e.from ? players(s, e.from, ctx)[0] : p.id;
+      if (fromId === undefined) return;
+      const lib = player(s, fromId);
       if (!sc.found) {
-        const cards = p.library.slice(0, e.n);
+        const cards = lib.library.slice(0, e.n);
         if (!cards.length) return;
         sc.looked = cards;
-        s.pending = { kind: "searchLibrary", player: p.id, source: src, what: "a card", cards, min: 1, max: 1, dig: { looked: cards, to: "into exile face down (hideaway)", rest: "on the bottom of your library in a random order" } };
+        s.pending = { kind: "searchLibrary", player: p.id, source: src, what: "a card", cards, min: 1, max: 1, dig: { looked: cards, to: e.castAnyType ? "into exile face down: you may cast it while it's exiled, with mana of any type" : "into exile face down (hideaway)", rest: e.from ? `on the bottom of ${lib.name}'s library in a random order` : "on the bottom of your library in a random order" } };
         return "paused";
       }
       const looked = sc.looked ?? [];
@@ -234,7 +237,14 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         moveObject(s, id, "exile");
         const o = obj(s, id);
         if (o.zone !== "exile") continue;
-        o.hiddenExile = { by: ctx.sourceId ?? "", seen: [p.id] };
+        o.hiddenExile = { by: ctx.sourceId ?? "", seen: [p.id], ...(e.castAnyType ? { label: "Face down" } : {}) };
+        // Gonti: its controller may cast it for as long as it remains exiled, even after Gonti has left (rulings).
+        if (e.castAnyType) {
+          o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: "exiled", turn: s.turn, castOnly: true, anyType: true };
+          log(s, `${p.name} exiles a card face down from ${lib.name}'s library.`);
+          log(s, `You exiled ${defOf(s, o).name} face down with ${src}; you may cast it while it's exiled.`, p.id);
+          continue;
+        }
         if (ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
         log(s, `${p.name} exiles a card face down (hideaway).`);
         log(s, `You exiled ${defOf(s, o).name} face down with ${src}.`, p.id);
@@ -242,12 +252,15 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const rest = looked.filter((id) => obj(s, id).zone === "library");
       shuffle(s, rest);
       for (const id of rest) moveObject(s, id, "library"); // to the bottom, in a random order
-      if (rest.length) log(s, `${p.name} puts ${rest.length} card${rest.length === 1 ? "" : "s"} on the bottom of their library in a random order.`);
+      if (rest.length) log(s, `${p.name} puts ${rest.length} card${rest.length === 1 ? "" : "s"} on the bottom of ${fromId === p.id ? "their" : `${lib.name}'s`} library in a random order.`);
       return;
     }
     case "scry":
     case "surveil": {
-      const p = player(s, ctx.controller);
+      // "Target player scries X": that player, if they're still a legal target (CR 608.2b).
+      const by = e.type === "scry" && e.who ? players(s, e.who, ctx)[0] : ctx.controller;
+      if (by === undefined) return;
+      const p = player(s, by);
       const r = s.resolving!;
       const arranged = r.scratch?.arranged;
       if (!arranged) {
@@ -657,7 +670,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const p = player(s, pid);
         const lib = libOf(pid);
         const found = foundBy(pid).filter((id) => dest(pid, id).zone !== "battlefield" || !defOf(s, obj(s, id)).subtypes.includes("Aura") || hosts.has(id));
-        lib.library = lib.library.filter((id) => !found.includes(id));
+        // Sunforger: the card to cast stays where it is until it's cast (castSearched).
+        lib.library = lib.library.filter((id) => !found.includes(id) || dest(pid, id).zone === "cast");
         const names = found.map((id) => defOf(s, obj(s, id)).name);
         // Found cards aren't revealed unless the effect says so (CR 701.23e).
         const shown = e.reveal || e.dest.zone === "battlefield" || (e.dest.zone === "exile" && !e.dest.faceDown) || exiledFor(pid) !== undefined ? ` (${names.join(", ")})` : "";
@@ -684,7 +698,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         for (const { pid, id } of moves) {
           const p = player(s, pid);
           const to = dest(pid, id);
-          if (to.zone === "libraryTop") {
+          if (to.zone === "cast") r.searchCast = id;
+          else if (to.zone === "libraryTop") {
             obj(s, id).zone = "library";
             // Third from the top, or on the bottom of a library with fewer than 3 other cards (rulings on Long-Term Plans).
             p.library.splice(to.third ? Math.min(2, p.library.length) : 0, 0, id);
@@ -787,8 +802,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (got === "paused") return "paused";
       const rest = looked.filter((id) => !got.includes(id));
       enterTogether(s, () => {
-        for (const id of got) moveObject(s, id, e.to.zone === "libraryTop" ? "library" : e.to.zone, e.to.zone === "battlefield" ? { controller: p.id, ...(e.to.tapped ? { tapped: true } : {}) } : undefined);
-        if (e.rest) for (const id of rest) moveObject(s, id, e.rest.zone === "libraryTop" ? "library" : e.rest.zone);
+        const zone = (d: SearchDest) => (d.zone === "libraryTop" || d.zone === "cast" ? "library" : d.zone);
+        for (const id of got) moveObject(s, id, zone(e.to), e.to.zone === "battlefield" ? { controller: p.id, ...(e.to.tapped ? { tapped: true } : {}) } : undefined);
+        if (e.rest) for (const id of rest) moveObject(s, id, zone(e.rest));
       });
       return;
     }

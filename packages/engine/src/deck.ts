@@ -9,6 +9,8 @@ export interface DeckProblem {
 /** Can this card be a commander? CR 903.3 */
 export function canBeCommander(c: CardDef): boolean {
   if (c.supertypes.includes("Legendary") && c.types.includes("Creature")) return true;
+  // Grist, the Hunger Tide: a legendary creature before the game begins, by its own static ability (rulings).
+  if (c.supertypes.includes("Legendary") && /^As long as .+ isn't on the battlefield, it's an? \d+\/\d+ [A-Z][a-z]+ creature in addition to its other types\.$/m.test(c.oracleText)) return true;
   return /can be your commander/i.test(c.oracleText);
 }
 

@@ -57,6 +57,8 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
     // Controlling a player's turn (CR 723): an opponent's, who then does what we like.
     if (e.type === "controlPlayer" && e.who.ref === "target") mark(e.who.index);
     if (e.type === "counterSpell") mark(e.index);
+    // Exchanging control (Oko): the opponent's permanent taken, our least useful one given.
+    if (e.type === "exchangeControl") for (const r of [e.a, e.b]) if (r.ref === "target") mark(r.index);
     // Taking a spell over: an opponent's.
     if (e.type === "controlSpell") mark(e.index);
     // Haunt: the card does something again when the haunted creature dies, which an opponent's creature does when

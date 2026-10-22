@@ -344,6 +344,10 @@ export interface GameObject {
     cost?: string;
     /** "A spell cast this way costs {2} more to cast" (Soul Partition, Elite Spellbinder). */
     more?: number;
+    /** "You may play one of those cards" (Nashi): the cards of one group, of which only one may be played (GameState.oneOfUsed). */
+    oneOf?: string;
+    /** "Pay life equal to its mana value rather than paying its mana cost" (Nashi): an alternative cost, the only way. */
+    life?: true;
   };
   /**
    * Foretold (CR 702.143a, 702.143c): exiled face down with foretell, which only its owner may look at; still so as the
@@ -1093,7 +1097,7 @@ export type PendingDecision =
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "commander" | "drawUpTo" | "payX" | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | "pile" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom" | "searchZones" | "vote" | /** One of the words of "each opponent chooses fame or fortune". */ "word" | "mutate" | "either" | "payOrTop" | "counterKind" | /** "Remove up to three counters": the next one to remove, or "done". */ "removeCounter" | /** Which target of a spell or ability becomes ~ (Spellskite). */ "targetSlot" | /** Which legendary permanent of a group to keep (CR 704.5j); the options are their ids. */ "legend" | /** A number chosen secretly (Wheel of Misfortune): any whole number in `numberRange`. */ "secretNumber"; options: string[]; /** Any whole number from `min` to `max` may be chosen, not only `options`. */ numberRange?: { min: number; max: number }; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** "removeCounter": the permanent the counters are moved onto (Resourceful Defense). */ onto?: ObjectId; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId; /** "pile": the two piles, the first then the second (Fact or Fiction); `of`, the player whose hand the chosen one goes to. */ piles?: [ObjectId[], ObjectId[]] }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "commander" | "drawUpTo" | "payX" | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | /** Eladamri: a card in the hand, or "top". */ "revealHandOrTop" | "pile" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom" | "searchZones" | "vote" | /** One of the words of "each opponent chooses fame or fortune". */ "word" | "mutate" | "either" | "payOrTop" | "counterKind" | /** "Remove up to three counters": the next one to remove, or "done". */ "removeCounter" | /** Which target of a spell or ability becomes ~ (Spellskite). */ "targetSlot" | /** Which legendary permanent of a group to keep (CR 704.5j); the options are their ids. */ "legend" | /** A number chosen secretly (Wheel of Misfortune): any whole number in `numberRange`. */ "secretNumber"; options: string[]; /** Any whole number from `min` to `max` may be chosen, not only `options`. */ numberRange?: { min: number; max: number }; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** "removeCounter": the permanent the counters are moved onto (Resourceful Defense). */ onto?: ObjectId; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId; /** "pile": the two piles, the first then the second (Fact or Fiction); `of`, the player whose hand the chosen one goes to. */ piles?: [ObjectId[], ObjectId[]] }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -1342,7 +1346,9 @@ export interface GameState {
   /** While added phases run: the step the turn's own order goes on with once they're done (CR 500.8). */
   resumeStep?: Step;
   /** "Your opponents can't cast spells this turn" (Silence): who can't cast what, until that turn ends (CR 101.2). */
-  cantCastThisTurn?: { player: PlayerId; turn: number; filter?: TargetSpec; source: string }[];
+  /** The "one of those cards" groups (GameObject.mayPlay.oneOf) a card of which has been played: the rest can't be. */
+  oneOfUsed?: string[];
+  cantCastThisTurn?: { player: PlayerId; turn: number; filter?: TargetSpec; source: string; /** Until the end of this player's next turn (Single Combat), kept past this turn's cleanup. */ untilEndOfTurnOf?: PlayerId }[];
   /** Players who can't play lands this turn (Moonhold), and what said so. */
   cantPlayLandsThisTurn?: { player: PlayerId; turn: number; source: string }[];
   /** "Players can't gain life this turn" effects from resolved spells and abilities, by the turn they were made (CR 119.7). */
@@ -1534,7 +1540,8 @@ export interface TurnRule {
    * "flash": "You may cast spells this turn as though they had flash" (Borne Upon a Wind, Emergence Zone; CR 702.8a).
    * "spellsUncounterable": "Spells you control can't be countered this turn" (Veil of Summer, CR 101.2).
    */
-  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "flash" | "spellsUncounterable";
+  /** "cantWinGame": "players can't win the game this turn" (Everybody Lives!). */
+  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable";
 }
 
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */
@@ -1653,6 +1660,8 @@ export interface Resolving {
   chose?: Record<string, string>;
   /** A library was searched by a search that leaves the shuffle for later (Claim Jumper, `search.noShuffle`). */
   searchedHere?: true;
+  /** Sunforger: the card the search found to cast (`castSearched`), still in the library. */
+  searchCast?: ObjectId;
   /** The mana it added, for a mana ability: what the triggered mana abilities of tapping its source see (CR 106.12a). */
   made?: ManaType[];
   next: number;
@@ -1709,6 +1718,10 @@ export interface Resolving {
     mayQueue?: PlayerId[]; // "each player may ...": players still to decide, in APNAP order (CR 101.4)
     mayers?: PlayerId[]; // and those who chose to
     mayStep?: number; // how many of its instructions are done
+    /** "repeatIf" (Grist): how many of this pass's instructions are done. */
+    repeatStep?: number;
+    /** "revealHandOrTop" (Eladamri): the card picked, or "top" for the top card of the library. */
+    revealPick?: string;
     /** A tempting offer's runs (see eachAccepted): the one going on, and the scratch kept between them. */
     offer?: { i: number; keep: string[] };
     /** The "if"s running, outermost first: whether each one's condition held as it was reached, and its instructions done. */
@@ -1803,7 +1816,7 @@ export interface Resolving {
     faceDownPick?: true;
     /** moveLinked with `one`: the card is being chosen. */
     linkedPick?: true;
-    castAmong?: { ids: { id: ObjectId; zc: number }[]; budget?: number; maxMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true; /** How many were cast. */ cast?: number; /** `untilHits`: the cards that qualified; `handPick`, choosing which goes to the hand. */ hits?: ObjectId[]; handPick?: true; /** `copies`: the card the copy being cast is of. */ copyOf?: ObjectId };
+    castAmong?: { ids: { id: ObjectId; zc: number }[]; budget?: number; maxMv?: number; casting?: ObjectId; declined: ObjectId[]; pick?: string; done?: true; /** How many were cast. */ cast?: number; /** `untilHits`: the cards that qualified; `handPick`, choosing which goes to the hand. */ hits?: ObjectId[]; handPick?: true; /** `copies`: the card the copy being cast is of. */ copyOf?: ObjectId; /** `lands`: the land picked to play, after asking whether it enters untapped. */ landPick?: ObjectId };
     topOrBottom?: string; // the owner's choice: "top" or "bottom"
     /** The player a creature put onto the battlefield attacking attacks (CR 508.4), as a PlayerId string. */
     attackWhom?: string;

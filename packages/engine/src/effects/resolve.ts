@@ -666,6 +666,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "returnLinked":
     case "exileFaceDown":
     case "moveLinked":
+    case "revealHandOrTop":
     case "playLinked":
     case "cipher":
     case "haunt":
@@ -771,6 +772,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "continuous":
     case "groupRules":
     case "ownersGainControl":
+    case "exchangeControl":
     case "playerGains":
     case "attach":
     case "attachAny":
@@ -794,6 +796,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "linkedExileToken":
       return runTokensEffect(s, e, ctx, src);
     case "delayed":
+    case "castSearched":
     case "castCipher":
     case "castParadigm":
     case "castLinkedCopy":
@@ -862,6 +865,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
       return runVotesEffect(s, e, ctx, src);
     case "may":
     case "repeatMay":
+    case "repeatIf":
     case "rollAgain":
     case "either":
     case "eachMay":

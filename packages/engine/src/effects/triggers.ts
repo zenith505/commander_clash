@@ -898,12 +898,19 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const hit = fits(t);
         if (hit.length < (t.minAttackers ?? 1)) continue;
         const amount = ev.type === "groupCombatDamage" ? hit.reduce((n, [, i]) => n + ev.amounts[i]!, 0) : undefined;
-        const same = (tt: TriggeredAbility) => tt.event === want && tt.body.text === t.body.text && JSON.stringify(tt.group) === JSON.stringify(t.group) && tt.minAttackers === t.minAttackers && !!tt.anyoneAttacks === anyone;
+        const same = (tt: TriggeredAbility) => tt.event === want && tt.body.text === t.body.text && JSON.stringify(tt.group) === JSON.stringify(t.group) && tt.minAttackers === t.minAttackers && !!tt.anyoneAttacks === anyone && !!tt.perPlayer === !!t.perPlayer;
         const group = hit.map(([x]) => ({ id: x, zc: obj(s, x).zoneChanges ?? 0 }));
         // "Whenever another player attacks": the attacking player, and how many of those creatures attack this one's
         // controller, as they were declared (rulings on Firemane Commando).
         const watcher = controllerOf(s, o);
         const attacked = t.anotherPlayer ? { player: ev.controller, amount: hit.filter(([x]) => obj(s, x).attacking === watcher && !obj(s, x).attackingPermanent).length } : undefined;
+        // "Whenever you attack a player": once for each player the matching creatures attack (CR 508.3e).
+        if (t.perPlayer) {
+          for (const p of s.turnOrder)
+            if (hit.filter(([x]) => obj(s, x).attacking === p && !obj(s, x).attackingPermanent).length >= (t.minAttackers ?? 1))
+              add(o, ev.controller, (_, tt) => same(tt), undefined, undefined, undefined, undefined, undefined, undefined, { player: p });
+          continue;
+        }
         add(o, anyone ? watcher : ev.controller, (_, tt) => same(tt) && !(ev.type === "groupCombatDamage" && ev.battle !== undefined && !tt.orBattle), undefined, undefined, undefined, undefined, undefined, undefined, ev.type === "groupCombatDamage" ? { player: ev.player, amount, group } : attacked);
       }
     };
@@ -1083,6 +1090,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const dealerBy = controllerOf(s, o);
     const dealWatch = (w: GameObject) => add(w, dealerBy, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer && !(t.dealer.other && w.id === o.id) && objectMatches(s, t.dealer.filter, o, dealerBy, false) && !(t.toOpponent && ev.player === dealerBy), undefined, undefined, o, undefined, undefined, undefined, info);
     for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === dealerBy) dealWatch(obj(s, id));
+    // "Whenever a creature deals combat damage to one of your opponents" (Edric): anyone's creature, to an opponent of
+    // the watcher's controller (its own controller's watchers saw it above).
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      const wc = controllerOf(s, w);
+      if (wc !== dealerBy && ev.player !== wc) add(w, wc, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer?.anyone && objectMatches(s, t.dealer.filter, o, wc, false), undefined, undefined, o, undefined, undefined, undefined, info);
+    }
     fromEmblems((w, owner) => owner === dealerBy && dealWatch(w));
     // "Until end of turn, whenever ~ deals combat damage to a player" (Lyra), "... a creature you control" (Mistway Spy).
     fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "selfDealsCombatDamageToPlayer" && !(t.toOpponent && ev.player === ctrl), triggers, undefined, undefined, undefined, undefined, undefined, info), o);
@@ -1120,6 +1134,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (e !== "castSpell" || !t.cast || (ev.copy && !t.cast.orCopy)) return false;
         const by = t.cast.by;
         if ((by === "you" && ev.controller !== you) || (by === "opponent" && ev.controller === you) || (by === "enchanted" && o.attachedToPlayer !== ev.controller)) return false;
+        if (t.cast.ownTurn && ev.controller !== s.activePlayer) return false;
         // Its caster's spells this turn, this one included (it was counted as it was cast).
         if (t.cast.nth && (s.castThisTurn ?? []).filter((c) => c.player === ev.controller && (!t.cast!.nthOfKind || (!!s.cards[c.card] && printedMatches(t.cast!.spell, s.cards[c.card]!)))).length !== t.cast.nth) return false;
         if (t.cast.treasure && !(ev.treasureSpent && !ev.copy)) return false;
@@ -1276,6 +1291,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const by = t.draws.by;
         if ((by === "you" && ev.player !== you) || (by === "opponent" && ev.player === you) || (by === "enchanted" && o.attachedToPlayer !== ev.player)) return false;
         if (t.draws.notFirstInDrawStep && ev.firstInDrawStep) return false;
+        if (t.draws.ownTurn && ev.player !== s.activePlayer) return false;
         if (!eventPlayerFits(s, o, t, ev.player)) return false;
         return t.draws.nth === undefined || t.draws.nth === ev.nth;
       }, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });

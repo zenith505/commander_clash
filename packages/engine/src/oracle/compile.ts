@@ -1610,6 +1610,14 @@ export function compile(d: CardDef): CompiledCard {
       out.allColors = true;
       continue;
     }
+    // "As long as ~ isn't on the battlefield, it's a 1/1 Insect creature in addition to its other types." (Grist, the Hunger
+    // Tide): a static ability that works everywhere else (CR 113.6b), in its library, hand, graveyard, exile, the command
+    // zone and on the stack, so it's a creature card and a creature spell there (rulings); on the battlefield it isn't.
+    const offField = /^As long as ~ isn't on the battlefield, it's an? (\d+)\/(\d+) ([A-Z][a-z]+) creature in addition to its other types\.$/.exec(line);
+    if (offField && !d.types.includes("Creature")) {
+      out.offFieldCreature = { power: offField[1]!, toughness: offField[2]!, subtype: offField[3]! };
+      continue;
+    }
     // "You may activate the loyalty abilities of ~ twice each turn rather than only once" (Urza, Planeswalker; CR 606.3).
     const loyaltyTwice = /^You may activate the loyalty abilities of (~|planeswalkers you control) twice each turn rather than only once\.$/.exec(line);
     if (loyaltyTwice) {
@@ -1622,6 +1630,10 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "You may spend mana as though it were mana of any color.") {
       out.spendAnyColor = true;
+      continue;
+    }
+    if (line === "Players may spend mana as though it were mana of any color.") {
+      out.spendAnyColorAll = true;
       continue;
     }
     if (line === "You may spend mana as though it were mana of any color to activate abilities of creatures you control.") {
@@ -2106,6 +2118,10 @@ export function compile(d: CardDef): CompiledCard {
       out.strive = strive[1]!;
       continue;
     }
+    // "Enchantment spells you cast have affinity for Auras" (Pearl-Ear): each such spell costs {1} less to cast for each
+    // Aura you control (CR 702.41a); two of them, {2} less (CR 702.41b, rulings).
+    const grantAffinity = /^((?:[A-Z][a-z]+ )?spells) you cast have affinity for ([A-Z][a-z]+s)\.$/.exec(line);
+    if (grantAffinity) line = `${grantAffinity[1]} you cast cost {1} less to cast for each ${grantAffinity[2]!.slice(0, -1)} you control.`;
     const cost = parseCostChange(line);
     if (cost) {
       if (cost === "fail") out.unsupported.push(raw);
@@ -2171,6 +2187,8 @@ export function compile(d: CardDef): CompiledCard {
     // died is the card).
     const twice =
       /^When you cast or cycle ~, (.+)$/.exec(line) ??
+      // "When you cast ~ and whenever ~ attacks, destroy up to one target nonland permanent" (Cityscape Leveler).
+      /^When you cast ~ and whenever ~ (attacks), (.+)$/.exec(line) ??
       /^When ~ enters and (at the beginning of (?:your upkeep|your end step|each upkeep|each end step)), (.+)$/.exec(line) ??
       /^When you cycle ~ and when ~ dies, (.+)$/.exec(line) ??
       /^When(?:ever)? ~ enters or (attacks|dies|is put into a graveyard from the battlefield|leaves the battlefield|the creature it haunts dies|deals combat damage to a player|transforms into ~), (.+)$/.exec(line) ??
@@ -2195,7 +2213,9 @@ export function compile(d: CardDef): CompiledCard {
       /^Whenever an opponent (attacks you with two or more creatures), (draws their second card each turn), or (casts their second spell each turn), (.+)$/.exec(line);
     if (twice && !/\bonly once\b/.test(line)) {
       const effect = twice[twice.length - 1]!;
-      const events = /^When you cast/.test(line)
+      const events = /^When you cast ~ and whenever/.test(line)
+        ? [`When you cast ~, ${effect}`, `Whenever ~ ${twice[1]}, ${effect}`]
+        : /^When you cast/.test(line)
         ? [`When you cast ~, ${effect}`, `When you cycle ~, ${effect}`]
         : /^When you cycle/.test(line)
           ? [`When ~ dies, ${effect}`, `When you cycle ~, ${effect}`]

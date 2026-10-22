@@ -745,6 +745,12 @@ export function modesProblem(s: GameState, body: AbilityBody, modes: number[] | 
 export function pickOptions(s: GameState, e: { filter: TargetSpec; least?: "toughness"; greatest?: "power" | "manaValue"; action?: PickAction }, pid: PlayerId, sourceId?: ObjectId): ObjectId[] {
   // Without an action: permanents to sacrifice (a sacrifice option or payment), which can't include one that "can't be sacrificed" (CR 701.21).
   const sacrificing = !e.action || e.action === "sacrifice";
+  // "Unattach an Equipment from a creature you control" (Akiri, Fearless Voyager): whoever controls the Equipment.
+  if (e.action === "unattach")
+    return s.battlefield.filter((id) => {
+      const host = obj(s, id).attachedTo ? s.objects[obj(s, id).attachedTo!] : undefined;
+      return !!host && host.zone === "battlefield" && objIsType(s, host, "Creature") && controllerOf(s, host) === pid && objectMatches(s, e.filter, obj(s, id), pid, false);
+    });
   const ids = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && !(e.filter.notSource && id === sourceId) && objectMatches(s, { ...e.filter, controller: "you" }, obj(s, id), pid, false) && !(sacrificing && !canBeSacrificed(s, obj(s, id))));
   // "Sacrifices a creature with the greatest power among creatures they control": the greatest, or tied for it; the
   // player chooses among those tied (rulings on Crackling Doom). Mana value from the mana cost, X as 0 (CR 202.3, 107.3).

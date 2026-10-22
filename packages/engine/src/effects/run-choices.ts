@@ -88,6 +88,20 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       s.pending = { kind: "chooseMay", player: ctx.controller, prompt: `repeat: ${e.text}`, source: src, repeat: true };
       return "paused";
     }
+    case "repeatIf": {
+      // Grist: each pass, its instructions in order, then if the card milled qualifies, `then` and another pass; it ends
+      // when one misses (an empty library mills nothing). Even with ~ gone, the process goes on (rulings).
+      const sc = (s.resolving!.scratch ??= {});
+      for (let pass = 0; pass < 1000; pass++) {
+        for (sc.repeatStep ??= 0; sc.repeatStep < e.effects.length; sc.repeatStep++) if (runEffect(s, e.effects[sc.repeatStep]!, ctx) === "paused") return "paused";
+        sc.repeatStep = undefined;
+        const hit = (s.resolving!.milled ?? []).some(({ id }) => printedMatches(e.cond.filter, defOf(s, s.objects[id]!)));
+        if (!hit) return;
+        for (const inner of e.then) runEffect(s, inner, ctx);
+        log(s, `${src} repeats the process.`);
+      }
+      return;
+    }
     case "rollAgain": {
       // "You may roll again" (CR 706.3c): the same roll, with its modifiers, and the results table after it once more.
       // Asked after the row's other instructions are done (rulings on Delina: rolling again is optional).
@@ -348,6 +362,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (s.resolving!.milled ?? []).some(({ id }) => printedMatches(bindChosen((e.cond as { filter: TargetSpec }).filter, ctx.chosen), defOf(s, s.objects[id]!)))
             : e.cond.kind === "targetIs"
             ? targetIs(s, ctx, e.cond.index, e.cond.filter)
+            : e.cond.kind === "subjectIs"
+            ? ((f) => objects(s, { ref: "subject" }, ctx).some((o) => objectMatches(s, f, o, ctx.controller, false)))(e.cond.filter)
             : e.cond.kind === "targetCardWas"
             ? targetCardWas(s, ctx, e.cond.index, e.cond.filter)
             : e.cond.kind === "unlessPaid"
@@ -530,6 +546,8 @@ function timesMana(mana: string, n: number): string {
  */
 function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
   for (const e of effects) {
+    // What a pick picks ("it", Akiri's "that creature") isn't known until it's made.
+    if ("what" in e && typeof e.what === "object" && e.what && "ref" in e.what && e.what.ref === "created" && effects.some((x) => x.type === "pick" && effects.indexOf(x) < effects.indexOf(e))) continue;
     // Discarding your hand can be done with an empty hand (rulings on Moonveil Regent).
     if (e.type === "discard" && e.who.ref === "you" && !e.hand && !player(s, ctx.controller).hand.some((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))) return false;
     if (e.type === "draw" && e.who.ref === "you" && !player(s, ctx.controller).library.length) return false;

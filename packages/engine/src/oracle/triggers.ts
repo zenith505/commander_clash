@@ -376,13 +376,15 @@ function parseTargetedTrigger(line: string): TriggeredAbility | "fail" | null {
 function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever you cast your second spell each turn", "Whenever an opponent casts their second spell each turn", "...
   // their first noncreature spell each turn" (Esper Sentinel): counting only the spells of that kind they cast this turn.
-  const nth = /^Whenever (you|an opponent|a player) casts? (?:your|their) (first|second) (?:(.+?) )?spell each turn, (.+)$/.exec(line);
+  // "Whenever a player casts their second spell during their turn" (The Council of Four): only in their own turn.
+  const nth = /^Whenever (you|an opponent|a player) casts? (?:your|their) (first|second) (?:(.+?) )?spell (each turn|during their turn), (.+)$/.exec(line);
   if (nth) {
     const parsed = nth[3] ? parseTargetPhrase(`${nth[3]} spell`) : { kind: "spell" as const, text: "spell" };
     const kind = parsed && { ...parsed, text: nth[3] ? `${nth[3]} spell` : "spell" };
     if (kind?.kind !== "spell") return "fail";
-    const body = parseBody(nth[4]!, { castSpell: true, eventPlayer: true });
-    return body ? { event: "castSpell", cast: { by: CAST_BY[nth[1] as keyof typeof CAST_BY], spell: kind, nth: nth[2] === "first" ? 1 : 2, ...(nth[3] ? { nthOfKind: true as const } : {}) }, body } : "fail";
+    if (nth[4] === "during their turn" && nth[1] === "you") return "fail";
+    const body = parseBody(nth[5]!, { castSpell: true, eventPlayer: true });
+    return body ? { event: "castSpell", cast: { by: CAST_BY[nth[1] as keyof typeof CAST_BY], spell: kind, nth: nth[2] === "first" ? 1 : 2, ...(nth[3] ? { nthOfKind: true as const } : {}), ...(nth[4] === "during their turn" ? { ownTurn: true as const } : {}) }, body } : "fail";
   }
   const m = CAST_TRIGGER.exec(line);
   if (!m) return null;
@@ -593,6 +595,15 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
  * "It" and "that creature" are the creature, "that player" the player, "that much" the damage.
  */
 function parseDealerTrigger(line: string): TriggeredAbility | "fail" | null {
+  // "Whenever a creature deals combat damage to one of your opponents, its controller may draw a card" (Edric, Gix):
+  // anyone's creature, dealing it to an opponent of this permanent's controller; "its controller" is the creature's.
+  const any = /^Whenever a creature deals combat damage to one of your opponents, (.+)$/.exec(line);
+  if (any) {
+    if (/\b(?:that player|defending player|that much|that many|you|your)\b/i.test(any[1]!)) return "fail";
+    const body = parseBody(any[1]!, { subjectIt: true, eventPlayer: true });
+    if (!body) return "fail";
+    return { event: "creatureYouControlDealsCombatDamageToPlayer", dealer: { filter: { kind: "object", types: ["Creature"], text: "creature" }, anyone: true }, body, toOpponent: true };
+  }
   const m = /^Whenever (another|an?) (.+?) you control deals combat damage to (a player(?: or battle)?|an opponent), (.+)$/.exec(line);
   if (!m) return null;
   const filter = parseTargetPhrase(m[2]!);
@@ -717,7 +728,15 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   let min: number | undefined;
   let anyone = false;
   let damageX = false;
-  if ((m = /^Whenever (?:one or more (.+?) you control attack|you attack with (one|two|three|four|five) or more (.+?)|you attack)(?: a player)?, (.+)$/.exec(line))) {
+  // "Whenever you attack a player (with one or more equipped creatures)": once for each player attacked, not a
+  // planeswalker or battle (CR 508.3e; rulings on Akiri, Fearless Voyager and Horizon Explorer). "That player" is them.
+  let perPlayer = false;
+  const youAttackAPlayer = /^Whenever you attack a player( with one or more [^,]+)?, /.exec(line);
+  if (youAttackAPlayer) {
+    perPlayer = true;
+    line = `Whenever you attack${youAttackAPlayer[1] ?? ""}, ${line.slice(youAttackAPlayer[0].length)}`;
+  }
+  if ((m = /^Whenever (?:one or more (.+?) you control attack|you attack with (one|two|three|four|five) or more (.+?)|you attack), (.+)$/.exec(line))) {
     event = "creaturesYouControlAttack";
     phrase = m[1] ?? m[3];
     bodyText = m[4]!;
@@ -781,7 +800,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     if (/\bX\b/.test(text)) return "fail";
     text = text.replace(/\bthat (?:much|many)\b/g, "X");
   }
-  let body = parseBody(text, { eventPlayer: event === "creaturesYouControlDealCombatDamageToPlayer" });
+  let body = parseBody(text, { eventPlayer: event === "creaturesYouControlDealCombatDamageToPlayer" || perPlayer });
   if (!body) return "fail";
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: damageX ? body.text : unX(body.text, bodyText) };
   if (toOpponent) {
@@ -792,7 +811,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     const filter: TargetSpec = group ?? { kind: "object", types: ["Creature"], text: "creature" };
     body = { ...body, effects: [...body.effects, { type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "bounce", fromGroup: true }], text: `return one of those ${phrase} to its owner's hand` }], text: `${body.text} You may return one of those ${phrase} to its owner's hand.` };
   }
-  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}), ...(toOpponent ? { toOpponent: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(anyone ? { anyoneAttacks: true as const } : {}) };
+  return { event, body, ...(group ? { group } : {}), ...(min ? { minAttackers: min } : {}), ...(toOpponent ? { toOpponent: true as const } : {}), ...(orBattle ? { orBattle: true as const } : {}), ...(anyone ? { anyoneAttacks: true as const } : {}), ...(perPlayer ? { perPlayer: true as const } : {}) };
 }
 
 /** "Other creatures you control", "tokens you control", "artifacts and/or creatures you control": what a batch trigger counts. */
@@ -982,14 +1001,17 @@ function parseManaTapTrigger(line: string): TriggeredAbility | "fail" | null {
 }
 
 function parseDrawTrigger(line: string): TriggeredAbility | "fail" | null {
-  const m = /^Whenever (you|an opponent|a player|enchanted player|enchanted opponent) draws? (a card(?: except the first one (?:they|you) draw in each of (?:their|your) draw steps)?|(?:your|their) (first|second|third) card each turn), (.+)$/.exec(line);
+  // "Whenever a player draws their second card during their turn" (The Council of Four): only cards drawn in their own
+  // turn count, the second of that turn.
+  const m = /^Whenever (you|an opponent|a player|enchanted player|enchanted opponent) draws? (a card(?: except the first one (?:they|you) draw in each of (?:their|your) draw steps)?|(?:your|their) (first|second|third) card (?:each|during their) turn), (.+)$/.exec(line);
   if (!m) return null;
+  const ownTurn = / during their turn$/.test(m[2]!);
   const body = parseBody(theyAreThatPlayer(m[4]!), { eventPlayer: true });
   if (!body) return "fail";
   const by = m[1] === "you" ? "you" : m[1] === "an opponent" ? "opponent" : /^enchanted /.test(m[1]!) ? "enchanted" : "any";
   const nth = m[3] ? { first: 1, second: 2, third: 3 }[m[3] as "first"] : undefined;
   const except = / except the first one /.test(m[2]!);
-  return { event: "playerDraws", draws: { by, ...(nth ? { nth } : {}), ...(except ? { notFirstInDrawStep: true as const } : {}) }, body };
+  return { event: "playerDraws", draws: { by, ...(nth ? { nth } : {}), ...(except ? { notFirstInDrawStep: true as const } : {}), ...(ownTurn ? { ownTurn: true as const } : {}) }, body };
 }
 
 /**

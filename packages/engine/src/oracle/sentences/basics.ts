@@ -505,6 +505,10 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (/your opponents can't win the game this turn/i.test(s)) rules.push("opponentsCantWin");
     return [{ type: "turnRules", rules }];
   }
+  // Everybody Lives!: "Players can't lose life this turn and players can't lose the game or win the game this turn" (CR
+  // 119.8, 104.3): every player in the game as it resolves.
+  if (/^Players can't lose life this turn and players can't lose the game or win the game this turn$/.test(s)) return [{ type: "turnRules", rules: ["cantLoseLife", "cantLoseGame", "cantWinGame"], everyone: true }];
+  if (/^Players gain hexproof until end of turn$/.test(s)) return [{ type: "playerGains", keywords: ["Hexproof"], everyone: true }];
   if (/^You may cast spells this turn as though they had flash$/i.test(s)) return [{ type: "turnRules", rules: ["flash"] }];
   if ((m = /^Until your next turn, you may cast (sorcery|creature|artifact|enchantment) spells as though they had flash$/.exec(s))) {
     const filter = parseTargetPhrase(`${m[1]} spell`);
@@ -518,13 +522,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // can't ..." (Render Silent), "defending player can't ..." (Xantid Swarm), "Players can't cast noncreature spells this
   // turn" (Calamity's Wake), "Players dealt damage this way can't ..." (Aurelia's Fury): a "can't" for those players
   // until the turn ends, which wins over anything that says they can (CR 101.2).
-  if ((m = /^(.+?) can't cast (?:(noncreature|creature|instant|sorcery|artifact) )?spells this turn$/i.exec(s))) {
+  // "Players can't cast creature or planeswalker spells until the end of your next turn" (Single Combat): until the end
+  // of this effect's controller's next turn.
+  if ((m = /^(.+?) can't cast (?:(noncreature|creature|instant|sorcery|artifact|creature or planeswalker) )?spells (this turn|until the end of your next turn)$/i.exec(s))) {
     const w = m[1]!.toLowerCase();
     const who: PlayerRef | null = w === "players" ? { ref: "eachPlayer" } : w === "your opponents" ? { ref: "eachOpponent" } : w === "players dealt damage this way" ? { ref: "damagedThisWay" } : parsePlayer(w, ctx);
     if (!who) return null;
     const filter = m[2] ? parseTargetPhrase(`${m[2].toLowerCase()} spell`) : undefined;
     if (filter === null || (filter && filter.kind !== "spell")) return null;
-    return [{ type: "cantCast", who, ...(filter ? { filter: { ...filter, text: `${m[2]!.toLowerCase()} spell` } } : {}) }];
+    return [{ type: "cantCast", who, ...(filter ? { filter: { ...filter, text: `${m[2]!.toLowerCase()} spell` } } : {}), ...(m[3] !== "this turn" ? { untilYourNextTurnEnds: true as const } : {}) }];
   }
   // "Target player can't play lands this turn" (Moonhold): one player, until the turn ends.
   if ((m = /^(target player|that player) can't play lands this turn$/i.exec(s))) {

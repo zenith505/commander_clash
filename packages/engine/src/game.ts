@@ -2256,6 +2256,7 @@ function startNextTurn(s: GameState, skipping = false) {
   s.damagedThisTurn = undefined;
   s.damageThisTurn = undefined;
   s.turnLog = undefined;
+  s.oneOfUsed = undefined;
   s.diedThisTurn = undefined;
   s.toGraveyardThisTurn = undefined;
   s.attackersThisTurn = undefined;
@@ -2271,7 +2272,14 @@ function startNextTurn(s: GameState, skipping = false) {
   s.descendedThisTurn = undefined;
   s.noLifeGain = undefined;
   s.turnRules = undefined;
-  s.cantCastThisTurn = undefined;
+  // "Until the end of your next turn" (Single Combat): kept until that player's next turn has ended, or they've left the
+  // game (as other such effects, below).
+  s.cantCastThisTurn = s.cantCastThisTurn?.filter((c) => {
+    if (c.untilEndOfTurnOf === undefined) return false;
+    const by = player(s, c.untilEndOfTurnOf);
+    return !by.lost && !(by.id !== s.activePlayer && (by.turnBegan ?? 0) > c.turn);
+  });
+  if (!s.cantCastThisTurn?.length) s.cantCastThisTurn = undefined;
   s.cantPlayLandsThisTurn = undefined;
   s.spellsCastThisTurn = undefined;
   s.castThisTurn = undefined;
@@ -2807,6 +2815,11 @@ function exilePermission(s: GameState, o: GameObject, pid: PlayerId): (Pick<NonN
   return how === "anyType" ? { anyType: true } : how === "life" ? { life: true } : undefined;
 }
 
+/** "You may play one of those cards" (Nashi): playing this exiled card uses up its group's permission. */
+function useOneOf(s: GameState, o: GameObject, pid: PlayerId): void {
+  if (o.zone === "exile" && o.mayPlay?.oneOf && ownExilePermission(s, o, pid)) (s.oneOfUsed ??= []).push(o.mayPlay.oneOf);
+}
+
 /** Valgavoth's permission is the one `pid` would cast this exiled card with: for life equal to its mana value, only. */
 export const castFromExileForLife = (s: GameState, o: GameObject, pid: PlayerId): boolean => o.zone === "exile" && !!exilePermission(s, o, pid)?.life;
 
@@ -2824,6 +2837,8 @@ function ownExilePermission(s: GameState, o: GameObject, pid: PlayerId): boolean
   // "For as long as Intet remains on the battlefield": that object (CR 400.7).
   if (m.until === "source" && !(m.source && s.objects[m.source.id]?.zone === "battlefield" && (s.objects[m.source.id]!.zoneChanges ?? 0) === m.source.zc)) return false;
   if (m.castOnly && isType(defOf(s, o), "Land")) return false;
+  // "You may play one of those cards" (Nashi): not once one of them has been played.
+  if (m.oneOf && s.oneOfUsed?.includes(m.oneOf)) return false;
   // A warped or plotted card: only on a later turn (CR 702.185a, 702.170d), and only cast, not played as a land.
   return !castOnlyFromExile(o) || (s.turn > o.mayPlay.turn && !isType(defOf(s, o), "Land"));
 }
@@ -2966,6 +2981,36 @@ function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean, fac
   const choice = entersRulesOf(s, p.id, id).entersTappedChoice;
   if (untapped && !canEnterUntapped(s, p.id, id))
     throw new RulesError(choice?.kind === "payLife" ? `you can't pay ${choice.n} life` : choice ? `you have no ${choice.filter.text} to reveal` : `${d.name} has no choice to make as it enters`);
+  putLandPlayed(s, p, id, untapped, face);
+}
+
+/**
+ * A land played as an effect resolves ("You may play lands ... from among cards exiled this way", Gix; hideaway): only
+ * on the player's own turn with a land play left (CR 305.2, 305.3; rulings), timing otherwise ignored (CR 608.2g).
+ */
+export function canPlayLandNow(s: GameState, pid: PlayerId, id: ObjectId): boolean {
+  const d = defOf(s, obj(s, id));
+  return isType(d, "Land") && s.activePlayer === pid && player(s, pid).landsPlayedThisTurn < landsAllowed(s, pid) && !nameLandBan(s, pid, d);
+}
+
+/** What the player could do so a land they play now enters untapped ("pay 2 life", a shock land), or null. */
+export function landUntappedOffer(s: GameState, pid: PlayerId, id: ObjectId): string | null {
+  const choice = entersRulesOf(s, pid, id).entersTappedChoice;
+  if (!choice || !canEnterUntapped(s, pid, id)) return null;
+  const name = defOf(s, obj(s, id)).name;
+  return choice.kind === "payLife" ? `pay ${choice.n} life so ${name} enters untapped` : `reveal a ${choice.filter.text} from your hand so ${name} enters untapped`;
+}
+
+/** Plays a land as an effect resolves (see canPlayLandNow): it counts as the turn's land play (CR 305.2). */
+export function playLandByEffect(s: GameState, pid: PlayerId, id: ObjectId, untapped?: boolean): void {
+  putLandPlayed(s, player(s, pid), id, untapped && canEnterUntapped(s, pid, id));
+}
+
+function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean, face?: number): void {
+  const o = obj(s, id);
+  const d = defOf(s, o);
+  const choice = entersRulesOf(s, p.id, id).entersTappedChoice;
+  useOneOf(s, o, p.id);
   p.landsPlayedThisTurn++;
   if (untapped && choice?.kind === "payLife") {
     loseLife(s, p.id, choice.n);
@@ -2976,7 +3021,7 @@ function playLand(s: GameState, p: Player, id: ObjectId, untapped?: boolean, fac
   }
   // Muldrotha's land from the graveyard is used up, unless something lets every land be played from there (Crucible).
   if (o.zone === "graveyard" && !landsFromGraveyardNow(s, p.id)) ((s.turnLog ??= {}).gravePermits ??= []).push(landPermit(s, p.id)!);
-  const from = o.zone === "exile" || o.zone === "graveyard" ? ` from ${o.zone === "exile" ? "exile" : "their graveyard"}` : "";
+  const from = o.zone === "exile" || o.zone === "graveyard" || o.zone === "library" ? ` from ${o.zone === "exile" ? "exile" : o.zone === "library" ? "their library" : "their graveyard"}` : "";
   // Under the control of the player who plays it (CR 305.1, 110.2), an opponent's card from exile too (Opposition Agent).
   moveObject(s, id, "battlefield", { controller: p.id, untapped, ...(face !== undefined ? { face } : {}) });
   log(s, `${p.name} plays ${d.name}${from}${obj(s, id).tapped ? " (tapped)" : ""}.`);
@@ -3626,7 +3671,8 @@ export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: Play
   if (alt === "citadel") {
     const top = s && pid !== undefined ? s.objects[player(s, pid).library[0] ?? ""] : undefined;
     // Valgavoth's exiled cards too (castProblem checks the card is one).
-    const valgavoth = s && pid !== undefined && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).playLinkedForLife);
+    // Nashi's exiled cards: their own permission says so.
+    const valgavoth = s && pid !== undefined && (s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).playLinkedForLife) || s.turnOrder.some((q) => player(s, q).exile.some((id) => obj(s, id).mayPlay?.life && obj(s, id).mayPlay?.player === pid)));
     if (!valgavoth && (!top || !mayPlayFromTop(s!, top, pid!, "life"))) return undefined;
     const n = manaValue(parseManaCost(d.manaCost));
     return { kind: "citadel", mana: "", costs: [{ kind: "payLife", n }], text: `pay ${n} life` };
@@ -3886,6 +3932,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   }
   if (fromCommand) p.commanderCasts[o.id] = (p.commanderCasts[o.id] ?? 0) + 1;
   const castFrom = o.zone;
+  useOneOf(s, o, p.id);
   // A once-a-turn permission to cast from the top is used up (Johann).
   if (castFrom === "library") {
     const how = topPermission(s, o, p.id);
@@ -4076,7 +4123,7 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
   if (named) return named;
   // "Your opponents can't cast spells this turn" (Silence) and the like.
   for (const c of s.cantCastThisTurn ?? [])
-    if (c.player === pid && c.turn === s.turn && (!c.filter || printedMatches(c.filter, d))) return `${c.source}: you can't cast ${c.filter ? `${c.filter.text.replace(/ spell$/, "")} ` : ""}spells this turn`;
+    if (c.player === pid && (c.turn === s.turn || c.untilEndOfTurnOf !== undefined) && (!c.filter || printedMatches(c.filter, d))) return `${c.source}: you can't cast ${c.filter ? `${c.filter.text.replace(/ spell$/, "")} ` : ""}spells ${c.untilEndOfTurnOf !== undefined ? "for now" : "this turn"}`;
   // Permanents, and emblems in the command zone (CR 114.4).
   for (const o of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)]) {
     // "Each opponent can cast spells only any time they could cast a sorcery" (Teferi, Time Raveler).
@@ -4858,6 +4905,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.onceEver && o.activatedEver?.includes(index) && !(ab.keyword === "Exhaust" && mayExhaustAgain(s, pid)) && !(ab.keyword === "Power-up" && o.activatedEver.filter((i) => i === index).length <= powerUpAgain(s, pid))) return `${d.name}'s ${ab.keyword === "Exhaust" ? "exhaust " : ""}ability can be activated only once`; // CR 702.177a-b, 602.5b
   // "Reveal the player you chose": not if no player was chosen as it entered (rulings on Guardian Archon).
   if (ab.revealChosen && o.chosen?.player === undefined) return `no player was chosen for ${d.name}`;
+  // "Unattach ~" (Sunforger): only while it's attached to a creature (rulings, CR 602.2b).
+  if (ab.unattachCost && !(o.attachedTo && s.objects[o.attachedTo]?.zone === "battlefield" && objIsType(s, obj(s, o.attachedTo), "Creature"))) return `${d.name} isn't attached to a creature`;
   if (ab.maxPerTurn && (o.activatedThisTurn?.filter((n) => n === index).length ?? 0) >= ab.maxPerTurn) return `${d.name}'s ability can be activated no more than ${ab.maxPerTurn === 2 ? "twice" : `${ab.maxPerTurn} times`} each turn`;
   if (ab.loyalty !== undefined || ab.loyaltyX) {
     // Loyalty abilities: as a sorcery, one per permanent per turn (CR 606.3); a negative cost needs that many counters (CR 606.6).
@@ -5143,6 +5192,12 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     o.exertedTurn = s.turn;
     log(s, `${p.name} exerts ${d.name}.`);
     fireEvent(s, { type: "exerted", id: o.id });
+  }
+  if (ab.unattachCost && o.attachedTo) {
+    log(s, `${p.name} unattaches ${d.name} from ${nameOf(s, o.attachedTo)}.`);
+    fireEvent(s, { type: "unattached", id: o.id, host: o.attachedTo });
+    o.attachedTo = undefined;
+    invalidateCharacteristics(s);
   }
   for (const c of tapCreatures ?? []) tapPermanent(s, obj(s, c));
   const sourceZc = o.zoneChanges ?? 0;
@@ -5700,6 +5755,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   if (pend.what === "castFromHand") {
     (r.scratch ??= {}).castFromHand = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "revealHandOrTop") {
+    if (!pend.options.includes(choice)) throw new RulesError("choose a card from your hand or the top card of your library");
+    (r.scratch ??= {}).revealPick = choice;
     continueResolution(s);
     return;
   }
@@ -7246,7 +7307,8 @@ export function syncControl(s: GameState) {
  */
 export function gameEndBlocked(s: GameState, pid: PlayerId, what: "lose" | "win"): boolean {
   // "You can't lose the game this turn and your opponents can't win the game this turn" (Courageous Resolve).
-  if (what === "lose" ? turnRule(s, pid, "cantLoseGame") : s.turnOrder.some((p) => p !== pid && turnRule(s, p, "opponentsCantWin"))) return true;
+  // "Players can't lose the game or win the game this turn" (Everybody Lives!).
+  if (what === "lose" ? turnRule(s, pid, "cantLoseGame") : turnRule(s, pid, "cantWinGame") || s.turnOrder.some((p) => p !== pid && turnRule(s, p, "opponentsCantWin"))) return true;
   return s.battlefield.some((id) => {
     const o = obj(s, id);
     const a = abilitiesOf(s, o);

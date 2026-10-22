@@ -2108,7 +2108,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const oneOf = e.oneOf ? `g${s.nextId++}` : undefined;
         const all: ObjectId[] = [];
         for (const pid of apnap(s, players(s, e.who, ctx))) {
-          const ids = player(s, pid).library.slice(0, amountNow(s, e.n, ctx));
+          const ids = e.graveyards ? [...player(s, pid).graveyard] : player(s, pid).library.slice(0, amountNow(s, e.n, ctx));
           for (const id of ids) {
             moveObject(s, id, "exile");
             const o = obj(s, id);
@@ -2117,7 +2117,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           all.push(...ids);
         }
         if (s.resolving) (s.resolving.impulsed ??= []).push(...all);
-        if (all.length) log(s, `${p.name} exiles ${all.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of each ${e.who.ref === "eachOpponent" ? "opponent's " : ""}library and may ${e.oneOf ? "play one of them" : e.castOnly ? "cast them" : "play them"}${e.life ? ", paying life rather than mana for a spell" : ""}${e.anyType ? ", spending mana as though it were mana of any color" : ""}${e.until === "thisTurn" ? " this turn" : ""}.`);
+        if (all.length) log(s, `${p.name} exiles ${all.map((id) => defOf(s, obj(s, id)).name).join(", ")} from ${e.graveyards ? "each opponent's graveyard" : `the top of each ${e.who.ref === "eachOpponent" ? "opponent's " : ""}library`} and may ${e.oneOf ? "play one of them" : e.castOnly ? "cast them" : "play them"}${e.life ? ", paying life rather than mana for a spell" : ""}${e.anyType ? ", spending mana as though it were mana of any color" : ""}${e.until === "thisTurn" ? " this turn" : ""}.`);
         return;
       }
       const from = e.who ? players(s, e.who, ctx)[0] : p.id;

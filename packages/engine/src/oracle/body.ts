@@ -3308,6 +3308,20 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push(rolled ? { type: "reflexive", body: reflexive } : { type: "if", cond: counted ? { kind: "selfHere" } : { kind: "youDid" }, effects: [{ type: "reflexive", body: reflexive }] });
       continue;
     }
+    // Mnemonic Betrayal: "Exile all opponents' graveyards. You may cast spells from among those cards this turn, and mana
+    // of any type can be spent to cast them." Each card exiled may be cast by you this turn (CR 601.2a), its colored mana
+    // paid with any type (CR 609.4b); lands can't be cast.
+    if (/^Exile all opponents' graveyards$/.test(s) && (sentences[si + 1] ?? "").replace(/\.$/, "") === "You may cast spells from among those cards this turn, and mana of any type can be spent to cast them") {
+      effects.push({ type: "impulse", n: 0, until: "thisTurn", who: { ref: "eachOpponent" }, castOnly: true, anyType: true, graveyards: true });
+      si++;
+      continue;
+    }
+    // "At the beginning of the next end step, if any of those cards remain exiled, return them to their owners'
+    // graveyards" (Mnemonic Betrayal): a delayed trigger (CR 603.7) with an intervening if (CR 603.4) about those cards.
+    if (/^At the beginning of the next end step, if any of those cards remain exiled, return them to their owners' graveyards$/.test(s) && effects[effects.length - 1]?.type === "impulse") {
+      effects.push({ type: "delayed", when: "nextEndStep", effects: [{ type: "exiledToGraveyard" }], text: "return those cards still exiled to their owners' graveyards" });
+      continue;
+    }
     // Glimpse the Impossible: "At the beginning of the next end step, if any of those cards remain exiled, put them into
     // your graveyard, then create a 0/1 colorless Eldrazi Spawn creature token for each card put into your graveyard this
     // way. Those tokens have "Sacrifice ~: Add {C}."": a delayed trigger about the cards just exiled to play, triggering

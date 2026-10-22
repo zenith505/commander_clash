@@ -807,3 +807,35 @@ describe("Y'shtola Rhul's additional end step", () => {
     expect(s.objects[token!]?.zone ?? "gone").not.toBe("battlefield");
   });
 });
+
+const betrayal = card("Mnemonic Betrayal", "Sorcery", "{1}{U}{B}", {
+  oracleText:
+    "Exile all opponents' graveyards. You may cast spells from among those cards this turn, and mana of any type can be spent to cast them. At the beginning of the next end step, if any of those cards remain exiled, return them to their owners' graveyards.\nExile Mnemonic Betrayal.",
+});
+
+describe("Mnemonic Betrayal", () => {
+  it("exiles opponents' graveyards; you may cast those spells this turn with any mana; the rest go back at the end step", () => {
+    expect(isFullySupported(betrayal)).toBe(true);
+    const { s: s0, ap, opp, ids } = setup([betrayal]);
+    let s = s0;
+    const white = toYard(s, opp, card("White Knight", "Creature — Human Knight", "{W}{W}", { power: "2", toughness: "2" }));
+    const land = toYard(s, opp, forest);
+    const third = toYard(s, later(s, ap, 2), bear({ name: "Third Bear" }));
+    const mine = toYard(s, ap, bear({ name: "My Bear" }));
+    s = settle(run(s, planCast(s, ap, ids[0]!)));
+    expect(s.objects[ids[0]!]!.zone).toBe("exile");
+    for (const id of [white, land, third]) expect(s.objects[id]!.zone).toBe("exile");
+    expect(s.objects[mine]!.zone).toBe("graveyard");
+    // Only Swamps and Islands untapped: {W}{W} paid with black or blue mana.
+    for (const id of s.battlefield) if (/Basic Land/.test(s.cards[s.objects[id]!.cardId]!.typeLine) && !/Swamp|Island/.test(name(s, id))) s.objects[id]!.tapped = true;
+    s = settle(run(s, planCast(s, ap, white)));
+    expect(s.objects[white]!.zone).toBe("battlefield");
+    expect(characteristics(s, s.objects[white]!).controller).toBe(ap);
+    // A land can't be cast.
+    expect(planCast(s, ap, land)).toBeNull();
+    s = passUntil(s, "cleanup", ap);
+    for (const id of [land, third]) expect(s.objects[id]!.zone).toBe("graveyard");
+    expect(s.players[opp]!.graveyard).toContain(land);
+    expect(s.players[later(s, ap, 2)]!.graveyard).toContain(third);
+  });
+});

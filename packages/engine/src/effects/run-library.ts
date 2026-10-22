@@ -247,7 +247,10 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
     }
     case "scry":
     case "surveil": {
-      const p = player(s, ctx.controller);
+      // "Target player scries X": that player, if they're still a legal target (CR 608.2b).
+      const by = e.type === "scry" && e.who ? players(s, e.who, ctx)[0] : ctx.controller;
+      if (by === undefined) return;
+      const p = player(s, by);
       const r = s.resolving!;
       const arranged = r.scratch?.arranged;
       if (!arranged) {

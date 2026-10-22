@@ -73,6 +73,10 @@ const constrictor = card("Winding Constrictor", "Creature — Snake", "{B}{G}", 
 });
 const counterSpell = card("Test Counters", "Sorcery", "{G}", { oracleText: "Put a +1/+1 counter and a lifelink counter on target creature." });
 const energySpell = card("Test Energy", "Sorcery", "{G}", { oracleText: "You get {E}{E}." });
+const kozilek = card("Kozilek's Command", "Kindred Instant — Eldrazi", "{X}{C}{C}", {
+  oracleText:
+    'Choose two —\n• Target player creates X 0/1 colorless Eldrazi Spawn creature tokens with "Sacrifice this token: Add {C}."\n• Target player scries X, then draws a card.\n• Exile target creature with mana value X or less.\n• Exile up to X target cards from graveyards.',
+});
 const treasure = card("Treasure", "Token Artifact — Treasure", "", { oracleText: "{T}, Sacrifice this token: Add one mana of any color." });
 
 /** Pass along, answering every pending choice the dull way, until `stop` holds. */
@@ -329,5 +333,35 @@ describe("Winding Constrictor", () => {
     for (const a of planCast(s, ap, ids[2]!, [{ kind: "object", id: theirs }])!) s = act(s, a);
     s = passAll(s);
     expect(s.objects[theirs]!.counters).toMatchObject({ "+1/+1": 1, lifelink: 1 });
+  });
+});
+
+describe("Kozilek's Command", () => {
+  it("is supported: the target player scries X and draws; up to X cards from graveyards are exiled", () => {
+    expect(isFullySupported(kozilek)).toBe(true);
+    let { s, ap, ids, opp } = setup([kozilek]);
+    // Its colorless mana: four Wastes.
+    for (let i = 0; i < 4; i++) putOnBattlefield(s, ap, card("Wastes", "Basic Land", "", { oracleText: "{T}: Add {C}." }));
+    const yard = [bear(), bear(), bear()].map((d) => {
+      const id = putOnBattlefield(s, opp, d);
+      s.battlefield.splice(s.battlefield.indexOf(id), 1);
+      s.objects[id]!.zone = "graveyard";
+      s.players[opp]!.graveyard.push(id);
+      return id;
+    });
+    invalidateCharacteristics(s);
+    const t = [{ kind: "player" as const, id: opp }, ...yard.map((id) => ({ kind: "object" as const, id }))];
+    expect(planCast(s, ap, ids[0]!, t, [1, 3], "auto", 2)).toBeNull();
+    const hand = s.players[opp]!.hand.length;
+    for (const a of planCast(s, ap, ids[0]!, t.slice(0, 3), [1, 3], "auto", 2)!) s = act(s, a);
+    s = passAll(s);
+    // The opponent scries 2.
+    expect(s.pending).toMatchObject({ kind: "arrangeTop", player: opp });
+    const cards = (s.pending as { cards: string[] }).cards;
+    expect(cards.length).toBe(2);
+    s = act(s, { type: "arrangeTop", player: opp, top: cards, away: [] });
+    s = until(s, (x) => x.stack.length === 0);
+    expect(s.players[opp]!.hand.length).toBe(hand + 1);
+    expect(yard.map((id) => s.objects[id]!.zone)).toEqual(["exile", "exile", "graveyard"]);
   });
 });

@@ -1,6 +1,6 @@
 // Round 120's prompts: Expel the Interlopers asks for a number as it resolves; Shadrix Silverquill's "you may choose two"
 // offers "Choose none" and then needs a different player for each mode; One with the Multiverse's free cast offers "Cast
-// it prototyped for {0}" for a prototype card.
+// it prototyped for {0}" for a prototype card; web-slinging returns a tapped creature you control (CR 702.188a).
 import { expect, test } from "@playwright/test";
 import { type GameState } from "@cc/engine";
 import { LANDS, one, open, pageErrors, playUntil, scene } from "./scene";
@@ -52,5 +52,24 @@ test("One with the Multiverse: you cast Phyrexian Fleshgorger prototyped for {0}
   await menu(page).locator('button[data-alt="payZero-prototyped"]').click();
   const after = await resolveUntil(page, (st) => st.objects[gorger]!.zone === "battlefield" && st.stack.length === 0);
   expect(after.objects[gorger]!.prototyped).toBe(true);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Web-slinging: Spider-Man, Web-Slinger cast for {W} by returning your tapped Grizzly Bears, not the untapped Hill Giant", async ({ page }) => {
+  const s = scene({ hand: ["Spider-Man, Web-Slinger"], board: ["Plains", "Grizzly Bears", "Hill Giant"] });
+  const [spidey, bears, giant] = [one(s, "Spider-Man, Web-Slinger"), one(s, "Grizzly Bears"), one(s, "Hill Giant")];
+  s.objects[bears]!.tapped = true;
+  await open(page, s);
+  await card(page, "Spider-Man, Web-Slinger", s).click();
+  await menu(page).getByRole("button", { name: /web-slinging: return a tapped creature you control/ }).click();
+  const bar = page.locator(".targeting", { hasText: "tapped creature" });
+  await expect(bar.getByRole("button", { name: "Return and cast" })).toBeDisabled();
+  await page.locator(`[data-obj="${giant}"]`).click(); // untapped: not a choice
+  await expect(bar.getByRole("button", { name: "Return and cast" })).toBeDisabled();
+  await page.locator(`[data-obj="${bears}"]`).click();
+  await bar.getByRole("button", { name: "Return and cast" }).click();
+  const after = await resolveUntil(page, (st) => st.objects[spidey]!.zone === "battlefield" && st.stack.length === 0);
+  expect(after.objects[bears]!.zone).toBe("hand");
+  expect(after.objects[giant]!.zone).toBe("battlefield");
   expect(pageErrors(page)).toEqual([]);
 });

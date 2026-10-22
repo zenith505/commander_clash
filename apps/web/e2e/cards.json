@@ -10326,6 +10326,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "505231d8-714f-4c5b-a635-d1662bd18a78",
+  "name": "Spider-Man, Web-Slinger",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Spider Human Hero",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spider",
+   "Human",
+   "Hero"
+  ],
+  "oracleText": "Web-slinging {W} (You may cast this spell for {W} if you also return a tapped creature you control to its owner's hand.)",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Web-slinging"
+  ],
+  "commanderLegal": "legal",
+  "set": "spm",
+  "releasedAt": "2025-09-26",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9ad61841-9894-41da-bdd8-248c2ce21b00",
   "name": "Split the Party",
   "manaCost": "{3}{U}{U}",

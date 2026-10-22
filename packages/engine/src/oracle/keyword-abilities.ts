@@ -325,6 +325,14 @@ export function parseCostKeyword(
       ? { alt: { kind: "sneak", mana: m[1]!, costs: [{ kind: "returnToHand", filter: { kind: "object", types: ["Creature"], controller: "you", text: "unblocked attacker you control" }, n: 1, unblockedAttacker: true }] } }
       : "fail";
   if (/^Sneak\b/.test(line)) return "fail";
+  // Web-slinging [cost] (CR 702.188a): "You may cast this spell by paying [cost] and returning a tapped creature you
+  // control to its owner's hand rather than paying its mana cost", an alternative cost.
+  if ((m = /^Web-slinging ((?:\{[^}]+\})+)$/.exec(line))) {
+    if (!plainMana(m[1]!)) return "fail";
+    const r = parseCostKeyword(`You may pay ${m[1]} and return a tapped creature you control to its owner's hand rather than pay ~'s mana cost`, d);
+    return r === "fail" || !r?.alt ? "fail" : { alt: { ...r.alt, text: `web-slinging: return a tapped creature you control to its owner's hand` } };
+  }
+  if (/^Web-slinging\b/.test(line)) return "fail";
   if (line === "Delve") return { delve: true };
   if (line === "Assist") return { assist: true }; // CR 702.132a
   if (line === "Living weapon") {
@@ -552,10 +560,10 @@ export function parseAdditionalCost(text: string, allowX = false): AdditionalCos
     if (spec?.kind !== "object" || spec.controller || spec.combat || spec.tapped !== undefined) return null;
     return { kind: "returnToHand", filter: { ...spec, controller: "you", text: `${m[2]} you control` }, n: num(m[1]!) };
   }
-  // "Return a land you control to its owner's hand" (Deprive).
+  // "Return a land you control to its owner's hand" (Deprive), "a tapped creature" (web-slinging, CR 702.188a).
   if ((m = /^return an? (.+?) you control to its owner's hand$/i.exec(text))) {
     const spec = parseTargetPhrase(m[1]!);
-    if (spec?.kind !== "object" || spec.controller || spec.combat || spec.tapped !== undefined) return null;
+    if (spec?.kind !== "object" || spec.controller || spec.combat || spec.tapped === false) return null;
     return { kind: "returnToHand", filter: { ...spec, controller: "you", text: `${m[1]} you control` }, n: 1 };
   }
   if ((m = /^reveal an? (.+? card) from your hand$/i.exec(text))) {

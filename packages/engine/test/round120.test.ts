@@ -756,4 +756,30 @@ describe("more popular cards", () => {
     invalidateCharacteristics(s);
     expect(objHasKeyword(s, s.objects[healer]!, "Vigilance")).toBe(true);
   });
+  it("web-slinging: Spider-Sense cast for {U} by returning a tapped creature you control counters a triggered ability", () => {
+    const sense = card("Spider-Sense", "Instant", "{1}{U}", { oracleText: "Web-slinging {U} (You may cast this spell for {U} if you also return a tapped creature you control to its owner's hand.)\nCounter target instant spell, sorcery spell, or triggered ability." });
+    const trigger = card("Test Chanter", "Creature — Human", "{1}{W}", { power: "1", toughness: "1", oracleText: "At the beginning of your upkeep, you gain 5 life." });
+    supported(sense);
+    const { s: s0, ap, opp } = setup([]);
+    const spell = toHand(s0, ap, sense);
+    const tapped = putOnBattlefield(s0, ap, bear({ name: "Tired Bear" }));
+    const fresh = putOnBattlefield(s0, ap, bear({ name: "Fresh Bear" }));
+    s0.objects[tapped]!.tapped = true;
+    putOnBattlefield(s0, opp, trigger);
+    // Only a tapped creature can be returned.
+    expect(castProblem(s0, ap, spell, undefined, undefined, undefined, undefined, undefined, { alt: "alternative", returnToHand: [fresh] })).toBeTruthy();
+    let s = passUntil(s0, "upkeep", opp);
+    for (let i = 0; i < 6 && !s.stack.length; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    const life = s.players[opp]!.life;
+    const ability = s.stack[s.stack.length - 1]!;
+    expect(ability.kind).toBe("ability");
+    for (let i = 0; i < 4 && waitingOn(s) !== ap; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    const before = s.battlefield.filter((id) => s.objects[id]!.controller === ap && !s.objects[id]!.tapped).length;
+    s = run(s, planCast(s, ap, spell, [{ kind: "stack", id: ability.id }], undefined, "auto", undefined, { alt: "alternative", returnToHand: [tapped] }));
+    expect(s.objects[tapped]!.zone).toBe("hand");
+    // One land tapped for {U}.
+    expect(s.battlefield.filter((id) => s.objects[id]!.controller === ap && !s.objects[id]!.tapped).length).toBe(before - 1);
+    s = settle(s);
+    expect(s.players[opp]!.life).toBe(life);
+  });
 });

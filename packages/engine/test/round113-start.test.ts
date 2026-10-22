@@ -855,3 +855,30 @@ describe("Planar Incision", () => {
     expect(power(s, s.objects[back]!)).toBe(3);
   });
 });
+
+describe("Sword of Light and Shadow", () => {
+  it("combat damage to a player: gain 3 life, then you may return up to one target creature card", () => {
+    const sword = card("Sword of Light and Shadow", "Artifact — Equipment", "{3}", {
+      oracleText: "Equipped creature gets +2/+2 and has protection from white and from black.\nWhenever equipped creature deals combat damage to a player, you gain 3 life and you may return up to one target creature card from your graveyard to your hand.\nEquip {2}",
+    });
+    expect(isFullySupported(sword)).toBe(true);
+    const { s: s0, ap, opp } = setup([]);
+    const b = putOnBattlefield(s0, ap, bear());
+    const sw = putOnBattlefield(s0, ap, sword);
+    s0.objects[sw]!.attachedTo = b;
+    const dead = putOnBattlefield(s0, ap, bear({ name: "Dead Bear" }));
+    moveObject(s0, dead, "graveyard");
+    invalidateCharacteristics(s0);
+    const life = s0.players[ap]!.life;
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: b, defender: opp }] });
+    for (let i = 0; i < 100 && s.pending?.kind !== "chooseTargets"; i++) s = act(s, s.pending?.kind === "declareBlockers" ? { type: "declareBlockers", player: s.pending.player, blocks: [] } : { type: "passPriority", player: waitingOn(s)! });
+    expect(s.players[opp]!.life).toBe(40 - 4);
+    s = act(s, { type: "chooseTargets", player: ap, targets: [target(dead)] });
+    for (let i = 0; i < 10 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.players[ap]!.life).toBe(life + 3);
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect(s.objects[dead]!.zone).toBe("hand");
+  });
+});

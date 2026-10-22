@@ -3989,9 +3989,21 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
     if (look?.length !== 1 || look[0]!.type !== "lookAtHand" || !look[0]!.reveal || filter === null) return null;
     return [look[0]!, { type: "takeFromHand", who: look[0]!.who, ...(filter ? { filter } : {}), action: "discard" }];
   }
-  const fx = attempt(ctx, () => parsePerOpponent(s, ctx)) ?? attempt(ctx, () => parseSentence(s, ctx)) ?? attempt(ctx, () => parseConjunction(s, ctx)) ?? attempt(ctx, () => parseSharedSubject(s, ctx)) ?? attempt(ctx, () => parseYouList(s, ctx)) ?? attempt(ctx, () => parseForEach(s, ctx)) ?? attempt(ctx, () => parseEqualTo(s, ctx)) ?? attempt(ctx, () => parseThen(s, ctx));
+  const fx = attempt(ctx, () => parsePerOpponent(s, ctx)) ?? attempt(ctx, () => parseSentence(s, ctx)) ?? attempt(ctx, () => parseConjunction(s, ctx)) ?? attempt(ctx, () => parseSharedSubject(s, ctx)) ?? attempt(ctx, () => parseYouList(s, ctx)) ?? attempt(ctx, () => parseForEach(s, ctx)) ?? attempt(ctx, () => parseEqualTo(s, ctx)) ?? attempt(ctx, () => parseThen(s, ctx)) ?? attempt(ctx, () => parseAndYouMay(s, ctx));
   if (fx) noteLast(ctx, fx);
   return fx;
+}
+
+/**
+ * "You gain 3 life and you may return up to one target creature card from your graveyard to your hand" (Sword of Light
+ * and Shadow): the first done, then the choice of the second, as two sentences.
+ */
+function parseAndYouMay(s: string, ctx: Ctx): Effect[] | null {
+  const m = /^([Yy]ou (?!may )[^,]+?) and you may ([^,]+)$/.exec(s);
+  if (!m) return null;
+  const first = parseOne(capital(m[1]!), ctx);
+  const then = first && parseOne(capital(m[2]!), ctx);
+  return first && then ? [...first, { type: "may", effects: then, text: m[2]! }] : null;
 }
 
 /**

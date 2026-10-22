@@ -185,6 +185,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c03ae426-2536-4c20-a73a-a24e816f76b0",
+  "name": "Akiri, Fearless Voyager",
+  "manaCost": "{1}{R}{W}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Kor Warrior",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Kor",
+   "Warrior"
+  ],
+  "oracleText": "Whenever you attack a player with one or more equipped creatures, draw a card.\n{W}: You may unattach an Equipment from a creature you control. If you do, tap that creature and it gains indestructible until end of turn.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "znr",
+  "releasedAt": "2020-09-25",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "fd949f82-fc10-4e37-8aa9-6c7569fe3c55",
   "name": "Akroma's Will",
   "manaCost": "{3}{W}",
@@ -2884,6 +2919,39 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9aff3d55-e25d-4f06-a783-c3aa9eb9fd50",
+  "name": "Eladamri, Korvecdal",
+  "manaCost": "{1}{G}{G}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Elf Warrior",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Warrior"
+  ],
+  "oracleText": "You may look at the top card of your library any time.\nYou may cast creature spells from the top of your library.\n{G}, {T}, Tap two untapped creatures you control: Reveal a card from your hand or the top card of your library. If you reveal a creature card this way, put it onto the battlefield. Activate only during your turn.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mh3",
+  "releasedAt": "2024-06-14",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "05e6b243-48a6-4a42-bc5f-413441de9c33",
   "name": "Elspeth, Sun's Champion",
   "manaCost": "{4}{W}{W}",
@@ -2970,6 +3038,39 @@
   "set": "sth",
   "releasedAt": "1998-03-02",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "473da1b6-232b-4428-a66d-30262246b47a",
+  "name": "Emeria Shepherd",
+  "manaCost": "{5}{W}{W}",
+  "cmc": 7,
+  "typeLine": "Creature — Angel",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Angel"
+  ],
+  "oracleText": "Flying\nLandfall — Whenever a land you control enters, you may return target nonland permanent card from your graveyard to your hand. If that land is a Plains, you may return that nonland permanent card to the battlefield instead.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Landfall",
+   "Flying"
+  ],
+  "commanderLegal": "legal",
+  "set": "bfz",
+  "releasedAt": "2015-10-02",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -3977,6 +4078,39 @@
   "commanderLegal": "legal",
   "set": "otj",
   "releasedAt": "2024-04-19",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "928d977e-cff0-4e0e-83bb-16d73a754f35",
+  "name": "Gix, Yawgmoth Praetor",
+  "manaCost": "{1}{B}{B}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Phyrexian Praetor",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Phyrexian",
+   "Praetor"
+  ],
+  "oracleText": "Whenever a creature deals combat damage to one of your opponents, its controller may pay 1 life. If they do, they draw a card.\n{4}{B}{B}{B}, Discard X cards: Exile the top X cards of target opponent's library. You may play lands and cast spells from among cards exiled this way without paying their mana costs.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bro",
+  "releasedAt": "2022-11-18",
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
@@ -9802,6 +9936,76 @@
   "gameChanger": false
  },
  {
+  "oracleId": "32af5f7b-a970-484a-9aff-226749551d32",
+  "name": "Thousand Moons Smithy // Barracks of the Thousand",
+  "manaCost": "{2}{W}{W}",
+  "cmc": 4,
+  "typeLine": "Legendary Artifact // Legendary Artifact Land",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "When Thousand Moons Smithy enters, create a white Gnome Soldier artifact creature token with \"This token's power and toughness are each equal to the number of artifacts and/or creatures you control.\"\nAt the beginning of your first main phase, you may tap five untapped artifacts and/or creatures you control. If you do, transform Thousand Moons Smithy.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Transform"
+  ],
+  "producedMana": [
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "lci",
+  "releasedAt": "2023-11-17",
+  "rarity": "rare",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Thousand Moons Smithy",
+    "manaCost": "{2}{W}{W}",
+    "typeLine": "Legendary Artifact",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Artifact"
+    ],
+    "subtypes": [],
+    "oracleText": "When Thousand Moons Smithy enters, create a white Gnome Soldier artifact creature token with \"This token's power and toughness are each equal to the number of artifacts and/or creatures you control.\"\nAt the beginning of your first main phase, you may tap five untapped artifacts and/or creatures you control. If you do, transform Thousand Moons Smithy.",
+    "colors": [
+     "W"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/4/a/4a6bec46-1acd-4726-b8d9-3045ac6a2ea2.jpg?1783913807",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/4/a/4a6bec46-1acd-4726-b8d9-3045ac6a2ea2.jpg?1783913807"
+   },
+   {
+    "name": "Barracks of the Thousand",
+    "manaCost": "",
+    "typeLine": "Legendary Artifact Land",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Artifact",
+     "Land"
+    ],
+    "subtypes": [],
+    "oracleText": "(Transforms from Thousand Moons Smithy.)\n{T}: Add {W}.\nWhenever you cast an artifact or creature spell using mana produced by Barracks of the Thousand, create a white Gnome Soldier artifact creature token with \"This token's power and toughness are each equal to the number of artifacts and/or creatures you control.\"",
+    "colors": [],
+    "imageUrl": "https://cards.scryfall.io/normal/back/4/a/4a6bec46-1acd-4726-b8d9-3045ac6a2ea2.jpg?1783913807",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/4/a/4a6bec46-1acd-4726-b8d9-3045ac6a2ea2.jpg?1783913807"
+   }
+  ]
+ },
+ {
   "oracleId": "5369e40a-5fd6-4a9d-bdc9-4af510449649",
   "name": "Three Bowls of Porridge",
   "manaCost": "{2}",
@@ -10758,6 +10962,38 @@
   "set": "ogw",
   "releasedAt": "2016-01-22",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "fc9ec820-4245-4a96-b009-5308a818ca58",
+  "name": "Watery Grave",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land — Island Swamp",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [
+   "Island",
+   "Swamp"
+  ],
+  "oracleText": "({T}: Add {U} or {B}.)\nAs this land enters, you may pay 2 life. If you don't, it enters tapped.",
+  "colors": [],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "U"
+  ],
+  "commanderLegal": "legal",
+  "set": "trk",
+  "releasedAt": "2026-11-13",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

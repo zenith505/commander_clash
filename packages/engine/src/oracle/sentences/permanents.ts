@@ -563,6 +563,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     }
     return out;
   }
+  // "All permanents you control phase out, and until your next turn, your life total can't change and you gain protection
+  // from everything" (Perch Protection): Teferi's Protection's two sentences in one.
+  if ((m = /^(All permanents you control phase out), and (until your next turn, .+)$/.exec(s))) {
+    const a = parsePermanentsSentence(m[1]!, ctx);
+    const b = parsePermanentsSentence(capital(m[2]!), ctx);
+    return a && b ? [...a, ...b] : null;
+  }
   // "You gain protection from everything until your next turn" (The One Ring); "Until your next turn, your life total
   // can't change and you gain protection from everything" (Teferi's Protection).
   if ((m = /^You gain (hexproof|shroud|protection from [a-z ]+?) until your next turn$/i.exec(s)) || (m = /^Until your next turn, (.+)$/i.exec(s))) {

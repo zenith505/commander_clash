@@ -884,3 +884,31 @@ describe("Professor Onyx", () => {
     expect(prompts).toBeGreaterThanOrEqual(14);
   });
 });
+
+const perch = card("Perch Protection", "Instant", "{4}{W}{W}", {
+  keywords: ["Gift"],
+  oracleText:
+    "Gift an extra turn (You may promise an opponent a gift as you cast this spell. If you do, they take an extra turn after this one.)\nCreate four 2/2 blue Bird creature tokens with flying. If the gift was promised, all permanents you control phase out, and until your next turn, your life total can't change and you gain protection from everything.\nExile Perch Protection.",
+});
+
+describe("Perch Protection", () => {
+  const birds = (s: GameState, pid: PlayerId, zone: string) => Object.values(s.objects).filter((o) => o.owner === pid && o.zone === zone && /^Bird/.test(s.cards[o.cardId]?.name ?? "")).length;
+  it("with the gift: the opponent gets an extra turn; four Birds, then everything you control phases out and you're protected", () => {
+    expect(isFullySupported(perch)).toBe(true);
+    const { s: s0, ap, ids, opp } = setup([perch]);
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [], undefined, "auto", undefined, { gift: opp })));
+    expect(s.objects[ids[0]!]!.zone).toBe("exile");
+    expect(birds(s, ap, "phasedOut")).toBe(4);
+    expect(Object.values(s.objects).filter((o) => o.zone === "battlefield" && controllerOf(s, o) === ap)).toEqual([]);
+    expect(s.players[ap]!.lifeCantChange).toBe(true);
+    expect(s.players[ap]!.gainedUntilNextTurn).toContain("Protection from everything");
+    expect(s.extraTurns?.some((t) => t.player === opp)).toBe(true);
+  });
+  it("without it: just four Birds", () => {
+    const { s: s0, ap, ids } = setup([perch]);
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [], undefined, "auto")));
+    expect(birds(s, ap, "battlefield")).toBe(4);
+    expect(birds(s, ap, "phasedOut")).toBe(0);
+    expect(s.players[ap]!.lifeCantChange).toBeUndefined();
+  });
+});

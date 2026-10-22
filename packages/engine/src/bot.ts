@@ -262,6 +262,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const names = new Set<string>();
       return [{ type: "searchLibrary", player: pid, found: pend.cards.filter((id) => { const n = defOf(s, obj(s, id)).name; return !names.has(n) && !!names.add(n); }) }];
     }
+    // Manifesting (Kozilek, the Broken Reality): creature cards first, which can be turned face up later for their mana
+    // cost (CR 701.40b), the cheapest first; then the least costly of the rest.
+    if (pend.kind === "searchLibrary" && pend.fromHand && pend.manifest) {
+      const creature = (id: ObjectId) => (isType(defOf(s, obj(s, id)), "Creature") ? 0 : 1);
+      return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => creature(a) - creature(b) || mv(s, a) - mv(s, b)).slice(0, pend.max) }];
+    }
     if (pend.kind === "searchLibrary" && pend.fromHand) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, pend.max) }];
     // "Put any number of ... from exile onto the battlefield under your control" (Oblivion Sower): all of them.
     if (pend.kind === "searchLibrary" && pend.exiled && pend.max > 1 && pend.dig && /battlefield/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: pend.cards.slice(0, pend.max) }];

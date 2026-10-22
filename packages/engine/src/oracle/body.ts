@@ -46,6 +46,8 @@ export interface Ctx {
   excessDamage?: boolean;
   /** A tapAnyNumber instruction came before, here or in the ability whose reflexive trigger this is: "for each creature tapped this way". */
   tappedThisWay?: boolean;
+  /** A "manifest N cards from their hands" instruction came before: "for each card manifested this way". */
+  manifested?: boolean;
   /** Parley's "each player reveals the top card of their library" came before: "for each nonland card revealed this way". */
   parley?: boolean;
   /** An amass instruction came before, here or in the ability whose reflexive trigger this is: "the amassed Army" (CR 701.47c). */

@@ -335,6 +335,16 @@ function eachPutFromHand(s: GameState, e: Extract<Effect, { type: "putFromHand" 
       hp.queue.shift();
       continue;
     }
+    // Manifest: exactly that many, and with that many or fewer there's nothing to choose (rulings).
+    if (e.manifest) {
+      if (cards.length <= e.manifest) {
+        hp.picked[pid] = cards;
+        hp.queue.shift();
+        continue;
+      }
+      s.pending = { kind: "searchLibrary", player: pid, source: src, what: e.manifest === 1 ? "a card" : `${e.manifest} cards`, cards, min: e.manifest, max: e.manifest, fromHand: true, manifest: true };
+      return "paused";
+    }
     const what = `${e.any ? "any number of " : /^[aeiou]/i.test(e.filter?.text ?? "card") ? "an " : "a "}${e.filter?.text ?? "card"}${e.any ? "s" : ""}`;
     s.pending = { kind: "searchLibrary", player: pid, source: src, what, cards, min: 0, max: e.any ? cards.length : 1, fromHand: true };
     return "paused";
@@ -343,6 +353,24 @@ function eachPutFromHand(s: GameState, e: Extract<Effect, { type: "putFromHand" 
   s.resolving!.choseThisWay = apnap(s, Object.keys(hp.picked).map(Number) as PlayerId[]).filter((pid) => hp.picked[pid]!.length);
   // An Aura: its controller chooses what it enchants as it enters, or it stays in the hand (CR 303.4f-g). It can't
   // enchant a card entering with it, which isn't on the battlefield yet.
+  if (e.manifest) {
+    // Face down, each a 2/2 creature with no name (CR 701.40a); nobody else sees which cards they were (CR 708.5).
+    s.resolving!.created = [];
+    enterTogether(s, () => {
+      for (const [pid, ids] of Object.entries(hp.picked)) {
+        const mine = ids.filter((id) => obj(s, id).zone === "hand");
+        if (!mine.length) continue;
+        log(s, `${player(s, Number(pid) as PlayerId).name} manifests ${mine.length === 1 ? "a card" : `${mine.length} cards`} from their hand: ${mine.length === 1 ? "a" : "each a"} face-down 2/2 creature.`);
+        for (const id of mine) {
+          moveObject(s, id, "battlefield", { controller: Number(pid) as PlayerId, faceDown: "manifest" });
+          if (obj(s, id).zone === "battlefield") s.resolving!.created!.push(id);
+        }
+      }
+    });
+    s.resolving!.manifestedThisWay = s.resolving!.created!.length;
+    sc.handPicks = undefined;
+    return;
+  }
   const hosts = chooseAuraHosts(s, picks, src);
   if (hosts === "paused") return "paused";
   if (s.resolving) s.resolving.created = [];

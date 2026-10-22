@@ -138,10 +138,13 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   const manyNow = ctx.manyPlayers !== undefined && ctx.lastPlayerTarget === ctx.manyPlayers;
   if (/^(?:each of )?those (?:players|opponents)$/.test(x) && manyNow) return { ref: "target", index: ctx.manyPlayers!, n: 2 };
   // "Two target players each draw a card" (Huddle Up), "Choose two target players. Each of them ..." (Scheming
-  // Symmetry): two different players (CR 115.3), then "each of them", "they" are both.
-  if (/^two target players(?: each)?$/.test(x) && !ctx.targets.some((t) => t.many) && ctx.manyPlayers === undefined) {
-    const first = addTarget(ctx, { kind: "player", text: "target player" });
-    addTarget(ctx, { kind: "player", text: "target player", distinctFrom: [first] });
+  // Symmetry): two different players (CR 115.3), then "each of them", "they" are both. "Up to two target players each
+  // ..." (Kozilek, the Broken Reality): either may be left unchosen (CR 115.6).
+  const twoPlayers = /^(up to )?two target players(?: each)?$/.exec(x);
+  if (twoPlayers && !ctx.targets.some((t) => t.many) && ctx.manyPlayers === undefined) {
+    const optional = twoPlayers[1] ? { optional: true as const } : {};
+    const first = addTarget(ctx, { kind: "player", text: "target player", ...optional });
+    addTarget(ctx, { kind: "player", text: "target player", distinctFrom: [first], ...optional });
     ctx.lastPlayerTarget = first;
     ctx.manyPlayers = first;
     return { ref: "target", index: first, n: 2 };

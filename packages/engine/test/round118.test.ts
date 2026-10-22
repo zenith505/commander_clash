@@ -468,3 +468,50 @@ describe("Wand of Wonder", () => {
     expect(hits.filter((h) => s.objects[h.hit]!.zone === "exile").length).toBe(3 - x);
   });
 });
+
+const kozilek = card("Kozilek, the Broken Reality", "Legendary Creature — Eldrazi", "{9}", {
+  power: "9",
+  toughness: "9",
+  oracleText:
+    "When you cast this spell, up to two target players each manifest two cards from their hands. For each card manifested this way, you draw a card. (To manifest a card, put it onto the battlefield face down as a 2/2 creature. Turn it face up any time for its mana cost if it's a creature card.)\nOther colorless creatures you control get +3/+2.",
+});
+const donatello = card("Donatello's Science Lesson", "Sorcery", "{1}{U}", { oracleText: "Tap up to two target creatures. Up to two target players each draw a card." });
+
+describe("Kozilek, the Broken Reality", () => {
+  it("up to two target players each manifest two cards from their hands (one if they have one); you draw that many", () => {
+    expect(isFullySupported(kozilek)).toBe(true);
+    const { s: s0, ap, ids } = setup([kozilek]);
+    let s = s0;
+    const [b, c] = [later(s, ap, 1), later(s, ap, 2)];
+    const handOf = (pid: PlayerId, n: number) => {
+      for (const id of [...s.players[pid]!.hand]) moveObject(s, id, "library");
+      return Array.from({ length: n }, (_, i) => {
+        const id = putOnBattlefield(s, pid, bear({ name: `Bear ${pid}-${i}` }));
+        moveObject(s, id, "hand");
+        return id;
+      });
+    };
+    const bHand = handOf(b, 3);
+    const cHand = handOf(c, 1);
+    const mine = s.players[ap]!.hand.length;
+    s = run(s, planCast(s, ap, ids[0]!));
+    if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: b }, { kind: "player", id: c }] });
+    s = settle(s);
+    // B has three: they choose two. C's one card is manifested without a choice.
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: b, fromHand: true, manifest: true, min: 2, max: 2 });
+    s = settle(act(s, { type: "searchLibrary", player: b, found: [bHand[0]!, bHand[2]!] }));
+    for (const id of [bHand[0]!, bHand[2]!, cHand[0]!]) {
+      expect(s.objects[id]!.zone).toBe("battlefield");
+      expect(s.objects[id]!.faceDown).toBe("manifest");
+      expect(characteristics(s, s.objects[id]!).power).toBe(2);
+    }
+    expect(s.objects[bHand[1]!]!.zone).toBe("hand");
+    expect(s.objects[bHand[0]!]!.controller).toBe(b);
+    // Three cards manifested: three drawn (Kozilek itself left the hand).
+    expect(s.players[ap]!.hand.length).toBe(mine - 1 + 3);
+  });
+
+  it("Donatello's Science Lesson: up to two target players each draw a card", () => {
+    expect(isFullySupported(donatello)).toBe(true);
+  });
+});

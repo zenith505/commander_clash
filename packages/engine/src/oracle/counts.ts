@@ -167,6 +167,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "For each creature tapped this way", "the number of creatures tapped this way" after "tap any number of untapped
   // creatures you control" (Harmony of Nature), or in its reflexive trigger (Teferi Akosa of Zhalfir).
   if (ctx?.tappedThisWay && /^(?:the number of )?(?:[A-Z][a-z]+ )?(?:creatures?|artifacts?|Gates?|Humans?|permanents?) tapped this way$/.test(p)) return { count: { kind: "tappedThisWay" } };
+  // "For each card manifested this way" (Kozilek, the Broken Reality), after its manifest-from-hand instruction.
+  if (ctx?.manifested && each && /^card manifested this way$/i.test(p)) return { count: { kind: "manifestedThisWay" } };
   // "For each card exiled from their hand this way" (Lost Legacy), after its exileNamed instruction.
   if (each && /^card exiled from (?:their|your) hand this way$/i.test(p)) return count({ kind: "exiledFromHandThisWay" });
   // "For each player being attacked", "the number of opponents being attacked" (Pack Attack, Dimir Strandcatcher).

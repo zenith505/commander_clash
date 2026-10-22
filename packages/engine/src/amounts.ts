@@ -221,6 +221,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.revealedFromHand ?? s.resolving?.item.revealed ?? 0;
     case "tappedThisWay":
       return s.resolving?.tappedThisWay ?? s.resolving?.item.tapped ?? 0;
+    case "manifestedThisWay":
+      return s.resolving?.manifestedThisWay ?? 0;
     case "parleyRevealed":
       return (c.land ? s.resolving?.parley?.land : s.resolving?.parley?.nonland) ?? 0;
     case "damageThisWay":
@@ -554,6 +556,8 @@ function describeCount(c: Count): string {
       return "#cards chosen";
     case "tappedThisWay":
       return "#tapped";
+    case "manifestedThisWay":
+      return "#cards manifested";
     case "parleyRevealed":
       return c.land ? "#land cards revealed" : "#nonland cards revealed";
     case "damageThisWay":

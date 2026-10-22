@@ -189,7 +189,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return [roll];
   }
   // Scry and surveil (CR 701.22, 701.25)
-  if ((m = new RegExp(`^(Scry|Surveil) ${NUMX}$`, "i").exec(s))) return [{ type: m[1]!.toLowerCase() === "scry" ? "scry" : "surveil", n: amt(m[2]!) }];
+  // "... and you scry X" (Alibou, Ancient Witness).
+  if ((m = new RegExp(`^(?:you )?(Scry|Surveil) ${NUMX}$`, "i").exec(s))) return [{ type: m[1]!.toLowerCase() === "scry" ? "scry" : "surveil", n: amt(m[2]!) }];
   // "Target player scries X, then draws a card" (Kozilek's Command, CR 701.22): that player looks and chooses.
   if ((m = new RegExp(`^(Target player|Target opponent) scries ${NUMX}$`).exec(s))) {
     const who = parsePlayer(m[1]!, ctx);

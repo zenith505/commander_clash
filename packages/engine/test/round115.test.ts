@@ -938,3 +938,28 @@ describe("The Lord of Pain", () => {
     expect(s.players[opp]!.life).toBe(38);
   });
 });
+
+const alibou = card("Alibou, Ancient Witness", "Legendary Artifact Creature — Golem", "{3}{R}{W}", {
+  power: "4",
+  toughness: "5",
+  oracleText:
+    "Other artifact creatures you control have haste.\nWhenever one or more artifact creatures you control attack, Alibou deals X damage to any target and you scry X, where X is the number of tapped artifacts you control.",
+});
+
+describe("Alibou, Ancient Witness", () => {
+  it("artifact creatures attack: X damage to any target and scry X, X the tapped artifacts you control as it resolves", () => {
+    expect(isFullySupported(alibou)).toBe(true);
+    const { s: s0, ap, opp } = setup([]);
+    const a = putOnBattlefield(s0, ap, alibou);
+    const r = putOnBattlefield(s0, ap, relic);
+    s0.objects[r]!.tapped = true;
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: a, defender: opp }] });
+    for (let i = 0; i < 10 && !s.pending && (s.triggerQueue.length || s.stack.length); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    s = settle(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] }));
+    expect(s.players[opp]!.life).toBe(38);
+    expect(s.pending).toMatchObject({ kind: "arrangeTop", how: "scry", player: ap });
+    expect((s.pending as { cards: string[] }).cards).toHaveLength(2);
+  });
+});

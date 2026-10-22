@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { act, activate, bear, card, cast, passAll, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
 import { applyAction, botActions, characteristics, compileCard, defOf, manaValue, spellCost, invalidateCharacteristics, isFullySupported, isLegalTarget, isSuspended, type TargetSpec, objHasKeyword, manaAbilitiesOn, planCast, planUnlock, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
-import { moveObject } from "../src/game";
+import { loseLife, moveObject } from "../src/game";
 import { nextRandom } from "../src/rng";
 
 // Real oracle text (Scryfall).
@@ -848,5 +848,30 @@ describe("Wrathful Red Dragon", () => {
     s = settle(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] }));
     expect(s.objects[w]!.zone).toBe("graveyard");
     expect(s.players[opp]!.life).toBe(life - 2);
+  });
+});
+
+describe("Valgavoth, Harrower of Souls", () => {
+  const valgavoth = card("Valgavoth, Harrower of Souls", "Legendary Creature — Elder Demon", "{2}{B}{R}", {
+    power: "4",
+    toughness: "4",
+    keywords: ["Flying", "Ward"],
+    oracleText: "Ward—Pay 2 life.\nFlying\nWhenever an opponent loses life for the first time during each of their turns, put a +1/+1 counter on Valgavoth and draw a card.",
+  });
+
+  it("plays", () => expect(isFullySupported(valgavoth)).toBe(true));
+
+  it("triggers on an opponent's first life loss during their own turn only", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const v = putOnBattlefield(s0, opp, valgavoth);
+    const third = s0.turnOrder.find((p) => p !== ap && p !== opp)!;
+    // The third player loses life during ap's turn: not their turn.
+    loseLife(s0, third, 1);
+    let s = settle(s0);
+    expect(s.objects[v]!.counters["+1/+1"] ?? 0).toBe(0);
+    loseLife(s, ap, 2);
+    loseLife(s, ap, 2);
+    s = settle(s);
+    expect(s.objects[v]!.counters["+1/+1"]).toBe(1);
   });
 });

@@ -1490,10 +1490,11 @@ export function loseLife(s: GameState, pid: PlayerId, n: number) {
     log(s, `${player(s, pid).name} loses twice as much life${doublers > 1 ? `, ${doublers} times over` : ""}.`);
   }
   player(s, pid).life -= n;
-  if (!(s.lostLifeThisTurn ??= []).includes(pid)) s.lostLifeThisTurn.push(pid);
+  const first = !(s.lostLifeThisTurn ??= []).includes(pid);
+  if (first) s.lostLifeThisTurn.push(pid);
   const lost = ((s.turnLog ??= {}).lifeLost ??= {});
   lost[pid] = (lost[pid] ?? 0) + n;
-  fireEvent(s, { type: "lifeLost", player: pid, amount: n });
+  fireEvent(s, { type: "lifeLost", player: pid, amount: n, first });
 }
 
 /**

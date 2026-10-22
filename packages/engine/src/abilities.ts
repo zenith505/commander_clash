@@ -3037,6 +3037,8 @@ export interface TriggeredAbility {
   body: AbilityBody;
   /** For "permanentIsDealtDamage": what has to be dealt damage. */
   dealtFilter?: TargetSpec;
+  /** For "opponentLosesLife": "for the first time during each of their turns" (Valgavoth): their first life loss this turn, on their turn. */
+  firstOnTheirTurn?: true;
   /** "This ability triggers only once each turn": see GameObject.triggeredThisTurn. */
   oncePerTurn?: boolean;
   /** For "selfBecomesLevel": the level. */

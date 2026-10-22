@@ -478,6 +478,14 @@ function parseIsDealtDamageTrigger(line: string): TriggeredAbility | "fail" | nu
   return { event: "permanentIsDealtDamage", dealtFilter: { ...filter, text: `${m[1]!} you control` }, body };
 }
 
+/** Valgavoth, Harrower of Souls: "Whenever an opponent loses life for the first time during each of their turns, ..." */
+function parseFirstLifeLossTrigger(line: string): TriggeredAbility | "fail" | null {
+  const m = /^Whenever an opponent loses life for the first time during each of their turns, (.+)$/.exec(line);
+  if (!m) return null;
+  const body = parseBody(m[1]!, { eventPlayer: true });
+  return body ? { event: "opponentLosesLife", firstOnTheirTurn: true, body } : "fail";
+}
+
 const ENTERS_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) enters(?: the battlefield)?( under your control| under an opponent's control)?, (.+)$/;
 
 function parseEntersTrigger(line: string): TriggeredAbility | "fail" | null {
@@ -1570,6 +1578,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (enters) return enters;
   const dealt = parseIsDealtDamageTrigger(line);
   if (dealt) return dealt;
+  const firstLoss = parseFirstLifeLossTrigger(line);
+  if (firstLoss) return firstLoss;
   const draws = parseDrawTrigger(line);
   if (draws) return draws;
   const attacked = /^Whenever an opponent attacks (?:you with two or more creatures|with creatures, if two or more of those creatures are attacking you and\/or planeswalkers you control), (.+)$/.exec(line);

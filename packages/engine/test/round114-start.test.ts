@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, cast, passAll, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
-import { applyAction, botActions, characteristics, manaValue, spellCost, invalidateCharacteristics, isFullySupported, isSuspended, objHasKeyword, manaAbilitiesOn, planCast, planUnlock, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { applyAction, botActions, characteristics, compileCard, defOf, manaValue, spellCost, invalidateCharacteristics, isFullySupported, isSuspended, objHasKeyword, manaAbilitiesOn, planCast, planUnlock, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 import { moveObject } from "../src/game";
 
 // Real oracle text (Scryfall).
@@ -617,5 +617,35 @@ describe("Deep Gnome Terramancer: lands entering under an opponent's control wit
       s = s.pending ? act(s, botActions(s, waitingOn(s)!)[0]!) : act(s, { type: "passPriority", player: waitingOn(s)! });
     }
     expect(plainsOut()).toBe(1);
+  });
+});
+
+describe("Imposter Mech: a copy that's a Vehicle artifact with crew 3 and loses all other card types", () => {
+  const mech = card("Imposter Mech", "Artifact — Vehicle", "{1}{U}", {
+    power: "3",
+    toughness: "1",
+    oracleText: "You may have this Vehicle enter as a copy of a creature an opponent controls, except it's a Vehicle artifact with crew 3 and it loses all other card types.\nCrew 3",
+  });
+  const knight = card("Serra Angel", "Creature — Angel", "{3}{W}{W}", { power: "4", toughness: "4", keywords: ["Flying", "Vigilance"], oracleText: "Flying, vigilance" });
+
+  it("plays", () => expect(isFullySupported(mech)).toBe(true));
+
+  it("copies an opponent's Serra Angel (not your own creature) as a noncreature Vehicle artifact with no Angel type, flying and crew 3", () => {
+    const { s: s0, ap, opp, ids } = setup([mech]);
+    for (let i = 0; i < 2; i++) putOnBattlefield(s0, ap, card("Island", "Basic Land — Island"));
+    const theirs = putOnBattlefield(s0, opp, knight);
+    putOnBattlefield(s0, ap, bear());
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    for (let i = 0; i < 10 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "copy", options: [theirs, "none"] });
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: theirs } as Action));
+    const c = characteristics(s, s.objects[ids[0]!]!);
+    expect(c.name).toBe("Serra Angel");
+    expect(c.types).toEqual(["Artifact"]);
+    expect(c.subtypes).toEqual(["Vehicle"]);
+    expect(c.keywords).toContain("Flying");
+    expect([c.power, c.toughness]).toEqual([4, 4]);
+    expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
+    expect(compileCard(defOf(s, s.objects[ids[0]!]!)).activated.some((a) => a.crew === 3)).toBe(true);
   });
 });

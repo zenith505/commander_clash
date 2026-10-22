@@ -337,3 +337,75 @@ describe("Nissa, Resurgent Animist", () => {
     expect(s.players[ap]!.hand.length).toBe(hand - 1); // the land played, nothing drawn
   });
 });
+
+const thrasher = card("Party Thrasher", "Creature — Lizard Wizard", "{1}{R}", {
+  power: "1",
+  toughness: "4",
+  oracleText:
+    "Noncreature spells you cast from exile have convoke. (Each creature you tap while casting a noncreature spell from exile pays for {1} or one mana of that creature's color.)\nAt the beginning of your first main phase, you may discard a card. If you do, exile the top two cards of your library, then choose one of them. You may play that card this turn.",
+});
+const channeler = card("Magmatic Channeler", "Creature — Human Wizard", "{1}{R}", {
+  power: "1",
+  toughness: "3",
+  oracleText:
+    "As long as there are four or more instant and/or sorcery cards in your graveyard, Magmatic Channeler gets +3/+1.\n{T}, Discard a card: Exile the top two cards of your library, then choose one of them. You may play that card this turn.",
+});
+const divination = card("Divination", "Sorcery", "{2}{U}", { oracleText: "Draw two cards." });
+
+describe("Party Thrasher", () => {
+  it("parse", () => {
+    expect(isFullySupported(thrasher)).toBe(true);
+    expect(compileCard(channeler).activated[0]!.body.effects).toEqual([{ type: "impulse", n: 2, until: "thisTurn", choose: true }]);
+  });
+
+  it("first main phase: discard, exile the top two, choose one; only that one may be played, this turn", () => {
+    const { s: s0, ap, ids } = setup([bolt]);
+    putOnBattlefield(s0, ap, thrasher);
+    let s = passUntil(s0, "upkeep", ap);
+    // The cards on top as the trigger resolves (after the draw step's draw).
+    for (let i = 0; i < 50 && s.pending?.kind !== "chooseMay"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.step).toBe("main1");
+    const second = toZone(s, ap, divination, "library");
+    const first = toZone(s, ap, swamp, "library");
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect(s.pending).toMatchObject({ kind: "discard", player: ap });
+    s = act(s, { type: "discard", player: ap, objectIds: [ids[0]!] });
+    expect(s.objects[ids[0]!]!.zone).toBe("graveyard");
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "impulseChoice", options: [first, second], labels: ["Swamp", "Divination"] });
+    s = act(s, { type: "chooseOption", player: ap, choice: second });
+    expect([first, second].map((id) => s.objects[id]!.zone)).toEqual(["exile", "exile"]);
+    expect(s.objects[second]!.mayPlay).toMatchObject({ player: ap, until: "thisTurn" });
+    expect(s.objects[first]!.mayPlay).toBeUndefined();
+    // The chosen sorcery is cast from exile with convoke: two creatures tapped and {U} paid.
+    for (const id of s.battlefield) if (s.objects[id]!.controller === ap && !characteristics(s, s.objects[id]!).types.includes("Creature")) s.objects[id]!.tapped = true;
+    const islandId = putOnBattlefield(s, ap, card("Island", "Basic Land — Island"));
+    const crew = [putOnBattlefield(s, ap, bear({ name: "Helper One" })), putOnBattlefield(s, ap, bear({ name: "Helper Two" }))];
+    s = act(s, { type: "activateMana", player: ap, objectId: islandId, mana: "U" } as Action);
+    s = act(s, { type: "castSpell", player: ap, objectId: second, convoke: crew } as Action);
+    expect(s.stack.at(-1)?.objectId).toBe(second);
+    expect(crew.every((id) => s.objects[id]!.tapped)).toBe(true);
+  });
+
+  it("a creature spell cast from exile doesn't get convoke", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, thrasher);
+    const giant = toZone(s0, ap, ogre, "library");
+    s0.players[ap]!.library = s0.players[ap]!.library.filter((x) => x !== giant);
+    s0.objects[giant]!.zone = "exile";
+    s0.players[ap]!.exile.push(giant);
+    s0.objects[giant]!.mayPlay = { player: ap, zc: s0.objects[giant]!.zoneChanges ?? 0, until: "thisTurn", turn: s0.turn };
+    const crew = [putOnBattlefield(s0, ap, bear({ name: "Helper One" }))];
+    expect(() => act(s0, { type: "castSpell", player: ap, objectId: giant, convoke: crew } as Action)).toThrow(/convoke/);
+  });
+
+  it("a bot discards, then picks the card it can use", () => {
+    const { s: s0, ap } = setup([bolt]);
+    putOnBattlefield(s0, ap, thrasher);
+    let s = passUntil(s0, "upkeep", ap);
+    for (let i = 0; i < 50 && s.pending?.kind !== "chooseMay"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    const second = toZone(s, ap, divination, "library");
+    toZone(s, ap, card("Colossal Dreadmaw", "Creature — Dinosaur", "{4}{G}{G}{G}{G}{G}{G}{G}{G}{G}{G}{G}{G}", { power: "6", toughness: "6" }), "library");
+    for (let i = 0; i < 6 && s.pending; i++) for (const a of botActions(s, waitingOn(s)!)) s = act(s, a);
+    expect(s.objects[second]!.mayPlay).toMatchObject({ player: ap });
+  });
+});

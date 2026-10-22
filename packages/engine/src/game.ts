@@ -5766,6 +5766,13 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "impulseChoice") {
+    const st = r.scratch?.impulseChoice;
+    if (!st || !pend.options.includes(choice)) throw new RulesError("choose one of the exiled cards");
+    st.pick = choice;
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "castFromAmong") {
     const st = r.scratch?.castAmong;
     if (!st || !pend.options.includes(choice)) throw new RulesError("choose one of the cards offered, or none");

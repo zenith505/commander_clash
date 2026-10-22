@@ -842,9 +842,10 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // Not after "If you do,": all of it depends on the payment ("If you do, choose a color, then ...").
     // Not after a leading condition either: "If you control a blue creature, draw a card, then discard a card" (Statute
     // of Denial) is all conditional.
+    // Nor "exile the top two cards of your library, then choose one of them" (Party Thrasher): the choice is of those cards.
     // Nor "you may exile target creature you control, then return that card to the battlefield" (Conjurer's Closet): one
     // blink, all of it optional.
-    .flatMap((x) => (/^If [^,]+, /.test(x) || /^[Yy]ou may exile [^,]+, then return (?:it|that card) to the battlefield under (?:its owner's|your) control\.?$/.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then reveals the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|destroy the rest$|meld them into )/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
+    .flatMap((x) => (/^If [^,]+, /.test(x) || /^[Yy]ou may exile [^,]+, then return (?:it|that card) to the battlefield under (?:its owner's|your) control\.?$/.test(x) || WHEEL.test(x) || /^\w+ player shuffles their .+ into their library, then draws /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then reveals the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|destroy the rest$|meld them into |choose one of them$)/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
     // "Target opponent reveals their hand and you choose a nonland card from it": two instructions, in order.
     .flatMap((x) => x.split(/(?<=reveals (?:their|his or her) hand) and (?=you choose )/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p)))
     .flatMap(splitSpentPair)
@@ -1350,6 +1351,14 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     if (/^Shuffle your library$/.test(s) && /^[Ee]xile the top card$/.test(sentences[si + 1] ?? "")) {
       effects.push({ type: "shuffle", who: { ref: "you" } });
       sentences[si + 1] = "Exile the top card of your library";
+      continue;
+    }
+    // "Exile the top two cards of your library, then choose one of them. You may play that card this turn." (Party
+    // Thrasher, Magmatic Channeler): only the chosen card may be played (Effect impulse `choose`).
+    const exChoose = !impulseIf && new RegExp(`^[Ee]xile the top (${NUM}) cards of your library, then choose one of them$`).exec(s);
+    if (exChoose && /^You may play that card this turn\.?$/.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "impulse", n: amt(exChoose[1]!), until: "thisTurn", choose: true });
+      si++;
       continue;
     }
     const exTop = exEqual ? (["", "X"] as unknown as RegExpExecArray) : new RegExp(`^[Ee]xile the top (?:card|${NUMX} cards) of your library$`).exec(impulseIf && !impulseIf.not ? impulseIf.text : s);
@@ -3027,7 +3036,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const all = `${ifDid[2]!}${where ? `, where X is ${where[2]!}` : ""}`;
       const sacIt = sacPick && /\b(?:that|the sacrificed) creature's (?:power|toughness|mana value)\b/.test(all) && !/\bthat creature(?!'s (?:power|toughness|mana value)\b)/.test(all) && !ctx.sacrificedIt;
       if (sacIt) ctx.sacrificedIt = true;
-      const inner = parseOne(ifDid[2]!.charAt(0).toUpperCase() + ifDid[2]!.slice(1), ctx);
+      // Party Thrasher: "If you do, exile the top two cards of your library, then choose one of them. You may play that
+      // card this turn." The permission is about the card chosen, so it depends on the discard too.
+      const choosePlay = ifDid[1] === "do" && /^You may play that card this turn$/.test(sentences[si + 1] ?? "") ? new RegExp(`^exile the top (${NUM}) cards of your library, then choose one of them$`).exec(ifDid[2]!) : null;
+      if (choosePlay) si++;
+      const inner = choosePlay ? [{ type: "impulse" as const, n: amt(choosePlay[1]!), until: "thisTurn" as const, choose: true as const }] : parseOne(ifDid[2]!.charAt(0).toUpperCase() + ifDid[2]!.slice(1), ctx);
       if (inner) effects.push(ifDid[1] === "do" ? { type: "if", cond: { kind: sacIt || mustSac ? "sacrificedThisWay" : "youDid" }, effects: inner } : { type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner });
       // Its own "where X is ..." (CR 107.3c).
       const ok = !!inner && defineX();

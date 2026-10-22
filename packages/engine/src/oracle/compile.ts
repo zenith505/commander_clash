@@ -1543,11 +1543,12 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "Noncreature spells you cast have convoke" (Caetus, Sea Tyrant of Segovia), "Multicolored spells you cast have
     // convoke" (Fallaji Wayfarer): the spell has it while it's being cast and paid for (CR 702.51a, 601.2g-h).
-    const giveConvoke = /^([A-Z][a-z]+(?: and [a-z]+)?) spells you cast have convoke\.$/.exec(line);
+    // "Noncreature spells you cast from exile have convoke" (Party Thrasher): those cast from exile.
+    const giveConvoke = /^([A-Z][a-z]+(?: and [a-z]+)?) spells you cast( from exile)? have convoke\.$/.exec(line);
     if (giveConvoke) {
       const f = parseTargetPhrase(`${giveConvoke[1]!.replace(/ and /g, " or ").toLowerCase()} spell`);
       if (f?.kind !== "spell") out.unsupported.push(raw);
-      else (out.spellsHaveConvoke ??= []).push({ filter: f, text: line });
+      else (out.spellsHaveConvoke ??= []).push({ filter: f, ...(giveConvoke[2] ? { fromExile: true as const } : {}), text: line });
       continue;
     }
     // "Spells you cast from exile have convoke" (Hoarding Broodlord): cast from exile, checked as they're paid for (CR 601.2g-h).

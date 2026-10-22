@@ -415,6 +415,16 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const pick = creatures.sort((a, b) => mv(s, b) - mv(s, a))[0];
       return [{ type: "chooseOption", player: pid, choice: pick ?? (pend.options.includes("top") ? "top" : pend.options[0]!) }];
     }
+    // Party Thrasher: the exiled card we'd rather play this turn, a land while we still have a land play, else the
+    // costliest spell we can pay for, else the cheapest.
+    if (pend.kind === "chooseOption" && pend.what === "impulseChoice") {
+      const p = player(s, pid);
+      const land = pend.options.find((o) => isType(defOf(s, obj(s, o)), "Land"));
+      const spells = pend.options.filter((o) => !isType(defOf(s, obj(s, o)), "Land")).sort((a, b) => mv(s, b) - mv(s, a));
+      const mana = availableMana(s, pid);
+      const pick = (land && p.landsPlayedThisTurn < landsAllowed(s, pid) && lands(s, pid) < 6 ? land : undefined) ?? spells.find((o) => mv(s, o) <= mana) ?? land ?? spells[spells.length - 1]!;
+      return [{ type: "chooseOption", player: pid, choice: pick }];
+    }
     // "You may cast any number of spells ... from among them": the biggest each time, until none is left or worth it.
     if (pend.kind === "chooseOption" && pend.what === "castFromAmong") {
       const cards = pend.options.filter((o) => o !== "none" && !isCounterOnly(compileCard(defOf(s, obj(s, o))).spell ?? { targets: [], effects: [], text: "" }));

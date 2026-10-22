@@ -140,6 +140,8 @@ export type TriggerSourceEvent =
   | { type: "tokenCreated"; player: PlayerId; id: ObjectId }
   /** All the damage dealt to a player at the same time (CR 120.3a): "whenever you're dealt damage". */
   | { type: "playerDealtDamage"; player: PlayerId; amount: number }
+  /** Damage that would have been dealt to `player` was prevented, `amount` of it, all at the same time (Selfless Squire). */
+  | { type: "damagePreventedToPlayer"; player: PlayerId; amount: number }
   /** A player collected evidence (CR 701.59a), once for each time. */
   | { type: "evidenceCollected"; player: PlayerId }
   | { type: "proliferated"; player: PlayerId }
@@ -779,6 +781,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
       add(o, you, (e) => (e === "youAreDealtDamage" && you === ev.player) || (e === "opponentIsDealtDamage" && you !== ev.player) || (e === "enchantedPlayerDealtDamage" && o.attachedToPlayer === ev.player), undefined, undefined, undefined, undefined, undefined, undefined, info);
+    }
+  } else if (ev.type === "damagePreventedToPlayer") {
+    // "Whenever damage that would be dealt to you is prevented, put that many +1/+1 counters on ~" (Selfless Squire).
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      const you = controllerOf(s, o);
+      if (you === ev.player) add(o, you, (e) => e === "youDamagePrevented", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
   } else if (ev.type === "ringTempted") {
     // "Whenever the Ring tempts you" (CR 701.54d), "if you chose a creature other than ~ as your Ring-bearer" (CR 603.4);

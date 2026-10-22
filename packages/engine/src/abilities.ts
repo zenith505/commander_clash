@@ -3027,6 +3027,8 @@ export type TriggerEvent =
    * for all the damage dealt to that player at the same time (rulings on Grievous Wound); the event amount is that damage.
    */
   | "youAreDealtDamage"
+  /** "Whenever damage that would be dealt to you is prevented" (Selfless Squire): "that many" is the damage prevented. */
+  | "youDamagePrevented"
   | "opponentIsDealtDamage"
   | "enchantedPlayerDealtDamage"
   /** "Whenever you draw a card", "whenever an opponent draws a card", "your second card each turn": see TriggeredAbility.draws. */
@@ -3425,6 +3427,8 @@ export interface ActivatedAbility {
   equip?: true;
   /** Works only while the card is in its owner's hand, like cycling (CR 702.29a), or graveyard, like unearth (CR 702.84a). Otherwise on the battlefield. */
   zone?: "hand" | "graveyard";
+  /** With `zone` "hand": from the command zone too (commander ninjutsu, CR 702.49d). */
+  orCommand?: true;
   /** "Discard this card" is part of the cost (cycling, transmute). */
   discardSelf?: boolean;
   /** "This ability costs {1} less to activate for each legendary creature you control" (CR 602.2b, 601.2f): generic mana only. */

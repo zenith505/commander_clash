@@ -984,18 +984,21 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
         event: "becomesTargetOfOpponent",
         body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: m[1]! }, ward: true }], text: `Ward ${m[1]}: counter that spell or ability unless its controller pays ${m[1]}.` },
       });
-    } else if ((m = /^ninjutsu ((?:\{(?:\d+|[WUBRGC]|[WUBRG]\/[WUBRGP])\})+)$/i.exec(p))) {
+    } else if ((m = /^(commander )?ninjutsu ((?:\{(?:\d+|[WUBRGC]|[WUBRG]\/[WUBRGP])\})+)$/i.exec(p))) {
       // CR 702.49a: "[Cost], Reveal this card from your hand, Return an unblocked attacking creature you control to
-      // its owner's hand: Put this card onto the battlefield from your hand tapped and attacking."
+      // its owner's hand: Put this card onto the battlefield from your hand tapped and attacking." Commander ninjutsu
+      // works from the command zone too (CR 702.49d); it isn't casting, so there's no commander tax.
+      const cmd = !!m[1];
       out.activated.push({
-        manaCost: m[1]!,
+        manaCost: m[2]!,
         tap: false,
         sacrificeSelf: false,
         sorcerySpeed: false,
         zone: "hand",
+        ...(cmd ? { orCommand: true as const } : {}),
         costs: [{ kind: "returnToHand", filter: { kind: "object", types: ["Creature"], controller: "you", text: "unblocked attacker you control" }, n: 1, unblockedAttacker: true }],
-        body: { targets: [], effects: [{ type: "ninjutsu" }], text: "Put ~ onto the battlefield from your hand tapped and attacking." },
-        text: `Ninjutsu ${m[1]}`,
+        body: { targets: [], effects: [{ type: "ninjutsu" }], text: cmd ? "Put ~ onto the battlefield tapped and attacking." : "Put ~ onto the battlefield from your hand tapped and attacking." },
+        text: `${cmd ? "Commander ninjutsu" : "Ninjutsu"} ${m[2]}`,
       });
     } else if (/^myriad$/i.test(p)) {
       // CR 702.116a: "Whenever this creature attacks, for each opponent other than defending player, you may create a

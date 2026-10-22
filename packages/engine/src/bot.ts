@@ -3178,11 +3178,12 @@ function chooseTimed(s: GameState, pid: PlayerId): Action[] | null {
  */
 function chooseNinjutsu(s: GameState, pid: PlayerId): Action[] | null {
   if (s.activePlayer !== pid || s.step !== "declareBlockers" || s.stack.length) return null;
-  for (const id of player(s, pid).hand) {
+  for (const id of [...player(s, pid).hand, ...player(s, pid).command]) {
     const abilities = abilitiesOf(s, obj(s, id)).activated;
     for (let i = 0; i < abilities.length; i++) {
       const ab = abilities[i]!;
-      const cost = ab.zone === "hand" ? ab.costs?.find((c) => c.kind === "returnToHand") : undefined;
+      // Commander ninjutsu works from the command zone too (CR 702.49d).
+      const cost = ab.zone === "hand" && (obj(s, id).zone === "hand" || ab.orCommand) ? ab.costs?.find((c) => c.kind === "returnToHand") : undefined;
       if (!cost || cost.kind !== "returnToHand") continue;
       const d = defOf(s, obj(s, id));
       const ninja = (Number.parseInt(d.power ?? "0", 10) || 0) + (Number.parseInt(d.toughness ?? "0", 10) || 0);

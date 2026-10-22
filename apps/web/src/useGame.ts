@@ -143,6 +143,8 @@ function hasInstantPlay(s: GameState): boolean {
     const d = cardOf(s, id);
     if ((isType(d, "Instant") || d.keywords.includes("Flash")) && planCast(s, HUMAN, id, undefined, undefined, "auto")) return true;
   }
+  // Commander ninjutsu from the command zone (CR 702.49d).
+  for (const id of me.command) if (abilitiesOf(s, obj(s, id)).activated.some((ab, i) => ab.orCommand && planActivate(s, HUMAN, id, i))) return true;
   for (const id of me.hand) {
     const d = cardOf(s, id);
     // Cycling works at instant speed from your hand (CR 702.29a).

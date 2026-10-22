@@ -1130,7 +1130,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     if (o.zone === "hand" && isLand(s, o.id) && entersRulesOf(s, HUMAN, o.id).entersTappedChoice) return setMenu(o.id);
     if (o.zone === "hand" && isLand(s, o.id)) return dispatch([{ type: "playLand", player: HUMAN, objectId: o.id }]);
     // A commander with an alternative cost (sneak): choose how to cast it.
-    if (o.zone === "command" && o.owner === HUMAN && altCostsFor(s, HUMAN, o).length) return setMenu(o.id);
+    if (o.zone === "command" && o.owner === HUMAN && (altCostsFor(s, HUMAN, o).length || handAbilities(s, o.id).length)) return setMenu(o.id);
     if (o.zone === "hand" || o.zone === "command") return startCast(o.id);
     // Courser of Kruphix, Future Sight: play the top card of your library.
     if (o.zone === "library" && mayPlayFromTop(s, o, HUMAN)) {
@@ -1929,9 +1929,10 @@ function canCastAlt(s: GameState, id: string, alt: AltCostKind): boolean {
   return !!sac && s.battlefield.some((x) => controllerOf(s, s.objects[x]!) === HUMAN && objectMatches(s, sac.filter, s.objects[x]!, HUMAN, false) && planCast(s, HUMAN, id, undefined, undefined, "auto", undefined, { alt, sacrifice: [x] }) !== null);
 }
 
-/** Indices of a card's abilities that work from your hand (cycling, CR 702.29a). */
+/** Indices of a card's abilities that work from your hand (cycling, CR 702.29a), or from the command zone for a commander (commander ninjutsu, CR 702.49d). */
 function handAbilities(s: GameState, id: string): number[] {
-  return abilitiesOf(s, s.objects[id]!).activated.flatMap((ab, i) => (ab.zone === "hand" ? [i] : []));
+  const o = s.objects[id]!;
+  return abilitiesOf(s, o).activated.flatMap((ab, i) => (ab.zone === "hand" && (o.zone !== "command" || ab.orCommand) ? [i] : []));
 }
 
 /** Could you cycle this card right now, tapping mana as needed? */
@@ -4090,7 +4091,8 @@ function AbilityMenu({
         })}
       {abilitiesOf(s, o).activated.map((ab, i) => {
         // From your hand, only cycling and the like; from your graveyard, unearth; on the battlefield, everything else.
-        if ((ab.zone ?? "battlefield") !== o.zone) return null;
+        // Commander ninjutsu works from the command zone too (CR 702.49d).
+        if ((ab.zone ?? "battlefield") !== o.zone && !(ab.orCommand && o.zone === "command")) return null;
         const problem = abilityProblem(s, HUMAN, objectId, i);
         const ok = !problem || (/not enough mana/.test(problem) && planActivate(s, HUMAN, objectId, i) !== null);
         // A mana ability with a choice of mana (CR 605.1a): a button for each, like a land's.

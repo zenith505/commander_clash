@@ -4999,8 +4999,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   const ab = abilitiesOf(s, o).activated[index];
   if (!ab) return `${d.name} has no such ability`;
   if (ab.zone === "hand") {
-    // Cycling works only while the card is in your hand (CR 702.29a).
-    if (o.zone !== "hand" || o.owner !== pid) return `${ab.text} works only from your hand`;
+    // Cycling works only while the card is in your hand (CR 702.29a); commander ninjutsu from the command zone too (CR 702.49d).
+    if (!(o.zone === "hand" || (o.zone === "command" && ab.orCommand)) || o.owner !== pid) return `${ab.text} works only from your hand${ab.orCommand ? " or the command zone" : ""}`;
   } else if (ab.zone === "graveyard") {
     // Unearth works only while the card is in your graveyard (CR 702.84a).
     if (o.zone !== "graveyard" || o.owner !== pid) return `${ab.text} works only from your graveyard`;
@@ -7164,6 +7164,10 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
   if (s.preventCombatDamage && hits.length && canPreventDamage(s)) {
     const kept = hits.filter((h) => unpreventable(objectSource(s, h.source), true));
     log(s, kept.length ? "Combat damage is prevented, except damage that can't be." : "All combat damage is prevented.");
+    // "Whenever damage that would be dealt to you is prevented" (Selfless Squire).
+    const toPlayers = new Map<PlayerId, number>();
+    for (const h of hits) if (!kept.includes(h) && h.toPlayer !== undefined) toPlayers.set(h.toPlayer, (toPlayers.get(h.toPlayer) ?? 0) + h.amount);
+    for (const [pid, amount] of toPlayers) fireEvent(s, { type: "damagePreventedToPlayer", player: pid, amount });
     if (!kept.length) return false;
     hits.splice(0, hits.length, ...kept);
   }

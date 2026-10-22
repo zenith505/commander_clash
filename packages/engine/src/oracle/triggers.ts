@@ -85,6 +85,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever an opponent plays a land, (.+)$/, "opponentPlaysLand"],
   [/^Whenever a player plays a land, (.+)$/, "playerPlaysLand"],
   [/^Whenever you're dealt damage, (.+)$/, "youAreDealtDamage"],
+  [/^Whenever damage that would be dealt to you is prevented, (.+)$/, "youDamagePrevented"],
   [/^Whenever an opponent is dealt damage, (.+)$/, "opponentIsDealtDamage"],
   [/^Whenever enchanted player is dealt damage, (.+)$/, "enchantedPlayerDealtDamage"],
   [/^At the beginning of your upkeep, (.+)$/, "yourUpkeep"],
@@ -1871,7 +1872,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // is the replaced damage's own, not the event's.
       let text = (self ? body0.replace(/^(?:it|he|she) (?=(?:gets|gains|deals|has|becomes|fights|explores)\b)/, "~ ").replace(/^(?:it|he|she) and (?=other )/, "~ and ") : body0).replace(/(would deal [^.]*?damage[^.]*?, it deals )that much( damage)/g, "$1THAT_MUCH$2");
       // "You gain that much life", "put that many +1/+1 counters on it": the damage the event dealt, or the life gained or lost.
-      const playerDealt = event === "youAreDealtDamage" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage";
+      const playerDealt = event === "youAreDealtDamage" || event === "opponentIsDealtDamage" || event === "enchantedPlayerDealtDamage" || event === "youDamagePrevented";
       const amount = event === "selfDealsDamage" || event === "selfIsDealtDamage" || event === "selfDealtDamageBySource" || event === "selfDealsCombatDamage" || event === "selfDealsCombatDamageToPlayer" || event === "selfDealsDamageToPlayer" || event === "youGainLife" || event === "opponentGainsLife" || event === "opponentLosesLife" || event === "youLoseLife" || playerDealt;
       // "With mana value less than or equal to that damage" (Aisha of Sparks and Smoke, Covert Technician): the damage dealt.
       const damage = amount && event !== "youGainLife" && event !== "opponentGainsLife" && event !== "opponentLosesLife" && event !== "youLoseLife" && !playerDealt;

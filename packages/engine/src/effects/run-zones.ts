@@ -2050,7 +2050,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const id = ctx.sourceId;
       const o = id ? s.objects[id] : undefined;
       const zc = s.resolving?.item.sourceZc;
-      if (!o || o.zone !== "hand" || o.owner !== ctx.controller || (zc !== undefined && (o.zoneChanges ?? 0) !== zc)) return;
+      // Commander ninjutsu: from the command zone too (CR 702.49d).
+      if (!o || (o.zone !== "hand" && o.zone !== "command") || o.owner !== ctx.controller || (zc !== undefined && (o.zoneChanges ?? 0) !== zc)) return;
       moveObject(s, o.id, "battlefield", { tapped: true });
       if ((o.zone as string) !== "battlefield") return;
       if (ctx.lki) enterAttacking(s, o, ctx.lki);

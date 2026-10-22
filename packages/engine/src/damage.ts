@@ -270,17 +270,18 @@ export interface ShieldQuestion {
 }
 
 type Rec = DamageEvent["to"];
+const toPlayer = (r: Rec): { player?: PlayerId } => ("player" in r ? { player: r.player } : {});
 const recKey = (r: Rec) => ("object" in r ? `o:${r.object}` : `p:${r.player}`);
 const srcKey = (src: DamageSource) => src.id ?? `spell:${src.name}`;
 
 type ShieldOp =
-  | { kind: "protection"; srcName: string; toName: string }
-  | { kind: "preventAll"; srcName: string; toName: string; /** A damage rule's, with what's prevented for its additional effect. */ rule?: string; n?: number; src?: DamageSource; /** A static rule's card, for the log. */ card?: string; /** Vigor's +1/+1 counters, one for each 1 damage prevented, put by `by`. */ plusOnes?: { id: ObjectId; n: number; by: PlayerId; card: string } }
+  | { kind: "protection"; srcName: string; toName: string; /** Damage to a player: who, and how much was prevented (Selfless Squire). */ player?: PlayerId; n?: number }
+  | { kind: "preventAll"; srcName: string; toName: string; /** Damage to a player: who (Selfless Squire). */ player?: PlayerId; /** A damage rule's, with what's prevented for its additional effect. */ rule?: string; n?: number; src?: DamageSource; /** A static rule's card, for the log. */ card?: string; /** Vigor's +1/+1 counters, one for each 1 damage prevented, put by `by`. */ plusOnes?: { id: ObjectId; n: number; by: PlayerId; card: string } }
   | { kind: "shieldCounter"; id: ObjectId; srcName: string }
   | { kind: "prevent"; to: Rec; n: number; srcName: string; toName: string; rule?: string; src?: DamageSource; card?: string }
   | { kind: "redirect"; to: Rec; shield: string; n: number; srcName: string; fromName: string; toName: string; card: string; rule?: boolean }
   /** A damage amount replacement or a prevention effect that changes the amount (see DamageMod): `from` became `n`. */
-  | { kind: "modify"; srcName: string; toName: string; from: number; n: number; card: string; prevent: boolean; /** A "next time" one, used up now. */ once?: string }
+  | { kind: "modify"; srcName: string; toName: string; from: number; n: number; card: string; prevent: boolean; /** Damage to a player: who. */ player?: PlayerId; /** A "next time" one, used up now. */ once?: string }
   /** The Mindskinner's additional effect (CR 615.5): each opponent of `by` mills `n` cards, even if the damage couldn't be prevented (615.12). */
   | { kind: "mill"; by: PlayerId; n: number; card: string }
   /** Khârn the Betrayer's additional effect (CR 615.5): `to` gains control of it, after any prevention. */
@@ -638,7 +639,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         const boost = allMods.filter((m) => !m.mod.prevent && modApplies(s, m, e, true));
         if ((rule.gainLife || rule.dealBack || rule.tokens) && boost.length && boost.length <= 6 && rule.controller === chooserOf(to))
           for (const order of permutations(boost)) n = Math.max(n, order.reduce((a, m) => (a > 0 ? modAmount(s, m, a) : 0), e.n));
-        ops.push({ kind: "preventAll", srcName: e.src.name, toName, rule: rule.id, n, src: e.src, ...(rule.mill ? { card: cardName(s, rule) } : {}) });
+        ops.push({ kind: "preventAll", srcName: e.src.name, toName, rule: rule.id, n, src: e.src, ...(rule.mill ? { card: cardName(s, rule) } : {}), ...toPlayer(to) });
         if (rule.mill) ops.push({ kind: "mill", by: rule.controller, n, card: cardName(s, rule) });
         continue;
       }
@@ -653,11 +654,11 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
             for (const order of permutations(boost)) n = Math.max(n, order.reduce((a, m) => (a > 0 ? modAmount(s, m, a) : 0), e.n));
           const src = vigor.from ? s.objects[vigor.from] : undefined;
           ops.push({ kind: "preventAll", srcName: e.src.name, toName, plusOnes: { id: to.object, n, by: vigor.you!, card: src ? (s.cards[src.cardId]?.name ?? "") : "" } });
-        } else ops.push({ kind: "preventAll", srcName: e.src.name, toName });
+        } else ops.push({ kind: "preventAll", srcName: e.src.name, toName, n: e.n, ...toPlayer(to) });
         continue;
       }
       if (prev(e) && "player" in to && playerProtectedFrom(s, to.player, e.src.controller, e.src)) {
-        ops.push({ kind: "protection", srcName: e.src.name, toName });
+        ops.push({ kind: "protection", srcName: e.src.name, toName, player: to.player, n: e.n });
         continue;
       }
       if (prev(e) && "object" in to && protectedFrom(characteristics(s, obj(s, to.object)).keywords, e.src, protectionHolder(s, obj(s, to.object)))) {
@@ -714,7 +715,7 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
         const before = at[i]!;
         at[i] = modAmount(s, m, before);
         seen[i]!.add(m.key);
-        if (record) ops.push({ kind: "modify", srcName: e.src.name, toName, from: before, n: at[i]!, card: m.card, prevent: !!m.mod.prevent, ...(m.once ? { once: m.once } : {}) });
+        if (record) ops.push({ kind: "modify", srcName: e.src.name, toName, from: before, n: at[i]!, card: m.card, prevent: !!m.mod.prevent, ...(m.once ? { once: m.once } : {}), ...toPlayer(to) });
       }
     };
     // How much of the damage a shield takes from each source's: `pick` chooses one at a time, among the options in the
@@ -951,6 +952,11 @@ interface DealBack {
  */
 function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
   const back: DealBack[] = [];
+  // "Whenever damage that would be dealt to you is prevented" (Selfless Squire): how much was prevented for each player.
+  const preventedTo = new Map<PlayerId, number>();
+  const prevented = (pid: PlayerId | undefined, n: number | undefined) => {
+    if (pid !== undefined && n && n > 0) preventedTo.set(pid, (preventedTo.get(pid) ?? 0) + n);
+  };
   const used = new Set<string>();
   const usedMods = new Set<string>();
   // Life gained from each rule's prevention of damage dealt at the same time is one life-gain event (CR 119.10).
@@ -973,6 +979,9 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
     if (colorsOk(r.dealBack, src)) back.push({ cardId: r.cardId, controller: r.controller, to: src.controller, n });
   };
   for (const op of plan.ops) {
+    if (op.kind === "protection" || op.kind === "preventAll") prevented(op.player, op.n);
+    else if (op.kind === "modify" && op.prevent) prevented(op.player, op.from - op.n);
+    else if (op.kind === "prevent" && "player" in op.to) prevented(op.to.player, op.n);
     if (op.kind === "protection") log(s, `Damage from ${op.srcName} to ${op.toName} is prevented (protection).`);
     else if (op.kind === "preventAll") {
       const r = op.rule ? s.damageRules?.find((x) => x.id === op.rule) : undefined;
@@ -1040,6 +1049,7 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
         createExtraTokens(s, r.controller, batch.extra);
       }
     });
+  for (const [pid, amount] of preventedTo) fireEvent(s, { type: "damagePreventedToPlayer", player: pid, amount });
   if (usedMods.size && s.damageMods) {
     s.damageMods = s.damageMods.filter((r) => !usedMods.has(r.id));
     if (!s.damageMods.length) s.damageMods = undefined;

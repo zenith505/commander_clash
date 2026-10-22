@@ -3,13 +3,18 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, forest, passAll, passUntil, putOnBattlefield, setup } from "./helpers";
-import { botActions, isFullySupported, planMana, waitingOn, type Action, type GameState, type PlayerId } from "../src";
+import { botActions, isFullySupported, planActivate, planCast, planMana, waitingOn, type Action, type GameState, type PlayerId } from "../src";
 import { moveObject, tapPermanent } from "../src/game";
 import { parseManaCost } from "../src/mana";
 import { characteristics } from "../src/layers";
 
 const settle = (s: GameState) => {
   for (let i = 0; i < 80 && (s.stack.length || s.triggerQueue.length) && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  return s;
+};
+const run = (s: GameState, plan: Action[] | null) => {
+  if (!plan) throw new Error("no plan");
+  for (const a of plan) s = act(s, a);
   return s;
 };
 const later = (s: GameState, ap: PlayerId, n: number) => s.turnOrder[(s.turnOrder.indexOf(ap) + n) % 4]!;
@@ -137,5 +142,106 @@ describe("round 117 gaps", () => {
       s = act(s, { type: "declareBlockers", player: ap, blocks: [{ blocker: wall, attacker: bears[1]! }] });
       expect(botActions(s, opp)).toEqual([{ type: "chooseMay", player: opp, yes: false }]);
     });
+  });
+});
+
+const yuriko = card("Yuriko, the Tiger's Shadow", "Legendary Creature — Human Ninja", "{1}{U}{B}", {
+  power: "1",
+  toughness: "3",
+  oracleText:
+    "Commander ninjutsu {U}{B} ({U}{B}, Return an unblocked attacker you control to hand: Put this card onto the battlefield from your hand or the command zone tapped and attacking.)\nWhenever a Ninja you control deals combat damage to a player, reveal the top card of your library and put that card into your hand. Each opponent loses life equal to that card's mana value.",
+});
+
+describe("Yuriko, the Tiger's Shadow (commander ninjutsu)", () => {
+  /** Ap's commander is Yuriko, in the command zone; ap attacks opp with a Bear, unblocked. */
+  const unblocked = () => {
+    const { s: s0, ap, opp } = setup([]);
+    let s = s0;
+    s.cards[yuriko.oracleId] = yuriko;
+    const y = s.players[ap]!.command[0]!;
+    s.objects[y]!.cardId = yuriko.oracleId;
+    const b = putOnBattlefield(s, ap, bear());
+    s = passUntil(s, "declareAttackers", ap);
+    s = settle(act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: b, defender: opp }] }));
+    for (let i = 0; i < 20 && s.pending?.kind !== "declareBlockers"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    while (s.pending?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: s.pending.player, blocks: [] });
+    return { s: settle(s), ap, opp, y, b };
+  };
+
+  it("puts Yuriko onto the battlefield from the command zone tapped and attacking, with no commander tax", () => {
+    expect(isFullySupported(yuriko)).toBe(true);
+    let { s, ap, opp, y, b } = unblocked();
+    s.players[ap]!.commanderCasts = { ...s.players[ap]!.commanderCasts, [y]: 2 };
+    const plan = planActivate(s, ap, y, 0, undefined, undefined, undefined, undefined, { returnToHand: [b] })!;
+    expect(plan).toBeTruthy();
+    s = settle(plan.reduce(act, s));
+    expect(s.objects[b]!.zone).toBe("hand");
+    expect(s.objects[y]!.zone).toBe("battlefield");
+    expect(s.objects[y]!.attacking).toBe(opp);
+    expect(s.objects[y]!.tapped).toBe(true);
+    // Two lands paid {U}{B}: no tax of {4}.
+    expect(s.battlefield.filter((id) => s.objects[id]!.tapped && s.objects[id]!.controller === ap).length).toBe(3);
+    // Its combat damage: reveal the top card, put it into the hand, each opponent loses its mana value.
+    const top = s.players[ap]!.library[0]!;
+    const mv = s.cards[s.objects[top]!.cardId]!.cmc;
+    const others = s.turnOrder.filter((p) => p !== ap && p !== opp);
+    const before = others.map((p) => s.players[p]!.life);
+    s = settle(passUntil(s, "main2", ap));
+    expect(s.objects[top]!.zone).toBe("hand");
+    expect(others.map((p) => s.players[p]!.life)).toEqual(before.map((l) => l - mv));
+  });
+
+  it("a bot uses it from the command zone", () => {
+    const { s, ap, y } = unblocked();
+    const tokenish = s.battlefield.find((id) => s.objects[id]!.attacking !== undefined)!;
+    s.objects[tokenish]!.isToken = true;
+    const plan = botActions(s, ap);
+    expect(plan.some((a) => a.type === "activateAbility" && a.objectId === y)).toBe(true);
+  });
+});
+
+const squire = card("Selfless Squire", "Creature — Human Soldier", "{3}{W}", {
+  power: "1",
+  toughness: "1",
+  keywords: ["Flash"],
+  oracleText: "Flash\nWhen this creature enters, prevent all damage that would be dealt to you this turn.\nWhenever damage that would be dealt to you is prevented, put that many +1/+1 counters on this creature.",
+});
+const shock = card("Shock", "Instant", "{R}", { oracleText: "Shock deals 2 damage to any target." });
+const fog = card("Fog", "Instant", "{G}", { oracleText: "Prevent all combat damage that would be dealt this turn." });
+
+describe("Selfless Squire", () => {
+  it("prevents all damage to you this turn and gets a +1/+1 counter for each 1 prevented", () => {
+    expect(isFullySupported(squire)).toBe(true);
+    const { s: s0, ap, ids, opp } = setup([squire, shock]);
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    const sq = ids[0]!;
+    expect(s.objects[sq]!.zone).toBe("battlefield");
+    // Shock at yourself (its controller doesn't matter).
+    const life = s.players[ap]!.life;
+    s = settle(run(s, planCast(s, ap, ids[1]!, [{ kind: "player", id: ap }])));
+    expect(s.players[ap]!.life).toBe(life);
+    expect(s.objects[sq]!.counters["+1/+1"]).toBe(2);
+    // Not damage to someone else.
+    expect(s.players[opp]!.life).toBeGreaterThan(0);
+  });
+
+  it("counts combat damage prevented by Fog, attackers together", () => {
+    const { s: s0, ap } = setup([fog]);
+    let s = s0;
+    const opp = later(s, ap, 3);
+    const sq = putOnBattlefield(s, ap, squire);
+    const attackers = [bear({ name: "A" }), bear({ name: "B" })].map((d) => putOnBattlefield(s, opp, d));
+    // Plenty of Forests for the Fog on the other player's turn: ap's lands untap.
+    s = passUntil(s, "declareAttackers", opp);
+    s = settle(act(s, { type: "declareAttackers", player: opp, attacks: attackers.map((attacker) => ({ attacker, defender: ap })) }));
+    s = passUntil(s, "declareBlockers", opp);
+    while (s.pending?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: s.pending.player, blocks: [] });
+    // Ap casts Fog with priority in declare blockers.
+    for (let i = 0; i < 8 && waitingOn(s) !== ap; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = settle(run(s, planCast(s, ap, s.players[ap]!.hand.find((id) => s.cards[s.objects[id]!.cardId]!.name === "Fog")!)));
+    const life = s.players[ap]!.life;
+    s = settle(passUntil(s, "endCombat", opp));
+    expect(s.players[ap]!.life).toBe(life);
+    expect(s.objects[sq]!.counters["+1/+1"]).toBe(4);
   });
 });

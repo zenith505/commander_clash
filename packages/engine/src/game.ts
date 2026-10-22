@@ -2870,8 +2870,12 @@ export const castFromExileForLife = (s: GameState, o: GameObject, pid: PlayerId)
 
 /** "Until the end of your next turn, you may play that card": `pid` may play this exiled card now. */
 export function mayPlayFromExile(s: GameState, o: GameObject, pid: PlayerId): boolean {
-  return ownExilePermission(s, o, pid) || !!linkedPlayPermission(s, o, pid) || preparedCopyCastable(s, o, pid);
+  return ownExilePermission(s, o, pid) || selfCastFromExile(s, o, pid) || !!linkedPlayPermission(s, o, pid) || preparedCopyCastable(s, o, pid);
 }
+
+/** "You may cast ~ from exile" (Squee): its owner, a face-up card; cast, not played as a land. */
+const selfCastFromExile = (s: GameState, o: GameObject, pid: PlayerId): boolean =>
+  o.zone === "exile" && o.owner === pid && !o.isToken && !o.faceDown && !!compileCard(defOf(s, o)).castFromExile && !isType(defOf(s, o), "Land");
 
 /** The card's own permission to be played from exile (GameObject.mayPlay), if it's `pid`'s and holds now. */
 function ownExilePermission(s: GameState, o: GameObject, pid: PlayerId): boolean {

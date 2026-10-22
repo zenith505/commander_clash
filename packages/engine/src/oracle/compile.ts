@@ -613,7 +613,10 @@ export function compile(d: CardDef): CompiledCard {
     const yard = parseGraveyardKeyword(line, d);
     if (yard !== null) {
       if (yard === "fail") out.unsupported.push(raw);
-      else if ("fromGraveyard" in yard) (out.fromGraveyard ??= []).push(yard.fromGraveyard);
+      else if ("fromExile" in yard) {
+        out.castFromExile = true;
+        if (yard.fromGraveyard) (out.fromGraveyard ??= []).push(yard.fromGraveyard);
+      } else if ("fromGraveyard" in yard) (out.fromGraveyard ??= []).push(yard.fromGraveyard);
       else if ("buyback" in yard) {
         out.buyback = yard.buyback;
         if (yard.costs) [out.buybackCosts, out.buybackText] = [yard.costs, yard.text];

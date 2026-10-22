@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, activate, bear, card, cast, passAll, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
-import { applyAction, botActions, characteristics, compileCard, defOf, manaValue, spellCost, invalidateCharacteristics, isFullySupported, isLegalTarget, isSuspended, type TargetSpec, objHasKeyword, manaAbilitiesOn, planCast, planUnlock, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { applyAction, botActions, characteristics, compileCard, defOf, mayPlayFromExile, manaValue, spellCost, invalidateCharacteristics, isFullySupported, isLegalTarget, isSuspended, type TargetSpec, objHasKeyword, manaAbilitiesOn, planCast, planUnlock, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 import { loseLife, moveObject } from "../src/game";
 import { nextRandom } from "../src/rng";
 
@@ -980,5 +980,33 @@ describe("the untap symbol {Q} (CR 107.6)", () => {
     expect(s.objects[id]!.tapped).toBe(false);
     s = passAll(s);
     expect(characteristics(s, s.objects[id]!).toughness).toBe(4);
+  });
+});
+
+describe("You may cast ~ from exile", () => {
+  const squee = card("Squee, the Immortal", "Legendary Creature — Goblin", "{1}{R}{R}", { power: "2", toughness: "1", oracleText: "You may cast this card from your graveyard or from exile." });
+  const griffin = card("Misthollow Griffin", "Creature — Griffin", "{2}{U}{U}", { power: "3", toughness: "3", keywords: ["Flying"], oracleText: "Flying\nYou may cast this card from exile." });
+
+  it("these cards play", () => {
+    for (const d of [squee, griffin]) expect(isFullySupported(d)).toBe(true);
+  });
+
+  it("Squee: its owner casts it from exile and from the graveyard, paying its mana cost; an opponent can't", () => {
+    const { s: s0, ap, ids } = setup([squee, griffin]);
+    const [sq, gr] = ids as [string, string];
+    moveObject(s0, sq, "exile");
+    moveObject(s0, gr, "exile");
+    const opp = s0.players.find((p) => p.id !== ap)!.id;
+    expect(mayPlayFromExile(s0, s0.objects[sq]!, ap)).toBe(true);
+    expect(mayPlayFromExile(s0, s0.objects[sq]!, opp)).toBe(false);
+    let s = cast(s0, ap, sq);
+    expect(s.objects[sq]!.zone).toBe("battlefield");
+    s = cast(s, ap, gr);
+    expect(s.objects[gr]!.zone).toBe("battlefield");
+    moveObject(s, sq, "graveyard");
+    for (const id of s.battlefield) s.objects[id]!.tapped = false;
+    for (const a of planCast(s, ap, sq, undefined, undefined, undefined, undefined, { via: "permission" })!) s = act(s, a);
+    s = passAll(s);
+    expect(s.objects[sq]!.zone).toBe("battlefield");
   });
 });

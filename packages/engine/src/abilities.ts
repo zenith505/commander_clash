@@ -4409,6 +4409,8 @@ export interface CompiledCard {
   costOr?: CostOption[];
   /** Flashback, jump-start, retrace, escape: casting it from your graveyard. */
   fromGraveyard?: CastFromGraveyard[];
+  /** "You may cast ~ from exile" (Misthollow Griffin, Squee): its owner may cast it while it's in exile. */
+  castFromExile?: true;
   /** "~ escapes with N +1/+1 counters on it" (CR 702.138c). */
   escapesWith?: number;
   /** Buyback (CR 702.27): an optional additional cost; paid, the spell returns to its owner's hand as it resolves. */

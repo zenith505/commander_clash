@@ -365,3 +365,46 @@ describe("Oblivion Sower (bot)", () => {
     expect(lib.map((id) => s.objects[id]!.zone)).toEqual(["battlefield", "battlefield"]);
   });
 });
+
+const bombardment = card("Arcane Bombardment", "Enchantment", "{4}{R}{R}", {
+  oracleText:
+    "Whenever you cast your first instant or sorcery spell each turn, exile an instant or sorcery card at random from your graveyard. Then copy each card exiled with Arcane Bombardment. You may cast any number of the copies without paying their mana costs.",
+});
+const shock = card("Spark Draw", "Instant", "{U}", { oracleText: "Draw a card." });
+const divine = card("Divination", "Sorcery", "{2}{U}", { oracleText: "Draw two cards." });
+
+describe("Arcane Bombardment", () => {
+  it("exiles a card at random with it on your first instant or sorcery each turn, then casts copies of all of them", () => {
+    expect(isFullySupported(bombardment)).toBe(true);
+    const { s: s0, ap, ids } = setup([shock, shock, shock]);
+    let s = s0;
+    putOnBattlefield(s, ap, bombardment);
+    for (let i = 0; i < 3; i++) putOnBattlefield(s, ap, island);
+    const d = putOnBattlefield(s, ap, divine);
+    moveObject(s, d, "graveyard");
+    s = passUntil(s, "main1", ap);
+    s = run(s, planCast(s, ap, ids[0]!));
+    s = settle(s);
+    // The spell that triggered it is still on the stack, so only Divination can be exiled (rulings).
+    expect(s.objects[d]!.zone).toBe("exile");
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "castFromAmong", options: [d, "none"] });
+    s = act(s, { type: "chooseOption", player: ap, choice: d });
+    expect(s.pending?.kind).toBe("castFree");
+    const copy = s.pending!.kind === "castFree" ? s.pending.objectId : "";
+    s = settle(run(s, planCast(s, ap, copy)));
+    expect(s.objects[ids[0]!]!.zone).toBe("graveyard");
+    // The second instant this turn doesn't trigger it.
+    s = settle(run(s, planCast(s, ap, ids[1]!)));
+    expect(s.pending).toBeFalsy();
+    expect(s.objects[ids[1]!]!.zone).toBe("graveyard");
+    // Next turn: one more card exiled at random, then copies of both cards exiled with it.
+    s = passUntil(passUntil(s, "end", ap), "main1", ap);
+    s = run(s, planCast(s, ap, ids[2]!));
+    s = settle(s);
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "castFromAmong" });
+    const options = s.pending!.kind === "chooseOption" ? s.pending.options : [];
+    const exiledNow = [ids[0]!, ids[1]!].filter((id) => s.objects[id]!.zone === "exile");
+    expect(exiledNow.length).toBe(1);
+    expect([...options].sort()).toEqual([d, exiledNow[0]!, "none"].sort());
+  });
+});

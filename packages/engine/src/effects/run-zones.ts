@@ -6,7 +6,7 @@ import { characteristics, controllerOf, invalidateCharacteristics } from "../lay
 import { putCounters, withPutter } from "../counters";
 import { manaValue } from "../mana";
 import type { GameObject, GameState, LastKnown, ObjectId, PlayerId } from "../types";
-import { bindBound, bindChosen, objectMatches, pickOptions, printedMatches } from "./targeting";
+import { bindBound, bindChosen, linkedCards, objectMatches, pickOptions, printedMatches } from "./targeting";
 import { ResolveCtx, apnap, objects, players, amountNow, amountCtx, amountFor, runEffect } from "./resolve";
 import { createToken, tokenCopies } from "./run-tokens";
 import { compileCard } from "../oracle";
@@ -845,6 +845,18 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           log(s, ids.length ? `${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} exiled from the top of each library.` : "No library has a card to exile.");
           sc.castAmong = { ids: ids.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
         }
+      }
+      if (!sc.castAmong && e.fromYard?.randomLinked) {
+        // Arcane Bombardment: one card at random, linked to the source; then every card still exiled with it.
+        const pool = you.graveyard.filter((id) => printedMatches(e.fromYard!.filter!, defOf(s, obj(s, id))));
+        if (pool.length) {
+          const id = pool[Math.floor(nextRandom(s) * pool.length)]!;
+          moveObject(s, id, "exile");
+          const o = obj(s, id);
+          log(s, `${you.name} exiles ${defOf(s, o).name}, chosen at random, from their graveyard.`);
+          if (o.zone === "exile" && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
+        }
+        sc.castAmong = { ids: linkedCards(s, ctx.sourceId, ctx.sourceZc ?? 0), declined: [] };
       }
       if (!sc.castAmong && e.fromYard) {
         // Mizzix's Mastery: the target card if it's still legal, or (overloaded) each one in your graveyard, all exiled.

@@ -1602,6 +1602,19 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si++;
       continue;
     }
+    // Arcane Bombardment: "exile an instant or sorcery card at random from your graveyard. Then copy each card exiled with
+    // this enchantment. You may cast any number of the copies without paying their mana costs." The copies are cast as
+    // the ability resolves, or never (rulings); the cards stay exiled, linked to it (CR 607.2a).
+    if (
+      /^[Ee]xile an instant or sorcery card at random from your graveyard$/.test(s) &&
+      /^Then copy each card exiled with (?:~|this enchantment)$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "") &&
+      /^You may cast any number of the copies without paying their mana costs$/.test(sentences[si + 2]?.replace(/\.$/, "") ?? "")
+    ) {
+      const filter: TargetSpec = { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], owner: "you", text: "instant or sorcery card" };
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, fromYard: { filter, randomLinked: true } });
+      si += 2;
+      continue;
+    }
     // Etali, Primal Conqueror: "each player exiles cards from the top of their library until they exile a nonland card.
     // You may cast any number of spells from among the nonland cards exiled this way without paying their mana costs."
     if (/^[Ee]ach player exiles cards from the top of their library until they exile a nonland card$/.test(s) && /^You may cast any number of spells from among the nonland cards exiled this way without paying their mana costs$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {

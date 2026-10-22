@@ -1,7 +1,7 @@
 # Roadmap
 
-23,034 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,204 of 4,988 (84%).
+23,109 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,225 of 4,988 (84%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,21 +22,24 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 120, most played first: Sheoldred // The True Scriptures
-   ("a nontoken creature or planeswalker": whether "nontoken" covers both isn't settled by a ruling), Inquisitive
-   Glimmer, Deadpool, Trading Card, Bloodsoaked Insight, Camellia, the Seedmiser and Forage ("or" costs on activated
-   abilities), Ygra, Wrenn and Realmbreaker, Gwenom, Virtue of Strength, Struggle for Project Purity, Lae'zel's
-   Acrobatics, Gisa, Glorious Resurrector, Sovereign Okinec Ahau, Jodah, the Unifier, Nowhere to Run, Kefka, Court Mage,
-   Tamiyo, Field Researcher, Wyll's Reversal, Lifestream's Blessing (an X counted "as you cast ~"), Paradox Haze,
-   Silent-Blade Oni, Twilight Diviner, Orcish Lumberjack (a sacrifice cost with "any combination of {R} and/or {G}"),
-   Silver-Fur Master (ninjutsu costs less), Obeka, Splitter of Seconds. Arahbo, Inalla, Sahir and The Ur-Sphinx have
-   eminence now but other lines keep them out. Smaller gaps from round 120: bots never cast spells or activate
-   abilities that end the turn (Time Stop, Sundial of the Infinite, Glorious End and the rest are skipped); bots don't
-   plan around The Chain Veil or Ichormoon Gauntlet; bots never use One with the Multiverse's free cast to cast a
-   prototype card prototyped; the attack screen doesn't pre-filter whom Weathered Sentinels may attack (the engine
-   refuses the others); bots cast Fatal Push without checking the target's mana value; web-slinging is an
-   "alternative" cost, so "if it was cast using web-slinging" (Spiders-Man, Heroic Horde, Scarlet Spider, Arachne) and
-   Spider-UK are out. Smaller gaps from round 119: Zaxara, Geometer's Arthropod, Glava, Nev, Owlin Spiralmancer and
+00. Most played first (`npm run popular`). Out after round 121, most played first: Sheoldred // The True Scriptures
+   ("a nontoken creature or planeswalker": whether "nontoken" covers both isn't settled by a ruling), Deadpool, Trading
+   Card (exchanging text boxes, a text-changing effect, CR 612), Gwenom, Struggle for Project Purity, Lae'zel's
+   Acrobatics, Gisa, Glorious Resurrector, Jodah, the Unifier, Kefka, Court Mage, Tamiyo, Field Researcher, Wyll's
+   Reversal, Lifestream's Blessing (an X counted "as you cast ~"), Silent-Blade Oni, Twilight Diviner, Toph, Hardheaded
+   Teacher, Fraying Sanity (the cards put into one player's graveyard this turn), Pariah (damage redirected to a
+   creature, also Empyrial Archangel, Ancient Adamantoise and Heroic Sacrifice), Wash Away (cleave), Duplicant, Machine
+   God's Effigy, Angel of Destiny, Maze's End, Derevi, Ultima, Origin of Oblivion, Tasha's Hideous Laughter, Underrealm
+   Lich, Doppelgang, Yenna, Liliana of the Veil, Emet-Selch, Comeuppance, Repercussion, Library of Leng, Biophagus,
+   Rottenmouth Viper, Zellix, Xantcha, Howlsquad Heavy, Marauding Raptor, Tiamat, Treasure Map, Abdel Adrian.
+   Arahbo, Inalla, Sahir and The Ur-Sphinx have eminence now but other lines keep them out. Smaller gaps from round
+   121: bots and autopay never forage for Thornvault Forager's mana (mana abilities with extra costs); "you may forage.
+   If you do" (Bushy Bodyguard, Treetop Sentries, Curious Forager) and "whenever you forage" (Corpseberry Cultivator)
+   are out; a token put onto the battlefield attacking (Brimaz, Parhelion II) attacks what its source attacks, though
+   CR 508.4 lets its controller choose; bots never cast Glorious End and end the turn only with nothing of their own on
+   the stack; Arachne's card types leave out Kindred. Smaller gaps from round 120: bots don't plan around The Chain
+   Veil or Ichormoon Gauntlet; bots never use One with the Multiverse's free cast to cast a prototype card prototyped;
+   the attack screen doesn't pre-filter whom Weathered Sentinels may attack (the engine refuses the others). Smaller gaps from round 119: Zaxara, Geometer's Arthropod, Glava, Nev, Owlin Spiralmancer and
    Elementalist's Palette (their {X} lines) are
    out; mana abilities with {X} don't trigger Unbound Flourishing (they can't be copied anyway). Smaller gaps from
    round 118: Selfless Squire triggers once for each player's batch of prevented damage; bots choose Kozilek, the

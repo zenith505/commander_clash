@@ -64,6 +64,7 @@ export function describeMods(s: GameState, mods: Modification[], controller: Pla
     if (m.kind === "modifyPT") parts.push(`gets ${sign(m.power)}/${sign(m.toughness)}`);
     else if (m.kind === "setPT") parts.push(`has base power and toughness ${describeAmount(m.power)}/${describeAmount(m.toughness)}`);
     else if (m.kind === "setName") parts.push(`is named ${m.name}`);
+    else if (m.kind === "setPower") parts.push(`has base power ${describeAmount(m.power)}`);
     else if (m.kind === "setToughness") parts.push(`has base toughness ${describeAmount(m.toughness)}`);
     else if (m.kind === "switchPT") parts.push("has its power and toughness switched");
     else if (m.kind === "addKeywords") parts.push(`gains ${m.keywords.map((k) => keywordLabel(k, (x) => player(s, x).name)).join(", ").toLowerCase()}`);

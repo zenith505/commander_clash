@@ -638,6 +638,14 @@ export function linkedCards(s: GameState, sourceId: ObjectId | undefined, zc?: n
 export function lesserPowerOk(s: GameState, spec: TargetSpec, t: TargetChoice, sourceId: ObjectId | undefined, sourceZc?: number): boolean {
   // "Target card exiled with ~": one of the cards linked to the source (CR 607.2a).
   if (spec.linkedExile && t.kind === "object" && !linkedCards(s, sourceId, sourceZc).some((l) => l.id === t.id)) return false;
+  if (spec.blockedBySource && t.kind === "object") {
+    const me = sourceId ? s.objects[sourceId] : undefined;
+    if (!me) return false;
+    const onField = me.zone === "battlefield" && (sourceZc === undefined || (me.zoneChanges ?? 0) === sourceZc);
+    const lk = s.lastKnown?.[me.id];
+    const blocking = onField ? me.blocking : lk && (sourceZc === undefined || lk.zc === sourceZc) ? lk.blocking : undefined;
+    if (!blocking?.includes(t.id) || s.objects[t.id]?.attacking === undefined) return false;
+  }
   if (!spec.lesserPowerThanSource || t.kind !== "object" || !sourceId) return true; // without the source, checked later
   const me = s.objects[sourceId];
   const mine = me?.zone === "battlefield" ? power(s, me) : s.lastKnown?.[sourceId]?.power;

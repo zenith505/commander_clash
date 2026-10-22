@@ -190,8 +190,8 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       effectText = effectText.slice(0, effectText.length - " Spend only mana of the chosen color to activate this ability.".length);
       found = true;
     }
-    // "X can't be 0." (Ruthless Technomancer): only with an X in its costs.
-    if (/ X can't be 0\.$/.test(effectText) && !xMin && extra.some((x) => "x" in x && x.x)) {
+    // "X can't be 0." (Ruthless Technomancer, Lair of the Hydra's {X}{G}): only with an X in its costs.
+    if (/ X can't be 0\.$/.test(effectText) && !xMin && (extra.some((x) => "x" in x && x.x) || /\{X\}/.test(costs))) {
       xMin = 1;
       effectText = effectText.slice(0, effectText.length - " X can't be 0.".length);
       found = true;

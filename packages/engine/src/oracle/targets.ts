@@ -301,9 +301,10 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   }
   // "It and other creatures you control that share a creature type with it each get +2/+0 ... until end of turn" (Haunted
   // One): the source while it's still there, and the others as this resolves (CR 611.2c).
-  const andOthers = !ctx.spell ? /^~ and (other .+?)( that shares? a creature type with (?:~|it))?(?: each)?$/i.exec(x) : null;
+  // "~ and Drakes you control each get +X/+X" (Alandra, Sky Dreamer): the same, the source counted once if it's one too.
+  const andOthers = !ctx.spell ? /^~ and ((?:other )?[A-Z]?[a-z]+ you control|other .+?)( that shares? a creature type with (?:~|it))?(?: each)?$/i.exec(x) : null;
   if (andOthers) {
-    const g = parseGroup(andOthers[1]!);
+    const g = parseGroup(andOthers[1]!.startsWith("other ") ? andOthers[1]! : `other ${andOthers[1]!}`);
     return g?.other && !/ (?:with|that|who|which) /i.test(andOthers[1]!.replace(/ you control$/, "")) ? { ref: "each", filter: g.filter, other: true, andSelf: true, ...(andOthers[2] ? { sharesTypeWithSelf: true as const } : {}) } : null;
   }
   // "All creatures with toughness less than or equal to the number of Islands you control": counted as it resolves.
@@ -688,6 +689,12 @@ export function parseTargetPhrase(
     if (!opts.chosen) return null;
     extra.chosen = "name";
     p = (p.slice(0, withName.index) + p.slice(withName.index + withName[0].length)).trim();
+  }
+  // "Target creature it's blocking" (Tinder Wall): one blocked by the source.
+  const blocked = / (?:it's|~ is) blocking$/.exec(p);
+  if (blocked) {
+    extra.blockedBySource = true;
+    p = p.slice(0, blocked.index);
   }
   // "Each green creature that entered this turn" (Oran-Rief, the Vastwood).
   const entered = / that entered (?:the battlefield )?this turn$/.exec(p);

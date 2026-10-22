@@ -2060,13 +2060,15 @@ export function compile(d: CardDef): CompiledCard {
       // died this turn" (morbid), "... if you cast it from your hand": checked as it enters.
       const [, tapped, count, kind, each, where, ifText] = ewc;
       const fromHand = ifText === "you cast it from your hand";
-      const cond = ifText && !fromHand ? parseStaticCondition(ifText, { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
+      // "If you cast it" (Nine-Lives Familiar): it enters from the stack as the spell it was, not a copy (CR 601.2i).
+      const ifCast = ifText === "you cast it";
+      const cond = ifText && !fromHand && !ifCast ? parseStaticCondition(ifText, { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
       const per = each ? parseCount(each, null, true) : null;
       const def = where ? parseCount(where, null) : null;
       const n = per ? scaleAmount(amt(count!), per) : def ? substituteX(amt(count!), def) : amt(count!);
       if ((each && !per) || (where && !def) || cond === null || !n || out.entersWithCounters) out.unsupported.push(raw);
       else {
-        out.entersWithCounters = { counter: counterKind(kind!), n, ...(cond ? { if: cond } : {}), ...(fromHand ? { castFromHand: true as const } : {}) };
+        out.entersWithCounters = { counter: counterKind(kind!), n, ...(cond ? { if: cond } : {}), ...(fromHand ? { castFromHand: true as const } : {}), ...(ifCast ? { ifCast: true as const } : {}) };
         if (tapped) out.entersTapped = true;
       }
       continue;

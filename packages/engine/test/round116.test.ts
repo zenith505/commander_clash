@@ -463,3 +463,93 @@ describe("more of the most played: Murkfiend Liege, Zenith Chronicler, Tifa Lock
     expect(s.objects[b]!.zone).toBe("graveyard");
   });
 });
+
+describe("more of the most played: Lair of the Hydra, PuPu UFO, Alandra, Tinder Wall, Nine-Lives Familiar", () => {
+  const lair = card("Lair of the Hydra", "Land", "", { oracleText: "If you control two or more other lands, this land enters tapped.\n{T}: Add {G}.\n{X}{G}: Until end of turn, this land becomes an X/X green Hydra creature. It's still a land. X can't be 0." });
+  const pupu = card("PuPu UFO", "Artifact Creature — Construct Alien", "{2}", { power: "0", toughness: "4", keywords: ["Flying"], oracleText: "Flying\n{T}: You may put a land card from your hand onto the battlefield.\n{3}: Until end of turn, this creature's base power becomes equal to the number of Towns you control." });
+  const alandra = card("Alandra, Sky Dreamer", "Legendary Creature — Merfolk Wizard", "{2}{U}{U}", {
+    power: "2",
+    toughness: "4",
+    oracleText: "Whenever you draw your second card each turn, create a 2/2 blue Drake creature token with flying.\nWhenever you draw your fifth card each turn, Alandra and Drakes you control each get +X/+X until end of turn, where X is the number of cards in your hand.",
+  });
+  const tinder = card("Tinder Wall", "Creature — Plant Wall", "{G}", { power: "0", toughness: "3", keywords: ["Defender"], oracleText: "Defender (This creature can't attack.)\nSacrifice this creature: Add {R}{R}.\n{R}, Sacrifice this creature: It deals 2 damage to target creature it's blocking." });
+  const familiar = card("Nine-Lives Familiar", "Creature — Cat", "{1}{B}{B}", { power: "1", toughness: "1", oracleText: "This creature enters with eight revival counters on it if you cast it.\nWhen this creature dies, if it had a revival counter on it, return it to the battlefield with one fewer revival counter on it at the beginning of the next end step." });
+  const town = card("Market Town", "Land — Town", "", { oracleText: "{T}: Add {C}." });
+  const drawFive = card("Big Draw", "Sorcery", "{U}", { oracleText: "Draw five cards." });
+
+  it("all five compile", () => {
+    for (const c of [lair, pupu, alandra, tinder, familiar]) expect(isFullySupported(c), c.name).toBe(true);
+  });
+
+  it("Lair of the Hydra: becomes an X/X Hydra; X can't be 0", () => {
+    const { s: s0, ap } = setup([]);
+    const l = putOnBattlefield(s0, ap, lair);
+    s0.objects[l]!.tapped = false;
+    expect(planActivate(s0, ap, l, 0, undefined, undefined, undefined, 0)).toBeNull();
+    const s = settle(run(s0, planActivate(s0, ap, l, 0, undefined, undefined, undefined, 3)));
+    expect(characteristics(s, s.objects[l]!).types).toEqual(expect.arrayContaining(["Land", "Creature"]));
+    expect(pt(s, l)).toBe("3/3");
+  });
+
+  it("PuPu UFO: base power becomes the number of Towns you control", () => {
+    const { s: s0, ap } = setup([]);
+    const u = putOnBattlefield(s0, ap, pupu);
+    putOnBattlefield(s0, ap, town);
+    putOnBattlefield(s0, ap, town);
+    const s = settle(run(s0, planActivate(s0, ap, u, 1)));
+    expect(pt(s, u)).toBe("2/4");
+  });
+
+  it("Alandra: a Drake for the second card drawn, then +X/+X for the fifth", () => {
+    const { s: s0, ap, ids } = setup([drawFive]);
+    let s = s0;
+    const a = putOnBattlefield(s, ap, alandra);
+    const drake = putOnBattlefield(s, ap, card("Wind Drake", "Creature — Drake", "{2}{U}", { power: "2", toughness: "2", keywords: ["Flying"], oracleText: "Flying" }));
+    const b = putOnBattlefield(s, ap, bear());
+    s = settle(cast(s, ap, ids[0]!));
+    // Both trigger as the spell resolves; whichever order they resolve in, there's one Drake token.
+    expect(s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === ap)).toHaveLength(1);
+    const x = s.players[ap]!.hand.length;
+    expect(pt(s, a)).toBe(`${2 + x}/${4 + x}`);
+    expect(pt(s, drake)).toBe(`${2 + x}/${2 + x}`);
+    expect(pt(s, b)).toBe("2/2");
+  });
+
+  it("Tinder Wall: 2 damage to a creature it's blocking, and only that one", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const w = putOnBattlefield(s0, ap, tinder);
+    const blocked = putOnBattlefield(s0, opp, bear());
+    const other = putOnBattlefield(s0, opp, bear({ name: "Other Bear" }));
+    for (const b of [blocked, other]) s0.objects[b]!.attacking = ap;
+    s0.objects[w]!.blocking = [blocked];
+    s0.objects[blocked]!.blockedBy = [w];
+    expect(planActivate(s0, ap, w, 0, [target(other)])).toBeNull();
+    const s = settle(run(s0, planActivate(s0, ap, w, 0, [target(blocked)])));
+    expect(s.objects[w]!.zone).toBe("graveyard");
+    expect(s.objects[blocked]!.zone).toBe("graveyard");
+    expect(s.objects[other]!.zone).toBe("battlefield");
+  });
+
+  it("Nine-Lives Familiar: eight revival counters if cast; back with one fewer at the next end step", () => {
+    const { s: s0, ap, ids } = setup([familiar]);
+    let s = settle(cast(s0, ap, ids[0]!));
+    const f = ids[0]!;
+    expect(s.objects[f]!.counters?.revival).toBe(8);
+    moveObject(s, f, "graveyard");
+    s = settle(s);
+    expect(s.objects[f]!.zone).toBe("graveyard");
+    s = settle(passUntil(s, "end", ap));
+    expect(s.objects[f]!.zone).toBe("battlefield");
+    expect(s.objects[f]!.counters?.revival).toBe(7);
+  });
+
+  it("Nine-Lives Familiar: not cast, no counters, so it stays dead", () => {
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const f = putOnBattlefield(s, ap, familiar);
+    expect(s.objects[f]!.counters?.revival ?? 0).toBe(0);
+    moveObject(s, f, "graveyard");
+    s = settle(passUntil(settle(s), "end", ap));
+    expect(s.objects[f]!.zone).toBe("graveyard");
+  });
+});

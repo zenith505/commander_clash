@@ -595,6 +595,8 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx): Mo
       ? m
       : m.kind === "modifyPT" || m.kind === "setPT"
       ? { ...m, power: evalAmount(s, m.power, c), toughness: evalAmount(s, m.toughness, c) }
+      : m.kind === "setPower"
+      ? { ...m, power: evalAmount(s, m.power, c) }
       : // Odric, Lunarch Marshal: the keywords creatures its controller controls have now (CR 611.2c), variants included.
         m.kind === "addKeywords" && m.sharedAmongYours
         ? { kind: "addKeywords", keywords: sharedKeywords(s, ctx.controller, m.keywords) }

@@ -40,6 +40,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     if (!what || isGroup(what)) return null;
     return [{ type: "doublePT", what, power: m[2] !== "toughness", toughness: m[2] !== "power" }];
   }
+  // "Until end of turn, ~'s base power becomes equal to the number of Towns you control" (PuPu UFO): its power set in
+  // layer 7b (CR 613.4b), the number counted as it resolves (rulings).
+  // The body has moved the "Until end of turn, " to the end.
+  if ((m = /^~'s base power becomes equal to (the number of .+) until end of turn$/.exec(s))) {
+    const n = parseCount(m[1]!, ctx);
+    if (!n) return null;
+    return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "setPower", power: n }], duration: "endOfTurn" }];
+  }
 
   // "Tap any number of untapped creatures you control" (Devout Invocation), "you may tap any number of untapped Gates you
   // control" (Guild Summit): chosen as it resolves, none allowed, so "you may" changes nothing (CR 608.2d). Followed by

@@ -661,3 +661,48 @@ describe("Currency Converter", () => {
     expect(mine()).toHaveLength(2);
   });
 });
+
+describe("cards these templates also cover", () => {
+  it("Ink-Eyes: a creature card from the damaged player's graveyard only, onto the battlefield under your control", () => {
+    const inkEyes = card("Ink-Eyes, Servant of Oni", "Legendary Creature — Rat Ninja", "{4}{B}{B}", {
+      power: "5",
+      toughness: "4",
+      keywords: ["Ninjutsu"],
+      oracleText:
+        "Ninjutsu {3}{B}{B} ({3}{B}{B}, Return an unblocked attacker you control to hand: Put this card onto the battlefield from your hand tapped and attacking.)\nWhenever Ink-Eyes deals combat damage to a player, you may put target creature card from that player's graveyard onto the battlefield under your control.\n{1}{B}: Regenerate Ink-Eyes.",
+    });
+    expect(isFullySupported(inkEyes)).toBe(true);
+    const { s: s0, ap, opp } = setup([]);
+    let s = s0;
+    const ink = putOnBattlefield(s, ap, inkEyes);
+    const theirs = toYard(s, opp, bear({ name: "Their Bear" }));
+    const other = toYard(s, later(s, ap, 2), bear({ name: "Other Bear" }));
+    s = passUntil(s, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: ink, defender: opp }] });
+    s = passUntil(s, "combatDamage", ap);
+    for (let i = 0; i < 20 && s.pending?.kind !== "chooseTargets"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(() => act(s, { type: "chooseTargets", player: ap, targets: [target(other)] })).toThrow();
+    s = act(s, { type: "chooseTargets", player: ap, targets: [target(theirs)] });
+    for (let i = 0; i < 20 && s.pending?.kind !== "chooseMay"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect(s.objects[theirs]!.zone).toBe("battlefield");
+    expect(characteristics(s, s.objects[theirs]!).controller).toBe(ap);
+  });
+  it("Ghitu Lavarunner: spell mastery counts instant and sorcery cards together", () => {
+    const lavarunner = card("Ghitu Lavarunner", "Creature — Human Wizard", "{R}", {
+      power: "1",
+      toughness: "2",
+      oracleText: "As long as there are two or more instant and/or sorcery cards in your graveyard, this creature gets +1/+0 and has haste.",
+    });
+    expect(isFullySupported(lavarunner)).toBe(true);
+    const { s, ap } = setup([]);
+    const g = putOnBattlefield(s, ap, lavarunner);
+    toYard(s, ap, card("Old Instant", "Instant", "{1}", { oracleText: "Draw a card." }));
+    invalidate(s);
+    expect(characteristics(s, s.objects[g]!).power).toBe(1);
+    toYard(s, ap, card("Old Sorcery", "Sorcery", "{1}", { oracleText: "Draw a card." }));
+    invalidate(s);
+    expect(characteristics(s, s.objects[g]!)).toMatchObject({ power: 2 });
+    expect(characteristics(s, s.objects[g]!).keywords).toContain("Haste");
+  });
+});

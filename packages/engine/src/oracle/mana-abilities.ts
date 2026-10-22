@@ -93,6 +93,13 @@ export function parseManaAbility(line0: string): ManaAbility | null {
       if (!cond || p.mana.some((x) => x !== m2![3]) || num(m2[2]!) <= p.mana.length) return null;
       out.produces = { kind: "fixed", mana: [p.mana[0]!], n: { count: { kind: "stateIf", cond }, times: num(m2[2]!) - p.mana.length, plus: p.mana.length } };
     }
+    else if ((m2 = /^If ([^,]+), add (\{[WUBRGC]\}) instead\.$/.exec(extra)) && !out.insteadIf && out.produces.kind === "fixed" && out.produces.mana.length === 1 && !out.produces.n && !out.produces.count) {
+      // River of Tears: "Add {U}. If you played a land this turn, add {B} instead." Checked as it resolves.
+      const cond = parseStaticCondition(m2[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      const produces = parseManaProduced(m2[2]!);
+      if (!cond || !produces) return null;
+      out.insteadIf = { cond, produces };
+    }
     else if ((m2 = /^If ([^,]+), add three mana of that type instead\.$/.exec(extra)) && !out.insteadIf && out.produces.kind === "landsCouldProduce" && !out.produces.n) {
       // Incubation Druid: "If ~ has a +1/+1 counter on it, add three mana of that type instead."
       const cond = parseStaticCondition(m2[1]!, { affects: { kind: "self" }, mods: [], text: "" });

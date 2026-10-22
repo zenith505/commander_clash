@@ -767,6 +767,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "handsEmpty":
       return s.players.filter((p) => !p.lost).every((p) => p.hand.length === 0);
+    case "playedLandThisTurn":
+      return (s.players[you]?.landsPlayedThisTurn ?? 0) > 0;
     case "someHandAtMost":
       return s.players.some((p) => !p.lost && p.hand.length <= cond.n);
     case "totalPower": {

@@ -786,3 +786,99 @@ describe("Mirri, Weatherlight Duelist", () => {
     expect(s.objects[ids[0]!]!.attacking).toBe(ap);
   });
 });
+
+const showdown = card("Spectacular Showdown", "Sorcery", "{1}{R}", {
+  oracleText:
+    "Put a double strike counter on target creature, then goad each creature that had a double strike counter put on it this way. (Until your next turn, those creatures attack each combat if able and attack a player other than you if able.)\nOverload {4}{R}{R}{R} (You may cast this spell for its overload cost. If you do, change \"target\" in its text to \"each.\")",
+});
+const anzrag = card("Anzrag, the Quake-Mole", "Legendary Creature — Mole God", "{2}{R}{G}", {
+  power: "8",
+  toughness: "4",
+  oracleText:
+    "Whenever Anzrag becomes blocked, untap each creature you control. After this combat phase, there is an additional combat phase.\n{3}{R}{R}{G}{G}: Anzrag must be blocked each combat this turn if able.",
+});
+const river = card("River of Tears", "Land", "", { oracleText: "{T}: Add {U}. If you played a land this turn, add {B} instead." });
+const constrictor = card("Persistent Constrictor", "Creature — Zombie Snake", "{4}{B}", {
+  power: "5",
+  toughness: "3",
+  oracleText: "At the beginning of each opponent's upkeep, they lose 1 life and you put a -1/-1 counter on up to one target creature they control.",
+});
+const rakdos = card("Rakdos, Patron of Chaos", "Legendary Creature — Demon", "{4}{B}{R}", {
+  power: "6",
+  toughness: "6",
+  keywords: ["Flying", "Trample"],
+  oracleText: "Flying, trample\nAt the beginning of your end step, target opponent may sacrifice two nonland, nontoken permanents of their choice. If they don't, you draw two cards.",
+});
+
+describe("more popular cards", () => {
+  it("Spectacular Showdown: a double strike counter, and that creature is goaded", () => {
+    expect(isFullySupported(showdown)).toBe(true);
+    const { s: s0, ap, ids, opp } = setup([showdown]);
+    let s = s0;
+    const b = putOnBattlefield(s, opp, bear());
+    s = settle(run(s, planCast(s, ap, ids[0]!, [{ kind: "object", id: b }])));
+    expect(s.objects[b]!.counters["double strike"]).toBe(1);
+    const ch = characteristics(s, s.objects[b]!);
+    expect(ch.keywords).toContain("Double strike");
+    expect(ch.goadedBy).toContain(ap);
+  });
+
+  it("Anzrag: must be blocked this turn if able", () => {
+    expect(isFullySupported(anzrag)).toBe(true);
+    const { s: s0, ap, opp } = setup([]);
+    let s = s0;
+    for (const l of [forest, forest]) putOnBattlefield(s, ap, l);
+    const a = putOnBattlefield(s, ap, anzrag);
+    const blocker = putOnBattlefield(s, opp, bear());
+    s = settle(run(s, planActivate(s, ap, a, 0)));
+    expect(characteristics(s, s.objects[a]!).mustBeBlocked).toBe(true);
+    s = passUntil(s, "declareAttackers", ap);
+    s = settle(act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: a, defender: opp }] }));
+    for (let i = 0; i < 20 && !(s.pending?.kind === "declareBlockers" && s.pending.player === opp); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(() => act(s, { type: "declareBlockers", player: opp, blocks: [] })).toThrow();
+    void blocker;
+  });
+
+  it("River of Tears: {U}, or {B} once you've played a land this turn", () => {
+    expect(isFullySupported(river)).toBe(true);
+    const { s: s0, ap, ids } = setup([forest]);
+    let s = s0;
+    const r = putOnBattlefield(s, ap, river);
+    const mana = (st: GameState) => {
+      const plan = planMana(st, ap, parseManaCost("{B}"));
+      return plan?.some((a) => a.type === "activateMana" && a.objectId === r);
+    };
+    s.players[ap]!.landsPlayedThisTurn = 0;
+    expect(mana(s)).toBeFalsy();
+    s = act(s, { type: "playLand", player: ap, objectId: ids[0]! });
+    expect(mana(s)).toBe(true);
+  });
+
+  it("Persistent Constrictor: on each opponent's upkeep they lose 1 life and one of their creatures gets a -1/-1 counter", () => {
+    expect(isFullySupported(constrictor)).toBe(true);
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    putOnBattlefield(s, ap, constrictor);
+    const foe = later(s, ap, 1);
+    const b = putOnBattlefield(s, foe, bear());
+    const life = s.players[foe]!.life;
+    s = passUntil(s, "upkeep", foe);
+    s = settle(s);
+    for (let i = 0; i < 6 && s.pending; i++) s = settle(run(s, botActions(s, s.pending.player)));
+    expect(s.players[foe]!.life).toBe(life - 1);
+    expect(s.objects[b]!.counters["-1/-1"]).toBe(1);
+  });
+
+  it("Rakdos, Patron of Chaos: the opponent sacrifices two nonland, nontoken permanents or you draw two", () => {
+    expect(isFullySupported(rakdos)).toBe(true);
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    putOnBattlefield(s, ap, rakdos);
+    const hand = s.players[ap]!.hand.length;
+    s = passUntil(s, "end", ap);
+    s = settle(s);
+    for (let i = 0; i < 6 && s.pending; i++) s = settle(run(s, botActions(s, s.pending.player)));
+    // The opponents have only lands and their commanders in the command zone: they can't, so you draw two.
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
+  });
+});

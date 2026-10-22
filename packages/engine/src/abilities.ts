@@ -1242,6 +1242,8 @@ export type StaticCondition =
   | { kind: "sameNamed"; types: string[]; n: number }
   /** "If each player has no cards in hand" (Howltooth Hollow). */
   | { kind: "handsEmpty" }
+  /** "If you played a land this turn" (River of Tears): a land played, not one put onto the battlefield (CR 305.1). */
+  | { kind: "playedLandThisTurn" }
   /** "If a player has one or fewer cards in hand" (Temple of the Dead): some player in the game. */
   | { kind: "someHandAtMost"; n: number }
   /** "If creatures you control have total power 10 or greater" (Mosswort Bridge). */

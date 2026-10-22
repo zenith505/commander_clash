@@ -472,6 +472,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^you control ${NUM} or more (artifacts|creatures|permanents) with the same name as one another$`).exec(text)))
     return { kind: "sameNamed", types: m[2] === "permanents" ? [] : [capital(m[2]!.slice(0, -1))], n: num(m[1]!) };
   if (/^each player has no cards in hand$/.test(text)) return { kind: "handsEmpty" };
+  if (/^you played a land this turn$/.test(text)) return { kind: "playedLandThisTurn" };
   if ((m = new RegExp(`^a player has ${NUM} or fewer cards in hand$`).exec(text))) return { kind: "someHandAtMost", n: num(m[1]!) };
   if (/^you have no cards in hand$/.test(text)) return { kind: "noneInHand", filter: { kind: "card", text: "card" } };
   // The Cases' "To solve" conditions (CR 719.3a), about this turn.

@@ -853,6 +853,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   text = text.replace(/\b(deals \w+ damage to) each of your opponents\b/g, "$1 each opponent");
   // "~ deals 4 damage to target creature and you gain life equal to the damage dealt this way" (Enter the God-Eternals).
   text = text.replace(/^(~ deals [^.]+? damage to [^.]+?) and you gain life equal to the damage dealt this way\./, "$1. You gain life equal to the damage dealt this way.");
+  // "They lose 1 life and you put a -1/-1 counter on up to one target creature they control" (Persistent Constrictor): the
+  // life, then the counter (the target chosen as the ability is put on the stack, CR 603.3d).
+  text = text.replace(/^(they|that player) (loses?) (\d+) life and you (put an? [^.]+? counter on up to one target creature) (they|that player) controls?\./, (_, w: string, v: string, n: string, rest: string) => `${w === "they" ? "They" : "That player"} ${v} ${n} life. ${capital(rest)} that player controls.`);
   // "~ deals damage to that player equal to the number of cards in their hand and you gain 1 life for each card in your
   // hand" (Sword of War and Peace): the damage, then the life; the cards counted as each part happens (CR 608.2c).
   text = text.replace(/^(~ deals damage to that player equal to the number of cards in their hand) and (you gain 1 life for each card in your hand)\./, "$1. $2.");
@@ -1442,6 +1445,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const fx = parseOne(`${mayOut[1]!} loses ${mayLose[1]!} life unless they ${mayOut[2]!}s ${mayOut[3]!}`, ctx);
       if (fx?.length !== 1 || fx[0]!.type !== "punisher") return null;
       effects.push(...fx);
+      si++;
+      continue;
+    }
+    // "Target opponent may sacrifice two nonland, nontoken permanents of their choice. If they don't, you draw two cards."
+    // (Rakdos, Patron of Chaos): a punisher whose only way out is the sacrifice.
+    const mayYou = mayOut && /^If (?:they|that player|the player) (?:doesn't|don't), (you (?!may\b).+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
+    if (mayOut && mayYou) {
+      const who = parsePlayer(mayOut[1]!.toLowerCase(), ctx);
+      const options = parsePunisherOptions(`${mayOut[2]!}s ${mayOut[3]!}`, ctx);
+      const then = options && parseOne(capital(mayYou[1]!), ctx);
+      if (!who || who.ref === "you" || !options || !then || then.some((e) => pauses(e))) return null;
+      effects.push({ type: "punisher", who, options, effects: then, thenText: mayYou[1]!.replace(/^you (\w+)/, (_, v: string) => `${v}s`) });
       si++;
       continue;
     }

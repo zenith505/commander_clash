@@ -811,8 +811,9 @@ export function parsePunisherOptions(text: string, ctx: Ctx): PunisherOption[] |
     let m: RegExpExecArray | null;
     if ((m = new RegExp(`^discards? ${NUM} cards?$`).exec(part))) out.push({ discard: num(m[1]!) });
     // "Sacrifice two creatures of their choice" (Prowling Pangolin).
-    else if ((m = /^sacrifices? (two|three) (creatures|lands)(?: of (?:their|his or her) choice)?$/.exec(part))) {
-      const filter = pickFilter(m[2]!.replace(/s$/, ""));
+    // "Two nonland, nontoken permanents of their choice" (Rakdos, Patron of Chaos).
+    else if ((m = /^sacrifices? (two|three) (creatures|lands|nonland, nontoken permanents)(?: of (?:their|his or her) choice)?$/.exec(part))) {
+      const filter = pickFilter(m[2]!.replace(/s$/, "").replace(/^nonland, nontoken/, "nonland nontoken"));
       if (!filter) return null;
       out.push({ sacrifice: filter, n: num(m[1]!) });
     }

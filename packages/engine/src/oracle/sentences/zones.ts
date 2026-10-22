@@ -660,14 +660,20 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (m[1] === "that Equipment" && !entered) return null;
     return what?.ref === "target" ? [{ type: "attach", what, ...(entered ? { source: { ref: "subject" as const } } : {}) }] : null;
   }
+  // Mirri, Weatherlight Duelist: "Each opponent can't block with more than one creature this combat" (CR 509.1b).
+  if (/^[Ee]ach opponent can't block with more than one creature this combat$/.test(s)) return [{ type: "blockLimitThisCombat", who: { ref: "eachOpponent" }, n: 1 }];
   // "Target creature can't block this turn", "~ can't attack or block this turn", "~ can't be blocked this
   // turn": until the turn ends.
   // "Target creature can't attack until your next turn" ends as your next turn begins (CR 611.2b).
-  // Mirri, Weatherlight Duelist: "Each opponent can't block with more than one creature this combat" (CR 509.1b).
-  if (/^[Ee]ach opponent can't block with more than one creature this combat$/.test(s)) return [{ type: "blockLimitThisCombat", who: { ref: "eachOpponent" }, n: 1 }];
   if ((m = /^Creatures( without flying)? can't block this turn$/.exec(s))) {
     const filter = parseTargetPhrase(m[1] ? "creature without flying" : "creature");
     return filter?.kind === "object" ? [{ type: "cantBlockRule", filter: { ...filter, text: m[1] ? "creatures without flying" : "creatures" } }] : null;
+  }
+  // "~ must be blocked each combat this turn if able" (Anzrag, the Quake-Mole): a blocking requirement (CR 509.1c) until
+  // the turn ends.
+  if ((m = /^(.+?) must be blocked (?:each combat )?this turn if able$/i.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what ? [{ type: "continuous", what, mods: [{ kind: "mustBeBlocked" }], duration: "endOfTurn" }] : null;
   }
   // "Target creature attacks this turn if able": in each combat this turn (CR 508.1d).
   if ((m = /^(.+?) attacks? (?:each combat )?this turn if able$/i.exec(s)) && !/ and$/.test(m[1]!)) {

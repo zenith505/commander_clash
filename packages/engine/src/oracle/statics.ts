@@ -599,7 +599,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   // Beastmaster Ascension: "as long as ~ has seven or more quest counters on it".
   // "If ~ has fewer than three +1/+1 counters on it" (Runaway Steam-Kin).
   if ((m = new RegExp(`^~ has fewer than ${NUM} ${COUNTER} counters on it$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[2]!), min: 0, max: num(m[1]!) - 1 };
-  if ((m = new RegExp(`^~ has ${NUM} or more ${COUNTER} counters on it$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[2]!), min: num(m[1]!) };
+  // "~ has trample as long as it has ten or more +1/+1 counters on it" (Primordial Hydra).
+  if ((m = new RegExp(`^(?:~|it) has ${NUM} or more ${COUNTER} counters on it$`).exec(text)) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "selfCounters", counter: counterKind(m[2]!), min: num(m[1]!) };
   // The Tron lands: "If you control an Urza's Mine and an Urza's Power-Plant" (CR 205.3i: "Urza's" and "Mine" are both
   // land types, so one land with both; not Processing Plant, an Ulamog's Power-Plant), each of them.
   if ((m = /^you control an Urza's (Mine|Power-Plant|Tower) and an Urza's (Mine|Power-Plant|Tower)$/.exec(text)) && m[1] !== m[2])

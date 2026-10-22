@@ -963,3 +963,24 @@ describe("Alibou, Ancient Witness", () => {
     expect((s.pending as { cards: string[] }).cards).toHaveLength(2);
   });
 });
+
+const hydra = card("Primordial Hydra", "Creature — Hydra", "{X}{G}{G}", {
+  power: "0",
+  toughness: "0",
+  oracleText:
+    "This creature enters with X +1/+1 counters on it.\nAt the beginning of your upkeep, double the number of +1/+1 counters on this creature.\nThis creature has trample as long as it has ten or more +1/+1 counters on it.",
+});
+
+describe("Primordial Hydra", () => {
+  it("trample with ten or more +1/+1 counters", () => {
+    expect(isFullySupported(hydra)).toBe(true);
+    const { s, ap } = setup([]);
+    const h = putOnBattlefield(s, ap, hydra);
+    s.objects[h]!.counters = { "+1/+1": 9 };
+    invalidateCharacteristics(s);
+    expect(objHasKeyword(s, s.objects[h]!, "Trample")).toBe(false);
+    s.objects[h]!.counters = { "+1/+1": 10 };
+    invalidateCharacteristics(s);
+    expect(objHasKeyword(s, s.objects[h]!, "Trample")).toBe(true);
+  });
+});

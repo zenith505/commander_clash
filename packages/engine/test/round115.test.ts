@@ -727,3 +727,27 @@ describe("Pay X {E}", () => {
     expect(s.players[ap]!.energy).toBe(0);
   });
 });
+
+const together = card("Together Forever", "Enchantment", "{W}{W}", {
+  keywords: ["Support"],
+  oracleText:
+    "When this enchantment enters, support 2. (Put a +1/+1 counter on each of up to two target creatures.)\n{1}: Choose target creature with a counter on it. When that creature dies this turn, return that card to its owner's hand.",
+});
+
+describe("Together Forever", () => {
+  it("a creature with a counter chosen this turn returns to its owner's hand when it dies, only this turn", () => {
+    expect(isFullySupported(together)).toBe(true);
+    const { s: s0, ap, opp, ids } = setup([murder, murder]);
+    const tf = putOnBattlefield(s0, ap, together);
+    const a = putOnBattlefield(s0, ap, bear());
+    const plain = putOnBattlefield(s0, ap, bear());
+    s0.objects[a]!.counters["+1/+1"] = 1;
+    invalidateCharacteristics(s0);
+    expect(abilityProblem(s0, ap, tf, 0, [target(plain)])).not.toBeNull();
+    Object.assign(s0.players[ap]!.manaPool, { C: 1, B: 6 });
+    let s = settle(run(s0, planActivate(s0, ap, tf, 0, [target(a)])));
+    s = settle(cast(s, ap, ids[0]!, [target(a)]));
+    expect(s.objects[a]!.zone).toBe("hand");
+    void opp;
+  });
+});

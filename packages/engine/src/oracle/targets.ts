@@ -15,7 +15,7 @@ HYPHENATED.set("time-lord", "Time Lord");
 // Artifact subtypes (CR 205.3g) other than Vehicle, which "creature or Vehicle" handles: "a Food", "a Clue", "Equipment".
 /** Planeswalker types (CR 205.3j), read only before the word "planeswalker": "Ugin planeswalker card". */
 const PLANESWALKER_TYPES = new Set("Ajani,Aminatou,Angrath,Arlinn,Ashiok,Bahamut,Basri,Bolas,Calix,Chandra,Dack,Dakkon,Daretti,Davriel,Dihada,Domri,Dovin,Ellywick,Elminster,Elspeth,Estrid,Freyalise,Garruk,Gideon,Grist,Guff,Huatli,Jace,Jared,Jaya,Kaito,Karn,Kasmina,Kaya,Kiora,Koth,Liliana,Lolth,Lukka,Minsc,Mordenkainen,Nahiri,Narset,Niko,Nissa,Nixilis,Oko,Quintorius,Ral,Rowan,Saheeli,Samut,Sarkhan,Serra,Sivitri,Sorin,Szat,Tamiyo,Tasha,Teferi,Teyo,Tezzeret,Tibalt,Tyvar,Ugin,Urza,Venser,Vivien,Vraska,Will,Windgrace,Wrenn,Xenagos,Yanggu,Yanling,Zariel".split(","));
-const OTHER_SUBTYPES = ["Arcane", "Omen", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Vehicle", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure", "Gate", "Desert", "Cave", "Town"];
+const OTHER_SUBTYPES = ["Arcane", "Omen", "Aura", "Trap", "Lesson", "Cartouche", "Shrine", "Saga", "Curse", "Blood", "Clue", "Equipment", "Vehicle", "Food", "Gold", "Incubator", "Junk", "Lander", "Map", "Mutagen", "Powerstone", "Treasure", "Gate", "Desert", "Cave", "Town", "Urza's"];
 
 /** Historic: artifacts, legendaries and Sagas (CR 700.6). */
 const HISTORIC: TargetSpec[] = [{ kind: "object", types: ["Artifact"], text: "artifact" }, { kind: "object", types: [], supertypes: ["Legendary"], text: "legendary" }, { kind: "object", types: [], subtypes: ["Saga"], text: "Saga" }];
@@ -56,6 +56,10 @@ export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | nul
     const spec: TargetSpec = { kind: "any", text: "any other target", ...(before.length ? { distinctFrom: before } : { notSource: true }) };
     return { ref: "anyTarget", index: addTarget(ctx, spec) };
   }
+  // "Any target that isn't a Dragon" (Wrathful Red Dragon): a player, or a creature, planeswalker or battle without
+  // that subtype (CR 115.4).
+  const notType = /^any target that isn't an? ([A-Z][a-z]+)$/.exec(p);
+  if (notType && CREATURE_TYPES.has(notType[1]!)) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", notSubtypes: [notType[1]!], text: p }) };
   let several: RegExpExecArray | null;
   // "... and 3 damage to each of up to two other targets" (Drakuseth, Maw of Flames): none of the targets before either.
   if ((several = /^each of (up to )?(two|three|four|one or two)( other)? targets$/i.exec(p))) {
@@ -155,6 +159,8 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (x === "its owner" && ctx.lastObjectTarget === lastCard && ctx.targets[lastCard]?.kind === "object" && !ctx.targets[lastCard]!.many) return { ref: "targetOwner", index: lastCard };
   // "Destroy target land. ~ deals 2 damage to that land's controller" (Melt Terrain): as it last existed (CR 608.2h).
   if (x === "that land's controller" && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "object" && isLandSpec(ctx.targets[ctx.lastObjectTarget]!)) return { ref: "targetController", index: ctx.lastObjectTarget };
+  // "Its owner loses life equal to its mana value" (Brainstealer Dragon): whose the entering permanent is.
+  if (x === "its owner" && ctx.lastObjectTarget === undefined && ctx.subjectIt && !ctx.targets.length) return { ref: "subjectOwner" };
   if (x === "its controller" || x === "that creature's controller" || x === "that permanent's controller") {
     const i = ctx.lastObjectTarget;
     if (i === undefined && ctx.subjectIt) return { ref: "subjectController" };
@@ -213,6 +219,11 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
   // "Create a token that's a copy of target artifact. That token gains haste" (Cogwork Assembler), "put an artifact card
   // from your hand onto the battlefield. That artifact gains haste" (Arms Race): the one just created or put there.
   if (ctx.lastCreated && (/^(?:that|the) token$/i.test(x) || (ctx.lastPut && /^[Tt]hat (?:artifact|enchantment|land|[A-Z][a-z]+)$/.test(x)))) return { ref: "created" };
+  // "Put a flood counter on target land. That land is an Island ..." (Xolatoyac): the land targeted last.
+  if (/^that land$/i.test(x) && !ctx.lastCreated && ctx.lastObjectTarget !== undefined) {
+    const t = ctx.targets[ctx.lastObjectTarget];
+    if (t?.kind === "object" && t.types?.length === 1 && t.types[0] === "Land") return { ref: "target", index: ctx.lastObjectTarget };
+  }
   if (/^(it|that creature|that permanent)$/i.test(x)) {
     if (ctx.lastCreated && (/^it$/i.test(x) || (ctx.lastPut && /^that creature$/i.test(x)))) return { ref: "created" };
     if (ctx.lastObjectTarget !== undefined) return { ref: "target", index: ctx.lastObjectTarget };
@@ -797,9 +808,10 @@ export function parseTargetPhrase(
     p = p.replace(/ you own$/, "");
   }
   // "Permanents you don't own" (Agent of Treachery): another player's, whoever controls it (CR 108.3).
-  if (!inGraveyard && / you don't own$/.test(p)) {
+  // "A nonland permanent an opponent owns" (Brainstealer Dragon): every other player is an opponent (CR 102.2).
+  if (!inGraveyard && / (?:you don't|an opponent) owns?$/.test(p)) {
     owner = "opponent";
-    p = p.replace(/ you don't own$/, "");
+    p = p.replace(/ (?:you don't|an opponent) owns?$/, "");
   }
   if (/ (an opponent controls|you don't control)$/.test(p)) {
     controller = "opponent";

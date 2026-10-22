@@ -199,6 +199,10 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     const c = parseCount(m[2]!, null, true);
     return c ? { less: { ...c, times: (c.times ?? 1) * Number(m[1]) } } : "fail";
   }
+  // Cemetery Prowler: "Spells you cast cost {1} less to cast for each card type they share with cards exiled with ~"
+  // (linked in compile.ts).
+  if ((m = /^Spells you cast cost \{(\d+)\} less to cast for each card type they share with cards exiled with ~$/.exec(text)))
+    return { costMod: { who: "you", filter: { kind: "spell", text: "spells" }, n: -Number(m[1]), perTypeSharedWithLinked: true, text: line } };
   // "Instant and sorcery spells you cast cost {1} less to cast for each experience counter you have" (Mizzix): that much
   // less for each, counted as the spell is cast (CR 601.2f).
   // "Angel spells and Human spells you cast cost {1} less to cast for each +1/+1 counter on ~" (Herald of War).
@@ -780,6 +784,14 @@ export function parseStaticMods(rest: string): Modification[] | null {
   }
   // Maha, Its Feathers Night: "have base toughness 1" (layer 7b, CR 613.4b).
   if ((m = /^(?:has|have) base toughness (\d+)$/.exec(rest))) return [{ kind: "setToughness", toughness: Number(m[1]) }];
+  // Opalescence: "is a creature in addition to its other types and has base power and base toughness each equal to its
+  // mana value"; March of the Machines: "is an artifact creature with power and toughness each equal to its mana value".
+  // Each object's own mana value, set in layer 7b (CR 613.4b); the creature type in layer 4 keeps applying to the same
+  // objects even if the source loses its abilities in layer 6 (CR 613.6, rulings on Opalescence and Humility).
+  if (/^is a creature in addition to its other types and has base power and base toughness each equal to its mana value$|^is an artifact creature with power and toughness each equal to its mana value$/.test(rest)) {
+    const mv = { count: { kind: "affectedManaValue" as const } };
+    return [{ kind: "addTypes", types: ["Creature"], subtypes: [] }, { kind: "setPT", power: mv, toughness: mv }];
+  }
   const IS = "is an? ([A-Z][a-z]+) in addition to its other types";
   if ((m = new RegExp(`^${IS}$`).exec(rest))) return typed(m[1]!, []);
   if ((m = new RegExp(`^${IS},? and ((?:has|have) .+)$`).exec(rest))) return typed(m[1]!, [m[2]!]);
@@ -816,8 +828,9 @@ export function parseStaticMods(rest: string): Modification[] | null {
     return grants && second ? [{ kind: "modifyPT", power: ptAmt(m[1]!), toughness: ptAmt(m[2]!) }, ...grants, ...second] : null;
   }
   // "Gets +2/+2 and can't block" (Childhood Horror), "gets +1/+1 and attacks each combat if able".
-  // "Gets +1/+1 and is goaded" (the Impetus Auras, CR 701.15), "gets -2/-0 and loses all abilities" (Mystic Subdual).
-  if ((m = new RegExp(`^(gets? ${PT}/${PT}|(?:has|have) .+?),? and (can't .+|attacks? each combat if able|blocks? each combat if able|must be blocked if able|is goaded|loses all abilities)$`).exec(rest))) {
+  // "Gets +1/+1 and is goaded" (the Impetus Auras, CR 701.15), "gets -2/-0 and loses all abilities" (Mystic Subdual),
+  // "gets +1/+1 and doesn't untap during its controller's untap step" (Dance of the Dead).
+  if ((m = new RegExp(`^(gets? ${PT}/${PT}|(?:has|have) .+?),? and (can't .+|attacks? each combat if able|blocks? each combat if able|must be blocked if able|is goaded|loses all abilities|doesn't untap during its controller's untap step)$`).exec(rest))) {
     const first = parseStaticMods(m[1]!);
     const second = parseStaticMods(m[4]!);
     return first && second ? [...first, ...second] : null;
@@ -927,7 +940,10 @@ export function parseStaticMods(rest: string): Modification[] | null {
   if (/^attacks or blocks each combat if able$/.test(rest)) return [{ kind: "attacksIfAble" }, { kind: "mustBlock" }];
   if (/^(?:doesn't untap during (?:its controller's|your) untap step|don't untap during their controllers' untap steps)$/.test(rest)) return [{ kind: "doesntUntap" }];
   if (/^can't become suspected$/.test(rest)) return [{ kind: "cantBeSuspected" }];
-  if (/^loses all abilities$/.test(rest)) return [{ kind: "loseAllAbilities" }];
+  if (/^loses? all abilities$/.test(rest)) return [{ kind: "loseAllAbilities" }];
+  // Humility: "All creatures lose all abilities and have base power and toughness 1/1" (layers 6 and 7b, CR 613.1f,
+  // 613.4b).
+  if ((m = /^loses? all abilities and (?:has|have) base power and toughness (\d+)\/(\d+)$/.exec(rest))) return [{ kind: "loseAllAbilities" }, { kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) }];
   // The Archetypes: "Creatures your opponents control lose flying and can't have or gain flying": gone whatever gives it,
   // after every other layer 6 effect (rulings).
   if ((m = /^loses? ([a-z ,]+?) and can't have or gain ([a-z ,]+)$/.exec(rest))) {
@@ -1093,6 +1109,18 @@ function parseStaticLine(line: string): StaticAbility | null {
   // "This creature is the chosen type in addition to its other types" (Metallic Mimic, Roaming Throne): the creature type
   // chosen as it entered, added in the type-changing layer (CR 613.1d).
   if (/^~ is the chosen type in addition to its other types$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "addTypes", types: [], subtypes: [], chosenType: true }], text: line };
+  // Opalescence: "Each other non-Aura enchantment is a creature in addition to its other types and has base power and base
+  // toughness each equal to its mana value" (Starfield of Nyx: "... you control"); March of the Machines: "Each
+  // noncreature artifact is an artifact creature with power and toughness each equal to its mana value". The set is
+  // fixed once the effect applies in layer 4, so they stay creatures for layer 7b (CR 613.6).
+  const animate = /^([Ee]ach (other )?non-Aura enchantment( you control)?|[Ee]ach noncreature artifact) (is .+ equal to its mana value)$/.exec(text);
+  if (animate) {
+    const mods = parseStaticMods(animate[4]!);
+    if (!mods) return null;
+    const ench = !animate[1]!.endsWith("artifact");
+    const spec: TargetSpec = ench ? { kind: "object", types: ["Enchantment"], notSubtypes: ["Aura"], text: "non-Aura enchantment" } : { kind: "object", types: ["Artifact"], notTypes: ["Creature"], text: "noncreature artifact" };
+    return { affects: { kind: "filter", types: [ench ? "Enchantment" : "Artifact"], spec, ...(animate[2] ? { other: true } : {}), ...(animate[3] ? { controller: "you" as const } : {}) }, mods, text: line };
+  }
   // Maskwood Nexus ("Creatures you control are every creature type"), Arcane Adaptation and Xenograft ("... the chosen type
   // in addition to their other types"), Conspiracy ("... the chosen type": it replaces their creature types, rulings):
   // layer 4 (CR 613.1d, 205.1b). "The same is true for creature spells you control and creature cards you own that
@@ -1227,7 +1255,7 @@ function parseStaticLine(line: string): StaticAbility | null {
   // greater is checked as it assigns combat damage, which comes to the same thing as a group that changes with it.
   const greater = /^(.+?) with toughness greater than (?:its|their) power (assigns? .+)$/.exec(text);
   if (greater) text = `${greater[1]} ${greater[2]}`;
-  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|(?:is|are) all colors|can't .+|can block .+|can attack as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:, .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses all abilities|loses? [a-z ,]+? and can't have or gain [a-z ,]+)$/.exec(text);
+  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|(?:is|are) all colors|can't .+|can block .+|can attack as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:, .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses? all abilities(?: and (?:has|have) base power and toughness \d+\/\d+)?|loses? [a-z ,]+? and can't have or gain [a-z ,]+)$/.exec(text);
   if (!m) return null;
   const affects = parseAffected(m[1]!);
   if (!affects) return null;

@@ -72,6 +72,7 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever you proliferate, (.+)$/, "youProliferate"],
   [/^Whenever a spell or ability you control counters a spell, (.+)$/, "youCounterSpell"],
   [/^Whenever you complete a dungeon, (.+)$/, "youCompleteDungeon"],
+  [/^Whenever you fully unlock a Room, (.+)$/, "youFullyUnlockRoom"],
   [/^Whenever you commit a crime, (.+)$/, "youCommitCrime"], // CR 700.13
   [/^Whenever an opponent commits a crime, (.+)$/, "opponentCommitsCrime"],
   [/^Whenever you choose a creature as your Ring-bearer, (.+)$/, "youChooseRingBearer"],
@@ -460,20 +461,51 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
  * greater enters": the entering permanent is the subject ("that creature", "it", "its power"). "One or
  * more" (one trigger for several entering at once) isn't modeled.
  */
+/**
+ * "Whenever a Dragon you control is dealt damage, it deals that much damage to any target that isn't a Dragon" (Wrathful
+ * Red Dragon): once for each such permanent, for all the damage dealt to it at the same time; "it" is that permanent.
+ */
+function parseIsDealtDamageTrigger(line: string): TriggeredAbility | "fail" | null {
+  const m = /^Whenever an? (.+?) you control is dealt damage, (.+)$/.exec(line);
+  if (!m) return null;
+  const filter = parseTargetPhrase(`${m[1]!} you control`);
+  if (filter?.kind !== "object") return "fail";
+  const thatMuch = /\bthat much\b/.test(m[2]!);
+  if (thatMuch && /\bX\b/.test(m[2]!)) return "fail";
+  let body = parseBody(thatMuch ? m[2]!.replace(/\bthat much\b/g, "X") : m[2]!, { subjectIt: true });
+  if (!body) return "fail";
+  if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, m[2]!) };
+  return { event: "permanentIsDealtDamage", dealtFilter: { ...filter, text: `${m[1]!} you control` }, body };
+}
+
+/** Valgavoth, Harrower of Souls: "Whenever an opponent loses life for the first time during each of their turns, ..." */
+function parseFirstLifeLossTrigger(line: string): TriggeredAbility | "fail" | null {
+  const m = /^Whenever an opponent loses life for the first time during each of their turns, (.+)$/.exec(line);
+  if (!m) return null;
+  const body = parseBody(m[1]!, { eventPlayer: true });
+  return body ? { event: "opponentLosesLife", firstOnTheirTurn: true, body } : "fail";
+}
+
 const ENTERS_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) enters(?: the battlefield)?( under your control| under an opponent's control)?, (.+)$/;
 
 function parseEntersTrigger(line: string): TriggeredAbility | "fail" | null {
   const m = ENTERS_TRIGGER.exec(line);
   if (!m) return null;
   let phrase = m[2]!;
-  if (m[3]) phrase += m[3] === " under your control" ? " you control" : " an opponent controls";
+  // "A nonland permanent an opponent owns enters under your control" (Brainstealer Dragon): owned by another player, under
+  // your control (CR 108.3).
+  const owned = m[3] === " under your control" && / (?:an opponent|you don't) owns?$/.test(phrase);
+  if (m[3] && !owned) phrase += m[3] === " under your control" ? " you control" : " an opponent controls";
   const ench = ENCHANTED_CONTROLS.test(phrase);
-  const filter = ench ? enchantedControls(phrase) : parseTargetPhrase(phrase, { chosen: true });
+  const parsed = ench ? enchantedControls(phrase) : parseTargetPhrase(phrase, { chosen: true });
+  const filter = owned && parsed?.kind === "object" && !parsed.controller && parsed.owner === "opponent" ? { ...parsed, controller: "you" as const } : owned ? null : parsed;
   if (!filter || filter.kind !== "object" || (filter.chosen && filter.chosen !== "type")) return "fail";
   // "That land's controller" (Zo-Zu), and "that player" after "a creature an opponent controls" (Suture Priest): the
   // entering permanent's controller.
   let bodyText = ench ? m[4]!.replace(/\bthat player\b/g, "enchanted player") : m[4]!.replace(/\bthat (?:land|artifact|creature|permanent|enchantment)'s controller\b/g, "its controller");
   if (!ench && filter.controller === "opponent") bodyText = bodyText.replace(/\bthat player\b/g, "its controller");
+  // "They lose life equal to its mana value" after "a nonland permanent an opponent owns" (Brainstealer Dragon): its owner.
+  if (owned) bodyText = bodyText.replace(/^they lose\b/, "its owner loses");
   const body = parseBody(bodyText, { subjectIt: true });
   if (!body) return "fail";
   const kind = m[1]!.toLowerCase();
@@ -914,6 +946,10 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
       batch.noneCastWithMana = true;
       rest = none[1]!;
     }
+  } else if ((m = /^Whenever one or more lands enter under an opponent's control( without being played)?, (.+)$/.exec(line))) {
+    // Deep Gnome Terramancer: lands put onto the battlefield under an opponent's control, not played (CR 305.1, 305.4).
+    batch = { what: "enters", filter: { kind: "object", types: ["Land"], notTypes: [], notColors: [], text: "lands" }, whose: "opponent", ...(m[1] ? { notPlayed: true as const } : {}) };
+    rest = m[2]!;
   } else if ((m = /^Whenever one or more (.+?) (enter|die|leave the battlefield( without dying)?|are put into a graveyard from the battlefield)( during your turn)?, (.+)$/.exec(line))) {
     const what = batchPermanents(m[1]!);
     if (!what) return "fail";
@@ -960,7 +996,9 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
   // The objects as a group: not modeled. "Exile the top card of your library. You may play that card ..." (Inti) is about
   // the exiled card, not them.
   const aboutThem = rest.replace(/exile the top card of your library\. (?:Until (?:the end of your next turn|end of turn|your next end step), you may play that card|You may play that card (?:this turn|until the end of your next turn|until your next end step))\.?$/i, "");
-  if (/\b(it|its|they|them|their|those|that card|that creature|that token|one of them|among them|this way)\b/i.test(aboutThem)) return "fail";
+  // "Search your library for a Plains card, put it onto the battlefield tapped" (Deep Gnome Terramancer): the card found.
+  const notThem = aboutThem.replace(/search your library for [^,]+, put it (?:onto the battlefield(?: tapped)?|into your hand)/i, "");
+  if (/\b(it|its|they|them|their|those|that card|that creature|that token|one of them|among them|this way)\b/i.test(notThem)) return "fail";
   let text = rest;
   const thatMuch = /\bthat (?:much|many)\b/.test(text);
   if (thatMuch) {
@@ -1115,7 +1153,7 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
 }
 
 /** The events that abilities of cards in graveyards see (fireEvent's `fromGraveyards`). */
-const YARD_EVENTS: TriggerEvent[] = ["castSpell", "spellYouControlDealsDamage", "youCommitCrime", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creaturesYouControlDealCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat"];
+const YARD_EVENTS: TriggerEvent[] = ["permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creaturesYouControlDealCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat"];
 
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).
@@ -1185,6 +1223,17 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "Whenever you play a land or cast a spell" (Infernal Sovereign), "... a card from exile" (Prosper), "a land from exile or
   // cast a spell from exile" (Urianger), "a legendary land or cast a legendary spell" (Shanid): the cast trigger, which
   // playing a land (CR 305.1) that matches also triggers, from the same zone. Not one that looks at "it" (the card played).
+  // "Whenever you play a land or cast a spell, if it shares a card type with the exiled card, ..." (Cemetery Protector),
+  // "Whenever a player plays a land or casts a spell, if ..., ~ deals 2 damage to that player" (Cemetery Gatekeeper).
+  const sharesM = /^Whenever (you play a land or cast|a player plays a land or casts) a spell, if it shares a card type with the exiled card, (.+)$/.exec(line);
+  if (sharesM) {
+    const anyone = sharesM[1]!.startsWith("a player");
+    if (/\b(it|its|that card|that spell)\b/.test(sharesM[2]!)) return "fail";
+    const t = parseTrigger(`Whenever ${anyone ? "a player casts" : "you cast"} a spell, ${sharesM[2]}`);
+    if (!t || t === "fail" || t.event !== "castSpell" || !t.cast || t.cast.orCopy || t.ifCond || t.cast.from) return "fail";
+    const land = parseTargetPhrase("land");
+    return land?.kind === "object" ? { ...t, cast: { ...t.cast, orPlaysLand: { ...land, text: "land" }, sharesTypeWithLinked: true } } : "fail";
+  }
   const playM = /^Whenever you play (a card|a land( from exile)? or cast a spell|a legendary land or cast a legendary spell)( from exile| from anywhere other than your hand)?, (.+)$/.exec(line);
   if (playM && !(playM[2] && !playM[3]) && !(playM[2] && playM[3] !== " from exile")) {
     const legendary = /legendary/.test(playM[1]!);
@@ -1527,6 +1576,10 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (damages) return damages;
   const enters = parseEntersTrigger(line);
   if (enters) return enters;
+  const dealt = parseIsDealtDamageTrigger(line);
+  if (dealt) return dealt;
+  const firstLoss = parseFirstLifeLossTrigger(line);
+  if (firstLoss) return firstLoss;
   const draws = parseDrawTrigger(line);
   if (draws) return draws;
   const attacked = /^Whenever an opponent attacks (?:you with two or more creatures|with creatures, if two or more of those creatures are attacking you and\/or planeswalkers you control), (.+)$/.exec(line);

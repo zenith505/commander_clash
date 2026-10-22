@@ -2,7 +2,7 @@ import { defMv, restingDef } from "../faces";
 import { isSiege, siegeTrigger } from "../battles";
 import type { AbilityBody, BatchTrigger, CompiledCard, TargetChoice, TargetSpec, TriggeredAbility, TriggerEvent } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, NO_ABILITIES, withGranted, describeAbility, objIsType, power, toughness } from "../cards";
-import { checkAscend, creatureTypesOf, describeTargets, draw, hasConvoke, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER } from "../game";
+import { checkAscend, sharesTypeWithLinked, creatureTypesOf, describeTargets, draw, hasConvoke, log, obj, opponents, pairable, pairCandidates, player, shareCreatureType, STEP_ORDER } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow, type Characteristics } from "../layers";
 import { fitMany, withModes } from "../modes";
 import { compileCard } from "../oracle";
@@ -17,7 +17,7 @@ import { initiativeTrigger } from "./run-dungeons";
 import { INITIATIVE } from "../oracle";
 import { isRingBearer, ringTrigger } from "./run-ring";
 import { kickedMatches } from "./run-spells";
-import { isSuspended } from "./run-zones";
+import { hasSuspend, isSuspended } from "./run-zones";
 import { liveEmblems } from "../emblems";
 
 /** The trigger events for the beginning of a step: on your turn, and on every turn. */
@@ -135,7 +135,7 @@ export type TriggerSourceEvent =
   /** A player gained life (one life-gain event, CR 119.9). */
   | { type: "lifeGained"; player: PlayerId; amount: number }
   /** A player lost life: from damage, an effect, or paying life (one life-loss event, CR 119.2-119.4). */
-  | { type: "lifeLost"; player: PlayerId; amount: number }
+  | { type: "lifeLost"; player: PlayerId; amount: number; /** The player's first life loss this turn. */ first?: boolean }
   /** `player` created a token (CR 111.2), `id` (it may have left already: "whenever you create a token" still triggers). */
   | { type: "tokenCreated"; player: PlayerId; id: ObjectId }
   /** All the damage dealt to a player at the same time (CR 120.3a): "whenever you're dealt damage". */
@@ -166,6 +166,8 @@ export type TriggerSourceEvent =
   | { type: "becameLevel"; id: ObjectId; level: number }
   /** A Room's door became unlocked (CR 709.5h). */
   | { type: "doorUnlocked"; id: ObjectId; door: number }
+  /** A Room got both unlocked designations (CR 709.5i), unlocked by its controller `player`. */
+  | { type: "roomFullyUnlocked"; id: ObjectId; player: PlayerId }
   /** A Case became solved (CR 719.3a), under `controller`. */
   | { type: "solved"; id: ObjectId; controller: PlayerId }
   /** A permanent transformed (CR 701.27a), now with the face `face` up (0: the front). */
@@ -478,6 +480,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       card: cardIdOf(entering),
       controller: you,
       entered: true,
+      ...(s.playingLand === entering.id ? { played: true as const } : {}),
       ...(locks.length ? { locks: locks.map((l) => ({ by: l.by, ...(l.lock.opponents ? { opponents: true } : {}) })) } : {}),
     });
     // Its own enters abilities use the X of the spell it was (CR 107.3m), and know whether it was kicked;
@@ -605,6 +608,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       }
       fromFloating((src, ctrl, triggers) => consider(src, ctrl, undefined, triggers));
       fromEmblems((src, owner) => consider(src, owner, undefined));
+      // "Whenever another creature is put into your graveyard from the battlefield, you may pay {B}. If you do, return ~
+      // from your graveyard to the battlefield" (Nether Traitor): a card already in the graveyard (CR 113.6m), not one that
+      // left the battlefield at the same time, which was still there then (CR 603.10a).
+      fromGraveyards((src, owner) => {
+        if (src.id !== ev.id && !s.leftTogether?.some((l) => l.id === src.id)) consider(src, owner, undefined);
+      });
     }
     // "Whenever you sacrifice a creature" isn't caused by its dying (rulings on Teysa Karlov).
     causedBy = null;
@@ -717,8 +726,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
       // "Whenever you play a land or cast a spell (from exile)": the land played, from that zone.
-      const asCast = (t: TriggeredAbility) => !!t.cast?.orPlaysLand && you === ev.player && printedMatches(t.cast.orPlaysLand, defOf(s, obj(s, ev.id))) && (!t.cast.from || castFromMatches(t.cast.from, { castFrom: ev.from } as GameObject, ev.player));
-      add(o, you, (e, t) => e === "playerPlaysLand" || (e === "youPlayLand" && you === ev.player) || (e === "youPlayAnotherLand" && you === ev.player && ev.id !== o.id) || (e === "opponentPlaysLand" && you !== ev.player) || (e === "castSpell" && asCast(t)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+      // "Whenever a player plays a land or casts a spell" (Cemetery Gatekeeper): anyone's.
+      const land = obj(s, ev.id);
+      const asCast = (t: TriggeredAbility) =>
+        !!t.cast?.orPlaysLand &&
+        (t.cast.by === "any" || you === ev.player) &&
+        printedMatches(t.cast.orPlaysLand, defOf(s, land)) &&
+        (!t.cast.from || castFromMatches(t.cast.from, { castFrom: ev.from } as GameObject, ev.player)) &&
+        (!t.cast.sharesTypeWithLinked || sharesTypeWithLinked(s, `${o.id}@${o.zoneChanges ?? 0}`, characteristics(s, land).types));
+      add(o, you, (e, t) => e === "playerPlaysLand" || (e === "youPlayLand" && you === ev.player) || (e === "youPlayAnotherLand" && you === ev.player && ev.id !== o.id) || (e === "opponentPlaysLand" && you !== ev.player) || (e === "castSpell" && asCast(t)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, played: { id: land.id, zc: land.zoneChanges ?? 0 } });
     }
   } else if (ev.type === "evidenceCollected" || ev.type === "proliferated") {
     const kind = ev.type === "proliferated" ? "youProliferate" : "youCollectEvidence";
@@ -741,7 +757,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
-      if (you !== ev.player) add(o, you, (e) => e === "opponentLosesLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
+      // Valgavoth: "for the first time during each of their turns".
+      if (you !== ev.player) add(o, you, (e, t) => e === "opponentLosesLife" && (!t.firstOnTheirTurn || (!!ev.first && s.activePlayer === ev.player)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
       else add(o, you, (e) => e === "youLoseLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
     speedTrigger(s, ev.player);
@@ -843,6 +860,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "When you unlock this door": an ability of that door, which the Room has now that it's unlocked (CR 709.5h).
     const o = obj(s, ev.id);
     add(o, controllerOf(s, o), (e, t) => e === "selfDoorUnlocked" && t.door === ev.door);
+  } else if (ev.type === "roomFullyUnlocked") {
+    // "Eerie — ... whenever you fully unlock a Room": the player who did is its controller (CR 709.5e-f).
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === "youFullyUnlockRoom", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+    }
   } else if (ev.type === "becameLevel") {
     // "When this Class becomes level 2": an ability it has from that level on (CR 716.2a), so it has it now.
     const o = obj(s, ev.id);
@@ -967,7 +990,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // A Siege's intrinsic "When the last defense counter is removed from this permanent" (CR 310.12b).
     if (o?.zone === "battlefield" && ev.counter === "defense" && isSiege(s, o)) siegeTrigger(s, o);
     // Suspend's third ability (CR 702.62a), whatever removed the counter (rulings): its owner may cast it.
-    if (o?.zone === "exile" && ev.counter === "time" && compileCard(defOf(s, o)).suspend)
+    if (o?.zone === "exile" && ev.counter === "time" && hasSuspend(s, o))
       s.triggerQueue.push({
         sourceId: o.id,
         sourceCardId: cardIdOf(o),
@@ -1060,6 +1083,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (o?.zone === "battlefield") {
       add(o, controllerOf(s, o), (e) => e === "selfIsDealtDamage", undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
       addHosted(o, (e) => e === "selfIsDealtDamage", undefined, o, { amount: ev.amount });
+      // "Whenever a Dragon you control is dealt damage" (Wrathful Red Dragon): that permanent is the subject.
+      for (const id of s.battlefield) {
+        const w = obj(s, id);
+        const wc = controllerOf(s, w);
+        add(w, wc, (e, t) => e === "permanentIsDealtDamage" && !!t.dealtFilter && objectMatches(s, t.dealtFilter, o, wc, false), undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
+      }
     }
   } else if (ev.type === "dealtDamageBySource") {
     const o = s.objects[ev.id];
@@ -1133,6 +1162,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (spell && !ev.copy) add(spell, ev.controller, (e, t) => e === "selfCast" && (!t.ifKicked || kickedMatches(item?.kicked, t.ifKicked)) && (!t.ifCasualty || !!item?.casualty) && (!t.ifX || (item?.x ?? 0) >= t.ifX) && (!t.ifConspired || !!item?.conspired), compileCard(defOf(s, spell)).triggers, ev.stackId, undefined, undefined, item?.x, item?.kicked);
     // Cascade a permanent gives the spells its controller casts: the spell's own ability, one for each (CR 702.85a, 702.85c).
     if (spell && item && !ev.copy) for (const _ of grantedCascades(s, item, spell, ev.controller)) for (let n = triggersAgain(s, spell, ev.controller, null); n >= 0; n--) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: CASCADE_BODY, cause: ev.stackId });
+    // Storm a permanent or an emblem gives the spells its controller casts (Prismari, Ral's emblem): the spell's own (CR 702.40a).
+    if (spell && item && !ev.copy)
+      for (const src of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)])
+        for (const g of abilitiesOf(s, src).spellsHaveStorm ?? [])
+          if (controllerOf(s, src) === ev.controller && spellMatches(s, g.filter, item))
+            for (let n = triggersAgain(s, spell, ev.controller, null); n >= 0; n--) s.triggerQueue.push({ sourceId: spell.id, sourceCardId: cardIdOf(spell), controller: ev.controller, index: -1, body: STORM_BODY, cause: ev.stackId });
     const castWatch = (o: GameObject, you: PlayerId, triggers?: TriggeredAbility[]) =>
       add(o, you, (e, t) => {
         if (e !== "castSpell" || !t.cast || (ev.copy && !t.cast.orCopy)) return false;
@@ -1152,13 +1187,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // Where it was cast from (CR 601.2a); a copy wasn't cast from anywhere.
         if (t.cast.from && !castFromMatches(t.cast.from, ev.copy ? undefined : spell, ev.controller)) return false;
         if (t.cast.sharesTypeWithSelf && !(spell && shareCreatureType(creatureTypesOf(s, o), creatureTypesOf(s, spell)))) return false;
+        // "If it shares a card type with the exiled card" (Cemetery Protector, CR 603.4), checked again as it resolves.
+        if (t.cast.sharesTypeWithLinked && !sharesTypeWithLinked(s, `${o.id}@${o.zoneChanges ?? 0}`, spell ? characteristics(s, spell).types : ev.card.types)) return false;
         // "A spell that has convoke": printed, or given by "spells you cast have convoke" (rulings on Joyful Stormsculptor:
         // whether or not any creatures were tapped for it).
         if (t.cast.keyword && !(spell && (defOf(s, spell).keywords.includes(t.cast.keyword) || (t.cast.keyword === "Convoke" && hasConvoke(s, ev.controller, spell))))) return false;
         // As the spell is on the stack: its mana value with X (CR 202.3e), its power from a "*" ability (604.3).
         const spec = bindBound(s, bindChosen(t.cast.spell, o.chosen), { controller: you, sourceId: o.id });
         return item?.objectId ? spellMatches(s, spec, item) : printedMatches(spec, ev.card);
-      }, triggers, ev.stackId, undefined, spell ? { copyKey: cardIdOf(spell) } : undefined, undefined, undefined, { player: ev.controller, ...(ev.manaSpent !== undefined ? { amount: ev.manaSpent } : {}), ...(ev.treasureSpent ? { treasureSpent: ev.treasureSpent } : {}), ...(ev.spent && !ev.copy ? { spent: ev.spent } : {}) }); // "counter it unless" that player pays" acts on the spell cast
+      }, triggers, ev.stackId, undefined, spell ? { copyKey: cardIdOf(spell) } : undefined, undefined, undefined, { player: ev.controller, ...(spell && !ev.copy ? { played: { id: spell.id, zc: spell.zoneChanges ?? 0 } } : {}), ...(ev.manaSpent !== undefined ? { amount: ev.manaSpent } : {}), ...(ev.treasureSpent ? { treasureSpent: ev.treasureSpent } : {}), ...(ev.spent && !ev.copy ? { spent: ev.spent } : {}) }); // "counter it unless" that player pays" acts on the spell cast
     // Veyran (CR 603.2d): casting or copying an instant or sorcery spell, as the spell is.
     const instantOrSorcery = spell ? characteristics(s, spell).types.some((t) => t === "Instant" || t === "Sorcery") : ev.card.types.some((t) => t === "Instant" || t === "Sorcery");
     causedBy = instantOrSorcery ? { event: "castOrCopy", caster: ev.controller } : null;
@@ -1654,6 +1691,7 @@ function speedTrigger(s: GameState, loser: PlayerId) {
   });
 }
 
+const STORM_BODY: AbilityBody = { targets: [], effects: [{ type: "copySpell", spell: "cause", n: "storm", newTargets: true }], text: "Storm: copy ~ for each other spell cast before it this turn." };
 const CASCADE_BODY: AbilityBody = { targets: [], effects: [{ type: "cascade" }], text: "Cascade: exile cards from the top of your library until you exile a cheaper nonland card. You may cast it without paying its mana cost." };
 
 /** The cascade abilities the permanents `you` controls give this spell as it's cast ("Sliver spells you cast have cascade"). */
@@ -1688,6 +1726,7 @@ function batchMoveMatches(s: GameState, b: BatchTrigger, m: ZoneMove, w: GameObj
     if (m.locks?.some((l) => !l.opponents || l.by !== you)) return false;
     if (b.orSelf && o.id === w.id) return true;
     if (b.other && o.id === w.id) return false;
+    if (b.notPlayed && m.played) return false;
     return whose(m.controller) && (!b.filter || objectMatches(s, b.filter, o, you, false));
   }
   if (b.what === "leaves") {

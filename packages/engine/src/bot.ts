@@ -88,7 +88,7 @@ import { manaValue, parseManaCost, xCount } from "./mana";
 import { asFace, castableFaces, defMv, layoutOf, registerFace, sameName } from "./faces";
 import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { castingBody, compileCard } from "./oracle";
-import type { Action, CardDef, Chosen, Color, CostChoices, GameObject, GameState, ObjectId, PendingDecision, PlayerId, StackItem } from "./types";
+import { COLORS, type Action, type CardDef, type Chosen, type Color, type CostChoices, type GameObject, type GameState, type ObjectId, type PendingDecision, type PlayerId, type StackItem } from "./types";
 import { evalAmount } from "./amounts";
 import { CHOSEN_HEXPROOF, CHOSEN_PROTECTION } from "./keywords";
 import { groupValue, ofPlayerPick, ofPlayerTargets, worth } from "./value";
@@ -189,6 +189,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseMay" && pend.wheel !== undefined) return [{ type: "chooseMay", player: pid, yes: player(s, pid).hand.length < pend.wheel }];
     // A land played as an effect resolves (Gix): untapped as we'd play it ourselves (see chooseLand).
     if (pend.kind === "chooseMay" && pend.card && pend.prompt === landUntappedOffer(s, pid, pend.card)) return [{ type: "chooseMay", player: pid, yes: /^reveal/.test(pend.prompt) || player(s, pid).life >= 16 }];
+    // Sepulchral Primordial: each opponent's creature card comes back under our control.
+    if (pend.kind === "chooseMay" && pend.eachTarget) return [{ type: "chooseMay", player: pid, yes: true }];
     if (pend.kind === "chooseMay") return [{ type: "chooseMay", player: pid, yes: pend.card ? (revealedMay(s, pend.card) ?? millExplored(s, pid, pend.card)) : wantsMay(s, pid) }];
     if (pend.kind === "payUnless" && pend.discard) return [{ type: "payUnless", player: pid, pay: player(s, pid).hand.length >= pend.discard }];
     if (pend.kind === "payUnless") {
@@ -259,6 +261,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Hideaway: the most expensive card, to play for free later.
     if (pend.kind === "searchLibrary" && pend.dig && /hideaway/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a)).slice(0, 1) }];
     if (pend.kind === "searchLibrary" && pend.dig && /face down/.test(pend.dig.to)) return [{ type: "searchLibrary", player: pid, found: chooseManifest(s, pid, pend.cards, pend.max) }];
+    // "Exile a card from a graveyard" (Cemetery Prowler): an opponent's card if there is one, the one sharing the most card
+    // types with the cards in our hand (the exiled card's types matter to these cards), the dearest first.
+    if (pend.kind === "searchLibrary" && pend.fromGraveyard === "exile" && pend.cards.some((id) => obj(s, id).owner !== pid)) {
+      const ours = player(s, pid).hand.flatMap((id) => defOf(s, obj(s, id)).types);
+      const score = (id: ObjectId) => defOf(s, obj(s, id)).types.reduce((n, t) => n + ours.filter((x) => x === t).length, 0);
+      const theirs = pend.cards.filter((id) => obj(s, id).owner !== pid).sort((a, b) => score(b) - score(a) || mv(s, b) - mv(s, a));
+      return [{ type: "searchLibrary", player: pid, found: theirs.slice(0, pend.min) }];
+    }
     // Exiling cards from our own graveyard: the ones we have no use for there, the cheapest first.
     if (pend.kind === "searchLibrary" && pend.fromGraveyard === "exile")
       return [{ type: "searchLibrary", player: pid, found: [...pend.cards].sort((a, b) => Number(usefulInGraveyard(s, a)) - Number(usefulInGraveyard(s, b)) || mv(s, a) - mv(s, b)).slice(0, pend.min) }];
@@ -292,6 +302,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "searchLibrary", player: pid, found }];
     }
     if (pend.kind === "searchLibrary") return [{ type: "searchLibrary", player: pid, found: chooseSearch(s, pid, pend.cards, pend.max) }];
+    if (pend.kind === "manaMix") return [{ type: "manaMix", player: pid, counts: chooseManaMix(s, pid, pend.n, pend.colors) }];
     if (pend.kind === "distribute") return [{ type: "distribute", player: pid, parts: pend.move ? chooseCounterMove(s, pid, pend.options, pend.total, pend.counter) : chooseDistribution(s, pid, pend.options, pend.total, pend.counter) }];
     // Soulbond: always pair, with the best creature (the bonus lands on both).
     if (pend.kind === "pickPermanents" && pend.action === "pair") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, 1, "populate") }];
@@ -1256,7 +1267,7 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   // A ritual, a spell that only adds mana (Dark Ritual): worth it when what it nets lets us cast a card we can't yet.
   const effects = compileCard(d).spell?.effects ?? [];
   if (!free && effects.length && effects.every((e) => e.type === "addMana" || e.type === "choose")) {
-    const added = effects.reduce((n, e) => n + (e.type !== "addMana" ? 0 : (e.mana?.match(/\{/g)?.length ?? e.chosen ?? 0)), 0);
+    const added = effects.reduce((n, e) => n + (e.type !== "addMana" ? 0 : (e.mana?.match(/\{/g)?.length ?? e.chosen ?? (e.anyColors && typeof e.times === "number" ? e.times : 0))), 0);
     const avail = availableMana(s, pid);
     const gain = added - manaValue(cost);
     if (!player(s, pid).hand.some((h) => h !== id && !isType(defOf(s, obj(s, h)), "Land") && mv(s, h) > avail && mv(s, h) <= avail + gain)) return null;
@@ -2862,6 +2873,35 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
 }
 
 /** The cards in our hand and command zone we could cast now, the dearest first. */
+/**
+ * "Add X mana in any combination of colors" (Klauth, Manamorphose): the colored symbols of the cards in our hand and
+ * command zone, dearest first, each one's colors met before the next's; what's left goes to the color most asked for
+ * (our commander's first color if none is).
+ */
+function chooseManaMix(s: GameState, pid: PlayerId, n: number, colors?: Color[]): Partial<Record<Color, number>> {
+  const allowed = colors ?? [...COLORS];
+  const p = player(s, pid);
+  const cards = [...p.command, ...p.hand].map((id) => defOf(s, obj(s, id))).filter((d) => !isType(d, "Land")).sort((a, b) => manaValue(parseManaCost(b.manaCost)) - manaValue(parseManaCost(a.manaCost)));
+  const out: Partial<Record<Color, number>> = {};
+  const demand: Partial<Record<Color, number>> = {};
+  let left = n;
+  for (const d of cards) {
+    for (const c of allowed) {
+      const k = d.manaCost.split(`{${c}}`).length - 1;
+      demand[c] = (demand[c] ?? 0) + k;
+      const add = Math.min(left, Math.max(0, k - (out[c] ?? 0)));
+      if (add) out[c] = (out[c] ?? 0) + add;
+      left -= add;
+    }
+  }
+  if (left) {
+    const identity = p.command.length ? defOf(s, obj(s, p.command[0]!)).colorIdentity : [];
+    const best = [...allowed].sort((a, b) => (demand[b] ?? 0) - (demand[a] ?? 0) || Number(identity.includes(b)) - Number(identity.includes(a)))[0]!;
+    out[best] = (out[best] ?? 0) + left;
+  }
+  return out;
+}
+
 function castableNow(s: GameState, pid: PlayerId): ObjectId[] {
   const p = player(s, pid);
   return [...p.command, ...p.hand].filter((id) => !isType(defOf(s, obj(s, id)), "Land") && castPlan(s, pid, id, false)).sort((a, b) => mv(s, b) - mv(s, a));

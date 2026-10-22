@@ -10,6 +10,7 @@ import { isLegalTarget, legalTargets, pickOptions, printedMatches, sameTarget, s
 import { ResolveCtx, objects, amountNow, players } from "./resolve";
 import { closeZoneBatch, fireEvent } from "./triggers";
 import { discardCards, toBottom } from "./run-library";
+import { suspendExiled } from "./run-zones";
 import { defMv, sameName } from "../faces";
 import { copyKey } from "../copies";
 
@@ -83,6 +84,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // Glimpse the Impossible: the cards this spell exiled to play ("those cards").
       const impulsed = (s.resolving?.impulsed ?? []).map((x) => ({ id: x, zc: s.objects[x]?.zoneChanges ?? 0 }));
       const effects = e.effects.map((x): Effect => (x.type === "returnFaceDownExiled" ? { ...x, cards: exiled } : x.type === "exiledToGraveyard" ? { ...x, cards: impulsed } : x));
+      // Dragonhawk: "for each of those cards that are still exiled", the cards this ability exiled.
+      for (const x of effects) if (x.type === "damage" && typeof x.amount === "object" && x.amount.count.kind === "stillExiled") Object.assign(x, { amount: { ...x.amount, count: { kind: "stillExiled", cards: impulsed } } });
       const body = { targets: [], effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." };
       if (e.when === "dies") {
         // "When that creature dies this turn, flip ~" (Initiate of Blood): about that permanent as it is now (CR 603.7c,
@@ -644,7 +647,13 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           return;
         }
       }
-      return counterOnStack(s, ctx, t.id, src, e.unless, e.exile ? "exile" : e.top ? "libraryTop" : e.hand || e.bounce ? "hand" : undefined, e.bounce);
+      const spellObj = e.suspend ? s.stack.find((x) => x.id === t.id && x.kind === "spell")?.objectId : undefined;
+      const done = counterOnStack(s, ctx, t.id, src, e.unless, e.exile ? "exile" : e.top ? "libraryTop" : e.hand || e.bounce ? "hand" : undefined, e.bounce);
+      if (done === "paused") return done;
+      // Delay: the card it was, countered and exiled this way (a copy has ceased to exist, CR 707.10a).
+      const o = spellObj ? s.objects[spellObj] : undefined;
+      if (e.suspend && o?.zone === "exile" && !s.stack.some((x) => x.id === t.id)) suspendExiled(s, o, e.suspend);
+      return;
     }
   }
 }

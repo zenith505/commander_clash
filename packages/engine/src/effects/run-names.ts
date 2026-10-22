@@ -1,6 +1,6 @@
 import type { Effect } from "../abilities";
 import { defOf } from "../cards";
-import { log, loseLife, moveObject, obj, player } from "../game";
+import { enterTogether, log, loseLife, moveObject, obj, player } from "../game";
 import { currentName } from "../names";
 import { shuffle, shuffleLibrary } from "../rng";
 import type { GameState, ObjectId } from "../types";
@@ -82,7 +82,8 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const hit = hits[0];
       log(s, `${p.name} reveals ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${seen.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}${hit || !want ? "" : `, finding no ${filter.text}`}.`);
       for (const id of stays) log(s, `${defOf(s, obj(s, id)).name} has nothing to enchant, so it stays in the library.`);
-      for (const id of hits) moveObject(s, id, e.found, { ...(e.tapped ? { tapped: true } : {}), ...(e.found === "battlefield" ? { controller: p.id, ...hosts.get(id) } : {}) });
+      // Several found for the battlefield enter at the same time (Open the Way, Kindred Summons).
+      enterTogether(s, () => hits.forEach((id) => moveObject(s, id, e.found, { ...(e.tapped ? { tapped: true } : {}), ...(e.found === "battlefield" ? { controller: p.id, ...hosts.get(id) } : {}) })));
       const rest = seen.filter((id) => !hits.includes(id) && !stays.includes(id));
       if (e.rest === "bottom") {
         // "The rest on the bottom of your library in a random order" (CR 701.20a), every one of them if none was found.
@@ -96,6 +97,9 @@ export function runNamesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       } else if (e.rest === "shuffle") {
         shuffleLibrary(s, p);
         log(s, `${p.name} shuffles their library.`);
+      } else if (e.rest === "graveyard") {
+        for (const id of rest) moveObject(s, id, "graveyard");
+        if (rest.length) log(s, `${p.name} puts ${rest.length} card${rest.length === 1 ? "" : "s"} into their graveyard.`);
       } else for (const id of rest) moveObject(s, id, "exile");
       if (e.lifePerRest && rest.length) {
         loseLife(s, p.id, rest.length);

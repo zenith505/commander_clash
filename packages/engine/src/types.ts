@@ -382,6 +382,8 @@ export interface GameObject {
    * with `turn`, any combat of that turn ("target creature blocks ~ this turn if able").
    */
   provokedBy?: { id: ObjectId; zc: number; turn?: number };
+  /** More creatures it must block this combat (Fighter Class triggering twice): it blocks one of them, its controller's choice (rulings). */
+  provokedAlso?: { id: ObjectId; zc: number }[];
   /** "Target creature can't block ~ this turn" (Duct Crawler): the attackers it can't block that turn, while it's still the object at `selfZc` (CR 400.7). */
   cantBlockThis?: { id: ObjectId; zc: number; turn: number; selfZc: number }[];
   /** The attackers it blocks: one, or more if it can block additional creatures (CR 509.1a, 509.1g). */
@@ -514,6 +516,8 @@ export interface GameObject {
   bestowed?: boolean;
   /** A creature spell cast with suspend has haste until this player loses control of it (CR 702.62a). */
   suspendHaste?: PlayerId;
+  /** "If it doesn't have suspend, it gains suspend" (Delay, Jhoira of the Ghitu): it has suspend while it's this object, by its zone changes (CR 702.62, 400.7). */
+  gainedSuspend?: number;
   /** Soulbond (CR 702.95b): the creature it's paired with (that object, by its zone changes) and who paired them. */
   paired?: { id: ObjectId; zc: number; by: PlayerId };
 }
@@ -1027,7 +1031,7 @@ export type PendingDecision =
    * mana value N or more, or none to decline. `not`: a card that can't be one of them.
    */
   | { kind: "collectEvidence"; player: PlayerId; n: number; source: string; not?: ObjectId }
-  | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; /** "Each player may discard their hand and draw this many cards". */ wheel?: number; pay?: PayCost; /** Pay to keep a permanent: echo, cumulative upkeep. */ keep?: boolean; /** Clash: put the revealed `card` on the bottom of the library (CR 701.30a)? */ clash?: boolean; /** "You may repeat this process" (Ad Nauseam). */ repeat?: true }
+  | { kind: "chooseMay"; player: PlayerId; prompt: string; source: string; card?: ObjectId; /** One target of a "may" asked about each of its targets (Effect "may" `eachTarget`). */ eachTarget?: true; /** "Each player may discard their hand and draw this many cards". */ wheel?: number; pay?: PayCost; /** Pay to keep a permanent: echo, cumulative upkeep. */ keep?: boolean; /** Clash: put the revealed `card` on the bottom of the library (CR 701.30a)? */ clash?: boolean; /** "You may repeat this process" (Ad Nauseam). */ repeat?: true }
   /**
    * "Counter that spell or ability unless its controller pays {2}" (ward, CR 702.21a). The player
    * may activate mana abilities first (CR 605.3a), then pays or declines.
@@ -1095,7 +1099,7 @@ export type PendingDecision =
    * Searching your library (CR 701.23): `cards` are the ones that match; pick between `min` and
    * `max` of them. With `firstTo`, the first one picked goes there and the rest to `othersTo`.
    */
-  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; /** Choosing from cards in exile (`dig.looked`, Dauthi Voidwalker). */ exiled?: true; min: number; max: number; firstTo?: string; othersTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string }; /** Not a search: cards in the hand to put onto the battlefield, or with `reveal` to reveal, with `bottom` to put on the bottom of the library. */ fromHand?: boolean; reveal?: true; bottom?: true; /** Not a search: cards in the graveyard to return to the hand, to exile, or to put onto the battlefield. */ fromGraveyard?: "hand" | "exile" | "battlefield" | "libraryTop"; /** "Cards with different mana values" (Seasons Past): no two found may share a mana value. */ distinctManaValues?: true; /** "With total mana value 4 or less" (Lively Dirge): the cards found together. */ totalMv?: number; /** "Basic land cards that share a land type" (Myriad Landscape): every card found shares a land type with each other one. */ shareLandType?: true; /** "A Forest card and a Plains card" (Krosan Verge): the cards found can each be one of these, a different one each. */ oneOfEach?: TargetSpec[]; /** The Leylines' "begin the game with it on the battlefield", before the first turn (CR 103.6a); with `exile`, the cards from the hand Gemstone Caverns exiles ("If you do, exile a card from your hand"). */ opening?: true; exile?: true; /** Choosing from this player's revealed hand ("You choose a nonland card from it"); `dig.looked` is the whole hand. */ hand?: PlayerId; /** Searching this player's graveyard, hand and library (Memoricide): `cards` are in any of them; `also`, the graveyard's that are found anyway ("all cards"). */ zonesOf?: PlayerId; also?: ObjectId[]; /** An opponent choosing from this player's revealed cards (Gifts Ungiven, Intuition); `helps` when where the chosen ones go is better for that player than where the rest go. */ forPlayer?: PlayerId; helps?: true; /** Separating `dig.looked` into two piles (CR 700.3): the cards chosen are the first pile, the rest the second. */ piles?: true; /** Opposition Agent (CR 723.2): `player` controls this player while they search their own library and chooses what they find; with `foundExiled`, what they find is exiled instead, and `player` may play it. */ controlling?: PlayerId; foundExiled?: true }
+  | { kind: "searchLibrary"; player: PlayerId; source: string; what: string; cards: ObjectId[]; /** "Exile a card from a graveyard" (Cemetery Prowler): `cards` are in every player's graveyard, not only yours. */ anyGraveyard?: true; /** Choosing from cards in exile (`dig.looked`, Dauthi Voidwalker). */ exiled?: true; min: number; max: number; firstTo?: string; othersTo?: string; /** Picking from the top of the library: all the cards looked at, and where the rest go. */ dig?: { looked: ObjectId[]; to: string; rest: string }; /** Not a search: cards in the hand to put onto the battlefield, or with `reveal` to reveal, with `bottom` to put on the bottom of the library. */ fromHand?: boolean; reveal?: true; bottom?: true; /** Not a search: cards in the graveyard to return to the hand, to exile, or to put onto the battlefield. */ fromGraveyard?: "hand" | "exile" | "battlefield" | "libraryTop"; /** "Cards with different mana values" (Seasons Past): no two found may share a mana value. */ distinctManaValues?: true; /** "With total mana value 4 or less" (Lively Dirge): the cards found together. */ totalMv?: number; /** "Basic land cards that share a land type" (Myriad Landscape): every card found shares a land type with each other one. */ shareLandType?: true; /** "A Forest card and a Plains card" (Krosan Verge): the cards found can each be one of these, a different one each. */ oneOfEach?: TargetSpec[]; /** The Leylines' "begin the game with it on the battlefield", before the first turn (CR 103.6a); with `exile`, the cards from the hand Gemstone Caverns exiles ("If you do, exile a card from your hand"). */ opening?: true; exile?: true; /** Choosing from this player's revealed hand ("You choose a nonland card from it"); `dig.looked` is the whole hand. */ hand?: PlayerId; /** Searching this player's graveyard, hand and library (Memoricide): `cards` are in any of them; `also`, the graveyard's that are found anyway ("all cards"). */ zonesOf?: PlayerId; also?: ObjectId[]; /** An opponent choosing from this player's revealed cards (Gifts Ungiven, Intuition); `helps` when where the chosen ones go is better for that player than where the rest go. */ forPlayer?: PlayerId; helps?: true; /** Separating `dig.looked` into two piles (CR 700.3): the cards chosen are the first pile, the rest the second. */ piles?: true; /** Opposition Agent (CR 723.2): `player` controls this player while they search their own library and chooses what they find; with `foundExiled`, what they find is exiled instead, and `player` may play it. */ controlling?: PlayerId; foundExiled?: true }
   /**
    * Choosing a creature type or a color by name: as a permanent enters (`objectId`, CR 614.12) or
    * while a spell or ability resolves. `options` are the names allowed.
@@ -1112,6 +1116,11 @@ export type PendingDecision =
   /** "Distribute X +1/+1 counters among any number of creatures you control": how many each of `options` gets, adding up to `total`. */
   /** `move`: moving the counters on the source, any number of them (Forgotten Ancient); otherwise all `total` are distributed. */
   | { kind: "distribute"; player: PlayerId; source: string; counter: CounterKind; total: number; options: ObjectId[]; what: string; move?: true }
+  /**
+   * "Add X mana in any combination of colors" from a spell or a non-mana ability (Klauth, Manamorphose): how much of each
+   * color, `n` in all, chosen as it resolves (CR 106.1b, 608.2d). `colors`: only these.
+   */
+  | { kind: "manaMix"; player: PlayerId; source: string; n: number; colors?: Color[] }
   /** `x`: the trigger's X (an enters trigger's is its spell's, CR 107.3m), which "up to X target ..." can't choose more than. */
   | { kind: "chooseTargets"; player: PlayerId; sourceId: ObjectId; specs: TargetSpec[]; description: string; x?: number }
   /**
@@ -1230,6 +1239,8 @@ export interface ZoneMove {
   /** Who controlled it: as it left the battlefield, or as it entered. */
   controller?: PlayerId;
   entered?: true;
+  /** A land entering because it was played (CR 305.1), not put onto the battlefield. */
+  played?: true;
   discardedBy?: PlayerId;
   /** Torpor Orb: the controllers whose abilities its entering can't trigger (`opponents`: only those of `by`'s opponents). */
   locks?: { by: PlayerId; opponents?: boolean }[];
@@ -1241,6 +1252,8 @@ export interface ZoneMove {
 }
 
 export interface GameState {
+  /** The land being played right now (CR 305.1), while it moves onto the battlefield. */
+  playingLand?: ObjectId;
   /** Phased-out permanents (CR 702.26b), which are treated as though they don't exist. */
   phasedOut?: ObjectId[];
   /**
@@ -1551,6 +1564,8 @@ export interface TurnRule {
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */
 export interface TriggerEventInfo {
   amount?: number;
+  /** A cast or play-a-land trigger: the spell or land, as the object it was (TriggeredAbility cast.sharesTypeWithLinked). */
+  played?: { id: ObjectId; zc: number };
   /** "Deals damage to a creature": the excess damage that creature has been dealt this turn (CR 120.10). */
   excess?: number;
   /** "Whenever one or more Dragons you control deal combat damage": those that did, as the objects they were ("one of those Dragons"). */
@@ -1771,6 +1786,10 @@ export interface Resolving {
     n?: number; // an amount the effect worked out before waiting on a player (CR 608.2h)
     nFor?: Record<string, number>; // the same, for each player when it counts their own ("half the cards in their hand")
     distributed?: Record<ObjectId, number>; // how a "distribute" effect's counters were divided, as it resolves
+    manaMix?: Partial<Record<Color, number>>; // the colors chosen for "add X mana in any combination of colors"
+    /** A "may" asked about each of its targets (Effect "may" `eachTarget`): the next target slot to ask about, and the ones accepted; `mayAnswer`, the last answer. */
+    mayEach?: { at: number; yes: number[] };
+    mayAnswer?: boolean;
     found?: ObjectId[]; // the cards a library search found
     picking?: true; // an opponent is choosing among revealed cards (Gifts Ungiven); `picked`, what they chose
     picked?: ObjectId[];
@@ -1836,6 +1855,8 @@ export interface Resolving {
     searchZones?: string;
     /** The card a "you may cast target card ... without paying its mana cost" offered (castTargetFree). */
     castingTarget?: ObjectId;
+    /** castTargetFree with several targets: the ones offered already. */
+    castTargetsDone?: ObjectId[];
     /** castLinkedCopy: the copy of the exiled card offered to be cast. */
     linkedCopy?: ObjectId;
     damageSource?: string; // the source of damage chosen as it resolves (CR 609.7a): an object id, or "none" if there was none to choose
@@ -1898,6 +1919,8 @@ export type Action =
   | { type: "searchLibrary"; player: PlayerId; found: ObjectId[] }
   /** Answer to a distribute decision: how many counters each permanent gets (left out: none). */
   | { type: "distribute"; player: PlayerId; parts: Record<ObjectId, number> }
+  /** Answer to manaMix: how many mana of each color (left out: none), adding up to its `n`. */
+  | { type: "manaMix"; player: PlayerId; counts: Partial<Record<Color, number>> }
   /** Answer to pickPermanents. */
   | { type: "pickPermanents"; player: PlayerId; ids: ObjectId[] }
   /** Answer to chooseOption: one of its options. */

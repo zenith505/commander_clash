@@ -178,6 +178,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what?.ref === "target" ? [{ type: "mustBlockSource", what, ...(m[3] === "turn" ? { thisTurn: true as const } : {}) }] : null;
   }
+  // Fighter Class: "Whenever a creature you control attacks, up to one target creature blocks it this combat if able":
+  // the attacking creature (the trigger's subject).
+  if ((m = /^((?:up to one )?target .+?) blocks it this combat if able$/i.exec(s)) && ctx.subjectIt) {
+    const what = parseObject(m[1]!, ctx);
+    return what?.ref === "target" ? [{ type: "mustBlockSource", what, attacker: { ref: "subject" } }] : null;
+  }
   // "Target creature can't block ~ this turn" (Duct Crawler, Burning-Tree Bloodscale).
   if ((m = /^(target .+?) can't block (~|it) this turn$/i.exec(s)) && (m[2] === "~" || ctx.selfIt)) {
     const what = parseObject(m[1]!, ctx);
@@ -256,7 +262,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if ((m = /^(Adapt|Monstrosity) (\d+|X)$/.exec(s))) return ctx.activated ? [{ type: m[1] === "Adapt" ? "adapt" : "monstrosity", n: amt(m[2]!) }] : null;
   // Regeneration (CR 701.19a)
   // "Regenerate each creature you control" (Golgari Charm): a shield for each, as it resolves (CR 701.19a, 611.2c).
-  if ((m = /^Regenerate (~|target .+|enchanted creature|equipped creature|each creature you control|all creatures you control)$/i.exec(s))) {
+  if ((m = /^Regenerate (~|(?:another )?target .+|enchanted creature|equipped creature|each creature you control|all creatures you control)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     return what ? [{ type: "regenerate", what }] : null;
   }

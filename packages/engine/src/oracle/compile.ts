@@ -613,7 +613,10 @@ export function compile(d: CardDef): CompiledCard {
     const yard = parseGraveyardKeyword(line, d);
     if (yard !== null) {
       if (yard === "fail") out.unsupported.push(raw);
-      else if ("fromGraveyard" in yard) (out.fromGraveyard ??= []).push(yard.fromGraveyard);
+      else if ("fromExile" in yard) {
+        out.castFromExile = true;
+        if (yard.fromGraveyard) (out.fromGraveyard ??= []).push(yard.fromGraveyard);
+      } else if ("fromGraveyard" in yard) (out.fromGraveyard ??= []).push(yard.fromGraveyard);
       else if ("buyback" in yard) {
         out.buyback = yard.buyback;
         if (yard.costs) [out.buybackCosts, out.buybackText] = [yard.costs, yard.text];
@@ -1607,6 +1610,14 @@ export function compile(d: CardDef): CompiledCard {
       (out.spellsHaveCascade ??= []).push({ ...(filter ? { filter } : {}), ...(from ? { from } : {}), ...(firstCascade ? { first: true as const } : {}), ...(firstCascade?.[2] ? { treasure: true as const } : {}), text: line });
       continue;
     }
+    // "Instant and sorcery spells you cast have storm" (Prismari, the Inspiration; Ral's emblem), CR 702.40a.
+    const giveStorm = /^([A-Z][a-z]+(?: and [a-z]+)?) spells you cast have storm\.$/.exec(line);
+    if (giveStorm) {
+      const f = parseTargetPhrase(`${giveStorm[1]!.replace(/ and /g, " or ").toLowerCase()} spell`);
+      if (f?.kind !== "spell") out.unsupported.push(raw);
+      else (out.spellsHaveStorm ??= []).push({ filter: f, text: line });
+      continue;
+    }
     // Shadow the Hedgehog (after its flavor word, CR 207.2d): spells its controller casts get split second (CR 702.61a).
     if (/^(?:[A-Z][A-Za-z' ]* — )?Each spell you cast has split second if mana from an artifact was spent to cast it\.$/.test(line)) {
       out.splitSecondIfArtifactMana = true;
@@ -2245,6 +2256,8 @@ export function compile(d: CardDef): CompiledCard {
       // "Whenever you create or sacrifice a token, ..." (Mirkwood Bats); "When ~ enters and whenever an opponent draws a
       // card except the first one they draw in each of their draw steps, ..." (Orcish Bowmasters).
       /^Whenever you (create or sacrifice) a token, (.+)$/.exec(line) ??
+      // Eerie: "Whenever an enchantment you control enters and whenever you fully unlock a Room, ..." (Entity Tracker).
+      /^Whenever (an enchantment you control enters|~ or another enchantment you control enters) and whenever you fully unlock a Room, (.+)$/.exec(line) ??
       // "When ~ enters and whenever you cast a spell with mana value 5 or greater, draw a card." (Up the Beanstalk)
       /^When ~ enters and (whenever (?!it )[^,]+), (.+)$/.exec(line) ??
       // "Whenever a creature you control of the chosen type enters or attacks, draw a card." (Kindred Discovery)
@@ -2273,6 +2286,8 @@ export function compile(d: CardDef): CompiledCard {
               ? [`When ~ enters, ${effect}`, `A${twice[1]!.slice(1)}, ${effect}`]
             : /^When ~ transforms into ~ or dies/.test(line)
               ? [`When ~ transforms into ~, ${effect}`, `When ~ dies, ${effect}`]
+            : / and whenever you fully unlock a Room, /.test(line)
+              ? [`Whenever ${twice[1]}, ${effect}`, `Whenever you fully unlock a Room, ${effect}`]
             : twice[1] === "create or sacrifice"
               ? [`Whenever you create a token, ${effect}`, `Whenever you sacrifice a token, ${effect}`]
             : /^whenever /.test(twice[1]!)
@@ -2514,6 +2529,15 @@ function linkExile(out: CompiledCard) {
     if (imprints.length !== 1 || others.length !== 1) out.unsupported.push("(its cost reduction can't be linked to one imprint ability)");
     else (imprints[0] as Extract<Effect, { type: "takeFromHand" }>).linked = true;
   }
+  // Cemetery Prowler, Protector, Gatekeeper: "cards exiled with ~", "the exiled card" are the ones its "exile a card from a
+  // graveyard" ability exiled (CR 607.2a); it has no other exile instruction.
+  if (out.costMods?.some((m) => m.perTypeSharedWithLinked) || out.triggers.some((t) => t.cast?.sharesTypeWithLinked)) {
+    const all = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body), ...(out.spell ? [out.spell] : [])].flatMap((b) => allEffects(b.effects));
+    const yards = all.filter((e): e is Extract<Effect, { type: "chooseFromGraveyard" }> => e.type === "chooseFromGraveyard" && !!e.anyGraveyard);
+    const others = all.filter((e) => e.type === "exile" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "chooseFromGraveyard" && e.dest === "exile" && !e.anyGraveyard));
+    if (!yards.length || others.length) out.unsupported.push("(compares with exiled cards it can't link to one exile ability)");
+    else for (const e of yards) e.linked = true;
+  }
   // Isochron Scepter: "copy the exiled card" is linked to the one ability that exiles a card from the hand as it enters.
   const copies = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)].some((b) => allEffects(b.effects).some((e) => e.type === "castLinkedCopy"));
   if (copies) {
@@ -2753,7 +2777,21 @@ function joinRollTables(lines: string[]): void {
  */
 function joinModes(lines: string[]): string[] {
   const out: string[] = [];
+  // "{4}, {T}: Choose one. Activate only as a sorcery." then the modes (Aetheric Amplifier): the restriction goes after
+  // the last mode, where the activated ability's parser reads it.
+  let restriction: string | undefined;
+  const close = () => {
+    if (restriction) out[out.length - 1] = `${out[out.length - 1]} ${restriction}`;
+    restriction = undefined;
+  };
   for (const line of lines) {
+    const before = out[out.length - 1];
+    const restricted = /^\s*•/.test(line) && !restriction && before !== undefined ? /: Choose one\.( Activate only [^.]+\.)+$/.exec(before) : null;
+    if (restricted) {
+      restriction = restricted[0].slice(": Choose one.".length).trim();
+      out[out.length - 1] = `${before!.slice(0, restricted.index)}: Choose one —`;
+    }
+    if (!/^\s*•/.test(line)) close();
     const prev = out[out.length - 1];
     // "..., choose one that hasn't been chosen this turn." followed by bullets (Lita): the same as with a dash.
     const dotted = prev !== undefined && /\bchoose one(?: that hasn't been chosen(?: this turn)?| at random)?\.$/i.test(prev);
@@ -2761,6 +2799,7 @@ function joinModes(lines: string[]): string[] {
     else if (/^\s*•/.test(line) && prev !== undefined && /—\s*(•.*)?$/.test(prev)) out[out.length - 1] = `${prev} ${line.trim()}`;
     else out.push(line);
   }
+  close();
   return out;
 }
 

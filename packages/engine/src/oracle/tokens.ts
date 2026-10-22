@@ -155,6 +155,10 @@ const COPY_CARD_TYPES = new Set(["Artifact", "Creature", "Enchantment", "Land", 
 export function parseCopyExcept(text: string, round?: "up" | "down"): CopyExcept | null {
   const out: CopyExcept = {};
   if (/^their power is half that creature's power and their toughness is half that creature's toughness$/.test(text)) return round ? { halfPT: round } : null;
+  // Imposter Mech: "except it's a Vehicle artifact with crew 3 and it loses all other card types": an artifact only, its
+  // subtypes of other card types gone (CR 205.1a, rulings), and crew N its own (CR 702.122a).
+  const mech = /^it's a Vehicle artifact with crew (\d+) and it loses all other card types$/.exec(text);
+  if (mech) return { setTypes: ["Artifact"], addSubtypes: ["Vehicle"], text: [`Crew ${mech[1]}`] };
   // Quoted abilities first, so commas inside them don't split anything.
   const quoted: string[] = [];
   let t = text.replace(/"([^"]+)"/g, (_, q: string) => `\u0000${quoted.push(q) - 1}\u0000`);

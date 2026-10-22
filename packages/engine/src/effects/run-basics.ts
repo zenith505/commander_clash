@@ -5,7 +5,7 @@ import { addPhases, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing,
 import { MONARCH } from "../oracle";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { cardSource, dealDamage, dealDamageBatch, dealPlanned, excessOver, lethalAmounts, objectSource, planShields, type DamageEvent, type DamageSource } from "../damage";
-import type { GameObject, GameState, ManaOrigin, ManaType, ObjectId, PlayerId, RedirectShield } from "../types";
+import { COLORS, type GameObject, type GameState, type ManaOrigin, type ManaType, type ObjectId, type PlayerId, type RedirectShield } from "../types";
 import { addMana, manaOriginsOf } from "../spend";
 import { tapManaTimes, timesAsMuch } from "../manaabilities";
 import { ResolveCtx, apnap, objects, players, amountNow, runEffectInner, damageRecipients, ctxSource } from "./resolve";
@@ -335,6 +335,17 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${p.name} loses all counters.`);
       }
       return;
+    case "doublePlayerCounters":
+      for (const pid of players(s, e.who, ctx)) {
+        const p = player(s, pid);
+        for (const kind of ["poison", "energy", "experience"] as const) {
+          const n = p[kind] ?? 0;
+          if (n <= 0) continue;
+          const put = putPlayerCounters(s, pid, kind, n);
+          if (put > 0) log(s, `${p.name} gets ${put} more ${kind === "energy" ? "energy" : `${kind}`} counter${put === 1 ? "" : "s"}.`);
+        }
+      }
+      return;
     case "emblem": {
       // Named for its source as it is now, or as it last existed (CR 114.3: most emblems have no name; this is for the log).
       const from = ctxSource(s, ctx).name.split(" // ")[0]!;
@@ -409,6 +420,24 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         delete sc.either;
         for (const m of mix(k).matchAll(/\{([WUBRGC])\}/g)) addMana(s, p.id, [m[1] as ManaType], { from: manaSourceOrigins(s, ctx) });
         log(s, `${p.name} adds ${mix(k)}.`);
+        return;
+      }
+      if (e.anyColors) {
+        // "Add X mana in any combination of colors" (CR 106.1b): X worked out first (CR 608.2h), then how much of each
+        // color, chosen by the player adding it (608.2d). No mana ability makes this, so it's never tapped-for mana.
+        const sc = (s.resolving!.scratch ??= {});
+        if (!sc.manaMix) {
+          const n = Math.max(0, amountNow(s, e.times ?? 1, ctx));
+          if (!n) return;
+          s.pending = { kind: "manaMix", player: ctx.controller, source: src, n };
+          return "paused";
+        }
+        const mix = sc.manaMix;
+        delete sc.manaMix;
+        const from = manaSourceOrigins(s, ctx);
+        const colors = COLORS.flatMap((c) => Array<ManaType>(mix[c] ?? 0).fill(c));
+        for (const c of colors) addMana(s, p.id, [c], { from, ...(e.only ? { only: e.only } : {}), ...(e.keep ? { keep: "turn" as const } : {}) });
+        if (colors.length) log(s, `${p.name} adds ${colors.map((c) => `{${c}}`).join("")}.`);
         return;
       }
       let added = e.mana ? e.mana.repeat(e.times === undefined ? 1 : amountNow(s, e.times, ctx)) : color && e.chosen ? `{${color}}`.repeat(e.chosen * (e.times === undefined ? 1 : amountNow(s, e.times, ctx))) : "";

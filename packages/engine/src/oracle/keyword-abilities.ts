@@ -18,7 +18,7 @@ import { parseStaticCondition } from "./statics";
 export function parseGraveyardKeyword(
   line: string,
   d: CardDef,
-): { fromGraveyard: CastFromGraveyard } | { buyback: string; costs?: AdditionalCost[]; text?: string } | { rebound: true } | { escapesWith: number } | { unearth: ActivatedAbility } | "fail" | null {
+): { fromGraveyard: CastFromGraveyard } | { fromExile: true; fromGraveyard?: CastFromGraveyard } | { buyback: string; costs?: AdditionalCost[]; text?: string } | { rebound: true } | { escapesWith: number } | { unearth: ActivatedAbility } | "fail" | null {
   const isSpell = d.types.includes("Instant") || d.types.includes("Sorcery");
   let m: RegExpExecArray | null;
   if ((m = /^(Flashback|Escape)(?: |—)(.+?)\.?$/.exec(line))) {
@@ -40,6 +40,10 @@ export function parseGraveyardKeyword(
   // "You may cast this card from your graveyard" (Skaab Ruinator), "... as long as you control a Zombie" (Gravecrawler),
   // "... by discarding a card in addition to paying its other costs" (Dragon Man): a permission to cast it from there,
   // paying its mana cost (CR 601.2, 118.9 doesn't apply: it's not an alternative cost).
+  // "You may cast ~ from exile" (Misthollow Griffin), "... from your graveyard or from exile" (Squee, the Immortal): its
+  // owner may cast it from exile, paying its mana cost and following the normal timing rules (rulings).
+  if (/^You may cast (?:~|this card) from exile\.?$/.test(line)) return { fromExile: true };
+  if (/^You may cast (?:~|this card) from your graveyard or from exile\.?$/.test(line)) return { fromExile: true, fromGraveyard: { kind: "permission", costs: [], exile: false } };
   if ((m = /^You may cast (?:~|this card|this creature) from your graveyard(?: (?:as long as|if) (.+?))?(?: by (.+?) in addition to paying its other costs)?$/.exec(line.replace(/\.$/, "")))) {
     const self: StaticAbility = { affects: { kind: "self" }, mods: [], text: line };
     const cond = m[1] ? parseStaticCondition(m[1], self) : undefined;

@@ -56,9 +56,11 @@ export function actingAs(s: GameState): PlayerId {
   if (w !== YOU && c && c.controlled !== YOU && deciderOf(s, c.controlled) === YOU) return c.controlled;
   return YOU;
 }
-const BOT_DELAY_MS = 120;
+/** The browser tests' build (`vite build --mode e2e`) has bots act sooner: the same steps, less waiting. */
+const QUICK = import.meta.env.MODE === "e2e";
+const BOT_DELAY_MS = QUICK ? 30 : 120;
 /** Bots pass more slowly while something is on the stack, so you can read it. */
-const STACK_DELAY_MS = 450;
+const STACK_DELAY_MS = QUICK ? 60 : 450;
 
 export interface DeckBundle {
   /** `secondCommander`: a partner or a Background (CR 702.124). */
@@ -289,7 +291,7 @@ export interface Intent {
   targets: TargetChoice[];
 }
 
-const INTENT_MS = 700;
+const INTENT_MS = QUICK ? 150 : 700;
 
 /** The targets a bot's chosen actions will use, if any. */
 function intentOf(s: GameState, who: PlayerId, actions: Action[]): Intent | null {

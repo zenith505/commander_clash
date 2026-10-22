@@ -395,6 +395,9 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "distribute":
       distributeChosen(s, p, action.parts);
       break;
+    case "manaMix":
+      manaMixChosen(s, p, action.counts);
+      break;
     case "chooseMay":
       chooseMay(s, p, action.yes);
       break;
@@ -1487,10 +1490,11 @@ export function loseLife(s: GameState, pid: PlayerId, n: number) {
     log(s, `${player(s, pid).name} loses twice as much life${doublers > 1 ? `, ${doublers} times over` : ""}.`);
   }
   player(s, pid).life -= n;
-  if (!(s.lostLifeThisTurn ??= []).includes(pid)) s.lostLifeThisTurn.push(pid);
+  const first = !(s.lostLifeThisTurn ??= []).includes(pid);
+  if (first) s.lostLifeThisTurn.push(pid);
   const lost = ((s.turnLog ??= {}).lifeLost ??= {});
   lost[pid] = (lost[pid] ?? 0) + n;
-  fireEvent(s, { type: "lifeLost", player: pid, amount: n });
+  fireEvent(s, { type: "lifeLost", player: pid, amount: n, first });
 }
 
 /**
@@ -2129,6 +2133,7 @@ function advanceStep(s: GameState): void {
     s.thatCombat = undefined;
     for (const o of attackersAndBlockers(s)) clearCombat(o);
     for (const id of s.battlefield) if (obj(s, id).provokedBy?.turn === undefined) obj(s, id).provokedBy = undefined;
+    for (const id of s.battlefield) obj(s, id).provokedAlso = undefined;
     s.unblockedChoice = undefined; // made for this combat's damage steps
   }
   const next = STEP_ORDER[STEP_ORDER.indexOf(s.step) + 1]!;
@@ -2624,7 +2629,13 @@ function resolveTop(s: GameState) {
     // Mangara: those attackers still at you or your planeswalkers, or gone from the battlefield (as they last were, rulings).
     const still = item.event?.attackingYou;
     const atYou = still && (item.event!.group ?? []).filter((g) => { const a = s.objects[g.id]; return !a || a.zone !== "battlefield" || (a.zoneChanges ?? 0) !== g.zc || attackingYouNow(s, g.id, still.you, !!still.orPlaneswalkers); }).length;
-    if ((still && atYou! < still.min) || (item.ifCond && item.sourceId && !staticConditionNow(s, item.ifCond, item.sourceId, item.controller, item.event?.player, item.event?.amount, item.sourceZc, item.subject?.id, item.subject?.zc))) {
+    // Cemetery Protector: the spell or land played, as it is now (or as the card it was, once gone), still shares a card
+    // type with the exiled card (CR 603.4).
+    const trig = item.event?.played && item.body ? compileCard(def).triggers.find((t) => t.body.text === item.body!.text) : undefined;
+    const played = item.event?.played;
+    const playedNow = played && s.objects[played.id];
+    const sharesNo = trig?.cast?.sharesTypeWithLinked && played && !sharesTypeWithLinked(s, `${item.sourceId}@${item.sourceZc ?? 0}`, playedNow && (playedNow.zoneChanges ?? 0) === played.zc ? characteristics(s, playedNow).types : playedNow ? defOf(s, playedNow).types : []);
+    if (sharesNo || (still && atYou! < still.min) || (item.ifCond && item.sourceId && !staticConditionNow(s, item.ifCond, item.sourceId, item.controller, item.event?.player, item.event?.amount, item.sourceZc, item.subject?.id, item.subject?.zc))) {
       log(s, `${def.name}'s ability does nothing (its "if" condition is no longer true).`); // CR 603.4
       return;
     }
@@ -2859,8 +2870,12 @@ export const castFromExileForLife = (s: GameState, o: GameObject, pid: PlayerId)
 
 /** "Until the end of your next turn, you may play that card": `pid` may play this exiled card now. */
 export function mayPlayFromExile(s: GameState, o: GameObject, pid: PlayerId): boolean {
-  return ownExilePermission(s, o, pid) || !!linkedPlayPermission(s, o, pid) || preparedCopyCastable(s, o, pid);
+  return ownExilePermission(s, o, pid) || selfCastFromExile(s, o, pid) || !!linkedPlayPermission(s, o, pid) || preparedCopyCastable(s, o, pid);
 }
+
+/** "You may cast ~ from exile" (Squee): its owner, a face-up card; cast, not played as a land. */
+const selfCastFromExile = (s: GameState, o: GameObject, pid: PlayerId): boolean =>
+  o.zone === "exile" && o.owner === pid && !o.isToken && !o.faceDown && !!compileCard(defOf(s, o)).castFromExile && !isType(defOf(s, o), "Land");
 
 /** The card's own permission to be played from exile (GameObject.mayPlay), if it's `pid`'s and holds now. */
 function ownExilePermission(s: GameState, o: GameObject, pid: PlayerId): boolean {
@@ -3058,7 +3073,9 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
   const fromZone = o.zone;
   const from = o.zone === "exile" || o.zone === "graveyard" || o.zone === "library" ? ` from ${o.zone === "exile" ? "exile" : o.zone === "library" ? "their library" : "their graveyard"}` : "";
   // Under the control of the player who plays it (CR 305.1, 110.2), an opponent's card from exile too (Opposition Agent).
+  s.playingLand = id;
   moveObject(s, id, "battlefield", { controller: p.id, untapped, ...(face !== undefined ? { face } : {}) });
+  s.playingLand = undefined;
   log(s, `${p.name} plays ${d.name}${from}${obj(s, id).tapped ? " (tapped)" : ""}.`);
   fireEvent(s, { type: "landPlayed", player: p.id, id, from: fromZone });
 }
@@ -3588,7 +3605,9 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
         lessColored.push(...m.colored);
         continue;
       }
-      const n = m.times ? m.n * Math.max(0, evalAmount(s, m.times, { controller: c.controller, sourceId: src.id })) : m.n;
+      // Cemetery Prowler: once for each card type of the spell among the cards exiled with it (rulings: not per card).
+      const shared = m.perTypeSharedWithLinked ? new Set(linkedExileCards(s, src).flatMap((x) => defOf(s, obj(s, x)).types)) : undefined;
+      const n = shared ? m.n * d.types.filter((t) => shared.has(t)).length : m.times ? m.n * Math.max(0, evalAmount(s, m.times, { controller: c.controller, sourceId: src.id })) : m.n;
       if (n > 0) more += n;
       else less -= n;
     }
@@ -4785,6 +4804,14 @@ export function counterCostCandidates(s: GameState, pid: PlayerId, source: GameO
 }
 
 /** The cards still exiled with `o` by its linked exile ability, as this object (CR 607.2a, 400.7): Jester's Scepter's cost. */
+/**
+ * "If it shares a card type with the exiled card" (Cemetery Protector): one of `types` is a card type (CR 205.2a) of a card
+ * the linked ability of the source exiled (its key in `s.linkedExile`, "id@zoneChanges"), still in exile (CR 607.2a).
+ */
+export function sharesTypeWithLinked(s: GameState, key: string, types: readonly string[]): boolean {
+  return (s.linkedExile?.[key] ?? []).some((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc && defOf(s, s.objects[l.id]!).types.some((t) => types.includes(t)));
+}
+
 export function linkedExileCards(s: GameState, o: GameObject): ObjectId[] {
   return (s.linkedExile?.[`${o.id}@${o.zoneChanges ?? 0}`] ?? []).filter((l) => s.objects[l.id]?.zone === "exile" && (s.objects[l.id]!.zoneChanges ?? 0) === l.zc).map((l) => l.id);
 }
@@ -4954,6 +4981,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.sorcerySpeed && !canActAtSorcerySpeed(s, pid) && !((ab.loyalty !== undefined || ab.loyaltyX) && loyaltyAtInstantSpeed(s, pid, o)) && !(ab.equip && equipAtInstantSpeed(s, pid))) return "activate only as a sorcery";
   if (ab.tap && o.tapped) return `${d.name} is tapped`;
   if (ab.tap && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${d.name} has summoning sickness`; // CR 602.5a
+  if (ab.untapSelf && !o.tapped) return `${d.name} is untapped`; // CR 107.6
+  if (ab.untapSelf && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${d.name} has summoning sickness`; // CR 302.6
   if (ab.sacrificeSelf && o.zone === "battlefield" && !canBeSacrificed(s, o)) return `${d.name} can't be sacrificed`; // CR 701.21, 602.2b
   if (ab.oncePerTurn && (o.activatedThisTurn?.filter((n) => n === index).length ?? 0) >= (ab.keyword === "Boast" && boastsTwice(s, pid) ? 2 : 1)) return `${d.name}'s ability can be activated only ${ab.keyword === "Boast" && boastsTwice(s, pid) ? "twice" : "once"} each turn`; // CR 602.5b
   if (ab.onceEver && o.activatedEver?.includes(index) && !(ab.keyword === "Exhaust" && mayExhaustAgain(s, pid)) && !(ab.keyword === "Power-up" && o.activatedEver.filter((i) => i === index).length <= powerUpAgain(s, pid))) return `${d.name}'s ${ab.keyword === "Exhaust" ? "exhaust " : ""}ability can be activated only once`; // CR 702.177a-b, 602.5b
@@ -5245,6 +5274,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // "Choose one that hasn't been chosen" (Three Bowls of Porridge): chosen as it's activated.
   if (ab.body.modal && modes) noteModesChosen(s, ab.body, o.id, modes);
   if (ab.tap) tapPermanent(s, o);
+  if (ab.untapSelf) untapPermanent(s, o);
   if (ab.exertCost && o.zone === "battlefield") {
     o.skipNextUntap = true; // CR 701.43a
     o.exertedTurn = s.turn;
@@ -5548,6 +5578,19 @@ function distributeChosen(s: GameState, p: Player, parts: Record<ObjectId, numbe
   s.pending = null;
   if (pend.move) log(s, sum ? `${p.name} moves ${sum} ${pend.counter} counter${sum > 1 ? "s" : ""}: ${given.map(([id, n]) => `${n} onto ${nameOf(s, id)}`).join(", ")}.` : `${p.name} moves no counters.`);
   else log(s, `${p.name} distributes ${pend.total} ${pend.counter} counter${pend.total > 1 ? "s" : ""}: ${given.map(([id, n]) => `${n} on ${nameOf(s, id)}`).join(", ")}.`);
+  continueResolution(s);
+}
+
+/** "Add X mana in any combination of colors": how much of each color, X in all (CR 106.1b, 608.2d). */
+function manaMixChosen(s: GameState, p: Player, counts: Partial<Record<Color, number>>) {
+  const pend = s.pending;
+  const r = s.resolving;
+  if (pend?.kind !== "manaMix" || pend.player !== p.id || !r) throw new RulesError("no mana to choose");
+  const given = Object.entries(counts).filter(([, n]) => n !== 0) as [Color, number][];
+  if (given.some(([c, n]) => !(pend.colors ?? COLORS).includes(c) || !Number.isInteger(n) || n < 0)) throw new RulesError(`choose ${pend.colors ? "among those colors" : "colors"} for the mana`);
+  if (given.reduce((a, [, n]) => a + n, 0) !== pend.n) throw new RulesError(`choose colors for all ${pend.n} mana`);
+  r.scratch = { ...r.scratch, manaMix: Object.fromEntries(given) };
+  s.pending = null;
   continueResolution(s);
 }
 
@@ -6192,6 +6235,13 @@ function chooseMay(s: GameState, p: Player, yes: boolean) {
     continueResolution(s);
     return;
   }
+  if (pend.eachTarget) {
+    (r.scratch ??= {}).mayAnswer = yes;
+    if (!yes) log(s, `${p.name} chooses not to ${pend.prompt.replace(/\.$/, "")}.`);
+    s.pending = null;
+    continueResolution(s);
+    return;
+  }
   (r.scratch ??= {}).may = yes;
   // The prompt speaks to the player ("discard your hand"); the log is about them.
   if (!yes) log(s, `${p.name} chooses not to ${pend.prompt.replace(/\.$/, "").replace(/ or lose the game$/, "").replace(/\byour\b/g, "their")}.`);
@@ -6716,7 +6766,7 @@ function declareBlockers(s: GameState, p: Player, blocks: { blocker: ObjectId; a
   if (earlier + seen.size > limit) throw new RulesError(`no more than ${limit === 1 ? "one creature" : `${limit} creatures`} can block each combat`);
   const obeys = (b: { blocker: ObjectId; attacker: ObjectId }) => {
     const at = characteristics(s, obj(s, b.attacker));
-    return at.allMustBlock || at.mustBeBlocked || characteristics(s, obj(s, b.blocker)).mustBlock || provokerOf(s, obj(s, b.blocker))?.id === b.attacker;
+    return at.allMustBlock || at.mustBeBlocked || characteristics(s, obj(s, b.blocker)).mustBlock || provokersOf(s, obj(s, b.blocker)).some((x) => x.id === b.attacker);
   };
   // When every block costs mana (Archangel of Tithes), no requirement makes a creature block: nothing obliges paying a
   // cost to block (CR 509.1c).
@@ -6776,14 +6826,16 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
   // A creature already blocking as many demanding attackers as it can block obeys all the requirements it can.
   const full = (b: GameObject) => {
     const at = blocking.get(b.id) ?? [];
-    return at.length >= maxBlocks(s, b) && at.every((x) => demanding.some((a) => a.id === x) || provokerOf(s, b)?.id === x);
+    return at.length >= maxBlocks(s, b) && at.every((x) => demanding.some((a) => a.id === x) || provokersOf(s, b).some((p) => p.id === x));
   };
   // Provoke (CR 702.39a): the provoked creature blocks the creature that provoked it if able. With menace, that
   // takes another creature able to block it too (CR 702.111b), two more with "except by three or more" (509.1b).
+  // Required to block more than one of them, it blocks any one it can (rulings on Fighter Class).
   for (const b of mine) {
-    const at = provokerOf(s, b);
-    if (!at || (blocking.get(b.id) ?? []).includes(at.id) || blockProblem(s, b, at) || full(b)) continue;
-    if (mine.filter((o) => o.id !== b.id && !blockProblem(s, o, at)).length < blockersNeeded(s, at) - 1) continue;
+    const ats = provokersOf(s, b);
+    if (!ats.length || ats.some((at) => (blocking.get(b.id) ?? []).includes(at.id)) || full(b)) continue;
+    const at = ats.find((a) => !blockProblem(s, b, a) && mine.filter((o) => o.id !== b.id && !blockProblem(s, o, a)).length >= blockersNeeded(s, a) - 1);
+    if (!at) continue;
     return `${characteristics(s, b).name} must block ${characteristics(s, at).name} if able (provoke)`;
   }
   // "Target creature blocks this turn if able": it blocks some attacking creature if one it can block, with another
@@ -6809,9 +6861,17 @@ export function blockRequirementProblem(s: GameState, pid: PlayerId, blocks: { b
 
 /** The attacking creature that provoked this one and that it must block, if that's still so (CR 702.39a). */
 export function provokerOf(s: GameState, b: GameObject): GameObject | undefined {
-  const at = b.provokedBy && s.objects[b.provokedBy.id];
-  if (b.provokedBy?.turn !== undefined && b.provokedBy.turn !== s.turn) return undefined;
-  return at && at.zone === "battlefield" && (at.zoneChanges ?? 0) === b.provokedBy!.zc && at.attacking === controllerOf(s, b) ? at : undefined;
+  return provokersOf(s, b)[0];
+}
+
+/** Every attacking creature this one must block, if able; blocking any one of them obeys the requirement (rulings on Fighter Class). */
+export function provokersOf(s: GameState, b: GameObject): GameObject[] {
+  const live = (p: { id: ObjectId; zc: number }) => {
+    const at = s.objects[p.id];
+    return at && at.zone === "battlefield" && (at.zoneChanges ?? 0) === p.zc && at.attacking === controllerOf(s, b) ? [at] : [];
+  };
+  const first = b.provokedBy && (b.provokedBy.turn === undefined || b.provokedBy.turn === s.turn) ? live(b.provokedBy) : [];
+  return [...first, ...(b.provokedAlso ?? []).flatMap(live).filter((at) => !first.includes(at))];
 }
 
 const LANDWALK: Record<string, string> = { Swampwalk: "Swamp", Islandwalk: "Island", Forestwalk: "Forest", Mountainwalk: "Mountain", Plainswalk: "Plains" };
@@ -7734,6 +7794,8 @@ export function setUnlocked(s: GameState, o: GameObject, doors: number[]) {
   registerRoom(s, cardIdOf(o));
   invalidateCharacteristics(s);
   for (const door of o.unlocked) if (!was.includes(door)) fireEvent(s, { type: "doorUnlocked", id: o.id, door });
+  // "Fully unlocks" (CR 709.5i): it had one designation and gets the other, or had neither and gets both.
+  if (was.length < 2 && o.unlocked.length === 2) fireEvent(s, { type: "roomFullyUnlocked", id: o.id, player: controllerOf(s, o) });
 }
 
 /** Plot a card (CR 702.170a): pay its plot cost and exile it. Its owner may cast it free on a later turn (702.170d). */

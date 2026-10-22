@@ -460,6 +460,10 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       if (lk && lk.zc === ctx.subject!.zc) return [lk.controller];
       return ctx.lki?.controller !== undefined && !player(s, ctx.lki.controller).lost ? [ctx.lki.controller] : [];
     }
+    case "subjectOwner": {
+      const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
+      return o && !player(s, o.owner).lost ? [o.owner] : [];
+    }
     case "targetOwner": {
       const t = ctx.targets[ref.index];
       const o = ctx.legal[ref.index] && t?.kind === "object" ? s.objects[t.id] : undefined;
@@ -637,6 +641,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "getExperience":
     case "poison":
     case "loseAllCounters":
+    case "doublePlayerCounters":
     case "emblem":
     case "becomeMonarch":
     case "extraLandThisTurn":

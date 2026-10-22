@@ -37,6 +37,11 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who = parsePlayer(m[1]!.toLowerCase(), ctx);
     return who ? [{ type: "loseAllCounters", who }] : null;
   }
+  // Aetheric Amplifier: "Double the number of each kind of counter you have": that many more of each (CR 701.10e).
+  if ((m = /^Double the number of each kind of counter (you have|target player has)$/.exec(s))) {
+    const who = parsePlayer(m[1] === "you have" ? "you" : "target player", ctx);
+    return who ? [{ type: "doublePlayerCounters", who }] : null;
+  }
   // "Exchange life totals with target opponent" (Mirror Universe), "two target players exchange life totals" (Axis of
   // Mortality): CR 701.12c.
   if ((m = /^[Ee]xchange life totals with (target opponent|target player)$/.exec(s))) {
@@ -439,7 +444,7 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
       return [{ type: "addMana", mana: theirs[1]!, times: { count: { ...count.count, whose: who } }, who }];
     }
     const inner = who && parseSentence(`Add ${m[2]!}`, ctx);
-    if (!who || !inner?.length || !inner.every((e) => e.type === "addMana" || (e.type === "choose" && e.choice === "color"))) return null;
+    if (!who || !inner?.length || !inner.every((e) => (e.type === "addMana" && !e.anyColors) || (e.type === "choose" && e.choice === "color"))) return null;
     return inner.map((e) => ({ ...e, who }));
   }
   // "Add {R} for each card in target opponent's hand" (Jeska's Will): counted as it resolves.
@@ -462,6 +467,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Add X mana of any one color, where X is 1 plus the exiled creature's mana value" (Food Chain): one color, chosen as
   // it resolves (CR 605.3b), X of it.
   if (/^[Aa]dd X mana of any one color$/.test(s)) return [{ type: "choose", choice: "color" }, { type: "addMana", chosen: 1, times: amt("X") }];
+  // "Add two mana in any combination of colors" (Manamorphose), "add X mana in any combination of colors" (Klauth, with
+  // its "where X is ..."): the colors are chosen as it resolves (CR 106.1b, 608.2d).
+  if ((m = new RegExp(`^[Aa]dd ${NUMX} mana in any combination of colors$`).exec(s))) return [{ type: "addMana", anyColors: true, times: amt(m[1]!) }];
   // Energy (CR 107.14): "You get {E}{E}", "you get X {E}", "you get an amount of {E} equal to ~'s power".
   if ((m = /^(?:[Yy]ou )?[Gg]et ((?:\{E\})+)$/.exec(s))) return [{ type: "getEnergy", who: { ref: "you" }, n: m[1]!.length / 3 }];
   if ((m = new RegExp(`^(?:[Yy]ou )?[Gg]et ${NUMX} \\{E\\}$`).exec(s))) return [{ type: "getEnergy", who: { ref: "you" }, n: amt(m[1]!) }];

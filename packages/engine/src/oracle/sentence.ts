@@ -79,6 +79,12 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       // permission is the sentence after (see parseBody).
       Object.assign(dig, { count: 1, upTo: m[1] === "You may exile", into: "exile" });
       if (m[2]) Object.assign(dig, restOf(m[2]));
+    } else if ((m = /^You may exile (an? .+? card) from among them$/.exec(s))) {
+      // "You may exile a nonland card from among them" (The Key to the Vault): what's done with it is the sentence after the
+      // rest go to the bottom (see parseBody).
+      const filter = parseSearchFilter(m[1]!.replace(/^an? /, ""));
+      if (!filter) return null;
+      Object.assign(dig, { count: 1, upTo: true, filter, into: "exile" });
     } else if (/^You may put one of (?:them|those cards) back on top of your library$/.test(s)) {
       Object.assign(dig, { count: 1, upTo: true, into: "libraryTop" });
     } else if ((m = new RegExp(`^Put up to one of them on top of your library(?: and the rest ${REST})?$`).exec(s))) {
@@ -87,6 +93,13 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       if (m[1]) Object.assign(dig, restOf(m[1]));
     } else return null;
     return dig.rest ? (dig as Extract<Effect, { type: "dig" }>) : "more";
+  }
+  // Turntimber Symbiosis: "If that card has mana value 3 or less, it enters with three additional +1/+1 counters on it":
+  // a replacement for how it enters (CR 614.1c), checked as it's put there.
+  if ((m = /^If that card has mana value (\d+) or less, it enters with (one|two|three|four|five|an) additional \+1\/\+1 counters? on it$/.exec(s))) {
+    if (dig.into !== "battlefield" || dig.count !== 1 || dig.counters || dig.countersIfMv) return null;
+    Object.assign(dig, { countersIfMv: { max: Number(m[1]), counter: "+1/+1", n: m[2] === "an" ? 1 : num(m[2]!) } });
+    return "more";
   }
   if ((m = new RegExp(`^Put (?:the rest|all cards revealed this way that weren't put onto the battlefield) ${REST}$`).exec(s))) return { ...(dig as Extract<Effect, { type: "dig" }>), ...restOf(m[1]!) };
   // "Then shuffle" (the "Then" is gone by now), "Then shuffle the rest into your library" (CR 701.20).
@@ -258,6 +271,9 @@ export function parseBecomes(text: string): Modification[] | null {
   if (/^the chosen color$/i.test(rest)) return [{ kind: "setColors", colors: [], chosen: true }];
   if (/^the chosen basic land type$/i.test(rest)) return [{ kind: "setLandTypes", subtypes: [CHOSEN_LAND_TYPE] }];
   if ((m = /^an? (Plains|Island|Swamp|Mountain|Forest)$/.exec(rest))) return [{ kind: "setLandTypes", subtypes: [m[1]!] }];
+  // "Becomes an Island in addition to its other types" (Xolatoyac's flood counters): the land keeps its types and abilities
+  // and has the basic land type's mana ability too (CR 305.6, 305.7; rulings).
+  if ((m = /^an? (Plains|Island|Swamp|Mountain|Forest) in addition to its other types$/.exec(rest))) return [{ kind: "addTypes", types: [], subtypes: [m[1]!] }];
   // The creature type chosen as it resolves (see parseBody): it replaces the other creature types (CR 205.1b), unless
   // "in addition to its other types".
   if ((m = /^the chosen creature type( in addition to its other types)?$/i.exec(rest)))

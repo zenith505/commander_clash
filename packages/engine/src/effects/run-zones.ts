@@ -21,7 +21,26 @@ import { meld, meldPartners } from "../meld";
 
 /** A suspended card (CR 702.62b): in exile, with suspend and a time counter on it. */
 export function isSuspended(s: GameState, o: GameObject): boolean {
-  return o.zone === "exile" && (o.counters.time ?? 0) > 0 && !!compileCard(defOf(s, o)).suspend;
+  return o.zone === "exile" && (o.counters.time ?? 0) > 0 && hasSuspend(s, o);
+}
+
+/** Suspend printed on the card, or gained in exile (Delay, Jhoira of the Ghitu). */
+export function hasSuspend(s: GameState, o: GameObject): boolean {
+  return !!compileCard(defOf(s, o)).suspend || o.gainedSuspend === (o.zoneChanges ?? 0);
+}
+
+/**
+ * "Exile it with three time counters on it. If it doesn't have suspend, it gains suspend." (Delay): a card in exile gets
+ * the time counters and, without suspend of its own, suspend's abilities for as long as it stays this object (CR 702.62a,
+ * 400.7). It's then suspended (CR 702.62b).
+ */
+export function suspendExiled(s: GameState, o: GameObject, n: number): void {
+  if (o.zone !== "exile") return;
+  o.counters.time = (o.counters.time ?? 0) + n;
+  const had = hasSuspend(s, o);
+  if (!had) o.gainedSuspend = o.zoneChanges ?? 0;
+  invalidateCharacteristics(s);
+  log(s, `${defOf(s, o).name} is exiled with ${n} time counter${n === 1 ? "" : "s"} on it${had ? "" : " and gains suspend"}.`);
 }
 
 /**
@@ -695,20 +714,27 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "castTargetFree": {
       // Cast as this resolves, or not (CR 608.2g); then "if that spell would be put into your graveyard, exile it
       // instead" applies to the spell it became.
+      // Several targets (Diluvian Primordial's one for each opponent): offered one at a time, in order (rulings).
       const sc = (s.resolving!.scratch ??= {});
+      const done = (sc.castTargetsDone ??= []);
       if (sc.castingTarget !== undefined) {
         const o = s.objects[sc.castingTarget];
         const d = o && defOf(s, o);
         if (o?.zone === "stack" && e.exileAfter && (e.exileAfter === true || isType(d!, "Instant") || isType(d!, "Sorcery"))) o.exileIfToGraveyard = true;
-        return;
+        done.push(sc.castingTarget);
+        sc.castingTarget = undefined;
       }
-      const o = objects(s, e.what, ctx)[0];
-      if (!o || o.zone !== "graveyard") return;
-      sc.castingTarget = o.id;
-      s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src };
-      if (castProblem(s, ctx.controller, o.id) === null) return "paused";
-      s.pending = null;
-      log(s, `${defOf(s, o).name} can't be cast.`);
+      for (const o of objects(s, e.what, ctx)) {
+        if (o.zone !== "graveyard" || done.includes(o.id)) continue;
+        sc.castingTarget = o.id;
+        s.pending = { kind: "castFree", player: ctx.controller, objectId: o.id, source: src };
+        if (castProblem(s, ctx.controller, o.id) === null) return "paused";
+        s.pending = null;
+        sc.castingTarget = undefined;
+        done.push(o.id);
+        log(s, `${defOf(s, o).name} can't be cast.`);
+      }
+      sc.castTargetsDone = undefined;
       return;
     }
     case "castFromExileFree": {
@@ -1061,6 +1087,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
             const more = m.more && (!m.moreOpponents || card.owner !== ctx.controller) ? m.more : undefined;
             card.mayPlay = { player: card.owner, zc: card.zoneChanges ?? 0, until: m.until ?? "exiled", turn: s.turn, ...(m.play ? {} : { castOnly: true as const }), ...(m.free ? { free: true as const } : {}), ...(m.cost ? { cost: m.cost } : {}), ...(more ? { more } : {}) };
           }
+          // Suspend: the card gets its time counters and suspend (CR 702.62); a token ceases to exist (CR 704.5d).
+          if (e.suspend && !card.isToken) suspendExiled(s, card, e.suspend);
           // Hostage Taker: its controller may cast the card, not a token (rulings), for as long as it remains exiled.
           if (e.youMay && !card.isToken) card.mayPlay = { player: ctx.controller, zc: card.zoneChanges ?? 0, until: "exiled", turn: s.turn, castOnly: true, ...(e.youMay.anyType ? { anyType: true as const } : {}) };
         }
@@ -1591,6 +1619,27 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         for (const id of found) moveObject(s, id, "hand");
         return;
       }
+      if (e.anyGraveyard) {
+        // "Exile a card from a graveyard" (Cemetery Prowler): you choose one in any graveyard as it resolves (CR 608.2c);
+        // it's linked to this source (CR 607.2a).
+        const sc = (s.resolving!.scratch ??= {});
+        const yards = () => livingPlayers(s).flatMap((pid) => player(s, pid).graveyard);
+        if (!sc.found) {
+          const cards = yards();
+          if (!cards.length) return;
+          s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what: "a card", cards, min: 1, max: 1, fromGraveyard: "exile", anyGraveyard: true };
+          return "paused";
+        }
+        const found = sc.found.filter((id) => yards().includes(id));
+        sc.found = undefined;
+        for (const id of found) {
+          const o = obj(s, id);
+          log(s, `${player(s, ctx.controller).name} exiles ${defOf(s, o).name} from ${o.owner === ctx.controller ? "their" : `${player(s, o.owner).name}'s`} graveyard.`);
+          moveObject(s, id, "exile");
+          if (e.linked && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: obj(s, id).zoneChanges ?? 0 });
+        }
+        return;
+      }
       const pid = e.who ? players(s, e.who, ctx)[0] : ctx.controller;
       if (pid === undefined || player(s, pid).lost) return;
       const p = player(s, pid);
@@ -1604,7 +1653,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const milled = (id: ObjectId) =>
           (!e.milled || !!s.resolving!.milled?.some((m) => m.id === id && (obj(s, id).zoneChanges ?? 0) === m.zc)) && (!e.eventGroup || !!ctx.event?.group?.some((g) => g.id === id && (obj(s, id).zoneChanges ?? 0) === g.zc)) &&
           // "Another permanent card" than the one you sacrificed this way (rulings on Rise of the Witch-king).
-          (!e.notSacrificed || !s.resolving!.sacrificedThisWay?.some((k) => k.id === id && k.controller === ctx.controller));
+          (!e.notSacrificed || !s.resolving!.sacrificedThisWay?.some((k) => k.id === id && k.controller === ctx.controller)) &&
+          // Starfall Invocation: a card that died to this destroy and hasn't moved since (CR 400.7).
+          (!e.destroyedThisWay || !!s.resolving!.destroyed?.some((d) => d.died && d.o.id === id && (obj(s, id).zoneChanges ?? 0) === (d.o.zoneChanges ?? 0) + 1));
         const all = p.graveyard.filter((id) => milled(id) && (!filter || printedMatches(filter, defOf(s, obj(s, id)))) && (e.dest !== "battlefield" || isPermanentCard(defOf(s, obj(s, id)))) && (e.totalMv === undefined || defMv(defOf(s, obj(s, id))) <= e.totalMv));
         // "With different names": one card of each name is offered (cards of one name are alike).
         const cards = e.oneEach ? all.filter((id, i) => all.findIndex((x) => sameName(defOf(s, obj(s, x)).name, defOf(s, obj(s, id)).name)) === i) : all;
@@ -1990,7 +2041,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // Exiled face up (CR 406.3); the permission belongs to this object only (CR 400.7).
       const p = player(s, ctx.controller);
       // "Exile the top card of each player's library" (Nashi): each library in turn, all part of one group.
-      if (e.who?.ref === "eachPlayer") {
+      // "Exile the top card of each opponent's library" (Brainstealer Dragon, Stolen Strategy): the same, opponents only.
+      if (e.who?.ref === "eachPlayer" || e.who?.ref === "eachOpponent") {
         const oneOf = e.oneOf ? `g${s.nextId++}` : undefined;
         const all: ObjectId[] = [];
         for (const pid of apnap(s, players(s, e.who, ctx))) {
@@ -1998,12 +2050,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           for (const id of ids) {
             moveObject(s, id, "exile");
             const o = obj(s, id);
-            o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.castOnly ? { castOnly: true as const } : {}), ...(oneOf ? { oneOf } : {}), ...(e.life ? { life: true as const } : {}) };
+            o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.castOnly ? { castOnly: true as const } : {}), ...(oneOf ? { oneOf } : {}), ...(e.life ? { life: true as const } : {}), ...(e.anyType ? { anyType: true as const } : {}) };
           }
           all.push(...ids);
         }
         if (s.resolving) (s.resolving.impulsed ??= []).push(...all);
-        if (all.length) log(s, `${p.name} exiles ${all.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of each library and may ${e.oneOf ? "play one of them" : "play them"}${e.life ? ", paying life rather than mana for a spell" : ""}${e.until === "thisTurn" ? " this turn" : ""}.`);
+        if (all.length) log(s, `${p.name} exiles ${all.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of each ${e.who.ref === "eachOpponent" ? "opponent's " : ""}library and may ${e.oneOf ? "play one of them" : e.castOnly ? "cast them" : "play them"}${e.life ? ", paying life rather than mana for a spell" : ""}${e.anyType ? ", spending mana as though it were mana of any color" : ""}${e.until === "thisTurn" ? " this turn" : ""}.`);
         return;
       }
       const from = e.who ? players(s, e.who, ctx)[0] : p.id;

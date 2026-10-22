@@ -2616,6 +2616,30 @@
   "gameChanger": false
  },
  {
+  "oracleId": "981298e6-ddee-49c0-9377-f47f019b4138",
+  "name": "Currency Converter",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Whenever you discard a card, you may exile that card from your graveyard.\n{2}, {T}: Draw a card, then discard a card.\n{T}: Put a card exiled with this artifact into its owner's graveyard. If it's a land card, create a Treasure token. If it's a nonland card, create a 2/2 black Rogue creature token.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Treasure"
+  ],
+  "commanderLegal": "legal",
+  "set": "msc",
+  "releasedAt": "2026-06-26",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5480f855-80b7-45c7-94a9-071c7b5d5ccf",
   "name": "Curse of the Bloody Tome",
   "manaCost": "{2}{U}",

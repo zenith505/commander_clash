@@ -587,6 +587,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (/^Put all cards exiled with ~ into their owners?'s? graveyards?$/i.test(s)) return [{ type: "moveLinked", dest: "graveyard" }];
     if (/^Put all other cards you own exiled with ~ into your hand$/i.test(s)) return [{ type: "moveLinked", dest: "hand", yours: true, other: true }];
     if (/^Return a card you own exiled with ~ to your hand$/i.test(s)) return [{ type: "moveLinked", dest: "hand", yours: true, one: true }];
+    // Currency Converter: one of them, chosen as it resolves.
+    if (/^Put a card exiled with ~ into its owner's graveyard$/i.test(s)) return [{ type: "moveLinked", dest: "graveyard", one: true }];
   }
   // "Attach target Equipment you control to target creature you control" (Brass Squire), "attach up to one target
   // Equipment you control to ~" (Cloud), "... to that creature" (Kemba: the creature that entered), Magnetic Theft's

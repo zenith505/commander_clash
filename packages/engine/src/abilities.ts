@@ -2793,6 +2793,8 @@ export type SpellCondition =
   | { kind: "unlessPaid" }
   /** "If it's a creature card" about the card "reveal the top card of your library" revealed, by its printed characteristics; `not`: "if it isn't". */
   | { kind: "revealedIs"; filter: TargetSpec; not?: true }
+  /** "Put a card exiled with ~ into its owner's graveyard. If it's a land card, ..." (Currency Converter): the card moved. */
+  | { kind: "movedLinkedIs"; filter: TargetSpec }
   /** Kinship: the card "look at the top card of your library" found shares a creature type with this ability's source. */
   | { kind: "revealedSharesCreatureType" }
   /** "If a card with the chosen name was milled this way" (Predict): any card the mill instruction before put there. */

@@ -379,6 +379,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? spentMeets(e.cond.target === undefined ? ctx.spent : targetSpellSpent(s, ctx, e.cond.target), e.cond.req)
             : e.cond.kind === "revealedIs"
             ? revealedIs(s, bindChosen(e.cond.filter, ctx.chosen)) !== !!e.cond.not
+            : e.cond.kind === "movedLinkedIs"
+            ? (s.resolving!.movedLinkedIds ?? []).some((id) => s.objects[id] && printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, s.objects[id]!)))
             : e.cond.kind === "revealedSharesCreatureType"
             ? revealedSharesType(s, ctx)
             : e.cond.kind === "createdNone"

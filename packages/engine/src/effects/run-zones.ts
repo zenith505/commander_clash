@@ -1294,6 +1294,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       else log(s, `${cards.map((c) => defOf(s, c).name).join(", ")} ${cards.length === 1 ? "goes" : "go"} from exile to ${cards.length === 1 ? "its owner's graveyard" : "their owners' graveyards"} (${src}).`);
       for (const c of cards) moveObject(s, c.id, e.dest);
       s.resolving!.movedLinked = cards.length;
+      s.resolving!.movedLinkedIds = cards.map((c) => c.id);
       if (s.linkedExile?.[key]) s.linkedExile[key] = s.linkedExile[key]!.filter((l) => !cards.some((c) => c.id === l.id));
       return;
     }

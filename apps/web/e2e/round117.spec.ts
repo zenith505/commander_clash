@@ -1,11 +1,12 @@
 // Round 117's prompts: Druid of Purification ("starting with you, each player may choose an artifact or enchantment you
 // don't control": a button for each, and "Choose nothing"), Odric, Master Tactician (you choose the defending
 // player's blocks: click their creatures, then your attackers), Armored Skyhunter (you may attach the Equipment it
-// put onto the battlefield to a creature you control) and Protean Hulk (a library search with a total mana value limit).
+// put onto the battlefield to a creature you control), Protean Hulk (a library search with a total mana value limit) and
+// Currency Converter (pick one of the cards exiled with it).
 import { expect, test } from "@playwright/test";
-import { applyAction, planCast, waitingOn } from "@cc/engine";
+import { applyAction, planActivate, planCast, waitingOn } from "@cc/engine";
 import { idsOf, LANDS, one, open, pageErrors, playUntil, scene } from "./scene";
-import { card, controls, modal, resolveUntil } from "./ui";
+import { card, controls, menu, modal, resolveUntil } from "./ui";
 
 test("Druid of Purification: choose an artifact you don't control, or nothing; each one chosen is destroyed", async ({ page }) => {
   const s = scene({ hand: ["Druid of Purification"], board: [...LANDS, "Mind Stone"] }, [{ board: ["Sol Ring"] }, { board: ["Grizzly Bears"] }]);
@@ -89,5 +90,37 @@ test("Protean Hulk: search for creature cards with total mana value 6 or less", 
   expect(after.objects[giant]!.zone).toBe("battlefield");
   expect(after.objects[elves]!.zone).toBe("battlefield");
   expect(after.objects[bears]!.zone).toBe("library");
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Currency Converter: pick a card exiled with it to put into the graveyard; a land makes a Treasure", async ({ page }) => {
+  let s = scene({ board: [...LANDS, "Currency Converter"], library: ["Grizzly Bears", "Forest"] });
+  const conv = one(s, "Currency Converter");
+  const [bears, forest] = [idsOf(s, "Grizzly Bears", "library", 0)[0]!, s.players[0]!.library[1]!];
+  // Two loots in the engine, each discarding the card drawn and exiling it with the Converter.
+  s = playUntil(s, (st) => st.step === "main1" && waitingOn(st) === 0 && !st.pending);
+  for (const id of [bears, forest]) {
+    s.objects[conv]!.tapped = false;
+    for (const a of planActivate(s, 0, conv, 0)!) s = applyAction(s, a);
+    s = playUntil(s, (st) => st.pending?.kind === "discard" || st.pending?.kind === "chooseMay");
+    if (s.pending?.kind === "discard") s = applyAction(s, { type: "discard", player: 0, objectIds: [id] });
+    s = playUntil(s, (st) => st.pending?.kind === "chooseMay");
+    s = applyAction(s, { type: "chooseMay", player: 0, yes: true });
+    s = playUntil(s, (st) => st.stack.length === 0 && !st.pending);
+  }
+  s.objects[conv]!.tapped = false;
+  expect(s.objects[forest]!.zone).toBe("exile");
+  await open(page, s);
+  await card(page, "Currency Converter", s).click();
+  await menu(page).locator("button", { hasText: "Put a card exiled with" }).click();
+  await resolveUntil(page, (st) => st.pending?.kind === "searchLibrary");
+  const pick = modal(page);
+  await expect(pick).toContainText("a card exiled with Currency Converter");
+  await pick.locator(`[data-pick="${forest}"]`).click();
+  await pick.getByRole("button", { name: "Done" }).click();
+  const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending);
+  expect(after.objects[forest]!.zone).toBe("graveyard");
+  expect(after.objects[bears]!.zone).toBe("exile");
+  expect(after.battlefield.some((id) => after.cards[after.objects[id]!.cardId]!.name === "Treasure Token")).toBe(true);
   expect(pageErrors(page)).toEqual([]);
 });

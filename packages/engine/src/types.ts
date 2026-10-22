@@ -1680,6 +1680,8 @@ export interface Resolving {
   countersRemoved?: number;
   /** How many cards its "put all cards exiled with ~ into their owners' graveyards" moved. */
   movedLinked?: number;
+  /** The cards "put a card exiled with ~ into its owner's graveyard" moved (SpellCondition movedLinkedIs). */
+  movedLinkedIds?: ObjectId[];
   /** The two players its exchangeLife instruction named (even one no longer a legal target), and the life each lost doing it. */
   exchanged?: { players: PlayerId[]; lost: Record<PlayerId, number> };
   /** "Choose a creature type / a color": what was chosen, for the rest of its instructions. */

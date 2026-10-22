@@ -615,3 +615,49 @@ describe("Protean Hulk", () => {
     expect(s.objects[two]!.zone).toBe("library");
   });
 });
+
+const converter = card("Currency Converter", "Artifact", "{1}", {
+  oracleText:
+    "Whenever you discard a card, you may exile that card from your graveyard.\n{2}, {T}: Draw a card, then discard a card.\n{T}: Put a card exiled with this artifact into its owner's graveyard. If it's a land card, create a Treasure token. If it's a nonland card, create a 2/2 black Rogue creature token.",
+});
+
+describe("Currency Converter", () => {
+  it("exiles discarded cards; puts one back into the graveyard for a Treasure (land) or a 2/2 Rogue (nonland)", () => {
+    expect(isFullySupported(converter)).toBe(true);
+    const { s: s0, ap } = setup([]);
+    let s = s0;
+    const c = putOnBattlefield(s, ap, converter);
+    const p = s.players[ap]!;
+    const loot = (discard: string) => {
+      s.objects[c]!.tapped = false;
+      s = run(s, planActivate(s, ap, c, 0));
+      for (let i = 0; i < 20 && s.pending?.kind !== "discard"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+      s = act(s, { type: "discard", player: ap, objectIds: [discard] });
+      for (let i = 0; i < 20 && s.pending?.kind !== "chooseMay"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+      s = settle(act(s, { type: "chooseMay", player: ap, yes: true }));
+      expect(s.objects[discard]!.zone).toBe("exile");
+    };
+    const [land, beast] = onTop(s, ap, [forest, bear()]);
+    // Each loot draws the top card and discards it.
+    loot(land!);
+    loot(beast!);
+    expect(p.graveyard).toHaveLength(0);
+    s.objects[c]!.tapped = false;
+    s = run(s, planActivate(s, ap, c, 1));
+    for (let i = 0; i < 20 && s.pending?.kind !== "searchLibrary"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", cards: [land, beast], min: 1, max: 1 });
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: [land!] }));
+    expect(s.objects[land!]!.zone).toBe("graveyard");
+    const mine = () => s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === ap).map((id) => name(s, id));
+    expect(mine()).toEqual([expect.stringMatching(/^Treasure/)]);
+    s.objects[c]!.tapped = false;
+    s = run(s, planActivate(s, ap, c, 1));
+    for (let i = 0; i < 20 && s.pending?.kind !== "searchLibrary"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = settle(act(s, { type: "searchLibrary", player: ap, found: [beast!] }));
+    expect(mine().sort()).toEqual(["Rogue Token", "Treasure Token"]);
+    // Nothing left: the ability does nothing.
+    s.objects[c]!.tapped = false;
+    s = settle(run(s, planActivate(s, ap, c, 1)));
+    expect(mine()).toHaveLength(2);
+  });
+});

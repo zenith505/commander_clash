@@ -1099,6 +1099,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "damage", amount: { count: { kind: "movedLinkedThisWay" } }, to: { ref: "eachOpponent" } });
       continue;
     }
+    // Currency Converter: "Put a card exiled with ~ into its owner's graveyard. If it's a land card, create a Treasure token.
+    // If it's a nonland card, ...": the card that moved, by its printed characteristics; nothing if none did.
+    const movedIs = effects.some((e) => e.type === "moveLinked" && e.one && e.dest === "graveyard") ? /^If it's an? (.+? card), (.+)$/.exec(s) : null;
+    if (movedIs) {
+      const filter = parseSearchFilter(movedIs[1]!);
+      const then = filter && parseOne(capital(movedIs[2]!), ctx);
+      if (!filter || !then) return null;
+      effects.push({ type: "if", cond: { kind: "movedLinkedIs", filter }, effects: then });
+      continue;
+    }
     // "At the beginning of the next end step, sacrifice that creature" (Meek Attack) is "Sacrifice that creature at the
     // beginning of the next end step" (one instruction, no condition).
     const atNext = /^At the beginning of (the|your) next end step, ((?:sacrifice|exile|destroy|return) [^,]+)$/.exec(s);

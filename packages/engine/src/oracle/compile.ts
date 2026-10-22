@@ -2608,6 +2608,14 @@ function linkExile(out: CompiledCard) {
     if (others || impulses.length !== 1) out.unsupported.push("(refers to cards exiled with it that it can't link to one exile ability)");
     else impulses[0]!.linked = true;
   }
+  // Currency Converter: "Whenever you discard a card, you may exile that card from your graveyard" and "Put a card exiled
+  // with ~ into its owner's graveyard": the cards its one exile instruction exiled (CR 607.2a).
+  if (!impulses.length && bodies.some((b) => allEffects(b.effects).some((e) => e.type === "moveLinked"))) {
+    const all = bodies.flatMap((b) => allEffects(b.effects));
+    const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
+    const others = all.some((e) => (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
+    if (!others && exiles.length === 1) exiles[0]!.linked = true;
+  }
   // "Create a token that's a copy of a card exiled with ~" (Mimic Vat, The Cloning of Shredder): the cards its one exile
   // ability exiled (CR 607.2a), unless that's already linked (Mimic Vat's imprint).
   if (bodies.some((b) => JSON.stringify(b).includes('"linkedCard"'))) {

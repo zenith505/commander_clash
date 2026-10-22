@@ -1,7 +1,7 @@
 # Roadmap
 
-22,375 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,976 of 1,989 (99%), top 5,000: 3,875 of 4,988 (77%).
+22,431 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,988 of 1,989 (99%), top 5,000: 3,898 of 4,988 (78%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,16 +22,17 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 109, most played first: Emrakul, the Promised End (needs
-   controlling another player's turn, CR 722, also Mindslaver, Sorin Markov's −7, Worst Fears), Urabrask and Sheoldred
-   // The True Scriptures (exile, then return transformed; casting from other players' graveyards), Monster Manual,
-   Commandeer, Aven Interrupter, Abundance, Sunbird's Invocation, Drana and Linvala, Norn's Annex (the attack tax is
-   paid in generic mana only, no {W/P}), Wild Magic Surge (an Aura or battle put onto the battlefield needs a host or
-   protector chosen), One with the Multiverse, Crystal Skull, Gix, Grist, Sunforger, Arixmethes, Eladamri, The Council
-   of Four. Smaller gaps from round 109: Halo Fountain's untap cost can't untap a creature you tapped for mana while
-   paying the same activation (the rulings allow it); a graveyard permission's alternative-cost buttons show only when
-   one permission applies; bots keep the legend with the most attachments and counters, then the non-token, then the
-   oldest. Smaller gaps from round 108: bots choose fame when their best creature has power 2 or less, else
+00. Most played first (`npm run popular`). Out after round 110, most played first: Gix, Yawgmoth Praetor (play
+   cards exiled this way for free), Sheoldred // The True Scriptures ("a nontoken creature or planeswalker": whether
+   "nontoken" covers both isn't settled by a ruling), Grist, the Hunger Tide, Sunforger, Arixmethes, Eladamri,
+   Korvecdal, The Council of Four (second card drawn or spell cast during their turn), Mycosynth Lattice, Single
+   Combat, Generous Plunderer, Volatile Stormdrake, Akiri, Thousand Moons Smithy, Nashi; also Thor, Guardian of
+   Midgard, Virtue of Courage, Asgardian Inspiration. Smaller gaps from round 110: a bot controlling another player's
+   turn (CR 723) makes them do only what they must (no spells, abilities or attacks); One with the Multiverse and
+   other "without paying its mana cost" sources can't cast a prototype card prototyped; Sunbird's Invocation and
+   Villainous Wealth compare a split card's combined mana value, not the half cast; Oviya, Automech Artisan is out
+   (its "it" lines). Smaller gaps from round 109: bots keep the legend with the most attachments and counters, then
+   the non-token, then the oldest. Smaller gaps from round 108: bots choose fame when their best creature has power 2 or less, else
    fortune; Witness Protection's new name counts in rules checks, but the card picture still shows the printed card.
    Smaller gaps from round 107: "Sacrifice A and
    B" costs read only two different single-word types (Jarad); "No more than one creature can attack ~ each combat" is checked for attacks on the planeswalker

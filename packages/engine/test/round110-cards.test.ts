@@ -1,6 +1,9 @@
 // Round 110, the most played cards left: Urabrask // The Great Work (exile, then return transformed; chapter III casts
 // instants and sorceries from any graveyard, exiled instead of going to a graveyard), Monster Manual // Zoological Study
-// ("return a creature card milled this way").
+// ("return a creature card milled this way"), Commandeer, Jill, Aven Interrupter, Abundance, Norn's Annex, Wild Magic
+// Surge, Polymorph, Transmogrify, Sunbird's Invocation, One with the Multiverse, Drana and Linvala, Crystal Skull,
+// Tribute Mage, Kitsa, Ruby, Agent of Treachery, Vengeful Ancestor, Niv-Mizzet Visionary, Triplicate Titan; Halo
+// Fountain untapping a creature tapped for its own {W}; cards the new parsing supports.
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";

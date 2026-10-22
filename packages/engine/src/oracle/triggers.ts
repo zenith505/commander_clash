@@ -669,6 +669,14 @@ function parseAttackerTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!body) return "fail";
     return { event: "creatureYouControlAttacks", attacker: { filter: { kind: "object", types: ["Creature"], text: "creature an opponent controls" }, anyone: true, attacksYou: "orPlaneswalker" }, ifCond: { kind: "subjectAttackingYou" }, body };
   }
+  // "Whenever your commander attacks" (Tome of Legends, We Ride at Dawn): the commander you own (CR 903.3), whoever
+  // controls it; "it" is that creature.
+  const yours = m || any ? null : /^Whenever your commander attacks, (.+)$/.exec(line);
+  if (yours) {
+    const body = parseBody(yours[1]!.replace(/\bthat creature\b(?!'s)/g, "it"), { subjectIt: true, defending: true });
+    if (!body) return "fail";
+    return { event: "creatureYouControlAttacks", attacker: { filter: { kind: "object", commander: true, owner: "you", text: "your commander" }, anyone: true }, body };
+  }
   const w = m ?? any;
   if (!w) return null;
   // "A creature you control of the chosen type" (Kindred Discovery): the type chosen for this permanent.
@@ -1111,7 +1119,8 @@ const YARD_EVENTS: TriggerEvent[] = ["castSpell", "spellYouControlDealsDamage", 
 
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).
-  const line = differenceInHand(raw.replace(/^[A-Z][A-Za-z' -]+ — (?=(When|Whenever|At)\b)/, ""));
+  // "Whenever your commander enters" (Nakia, Tome of Legends): the commander you own (CR 903.3), whoever controls it.
+  const line = differenceInHand(raw.replace(/^[A-Z][A-Za-z' -]+ — (?=(When|Whenever|At)\b)/, "")).replace(/^Whenever your commander enters, /, "Whenever a commander you own enters, ");
   if (!/^(When|Whenever|At)\b/.test(line)) return null;
   // Springheart Nantuko: "Whenever a land you control enters, you may pay {1}{G} if ~ is attached to a creature you
   // control. If you do, create a token that's a copy of that creature. If you didn't create a token this way, create a

@@ -427,3 +427,51 @@ describe("Carnelian Orb of Dragonkind", () => {
       expect(objHasKeyword(s, s.objects[ids[0]!]!, "Haste")).toBe(haste);
     });
 });
+
+const nakia = card("Nakia, Wakandan Operative", "Legendary Creature — Human Warrior Hero", "{2}{G}", {
+  power: "3",
+  toughness: "3",
+  keywords: ["Reach"],
+  oracleText: "Reach\nWhenever your commander enters, you become the monarch.\n{2}, {T}: Put two +1/+1 counters on target creature or Vehicle. Activate only as a sorcery.",
+});
+const tome = card("Tome of Legends", "Artifact", "{2}", {
+  oracleText: "This artifact enters with a page counter on it.\nWhenever your commander enters or attacks, put a page counter on this artifact.\n{1}, {T}, Remove a page counter from this artifact: Draw a card.",
+});
+
+describe("Tome of Legends (whenever your commander enters or attacks)", () => {
+  it("is supported, and so are Nakia and Search for Dagger", () => {
+    expect(isFullySupported(tome)).toBe(true);
+    expect(isFullySupported(nakia)).toBe(true);
+    expect(isFullySupported(card("Search for Dagger", "Enchantment", "{1}{W}", { oracleText: "Whenever your commander enters or attacks, look at the top six cards of your library. You may reveal a legendary creature card from among them and put it into your hand. Put the rest on the bottom of your library in a random order." }))).toBe(true);
+  });
+
+  it("Nakia: you become the monarch when your commander enters", () => {
+    let { s, ap } = setup([]);
+    putOnBattlefield(s, ap, nakia);
+    expect(s.monarch).toBeUndefined();
+    const mine = s.players[ap]!.command[0]!;
+    for (const a of planCast(s, ap, mine)!) s = act(s, a);
+    s = passAll(s);
+    expect(s.monarch).toBe(ap);
+  });
+
+  it("a page counter when your commander enters and when it attacks, not for another creature or someone else's commander", () => {
+    let { s, ap, opp } = setup([]);
+    const t = putOnBattlefield(s, ap, tome);
+    const pages = () => s.objects[t]!.counters.page ?? 0;
+    const start = pages();
+    const cmd = s.players[ap]!.command[0]!;
+    // Cast from the command zone.
+    for (const a of planCast(s, ap, cmd)!) s = act(s, a);
+    s = passAll(s);
+    expect(s.objects[cmd]!.zone).toBe("battlefield");
+    expect(pages()).toBe(start + 1);
+    const theirs = putOnBattlefield(s, opp, bear({ name: "Their Commander" }));
+    s.objects[theirs]!.isCommander = true;
+    const other = putOnBattlefield(s, ap, bear());
+    s.objects[cmd]!.controlledSinceTurn = s.turn - 1;
+    s = attackWith(s, ap, [cmd, other]);
+    s = passAll(s);
+    expect(pages()).toBe(start + 2);
+  });
+});

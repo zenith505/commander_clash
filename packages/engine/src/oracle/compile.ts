@@ -2239,6 +2239,8 @@ export function compile(d: CardDef): CompiledCard {
       /^When ~ enters and (whenever (?!it )[^,]+), (.+)$/.exec(line) ??
       // "Whenever a creature you control of the chosen type enters or attacks, draw a card." (Kindred Discovery)
       /^Whenever (an? [^,]+? you control(?: of the chosen type)?) enters or attacks, (.+)$/.exec(line) ??
+      // "Whenever your commander enters or attacks, ..." (Tome of Legends, Search for Dagger).
+      /^Whenever (your commander) enters or attacks, (.+)$/.exec(line) ??
       // "Whenever another creature you control enters or dies, you gain 1 life." (Daxos, Blessed by the Sun)
       /^Whenever ((?:another|an?) [^,]+? you control) enters or dies, (.+)$/.exec(line) ??
       // Syr Konrad: "Whenever another creature dies, or a creature card is put into a graveyard from anywhere other than
@@ -2269,7 +2271,7 @@ export function compile(d: CardDef): CompiledCard {
               ? [`Whenever ~ attacks, ${effect}`, `Whenever ~ becomes the target of a spell, ${effect}`]
             : twice.length === 5
               ? twice.slice(1, 4).map((e) => `Whenever ${/^Whenever an opponent /.test(line) ? "an opponent " : ""}${e}, ${effect}`)
-            : /^Whenever an? [^,]+? enters or attacks, /.test(line)
+            : /^Whenever (?:an? [^,]+?|your commander) enters or attacks, /.test(line)
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} attacks, ${effect}`]
             : /^Whenever [^,]+? you control enters or dies, /.test(line)
               ? [`Whenever ${twice[1]} enters, ${effect}`, `Whenever ${twice[1]} dies, ${effect}`]

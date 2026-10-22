@@ -2669,6 +2669,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // cards. Otherwise, you draw a card." (Predict): about the cards that mill instruction put into the graveyard.
     // "Mill a card. If a land card was milled this way, ..." (Lorehold Excavation), several of them after one mill (Old
     // Rutstein): by its printed characteristics in the graveyard.
+    // Sunforger: "Search your library for a red or white instant card with mana value 4 or less and cast that card without
+    // paying its mana cost. Then shuffle." The card is cast from the library as this resolves (CR 608.2g), then the
+    // library is shuffled.
+    const searchCast = /^Search your library for an? (.+? card(?: with mana value \d+ or less)?) and cast that card without paying its mana cost$/.exec(s);
+    if (searchCast && sentences[si + 1]?.replace(/\.$/, "") === "Then shuffle") {
+      const filter = parseSearchFilter(searchCast[1]!);
+      if (!filter) return null;
+      effects.push({ type: "search", filter, n: 1, upTo: false, dest: { zone: "cast" }, reveal: false, noShuffle: true }, { type: "castSearched" }, { type: "shuffle", who: { ref: "you" }, ifSearched: true });
+      si++;
+      continue;
+    }
     // Grist, the Hunger Tide: "Create a 1/1 black and green Insect creature token, then mill a card. If an Insect card was
     // milled this way, put a loyalty counter on ~ and repeat this process." All of it again, for as long as it hits.
     const milledRepeat = /^If an? ([A-Za-z]+ card) was milled this way, (.+) and repeat this process$/.exec(s);

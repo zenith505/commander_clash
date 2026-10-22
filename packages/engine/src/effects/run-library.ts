@@ -657,7 +657,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const p = player(s, pid);
         const lib = libOf(pid);
         const found = foundBy(pid).filter((id) => dest(pid, id).zone !== "battlefield" || !defOf(s, obj(s, id)).subtypes.includes("Aura") || hosts.has(id));
-        lib.library = lib.library.filter((id) => !found.includes(id));
+        // Sunforger: the card to cast stays where it is until it's cast (castSearched).
+        lib.library = lib.library.filter((id) => !found.includes(id) || dest(pid, id).zone === "cast");
         const names = found.map((id) => defOf(s, obj(s, id)).name);
         // Found cards aren't revealed unless the effect says so (CR 701.23e).
         const shown = e.reveal || e.dest.zone === "battlefield" || (e.dest.zone === "exile" && !e.dest.faceDown) || exiledFor(pid) !== undefined ? ` (${names.join(", ")})` : "";
@@ -684,7 +685,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         for (const { pid, id } of moves) {
           const p = player(s, pid);
           const to = dest(pid, id);
-          if (to.zone === "libraryTop") {
+          if (to.zone === "cast") r.searchCast = id;
+          else if (to.zone === "libraryTop") {
             obj(s, id).zone = "library";
             // Third from the top, or on the bottom of a library with fewer than 3 other cards (rulings on Long-Term Plans).
             p.library.splice(to.third ? Math.min(2, p.library.length) : 0, 0, id);

@@ -510,7 +510,8 @@ export interface TargetSpec {
 
 /** Where a card found by a search goes. */
 export interface SearchDest {
-  zone: "hand" | "battlefield" | "libraryTop" | "graveyard" | "exile";
+  /** "cast": "search your library for ... and cast that card without paying its mana cost" (Sunforger): it stays in the library for `castSearched`. */
+  zone: "hand" | "battlefield" | "libraryTop" | "graveyard" | "exile" | "cast";
   tapped?: boolean;
   /** "Exile it face down" (Beseech the Mirror): only its owner may look at it (CR 406.3); kept in Resolving.faceDownExiled. */
   faceDown?: true;
@@ -1951,6 +1952,8 @@ export type Effect =
   | { type: "revealTopToHand"; life?: { who: PlayerRef; gain?: boolean; drain?: true } }
   /** "You may repeat this process any number of times" (Ad Nauseam): `effects` (none of which waits on a choice), then the controller decides whether to go again, each time after seeing the result (rulings). */
   | { type: "repeatMay"; effects: Effect[]; text: string }
+  /** Sunforger: the card a search with dest "cast" found, cast from the library without paying its mana cost (CR 608.2g). */
+  | { type: "castSearched" }
   /**
    * "Create a 1/1 Insect token, then mill a card. If an Insect card was milled this way, put a loyalty counter on ~ and
    * repeat this process." (Grist): `effects`, then `then` and all of it again for as long as `cond` holds after them.
@@ -3295,6 +3298,8 @@ export interface ActivatedAbility {
   removeCounters?: { counter: CounterKind; n: number };
   /** "{T}, Exert ~: ..." (CR 701.43a): it won't untap during your next untap step; possible even if already exerted (701.43b). */
   exertCost?: true;
+  /** "Unattach ~" as a cost (Sunforger): it must be attached to a creature (rulings). */
+  unattachCost?: true;
   /** "Put a -1/-1 counter on ~" as part of the cost (Devoted Druid): replacement effects on counters apply (Vizier of Remedies rulings). */
   putCounters?: { counter: CounterKind; n: number };
   /**

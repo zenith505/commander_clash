@@ -143,6 +143,14 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     const condition = parseStaticCondition(cond, self);
     return condition ? { ...self, condition } : null;
   }
+  // Arixmethes: "As long as ~ has a slumber counter on it, it's a land. (It's not a creature.)": its card types become
+  // just land, replacing the others and their subtypes (layer 4, CR 205.1a-b); still legendary, its colors and mana
+  // value stay (rulings).
+  if (statement === "it's a land" && /^~ has an? [a-z]+ counter on it$/.test(cond)) {
+    const self: StaticAbility = { affects: { kind: "self" }, mods: [{ kind: "setTypes", types: ["Land"], subtypes: [] }], text: line };
+    const condition = parseStaticCondition(cond, self);
+    return condition ? { ...self, condition } : null;
+  }
   // "During your turn, equipped creature gets +1/+0": the statement starts a sentence of its own.
   const st = parseStatic(`${statement.replace(/\bgets an additional\b/, "gets").replace(/^(it|this creature|this permanent)\b/i, "~").replace(/^(enchanted|equipped|creatures|other|commanders) /, (w) => w.charAt(0).toUpperCase() + w.slice(1))}.`);
   if (!st || st.condition) return null;

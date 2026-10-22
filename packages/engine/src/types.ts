@@ -1653,6 +1653,8 @@ export interface Resolving {
   chose?: Record<string, string>;
   /** A library was searched by a search that leaves the shuffle for later (Claim Jumper, `search.noShuffle`). */
   searchedHere?: true;
+  /** Sunforger: the card the search found to cast (`castSearched`), still in the library. */
+  searchCast?: ObjectId;
   /** The mana it added, for a mana ability: what the triggered mana abilities of tapping its source see (CR 106.12a). */
   made?: ManaType[];
   next: number;

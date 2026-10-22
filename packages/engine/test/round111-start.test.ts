@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passAll, putOnBattlefield, setup, swamp } from "./helpers";
-import { abilityProblem, canBeCommander, characteristics, defOf, isFullySupported, objIsType, planActivate, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { abilityProblem, canBeCommander, characteristics, defOf, invalidateCharacteristics, isFullySupported, objIsType, planCast, planActivate, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 // Real oracle text (Scryfall).
 const gix = card("Gix, Yawgmoth Praetor", "Legendary Creature — Phyrexian Praetor", "{1}{B}{B}", {
@@ -23,7 +23,18 @@ const grist = card("Grist, the Hunger Tide", "Legendary Planeswalker — Grist",
   oracleText:
     "As long as Grist isn't on the battlefield, it's a 1/1 Insect creature in addition to its other types.\n+1: Create a 1/1 black and green Insect creature token, then mill a card. If an Insect card was milled this way, put a loyalty counter on Grist and repeat this process.\n−2: You may sacrifice a creature. When you do, destroy target creature or planeswalker.\n−5: Each opponent loses life equal to the number of creature cards in your graveyard.",
 });
+const sunforger = card("Sunforger", "Artifact — Equipment", "{3}", {
+  oracleText:
+    "Equipped creature gets +4/+0.\n{R}{W}, Unattach this Equipment: Search your library for a red or white instant card with mana value 4 or less and cast that card without paying its mana cost. Then shuffle.\nEquip {3}",
+});
+const arixmethes = card("Arixmethes, Slumbering Isle", "Legendary Creature — Kraken", "{2}{G}{U}", {
+  power: "12",
+  toughness: "12",
+  oracleText:
+    "Arixmethes enters tapped with five slumber counters on it.\nAs long as Arixmethes has a slumber counter on it, it's a land. (It's not a creature.)\nWhenever you cast a spell, you may remove a slumber counter from Arixmethes.\n{T}: Add {G}{U}.",
+});
 // Test cards.
+const opt = card("Test Opt", "Instant", "{U}", { oracleText: "Draw a card." });
 const ponder = card("Test Ponder", "Sorcery", "{U}", { oracleText: "Draw a card." });
 const shockland = card("Test Shockland", "Land — Swamp Mountain", "", { oracleText: "({T}: Add {B} or {R}.)\nAs this land enters, you may pay 2 life. If you don't, it enters tapped." });
 
@@ -183,5 +194,58 @@ describe("Grist, the Hunger Tide", () => {
     toZone(s0, ap, bear(), "graveyard");
     const s = passAll(run(s0, planActivate(s0, ap, g, 2)));
     expect(s.players[opp]!.life).toBe(38);
+  });
+});
+
+describe("Sunforger", () => {
+  it("parse", () => supported(sunforger));
+
+  it("unattach it: find a red or white instant with mana value 4 or less and cast it from the library for free", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const sf = putOnBattlefield(s0, ap, sunforger);
+    const b = putOnBattlefield(s0, ap, bear());
+    const bolt = toZone(s0, ap, card("Test Bolt", "Instant", "{3}{R}", { oracleText: "Test Bolt deals 3 damage to any target." }), "library");
+    const big = toZone(s0, ap, card("Big Bolt", "Instant", "{4}{R}", { oracleText: "Big Bolt deals 5 damage to any target." }), "library");
+    toZone(s0, ap, card("Blue Draw", "Instant", "{U}", { oracleText: "Draw a card." }), "library");
+    // Not attached: it can't be activated.
+    expect(planActivate(s0, ap, sf, 0)).toBeNull();
+    s0.objects[sf]!.attachedTo = b;
+    let s = passAll(run(s0, planActivate(s0, ap, sf, 0)));
+    expect(s.objects[sf]!.attachedTo).toBeUndefined();
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", cards: [bolt] });
+    expect(big).toBeDefined();
+    s = act(s, { type: "searchLibrary", player: ap, found: [bolt] });
+    expect(s.pending).toMatchObject({ kind: "castFree", objectId: bolt });
+    expect(s.objects[bolt]!.zone).toBe("library");
+    s = act(s, { type: "castSpell", player: ap, objectId: bolt, targets: [{ kind: "player", id: opp }] });
+    s = passAll(passAll(s));
+    expect(s.players[opp]!.life).toBe(37);
+    expect(s.objects[bolt]!.zone).toBe("graveyard");
+  });
+});
+
+describe("Arixmethes, Slumbering Isle", () => {
+  it("parse", () => supported(arixmethes));
+
+  it("a legendary land while it has a slumber counter; a 12/12 Kraken creature once the last one is gone", () => {
+    const { s: s0, ap, ids } = setup([opt, opt]);
+    const a = putOnBattlefield(s0, ap, arixmethes);
+    s0.objects[a]!.counters.slumber = 2;
+    invalidateCharacteristics(s0);
+    const c = () => characteristics(s0, s0.objects[a]!);
+    expect(c().types).toEqual(["Land"]);
+    expect(c().subtypes).toEqual([]);
+    expect(c().supertypes).toEqual(["Legendary"]);
+    expect(c().colors).toEqual(["G", "U"]);
+    let s = s0;
+    for (const id of ids) {
+      s = passAll(run(s, planCast(s, ap, id)));
+      expect(s.pending?.kind).toBe("chooseMay");
+      s = passAll(passAll(act(s, { type: "chooseMay", player: ap, yes: true })));
+    }
+    expect(s.objects[a]!.counters.slumber ?? 0).toBe(0);
+    expect(characteristics(s, s.objects[a]!).types).toEqual(["Creature"]);
+    expect(characteristics(s, s.objects[a]!).subtypes).toEqual(["Kraken"]);
+    expect(characteristics(s, s.objects[a]!).power).toBe(12);
   });
 });

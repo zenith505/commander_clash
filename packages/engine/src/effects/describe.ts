@@ -22,7 +22,9 @@ export function describeDest(d: SearchDest): string {
         ? d.third ? "into your library third from the top" : "on top of your library"
         : d.zone === "graveyard"
           ? "into your graveyard"
-          : "into exile";
+          : d.zone === "cast"
+            ? "to cast"
+            : "into exile";
 }
 
 const sign = (n: Amount) => (typeof n !== "number" ? describeAmount(n) : n >= 0 ? `+${n}` : `${n}`);

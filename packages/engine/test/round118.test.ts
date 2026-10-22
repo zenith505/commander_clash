@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, forest, passAll, passUntil, putOnBattlefield, scry, setup, swamp } from "./helpers";
-import { botActions, isFullySupported, planActivate, planCast, planMana, waitingOn, type Action, type GameState, type PlayerId } from "../src";
+import { botActions, isFullySupported, planActivate, planCast, planMana, planManaAbility, waitingOn, type Action, type GameState, type PlayerId } from "../src";
 import { destroyPermanent, moveObject, spellCost, tapPermanent } from "../src/game";
 import { parseManaCost } from "../src/mana";
 import { characteristics, invalidateCharacteristics } from "../src/layers";
@@ -937,5 +937,65 @@ describe("more popular cards, 2", () => {
     expect(abilities(ally)).toBeGreaterThan(0);
     expect(abilities(g)).toBeGreaterThan(0);
     expect(abilities(other)).toBe(0);
+  });
+});
+
+const reckless = card("Reckless Handling", "Instant", "{1}{R}", {
+  oracleText:
+    "Search your library for an artifact card, reveal it, put it into your hand, shuffle, then discard a card at random. If an artifact card was discarded this way, Reckless Handling deals 2 damage to each opponent.",
+});
+const gondGate = card("Gond Gate", "Land — Gate", "", {
+  oracleText: "Gates you control enter untapped.\n{T}: Add {C}.\n{T}: Add one mana of any color that a Gate you control could produce.",
+});
+const rakdosGate = card("Rakdos Guildgate", "Land — Gate", "", {
+  oracleText: "This land enters tapped.\n{T}: Add {B} or {R}.",
+});
+
+describe("more popular cards, 3", () => {
+  it("Reckless Handling: the found artifact discarded at random deals 2 damage to each opponent", () => {
+    expect(isFullySupported(reckless)).toBe(true);
+    const { s: s0, ap, ids } = setup([reckless]);
+    let s = s0;
+    for (const id of s.players[ap]!.hand.filter((id) => id !== ids[0])) moveObject(s, id, "library");
+    const art = putOnBattlefield(s, ap, card("Mind Stone", "Artifact", "{2}", { oracleText: "{T}: Add {C}." }));
+    moveObject(s, art, "library");
+    const life = s.turnOrder.map((p) => s.players[p]!.life);
+    s = run(s, planCast(s, ap, ids[0]!));
+    s = settle(s);
+    for (let i = 0; i < 5 && s.pending; i++) s = settle(run(s, botActions(s, s.pending.player)));
+    // The hand held only the found artifact, so the random discard took it (CR 701.9a).
+    expect(s.objects[art]!.zone).toBe("graveyard");
+    expect(s.turnOrder.map((p) => s.players[p]!.life)).toEqual(life.map((l, i) => (s.turnOrder[i] === ap ? l : l - 2)));
+  });
+
+  it("Reckless Handling: a nonartifact card discarded deals no damage", () => {
+    const { s: s0, ap, ids } = setup([reckless]);
+    let s = s0;
+    for (const id of s.players[ap]!.hand.filter((id) => id !== ids[0])) moveObject(s, id, "library");
+    const life = s.turnOrder.map((p) => s.players[p]!.life);
+    // No artifact in the library: the discard still happens (rulings), and the only card is a creature.
+    const b = putOnBattlefield(s, ap, bear());
+    moveObject(s, b, "hand");
+    s = run(s, planCast(s, ap, ids[0]!));
+    s = settle(s);
+    for (let i = 0; i < 5 && s.pending; i++) s = settle(run(s, botActions(s, s.pending.player)));
+    expect(s.objects[b]!.zone).toBe("graveyard");
+    expect(s.turnOrder.map((p) => s.players[p]!.life)).toEqual(life);
+  });
+
+  it("Gond Gate: Gates enter untapped, and it taps for a color a Gate you control could produce", () => {
+    expect(isFullySupported(gondGate)).toBe(true);
+    const { s: s0, ap, ids } = setup([rakdosGate]);
+    let s = s0;
+    const g = putOnBattlefield(s, ap, gondGate);
+    s = settle(act(s, { type: "playLand", player: ap, objectId: ids[0]! }));
+    expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
+    expect(s.objects[ids[0]!]!.tapped).toBe(false);
+    const pool = (mana: "R" | "G") => {
+      const t = run(structuredClone(s), planManaAbility(s, ap, g, 1, mana));
+      return t.players[ap]!.manaPool;
+    };
+    expect(pool("R").R).toBe(1);
+    expect(() => pool("G")).toThrow(/can't produce/);
   });
 });

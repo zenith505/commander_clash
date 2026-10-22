@@ -345,7 +345,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     o: GameObject,
     controller: PlayerId,
     pred: (event: string, t: TriggeredAbility) => boolean,
-    triggers = abilitiesOf(s, o).triggers,
+    triggersIn?: TriggeredAbility[],
     cause?: string,
     subject?: GameObject,
     lki?: LastKnown,
@@ -355,6 +355,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     colorsSpent?: number,
   ) => {
     if (locked?.(controller)) return;
+    // Passed-in abilities look back in time (a commander that left for the command zone still has its "leaves" trigger).
+    const triggers = triggersIn ?? abilitiesOf(s, o).triggers;
     const printed = compileCard(defOf(s, o)).triggers;
     // Two instances of one "triggers only once each turn" ability (two Dionus, Elvish Archdruid granting it) each
     // trigger once (rulings): the nth instance is used up once n of them have triggered this turn.
@@ -365,7 +367,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (hosting ? !t.host : t.host === "attached") return;
       if ((t.zone === "graveyard") !== fromYard) return;
       // In the command zone, only an eminence ability works (CR 113.6).
-      if (o.zone === "command" && !o.emblem && !t.eminence) return;
+      if (o.zone === "command" && !o.emblem && !t.eminence && !triggersIn) return;
       // An intervening "if" has to be true for it to trigger at all (CR 603.4).
       // "Max speed — Whenever ...": only while it has the ability (CR 702.178a).
       if (t.activeIf && !staticConditionNow(s, t.activeIf, o.id, controller)) return;

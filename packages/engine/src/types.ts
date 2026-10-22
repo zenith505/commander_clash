@@ -1643,6 +1643,8 @@ export interface Resolving {
   discarded?: Record<PlayerId, number>;
   /** The cards the last discard while this resolves put into a graveyard, as those objects ("the discarded card", Malcolm). */
   discardedCards?: { id: ObjectId; zc: number }[];
+  /** Every card discarded while this resolves, wherever it went (madness): "if an artifact card was discarded this way". */
+  discardedAll?: ObjectId[];
   /** The powers of the creature cards exiling graveyards exiled so far while this resolves ("exiled this way"). */
   exiledPowers?: number[];
   /**

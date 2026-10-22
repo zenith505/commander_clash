@@ -2761,6 +2761,8 @@ export type SpellCondition =
   | { kind: "rollIn"; min?: number; max?: number; event?: true }
   /** "If none of those creatures attacked you" (Firemane Commando): the attack trigger's event counted none attacking its controller. */
   | { kind: "noneAttackedYou" }
+  /** "If an artifact card was discarded this way" (Reckless Handling): one of the cards this resolution discarded, by its card (CR 701.9). */
+  | { kind: "discardedThisWayIs"; filter: TargetSpec }
   /** "If it's suspected, ...": the object, as the instruction is done (CR 701.60). */
   | { kind: "suspected"; what: ObjRef }
   /** "If the sacrificed creature was suspected" (Agency Coroner): the creature its sacrifice cost sacrificed, as it last
@@ -3551,7 +3553,7 @@ export type ManaProduce =
    * "One mana of any color that a land an opponent controls could produce" (Fellwar Stone, Exotic Orchard), "of any
    * type that a land you control could produce" (Reflecting Pool): what those lands' mana abilities would make (CR 106.7).
    */
-  | { kind: "landsCouldProduce"; whose: "you" | "opponent"; anyType?: boolean; /** "Add three mana of that type instead" (Incubation Druid). */ n?: number }
+  | { kind: "landsCouldProduce"; whose: "you" | "opponent"; anyType?: boolean; /** "That a Gate you control could produce" (Gond Gate). */ subtype?: string; /** "Add three mana of that type instead" (Incubation Druid). */ n?: number }
   /** "Add {W}{W}, {W}{U}, or {U}{U}" (filter lands): one of these combinations, chosen as it resolves (CR 605.3b). */
   | { kind: "combos"; options: ManaType[][] }
   /**

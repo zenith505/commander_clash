@@ -671,9 +671,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // "~ must be blocked each combat this turn if able" (Anzrag, the Quake-Mole): a blocking requirement (CR 509.1c) until
   // the turn ends.
-  if ((m = /^(.+?) must be blocked (?:each combat )?this turn if able$/i.exec(s))) {
+  if ((m = /^(.+?) must be blocked (?:each combat )?this turn if able$/i.exec(s)) && !/ and$/.test(m[1]!)) {
     const what = parseObject(m[1]!, ctx);
-    return what ? [{ type: "continuous", what, mods: [{ kind: "mustBeBlocked" }], duration: "endOfTurn" }] : null;
+    if (what) return [{ type: "continuous", what, mods: [{ kind: "mustBeBlocked" }], duration: "endOfTurn" }];
   }
   // "Target creature attacks this turn if able": in each combat this turn (CR 508.1d).
   if ((m = /^(.+?) attacks? (?:each combat )?this turn if able$/i.exec(s)) && !/ and$/.test(m[1]!)) {

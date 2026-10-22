@@ -61,16 +61,17 @@ export function commanderIdentity(s: GameState, pid: PlayerId): ManaType[] {
  * what those could produce, except the ones already being asked about (`asking`): Exotic Orchards that only see each
  * other make no mana (rulings).
  */
-function landsCouldProduce(s: GameState, pid: PlayerId, whose: "you" | "opponent", anyType: boolean, asking: ReadonlySet<ObjectId>): ManaType[] {
+function landsCouldProduce(s: GameState, pid: PlayerId, whose: "you" | "opponent", anyType: boolean, asking: ReadonlySet<ObjectId>, /** "A Gate you control" (Gond Gate). */ subtype?: string): ManaType[] {
   const out = new Set<ManaType>();
   for (const id of s.battlefield) {
     const land = obj(s, id);
     const ctrl = controllerOf(s, land);
     if (asking.has(id) || !objIsType(s, land, "Land") || (whose === "you" ? ctrl !== pid : ctrl === pid)) continue;
+    if (subtype && !characteristics(s, land).subtypes.includes(subtype)) continue;
     for (const ab of manaAbilitiesOn(s, land)) {
       if (ab.activeIf && !staticConditionNow(s, ab.activeIf, land.id, ctrl)) continue;
       const p = ab.produces;
-      const made = p.kind === "fixed" ? p.mana : p.kind === "landsCouldProduce" ? landsCouldProduce(s, ctrl, p.whose, !!p.anyType, new Set([...asking, id])) : manaChoices(s, land, ab);
+      const made = p.kind === "fixed" ? p.mana : p.kind === "landsCouldProduce" ? landsCouldProduce(s, ctrl, p.whose, !!p.anyType, new Set([...asking, id]), p.subtype) : manaChoices(s, land, ab);
       made.forEach((m) => out.add(m));
     }
     // Its activated mana abilities too ("{T}, Sacrifice a creature: Add {B}{B}"): whatever their costs (CR 106.7).
@@ -84,7 +85,7 @@ export function manaChoices(s: GameState, o: GameObject, ab: ManaAbility): ManaT
   const p = ab.produces;
   if (p.kind === "fixed") return [p.mana[0]!];
   if (p.kind === "oneOf") return p.options;
-  if (p.kind === "landsCouldProduce") return landsCouldProduce(s, controllerOf(s, o), p.whose, !!p.anyType, new Set([o.id]));
+  if (p.kind === "landsCouldProduce") return landsCouldProduce(s, controllerOf(s, o), p.whose, !!p.anyType, new Set([o.id]), p.subtype);
   if (p.kind === "chosenColor") {
     const c = o.chosen?.color;
     return [...(p.also ? [p.also] : []), ...(c && c !== p.also ? [c] : [])];

@@ -856,6 +856,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // "They lose 1 life and you put a -1/-1 counter on up to one target creature they control" (Persistent Constrictor): the
   // life, then the counter (the target chosen as the ability is put on the stack, CR 603.3d).
   text = text.replace(/^(they|that player) (loses?) (\d+) life and you (put an? [^.]+? counter on up to one target creature) (they|that player) controls?\./, (_, w: string, v: string, n: string, rest: string) => `${w === "they" ? "They" : "That player"} ${v} ${n} life. ${capital(rest)} that player controls.`);
+  // Reckless Handling: "..., put it into your hand, shuffle, then discard a card at random." The discard comes after the
+  // shuffle, found or not (rulings).
+  text = text.replace(/, put it into your hand, shuffle, then discard a card at random\./, ", put it into your hand, then shuffle. Discard a card at random.");
   // "~ deals damage to that player equal to the number of cards in their hand and you gain 1 life for each card in your
   // hand" (Sword of War and Peace): the damage, then the life; the cards counted as each part happens (CR 608.2c).
   text = text.replace(/^(~ deals damage to that player equal to the number of cards in their hand) and (you gain 1 life for each card in your hand)\./, "$1. $2.");
@@ -3073,6 +3076,19 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const inner = parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       effects.push({ type: "if", cond: { kind: "destroyedThisWay" }, effects: inner });
+      continue;
+    }
+    // "Discard a card at random. If an artifact card was discarded this way, ~ deals 2 damage to each opponent" (Reckless
+    // Handling): checked against the card this resolution's discard put into the graveyard (CR 701.9a).
+    const ifDiscarded = /^If an? (.+? card) was discarded this way, (.+)$/.exec(s);
+    if (ifDiscarded) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "discard") return null;
+      const filter = parseSearchFilter(ifDiscarded[1]!);
+      const then = ifDiscarded[2]!;
+      const inner = filter && parseOne(then.charAt(0).toUpperCase() + then.slice(1), ctx);
+      if (!filter || !inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
+      effects.push({ type: "if", cond: { kind: "discardedThisWayIs", filter }, effects: inner });
       continue;
     }
     // "Flip a coin. If you win the flip, ... If you lose the flip, ...": decided by that flip (CR 705.2); neither if it

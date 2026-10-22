@@ -794,7 +794,8 @@ export function compile(d: CardDef): CompiledCard {
     }
     const othersUntapped = /^([A-Z][a-z]+) you control enter untapped\.$/.exec(line);
     if (othersUntapped) {
-      const g = parseGroup(`${othersUntapped[1]} you control`, true);
+      // "Gates you control" (Gond Gate): a land type isn't read as a plural, "each Gate you control" is the same group.
+      const g = othersUntapped[1] === "Gates" ? parseGroup("each Gate you control") : parseGroup(`${othersUntapped[1]} you control`, true);
       if (g && !g.other) {
         (out.othersEnterUntapped ??= []).push({ filter: g.filter, text: line });
         continue;

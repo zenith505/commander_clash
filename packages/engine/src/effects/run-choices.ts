@@ -411,6 +411,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? !!ctx.sacrificed?.[0]?.suspected
             : e.cond.kind === "sacrificedLegendary"
             ? !!ctx.sacrificed?.[0]?.legendary
+            : e.cond.kind === "discardedThisWayIs"
+            ? ((f) => (s.resolving!.discardedAll ?? []).some((id) => !!s.objects[id] && printedMatches(f, defOf(s, s.objects[id]!))))(e.cond.filter)
             : e.cond.kind === "discardedIs"
             ? ((f) => (s.resolving!.item.costDiscarded ?? []).some((k) => !!s.cards[k] && printedMatches(f, s.cards[k]!)))(e.cond.filter)
             : e.cond.kind === "suspected"

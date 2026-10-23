@@ -1256,6 +1256,8 @@ export interface TurnLog {
   toGraveyard?: Record<number, number>;
   /** Each event this turn that discarded cards: who discarded them, and the cards (keys into `cards`). */
   discards?: { player: PlayerId; cards: string[] }[];
+  /** Each event that put cards into graveyards this turn: the cards (CardDef keys), by their owner (Crawling Sensation's "for the first time each turn"). */
+  toGraveyardEvents?: { player: PlayerId; cards: string[] }[];
   /** Cards put into graveyards from anywhere, anyone's, counted by each card type they had there (Case of the Gorgon's Kiss). */
   toGraveyardTypes?: Record<string, number>;
   /** Life each player gained in total (Case of the Uneaten Feast). */

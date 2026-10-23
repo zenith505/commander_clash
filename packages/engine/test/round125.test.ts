@@ -261,3 +261,39 @@ describe("Gluntch, the Bestower: three different players, chosen in turn (ruling
     expect(logText(s)).toMatch(/[ACD] creates 2 Treasure tokens \(Gluntch, the Bestower\)\./);
   });
 });
+
+const crawling = card("Crawling Sensation", "Enchantment", "{2}{G}", {
+  keywords: ["Mill"],
+  oracleText: "At the beginning of your upkeep, you may mill two cards. (You may put the top two cards of your library into your graveyard.)\nWhenever one or more land cards are put into your graveyard from anywhere for the first time each turn, create a 1/1 green Insect creature token.",
+});
+const millSpell = (name: string) => card(name, "Sorcery", "{U}", { oracleText: "Mill four cards." });
+
+describe("Crawling Sensation: \"for the first time each turn\" on a batch of land cards put into your graveyard", () => {
+  const insects = (s: GameState, pid: number) => s.battlefield.filter((id) => s.objects[id]!.controller === pid && s.cards[s.objects[id]!.cardId]!.name.startsWith("Insect")).length;
+  /** The top four cards of `pid`'s library made Forests. */
+  const landsOnTop = (s: GameState, pid: number) => {
+    const forest = s.players[pid]!.library.find((id) => s.cards[s.objects[id]!.cardId]!.name === "Forest")!;
+    const forests = s.players[pid]!.library.filter((id) => s.objects[id]!.cardId === s.objects[forest]!.cardId).slice(0, 8);
+    s.players[pid]!.library = [...forests, ...s.players[pid]!.library.filter((id) => !forests.includes(id))];
+  };
+
+  it("milling four lands makes one Insect; milling more lands that turn makes none", () => {
+    supported(crawling);
+    const { s: s0, ap, ids } = setup([millSpell("Mill A"), millSpell("Mill B")]);
+    putOnBattlefield(s0, ap, crawling);
+    landsOnTop(s0, ap);
+    let s = settleBots(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(insects(s, ap)).toBe(1);
+    s = settleBots(run(s, planCast(s, ap, ids[1]!)));
+    expect(insects(s, ap)).toBe(1);
+  });
+
+  it("a land put into your graveyard earlier this turn, before it was there, counts as the first time", () => {
+    const { s: s0, ap, ids } = setup([millSpell("Mill A"), millSpell("Mill B")]);
+    landsOnTop(s0, ap);
+    let s = settleBots(run(s0, planCast(s0, ap, ids[0]!)));
+    putOnBattlefield(s, ap, crawling);
+    s = settleBots(run(s, planCast(s, ap, ids[1]!)));
+    expect(insects(s, ap)).toBe(0);
+  });
+});

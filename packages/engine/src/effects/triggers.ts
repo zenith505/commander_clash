@@ -1455,6 +1455,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (b.fromGraveyard && !matched.some(fromYard)) continue;
         if (b.first && b.what === "created" && (s.turnLog?.tokensCreated ?? []).filter((c) => c.player === you).length > n) continue;
         if (b.first && b.what === "discards" && (s.turnLog?.discards ?? []).some((d) => (b.whose !== "you" || d.player === you) && d.cards.some((c) => !b.filter || printedMatches(b.filter, s.cards[c]!)))) continue;
+        if (b.first && b.what === "toGraveyard" && (s.turnLog?.toGraveyardEvents ?? []).some((d) => (b.whose !== "you" || d.player === you) && d.cards.some((c) => !b.filter || printedMatches(b.filter, s.cards[c]!)))) continue;
         // "Whenever one or more creatures enter / die": caused by each of them entering or dying (CR 603.2d).
         const died = matched.filter((m) => m.from === "battlefield" && m.to === "graveyard" && m.snapshot && m.chars?.types.includes("Creature"));
         causedBy =
@@ -1490,6 +1491,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const discards = new Map<PlayerId, string[]>();
     for (const m of ev.moves) if (m.discardedBy !== undefined) discards.set(m.discardedBy, [...(discards.get(m.discardedBy) ?? []), m.card]);
     for (const [player, cards] of discards) ((s.turnLog ??= {}).discards ??= []).push({ player, cards });
+    const toYard = new Map<PlayerId, string[]>();
+    for (const m of ev.moves) if (m.to === "graveyard") toYard.set(m.owner, [...(toYard.get(m.owner) ?? []), m.card]);
+    for (const [player, cards] of toYard) ((s.turnLog ??= {}).toGraveyardEvents ??= []).push({ player, cards });
   } else if (ev.type === "step") {
     // Delayed triggers whose moment this is (CR 603.7): each triggers once.
     // An additional end step (Y'shtola Rhul): one made during an earlier end step of this turn is due now (rulings).

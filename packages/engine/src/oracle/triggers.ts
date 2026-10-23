@@ -996,11 +996,13 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     // Laelia: cards exiled from either zone in one event, by anyone, for any reason (rulings).
     batch = { what: "exiledFromLibraryOrGraveyard", whose: "you" };
     rest = m[1]!;
-  } else if ((m = /^Whenever one or more (?:(.+?) )?cards are put into your graveyard from (anywhere|your library)( during your turn)?, (.+)$/.exec(line))) {
+  } else if ((m = /^Whenever one or more (?:(.+?) )?cards are put into your graveyard from (anywhere|your library)( during your turn| for the first time each turn)?, (.+)$/.exec(line))) {
+    // Crawling Sensation: "for the first time each turn", counting events before it was on the battlefield.
     const filter = batchCards(m[1]);
     if (filter === null) return "fail";
-    batch = { what: "toGraveyard", whose: "you", ...(filter ? { filter } : {}), ...(m[2] === "your library" ? { from: "library" as const } : {}) };
-    yourTurn = !!m[3];
+    const first = m[3] === " for the first time each turn";
+    batch = { what: "toGraveyard", whose: "you", ...(filter ? { filter } : {}), ...(m[2] === "your library" ? { from: "library" as const } : {}), ...(first ? { first: true as const } : {}) };
+    yourTurn = !!m[3] && !first;
     rest = m[4]!;
   } else if ((m = /^Whenever a player mills one or more (?:(.+?) )?cards, (.+)$/.exec(line))) {
     // Zellix, Sanity Flayer: cards a mill instruction put there (CR 701.17a), once for each player who milled them.

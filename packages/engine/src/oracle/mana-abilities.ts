@@ -82,6 +82,12 @@ export function parseManaAbility(line0: string): ManaAbility | null {
     }
     else if (extra === "If that mana is spent on an instant or sorcery spell, that spell can't be countered.") out.spentUncounterable = true;
     else if (extra === "If this mana is spent to cast a creature spell, that creature enters with an additional +1/+1 counter on it.") out.spentCreatureCounter = true;
+    else if (/^When you next cast an? [a-z ]+ spell this turn, /.test(extra) && !out.nextCast) {
+      const body = parseBody(extra);
+      const e = body?.effects.length === 1 && !body.targets.length ? body.effects[0]! : undefined;
+      if (e?.type !== "nextCast" || e.cascade || e.who) return null;
+      out.nextCast = e;
+    }
     else if (extra === "If you spend this mana to cast your commander, it enters with a number of additional +1/+1 counters on it equal to the number of times it's been cast from the command zone this game.") out.spentCommanderCounters = true;
     // Depletion lands: "Put a depletion counter on ~.", "If there are no depletion counters on ~, sacrifice it."
     else if ((m2 = new RegExp(`^Put an? ${COUNTER} counter on ~\\.$`).exec(extra)) && !out.putCounter) out.putCounter = counterKind(m2[1]!);
@@ -258,6 +264,7 @@ function parseManaProduced(text: string): ManaProduce | null {
   const any = new RegExp(`^${NUM} mana of any (?:one )?color$`).exec(text);
   if (any) return { kind: "oneOf", options: ALL_COLORS, amount: num(any[1]!) };
   if (text === "one mana of any color in your commander's color identity") return { kind: "commanderIdentity" };
+  if (text === "one mana of ~'s last noted type") return { kind: "noted" };
   const could = /^one mana of any (color|type) that a (land|Gate) (you control|an opponent controls) could produce$/.exec(text);
   if (could) return { kind: "landsCouldProduce", whose: could[3] === "you control" ? "you" : "opponent", ...(could[1] === "type" ? { anyType: true } : {}), ...(could[2] === "Gate" ? { subtype: "Gate" } : {}) };
   // "one mana of the chosen color", "{B} or one mana of the chosen color" (chosen as it entered).

@@ -352,6 +352,12 @@ export function normalizeSelf(d: CardDef): string {
     t = t.replace(re, "~");
   }
   t = t.replace(/\u0001(\d+)\u0001/g, (_, i: string) => tokenNames[Number(i)]!);
+  // A card named for two characters ("Aang and La, Ocean's Fury", "Bebop & Rocksteady") takes plural verbs: "Whenever
+  // Aang and La attack", "Whenever ~ enter or attack". It's still one object (CR 201.5), read as "~ attacks".
+  if (/ (?:and|&) /.test(comma)) {
+    const third = (v: string) => (v === "die" ? "dies" : `${v}s`);
+    t = t.replace(/~ (attack|enter|deal|block|die)(?: or (attack|enter|block|die))?\b/g, (_, a: string, b?: string) => `~ ${third(a)}${b ? ` or ${third(b)}` : ""}`);
+  }
   // A legendary character card refers to itself as "he" or "she" ("Put a +1/+1 counter on Hercules. He gains
   // vigilance", "his power", "attach up to one target Equipment to her"): the card itself, like "it" (CR 201.5). Not in
   // a quoted ability, where it would mean the object given the ability, and not "his or her" (an old way to say "their").
@@ -678,6 +684,11 @@ export function compile(d: CardDef): CompiledCard {
       else out.unsupported.push(raw);
       continue;
     }
+    // Mayhem without a cost (CR 702.187c): a land played from the graveyard the turn it was discarded.
+    if (line === "Mayhem" && d.types.includes("Land") && d.types.length === 1) {
+      out.mayhemLand = true;
+      continue;
+    }
     const yard = parseGraveyardKeyword(line, d);
     if (yard !== null) {
       if (yard === "fail") out.unsupported.push(raw);
@@ -913,6 +924,15 @@ export function compile(d: CardDef): CompiledCard {
       (out.entersWithAdditional ??= []).push({ counter: counterKind(selfExtra[2]!), n: /^an?$/.test(selfExtra[1]!) ? 1 : num(selfExtra[1]!) });
       continue;
     }
+    // Ral, Leyline Prodigy: "~ enters with an additional loyalty counter on ~ for each instant and sorcery spell you've
+    // cast this turn": counted as it enters (CR 614.1c), spells countered or still on the stack too (rulings).
+    const selfEach = new RegExp(`^~ enters with an additional ${COUNTER} counter on (?:~|it) for each (.+)\\.$`).exec(line);
+    const eachN = selfEach ? parseCount(selfEach[2]!.replace(/ spell you've cast this turn$/, " spells you've cast this turn"), null) : null;
+    if (selfEach) {
+      if (!eachN) out.unsupported.push(raw);
+      else (out.entersWithAdditional ??= []).push({ counter: counterKind(selfEach[1]!), n: eachN });
+      continue;
+    }
     // "As this creature transforms into Sephiroth, One-Winged Angel, you get an emblem with ..." (CR 712.20): instructions
     // with no targets, done as it transforms.
     const asTransforms = /^As ~ transforms into ~, (.+)$/.exec(line);
@@ -924,6 +944,10 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "As ~ enters, choose a player." (CR 614.12): True-Name Nemesis's "the chosen player". "Secretly choose an opponent"
     // (Guardian Archon): the same, but only its controller knows who until it's revealed.
+    if (/^As ~ enters, choose two players\.$/.test(line) && !out.entersChoosePlayer) {
+      out.entersChooseTwoPlayers = true;
+      continue;
+    }
     const choosePlayer = /^As (?:~|it) enters, (secretly )?choose (a player|an opponent)\.$/.exec(line);
     if (choosePlayer && !out.entersChoosePlayer) {
       out.entersChoosePlayer = choosePlayer[2] === "a player" ? "player" : "opponent";
@@ -1575,6 +1599,10 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Nowhere to Run: creatures its controller's opponents control can be targeted as though they didn't have hexproof
     // (nor any "hexproof from", CR 702.11e), by anyone's spells and abilities; their ward abilities don't trigger (rulings).
+    if (line === "Creatures your opponents control with hexproof can be the targets of spells and abilities you control as though they didn't have hexproof.") {
+      out.seesOpponentsCreatures = true;
+      continue;
+    }
     if (line === "Creatures your opponents control can be the targets of spells and abilities as though they didn't have hexproof. Ward abilities of those creatures don't trigger.") {
       out.exposesOpponentsCreatures = true;
       continue;
@@ -3117,6 +3145,8 @@ function checkCastingLinks(out: CompiledCard) {
   if (out.nameBans || out.protectionFromChosenName) needs.add("cardName");
   if (out.noncreatureChosenMvCantBeCast) needs.add("number");
   if ([...needs].some((k) => !choices.has(k))) bad = true;
+  // Sower of Discord's trigger is about the two players chosen as it entered, and only that.
+  if (out.triggers.some((tr) => tr.event === "chosenPlayerDealtDamage") !== !!out.entersChooseTwoPlayers) bad = true;
   // "If the discarded card ..." needs a discard cost: the spell's, or the activated ability's own.
   const discIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"discardedIs"');
   if (discIn(out.spell) && !out.additionalCosts?.some((c) => c.kind === "discard")) bad = true;

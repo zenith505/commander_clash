@@ -542,6 +542,8 @@ export interface GameObject {
   entersGaining?: string;
   /** "As ~ enters, choose a creature type / color": what was chosen (CR 614.12). Forgotten when it leaves (CR 400.7). */
   chosen?: Chosen;
+  /** Jeweled Amulet: the type of mana last noted for it ("note the type of mana spent to pay this activation cost"). */
+  notedMana?: ManaType;
   /** A battle's protector (CR 310.9), chosen as it enters (310.9a) and again when that player can't be (704.5x-y). */
   protector?: PlayerId;
   /** How many permanents it devoured as it entered (CR 702.82b), for "for each creature it devoured". */
@@ -826,6 +828,8 @@ export interface StackItem {
   manaAbility?: { index: number; tapped: boolean; extra?: ManaType[]; /** What its source was as it was activated: a snow permanent, a Treasure, a creature, an artifact (CR 106.3). */ from?: ManaOrigin[] };
   /** For an activated ability: how much mana from Treasures was spent to activate it (CR 106.3). */
   treasureSpent?: number;
+  /** For an activated ability: the mana spent to pay its cost, one entry for each mana (Jeweled Amulet's note). */
+  manaSpentTypes?: ManaType[];
   /** A triggered ability's intervening "if": it does nothing unless this is still true as it resolves (CR 603.4). */
   ifCond?: StaticCondition;
   /** For a spell: how many spells were cast before it this turn (storm, CR 702.40a). */
@@ -1480,6 +1484,8 @@ export interface GameState {
   /** The key of the added combat phase going on now (see addedPhases), and the last key given out. */
   thatCombat?: number;
   combatKeys?: number;
+  /** Added combat phases (by key) only creatures matching the filter can attack in (Bumi, Unleashed); this turn only. */
+  combatAttackOnly?: Record<number, TargetSpec>;
   /** While added phases run: the step the turn's own order goes on with once they're done (CR 500.8). */
   resumeStep?: Step;
   /** "Your opponents can't cast spells this turn" (Silence): who can't cast what, until that turn ends (CR 101.2). */
@@ -1635,7 +1641,7 @@ export interface GameState {
   untilReturns?: { auras: { id: ObjectId; zc: number; under: PlayerId; source: string; asking?: true }[]; returned: ObjectId[] };
   /** Legends chosen to keep under the legend rule (CR 704.5j), until the state-based actions are next performed. */
   legendKeep?: ObjectId[];
-  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; names?: TargetSpec; purpose?: NamePurpose; options?: string[]; range?: { min: number; max: number }; secret?: true; /** "Look at an opponent's hand" once that opponent is chosen (Arachne). */ lookHand?: true; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean; controlChosen?: boolean } }[];
+  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; names?: TargetSpec; purpose?: NamePurpose; options?: string[]; range?: { min: number; max: number }; secret?: true; /** "Look at an opponent's hand" once that opponent is chosen (Arachne). */ lookHand?: true; /** One of "two players" (Sower of Discord): added to Chosen.players, not one chosen before. */ pair?: true; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean; controlChosen?: boolean } }[];
   nextId: number;
   /**
    * Resolutions in a row in this step with every player only passing priority, and the states they left (as hashes,
@@ -1708,7 +1714,11 @@ export interface TurnRule {
    * "extraLoyalty": The Chain Veil's "for each planeswalker you control, you may activate one of its loyalty abilities once
    * this turn as though none of its loyalty abilities have been activated this turn": one more each, each time (rulings).
    */
-  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable" | "creatureSpellsUncounterable" | "extraLoyalty";
+  /**
+   * "seeHexproof": Detection Tower's "your opponents and creatures your opponents control with hexproof can be the targets
+   * of spells and abilities you control as though they didn't have hexproof" (CR 702.11e: "hexproof from" too).
+   */
+  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable" | "creatureSpellsUncounterable" | "extraLoyalty" | "seeHexproof";
   /** "Can't be countered by blue or black spells this turn" (Autumn's Veil): only by spells of these colors, as they resolve. */
   byColors?: Color[];
 }
@@ -1777,6 +1787,11 @@ export interface Resolving {
   drawnThisWay?: ObjectId[];
   /** The cards the draw instruction before this one drew ("each opponent who drew a card this way", Cut a Deal). */
   drawnBefore?: ObjectId[];
+  /**
+   * While a draw effect works out how many to draw: "for each card drawn this way" is the draw before it (drawnBefore)
+   * then; any other effect after a draw counts that draw's cards (drawnThisWay; Communal Brewing's counters).
+   */
+  drawing?: true;
   /** How many cards each player discarded so far while this resolves ("draw that many cards"). */
   discarded?: Record<PlayerId, number>;
   /** The cards the last discard while this resolves put into a graveyard, as those objects ("the discarded card", Malcolm). */
@@ -2059,6 +2074,8 @@ export interface Resolving {
     searchZones?: string;
     /** The card a "you may cast target card ... without paying its mana cost" offered (castTargetFree). */
     castingTarget?: ObjectId;
+    /** Rona, Tolarian Obliterator (Effect "exileRandomThenPlay"): the card exiled, and whether it's been offered. */
+    exiledAtRandom?: { id: ObjectId; zc: number; asked?: true };
     /** castTargetFree with several targets: the ones offered already. */
     castTargetsDone?: ObjectId[];
     /** castLinkedCopy: the copy of the exiled card offered to be cast. */

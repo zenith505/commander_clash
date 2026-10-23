@@ -91,10 +91,12 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "addPhases": {
       // "At the beginning of that combat, ...": a delayed trigger for this added combat phase only (CR 603.7; rulings on
       // Moraug: not the turn's regular combat).
-      const key = e.thatCombat ? (s.combatKeys = (s.combatKeys ?? 0) + 1) : undefined;
+      const key = e.thatCombat || e.onlyAttack ? (s.combatKeys = (s.combatKeys ?? 0) + 1) : undefined;
       const item = s.resolving?.item;
       const me = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
-      if (addPhases(s, e.phases, e.after, key) && e.thatCombat && me) {
+      const added = addPhases(s, e.phases, e.after, key);
+      if (added && e.onlyAttack && key !== undefined) (s.combatAttackOnly ??= {})[key] = e.onlyAttack;
+      if (added && e.thatCombat && me) {
         addDelayed(s, "thatCombat", ctx.controller, me, { targets: [], effects: e.thatCombat.effects, text: e.thatCombat.text });
         s.delayed![s.delayed!.length - 1]!.combat = key;
       }
@@ -226,6 +228,10 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         return;
       }
       for (const rule of e.rules) (s.turnRules ??= []).push({ turn: s.turn, player: ctx.controller, rule, ...(e.byColors ? { byColors: e.byColors } : {}) });
+      if (e.rules[0] === "seeHexproof") {
+        log(s, `${player(s, ctx.controller).name}'s spells and abilities can target their opponents and their creatures as though they didn't have hexproof this turn.`);
+        return;
+      }
       if (e.rules[0] === "extraLoyalty") {
         log(s, `${player(s, ctx.controller).name} may activate a loyalty ability of each planeswalker they control once more this turn.`);
         return;
@@ -315,7 +321,9 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const queue = (sc.drawQueue ??= players(s, e.who, ctx));
       while (queue.length) {
         const pid = queue.shift()!;
+        s.resolving!.drawing = true;
         const n = amountNow(s, e.n, { ...ctx, eachOne: pid });
+        s.resolving!.drawing = undefined;
         log(s, `${player(s, pid).name} draws ${n} card${n === 1 ? "" : "s"}.`);
         if (!draw(s, pid, n)) return "paused";
       }

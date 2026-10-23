@@ -683,6 +683,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return { kind: "selfCounter", counter: counterKind(m[1]!) };
   // Dark Depths: "When ~ has no ice counters on it" (a state trigger, CR 603.8).
   if ((m = new RegExp(`^~ has no ${COUNTER} counters on it$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[1]!), min: 0, max: 0 };
+  // Jeweled Amulet: "Activate only if there are no charge counters on ~".
+  if ((m = new RegExp(`^there are no ${COUNTER} counters on ~$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[1]!), min: 0, max: 0 };
   // Temple of Cyclical Time: "Activate only if it has no time counters on it": it is ~.
   if ((m = new RegExp(`^it has no ${COUNTER} counters on it$`).exec(text)) && st.affects.kind === "self") return { kind: "selfCounters", counter: counterKind(m[1]!), min: 0, max: 0 };
   // Beastmaster Ascension: "as long as ~ has seven or more quest counters on it".

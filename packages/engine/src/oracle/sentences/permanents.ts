@@ -65,7 +65,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // "That creature enters with an additional +1/+1 counter on it" about a creature spell a cast trigger is about (Boreal
   // Outrider): the spell, as it resolves (CR 614.1c).
   if ((m = new RegExp(`^[Tt]hat creature enters with (an|${NUMX}) additional ${COUNTER} counters? on it$`).exec(s)))
-    return ctx.castSpell && m[1] !== "X" ? [{ type: "spellEntersWith", counter: counterKind(m[m.length - 1]!), n: m[1] === "an" ? 1 : amt(m[1]!) }] : null;
+    // "That creature enters with X additional +1/+1 counters on it, where X is the number of ingredient counters on ~"
+    // (Communal Brewing): X counted as the trigger resolves (rulings), with ~'s last known counters if it has left.
+    return ctx.castSpell && (m[1] !== "X" || ctx.whereX) ? [{ type: "spellEntersWith", counter: counterKind(m[m.length - 1]!), n: m[1] === "an" ? 1 : amt(m[1]!) }] : null;
   // "It gains haste until end of turn" about the spell a cast trigger is about (Tyvar Kell's emblem): the permanent it
   // becomes has it until end of turn (CR 400.7a, rulings on Tyvar Kell).
   // "It gains rebound" (Narset Transcendent): as it resolves (CR 702.88a).
@@ -567,7 +569,18 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return who && what?.ref === "target" && !what.n ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: "game", giveTo: who }] : null;
   }
   // "That player gains control of ~" (Coveted Jewel): the trigger's player, for the rest of the game (layer 2).
-  if (/^[Tt]hat player gains control of ~$/.test(s) && ctx.eventPlayer) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "eventPlayer" } }];
+  // Jeweled Amulet: "Note the type of mana spent to pay this activation cost."
+  if (s === "Note the type of mana spent to pay this activation cost" && ctx.activated) return [{ type: "noteManaSpent" }];
+  // Slicer, Hired Muscle: "... until end of turn" (CR 611.2a), ending in the cleanup step (514.2).
+  if ((m = /^[Tt]hat player gains control of ~( until end of turn)?$/.exec(s)) && ctx.eventPlayer) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: m[1] ? "endOfTurn" : "game", giveTo: { ref: "eventPlayer" } }];
+  // Slicer, Hired Muscle: "untap ~, goad it, and it can't be sacrificed this turn". Goaded by the ability's controller
+  // (CR 701.15a), even while another player controls it; "can't be sacrificed" (CR 701.21) until the cleanup step.
+  if (/^Untap ~, goad it, and it can't be sacrificed this turn$/.test(s))
+    return [
+      { type: "untap", what: { ref: "self" } },
+      { type: "continuous", what: { ref: "self" }, mods: [{ kind: "goad" }], duration: "yourNextTurn" },
+      { type: "continuous", what: { ref: "self" }, mods: [{ kind: "cantBeSacrificed" }], duration: "endOfTurn" },
+    ];
   // Alexios: "that player gains control of ~, untaps it, and puts a +1/+1 counter on it": that player puts the counter.
   if ((m = /^[Tt]hat player gains control of ~, untaps it, and puts (a|two|three) \+1\/\+1 counters? on it$/.exec(s)) && ctx.eventPlayer)
     return [
@@ -789,6 +802,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // "~ becomes a Kithkin Spirit with base power and toughness 2/2" (Figure of Destiny), '~ gains "Whenever ~ deals combat
   // damage to a player, draw a card."' (Ascendant Spirit): no duration, so for as long as it stays on the battlefield
   // (CR 611.2a; a new object after a zone change, CR 400.7). New creature types replace its others (rulings).
+  // Clavileño: 'It gains "When this creature dies, ..."' about a target: no duration, so for as long as it stays on the
+  // battlefield (CR 611.2a), even if it stops being what it was targeted as.
+  if ((m = /^([Tt]arget .+?|It) gains ("[^"]+")$/.exec(s))) {
+    const what = parseObject(m[1]!.replace(/^It$/, "it"), ctx);
+    const grant = what?.ref === "target" && !what.n ? parseGrants(m[2]!) : null;
+    if (what && grant?.length && grant.every((x) => x.kind === "addAbility")) return [{ type: "continuous", what, mods: grant, duration: "game" }];
+  }
   if ((m = /^~ ((?:becomes?|gains?) .+)$/.exec(s)) && !ctx.spell) {
     const what = parseObject("~", ctx);
     const mods = what?.ref === "self" ? parseChanges(m[1]!) : null;

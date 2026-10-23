@@ -76,14 +76,14 @@ function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObjec
  * from it stays put. Cards that aren't Auras are skipped. `onlyTo`: "attached to ~" (Light-Paws), only that permanent, if
  * it could enchant it (null: it's gone, so nothing).
  */
-export function chooseAuraHosts(s: GameState, cards: { o: GameObject; under: PlayerId; face?: number }[], src: string, onlyTo?: ObjectId | null): "paused" | Map<ObjectId, AuraHost> {
+export function chooseAuraHosts(s: GameState, cards: { o: GameObject; under: PlayerId; face?: number }[], src: string, onlyTo?: ObjectId | null, onCreature?: boolean): "paused" | Map<ObjectId, AuraHost> {
   const sc = (s.resolving!.scratch ??= {});
   const hosts = (sc.auraHosts ??= {});
   for (const { o, under, face } of cards) {
     // A card entering transformed is an Aura, and enchants, as its back face (CR 712.14a, 303.4f).
     const d = asFace(s, o, face, () => defOf(s, o));
     if (!d.subtypes.includes("Aura") || hosts[o.id] !== undefined) continue;
-    const options = asFace(s, o, face, () => auraHostOptions(s, o, under)).filter((h) => onlyTo === undefined || ("attachTo" in h && h.attachTo === onlyTo));
+    const options = asFace(s, o, face, () => auraHostOptions(s, o, under)).filter((h) => (onlyTo === undefined || ("attachTo" in h && h.attachTo === onlyTo)) && (!onCreature || ("attachTo" in h && s.objects[h.attachTo]?.zone === "battlefield" && objIsType(s, obj(s, h.attachTo), "Creature"))));
     if (options.length <= 1) {
       hosts[o.id] = options[0] ? auraHostKey(options[0]) : "none";
       continue;
@@ -844,6 +844,45 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (freeCastable(s, p.id, o.id)) return "paused";
       s.pending = null;
       log(s, `${src} can't be cast.`);
+      return;
+    }
+    case "exileRandomThenPlay": {
+      const sc = (s.resolving!.scratch ??= {});
+      if (!sc.exiledAtRandom) {
+        const pid = players(s, e.who, ctx)[0];
+        const hand = pid === undefined ? [] : player(s, pid).hand;
+        if (pid === undefined || !hand.length) return;
+        const id = hand[Math.floor(nextRandom(s) * hand.length)]!;
+        log(s, `${player(s, pid).name} exiles ${defOf(s, obj(s, id)).name} from their hand at random.`);
+        moveObject(s, id, "exile");
+        if (obj(s, id).zone !== "exile") return;
+        sc.exiledAtRandom = { id, zc: obj(s, id).zoneChanges ?? 0 };
+      }
+      const got = sc.exiledAtRandom;
+      const o = s.objects[got.id];
+      // Still that card in exile (CR 400.7).
+      if (!o || o.zone !== "exile" || (o.zoneChanges ?? 0) !== got.zc) return;
+      const name = defOf(s, o).name;
+      const you = player(s, ctx.controller);
+      if (isType(defOf(s, o), "Land")) {
+        if (!got.asked) {
+          got.asked = true;
+          sc.may = undefined;
+          s.pending = { kind: "chooseMay", player: you.id, prompt: `put ${name} onto the battlefield under your control`, source: src, card: o.id };
+          return "paused";
+        }
+        if (!sc.may) return;
+        sc.may = undefined;
+        moveObject(s, o.id, "battlefield", { controller: you.id });
+        log(s, `${you.name} puts ${name} onto the battlefield.`);
+        return;
+      }
+      if (got.asked) return;
+      got.asked = true;
+      s.pending = { kind: "castFree", player: you.id, objectId: o.id, source: src };
+      if (freeCastable(s, you.id, o.id)) return "paused";
+      s.pending = null;
+      log(s, `${name} can't be cast.`);
       return;
     }
     case "madness": {
@@ -1996,7 +2035,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       const cards = sc.found.map((id) => obj(s, id)).filter((o) => o.zone === "graveyard");
       const under = (o: GameObject) => (e.owners ? o.owner : ctx.controller);
-      const hosts = chooseAuraHosts(s, cards.map((o) => ({ o, under: under(o) })), src);
+      const hosts = chooseAuraHosts(s, cards.map((o) => ({ o, under: under(o) })), src, undefined, e.auraOnCreature);
       if (hosts === "paused") return "paused";
       const ids = cards.filter((o) => !defOf(s, o).subtypes.includes("Aura") || hosts.has(o.id)).map((o) => o.id);
       if (ids.length) log(s, `${src} returns ${ids.map((id) => defOf(s, s.objects[id]!).name + (hosts.has(id) ? ` (enchanting ${auraHostName(s, hosts.get(id)!)})` : "")).join(", ")} to the battlefield${e.tapped ? ", tapped" : ""}.`);
@@ -2472,13 +2511,14 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       for (const id of ids) {
         moveObject(s, id, "exile");
         const o = obj(s, id);
+        if (e.castFilter && !printedMatches(e.castFilter, defOf(s, o))) continue;
         o.mayPlay = { player: p.id, zc: o.zoneChanges ?? 0, until: e.until, turn: s.turn, ...(e.castOnly ? { castOnly: true as const } : {}), ...(e.free ? { free: true as const } : {}), ...(e.orPay ? { orPay: true as const } : {}), ...(e.anyType ? { anyType: true as const } : {}), ...(e.attackedWithToken ? { attackedWithToken: true as const } : {}) };
         if (e.linked && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
       }
       if (ids.length === 1 && s.resolving) s.resolving.exiledTop = { id: ids[0]!, zc: s.objects[ids[0]!]!.zoneChanges ?? 0 };
       if (s.resolving) (s.resolving.impulsed ??= []).push(...ids);
       if (ids.length)
-        log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of ${from === p.id ? "their" : `${player(s, from).name}'s`} library and may ${e.castOnly ? "cast" : "play"} ${ids.length === 1 ? "it" : "them"}${e.free ? (e.orPay ? ", with or without paying their mana costs" : " without paying its mana cost") : ""}${e.until === "thisTurn" ? " this turn" : e.until === "nextTurn" ? " until the end of their next turn" : e.until === "yourNextEndStep" ? " until their next end step" : ""}${e.attackedWithToken ? " during any turn they attacked with a token" : ""}.`);
+        log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of ${from === p.id ? "their" : `${player(s, from).name}'s`} library and may ${e.castOnly ? "cast" : "play"} ${e.castFilter ? `the ${e.castFilter.text.replace(/ card$/, "")} spells among them` : ids.length === 1 ? "it" : "them"}${e.free ? (e.orPay ? ", with or without paying their mana costs" : " without paying its mana cost") : ""}${e.until === "thisTurn" ? " this turn" : e.until === "nextTurn" ? " until the end of their next turn" : e.until === "yourNextEndStep" ? " until their next end step" : ""}${e.attackedWithToken ? " during any turn they attacked with a token" : ""}.`);
       return;
     }
   }

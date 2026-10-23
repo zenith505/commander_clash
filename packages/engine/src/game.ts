@@ -882,6 +882,7 @@ export function moveObject(
   o.haunting = undefined; // a haunting card that leaves exile is a new object that haunts nothing (CR 400.7, 702.55b)
   o.escaped = escaped || undefined; // CR 702.138b
   o.chosen = undefined;
+  o.notedMana = undefined; // a new object (CR 400.7)
   o.protector = undefined;
   // A Room enters with the door that was cast unlocked, and from anywhere but the stack with both locked (CR 709.5d,
   // rulings). On the battlefield it's the whole card, its doors locked or unlocked, not a half (709.5).
@@ -1102,7 +1103,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
     invalidateCharacteristics(s);
   }
   // Its own "enters with an additional counter", printed or granted as it enters (Master Chef, CR 614.12).
-  for (const e of withGranted(printed, characteristics(s, o).grantedAbilities).entersWithAdditional ?? []) add(e.counter, e.n);
+  for (const e of withGranted(printed, characteristics(s, o).grantedAbilities).entersWithAdditional ?? []) add(e.counter, evalAmount(s, e.n, { controller: controllerOf(s, o), sourceId: o.id }));
   for (const [k, n] of Object.entries(entering)) putCounters(s, o, k, n, true);
   // Bloodthirst: "if an opponent was dealt damage this turn" (CR 702.54a).
   if (printed.bloodthirst && (s.damagedThisTurn ?? []).some((pid) => opponents(s, o.controller).includes(pid)))
@@ -1128,6 +1129,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   if (printed.entersAnchor) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "anchor" });
   // As a battle enters, its controller chooses its protector (CR 310.9a).
   if (isType(defOf(s, o), "Battle")) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "protector" });
+  if (printed.entersChooseTwoPlayers) for (let i = 0; i < 2; i++) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "player", pair: true });
   if (printed.entersChoosePlayer && !printed.entersLookHand) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "player", ...(printed.entersChoosePlayer === "opponent" ? { except: "you" } : {}), ...(printed.entersChooseSecret ? { secret: true as const } : {}) });
   // Devour, riot and unleash: how many +1/+1 counters it has is part of how it enters (CR 614.12), so what it
   // triggers waits for that choice (evolve compares its power as it entered, CR 702.100a).
@@ -2612,6 +2614,7 @@ function startNextTurn(s: GameState, skipping = false) {
   s.attackersThisTurn = undefined;
   s.combatsThisTurn = undefined;
   s.mainPhasesThisTurn = undefined;
+  s.combatAttackOnly = undefined;
   s.blockersStep = undefined;
   s.addedPhases = undefined;
   s.afterSecondMain = undefined;
@@ -3357,7 +3360,12 @@ export function plottedCast(s: GameState, pid: PlayerId, o: GameObject): boolean
  */
 export function mayPlayLandFromGraveyard(s: GameState, o: GameObject, pid: PlayerId): boolean {
   if (o.zone !== "graveyard" || o.owner !== pid || !isType(defOf(s, o), "Land")) return false;
-  return ownGraveyardPlay(s, o, pid) || landsFromGraveyardNow(s, pid) || !!landPermit(s, pid);
+  return ownGraveyardPlay(s, o, pid) || mayhemPlay(s, o) || landsFromGraveyardNow(s, pid) || !!landPermit(s, pid);
+}
+
+/** Mayhem on a land (Oscorp Industries): discarded this turn, so its owner may play it from their graveyard (CR 702.187c). */
+function mayhemPlay(s: GameState, o: GameObject): boolean {
+  return o.zone === "graveyard" && o.discardedTurn === s.turn && !!compileCard(defOf(s, o)).mayhemLand;
 }
 
 /** "Mill a card. You may play that card this turn." (Tablet of Discovery): that card's own permission (CR 400.7). */
@@ -3536,7 +3544,7 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
     log(s, `${p.name} reveals ${nameOf(s, shown)} so ${d.name} enters untapped.`);
   }
   // Muldrotha's land from the graveyard is used up, unless something lets every land be played from there (Crucible).
-  if (o.zone === "graveyard" && !ownGraveyardPlay(s, o, p.id) && !landsFromGraveyardNow(s, p.id)) {
+  if (o.zone === "graveyard" && !ownGraveyardPlay(s, o, p.id) && !mayhemPlay(s, o) && !landsFromGraveyardNow(s, p.id)) {
     const permit = landPermit(s, p.id)!;
     ((s.turnLog ??= {}).gravePermits ??= []).push(permit);
     // Serra Paragon: "it gains ..." as the land it becomes.
@@ -3630,6 +3638,11 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   addMana(s, p.id, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(ab.spentCreatureCounter ? { creatureCounter: true as const } : {}), ...(ab.spentUncounterable ? { uncounterableInstantSorcery: true as const } : {}), ...(source ? { source } : {}) });
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
   addTriggeredMana(s, p.id, picked);
+  // Yuna, Grand Summoner: "When you next cast a creature spell this turn, ..." (a delayed trigger, CR 603.7a).
+  if (ab.nextCast) {
+    const e = ab.nextCast;
+    (s.nextCast ??= []).push({ controller: p.id, filter: e.filter, sourceId: o.id, sourceCardId: cardIdOf(o), body: { targets: [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." }, turn: s.turn, ...(e.uncounterable ? { uncounterable: true as const } : {}), ...(e.fromHand ? { fromHand: true as const } : {}) });
+  }
   if (ab.skipNextUntap && o.zone === "battlefield") o.skipNextUntap = true;
   // Depletion lands, as the ability resolves: "Put a depletion counter on ~", "If there are no depletion counters on ~,
   // sacrifice it" (checked after the cost removed one).
@@ -6139,6 +6152,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(o.transforms ? { sourceTransforms: o.transforms } : {}),
     ...(manaPick ? { manaAbility: { index, tapped: ab.tap, ...(manaPick.extra ? { extra: manaPick.extra } : {}), ...(manaFrom.length ? { from: manaFrom } : {}) } } : {}),
     ...(paid.treasure ? { treasureSpent: paid.treasure } : {}),
+    ...(paid.spent && Object.values(paid.spent).some((n) => n > 0) ? { manaSpentTypes: (Object.keys(paid.spent) as ManaType[]).flatMap((m) => Array<ManaType>(paid.spent[m]).fill(m)) } : {}),
   };
   if (manaPick) {
     // A mana ability doesn't go on the stack: it resolves as soon as it's activated (CR 605.3b).
@@ -6635,7 +6649,8 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       const pid = Number(choice);
       if (!pend.options.includes(choice)) throw new RulesError("choose one of the players offered");
       // "Secretly choose an opponent": nobody else learns who until it's revealed (Guardian Archon).
-      o.chosen = { ...o.chosen, player: pid, ...(entry?.secret ? { secret: true as const } : {}) };
+      if (entry?.pair) o.chosen = { ...o.chosen, players: [...(o.chosen?.players ?? []), pid] };
+      else o.chosen = { ...o.chosen, player: pid, ...(entry?.secret ? { secret: true as const } : {}) };
       log(s, entry?.secret ? `${p.name} secretly chooses an opponent for ${pend.source}.` : `${p.name} chooses ${player(s, pid).name} for ${pend.source}.`);
       if (entry?.lookHand) {
         log(s, `${p.name} looks at ${player(s, pid).name}'s hand.`);
@@ -7040,12 +7055,14 @@ function askEntersChoice(s: GameState): boolean {
     if (c.what === "player") {
       // "As ~ enters, choose a player" (CR 614.12): one still in the game (CR 800.4a), or an opponent.
       const you = controllerOf(s, o);
-      const options = s.turnOrder.filter((x) => !player(s, x).lost && (c.except !== "you" || x !== you));
+      // "Choose two players" (Sower of Discord): two different ones (rulings).
+      const options = s.turnOrder.filter((x) => !player(s, x).lost && (c.except !== "you" || x !== you) && !(c.pair && o.chosen?.players?.includes(x)));
       if (!options.length) {
         q.shift();
         continue;
       }
-      s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "player", options: options.map(String), labels: options.map((x) => (x === you ? `${player(s, x).name} (you)` : player(s, x).name)), objectId: o.id, prompt: `${c.secret ? "secretly " : ""}choose ${c.except === "you" ? "an opponent" : "a player"}` };
+      const pairPrompt = o.chosen?.players?.length ? "choose the second of two players" : "choose two players: the first";
+      s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "player", options: options.map(String), labels: options.map((x) => (x === you ? `${player(s, x).name} (you)` : player(s, x).name)), objectId: o.id, prompt: c.pair ? pairPrompt : `${c.secret ? "secretly " : ""}choose ${c.except === "you" ? "an opponent" : "a player"}` };
       return true;
     }
     if (c.what === "protector") {
@@ -7283,6 +7300,8 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
       (!objHasKeyword(s, o, "Defender") || characteristics(s, o).attackDespiteDefender || (characteristics(s, o).attackDespiteDefenderVs && opps.some((d) => attackedYouLastTurn(s, d, pid)))) &&
       !characteristics(s, o).cantAttack &&
       !(s.cantAttackThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false)) &&
+      // "Only land creatures can attack during that combat phase" (Bumi, Unleashed): an added combat phase's own rule.
+      !(s.thatCombat !== undefined && s.combatAttackOnly?.[s.thatCombat] && !objectMatches(s, s.combatAttackOnly[s.thatCombat]!, o, pid, false)) &&
       (!(characteristics(s, o).attackUnless.length || characteristics(s, o).cantAttackPlayers.length || characteristics(s, o).cantAttackOwner) || opps.some((d) => !attackProblem(s, o, d))),
   );
 }
@@ -8472,11 +8491,14 @@ export function gameEndBlocked(s: GameState, pid: PlayerId, what: "lose" | "win"
   if (what === "lose" ? turnRule(s, pid, "cantLoseGame") : turnRule(s, pid, "cantWinGame") || s.turnOrder.some((p) => p !== pid && turnRule(s, p, "opponentsCantWin"))) return true;
   return s.battlefield.some((id) => {
     const o = obj(s, id);
-    const a = abilitiesOf(s, o);
-    const rule = what === "lose" ? a.cantLose : a.cantWin;
-    if (!rule) return false;
+    // Its own, and ones an effect gave it (The Book of Exalted Deeds' Angel): each a rule of its own, so Platinum Angel's
+    // given to Abyssal Persecutor blocks both ways.
+    const all = [abilitiesOf(s, o), ...characteristics(s, o).grantedAbilities.map(compileGranted)];
     const you = controllerOf(s, o);
-    return rule === "you" ? you === pid : you !== pid;
+    return all.some((a) => {
+      const rule = what === "lose" ? a.cantLose : a.cantWin;
+      return !!rule && (rule === "you" ? you === pid : you !== pid);
+    });
   });
 }
 

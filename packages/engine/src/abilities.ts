@@ -1753,7 +1753,7 @@ export type Effect =
    * "Return all land cards from your graveyard to the battlefield tapped" (CR 110.2a: under your control), "from all graveyards
    * ... under their owners' control". All at once. Never Auras: those need a choice of what they enchant (CR 303.4f).
    */
-  | { type: "returnAllFromGraveyard"; who: PlayerRef; filter: TargetSpec; tapped?: boolean; owners?: true; /** "... to your hand" instead of the battlefield. */ toHand?: true }
+  | { type: "returnAllFromGraveyard"; who: PlayerRef; filter: TargetSpec; tapped?: boolean; owners?: true; /** "... to your hand" instead of the battlefield. */ toHand?: true; /** "Only creatures can be enchanted this way" (Retether): an Aura can attach only to a creature. */ auraOnCreature?: true }
   /** "Remove it from combat" (CR 506.4): it stops being an attacking, blocking, blocked or unblocked creature. */
   | { type: "removeFromCombat"; what: ObjRef }
   /**
@@ -2032,7 +2032,7 @@ export type Effect =
    * Locthwain): one spell, from the cards its linked exile took (CR 607.2a), cast for its AltCostKind "linkedFree" (CR 118.9).
    */
   | { type: "castLinkedFree"; /** "A creature spell" (Idol of Endurance): only one of these. */ filter?: TargetSpec }
-  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" | "yourNextEndStep"; who?: PlayerRef; castOnly?: true; free?: true; /** With `free`: "you may play cards this way without paying their mana costs" (Ignite the Future): or for their costs. */ orPay?: true; /** "During any turn you attacked with a token" (Neyali): only then. */ attackedWithToken?: true; /** "And you may spend mana as though it were mana of any color to cast that spell" (Grenzo, CR 609.4b). */ anyType?: true; /** The cards are "exiled with ~" for its other abilities (CR 607.2a). */ linked?: true; /** "You may play one of those cards" (Nashi, Moon Sage's Scion): once one is played, the rest can't be. */ oneOf?: true; /** "Exile the top two cards of your library, then choose one of them. You may play that card this turn." (Party Thrasher): only the chosen one. */ choose?: true; /** "If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost" (Nashi). */ life?: true; /** "Exile all opponents' graveyards" (Mnemonic Betrayal): every card in each `who` player's graveyard, `n` aside. */ graveyards?: true }
+  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" | "yourNextEndStep"; who?: PlayerRef; castOnly?: true; free?: true; /** With `free`: "you may play cards this way without paying their mana costs" (Ignite the Future): or for their costs. */ orPay?: true; /** "During any turn you attacked with a token" (Neyali): only then. */ attackedWithToken?: true; /** "And you may spend mana as though it were mana of any color to cast that spell" (Grenzo, CR 609.4b). */ anyType?: true; /** The cards are "exiled with ~" for its other abilities (CR 607.2a). */ linked?: true; /** "You may play one of those cards" (Nashi, Moon Sage's Scion): once one is played, the rest can't be. */ oneOf?: true; /** "Exile the top two cards of your library, then choose one of them. You may play that card this turn." (Party Thrasher): only the chosen one. */ choose?: true; /** "If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost" (Nashi). */ life?: true; /** "Exile all opponents' graveyards" (Mnemonic Betrayal): every card in each `who` player's graveyard, `n` aside. */ graveyards?: true; /** "You may cast instant and sorcery spells from among them" (Ral, Leyline Prodigy): only cards like this get the permission. */ castFilter?: TargetSpec }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
   /** "Remove a +1/+1 counter from it", "remove all -1/-1 counters from ~" (CR 122.8): as many as it has, at most. */
   /**
@@ -2325,7 +2325,8 @@ export type Effect =
    * "Create a 1/1 Insect token, then mill a card. If an Insect card was milled this way, put a loyalty counter on ~ and
    * repeat this process." (Grist): `effects`, then `then` and all of it again for as long as `cond` holds after them.
    */
-  | { type: "repeatIf"; effects: Effect[]; cond: { kind: "milledIs"; filter: TargetSpec }; then: Effect[] }
+  /** Sphinx's Tutelage: "If two nonland cards that share a color were milled this way, repeat this process" (cond "milledShareColor"). */
+  | { type: "repeatIf"; effects: Effect[]; cond: { kind: "milledIs"; filter: TargetSpec } | { kind: "milledShareColor" }; then: Effect[] }
   /** "You may roll again" in a results table's row (Delina, Wild Mage): if its controller wants, the ability's roll and the rows after it happen again (CR 706.3c). */
   | { type: "rollAgain" }
   /**
@@ -2526,6 +2527,8 @@ export type Effect =
       exileSpell?: true;
       /** "Exile target spell. It becomes plotted." (Aven Interrupter, CR 702.170c). */
       plot?: true;
+      /** With `exileSpell`: airbend (CR 701.65a): while the card stays exiled, its owner may cast it for this rather than its mana cost. */
+      ownerMayCost?: string;
       /** "Any number of target spells": the targets from `index`, this many (see TargetSpec.many, expandMany). */
       n?: number;
       /** "Counter target spell if its mana value is X" (Disrupting Shoal): only then, checked as it resolves. */
@@ -2667,6 +2670,17 @@ export type Effect =
   | { type: "unearth" }
   /** Rebound's delayed trigger (CR 702.88a): "you may cast this card from exile without paying its mana cost". */
   | { type: "castFromExileFree" }
+  /**
+   * Jeweled Amulet: "Note the type of mana spent to pay this activation cost." As the ability resolves, its source notes
+   * that type (GameObject.notedMana); with no mana spent, nothing new is noted.
+   */
+  | { type: "noteManaSpent" }
+  /**
+   * Rona, Tolarian Obliterator: "that source's controller exiles a card from their hand at random. If it's a land card,
+   * you may put it onto the battlefield under your control. Otherwise, you may cast it without paying its mana cost."
+   * The card is cast as this resolves, ignoring timing (CR 608.2g); X is 0, no alternative costs (rulings).
+   */
+  | { type: "exileRandomThenPlay"; who: PlayerRef }
   /**
    * Isochron Scepter, Spellbinder: "You may copy the exiled card. If you do, you may cast the copy without paying its mana
    * cost." A copy of the card its linked imprint ability exiled (CR 607.2a), made in exile and cast as this resolves or
@@ -2846,6 +2860,8 @@ export type Effect =
       after?: "main" | "combat" | "secondMain";
       /** "At the beginning of that combat, untap all creatures you control" (Moraug): a delayed trigger for the added combat phase only (CR 603.7). */
       thatCombat?: { effects: Effect[]; text: string };
+      /** "Only land creatures can attack during that combat phase" (Bumi, Unleashed): the added combat phase only (rulings). */
+      onlyAttack?: TargetSpec;
     }
   /** "You lose the game" (CR 104.3e). */
   | { type: "loseGame"; who: PlayerRef }
@@ -3349,6 +3365,8 @@ export type TriggerEvent =
   | "youDamagePrevented"
   | "opponentIsDealtDamage"
   | "enchantedPlayerDealtDamage"
+  /** Sower of Discord: "Whenever damage is dealt to one of the chosen players" (Chosen.players, two): the event's player is the other one. */
+  | "chosenPlayerDealtDamage"
   /** "Whenever you draw a card", "whenever an opponent draws a card", "your second card each turn": see TriggeredAbility.draws. */
   | "playerDraws"
   /** "Whenever an opponent activates an ability that isn't a mana ability" (see TriggeredAbility.activates). */
@@ -3894,6 +3912,8 @@ export interface ActivatedAbility {
  */
 export type ManaProduce =
   | { kind: "fixed"; mana: ManaType[]; count?: TargetSpec; n?: AmountExpr }
+  /** Jeweled Amulet: "Add one mana of ~'s last noted type" (GameObject.notedMana); none if no type was noted (rulings). */
+  | { kind: "noted" }
   | { kind: "oneOf"; options: ManaType[]; amount: number; n?: AmountExpr }
   | { kind: "commanderIdentity" }
   /** "Add one mana of the chosen color", "Add {B} or one mana of the chosen color": the color chosen as it entered. */
@@ -4005,6 +4025,11 @@ export interface ManaAbility {
   spentCommanderCounters?: true;
   /** Biophagus: "If this mana is spent to cast a creature spell, that creature enters with an additional +1/+1 counter on it" (one for each such mana). */
   spentCreatureCounter?: true;
+  /**
+   * Yuna, Grand Summoner: "When you next cast a creature spell this turn, that creature enters with two additional +1/+1
+   * counters on it", a delayed trigger the ability creates as it resolves (CR 603.7a, 605.3b), whatever the mana is spent on.
+   */
+  nextCast?: Extract<Effect, { type: "nextCast" }>;
   /** Depletion lands: "Put a depletion counter on ~." after the mana is added. */
   putCounter?: CounterKind;
   /** Depletion lands: "If there are no depletion counters on ~, sacrifice it." after the mana is added. */
@@ -4378,7 +4403,7 @@ export interface CompiledCard {
   /** `perControlled`: "for each Angel you already control" (Giada): `n` times the permanents matching it its controller controls, the entering one aside. */
   othersEnterWithCounters?: { filter: TargetSpec; counter: CounterKind; n: number; perControlled?: TargetSpec; /** n times the source's toughness (Arwen, Weaver of Hope). */ perSourceToughness?: true; /** n times the source's power (Master Biomancer). */ perSourcePower?: true; /** "And as a Mutant in addition to its other types" (Master Biomancer): it enters with this creature type too (CR 614.1c). */ asSubtype?: string; text: string }[];
   /** "This creature enters with an additional +1/+1 counter on it" (Master Chef's granted ability): on itself entering. */
-  entersWithAdditional?: { counter: CounterKind; n: number }[];
+  entersWithAdditional?: { counter: CounterKind; /** Counted as it enters: "for each instant and sorcery spell you've cast this turn" (Ral, Leyline Prodigy). */ n: Amount }[];
   entersTappedUnless?: EntersCondition;
   entersTappedChoice?: EntersChoice;
   /** "As ~ enters, choose a creature type / a color" (CR 614.12): made as it enters, kept while it's on the battlefield. */
@@ -4389,6 +4414,8 @@ export interface CompiledCard {
   flashIfTargetsCommander?: true;
   /** "As ~ enters, choose a player" / "an opponent" (CR 614.12): kept while it's on the battlefield, as Chosen.player. */
   entersChoosePlayer?: "player" | "opponent";
+  /** "As ~ enters, choose two players" (Sower of Discord): two different ones, you too if you like (rulings), as Chosen.players. */
+  entersChooseTwoPlayers?: true;
   /** "As Arachne enters, look at an opponent's hand, then choose ...": the opponent is chosen first, then their hand is seen (CR 614.12). */
   entersLookHand?: true;
   /** "As ~ enters, choose Khans or Dragons" (CR 614.12b): the anchor words, one chosen as it enters (Chosen.anchor). */
@@ -4599,6 +4626,11 @@ export interface CompiledCard {
    * Ward abilities of those creatures don't trigger." (Nowhere to Run, CR 702.11e).
    */
   exposesOpponentsCreatures?: true;
+  /**
+   * Glaring Spotlight: "Creatures your opponents control with hexproof can be the targets of spells and abilities you
+   * control as though they didn't have hexproof" (CR 702.11e: "hexproof from" too); ward still triggers.
+   */
+  seesOpponentsCreatures?: true;
   /** "If you tap a basic land for mana, it produces three times as much of that mana instead" (Virtue of Strength). */
   tapBasicManaTimes?: number;
   /** "If you would gain life, you gain that much life plus 1 instead" (CR 614.1a): N for each. */
@@ -4906,6 +4938,11 @@ export interface CompiledCard {
   extraLandsIf?: StaticCondition[];
   /** "You may play lands from your graveyard." (Crucible of Worlds): a permission; each still uses a land play (CR 305.2). */
   landsFromGraveyard?: boolean;
+  /**
+   * "Mayhem" without a cost on a land (Oscorp Industries): "You may play this card from your graveyard if you discarded
+   * it this turn" (CR 702.187c), with a land play and the usual timing (rulings).
+   */
+  mayhemLand?: true;
   /**
    * "Each nonland card in your graveyard has escape. The escape cost is equal to the card's mana cost plus exile three
    * other cards from your graveyard." (Underworld Breach), "Each instant and sorcery card in your graveyard has flashback.

@@ -116,7 +116,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
     const col = s.resolving?.chosen?.colorsBy?.[c.controller];
     if (!c.colors.length || (c.colors.length === 1 && c.colors[0] === col)) return false;
   }
-  const hexproof = targeting && c.controller !== controller && !exposed(s, o);
+  const hexproof = targeting && c.controller !== controller && !exposed(s, o) && !seesHexproofOf(s, controller, o);
   if (hexproof && objHasKeyword(s, o, "Hexproof")) return false;
   if (hexproof && src && hexproofFrom(c.keywords, src)) return false; // CR 702.11d
   if (targeting && objHasKeyword(s, o, "Shroud")) return false; // CR 702.18a: not even its controller can target it
@@ -140,6 +140,16 @@ export function exposed(s: GameState, o: GameObject): boolean {
     const p = obj(s, id);
     return !!abilitiesOf(s, p).exposesOpponentsCreatures && controllerOf(s, p) !== holder;
   });
+}
+
+/**
+ * Does `pid` target `o` (a creature an opponent controls) as though it didn't have hexproof? Glaring Spotlight's static
+ * ability, or Detection Tower's this turn.
+ */
+function seesHexproofOf(s: GameState, pid: PlayerId, o: GameObject): boolean {
+  if (o.zone !== "battlefield" || !objIsType(s, o, "Creature")) return false;
+  if ((s.turnRules ?? []).some((r) => r.turn === s.turn && r.player === pid && r.rule === "seeHexproof")) return true;
+  return s.battlefield.some((id) => controllerOf(s, s.objects[id]!) === pid && !!abilitiesOf(s, s.objects[id]!).seesOpponentsCreatures);
 }
 
 /**
@@ -393,10 +403,12 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     if (!p || p.lost) return false;
     // "You have hexproof": not by opponents' spells and abilities (CR 702.11d); "you have shroud": by none (CR 702.18d).
     const prot = playerProtection(s, t.id);
-    if (prot === "shroud" || (prot === "hexproof" && t.id !== controller)) return false;
+    // Detection Tower: its controller's opponents can be targeted as though they didn't have hexproof (CR 702.11e).
+    const sees = (s.turnRules ?? []).some((r) => r.turn === s.turn && r.player === controller && r.rule === "seeHexproof");
+    if (prot === "shroud" || (prot === "hexproof" && t.id !== controller && !sees)) return false;
     if (playerProtectedFrom(s, t.id, controller, src)) return false; // CR 702.16b, 702.16k
     // "You gain hexproof from blue and from black until end of turn" (Veil of Summer): as for a permanent (CR 702.11d).
-    if (src && t.id !== controller && hexproofFrom(gainedBy(s, t.id), src)) return false;
+    if (src && t.id !== controller && !sees && hexproofFrom(gainedBy(s, t.id), src)) return false;
     if (spec.kind === "any") return !spec.opponent || t.id !== controller;
     if (spec.kind !== "player") return false;
     if (spec.notEventPlayer || t.id === spec.notPlayer) return false;

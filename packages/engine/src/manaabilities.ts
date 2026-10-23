@@ -100,6 +100,7 @@ export function manaChoices(s: GameState, o: GameObject, ab: ManaAbility): ManaT
   if (p.kind === "eachColorAmong") return eachColorAmong(s, o);
   if (p.kind === "devotion") return [...COLORS];
   if (p.kind === "doublePool") return [...COLORS, "C"];
+  if (p.kind === "noted") return [o.notedMana ?? "C"];
   return commanderIdentity(s, controllerOf(s, o));
 }
 
@@ -208,6 +209,8 @@ export function manaProduced(s: GameState, o: GameObject, ab: ManaAbility, choic
 function baseManaProduced(s: GameState, o: GameObject, ab: ManaAbility, choice: ManaType, combo?: number): ManaType[] {
   const p = ab.produces;
   if (p.kind === "combos") return p.options[combo ?? -1] ?? [];
+  // Jeweled Amulet: no mana if no type was noted (rulings).
+  if (p.kind === "noted") return o.notedMana ? [o.notedMana] : [];
   if (p.kind === "removeX") return removeXCombos(o, p)[combo ?? -1] ?? [];
   if (p.kind === "doublePool") {
     // As much again of each type as is left in the pool once that payment is made.

@@ -36,6 +36,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!change || change === "fail" || !("costMod" in change) || change.costMod.who !== "you" || change.costMod.turn || change.costMod.fromGraveyard) return null;
     return [{ type: "costModThisTurn", mod: { ...change.costMod, text: `${s}.` } }];
   }
+  // Ral, Leyline Prodigy: "Until your next turn, instant and sorcery spells you cast cost {1} less to cast": the same,
+  // until its controller's next turn begins (CR 611.2b).
+  if ((m = /^Until your next turn, (.+? spells) you cast cost (\{\d+\}) less to cast$/.exec(s)) && !/\bwith\b|\bfrom\b/.test(m[1]!)) {
+    const change = parseCostChange(`${m[1]!.charAt(0).toUpperCase()}${m[1]!.slice(1)} you cast cost ${m[2]} less to cast`);
+    if (!change || change === "fail" || !("costMod" in change) || change.costMod.who !== "you" || change.costMod.turn || change.costMod.fromGraveyard) return null;
+    return [{ type: "costModThisTurn", mod: { ...change.costMod, text: `${s}.` }, untilYourNextTurn: true }];
+  }
   // Elspeth Conquers Death: "Noncreature spells your opponents cast cost {2} more to cast until your next turn": the same,
   // until its controller's next turn begins (CR 611.2b).
   if ((m = /^(.+? spells) your opponents cast cost (\{\d+\}) more to cast until your next turn$/.exec(s)) && !/\bwith\b|\bfrom\b/.test(m[1]!)) {

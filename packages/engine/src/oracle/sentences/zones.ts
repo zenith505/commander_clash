@@ -125,6 +125,18 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Airbend (CR 701.65a): exile them; for as long as each card stays exiled, its owner may cast it by paying {2} rather
   // than its mana cost (a token ceases to exist, a land can't be played, rulings on Airbending Lesson).
   if ((m = /^[Aa]irbend (.+)$/.exec(s))) {
+    // "Airbend up to one other target creature or spell" (Aang, Swift Savior): one target, a spell (removed from the
+    // stack, not countered, so even one that can't be countered, rulings) or a permanent other than the source.
+    const orSpell = /^(up to one )?(other )?target (creature|nonland permanent|permanent) or spell$/.exec(m[1]!);
+    if (orSpell) {
+      const perm = parseTargetPhrase(orSpell[3]!);
+      if (perm?.kind !== "object") return null;
+      const i = addTarget(ctx, { kind: "spell", types: [], notTypes: [], notColors: [], orPermanent: perm, ...(orSpell[2] ? { notSource: true } : {}), ...(orSpell[1] ? { optional: true } : {}), text: `${orSpell[1] ?? ""}${orSpell[2] ?? ""}target ${orSpell[3]} or spell` });
+      return [
+        { type: "counterSpell", index: i, exileSpell: true, ownerMayCost: "{2}" },
+        { type: "exile", what: { ref: "target", index: i }, ownerMay: { cost: "{2}" } },
+      ];
+    }
     const fx = parseSentence(`Exile ${m[1]!}`, ctx);
     const ex = fx?.length === 1 ? fx[0] : undefined;
     if (ex?.type !== "exile" || ex.until || ex.linked || !["target", "each", "subject"].includes(ex.what.ref)) return null;
@@ -413,6 +425,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const spec = parseTargetPhrase(`${yours[1]!.split(/\s+/).map(singularWord).join(" ")} card from a graveyard`, { chosen: true });
     if (spec?.kind !== "card" || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
     return [{ type: "returnAllFromGraveyard", who: { ref: "eachPlayer" }, filter: { ...spec, text: `${yours[1]} card` }, ...(yours[2] ? { tapped: true } : {}) }];
+  }
+  // "Return each Aura card from your graveyard to the battlefield" (Retether): its controller chooses what each enchants as
+  // it enters (CR 303.4f); one with nothing to enchant stays in the graveyard (303.4g).
+  if (/^[Rr]eturn each Aura card from your graveyard to the battlefield$/.test(s)) {
+    return [{ type: "returnAllFromGraveyard", who: { ref: "you" }, filter: { kind: "card", types: [], notTypes: [], notColors: [], subtypes: ["Aura"], text: "Aura card" } }];
   }
   // "Return all creature cards with mana value 2 or less from your graveyard to the battlefield" (Raise the Past).
   if ((m = /^[Rr]eturn all (.+? cards(?: with mana value (?:X|\d+) or less)?) from (your graveyard|all graveyards) to the battlefield( tapped)?( under their owners' control)?$/.exec(s)) && (m[2] === "your graveyard") === !m[4]) {

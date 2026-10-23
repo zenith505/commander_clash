@@ -1,7 +1,7 @@
 # Roadmap
 
-23,600 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,491 of 4,988 (90%).
+23,635 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,510 of 4,988 (90%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,16 +22,15 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 132, most played first: Slicer (the opponent gains control
-   of it until end of turn, it's goaded and can't be sacrificed, else it converts), Rona's back face (a random card
-   exiled from the hand of a source's controller, then put onto the battlefield or cast free), Oscorp Industries
-   (mayhem), Yuna, Grand Summoner (counters for the next creature cast; "if it had counters on it"), Jeweled Amulet
-   ("note the type of mana spent to pay this activation cost"), Clavileño (becomes a Demon and gains a quoted dies
-   trigger), Ral, Monsoon Mage (exile it and return it transformed on a won flip), Aang, Swift Savior, The Book of
-   Exalted Deeds, Inspirit, Retether, Sower of Discord, Bumi, Detection Tower, Rashmi, Communal Brewing, Rose Room
-   Treasurer, Sphinx's Tutelage. Karazikar's "whenever an opponent attacks another one of your opponents" has no rulings
-   on planeswalkers and battles, so it stays out. Smaller gaps from round 132: bots and autopay never use Doubling Cube
-   (it's offered in its own menu only); bots choose Selective Obliteration's color by the worth of their own one-color
+00. Most played first (`npm run popular`). Out after round 133, most played first: Edgar, Charmed Groom's back face
+   (a bloodline counter, then transform once there are three), Prisoner's Dilemma (each opponent secretly chooses
+   silence or snitch), High Perfect Morcant (blight), Bramble Familiar's Fetch Quest, Rise and Shine (overload), Storm of
+   Saruman, Elanor Gardner ("if you sacrificed a Food this turn"), Calix, Guided by Fate, Ghyrson Starn, Lux Artillery,
+   Shadow of the Second Sun, Bello, Hobgoblin Bandit Lord, Fire Lord Azula. Karazikar's "whenever an opponent attacks
+   another one of your opponents" has no rulings on planeswalkers and battles, so it stays out. Smaller gaps from round
+   133: bots and autopay use Doubling Cube only when nothing else pays; Sower of Discord's chosen players aren't shown on the card (the log says
+   who); "put your choice of a +1/+1 counter or ..." with "up to one" target still asks which when no target was
+   chosen; bots never activate Detection Tower; Yennett's "if its mana value is odd" is out. Smaller gaps from round 132: bots choose Selective Obliteration's color by the worth of their own one-color
    permanents and take Atraxa's cards one at a time, the first that fits. Smaller gaps from round 131: Thundermane Dragon checks a creature card's printed
    power (a */* card counts as 0); with several "cast from the top" permissions the one that gives haste is used;
    Hoarder's Overflow ("When ~ enters and whenever you expend 4"), Blood Operative and Council's Deliberation

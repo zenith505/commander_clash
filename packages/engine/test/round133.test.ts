@@ -574,3 +574,39 @@ describe("cards named for two characters take plural verbs: \"Whenever Aang and 
     expect(s.battlefield.filter((x) => s.objects[x]!.controller === ap && characteristics(s, s.objects[x]!).name === "Bird Token")).toHaveLength(1);
   });
 });
+
+describe("The Book of Exalted Deeds", () => {
+  const book = card("The Book of Exalted Deeds", "Legendary Artifact — Book", "{W}{W}{W}", {
+    oracleText: "At the beginning of your end step, if you gained 3 or more life this turn, create a 3/3 white Angel creature token with flying.\n{W}{W}{W}, {T}, Exile The Book of Exalted Deeds: Put an enlightened counter on target Angel. It gains \"You can't lose the game and your opponents can't win the game.\" Activate only as a sorcery.",
+  });
+  const angel = card("Test Angel", "Creature — Angel", "{3}{W}", { power: "3", toughness: "3", keywords: ["Flying"], oracleText: "Flying" });
+
+  it("the Angel gains \"You can't lose the game ...\" for good, even if it loses the counter; with 0 life you stay in", () => {
+    supported(book);
+    const { s: s0, ap } = setup([]);
+    const b = putOnBattlefield(s0, ap, book);
+    const a = putOnBattlefield(s0, ap, angel);
+    addMana(s0, ap, ["W", "W", "W"]);
+    let s = passToPending(run(s0, planActivate(s0, ap, b, 0, [target(a)])));
+    expect(s.objects[b]!.zone).toBe("exile");
+    expect(s.objects[a]!.counters.enlightened).toBe(1);
+    s.objects[a]!.counters = {};
+    s.players[ap]!.life = 0;
+    s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.players[ap]!.lost).toBeFalsy();
+    // Once the Angel is gone, the state-based action applies.
+    s.battlefield.splice(s.battlefield.indexOf(a), 1);
+    s.objects[a]!.zone = "graveyard";
+    invalidateCharacteristics(s);
+    s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.players[ap]!.lost).toBe(true);
+  });
+
+  it("a non-Angel can't be targeted", () => {
+    const { s: s0, ap } = setup([]);
+    const b = putOnBattlefield(s0, ap, book);
+    putOnBattlefield(s0, ap, bear());
+    addMana(s0, ap, ["W", "W", "W"]);
+    expect(planActivate(s0, ap, b, 0)).toBeNull();
+  });
+});

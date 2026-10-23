@@ -38,10 +38,11 @@ export function compileGranted(text: string): CompiledCard {
  * The kinds of static abilities an effect can give an object and the engine runs (see `grantedStatics` in layers.ts and
  * `withGranted` in cards.ts): continuous effects in layer 7 or the rules that apply after abilities are settled in layer
  * 6 (CR 613.1f-g), cost changes, counter and token replacements, "enters with an additional counter" and
- * "room abilities trigger an additional time", and a draw replacement (Scion of Halaster). Ones that
+ * "room abilities trigger an additional time", a draw replacement (Scion of Halaster), and "you can't lose the game and
+ * your opponents can't win the game" (The Book of Exalted Deeds; read by gameEndBlocked in game.ts). Ones that
  * change types, colors or abilities would have to come out of the same layers that grant them, so they stay out.
  */
-const GRANTED_FIELDS = new Set(["costMods", "countMods", "othersEnterWithCounters", "entersWithAdditional", "roomsTwice", "firstDrawLook"]);
+const GRANTED_FIELDS = new Set(["costMods", "countMods", "othersEnterWithCounters", "entersWithAdditional", "roomsTwice", "firstDrawLook", "cantLose", "cantWin"]);
 export const grantedStaticOk = (mods: Modification[]) => mods.every((m) => !["2", "4", "5", "6"].includes(layerOf(m)) && !(m.kind === "definePT" && (m.power === undefined || m.toughness === undefined)));
 
 /**

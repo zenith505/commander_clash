@@ -8484,11 +8484,14 @@ export function gameEndBlocked(s: GameState, pid: PlayerId, what: "lose" | "win"
   if (what === "lose" ? turnRule(s, pid, "cantLoseGame") : turnRule(s, pid, "cantWinGame") || s.turnOrder.some((p) => p !== pid && turnRule(s, p, "opponentsCantWin"))) return true;
   return s.battlefield.some((id) => {
     const o = obj(s, id);
-    const a = abilitiesOf(s, o);
-    const rule = what === "lose" ? a.cantLose : a.cantWin;
-    if (!rule) return false;
+    // Its own, and ones an effect gave it (The Book of Exalted Deeds' Angel): each a rule of its own, so Platinum Angel's
+    // given to Abyssal Persecutor blocks both ways.
+    const all = [abilitiesOf(s, o), ...characteristics(s, o).grantedAbilities.map(compileGranted)];
     const you = controllerOf(s, o);
-    return rule === "you" ? you === pid : you !== pid;
+    return all.some((a) => {
+      const rule = what === "lose" ? a.cantLose : a.cantWin;
+      return !!rule && (rule === "you" ? you === pid : you !== pid);
+    });
   });
 }
 

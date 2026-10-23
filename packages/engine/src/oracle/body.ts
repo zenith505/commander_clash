@@ -685,6 +685,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Court of Vantress: "If you're the monarch, you may create a token that's a copy of it. If you're not the monarch, you
   // may have ~ become a copy of it": both "it"s are the chosen target, not the token (only one branch happens).
   text = text.replace(/(If you're the monarch, you may create a token that's a copy of it\. If you're not the monarch, you may have ~ become a copy of) it\b/, "$1 the chosen permanent");
+  // Rite of the Raging Storm: "creates a 5/1 red Elemental creature token named Lightning Rager. It has trample, haste, and
+  // "..."": what the token has, as one instruction.
+  text = text.replace(/(creature token named [A-Z][\w'-]*(?: [A-Z][\w'-]*)*)\. It has ((?:[^."]|"[^"]*")+?)(\.|(?<="))(?=\s|$)/, "$1 with $2$3");
   // Orzhov Advokist: "If a player does" is about the "may" of the sentence before: one instruction.
   text = text.replace(/(each player may put (?:two|three) \S+ counters on a creature they control)\. If a player does, (creatures that player controls can't attack you or planeswalkers you control until your next turn)\./i, "$1; if a player does, $2.");
   // Stinging Study: "where X is the mana value of a commander you own on the battlefield or in the command zone": one of

@@ -754,6 +754,9 @@ export function parseAffected(subject: string): Affects | null {
   // "Each creature that's attacking one of your opponents has trample" (Oviya, Automech Artisan): any player's creature
   // attacking that player (not their planeswalkers or battles), whichever are now (CR 611.3a).
   if (/^(?:Each creature that's|Creatures) attacking one of your opponents$/.test(x)) return { kind: "filter", types: ["Creature"], spec: { kind: "object", combat: "attackingOpponent", text: "creature attacking one of your opponents" } };
+  // "Creatures named Lightning Rager can't attack you ..." (Rite of the Raging Storm): any player's, by their name.
+  const named = /^Creatures named ([A-Z][A-Za-z' -]+)$/.exec(x);
+  if (named) return { kind: "filter", types: ["Creature"], spec: { kind: "object", named: named[1]!, text: `creature named ${named[1]}` } };
   // "Commander creatures you control get +2/+2", "Commanders you control have ward {2}" (CR 903.3): any player's.
   if (/^Commanders? (?:creatures )?you control$/.test(x))
     return { kind: "filter", types: x.includes("creatures") ? ["Creature"] : [], controller: "you", spec: { kind: "object", commander: true, text: "commander" } };

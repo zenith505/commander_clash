@@ -806,3 +806,25 @@ describe("Command Bridge and Lembas", () => {
     expect(s.objects[l]!.zone).toBe("library");
   });
 });
+
+const riteStorm = card("Rite of the Raging Storm", "Enchantment", "{3}{R}{R}", {
+  oracleText:
+    'Creatures named Lightning Rager can\'t attack you or planeswalkers you control.\nAt the beginning of each player\'s upkeep, that player creates a 5/1 red Elemental creature token named Lightning Rager. It has trample, haste, and "At the beginning of the end step, sacrifice this token."',
+});
+
+describe("Rite of the Raging Storm", () => {
+  it("each player's upkeep: a Lightning Rager for them, which can't attack you and is sacrificed at the end step", () => {
+    supported(riteStorm);
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, riteStorm);
+    const other = s0.turnOrder[(s0.turnOrder.indexOf(ap) + 2) % 4]!;
+    let s = passUntil(s0, "declareAttackers", opp);
+    const rager = s.battlefield.find((id) => s.cards[s.objects[id]!.cardId]?.name === "Lightning Rager" && s.objects[id]!.controller === opp)!;
+    expect(rager).toBeDefined();
+    expect(characteristics(s, s.objects[rager]!)).toMatchObject({ power: 5, toughness: 1, keywords: expect.arrayContaining(["Trample", "Haste"]) });
+    expect(() => act(s, { type: "declareAttackers", player: opp, attacks: [{ attacker: rager, defender: ap }] })).toThrow();
+    expect(() => act(s, { type: "declareAttackers", player: opp, attacks: [{ attacker: rager, defender: other }] })).not.toThrow();
+    s = passUntil(s, "cleanup", opp);
+    expect(s.objects[rager]?.zone ?? "gone").not.toBe("battlefield");
+  });
+});

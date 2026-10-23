@@ -4832,11 +4832,13 @@ export interface CompiledCard {
     once?: string[];
     /** "A permanent spell with mana value 2 or less" (Lurrus): the spell's, its X counted (CR 202.3e), as it's cast. */
     maxMv?: number;
+    /** Serra Paragon: "If you do, it gains '...'": the permanent the land or spell becomes has this ability (GameObject.entersGaining). */
+    gains?: string;
     /** Only while this holds: a station symbol's (Exploration Broodship's 8+, CR 721.2a). */
     if?: StaticCondition;
   }[];
-  /** Muldrotha: "you may play a land ... from your graveyard" once during each of your turns. */
-  landFromGraveyardOnce?: true;
+  /** Muldrotha: "you may play a land ... from your graveyard" once during each of your turns. "shared": the same use as its once-each-turn spell permission (Serra Paragon's "a land ... or a permanent spell"). */
+  landFromGraveyardOnce?: true | "shared";
   /**
    * "You may play cards exiled with ~, and you may spend mana as though it were mana of any color to cast those spells"
    * (Rogue Class): its controller may play the cards its linked exile took (CR 607.2a), with any mana (609.4b).

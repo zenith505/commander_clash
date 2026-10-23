@@ -532,6 +532,8 @@ export interface GameObject {
   exileIfLeaves?: ZoneName;
   /** A spell: "if that spell would be put into your graveyard, exile it instead" (Torrential Gearhulk, CR 614.1a). */
   exileIfToGraveyard?: true;
+  /** Serra Paragon: the permanent this land or spell becomes gains this ability (as an ability text) for good. */
+  entersGaining?: string;
   /** "As ~ enters, choose a creature type / color": what was chosen (CR 614.12). Forgotten when it leaves (CR 400.7). */
   chosen?: Chosen;
   /** A battle's protector (CR 310.9), chosen as it enters (310.9a) and again when that player can't be (704.5x-y). */

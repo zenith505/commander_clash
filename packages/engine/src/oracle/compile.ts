@@ -1347,6 +1347,20 @@ export function compile(d: CardDef): CompiledCard {
       }
       continue;
     }
+    // Serra Paragon: "Once during each of your turns, you may play a land from your graveyard or cast a permanent spell with
+    // mana value 3 or less from your graveyard. If you do, it gains ...": one use each turn for either (a land played or a
+    // spell cast), and the permanent it becomes has the quoted ability (as this object, CR 400.7).
+    const paragon = /^Once during each of your turns, you may play a land from your graveyard or cast a permanent spell with mana value (\d+) or less from your graveyard\. If you do, it gains "(When (?:this permanent|~) is put into a graveyard from the battlefield, exile it and you gain \d+ life\.)"$/.exec(line);
+    if (paragon) {
+      const filter = parseTargetPhrase("permanent card from a graveyard");
+      if (filter?.kind !== "card") out.unsupported.push(raw);
+      else {
+        const { owner: _, ...f } = filter;
+        (out.graveyardGrants ??= []).push({ filter: { ...f, text: "permanent cards" }, way: { kind: "turnPermission", costs: [], exile: false }, yourTurn: true, once: [""], maxMv: Number(paragon[1]), gains: paragon[2]!.replace(/^When ~ /, "When this permanent ") });
+        out.landFromGraveyardOnce = "shared";
+      }
+      continue;
+    }
     // "Once during each of your turns, you may cast a creature spell from your graveyard" (Karador, Gisa and Geralf): a
     // permission used once each turn (rulings: the spell's costs are paid, its timing rules followed). Muldrotha: "During
     // each of your turns, you may play a land and cast a permanent spell of each permanent type from your graveyard."

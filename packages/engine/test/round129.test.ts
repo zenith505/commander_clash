@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup, swamp } from "./helpers";
-import { botActions, isFullySupported, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { botActions, characteristics, isFullySupported, legalActions, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -25,6 +25,7 @@ const passToPending = (s: GameState) => {
   for (let i = 0; i < 30 && !s.pending && (s.stack.length || s.triggerQueue.length); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
   return s;
 };
+const legalLand = (s: GameState, pid: PlayerId, id: string) => legalActions(s, pid).some((a) => a.type === "playLand" && a.objectId === id);
 const logText = (s: GameState) => s.log.map((l) => (typeof l === "string" ? l : l.text)).join("\n");
 const nameOf = (s: GameState, id: string) => s.cards[s.objects[id]!.cardId]!.name;
 /** A fresh copy of `def` put into `pid`'s `zone` (on top of the library). */
@@ -284,5 +285,82 @@ describe("Villainous choice (CR 701.55): each opponent chooses, in turn order, a
     expect(s.objects[theirs]!.zone).toBe("battlefield");
     const daleks = s.battlefield.filter((id) => nameOf(s, id) === "Dalek Token" || nameOf(s, id) === "Dalek");
     expect(daleks.length).toBe(1);
+  });
+});
+
+const serraParagon = card("Serra Paragon", "Creature — Angel", "{2}{W}{W}", {
+  power: "3",
+  toughness: "4",
+  keywords: ["Flying"],
+  oracleText: "Flying\nOnce during each of your turns, you may play a land from your graveyard or cast a permanent spell with mana value 3 or less from your graveyard. If you do, it gains \"When this permanent is put into a graveyard from the battlefield, exile it and you gain 2 life.\"",
+});
+
+describe("Serra Paragon: one land or small permanent spell from the graveyard each turn, and it gains the exile trigger", () => {
+  const via = { via: "turnPermission" as const };
+  it("a creature cast from the graveyard is exiled when it dies, you gain 2 life, and no land after it this turn", () => {
+    supported(serraParagon);
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, serraParagon);
+    const b = putIn(s0, ap, card("Yard Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }), "graveyard");
+    const big = putIn(s0, ap, card("Yard Giant", "Creature — Giant", "{3}{G}", { power: "4", toughness: "4" }), "graveyard");
+    const l = putIn(s0, ap, card("Yard Wastes", "Land"), "graveyard");
+    s0.players[ap]!.landsPlayedThisTurn = 0;
+    // Mana value 4: not with this permission.
+    expect(planCast(s0, ap, big, undefined, undefined, "auto", undefined, via)).toBeNull();
+    let s = settleBots(run(s0, planCast(s0, ap, b, undefined, undefined, "auto", undefined, via)));
+    expect(s.objects[b]!.zone).toBe("battlefield");
+    // The permission is one for lands and spells together.
+    expect(legalLand(s, ap, l)).toBe(false);
+    const life = s.players[ap]!.life;
+    s.objects[b]!.damage = 2;
+    s = settleBots(act(s, { type: "passPriority", player: waitingOn(s)! }));
+    expect(s.objects[b]!.zone).toBe("exile");
+    expect(s.players[ap]!.life).toBe(life + 2);
+  });
+  it("a land played from the graveyard gains it too, and uses the turn's permission", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, serraParagon);
+    const l = putIn(s0, ap, card("Yard Wastes", "Land"), "graveyard");
+    const b = putIn(s0, ap, card("Yard Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }), "graveyard");
+    s0.players[ap]!.landsPlayedThisTurn = 0;
+    expect(legalLand(s0, ap, l)).toBe(true);
+    const s = act(s0, { type: "playLand", player: ap, objectId: l });
+    expect(s.objects[l]!.zone).toBe("battlefield");
+    expect(planCast(s, ap, b, undefined, undefined, "auto", undefined, via)).toBeNull();
+    expect(characteristics(s, s.objects[l]!).grantedAbilities.join("\n")).toContain("exile it and you gain 2 life");
+  });
+});
+
+const lordOfTheVoid = card("Lord of the Void", "Creature — Demon", "{4}{B}{B}{B}", {
+  power: "7",
+  toughness: "7",
+  keywords: ["Flying"],
+  oracleText: "Flying\nWhenever this creature deals combat damage to a player, exile the top seven cards of that player's library, then put a creature card from among them onto the battlefield under your control.",
+});
+
+describe("Lord of the Void: exile seven of the player's cards, then take a creature card from among them", () => {
+  it("you choose the creature; the rest stay exiled", () => {
+    supported(lordOfTheVoid);
+    const { s: s0, ap, opp } = setup([]);
+    const lord = putOnBattlefield(s0, ap, lordOfTheVoid);
+    const ogre = putIn(s0, opp, card("Void Ogre", "Creature — Ogre", "{2}{R}", { power: "3", toughness: "3" }), "library");
+    const elf = putIn(s0, opp, card("Void Elf", "Creature — Elf", "{G}", { power: "1", toughness: "1" }), "library");
+    const rock = putIn(s0, opp, card("Void Rock", "Artifact", "{1}"), "library");
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: lord, defender: opp }] });
+    for (let i = 0; i < 80 && !(s.pending?.kind === "chooseOption" && s.pending.what === "impulseChoice"); i++) {
+      const pid = waitingOn(s)!;
+      s = s.pending?.kind === "declareBlockers" ? act(s, { type: "declareBlockers", player: pid, blocks: [] }) : s.pending ? botActions(s, pid).reduce((x, y) => act(x, y), s) : act(s, { type: "passPriority", player: pid });
+    }
+    const p = s.pending as { options: string[]; player: PlayerId };
+    expect(p.player).toBe(ap);
+    expect(p.options).toContain(ogre);
+    expect(p.options).toContain(elf);
+    expect(p.options).not.toContain(rock);
+    s = act(s, { type: "chooseOption", player: ap, choice: elf });
+    expect(s.objects[elf]!.zone).toBe("battlefield");
+    expect(s.objects[elf]!.controller).toBe(ap);
+    expect(s.objects[ogre]!.zone).toBe("exile");
+    expect(s.objects[rock]!.zone).toBe("exile");
   });
 });

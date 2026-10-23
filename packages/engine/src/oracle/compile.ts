@@ -1033,6 +1033,11 @@ export function compile(d: CardDef): CompiledCard {
       out.entersExchangeText = true;
       continue;
     }
+    // Xantcha: a replacement effect on how it enters (CR 614.1c, 614.12); "your" is the player it would enter under.
+    if (line === "~ enters under the control of an opponent of your choice." && !isSpell) {
+      out.entersUnderOpponent = true;
+      continue;
+    }
     // "Exile ~." as an instant's or sorcery's last instruction (Spirit Water Revival): it's exiled as it finishes
     // resolving, instead of going to its owner's graveyard (CR 608.2n).
     if (line === "Exile ~." && isSpell && li === lines.length - 1) {

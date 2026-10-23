@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { botActions, castProblem, isFullySupported, moveObject, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { botActions, castProblem, isFullySupported, moveObject, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
 import { characteristics, invalidateCharacteristics } from "../src/layers";
 import { abilitiesOf, power, toughness } from "../src/cards";
 
@@ -358,5 +358,63 @@ describe("Emet-Selch of the Third Seat", () => {
     expect(s.objects[div]!.zone).toBe("graveyard");
     s = castDrain(s, ap, ids[1]!);
     expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+  });
+});
+
+const xantcha = card("Xantcha, Sleeper Agent", "Legendary Creature — Phyrexian Minion", "{1}{B}{R}", {
+  power: "5",
+  toughness: "5",
+  oracleText: "Xantcha enters under the control of an opponent of your choice.\nXantcha attacks each combat if able and can't attack its owner or planeswalkers its owner controls.\n{3}: Xantcha's controller loses 2 life and you draw a card. Any player may activate this ability.",
+});
+const audience = card("Captive Audience", "Enchantment", "{5}{B}{R}", {
+  oracleText: "This enchantment enters under the control of an opponent of your choice.\nAt the beginning of your upkeep, choose one that hasn't been chosen —\n• Your life total becomes 4.\n• Discard your hand.\n• Each opponent creates five 2/2 black Zombie creature tokens.",
+});
+
+describe("Xantcha, Sleeper Agent", () => {
+  it("it enters under the control of an opponent its caster chooses (CR 614.1c); its caster still owns it", () => {
+    supported(xantcha, audience);
+    const { s: s0, ap, ids, opp } = setup([xantcha]);
+    let s = untilChoice(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "controlOpponent", player: ap });
+    expect(s.pending?.kind === "chooseOption" && s.pending.options).toHaveLength(3);
+    expect(s.pending?.kind === "chooseOption" && s.pending.options).not.toContain(String(ap));
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: String(opp) }));
+    const x = s.objects[ids[0]!]!;
+    expect(x.zone).toBe("battlefield");
+    expect(x.controller).toBe(opp);
+    expect(x.owner).toBe(ap);
+  });
+
+  it("any player may activate its last ability: its controller loses 2 life and the activator draws", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const x = putOnBattlefield(s0, opp, xantcha);
+    s0.objects[x]!.owner = ap;
+    const [life, oppLife, hand] = [s0.players[ap]!.life, s0.players[opp]!.life, s0.players[ap]!.hand.length];
+    const s = settle(run(s0, planActivate(s0, ap, x, 0)));
+    expect(s.players[opp]!.life).toBe(oppLife - 2);
+    expect(s.players[ap]!.life).toBe(life);
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+  });
+
+  it("it must attack, but not its owner; a bot attacks someone else with it", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const x = putOnBattlefield(s0, opp, xantcha);
+    s0.objects[x]!.owner = ap;
+    const s = passUntil(s0, "declareAttackers", opp);
+    expect(() => act(s, { type: "declareAttackers", player: opp, attacks: [{ attacker: x, defender: ap }] })).toThrow(/owner/);
+    expect(() => act(s, { type: "declareAttackers", player: opp, attacks: [] })).toThrow();
+    const bot = botActions(s, opp).find((a) => a.type === "declareAttackers");
+    const mine = bot?.type === "declareAttackers" ? bot.attacks.find((a) => a.attacker === x) : undefined;
+    expect(mine).toBeDefined();
+    expect(mine!.defender).not.toBe(ap);
+    expect(mine!.defender).not.toBe(opp);
+  });
+
+  it("a bot gives it to the opponent with the least life", () => {
+    const { s: s0, ap, ids } = setup([xantcha]);
+    const low = s0.turnOrder.find((p) => p !== ap)!;
+    s0.players[low]!.life = 7;
+    const s = untilChoice(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(botActions(s, ap)).toEqual([{ type: "chooseOption", player: ap, choice: String(low) }]);
   });
 });

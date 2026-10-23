@@ -966,6 +966,7 @@ export function moveObject(
     // enters and what it triggers wait for that choice.
     if (printed.entersAsCopy && copyCandidates(s, o, printed.entersAsCopy.filter).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });
     else if (printed.entersExchangeText && textExchangeCandidates(s, o).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "exchangeText", enterOpts: how });
+    else if (printed.entersUnderOpponent && opponents(s, o.controller).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "controlOpponent", enterOpts: how });
     else finishEntering(s, o, printed, how, withCounters && counterN ? { counter: withCounters.counter, n: counterN } : undefined);
     // Entering with others (enterTogether): off the list until they all have, so the next ones don't see it.
     if (together && o.zone === "battlefield") {
@@ -1048,7 +1049,7 @@ function scatterMerged(s: GameState, ids: ObjectId[], to: ZoneName, top: boolean
 }
 
 /** `fromStack`: it's a resolving spell becoming a permanent (sunburst, CR 702.44b). */
-type EnterOpts = { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; countersIfCreature?: Record<string, number>; countersIfPlaneswalker?: Record<string, number>; escaped?: boolean; fromStack?: boolean };
+type EnterOpts = { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; countersIfCreature?: Record<string, number>; countersIfPlaneswalker?: Record<string, number>; escaped?: boolean; fromStack?: boolean; /** Its "enters under the control of an opponent of your choice" was applied. */ controlChosen?: boolean };
 
 /**
  * The rest of entering the battlefield (CR 614.1c, 614.12): tapped or not, counters, "as it enters" choices,
@@ -1190,6 +1191,11 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
 /** Finish entering as what it now is, after "as it enters" copy or text choices (CR 614.12). */
 function finishEnteringAs(s: GameState, o: GameObject, opts: EnterOpts) {
   const printed = compileCard(defOf(s, o));
+  // A Clone entering as a copy of Xantcha enters under an opponent's control too (CR 614.12, 707.5).
+  if (printed.entersUnderOpponent && !opts.controlChosen && opponents(s, o.controller).length) {
+    (s.entersChoices ??= []).unshift({ id: o.id, zc: o.zoneChanges ?? 0, what: "controlOpponent", enterOpts: opts });
+    return;
+  }
   // A Clone entering as a copy of Primeval Spawn has its "If ~ would enter and it wasn't cast or no mana was spent to cast
   // it, exile it instead" as it would exist on the battlefield (CR 614.12, 707.5), judged by the Clone's own casting. It
   // never was on the battlefield, so nothing sees it leave.
@@ -6308,6 +6314,15 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       enterExchangingText(s, o, choice, entry?.enterOpts ?? {});
       return;
     }
+    if (pend.what === "controlOpponent") {
+      if (!pend.options.includes(choice)) throw new RulesError("choose an opponent offered");
+      // It enters under that player's control (CR 614.1c, 110.2).
+      o.controller = Number(choice);
+      invalidateCharacteristics(s);
+      log(s, `${defOf(s, o).name} enters under ${player(s, o.controller).name}'s control.`);
+      finishEnteringAs(s, o, { ...(entry?.enterOpts ?? {}), controlChosen: true });
+      return;
+    }
     if (pend.what === "discardInstead") {
       if (!pend.options.includes(choice)) throw new RulesError("choose a card offered, or none");
       if (choice !== "none" && obj(s, choice).zone === "hand") {
@@ -6399,7 +6414,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "discardInstead" || pend.what === "copy" || pend.what === "exchangeText" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "discardInstead" || pend.what === "copy" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector") throw new RulesError("nothing to choose");
   if (pend.what === "searchZones") {
     if (!pend.options.includes(choice)) throw new RulesError("choose both or the graveyard only");
     (r.scratch ??= {}).searchZones = choice;
@@ -6678,6 +6693,13 @@ function askEntersChoice(s: GameState): boolean {
         continue;
       }
       s.pending = { kind: "pickPermanents", player: controllerOf(s, o), source: defOf(s, o).name, action: "reveal", what: "card that shares a creature type with it", options, count: options.length, min: 0, objectId: o.id };
+      return true;
+    }
+    if (c.what === "controlOpponent") {
+      // "~ enters under the control of an opponent of your choice": the player it would have entered under chooses.
+      const you = o.controller;
+      const opps = opponents(s, you);
+      s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "controlOpponent", options: opps.map(String), labels: opps.map((x) => player(s, x).name), objectId: o.id, prompt: "choose an opponent to control it" };
       return true;
     }
     if (c.what === "exchangeText") {
@@ -7025,6 +7047,8 @@ export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, p
   if (c.cantAttackPlayers.includes(defender) && !atBattle) return `${c.name} can't attack ${player(s, defender).name}${planeswalker ? "'s planeswalkers" : ""}`;
   // Alexios: its owner, but not their planeswalkers or the battles they protect (rulings).
   if (c.cantAttackOwner && !planeswalker && attacked === undefined && defender === o.owner) return `${c.name} can't attack its owner`;
+  // Xantcha: nor its owner's planeswalkers (a battle its owner protects isn't one).
+  if (c.cantAttackOwnerWalkers && planeswalker && !atBattle && defender === o.owner) return `${c.name} can't attack planeswalkers its owner controls`;
   if (c.cantAttackSamePlayer && !planeswalker && o.attacked?.turn === s.turn && o.attacked.players?.includes(defender)) return `${c.name} can't attack a player it has already attacked this turn`;
   for (const f of c.attackUnless)
     if (!s.battlefield.some((id) => controllerOf(s, obj(s, id)) === defender && objectMatches(s, f, obj(s, id), c.controller, false)))

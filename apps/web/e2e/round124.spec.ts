@@ -59,3 +59,18 @@ test("Deadpool, Trading Card: as it enters, exchange its text box with Ana's Ser
   expect(after.objects[angel]!.textFrom).toBeTruthy();
   expect(pageErrors(page)).toEqual([]);
 });
+
+test("Xantcha, Sleeper Agent: its caster chooses the opponent it enters under the control of", async ({ page }) => {
+  const s = scene({ hand: ["Xantcha, Sleeper Agent"], board: LANDS });
+  const xantcha = one(s, "Xantcha, Sleeper Agent");
+  const ana = s.players.find((p) => p.name === "Ana")!.id;
+  await open(page, s);
+  await card(page, "Xantcha, Sleeper Agent", s).click();
+  await resolveUntil(page, (st) => st.pending?.kind === "chooseOption" && st.pending.what === "controlOpponent");
+  const bar = controls(page);
+  await expect(bar).toContainText("choose an opponent to control it");
+  await bar.getByRole("button", { name: "Ana", exact: true }).click();
+  const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && st.objects[xantcha]!.zone === "battlefield");
+  expect(after.objects[xantcha]!.controller).toBe(ana);
+  expect(pageErrors(page)).toEqual([]);
+});

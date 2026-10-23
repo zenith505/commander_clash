@@ -13148,6 +13148,41 @@
   "gameChanger": false
  },
  {
+  "oracleId": "0f0f3712-8d13-41a5-b332-2ab34e48d79d",
+  "name": "Xantcha, Sleeper Agent",
+  "manaCost": "{1}{B}{R}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Phyrexian Minion",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Phyrexian",
+   "Minion"
+  ],
+  "oracleText": "Xantcha enters under the control of an opponent of your choice.\nXantcha attacks each combat if able and can't attack its owner or planeswalkers its owner controls.\n{3}: Xantcha's controller loses 2 life and you draw a card. Any player may activate this ability.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c18",
+  "releasedAt": "2018-08-10",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "322f0459-f394-44f0-977b-55fd0cbe0712",
   "name": "Yawgmoth's Will",
   "manaCost": "{2}{B}",

@@ -481,6 +481,13 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const p = me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? me.chosen?.player : lk && lk.zc === ctx.sourceZc ? lk.chosenPlayer : undefined;
       return p !== undefined && !player(s, p).lost ? [p] : [];
     }
+    case "selfController": {
+      // The source's controller now, or as it last existed on the battlefield (CR 608.2h).
+      const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      const lk = me && s.lastKnown?.[me.id];
+      const p = me && me.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? controllerOf(s, me) : lk && lk.zc === ctx.sourceZc ? lk.controller : undefined;
+      return p !== undefined && !player(s, p).lost ? [p] : [];
+    }
     case "combatDamagedBySelf": {
       // This object as the ability's source, the same one that dealt the damage (CR 400.7).
       const key = ctx.sourceId !== undefined ? `${ctx.sourceId}@${ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0}` : undefined;

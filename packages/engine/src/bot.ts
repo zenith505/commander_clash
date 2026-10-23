@@ -422,6 +422,11 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "chooseOption", player: pid, choice: pick }];
     }
     if (pend.kind === "chooseOption" && pend.what === "tributePay") return [{ type: "chooseOption", player: pid, choice: payTribute(s, pend.objectId!) ? "pay" : "no" }];
+    // Xantcha, Captive Audience: the opponent with the least life, who loses the most from controlling it.
+    if (pend.kind === "chooseOption" && pend.what === "controlOpponent") {
+      const pick = [...pend.options].sort((a, b) => player(s, Number(a)).life - player(s, Number(b)).life)[0]!;
+      return [{ type: "chooseOption", player: pid, choice: pick }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "exchangeText") {
       // Deadpool: its own text is a drawback ("you lose 3 life" each upkeep), so trade it to an opponent for the text of
       // their best creature; never onto one of our own.

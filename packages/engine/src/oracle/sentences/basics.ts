@@ -621,6 +621,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Everybody Lives!: "Players can't lose life this turn and players can't lose the game or win the game this turn" (CR
   // 119.8, 104.3): every player in the game as it resolves.
+  // Detection Tower: hexproof ignored for its controller's spells and abilities, this turn (CR 702.11e).
+  if (/^(?:Until end of turn, your|Your) opponents and creatures your opponents control with hexproof can be the targets of spells and abilities you control as though they didn't have hexproof(?: until end of turn)?$/.test(s) && /\buntil end of turn\b/i.test(s)) return [{ type: "turnRules", rules: ["seeHexproof"] }];
   if (/^Players can't lose life this turn and players can't lose the game or win the game this turn$/.test(s)) return [{ type: "turnRules", rules: ["cantLoseLife", "cantLoseGame", "cantWinGame"], everyone: true }];
   if (/^Players gain hexproof until end of turn$/.test(s)) return [{ type: "playerGains", keywords: ["Hexproof"], everyone: true }];
   if (/^You may cast spells this turn as though they had flash$/i.test(s)) return [{ type: "turnRules", rules: ["flash"] }];

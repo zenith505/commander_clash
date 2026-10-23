@@ -1714,7 +1714,11 @@ export interface TurnRule {
    * "extraLoyalty": The Chain Veil's "for each planeswalker you control, you may activate one of its loyalty abilities once
    * this turn as though none of its loyalty abilities have been activated this turn": one more each, each time (rulings).
    */
-  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable" | "creatureSpellsUncounterable" | "extraLoyalty";
+  /**
+   * "seeHexproof": Detection Tower's "your opponents and creatures your opponents control with hexproof can be the targets
+   * of spells and abilities you control as though they didn't have hexproof" (CR 702.11e: "hexproof from" too).
+   */
+  rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable" | "creatureSpellsUncounterable" | "extraLoyalty" | "seeHexproof";
   /** "Can't be countered by blue or black spells this turn" (Autumn's Veil): only by spells of these colors, as they resolve. */
   byColors?: Color[];
 }

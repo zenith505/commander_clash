@@ -4625,6 +4625,11 @@ export interface CompiledCard {
    * Ward abilities of those creatures don't trigger." (Nowhere to Run, CR 702.11e).
    */
   exposesOpponentsCreatures?: true;
+  /**
+   * Glaring Spotlight: "Creatures your opponents control with hexproof can be the targets of spells and abilities you
+   * control as though they didn't have hexproof" (CR 702.11e: "hexproof from" too); ward still triggers.
+   */
+  seesOpponentsCreatures?: true;
   /** "If you tap a basic land for mana, it produces three times as much of that mana instead" (Virtue of Strength). */
   tapBasicManaTimes?: number;
   /** "If you would gain life, you gain that much life plus 1 instead" (CR 614.1a): N for each. */

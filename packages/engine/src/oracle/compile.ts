@@ -1599,6 +1599,10 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Nowhere to Run: creatures its controller's opponents control can be targeted as though they didn't have hexproof
     // (nor any "hexproof from", CR 702.11e), by anyone's spells and abilities; their ward abilities don't trigger (rulings).
+    if (line === "Creatures your opponents control with hexproof can be the targets of spells and abilities you control as though they didn't have hexproof.") {
+      out.seesOpponentsCreatures = true;
+      continue;
+    }
     if (line === "Creatures your opponents control can be the targets of spells and abilities as though they didn't have hexproof. Ward abilities of those creatures don't trigger.") {
       out.exposesOpponentsCreatures = true;
       continue;

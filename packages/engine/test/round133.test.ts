@@ -774,3 +774,48 @@ describe("Bumi, Unleashed: an additional combat phase only land creatures can at
     expect(s.combatAttackOnly).toBeUndefined();
   });
 });
+
+describe("Detection Tower, Glaring Spotlight: targeting as though they didn't have hexproof", () => {
+  const tower = card("Detection Tower", "Land", "", { oracleText: "{T}: Add {C}.\n{1}, {T}: Until end of turn, your opponents and creatures your opponents control with hexproof can be the targets of spells and abilities you control as though they didn't have hexproof." });
+  const spotlight = card("Glaring Spotlight", "Artifact", "{1}", { oracleText: "Creatures your opponents control with hexproof can be the targets of spells and abilities you control as though they didn't have hexproof.\n{3}, Sacrifice this artifact: Creatures you control gain hexproof until end of turn and can't be blocked this turn." });
+  const leyline = card("Leyline of Sanctity", "Enchantment", "{2}{W}{W}", { oracleText: "You have hexproof." });
+  const troll = card("Test Troll", "Creature — Troll", "{2}{G}", { power: "3", toughness: "3", keywords: ["Hexproof"], oracleText: "Hexproof" });
+  const bolt = card("Test Bolt", "Instant", "{R}", { oracleText: "Test Bolt deals 3 damage to any target." });
+  const scene = () => {
+    const { s, ap, ids } = setup([bolt]);
+    const opp = nextOf(s, ap);
+    putOnBattlefield(s, opp, leyline);
+    const t = putOnBattlefield(s, opp, troll);
+    addMana(s, ap, ["R"]);
+    return { s, ap, opp, t, boltId: ids[0]! };
+  };
+  const canTarget = (s: GameState, ap: PlayerId, id: string, t: { kind: "player"; id: PlayerId } | { kind: "object"; id: string }) => {
+    try {
+      return !!planCast(s, ap, id, [t]);
+    } catch {
+      return false;
+    }
+  };
+
+  it("Detection Tower: this turn, the opponent and their hexproof creature can be targeted", () => {
+    supported(tower, spotlight);
+    const { s: s0, ap, opp, t, boltId } = scene();
+    expect(canTarget(s0, ap, boltId, { kind: "player", id: opp })).toBe(false);
+    expect(canTarget(s0, ap, boltId, target(t))).toBe(false);
+    const tw = putOnBattlefield(s0, ap, tower);
+    addMana(s0, ap, ["C"]);
+    const s = passToPending(run(s0, planActivate(s0, ap, tw, 0)));
+    addMana(s, ap, ["R"]);
+    expect(canTarget(s, ap, boltId, { kind: "player", id: opp })).toBe(true);
+    expect(canTarget(s, ap, boltId, target(t))).toBe(true);
+    // Only for its controller's spells and abilities.
+    expect(s.turnRules?.some((r) => r.player === opp && r.rule === "seeHexproof")).toBe(false);
+  });
+
+  it("Glaring Spotlight: the creature, not the player", () => {
+    const { s, ap, opp, t, boltId } = scene();
+    putOnBattlefield(s, ap, spotlight);
+    expect(canTarget(s, ap, boltId, target(t))).toBe(true);
+    expect(canTarget(s, ap, boltId, { kind: "player", id: opp })).toBe(false);
+  });
+});

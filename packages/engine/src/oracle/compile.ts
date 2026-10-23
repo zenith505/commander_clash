@@ -678,6 +678,11 @@ export function compile(d: CardDef): CompiledCard {
       else out.unsupported.push(raw);
       continue;
     }
+    // Mayhem without a cost (CR 702.187c): a land played from the graveyard the turn it was discarded.
+    if (line === "Mayhem" && d.types.includes("Land") && d.types.length === 1) {
+      out.mayhemLand = true;
+      continue;
+    }
     const yard = parseGraveyardKeyword(line, d);
     if (yard !== null) {
       if (yard === "fail") out.unsupported.push(raw);

@@ -4913,6 +4913,11 @@ export interface CompiledCard {
   /** "You may play lands from your graveyard." (Crucible of Worlds): a permission; each still uses a land play (CR 305.2). */
   landsFromGraveyard?: boolean;
   /**
+   * "Mayhem" without a cost on a land (Oscorp Industries): "You may play this card from your graveyard if you discarded
+   * it this turn" (CR 702.187c), with a land play and the usual timing (rulings).
+   */
+  mayhemLand?: true;
+  /**
    * "Each nonland card in your graveyard has escape. The escape cost is equal to the card's mana cost plus exile three
    * other cards from your graveyard." (Underworld Breach), "Each instant and sorcery card in your graveyard has flashback.
    * The flashback cost is equal to that card's mana cost." (Lier), "During your turn, nonland permanent cards in your

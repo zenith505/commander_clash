@@ -3357,7 +3357,12 @@ export function plottedCast(s: GameState, pid: PlayerId, o: GameObject): boolean
  */
 export function mayPlayLandFromGraveyard(s: GameState, o: GameObject, pid: PlayerId): boolean {
   if (o.zone !== "graveyard" || o.owner !== pid || !isType(defOf(s, o), "Land")) return false;
-  return ownGraveyardPlay(s, o, pid) || landsFromGraveyardNow(s, pid) || !!landPermit(s, pid);
+  return ownGraveyardPlay(s, o, pid) || mayhemPlay(s, o) || landsFromGraveyardNow(s, pid) || !!landPermit(s, pid);
+}
+
+/** Mayhem on a land (Oscorp Industries): discarded this turn, so its owner may play it from their graveyard (CR 702.187c). */
+function mayhemPlay(s: GameState, o: GameObject): boolean {
+  return o.zone === "graveyard" && o.discardedTurn === s.turn && !!compileCard(defOf(s, o)).mayhemLand;
 }
 
 /** "Mill a card. You may play that card this turn." (Tablet of Discovery): that card's own permission (CR 400.7). */
@@ -3536,7 +3541,7 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
     log(s, `${p.name} reveals ${nameOf(s, shown)} so ${d.name} enters untapped.`);
   }
   // Muldrotha's land from the graveyard is used up, unless something lets every land be played from there (Crucible).
-  if (o.zone === "graveyard" && !ownGraveyardPlay(s, o, p.id) && !landsFromGraveyardNow(s, p.id)) {
+  if (o.zone === "graveyard" && !ownGraveyardPlay(s, o, p.id) && !mayhemPlay(s, o) && !landsFromGraveyardNow(s, p.id)) {
     const permit = landPermit(s, p.id)!;
     ((s.turnLog ??= {}).gravePermits ??= []).push(permit);
     // Serra Paragon: "it gains ..." as the land it becomes.

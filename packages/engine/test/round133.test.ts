@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { act, card, forest, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
 import { invalidateCharacteristics } from "../src/layers";
-import { botActions, canBeSacrificed, characteristics, controllerOf, isFullySupported, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { botActions, legalActions, canBeSacrificed, characteristics, controllerOf, isFullySupported, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -195,5 +195,51 @@ describe("Rona, Tolarian Obliterator: a source's controller exiles a card from t
     const s = passToPending(run(s0, planCast(s0, ap, shockId, [target(id)])));
     expect(s.pending).toBeNull();
     expect(s.objects[id]!.damage).toBe(2);
+  });
+});
+
+const oscorp = card("Oscorp Industries", "Land", "", { oracleText: "This land enters tapped.\nWhen this land enters from a graveyard, you lose 2 life.\n{T}: Add {U}, {B}, or {R}.\nMayhem (You may play this card from your graveyard if you discarded it this turn. Timing rules still apply.)", keywords: ["Mayhem"] });
+const rummage = card("Test Rummage", "Sorcery", "{R}", { oracleText: "Discard a card, then draw a card." });
+
+describe("Oscorp Industries: mayhem without a cost, a land played from the graveyard the turn it was discarded (CR 702.187c)", () => {
+  const discarded = () => {
+    const { s: s0, ap, ids } = setup([rummage, oscorp]);
+    onlyInHand(s0, ap, ids);
+    // The only card in hand, so it's the one discarded.
+    const s = passToPending(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.objects[ids[1]!]!.zone).toBe("graveyard");
+    return { s, ap, id: ids[1]! };
+  };
+
+  it("discarded this turn, it's played from the graveyard with the turn's land play, enters tapped, and its owner loses 2 life", () => {
+    supported(oscorp);
+    const { s: s0, ap, id } = discarded();
+    expect(s0.players[ap]!.landsPlayedThisTurn).toBe(0);
+    const life = s0.players[ap]!.life;
+    expect(legalActions(s0, ap)).toContainEqual({ type: "playLand", player: ap, objectId: id });
+    const s = passToPending(act(s0, { type: "playLand", player: ap, objectId: id }));
+    expect(s.objects[id]!.zone).toBe("battlefield");
+    expect(s.objects[id]!.tapped).toBe(true);
+    expect(s.players[ap]!.landsPlayedThisTurn).toBe(1);
+    expect(s.players[ap]!.life).toBe(life - 2);
+  });
+
+  it("not after a land was played this turn, nor on a later turn", () => {
+    const { s: s0, ap, id } = discarded();
+    const s = structuredClone(s0);
+    s.players[ap]!.landsPlayedThisTurn = 1;
+    expect(() => act(s, { type: "playLand", player: ap, objectId: id })).toThrow();
+    const later = passUntil(passUntil(s0, "upkeep", nextOf(s0, ap)), "main1", ap, 4000);
+    expect(later.turn).toBeGreaterThan(s0.turn);
+    expect(legalActions(later, ap).some((a) => a.type === "playLand" && a.objectId === id)).toBe(false);
+  });
+
+  it("milled, it can't be played", () => {
+    const { s: s0, ap, ids } = setup([oscorp]);
+    const id = ids[0]!;
+    s0.players[ap]!.hand = s0.players[ap]!.hand.filter((x) => x !== id);
+    s0.objects[id]!.zone = "graveyard";
+    s0.players[ap]!.graveyard.push(id);
+    expect(legalActions(s0, ap).some((a) => a.type === "playLand" && a.objectId === id)).toBe(false);
   });
 });

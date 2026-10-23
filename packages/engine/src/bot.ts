@@ -1912,7 +1912,9 @@ function costXRoom(s: GameState, pid: PlayerId, id: string, costs: AdditionalCos
             ? p.graveyard.filter((x) => x !== id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x))))).length
             : c.kind === "sacrifice"
               ? sacrificePool(s, pid, c, new Set()).filter((o) => !c.optional || o.isToken).length
-              : returnCandidates(s, pid, c).length;
+              : c.kind === "tap"
+                ? 0 // "Tap X untapped ... you control" is an activated ability's cost only
+                : returnCandidates(s, pid, c).length;
     most = Math.min(most, room);
   }
   return Math.max(0, most === Infinity ? 0 : most);

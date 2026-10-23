@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { botActions, characteristics, isFullySupported, objHasKeyword, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { botActions, characteristics, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -46,6 +46,14 @@ const toYard = (s: GameState, pid: number, ...defs: CardDef[]) =>
   });
 const bears = (name = "Grizzly Bears") => card(name, "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" });
 void logText;
+/** Pass priority (no blocks) until a choice of this kind waits. */
+const untilPending = (s: GameState, kind: string) => {
+  for (let i = 0; i < 80 && s.pending?.kind !== kind; i++) {
+    const pid = waitingOn(s)!;
+    s = s.pending?.kind === "declareBlockers" ? act(s, { type: "declareBlockers", player: pid, blocks: [] }) : act(s, { type: "passPriority", player: pid });
+  }
+  return s;
+};
 void toHand;
 
 // Real oracle text (Scryfall).
@@ -210,7 +218,6 @@ describe("Phyrexian Vindicator: damage to it is prevented, then it deals that mu
     s = act(s, { type: "declareBlockers", player: opp, blocks: [{ blocker: b1, attacker: v }, { blocker: b2, attacker: v }] } as Action);
     for (let i = 0; i < 30 && !s.pending && s.step !== "combatDamage"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
     for (let i = 0; i < 30 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
-    if (s.pending?.kind === "assignDamage" || s.pending?.kind === "damageOrder") s = settleBots(s);
     expect(s.objects[v]!.damage).toBe(0);
     expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
     expect(s.triggerQueue.length + s.stack.filter((x) => x.sourceId === v).length).toBeLessThanOrEqual(1);
@@ -271,4 +278,185 @@ describe("Vnwxt, Verbose Host: two cards for each draw only at max speed (CR 702
     expect(drawStep(4)).toBe(2);
   });
   it("speed 3: one", () => expect(drawStep(3)).toBe(1));
+});
+
+const thief = card("Thief of Sanity", "Creature — Specter", "{1}{U}{B}", {
+  power: "2",
+  toughness: "2",
+  keywords: ["Flying"],
+  oracleText: "Flying\nWhenever this creature deals combat damage to a player, look at the top three cards of that player's library, exile one of them face down, then put the rest into their graveyard. You may cast that card for as long as it remains exiled, and mana of any type can be spent to cast that spell.",
+});
+
+describe("Thief of Sanity: one of the top three exiled face down for you to cast, the rest into their graveyard", () => {
+  it("picks one; the other two go to the damaged player's graveyard; it can be cast with any mana", () => {
+    supported(thief);
+    const { s: s0, ap, opp } = setup([]);
+    const t = putOnBattlefield(s0, ap, thief);
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: t, defender: opp }] });
+    s = untilPending(s, "searchLibrary");
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap });
+    const top = s.pending!.kind === "searchLibrary" ? s.pending.cards : [];
+    expect(top).toHaveLength(3);
+    const yard = s.players[opp]!.graveyard.length;
+    s = act(s, { type: "searchLibrary", player: ap, found: [top[1]!] });
+    expect(s.objects[top[1]!]!.zone).toBe("exile");
+    expect(s.objects[top[1]!]!.mayPlay).toMatchObject({ player: ap, anyType: true });
+    expect(s.objects[top[0]!]!.zone).toBe("graveyard");
+    expect(s.objects[top[2]!]!.zone).toBe("graveyard");
+    expect(s.players[opp]!.graveyard.length).toBe(yard + 2);
+  });
+});
+
+const grima = card("Gríma, Saruman's Footman", "Legendary Creature — Human Advisor", "{2}{U}{B}", {
+  power: "1",
+  toughness: "4",
+  oracleText: "Gríma can't be blocked.\nWhenever Gríma deals combat damage to a player, that player exiles cards from the top of their library until they exile an instant or sorcery card. You may cast that card without paying its mana cost. Then that player puts the exiled cards that weren't cast this way on the bottom of their library in a random order.",
+});
+
+describe("Gríma, Saruman's Footman: exile until an instant or sorcery, cast it free; the rest on the bottom (rulings)", () => {
+  const swing = (castIt: boolean) => {
+    const { s: s0, ap, opp } = setup([]);
+    const g = putOnBattlefield(s0, ap, grima);
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: g, defender: opp }] });
+    // Two lands, then a sorcery on top of their library as the damage is dealt.
+    const lib = s.players[opp]!.library;
+    const sorcery = putOnBattlefield(s, opp, card("Test Growth", "Sorcery", "{G}", { oracleText: "You gain 3 life." }));
+    s.battlefield.splice(s.battlefield.indexOf(sorcery), 1);
+    s.objects[sorcery]!.zone = "library";
+    const lands = lib.filter((id) => s.cards[s.objects[id]!.cardId]!.types.includes("Land")).slice(0, 2);
+    s.players[opp]!.library = [...lands, sorcery, ...lib.filter((id) => !lands.includes(id))];
+    s = untilPending(s, "castFree");
+    expect(s.pending).toMatchObject({ kind: "castFree", player: ap, objectId: sorcery });
+    expect(lands.every((id) => s.objects[id]!.zone === "exile")).toBe(true);
+    const life = s.players[ap]!.life;
+    if (castIt) s = run(s, planCast(s, ap, sorcery));
+    else s = act(s, { type: "chooseMay", player: ap, yes: false });
+    s = settleBots(s);
+    return { s, ap, opp, lands, sorcery, life };
+  };
+  it("cast it: you gain the life; the two lands go to the bottom", () => {
+    supported(grima);
+    const { s, ap, opp, lands, sorcery, life } = swing(true);
+    expect(s.players[ap]!.life).toBe(life + 3);
+    expect(s.objects[sorcery]!.zone).toBe("graveyard");
+    expect(s.players[opp]!.library.slice(-2).sort()).toEqual([...lands].sort());
+  });
+  it("not cast: it goes to the bottom with the others", () => {
+    const { s, opp, lands, sorcery } = swing(false);
+    expect(s.players[opp]!.library.slice(-3).sort()).toEqual([...lands, sorcery].sort());
+  });
+});
+
+const oviya = card("Oviya, Automech Artisan", "Legendary Creature — Human Artificer", "{3}{G}", {
+  power: "1",
+  toughness: "2",
+  oracleText: "Each creature that's attacking one of your opponents has trample.\n{G}, {T}: You may put a creature or Vehicle card from your hand onto the battlefield. If you put an artifact onto the battlefield this way, put two +1/+1 counters on it.",
+});
+
+describe("Oviya, Automech Artisan", () => {
+  it("creatures attacking your opponents have trample, whoever controls them; not those attacking you or a planeswalker", () => {
+    supported(oviya);
+    const { s: s0, ap } = setup([]);
+    const [o1, o2] = [nextOf(s0, ap, 1), nextOf(s0, ap, 2)];
+    putOnBattlefield(s0, ap, oviya);
+    const pw = putOnBattlefield(s0, o2, walker);
+    s0.objects[pw]!.counters = { loyalty: 5 };
+    const [a, b] = [bears("A"), bears("B")].map((d) => putOnBattlefield(s0, ap, d));
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: a!, defender: o1 }, { attacker: b!, defender: o2, planeswalker: pw }] });
+    expect(objHasKeyword(s, s.objects[a!]!, "Trample")).toBe(true);
+    expect(objHasKeyword(s, s.objects[b!]!, "Trample")).toBe(false);
+    // An opponent's creature attacking you doesn't have it.
+    const { s: t0, ap: me } = setup([]);
+    const them = nextOf(t0, me, 1);
+    putOnBattlefield(t0, me, oviya);
+    const c = putOnBattlefield(t0, them, bears("C"));
+    let t = passUntil(t0, "declareAttackers", them);
+    t = act(t, { type: "declareAttackers", player: them, attacks: [{ attacker: c, defender: me }] });
+    expect(objHasKeyword(t, t.objects[c]!, "Trample")).toBe(false);
+  });
+
+  it("puts an artifact creature from your hand with two +1/+1 counters; a non-artifact creature gets none", () => {
+    const golem = card("Test Golem", "Artifact Creature — Golem", "{5}", { power: "3", toughness: "3" });
+    const { s: s0, ap, ids } = setup([golem, bears()]);
+    const o = putOnBattlefield(s0, ap, oviya);
+    let s = untilChoice(run(s0, planActivate(s0, ap, o, 0)));
+    expect(s.pending).toMatchObject({ player: ap });
+    s = settleBots(s);
+    const put = ids.find((id) => s.objects[id]!.zone === "battlefield");
+    expect(put).toBeDefined();
+    expect(s.objects[put!]!.counters["+1/+1"] ?? 0).toBe(put === ids[0] ? 2 : 0);
+  });
+});
+
+const aryel = card("Aryel, Knight of Windgrace", "Legendary Creature — Human Knight", "{2}{W}{B}", {
+  power: "4",
+  toughness: "4",
+  keywords: ["Vigilance"],
+  oracleText: "Vigilance\n{2}{W}, {T}: Create a 2/2 white Knight creature token with vigilance.\n{B}, {T}, Tap X untapped Knights you control: Destroy target creature with power X or less.",
+});
+
+describe("\"Tap X untapped Knights you control\": X is how many are tapped (CR 107.3a, 602.2b)", () => {
+  it("Aryel: tap two Knights, destroy a creature with power 2", () => {
+    supported(aryel);
+    const { s: s0, ap, opp } = setup([]);
+    const a = putOnBattlefield(s0, ap, aryel);
+    const knight = (n: string) => card(n, "Creature — Human Knight", "{1}{W}", { power: "2", toughness: "2" });
+    const [k1, k2] = [putOnBattlefield(s0, ap, knight("K1")), putOnBattlefield(s0, ap, knight("K2"))];
+    const victim = putOnBattlefield(s0, opp, bears());
+    const big = putOnBattlefield(s0, opp, card("Big", "Creature — Giant", "{4}", { power: "3", toughness: "3" }));
+    // X = 2 can't destroy the 3-power one.
+    expect(planActivate(s0, ap, a, 1, [{ kind: "object", id: big }], undefined, undefined, 2)).toBeNull();
+    expect(planActivate(s0, ap, a, 1, [{ kind: "object", id: victim }], undefined, undefined, 3)).toBeNull(); // only two Knights
+    let s = run(s0, planActivate(s0, ap, a, 1, [{ kind: "object", id: victim }], undefined, undefined, 2, { tap: [k1, k2] }));
+    expect(s.objects[k1]!.tapped && s.objects[k2]!.tapped && s.objects[a]!.tapped).toBe(true);
+    s = settleBots(s);
+    expect(s.objects[victim]!.zone).toBe("graveyard");
+  });
+});
+
+const hazel = card("Hazel of the Rootbloom", "Legendary Creature — Squirrel Druid", "{2}{B}{G}", {
+  power: "3",
+  toughness: "5",
+  oracleText: "{T}, Pay 2 life, Tap X untapped tokens you control: Add X mana in any combination of colors.\nAt the beginning of your end step, create a token that's a copy of target token you control. If that token is a Squirrel, instead create two tokens that are copies of it.",
+});
+const squirrelToken = card("Squirrel", "Token Creature — Squirrel", "", { power: "1", toughness: "1", colors: ["G"] });
+const clueToken = card("Clue", "Token Artifact — Clue", "", { oracleText: "{2}, Sacrifice this artifact: Draw a card." });
+
+describe("Hazel of the Rootbloom", () => {
+  const withTokens = (...defs: CardDef[]) => {
+    const { s, ap } = setup([]);
+    const h = putOnBattlefield(s, ap, hazel);
+    const toks = defs.map((d) => {
+      const id = putOnBattlefield(s, ap, d);
+      s.objects[id]!.isToken = true;
+      return id;
+    });
+    return { s, ap, h, toks };
+  };
+  it("tap two tokens and pay 2 life: two mana in any combination of colors (a mana ability)", () => {
+    supported(hazel);
+    const { s: s0, ap, h, toks } = withTokens(squirrelToken, clueToken);
+    const life = s0.players[ap]!.life;
+    let s = act(s0, { type: "activateAbility", player: ap, objectId: h, index: 0, x: 2, costs: { tap: toks } });
+    expect(s.stack).toHaveLength(0);
+    expect(s.pending).toMatchObject({ kind: "manaMix", player: ap, n: 2 });
+    s = act(s, { type: "manaMix", player: ap, counts: { B: 1, G: 1 } });
+    expect(s.players[ap]!.life).toBe(life - 2);
+    expect(toks.every((id) => s.objects[id]!.tapped)).toBe(true);
+    expect(s.players[ap]!.manaPool.B).toBeGreaterThanOrEqual(1);
+  });
+  it("end step: a Squirrel token is copied twice; another token once", () => {
+    for (const [def, n] of [[squirrelToken, 2], [clueToken, 1]] as const) {
+      const { s: s0, ap, toks } = withTokens(def);
+      const before = s0.battlefield.length;
+      let s = passUntil(s0, "end", ap);
+      s = untilChoice(s);
+      if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: toks[0]! }] } as Action);
+      s = settleBots(s);
+      expect(s.battlefield.length - before).toBe(n);
+    }
+  });
 });

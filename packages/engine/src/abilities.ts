@@ -383,7 +383,7 @@ export interface TargetSpec {
    * the Witch): ones that could have been declared as attackers this turn but weren't (rulings, GameObject.couldAttack).
    */
   /** `attackingYou`: "creatures attacking you", attacking that player and not a planeswalker or battle (CR 506.3, 508.1b). */
-  combat?: "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | "couldButDidntAttack" | "attackingBattle" | "attackingYou";
+  combat?: "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | "couldButDidntAttack" | "attackingBattle" | "attackingYou" | /** "Attacking one of your opponents" (Oviya, Automech Artisan): that player, not a planeswalker or battle. */ "attackingOpponent";
   /** "Each green creature that entered this turn" (Oran-Rief): this object came onto the battlefield this turn (CR 400.7). */
   enteredThisTurn?: true;
   /** "Target creature card from a graveyard that was put there this turn" (Abyssal Harvester): from anywhere (GameObject.toGraveyardTurn). */
@@ -1570,7 +1570,7 @@ export type Effect =
    * long as it remains exiled, and mana of any type can be spent to cast that spell": `from` that player's library, and
    * `castAnyType` the permission (CR 609.4b).
    */
-  | { type: "hideaway"; n: number; from?: PlayerRef; castAnyType?: true }
+  | { type: "hideaway"; n: number; from?: PlayerRef; castAnyType?: true; /** "Then put the rest into their graveyard" (Thief of Sanity), not on the bottom. */ restToGraveyard?: true }
   /**
    * "You may play the exiled card without paying its mana cost": the card this permanent's hideaway exiled, as this
    * resolves. A land only on your turn with a land play left (CR 305.2-3, rulings on Evercoat Ursine).
@@ -2061,6 +2061,8 @@ export type Effect =
       notNamedAs?: number;
       /** "Then they put the exiled cards on the bottom of their library in a random order": the card not cast too. */
       restBottom?: true;
+      /** "Until they exile an instant or sorcery card" (Gríma, Saruman's Footman): a card of one of these types, not a nonland card. */
+      untilTypes?: string[];
     }
   /**
    * Discover N (CR 701.57a): exile cards from the top of your library until a nonland card with mana value N or less;
@@ -3990,7 +3992,7 @@ export type AdditionalCost =
    * "Tap an untapped creature you control", "tap two untapped Wizards you control" (CR 602.2b). Any of them, summoning
    * sick or not (CR 302.6 is only about {T}). `other`: the ability also has {T}, so its source is already tapped for it.
    */
-  | { kind: "tap"; filter: TargetSpec; n: number; other?: boolean; /** "Untap a tapped creature you control" (Halo Fountain): untapped instead. */ untap?: true }
+  | { kind: "tap"; filter: TargetSpec; n: number; other?: boolean; /** "Untap a tapped creature you control" (Halo Fountain): untapped instead. */ untap?: true; /** "Tap X untapped Knights you control" (Aryel): X is announced as it's activated, and is how many (CR 107.3a). */ x?: true }
   /** "Reveal a Pirate card from your hand" (Daring Buccaneer): the card stays in the hand. */
   | { kind: "reveal"; filter: TargetSpec; n: number }
   /** "Exile a blue card from your hand" (Force of Will's alternative cost): not the spell itself, on the stack by then (CR 601.2a). */

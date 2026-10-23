@@ -3,7 +3,7 @@ import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Modification,
 import { compileCard } from "../oracle";
 import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, basePowerNow, canBeSacrificed, defOf, objHasKeyword, objIsType, power, toughness, withCastThisTurn } from "../cards";
-import { attackedPlaneswalker, creatureTypesOf, livingPlayers, obj, player, shareCreatureType } from "../game";
+import { attackedPlaneswalker, creatureTypesOf, livingPlayers, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, type Characteristics } from "../layers";
 import { expandMany, expandPerOpponent, manySlot, modeCountProblem } from "../modes";
 import { CREATURE_TYPES, hexproofFrom, protectedFromPlayer, type SourceQuality } from "../keywords";
@@ -86,6 +86,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.manaCostIn && !spec.manaCostIn.includes(defOf(s, o).manaCost)) return false;
   if (spec.combat === "attacking" && o.attacking === undefined) return false;
   if (spec.combat === "attackingYou" && (o.attacking !== controller || o.attackingPermanent)) return false;
+  if (spec.combat === "attackingOpponent" && (o.attacking === undefined || o.attacking === controller || o.attackingPermanent || !opponents(s, controller).includes(o.attacking))) return false;
   if (spec.combat === "blocking" && !o.blocking) return false;
   if (spec.combat === "attackingOrBlocking" && o.attacking === undefined && !o.blocking) return false;
   if (spec.combat === "attackedThisTurn" && o.attacked?.turn !== s.turn) return false;

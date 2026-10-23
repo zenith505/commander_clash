@@ -448,6 +448,17 @@ function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect:
     const who = { ref: "targetController" as const, index: 0 };
     return { effect: { type: "exileUntilNonland", who, then: "castFree", ownerCasts: true, millFirst: 3, notNamedAs: 0, restBottom: true }, next: at + 1 };
   }
+  // Gríma, Saruman's Footman: "that player exiles cards from the top of their library until they exile an instant or
+  // sorcery card. You may cast that card without paying its mana cost. Then that player puts the exiled cards that weren't
+  // cast this way on the bottom of their library in a random order." Cast as it resolves; not cast, it goes to the bottom
+  // with the rest (rulings).
+  if (
+    ctx.eventPlayer &&
+    /^[Tt]hat player exiles cards from the top of their library until they exile an instant or sorcery card$/.test(sentences[at]!) &&
+    sentences[at + 1] === "You may cast that card without paying its mana cost" &&
+    /^Then that player puts the exiled cards that weren't cast this way on the bottom of their library in a random order\.?$/.test(sentences[at + 2] ?? "")
+  )
+    return { effect: { type: "exileUntilNonland", who: { ref: "eventPlayer" }, then: "castFree", restBottom: true, untilTypes: ["Instant", "Sorcery"] }, next: at + 3 };
   // Jodah, the Unifier: cascade that only stops at a legendary card, measured against the spell that triggered it.
   if (
     /^[Ee]xile cards from the top of your library until you exile a legendary nonland card with lesser mana value$/.test(sentences[at]!) &&
@@ -3543,17 +3554,22 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // put the rest on the bottom of that library in a random order. You may cast that card for as long as it remains
     // exiled, and mana of any type can be spent to cast that spell." Cast only (no land play), with its usual timing and
     // costs (rulings).
-    const gonti = new RegExp(`^[Ll]ook at the top ${NUMX} cards of (target opponent's|target player's) library, exile one of them face down(?:, then put| and put)? ?(?:the rest on the bottom of that library in a random order)?$`).exec(s);
-    if (gonti) {
+    // Thief of Sanity: "look at the top three cards of that player's library, exile one of them face down, then put the
+    // rest into their graveyard. You may cast that card ...", the player dealt combat damage.
+    const gonti = new RegExp(`^[Ll]ook at the top ${NUMX} cards of (target opponent's|target player's|that player's) library, exile one of them face down(?:, then put| and put)? ?(the rest on the bottom of that library in a random order|the rest into their graveyard)?$`).exec(s);
+    if (gonti && (gonti[2] !== "that player's" || ctx.eventPlayer)) {
       let k = si + 1;
-      if (!/the rest on the bottom/.test(s)) {
-        if (!/^(?:Then )?[Pp]ut the rest on the bottom of that library in a random order$/.test(sentences[k] ?? "")) return null;
+      let toYard = gonti[3] === "the rest into their graveyard";
+      if (!gonti[3]) {
+        const rest = /^(?:Then )?[Pp]ut the rest (on the bottom of that library in a random order|into their graveyard)$/.exec(sentences[k]?.replace(/\.$/, "") ?? "");
+        if (!rest) return null;
+        toYard = rest[1] === "into their graveyard";
         k++;
       }
       if ((sentences[k] ?? "").replace(/\.$/, "") !== "You may cast that card for as long as it remains exiled, and mana of any type can be spent to cast that spell") return null;
       const who = parsePlayer(gonti[2]!.replace(/'s$/, ""), ctx);
       if (!who) return null;
-      effects.push({ type: "hideaway", n: num(gonti[1]!), from: who, castAnyType: true });
+      effects.push({ type: "hideaway", n: num(gonti[1]!), from: who, castAnyType: true, ...(toYard ? { restToGraveyard: true as const } : {}) });
       si = k;
       continue;
     }
@@ -3620,15 +3636,27 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       continue;
     }
     // "Then you may put a land card from your hand onto the battlefield. If you put a Cave onto the battlefield this way,
-    // you gain 4 life." (Spelunking): about the permanent it became.
+    // you gain 4 life." (Spelunking): about the permanent it became. "If you put an artifact onto the battlefield this way,
+    // put two +1/+1 counters on it" (Oviya, Automech Artisan): "it" is that permanent.
     const putThisWay = /^If you put an? ([A-Z][a-z]+|[a-z]+) onto the battlefield this way, (.+)$/.exec(s);
     if (putThisWay) {
       const last = effects[effects.length - 1];
       const put = last?.type === "may" && last.effects.length === 1 ? last.effects[0] : last;
       const filter = parseTargetPhrase(putThisWay[1]!);
       const inner = parseOne(putThisWay[2]!.charAt(0).toUpperCase() + putThisWay[2]!.slice(1), ctx);
-      if (put?.type !== "putFromHand" || put.who || put.any || filter?.kind !== "object" || !inner || /\b(?:it|its|that)\b/.test(putThisWay[2]!)) return null;
+      const aboutIt = /\bit\b/.test(putThisWay[2]!) && !(ctx.lastPut && /^put (?:a|an|one|two|three) [^ ]+ counters? on it$/.test(putThisWay[2]!));
+      if (put?.type !== "putFromHand" || put.who || put.any || filter?.kind !== "object" || !inner || aboutIt || /\b(?:its|that)\b/.test(putThisWay[2]!)) return null;
       effects.push({ type: "if", cond: { kind: "putThisWayIs", filter }, effects: inner });
+      continue;
+    }
+    // Hazel of the Rootbloom: "create a token that's a copy of target token you control. If that token is a Squirrel, instead
+    // create two tokens that are copies of it": the target as it is when this resolves.
+    const insteadTwo = /^If that token is an? ([A-Z][a-z]+), instead create (two|three) tokens that are copies of it$/.exec(s);
+    if (insteadTwo) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "createTokenCopy" || last.what.ref !== "target" || last.what.n || last.n !== 1 || last.each || !CREATURE_TYPES.has(insteadTwo[1]!)) return null;
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [insteadTwo[1]!], text: insteadTwo[1]! };
+      effects[effects.length - 1] = { type: "if", cond: { kind: "targetIs", index: last.what.index, filter }, effects: [{ ...last, n: num(insteadTwo[2]!) }], otherwise: [last] };
       continue;
     }
     // Yenna, Redtooth Regent: "Create a token that's a copy of it, except it isn't legendary. If the token is an Aura, untap

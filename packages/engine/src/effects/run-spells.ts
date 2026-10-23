@@ -447,12 +447,13 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         }
         // "With a different name than that spell": the countered spell's name (CR 201.2).
         const other = e.notNamedAs !== undefined ? spellNameOf(s, ctx, e.notNamedAs) : undefined;
-        const at = p.library.findIndex((id) => !isType(defOf(s, obj(s, id)), "Land") && (other === undefined || !sameName(defOf(s, obj(s, id)).name, other)));
+        const fits = (id: ObjectId) => (e.untilTypes ? e.untilTypes.some((t) => isType(defOf(s, obj(s, id)), t)) : !isType(defOf(s, obj(s, id)), "Land"));
+        const at = p.library.findIndex((id) => fits(id) && (other === undefined || !sameName(defOf(s, obj(s, id)).name, other)));
         // No nonland card: every card is revealed or exiled (rulings on Stolen Goods and Treasure Hunt).
         const seen = p.library.slice(0, at < 0 ? p.library.length : at + 1);
         const hit = at < 0 ? undefined : p.library[at];
         const names = seen.map((id) => defOf(s, obj(s, id)).name).join(", ");
-        log(s, `${p.name} ${e.reveal ? "reveals" : "exiles"} ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${names})` : ""}${hit ? "" : ", finding no nonland card"}.`);
+        log(s, `${p.name} ${e.reveal ? "reveals" : "exiles"} ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${names})` : ""}${hit ? "" : `, finding no ${e.untilTypes ? "instant or sorcery" : "nonland"} card`}.`);
         if (e.then === "hand") {
           for (const id of seen) moveObject(s, id, "hand");
           return;

@@ -703,7 +703,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: mv !== undefined && mv <= max && fits(mv) ? mv : max, modes, extra: "discard a card with mana value X" });
       }
       const max = maxX((n) => planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, n));
-      const extra = [...(ab.energyX ? ["pay X energy"] : []), ...(ab.costs ?? []).flatMap((c) => ("x" in c && c.x ? [`${c.kind === "sacrifice" ? "sacrifice" : c.kind} X ${c.kind === "sacrifice" ? c.filter.text.replace(/s?$/, "s") : ""}`.trim()] : []))].join(" and ");
+      // "Tap X untapped Knights you control" (Aryel): the noun before "you control" in the plural.
+      const extra = [...(ab.energyX ? ["pay X energy"] : []), ...(ab.costs ?? []).flatMap((c) => ("x" in c && c.x ? [`${c.kind === "sacrifice" ? "sacrifice" : c.kind} X ${c.kind === "sacrifice" ? c.filter.text.replace(/s?$/, "s") : c.kind === "tap" ? c.filter.text.replace(/(\w)( you control)$/, "$1s$2") : ""}`.trim()] : []))].join(" and ");
       return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: Math.min(max, Math.max(ab.xMin ?? 0, 1)), modes, extra });
     }
     // −X loyalty abilities: X loyalty counters, up to how many it has (CR 606.6).

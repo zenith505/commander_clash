@@ -5680,7 +5680,18 @@ export function lessWaterbend(cost: ParsedCost, extra: number, ab: ActivatedAbil
  * (CR 602.2b applies 601.2f): reductions only take off generic mana. Without `targets` chosen yet, as if the best one were.
  */
 export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets?: TargetChoice[], x = 0): ParsedCost {
-  return activationLessCost(s, o, activationCostBefore(s, pid, o, ab, targets), x);
+  // Zirda, the Dawnwaker: abilities `pid` activates that aren't mana abilities, wherever they are (rulings).
+  let less = 0;
+  let atLeastOne = false;
+  if (!ab.mana)
+    for (const id of s.battlefield) {
+      const src = obj(s, id);
+      const z = controllerOf(s, src) === pid ? abilitiesOf(s, src).youActivateLess : undefined;
+      if (!z) continue;
+      less += z.n;
+      if (z.atLeastOne) atLeastOne = true;
+    }
+  return activationLessCost(s, o, activationCostBefore(s, pid, o, ab, targets), x, less ? { n: less, atLeastOne } : undefined);
 }
 
 /**
@@ -5689,11 +5700,10 @@ export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: A
  * counting (its symbols become that much generic mana then), and not below one mana where the reduction says so (rulings
  * on Training Grounds: a cost with no generic mana, {0} included, stays as it is). Only for a permanent on the battlefield.
  */
-export function activationLessCost(s: GameState, o: GameObject, cost: ParsedCost, x = 0): ParsedCost {
-  if (o.zone !== "battlefield") return cost;
-  let less = 0;
-  let atLeastOne = false;
-  for (const id of s.battlefield) {
+export function activationLessCost(s: GameState, o: GameObject, cost: ParsedCost, x = 0, also?: { n: number; atLeastOne: boolean }): ParsedCost {
+  let less = also?.n ?? 0;
+  let atLeastOne = !!also?.atLeastOne;
+  for (const id of o.zone === "battlefield" ? s.battlefield : []) {
     const src = obj(s, id);
     for (const m of abilitiesOf(s, src).activationLess ?? []) {
       if (!objectMatches(s, m.filter, o, controllerOf(s, src), false)) continue;
@@ -5706,6 +5716,7 @@ export function activationLessCost(s: GameState, o: GameObject, cost: ParsedCost
   const g = splitGeneric(cost, xs);
   if (!g.extra) return cost;
   const others = g.cost.symbols.filter((sym) => sym.kind !== "x");
+  // Not below one mana (rulings on Training Grounds and Zirda: {1}{R} becomes {R}, {2} becomes {1}).
   const left = Math.max(atLeastOne && !others.length ? 1 : 0, g.extra - less);
   // Still "with X" (CR 107.3): the X chosen is its value for the ability, now paid as generic mana.
   return { ...g.cost, symbols: [...(left ? [{ kind: "generic" as const, amount: left }] : []), ...others] };

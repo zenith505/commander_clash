@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, addEffect, card, cast, passAll, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
-import { abilitiesOf, altCostsFor, botActions, invalidateCharacteristics, characteristics, power, isFullySupported, manaAbilitiesOn, objHasKeyword, objIsType, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { abilitiesOf, activationCost, altCostsFor, botActions, invalidateCharacteristics, characteristics, power, isFullySupported, manaAbilitiesOn, objHasKeyword, objIsType, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -786,5 +786,33 @@ describe("Ghost Vacuum: the creature cards it exiled come back as 1/1 Spirits wi
     expect([c.power, c.toughness]).toEqual([1, 1]);
     expect(c.subtypes).toEqual(expect.arrayContaining(["Giant", "Spirit"]));
     expect(objHasKeyword(s, o, "Flying")).toBe(true);
+  });
+});
+
+const zirda = card("Zirda, the Dawnwaker", "Legendary Creature — Elemental Fox", "{1}{R/W}{R/W}", {
+  power: "3",
+  toughness: "3",
+  oracleText: "Companion — Each permanent card in your starting deck has an activated ability. (If this card is your chosen companion, you may put it into your hand from outside the game for {3} as a sorcery.)\nAbilities you activate that aren't mana abilities cost {2} less to activate. This effect can't reduce the mana in that cost to less than one mana.\n{1}, {T}: Target creature can't block this turn.",
+});
+
+describe("Zirda, the Dawnwaker: abilities you activate cost {2} less, not below one mana (rulings)", () => {
+  const costOf = (s: GameState, pid: number, id: string, i = 0) => {
+    const c = activationCost(s, pid, s.objects[id]!, abilitiesOf(s, s.objects[id]!).activated[i]!);
+    return c.symbols.map((x) => (x.kind === "generic" ? `{${x.amount}}` : x.kind === "colored" ? `{${x.color}}` : x.kind)).join("");
+  };
+  it("{3}{G} becomes {1}{G}, {2} becomes {1}, {1}{R} becomes {R}, cycling {2} becomes {1}; an opponent's Zirda does nothing for you", () => {
+    supported(zirda);
+    const cycler = card("Test Cycler", "Creature — Bird", "{3}{U}", { power: "2", toughness: "2", oracleText: "Cycling {2} ({2}, Discard this card: Draw a card.)" });
+    const { s, ap, ids, opp } = setup([cycler]);
+    const a = putOnBattlefield(s, ap, card("Test Pump", "Creature — Elf", "{G}", { power: "1", toughness: "1", oracleText: "{3}{G}: Test Pump gets +1/+1 until end of turn." }));
+    const b = putOnBattlefield(s, ap, card("Test Orb", "Artifact", "{1}", { oracleText: "{2}, {T}: Draw a card." }));
+    const c = putOnBattlefield(s, ap, card("Test Torch", "Artifact", "{1}", { oracleText: "{1}{R}, {T}: Test Torch deals 1 damage to any target." }));
+    const before = [costOf(s, ap, a), costOf(s, ap, b), costOf(s, ap, c), costOf(s, ap, ids[0]!)];
+    putOnBattlefield(s, opp, zirda);
+    invalidateCharacteristics(s);
+    expect([costOf(s, ap, a), costOf(s, ap, b), costOf(s, ap, c), costOf(s, ap, ids[0]!)]).toEqual(before);
+    const z = putOnBattlefield(s, ap, zirda);
+    invalidateCharacteristics(s);
+    expect([costOf(s, ap, a), costOf(s, ap, b), costOf(s, ap, c), costOf(s, ap, ids[0]!), costOf(s, ap, z)]).toEqual(["{1}{G}", "{1}", "{R}", "{1}", "{1}"]);
   });
 });

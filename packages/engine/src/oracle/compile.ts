@@ -1702,6 +1702,11 @@ export function compile(d: CardDef): CompiledCard {
       out.powerUpAgain = true;
       continue;
     }
+    const youActivateLess = /^Abilities you activate that aren't mana abilities cost \{(\d+)\} less to activate\.( This effect can't reduce the mana in that cost to less than one mana\.)?$/.exec(line);
+    if (youActivateLess && !out.youActivateLess) {
+      out.youActivateLess = { n: Number(youActivateLess[1]), ...(youActivateLess[2] ? { atLeastOne: true as const } : {}) };
+      continue;
+    }
     const activationLess = /^Activated abilities of (creatures|artifacts|lands|artifact tokens)( you control)? cost \{(\d+)\} less to activate\.( This effect can't reduce the mana in that cost to less than one mana\.)?$/.exec(line);
     const lessFilter = activationLess && parseTargetPhrase(`${activationLess[1]!.replace(/s$/, "")}${activationLess[2] ?? ""}`);
     if (activationLess && lessFilter?.kind === "object") {

@@ -4655,6 +4655,11 @@ export interface CompiledCard {
    */
   activationLess?: { n: number; filter: TargetSpec; atLeastOne?: true }[];
   /**
+   * Zirda, the Dawnwaker: "Abilities you activate that aren't mana abilities cost {2} less to activate. This effect can't
+   * reduce the mana in that cost to less than one mana." Any such ability its controller activates, from any zone (rulings).
+   */
+  youActivateLess?: { n: number; atLeastOne?: true };
+  /**
    * "Players can't untap more than one nonbasic land during their untap steps" (Winter Moon), "You can't untap more than
    * one land during your untap step" (Mungha Wurm, `you`), "As long as ~ is untapped, players can't untap more than two
    * permanents ..." (Static Orb, `whileUntapped`): the active player chooses which of them untap (CR 502.3).

@@ -3336,6 +3336,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "53716e0b-4d4e-40b0-8370-38e11f73d195",
+  "name": "Demon of Fate's Design",
+  "manaCost": "{4}{B}{B}",
+  "cmc": 6,
+  "typeLine": "Enchantment Creature — Demon",
+  "supertypes": [],
+  "types": [
+   "Enchantment",
+   "Creature"
+  ],
+  "subtypes": [
+   "Demon"
+  ],
+  "oracleText": "Flying, trample\nOnce during each of your turns, you may cast an enchantment spell by paying life equal to its mana value rather than paying its mana cost.\n{2}{B}, Sacrifice another enchantment: This creature gets +X/+0 until end of turn, where X is the sacrificed enchantment's mana value.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Flying",
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "cmm",
+  "releasedAt": "2023-08-04",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "dac85722-d741-4584-8b98-8ac220958a38",
   "name": "Demonmail Hauberk",
   "manaCost": "{4}",
@@ -6695,6 +6729,88 @@
   "gameChanger": false
  },
  {
+  "oracleId": "b70c3adb-64ba-49ea-bcf6-6406a58cb453",
+  "name": "Jin-Gitaxias // The Great Synthesis",
+  "manaCost": "{3}{U}{U}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Phyrexian Praetor // Enchantment — Saga",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Phyrexian",
+   "Praetor"
+  ],
+  "oracleText": "Ward {2}\nWhenever you cast a noncreature spell with mana value 3 or greater, draw a card.\n{3}{U}: Exile Jin-Gitaxias, then return it to the battlefield transformed under its owner's control. Activate only as a sorcery and only if you have seven or more cards in hand.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Transform",
+   "Ward"
+  ],
+  "commanderLegal": "legal",
+  "set": "mom",
+  "releasedAt": "2023-04-21",
+  "rarity": "mythic",
+  "layout": "transform",
+  "gameChanger": false,
+  "faces": [
+   {
+    "name": "Jin-Gitaxias",
+    "manaCost": "{3}{U}{U}",
+    "typeLine": "Legendary Creature — Phyrexian Praetor",
+    "supertypes": [
+     "Legendary"
+    ],
+    "types": [
+     "Creature"
+    ],
+    "subtypes": [
+     "Phyrexian",
+     "Praetor"
+    ],
+    "oracleText": "Ward {2}\nWhenever you cast a noncreature spell with mana value 3 or greater, draw a card.\n{3}{U}: Exile Jin-Gitaxias, then return it to the battlefield transformed under its owner's control. Activate only as a sorcery and only if you have seven or more cards in hand.",
+    "power": "5",
+    "toughness": "5",
+    "colors": [
+     "U"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/front/4/1/41c83142-b948-4ee5-a486-41306d2bb411.jpg?1783917044",
+    "artUrl": "https://cards.scryfall.io/art_crop/front/4/1/41c83142-b948-4ee5-a486-41306d2bb411.jpg?1783917044"
+   },
+   {
+    "name": "The Great Synthesis",
+    "manaCost": "",
+    "typeLine": "Enchantment — Saga",
+    "supertypes": [],
+    "types": [
+     "Enchantment"
+    ],
+    "subtypes": [
+     "Saga"
+    ],
+    "oracleText": "(As this Saga enters and after your draw step, add a lore counter.)\nI — Draw cards equal to the number of cards in your hand. You have no maximum hand size for as long as you control this Saga.\nII — Return all non-Phyrexian creatures to their owners' hands.\nIII — You may cast any number of spells from your hand without paying their mana costs. Exile this Saga, then return it to the battlefield (front face up).",
+    "colors": [
+     "U"
+    ],
+    "colorIndicator": [
+     "U"
+    ],
+    "imageUrl": "https://cards.scryfall.io/normal/back/4/1/41c83142-b948-4ee5-a486-41306d2bb411.jpg?1783917044",
+    "artUrl": "https://cards.scryfall.io/art_crop/back/4/1/41c83142-b948-4ee5-a486-41306d2bb411.jpg?1783917044"
+   }
+  ]
+ },
+ {
   "oracleId": "794ad296-4718-45b7-ab85-6ae45903ada7",
   "name": "Jungle Wayfinder",
   "manaCost": "{2}{G}",
@@ -8084,6 +8200,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "eaffdf95-8e20-408d-99fa-3adc9e19523d",
+  "name": "Misleading Signpost",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "Flash\nWhen this artifact enters during the declare attackers step, you may reselect which player or permanent target attacking creature is attacking. (It can't attack its controller or their permanents.)\n{T}: Add {U}.",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Flash"
+  ],
+  "producedMana": [
+   "U"
+  ],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2026-09-28",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "40362fe0-a1a9-4d76-8c35-eac474b91af5",
   "name": "Mizzix's Mastery",
   "manaCost": "{3}{R}",
@@ -8703,6 +8850,35 @@
   "commanderLegal": "legal",
   "set": "exp",
   "releasedAt": "2016-01-22",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "613a8774-165e-4cf6-ad43-124f9ffc9980",
+  "name": "Nautiloid Ship",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact — Vehicle",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [
+   "Vehicle"
+  ],
+  "oracleText": "Flying\nWhen this Vehicle enters, exile target player's graveyard.\nWhenever this Vehicle deals combat damage to a player, you may put a creature card exiled with this Vehicle onto the battlefield under your control.\nCrew 3",
+  "power": "5",
+  "toughness": "5",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Flying",
+   "Crew"
+  ],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
@@ -9361,6 +9537,34 @@
   "set": "exo",
   "releasedAt": "1998-06-15",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "62e44e0d-eda0-4275-8367-49dab9a087c3",
+  "name": "Pernicious Deed",
+  "manaCost": "{1}{B}{G}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "{X}, Sacrifice this enchantment: Destroy each artifact, creature, and enchantment with mana value X or less.",
+  "colors": [
+   "B",
+   "G"
+  ],
+  "colorIdentity": [
+   "B",
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2024-09-30",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -10150,6 +10354,42 @@
   "commanderLegal": "legal",
   "set": "uds",
   "releasedAt": "1999-06-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "ec8a4b26-633a-4e88-aa8a-82e9704b3439",
+  "name": "Resonance Technician",
+  "manaCost": "{3}{U/R}{U/R}",
+  "cmc": 5,
+  "typeLine": "Creature — Weird Detective",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Weird",
+   "Detective"
+  ],
+  "oracleText": "Flying\nWhen this creature enters, you may discard a card. If you do, investigate twice.\n{T}, Tap X untapped artifacts you control: Copy target instant or sorcery spell you control with mana value X. You may choose new targets for the copy.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "R",
+   "U"
+  ],
+  "colorIdentity": [
+   "R",
+   "U"
+  ],
+  "keywords": [
+   "Flying",
+   "Investigate"
+  ],
+  "commanderLegal": "legal",
+  "set": "clu",
+  "releasedAt": "2024-02-23",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -13956,6 +14196,39 @@
   "commanderLegal": "legal",
   "set": "usg",
   "releasedAt": "1998-10-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1fa20b05-cc06-4fb7-ae76-677a29e2185a",
+  "name": "Yedora, Grave Gardener",
+  "manaCost": "{4}{G}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Treefolk Druid",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Treefolk",
+   "Druid"
+  ],
+  "oracleText": "Whenever another nontoken creature you control dies, you may return it to the battlefield face down under its owner's control. It's a Forest land. (It has no other types or abilities.)",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c21",
+  "releasedAt": "2021-04-23",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

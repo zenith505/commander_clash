@@ -104,8 +104,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // isn't one an effect causes (Library of Leng's rulings).
       const next = r.body.effects[r.body.effects.indexOf(e) + 1];
       const asCost = r.body.effects.includes(e) && next?.type === "if" && next.cond.kind === "youDid";
-      const xctx = e.payX || asCost ? { ...ctx, ...(e.payX ? { x: Number(sc.payX) } : {}), ...(asCost ? { asCost: true as const } : {}) } : ctx;
-      for (const inner of e.effects) if (runEffect(s, inner, xctx) === "paused") return "paused";
+      const xctx = e.payX ? { ...ctx, x: Number(sc.payX) } : ctx;
+      // A copy that keeps ctx's live "chosen".
+      const cctx: ResolveCtx = asCost ? (Object.defineProperties({ asCost: true }, Object.getOwnPropertyDescriptors(xctx)) as ResolveCtx) : xctx;
+      for (const inner of e.effects) if (runEffect(s, inner, cctx) === "paused") return "paused";
       return;
     }
     case "repeatMay": {

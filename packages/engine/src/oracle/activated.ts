@@ -24,9 +24,12 @@ export const KEYWORD_WORDS = KEYWORD_NAMES;
 /** A line without its ability word ("Threshold — "), which has no rules meaning (CR 207.2c). */
 export function stripAbilityWord(raw: string): string {
   const word = /^([A-Z][A-Za-z' 0-9]+) — /.exec(raw);
-  // A flavor word ("Genomic Enhancement — {T}: Add ...", Biophagus) has no rules meaning either (CR 207.2d); a keyword
-  // written with a dash does ("Exhaust — ", CR 702).
-  return word && (ABILITY_WORDS.has(word[1]!.toLowerCase()) || (!KEYWORD_NAMES.has(word[1]!.toLowerCase()) && !/^(?:Exhaust|Boast|Power-up)$/.test(word[1]!))) ? raw.slice(word[0].length) : raw;
+  if (!word) return raw;
+  if (ABILITY_WORDS.has(word[1]!.toLowerCase())) return raw.slice(word[0].length);
+  // A flavor word before a mana ability ("Genomic Enhancement — {T}: Add ...", Biophagus) has no rules meaning either (CR
+  // 207.2d). Not a keyword written with a dash ("Exhaust — ", CR 702), a modal choice ("Choose two — •") or a chapter.
+  const flavor = /^\{/.test(raw.slice(word[0].length)) && !KEYWORD_NAMES.has(word[1]!.toLowerCase()) && !/^(?:Exhaust|Boast|Power-up|Choose\b|[IVX]+$)/.test(word[1]!);
+  return flavor ? raw.slice(word[0].length) : raw;
 }
 
 export function parseActivated(raw: string): ActivatedAbility | "fail" | null {

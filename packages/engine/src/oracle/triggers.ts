@@ -1523,6 +1523,16 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         text: "If it was a creature, return it to the battlefield under its owner's control. It's an enchantment.",
       },
     };
+  // Yedora, Grave Gardener: "..., you may return it to the battlefield face down under its owner's control. It's a Forest
+  // land. (It has no other types or abilities.)": face down, its characteristics those the effect gives it (CR 708.2a).
+  const forest = /^(.+), (you may )?return it to the battlefield face down under its owner's control\. It's a Forest land\.(?: \(It has no other types or abilities\.\))?$/.exec(line);
+  if (forest) {
+    const t = parseTrigger(`${forest[1]}, ${forest[2] ?? ""}return it to the battlefield under its owner's control.`);
+    if (!t || t === "fail") return "fail";
+    const put = (e: Effect): Effect | null => (e.type === "putOntoBattlefield" && e.what.ref === "subjectCard" && e.owner && !e.tapped && !e.counters ? { ...e, faceDown: "forest" } : e.type === "may" && e.effects.length === 1 ? (((x) => x && { ...e, effects: [x], text: `${e.text.replace(/ to the battlefield/, " to the battlefield face down")}. It's a Forest land` })(put(e.effects[0]!))) : null);
+    const fx = t.body.effects.length === 1 ? put(t.body.effects[0]!) : null;
+    return fx ? { ...t, body: { ...t.body, effects: [fx], text: line.replace(/^[^,]+, /, "") } } : "fail";
+  }
   // Eminence (C17): "Whenever you cast another Vampire spell, if ~ is in the command zone or on the battlefield, ..." (Edgar
   // Markov), "... This ability triggers only if ~ is in the command zone or on the battlefield" (Sahir): the ability
   // works in the command zone too (CR 113.6), with an intervening if (CR 603.4) for the first.

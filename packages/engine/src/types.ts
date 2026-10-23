@@ -157,7 +157,8 @@ export interface CardFace {
 
 /** How a face-down spell or permanent got that way (CR 708): which ability lets it be turned face up. */
 /** How it became face down: cast with morph, megamorph or disguise, or put onto the battlefield manifested or cloaked (CR 701.40, 701.58). */
-export type FaceDownKind = "morph" | "megamorph" | "disguise" | "manifest" | "cloak";
+/** "forest": put onto the battlefield face down as a Forest land with no other types or abilities (Yedora, CR 708.2a). */
+export type FaceDownKind = "morph" | "megamorph" | "disguise" | "manifest" | "cloak" | "forest";
 
 /**
  * "merged": a card or token that's a component of a merged permanent other than the permanent's own object (CR 730.2):

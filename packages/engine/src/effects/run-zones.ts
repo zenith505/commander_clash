@@ -1644,6 +1644,18 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         return;
       }
       const under = (o: GameObject) => (e.owner ? o.owner : ctx.controller);
+      if (e.faceDown) {
+        // Yedora: face down as a Forest land, whatever the card is (CR 708.2a); not an Aura there, so it enchants nothing.
+        if (s.resolving) s.resolving.created = [];
+        enterTogether(s, () => {
+          for (const o of list) {
+            log(s, `${src} returns ${defOf(s, o).name} to the battlefield face down under ${player(s, under(o)).name}'s control: it's a Forest land.`);
+            moveObject(s, o.id, "battlefield", { controller: under(o), faceDown: e.faceDown });
+            if (o.zone === "battlefield") s.resolving?.created?.push(o.id);
+          }
+        });
+        return;
+      }
       // Auras: their controller chooses what each enchants as it enters (CR 303.4f), all before any card moves; one with
       // nothing to enchant stays where it is (303.4g).
       // "Transformed": a double-faced card with its back face up; anything else stays where it is (CR 712.14a).

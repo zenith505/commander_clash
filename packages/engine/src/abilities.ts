@@ -1737,6 +1737,8 @@ export type Effect =
        * resolves, or was last attached to if it has left (rulings); each card only if it could be attached to it.
        */
       attachToEnchanted?: true;
+      /** "Face down ... It's a Forest land" (Yedora, Grave Gardener): face down as a Forest land (FaceDownKind "forest"). */
+      faceDown?: "forest";
       /** The Enduring cycle's "It's an enchantment. (It's not a creature.)": its new card types as it enters. */
       becomes?: { types: string[]; subtypes: string[] };
       /** "That creature gains haste until end of turn" ("endOfTurn"), "It gains haste" ("game": for as long as it's that object). */

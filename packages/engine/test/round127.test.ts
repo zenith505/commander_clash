@@ -1,8 +1,8 @@
 // Round 127: round 126's gaps (Hazel of the Rootbloom's mana in autopay, ...), then the most played cards.
 
 import { describe, expect, it } from "vitest";
-import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { botActions, isFullySupported, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { act, card, cast, passAll, passUntil, putOnBattlefield, setup, target } from "./helpers";
+import { botActions, characteristics, isFullySupported, manaAbilitiesOn, objHasKeyword, objIsType, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -285,5 +285,96 @@ describe("One Ring to Rule Them All", () => {
     s = settleBots(passUntil(s, "main1", ap));
     expect(life(s).map((n, i) => start[i]! - n)).toEqual([0, creatures[1], creatures[2], creatures[3]]);
     expect(creatures[1]).toBeGreaterThanOrEqual(2);
+  });
+});
+
+const infantryShield = card("Infantry Shield", "Artifact — Equipment", "{2}{R}", {
+  oracleText: "Equipped creature has menace and mobilize X, where X is its power. (Whenever it attacks, create X tapped and attacking 1/1 red Warrior creature tokens. Sacrifice them at the beginning of the next end step.)\nEquip {2}",
+});
+const avenger = card("Avenger of the Fallen", "Creature — Human Warrior", "{2}{B}", {
+  power: "2",
+  toughness: "4",
+  keywords: ["Deathtouch", "Mobilize"],
+  oracleText: "Deathtouch\nMobilize X, where X is the number of creature cards in your graveyard. (Whenever this creature attacks, create X tapped and attacking 1/1 red Warrior creature tokens. Sacrifice them at the beginning of the next end step.)",
+});
+
+describe("Mobilize X (CR 702.181a): Infantry Shield's, X its power; Avenger of the Fallen's, creature cards in your graveyard", () => {
+  const warriors = (s: GameState, pid: number) => s.battlefield.filter((id) => s.objects[id]!.controller === pid && s.cards[s.objects[id]!.cardId]?.name === "Warrior Token");
+  const attack = (s0: GameState, ap: number, attacker: string) => {
+    const opp = s0.turnOrder[(s0.turnOrder.indexOf(ap) + 1) % 4]!;
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker, defender: opp }] });
+    for (let i = 0; i < 20 && (s.stack.length || s.triggerQueue.length || s.pending) && s.step === "declareAttackers"; i++) {
+      const who = s.pending ? s.pending.player : waitingOn(s)!;
+      s = s.pending ? botActions(s, who).reduce((x, a) => act(x, a), s) : act(s, { type: "passPriority", player: who });
+    }
+    return { s, opp };
+  };
+  it("a 3-power creature equipped with Infantry Shield attacks: menace, and three attacking Warriors", () => {
+    supported(infantryShield, avenger);
+    const { s: s0, ap } = setup([]);
+    const giant = putOnBattlefield(s0, ap, card("Test Giant", "Creature — Giant", "{3}{R}", { power: "3", toughness: "3" }));
+    const shield = putOnBattlefield(s0, ap, infantryShield);
+    s0.objects[shield]!.attachedTo = giant;
+    const { s, opp } = attack(s0, ap, giant);
+    expect(objHasKeyword(s, s.objects[giant]!, "Menace")).toBe(true);
+    const ws = warriors(s, ap);
+    expect(ws).toHaveLength(3);
+    expect(ws.every((id) => s.objects[id]!.tapped && s.objects[id]!.attacking === opp)).toBe(true);
+  });
+  it("Avenger of the Fallen with two creature cards in your graveyard: two Warriors", () => {
+    const { s: s0, ap } = setup([]);
+    const a = putOnBattlefield(s0, ap, avenger);
+    for (let i = 0; i < 2; i++) {
+      const id = putOnBattlefield(s0, ap, card("Dead Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+      s0.battlefield.splice(s0.battlefield.indexOf(id), 1);
+      s0.objects[id]!.zone = "graveyard";
+      s0.players[ap]!.graveyard.push(id);
+    }
+    const { s } = attack(s0, ap, a);
+    expect(warriors(s, ap)).toHaveLength(2);
+  });
+});
+
+const yedora = card("Yedora, Grave Gardener", "Legendary Creature — Treefolk Druid", "{4}{G}", {
+  power: "5",
+  toughness: "5",
+  oracleText: "Whenever another nontoken creature you control dies, you may return it to the battlefield face down under its owner's control. It's a Forest land. (It has no other types or abilities.)",
+});
+
+describe("Yedora, Grave Gardener: the creature comes back face down as a Forest land (CR 708.2a, 305.6)", () => {
+  const murder = card("Test Murder", "Instant", "{B}", { oracleText: "Destroy target creature." });
+  const bigBear = card("Big Bear", "Creature — Bear", "{3}{G}", { power: "4", toughness: "4", oracleText: "Trample" });
+  const kill = (yes: boolean, token = false) => {
+    const { s: s0, ap, ids } = setup([murder]);
+    putOnBattlefield(s0, ap, yedora);
+    const b = putOnBattlefield(s0, ap, bigBear);
+    if (token) s0.objects[b]!.isToken = true;
+    let s = cast(s0, ap, ids[0]!, [target(b)]);
+    const asked = s.pending?.kind === "chooseMay";
+    if (asked) s = act(s, { type: "chooseMay", player: ap, yes });
+    s = passAll(s);
+    return { s, ap, b, asked };
+  };
+  it("a creature card returns face down: an untapped Forest land with no name, no creature type, tapping for {G}", () => {
+    supported(yedora);
+    const { s, ap, asked } = kill(true);
+    expect(asked).toBe(true);
+    const land = s.battlefield.map((id) => s.objects[id]!).find((o) => o.faceDown && o.controller === ap);
+    expect(land, logText(s)).toBeDefined();
+    const c = characteristics(s, land!);
+    expect(c.types).toEqual(["Land"]);
+    expect(c.subtypes).toEqual(["Forest"]);
+    expect(objIsType(s, land!, "Creature")).toBe(false);
+    expect(objHasKeyword(s, land!, "Trample")).toBe(false);
+    expect(manaAbilitiesOn(s, land!).map((m) => m.produces)).toEqual([{ kind: "fixed", mana: ["G"] }]);
+    expect(s.players[ap]!.graveyard.some((id) => s.cards[s.objects[id]!.cardId]?.name === "Big Bear")).toBe(false);
+  });
+  it("declining leaves it in the graveyard; a token never triggers", () => {
+    const no = kill(false);
+    expect(no.asked).toBe(true);
+    expect(no.s.players[no.ap]!.graveyard.some((id) => no.s.cards[no.s.objects[id]!.cardId]?.name === "Big Bear")).toBe(true);
+    expect(no.s.battlefield.some((id) => no.s.objects[id]!.faceDown)).toBe(false);
+    expect(kill(true, true).asked).toBe(false);
   });
 });

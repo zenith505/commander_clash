@@ -2327,12 +2327,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Moraug: "there's an additional combat phase after this phase. At the beginning of that combat, untap all creatures
     // you control." The delayed trigger is for that combat phase only (rulings: not the turn's regular combat).
-    const thatCombat = /^(?:[Tt]here(?:'s| is) an additional combat phase after this phase|[Aa]fter this phase, there is an additional combat phase)$/.test(s) ? /^At the beginning of that combat, (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    // World at War: "After the second main phase this turn, there's an additional combat phase followed by an additional
+    // main phase. At the beginning of that combat, untap all creatures that attacked this turn" (rulings: the turn's
+    // first postcombat main phase, if this resolves before it ends).
+    const second = /^After the second main phase this turn, there's an additional combat phase followed by an additional main phase$/.test(s);
+    const thatCombat = second || /^(?:[Tt]here(?:'s| is) an additional combat phase after this phase|[Aa]fter this phase, there is an additional combat phase)$/.test(s) ? /^At the beginning of that combat, (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
     if (thatCombat) {
       const before = ctx.targets.length;
       const inner = parseSentence(capital(thatCombat[1]!), ctx);
       if (!inner || ctx.targets.length !== before) return null;
-      effects.push({ type: "addPhases", phases: ["combat"], thatCombat: { effects: inner, text: `${capital(thatCombat[1]!)}.` } });
+      effects.push({ type: "addPhases", phases: second ? ["combat", "main"] : ["combat"], ...(second ? { after: "secondMain" as const } : {}), thatCombat: { effects: inner, text: `${capital(thatCombat[1]!)}.` } });
       si++;
       continue;
     }

@@ -465,3 +465,59 @@ describe("Demon of Fate's Design: an enchantment spell for life, once during eac
     expect(power(s, s.objects[d]!)).toBe(9);
   });
 });
+
+const worldAtWar = card("World at War", "Sorcery", "{3}{R}{R}", {
+  oracleText: "After the second main phase this turn, there's an additional combat phase followed by an additional main phase. At the beginning of that combat, untap all creatures that attacked this turn.\nRebound (If you cast this spell from your hand, exile it as it resolves. At the beginning of your next upkeep, you may cast this card from exile without paying its mana cost.)",
+});
+
+describe("World at War: a combat and a main phase after the turn's second main phase (CR 500.8)", () => {
+  const scene = () => {
+    const { s, ap, ids, opp } = setup([worldAtWar]);
+    const bear = putOnBattlefield(s, ap, card("Test Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    return { s, ap, ids, opp, bear };
+  };
+  const attackWith = (s0: GameState, ap: number, bear: string, opp: number) => {
+    const s = passUntil(s0, "declareAttackers", ap);
+    return act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: bear, defender: opp }] });
+  };
+  it("cast in the first main phase: the turn's combat, the second main phase, then the new combat, which untaps the attacker", () => {
+    supported(worldAtWar);
+    const { s: s0, ap, ids, opp, bear } = scene();
+    let s = cast(s0, ap, ids[0]!);
+    expect(s.players[ap]!.exile).toContain(ids[0]); // rebound
+    s = attackWith(s, ap, bear, opp);
+    s = passUntil(s, "main2");
+    expect(s.mainPhasesThisTurn).toBe(2);
+    expect(s.objects[bear]!.tapped).toBe(true);
+    s = passUntil(s, "beginCombat");
+    expect(s.activePlayer).toBe(ap);
+    expect(s.combatsThisTurn).toBe(2);
+    s = settleBots(s);
+    expect(s.objects[bear]!.tapped).toBe(false);
+    s = passUntil(s, "main2");
+    expect(s.activePlayer).toBe(ap);
+    expect(s.mainPhasesThisTurn).toBe(3);
+    s = passUntil(s, "end");
+    expect([s.activePlayer, s.combatsThisTurn]).toEqual([ap, 2]);
+  });
+  it("cast in the second main phase: it still adds them; untapping only creatures that attacked", () => {
+    const { s: s0, ap, ids, opp, bear } = scene();
+    const idle = putOnBattlefield(s0, ap, card("Idle Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    let s = attackWith(s0, ap, bear, opp);
+    s = passUntil(s, "main2");
+    s.objects[idle]!.tapped = true;
+    s = cast(s, ap, ids[0]!);
+    s = passUntil(s, "beginCombat");
+    expect([s.activePlayer, s.combatsThisTurn]).toEqual([ap, 2]);
+    s = settleBots(s);
+    expect([s.objects[bear]!.tapped, s.objects[idle]!.tapped]).toEqual([false, true]);
+  });
+  it("cast after the second main phase has ended: no new phases", () => {
+    const { s: s0, ap, ids } = scene();
+    let s = passUntil(s0, "main2");
+    s.mainPhasesThisTurn = 3; // as in a third main phase (an earlier extra combat's)
+    s = cast(s, ap, ids[0]!);
+    s = passUntil(s, "end");
+    expect([s.activePlayer, s.combatsThisTurn]).toEqual([ap, 1]);
+  });
+});

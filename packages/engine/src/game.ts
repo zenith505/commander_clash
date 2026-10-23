@@ -2381,6 +2381,7 @@ export function endTheTurn(s: GameState, item?: StackItem): void {
   s.blockLimits = undefined;
   // The phases and steps skipped go with the ones added after them (CR 500.8) and the end steps added to this one.
   s.addedPhases = undefined;
+  s.afterSecondMain = undefined;
   s.resumeStep = undefined;
   s.extraEndSteps = undefined;
   s.extraUpkeeps = undefined;
@@ -2396,11 +2397,22 @@ const PHASE_ENDS = new Set<Step>(["draw", "main1", "endCombat", "main2"]);
  * directly after the current phase, before any added after it earlier. "After this main phase" and "after this combat
  * phase" add nothing when it isn't one (rulings on Relentless Assault and Full Throttle).
  */
-export function addPhases(s: GameState, phases: ("combat" | "main" | "beginning")[], after?: "main" | "combat", combatKey?: number): boolean {
+export function addPhases(s: GameState, phases: ("combat" | "main" | "beginning")[], after?: "main" | "combat" | "secondMain", combatKey?: number): boolean {
+  const added = phases.map((p) => (p === "combat" && combatKey !== undefined ? { combat: combatKey } : p));
+  // "After the second main phase this turn" (World at War): before it begins, they wait for it, the most recently created
+  // first (CR 500.8; rulings); during it, they come after it; after it has ended, there are none.
+  if (after === "secondMain") {
+    const mains = s.mainPhasesThisTurn ?? 0;
+    if (mains < 2) {
+      s.afterSecondMain = [...added, ...(s.afterSecondMain ?? [])];
+      return true;
+    }
+    if (mains > 2 || !isMainPhase(s)) return false;
+  }
   if (after === "main" && !isMainPhase(s)) return false;
   if (after === "combat" && !inCombatPhase(s)) return false;
   if (s.step === "end" || s.step === "cleanup") return false; // nothing comes after the ending phase but the next turn
-  s.addedPhases = [...phases.map((p) => (p === "combat" && combatKey !== undefined ? { combat: combatKey } : p)), ...(s.addedPhases ?? [])];
+  s.addedPhases = [...added, ...(s.addedPhases ?? [])];
   return true;
 }
 
@@ -2541,6 +2553,7 @@ function startNextTurn(s: GameState, skipping = false) {
   s.mainPhasesThisTurn = undefined;
   s.blockersStep = undefined;
   s.addedPhases = undefined;
+  s.afterSecondMain = undefined;
   s.resumeStep = undefined;
   s.lostLifeThisTurn = undefined;
   s.permanentLeftThisTurn = undefined;
@@ -2742,6 +2755,11 @@ function beginStep(s: GameState, step: Step): void {
     case "main2":
       // Every main phase after the first is a postcombat main phase, an added one too (CR 505.1a).
       s.mainPhasesThisTurn = (s.mainPhasesThisTurn ?? 0) + 1;
+      // World at War's phases, waiting for the turn's second main phase, now come right after it.
+      if (s.mainPhasesThisTurn === 2 && s.afterSecondMain) {
+        s.addedPhases = [...s.afterSecondMain, ...(s.addedPhases ?? [])];
+        s.afterSecondMain = undefined;
+      }
       fireEvent(s, { type: "step", step: "main2", active: ap });
       break;
     case "beginCombat":

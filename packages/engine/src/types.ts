@@ -1443,6 +1443,8 @@ export interface GameState {
    */
   /** Phases added after the current one (CR 500.8); `{ combat: key }` is a combat phase a delayed trigger waits for ("at the beginning of that combat"). */
   addedPhases?: ("combat" | "main" | "beginning" | { combat: number })[];
+  /** Phases waiting for this turn's second main phase, to come after it (World at War, CR 500.8). */
+  afterSecondMain?: ("combat" | "main" | "beginning" | { combat: number })[];
   /** Additional end steps still to come directly after this end step (Y'shtola Rhul, CR 500.8): no cleanup in between. */
   extraEndSteps?: number;
   /** Additional upkeep steps still to come directly after this upkeep (Paradox Haze, CR 500.8). */

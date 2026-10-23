@@ -2737,7 +2737,8 @@ export type Effect =
       type: "addPhases";
       /** "beginning": "there is an additional beginning phase after this phase" (Sphinx of the Second Sun): untap, upkeep and draw steps. */
       phases: ("combat" | "main" | "beginning")[];
-      after?: "main" | "combat";
+      /** "secondMain": "after the second main phase this turn" (World at War): after the turn's second main phase, whenever it ends. */
+      after?: "main" | "combat" | "secondMain";
       /** "At the beginning of that combat, untap all creatures you control" (Moraug): a delayed trigger for the added combat phase only (CR 603.7). */
       thatCombat?: { effects: Effect[]; text: string };
     }

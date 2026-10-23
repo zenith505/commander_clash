@@ -240,6 +240,8 @@ export type Count =
   | { kind: "eventExcess" }
   /** "The number of colors of mana spent to cast this spell" (converge, CR 207.2c; sunburst counts the same way, 702.44a). 0 if it wasn't cast. */
   | { kind: "colorsSpent" }
+  /** "For each of that spell's colors" in a cast trigger (Ramos, Dragon Engine): as it is, or as it was cast if it's gone. */
+  | { kind: "castSpellColors" }
   /**
    * "Enters with a number of +1/+1 counters on it equal to the amount of mana spent to cast it" (Marath): only in an
    * "enters with" (the spell it was); 0 if it wasn't cast.
@@ -1320,7 +1322,7 @@ export type StaticCondition =
   /** "If a player has one or fewer cards in hand" (Temple of the Dead): some player in the game. */
   | { kind: "someHandAtMost"; n: number }
   /** "If creatures you control have total power 10 or greater" (Mosswort Bridge). */
-  | { kind: "totalPower"; n: number }
+  | { kind: "totalPower"; n: number; toughness?: true }
   /** "If a library has twenty or fewer cards in it": any player's (Shelldock Isle). */
   /** `yours`: "if your library has no cards in it" (Jace, Wielder of Mysteries): your library only. */
   | { kind: "libraryAtMost"; n: number; yours?: true }

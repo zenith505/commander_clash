@@ -626,6 +626,8 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // Night Nurse: "choose target permanent card in your graveyard that was put there from anywhere this turn. Return it to
   // your hand." is one instruction.
   text = text.replace(/^[Cc]hoose (target [^.]+? in your graveyard(?: that was put there (?:from anywhere )?this turn)?)\. Return it to your hand\.$/, "Return $1 to your hand.");
+  // Meathook Massacre II: "return that card under your control" (its Oracle wording) is from the graveyard to the battlefield.
+  text = text.replace(/\breturn that card under your control\b/g, "return that card to the battlefield under your control");
   // Tibalt's Trickery: one instruction about the countered spell's controller (read in parseUntilNonland).
   // "Search your library for up to X basic land cards, where X is .... Put those cards onto the battlefield tapped, then
   // shuffle." (Traverse the Outlands): the same as "... put them onto the battlefield tapped, then shuffle, where X is ...".
@@ -1614,9 +1616,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "Whenever an opponent draws a card, that player may pay {2}. If the player doesn't, you create a Treasure token."
     // (Smothering Tithe): a punisher whose only way out is the payment.
     const thatMay = /^([Tt]hat player|[Tt]hey|[Tt]arget opponent|[Tt]arget player|[Ee]ach opponent) may pay (.+)$/.exec(s);
-    const thatThen = thatMay && /^If (?:the player|that player|they|he or she) (?:doesn't|don't), (you .+)$/.exec(sentences[si + 1] ?? "");
+    // "If they don't, return that card to the battlefield under your control ..." (Meathook Massacre II): what you do.
+    const thatThen = thatMay && /^If (?:the player|that player|they|he or she) (?:doesn't|don't), (you .+|return that card to the battlefield under your control.*)$/.exec(sentences[si + 1] ?? "");
     if (thatMay && thatThen) {
-      const who = parsePlayer(thatMay[1]!.toLowerCase(), ctx);
+      // "Whenever a creature an opponent controls dies, they may pay 3 life" (Meathook Massacre II): its controller.
+      const who = parsePlayer(thatMay[1]!.toLowerCase(), ctx) ?? (ctx.subjectIt && /^they$/i.test(thatMay[1]!) ? { ref: "subjectController" as const } : null);
       const options = parsePunisherOptions(`pays ${thatMay[2]!}`, ctx);
       const then = options && parseOne(capital(thatThen[1]!), ctx);
       // "They may pay {2}. If they don't, you may copy that spell." (Wandering Archaic): your choice comes after theirs, so
@@ -1633,7 +1637,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
         continue;
       }
       if (!who || who.ref === "you" || !options || !then || then.some((e) => pauses(e))) return null;
-      effects.push({ type: "punisher", who, options, effects: then, thenText: thatThen[1]!.replace(/^you (\w+)/, (_, v: string) => `${v}s`) });
+      effects.push({ type: "punisher", who, options, effects: then, thenText: thatThen[1]!.replace(/^you (\w+)/, (_, v: string) => `${v}s`).replace(/^return that card (.+?) under your control/, "returns that card $1 under their control").replace(/\.$/, "") });
       si++;
       continue;
     }

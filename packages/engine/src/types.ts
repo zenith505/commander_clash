@@ -775,6 +775,8 @@ export interface StackItem {
    * the stack by the time something asks (a countered spell's cascade uses its last known information, CR 113.7a).
    */
   castMv?: number;
+  /** The spell's colors as it was cast (Ramos, Dragon Engine), for when it has left the stack (CR 113.7a). */
+  castColors?: Color[];
   /** An amount "as you cast this spell" (Count asCast), counted as it became cast (rulings on Lifestream's Blessing). */
   asCast?: number;
   /** Kicker costs paid (CR 702.33d), for a spell or its permanent's enters trigger. */

@@ -4615,7 +4615,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   (p.castNames ??= {})[d.name] = (p.castNames[d.name] ?? 0) + 1;
   const castMv = spellManaValue(s, item);
   (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors], from: castFrom, ...(paid.treasure ? { treasure: true as const } : {}), mv: castMv });
-  (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv };
+  (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv, castColors: [...characteristics(s, o).colors] };
   // A copy of a prepare spell: its permanent stops being prepared as it becomes cast (CR 722.3c, 601.2i).
   if (o.preparedFrom) unprepareFor(s, o);
   // Once it's cast, "whenever you cast" and "becomes the target" abilities trigger (CR 601.2i).

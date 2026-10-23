@@ -523,7 +523,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^you created a token this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "tokensCreatedThisTurn" } }, min: 1 };
   // "If you gained 3 or more life this turn" (The Gaffer, Resplendent Angel).
   if ((m = /^you(?:'ve)? gained (\d+) or more life this turn$/.exec(text))) return { kind: "lifeGainedThisTurn", n: Number(m[1]) };
-  if ((m = /^creatures you control have total power (\d+) or greater$/.exec(text))) return { kind: "totalPower", n: Number(m[1]) };
+  // Betor, Kin to All: "creatures you control have total toughness 10 or greater".
+  if ((m = /^creatures you control have total (power|toughness) (\d+) or greater$/.exec(text))) return { kind: "totalPower", n: Number(m[2]), ...(m[1] === "toughness" ? { toughness: true as const } : {}) };
   if ((m = new RegExp(`^a library has ${NUM} or fewer cards in it$`).exec(text))) return { kind: "libraryAtMost", n: num(m[1]!) };
   if (/^your library has no cards in it$/.test(text)) return { kind: "libraryAtMost", n: 0, yours: true };
   if (/^you're the monarch$/.test(text)) return { kind: "monarch" };

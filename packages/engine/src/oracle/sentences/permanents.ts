@@ -402,10 +402,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // "Move a +1/+1 counter from target creature you control onto another target creature", Nesting Grounds' "move a
   // counter from target permanent you control onto a second target permanent" (a kind it has, chosen as it resolves).
-  if ((m = new RegExp(`^Move (?:a|one) (?:(?<kind>${COUNTER}) )?counter from (?<from>target .+?) onto (?<to>another target .+|a second target .+)$`, "i").exec(s))) {
+  // Diamond City: "Move a shield counter from ~ onto target creature".
+  if ((m = new RegExp(`^Move (?:a|one) (?:(?<kind>${COUNTER}) )?counter from (?:(?<from>target .+?) onto (?<to>another target .+|a second target .+)|(?<self>~) onto (?<to2>target [^,]+))$`, "i").exec(s))) {
     const g = m.groups!;
-    const from = parseObject(g.from!, ctx);
-    const to = from && !isGroup(from) ? parseObject(g.to!.replace(/^a second /i, ""), ctx) : null;
+    const from = parseObject(g.from ?? g.self!, ctx);
+    const to = from && !isGroup(from) ? parseObject((g.to ?? g.to2!).replace(/^a second /i, ""), ctx) : null;
     return from && to && !isGroup(to) ? [{ type: "moveCounter", counter: g.kind ? counterKind(g.kind) : "any", from, to }] : null;
   }
   // Portent Tracker (see parseBody): an opponent's battle loses defense, anyone else's gains it.

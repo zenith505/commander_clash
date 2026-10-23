@@ -789,7 +789,7 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       return s.players.some((p) => !p.lost && p.hand.length <= cond.n);
     case "totalPower": {
       let n = 0;
-      for (const c of chars.values()) if (c.controller === you && c.types.includes("Creature")) n += c.power;
+      for (const c of chars.values()) if (c.controller === you && c.types.includes("Creature")) n += cond.toughness ? c.toughness : c.power;
       return n >= cond.n;
     }
     case "libraryAtMost":

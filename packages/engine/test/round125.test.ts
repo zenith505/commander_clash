@@ -578,3 +578,104 @@ describe("Eluge, the Shoreless Sea: {U} (or {1}) less for each land with a flood
     expect(power(s, s.objects[ids[0]!]!)).toBe(islands);
   });
 });
+
+const meathook2 = card("Meathook Massacre II", "Legendary Enchantment", "{X}{X}{B}{B}{B}{B}", {
+  oracleText: "When Meathook Massacre II enters, each player sacrifices X creatures of their choice.\nWhenever a creature you control dies, you may pay 3 life. If you do, return that card under your control with a finality counter on it.\nWhenever a creature an opponent controls dies, they may pay 3 life. If they don't, return that card under your control with a finality counter on it.",
+});
+
+describe("Meathook Massacre II: \"return that card under your control\" from the graveyard (rulings)", () => {
+  const kill = card("Test Murder", "Instant", "{B}", { oracleText: "Destroy target creature." });
+  it("an opponent's creature dies and they don't pay 3 life: it returns under your control with a finality counter", () => {
+    supported(meathook2);
+    const { s: s0, ap, ids, opp } = setup([kill]);
+    putOnBattlefield(s0, ap, meathook2);
+    const b = putOnBattlefield(s0, opp, card("Grizzly Bears", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    let s = untilChoice(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: b }])));
+    for (let i = 0; i < 20 && !s.pending && (s.stack.length || s.triggerQueue.length); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "payUnless", player: opp, life: 3 });
+    s = settleBots(act(s, { type: "payUnless", player: opp, pay: false }));
+    expect(s.objects[b]).toMatchObject({ zone: "battlefield", controller: ap });
+    expect(s.objects[b]!.counters.finality).toBe(1);
+    expect(s.players[opp]!.life).toBe(s0.players[opp]!.life);
+  });
+  it("your creature dies and you pay 3 life: it returns with a finality counter", () => {
+    const { s: s0, ap, ids } = setup([kill]);
+    putOnBattlefield(s0, ap, meathook2);
+    const b = putOnBattlefield(s0, ap, card("Grizzly Bears", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    let s = untilChoice(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: b }])));
+    for (let i = 0; i < 20 && !s.pending && (s.stack.length || s.triggerQueue.length); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap, pay: { life: 3 } });
+    s = settleBots(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect(s.objects[b]).toMatchObject({ zone: "battlefield", controller: ap });
+    expect(s.objects[b]!.counters.finality).toBe(1);
+    expect(s.players[ap]!.life).toBe(s0.players[ap]!.life - 3);
+  });
+});
+
+const ramos = card("Ramos, Dragon Engine", "Legendary Artifact Creature — Dragon", "{6}", {
+  power: "4", toughness: "4", keywords: ["Flying"],
+  oracleText: "Flying\nWhenever you cast a spell, put a +1/+1 counter on Ramos for each of that spell's colors.\nRemove five +1/+1 counters from Ramos: Add {W}{W}{U}{U}{B}{B}{R}{R}{G}{G}. Activate only once each turn.",
+});
+const diamondCity = card("Diamond City", "Land", "", {
+  oracleText: "This land enters with a shield counter on it. (If it would be dealt damage or destroyed, remove a shield counter from it instead.)\n{T}: Add {C}.\n{T}: Move a shield counter from this land onto target creature. Activate only if two or more creatures entered the battlefield under your control this turn.",
+});
+const betor = card("Betor, Kin to All", "Legendary Creature — Spirit Dragon", "{2}{W}{B}{G}", {
+  power: "5", toughness: "7", keywords: ["Flying"],
+  oracleText: "Flying\nAt the beginning of your end step, if creatures you control have total toughness 10 or greater, draw a card. Then if creatures you control have total toughness 20 or greater, untap each creature you control. Then if creatures you control have total toughness 40 or greater, each opponent loses half their life, rounded up.",
+});
+
+describe("Ramos, Dragon Engine: a +1/+1 counter for each of that spell's colors (rulings)", () => {
+  it("a blue-red spell: two counters; a colorless one: none", () => {
+    supported(ramos);
+    const izzet = card("Test Izzet Draw", "Sorcery", "{U}{R}", { oracleText: "Draw a card." });
+    const rock = card("Test Rock", "Artifact", "{1}", { oracleText: "" });
+    const { s: s0, ap, ids } = setup([izzet, rock]);
+    const r = putOnBattlefield(s0, ap, ramos);
+    let s = settleBots(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.objects[r]!.counters["+1/+1"]).toBe(2);
+    s = settleBots(run(s, planCast(s, ap, ids[1]!)));
+    expect(s.objects[r]!.counters["+1/+1"] ?? 0).toBe(2);
+  });
+});
+
+describe("Diamond City: move its shield counter onto a creature once two creatures entered under your control", () => {
+  it("not before the second creature; then the counter moves", () => {
+    supported(diamondCity);
+    const soldier = (n: string) => card(n, "Creature — Soldier", "{W}", { power: "1", toughness: "1" });
+    const { s: s0, ap, ids } = setup([soldier("Soldier One"), soldier("Soldier Two")]);
+    const city = putOnBattlefield(s0, ap, diamondCity);
+    s0.objects[city]!.counters.shield = 1;
+    const move = compileCard(diamondCity).activated.findIndex((a) => a.body.effects.some((e) => e.type === "moveCounter"));
+    let s = settleBots(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(planActivate(s, ap, city, move, [{ kind: "object", id: ids[0]! }])).toBeNull();
+    s = settleBots(run(s, planCast(s, ap, ids[1]!)));
+    s = settleBots(run(s, planActivate(s, ap, city, move, [{ kind: "object", id: ids[0]! }])));
+    expect(s.objects[city]!.counters.shield ?? 0).toBe(0);
+    expect(s.objects[ids[0]!]!.counters.shield).toBe(1);
+  });
+});
+
+describe("Betor, Kin to All: total toughness 10, 20, 40 (rulings)", () => {
+  const wall = (t: number) => card(`Test Wall ${t}`, "Creature — Wall", "{2}", { power: "0", toughness: String(t) });
+  it("21 toughness: a card and its creatures untap; 41: each opponent loses half their life, rounded up", () => {
+    supported(betor);
+    const { s: s0, ap, opp } = setup([]);
+    const b = putOnBattlefield(s0, ap, betor);
+    const w = putOnBattlefield(s0, ap, wall(14));
+    s0.objects[b]!.tapped = true;
+    const hand = s0.players[ap]!.hand.length;
+    s0.players[opp]!.life = 39;
+    let s = passUntil(s0, "end", ap);
+    s = settleBots(s);
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+    expect(s.objects[b]!.tapped).toBe(false);
+    expect(s.players[opp]!.life).toBe(39);
+    const { s: t0, ap: ap2, opp: opp2 } = setup([]);
+    putOnBattlefield(t0, ap2, betor);
+    putOnBattlefield(t0, ap2, wall(34));
+    t0.players[opp2]!.life = 39;
+    const t = settleBots(passUntil(t0, "end", ap2));
+    expect(t.players[opp2]!.life).toBe(19);
+    void w;
+  });
+});

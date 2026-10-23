@@ -1,8 +1,9 @@
 // Round 128's prompts: Lathiel, the Bounteous Dawn ("distribute up to that many" counters), Windshaper Planetar (each
 // attacking creature, "keep" or another player), Stinging Study (which commander), Orzhov Advokist (each player may
-// put counters on a creature), Goblin Recruiter (a search of any number, then their order on top).
+// put counters on a creature), Goblin Recruiter (a search of any number, then their order on top), Jace, the Mind
+// Sculptor (the top card of another player's library).
 import { expect, test } from "@playwright/test";
-import { applyAction, planCast, waitingOn, type Action, type GameState } from "@cc/engine";
+import { applyAction, planActivate, planCast, waitingOn, type Action, type GameState } from "@cc/engine";
 import { LANDS, idsOf, one, open, pageErrors, playUntil, scene, state } from "./scene";
 import { card, controls, modal, resolveUntil } from "./ui";
 
@@ -114,5 +115,21 @@ test("Goblin Recruiter: find Raging Goblin and Goblin Piker, then they go on top
   await arrange.getByRole("button", { name: "Done" }).click();
   const after = await resolveUntil(page, (x) => !x.pending && x.stack.length === 0 && x.objects[one(s, "Goblin Recruiter")]!.zone === "battlefield");
   expect(after.players[0]!.library.slice(0, 2)).toEqual(start);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Jace, the Mind Sculptor +2: the top card of Ana's library goes to the bottom", async ({ page }) => {
+  const s0 = scene({ board: [...LANDS, "Jace, the Mind Sculptor"] });
+  const jace = one(s0, "Jace, the Mind Sculptor");
+  s0.objects[jace]!.counters.loyalty = 3;
+  const top = s0.players[1]!.library[0]!;
+  const s = passToPrompt(run(s0, planActivate(s0, 0, jace, 0, [{ kind: "player", id: 1 }])));
+  expect(s.pending).toMatchObject({ kind: "arrangeTop", how: "scry", owner: 1 });
+  await open(page, s);
+  const arrange = page.locator(".modal.arrange");
+  await expect(arrange).toContainText("the top card of Ana's library: leave it on top or put it on the bottom");
+  await arrange.locator(`[data-arrange="${top}"]`).click();
+  await arrange.getByRole("button", { name: "Done" }).click();
+  await expect.poll(async () => (await state(page)).players[1]!.library.at(-1)).toBe(top);
   expect(pageErrors(page)).toEqual([]);
 });

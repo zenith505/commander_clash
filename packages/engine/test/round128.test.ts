@@ -569,3 +569,63 @@ describe("Goblin Recruiter: any number of Goblin cards, shuffled, then on top in
     expect(logText(s)).toMatch(/Goblin A/);
   });
 });
+
+const starCharts = card("Consult the Star Charts", "Instant", "{1}{U}", {
+  oracleText:
+    "Kicker {1}{U} (You may pay an additional {1}{U} as you cast this spell.)\nLook at the top X cards of your library, where X is the number of lands you control. Put one of those cards into your hand. If this spell was kicked, put two of those cards into your hand instead. Put the rest on the bottom of your library in a random order.",
+});
+
+describe("Consult the Star Charts: one card of the top X, two when kicked", () => {
+  for (const kicked of [false, true])
+    it(kicked ? "kicked: two of them" : "not kicked: one of them", () => {
+      supported(starCharts);
+      const { s: s0, ap, ids } = setup([starCharts]);
+      const lands = s0.battlefield.filter((id) => s0.cards[s0.objects[id]!.cardId]!.types.includes("Land") && s0.objects[id]!.controller === ap).length;
+      let s = run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "auto", undefined, kicked ? { kicks: [0] } : undefined));
+      for (let i = 0; i < 20 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+      expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap, min: kicked ? 2 : 1, max: kicked ? 2 : 1 });
+      expect(s.pending?.kind === "searchLibrary" && s.pending.dig?.looked.length).toBe(lands);
+    });
+});
+
+const mindSculptor = card("Jace, the Mind Sculptor", "Legendary Planeswalker — Jace", "{2}{U}{U}", {
+  loyalty: "3",
+  oracleText:
+    "+2: Look at the top card of target player's library. You may put that card on the bottom of that player's library.\n0: Draw three cards, then put two cards from your hand on top of your library in any order.\n−1: Return target creature to its owner's hand.\n−12: Exile all cards from target player's library, then that player shuffles their hand into their library.",
+});
+
+describe("Jace, the Mind Sculptor (rulings)", () => {
+  it("+2: you look at the top card of Ana's library and put it on the bottom", () => {
+    supported(mindSculptor);
+    const { s: s0, ap, opp } = setup([]);
+    const j = putOnBattlefield(s0, ap, mindSculptor);
+    s0.objects[j]!.counters.loyalty = 3;
+    const top = s0.players[opp]!.library[0]!;
+    let s = run(s0, planActivate(s0, ap, j, 0, [{ kind: "player", id: opp }]));
+    for (let i = 0; i < 20 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "arrangeTop", player: ap, how: "scry", cards: [top], owner: opp });
+    s = act(s, { type: "arrangeTop", player: ap, top: [], away: [top] });
+    expect(s.players[opp]!.library.at(-1)).toBe(top);
+    expect(s.objects[j]!.counters.loyalty).toBe(5);
+  });
+  it("+2 by a bot: it answers the look at an opponent's library", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const j = putOnBattlefield(s0, ap, mindSculptor);
+    s0.objects[j]!.counters.loyalty = 3;
+    let s = run(s0, planActivate(s0, ap, j, 0, [{ kind: "player", id: opp }]));
+    for (let i = 0; i < 20 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    const [a] = botActions(s, ap);
+    expect(a).toMatchObject({ type: "arrangeTop", player: ap });
+  });
+  it("−12: exiles Ana's library, then she shuffles her hand into it", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const j = putOnBattlefield(s0, ap, mindSculptor);
+    s0.objects[j]!.counters.loyalty = 12;
+    const hand = [...s0.players[opp]!.hand];
+    const lib = [...s0.players[opp]!.library];
+    const s = settleBots(run(s0, planActivate(s0, ap, j, 3, [{ kind: "player", id: opp }])));
+    expect(lib.every((id) => s.objects[id]!.zone === "exile")).toBe(true);
+    expect(s.players[opp]!.hand).toEqual([]);
+    expect([...s.players[opp]!.library].sort()).toEqual([...hand].sort());
+  });
+});

@@ -648,7 +648,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Going to the bottom (CR 401.4): the order hardly matters to a bot.
     if (pend.kind === "arrangeTop" && (pend.how === "bottom" || pend.how === "look")) return [{ type: "arrangeTop", player: pid, top: [...pend.cards], away: [] }];
     if (pend.kind === "arrangeTop") {
-      const keep = pend.cards.filter((id) => wantOnTop(s, pid, id));
+      // Someone else's library (Jace, the Mind Sculptor): keep on top only what its owner doesn't want.
+      const owner = pend.owner ?? pid;
+      const keep = pend.cards.filter((id) => wantOnTop(s, owner, id) === (owner === pid));
       return [{ type: "arrangeTop", player: pid, top: keep, away: pend.cards.filter((id) => !keep.includes(id)) }];
     }
     if (pend.kind === "orderGraveyard") return [{ type: "orderGraveyard", player: pid, order: orderOwnGraveyard(s, pend.cards) }];

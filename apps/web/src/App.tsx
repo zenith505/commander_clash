@@ -3398,7 +3398,9 @@ function ArrangeTop({
                   ? `put these ${cards.length} cards into your graveyard in any order`
                   : how === "wholeGraveyard"
                     ? "reorder your graveyard as you choose"
-                    : `${how} ${cards.length}`}
+                    : how === "scry" && owner
+                      ? `the top card of ${owner}'s library: leave it on top or put it on the bottom`
+                      : `${how} ${cards.length}`}
           </strong>
           {how !== "look" && <span className="muted">{together ? " Use the arrows to order them." : " Click a card to move it between rows."}</span>}
           <button onClick={() => onDone(top, away)}>Done</button>

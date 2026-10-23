@@ -2089,6 +2089,12 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "exileGraveyard":
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
+        if (e.library) {
+          const n = p.library.length;
+          for (const id of [...p.library]) moveObject(s, id, "exile");
+          log(s, `${src} exiles ${p.name}'s library (${n} card${n === 1 ? "" : "s"}).`);
+          continue;
+        }
         const n = p.graveyard.length;
         for (const id of [...p.graveyard]) {
           // "Creature cards exiled this way": their power as it was in the graveyard (rulings on Szat's Will).

@@ -1550,7 +1550,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Dire Fleet Daredevil: "exile target instant or sorcery card from an opponent's graveyard. You may cast it this turn, and
     // mana of any type can be spent to cast that spell. If that spell would be put into a graveyard, exile it instead": a
     // card from a graveyard, cast with its usual timing this turn (rulings).
-    const youCast = /^You may cast (?:that card|it) (for as long as it remains exiled|this turn)(, and mana of any type can be spent to cast (?:that spell|it))?$/.exec(s);
+    const youCast0 = /^You may cast (?:that card|it) (for as long as it remains exiled|this turn)(, and mana of any type can be spent to cast (?:that spell|it))?$/.exec(s);
+    // "You may cast that card this turn" after something other than an exile (Emry) is read elsewhere.
+    const youCast = youCast0 && (youCast0[1] !== "this turn" || effects[effects.length - 1]?.type === "exile") ? youCast0 : null;
     if (youCast) {
       const prev = effects[effects.length - 1];
       if (prev?.type !== "exile" || prev.linked || prev.ownerMay || prev.youMay || prev.what.ref !== "target" || (prev.what.n ?? 1) !== 1) return null;
@@ -2434,6 +2436,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!then || ctx.targets.length !== before) return null;
       effects.push({ type: "revealTop", look: true }, { type: "if", cond: { kind: "revealedSharesCreatureType" }, effects: [{ type: "may", effects: [{ type: "revealRevealed" }, ...then], text: `reveal the revealed card (if you do, ${ifDo[1]!.replace(/\.$/, "")})` }] });
       si += 2;
+      continue;
+    }
+    // Jace, the Mind Sculptor: "Look at the top card of target player's library. You may put that card on the bottom of that
+    // player's library." The one who looks decides.
+    if (lookTop && /^You may put (?:that card|it) on the bottom of (?:that player's|your) library$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "") && /your/.test(sentences[si + 1]!) === (lookTop[1] === "your")) {
+      const who = parsePlayer(lookTop[1] === "your" ? "you" : lookTop[1]!.replace(/'s$/, ""), ctx);
+      if (!who) return null;
+      effects.push({ type: "orderTop", who, n: 1, mayBottom: true });
+      si++;
       continue;
     }
     // "Look at the top card of target player's library. Draw a card at the beginning of the next turn's upkeep." (Mishra's

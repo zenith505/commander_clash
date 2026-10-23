@@ -3994,6 +3994,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "da3e7d3d-2ca0-40c3-9602-fca37c92f507",
+  "name": "Emry, Lurker of the Loch",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Merfolk Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Merfolk",
+   "Wizard"
+  ],
+  "oracleText": "Affinity for artifacts (This spell costs {1} less to cast for each artifact you control.)\nWhen Emry enters, mill four cards.\n{T}: Choose target artifact card in your graveyard. You may cast that card this turn. (You still pay its costs. Timing rules still apply.)",
+  "power": "1",
+  "toughness": "2",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Affinity",
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "mul",
+  "releasedAt": "2023-04-21",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "c62a9e10-cfc6-48cc-a3f7-68d624182a5a",
   "name": "Endless Swarm",
   "manaCost": "{5}{G}{G}{G}",
@@ -6632,6 +6668,37 @@
   "commanderLegal": "legal",
   "set": "dd2",
   "releasedAt": "2008-11-07",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "7f77a84e-5a4b-4834-aefa-3cecc175ae8e",
+  "name": "Jace, the Mind Sculptor",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Legendary Planeswalker — Jace",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Jace"
+  ],
+  "oracleText": "+2: Look at the top card of target player's library. You may put that card on the bottom of that player's library.\n0: Draw three cards, then put two cards from your hand on top of your library in any order.\n−1: Return target creature to its owner's hand.\n−12: Exile all cards from target player's library, then that player shuffles their hand into their library.",
+  "loyalty": "3",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "blc",
+  "releasedAt": "2024-08-02",
   "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false

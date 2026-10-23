@@ -30,6 +30,12 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
   // Without "in a random order", the owner arranges the cards going to the bottom (CR 401.4).
   const restOf = (r: string) => (r === "into your graveyard" ? { rest: "graveyard" as const } : r === "into your hand" ? { rest: "hand" as const } : / random /.test(r) ? { rest: "bottom" as const, random: true as const } : { rest: "bottom" as const });
   let m: RegExpExecArray | null;
+  // Consult the Star Charts: "Put one of those cards into your hand. If ~ was kicked, put two of those cards into your hand
+  // instead." More of them, when it was kicked (CR 702.33e).
+  if (dig.into === "hand" && dig.rest === undefined && dig.kickedCount === undefined && ctx?.spell && (m = /^If (?:~|this spell) was kicked, put (two|three) of (?:them|those cards) into your hand instead$/.exec(s))) {
+    dig.kickedCount = num(m[1]!);
+    return "more";
+  }
   if (dig.into === undefined) {
     if ((m = new RegExp(`^Put (one|two|three) of (?:them|those cards) into your hand(?: and (?:the rest|the other) ${REST})?$`).exec(s))) {
       Object.assign(dig, { count: num(m[1]!), upTo: false, into: "hand" });

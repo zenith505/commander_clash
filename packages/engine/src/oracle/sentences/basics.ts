@@ -342,7 +342,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who: PlayerRef | null = m[1] ? parsePlayer(m[1].toLowerCase(), ctx) : { ref: "you" };
     return who ? [{ type: "shuffleZones", who, hand: true, drawThatMany: true }] : null;
   }
-  if ((m = /^(?:([Tt]arget player|[Ee]ach player|[Tt]arget opponent) shuffles their|[Ss]huffle your) (hand and graveyard|graveyard|hand) into (?:their|your) library(?:, then (?:draws|draw) (\w+) cards?)?$/.exec(s))) {
+  // "..., then that player shuffles their hand into their library" (Jace, the Mind Sculptor): the player targeted before.
+  if ((m = /^(?:([Tt]arget player|[Ee]ach player|[Tt]arget opponent|[Tt]hat player) shuffles their|[Ss]huffle your) (hand and graveyard|graveyard|hand) into (?:their|your) library(?:, then (?:draws|draw) (\w+) cards?)?$/.exec(s))) {
     const who: PlayerRef | null = m[1] ? parsePlayer(m[1].toLowerCase(), ctx) : { ref: "you" };
     if (!who) return null;
     const out: Effect[] = [{ type: "shuffleZones", who, ...(m[2] !== "graveyard" ? { hand: true as const } : {}), ...(m[2] !== "hand" ? { graveyard: true as const } : {}) }];

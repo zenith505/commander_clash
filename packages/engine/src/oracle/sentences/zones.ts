@@ -489,6 +489,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (filter === null) return null;
     return [{ type: "takeFromHand", who: { ref: "you" }, ...(filter ? { filter } : {}), action: "exile", ...(m[1] ? { optional: true as const } : {}) }];
   }
+  // Jace, the Mind Sculptor: "Exile all cards from target player's library, then that player shuffles their hand into their
+  // library." With no cards in hand, their library stays empty (rulings).
+  if ((m = /^Exile all cards from (target player's|target opponent's) library$/.exec(s))) {
+    const who = parsePlayer(m[1]!.replace(/'s$/, ""), ctx);
+    return who ? [{ type: "exileGraveyard", who, library: true }] : null;
+  }
   if ((m = /^Exile (target player's|target opponent's|each opponent's|all opponents'|all|any number of target players') graveyards?$/i.exec(s))) {
     const w = m[1]!.toLowerCase();
     const who: PlayerRef | null =

@@ -1104,6 +1104,8 @@ export function damageRecipients(s: GameState, to: DamageRecipient, ctx: Resolve
     }
     return { objs: [], pids: at?.attacking !== undefined && !s.players[at.attacking]?.lost ? [at.attacking] : [] };
   }
+  // "That permanent or player" (Ghyrson Starn): the permanent dealt damage, while it's still that permanent, else the player.
+  if (to.ref === "eventRecipient") return ctx.subject ? { objs: objects(s, { ref: "subject" }, ctx), pids: [] } : { objs: [], pids: players(s, { ref: "eventPlayer" }, ctx) };
   if (to.ref === "anyTarget") {
     const out: { objs: GameObject[]; pids: PlayerId[] } = { objs: [], pids: [] };
     for (let i = to.index; i < to.index + (to.n ?? 1); i++) {

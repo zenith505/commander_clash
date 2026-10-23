@@ -83,7 +83,7 @@ export function harmfulTargets(body: AbilityBody): boolean[] {
   };
   counted(body.effects);
   // An Aura spell with "enchant player" is a Curse, aimed at an opponent.
-  body.targets.forEach((t, i) => t.kind === "player" && / to enchant$/.test(t.text) && mark(i));
+  body.targets.forEach((t, i) => t.kind === "player" && / to enchant$/.test(t.text) && !t.helpsEnchanted && mark(i));
   return harm;
 }
 

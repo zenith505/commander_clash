@@ -2889,6 +2889,10 @@ export function compile(d: CardDef): CompiledCard {
   const json = JSON.stringify(out);
   if (json.includes('"thisAbility":true')) out.unsupported.push("(a copy effect's \"this ability\" outside a triggered or activated ability)");
   if (out.sunburst || json.includes('"kind":"colorsSpent"')) out.countsColors = true;
+  // An "enchant player" Aura that only gives the enchanted player more steps or phases on their turn (Paradox Haze, Shadow
+  // of the Second Sun): it helps the player it enchants, so bots put it on themselves.
+  if (out.enchant?.kind === "player" && !out.enchant.opponent && !d.subtypes.includes("Curse") && !out.statics.length && !out.activated.length && out.triggers.length && out.triggers.every((t) => t.enchantedPlayersTurn && t.body.effects.every((e) => e.type === "addPhases" || e.type === "addUpkeepStep")))
+    out.enchant = { ...out.enchant, helpsEnchanted: true };
   const wanted = wantedSpent(out);
   if (wanted.length) out.wantSpent = wanted;
   if (/"kind":"snowSpent"|"snow(?:OfColors)?":/.test(JSON.stringify([out.spell, out.entersWithCounters, out.triggers.filter((t) => t.event === "selfEnters")]))) out.wantSnow = true;

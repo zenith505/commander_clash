@@ -696,7 +696,14 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         o.reboundGained = true;
         log(s, `${defOf(s, o).name} gains rebound.`);
       }
-      const mods = e.mods.flatMap((x): Modification[] => (x.kind !== "addKeywords" ? [x] : x.keywords.some((k) => k !== "Rebound") ? [{ ...x, keywords: x.keywords.filter((k) => k !== "Rebound") }] : []));
+      // Sunburst works as it enters from the stack (CR 702.44a): one more instance for each time it's gained.
+      const sunburst = e.mods.some((x) => x.kind === "addKeywords" && x.keywords.includes("Sunburst"));
+      if (sunburst) {
+        o.sunburstGained = (o.sunburstGained ?? 0) + 1;
+        log(s, `${defOf(s, o).name} gains sunburst.`);
+      }
+      const stackOnly = (k: string) => k === "Rebound" || k === "Sunburst";
+      const mods = e.mods.flatMap((x): Modification[] => (x.kind !== "addKeywords" ? [x] : x.keywords.some((k) => !stackOnly(k)) ? [{ ...x, keywords: x.keywords.filter((k) => !stackOnly(k)) }] : []));
       if (mods.length) (o.spellGains ??= []).push({ mods, timestamp: s.nextTimestamp++, controller: ctx.controller, source: src, ...(e.forever ? { forever: true as const } : {}) });
       return;
     }

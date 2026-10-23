@@ -27,6 +27,7 @@ export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | nul
   const attacked = /^the player or planeswalker (it's|it is|~'s|that creature is) attacking$/i.exec(p);
   if (attacked && (attacked[1] === "that creature is" || attacked[1] === "it is")) return ctx.defending && (ctx.subject || ctx.subjectIt) ? { ref: "attackedBySelf", subject: true } : null;
   if (attacked) return !ctx.defending ? null : attacked[1] === "it's" && ctx.subjectIt ? { ref: "attackedBySelf", subject: true } : attacked[1] === "~'s" || !ctx.subject ? { ref: "attackedBySelf" } : null;
+  if (/^that permanent or player$/i.test(p)) return ctx.eventRecipient ? { ref: "eventRecipient" } : null;
   if (/^any target$/i.test(p)) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", text: "any target" }) };
   // "target player or planeswalker", "target opponent or planeswalker" (Lava Axe): a player, or a planeswalker permanent.
   const pw = /^target (player|opponent) or planeswalker$/i.exec(p);

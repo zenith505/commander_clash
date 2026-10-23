@@ -319,6 +319,8 @@ export type Count =
 
 /** What a "target ..." phrase allows. CR 115 */
 export interface TargetSpec {
+  /** An "enchant player" Aura's target when the Aura helps the player it enchants (Paradox Haze): bots choose themselves. */
+  helpsEnchanted?: true;
   /**
    * "object" = a permanent, "player", "any" = creature/planeswalker/player (CR 115.4),
    * "spell" = an object on the stack, "card" = a card in a graveyard ("target creature card
@@ -852,7 +854,9 @@ export type DamageRecipient =
   | PlayerRef
   | { ref: "anyTarget"; index: number; /** "each of up to two targets" */ n?: number }
   /** "The player or planeswalker it's attacking" (Myr Battlesphere): what the source is attacking, or was as it last existed; nothing for a battle. */
-  | { ref: "attackedBySelf"; subject?: true };
+  | { ref: "attackedBySelf"; subject?: true }
+  /** "That permanent or player" after "Whenever a source you control deals damage to a permanent or player" (Ghyrson Starn): the permanent dealt it (the subject), while it's that permanent, or the player (the event player). */
+  | { ref: "eventRecipient" };
 
 /**
  * What a "damageRule" effect makes (see GameState.damageRules). It applies to damage that matches both `to` and `by`
@@ -3281,6 +3285,8 @@ export type TriggerEvent =
   | "selfDealsDamageToPlayer"
   /** "Whenever a source you control deals (noncombat) damage to an opponent" (Niv-Mizzet, Visionary): once for each source and player (CR 603.2c). */
   | "sourceYouControlDamagesOpponent"
+  /** "Whenever another source you control deals exactly 1 damage to a permanent or player" (Ghyrson Starn): once for each source and recipient, the permanent dealt it the subject, the player the event player. */
+  | "sourceYouControlDealsDamage"
   /** "Whenever ~ deals damage": once per event, however many things it damaged at once; "that much" is the total. */
   | "selfDealsDamage"
   | "selfDealsCombatDamage"
@@ -3574,7 +3580,7 @@ export interface TriggeredAbility {
    */
   discards?: { by: "you" | "opponent" | "any"; cycled?: true; other?: true; filter?: TargetSpec };
   /** For "creatureYouControlDealsCombatDamageToPlayer": which creature ("a Vampire you control", "another creature"). */
-  dealer?: { filter: TargetSpec; other?: boolean; /** "Whenever a creature deals combat damage to one of your opponents" (Edric): anyone's creature; `toOpponent` is then about this permanent's controller. */ anyone?: true };
+  dealer?: { filter: TargetSpec; other?: boolean; /** "Whenever ~ or an enchanted creature you control deals combat damage to a player" (Calix): this permanent too, whatever the filter says. */ orSelf?: true; /** "Whenever a creature deals combat damage to one of your opponents" (Edric): anyone's creature; `toOpponent` is then about this permanent's controller. */ anyone?: true };
   /** For "creatureYouControlAttacks": which creature ("a Dragon you control", "another creature you control"). */
   attacker?: {
     filter: TargetSpec;
@@ -3607,6 +3613,8 @@ export interface TriggeredAbility {
   minDamage?: number;
   /** For "sourceYouControlDamagesOpponent": "to a player", you included. */
   anyPlayer?: true;
+  /** For "sourceYouControlDealsDamage": exactly this much at once; `other`: a source other than this permanent. */
+  sourceDamage?: { exactly: number; other?: true };
   /** For "creaturesYouControlAttack": "Whenever you attack with two or more creatures", at least this many of them. */
   minAttackers?: number;
   /** "Whenever you expend N": the total mana spent casting spells this turn reaching N as a cost is paid (CR 700.14). */

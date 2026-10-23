@@ -531,6 +531,11 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return filter ? { kind: "castCount", n: num(m[1]!), filter } : null;
   }
   if ((m = new RegExp(`^there are ${NUM} colors among permanents you control$`).exec(text))) return { kind: "colorsAmong", n: num(m[1]!) };
+  // "If there are thirty or more counters among artifacts and creatures you control" (Lux Artillery): every kind, added up.
+  if ((m = new RegExp(`^there are ${NUM} or more counters among (.+ you control)$`).exec(text))) {
+    const amount = parseCount(`counters among ${m[2]}`, null);
+    return amount && typeof amount === "object" ? { kind: "amount", amount, min: num(m[1]!) } : null;
+  }
   // "If there are two or more ki counters on ~" (the Kamigawa flip cards).
   if ((m = new RegExp(`^there are ${NUM} or more ${COUNTER} counters on ~$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[2]!), min: num(m[1]!) };
   if ((m = new RegExp(`^you've gained ${NUM} or more life this turn$`).exec(text))) return { kind: "lifeGainedThisTurn", n: num(m[1]!) };

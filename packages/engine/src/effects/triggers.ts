@@ -203,6 +203,8 @@ export type TriggerSourceEvent =
   /** A permanent dealt damage to a player, in combat or not. */
   /** `source` is the permanent dealing it, or "" for a spell or a gone permanent's ability (CR 120.3); `by` controls it. */
   | { type: "damagedPlayer"; source: ObjectId; by: PlayerId; player: PlayerId; amount: number; combat: boolean }
+  /** A source (`source`: its object, "" if none) controlled by `by` dealt damage to a permanent (`id`) or a player. */
+  | { type: "sourceDealtDamage"; source: ObjectId; by: PlayerId; id?: ObjectId; player?: PlayerId; amount: number }
   /** A permanent dealt damage to a creature (`id`). */
   | { type: "damagedCreature"; source: ObjectId; id: ObjectId; amount: number; combat: boolean; /** The excess damage that creature has been dealt this turn (CR 120.10). */ excess?: number }
   /** A spell (`card`, controlled by `by`) dealt damage to a player or a battle. */
@@ -1166,7 +1168,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (ev.combat)
         for (const id of s.battlefield) {
           const w = obj(s, id);
-          if (controllerOf(s, w) === dealerBy) add(w, dealerBy, (e, t) => e === "creatureYouControlDealsCombatDamage" && !!t.dealer && !(t.dealer.other && w.id === o.id) && objectMatches(s, t.dealer.filter, o, dealerBy, false), undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
+          if (controllerOf(s, w) === dealerBy) add(w, dealerBy, (e, t) => e === "creatureYouControlDealsCombatDamage" && !!t.dealer && !(t.dealer.other && w.id === o.id) && ((t.dealer.orSelf && w.id === o.id) || objectMatches(s, t.dealer.filter, o, dealerBy, false)), undefined, undefined, o, undefined, undefined, undefined, { amount: ev.amount });
         }
     }
   } else if (ev.type === "damagedPlayer") {
@@ -1199,6 +1201,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         return !!fromPermanent && (!t.subjectFilter || objectMatches(s, t.subjectFilter, fromPermanent, ev.player, false));
       };
       add(w, ev.player, (e, t) => e === "dealsDamageToYou" && fits(t), undefined, undefined, fromPermanent, undefined, undefined, undefined, { player: ev.by, amount: ev.amount });
+    }
+  } else if (ev.type === "sourceDealtDamage") {
+    // "Whenever another source you control deals exactly 1 damage to a permanent or player" (Ghyrson Starn): its
+    // controller's permanents, once for each source and recipient (rulings); the permanent is the subject.
+    const hit = ev.id ? s.objects[ev.id] : undefined;
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      if (controllerOf(s, w) !== ev.by) continue;
+      add(w, ev.by, (e, t) => e === "sourceYouControlDealsDamage" && !!t.sourceDamage && ev.amount === t.sourceDamage.exactly && !(t.sourceDamage.other && ev.source === w.id), undefined, undefined, hit, undefined, undefined, undefined, { amount: ev.amount, ...(ev.player !== undefined ? { player: ev.player } : {}) });
     }
   } else if (ev.type === "damagedCreature") {
     const o = s.objects[ev.source];
@@ -1281,7 +1292,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     for (const id of s.battlefield) {
       const w = obj(s, id);
       if (controllerOf(s, w) !== dealerBy) continue;
-      add(w, dealerBy, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.orBattle && !!t.dealer && !(t.dealer.other && w.id === o.id) && objectMatches(s, t.dealer.filter, o, dealerBy, false), undefined, undefined, o, undefined, undefined, undefined, info);
+      add(w, dealerBy, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.orBattle && !!t.dealer && !(t.dealer.other && w.id === o.id) && ((t.dealer.orSelf && w.id === o.id) || objectMatches(s, t.dealer.filter, o, dealerBy, false)), undefined, undefined, o, undefined, undefined, undefined, info);
     }
     fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "selfDealsCombatDamageToPlayer" && !!t.orBattle, triggers, undefined, undefined, undefined, undefined, undefined, info), o);
     causedBy = null;
@@ -1293,7 +1304,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     addHosted(o, (e) => e === "selfDealsCombatDamageToPlayer", undefined, o, info);
     // "Whenever a creature you control deals combat damage to a player": the creature is the subject.
     const dealerBy = controllerOf(s, o);
-    const dealWatch = (w: GameObject) => add(w, dealerBy, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer && !(t.dealer.other && w.id === o.id) && objectMatches(s, t.dealer.filter, o, dealerBy, false) && !(t.toOpponent && ev.player === dealerBy), undefined, undefined, o, undefined, undefined, undefined, info);
+    const dealWatch = (w: GameObject) => add(w, dealerBy, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer && !(t.dealer.other && w.id === o.id) && ((t.dealer.orSelf && w.id === o.id) || objectMatches(s, t.dealer.filter, o, dealerBy, false)) && !(t.toOpponent && ev.player === dealerBy), undefined, undefined, o, undefined, undefined, undefined, info);
     for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === dealerBy) dealWatch(obj(s, id));
     // "Whenever a creature deals combat damage to one of your opponents" (Edric): anyone's creature, to an opponent of
     // the watcher's controller (its own controller's watchers saw it above).
@@ -1305,7 +1316,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     fromEmblems((w, owner) => owner === dealerBy && dealWatch(w));
     // "Until end of turn, whenever ~ deals combat damage to a player" (Lyra), "... a creature you control" (Mistway Spy).
     fromFloating((src, ctrl, triggers) => add(src, ctrl, (e, t) => e === "selfDealsCombatDamageToPlayer" && !(t.toOpponent && ev.player === ctrl), triggers, undefined, undefined, undefined, undefined, undefined, info), o);
-    fromFloating((src, ctrl, triggers) => ctrl === dealerBy && add(src, ctrl, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer && !(t.dealer.other && src.id === o.id) && objectMatches(s, t.dealer.filter, o, ctrl, false) && !(t.toOpponent && ev.player === ctrl), triggers, undefined, o, undefined, undefined, undefined, info), undefined, ev.player);
+    fromFloating((src, ctrl, triggers) => ctrl === dealerBy && add(src, ctrl, (e, t) => e === "creatureYouControlDealsCombatDamageToPlayer" && !!t.dealer && !(t.dealer.other && src.id === o.id) && ((t.dealer.orSelf && src.id === o.id) || objectMatches(s, t.dealer.filter, o, ctrl, false)) && !(t.toOpponent && ev.player === ctrl), triggers, undefined, o, undefined, undefined, undefined, info), undefined, ev.player);
     causedBy = null;
     // "Whenever a creature deals combat damage to the monarch, its controller becomes the monarch" (CR 725.2).
     if (ev.player === s.monarch && objIsType(s, o, "Creature")) monarchTrigger(s, 1, o);

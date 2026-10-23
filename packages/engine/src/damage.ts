@@ -199,6 +199,7 @@ export function dealDamage(
       if (creatureBatch) creatureBatch.push(ev);
       else fireEvent(s, ev);
     }
+    fireEvent(s, { type: "sourceDealtDamage", source: src.id ?? src.ref?.object ?? "", by: src.controller, id: o.id, amount: n });
   } else {
     const p = player(s, to.player);
     if (has(src, "Infect")) {
@@ -228,6 +229,7 @@ export function dealDamage(
     else fireEvent(s, { type: "playerDealtDamage", player: p.id, amount: n });
     // "Whenever ~ deals damage to a player" (combat damage is all dealt before any of it triggers anything).
     fireEvent(s, { type: "damagedPlayer", source: src.id ?? "", by: src.controller, player: p.id, amount: n, combat: !!opts.combat });
+    fireEvent(s, { type: "sourceDealtDamage", source: src.id ?? src.ref?.object ?? "", by: src.controller, player: p.id, amount: n });
     spellDealt(s, src, { player: p.id });
     if (opts.combat) {
       p.combatDamagedTurn = s.turn;

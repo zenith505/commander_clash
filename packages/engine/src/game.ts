@@ -825,6 +825,7 @@ export function moveObject(
     o.extraCounters = undefined; // and the counters a spell will enter with
     o.spellGains = undefined;
     o.reboundGained = undefined;
+    o.sunburstGained = undefined;
     o.teamwork = undefined;
     o.gift = undefined; // and whom its gift was promised to (CR 702.174a)
     o.sneak = undefined;
@@ -979,7 +980,9 @@ export function moveObject(
     // Serra Paragon: "If you do, it gains '...'": the permanent the land or spell becomes has the ability for good.
     if (o.entersGaining && (fromZone === "stack" || fromZone === "graveyard")) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: "Serra Paragon", duration: "game", affected: [o.id], mods: [{ kind: "addAbility", text: o.entersGaining }] });
     o.entersGaining = undefined;
-    const how: EnterOpts = { ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(opts.countersIfCreature ? { countersIfCreature: opts.countersIfCreature } : {}), ...(opts.countersIfPlaneswalker ? { countersIfPlaneswalker: opts.countersIfPlaneswalker } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
+    const sunburstGained = fromZone === "stack" ? (o.sunburstGained ?? 0) : 0;
+    o.sunburstGained = undefined;
+    const how: EnterOpts = { ...(sunburstGained ? { sunburstGained } : {}), ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(opts.countersIfCreature ? { countersIfCreature: opts.countersIfCreature } : {}), ...(opts.countersIfPlaneswalker ? { countersIfPlaneswalker: opts.countersIfPlaneswalker } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
     // "You may have ~ enter as a copy of ...": it becomes the copy as it enters (CR 707.5), so how it
     // enters and what it triggers wait for that choice.
     if (printed.entersAsCopy && copyCandidates(s, o, printed.entersAsCopy.filter).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });
@@ -1067,7 +1070,7 @@ function scatterMerged(s: GameState, ids: ObjectId[], to: ZoneName, top: boolean
 }
 
 /** `fromStack`: it's a resolving spell becoming a permanent (sunburst, CR 702.44b). */
-type EnterOpts = { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; countersIfCreature?: Record<string, number>; countersIfPlaneswalker?: Record<string, number>; escaped?: boolean; fromStack?: boolean; /** Its "enters under the control of an opponent of your choice" was applied. */ controlChosen?: boolean };
+type EnterOpts = { /** Sunburst the spell gained (Lux Artillery), each instance apart. */ sunburstGained?: number; x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; countersIfCreature?: Record<string, number>; countersIfPlaneswalker?: Record<string, number>; escaped?: boolean; fromStack?: boolean; /** Its "enters under the control of an opponent of your choice" was applied. */ controlChosen?: boolean };
 
 /**
  * The rest of entering the battlefield (CR 614.1c, 614.12): tapped or not, counters, "as it enters" choices,
@@ -1114,9 +1117,11 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   if (opts.escaped && printed.escapesWith) putCounters(s, o, "+1/+1", printed.escapesWith, true);
   // Sunburst: only a resolving spell, and only for colored mana spent to cast it (CR 702.44b). Whether it enters as a
   // creature ignores type-changing effects (702.44a): its copiable values decide.
-  if (printed.sunburst && opts.fromStack && o.colorsSpent?.length) {
-    const counter = printed.sunburst.counter ?? (isType(defOf(s, o), "Creature") ? "+1/+1" : "charge");
-    const put = putCounters(s, o, counter, o.colorsSpent.length, true);
+  // One it gained as a spell (Lux Artillery) works the same, each instance apart (rulings).
+  const sunbursts = [...(printed.sunburst ? [printed.sunburst] : []), ...Array.from({ length: opts.sunburstGained ?? 0 }, () => ({}) as { counter?: "+1/+1" })];
+  for (const sb of opts.fromStack && o.colorsSpent?.length ? sunbursts : []) {
+    const counter = sb.counter ?? (isType(defOf(s, o), "Creature") ? "+1/+1" : "charge");
+    const put = putCounters(s, o, counter, o.colorsSpent!.length, true);
     log(s, `${defOf(s, o).name} enters with ${put} ${counter} counter${put === 1 ? "" : "s"} (sunburst).`);
   }
   // "This creature enters prepared" (CR 722.3a): the copy of its prepare spell is created as it enters (722.3c).

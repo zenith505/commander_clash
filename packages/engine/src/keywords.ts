@@ -275,7 +275,8 @@ export const toxicValue = (keywords: readonly string[]) =>
   keywords.reduce((n, k) => n + Number(/^toxic (\d+)$/i.exec(k)?.[1] ?? 0), 0);
 
 /** Remove reminder text in parentheses. */
-export const stripReminder = (text: string) => text.replace(/\s*\([^)]*\)/g, "").trim();
+// Not Eluge's "costs {U} (or {1}) less": rules text, not reminder text.
+export const stripReminder = (text: string) => text.replace(/\s*\((?!or \{\d+\}\))[^)]*\)/g, "").trim();
 
 /** Creature types, from CR 205.3m. Used to tell "Elf creatures" from "Enchanted creatures". */
 export const CREATURE_TYPES: ReadonlySet<string> = new Set([

@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { botActions, power, compileCard, isFullySupported, manaValue, planActivate, planCast, spellCost, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { botActions, power, characteristics, invalidateCharacteristics, compileCard, isFullySupported, manaValue, planActivate, planCast, spellCost, waitingOn, type Action, type CardDef, type GameState } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -526,5 +526,55 @@ describe("Master of Ceremonies: each opponent chooses money, friends, or secrets
     expect(names(s, opps[1]!).filter((n) => n === "Citizen Token")).toHaveLength(1);
     expect(names(s, opps[2]!).filter((n) => n === "Treasure Token")).toHaveLength(1);
     expect(s.players[ap]!.hand.length).toBe(hands[ap]);
+  });
+});
+
+const eluge = card("Eluge, the Shoreless Sea", "Legendary Creature — Elemental Fish", "{1}{U}{U}{U}", {
+  power: "*", toughness: "*",
+  oracleText: "Eluge's power and toughness are each equal to the number of Islands you control.\nWhenever Eluge enters or attacks, put a flood counter on target land. It's an Island in addition to its other types for as long as it has a flood counter on it.\nThe first instant or sorcery spell you cast each turn costs {U} (or {1}) less to cast for each land you control with a flood counter on it.",
+});
+const weaving = card("Season of Weaving", "Sorcery", "{4}{U}{U}", { oracleText: "Draw a card." });
+const shock = card("Shock", "Instant", "{R}", { oracleText: "Shock deals 2 damage to any target." });
+
+describe("Eluge, the Shoreless Sea: {U} (or {1}) less for each land with a flood counter (rulings)", () => {
+  const flooded = (n: number, hand: CardDef[]) => {
+    const { s, ap, ids } = setup(hand);
+    putOnBattlefield(s, ap, eluge);
+    const lands = s.battlefield.filter((id) => s.cards[s.objects[id]!.cardId]!.types.includes("Land") && s.objects[id]!.controller === ap);
+    for (const l of lands.slice(0, n)) s.objects[l]!.counters.flood = 1;
+    invalidateCharacteristics(s);
+    return { s, ap, ids };
+  };
+  const blue = (c: { cost: { symbols: { kind: string; color?: string }[] } }) => c.cost.symbols.filter((y) => y.color === "U").length;
+  it("four flood counters: Season of Weaving's {U}{U} first, then {2} generic: {2} left", () => {
+    supported(eluge);
+    const { s, ap, ids } = flooded(4, [weaving]);
+    const c = spellCost(s, ap, s.objects[ids[0]!]!);
+    expect(blue(c)).toBe(0);
+    expect(manaValue(c.cost) + c.extra).toBe(2);
+  });
+  it("a spell with no {U} gets {1} less for each; only the first instant or sorcery each turn", () => {
+    const { s: s0, ap, ids } = flooded(2, [shock, weaving]);
+    const c = spellCost(s0, ap, s0.objects[ids[0]!]!);
+    expect(manaValue(c.cost) + c.extra).toBe(1);
+    expect(c.cost.symbols.some((y) => (y as { color?: string }).color === "R")).toBe(true);
+    const w = spellCost(s0, ap, s0.objects[ids[1]!]!);
+    expect(manaValue(w.cost) + w.extra).toBe(4);
+    const s = settleBots(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "player", id: (ap + 1) % 4 }])));
+    const after = spellCost(s, ap, s.objects[ids[1]!]!);
+    expect(manaValue(after.cost) + after.extra).toBe(6);
+    expect(blue(after)).toBe(2);
+  });
+  it("entering, it puts a flood counter on a Mountain, now an Island too, and Eluge's power counts it", () => {
+    const { s: s0, ap, ids } = setup([eluge]);
+    const mountain = s0.battlefield.find((id) => s0.cards[s0.objects[id]!.cardId]!.name === "Mountain")!;
+    let s = untilChoice(run(s0, planCast(s0, ap, ids[0]!)));
+    for (let i = 0; i < 10 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    s = settleBots(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: mountain }] }));
+    expect(s.objects[mountain]!.counters.flood).toBe(1);
+    expect(characteristics(s, s.objects[mountain]!).subtypes).toContain("Island");
+    const islands = s.battlefield.filter((id) => s.objects[id]!.controller === ap && characteristics(s, s.objects[id]!).subtypes.includes("Island")).length;
+    expect(power(s, s.objects[ids[0]!]!)).toBe(islands);
   });
 });

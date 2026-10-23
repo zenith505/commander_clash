@@ -3937,6 +3937,8 @@ export interface CostMod {
   times?: AmountExpr;
   /** "Cost {W}{U}{B}{R}{G} less to cast. This effect reduces only the amount of colored mana you pay" (Morophon): `n` is 0. */
   colored?: Color[];
+  /** Eluge: "costs {U} (or {1}) less ... for each": `times` that color, each one {1} once the cost has none of it left. */
+  coloredOrGeneric?: Color;
   /** The Defilers: only if the caster chose to pay this much life for it as an additional cost (CostChoices.lifeFor). */
   payLife?: number;
   /** Eminence (The Ur-Dragon): it also works while its commander is in the command zone (CR 113.6). */

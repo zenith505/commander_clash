@@ -3892,7 +3892,14 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // "During your turn, ~ costs {2}{U}{U} less to cast" (Discontinuity): its colored part.
   for (const c of compileCard(d).costLessIf ?? []) if (c.colored && staticConditionNow(s, c.cond, o.id, pid)) mods.lessColored.push(...c.colored);
   // Colored reductions (Morophon) after the costs are added up, on any of their colored mana (CR 601.2f, rulings).
-  const lessColored = (c: ParsedCost) => reduceColored(c, mods.lessColored);
+  // Eluge's "{U} (or {1})": the {U} it can take off, the rest as generic (rulings).
+  const lessColored = (c: ParsedCost) => {
+    const r = reduceColored(c, mods.lessColored);
+    if (!mods.lessColoredOrGeneric.length) return r;
+    const r2 = reduceColored(r, mods.lessColoredOrGeneric);
+    mods.less += mods.lessColoredOrGeneric.length - (r.symbols.length - r2.symbols.length);
+    return r2;
+  };
   // "~ costs {2} less to cast if it's bargained" (a cost reduction, CR 601.2f).
   if (how.bargain && !how.faceDown) mods.less += compileCard(d).bargainReduction ?? 0;
   // "This spell costs {2} less to cast if evidence was collected" (CR 601.2f).
@@ -3973,9 +3980,10 @@ export function eminenceCommanders(s: GameState): GameObject[] {
   return s.players.filter((p) => !p.lost).flatMap((p) => p.command.map((id) => s.objects[id]!)).filter((o) => o?.zone === "command" && !o.emblem && !!compileCard(defOf(s, o)).costMods?.some((m) => m.eminence));
 }
 
-function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: number, lifeFor?: ObjectId[]): { more: number; less: number; lessColored: Color[]; lifeOffers: { id: ObjectId; life: number }[] } {
+function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: number, lifeFor?: ObjectId[]): { more: number; less: number; lessColored: Color[]; lessColoredOrGeneric: Color[]; lifeOffers: { id: ObjectId; life: number }[] } {
   let [more, less] = [0, 0];
   const lessColored: Color[] = [];
+  const lessColoredOrGeneric: Color[] = [];
   const lifeOffers: { id: ObjectId; life: number }[] = [];
   const mv = defMv(d) + x * xCount(parseManaCost(d.manaCost));
   // Emblems' too, which work in the command zone (CR 114.4).
@@ -4019,6 +4027,11 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
         lessColored.push(...m.colored);
         continue;
       }
+      if (m.coloredOrGeneric) {
+        const k = Math.max(0, m.times ? evalAmount(s, m.times, { controller: c.controller, sourceId: src.id }) : 0);
+        for (let i = 0; i < k; i++) lessColoredOrGeneric.push(m.coloredOrGeneric);
+        continue;
+      }
       // Cemetery Prowler: once for each card type of the spell among the cards exiled with it (rulings: not per card).
       const shared = m.perTypeSharedWithLinked ? new Set(linkedExileCards(s, src).flatMap((x) => defOf(s, obj(s, x)).types)) : undefined;
       const n = shared ? m.n * d.types.filter((t) => shared.has(t)).length : m.times ? m.n * Math.max(0, evalAmount(s, m.times, { controller: c.controller, sourceId: src.id })) : m.n;
@@ -4036,7 +4049,7 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
     if (m.n > 0) more += m.n;
     else less -= m.n;
   }
-  return { more, less, lessColored, lifeOffers };
+  return { more, less, lessColored, lessColoredOrGeneric, lifeOffers };
 }
 
 /**

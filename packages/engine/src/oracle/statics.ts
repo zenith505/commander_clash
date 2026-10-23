@@ -223,6 +223,14 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   // "Instant and sorcery spells you cast cost {1} less to cast for each experience counter you have" (Mizzix): that much
   // less for each, counted as the spell is cast (CR 601.2f).
   // "Angel spells and Human spells you cast cost {1} less to cast for each +1/+1 counter on ~" (Herald of War).
+  // Eluge: "The first instant or sorcery spell you cast each turn costs {U} (or {1}) less to cast for each land you control
+  // with a flood counter on it": {U} off for each while there's {U} in the cost, then {1} (rulings).
+  if ((m = /^(The first .*?spell you cast each turn) costs \{([WUBRG])\} \(or \{1\}\) less to cast for each (.+)$/.exec(text))) {
+    const base = parseCostChange(`${m[1]} costs {1} less to cast`);
+    const c = parseCount(m[3]!, null, true);
+    if (!base || base === "fail" || !("costMod" in base) || !c) return "fail";
+    return { costMod: { ...base.costMod, n: 0, times: c, coloredOrGeneric: m[2] as Color, text: line } };
+  }
   if ((m = /^(.+ you cast costs? \{\d+\} less to cast) for each (.+)$/.exec(text)) && !/^~/.test(text)) {
     const base = parseCostChange(m[1]!);
     const c = parseCount(m[2]!, null, true);

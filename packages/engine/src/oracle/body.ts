@@ -5339,6 +5339,29 @@ function parseThen(s: string, ctx: Ctx): Effect[] | null {
   return out.slice(0, -1).some((e) => pauses(e)) ? null : out;
 }
 
+/**
+ * "Put your choice of a +1/+1 counter or two charge counters on up to one other target artifact" (Inspirit, Flagship
+ * Vessel), "put your choice of a +1/+1, first strike, or trample counter on that creature" (Assaultron Dominator): one of
+ * them, chosen as it resolves (CR 608.2d); a target is chosen once, as it's put on the stack (CR 601.2c).
+ */
+function parsePutChoice(s: string, ctx: Ctx): Effect[] | null {
+  const m = /^[Pp]ut your choice of (.+?) on (.+)$/.exec(s);
+  if (!m) return null;
+  let opts = m[1]!.split(/,? or |, /);
+  // "a +1/+1, first strike, or trample counter": the noun is said once, the article too.
+  if (!opts.slice(0, -1).some((o) => / counters?$/.test(o)) && / counter$/.test(opts[opts.length - 1]!)) opts = opts.map((o, i) => (i === opts.length - 1 ? o : `${o} counter`));
+  opts = opts.map((o) => (/^(?:an?|one|two|three|four|five) /.test(o) ? o : `${/^[aeiou]/.test(o) ? "an" : "a"} ${o}`));
+  const before = ctx.targets.length;
+  const first = opts.length >= 2 ? parseOne(`Put ${opts[0]} on ${m[2]}`, ctx) : null;
+  const added = ctx.targets.length - before;
+  if (first?.length !== 1 || first[0]!.type !== "counters" || added > 1) return null;
+  const rest = opts.slice(1).map((o) => parseOne(`Put ${o} on ${added ? "it" : m[2]}`, ctx));
+  if (ctx.targets.length !== before + added) return null;
+  const same = (x: Effect[] | null) => x?.length === 1 && x[0]!.type === "counters" && JSON.stringify(x[0]!.what) === JSON.stringify((first[0] as Extract<Effect, { type: "counters" }>).what);
+  if (!rest.every(same)) return null;
+  return [{ type: "either", options: [first, ...(rest as Effect[][])], labels: opts.map((o) => `Put ${o}`) }];
+}
+
 /** One sentence: a plain instruction, two joined by "and", or one with "for each" / "equal to" in it. */
 function parseOne(s: string, ctx: Ctx): Effect[] | null {
   // "{T}: This creature deals 1 damage to itself" (Stuffy Doll): the source is the one dealt the damage.
@@ -5358,7 +5381,7 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
     if (look?.length !== 1 || look[0]!.type !== "lookAtHand" || !look[0]!.reveal || filter === null) return null;
     return [look[0]!, { type: "takeFromHand", who: look[0]!.who, ...(filter ? { filter } : {}), action: "discard" }];
   }
-  const fx = attempt(ctx, () => parsePerOpponent(s, ctx)) ?? attempt(ctx, () => parseSentence(s, ctx)) ?? attempt(ctx, () => parseConjunction(s, ctx)) ?? attempt(ctx, () => parseSharedSubject(s, ctx)) ?? attempt(ctx, () => parseYouList(s, ctx)) ?? attempt(ctx, () => parseForEach(s, ctx)) ?? attempt(ctx, () => parseEqualTo(s, ctx)) ?? attempt(ctx, () => parseThen(s, ctx)) ?? attempt(ctx, () => parseAndYouMay(s, ctx));
+  const fx = attempt(ctx, () => parsePutChoice(s, ctx)) ?? attempt(ctx, () => parsePerOpponent(s, ctx)) ?? attempt(ctx, () => parseSentence(s, ctx)) ?? attempt(ctx, () => parseConjunction(s, ctx)) ?? attempt(ctx, () => parseSharedSubject(s, ctx)) ?? attempt(ctx, () => parseYouList(s, ctx)) ?? attempt(ctx, () => parseForEach(s, ctx)) ?? attempt(ctx, () => parseEqualTo(s, ctx)) ?? attempt(ctx, () => parseThen(s, ctx)) ?? attempt(ctx, () => parseAndYouMay(s, ctx));
   if (fx) noteLast(ctx, fx);
   return fx;
 }

@@ -610,3 +610,53 @@ describe("The Book of Exalted Deeds", () => {
     expect(planActivate(s0, ap, b, 0)).toBeNull();
   });
 });
+
+describe("\"Put your choice of a +1/+1 counter or two charge counters on ...\": chosen as it resolves", () => {
+  const inspirit = card("Inspirit, Flagship Vessel", "Legendary Artifact — Spacecraft", "{U}{R}{W}", {
+    power: "5",
+    toughness: "5",
+    keywords: ["Station"],
+    oracleText: "Station (Tap another creature you control: Put charge counters equal to its power on this Spacecraft. Station only as a sorcery. It's an artifact creature at 8+.)\n1+ | At the beginning of combat on your turn, put your choice of a +1/+1 counter or two charge counters on up to one other target artifact.\n8+ | Flying\nOther artifacts you control have hexproof and indestructible.",
+  });
+  const assaultron = card("Assaultron Dominator", "Artifact Creature — Robot", "{1}{R}", { power: "2", toughness: "2", oracleText: "When this creature enters, you get {E}{E} (two energy counters).\nWhenever an artifact creature you control attacks, you may pay {E}. If you do, put your choice of a +1/+1, first strike, or trample counter on that creature." });
+  const relic = card("Test Relic", "Artifact", "{1}", { oracleText: "" });
+
+  it("Inspirit with a charge counter: two charge counters on another artifact at the beginning of combat", () => {
+    supported(inspirit, assaultron);
+    const { s: s0, ap } = setup([]);
+    const id = putOnBattlefield(s0, ap, inspirit);
+    s0.objects[id]!.counters.charge = 1;
+    const r = putOnBattlefield(s0, ap, relic);
+    invalidateCharacteristics(s0);
+    let s = passUntil(s0, "beginCombat", ap);
+    for (let i = 0; i < 10 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: r }] });
+    s = passToPending(s);
+    expect(s.pending).toMatchObject({ kind: "chooseOption", labels: ["Put a +1/+1 counter", "Put two charge counters"] });
+    s = passToPending(act(s, { type: "chooseOption", player: ap, choice: "1" }));
+    expect(s.objects[r]!.counters).toEqual({ charge: 2 });
+  });
+
+  it("Inspirit without charge counters doesn't trigger", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, inspirit);
+    putOnBattlefield(s0, ap, relic);
+    const s = passUntil(s0, "beginCombat", ap);
+    expect(s.triggerQueue.length + s.stack.length).toBe(0);
+    expect(s.pending).toBeFalsy();
+  });
+
+  it("Assaultron Dominator: pay {E} and choose the first strike counter for the attacking artifact creature", () => {
+    const { s: s0, ap } = setup([]);
+    const id = putOnBattlefield(s0, ap, assaultron);
+    s0.players[ap]!.energy = 1;
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = passToPending(act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: id, defender: nextOf(s, ap) }] }));
+    expect(s.pending?.kind).toBe("chooseMay");
+    s = passToPending(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect(s.pending).toMatchObject({ kind: "chooseOption", labels: ["Put a +1/+1 counter", "Put a first strike counter", "Put a trample counter"] });
+    s = passToPending(act(s, { type: "chooseOption", player: ap, choice: "1" }));
+    expect(s.objects[id]!.counters).toEqual({ "first strike": 1 });
+    expect(s.players[ap]!.energy ?? 0).toBe(0);
+  });
+});

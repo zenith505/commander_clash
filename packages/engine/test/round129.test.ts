@@ -648,3 +648,19 @@ describe("round 129: statics and attack triggers", () => {
     for (const r of rats) expect(s.objects[r]!.zone).toBe("hand");
   });
 });
+
+describe("round 129: creatures attacking you", () => {
+  it("Watchdog: creatures attacking you get -1/-0 while it's untapped; those attacking another player don't", () => {
+    const watchdog = card("Watchdog", "Artifact Creature — Dog", "{3}", { power: "1", toughness: "2", oracleText: "This creature blocks each combat if able.\nAs long as this creature is untapped, all creatures attacking you get -1/-0." });
+    supported(watchdog);
+    const { s: s0, ap, opp } = setup([]);
+    const other = s0.turnOrder[(s0.turnOrder.indexOf(ap) + 2) % 4]!;
+    putOnBattlefield(s0, opp, watchdog);
+    const a = putOnBattlefield(s0, ap, card("Raider A", "Creature — Orc", "{2}{R}", { power: "3", toughness: "3" }));
+    const b = putOnBattlefield(s0, ap, card("Raider B", "Creature — Orc", "{2}{R}", { power: "3", toughness: "3" }));
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: a, defender: opp }, { attacker: b, defender: other }] });
+    expect(characteristics(s, s.objects[a]!).power).toBe(2);
+    expect(characteristics(s, s.objects[b]!).power).toBe(3);
+  });
+});

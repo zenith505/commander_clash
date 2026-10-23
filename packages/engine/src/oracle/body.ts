@@ -1827,7 +1827,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const exEqualN = exEqual ? parseCount(exEqual[1]!, ctx) : null;
     if (exEqual && !exEqualN) return null;
     // "Shuffle your library, then exile the top card." (Urza, Lord High Artificer): the top card of your library, after.
-    if (/^Shuffle your library$/.test(s) && /^[Ee]xile the top card$/.test(sentences[si + 1] ?? "")) {
+    // "Shuffle your library. Then exile the top card of your library." (Mind's Desire): the same.
+    if (/^Shuffle your library$/.test(s) && /^(?:[Ee]xile the top card|Then exile the top card of your library)$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "")) {
       effects.push({ type: "shuffle", who: { ref: "you" } });
       sentences[si + 1] = "Exile the top card of your library";
       continue;

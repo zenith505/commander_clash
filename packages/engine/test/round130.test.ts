@@ -664,3 +664,17 @@ describe("\"The number of creatures exiled / destroyed this way\": Sunfall, Phyr
     expect([pow(s, horror[0]!), tough(s, horror[0]!)]).toEqual([3, 3]);
   });
 });
+
+describe("Mind's Desire: shuffle, then exile the top card; it may be played free this turn", () => {
+  it("a card is exiled face up with a free permission for this turn", () => {
+    const desire = card("Mind's Desire", "Sorcery", "{4}{U}{U}", { keywords: ["Storm"], oracleText: "Shuffle your library. Then exile the top card of your library. Until end of turn, you may play that card without paying its mana cost.\nStorm (When you cast this spell, copy it for each spell cast before it this turn.)" });
+    supported(desire);
+    const { s: s0, ap, ids } = setup([desire]);
+    const before = s0.players[ap]!.exile.length;
+    const s = settleBots(run(s0, planCast(s0, ap, ids[0]!)));
+    const exiled = s.players[ap]!.exile.slice(before);
+    expect(exiled).toHaveLength(1);
+    expect(s.objects[exiled[0]!]!.mayPlay).toMatchObject({ player: ap, until: "thisTurn", free: true });
+    expect(logText(s)).toMatch(/shuffles/i);
+  });
+});

@@ -464,7 +464,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
       w === "all" ? { ref: "eachPlayer" } : w === "each opponent's" || w === "all opponents'" ? { ref: "eachOpponent" } : parsePlayer(w.replace(/'s?$/, ""), ctx);
     return who ? [{ type: "exileGraveyard", who }] : null;
   }
-  if ((m = /^Exile ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyards?)$/i.exec(s))) {
+  if ((m = /^Exile ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyards?(?: that was put there (?:from anywhere )?this turn)?)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx, true);
     return what ? [{ type: "exile", what }] : null;
   }

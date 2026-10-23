@@ -639,7 +639,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   text = text.replace(/(^|\. )([Ee]ach opponent loses X life) and you (scry X|draw X cards), where X is ([^.]+)\./, (_, lead: string, a: string, b: string, x: string) => `${lead}${a}, where X is ${x}. ${b.charAt(0).toUpperCase()}${b.slice(1)}, where X is ${x}.`);
   // Brass's Tunnel-Grinder: "Then if there are three or more bore counters on it, remove those counters and transform it."
   // Primal Amulet: "..., you may remove those counters and transform it."
-  text = text.replace(/^([Pp]ut an? ([a-z]+) counter on ~\.) Then if (?:it has|there are) ([a-z]+) or more \2 counters on it, (you may )?remove (?:all of them|those counters) and /, (_, put: string, kind: string, n: string, may?: string) => `${put} If there are ${n} or more ${kind} counters on ~, ${may ?? ""}remove all ${kind} counters from ~ and `);
+  text = text.replace(/(^|\. )([Pp]ut an? ([a-z]+) counter on ~\.) Then if (?:it has|there are) ([a-z]+) or more \3 counters on it, (you may )?remove (?:all of them|those counters)( and |(?=, transform ~, and ))/, (_, lead: string, put: string, kind: string, n: string, may: string | undefined, and: string) => `${lead}${put} If there are ${n} or more ${kind} counters on ~, ${may ?? ""}remove all ${kind} counters from ~${and}`);
   // Firebender Ascension: "Put a quest counter on ~. Then if it has four or more quest counters on it, you may copy that
   // ability": the same check of ~'s counters as it resolves.
   text = text.replace(/^([Pp]ut an? ([a-z]+) counter on ~\.) Then if it has ([a-z]+) or more \2 counters on it, (you may copy that ability\.)/, "$1 If there are $3 or more $2 counters on ~, $4");
@@ -1245,6 +1245,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       for (let i = 0; i < 10; i++) effects.push({ type: "connive", what: { ref: "convoker", index: i }, n: 1 });
       continue;
     }
+    // Abdel Adrian: "exile any number of other nonland permanents you control until ~ leaves the battlefield" (CR 610.3),
+    // Glorious Protector: "you may exile any number of non-Angel creatures you control ...": chosen as it resolves, none
+    // too, then exiled together.
+    const anyExile = !ctx.spell ? /^(?:[Yy]ou may )?[Ee]xile any number of (other )?(.+?) you control until ~ leaves the battlefield$/.exec(s) : null;
+    if (anyExile) {
+      const filter = pickFilter(anyExile[2]!);
+      if (!filter) return null;
+      effects.push({ type: "pick", who: { ref: "you" }, filter: anyExile[1] ? { ...filter, notSource: true, text: `other ${filter.text}` } : filter, n: 1, action: "choose", anyNumber: true }, { type: "exile", what: { ref: "created" }, until: "sourceLeaves" });
+      continue;
+    }
     // "Sacrifice any number of lands. Search your library for up to that many land cards, put them onto the battlefield
     // tapped, then shuffle." (Scapeshift): the same count.
     const anySac = /^(?:[Yy]ou may )?[Ss]acrifice any number of (other )?(.+)$/.exec(s);
@@ -1681,6 +1691,15 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     if (exChoose && /^You may play that card this turn\.?$/.test(sentences[si + 1] ?? "")) {
       effects.push({ type: "impulse", n: amt(exChoose[1]!), until: "thisTurn", choose: true });
       si++;
+      continue;
+    }
+    // Tectonic Giant: "Exile the top two cards of your library. Choose one of them. Until the end of your next turn, you may
+    // play that card." The same, the card chosen as it resolves (rulings).
+    const exChoose2 = !impulseIf && new RegExp(`^[Ee]xile the top (${NUM}) cards of your library$`).exec(s);
+    const playChosen = exChoose2 && /^Choose one of them\.?$/.test(sentences[si + 1] ?? "") ? /^(?:Until (end of turn|the end of your next turn), you may play that card|You may play that card (this turn|until the end of your next turn))\.?$/.exec(sentences[si + 2] ?? "") : null;
+    if (exChoose2 && playChosen) {
+      effects.push({ type: "impulse", n: amt(exChoose2[1]!), until: /next turn/.test(playChosen[0]) ? "nextTurn" : "thisTurn", choose: true });
+      si += 2;
       continue;
     }
     const exTop = exEqual ? (["", "X"] as unknown as RegExpExecArray) : new RegExp(`^[Ee]xile the top (?:card|${NUMX} cards) of your library$`).exec(impulseIf && !impulseIf.not ? impulseIf.text : s);
@@ -4029,7 +4048,20 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       // Amulet): optional, decided as it resolves (CR 608.2d).
       // Other "you may" sentences that read on their own come first ("you may cast the discarded card ...", Malcolm).
       const mayThen = /^you may (.+)$/.exec(then);
-      const own = attempt(ctx, () => parseOne(capital(then), ctx));
+      // "..., remove those counters, transform ~, and create three Treasure tokens" (Treasure Map): a list of instructions,
+      // in order, each read on its own.
+      const list = (): Effect[] | null => {
+        const parts = then.split(/, (?:and )?/);
+        if (parts.length < 3 || !/, and /.test(then)) return null;
+        const out: Effect[] = [];
+        for (const p of parts) {
+          const one = parseOne(capital(p), ctx);
+          if (!one) return null;
+          out.push(...one);
+        }
+        return out;
+      };
+      const own = attempt(ctx, () => parseOne(capital(then), ctx)) ?? (mayThen ? null : attempt(ctx, list));
       const mayInner = !own && mayThen ? parseOne(capital(mayThen[1]!), ctx) : null;
       const inner: Effect[] | null = own ?? (mayInner ? [{ type: "may", effects: mayInner, text: mayThen![1]! }] : null);
       // Its instructions run one at a time, so one may wait on a player ("draw a card, then discard a card", see the "if"

@@ -2466,7 +2466,8 @@ export function compile(d: CardDef): CompiledCard {
       /^When ~ (transforms into ~) or dies, (.+)$/.exec(line) ??
       /^When ~ enters and whenever it (attacks while saddled), (.+)$/.exec(line) ??
       // "Whenever ~ attacks or becomes the target of a spell, create a Treasure token" (Goldspan Dragon).
-      /^Whenever ~ (attacks) or (becomes the target of a spell), (.+)$/.exec(line) ??
+      // Tectonic Giant: "... or becomes the target of a spell an opponent controls".
+      /^Whenever ~ (attacks) or (becomes the target of a spell(?: an opponent controls)?), (.+)$/.exec(line) ??
       // "Whenever this creature attacks, blocks, or becomes the target of a spell, ..." (Giggling Skitterspike).
       /^Whenever ~ attacks, blocks, or becomes the target of a spell, (.+)$/.exec(line) ??
       // "Whenever you create or sacrifice a token, ..." (Mirkwood Bats); "When ~ enters and whenever an opponent draws a
@@ -2510,8 +2511,8 @@ export function compile(d: CardDef): CompiledCard {
               ? [`When ~ enters, ${effect}`, `W${twice[1]!.slice(1)}, ${effect}`]
             : /^Whenever ~ attacks, blocks, or becomes the target of a spell, /.test(line)
               ? [`Whenever ~ attacks, ${effect}`, `Whenever ~ blocks, ${effect}`, `Whenever ~ becomes the target of a spell, ${effect}`]
-            : /^Whenever ~ attacks or becomes the target of a spell, /.test(line)
-              ? [`Whenever ~ attacks, ${effect}`, `Whenever ~ becomes the target of a spell, ${effect}`]
+            : /^Whenever ~ attacks or becomes the target of a spell(?: an opponent controls)?, /.test(line)
+              ? [`Whenever ~ attacks, ${effect}`, `Whenever ~ ${twice[2]}, ${effect}`]
             : twice.length === 5
               ? twice.slice(1, 4).map((e) => `Whenever ${/^Whenever an opponent /.test(line) ? "an opponent " : ""}${e}, ${effect}`)
             : /^Whenever (?:an? [^,]+?|your commander) enters or attacks, /.test(line)

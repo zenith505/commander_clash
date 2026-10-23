@@ -74,3 +74,20 @@ test("Xantcha, Sleeper Agent: its caster chooses the opponent it enters under th
   expect(after.objects[xantcha]!.controller).toBe(ana);
   expect(pageErrors(page)).toEqual([]);
 });
+
+test("Abdel Adrian: choose any number of your other nonland permanents to exile, or none", async ({ page }) => {
+  const s = scene({ hand: ["Abdel Adrian, Gorion's Ward"], board: [...LANDS, "Grizzly Bears", "Elvish Visionary"] });
+  const [bears, visionary] = [one(s, "Grizzly Bears"), one(s, "Elvish Visionary")];
+  await open(page, s);
+  await card(page, "Abdel Adrian, Gorion's Ward", s).click();
+  await resolveUntil(page, (st) => st.pending?.kind === "pickPermanents" && st.pending.action === "choose");
+  const bar = controls(page);
+  await expect(bar).toContainText("any number of other nonland permanents");
+  await expect(bar.getByRole("button", { name: "Choose none", exact: true })).toBeVisible();
+  await page.locator(`[data-obj="${visionary}"]`).click();
+  await bar.getByRole("button", { name: "Choose", exact: true }).click();
+  const after = await resolveUntil(page, (st) => !st.pending && st.stack.length === 0 && st.triggerQueue.length === 0 && st.objects[visionary]!.zone === "exile");
+  expect(after.objects[bears]!.zone).toBe("battlefield");
+  expect(after.battlefield.filter((id) => after.objects[id]!.isToken)).toHaveLength(1);
+  expect(pageErrors(page)).toEqual([]);
+});

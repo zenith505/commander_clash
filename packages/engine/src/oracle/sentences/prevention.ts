@@ -30,6 +30,9 @@ function sourceGroup(p: string): TargetSpec | null {
   const t = p.trim();
   const colors = /^((?:white|blue|black|red|green) sources(?:,? (?:and|or) (?:white|blue|black|red|green) sources)*)$/i.exec(t);
   if (colors) return { kind: "object", colors: t.toLowerCase().split(/ sources(?:,? (?:and|or) )?/).filter(Boolean).map((w) => COLOR_WORDS[w]!), text: t.toLowerCase() };
+  // "Black and/or red sources" (Surge of Salvation): a source that's either color, or both.
+  const either = /^(white|blue|black|red|green) and\/or (white|blue|black|red|green) sources$/i.exec(t);
+  if (either) return { kind: "object", colors: [COLOR_WORDS[either[1]!.toLowerCase()]!, COLOR_WORDS[either[2]!.toLowerCase()]!], text: t.toLowerCase() };
   const src = /^(?:(non-?)([A-Z]\w+|colorless|artifact|creature) )?sources( you don't control| your opponents control)?$/i.exec(t);
   if (src) {
     const spec: TargetSpec = { kind: "object", text: t.toLowerCase() };

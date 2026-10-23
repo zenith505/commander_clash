@@ -1,7 +1,7 @@
 // Round 124: round 123's gaps (ward—waterbend, ...), then the most played cards.
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
+import { act, bear, card, passUntil, putOnBattlefield, scry, setup } from "./helpers";
 import { botActions, castProblem, isFullySupported, moveObject, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
 import { characteristics, invalidateCharacteristics } from "../src/layers";
 import { abilitiesOf, power, toughness } from "../src/cards";
@@ -416,5 +416,170 @@ describe("Xantcha, Sleeper Agent", () => {
     s0.players[low]!.life = 7;
     const s = untilChoice(run(s0, planCast(s0, ap, ids[0]!)));
     expect(botActions(s, ap)).toEqual([{ type: "chooseOption", player: ap, choice: String(low) }]);
+  });
+});
+
+const treasureMap = scry(
+  "transform",
+  [
+    { name: "Treasure Map", mana_cost: "{2}", type_line: "Artifact", oracle_text: "{1}, {T}: Scry 1. Put a landmark counter on this artifact. Then if there are three or more landmark counters on it, remove those counters, transform this artifact, and create three Treasure tokens. (They're artifacts with \"{T}, Sacrifice this token: Add one mana of any color.\")" },
+    { name: "Treasure Cove", type_line: "Land", oracle_text: "(Transforms from Treasure Map.)\n{T}: Add {C}.\n{T}, Sacrifice a Treasure: Draw a card." },
+  ],
+  { keywords: ["Transform", "Treasure", "Scry"] },
+);
+const treasures = (s: GameState, pid: number) => s.battlefield.filter((id) => s.objects[id]!.controller === pid && characteristics(s, s.objects[id]!).subtypes.includes("Treasure"));
+
+describe("Treasure Map", () => {
+  it("a landmark counter each time; at three, they're removed, it transforms into Treasure Cove, and three Treasures are made", () => {
+    supported(treasureMap);
+    const { s: s0, ap } = setup([]);
+    const map = putOnBattlefield(s0, ap, treasureMap);
+    let s = settle(run(s0, planActivate(s0, ap, map, 0)));
+    expect(s.objects[map]!.counters.landmark).toBe(1);
+    expect(treasures(s, ap)).toHaveLength(0);
+    s.objects[map]!.counters.landmark = 2;
+    s.objects[map]!.tapped = false;
+    s = settle(run(s, planActivate(s, ap, map, 0)));
+    expect(s.objects[map]!.counters.landmark ?? 0).toBe(0);
+    expect(characteristics(s, s.objects[map]!).name).toBe("Treasure Cove");
+    expect(treasures(s, ap)).toHaveLength(3);
+  });
+});
+
+const abdel = card("Abdel Adrian, Gorion's Ward", "Legendary Creature — Human Warrior", "{4}{W}", {
+  power: "4",
+  toughness: "4",
+  keywords: ["Choose a background"],
+  oracleText: "When Abdel Adrian enters, exile any number of other nonland permanents you control until Abdel Adrian leaves the battlefield. Create a 1/1 white Soldier creature token for each permanent exiled this way.\nChoose a Background (You can have a Background as a second commander.)",
+});
+const soldiers = (s: GameState, pid: number) => s.battlefield.filter((id) => s.objects[id]!.controller === pid && s.objects[id]!.isToken && characteristics(s, s.objects[id]!).subtypes.includes("Soldier"));
+
+describe("Abdel Adrian, Gorion's Ward", () => {
+  const scene = () => {
+    const { s: s0, ap, ids } = setup([abdel]);
+    const bear1 = putOnBattlefield(s0, ap, bear());
+    const vision = putOnBattlefield(s0, ap, visionary);
+    const s = untilChoice(run(s0, planCast(s0, ap, ids[0]!)));
+    return { s, ap, ab: ids[0]!, bear1, vision };
+  };
+
+  it("its controller chooses any number of other nonland permanents; they're exiled, and a Soldier is made for each", () => {
+    supported(abdel);
+    const { s: s0, ap, ab, bear1, vision } = scene();
+    expect(s0.pending).toMatchObject({ kind: "pickPermanents", player: ap, action: "choose", anyNumber: true, min: 0 });
+    expect(s0.pending?.kind === "pickPermanents" && s0.pending.options).not.toContain(ab);
+    expect(s0.pending?.kind === "pickPermanents" && s0.pending.options.some((id) => s0.objects[id]!.cardId.includes("orest"))).toBe(false);
+    let s = settle(act(s0, { type: "pickPermanents", player: ap, ids: [bear1, vision] }));
+    expect(s.objects[bear1]!.zone).toBe("exile");
+    expect(s.objects[vision]!.zone).toBe("exile");
+    expect(soldiers(s, ap)).toHaveLength(2);
+    // They come back when Abdel leaves (CR 610.3); the Soldiers stay. Elvish Visionary's enters ability triggers again.
+    const hand = s.players[ap]!.hand.length;
+    s = settle(moveObject(s, ab, "graveyard") ?? s);
+    expect(s.battlefield.filter((id) => s.objects[id]!.cardId === bear().oracleId || defName(s, id) === "Grizzly Bears").length).toBeGreaterThan(0);
+    expect(s.battlefield.some((id) => defName(s, id) === "Elvish Visionary")).toBe(true);
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+    expect(soldiers(s, ap)).toHaveLength(2);
+  });
+
+  it("choosing none: nothing is exiled and no Soldiers; a bot exiles what comes back with an enters ability", () => {
+    const { s: s0, ap, vision } = scene();
+    const none = settle(act(structuredClone(s0), { type: "pickPermanents", player: ap, ids: [] }));
+    expect(soldiers(none, ap)).toHaveLength(0);
+    expect(botActions(s0, ap)).toEqual([{ type: "pickPermanents", player: ap, ids: [vision] }]);
+  });
+});
+const defName = (s: GameState, id: string) => characteristics(s, s.objects[id]!).name;
+
+const giant = card("Tectonic Giant", "Creature — Elemental Giant", "{2}{R}{R}", {
+  power: "3",
+  toughness: "4",
+  oracleText: "Whenever this creature attacks or becomes the target of a spell an opponent controls, choose one —\n• This creature deals 3 damage to each opponent.\n• Exile the top two cards of your library. Choose one of them. Until the end of your next turn, you may play that card.",
+});
+
+describe("Tectonic Giant", () => {
+  it("an opponent's spell targeting it: 3 damage to each opponent (first mode)", () => {
+    supported(giant);
+    const { s: s0, ap, ids, opp } = setup([bolt]);
+    const g = putOnBattlefield(s0, opp, giant);
+    const lives = s0.turnOrder.map((p) => s0.players[p]!.life);
+    let s = run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: g }]));
+    for (let i = 0; i < 20 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseModes", player: opp });
+    s = act(s, { type: "chooseModes", player: opp, modes: [0] });
+    s = settle(s);
+    s0.turnOrder.forEach((p, i) => expect(s.players[p]!.life).toBe(lives[i]! - (p === opp ? 0 : 3)));
+  });
+
+  it("second mode: two cards exiled, one chosen, and only that one may be played until the end of its controller's next turn", () => {
+    const { s: s0, ap } = setup([]);
+    const g = putOnBattlefield(s0, ap, giant);
+    const top = s0.players[ap]!.library.slice(0, 2);
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: g, defender: s.turnOrder.find((p) => p !== ap)! }] });
+    for (let i = 0; i < 20 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = act(s, { type: "chooseModes", player: ap, modes: [1] });
+    for (let i = 0; i < 20 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "impulseChoice", options: top });
+    expect(s.pending?.kind === "chooseOption" && s.pending.prompt).toContain("until the end of your next turn");
+    s = act(s, { type: "chooseOption", player: ap, choice: top[1]! });
+    expect(top.map((id) => s.objects[id]!.zone)).toEqual(["exile", "exile"]);
+    expect(s.objects[top[1]!]!.mayPlay?.until).toBe("nextTurn");
+    expect(s.objects[top[0]!]!.mayPlay).toBeUndefined();
+  });
+});
+
+const harvester = card("Abyssal Harvester", "Creature — Demon Warlock", "{1}{B}{B}", {
+  power: "3",
+  toughness: "2",
+  oracleText: "{T}: Exile target creature card from a graveyard that was put there this turn. Create a token that's a copy of it, except it's a Nightmare in addition to its other types. Then exile all other Nightmare tokens you control.",
+});
+
+describe("Abyssal Harvester", () => {
+  it("only a creature card put into a graveyard this turn; the copy is a Nightmare, and other Nightmare tokens are exiled", () => {
+    supported(harvester);
+    const { s: s0, ap, opp } = setup([]);
+    const h = putOnBattlefield(s0, ap, harvester);
+    const old = putOnBattlefield(s0, opp, bear({ name: "Old Bear" }));
+    const fresh = putOnBattlefield(s0, opp, serra);
+    let s = moveObject(s0, old, "graveyard") ?? s0;
+    s.objects[old]!.toGraveyardTurn = s.turn - 1;
+    s = moveObject(s, fresh, "graveyard") ?? s;
+    expect(planActivate(s, ap, h, 0, [{ kind: "object", id: old }])).toBeNull();
+    s = settle(run(s, planActivate(s, ap, h, 0, [{ kind: "object", id: fresh }])));
+    expect(s.objects[fresh]!.zone).toBe("exile");
+    const nightmares = () => s.battlefield.filter((id) => s.objects[id]!.isToken && characteristics(s, s.objects[id]!).subtypes.includes("Nightmare"));
+    expect(nightmares()).toHaveLength(1);
+    expect(defName(s, nightmares()[0]!)).toBe("Serra Angel");
+    expect(characteristics(s, s.objects[nightmares()[0]!]!).subtypes).toEqual(expect.arrayContaining(["Angel", "Nightmare"]));
+    // A second one: the first Nightmare token is exiled, the new one stays.
+    const first = nightmares()[0]!;
+    const another = putOnBattlefield(s, opp, visionary);
+    s = moveObject(s, another, "graveyard") ?? s;
+    s.objects[h]!.tapped = false;
+    s = settle(run(s, planActivate(s, ap, h, 0, [{ kind: "object", id: another }])));
+    expect(nightmares()).toHaveLength(1);
+    expect(defName(s, nightmares()[0]!)).toBe("Elvish Visionary");
+    expect(s.objects[first]?.zone === "battlefield").toBe(false);
+  });
+});
+
+const surge = card("Surge of Salvation", "Instant", "{W}", { oracleText: "You and permanents you control gain hexproof until end of turn. Prevent all damage that black and/or red sources would deal to creatures you control this turn." });
+const shock = card("Test Shock", "Instant", "{R}", { oracleText: "Test Shock deals 2 damage to each creature." });
+
+describe("Surge of Salvation", () => {
+  it("you and your permanents gain hexproof; damage from red sources, your own too, to your creatures is prevented, but not to others'", () => {
+    supported(surge);
+    const { s: s0, ap, ids, opp } = setup([surge, shock]);
+    const mine = putOnBattlefield(s0, ap, bear());
+    const theirs = putOnBattlefield(s0, opp, bear({ name: "Their Bear" }));
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(characteristics(s, s.objects[mine]!).keywords).toContain("Hexproof");
+    expect(s.players[ap]!.gained).toContain("Hexproof");
+    // Its own red sources too: "black and/or red sources" is any of them.
+    s = settle(run(s, planCast(s, ap, ids[1]!)));
+    expect(s.objects[mine]!.zone).toBe("battlefield");
+    expect(s.objects[mine]!.damage).toBe(0);
+    expect(s.objects[theirs]!.zone).toBe("graveyard");
   });
 });

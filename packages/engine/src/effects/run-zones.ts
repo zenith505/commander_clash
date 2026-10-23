@@ -2325,7 +2325,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           sc.impulseChoice = { ids };
           if (ids.length) log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of their library.`);
           if (ids.length > 1) {
-            s.pending = { kind: "chooseOption", player: p.id, source: src, what: "impulseChoice", options: ids, labels: ids.map((id) => defOf(s, obj(s, id)).name), prompt: `choose one of them; you may play it${e.until === "thisTurn" ? " this turn" : ""}` };
+            s.pending = { kind: "chooseOption", player: p.id, source: src, what: "impulseChoice", options: ids, labels: ids.map((id) => defOf(s, obj(s, id)).name), prompt: `choose one of them; you may play it${e.until === "thisTurn" ? " this turn" : e.until === "nextTurn" ? " until the end of your next turn" : ""}` };
             return "paused";
           }
         }

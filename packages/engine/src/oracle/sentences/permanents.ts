@@ -182,8 +182,14 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return [{ type: "delayed", when: "dies", of: { ref: "target", index: ctx.lastObjectTarget }, effects: [{ type: "bounce", what: { ref: "subjectCard", zone: "graveyard" } }], text: "return that card to its owner's hand", thisTurn: true }];
   // Removal and tapping. Not a blink ("Exile target creature you control, then return that card ...", sentences/tokens.ts).
   if (!/^Exile [^,]+, then return /i.test(s) && (m = /^(Destroy|Exile|Tap|Untap) ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+|all .+|each .+|~|~ and (?:each|all) .+|it|that creature|that permanent|that land|them|those creatures|those permanents|those lands|enchanted \w+|equipped \w+)$/i.exec(s))) {
-    const what = parseObject(m[2]!, ctx);
+    let what = parseObject(m[2]!, ctx);
     if (!what) return null;
+    // "Create a token that's a copy of it .... Then exile all other Nightmare tokens you control" (Abyssal Harvester): other
+    // than the token just created (rulings).
+    if (what.ref === "each" && what.other && ctx.lastCreated && /^all other .+ tokens you control$/i.test(m[2]!)) {
+      const { other: _, ...rest } = what;
+      what = { ...rest, notCreated: true };
+    }
     const type = ({ destroy: "destroy", exile: "exile", tap: "tap", untap: "untap" } as const)[m[1]!.toLowerCase() as "destroy" | "exile" | "tap" | "untap"];
     if ((type === "tap" || type === "untap") && what.ref === "each") ctx.lastGroup = what;
     return [{ type, what }];

@@ -2381,6 +2381,12 @@ function chooseOptionalSacrifices(s: GameState, pid: PlayerId, pend: Extract<Pen
   if (here?.type === "pick" && here.anyNumber) {
     const next = r!.body.effects[r!.next + 1];
     if (next?.type === "search" && next.filter?.types?.includes("Land")) return pend.options.filter((id) => objIsType(s, obj(s, id), "Land") && obj(s, id).tapped);
+    // "Exile any number of ... until ~ leaves the battlefield" (Abdel Adrian, Glorious Protector): the nontoken ones that
+    // come back with an enters ability, and, when a token is made for each, cheap tokens.
+    if (next?.type === "exile" && next.until) {
+      const tokensFor = r!.body.effects.slice(r!.next + 2).some((e) => e.type === "createToken");
+      return ok.filter((o) => (o.isToken ? tokensFor && worth(s, pid, o) <= 1 : !o.isCommander && compileCard(defOf(s, o)).triggers.some((t) => t.event === "selfEnters"))).map((o) => o.id);
+    }
     return ok.filter((o) => o.isToken && worth(s, pid, o) <= 2).map((o) => o.id);
   }
   const cheapest = ok.sort((a, b) => worth(s, pid, a) - worth(s, pid, b))[0];

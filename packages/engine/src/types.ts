@@ -215,6 +215,8 @@ export interface GameObject {
   controlledSinceTurn: number;
   /** Turn number it last entered the battlefield ("activate only if ~ entered this turn"); phasing in isn't entering (CR 702.26d). */
   enteredTurn?: number;
+  /** Turn number it was last put into a graveyard ("a card from a graveyard that was put there this turn", Abyssal Harvester). */
+  toGraveyardTurn?: number;
   damage: number;
   deathtouchDamage: boolean;
   counters: Record<string, number>;

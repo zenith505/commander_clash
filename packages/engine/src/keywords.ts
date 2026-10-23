@@ -131,6 +131,7 @@ export function canonicalKeyword(text: string): string | undefined {
   if (q === "spells" || q === "permanents that were cast this turn") return `Protection from ${q}`;
   if (q === "the chosen player") return CHOSEN_PLAYER_PROTECTION;
   if (q === "the chosen card type") return CHOSEN_TYPE_PROTECTION;
+  if (q === "each of that creature's colors") return TARGET_COLORS_PROTECTION;
   if (q === "each color that's not in your commander's color identity") return IDENTITY_PROTECTION;
   if (q === "everything" || q === "multicolored" || q === "monocolored" || q === "colorless" || q === "each color" || q === "all colors" || q === "the chosen color") return q === "the chosen color" ? CHOSEN_PROTECTION : `Protection from ${q}`;
   if (PROTECTION_TYPES[q]) return `Protection from ${q}`;
@@ -169,6 +170,11 @@ const COLOR_WORD: Record<string, string> = { W: "white", U: "blue", B: "black", 
  * commander (rulings).
  */
 export const IDENTITY_PROTECTION = "Protection from each color not in your commander's color identity";
+/**
+ * "Gain protection from each of that creature's colors until end of turn" (Éowyn, Fearless Knight): filled in as it
+ * resolves with the colors of the ability's one target, as it last existed if it has left (rulings).
+ */
+export const TARGET_COLORS_PROTECTION = "Protection from each of that creature's colors";
 /** "Protection from the chosen card type" (Serra's Emissary): the card type chosen as the source entered (CR 702.16a). */
 export const CHOSEN_TYPE_PROTECTION = "Protection from the chosen card type";
 /** The card types a player may name in a game here (rulings on Serra's Emissary; kindred cards aren't supported), as protection says them. */

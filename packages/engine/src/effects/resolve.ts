@@ -4,13 +4,14 @@ import { cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../car
 import { addTriggeredMana, askAuraReturns, cloneState, creatureTypesOf, draw, endTheTurn, enterTogether, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics } from "../layers";
 import { compileCard } from "../oracle";
-import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LAND_TYPE, CHOSEN_HEXPROOF, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, CHOSEN_TYPE_PROTECTION, protectionFromPlayer } from "../keywords";
+import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LAND_TYPE, CHOSEN_HEXPROOF, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, CHOSEN_TYPE_PROTECTION, protectionFromPlayer, TARGET_COLORS_PROTECTION } from "../keywords";
 import { evalAmount, type AmountCtx } from "../amounts";
 import { cardSource, objectSource, shieldChoicesPossible, ShieldQuestionPause, withShieldAnswers, type DamageSource } from "../damage";
 import { RulesError, type CardDef, type Chosen, type Color, type GameObject, type GameState, type LastKnown, type ManaType, type ObjectId, type PlayerId, type StackItem, type TriggerEventInfo } from "../types";
 import { manaTriggerResults } from "../manaabilities";
 import { askGraveyardOrder, closeGraveyardBatch, graveyardEnd } from "../graveyard";
 import type { ManaSpent } from "../mana";
+import { COLOR_NAMES } from "./describe";
 import { objectMatches, bindChosen, bindBound, targetingCtx, sourceQuality, spellManaValue, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, checkTotals, relatedOk } from "./targeting";
 import { runPreventionEffect } from "./run-prevention";
 import { runBasicsEffect, becomeMonarch } from "./run-basics";
@@ -621,6 +622,15 @@ function subjectEvenIfGone(s: GameState, ctx: ResolveCtx): GameObject[] {
   return zc === ctx.subject!.zc ? [o] : zc === ctx.subject!.zc + 1 && o.zone !== "battlefield" ? [o] : [];
 }
 
+/** The colors of the ability's one object target: as it is, or as it last existed if it has left the battlefield (CR 608.2h). */
+function targetColors(s: GameState, ctx: ResolveCtx): Color[] {
+  const t = ctx.targets.find((x) => x?.kind === "object");
+  if (t?.kind !== "object") return [];
+  const o = s.objects[t.id];
+  if (o?.zone === "battlefield" && (o.zoneChanges ?? 0) === t.zc) return characteristics(s, o).colors;
+  return s.lastKnown?.[t.id]?.source?.colors ?? [];
+}
+
 /** The player chosen for the source as it entered ("the chosen player"), as the ability was activated or as it is now. */
 export function chosenPlayerOf(s: GameState, ctx: ResolveCtx): PlayerId | undefined {
   if (ctx.lki?.chosenPlayer !== undefined) return ctx.lki.chosenPlayer;
@@ -664,6 +674,9 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx): Mo
         // (Pippin), the card type.
         m.kind === "addKeywords" && (m.keywords.includes(CHOSEN_PROTECTION) || m.keywords.includes(CHOSEN_HEXPROOF) || m.keywords.includes(CHOSEN_TYPE_PROTECTION))
         ? { ...m, keywords: bindChosenKeywords(m.keywords, s.resolving?.chosen?.color, undefined, s.resolving?.chosen?.cardType) }
+        : // Éowyn: "protection from each of that creature's colors": its target's, as it last existed if it has left (rulings).
+          m.kind === "addKeywords" && m.keywords.includes(TARGET_COLORS_PROTECTION)
+        ? { ...m, keywords: m.keywords.flatMap((k) => (k !== TARGET_COLORS_PROTECTION ? [k] : targetColors(s, ctx).map((c) => `Protection from ${COLOR_NAMES[c].toLowerCase()}`))) }
         : // "Gains protection from the chosen player" (Guardian Archon): the player chosen for its source.
           m.kind === "addKeywords" && m.keywords.includes(CHOSEN_PLAYER_PROTECTION)
         ? { ...m, keywords: m.keywords.flatMap((k) => (k !== CHOSEN_PLAYER_PROTECTION ? [k] : chosenPlayerOf(s, ctx) !== undefined ? [protectionFromPlayer(chosenPlayerOf(s, ctx)!)] : [])) }

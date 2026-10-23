@@ -682,11 +682,11 @@ export function lesserPowerOk(s: GameState, spec: TargetSpec, t: TargetChoice, s
     const blocking = onField ? me.blocking : lk && (sourceZc === undefined || lk.zc === sourceZc) ? lk.blocking : undefined;
     if (!blocking?.includes(t.id) || s.objects[t.id]?.attacking === undefined) return false;
   }
-  if (!spec.lesserPowerThanSource || t.kind !== "object" || !sourceId) return true; // without the source, checked later
+  if ((!spec.lesserPowerThanSource && !spec.greaterPowerThanSource) || t.kind !== "object" || !sourceId) return true; // without the source, checked later
   const me = s.objects[sourceId];
   const mine = me?.zone === "battlefield" ? power(s, me) : s.lastKnown?.[sourceId]?.power;
   const o = s.objects[t.id];
-  return mine !== undefined && !!o && power(s, o) < mine;
+  return mine !== undefined && !!o && (spec.greaterPowerThanSource ? power(s, o) > mine : power(s, o) < mine);
 }
 
 /** Throws a message if `targets` isn't a legal, complete choice for `specs`. CR 601.2c */

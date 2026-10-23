@@ -773,3 +773,31 @@ describe("Redoubled Stormsinger: a tapped and attacking copy of each creature to
     expect(s.objects[made[0]!]?.zone ?? "gone").not.toBe("battlefield");
   });
 });
+
+const eowyn = card("Éowyn, Fearless Knight", "Legendary Creature — Human Knight", "{2}{R}{W}", {
+  power: "3",
+  toughness: "4",
+  keywords: ["Haste"],
+  oracleText: "Haste\nWhen Éowyn enters, exile target creature an opponent controls with greater power. Legendary creatures you control gain protection from each of that creature's colors until end of turn.",
+});
+
+describe("Éowyn, Fearless Knight: a creature with greater power exiled; protection from its colors", () => {
+  it("only the bigger creature can be targeted; legendary creatures you control gain protection from its colors", () => {
+    supported(eowyn);
+    const { s: s0, ap, ids, opp } = setup([eowyn]);
+    const big = putOnBattlefield(s0, opp, card("Test Gruul Brute", "Creature — Ogre", "{2}{R}{G}", { power: "4", toughness: "4", colors: ["R", "G"] }));
+    const small = putOnBattlefield(s0, opp, bears());
+    const bear = putOnBattlefield(s0, ap, bears("My Bear"));
+    let s = untilChoice(run(s0, planCast(s0, ap, ids[0]!)));
+    if (s.pending?.kind !== "chooseTargets") s = untilChoice(s);
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    const pick = (id: string) => act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id }] } as Action);
+    expect(() => pick(small)).toThrow();
+    s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: big }] } as Action);
+    s = settleBots(s);
+    expect(s.objects[big]!.zone).toBe("exile");
+    expect(objHasKeyword(s, s.objects[ids[0]!]!, "Protection from red")).toBe(true);
+    expect(objHasKeyword(s, s.objects[ids[0]!]!, "Protection from green")).toBe(true);
+    expect(objHasKeyword(s, s.objects[bear]!, "Protection from red")).toBe(false);
+  });
+});

@@ -390,6 +390,8 @@ export interface TargetSpec {
   putThereThisTurn?: true;
   /** "With lesser power" than the ability's source (mentor, CR 702.134a). */
   lesserPowerThanSource?: boolean;
+  /** "With greater power" than the ability's source (Éowyn, Fearless Knight). */
+  greaterPowerThanSource?: true;
   /** "Target creature it's blocking" (Tinder Wall): one the source is blocking, or was as it last existed (CR 608.2h). */
   blockedBySource?: true;
   /**

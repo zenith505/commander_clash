@@ -3,7 +3,7 @@ import { liveEmblems } from "./emblems";
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
 import { payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaCombos, manaOptions, manaPenalty } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
-import { abilityProblem, lessWaterbend, eminenceCommanders, activationCost, applyAction, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
+import { abilityProblem, lessWaterbend, eminenceCommanders, activationCost, applyAction, applyInPlace, cloneState, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
 import { compileCard } from "./oracle";
 import { hopeValues, spendPlan } from "./value";
 import { abilityUse, boundSpend, payableCost, poolFor, spendAllows, usableTypes, type ManaUse } from "./spend";
@@ -581,7 +581,58 @@ function tapManaOptions(s: GameState, pid: PlayerId, id: ObjectId): Option[] {
  */
 export function planMana(s: GameState, pid: PlayerId, cost0: ParsedCost, extraGeneric = 0, exclude?: ObjectId, alsoExclude: ObjectId[] = [], use: ManaUse = "other", harm?: Partial<Record<Color, number>>, wantSnow = false): Action[] | null {
   const excluded = [...(exclude ? [exclude] : []), ...alsoExclude];
-  return planManaWith(s, pid, cost0, extraGeneric, excluded, use, harm, wantSnow) ?? planXMana(s, pid, cost0, extraGeneric, excluded, use, harm, wantSnow);
+  return planManaWith(s, pid, cost0, extraGeneric, excluded, use, harm, wantSnow) ?? planXMana(s, pid, cost0, extraGeneric, excluded, use, harm, wantSnow) ?? planCubeMana(s, pid, cost0, extraGeneric, excluded, use, harm, wantSnow);
+}
+
+/**
+ * Doubling Cube's "{3}, {T}: Double the amount of each type of unspent mana you have" (ManaProduce "doublePool"), used
+ * only when nothing else pays: other sources first make half of what's asked (half of each color, rounded up) and the
+ * {3}, then the Cube pays its {3} from the pool and doubles what's left. The plan is tried on a copy of the game, and
+ * kept only if the doubled pool pays the whole cost (with whichever way of paying the {3} lets it).
+ */
+function planCubeMana(s: GameState, pid: PlayerId, cost0: ParsedCost, extraGeneric: number, excluded: ObjectId[], use: ManaUse, harm?: Partial<Record<Color, number>>, wantSnow = false): Action[] | null {
+  if (wantSnow || s.priority !== pid || s.pending || s.over) return null;
+  const cubes = s.battlefield.filter((id) => {
+    if (excluded.includes(id)) return false;
+    const o = obj(s, id);
+    return controllerOf(s, o) === pid && manaAbilitiesOn(s, o).some((ab) => ab.produces.kind === "doublePool");
+  });
+  if (!cubes.length || cost0.symbols.some((x) => x.kind === "unsupported")) return null;
+  const total = manaValue(cost0) + extraGeneric;
+  const colored = new Map<ManaType, number>();
+  for (const x of cost0.symbols) if (x.kind === "colored") colored.set(x.color, (colored.get(x.color) ?? 0) + 1);
+  const halves = [...colored].map(([m, n]) => [m, Math.ceil(n / 2)] as const);
+  const named = halves.reduce((a, [, n]) => a + n, 0);
+  for (const cube of cubes) {
+    const o = obj(s, cube);
+    const ability = manaAbilitiesOn(s, o).findIndex((ab) => ab.produces.kind === "doublePool");
+    const ab = manaAbilitiesOn(s, o)[ability]!;
+    if (manaAbilityProblem(s, pid, o, ability, true)) continue;
+    const cubeCost = activationLessCost(s, o, parseManaCost(ab.manaCost));
+    if (cubeCost.symbols.some((x) => x.kind !== "generic")) continue;
+    const half = halves.map(([m, n]) => `{${m}}`.repeat(n)).join("") + `{${Math.max(0, Math.ceil(total / 2) - named) + manaValue(cubeCost)}}`;
+    const before = planManaWith(s, pid, parseManaCost(half), 0, [...excluded, cube], use, harm);
+    if (!before) continue;
+    const t = cloneState(s);
+    try {
+      for (const a of before) applyInPlace(t, a);
+    } catch {
+      continue;
+    }
+    if (t.priority !== pid || t.pending) continue;
+    const combos = manaCombos(t, obj(t, cube), ab) ?? [];
+    for (let combo = 0; combo < combos.length; combo++) {
+      const doubling: Action = { type: "activateMana", player: pid, objectId: cube, mana: combos[combo]![0]!, ability, combo };
+      let u: GameState;
+      try {
+        u = applyAction(t, doubling);
+      } catch {
+        continue;
+      }
+      if (u.priority === pid && !u.pending && planManaWith(u, pid, cost0, extraGeneric, [...excluded, cube], use, harm)?.length === 0) return [...before, doubling];
+    }
+  }
+  return null;
 }
 
 /**

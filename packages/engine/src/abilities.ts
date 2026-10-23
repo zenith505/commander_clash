@@ -3265,6 +3265,8 @@ export type TriggerEvent =
   | "creatureAttacksEnchantedPlayer"
   /** "Whenever enchanted player is attacked": once as attackers are declared, if a creature attacks that player (rulings). */
   | "enchantedPlayerAttacked"
+  /** Tenuous Truce: you attack enchanted player or their planeswalkers, or they attack you or yours (once per declaration). */
+  | "attackBetweenYouAndEnchanted"
   /** "Whenever you discard a card", "whenever a player cycles a card": see TriggeredAbility.discards. */
   | "playerDiscards"
   /** "Whenever an opponent searches their library" (Archivist of Oghma): their own library, not another's (rulings). */

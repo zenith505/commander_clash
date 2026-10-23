@@ -1297,6 +1297,11 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
     const body = parseBody(attacks[1]!.replace(/\bthat creature\b/g, "it"), { subjectIt: true });
     return body ? { event: "creatureAttacksEnchantedPlayer", body } : "fail";
   }
+  const truce = /^When you attack enchanted (?:opponent|player) or a planeswalker they control or when they attack you or a planeswalker you control, (.+)$/.exec(line);
+  if (truce) {
+    const body = parseBody(truce[1]!);
+    return body ? { event: "attackBetweenYouAndEnchanted", body } : "fail";
+  }
   const attacked = /^Whenever enchanted player is attacked, (.+)$/.exec(line);
   if (attacked) {
     const same = / Each opponent attacking that player does the same\.$/;

@@ -1082,6 +1082,19 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
           add(aura, controllerOf(s, aura), (e) => e === "enchantedPlayerAttacked", undefined, undefined, undefined, undefined, undefined, undefined, { player: aura.attachedToPlayer });
       }
     }
+    // Tenuous Truce: "When you attack enchanted opponent or a planeswalker they control or when they attack you or a
+    // planeswalker you control": once for the declaration, if a creature attacks the other of the two (CR 506.2, 508.3a).
+    if (ev.type === "groupAttack") {
+      for (const id of s.battlefield) {
+        const aura = obj(s, id);
+        const them = aura.attachedToPlayer;
+        if (them === undefined) continue;
+        const you = controllerOf(s, aura);
+        const other = ev.controller === you ? them : ev.controller === them ? you : undefined;
+        if (other !== undefined && other !== ev.controller && ev.ids.some((x) => attackingYouNow(s, x, other, true)))
+          add(aura, you, (e) => e === "attackBetweenYouAndEnchanted", undefined, undefined, undefined, undefined, undefined, undefined, { player: them });
+      }
+    }
     causedBy = null;
   } else if (ev.type === "lastCounterRemoved") {
     const o = s.objects[ev.id];

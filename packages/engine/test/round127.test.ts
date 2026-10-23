@@ -378,3 +378,48 @@ describe("Yedora, Grave Gardener: the creature comes back face down as a Forest 
     expect(kill(true, true).asked).toBe(false);
   });
 });
+
+const truce = card("Tenuous Truce", "Enchantment — Aura", "{1}{W}", {
+  oracleText: "Enchant opponent\nAt the beginning of enchanted opponent's end step, you and that player each draw a card.\nWhen you attack enchanted opponent or a planeswalker they control or when they attack you or a planeswalker you control, sacrifice this Aura.",
+});
+
+describe("Tenuous Truce: sacrificed when you and the enchanted opponent attack each other (CR 506.2, 508.3a)", () => {
+  const scene = () => {
+    const { s, ap } = setup([]);
+    const others = s.turnOrder.filter((p) => p !== ap);
+    const [them, third] = [others[0]!, others[1]!];
+    const t = putOnBattlefield(s, ap, truce);
+    s.objects[t]!.attachedToPlayer = them;
+    const bear = (pid: number) => putOnBattlefield(s, pid, card("Test Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    return { s, ap, them, third, t, bear };
+  };
+  const declare = (s0: GameState, who: number, attacks: { attacker: string; defender: number }[]) => {
+    let s = passUntil(s0, "declareAttackers", who);
+    s.battlefield.forEach((id) => (s.objects[id]!.attacking = undefined));
+    s = act(s, { type: "declareAttackers", player: who, attacks });
+    return settleBots(s);
+  };
+  const on = (s: GameState, id: string) => s.battlefield.includes(id);
+  it("at the enchanted opponent's end step, you and they each draw a card", () => {
+    supported(truce);
+    const { s: s0, ap, them } = scene();
+    let s = passUntil(s0, "end", them);
+    const hands = [s.players[ap]!.hand.length, s.players[them]!.hand.length];
+    s = settleBots(s);
+    expect([s.players[ap]!.hand.length, s.players[them]!.hand.length]).toEqual([hands[0]! + 1, hands[1]! + 1]);
+  });
+  it("you attack them: sacrificed; you attack someone else: it stays", () => {
+    const { s: s0, ap, them, third, t, bear } = scene();
+    const b = bear(ap);
+    expect(on(declare(structuredClone(s0), ap, [{ attacker: b, defender: third }]), t)).toBe(true);
+    expect(on(declare(s0, ap, [{ attacker: b, defender: them }]), t)).toBe(false);
+  });
+  it("they attack you: sacrificed; they attack someone else: it stays", () => {
+    const { s: s0, ap, them, third, t, bear } = scene();
+    const b = bear(them);
+    expect(on(declare(structuredClone(s0), them, [{ attacker: b, defender: third }]), t)).toBe(true);
+    const s = declare(s0, them, [{ attacker: b, defender: ap }]);
+    expect(on(s, t)).toBe(false);
+    expect(logText(s)).toMatch(/Tenuous Truce/);
+  });
+});

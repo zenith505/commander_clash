@@ -1075,7 +1075,7 @@ export type PendingDecision =
   /** A resolving spell or ability makes this player discard `count` cards of their choice (CR 701.9b). */
   | { kind: "discard"; player: PlayerId; count: number; source: string; /** Only cards like this: "discard a creature card". */ filter?: TargetSpec; /** Exiled, not discarded ("exiles a card from their hand"). */ exile?: true; /** Up to `count` ("discard any number of cards"), none too. */ upTo?: true }
   /** "Put two cards from your hand on top of your library in any order": which, and their order (first on top). */
-  | { kind: "handToTop"; player: PlayerId; count: number; source: string; /** On the bottom instead, the first pick lowest. */ bottom?: true; /** Scroll Rack: any number up to `count`, exiled face down first and traded for as many from the top of the library. */ upTo?: true }
+  | { kind: "handToTop"; player: PlayerId; count: number; source: string; /** On the bottom instead, the first pick lowest. */ bottom?: true; /** Scroll Rack: any number up to `count`, exiled face down first and traded for as many from the top of the library. */ upTo?: true; /** Library of Leng: these cards are being discarded because of an effect, and any of them may go on top of the library instead of into the graveyard (`upTo`, the first pick ending on top). */ discarding?: ObjectId[] }
   /** Scry or surveil (CR 701.22, 701.25): `cards` are the top of their library, top first. */
   /** `order`: put them all back in any order (no bottom or graveyard); `owner` = whose library, if not the player's. */
   /** "bottom": the cards go to the bottom of the library together and their owner orders them (CR 401.4). */
@@ -1844,6 +1844,10 @@ export interface Resolving {
     drawQueue?: PlayerId[]; // players still to draw: a draw can stop for dredge (CR 702.52a)
     digQueue?: PlayerId[]; // "each player looks at the top five cards": players still to look (Explore the Vastlands)
     chosen?: Record<string, ObjectId[]>; // cards each player chose to discard
+    /** Library of Leng: the discarded cards each player put on top of their library instead, the first ending on top. */
+    toTop?: Record<string, ObjectId[]>;
+    /** The cards each player discards at random, picked before they're asked about Library of Leng. */
+    randomPicks?: Record<string, ObjectId[]>;
     venture?: string; // the dungeon or room chosen while venturing (CR 701.49a-b)
     arranged?: { top: ObjectId[]; away: ObjectId[] };
     /** Teferi's Puzzle Box: how many cards the hand put on the bottom (then drawn). */

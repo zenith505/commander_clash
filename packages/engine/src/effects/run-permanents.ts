@@ -11,7 +11,7 @@ import { objectMatches, playerProtectedFrom } from "./targeting";
 import { ResolveCtx, convokedFor, objects, amountNow, fixMods, players, runEffect } from "./resolve";
 import { exiledWithCounter } from "./run-choices";
 import { createExtraTokens, createToken } from "./run-tokens";
-import { discardCards } from "./run-library";
+import { discardCards, discardToTop } from "./run-library";
 import { describeMods } from "./describe";
 import { evolves, fireEvent } from "./triggers";
 import { phaseOut } from "../phasing";
@@ -419,7 +419,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       }
       const ids = sc.chosen![pid] ?? [];
       const nonland = ids.filter((x) => !defOf(s, obj(s, x)).types.includes("Land")).length;
-      discardCards(s, pid, ids, "", false, false, ctx.controller);
+      const tops = discardToTop(s, pid, ids, src, ctx);
+      if (tops === "paused") return "paused";
+      discardCards(s, pid, ids, "", false, false, ctx.controller, undefined, tops);
       if (e.type === "recruit") {
         if (!nonland) return;
         const soldier: TokenSpec = { name: "Human Soldier", power: 1, toughness: 1, colors: ["W"], types: ["Creature"], subtypes: ["Human", "Soldier"], keywords: [] };

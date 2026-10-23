@@ -44,6 +44,8 @@ export interface ResolveCtx {
   lki?: LastKnown;
   /** The announced X (CR 107.3a). */
   x?: number;
+  /** Its instructions are run as a cost paid as it resolves ("You may discard a card. If you do, ...", CR 118.12). */
+  asCost?: true;
   event?: TriggerEventInfo;
   /** Kicker costs paid for it (CR 702.33d). */
   kicked?: number[];

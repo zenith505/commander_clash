@@ -1144,7 +1144,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     }
     if (pending?.kind === "chooseMay" || pending?.kind === "payUnless" || pending?.kind === "mulligan") return;
     if (pending?.kind === "discardToHandSize" || pending?.kind === "discard" || pending?.kind === "bottomCards" || pending?.kind === "handToTop") {
-      if (o.zone === "hand" && o.owner === HUMAN)
+      if (o.zone === "hand" && o.owner === HUMAN && (pending.kind !== "handToTop" || !pending.discarding || pending.discarding.includes(o.id)))
         setDiscards((prev) => (prev.includes(o.id) ? prev.filter((x) => x !== o.id) : [...prev, o.id].slice(-pending.count)));
       return;
     }
@@ -4986,6 +4986,19 @@ function Controls({
         </span>
         <button disabled={discards.length !== pending.count} onClick={() => dispatch([{ type: "bottomCards", player: HUMAN, objectIds: discards }])}>
           Put on bottom
+        </button>
+      </div>
+    );
+  // Library of Leng: which of the cards being discarded go on top of the library instead.
+  if (pending?.kind === "handToTop" && pending.player === HUMAN && pending.discarding)
+    return (
+      <div className="controls">
+        <span>
+          <strong>{pending.source}: </strong>you discard {pending.discarding.map((id) => cardOf(s, id).name).join(", ")}. Click any of {pending.discarding.length === 1 ? "it" : "them"} to put on top of your
+          library instead of into your graveyard{discards.length > 1 ? " (first pick ends on top)" : ""}.
+        </span>
+        <button onClick={() => dispatch([{ type: "handToTop", player: HUMAN, objectIds: discards }])}>
+          {discards.length ? `Put ${discards.length} on top` : "All to the graveyard"}
         </button>
       </div>
     );

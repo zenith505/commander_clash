@@ -231,6 +231,16 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return taps ? [...taps, { type: "payUnless", player: pid, pay: true }] : [{ type: "payUnless", player: pid, pay: false }];
     }
     if (pend.kind === "discard") return [{ type: "discard", player: pid, objectIds: chooseDiscards(s, pid, pend.count, undefined, pend.filter, pend.upTo) }];
+    // Library of Leng: back on top go the spells we'd draw again, lands only while we're short of them; not a card
+    // that wants the graveyard (madness, flashback and the like).
+    if (pend.kind === "handToTop" && pend.discarding) {
+      const wantsYard = (d: CardDef) => !!compileCard(d).madness || d.keywords.some((k) => ["Flashback", "Unearth", "Escape", "Embalm", "Eternalize", "Disturb", "Retrace", "Jump-start", "Aftermath", "Scavenge", "Dredge"].includes(k));
+      const keep = pend.discarding.filter((id) => {
+        const d = defOf(s, obj(s, id));
+        return !wantsYard(d) && (!isType(d, "Land") || lands(s, pid) < 5);
+      });
+      return [{ type: "handToTop", player: pid, objectIds: keep }];
+    }
     // Brainstorm: back go the cards we'd most readily discard, the better of them on top.
     // Scroll Rack: the lands we don't need, traded for fresh cards (a library short of cards trades fewer).
     if (pend.kind === "handToTop" && pend.upTo) {

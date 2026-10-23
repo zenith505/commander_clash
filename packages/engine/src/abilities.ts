@@ -4431,6 +4431,11 @@ export interface CompiledCard {
    * library." Only that player's own library, searched by them; any shuffle the effect calls for still happens (rulings).
    */
   opponentsCantSearchOwn?: true;
+  /**
+   * Library of Leng: "If an effect causes you to discard a card, discard it, but you may put it on top of your library
+   * instead of into your graveyard." (CR 614.1a). Never a discard as a cost (rulings).
+   */
+  discardToTop?: true;
   /** Opposition Agent: "You control your opponents while they're searching their libraries." (CR 723.2) */
   controlsOpponentSearches?: true;
   /**

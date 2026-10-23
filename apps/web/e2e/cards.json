@@ -4092,6 +4092,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "3d6fa57a-aa53-4b5c-b8af-a7612c823117",
+  "name": "Faithless Looting",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Draw two cards, then discard two cards.\nFlashback {2}{R} (You may cast this card from your graveyard for its flashback cost. Then exile it.)",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flashback"
+  ],
+  "commanderLegal": "legal",
+  "set": "cmm",
+  "releasedAt": "2023-08-04",
+  "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "f1072af9-9e6f-45ce-8c4b-8e678e7da8ce",
   "name": "Fanatic of Xenagos",
   "manaCost": "{1}{R}{G}",
@@ -7028,6 +7056,28 @@
   "set": "clu",
   "releasedAt": "2024-02-23",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "867def48-4be8-4056-bcf1-d6b00450b9a3",
+  "name": "Library of Leng",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "You have no maximum hand size.\nIf an effect causes you to discard a card, discard it, but you may put it on top of your library instead of into your graveyard.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "spg",
+  "releasedAt": "2026-04-24",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

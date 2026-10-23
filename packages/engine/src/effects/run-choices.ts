@@ -100,7 +100,11 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         return;
       }
       if (source && !source.triggeredThisTurn?.includes(key)) (source.triggeredThisTurn ??= []).push(key);
-      const xctx = e.payX ? { ...ctx, x: Number(sc.payX) } : ctx;
+      // "You may [do something]. If you do, ...": what they do is a cost, paid as it resolves (CR 118.12), so a discard
+      // isn't one an effect causes (Library of Leng's rulings).
+      const next = r.body.effects[r.body.effects.indexOf(e) + 1];
+      const asCost = r.body.effects.includes(e) && next?.type === "if" && next.cond.kind === "youDid";
+      const xctx = e.payX || asCost ? { ...ctx, ...(e.payX ? { x: Number(sc.payX) } : {}), ...(asCost ? { asCost: true as const } : {}) } : ctx;
       for (const inner of e.effects) if (runEffect(s, inner, xctx) === "paused") return "paused";
       return;
     }
@@ -744,6 +748,7 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
     }
     if (!pu.acted) {
       const who = apnap(s, Object.keys(pu.made).map(Number) as PlayerId[]);
+      // "Unless that player discards a card": a cost, paid as it resolves (CR 118.12a), so not Library of Leng's.
       for (const pid of who) discardCards(s, pid, (pu.chosen?.[pid]?.discard ?? []).filter((id) => player(s, pid).hand.includes(id)), "", false, false, ctx.controller);
       for (const pid of who)
         for (const id of pu.chosen?.[pid]?.sacrifice ?? []) {

@@ -2136,6 +2136,10 @@ export function compile(d: CardDef): CompiledCard {
       out.opponentsSearchTop = num(mindcensor[1]!);
       continue;
     }
+    if (line === "If an effect causes you to discard a card, discard it, but you may put it on top of your library instead of into your graveyard.") {
+      out.discardToTop = true;
+      continue;
+    }
     if (line === "Spells and abilities your opponents control can't cause their controller to search their library.") {
       out.opponentsCantSearchOwn = true;
       continue;

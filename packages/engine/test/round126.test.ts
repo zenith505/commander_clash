@@ -740,3 +740,36 @@ describe("Pippin, Guard of the Citadel: protection from the card type of your ch
     expect(planCast(s, ap, shock, [{ kind: "player", id: opp }])).not.toBeNull();
   });
 });
+
+const stormsinger = card("Redoubled Stormsinger", "Creature — Orc Wizard", "{2}{R}", {
+  power: "3",
+  toughness: "3",
+  keywords: ["First strike"],
+  oracleText: "First strike\nWhenever this creature attacks, for each creature token you control that entered this turn, create a tapped and attacking token that's a copy of that token. At the beginning of the next end step, sacrifice those tokens.",
+});
+
+describe("Redoubled Stormsinger: a tapped and attacking copy of each creature token that entered this turn", () => {
+  it("copies the new token, not the old one; the copies attack and are sacrificed at the end step", () => {
+    supported(stormsinger);
+    const { s: s0, ap, opp } = setup([]);
+    const st = putOnBattlefield(s0, ap, stormsinger);
+    const fresh = putOnBattlefield(s0, ap, squirrelToken);
+    const old = putOnBattlefield(s0, ap, card("Goblin", "Token Creature — Goblin", "", { power: "1", toughness: "1", colors: ["R"] }));
+    for (const id of [fresh, old]) s0.objects[id]!.isToken = true;
+    s0.objects[fresh]!.enteredTurn = s0.turn;
+    s0.objects[old]!.enteredTurn = s0.turn - 1;
+    const before = s0.battlefield.length;
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: st, defender: opp }] });
+    s = settleBots(s);
+    const made = s.battlefield.filter((id) => !s0.battlefield.includes(id));
+    expect(made).toHaveLength(1);
+    expect(s.battlefield.length).toBe(before + 1);
+    expect(characteristics(s, s.objects[made[0]!]!).subtypes).toEqual(["Squirrel"]);
+    expect(s.objects[made[0]!]!.tapped).toBe(true);
+    expect(s.objects[made[0]!]!.attacking).toBe(opp);
+    s = passUntil(s, "end", ap);
+    s = settleBots(s);
+    expect(s.objects[made[0]!]?.zone ?? "gone").not.toBe("battlefield");
+  });
+});

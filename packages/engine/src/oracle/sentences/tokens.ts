@@ -119,11 +119,13 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // "For each token you control, create a token that's a copy of that permanent" (Second Harvest), "For each creature
   // target player controls, create a token that's a copy of that creature" (Clone Legion): one copy of each of them.
-  if ((m = /^[Ff]or each (.+?), create a token that's a copy of (?:that (?:creature|permanent|artifact|token)|it)(?:, except (.+))?$/.exec(s))) {
+  // "For each creature token you control that entered this turn, create a tapped and attacking token that's a copy of that
+  // token" (Redoubled Stormsinger): each one attacking whom its controller chooses (CR 508.4, rulings).
+  if ((m = /^[Ff]or each (.+?), create a (tapped and attacking )?token that's a copy of (?:that (?:creature|permanent|artifact|token)|it)(?:, except (.+))?$/.exec(s))) {
     const what = parseObject(`each ${m[1]!}`, ctx);
-    const except = m[2] ? parseCopyExcept(m[2]) : undefined;
+    const except = m[3] ? parseCopyExcept(m[3]) : undefined;
     if (!what || what.ref !== "each" || except === null) return null;
-    return [{ type: "createTokenCopy", who: { ref: "you" }, n: 1, what, each: true, ...(except ? { except } : {}) }];
+    return [{ type: "createTokenCopy", who: { ref: "you" }, n: 1, what, each: true, ...(except ? { except } : {}), ...(m[2] ? { tapped: true, attacking: true } : {}) }];
   }
   // Doppelgang: "For each of X target permanents, create X tokens that are copies of that permanent": that many copies of
   // each of them, all created at once.

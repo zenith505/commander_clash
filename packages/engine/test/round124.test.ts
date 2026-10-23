@@ -265,3 +265,43 @@ describe("Deadpool, Trading Card: exchanging text boxes (CR 612.5, 701.12h)", ()
     void ap;
   });
 });
+
+const diviner = card("Twilight Diviner", "Creature — Elf Cleric", "{2}{B}", {
+  power: "3",
+  toughness: "3",
+  keywords: ["Surveil"],
+  oracleText: "When this creature enters, surveil 2. (Look at the top two cards of your library, then put any number of them into your graveyard and the rest on top of your library in any order.)\nWhenever one or more other creatures you control enter, if they entered or were cast from a graveyard, create a token that's a copy of one of them. This ability triggers only once each turn.",
+});
+const reanimate = card("Test Reanimate", "Sorcery", "{B}", { oracleText: "Return target creature card from your graveyard to the battlefield." });
+
+describe("Twilight Diviner", () => {
+  const inYard = (s: GameState, pid: number, def: CardDef) => {
+    const id = putOnBattlefield(s, pid, def);
+    s.battlefield.splice(s.battlefield.indexOf(id), 1);
+    s.objects[id]!.zone = "graveyard";
+    s.players[pid]!.graveyard.push(id);
+    invalidateCharacteristics(s);
+    return id;
+  };
+  const tokens = (s: GameState, name: string) => s.battlefield.filter((id) => s.objects[id]!.isToken && characteristics(s, s.objects[id]!).name === name);
+
+  it("a creature returned from your graveyard: a token copy of it; only once each turn", () => {
+    supported(diviner);
+    const { s: s0, ap, ids } = setup([reanimate, reanimate]);
+    putOnBattlefield(s0, ap, diviner);
+    const a = inYard(s0, ap, serra);
+    const b = inYard(s0, ap, visionary);
+    let s = settle(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: a }])));
+    expect(s.objects[a]!.zone).toBe("battlefield");
+    expect(tokens(s, "Serra Angel")).toHaveLength(1);
+    s = settle(run(s, planCast(s, ap, ids[1]!, [{ kind: "object", id: b }])));
+    expect(tokens(s, "Elvish Visionary")).toHaveLength(0);
+  });
+
+  it("a creature cast from your hand doesn't trigger it", () => {
+    const { s: s0, ap, ids } = setup([bear()]);
+    putOnBattlefield(s0, ap, diviner);
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(tokens(s, "Grizzly Bears")).toHaveLength(0);
+  });
+});

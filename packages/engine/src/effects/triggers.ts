@@ -1442,12 +1442,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.event !== "batch" || !t.batch) continue;
         const b = t.batch;
         if (gone ? !lookBack(b) : lookBack(b) && arrived.has(`${w.id}@${w.zoneChanges ?? 0}`)) continue;
-        const matched = ev.moves.filter((m) => batchMoveMatches(s, b, m, w, you, gone));
+        const fromYard = (m: { id: ObjectId }) => !!(s.objects[m.id]?.enteredFromGraveyard || s.objects[m.id]?.castFromGraveyard);
+        const matched = ev.moves.filter((m) => batchMoveMatches(s, b, m, w, you, gone) && (!b.onlyFromGraveyard || fromYard(m)));
         const n = matched.length;
         if (!n) continue;
         // Satoru: not if any of them was cast with mana spent on it (rulings: mana for additional costs counts too).
         if (b.noneCastWithMana && matched.some((m) => s.objects[m.id]?.wasCast && (s.objects[m.id]!.manaSpent ?? 0) > 0)) continue;
-        if (b.fromGraveyard && !matched.some((m) => s.objects[m.id]?.enteredFromGraveyard || s.objects[m.id]?.castFromGraveyard)) continue;
+        if (b.fromGraveyard && !matched.some(fromYard)) continue;
         if (b.first && b.what === "created" && (s.turnLog?.tokensCreated ?? []).filter((c) => c.player === you).length > n) continue;
         if (b.first && b.what === "discards" && (s.turnLog?.discards ?? []).some((d) => (b.whose !== "you" || d.player === you) && d.cards.some((c) => !b.filter || printedMatches(b.filter, s.cards[c]!)))) continue;
         // "Whenever one or more creatures enter / die": caused by each of them entering or dying (CR 603.2d).

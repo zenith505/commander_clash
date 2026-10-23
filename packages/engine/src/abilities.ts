@@ -3557,6 +3557,8 @@ export interface BatchTrigger {
   noneCastWithMana?: true;
   /** Kotis: "if one or more of them entered from a graveyard or was cast from a graveyard" (an intervening if, CR 603.4). */
   fromGraveyard?: true;
+  /** With `fromGraveyard`: "them" are only those of them that entered or were cast from a graveyard (Twilight Diviner). */
+  onlyFromGraveyard?: true;
   dies?: true;
   notDies?: true;
   /** `notBattlefield`: "from anywhere other than the battlefield" (Syr Konrad). */

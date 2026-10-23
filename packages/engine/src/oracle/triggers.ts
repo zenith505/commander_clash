@@ -1064,6 +1064,17 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     batch.fromGraveyard = true;
     rest = fromYard[1]!;
   }
+  // Twilight Diviner: "if they entered or were cast from a graveyard, create a token that's a copy of one of them": an
+  // intervening if (CR 603.4) about those that did, and one of them of your choice, while it's still that permanent.
+  const diviner = /^if they entered or were cast from a graveyard, create a token that's a copy of one of them\.?$/.exec(rest);
+  if (diviner && batch.what === "enters" && batch.filter && !yourTurn) {
+    const filter = { ...batch.filter, text: batch.filter.text.replace(/^creatures\b/, "creature") };
+    return {
+      event: "batch",
+      batch: { ...batch, fromGraveyard: true, onlyFromGraveyard: true },
+      body: { targets: [], effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "choose", fromGroup: true }, { type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "created" } }], text: rest.replace(/\.$/, "") },
+    };
+  }
   // Kambal, Profiteering Mayor: "for each of them, create a tapped token that's a copy of it", those that entered.
   const eachCopy = /^for each of them, create an? (tapped )?token that's a copy of it\.?$/.exec(rest);
   if (eachCopy && batch.what === "enters" && !yourTurn) return { event: "batch", batch, body: { targets: [], effects: [{ type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "eventGroup" }, each: true, ...(eachCopy[1] ? { tapped: true } : {}) }], text: rest.replace(/\.$/, "") } };

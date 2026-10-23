@@ -4513,6 +4513,8 @@ const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true
   { re: "the sacrificed creature was suspected", cond: { kind: "sacrificedSuspected" }, noTargets: true },
   { re: "the sacrificed creature was legendary", cond: { kind: "sacrificedLegendary" }, noTargets: true },
   { re: "~'s surge cost was paid", cond: { kind: "altPaid", alt: "surge" } },
+  // "As an additional cost to cast this spell, you may waterbend {2}" is paid like kicker (CompiledCard.kicker.waterbend).
+  { re: "~'s waterbend cost was paid", cond: { kind: "kicked" } },
   // The Masteries: "If the {1}{B} cost was paid" (compile checks it's the card's "rather than pay" cost).
   { re: "the (?:\\{[^}]+\\})+ cost was paid", cond: { kind: "altPaid", alt: "alternative" }, spellOnly: true },
   { re: "~'s madness cost was paid", cond: { kind: "altPaid", alt: "madness" }, spellOnly: true },
@@ -4716,7 +4718,24 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
     }
     return out;
   };
-  const fx = parseOne(t, ctx) ?? (/, then (?!shuffle)/.test(t) ? attempt(ctx, thenParts) : null);
+  // "If this spell's additional cost was paid, whenever a creature dies this turn, you gain 1 life" (Ruinous Waterbending):
+  // a trigger for the rest of the turn, made only then (CR 603.7b).
+  const floating = instead ? undefined : floatingTrigger(t, [], ctx);
+  if (floating !== undefined) return floating && { effects: [floating], instead };
+  // "Instead shuffle your graveyard into your library, draw seven cards, and you have no maximum hand size for the rest of
+  // the game" (Spirit Water Revival): three instructions in a list, in order.
+  const listParts = (): Effect[] | null => {
+    const parts = t.split(/, (?:and )?/);
+    if (parts.length < 3 || !/, and /.test(t)) return null;
+    const out: Effect[] = [];
+    for (const p of parts) {
+      const one = parseOne(p.charAt(0).toUpperCase() + p.slice(1), ctx);
+      if (!one) return null;
+      out.push(...one);
+    }
+    return out;
+  };
+  const fx = parseOne(t, ctx) ?? (/, then (?!shuffle)/.test(t) ? attempt(ctx, thenParts) : null) ?? (/, and /.test(t) ? attempt(ctx, listParts) : null);
   if (!fx || (!newTargets && ctx.targets.length !== before)) return null;
   // Under an "if", either branch's instructions run one at a time, so one may wait on a player (see the "if" effect).
   const done = instead ? insteadOfAffected(fx, previous) : fx;

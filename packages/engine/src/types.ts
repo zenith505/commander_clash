@@ -967,6 +967,8 @@ export interface CostChoices {
   exileCards?: ObjectId[];
   /** Untapped permanents to tap for "Tap an untapped creature you control" (CR 602.2b). */
   tap?: ObjectId[];
+  /** Waterbend as an additional cost to cast it (CR 701.67a): untapped artifacts and creatures you control, each paying {1}. */
+  waterbend?: ObjectId[];
   /** Cards in hand revealed for "reveal a Pirate card from your hand". */
   reveal?: ObjectId[];
   /** Cards exiled from your hand for "exile a blue card from your hand" (Force of Will). */

@@ -290,6 +290,12 @@ export function planCast(
     if (!reduced) return null;
     ({ cost, extra } = reduced);
   }
+  if (choices.waterbend?.length) {
+    // Artifacts and creatures tapped to waterbend pay generic mana (CR 701.67a).
+    const reduced = payGenericWith(cost, extra, choices.waterbend.length);
+    if (!reduced) return null;
+    ({ cost, extra } = reduced);
+  }
   const paid = Object.fromEntries(Object.entries(choices).filter(([, v]) => (Array.isArray(v) ? v.length : v !== undefined && v !== false))) as CostChoices;
   const improvise = hasImprovise(s, pid, obj(s, objectId));
   const cast = (taps: Action[], creatures?: ObjectId[], artifacts?: ObjectId[]): Action[] => [
@@ -331,6 +337,13 @@ export function planCast(
     if (sacs.length) taps = planMana(s, pid, cost, extra, undefined, [...sacs, ...sacrificedTargets(s, targets), ...tapping], use, undefined, wantSnow);
   }
   if (taps) return cast(taps);
+  // Waterbend as an additional cost (CR 701.67a): mana first, then artifacts and creatures for the rest of it.
+  const wk = compileCard(d).kicker;
+  if (wk?.waterbend !== undefined && (wk.required || choices.kicks?.includes(0)) && !choices.waterbend?.length) {
+    const wb = autoWaterbend(s, pid, cost, extra, wk.waterbend, [...sacrificedTargets(s, targets), ...targetIds, ...tapping, ...(choices.tap ?? [])], use);
+    const c = cast([])[0]!;
+    if (wb && c.type === "castSpell") return [...wb.taps, { ...c, waterbend: wb.tapped }];
+  }
   if (convoke !== "auto") return null;
   // Tap artifacts for improvise, or creatures for convoke, only when mana alone can't pay.
   const imp = improvise ? autoImprovise(s, pid, cost, extra, [], use) : null;

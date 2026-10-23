@@ -19,3 +19,27 @@ test("The Unagi of Kyoshi Island: Lightning Bolt at it, ward—waterbend {4} pai
   expect(after.battlefield.filter((id) => after.cards[after.objects[id]!.cardId]!.name === "Grizzly Bears").every((id) => after.objects[id]!.tapped)).toBe(true);
   expect(pageErrors(page)).toEqual([]);
 });
+
+test("Katara, Seeking Revenge: \"Pay waterbend\" taps two creatures for {2} of it, and she doesn't discard", async ({ page }) => {
+  const s = scene({ hand: ["Katara, Seeking Revenge"], board: ["Island", "Island", "Island", "Swamp", "Grizzly Bears", "Grizzly Bears"], library: ["Hill Giant"] });
+  const katara = one(s, "Katara, Seeking Revenge");
+  await open(page, s);
+  await card(page, "Katara, Seeking Revenge", s).click();
+  const bar = page.locator(".targeting");
+  await expect(bar).toContainText("pay waterbend");
+  await bar.getByRole("button", { name: "Pay waterbend", exact: true }).click();
+  const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && st.objects[katara]!.zone === "battlefield");
+  expect(after.battlefield.filter((id) => after.cards[after.objects[id]!.cardId]!.name === "Grizzly Bears").every((id) => after.objects[id]!.tapped)).toBe(true);
+  expect(after.players[0]!.hand.map((id) => after.cards[after.objects[id]!.cardId]!.name)).toEqual(["Hill Giant"]);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Benevolent River Spirit: cast with two Islands, its waterbend {5} paid by tapping five creatures", async ({ page }) => {
+  const s = scene({ hand: ["Benevolent River Spirit"], board: ["Island", "Island", "Grizzly Bears", "Grizzly Bears", "Grizzly Bears", "Grizzly Bears", "Grizzly Bears"] });
+  const spirit = one(s, "Benevolent River Spirit");
+  await open(page, s);
+  await card(page, "Benevolent River Spirit", s).click();
+  const after = await resolveUntil(page, (st) => st.objects[spirit]!.zone === "battlefield" && st.stack.length === 0);
+  expect(after.battlefield.filter((id) => after.cards[after.objects[id]!.cardId]!.name === "Grizzly Bears").every((id) => after.objects[id]!.tapped)).toBe(true);
+  expect(pageErrors(page)).toEqual([]);
+});

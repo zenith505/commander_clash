@@ -1006,6 +1006,12 @@ function finishSpell(s: GameState, id: ObjectId, item: StackItem) {
     if (s.objects[id]?.zone === "exile") log(s, `${d.name} is exiled (paradigm).`);
     return;
   }
+  // "Exile ~." (Spirit Water Revival): its own last instruction, so it doesn't go to the graveyard.
+  if (compileCard(d).exileSelfOnResolve) {
+    moveObject(s, id, "exile");
+    if (s.objects[id]?.zone === "exile") log(s, `${d.name} is exiled.`);
+    return;
+  }
   if ((compileCard(d).rebound || o.reboundGained) && o.castFrom === "hand" && !o.exileIfLeaves) {
     moveObject(s, id, "exile");
     log(s, `${d.name} is exiled (rebound).`);

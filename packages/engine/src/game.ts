@@ -3820,7 +3820,8 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const strive = compileCard(d).strive?.repeat(Math.max(0, (how.targets ?? []).filter((t) => t.kind !== "none").length - 1)) ?? "";
   // Escalate's for each mode beyond the first (CR 702.120a), paid even when it's cast without paying its mana cost (rulings).
   const escalate = spell?.modal?.escalate?.mana?.repeat(Math.max(0, (how.modes?.length ?? 0) - 1)) ?? "";
-  const kickCost = kicks.map((i) => kicker?.costs[i] ?? "").join("") + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "") + entwine + strive + escalate + spliceMana(s, how.splice);
+  // "As an additional cost to cast this spell, waterbend {5}": always paid, with or without kicks (CR 601.2b).
+  const kickCost = (kicker?.required ? kicker.costs[0]! : kicks.map((i) => kicker?.costs[i] ?? "").join("")) + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "") + entwine + strive + escalate + spliceMana(s, how.splice);
   // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast: a bestowed creature card is
   // an Aura spell (CR 702.103b, Hero of Iroas rulings).
   const mods = costModsFor(s, pid, o, how.alt === "bestow" && !o.bestowed && !how.faceDown ? bestowedDef(d) : d, x, how.lifeFor);
@@ -4028,6 +4029,17 @@ function costToPay(s: GameState, pid: PlayerId, o: GameObject, convoke?: ObjectI
     if (!reduced) return `that's more artifacts than ${d.name}'s cost has generic mana for`;
     ({ cost, extra } = reduced);
   }
+  if (how.waterbend?.length) {
+    // Waterbend as an additional cost (CR 701.67a): up to the waterbend cost's own generic mana, if it's being paid.
+    const k = compileCard(d).kicker;
+    const cap = k?.waterbend !== undefined && (k.required || kicks?.includes(0)) ? k.waterbend : 0;
+    if (!cap) return `${d.name} has no waterbend cost being paid`;
+    const problem = castWaterbendProblem(s, pid, how.waterbend, cap, [...(convoke ?? []), ...(improvise ?? []), ...(how.tap ?? []), ...(how.teamwork ?? []), ...(how.conspire ?? []), ...(how.harmonize !== undefined ? [how.harmonize] : []), ...(how.sacrifice ?? [])]);
+    if (problem) return problem;
+    const reduced = payGenericWith(cost, extra, how.waterbend.length);
+    if (!reduced) return `that's more artifacts and creatures than ${d.name}'s cost has generic mana for`;
+    ({ cost, extra } = reduced);
+  }
   if (how.assisted) {
     // The assisting player pays for generic mana only (CR 702.132a).
     const reduced = payGenericWith(cost, extra, how.assisted);
@@ -4044,6 +4056,18 @@ function costToPay(s: GameState, pid: PlayerId, o: GameObject, convoke?: ObjectI
     ({ cost, extra } = reduced);
   }
   return { cost, extra };
+}
+
+/** Artifacts and creatures tapped to waterbend as a spell is cast: untapped ones you control, each once, no more than `cap` (CR 701.67a). */
+function castWaterbendProblem(s: GameState, pid: PlayerId, ids: ObjectId[], cap: number, used: ObjectId[]): string | null {
+  if (ids.length > cap) return `waterbend {${cap}} can be paid by tapping no more than ${cap} artifact${cap === 1 ? "" : "s"} or creature${cap === 1 ? "" : "s"}`;
+  if (new Set(ids).size !== ids.length) return "each artifact or creature can only be tapped once to waterbend";
+  for (const id of ids) {
+    const c = s.objects[id];
+    if (!c || c.zone !== "battlefield" || controllerOf(s, c) !== pid || !(objIsType(s, c, "Artifact") || objIsType(s, c, "Creature"))) return "only artifacts and creatures you control can be tapped to waterbend";
+    if (c.tapped || used.includes(id)) return `${nameOf(s, id)} is already tapped`;
+  }
+  return null;
 }
 
 /** Cards exiled for delve: other cards in your graveyard, each once, not also exiled for another cost. */
@@ -4315,7 +4339,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     spendFromPool(s, helper.id, parseManaCost(`{${choices.assisted}}`), { spell: d });
     log(s, `${helper.name} pays {${choices.assisted}} of ${d.name}'s cost (assist).`);
   }
-  for (const c of [...(convoke ?? []), ...(improvise ?? [])]) tapPermanent(s, obj(s, c));
+  for (const c of [...(convoke ?? []), ...(improvise ?? []), ...(choices.waterbend ?? [])]) tapPermanent(s, obj(s, c));
+  if (choices.waterbend?.length) log(s, `${p.name} taps ${choices.waterbend.map((c) => nameOf(s, c)).join(", ")} to waterbend.`);
   const kicks = choices.kicks?.length ? [...choices.kicks].sort() : undefined;
   o.kicked = kicks;
   o.colorsSpent = colorsSpent.length ? colorsSpent : undefined;
@@ -4758,6 +4783,8 @@ function describeKicks(d: CardDef, kicks: number[]): string {
 function kickProblem(d: CardDef, kicks?: number[]): string | null {
   if (!kicks?.length) return null;
   const k = compileCard(d).kicker;
+  // "As an additional cost to cast this spell, waterbend {5}": always paid, so nothing to choose.
+  if (k?.required) return `${d.name}'s ${kickerName(k)} cost is always paid`;
   if (!k) return `${d.name} has no kicker`;
   if (kicks.some((i) => !Number.isInteger(i) || i < 0 || i >= k.costs.length)) return `${d.name} has no such kicker cost`;
   if (!k.multi && new Set(kicks).size !== kicks.length) return "each kicker cost can be paid only once";

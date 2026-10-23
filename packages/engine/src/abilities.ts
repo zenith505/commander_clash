@@ -818,8 +818,8 @@ export const refCovers = (r: object, i: number): boolean =>
   "index" in r && typeof r.index === "number" && i >= r.index && i < r.index + ("n" in r && typeof r.n === "number" ? r.n : 1);
 
 /** What a card's kicker-like cost is called (see CompiledCard.kicker). */
-export const kickerName = (k: NonNullable<CompiledCard["kicker"]>): "kicker" | "multikicker" | "replicate" | "squad" | "offspring" =>
-  k.replicate ? "replicate" : k.squad ? "squad" : k.offspring ? "offspring" : k.multi ? "multikicker" : "kicker";
+export const kickerName = (k: NonNullable<CompiledCard["kicker"]>): "kicker" | "multikicker" | "replicate" | "squad" | "offspring" | "waterbend" =>
+  k.replicate ? "replicate" : k.squad ? "squad" : k.offspring ? "offspring" : k.waterbend !== undefined ? "waterbend" : k.multi ? "multikicker" : "kicker";
 
 export interface TokenSpec {
   name: string;
@@ -4131,6 +4131,8 @@ export interface CompiledCard {
   shuffleInsteadOfGraveyard?: boolean;
   /** "If ~ would be put into a graveyard from anywhere, exile it instead" (a disturb card's back face, CR 614.1a). */
   exileInsteadOfGraveyard?: boolean;
+  /** An instant or sorcery whose last instruction is "Exile ~.": exiled as it finishes resolving (CR 608.2n). */
+  exileSelfOnResolve?: true;
   /**
    * "If a card or token would be put into a graveyard from anywhere, exile it instead." (Rest in Peace), "If a card would
    * be put into an opponent's graveyard from anywhere, exile it instead." (Leyline of the Void), "..., instead exile it
@@ -4744,7 +4746,20 @@ export interface CompiledCard {
    * same way; `offspring` is offspring (CR 702.175a), paid once like kicker. None of these is "kicked" for other cards.
    */
   /** `xMin`: "Kicker {X}. X can't be 0." (Thieving Skydiver): a kicker cost with X, chosen as it's cast (CR 107.3a, 601.2b). */
-  kicker?: { costs: string[]; multi?: boolean; replicate?: boolean; squad?: boolean; offspring?: boolean; xMin?: number };
+  kicker?: {
+    costs: string[];
+    multi?: boolean;
+    replicate?: boolean;
+    squad?: boolean;
+    offspring?: boolean;
+    xMin?: number;
+    /**
+     * "As an additional cost to cast this spell, (you may) waterbend {N}" (CR 701.67a): paid like kicker, and up to N of
+     * its generic mana may be paid by tapping artifacts and creatures (CostChoices.waterbend). `required`: it must be paid.
+     */
+    waterbend?: number;
+    required?: true;
+  };
   /** "As an additional cost to cast this spell, sacrifice a creature" and the like (CR 601.2b, 601.2f-h). */
   additionalCosts?: AdditionalCost[];
   /** "As an additional cost to cast this spell, sacrifice a creature or pay {3}{B}": exactly one of these, announced as it's cast (CR 601.2b). */

@@ -2079,6 +2079,8 @@ function wantsEvidence(c: CompiledCard): boolean {
 function kickOptions(s: GameState, pid: PlayerId, id: string, free: boolean, x?: number): number[][] {
   const k = compileCard(defOf(s, obj(s, id))).kicker;
   if (!k) return [[]];
+  // "As an additional cost to cast this spell, waterbend {5}": always paid, nothing to choose.
+  if (k.required) return [[]];
   // "Kicker {X}": kicked only with an X chosen for it, else not.
   if (parseManaCost(k.costs[0]!).hasX && !parseManaCost(defOf(s, obj(s, id)).manaCost).hasX) return x ? [[0]] : [[]];
   if (k.multi) {

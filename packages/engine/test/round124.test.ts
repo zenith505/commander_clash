@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, putOnBattlefield, setup } from "./helpers";
-import { botActions, isFullySupported, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { botActions, castProblem, isFullySupported, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
 import { invalidateCharacteristics } from "../src/layers";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -26,7 +26,7 @@ const untilChoice = (s: GameState) => {
   return s;
 };
 /** Tap all of `pid`'s lands but `keep` of them. */
-const tapLands = (s: GameState, pid: string, keep: number) => {
+const tapLands = (s: GameState, pid: number, keep: number) => {
   let left = keep;
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
@@ -89,5 +89,115 @@ describe("ward—waterbend (The Unagi of Kyoshi Island)", () => {
     expect(() => act(s0, { type: "payUnless", player: ap, pay: true, tap: mine.slice(0, 4) })).toThrow(/already tapped/);
     const s = act(s0, { type: "payUnless", player: ap, pay: true, tap: mine.slice(1, 5) });
     expect(s.log.some((l) => /taps .* to waterbend/.test(typeof l === "string" ? l : JSON.stringify(l)))).toBe(true);
+  });
+});
+
+const riverSpirit = card("Benevolent River Spirit", "Creature — Spirit", "{U}{U}", {
+  power: "4",
+  toughness: "5",
+  keywords: ["Scry", "Flying", "Ward", "Waterbend"],
+  oracleText: "As an additional cost to cast this spell, waterbend {5}. (While paying a waterbend cost, you can tap your artifacts and creatures to help. Each one pays for {1}.)\nFlying, ward {2} (Whenever this creature becomes the target of a spell or ability an opponent controls, counter it unless that player pays {2}.)\nWhen this creature enters, scry 2.",
+});
+const katara = card("Katara, Seeking Revenge", "Legendary Creature — Human Warrior Ally", "{3}{U/B}", {
+  power: "3",
+  toughness: "3",
+  keywords: ["Waterbend"],
+  oracleText: "As an additional cost to cast this spell, you may waterbend {2}. (While paying a waterbend cost, you can tap your artifacts and creatures to help. Each one pays for {1}.)\nWhen Katara enters, draw a card, then discard a card unless her additional cost was paid.\nKatara gets +1/+1 for each Lesson card in your graveyard.",
+});
+const ruinous = card("Ruinous Waterbending", "Sorcery — Lesson", "{1}{B}{B}", {
+  keywords: ["Waterbend"],
+  oracleText: "As an additional cost to cast this spell, you may waterbend {4}. (While paying a waterbend cost, you can tap your artifacts and creatures to help. Each one pays for {1}.)\nAll creatures get -2/-2 until end of turn. If this spell's additional cost was paid, whenever a creature dies this turn, you gain 1 life.",
+});
+const revival = card("Spirit Water Revival", "Sorcery", "{1}{U}{U}", {
+  keywords: ["Waterbend"],
+  oracleText: "As an additional cost to cast this spell, you may waterbend {6}. (While paying a waterbend cost, you can tap your artifacts and creatures to help. Each one pays for {1}.)\nDraw two cards. If this spell's additional cost was paid, instead shuffle your graveyard into your library, draw seven cards, and you have no maximum hand size for the rest of the game.\nExile Spirit Water Revival.",
+});
+const wall = (name: string) => card(name, "Artifact Creature — Wall", "{2}", { power: "0", toughness: "4" });
+
+describe("waterbend as an additional cost to cast a spell (CR 701.67a)", () => {
+  it("Benevolent River Spirit: {U}{U} plus waterbend {5}; two Islands and five artifact creatures pay it all", () => {
+    supported(riverSpirit, katara, ruinous, revival);
+    const { s: s0, ap, ids } = setup([riverSpirit]);
+    const walls = Array.from({ length: 5 }, (_, i) => putOnBattlefield(s0, ap, wall(`Wall ${i}`)));
+    // Only two Islands untapped.
+    let islands = 2;
+    for (const id of s0.battlefield) {
+      const o = s0.objects[id]!;
+      if (o.controller !== ap || !s0.cards[o.cardId]!.types.includes("Land")) continue;
+      if (s0.cards[o.cardId]!.name === "Island" && islands-- > 0) continue;
+      o.tapped = true;
+    }
+    const plan = planCast(s0, ap, ids[0]!, undefined, undefined, "auto");
+    const c = plan?.at(-1);
+    expect(c?.type === "castSpell" && [...(c.waterbend ?? [])].sort()).toEqual([...walls].sort());
+    const s = settle(run(s0, plan));
+    expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
+    expect(walls.every((id) => s.objects[id]!.tapped)).toBe(true);
+    // Its mana value is still 2 (CR 202.3): the additional cost isn't part of it.
+    expect(s.cards[s.objects[ids[0]!]!.cardId]!.manaCost).toBe("{U}{U}");
+  });
+
+  it("it can't be cast for {U}{U} alone, and isn't offered as an optional cost", () => {
+    const { s: s0, ap, ids } = setup([riverSpirit]);
+    for (const id of s0.battlefield) if (s0.objects[id]!.controller === ap && s0.cards[s0.objects[id]!.cardId]!.name !== "Island") s0.objects[id]!.tapped = true;
+    // Three Islands: {U}{U} and one more, not five.
+    expect(planCast(s0, ap, ids[0]!, undefined, undefined, "auto")).toBeNull();
+    expect(castProblem(s0, ap, ids[0]!, undefined, undefined, undefined, undefined, undefined, { kicks: [0] })).toMatch(/always paid/);
+  });
+
+  it("no more than five can be tapped for it, and only untapped artifacts and creatures you control", () => {
+    const { s: s0, ap, ids, opp } = setup([riverSpirit]);
+    const walls = Array.from({ length: 6 }, (_, i) => putOnBattlefield(s0, ap, wall(`Wall ${i}`)));
+    const theirs = putOnBattlefield(s0, opp, wall("Their Wall"));
+    expect(castProblem(s0, ap, ids[0]!, undefined, undefined, undefined, undefined, undefined, { waterbend: walls })).toMatch(/no more than 5/);
+    expect(castProblem(s0, ap, ids[0]!, undefined, undefined, undefined, undefined, undefined, { waterbend: [theirs] })).toMatch(/only artifacts and creatures you control/);
+    // Five is fine (what's left is {U}{U}, and the mana pool is empty).
+    expect(castProblem(s0, ap, ids[0]!, undefined, undefined, undefined, undefined, undefined, { waterbend: walls.slice(0, 5) })).toMatch(/not enough mana/);
+  });
+
+  it("Katara, Seeking Revenge: with its waterbend cost paid, she draws a card and doesn't discard", () => {
+    const { s: s0, ap, ids } = setup([katara]);
+    const plan = planCast(s0, ap, ids[0]!, undefined, undefined, "auto", undefined, { kicks: [0] });
+    let s = run(s0, plan);
+    const hand = s.players[ap]!.hand.length;
+    s = settle(s);
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+  });
+
+  it("Katara without it: she draws, then discards a card", () => {
+    const { s: s0, ap, ids } = setup([katara]);
+    let s = run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "auto"));
+    const hand = s.players[ap]!.hand.length;
+    s = settle(s);
+    expect(s.players[ap]!.hand.length).toBe(hand);
+  });
+
+  it("Ruinous Waterbending: -2/-2 to all creatures, and with its cost paid, 1 life for each creature that dies this turn", () => {
+    for (const kicks of [[0], []]) {
+      const { s: s0, ap, ids, opp } = setup([ruinous]);
+      putOnBattlefield(s0, opp, bear());
+      putOnBattlefield(s0, opp, bear({ name: "Other Bear" }));
+      const life = s0.players[ap]!.life;
+      const s = settle(run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "auto", undefined, kicks.length ? { kicks } : {})));
+      expect(s.players[ap]!.life).toBe(life + (kicks.length ? 2 : 0));
+    }
+  });
+
+  it("Spirit Water Revival: two cards; with its cost paid, its graveyard shuffled in, seven cards and no hand size limit; then it's exiled", () => {
+    const { s: s0, ap, ids } = setup([revival]);
+    const yard = putOnBattlefield(s0, ap, bear({ name: "Yard Bear" }));
+    s0.battlefield.splice(s0.battlefield.indexOf(yard), 1);
+    s0.objects[yard]!.zone = "graveyard";
+    s0.players[ap]!.graveyard.push(yard);
+    const before = s0.players[ap]!.hand.length - 1;
+    const plain = settle(run(structuredClone(s0), planCast(s0, ap, ids[0]!, undefined, undefined, "auto")));
+    expect(plain.players[ap]!.hand.length).toBe(before + 2);
+    expect(plain.objects[ids[0]!]!.zone).toBe("exile");
+    expect(plain.objects[yard]!.zone).toBe("graveyard");
+    const paid = settle(run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "auto", undefined, { kicks: [0] })));
+    expect(paid.players[ap]!.hand.length).toBe(before + 7);
+    expect(paid.objects[yard]!.zone).toBe("library");
+    expect(paid.objects[ids[0]!]!.zone).toBe("exile");
+    expect(paid.players[ap]!.noMaxHandSize).toBeTruthy();
   });
 });

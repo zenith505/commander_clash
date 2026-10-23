@@ -821,7 +821,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       if (!convokers(s).length) return continueCast({ ...d, harmonize: null });
       return setTapPick({ kind: "harmonize", objectId: d.objectId, chosen: [], draft: d });
     }
-    if (d.kicks === undefined && compiled.kicker)
+    if (d.kicks === undefined && compiled.kicker && !compiled.kicker.required)
       return setKickPick({ draft: d, label: card.name, costs: compiled.kicker.costs, multi: !!compiled.kicker.multi, name: kickerName(compiled.kicker), chosen: [] });
     // Inscriptions: one mode, or any number of them when kicked (CR 601.2b).
     const kickedModal = compiled.spell?.modal?.both === "kicked" ? compiled.spell : undefined;

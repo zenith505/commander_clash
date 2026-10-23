@@ -1581,9 +1581,9 @@ function altCastPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
     if (plan) return plan;
   }
   // Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" too (CR 118.9).
-  for (const a of [...(c.altCosts ?? []), ...altCostsFor(s, pid, obj(s, id)).filter((x) => x.kind === "evidence" || x.kind === "citadel")]) {
-    // Bolas's Citadel: life for the top card, while we'd still have 15 or more afterwards.
-    if (a.kind === "citadel" && player(s, pid).life - mv(s, id) < 15) continue;
+  for (const a of [...(c.altCosts ?? []), ...altCostsFor(s, pid, obj(s, id)).filter((x) => x.kind === "evidence" || x.kind === "citadel" || x.kind === "lifeForMv")]) {
+    // Bolas's Citadel, Demon of Fate's Design: life rather than mana, while we'd still have 15 or more afterwards.
+    if ((a.kind === "citadel" || a.kind === "lifeForMv") && player(s, pid).life - mv(s, id) < 15) continue;
     if (a.kind === "evoke" && !c.triggers.some((t) => t.event === "selfEnters" && !t.ifEvoked)) continue;
     if (a.kind === "bestow" || a.kind === "overload") continue; // tried first, see bestowPlan and overloadPlan
     const plan = castPlan(s, pid, id, false, undefined, a.kind);

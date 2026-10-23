@@ -3700,6 +3700,7 @@ export function castProblem(
     if (choices.alt === "wubrg" && x) return "X is 0 when you pay {W}{U}{B}{R}{G} rather than the mana cost";
     if (choices.alt === "payZero" && x) return "X is 0 when you pay {0} rather than the mana cost";
     if (choices.alt === "payZero" && !payZeroSource(s, pid, o)) return `nothing lets you pay {0} rather than ${d.name}'s mana cost now`;
+    if (choices.alt === "lifeForMv" && !payZeroSource(s, pid, o, true)) return `nothing lets you pay life rather than ${d.name}'s mana cost now`;
     if (choices.alt === "omniscience" && o.zone !== "hand") return "only spells cast from your hand are free";
     if (choices.alt === "citadel" && o.zone !== "library" && !castFromExileForLife(s, o, pid)) return "only the top card of your library is cast for life";
     // A foretell cost is paid only for a foretold card, after the turn it was foretold (CR 702.143a).
@@ -4218,6 +4219,12 @@ export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: Play
   }
   // As Foretold, Rooftop Storm: {0}, while one of `pid`'s permanents lets them (castProblem checks it's for this spell).
   if (alt === "payZero") return s && pid !== undefined && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && compileCard(defOf(s, obj(s, id))).payZero && characteristics(s, obj(s, id)).hasPrintedAbilities) ? { kind: "payZero", mana: "{0}" } : undefined;
+  // Demon of Fate's Design: life equal to the spell's mana value, X at 0 (rulings); castProblem checks it covers this spell.
+  if (alt === "lifeForMv") {
+    if (!s || pid === undefined || !s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && compileCard(defOf(s, obj(s, id))).payZero?.life && characteristics(s, obj(s, id)).hasPrintedAbilities)) return undefined;
+    const n = manaValue(parseManaCost(d.manaCost));
+    return { kind: "lifeForMv", mana: "", costs: [{ kind: "payLife", n }], text: `pay ${n} life` };
+  }
   if (alt === "evidence") {
     const n = s && pid !== undefined ? payEvidenceOf(s, pid) : undefined;
     return n === undefined ? undefined : { kind: "evidence", mana: "", costs: [{ kind: "collectEvidence", n }], text: `collect evidence ${n}` };
@@ -4255,13 +4262,13 @@ function payEvidenceOf(s: GameState, pid: PlayerId): number | undefined {
  * The permanent of `pid`'s whose "you may pay {0} rather than pay the mana cost" covers this spell now (As Foretold, Rooftop
  * Storm, Darksteel Monolith), X counted as 0 (rulings): one with no once-each-turn limit first, then the first unused one.
  */
-export function payZeroSource(s: GameState, pid: PlayerId, o: GameObject): GameObject | undefined {
+export function payZeroSource(s: GameState, pid: PlayerId, o: GameObject, life = false): GameObject | undefined {
   const d = defOf(s, o);
   if (isType(d, "Land")) return undefined;
   const used = s.turnLog?.payZeroUsed ?? [];
   const ok = s.battlefield.map((id) => obj(s, id)).filter((p) => {
     const z = compileCard(defOf(s, p)).payZero;
-    if (!z || controllerOf(s, p) !== pid || !characteristics(s, p).hasPrintedAbilities) return false;
+    if (!z || !!z.life !== life || controllerOf(s, p) !== pid || !characteristics(s, p).hasPrintedAbilities) return false;
     if (z.once && used.includes(`${p.id}@${p.zoneChanges ?? 0}`)) return false;
     if (z.fromHand && o.zone !== "hand") return false;
     if (z.fromExile && o.zone !== "exile") return false;
@@ -4277,7 +4284,7 @@ export function payZeroSource(s: GameState, pid: PlayerId, o: GameObject): GameO
 export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): NonNullable<CompiledCard["altCosts"]> {
   const own = compileCard(defOf(s, o)).altCosts ?? [];
   if (isType(defOf(s, o), "Land")) return own;
-  return [...own, ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(["evidence" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
+  return [...own, ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(["evidence" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
 }
 
 /** Artifacts tapped for improvise: untapped artifacts you control, each once, not also tapped for convoke. */
@@ -4505,6 +4512,11 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     if (compileCard(defOf(s, by)).payZero!.once) ((s.turnLog ??= {}).payZeroUsed ??= []).push(`${by.id}@${by.zoneChanges ?? 0}`);
     log(s, `${p.name} pays {0} rather than ${d.name}'s mana cost (${characteristics(s, by).name}).`);
   }
+  if (choices.alt === "lifeForMv") {
+    const by = payZeroSource(s, p.id, o, true)!;
+    ((s.turnLog ??= {}).payZeroUsed ??= []).push(`${by.id}@${by.zoneChanges ?? 0}`);
+    log(s, `${p.name} pays life rather than ${d.name}'s mana cost (${characteristics(s, by).name}).`);
+  }
   const from = zoneList(s, o)!;
   from.splice(from.indexOf(id), 1);
   o.zone = "stack";
@@ -4566,7 +4578,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const howText =
     (via ? ` from their graveyard (${describeVia(via.kind)})` : castFrom === "exile" ? " from exile" : "") +
     (choices.prototyped && choices.alt !== "prototype" ? " prototyped" : "") +
-    (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "payZero" ? " for {0}" : choices.alt === "omniscience" ? " without paying its mana cost" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt === "convert" ? " converted, for its More Than Meets the Eye cost" : choices.alt ? ` for its ${choices.alt} cost` : "") +
+    (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "payZero" ? " for {0}" : choices.alt === "lifeForMv" ? " for life" : choices.alt === "omniscience" ? " without paying its mana cost" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt === "convert" ? " converted, for its More Than Meets the Eye cost" : choices.alt ? ` for its ${choices.alt} cost` : "") +
     (madness && o.castAlt === "madness" ? " for its madness cost" : madness && o.castAlt === "miracle" ? " for its miracle cost" : "") +
     (choices.buyback ? ", paying buyback" : "") +
     (choices.splice?.length ? `, splicing ${choices.splice.map((c) => nameOf(s, c)).join(" and ")} onto it` : "") +

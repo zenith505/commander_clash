@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, cast, passAll, passUntil, putOnBattlefield, setup, target } from "./helpers";
-import { botActions, characteristics, isFullySupported, manaAbilitiesOn, objHasKeyword, objIsType, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { altCostsFor, botActions, characteristics, power, isFullySupported, manaAbilitiesOn, objHasKeyword, objIsType, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -421,5 +421,47 @@ describe("Tenuous Truce: sacrificed when you and the enchanted opponent attack e
     const s = declare(s0, them, [{ attacker: b, defender: ap }]);
     expect(on(s, t)).toBe(false);
     expect(logText(s)).toMatch(/Tenuous Truce/);
+  });
+});
+
+const demon = card("Demon of Fate's Design", "Enchantment Creature — Demon", "{4}{B}{B}", {
+  power: "6",
+  toughness: "6",
+  oracleText: "Flying, trample\nOnce during each of your turns, you may cast an enchantment spell by paying life equal to its mana value rather than paying its mana cost.\n{2}{B}, Sacrifice another enchantment: This creature gets +X/+0 until end of turn, where X is the sacrificed enchantment's mana value.",
+});
+
+describe("Demon of Fate's Design: an enchantment spell for life, once during each of your turns (CR 118.9)", () => {
+  const ench = card("Test Omen", "Enchantment", "{2}{W}", { oracleText: "At the beginning of your upkeep, you gain 1 life." });
+  const ench2 = card("Test Charm", "Enchantment", "{1}{U}", { oracleText: "At the beginning of your upkeep, you gain 1 life." });
+  const sorcery = card("Test Sorcery", "Sorcery", "{2}", { oracleText: "Draw a card." });
+  it("pays 3 life and no mana for a 3-mana enchantment; the second one this turn costs mana", () => {
+    supported(demon);
+    const { s: s0, ap, ids } = setup([ench, ench2, sorcery]);
+    putOnBattlefield(s0, ap, demon);
+    const life = s0.players[ap]!.life;
+    expect(altCostsFor(s0, ap, s0.objects[ids[0]!]!).find((a) => a.kind === "lifeForMv")?.text).toBe("pay 3 life");
+    expect(altCostsFor(s0, ap, s0.objects[ids[2]!]!).some((a) => a.kind === "lifeForMv")).toBe(false); // not an enchantment
+    let s = run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "auto", undefined, { alt: "lifeForMv" }));
+    expect(s.players[ap]!.life).toBe(life - 3);
+    expect(s.battlefield.filter((id) => s.objects[id]!.tapped)).toHaveLength(0);
+    s = passAll(s);
+    expect(s.battlefield).toContain(ids[0]);
+    expect(planCast(s, ap, ids[1]!, undefined, undefined, "auto", undefined, { alt: "lifeForMv" })).toBeNull();
+    expect(altCostsFor(s, ap, s.objects[ids[1]!]!).some((a) => a.kind === "lifeForMv")).toBe(false);
+  });
+  it("not during an opponent's turn", () => {
+    const { s: s0, ap, ids, opp } = setup([card("Test Flash Omen", "Enchantment", "{1}{W}", { oracleText: "Flash\nAt the beginning of your upkeep, you gain 1 life." })]);
+    putOnBattlefield(s0, ap, demon);
+    const s = passUntil(s0, "upkeep", opp);
+    expect(altCostsFor(s, ap, s.objects[ids[0]!]!).some((a) => a.kind === "lifeForMv")).toBe(false);
+  });
+  it("{2}{B}, sacrifice a 3-mana enchantment: +3/+0", () => {
+    const { s: s0, ap } = setup([]);
+    const d = putOnBattlefield(s0, ap, demon);
+    const e = putOnBattlefield(s0, ap, ench);
+    const plan = planActivate(s0, ap, d, 0, undefined, undefined, undefined, undefined, { sacrifice: [e] });
+    const s = passAll(run(s0, plan));
+    expect(s.battlefield).not.toContain(e);
+    expect(power(s, s.objects[d]!)).toBe(9);
   });
 });

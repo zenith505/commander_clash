@@ -1673,6 +1673,16 @@ export function compile(d: CardDef): CompiledCard {
     }
     // One with the Multiverse: casting without paying the mana cost is an alternative cost (CR 118.9), X is 0 (107.3b);
     // once for each such permanent (a new object again, rulings), during your turn, following the normal timing rules.
+    // Demon of Fate's Design: "Once during each of your turns, you may cast an enchantment spell by paying life equal to its
+    // mana value rather than paying its mana cost": an alternative cost (CR 118.9), X is 0 (rulings), from wherever the
+    // spell may be cast; once for each such permanent, as for One with the Multiverse.
+    const lifeAlt = /^Once during each of your turns, you may cast an? ([a-z]+) spell by paying life equal to its mana value rather than paying its mana cost\.$/.exec(line);
+    if (lifeAlt) {
+      const spec = parseTargetPhrase(`${lifeAlt[1]} card from a graveyard`);
+      if (spec?.kind !== "card") out.unsupported.push(raw);
+      else out.payZero = { filter: (({ owner: _, ...rest }) => ({ ...rest, text: `${lifeAlt[1]} spell` }))(spec), once: true, yourTurn: true, life: true };
+      continue;
+    }
     if (line === "Once during each of your turns, you may cast a spell from your hand or the top of your library without paying its mana cost.") {
       out.payZero = { once: true, yourTurn: true, fromHandOrTop: true };
       continue;

@@ -733,3 +733,32 @@ describe("Sisay, Weatherlight Captain: colors among other legendaries; a search 
     expect(pend?.cards ?? []).toHaveLength(0);
   });
 });
+
+const commitMemory = scry(
+  "split",
+  [
+    { name: "Commit", mana_cost: "{3}{U}", type_line: "Instant", oracle_text: "Put target spell or nonland permanent into its owner's library second from the top." },
+    { name: "Memory", mana_cost: "{4}{U}{U}", type_line: "Sorcery", oracle_text: "Aftermath (Cast this spell only from your graveyard. Then exile it.)\nEach player shuffles their hand and graveyard into their library, then draws seven cards." },
+  ],
+  { keywords: ["Aftermath"] },
+);
+
+describe("Commit: a spell or nonland permanent goes second from the top of its owner's library", () => {
+  const sorcery = card("Test Sorcery", "Sorcery", "{1}{R}", { oracleText: "Draw a card." });
+  it("a spell leaves the stack without resolving (not countered)", () => {
+    supported(commitMemory);
+    const { s: s0, ap, ids } = setup([sorcery, commitMemory]);
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    const item = s.stack.at(-1)!;
+    s = run(s, planCast(s, ap, ids[1]!, [{ kind: "stack", id: item.id }], undefined, "auto", undefined, { face: 0 }));
+    s = passAll(s);
+    expect(s.stack).toHaveLength(0);
+    expect(s.players[ap]!.library[1]).toBe(ids[0]);
+  });
+  it("a permanent: an opponent's creature goes second from the top of their library", () => {
+    const { s: s0, ap, ids, opp } = setup([commitMemory]);
+    const bear = putOnBattlefield(s0, opp, card("Test Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    const s = passAll(run(s0, planCast(s0, ap, ids[0]!, [target(bear)], undefined, "auto", undefined, { face: 0 })));
+    expect(s.players[opp]!.library[1]).toBe(bear);
+  });
+});

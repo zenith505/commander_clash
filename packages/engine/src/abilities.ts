@@ -2417,6 +2417,8 @@ export type Effect =
        * (CR 101.2 doesn't apply); otherwise like Remand's.
        */
       bounce?: true;
+      /** With `bounce`: "Put target spell ... into its owner's library second from the top" (Commit): there instead of the hand. */
+      librarySecond?: true;
       /** "Exile any number of target spells" (Mindbreak Trap): not a counter either, so it exiles one that can't be countered (rulings). */
       exileSpell?: true;
       /** "Exile target spell. It becomes plotted." (Aven Interrupter, CR 702.170c). */

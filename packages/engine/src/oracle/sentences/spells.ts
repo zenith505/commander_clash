@@ -417,6 +417,14 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const i = addTarget(ctx, spec);
     return [{ type: "counterSpell", index: i, bounce: true }, { type: "bounce", what: { ref: "target", index: i } }];
   }
+  // Commit: "Put target spell or nonland permanent into its owner's library second from the top": a spell isn't countered
+  // (rulings), a permanent goes there as for "put target creature ...".
+  if ((m = /^Put target spell or (.+?) into its owner's library second from the top$/i.exec(s))) {
+    const perm = parseTargetPhrase(m[1]!);
+    if (perm?.kind !== "object" || perm.controller || perm.tapped !== undefined || perm.combat || perm.xRange || perm.bound) return null;
+    const i = addTarget(ctx, { kind: "spell", types: [], notTypes: [], notColors: [], orPermanent: perm, text: `target spell or ${m[1]!.toLowerCase()}` });
+    return [{ type: "counterSpell", index: i, bounce: true, librarySecond: true }, { type: "putInLibrary", what: { ref: "target", index: i }, position: "second" }];
+  }
   // "Return target spell to its owner's hand" (Reprieve): it leaves the stack without being countered.
   if ((m = /^Return target (.*?spell(?: you don't control| an opponent controls)?) to its owner's hand$/i.exec(s))) {
     const spec = parseTargetPhrase(m[1]!);

@@ -585,7 +585,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Put target creature into its owner's library second from the top" (Bury in Books), "third from the top" (Teferi,
   // Hero of Dominaria; Shattered Ego's "enchanted creature").
-  if ((m = /^Put (target .+?|~|enchanted creature) into its owner's library (second|third) from the top$/i.exec(s)) && !/graveyard$/i.test(m[1]!)) {
+  if ((m = /^Put (target .+?|~|enchanted creature) into its owner's library (second|third) from the top$/i.exec(s)) && !/graveyard$/i.test(m[1]!) && !/^target spell or /i.test(m[1]!)) {
     const what = parseObject(m[1]!, ctx);
     return what && (what.ref === "target" || what.ref === "self" || what.ref === "attached") ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() as "second" | "third" }] : null;
   }

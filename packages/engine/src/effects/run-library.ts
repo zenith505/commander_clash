@@ -75,6 +75,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const ids = p.library.slice(0, amountNow(s, e.n, { ...ctx, eachOne: pid }));
         for (const id of ids) moveObject(s, id, "exile");
         if (ids.length === 1 && s.resolving) s.resolving.exiledTop = { id: ids[0]!, zc: s.objects[ids[0]!]!.zoneChanges ?? 0 };
+        if (s.resolving) s.resolving.exiledTopCards = ids;
         // An empty library: nothing happens (ingest rulings).
         if (ids.length) log(s, `${p.name} exiles ${ids.map((id) => defOf(s, s.objects[id]!).name).join(", ")} from the top of their library.`);
         // Only permanent cards can be put onto the battlefield (CR 110.4b); they enter at the same time.
@@ -729,7 +730,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // still shuffled after, rulings); the same top cards for the whole search.
         const top = searchTop(s, p.id);
         const lib = libOf(p.id).library;
-        let cards = [...(yardOnly ? [] : top === undefined ? lib : lib.slice(0, top)), ...(e.orGraveyard ? p.graveyard : [])].filter(fits);
+        let cards = [...(yardOnly ? [] : top === undefined ? lib : lib.slice(0, top)), ...(e.orGraveyard || e.andGraveyard ? p.graveyard : [])].filter(fits);
         // At most one of each name: cards with the same name in a library are alike, so one of each is offered.
         if (e.oneEach) cards = cards.filter((id, i) => cards.findIndex((x) => sameName(defOf(s, obj(s, x)).name, defOf(s, obj(s, id)).name)) === i);
         if (e.totalMv !== undefined) cards = cards.filter((id) => defMv(defOf(s, obj(s, id))) <= e.totalMv!);
@@ -802,9 +803,15 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const shown = e.reveal || e.dest.zone === "battlefield" || (e.dest.zone === "exile" && !e.dest.faceDown) || exiledFor(pid) !== undefined ? ` (${names.join(", ")})` : "";
         const whose = lib === p ? "their" : `${lib.name}'s`;
         const yardOnly = sc.searchZones === "graveyard";
-        const where = yardOnly ? `${whose} graveyard` : e.orGraveyard ? `${whose} library and graveyard` : `${whose} library`;
+        const where = yardOnly ? `${whose} graveyard` : e.orGraveyard || e.andGraveyard ? `${whose} library and graveyard` : `${whose} library`;
         log(s, `${p.name} searches ${where}${found.length ? `, finds ${found.length === 1 ? "a card" : `${found.length} cards`}${shown}${exiledFor(pid) !== undefined ? ` and exiles ${found.length === 1 ? "it" : "them"} for ${player(s, exiledFor(pid)!).name} to play` : ""}` : " and finds nothing"}${(searchers.length > 1 && e.dest.zone !== "libraryTop") || yardOnly || e.noShuffle ? "" : lib === p ? ", and shuffles" : `, and ${lib.name} shuffles`}.`);
         for (const id of found) moves.push({ pid, id });
+        // "And exile the rest" (Doomsday): every other card in the library and graveyard, before the chosen cards move.
+        if (e.exileRest && !barred(pid)) {
+          const rest = [...lib.library, ...(e.andGraveyard ? p.graveyard : [])].filter((id) => !found.includes(id));
+          if (rest.length) log(s, `${p.name} exiles the rest of their library${e.andGraveyard ? " and graveyard" : ""} (${rest.length} card${rest.length === 1 ? "" : "s"}).`);
+          for (const id of rest) moveObject(s, id, "exile");
+        }
         // "Then shuffles and puts that card on top": the shuffle comes first, for each of them (Scheming Symmetry).
         if ((searchers.length === 1 || e.dest.zone === "libraryTop") && !yardOnly && !e.noShuffle) shuffleLibrary(s, lib);
         if (e.noShuffle && !yardOnly) r.searchedHere = true;
@@ -824,6 +831,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           const p = player(s, pid);
           const to = dest(pid, id);
           if (to.zone === "cast") r.searchCast = id;
+          else if (to.zone === "libraryTop" && obj(s, id).zone === "graveyard") moveObject(s, id, "library", { top: true });
           else if (to.zone === "libraryTop") {
             obj(s, id).zone = "library";
             // Third from the top, or on the bottom of a library with fewer than 3 other cards (rulings on Long-Term Plans).

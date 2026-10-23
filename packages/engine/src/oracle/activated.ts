@@ -176,6 +176,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   let oncePerTurn = keyword === "Boast";
   let maxPerTurn: number | undefined;
   let xMin: number | undefined;
+  let uncopyable = false;
   let onceEver = keyword === "Exhaust" || keyword === "Power-up";
   // "Activate only if you have the city's blessing." (CR 602.5b): a condition checked as it's activated.
   let activateIf: ActivatedAbility["activateIf"] = keyword === "Boast" ? { kind: "self", is: "attackedThisTurn" } : undefined;
@@ -211,6 +212,19 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     if (/ Spend only mana of the chosen color to activate this ability\.$/.test(effectText) && !spendOnlyChosenColor) {
       spendOnlyChosenColor = true;
       effectText = effectText.slice(0, effectText.length - " Spend only mana of the chosen color to activate this ability.".length);
+      found = true;
+    }
+    // "This ability can't be copied and X can't be 0." (Gogo, Master of Mimicry): a copy effect makes no copy of it
+    // (AbilityBody.uncopyable), and the X paid is 1 or more.
+    if (/ This ability can't be copied and X can't be 0\.$/.test(effectText) && !xMin && !uncopyable && /\{X\}/.test(costs)) {
+      xMin = 1;
+      uncopyable = true;
+      effectText = effectText.slice(0, effectText.length - " This ability can't be copied and X can't be 0.".length);
+      found = true;
+    }
+    if (/ This ability can't be copied\.$/.test(effectText) && !uncopyable) {
+      uncopyable = true;
+      effectText = effectText.slice(0, effectText.length - " This ability can't be copied.".length);
       found = true;
     }
     // "X can't be 0." (Ruthless Technomancer, Lair of the Hydra's {X}{G}): only with an X in its costs.
@@ -294,6 +308,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // target": "it" is the source, the only object named before it.
   const body = putFromHand || putFromCommand ? { targets: [], effects: [{ type: "putOntoBattlefield" as const, what: { ref: "selfCard" as const } }], text: effectText } : parseBody(effectText.replace(/^It (?=deals\b)/, "~ ").replace(/^(Put [^.]+ counters? on ~\. )It (?=deals\b)/, "$1~ "), { activated: true, ...(returnsSelf || inYard ? { selfCard: true } : {}), ...(fromHand ? { discardedSelf: true as const } : {}), ...(extra.some((c) => c.kind === "exileFromGraveyard" && c.linked) ? { costLinked: true } : {}) });
   if (!body) return "fail";
+  if (uncopyable) body.uncopyable = true;
   // An activated ability without a target that could add mana, and that moves no card to or from a library, is a mana
   // ability (CR 605.1a): it doesn't use the stack (605.3b). One whose other instructions aren't known to stay clear of
   // libraries isn't compiled.

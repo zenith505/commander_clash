@@ -302,6 +302,11 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const id = e.spell === "self" ? r.item.id : typeof e.spell === "object" && "epic" in e.spell ? e.spell.epic : i < 0 ? ctx.cause : t?.kind === "stack" && ctx.legal[i] ? t.id : undefined;
         const orig = e.spell === "self" ? r.item : id ? (s.stack.find((x) => x.id === id) ?? s.castItems?.[id] ?? s.epics?.[id]) : undefined;
         if (!orig || (orig.kind !== "spell" && !(orig.kind === "ability" && orig.body))) return;
+        // "This ability can't be copied" (Gogo), "~ can't be copied" (See Double): no copy is made.
+        if (orig.body?.uncopyable) {
+          log(s, `${orig.description} can't be copied.`);
+          return;
+        }
         const n =
           e.n === "storm"
             ? (orig.castNth ?? 0)

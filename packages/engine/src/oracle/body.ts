@@ -218,7 +218,7 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx): Effect | null |
 const ROW_MARK = "\u0001";
 
 /** Effects that can stop a resolution to wait for a player's choice. */
-const PAUSING = new Set<Effect["type"]>(["vote", "attachAny", "discard", "reorderGraveyard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure", "tapOrUntap", "untapUpTo", "castFromHand", "punisher", "sacrificeEach", "venture", "chooseFromGraveyard", "keepRest"]);
+const PAUSING = new Set<Effect["type"]>(["vote", "attachAny", "discard", "reorderGraveyard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure", "tapOrUntap", "untapUpTo", "castFromHand", "punisher", "sacrificeEach", "venture", "chooseFromGraveyard", "keepRest", "villainous"]);
 /** Effects that can stop for a choice partway: they can't share a conditional or a loop with other effects. */
 const pauses = (e: Effect) => PAUSING.has(e.type) || (e.type === "putInLibrary" && e.position === "ownersChoice") || (e.type === "roll" && !!e.chooseOne);
 
@@ -477,7 +477,9 @@ function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect:
   const s = sentences[shuffleFirst ? at + 1 : at] ?? "";
   const reveal = (shuffleFirst ? /^Reveal cards from the top of it until you reveal a nonland card$/ : /^[Rr]eveal cards from the top of your library until you reveal a nonland card$/).test(s);
   const exile = !shuffleFirst && /^[Ee]xile cards from the top of your library until you exile a nonland card$/.test(s);
-  const they = shuffleFirst ? null : /^(Target opponent|Target player) exiles cards from the top of their library until they exile a nonland card$/.exec(s);
+  // "They exile cards ... until they exile a nonland card" in a villainous choice's option (Ensnared by the Mara): the
+  // player facing it, the event player as it runs.
+  const they = shuffleFirst ? null : (/^(Target opponent|Target player) exiles cards from the top of their library until they exile a nonland card$/.exec(s) ?? (ctx.eventPlayer ? /^(They|That player) exiles? cards from the top of their library until they exile a nonland card$/.exec(s) : null));
   const flourish = !shuffleFirst && /^If that (?:permanent|creature) is destroyed this way, its controller exiles cards from the top of their library until they exile a nonland card, then they may cast that card without paying its mana cost$/.test(s);
   if (!reveal && !exile && !they && !flourish) return null;
   if (flourish) {
@@ -504,7 +506,7 @@ function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect:
   if (suspend && /^If it doesn't have suspend, it gains suspend$/.test(sentences[next + 1] ?? ""))
     return { effect: { type: "exileUntilNonland", then: "suspend", suspend: Number(amt(suspend[1]!)) }, next: next + 2 };
   if (!then) return null;
-  const who = they ? parsePlayer(they[1]!, ctx) : undefined;
+  const who = they ? (/^(?:They|That player)$/.test(they[1]!) ? ({ ref: "eventPlayer" } as const) : parsePlayer(they[1]!, ctx)) : undefined;
   if (they && !who) return "fail";
   return { effect: { type: "exileUntilNonland", ...(who ? { who } : {}), ...(reveal ? { reveal: true as const } : {}), ...(shuffleFirst ? { shuffleFirst: true as const } : {}), then }, next: next + 1 };
 }
@@ -1068,7 +1070,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Nor "exile the top two cards of your library, then choose one of them" (Party Thrasher): the choice is of those cards.
     // Nor "you may exile target creature you control, then return that card to the battlefield" (Conjurer's Closet): one
     // blink, all of it optional.
-    .flatMap((x) => (/^If [^,]+, /.test(x) || /^[Yy]ou may exile [^,]+, then return (?:it|that card) to the battlefield under (?:its owner's|your) control\.?$/.test(x) || WHEEL.test(x) || /^(?:\w+ player shuffles (?:their|the cards from their) .+ into their library, then draws|[Ss]huffle the cards from your hand into your library, then draw) /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then reveals the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|sacrifices all other creatures they control$|destroy the rest$|meld them into |choose one of them$|exile them again$)/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
+    .flatMap((x) => (/^If [^,]+, /.test(x) || / faces? a villainous choice — /.test(x) || /^[Yy]ou may exile [^,]+, then return (?:it|that card) to the battlefield under (?:its owner's|your) control\.?$/.test(x) || WHEEL.test(x) || /^(?:\w+ player shuffles (?:their|the cards from their) .+ into their library, then draws|[Ss]huffle the cards from your hand into your library, then draw) /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then reveals the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|sacrifices all other creatures they control$|destroy the rest$|meld them into |choose one of them$|exile them again$)/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
     // "Target opponent reveals their hand and you choose a nonland card from it": two instructions, in order.
     .flatMap((x) => x.split(/(?<=reveals (?:their|his or her) hand) and (?=you choose )/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p)))
     .flatMap(splitSpentPair)
@@ -2247,6 +2249,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       else sentences.splice(shuffleAt, 1);
       continue;
     }
+    // Doomsday: "Search your library and graveyard for five cards and exile the rest. Put the chosen cards on top of your
+    // library in any order.": five from the two zones together, all of them if there are fewer (rulings, CR 701.23d); the
+    // rest of both zones is exiled, then the five go on top in the order you choose, with no shuffle.
+    const doom = /^Search your library and graveyard for (two|three|four|five|six|seven) cards and exile the rest$/.exec(s);
+    if (doom && sentences[si + 1]?.replace(/\.$/, "") === "Put the chosen cards on top of your library in any order") {
+      effects.push({ type: "search", n: amt(doom[1]!), upTo: false, reveal: false, dest: { zone: "libraryTop" }, andGraveyard: true, exileRest: true, noShuffle: true });
+      si++;
+      continue;
+    }
     // Claim Jumper: "you may search your library for a Plains card and put it onto the battlefield tapped. Then if an
     // opponent controls more lands than you, repeat this process once. If you search your library this way, shuffle."
     // The process (the "you may" too) happens again only if the condition holds then (rulings); one shuffle at the end,
@@ -2486,6 +2497,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const filter = then && parseSearchFilter(`${then[1]!} card`);
       if (what?.ref !== "target" || what.n || !filter) return null;
       effects.push({ type: "shuffleIntoLibrary", what }, { type: "revealTop", who: { ref: "targetOwner", index: what.index } }, { type: "if", cond: { kind: "revealedIs", filter }, effects: [{ type: "putOntoBattlefield", what: { ref: "revealed" }, owner: true }] });
+      si++;
+      continue;
+    }
+    // Goblin Guide: "defending player reveals the top card of their library. If it's a land card, that player puts it into
+    // their hand.": that player's library, and only "that player puts it into their hand" after it (CR 701.20a).
+    const defReveal = /^([Dd]efending player) reveals the top card of their library$/.exec(s);
+    if (defReveal) {
+      const who = parsePlayer(defReveal[1]!, ctx);
+      const then = /^If it's an? (.+?) card, that player puts it into their hand\.?$/.exec(sentences[si + 1] ?? "");
+      const filter = then && parseSearchFilter(`${then[1]!} card`);
+      if (!who || !filter) return null;
+      effects.push({ type: "revealTop", who }, { type: "if", cond: { kind: "revealedIs", filter }, effects: [{ type: "bounce", what: { ref: "revealed" } }] });
       si++;
       continue;
     }

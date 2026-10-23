@@ -1207,7 +1207,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (!hit.length) continue;
         const same = (e: string, tt: TriggeredAbility) => e === "groupDealsDamageToPlayers" && tt.body.text === t.body.text && JSON.stringify(tt.damageGroup) === JSON.stringify(g);
         if (g.perPlayer) for (const p of s.turnOrder.filter((q) => hit.includes(q))) add(w, wc, same, undefined, undefined, undefined, undefined, undefined, undefined, { player: p });
-        else add(w, wc, same, undefined, undefined, undefined, undefined, undefined, undefined, { amount: hit.length });
+        else add(w, wc, same, undefined, undefined, undefined, undefined, undefined, undefined, { amount: hit.length, players: hit });
       }
     }
   } else if (ev.type === "excessDamage") {

@@ -290,8 +290,13 @@ function parseGroupDamagesPlayers(line: string): TriggeredAbility | "fail" | nul
   const m = /^Whenever one or more (.+?) you control deal damage to (your opponents|a player), (.+)$/.exec(line);
   if (!m) return null;
   const spec = parseTargetPhrase(m[1]!.split(/\s+/).map(singularWord).join(" "));
-  if (spec?.kind !== "object" || /\b(?:they|them|their|those)\b/.test(m[3]!)) return "fail";
   const opponents = m[2] === "your opponents";
+  // Breeches, Brazen Plunderer: "exile the top card of each of those opponents' libraries. You may play those cards this
+  // turn, and you may spend mana as though it were mana of any color to cast those spells.": each opponent dealt damage
+  // (rulings), each card face up with its own permission (CR 400.7), mana of any type for those spells (CR 609.4b).
+  if (spec?.kind === "object" && opponents && m[3] === "exile the top card of each of those opponents' libraries. You may play those cards this turn, and you may spend mana as though it were mana of any color to cast those spells.")
+    return { event: "groupDealsDamageToPlayers", body: { targets: [], effects: [{ type: "impulse", n: 1, until: "thisTurn", who: { ref: "eventPlayers" }, anyType: true }], text: m[3]! }, damageGroup: { filter: { ...spec, text: m[1]! }, opponents: true } };
+  if (spec?.kind !== "object" || /\b(?:they|them|their|those)\b/.test(m[3]!)) return "fail";
   const each = opponents ? /^you create (an?) (.+?) token for each opponent dealt damage(\.?)$/.exec(m[3]!) : null;
   if (opponents && !each) return "fail";
   const body0 = parseBody(each ? `Create X ${each[2]} tokens${each[3]}` : m[3]!, { eventPlayer: !opponents });

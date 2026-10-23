@@ -110,6 +110,8 @@ export type Count =
   | { kind: "discardedThisWay"; greatest?: true; /** Only these players' discards: "each player discards their hand, then draws that many cards" is each their own (Dark Deal). */ who?: PlayerRef }
   /** "The total mana value of those cards" after "you mill three cards" (Combustible Gearhulk): X counts 0 (CR 107.3). */
   | { kind: "milledManaValue" }
+  /** "The total mana value of those exiled cards" (Ensnared by the Mara): of the cards an "exile the top N cards" before it exiled (GameState.resolving.exiledTopCards). */
+  | { kind: "exiledTopManaValue" }
   /** "For each card exiled from their hand this way" (Lost Legacy): of the cards an exileNamed instruction exiled. */
   | { kind: "exiledFromHandThisWay" }
   /** "Draw that many cards" after "sacrifice any number of other creatures": how many its instructions sacrificed. */
@@ -767,6 +769,8 @@ export type PlayerRef =
   | { ref: "targetOwner"; index: number } // "its owner": a targeted card's owner (Pharika's "Its owner creates ...")
   /** "That player" in "Whenever ~ deals combat damage to a player, that player discards a card". */
   | { ref: "eventPlayer" }
+  /** "Each of those opponents" (Breeches, Brazen Plunderer): the players a "one or more ... deal damage to your opponents" event was about (TriggerEventInfo.players). */
+  | { ref: "eventPlayers" }
   /** "That attacking player" (Breena): the player who attacked, for "playerAttacksYourOpponent" (TriggerEventInfo.attacker). */
   | { ref: "attackingPlayer" }
   /** "Each other opponent" after "Whenever ~ deals combat damage to an opponent": this ability's controller's opponents but that one. */
@@ -2267,6 +2271,12 @@ export type Effect =
    */
   | { type: "eachChooses"; who: PlayerRef; options: string[]; text: string }
   /**
+   * "Each opponent faces a villainous choice — A, or B" (CR 701.55): each of `who` in APNAP order chooses one of the two
+   * options, then all of it is done, that player being the event player in it, before the next one chooses (701.55d).
+   * `labels`: the options' text, for the prompt.
+   */
+  | { type: "villainous"; who: PlayerRef; options: [Effect[], Effect[]]; labels: [string, string] }
+  /**
    * "For each player who chose fame, gain control of a creature that player controls until end of turn": for each player
    * who chose `chose`, in APNAP order, its controller chooses one of that player's creatures (not targeted); then it gains
    * control of all of them for the duration. Afterwards "those creatures" are they (ObjRef created).
@@ -2724,7 +2734,7 @@ export type Effect =
    * (CR 701.23). `filter` unset = any card. Found cards go to `dest`; with `others`, only the first
    * does and the rest go there (Cultivate). The library is then shuffled (CR 701.20).
    */
-  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; reveal: boolean; /** Whose library: "its controller may search their library" (Path to Exile). Yours if left out. */ who?: PlayerRef; /** "Search target opponent's library" (Bribery): you search that player's library, which they then shuffle. */ library?: PlayerRef; /** "Search your library and/or graveyard ... If you search your library this way, shuffle" (Finale of Devastation): your graveyard, and your library too if you choose. */ orGraveyard?: boolean; /** "A card named A and/or a card named B" (Alpine Houndmaster), "cards with different names" (Three Dreams): at most one card of each name. */ oneEach?: true; /** "Up to two basic land cards that share a land type" (Myriad Landscape): the cards found all have a land type in common. */ shareLandType?: true; /** "Each player may search their library" (Veteran Explorer): each one, as their turn to search comes, chooses whether to (rulings); only those who did shuffle. */ may?: true; /** "Target opponent chooses two of those cards. Put the chosen cards into your graveyard and the rest into your hand" (Gifts Ungiven): `n` of the cards found, chosen by that opponent (by an opponent you choose as it resolves if left out), go `to`; the rest go to `dest`. */ split?: { chooser?: PlayerRef; n: number; to: SearchDest }; /** "Put it onto the battlefield tapped if it's a land card. Otherwise, put it into your hand." (Archdruid's Charm): where a land card found goes instead of `dest`. */ landTo?: SearchDest; /** "A Forest card and a Plains card" (Krosan Verge): up to one card for each of these, each card found matching a different one. */ oneOfEach?: TargetSpec[]; /** The cards a "hold" flicker exiled enter with the found cards, at the same time, under your control (Sword of Hearth and Home). */ withHeld?: true; /** Not shuffled now: a later "shuffle" with `ifSearched` does it once (Claim Jumper). */ noShuffle?: true; /** "Any number of creature cards with total mana value 6 or less" (Protean Hulk): of all the cards found. */ totalMv?: number; /** Scholar of New Horizons: "If an opponent controls more lands than you, you may put that card onto the battlefield tapped. If you don't put the card onto the battlefield, put it into your hand": the one card found may go here instead of `dest` while `cond` holds, the searcher's choice. */ mayInstead?: { dest: SearchDest; cond: StaticCondition } }
+  | { type: "search"; filter?: TargetSpec; n: Amount; upTo: boolean; dest: SearchDest; others?: SearchDest; reveal: boolean; /** Whose library: "its controller may search their library" (Path to Exile). Yours if left out. */ who?: PlayerRef; /** "Search target opponent's library" (Bribery): you search that player's library, which they then shuffle. */ library?: PlayerRef; /** "Search your library and/or graveyard ... If you search your library this way, shuffle" (Finale of Devastation): your graveyard, and your library too if you choose. */ orGraveyard?: boolean; /** "A card named A and/or a card named B" (Alpine Houndmaster), "cards with different names" (Three Dreams): at most one card of each name. */ oneEach?: true; /** "Up to two basic land cards that share a land type" (Myriad Landscape): the cards found all have a land type in common. */ shareLandType?: true; /** "Each player may search their library" (Veteran Explorer): each one, as their turn to search comes, chooses whether to (rulings); only those who did shuffle. */ may?: true; /** "Target opponent chooses two of those cards. Put the chosen cards into your graveyard and the rest into your hand" (Gifts Ungiven): `n` of the cards found, chosen by that opponent (by an opponent you choose as it resolves if left out), go `to`; the rest go to `dest`. */ split?: { chooser?: PlayerRef; n: number; to: SearchDest }; /** "Put it onto the battlefield tapped if it's a land card. Otherwise, put it into your hand." (Archdruid's Charm): where a land card found goes instead of `dest`. */ landTo?: SearchDest; /** "A Forest card and a Plains card" (Krosan Verge): up to one card for each of these, each card found matching a different one. */ oneOfEach?: TargetSpec[]; /** The cards a "hold" flicker exiled enter with the found cards, at the same time, under your control (Sword of Hearth and Home). */ withHeld?: true; /** Not shuffled now: a later "shuffle" with `ifSearched` does it once (Claim Jumper). */ noShuffle?: true; /** "Search your library and graveyard for five cards" (Doomsday): both zones together, no choice. */ andGraveyard?: true; /** "And exile the rest" (Doomsday): every other card in the zones searched is exiled before the found cards are put where they go. */ exileRest?: true; /** "Any number of creature cards with total mana value 6 or less" (Protean Hulk): of all the cards found. */ totalMv?: number; /** Scholar of New Horizons: "If an opponent controls more lands than you, you may put that card onto the battlefield tapped. If you don't put the card onto the battlefield, put it into your hand": the one card found may go here instead of `dest` while `cond` holds, the searcher's choice. */ mayInstead?: { dest: SearchDest; cond: StaticCondition } }
   /** "Reveal the top three cards of your library. An opponent chooses one of them. Put that card into your graveyard and the rest into your hand" (Murmurs from Beyond): the chooser (an opponent you choose as it resolves if left out) picks one revealed card (one that fits `filter`), which goes `to`; the rest go `rest`, or stay on top. */
   | { type: "revealPick"; n: Amount; chooser?: PlayerRef; filter?: TargetSpec; to: SearchDest; rest?: SearchDest }
   /**
@@ -3069,7 +3079,7 @@ export type SpellCondition =
 
 /** Every effect, including the ones inside "you may" and "if", in order. */
 export const allEffects = (effects: Effect[]): Effect[] =>
-  effects.flatMap((e) => (e.type === "may" || e.type === "if" ? [e, ...allEffects(e.effects), ...allEffects(e.otherwise ?? [])] : e.type === "either" ? [e, ...e.options.flatMap(allEffects)] : e.type === "together" || e.type === "repeatMay" ? [e, ...allEffects(e.effects)] : [e]));
+  effects.flatMap((e) => (e.type === "may" || e.type === "if" ? [e, ...allEffects(e.effects), ...allEffects(e.otherwise ?? [])] : e.type === "either" || e.type === "villainous" ? [e, ...e.options.flatMap(allEffects)] : e.type === "together" || e.type === "repeatMay" ? [e, ...allEffects(e.effects)] : [e]));
 
 /** A sequence of effects with the targets they need, like a spell's text or one ability. */
 export interface AbilityBody {
@@ -3078,6 +3088,8 @@ export interface AbilityBody {
   text: string;
   /** "This ability still resolves if its target becomes illegal" (Gilded Drake): it isn't removed by CR 608.2b. */
   resolvesAnyway?: true;
+  /** "This ability can't be copied" (Gogo, Master of Mimicry), "~ can't be copied" (See Double): an effect that would copy it makes no copy. */
+  uncopyable?: true;
   /**
    * For modal text ("Choose one —" and a bulleted list, CR 700.2): the modes. A modal body
    * has no targets or effects of its own; see `withModes` in modes.ts. `costs`: spree's additional cost for each

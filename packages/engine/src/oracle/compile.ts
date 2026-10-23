@@ -498,7 +498,8 @@ export function compile(d: CardDef): CompiledCard {
     // 714.2b) or a modal choice.
     // "10,000 Needles — " (Jumbo Cactuar) starts with a number.
     const word = !isSpell ? /^([A-Z][^—•":{}]*?|\d[\d,]* [A-Z][^—•":{}]*?) — (?![{+•])/.exec(line) : null;
-    if (word && !KEYWORD_WORDS.has(word[1]!.toLowerCase()) && !/^[IVX]+(?:, [IVX]+)*$/.test(word[1]!) && !/^(?:Choose\b|To solve$)/.test(word[1]!)) line = line.slice(word[0].length);
+    // "... faces a villainous choice — " (CR 701.55a) is the instruction itself.
+    if (word && !KEYWORD_WORDS.has(word[1]!.toLowerCase()) && !/^[IVX]+(?:, [IVX]+)*$/.test(word[1]!) && !/^(?:Choose\b|To solve$)/.test(word[1]!) && !/\bfaces? a villainous choice$/.test(word[1]!)) line = line.slice(word[0].length);
     // "Vivid — {T}: For each color among permanents you control, add ..." (Bloom Tender): an ability word too.
     else if (!isSpell && /^Vivid — \{/.test(line)) line = line.replace(/^Vivid — /, "");
     if (!line) continue;

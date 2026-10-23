@@ -29,6 +29,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return { ...c, count: { ...c.count, filter: { ...c.count.filter, subtypes: types, text: p.replace(/^the number of /, "") } } };
   }
   if (ctx?.milledThisWay && /^the total mana value of those cards$/i.test(p)) return { count: { kind: "milledManaValue" } };
+  // "Exiles the top four cards of their library and ~ deals damage equal to the total mana value of those exiled cards"
+  // (Ensnared by the Mara): the cards it exiled, a card with {X} in its mana cost counting 0 (CR 202.3e).
+  if (/^the total mana value of those exiled cards$/i.test(p)) return { count: { kind: "exiledTopManaValue" } };
   // "The number of experience counters you have", "for each experience counter you have" (CR 122.1).
   if ((each && /^experience counter you have$/i.test(p)) || /^the number of experience counters you have$/i.test(p)) return { count: { kind: "experience", who: { ref: "you" } } };
   // "For each Urza's land you control" (Urza's Workshop): the land type Urza's (CR 205.3i), not a possessive.

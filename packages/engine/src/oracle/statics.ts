@@ -544,6 +544,9 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^you gained and lost life this turn$/.test(text)) return { kind: "allOf", conds: [{ kind: "lifeGainedThisTurn", n: 1 }, { kind: "amount", amount: { count: { kind: "lifeLostThisTurn", who: { ref: "you" } } }, min: 1 }] };
   // "If you created a token this turn" (Bennie Bracks, Zoologist).
   if (/^you created a token this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "tokensCreatedThisTurn" } }, min: 1 };
+  // "If you sacrificed a Food this turn" (Elanor Gardner).
+  if ((m = /^you(?:'ve)? sacrificed an? (Food|Clue|Treasure|Blood|artifact|creature|enchantment|land|permanent) this turn$/.exec(text)))
+    return { kind: "amount", amount: { count: { kind: "sacrificedThisTurn", ...(/^[A-Z]/.test(m[1]!) ? { subtype: m[1]! } : m[1] === "permanent" ? {} : { type: capital(m[1]!) }) } }, min: 1 };
   // "If you gained 3 or more life this turn" (The Gaffer, Resplendent Angel).
   if ((m = /^you(?:'ve)? gained (\d+) or more life this turn$/.exec(text))) return { kind: "lifeGainedThisTurn", n: Number(m[1]) };
   // Betor, Kin to All: "creatures you control have total toughness 10 or greater".

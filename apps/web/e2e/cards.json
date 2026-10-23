@@ -3598,6 +3598,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "6048fc70-0dcc-4b54-977d-16e240225f82",
+  "name": "Diregraf Ghoul",
+  "manaCost": "{B}",
+  "cmc": 1,
+  "typeLine": "Creature — Zombie",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie"
+  ],
+  "oracleText": "This creature enters tapped.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "isd",
+  "releasedAt": "2011-09-30",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a7e97fa9-4b72-4548-b854-5be5f18a6f1a",
   "name": "Disenchant",
   "manaCost": "{1}{W}",
@@ -6152,6 +6182,34 @@
   "set": "p02",
   "releasedAt": "1998-06-24",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "334c284e-7bc3-4c18-9f8d-4d846f80008e",
+  "name": "Haunting Voyage",
+  "manaCost": "{4}{B}{B}",
+  "cmc": 6,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Choose a creature type. Return up to two creature cards of that type from your graveyard to the battlefield. If this spell was foretold, return all creature cards of that type from your graveyard to the battlefield instead.\nForetell {5}{B}{B} (During your turn, you may pay {2} and exile this card from your hand face down. Cast it on a later turn for its foretell cost.)",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Foretell"
+  ],
+  "commanderLegal": "legal",
+  "set": "khm",
+  "releasedAt": "2021-02-05",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -10328,6 +10386,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "fecbbc79-2f74-46b3-a049-45736f904f58",
+  "name": "Prisoner's Dilemma",
+  "manaCost": "{3}{R}{R}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Each opponent secretly chooses silence or snitch, then the choices are revealed. If each opponent chose silence, Prisoner's Dilemma deals 4 damage to each of them. If each opponent chose snitch, Prisoner's Dilemma deals 8 damage to each of them. Otherwise, Prisoner's Dilemma deals 12 damage to each opponent who chose silence.\nFlashback {5}{R}{R}",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flashback"
+  ],
+  "commanderLegal": "legal",
+  "set": "mkc",
+  "releasedAt": "2024-02-09",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "1b3d7fce-e9fe-4176-9d9a-472415826cdd",
   "name": "Pristine Talisman",
   "manaCost": "{3}",
@@ -11224,6 +11310,38 @@
   "gameChanger": false
  },
  {
+  "oracleId": "fcb7c93c-46ab-49b5-a6e0-35d73f3be8f0",
+  "name": "Screaming Nemesis",
+  "manaCost": "{2}{R}",
+  "cmc": 3,
+  "typeLine": "Creature — Spirit",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spirit"
+  ],
+  "oracleText": "Haste\nWhenever this creature is dealt damage, it deals that much damage to any other target. If a player is dealt damage this way, they can't gain life for the rest of the game.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Haste"
+  ],
+  "commanderLegal": "legal",
+  "set": "dsk",
+  "releasedAt": "2024-09-27",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "648bd03d-247e-4d6f-87a9-12a67688cbf5",
   "name": "Scroll Rack",
   "manaCost": "{2}",
@@ -11834,6 +11952,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "8aed54cb-d1bb-45ad-adbe-38e55d84ff31",
+  "name": "Silence",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Your opponents can't cast spells this turn.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2026-09-14",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "44e0ffa3-8915-4c1f-8f1a-4aeea1365f07",
   "name": "Simian Spirit Guide",
   "manaCost": "{2}{R}",
@@ -11892,6 +12036,38 @@
   "set": "rna",
   "releasedAt": "2019-01-25",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d3d8dd6e-a80b-4063-a542-ff67ef8dad4f",
+  "name": "Skullwinder",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Creature — Snake",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Snake"
+  ],
+  "oracleText": "Deathtouch\nWhen this creature enters, return target card from your graveyard to your hand, then choose an opponent. That player returns a card from their graveyard to their hand.",
+  "power": "1",
+  "toughness": "3",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Deathtouch"
+  ],
+  "commanderLegal": "legal",
+  "set": "m3c",
+  "releasedAt": "2024-06-14",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

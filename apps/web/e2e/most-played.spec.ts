@@ -25,9 +25,11 @@ test("Arcane Denial: at the next upkeep, buttons to draw two, one or none", asyn
   const [divination, denial] = [one(s, "Divination"), one(s, "Arcane Denial")];
   await open(page, s);
   await card(page, "Divination", s).click();
-  await expect.poll(async () => (await state(page)).stack.length).toBe(1);
+  // Divination's stack item, read once the page has it there (not from a state read right after a click).
+  let top = "";
+  await expect.poll(async () => (top = (await state(page)).stack.find((i) => i.objectId === divination)?.id ?? "")).not.toBe("");
   await card(page, "Arcane Denial", s).click();
-  const top = (await state(page)).stack[0]!.id;
+  await expect(page.locator(".targeting")).toBeVisible();
   await page.locator(`[data-stack="${top}"]`).click();
   // Arcane Denial was cast (auto-pass may resolve it at once) before anything is passed.
   await expect.poll(async () => (await state(page)).objects[denial]!.zone).not.toBe("hand");

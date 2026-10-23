@@ -1,10 +1,10 @@
 // Round 134: round 133's gaps (bots use Doubling Cube when it saves mana, and Detection Tower), then the most played cards.
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
+import { act, bear, card, forest, island, mountain, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
 import { invalidateCharacteristics } from "../src/layers";
 import { setFace } from "../src/faces";
-import { botActions, characteristics, isFullySupported, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { botActions, characteristics, isFullySupported, planActivate, planCast, planForetell, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -304,5 +304,269 @@ describe("Storm of Saruman: the second spell each turn is copied, the copy not l
     const hand = s0.players[ap]!.hand.length;
     const s = passToPending(run(s0, planCast(s0, ap, ids[0]!)));
     expect(s.players[ap]!.hand.length).toBe(hand - 1 + 2);
+  });
+});
+
+describe("Elanor Gardner: a basic land at your end step if you sacrificed a Food this turn", () => {
+  const elanor = card("Elanor Gardner", "Legendary Creature — Halfling Scout", "{3}{G}", { power: "2", toughness: "4", keywords: ["Food"], oracleText: "When Elanor enters, create a Food token.\nAt the beginning of your end step, if you sacrificed a Food this turn, you may search your library for a basic land card, put that card onto the battlefield tapped, then shuffle." });
+
+  it("after eating the Food: a tapped basic land; it doesn't trigger without one", () => {
+    supported(elanor);
+    const { s: s0, ap, ids } = setup([elanor]);
+    onlyInHand(s0, ap, ids);
+    let s = passToPending(run(s0, planCast(s0, ap, ids[0]!)));
+    const food = s.battlefield.find((x) => characteristics(s, s.objects[x]!).subtypes.includes("Food"))!;
+    expect(food).toBeDefined();
+    // Not this turn: nothing sacrificed.
+    const lands = () => s.battlefield.filter((x) => s.objects[x]!.controller === ap && characteristics(s, s.objects[x]!).types.includes("Land")).length;
+    const before = lands();
+    s = passUntil(s, "end", ap);
+    expect(s.stack).toHaveLength(0);
+    for (let i = 0; i < 8 && s.step === "end"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(lands()).toBe(before);
+    // Next turn of ours: eat the Food, then the end step.
+    s = passUntil(passUntil(s, "upkeep", nextOf(s, ap)), "main1", ap);
+    s = passToPending(run(s, planActivate(s, ap, food, 0)));
+    expect(s.objects[food]).toBeUndefined();
+    s = passToPending(passUntil(s, "end", ap));
+    expect(s.pending?.player).toBe(ap);
+    for (let i = 0; i < 4 && s.pending; i++) s = passToPending(run(s, botActions(s, ap)));
+    expect(lands()).toBe(before + 1);
+    const fresh = s.battlefield.filter((x) => s.objects[x]!.controller === ap && s.objects[x]!.tapped && characteristics(s, s.objects[x]!).name === "Forest");
+    expect(fresh.length).toBeGreaterThan(0);
+  });
+});
+
+describe("Hobgoblin Bandit Lord: damage equal to the Goblins that entered under your control this turn", () => {
+  const lord = card("Hobgoblin Bandit Lord", "Creature — Goblin Rogue", "{1}{R}{R}", { power: "2", toughness: "3", oracleText: "Other Goblins you control get +1/+1.\n{R}, {T}: This creature deals damage equal to the number of Goblins that entered the battlefield under your control this turn to any target." });
+  const goblin = card("Test Goblin", "Creature — Goblin", "{R}", { power: "1", toughness: "1" });
+  const shock = card("Test Shock", "Instant", "{R}", { oracleText: "Test Shock deals 2 damage to target creature." });
+
+  const party = card("Test Party", "Sorcery", "{2}", { oracleText: "Each player creates a 1/1 red Goblin creature token." });
+
+  it("a Goblin cast and a token entered (the cast one since died): 2 damage; opponents' Goblins and the lord don't count", () => {
+    supported(lord, party);
+    const { s: s0, ap, opp, ids } = setup([goblin, party, shock]);
+    const l = putOnBattlefield(s0, ap, lord);
+    putOnBattlefield(s0, ap, mountain);
+    let s = passToPending(run(s0, planCast(s0, ap, ids[0]!)));
+    s = passToPending(run(s, planCast(s, ap, ids[1]!)));
+    expect(s.battlefield.filter((x) => s.objects[x]!.isToken).length).toBe(4);
+    // The cast one dies; it still counts (rulings).
+    s = passToPending(run(s, planCast(s, ap, ids[2]!, [target(ids[0]!)])));
+    expect(s.objects[ids[0]!]!.zone).toBe("graveyard");
+    s = passToPending(run(s, planActivate(s, ap, l, 0, [{ kind: "player", id: opp }])));
+    expect(s.players[opp]!.life).toBe(38);
+  });
+});
+
+describe("Fire Lord Azula: spells cast while it's attacking are copied", () => {
+  const azula = card("Fire Lord Azula", "Legendary Creature — Human Noble", "{1}{U}{B}{R}", { power: "4", toughness: "4", keywords: ["Firebending"], oracleText: "Firebending 2 (Whenever this creature attacks, add {R}{R}. This mana lasts until end of combat.)\nWhenever you cast a spell while Fire Lord Azula is attacking, copy that spell. You may choose new targets for the copy. (A copy of a permanent spell becomes a token.)" });
+  const bolt = card("Test Bolt", "Instant", "{R}", { oracleText: "Test Bolt deals 3 damage to any target." });
+
+  it("while attacking: copied (6 damage); before combat: not", () => {
+    supported(azula);
+    const { s: s0, ap, opp, ids } = setup([bolt, bolt]);
+    putOnBattlefield(s0, ap, azula);
+    let s = passToPending(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "player", id: opp }])));
+    expect(s.players[opp]!.life).toBe(37);
+    s = passUntil(s, "declareAttackers", ap);
+    const az = s.battlefield.find((x) => characteristics(s, s.objects[x]!).name === "Fire Lord Azula")!;
+    s = passToPending(act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: az, defender: opp }] }));
+    expect(s.players[ap]!.manaPool.R).toBeGreaterThanOrEqual(2);
+    s = run(s, planCast(s, ap, ids[1]!, [{ kind: "player", id: opp }]));
+    s = passToPending(s);
+    for (let i = 0; i < 4 && s.pending; i++) s = passToPending(run(s, s.pending.kind === "chooseMay" ? [{ type: "chooseMay", player: ap, yes: false }] : botActions(s, ap)));
+    expect(s.players[opp]!.life).toBe(31);
+  });
+});
+
+describe("Famished Worldsire: devour land, then lands from among the top X cards, X its power", () => {
+  const worldsire = card("Famished Worldsire", "Creature — Leviathan", "{5}{G}{G}{G}", { power: "0", toughness: "0", keywords: ["Ward", "Devour"], oracleText: "Ward {3}\nDevour land 3 (As this creature enters, you may sacrifice any number of lands. It enters with three times that many +1/+1 counters on it.)\nWhen this creature enters, look at the top X cards of your library, where X is this creature's power. Put any number of land cards from among them onto the battlefield tapped, then shuffle." });
+
+  it("two lands devoured: a 6/6 that looks at six cards and puts the lands among them onto the battlefield", () => {
+    supported(worldsire);
+    const { s: s0, ap, ids } = setup([worldsire]);
+    const top = [onTop(s0, ap, forest), onTop(s0, ap, bear()), onTop(s0, ap, forest), onTop(s0, ap, bear()), onTop(s0, ap, bear()), onTop(s0, ap, forest), onTop(s0, ap, island)];
+    let s = passToPending(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", player: ap, action: "sacrifice", min: 0 });
+    const eaten = s.pending?.kind === "pickPermanents" ? s.pending.options.slice(0, 2) : [];
+    s = passToPending(act(s, { type: "pickPermanents", player: ap, ids: eaten }));
+    const w = ids[0]!;
+    expect(s.objects[w]!.counters["+1/+1"]).toBe(6);
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap });
+    // The top six (the Island on top): its three lands, not the Forest seventh down.
+    const offered = s.pending?.kind === "searchLibrary" ? s.pending.cards : [];
+    expect([...offered].sort()).toEqual([top[6]!, top[5]!, top[2]!].sort());
+    s = passToPending(act(s, { type: "searchLibrary", player: ap, found: offered }));
+    for (const id of offered) expect([s.objects[id]!.zone, s.objects[id]!.tapped]).toEqual(["battlefield", true]);
+    expect(s.objects[top[0]!]!.zone).toBe("library");
+  });
+});
+
+describe("Dread Summons: a tapped Zombie for each creature card milled this way", () => {
+  const summons = card("Dread Summons", "Sorcery", "{X}{B}{B}", { oracleText: "Each player mills X cards. For each creature card put into a graveyard this way, you create a tapped 2/2 black Zombie creature token. (To mill a card, a player puts the top card of their library into their graveyard.)" });
+
+  it("X=2: every player's creature cards count", () => {
+    supported(summons);
+    const { s: s0, ap, ids } = setup([summons]);
+    const [a, b, c] = [1, 2, 3].map((k) => s0.turnOrder[(s0.turnOrder.indexOf(ap) + k) % 4]!) as [PlayerId, PlayerId, PlayerId];
+    onTop(s0, ap, forest); onTop(s0, ap, bear());
+    onTop(s0, a, bear()); onTop(s0, a, bear());
+    onTop(s0, b, forest); onTop(s0, b, forest);
+    onTop(s0, c, forest); onTop(s0, c, bear());
+    const s = passToPending(run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "auto", 2)));
+    const zombies = s.battlefield.filter((x) => s.objects[x]!.isToken && characteristics(s, s.objects[x]!).subtypes.includes("Zombie"));
+    expect(zombies).toHaveLength(4);
+    for (const z of zombies) expect([s.objects[z]!.tapped, s.objects[z]!.controller]).toEqual([true, ap]);
+  });
+});
+
+/** Puts `def` into `pid`'s graveyard. */
+const inYard = (s: GameState, pid: PlayerId, def: CardDef) => {
+  const id = onTop(s, pid, def);
+  s.players[pid]!.library.shift();
+  s.objects[id]!.zone = "graveyard";
+  s.players[pid]!.graveyard.push(id);
+  return id;
+};
+
+describe("Skullwinder: return target card from your graveyard, then an opponent you choose returns one of theirs", () => {
+  const skullwinder = card("Skullwinder", "Creature — Snake", "{2}{G}", { power: "1", toughness: "3", keywords: ["Deathtouch"], oracleText: "Deathtouch\nWhen this creature enters, return target card from your graveyard to your hand, then choose an opponent. That player returns a card from their graveyard to their hand." });
+
+  it("our card, then the chosen opponent picks one of theirs", () => {
+    supported(skullwinder);
+    const { s: s0, ap, ids } = setup([skullwinder]);
+    const [a, b] = [nextOf(s0, ap), nextOf(s0, nextOf(s0, ap))];
+    const mine = inYard(s0, ap, bear({ name: "My Bear" }));
+    const theirs = [inYard(s0, b, bear({ name: "Their Bear" })), inYard(s0, b, forest)];
+    let s = passToPending(run(s0, planCast(s0, ap, ids[0]!)));
+    // The trigger targets our card.
+    s = passToPending(run(s, s.pending?.kind === "chooseTargets" ? [{ type: "chooseTargets", player: ap, targets: [target(mine)] } as Action] : []));
+    expect(s.objects[mine]!.zone).toBe("hand");
+    expect(s.pending).toMatchObject({ kind: "chooseOption", player: ap, what: "opponent" });
+    s = passToPending(act(s, { type: "chooseOption", player: ap, choice: String(b) }));
+    // That player chooses which (rulings).
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: b, fromGraveyard: "hand" });
+    s = passToPending(act(s, { type: "searchLibrary", player: b, found: [theirs[1]!] }));
+    expect(s.objects[theirs[1]!]!.zone).toBe("hand");
+    expect(s.objects[theirs[0]!]!.zone).toBe("graveyard");
+    expect(s.players[a]!.hand.length).toBe(s0.players[a]!.hand.length);
+  });
+
+  it("a bot chooses an opponent with an empty graveyard", () => {
+    const { s: s0, ap, ids } = setup([skullwinder]);
+    const mine = inYard(s0, ap, bear({ name: "My Bear" }));
+    const [a, b, c] = [1, 2, 3].map((k) => s0.turnOrder[(s0.turnOrder.indexOf(ap) + k) % 4]!) as [PlayerId, PlayerId, PlayerId];
+    inYard(s0, a, bear());
+    inYard(s0, c, bear());
+    let s = passToPending(run(s0, planCast(s0, ap, ids[0]!)));
+    for (let i = 0; i < 6 && s.pending?.player === ap; i++) {
+      if (s.pending.kind === "chooseOption") expect(s.pending.what === "opponent" && botActions(s, ap)[0]).toMatchObject({ choice: String(b) });
+      s = passToPending(run(s, botActions(s, ap)));
+    }
+    expect(s.objects[mine]!.zone).toBe("hand");
+    expect([s.players[a]!.graveyard.length, s.players[c]!.graveyard.length]).toEqual([1, 1]);
+    expect(s.log.some((l) => l.text.includes(`chooses ${s.players[b]!.name}`))).toBe(true);
+  });
+});
+
+describe("Screaming Nemesis: the damage it's dealt goes on; a player it hits can't gain life again", () => {
+  const nemesis = card("Screaming Nemesis", "Creature — Spirit", "{2}{R}", { power: "3", toughness: "3", keywords: ["Haste"], oracleText: "Haste\nWhenever this creature is dealt damage, it deals that much damage to any other target. If a player is dealt damage this way, they can't gain life for the rest of the game." });
+  const bolt = card("Test Bolt", "Instant", "{R}", { oracleText: "Test Bolt deals 3 damage to any target." });
+  const salve = card("Test Salve", "Instant", "{W}", { oracleText: "You gain 5 life." });
+
+  it("dies to 3 damage and still deals 3 to the player, who then can't gain life (the Nemesis gone)", () => {
+    supported(nemesis);
+    const { s: s0, ap, opp, ids } = setup([bolt]);
+    const n = putOnBattlefield(s0, ap, nemesis);
+    const oppSalve = putOnBattlefield(s0, opp, salve);
+    s0.battlefield.splice(s0.battlefield.indexOf(oppSalve), 1);
+    s0.objects[oppSalve]!.zone = "hand";
+    s0.players[opp]!.hand.push(oppSalve);
+    putOnBattlefield(s0, opp, card("Plains", "Basic Land — Plains"));
+    let s = run(s0, planCast(s0, ap, ids[0]!, [target(n)]));
+    s = passToPending(s);
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    // Not itself ("any other target", CR 115.4).
+    s = passToPending(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] } as Action));
+    expect(s.objects[n]!.zone).toBe("graveyard");
+    expect(s.players[opp]!.life).toBe(37);
+    expect(s.players[opp]!.cantGainLifeForGame).toBe(true);
+    // Their turn: the salve does nothing.
+    s = passUntil(s, "main1", opp);
+    s = passToPending(run(s, planCast(s, opp, oppSalve)));
+    expect(s.players[opp]!.life).toBe(37);
+  });
+
+  it("damage to a creature this way: no one is stopped from gaining life", () => {
+    const { s: s0, ap, opp, ids } = setup([bolt]);
+    const n = putOnBattlefield(s0, ap, nemesis);
+    const theirs = putOnBattlefield(s0, opp, bear());
+    let s = passToPending(run(s0, planCast(s0, ap, ids[0]!, [target(n)])));
+    s = passToPending(act(s, { type: "chooseTargets", player: ap, targets: [target(theirs)] } as Action));
+    expect(s.objects[theirs]!.zone).toBe("graveyard");
+    expect(s.players.every((p) => !p.cantGainLifeForGame)).toBe(true);
+  });
+});
+
+describe("Haunting Voyage: up to two creature cards of the chosen type; foretold, all of them", () => {
+  const voyage = card("Haunting Voyage", "Sorcery", "{4}{B}{B}", { keywords: ["Foretell"], oracleText: "Choose a creature type. Return up to two creature cards of that type from your graveyard to the battlefield. If this spell was foretold, return all creature cards of that type from your graveyard to the battlefield instead.\nForetell {5}{B}{B} (During your turn, you may pay {2} and exile this card from your hand face down. Cast it on a later turn for its foretell cost.)" });
+  const zombie = (name: string) => card(name, "Creature — Zombie", "{1}{B}", { power: "2", toughness: "2" });
+
+  it("two Zombies of three, not the Bear", () => {
+    supported(voyage);
+    const { s: s0, ap, ids } = setup([voyage]);
+    const zs = ["Z1", "Z2", "Z3"].map((x) => inYard(s0, ap, zombie(x)));
+    const b = inYard(s0, ap, bear());
+    let s = passToPending(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.pending).toMatchObject({ kind: "chooseOption", player: ap, what: "creatureType" });
+    // A bot would name the type in its graveyard.
+    expect(botActions(s, ap)[0]).toMatchObject({ choice: "Zombie" });
+    s = passToPending(act(s, { type: "chooseOption", player: ap, choice: "Zombie" }));
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap, min: 0, max: 2, fromGraveyard: "battlefield" });
+    expect(s.pending?.kind === "searchLibrary" && [...s.pending.cards].sort()).toEqual([...zs].sort());
+    s = passToPending(act(s, { type: "searchLibrary", player: ap, found: zs.slice(0, 2) }));
+    expect(zs.map((z) => s.objects[z]!.zone)).toEqual(["battlefield", "battlefield", "graveyard"]);
+    expect(s.objects[b]!.zone).toBe("graveyard");
+  });
+
+  it("foretold: all three", () => {
+    const { s: s0, ap, ids } = setup([voyage]);
+    const zs = ["Z1", "Z2", "Z3"].map((x) => inYard(s0, ap, zombie(x)));
+    let s = run(s0, planForetell(s0, ap, ids[0]!));
+    expect(s.objects[ids[0]!]!.foretold).toBe(true);
+    s = passUntil(passUntil(s, "upkeep", nextOf(s, ap)), "main1", ap);
+    s = passToPending(run(s, planCast(s, ap, ids[0]!, undefined, undefined, "auto", undefined, { alt: "foretell" })));
+    s = passToPending(act(s, { type: "chooseOption", player: ap, choice: "Zombie" }));
+    expect(zs.map((z) => s.objects[z]!.zone)).toEqual(["battlefield", "battlefield", "battlefield"]);
+  });
+});
+
+describe("Astarion's Thirst: exile a creature, its power in +1/+1 counters on a commander creature you control", () => {
+  const thirst = card("Astarion's Thirst", "Instant", "{3}{B}", { oracleText: "Exile target creature. Put X +1/+1 counters on a commander creature you control, where X is the power of the creature exiled this way." });
+
+  it("its power as it last existed, counters included", () => {
+    supported(thirst);
+    const { s: s0, ap, opp, ids } = setup([thirst]);
+    const mine = putOnBattlefield(s0, ap, bear({ name: "My Commander" }), { commander: true });
+    const plain = putOnBattlefield(s0, ap, bear());
+    const big = putOnBattlefield(s0, opp, bear({ name: "Big Bear", power: "4", toughness: "4" }));
+    s0.objects[big]!.counters["+1/+1"] = 1;
+    invalidateCharacteristics(s0);
+    let s = passToPending(run(s0, planCast(s0, ap, ids[0]!, [target(big)])));
+    for (let i = 0; i < 3 && s.pending; i++) s = passToPending(run(s, botActions(s, ap)));
+    expect(s.objects[big]!.zone).toBe("exile");
+    expect(s.objects[mine]!.counters["+1/+1"]).toBe(5);
+    expect(s.objects[plain]!.counters["+1/+1"]).toBeUndefined();
+  });
+
+  it("no commander creature: just the exile", () => {
+    const { s: s0, ap, opp, ids } = setup([thirst]);
+    const plain = putOnBattlefield(s0, ap, bear());
+    const big = putOnBattlefield(s0, opp, bear({ name: "Big Bear", power: "4", toughness: "4" }));
+    const s = passToPending(run(s0, planCast(s0, ap, ids[0]!, [target(big)])));
+    expect(s.objects[big]!.zone).toBe("exile");
+    expect(s.objects[plain]!.counters["+1/+1"]).toBeUndefined();
   });
 });

@@ -3477,25 +3477,30 @@ function TypePicker({
   onDone: (choice: string) => void;
 }) {
   const [query, setQuery] = useState("");
-  const counts = new Map<string, { yours: number; theirs: number }>();
-  const tally = (types: string[], yours: boolean) =>
+  const counts = new Map<string, { yours: number; theirs: number; yard: number }>();
+  const tally = (types: string[], whose: "yours" | "theirs" | "yard") =>
     types.forEach((t) => {
       if (!pending.options.includes(t)) return;
-      const c = counts.get(t) ?? { yours: 0, theirs: 0 };
-      if (yours) c.yours++;
-      else c.theirs++;
+      const c = counts.get(t) ?? { yours: 0, theirs: 0, yard: 0 };
+      c[whose]++;
       counts.set(t, c);
     });
   for (const id of s.battlefield) {
     const o = s.objects[id]!;
     const ch = characteristics(s, o);
-    if (ch.types.includes("Creature")) tally(ch.subtypes, ch.controller === HUMAN);
+    if (ch.types.includes("Creature")) tally(ch.subtypes, ch.controller === HUMAN ? "yours" : "theirs");
   }
   for (const id of s.players[HUMAN]!.hand) {
     const d = cardOf(s, id);
-    if (d.types.includes("Creature")) tally(d.subtypes, true);
+    if (d.types.includes("Creature")) tally(d.subtypes, "yours");
   }
-  const seen = [...counts].sort((a, b) => b[1].yours + b[1].theirs - (a[1].yours + a[1].theirs) || a[0].localeCompare(b[0]));
+  // Haunting Voyage: "return up to two creature cards of that type from your graveyard".
+  for (const id of s.players[HUMAN]!.graveyard) {
+    const d = cardOf(s, id);
+    if (d.types.includes("Creature")) tally(d.subtypes, "yard");
+  }
+  const total = (c: { yours: number; theirs: number; yard: number }) => c.yours + c.theirs + c.yard;
+  const seen = [...counts].sort((a, b) => total(b[1]) - total(a[1]) || a[0].localeCompare(b[0]));
   const q = query.trim().toLowerCase();
   // Names that start with what was typed first ("el": Elf, Elk, ... then Angel, Camel).
   const matches = pending.options.filter((t) => t.toLowerCase().includes(q)).sort((a, b) => Number(!a.toLowerCase().startsWith(q)) - Number(!b.toLowerCase().startsWith(q)));
@@ -3516,13 +3521,13 @@ function TypePicker({
         <div className="modal-body">
           {seen.length > 0 && !q && (
             <>
-              <h4>On the battlefield and in your hand</h4>
+              <h4>On the battlefield, in your hand and in your graveyard</h4>
               <div className="type-list">
                 {seen.map(([t, c]) => (
                   <button key={t} className="ghost" data-type={t} onClick={() => onDone(t)}>
                     {t}{" "}
                     <span className="muted small">
-                      {[c.yours ? `${c.yours} yours` : "", c.theirs ? `${c.theirs} theirs` : ""].filter(Boolean).join(", ")}
+                      {[c.yours ? `${c.yours} yours` : "", c.theirs ? `${c.theirs} theirs` : "", c.yard ? `${c.yard} in your graveyard` : ""].filter(Boolean).join(", ")}
                     </span>
                   </button>
                 ))}

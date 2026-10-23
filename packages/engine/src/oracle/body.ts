@@ -89,6 +89,8 @@ export interface Ctx {
   lastDugLands?: boolean;
   /** The instruction before was "mill N cards" (yours): "those cards" in what follows can be the milled cards (Ripples of Undeath). */
   afterMill?: boolean;
+  /** The instruction before was a mill, anyone's: "for each creature card put into a graveyard this way" (Dread Summons). */
+  afterAnyMill?: boolean;
   /** An instruction before discarded one card of yours: "the discarded card" is that card (Malcolm). */
   discardedOne?: boolean;
   /** An instant or sorcery: "other" can't mean other than its source, which isn't a permanent. */
@@ -1193,7 +1195,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     let s = sentences[si]!.replace(/^Then,? (.)/, (_, c: string) => c.toUpperCase());
     const last = effects[effects.length - 1];
     ctx.afterMill = last?.type === "mill" && last.who.ref === "you";
+    ctx.afterAnyMill = last?.type === "mill";
     if (last?.type === "discard" && last.who.ref === "you" && last.n === 1) ctx.discardedOne = true;
+    // Haunting Voyage: "Choose a creature type. Return up to two creature cards of that type ...": the type chosen.
+    if (/ cards? of that type\b/.test(s) && effects.some((e) => e.type === "choose" && e.choice === "creatureType" && !e.each)) s = s.replace(/( cards?) of that type\b/g, "$1 of the chosen type");
     // Lae'zel's Acrobatics: "Exile all nontoken creatures you control, then roll a d20. 1—9 | Return those cards to the
     // battlefield ... at the beginning of the next end step. 10—20 | Return those cards ..., then exile them again. Return
     // those cards ... at the beginning of the next end step." The cards the first exile exiled are held for the returns.
@@ -3440,6 +3445,30 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const double = /^[Dd]ouble (?:(its|target creature's) power( and toughness)?|the power( and toughness)? of (target creature(?: you control)?)) until end of turn$/.exec(s);
     const doubleBoth = !!double && !!(double[2] ?? double[3]);
     if (double) s = `${double[1] === "its" ? "It" : double[4] ? double[4].charAt(0).toUpperCase() + double[4].slice(1) : "Target creature"} gets +X/+0 until end of turn, where X is its power`;
+    // Astarion's Thirst: "Exile target creature. Put X +1/+1 counters on a commander creature you control, where X is the
+    // power of the creature exiled this way": that target's power as it last existed (CR 608.2h), if it was exiled. A
+    // commander exiled this way is still in exile as this resolves (it can go to the command zone only as a state-based
+    // action afterwards, CR 903.9a).
+    const powerExiled = /^(.+), where X is the power of the creature exiled this way$/.exec(s);
+    if (powerExiled) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "exile" || prev.what.ref !== "target" || ctx.targets[prev.what.index]?.types?.join() !== "Creature") return null;
+      const parsed = parseOne(powerExiled[1]!, ctx);
+      // X stands for that power (amounts.ts reads a target that just left as it last existed).
+      const power = { count: { kind: "power", of: { ref: "target", index: prev.what.index } } };
+      let xs = 0;
+      const subst = (v: unknown): unknown => {
+        if (Array.isArray(v)) return v.map(subst);
+        if (!v || typeof v !== "object") return v;
+        const c = (v as { count?: { kind?: string } }).count;
+        if (c?.kind === "x" && Object.keys(v).length === 1 && Object.keys(c).length === 1) return xs++, power;
+        return Object.fromEntries(Object.entries(v).map(([k, w]) => [k, subst(w)]));
+      };
+      const inner = parsed && (subst(parsed) as Effect[]);
+      if (!inner || xs !== 1) return null;
+      effects.push({ type: "if", cond: { kind: "targetExiled", index: prev.what.index }, effects: inner });
+      continue;
+    }
     // "..., where X is the number of creatures you control": X is defined by the text (CR 107.3c).
     // It's read after the rest of the sentence, which may name what it counts ("that player's hand").
     // Not one inside a quoted ability ('You get an emblem with "..., where X is ..."'), which is that ability's own.

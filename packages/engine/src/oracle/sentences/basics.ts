@@ -639,6 +639,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: "turnRules", rules: ["spellsUncounterable"], byColors: [COLOR_WORDS[m[1]!.toLowerCase()]!, COLOR_WORDS[m[2]!.toLowerCase()]!] }];
   // Domri, Anarch of Bolas: "Creature spells you cast this turn can't be countered" (rulings: every one, after it resolves).
   if (/^Creature spells you cast this turn can't be countered$/i.test(s)) return [{ type: "turnRules", rules: ["creatureSpellsUncounterable"] }];
+  // Screaming Nemesis: each player the damage just before was dealt to (CR 119.7), for good.
+  if (/^If a player is dealt damage this way, they can't gain life for the rest of the game$/.test(s)) return [{ type: "noLifeGainForGame", who: { ref: "damagedThisWay" } }];
   if ((m = /^(Players|Your opponents) can't gain life this turn$/i.exec(s))) return [{ type: "noLifeGain", players: /^players$/i.test(m[1]!) ? "all" : "opponents" }];
   if (/^Damage can't be prevented this turn$/i.test(s)) return [{ type: "noPrevention" }];
   // "Your opponents can't cast spells this turn" (Silence), "Target player can't ..." (Orim's Chant), "Its controller

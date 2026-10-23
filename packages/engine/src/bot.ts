@@ -435,6 +435,14 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && (pend.what === "player" || pend.what === "opponent")) {
       const might = (x: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === x && objIsType(s, obj(s, id), "Creature")).reduce((n, id) => n + Math.max(0, power(s, obj(s, id))), 0);
       const opps = pend.options.filter((x) => Number(x) !== pid);
+      // Skullwinder: "That player returns a card from their graveyard to their hand", a gift, so the one with the fewest
+      // cards there (none, ideally).
+      const r = s.resolving;
+      const next = r && pend.what === "opponent" ? r.body.effects[r.next + 1] : undefined;
+      if (next?.type === "chooseFromGraveyard" && next.who?.ref === "chosenPlayer" && !next.dest && opps.length) {
+        const fewest = [...opps].sort((a, b) => player(s, Number(a)).graveyard.length - player(s, Number(b)).graveyard.length)[0]!;
+        return [{ type: "chooseOption", player: pid, choice: fewest }];
+      }
       const best = [...(opps.length ? opps : pend.options)].sort((a, b) => might(Number(b)) - might(Number(a)) || player(s, Number(b)).life - player(s, Number(a)).life)[0]!;
       return [{ type: "chooseOption", player: pid, choice: best }];
     }
@@ -2952,8 +2960,9 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
       } else (c?.mana.length ? d.colorIdentity : d.colors).forEach((col) => count(COLOR_NAMES[col], c?.mana.length ? 3 : 1));
     }
   }
-  // "Returns all creature cards of a type chosen this way from their graveyard" (Patriarch's Bidding): what's in ours.
-  const fromYard = what === "creatureType" && !!c && allEffects([...(c.spell?.effects ?? []), ...c.triggers.flatMap((t) => t.body.effects)]).some((e) => e.type === "returnAllFromGraveyard" && e.filter.chosen === "typesChosen");
+  // "Returns all creature cards of a type chosen this way from their graveyard" (Patriarch's Bidding), "return up to two
+  // creature cards of that type from your graveyard" (Haunting Voyage): what's in ours.
+  const fromYard = what === "creatureType" && !!c && allEffects([...(c.spell?.effects ?? []), ...c.triggers.flatMap((t) => t.body.effects)]).some((e) => (e.type === "returnAllFromGraveyard" && (e.filter.chosen === "typesChosen" || e.filter.chosen === "type")) || (e.type === "chooseFromGraveyard" && !e.who && e.filter?.chosen === "type"));
   if (fromYard)
     for (const id of player(s, pid).graveyard) {
       const d = defOf(s, obj(s, id));

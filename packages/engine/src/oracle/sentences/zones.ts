@@ -361,9 +361,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (mvX && !ctx.spell && !ctx.activated && !ctx.whereX) return null;
     // "Up to two creature cards with total mana value 4 or less" (Lively Dirge): the cards chosen together.
     const total = !mvX ? / with total mana value (\d+) or less$/.exec(m[2]!) : null;
-    const filter = parseSearchFilter(m[2]!.slice(0, (mvX ?? total)?.index).replace(/ and\/or /g, " or "));
+    // "Up to two creature cards of the chosen type" (Haunting Voyage): bound to the type as it resolves.
+    const ofChosen = !mvX && !total && / cards? of the chosen type$/.test(m[2]!);
+    const parsed = parseSearchFilter(m[2]!.slice(0, (mvX ?? total)?.index).replace(/ of the chosen type$/, "").replace(/ and\/or /g, " or "));
+    const filter = parsed && ofChosen ? { ...parsed, chosen: "type" as const, text: `${parsed.text} of the chosen type` } : parsed;
     const n = num(m[1]!.replace(/^up to /, "").replace(/^an?$/, "one"));
     if (filter === null || !Number.isInteger(n) || n < 1) return null;
+    if (ofChosen && !filter?.types?.includes("Creature")) return null;
     if (total && (!filter || n < 2)) return null;
     return [{ type: "chooseFromGraveyard", n, dest: "battlefield", ...(total ? { totalMv: Number(total[1]) } : {}), ...(filter ? { filter: mvX ? { ...filter, text: `${filter.text} with mana value X or less` } : filter } : {}), ...(mvX ? { mvMax: amt("X") } : {}), ...(/^up to /.test(m[1]!) ? { upTo: true as const } : {}), ...(m[3] ? { tapped: true as const } : {}), ...(m[4] ? { counters: { [counterKind(m[4])]: 1 } } : {}) }];
   }
@@ -375,6 +379,15 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const n = num(m[2]!.replace(/^an?$/, "one"));
     if (who === null || filter === null || !Number.isInteger(n)) return null;
     return [{ type: "chooseFromGraveyard", n, dest: "exile", ...(who ? { who } : {}), ...(filter ? { filter } : {}) }];
+  }
+  // "Choose an opponent. That player returns a card from their graveyard to their hand" (Skullwinder): that player
+  // chooses which, as it resolves (rulings).
+  if ((m = /^(Target player|Target opponent|That player) returns (an?|one|two|three) (.+?) from their graveyard to their hand$/.exec(s))) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    const filter = parseSearchFilter(m[3]!);
+    const n = num(m[2]!.replace(/^an?$/, "one"));
+    if (!who || filter === null || !Number.isInteger(n)) return null;
+    return [{ type: "chooseFromGraveyard", n, who, ...(filter ? { filter } : {}) }];
   }
   // "Exile a card from a graveyard" (Cemetery Prowler): any player's, chosen as it resolves (not targeted).
   if (/^[Ee]xile a card from a graveyard$/.test(s)) return [{ type: "chooseFromGraveyard", n: 1, dest: "exile", anyGraveyard: true }];

@@ -658,6 +658,8 @@ export interface Player {
   gainedUntilNextTurn?: string[];
   /** "Until your next turn, your life total can't change" (Teferi's Protection): no life gained or lost (CR 119.7-8). */
   lifeCantChange?: true;
+  /** Screaming Nemesis: "they can't gain life for the rest of the game", whatever happens to the Nemesis (rulings). */
+  cantGainLifeForGame?: true;
   /** "Until your next turn, creatures can't attack you unless their controller pays {2} for each" (Summon: Yojimbo), one entry per effect. */
   attackTaxUntil?: { n: number; planeswalkers?: true }[];
   /**
@@ -1262,6 +1264,8 @@ export interface TurnLog {
   endSteps?: number;
   /** Upkeep steps begun this turn (Paradox Haze's "first upkeep each turn"). */
   upkeeps?: number;
+  /** Each permanent sacrificed this turn: who sacrificed it, and its card types and subtypes as it last existed (Elanor Gardner). */
+  sacrificed?: { player: PlayerId; types: string[]; subtypes: string[] }[];
   /** Players who searched their library (Archive Trap). */
   searched?: PlayerId[];
   /** Each token created this turn (CR 111.2): who created it and its subtypes then ("Treasure tokens you created"). */

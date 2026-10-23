@@ -201,6 +201,12 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && /^opponent who drew a card this way$/i.test(p)) return count({ kind: "players", opponents: true, drewThisWay: true });
   // Kefka, Court Mage: "for each card type among cards discarded this way" (CR 205.2a: card types, not supertypes or subtypes).
   if (each && /^card type among cards discarded this way$/i.test(p)) return count({ kind: "discardedTypes" });
+  // Dread Summons: "Each player mills X cards. For each creature card put into a graveyard this way, ...": the milled
+  // cards that went there (one replaced to go elsewhere doesn't count, rulings).
+  if (each && ctx?.afterAnyMill && (m = /^(.+? card) (?:put into a graveyard this way|milled this way)$/i.exec(p))) {
+    const filter = parseSearchFilter(m[1]!);
+    return filter ? count({ kind: "milledThisWay", filter }) : null;
+  }
   // Struggle for Project Purity: "Each opponent draws a card. You draw a card for each card drawn this way."
   if (each && /^card drawn this way$/i.test(p)) return count({ kind: "drawnThisWay" });
   // Smuggler's Share: "for each opponent who drew two or more cards this turn", "... who had two or more lands enter the
@@ -209,6 +215,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (each && (m = /^opponent who had (two|three|four) or more lands enter the battlefield under their control this turn$/i.exec(p))) return count({ kind: "players", opponents: true, landsEnteredAtLeast: num(m[1]!) });
   if ((m = /^creatures? that died (under your control )?this turn$/i.exec(p))) return count({ kind: "diedThisTurn", ...(m[1] ? { yours: true as const } : {}) });
   if (/^creatures? that attacked this turn$/i.test(p)) return count({ kind: "attackersThisTurn" });
+  // "The number of Goblins that entered the battlefield under your control this turn" (Hobgoblin, Bandit Lord).
+  if ((m = /^(creature|artifact|land|permanent|[A-Z][a-z]+?)s? that entered the battlefield under your control this turn$/.exec(p)) && !["Elve", "Dwarve"].includes(m[1]!))
+    return count({ kind: "enteredThisTurn", ...(/^[A-Z]/.test(m[1]!) ? { subtype: m[1]! } : m[1] === "permanent" ? {} : { types: [capital(m[1]!)] }) });
   if ((m = /^(?:([A-Z][a-z]+) )?tokens you created this turn$/.exec(p))) return count({ kind: "tokensCreatedThisTurn", ...(m[1] ? { subtype: m[1] } : {}) });
   if (/^times? you've cast your commander from the command zone this game$/i.test(p)) return count({ kind: "commanderCasts" });
   if (/^the chosen commander's mana value$/i.test(p)) return count({ kind: "chosenCommanderMv" });

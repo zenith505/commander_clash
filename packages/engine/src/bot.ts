@@ -3144,6 +3144,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // "~ becomes a Kithkin Spirit with base power and toughness 2/2" when it's that big already, or bigger (Figure of
       // Destiny after its later steps): it would only shrink.
       if (shrinksSelf(s, o, ab.body)) continue;
+      // Biomancer's Familiar: only for a creature of ours with +1/+1 counters that could adapt again this turn.
+      const refresh = ab.body.effects.some((e) => e.type === "adaptFresh") ? adaptAgain(s, pid) : undefined;
+      if (refresh === null) continue;
       // "{1}: Look at the top card of your library" (Brutal Deceiver): nothing a bot can use.
       if (!ab.body.modal && ab.body.effects.every((e) => e.type === "orderTop" && e.n === 1)) continue;
       const problem = abilityProblem(s, pid, id, i);
@@ -3157,7 +3160,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const xs = discardX !== undefined ? [discardX] : energyX > 0 ? [energyX] : energyTargetX >= 3 ? Array.from({ length: energyTargetX - 2 }, (_, k) => energyTargetX - k) : cost.hasX ? xChoices(availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost), xCount(cost)) : [undefined];
       let plan: Action[] | null = null;
       for (const x of xs) {
-        const targets = body.targets.length ? chooseTargets(s, pid, body, false, id, x) : [];
+        const targets: TargetChoice[] | null = refresh ? [{ kind: "object", id: refresh }] : body.targets.length ? chooseTargets(s, pid, body, false, id, x) : [];
         if (!targets || pointlessAttach(s, body, targets, id)) continue;
         const costs = discardX !== undefined ? discardXCosts(s, pid, o, ab, targets, discardX) : abilityCosts(s, pid, o, ab, targets);
         if (costs === null) continue;
@@ -3182,6 +3185,14 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
     }
   }
   return null;
+}
+
+/** A creature of ours with +1/+1 counters and an adapt ability, not yet refreshed this turn (Biomancer's Familiar). */
+function adaptAgain(s: GameState, pid: PlayerId): ObjectId | null {
+  return s.battlefield.find((id) => {
+    const o = obj(s, id);
+    return controllerOf(s, o) === pid && objIsType(s, o, "Creature") && (o.counters["+1/+1"] ?? 0) > 0 && o.adaptFresh !== s.turn && abilitiesOf(s, o).activated.some((a) => a.body.effects.some((e) => e.type === "adapt"));
+  }) ?? null;
 }
 
 /** The cards in our hand and command zone we could cast now, the dearest first. */

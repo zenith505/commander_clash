@@ -291,6 +291,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [{ type: "endure", what, n: amt(m[2]!) }] : null;
   }
+  // Biomancer's Familiar: "The next time target creature adapts this turn, it adapts as though it had no +1/+1
+  // counters on it" (CR 701.46a: adapting normally does nothing if it has any).
+  if ((m = /^The next time (target creature) adapts this turn, it adapts as though it had no \+1\/\+1 counters on it$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what && !isGroup(what) ? [{ type: "adaptFresh", what }] : null;
+  }
   // Adapt N (CR 701.46a), Monstrosity N (CR 701.37a): only the permanent's own activated abilities do it.
   if ((m = /^(Adapt|Monstrosity) (\d+|X)$/.exec(s))) return ctx.activated ? [{ type: m[1] === "Adapt" ? "adapt" : "monstrosity", n: amt(m[2]!) }] : null;
   // Regeneration (CR 701.19a)

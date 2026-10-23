@@ -376,3 +376,49 @@ describe("\"a card in a graveyard that was put there from anywhere this turn\"",
     expect(s.objects[old]!.zone).toBe("graveyard");
   });
 });
+
+const familiar = card("Biomancer's Familiar", "Creature — Mutant", "{G}{U}", {
+  power: "2", toughness: "2",
+  oracleText: "Activated abilities of creatures you control cost {2} less to activate. This effect can't reduce the mana in that cost to less than one mana.\n{T}: The next time target creature adapts this turn, it adapts as though it had no +1/+1 counters on it.",
+});
+const adapter = card("Test Adapter", "Creature — Elf", "{1}{G}", { power: "1", toughness: "1", oracleText: "{3}{G}: Adapt 2. (If this creature has no +1/+1 counters on it, put two +1/+1 counters on it.)" });
+
+describe("Biomancer's Familiar: adapting as though it had no +1/+1 counters (CR 701.46a, rulings)", () => {
+  it("the next adapt this turn puts the counters on anyway; the one after does nothing again", () => {
+    supported(familiar);
+    const { s: s0, ap } = setup([]);
+    const f = putOnBattlefield(s0, ap, familiar);
+    const a = putOnBattlefield(s0, ap, adapter);
+    for (let i = 0; i < 4; i++) putOnBattlefield(s0, ap, card("Forest", "Basic Land — Forest", "", { oracleText: "({T}: Add {G}.)" }));
+    s0.objects[a]!.counters["+1/+1"] = 2;
+    // {3}{G} costs {1}{G} (two less).
+    let s = settleBots(run(s0, planActivate(s0, ap, a, 0)));
+    expect(s.objects[a]!.counters["+1/+1"]).toBe(2);
+    expect(logText(s)).toMatch(/already has a \+1\/\+1 counter/);
+    s = settleBots(run(s, planActivate(s, ap, f, 0, [{ kind: "object", id: a }])));
+    s = settleBots(run(s, planActivate(s, ap, a, 0)));
+    expect(s.objects[a]!.counters["+1/+1"]).toBe(4);
+    expect(s.objects[a]!.adaptFresh).toBeUndefined();
+  });
+
+  it("a bot taps it for its own adapter with counters, then adapts again", () => {
+    const { s: s0, ap } = setup([]);
+    const f = putOnBattlefield(s0, ap, familiar);
+    const a = putOnBattlefield(s0, ap, adapter);
+    for (let i = 0; i < 4; i++) putOnBattlefield(s0, ap, card("Forest", "Basic Land — Forest", "", { oracleText: "({T}: Add {G}.)" }));
+    s0.objects[a]!.counters["+1/+1"] = 2;
+    // Bots use activated abilities in their second main phase.
+    let s = passUntil(s0, "main2");
+    s.players[ap]!.command = [];
+    for (const c of s.players[ap]!.hand) s.objects[c]!.zone = "library";
+    s.players[ap]!.library.push(...s.players[ap]!.hand.splice(0));
+    for (let i = 0; i < 6 && !(s.objects[a]!.counters["+1/+1"]! > 2); i++) {
+      const acts = botActions(s, ap);
+      if (!acts.length || acts[0]!.type === "passPriority") break;
+      for (const y of acts) if (waitingOn(s) === ap || s.pending?.player === ap) s = act(s, y);
+      s = settleBots(s);
+    }
+    expect(s.objects[f]!.tapped).toBe(true);
+    expect(s.objects[a]!.counters["+1/+1"]).toBe(4);
+  });
+});

@@ -1871,6 +1871,8 @@ export type Effect =
   | { type: "renown"; n: number }
   /** Adapt N (CR 701.46a): if this permanent has no +1/+1 counters on it, put N +1/+1 counters on it. */
   | { type: "adapt"; n: Amount }
+  /** Biomancer's Familiar: "The next time target creature adapts this turn, it adapts as though it had no +1/+1 counters on it." (GameObject.adaptFresh) */
+  | { type: "adaptFresh"; what: ObjRef }
   /** Monstrosity N (CR 701.37a): if this permanent isn't monstrous, put N +1/+1 counters on it and it becomes monstrous. */
   | { type: "monstrosity"; n: Amount }
   /** Fading: "remove a fade counter from ~. If you can't, sacrifice it"; vanishing: "remove a time counter from it". */

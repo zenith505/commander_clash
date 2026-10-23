@@ -799,7 +799,10 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       // As it resolves: any +1/+1 counter on it, for whatever reason, and it gets none (rulings). Gone: nothing.
       const o = objects(s, { ref: "self" }, ctx)[0];
       if (!o) return;
-      if ((o.counters["+1/+1"] ?? 0) > 0) {
+      // Biomancer's Familiar: this time as though it had none; it adapts either way, so that's used up (CR 701.46a).
+      const fresh = o.adaptFresh === s.turn;
+      o.adaptFresh = undefined;
+      if ((o.counters["+1/+1"] ?? 0) > 0 && !fresh) {
         log(s, `${characteristics(s, o).name} already has a +1/+1 counter, so it doesn't adapt.`);
         return;
       }
@@ -807,6 +810,13 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       invalidateCharacteristics(s);
       const put = n > 0 ? putCounters(s, o, "+1/+1", n) : 0;
       log(s, `${characteristics(s, o).name} adapts: it gets ${put} +1/+1 counter${put === 1 ? "" : "s"}.`);
+      return;
+    }
+    case "adaptFresh": {
+      for (const o of objects(s, e.what, ctx)) {
+        o.adaptFresh = s.turn;
+        log(s, `The next time ${characteristics(s, o).name} adapts this turn, it adapts as though it had no +1/+1 counters on it.`);
+      }
       return;
     }
     case "monstrosity": {

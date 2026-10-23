@@ -284,6 +284,8 @@ export interface GameObject {
   renowned?: boolean;
   /** Monstrous (CR 701.37b): a designation it keeps until it leaves the battlefield. */
   monstrous?: boolean;
+  /** Biomancer's Familiar: the turn in which, the next time it adapts, it adapts as though it had no +1/+1 counters. */
+  adaptFresh?: number;
   /**
    * Suspected (CR 701.60): a designation, not copiable (701.60b), until it leaves the battlefield or an effect ends it. It
    * gives menace and "can't block" (701.60c) with the timestamp it became suspected, so losing all abilities later removes

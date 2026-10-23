@@ -18,7 +18,7 @@ export function doesNothingNow(s: GameState, sourceId: ObjectId, body: AbilityBo
   return body.effects.every(
     (e) =>
       ((e.type === "untap" || e.type === "tap") && e.what.ref === "self" && o.tapped === (e.type === "tap")) ||
-      (e.type === "adapt" && (o.counters["+1/+1"] ?? 0) > 0) ||
+      (e.type === "adapt" && (o.counters["+1/+1"] ?? 0) > 0 && o.adaptFresh !== s.turn) ||
       (e.type === "monstrosity" && !!o.monstrous) ||
       // "If ~ is a Warrior, ..." while it isn't one (Figure of Destiny).
       (e.type === "if" && !e.otherwise?.length && e.cond.kind === "state" && e.cond.cond.kind === "selfIs" && !staticConditionNow(s, e.cond.cond, o.id, controllerOf(s, o))),

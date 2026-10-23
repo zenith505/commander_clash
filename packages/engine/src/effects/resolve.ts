@@ -863,6 +863,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "removeSelfCounter":
     case "renown":
     case "adapt":
+    case "adaptFresh":
     case "monstrosity":
     case "evolve":
     case "explore":

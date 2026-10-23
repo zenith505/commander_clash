@@ -384,6 +384,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "pickPermanents" && pend.action === "encode") return [{ type: "pickPermanents", player: pid, ids: chooseEncode(s, pend.options) }];
     if (pend.kind === "pickPermanents" && pend.action === "untap") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, "untap") }];
     if (pend.kind === "pickPermanents" && pend.action === "tap") return [{ type: "pickPermanents", player: pid, ids: choosePicks(s, pid, pend.options, pend.count, "tap") }];
+    // Orzhov Advokist: the counters on our best creature, unless its controller is the only opponent we could attack.
+    if (pend.kind === "pickPermanents" && pend.action === "counters" && pend.min === 0 && pend.count === 1) {
+      const giver = s.resolving?.item.controller;
+      const others = opponents(s, pid).filter((p) => p !== giver);
+      return [{ type: "pickPermanents", player: pid, ids: giver === pid || others.length ? choosePicks(s, pid, pend.options, 1, "counters", pend.counter) : [] }];
+    }
     if (pend.kind === "pickPermanents" && pend.min !== undefined && pend.action !== "keep") return [{ type: "pickPermanents", player: pid, ids: chooseOptionalSacrifices(s, pid, pend) }];
     // Slaughter the Strong: our best creatures that fit in the total power, those with no power (or less) first.
     if (pend.kind === "pickPermanents" && pend.action === "keep" && pend.maxTotalPower !== undefined) {

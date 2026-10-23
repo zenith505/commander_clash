@@ -1,5 +1,6 @@
 // Round 128's prompts: Lathiel, the Bounteous Dawn ("distribute up to that many" counters), Windshaper Planetar (each
-// attacking creature, "keep" or another player), Stinging Study (which commander).
+// attacking creature, "keep" or another player), Stinging Study (which commander), Orzhov Advokist (each player may
+// put counters on a creature).
 import { expect, test } from "@playwright/test";
 import { applyAction, planCast, waitingOn, type Action, type GameState } from "@cc/engine";
 import { LANDS, idsOf, one, open, pageErrors, playUntil, scene, state } from "./scene";
@@ -74,5 +75,22 @@ test("Stinging Study with two commanders: choose Hill Giant (mana value 4), draw
   const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && st.players[0]!.life < life);
   expect(after.players[0]!.life).toBe(life - 4);
   expect(after.players[0]!.hand.length).toBe(hand - 1 + 4);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Orzhov Advokist: at your upkeep, two +1/+1 counters on Grizzly Bears; Ana takes them too and can't attack you", async ({ page }) => {
+  const s0 = scene({ board: [...LANDS, "Orzhov Advokist", "Grizzly Bears"] }, [{ board: ["Hill Giant"] }]);
+  const [bears, giant] = [one(s0, "Grizzly Bears"), idsOf(s0, "Hill Giant", "battlefield", 1)[0]!];
+  const s = playUntil(s0, (st) => st.pending?.kind === "pickPermanents" && st.pending.player === 0);
+  await open(page, s);
+  const bar = controls(page);
+  await expect(bar).toContainText("click a creature of yours to put 2 +1/+1 counters on, or put none.");
+  await expect(bar.getByRole("button", { name: "Put none" })).toBeVisible();
+  await page.locator(`[data-obj="${bears}"]`).first().click();
+  await bar.getByRole("button", { name: "Put counters" }).click();
+  const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && plusOnes(st, bears) > 0);
+  expect(plusOnes(after, bears)).toBe(2);
+  expect(plusOnes(after, giant)).toBe(2);
+  expect(after.players[0]!.attackBansUntil).toEqual([1]);
   expect(pageErrors(page)).toEqual([]);
 });

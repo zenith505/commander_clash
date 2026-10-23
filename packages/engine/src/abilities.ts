@@ -1466,6 +1466,12 @@ export type Effect =
   /** "Put your commander into your hand from the command zone" (Command Beacon): one of yours there, chosen with two (rulings). */
   | { type: "commanderToHand" }
   /**
+   * Orzhov Advokist: "each player may put two +1/+1 counters on a creature they control. If a player does, creatures that
+   * player controls can't attack you or planeswalkers you control until your next turn." Chosen in turn order from its
+   * controller, each knowing the choices before, then the counters put at once (rulings).
+   */
+  | { type: "eachMayCounter"; n: number; counter: CounterKind; attackBan?: true }
+  /**
    * "Where X is the mana value of a commander you own on the battlefield or in the command zone" (Stinging Study): one
    * of them chosen as it resolves (rulings), counted by Count "chosenCommanderMv"; under another player's control too.
    */

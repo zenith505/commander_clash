@@ -2514,6 +2514,7 @@ function startNextTurn(s: GameState, skipping = false) {
       p.gainedUntilNextTurn = undefined;
       p.lifeCantChange = undefined;
       p.attackTaxUntil = undefined;
+      p.attackBansUntil = undefined;
     }
   if (s.namedBansUntil) s.namedBansUntil = s.namedBansUntil.filter((r) => !began.has(r.controller));
   if (!s.namedBansUntil?.length) s.namedBansUntil = undefined;
@@ -7164,6 +7165,7 @@ export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, p
   if (c.attackDespiteDefenderVs && !c.attackDespiteDefender && objHasKeyword(s, o, "Defender") && (planeswalker || attacked !== undefined || !attackedYouLastTurn(s, defender, c.controller))) return `${c.name} has defender`;
   // "Can't attack you or planeswalkers you control": that player, and their planeswalkers (a battle they protect isn't one).
   const atBattle = !!attacked && !!s.objects[attacked] && objIsType(s, obj(s, attacked), "Battle") && !objIsType(s, obj(s, attacked), "Planeswalker");
+  if (player(s, defender).attackBansUntil?.includes(c.controller) && !atBattle) return `${c.name} can't attack ${player(s, defender).name}${planeswalker ? "'s planeswalkers" : ""} until their next turn`;
   if (c.cantAttackPlayers.includes(defender) && !atBattle) return `${c.name} can't attack ${player(s, defender).name}${planeswalker ? "'s planeswalkers" : ""}`;
   // Alexios: its owner, but not their planeswalkers or the battles they protect (rulings).
   if (c.cantAttackOwner && !planeswalker && attacked === undefined && defender === o.owner) return `${c.name} can't attack its owner`;

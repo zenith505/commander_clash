@@ -394,3 +394,42 @@ describe("Hope of Ghirapur: only a player it dealt combat damage this turn, unti
     expect(s.cantCastThisTurn ?? []).toHaveLength(0);
   });
 });
+
+const advokist = card("Orzhov Advokist", "Creature — Human Advisor", "{2}{W}", {
+  power: "1",
+  toughness: "4",
+  oracleText: "At the beginning of your upkeep, each player may put two +1/+1 counters on a creature they control. If a player does, creatures that player controls can't attack you or planeswalkers you control until your next turn.",
+});
+
+describe("Orzhov Advokist: each player may take two counters; those who do can't attack you until your next turn (rulings)", () => {
+  it("you, then each other player in turn order; Ana takes them and can't attack you, Ben declines", () => {
+    supported(advokist);
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, advokist);
+    const mine = putOnBattlefield(s0, ap, testBear());
+    const [ana, ben, cy] = [1, 2, 3].map((n) => s0.turnOrder[(s0.turnOrder.indexOf(ap) + n) % 4]!);
+    const [anaBear, benBear] = [putOnBattlefield(s0, ana!, testBear()), putOnBattlefield(s0, ben!, testBear())];
+    let s = passUntil(s0, "upkeep", ana);
+    for (let i = 0; i < 400 && !(s.activePlayer === ap && s.pending); i++) s = s.pending?.kind === "declareAttackers" ? act(s, { type: "declareAttackers", player: waitingOn(s)!, attacks: [] }) : s.pending?.kind === "discardToHandSize" ? act(s, { type: "discard", player: waitingOn(s)!, objectIds: s.players[waitingOn(s)!]!.hand.slice(0, s.pending.count) }) : act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", player: ap, min: 0, count: 1 });
+    s = act(s, { type: "pickPermanents", player: ap, ids: [mine] });
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", player: ana });
+    s = act(s, { type: "pickPermanents", player: ana!, ids: [anaBear] });
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", player: ben });
+    expect(s.objects[anaBear]!.counters["+1/+1"]).toBeUndefined(); // all at once, after everyone chose
+    s = act(s, { type: "pickPermanents", player: ben!, ids: [] });
+    // Cy has no creature: not asked.
+    expect(s.pending).toBeFalsy();
+    expect(s.objects[mine]!.counters["+1/+1"]).toBe(2);
+    expect(s.objects[anaBear]!.counters["+1/+1"]).toBe(2);
+    expect(s.objects[benBear]!.counters["+1/+1"]).toBeUndefined();
+    expect(s.players[ap]!.attackBansUntil).toEqual([ana]);
+    // On Ana's turn: her Bears can attack Ben or Cy, not you.
+    s = passUntil(s, "declareAttackers", ana);
+    expect(() => act(s, { type: "declareAttackers", player: ana!, attacks: [{ attacker: anaBear, defender: ap }] })).toThrow();
+    expect(() => act(s, { type: "declareAttackers", player: ana!, attacks: [{ attacker: anaBear, defender: cy! }] })).not.toThrow();
+    // Your next turn: over.
+    s = passUntil(s, "upkeep", ap);
+    expect(s.players[ap]!.attackBansUntil).toBeUndefined();
+  });
+});

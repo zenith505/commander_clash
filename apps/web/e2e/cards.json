@@ -9288,6 +9288,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d5e9942e-096f-433f-8668-4b594f3c1b02",
+  "name": "Orzhov Advokist",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Advisor",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Advisor"
+  ],
+  "oracleText": "At the beginning of your upkeep, each player may put two +1/+1 counters on a creature they control. If a player does, creatures that player controls can't attack you or planeswalkers you control until your next turn.",
+  "power": "1",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c16",
+  "releasedAt": "2016-11-11",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4669e8c7-fc37-4b97-9cb7-8d29b43d9176",
   "name": "Overlord of the Hauntwoods",
   "manaCost": "{3}{G}{G}",

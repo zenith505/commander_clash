@@ -685,6 +685,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Court of Vantress: "If you're the monarch, you may create a token that's a copy of it. If you're not the monarch, you
   // may have ~ become a copy of it": both "it"s are the chosen target, not the token (only one branch happens).
   text = text.replace(/(If you're the monarch, you may create a token that's a copy of it\. If you're not the monarch, you may have ~ become a copy of) it\b/, "$1 the chosen permanent");
+  // Orzhov Advokist: "If a player does" is about the "may" of the sentence before: one instruction.
+  text = text.replace(/(each player may put (?:two|three) \S+ counters on a creature they control)\. If a player does, (creatures that player controls can't attack you or planeswalkers you control until your next turn)\./i, "$1; if a player does, $2.");
   // Stinging Study: "where X is the mana value of a commander you own on the battlefield or in the command zone": one of
   // them chosen as it resolves (rulings), the same one for both.
   text = text.replace(/(^|\. )You draw X cards and you lose X life, where X is the mana value of a commander you own on the battlefield or in the command zone\./, "$1Choose a commander you own on the battlefield or in the command zone. You draw X cards, where X is the chosen commander's mana value. You lose X life, where X is the chosen commander's mana value.");

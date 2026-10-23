@@ -462,6 +462,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[2]!, ctx);
     return what && !isGroup(what) ? [{ type: "lastKnownCounters", what, ...(m[1] ? { only: counterKind(m[1]) } : {}) }] : null;
   }
+  // Orzhov Advokist (the two sentences joined in body.ts).
+  if ((m = new RegExp(`^[Ee]ach player may put (two|three) ${COUNTER} counters on a creature they control; if a player does, creatures that player controls can't attack you or planeswalkers you control until your next turn$`).exec(s)))
+    return [{ type: "eachMayCounter", n: num(m[1]!), counter: counterKind(m[2]!), attackBan: true }];
   // "Distribute three +1/+1 counters among one, two, or three target creatures you control": how many targets and how
   // many each gets are chosen with the targets, at least one each (CR 601.2d), like divided damage.
   if ((m = /^Distribute (two|three|four|five|six|seven|eight) ([+-]1\/[+-]1) counters among (one or two|one, two, or three|any number of|up to (?:two|three|four)) ((?:other )?target .+)$/i.exec(s))) {

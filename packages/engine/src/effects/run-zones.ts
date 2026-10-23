@@ -679,6 +679,44 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       moveObject(s, id, "hand");
       return;
     }
+    case "eachMayCounter": {
+      // In turn order from its controller (rulings), each choosing one of their creatures or none.
+      const sc = (s.resolving!.scratch ??= {});
+      const i = s.turnOrder.indexOf(ctx.controller);
+      const order = [...s.turnOrder.slice(i), ...s.turnOrder.slice(0, i)].filter((p) => !player(s, p).lost);
+      sc.chosen ??= {};
+      for (const pid of order) {
+        if (sc.chosen[pid]) continue;
+        const options = s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature"));
+        if (!options.length) {
+          sc.chosen[pid] = [];
+          continue;
+        }
+        sc.queue = [pid];
+        const you = player(s, ctx.controller).name;
+        const ban = e.attackBan && pid !== ctx.controller ? ` If you do, your creatures can't attack ${you} or planeswalkers ${you} controls until ${you}'s next turn.` : "";
+        s.pending = { kind: "pickPermanents", player: pid, source: src, action: "counters", counter: e.counter, what: "creature", options, count: 1, min: 0, prompt: `click a creature of yours to put ${e.n} ${e.counter} counters on, or put none.${ban}` };
+        return "paused";
+      }
+      const chosen = sc.chosen;
+      sc.chosen = undefined;
+      sc.queue = undefined;
+      const did = order.filter((pid) => chosen[pid]?.length);
+      for (const pid of order) if (!chosen[pid]?.length) log(s, `${player(s, pid).name} puts no counters (${src}).`);
+      for (const pid of did) {
+        const o = s.objects[chosen[pid]![0]!];
+        // Each player puts the counters on their own creature (who puts them matters for Hardened Scales and the like).
+        if (o?.zone === "battlefield") withPutter(pid, () => putCounters(s, o, e.counter, e.n));
+      }
+      if (e.attackBan)
+        for (const pid of did.filter((p) => p !== ctx.controller)) {
+          const you = player(s, ctx.controller);
+          if (!(you.attackBansUntil ??= []).includes(pid)) you.attackBansUntil.push(pid);
+          log(s, `${player(s, pid).name}'s creatures can't attack ${you.name} or their planeswalkers until ${you.name}'s next turn.`);
+        }
+      invalidateCharacteristics(s);
+      return;
+    }
     case "chooseOwnCommander": {
       const p = player(s, ctx.controller);
       const mine = [...s.battlefield, ...p.command].filter((id) => obj(s, id).isCommander && obj(s, id).owner === p.id);

@@ -439,6 +439,9 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   const m = CAST_TRIGGER.exec(line.replace(/ with mana value (\d+), (\d+), or (\d+),/, (all, a: string, b: string, c: string) => (Number(b) === Number(a) + 1 && Number(c) === Number(b) + 1 ? ` with mana value ${a} through ${c},` : all)));
   if (!m) return null;
   let what = m[3]!.replace(/^(?:an?|another) /, "");
+  // "Whenever you cast an instant or sorcery spell during your turn" (Ral, Monsoon Mage): only while you're the active player.
+  const duringYours = m[1] === "you" && / during your turn$/.test(what);
+  if (duringYours) what = what.replace(/ during your turn$/, "");
   // "Whenever you cast a spell from exile", "... from anywhere other than your hand", "... from your graveyard": the zone
   // it was cast from (CR 601.2a); "your graveyard" and "your library" are its caster's own.
   const fromM = / from (anywhere other than (?:your|their) hand|(?:your|their) hand|exile|your graveyard|a graveyard|your library)$/.exec(what);
@@ -516,7 +519,7 @@ function parseCastTrigger(line: string): TriggeredAbility | "fail" | null {
   if (!body) return "fail";
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: body.text.replace(/\bX\b/g, "that much") };
   if (short) body = { ...replaceX(body, { count: { kind: "castShortfall" } }), text: body.text.replace(/\bloses X life\b/, "loses life equal to the difference") };
-  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}) }, body };
+  return { event: "castSpell", cast: { by: CAST_BY[m[1] as keyof typeof CAST_BY], spell: { ...spell, text: /\bspell\b/.test(what) ? what : `${what} spell` }, ...(m[2] ? { orCopy: true } : {}), ...(treasure ? { treasure: true as const } : {}), ...(spent ? { spent } : {}), ...(short ? { spentLessThanMv: true as const } : {}), ...(targets ? { targets } : {}), ...(from ? { from } : {}), ...(shares ? { sharesTypeWithSelf: true as const } : {}), ...(notOwned ? { notOwned: true as const } : {}), ...(kwM ? { keyword: capital(kwM[1]!) } : {}), ...(xM ? { xInCost: true as const } : {}), ...(duringYours ? { ownTurn: true as const } : {}) }, body };
 }
 
 /**

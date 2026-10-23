@@ -918,6 +918,15 @@ export function compile(d: CardDef): CompiledCard {
       (out.entersWithAdditional ??= []).push({ counter: counterKind(selfExtra[2]!), n: /^an?$/.test(selfExtra[1]!) ? 1 : num(selfExtra[1]!) });
       continue;
     }
+    // Ral, Leyline Prodigy: "~ enters with an additional loyalty counter on ~ for each instant and sorcery spell you've
+    // cast this turn": counted as it enters (CR 614.1c), spells countered or still on the stack too (rulings).
+    const selfEach = new RegExp(`^~ enters with an additional ${COUNTER} counter on (?:~|it) for each (.+)\\.$`).exec(line);
+    const eachN = selfEach ? parseCount(selfEach[2]!.replace(/ spell you've cast this turn$/, " spells you've cast this turn"), null) : null;
+    if (selfEach) {
+      if (!eachN) out.unsupported.push(raw);
+      else (out.entersWithAdditional ??= []).push({ counter: counterKind(selfEach[1]!), n: eachN });
+      continue;
+    }
     // "As this creature transforms into Sephiroth, One-Winged Angel, you get an emblem with ..." (CR 712.20): instructions
     // with no targets, done as it transforms.
     const asTransforms = /^As ~ transforms into ~, (.+)$/.exec(line);

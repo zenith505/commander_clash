@@ -4,7 +4,10 @@ import { describe, expect, it } from "vitest";
 import { act, card, forest, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
 import { invalidateCharacteristics } from "../src/layers";
 import { addMana } from "../src/spend";
-import { abilityProblem, botActions, legalActions, manaOptions, canBeSacrificed, characteristics, controllerOf, isFullySupported, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { spellCost } from "../src/game";
+import { manaValue as manaValueOf } from "../src/mana";
+import { setFace } from "../src/faces";
+import { abilityProblem, botActions, compileCard, faceDef, legalActions, manaOptions, planActivate, canBeSacrificed, characteristics, controllerOf, isFullySupported, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -153,7 +156,7 @@ describe("Rona, Tolarian Obliterator: a source's controller exiles a card from t
     const [shockId, otherId] = ids as [string, string];
     const opp = nextOf(s0, ap);
     const id = putOnBattlefield(s0, opp, rona);
-    s0.objects[id]!.face = 1;
+    setFace(s0, s0.objects[id]!, 1);
     invalidateCharacteristics(s0);
     onlyInHand(s0, ap, ids);
     let s = run(s0, planCast(s0, ap, shockId, [target(id)]));
@@ -189,7 +192,7 @@ describe("Rona, Tolarian Obliterator: a source's controller exiles a card from t
     const { s: s0, ap, ids } = setup([shock]);
     const opp = nextOf(s0, ap);
     const id = putOnBattlefield(s0, opp, rona);
-    s0.objects[id]!.face = 1;
+    setFace(s0, s0.objects[id]!, 1);
     invalidateCharacteristics(s0);
     const shockId = ids[0]!;
     onlyInHand(s0, ap, ids);
@@ -361,5 +364,85 @@ describe("Clavileño, First of the Blessed: an attacking Vampire becomes a Demon
     s = passToPending(act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: v, defender: opp }] }));
     expect(s.pending).toBeNull();
     expect(s.stack.length).toBe(0);
+  });
+});
+
+const ral = scry(
+  "transform",
+  [
+    { name: "Ral, Monsoon Mage", mana_cost: "{1}{R}", type_line: "Legendary Creature — Human Wizard", oracle_text: "Instant and sorcery spells you cast cost {1} less to cast.\nWhenever you cast an instant or sorcery spell during your turn, flip a coin. If you lose the flip, Ral deals 1 damage to you. If you win the flip, you may exile Ral. If you do, return him to the battlefield transformed under his owner's control.", power: "1", toughness: "3" },
+    { name: "Ral, Leyline Prodigy", type_line: "Legendary Planeswalker — Ral", oracle_text: "Ral enters with an additional loyalty counter on him for each instant and sorcery spell you've cast this turn.\n+1: Until your next turn, instant and sorcery spells you cast cost {1} less to cast.\n−2: Ral deals 2 damage divided as you choose among one or two targets. Draw a card if you control a blue permanent other than Ral.\n−8: Exile the top eight cards of your library. You may cast instant and sorcery spells from among them this turn without paying their mana costs.", loyalty: "2", color_indicator: ["U", "R"] },
+  ],
+);
+const opt = card("Opt", "Instant", "{U}", { oracleText: "Scry 1.\nDraw a card." });
+
+/** The mana value of what casting `id` costs `pid` now: its symbols and generic mana together. */
+const costOf = (s: GameState, pid: PlayerId, id: string) => {
+  const c = spellCost(s, pid, s.objects[id]!);
+  return manaValueOf(c.cost) + c.extra;
+};
+
+describe("Ral, Monsoon Mage // Ral, Leyline Prodigy", () => {
+  /** Ral's trigger for casting Opt, on top of the stack; then resolved with the coin landing `won` or not. */
+  const flipped = (won: boolean) => {
+    const { s: s0, ap, ids } = setup([opt]);
+    const r = putOnBattlefield(s0, ap, ral);
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    expect(s.triggerQueue.length + s.stack.length).toBeGreaterThan(1);
+    for (let seed = 1; seed < 200; seed++) {
+      const t = structuredClone(s);
+      t.rngState = seed;
+      let u = t;
+      for (let i = 0; i < 10 && !u.pending && u.stack.some((x) => x.sourceId === r); i++) u = act(u, { type: "passPriority", player: waitingOn(u)! });
+      const won2 = u.pending?.kind === "chooseMay";
+      if (won2 === won) return { s: u, ap, r, opt: ids[0]! };
+    }
+    throw new Error("no seed");
+  };
+
+  it("compiles on both faces; it triggers only during its controller's turn", () => {
+    supported(ral);
+    expect(compileCard(faceDef(ral, 0)).triggers[0]!.cast?.ownTurn).toBe(true);
+  });
+
+  it("losing the flip: 1 damage to you", () => {
+    const { s, ap } = flipped(false);
+    expect(s.players[ap]!.life).toBe(39);
+  });
+
+  it("winning the flip: you may exile Ral; he returns transformed with a loyalty counter more for each instant and sorcery cast this turn", () => {
+    const { s: s0, ap, r } = flipped(true);
+    const s = act(s0, { type: "chooseMay", player: ap, yes: true });
+    const back = s.battlefield.map((id) => s.objects[id]!).find((o) => characteristics(s, o).name === "Ral, Leyline Prodigy");
+    expect(back).toBeDefined();
+    expect(back!.id === r || s.objects[r]!.zone !== "battlefield").toBe(true);
+    // 2 printed, +1 for Opt (still on the stack, rulings).
+    expect(back!.counters.loyalty).toBe(3);
+    expect(s.players[ap]!.life).toBe(40);
+  });
+
+  it("+1: instant and sorcery spells cost {1} less until your next turn; −8: only instants and sorceries may be cast free this turn", () => {
+    const { s: s0, ap, ids } = setup([card("Test Bolt", "Instant", "{2}{R}", { oracleText: "Test Bolt deals 3 damage to any target." })]);
+    const r = putOnBattlefield(s0, ap, ral);
+    setFace(s0, s0.objects[r]!, 1);
+    s0.objects[r]!.counters.loyalty = 9;
+    invalidateCharacteristics(s0);
+    const s1 = passToPending(run(s0, planActivate(s0, ap, r, 0)));
+    expect(s1.objects[r]!.counters.loyalty).toBe(10);
+    expect(costOf(s1, ap, ids[0]!)).toBe(2);
+    expect(costOf(s0, ap, ids[0]!)).toBe(3);
+    // −8, with an instant, a sorcery and a creature among the top eight.
+    const top = [opt, card("Test Sorcery", "Sorcery", "{5}{U}", { oracleText: "Draw two cards." }), card("Test Ogre", "Creature — Ogre", "{2}{R}", { power: "3", toughness: "3" })];
+    const lib = s0.players[ap]!.library;
+    const putTop = top.map((c) => {
+      const id = putOnBattlefield(s0, ap, c);
+      s0.battlefield.splice(s0.battlefield.indexOf(id), 1);
+      s0.objects[id]!.zone = "library";
+      lib.unshift(id);
+      return id;
+    });
+    const s = passToPending(run(s0, planActivate(s0, ap, r, 2)));
+    expect(putTop.map((id) => s.objects[id]!.zone)).toEqual(["exile", "exile", "exile"]);
+    expect(putTop.map((id) => !!s.objects[id]!.mayPlay?.free)).toEqual([true, true, false]);
   });
 });

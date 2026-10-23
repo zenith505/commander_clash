@@ -1103,7 +1103,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
     invalidateCharacteristics(s);
   }
   // Its own "enters with an additional counter", printed or granted as it enters (Master Chef, CR 614.12).
-  for (const e of withGranted(printed, characteristics(s, o).grantedAbilities).entersWithAdditional ?? []) add(e.counter, e.n);
+  for (const e of withGranted(printed, characteristics(s, o).grantedAbilities).entersWithAdditional ?? []) add(e.counter, evalAmount(s, e.n, { controller: controllerOf(s, o), sourceId: o.id }));
   for (const [k, n] of Object.entries(entering)) putCounters(s, o, k, n, true);
   // Bloodthirst: "if an opponent was dealt damage this turn" (CR 702.54a).
   if (printed.bloodthirst && (s.damagedThisTurn ?? []).some((pid) => opponents(s, o.controller).includes(pid)))

@@ -742,6 +742,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Cosmos Elixir: "draw a card if your life total is greater than your starting life total. Otherwise, you gain 2 life."
   text = text.replace(/(^|\. )[Dd]raw a card if (you have no cards in hand|your life total is greater than your starting life total)\. Otherwise,/, (_, lead: string, cond: string) => `${lead}If ${cond}, draw a card. Otherwise,`);
   text = text.replace(/An opponent chooses a card at random in your graveyard\. If it's a creature card, put it onto the battlefield\. Otherwise, exile it\./, "Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it.");
+  // Ral, Leyline Prodigy: "Draw a card if you control a blue permanent other than ~": another blue permanent.
+  text = text.replace(/\bif you control an? ((?:white|blue|black|red|green) (?:permanent|creature)) other than ~\./g, "if you control another $1.");
+  // Ral, Monsoon Mage: "If you win the flip, you may exile ~. If you do, return ~ to the battlefield transformed under ~'s
+  // owner's control": one choice, exiling it and returning it (a blink, CR 712.14a); if it's gone by then, nothing happens.
+  text = text.replace(/If you win the flip, you may exile ~\. If you do, return ~ to the battlefield transformed under (?:its|~'s) owner's control\./, "If you win the flip, you may exile ~, then return it to the battlefield transformed under its owner's control.");
   // Deadbridge Chant: "choose a card at random in your graveyard. If it's a creature card, put it onto the battlefield.
   // Otherwise, put it into your hand."
   text = text.replace(/(^|\. )[Cc]hoose a card at random in your graveyard\. If it's a creature card, put it onto the battlefield\. Otherwise, put it into your hand\./, "$1Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise into your hand.");
@@ -1091,9 +1096,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Not after a leading condition either: "If you control a blue creature, draw a card, then discard a card" (Statute
     // of Denial) is all conditional.
     // Nor "exile the top two cards of your library, then choose one of them" (Party Thrasher): the choice is of those cards.
-    // Nor "you may exile target creature you control, then return that card to the battlefield" (Conjurer's Closet): one
-    // blink, all of it optional.
-    .flatMap((x) => (/^If [^,]+, /.test(x) || / faces? a villainous choice — /.test(x) || /^[Yy]ou may exile [^,]+, then return (?:it|that card) to the battlefield under (?:its owner's|your) control\.?$/.test(x) || WHEEL.test(x) || /^(?:\w+ player shuffles (?:their|the cards from their) .+ into their library, then draws|[Ss]huffle the cards from your hand into your library, then draw) /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then reveals the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|sacrifices all other creatures they control$|destroy the rest$|meld them into |choose one of them$|exile them again$)/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
+    // Nor "you may exile target creature you control, then return that card to the battlefield" (Conjurer's Closet), "...
+    // transformed" (Ral, Monsoon Mage): one blink, all of it optional.
+    .flatMap((x) => (/^If [^,]+, /.test(x) || / faces? a villainous choice — /.test(x) || /^[Yy]ou may exile [^,]+, then return (?:it|that card) to the battlefield(?: transformed)? under (?:its owner's|your) control\.?$/.test(x) || WHEEL.test(x) || /^(?:\w+ player shuffles (?:their|the cards from their) .+ into their library, then draws|[Ss]huffle the cards from your hand into your library, then draw) /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then reveals the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|sacrifices all other creatures they control$|destroy the rest$|meld them into |choose one of them$|exile them again$)/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
     // "Target opponent reveals their hand and you choose a nonland card from it": two instructions, in order.
     .flatMap((x) => x.split(/(?<=reveals (?:their|his or her) hand) and (?=you choose )/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p)))
     .flatMap(splitSpentPair)
@@ -1994,6 +1999,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!inner || ctx.targets.length !== before) return null;
       effects.push({ type: "exileTop", who: { ref: "you" }, n: 1 }, { type: "castNow", what: { ref: "exiledTop" } }, { type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner });
       si += 2;
+      continue;
+    }
+    // Ral, Leyline Prodigy: "Exile the top eight cards of your library. You may cast instant and sorcery spells from among
+    // them this turn without paying their mana costs." Only those card types, with their normal timing (rulings).
+    const castAmongKind = exTop && exTop[1] && !exEqual && !impulseIf ? /^You may cast ((?:instant|sorcery|creature|artifact|enchantment)(?: and (?:instant|sorcery|creature|artifact|enchantment))?) spells from among them this turn without paying their mana costs$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    const castFilter = castAmongKind ? parseSearchFilter(`${castAmongKind[1]!.replace(/ and /, " or ")} card`) : null;
+    if (castAmongKind) {
+      if (!castFilter) return null;
+      effects.push({ type: "impulse", n: amt(exTop![1]!), until: "thisTurn", castOnly: true, free: true, castFilter });
+      si++;
       continue;
     }
     if (exTop && playIt) {
@@ -3765,7 +3780,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     const ifFlip = /^If you (win|lose) the flip, (.+)$/.exec(s);
     if (ifFlip) {
-      const inner = flipped(effects) && parseOne(ifFlip[2]!.charAt(0).toUpperCase() + ifFlip[2]!.slice(1), ctx);
+      // "If you win the flip, you may exile ~, then return it to the battlefield transformed ..." (Ral, Monsoon Mage):
+      // decided as it resolves, after the flip (CR 608.2d).
+      const may = /^you may (exile ~, then return it to the battlefield transformed under its owner's control)$/.exec(ifFlip[2]!);
+      const inner0 = flipped(effects) && parseOne(capital(may ? may[1]! : ifFlip[2]!), ctx);
+      const inner = inner0 && may ? [{ type: "may" as const, effects: inner0, text: may[1]! }] : inner0;
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       effects.push({ type: "if", cond: { kind: "wonFlip", ...(ifFlip[1] === "lose" ? { lost: true as const } : {}) }, effects: inner });
       continue;

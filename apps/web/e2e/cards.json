@@ -821,6 +821,50 @@
   "gameChanger": false
  },
  {
+  "oracleId": "abbcb153-0763-44c6-964f-b4ff0eb64257",
+  "name": "Atraxa, Grand Unifier",
+  "manaCost": "{3}{G}{W}{U}{B}",
+  "cmc": 7,
+  "typeLine": "Legendary Creature — Phyrexian Angel",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Phyrexian",
+   "Angel"
+  ],
+  "oracleText": "Flying, vigilance, deathtouch, lifelink\nWhen Atraxa enters, reveal the top ten cards of your library. For each card type, you may put a card of that type from among the revealed cards into your hand. Put the rest on the bottom of your library in a random order. (Artifact, battle, creature, enchantment, instant, land, planeswalker, and sorcery are card types.)",
+  "power": "7",
+  "toughness": "7",
+  "colors": [
+   "B",
+   "G",
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "G",
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Deathtouch",
+   "Flying",
+   "Lifelink",
+   "Vigilance"
+  ],
+  "commanderLegal": "legal",
+  "set": "one",
+  "releasedAt": "2023-02-10",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "34e05dc1-35af-402d-96ae-e249b3738493",
   "name": "Augur il-Vec",
   "manaCost": "{1}{W}",
@@ -3563,6 +3607,30 @@
   "set": "msc",
   "releasedAt": "2026-06-26",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9afd8f12-0796-4500-aaa3-10b4a46ef6ec",
+  "name": "Doubling Cube",
+  "manaCost": "{2}",
+  "cmc": 2,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{3}, {T}: Double the amount of each type of unspent mana you have.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Double"
+  ],
+  "commanderLegal": "legal",
+  "set": "5dn",
+  "releasedAt": "2004-06-04",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -11269,6 +11337,28 @@
   "commanderLegal": "legal",
   "set": "ncc",
   "releasedAt": "2022-04-29",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9f95027a-5f04-48b4-99a0-8913be3a520a",
+  "name": "Selective Obliteration",
+  "manaCost": "{3}{C}{C}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Each player chooses a color. Then exile each permanent unless it's colorless or it's only the color its controller chose.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "m3c",
+  "releasedAt": "2024-06-14",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

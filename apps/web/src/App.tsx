@@ -3733,7 +3733,7 @@ function LibrarySearch({
                   : pending.shareLandType
                   ? `Found ${found.length} of ${pending.max}. They must share a land type.`
                   : pending.oneOfEach
-                  ? `Found ${found.length} of ${pending.max}: one for each of ${pending.oneOfEach.length > 2 ? `${pending.oneOfEach.map((f) => f.text.replace(/ card$/, "")).join(", ")} card` : pending.oneOfEach.map((f) => f.text).join(" and ")}.`
+                  ? `Found ${found.length} of ${pending.max}: one for each of ${pending.oneOfEach.map((f) => f.text).join(" and ")}.`
                   : pending.also?.length
                     ? `Found ${found.length} of ${pending.max}. The ${pending.also.length} in the graveyard ${pending.also.length === 1 ? "is" : "are"} exiled too.`
                     : `Found ${found.length} of ${pending.max}.`}

@@ -743,3 +743,37 @@ describe("Nesting Dragon: a quoted ability inside a token's quoted ability", () 
     expect(pt(s, dragon)).toBe("3/2");
   });
 });
+
+const swiftWarkite = card("Swift Warkite", "Creature — Dragon", "{4}{B}{R}", { power: "4", toughness: "4", keywords: ["Flying"], oracleText: "Flying\nWhen this creature enters, you may put a creature card with mana value 3 or less from your hand or graveyard onto the battlefield. That creature gains haste. Return it to your hand at the beginning of the next end step." });
+const reefWorm = card("Reef Worm", "Creature — Worm", "{3}{U}", { power: "0", toughness: "1", oracleText: "When this creature dies, create a 3/3 blue Fish creature token with \"When this token dies, create a 6/6 blue Whale creature token with 'When this token dies, create a 9/9 blue Kraken creature token.'\"" });
+
+describe("Cards these changes made supported: Swift Warkite (hand or graveyard), Reef Worm (nested quotes)", () => {
+  it("Swift Warkite puts a creature from the graveyard with haste, back to hand at the end step", () => {
+    supported(swiftWarkite);
+    const { s: s0, ap, ids } = setup([swiftWarkite]);
+    const bear = putIn(s0, ap, card("Test Cub", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }), "graveyard");
+    let s = passToPending(run(s0, planCast(s0, ap, ids[0]!)));
+    for (let i = 0; i < 4 && s.pending?.kind !== "searchLibrary"; i++) s = s.pending?.kind === "chooseMay" ? act(s, { type: "chooseMay", player: ap, yes: true }) : passToPending(act(s, { type: "passPriority", player: waitingOn(s)! }));
+    expect((s.pending as { cards: string[] }).cards).toContain(bear);
+    s = settleBots(act(s, { type: "searchLibrary", player: ap, found: [bear] }));
+    expect(s.objects[bear]!.zone).toBe("battlefield");
+    expect(characteristics(s, s.objects[bear]!).keywords).toContain("Haste");
+    s = settleBots(passUntil(s, "end", ap));
+    expect(s.objects[bear]!.zone).toBe("hand");
+  });
+
+  it("Reef Worm: Fish, then Whale, then Kraken", () => {
+    supported(reefWorm);
+    const { s: s0, ap } = setup([]);
+    const worm = putOnBattlefield(s0, ap, reefWorm);
+    let s = s0;
+    for (const [id0, next] of [[worm, "Fish"], [undefined, "Whale"], [undefined, "Kraken"]] as const) {
+      const id = id0 ?? s.battlefield.find((x) => s.objects[x]!.isToken && s.objects[x]!.controller === ap)!;
+      s.objects[id]!.damage = 10;
+      s = settleBots(act(s, { type: "passPriority", player: ap }));
+      const tok = s.battlefield.filter((x) => s.objects[x]!.isToken && s.objects[x]!.controller === ap);
+      expect(tok.map((x) => nameOf(s, x))).toEqual([`${next} Token`]);
+    }
+    expect(pt(s, s.battlefield.find((x) => s.objects[x]!.isToken)!)).toBe("9/9");
+  });
+});

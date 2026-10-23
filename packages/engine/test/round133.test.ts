@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { act, bear, card, forest, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
 import { invalidateCharacteristics } from "../src/layers";
 import { addMana } from "../src/spend";
-import { spellCost } from "../src/game";
+import { moveObject, spellCost } from "../src/game";
 import { manaValue as manaValueOf } from "../src/mana";
 import { setFace } from "../src/faces";
 import { abilityProblem, botActions, potentialAttackers, compileCard, faceDef, legalActions, manaOptions, planActivate, canBeSacrificed, characteristics, controllerOf, isFullySupported, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
@@ -860,5 +860,44 @@ describe("Rashmi, Eternities Crafter: the first spell each turn reveals the top 
       expect(s.pending).toBeFalsy();
       expect(s.objects[t]!.zone).toBe("hand");
     }
+  });
+});
+
+describe("Communal Brewing: creature spells enter with X more +1/+1 counters, X its ingredient counters", () => {
+  const brewing = card("Communal Brewing", "Enchantment", "{2}{G}", { oracleText: "When this enchantment enters, any number of target opponents each draw a card. Put an ingredient counter on this enchantment, then put an ingredient counter on it for each card drawn this way.\nWhenever you cast a creature spell, that creature enters with X additional +1/+1 counters on it, where X is the number of ingredient counters on this enchantment." });
+
+  it("three ingredient counters: the creature enters with three +1/+1 counters", () => {
+    supported(brewing);
+    const { s: s0, ap, ids } = setup([bear()]);
+    onlyInHand(s0, ap, ids);
+    const b = putOnBattlefield(s0, ap, brewing);
+    s0.objects[b]!.counters.ingredient = 3;
+    addMana(s0, ap, ["G", "C"]);
+    let s = passToPending(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
+    expect(s.objects[ids[0]!]!.counters["+1/+1"]).toBe(3);
+    // Gone before the trigger resolves: its last known counters (rulings).
+    const { s: t0, ap: p2, ids: ids2 } = setup([bear()]);
+    onlyInHand(t0, p2, ids2);
+    const b2 = putOnBattlefield(t0, p2, brewing);
+    t0.objects[b2]!.counters.ingredient = 2;
+    addMana(t0, p2, ["G", "C"]);
+    s = run(t0, planCast(t0, p2, ids2[0]!));
+    moveObject(s, b2, "graveyard");
+    s = passToPending(s);
+    expect(s.objects[ids2[0]!]!.counters["+1/+1"] ?? 0).toBe(2);
+  });
+
+  it("as it enters, two target opponents draw: three ingredient counters", () => {
+    const { s: s0, ap, ids } = setup([brewing]);
+    onlyInHand(s0, ap, ids);
+    addMana(s0, ap, ["G", "C", "C"]);
+    const [o1, o2] = [nextOf(s0, ap), nextOf(s0, nextOf(s0, ap))];
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    for (let i = 0; i < 10 && !s.pending && s.objects[ids[0]!]!.zone !== "battlefield"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    for (let i = 0; i < 10 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending?.kind).toBe("chooseTargets");
+    s = passToPending(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: o1 }, { kind: "player", id: o2 }] }));
+    expect(s.objects[ids[0]!]!.counters.ingredient).toBe(3);
   });
 });

@@ -1787,6 +1787,11 @@ export interface Resolving {
   drawnThisWay?: ObjectId[];
   /** The cards the draw instruction before this one drew ("each opponent who drew a card this way", Cut a Deal). */
   drawnBefore?: ObjectId[];
+  /**
+   * While a draw effect works out how many to draw: "for each card drawn this way" is the draw before it (drawnBefore)
+   * then; any other effect after a draw counts that draw's cards (drawnThisWay; Communal Brewing's counters).
+   */
+  drawing?: true;
   /** How many cards each player discarded so far while this resolves ("draw that many cards"). */
   discarded?: Record<PlayerId, number>;
   /** The cards the last discard while this resolves put into a graveyard, as those objects ("the discarded card", Malcolm). */

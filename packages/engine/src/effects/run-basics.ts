@@ -321,7 +321,9 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       const queue = (sc.drawQueue ??= players(s, e.who, ctx));
       while (queue.length) {
         const pid = queue.shift()!;
+        s.resolving!.drawing = true;
         const n = amountNow(s, e.n, { ...ctx, eachOne: pid });
+        s.resolving!.drawing = undefined;
         log(s, `${player(s, pid).name} draws ${n} card${n === 1 ? "" : "s"}.`);
         if (!draw(s, pid, n)) return "paused";
       }

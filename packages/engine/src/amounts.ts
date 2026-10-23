@@ -329,7 +329,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "flipsWon":
       return s.resolving?.flipped?.wins ?? 0;
     case "drawnThisWay":
-      return s.resolving?.drawnBefore?.length ?? 0;
+      return (s.resolving?.drawing ? s.resolving.drawnBefore : s.resolving?.drawnThisWay)?.length ?? 0;
     case "asCast":
       return s.resolving?.item.asCast ?? evalCount(s, c.of, ctx);
     case "discardedTypes":
@@ -341,7 +341,7 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       // Cut a Deal: each one that drew a card in the draw before, however many it drew (rulings).
       // Aclazotz: an opponent with no card to discard (CR 701.9b) didn't discard one.
       if (c.discardedNone) return s.turnOrder.filter((pid) => !s.players[pid]!.lost && !(c.opponents && pid === ctx.controller) && !(s.resolving?.discarded?.[pid] ?? 0)).length;
-      if (c.drewThisWay) return new Set((s.resolving?.drawnBefore ?? []).map((id) => s.objects[id]?.owner).filter((pid) => pid !== undefined && !(c.opponents && pid === ctx.controller))).size;
+      if (c.drewThisWay) return new Set(((s.resolving?.drawing ? s.resolving.drawnBefore : s.resolving?.drawnThisWay) ?? []).map((id) => s.objects[id]?.owner).filter((pid) => pid !== undefined && !(c.opponents && pid === ctx.controller))).size;
       // Summon: Yojimbo: opponents still in the game who control at least one such permanent now.
       if (c.controlling) {
         const f = c.controlling;
@@ -427,7 +427,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const o = refObjects(s, c.of, ctx)[0];
       if (o?.zone === "battlefield") return of(o.counters);
       // "For each blight counter on it" after it left: as it last existed on the battlefield (CR 608.2h).
-      const lk = c.of.ref === "self" && !ctx.lki && ctx.sourceId && ctx.sourceZc !== undefined ? s.lastKnown?.[ctx.sourceId] : undefined;
+      // Not when the ability carries its own (a dies trigger's), only other last known information (a cast spell's copy key).
+      const lk = c.of.ref === "self" && !ctx.lki?.counters && ctx.sourceId && ctx.sourceZc !== undefined ? s.lastKnown?.[ctx.sourceId] : undefined;
       if (lk && lk.zc === ctx.sourceZc) return of(lk.counters);
       return c.of.ref === "self" || c.of.ref === "subject" ? of(ctx.lki?.counters) : 0;
     }

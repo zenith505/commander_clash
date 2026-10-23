@@ -123,6 +123,7 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   const tapped = /^(?:For as long as ~ remains tapped, (.+)|(.+?) for as long as (you control ~ and )?~ remains tapped)$/i.exec(s);
   if (tapped) return parseWhileTapped((tapped[1] ?? tapped[2])!, !!tapped[3], ctx);
   const controlled = /^(.+?) for as long as you control ~$/.exec(s);
+  if (controlled?.[1] === "You have no maximum hand size") return ctx.spell ? null : [{ type: "noMaxHandSize", whileControlled: true }];
   if (controlled) return parseWhileTapped(controlled[1]!, "controlled", ctx);
   // "You and target opponent each draw a card", "you and that player each create a Food token": the same instruction for
   // each of them, you first. Only verbs where doing it one after the other can't be told from doing it at once.

@@ -2819,6 +2819,7 @@ function sagaSBAs(s: GameState): boolean {
 /** "You have no maximum hand size" on a permanent the player controls, or "Players have ..." on any (CR 402.2, 514.1). */
 export const hasNoMaxHandSize = (s: GameState, pid: PlayerId) =>
   !!player(s, pid).noMaxHandSize ||
+  !!player(s, pid).noMaxHandSizeWhile?.some((w) => s.objects[w.id]?.zone === "battlefield" && (s.objects[w.id]!.zoneChanges ?? 0) === w.zc && controllerOf(s, s.objects[w.id]!) === pid) ||
   s.battlefield.some((id) => {
     const a = abilitiesOf(s, obj(s, id)).noMaxHandSize;
     return a === "all" || (!!a && controllerOf(s, obj(s, id)) === pid);

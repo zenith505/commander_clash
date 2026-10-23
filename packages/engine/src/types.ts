@@ -607,6 +607,8 @@ export interface Player {
   shuffles?: number;
   /** "You have no maximum hand size for the rest of the game" from a resolved spell or ability (CR 402.2). */
   noMaxHandSize?: true;
+  /** "You have no maximum hand size for as long as you control ~" (The Great Synthesis): while they control that object (CR 611.2b). */
+  noMaxHandSizeWhile?: { id: ObjectId; zc: number }[];
   /** Epic (CR 702.50a-b): "for the rest of the game, you can't cast spells", and the spell that said so. */
   cantCastSpells?: string;
   /** The names of paradigm spells this player has had resolve (CR 702.192a): only the first of each name counts. */

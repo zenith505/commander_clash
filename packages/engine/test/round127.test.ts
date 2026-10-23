@@ -1,7 +1,7 @@
 // Round 127: round 126's gaps (Hazel of the Rootbloom's mana in autopay, ...), then the most played cards.
 
 import { describe, expect, it } from "vitest";
-import { act, card, cast, passAll, passUntil, putOnBattlefield, setup, target } from "./helpers";
+import { act, card, cast, passAll, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
 import { abilitiesOf, altCostsFor, botActions, invalidateCharacteristics, characteristics, power, isFullySupported, manaAbilitiesOn, objHasKeyword, objIsType, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -604,5 +604,64 @@ describe("Nautiloid Ship: a creature card from the graveyard it exiled (CR 607.2
     expect(s.objects[yard[0]!]!.zone).toBe("battlefield");
     expect(s.objects[yard[0]!]!.controller).toBe(ap);
     expect(s.objects[yard[1]!]!.zone).toBe("exile");
+  });
+});
+
+const jin = scry("transform", [
+  { name: "Jin-Gitaxias", type_line: "Legendary Creature — Phyrexian Praetor", mana_cost: "{3}{U}{U}", power: "5", toughness: "5", oracle_text: "Ward {2}\nWhenever you cast a noncreature spell with mana value 3 or greater, draw a card.\n{3}{U}: Exile Jin-Gitaxias, then return it to the battlefield transformed under its owner's control. Activate only as a sorcery and only if you have seven or more cards in hand." },
+  { name: "The Great Synthesis", type_line: "Enchantment — Saga", oracle_text: "(As this Saga enters and after your draw step, add a lore counter.)\nI — Draw cards equal to the number of cards in your hand. You have no maximum hand size for as long as you control this Saga.\nII — Return all non-Phyrexian creatures to their owners' hands.\nIII — You may cast any number of spells from your hand without paying their mana costs. Exile this Saga, then return it to the battlefield (front face up)." },
+]);
+const vorinclex = scry("transform", [
+  { name: "Vorinclex", type_line: "Legendary Creature — Phyrexian Praetor", mana_cost: "{3}{G}{G}", power: "6", toughness: "6", oracle_text: "Reach, trample\nWhen Vorinclex enters, search your library for up to two Forest cards, reveal them, put them into your hand, then shuffle.\n{6}{G}{G}: Exile Vorinclex, then return it to the battlefield transformed under its owner's control. Activate only as a sorcery." },
+  { name: "The Grand Evolution", type_line: "Enchantment — Saga", oracle_text: "(As this Saga enters and after your draw step, add a lore counter.)\nI — Mill ten cards. Put up to two creature cards from among the milled cards onto the battlefield.\nII — Distribute seven +1/+1 counters among any number of target creatures you control.\nIII — Until end of turn, creatures you control gain \"{1}: This creature fights target creature you don't control.\" Exile this Saga, then return it to the battlefield (front face up)." },
+]);
+
+describe("The Great Synthesis and The Grand Evolution (Saga back faces, CR 714)", () => {
+  const filler = card("Test Filler", "Sorcery", "{5}{U}", { oracleText: "Draw a card." });
+  const bigBear = card("Big Bear", "Creature — Bear", "{4}{G}", { power: "4", toughness: "4" });
+  const toMain = (s: GameState, ap: number) => settleBots(passUntil(passUntil(s, "upkeep", s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % 4]!), "main1", ap));
+  it("I draws as many as in hand, with no maximum hand size; II bounces non-Phyrexians; III casts spells free, then Jin-Gitaxias returns", () => {
+    supported(jin);
+    const { s: s0, ap, ids } = setup(Array.from({ length: 7 }, () => filler));
+    const j = putOnBattlefield(s0, ap, jin);
+    const bear = putOnBattlefield(s0, ap, card("Test Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    const h0 = s0.players[ap]!.hand.length;
+    let s = settleBots(run(s0, planActivate(s0, ap, j, 0)));
+    const saga = s.battlefield.find((id) => s.cards[s.objects[id]!.cardId] && characteristics(s, s.objects[id]!).name === "The Great Synthesis")!;
+    expect(saga).toBeDefined();
+    expect(s.players[ap]!.hand).toHaveLength(2 * h0);
+    s = passUntil(s, "upkeep", s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % 4]!);
+    expect(s.players[ap]!.hand).toHaveLength(2 * h0); // no discard at cleanup
+    s = toMain(s, ap);
+    expect(s.objects[bear]!.zone).toBe("hand"); // II
+    s = passUntil(s, "upkeep", s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % 4]!);
+    s = passUntil(s, "main1", ap);
+    for (let i = 0; i < 20 && s.pending?.kind !== "chooseOption"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "castFromAmong" });
+    expect((s.pending as { prompt: string }).prompt).toMatch(/from your hand/);
+    s = act(s, { type: "chooseOption", player: ap, choice: ids[0]! });
+    s = act(s, { type: "castSpell", player: ap, objectId: ids[0]! });
+    s = act(s, { type: "chooseOption", player: ap, choice: bear });
+    s = act(s, { type: "castSpell", player: ap, objectId: bear });
+    s = act(s, { type: "chooseOption", player: ap, choice: "none" });
+    expect(s.stack.map((x) => x.objectId)).toEqual(expect.arrayContaining([ids[0], bear]));
+    const back = s.battlefield.map((id) => s.objects[id]!).find((o) => characteristics(s, o).name === "Jin-Gitaxias");
+    expect(back, logText(s)).toBeDefined();
+    expect(s.battlefield.includes(saga) && characteristics(s, s.objects[saga]!).name === "The Great Synthesis").toBe(false);
+  });
+  it("The Grand Evolution I: mill ten, then up to two creature cards from among them onto the battlefield", () => {
+    supported(vorinclex);
+    const { s: s0, ap } = setup([]);
+    const v = putOnBattlefield(s0, ap, vorinclex);
+    const lib = s0.players[ap]!.library;
+    lib.splice(0, 10, ...[bigBear, bigBear, bigBear, filler, filler, filler, filler, filler, filler, filler].map((d) => onTop(s0, ap, d)).reverse());
+    s0.players[ap]!.library = [...new Set(s0.players[ap]!.library)];
+    let s = run(s0, planActivate(s0, ap, v, 0));
+    for (let i = 0; i < 30 && s.pending?.kind !== "searchLibrary"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    const pend = s.pending as Extract<GameState["pending"], { kind: "searchLibrary" }>;
+    expect(pend).toMatchObject({ max: 2, min: 0 });
+    expect(pend.cards.every((id) => s.cards[s.objects[id]!.cardId]!.name === "Big Bear")).toBe(true);
+    s = act(s, { type: "searchLibrary", player: ap, found: pend.cards.slice(0, 2) });
+    expect(pend.cards.slice(0, 2).every((id) => s.objects[id]!.zone === "battlefield" && s.objects[id]!.controller === ap)).toBe(true);
   });
 });

@@ -479,6 +479,14 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       for (const o of objects(s, e.what, ctx)) o.skipNextUntap = true;
       return;
     case "noMaxHandSize":
+      // "For as long as you control ~": nothing if you no longer do (CR 611.2b; rulings on The Great Synthesis).
+      if (e.whileControlled) {
+        const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+        if (!me || me.zone !== "battlefield" || (me.zoneChanges ?? 0) !== (ctx.sourceZc ?? 0) || controllerOf(s, me) !== ctx.controller) return;
+        (player(s, ctx.controller).noMaxHandSizeWhile ??= []).push({ id: me.id, zc: me.zoneChanges ?? 0 });
+        log(s, `${player(s, ctx.controller).name} has no maximum hand size for as long as they control ${src}.`);
+        return;
+      }
       player(s, ctx.controller).noMaxHandSize = true;
       log(s, `${player(s, ctx.controller).name} has no maximum hand size for the rest of the game.`);
       return;

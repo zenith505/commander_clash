@@ -1195,6 +1195,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "newTargets", index: ctx.lastObjectTarget });
       continue;
     }
+    // The Great Synthesis: "You may cast any number of spells from your hand without paying their mana costs": one after
+    // another as it resolves, ignoring timing (CR 608.2g); X is 0 (rulings).
+    if (/^You may cast any number of spells from your hand without paying their mana costs$/.test(s)) {
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, fromHand: true });
+      continue;
+    }
     // Silent-Blade Oni: "look at that player's hand. You may cast a spell from among those cards without paying its mana
     // cost"; Mindclaw Shaman: "target opponent reveals their hand. You may cast an instant or sorcery spell from among
     // those cards ...": cast from that hand as this resolves (CR 608.2g), the spell controlled by you (rulings).
@@ -3720,15 +3726,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "Mill three cards. You may put a land card from among them into your hand." (Six, Eerie Gravestone), "... from among
     // the cards milled this way ..." (Blanchwood Prowler), "You may put an instant or sorcery card milled this way into
     // your hand" (Leyline Dowser): one of the cards your mill just put into your graveyard, if any matches.
+    // "Put up to two creature cards from among the milled cards onto the battlefield" (The Grand Evolution): under your
+    // control, chosen as it resolves.
     const fromMilled =
-      /^[Yy]ou may put (an? .+?|up to (?:one|two|three|four|five) .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) into your hand$/.exec(s) ?? /^[Yy]ou may put (an? .+?) milled this way into your hand$/.exec(s);
+      /^[Yy]ou may put (an? .+?|up to (?:one|two|three|four|five) .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) into your hand$/.exec(s) ?? /^[Yy]ou may put (an? .+?) milled this way into your hand$/.exec(s) ?? /^Put (up to (?:one|two|three|four|five) .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) (onto the battlefield)(?: under your control)?$/.exec(s);
     if (fromMilled) {
       const prev = effects[effects.length - 1];
       // "Up to two creature and/or land cards from among the milled cards" (Smuggler's Surprise).
       const upTo = /^up to (\w+) (.+) cards$/.exec(fromMilled[1]!);
       const filter = parseSearchFilter(upTo ? `${upTo[2]!.replace(/ and\/or /g, " or ")} card` : fromMilled[1]!.replace(/^an? /, ""));
       if (prev?.type !== "mill" || prev.who.ref !== "you" || filter === null) return null;
-      effects.push({ type: "chooseFromGraveyard", n: upTo ? num(upTo[1]!) : 1, upTo: true, milled: true, ...(filter ? { filter } : {}) });
+      effects.push({ type: "chooseFromGraveyard", n: upTo ? num(upTo[1]!) : 1, upTo: true, milled: true, ...(filter ? { filter } : {}), ...(fromMilled[2] ? { dest: "battlefield" as const } : {}) });
       // "If you don't, put a +1/+1 counter on this creature." (Ainok Wayfarer): no card was put into your hand.
       const didnt = /^If you don't, (.+)$/.exec(sentences[si + 1] ?? "");
       if (didnt) {

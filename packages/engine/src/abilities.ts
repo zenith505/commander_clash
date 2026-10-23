@@ -1852,7 +1852,7 @@ export type Effect =
   /** "That creature doesn't untap during its controller's next untap step." */
   | { type: "skipUntap"; what: ObjRef }
   /** "You have no maximum hand size for the rest of the game" (Player.noMaxHandSize). */
-  | { type: "noMaxHandSize" }
+  | { type: "noMaxHandSize"; /** "For as long as you control ~" (The Great Synthesis): see Player.noMaxHandSizeWhile. */ whileControlled?: true }
   /** "Until your next turn, creatures your opponents control enter tapped" (Cone of Cold): GameState.entersTappedUntil. */
   | { type: "enterTappedUntil"; filter: TargetSpec }
   /** `perLastKnownCounter`: modular's "a +1/+1 counter for each +1/+1 counter on this permanent", as it last was. */

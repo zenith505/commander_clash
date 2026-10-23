@@ -1080,7 +1080,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         .filter((id) => exiled(id) && !st.declined.includes(id) && id !== st.excluded && (isLand(id) ? !!e.lands && canPlayLandNow(s, you.id, id) : (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (!st.hits || st.hits.includes(id)) && (!e.sharesTypeWithYours || sharesType(id)) && castable(id)));
       if (!options.length || (e.max !== undefined && (st.cast ?? 0) >= e.max)) return finish();
       const left = st.budget !== undefined ? ` (total mana value ${st.budget} left)` : "";
-      s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Done"], prompt: `${e.lands ? "play a land or " : ""}cast a spell from among ${e.fromHand ? `the cards in ${player(s, obj(s, options[0]!).owner).name}'s hand` : `the ${e.reveal ? "revealed" : "exiled"} cards`} without paying its mana cost${left}?` };
+      s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Done"], prompt: `${e.lands ? "play a land or " : ""}cast a spell from ${e.fromHand ? (obj(s, options[0]!).owner === you.id ? "your hand" : `among the cards in ${player(s, obj(s, options[0]!).owner).name}'s hand`) : "among "}${e.fromHand ? "" : `the ${e.reveal ? "revealed" : "exiled"} cards`} without paying its mana cost${left}?` };
       return "paused";
     }
     case "exileCastEachType": {

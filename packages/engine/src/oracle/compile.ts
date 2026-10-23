@@ -504,6 +504,13 @@ export function compile(d: CardDef): CompiledCard {
     if (!line) continue;
     // "~ has all activated abilities of ..." (CompiledCard.borrows).
     const borrow = /^(?:As long as ~ is on the battlefield, it|~) has all activated abilities of (.+?)( except mana abilities)?\.( You may spend mana as though it were mana of any color to activate those abilities\.)?$/.exec(line);
+    // Conspicuous Snoop: "As long as the top card of your library is a Goblin card, ~ has all activated abilities of that
+    // card": the printed ones of that card (rulings).
+    const topBorrow = /^As long as the top card of your library is an? ([A-Z][a-z]+) card, ~ has all activated abilities of that card\.$/.exec(line);
+    if (topBorrow && !out.borrows) {
+      out.borrows = { filter: { kind: "object", subtypes: [topBorrow[1]!], text: `${topBorrow[1]} card` }, top: true };
+      continue;
+    }
     if (borrow && !out.borrows) {
       const yard = /^all (.+?) cards in (all graveyards|your graveyard)$/.exec(borrow[1]!);
       const what = yard ? parseTargetPhrase(yard[1]!) : null;
@@ -1673,6 +1680,16 @@ export function compile(d: CardDef): CompiledCard {
     }
     // One with the Multiverse: casting without paying the mana cost is an alternative cost (CR 118.9), X is 0 (107.3b);
     // once for each such permanent (a new object again, rulings), during your turn, following the normal timing rules.
+    // Demon of Fate's Design: "Once during each of your turns, you may cast an enchantment spell by paying life equal to its
+    // mana value rather than paying its mana cost": an alternative cost (CR 118.9), X is 0 (rulings), from wherever the
+    // spell may be cast; once for each such permanent, as for One with the Multiverse.
+    const lifeAlt = /^Once during each of your turns, you may cast an? ([a-z]+) spell by paying life equal to its mana value rather than paying its mana cost\.$/.exec(line);
+    if (lifeAlt) {
+      const spec = parseTargetPhrase(`${lifeAlt[1]} card from a graveyard`);
+      if (spec?.kind !== "card") out.unsupported.push(raw);
+      else out.payZero = { filter: (({ owner: _, ...rest }) => ({ ...rest, text: `${lifeAlt[1]} spell` }))(spec), once: true, yourTurn: true, life: true };
+      continue;
+    }
     if (line === "Once during each of your turns, you may cast a spell from your hand or the top of your library without paying its mana cost.") {
       out.payZero = { once: true, yourTurn: true, fromHandOrTop: true };
       continue;
@@ -1683,6 +1700,11 @@ export function compile(d: CardDef): CompiledCard {
     }
     if (line === "Each power-up ability of permanents you control can be activated an additional time.") {
       out.powerUpAgain = true;
+      continue;
+    }
+    const youActivateLess = /^Abilities you activate that aren't mana abilities cost \{(\d+)\} less to activate\.( This effect can't reduce the mana in that cost to less than one mana\.)?$/.exec(line);
+    if (youActivateLess && !out.youActivateLess) {
+      out.youActivateLess = { n: Number(youActivateLess[1]), ...(youActivateLess[2] ? { atLeastOne: true as const } : {}) };
       continue;
     }
     const activationLess = /^Activated abilities of (creatures|artifacts|lands|artifact tokens)( you control)? cost \{(\d+)\} less to activate\.( This effect can't reduce the mana in that cost to less than one mana\.)?$/.exec(line);
@@ -2119,6 +2141,15 @@ export function compile(d: CardDef): CompiledCard {
     if (/^~ can't be countered\.$/.test(line)) {
       out.cantBeCountered = true;
       continue;
+    }
+    // Thryx, the Sudden Storm: "Spells you cast with mana value 5 or greater cost {1} less to cast and can't be countered":
+    // two statics about the same spells.
+    const thryx = /^Spells you cast with mana value (\d+) or greater (cost \{\d+\} less to cast and )?can't be countered\.$/.exec(line);
+    if (thryx) {
+      (out.uncounterable ??= []).push({ filter: { kind: "spell", text: `spells you cast with mana value ${thryx[1]} or greater` }, minMv: Number(thryx[1]) });
+      if (!thryx[2]) continue;
+      // The cost half is read by the cost-change lines below.
+      line = `Spells you cast with mana value ${thryx[1]} or greater ${thryx[2].replace(/ and $/, "")}.`;
     }
     // "Creature spells you control can't be countered." "Creature spells can't be countered." (CR 101.2)
     const uncounterable = /^(.*?)[Ss]pells( you control)? can't be countered\.$/.exec(line);
@@ -2868,7 +2899,8 @@ function linkExile(out: CompiledCard) {
   // with ~ into its owner's graveyard": the cards its one exile instruction exiled (CR 607.2a).
   if (!impulses.length && bodies.some((b) => allEffects(b.effects).some((e) => e.type === "moveLinked"))) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
-    const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
+    // Nautiloid Ship: "exile target player's graveyard" is the one exile instruction too.
+    const exiles = all.filter((e): e is Extract<Effect, { type: "exile" | "exileGraveyard" }> => (e.type === "exile" && !e.until) || e.type === "exileGraveyard");
     const others = all.some((e) => (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
     if (!others && exiles.length === 1) exiles[0]!.linked = true;
   }

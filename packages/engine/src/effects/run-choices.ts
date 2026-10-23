@@ -6,7 +6,7 @@ import { autoEvidence, availableMana, canLoseLife, collectEvidence, creatureType
 import { cardIdOf, defOf } from "../cards";
 import { controllerOf, staticConditionNow } from "../layers";
 import type { GameState, ObjectId, PlayerId } from "../types";
-import { bindBound, bindChosen, choiceOptions, objectMatches, pickOptions, printedMatches, spellMatches } from "./targeting";
+import { bindBound, bindChosen, choiceOptions, objectMatches, pickOptions, printedMatches, sayBound, spellMatches } from "./targeting";
 import { ResolveCtx, apnap, objects, players, runEffect, amountNow, amountCtx, gifteeOf, evidenceCollected, sourceCreatureTypes, ctxSource } from "./resolve";
 import { dealDamageBatch } from "../damage";
 import { kickedMatches, paidUnless } from "./run-spells";
@@ -97,7 +97,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           // About the card "reveal/look at the top card" found: it's named, and shown (the controller has seen it).
           const rv = s.resolving?.revealed;
           const card = rv && allEffects(e.effects).some((x) => x.type === "revealRevealed" || ("what" in x && (x.what as { ref?: string } | undefined)?.ref === "revealed")) ? s.objects[rv.id] : undefined;
-          const prompt = card ? e.text.replace("the revealed card", defOf(s, card).name) : e.payEnergy !== undefined ? `${e.text} (${pay!.energy} energy)` : e.text;
+          // "You may search your library for an Aura card with mana value less than or equal to that Aura" (Light-Paws): the number.
+          const first = e.effects[0];
+          const text = first?.type === "search" ? sayBound(s, e.text, first.filter, amountCtx(s, ctx)) : e.text;
+          const prompt = card ? text.replace("the revealed card", defOf(s, card).name) : e.payEnergy !== undefined ? `${text} (${pay!.energy} energy)` : text;
           s.pending = { kind: "chooseMay", player: ctx.controller, prompt: prompt.replace(/~/g, src), source: src, ...(card ? { card: card.id } : {}), ...(pay ? { pay } : {}), ...(e.keep ? { keep: true } : {}) };
           return "paused";
         }

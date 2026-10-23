@@ -585,7 +585,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Put target creature into its owner's library second from the top" (Bury in Books), "third from the top" (Teferi,
   // Hero of Dominaria; Shattered Ego's "enchanted creature").
-  if ((m = /^Put (target .+?|~|enchanted creature) into its owner's library (second|third) from the top$/i.exec(s)) && !/graveyard$/i.test(m[1]!)) {
+  if ((m = /^Put (target .+?|~|enchanted creature) into its owner's library (second|third) from the top$/i.exec(s)) && !/graveyard$/i.test(m[1]!) && !/^target spell or /i.test(m[1]!)) {
     const what = parseObject(m[1]!, ctx);
     return what && (what.ref === "target" || what.ref === "self" || what.ref === "attached") ? [{ type: "putInLibrary", what, position: m[2]!.toLowerCase() as "second" | "third" }] : null;
   }
@@ -639,12 +639,14 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (/^Exile all cards from your hand face down$/i.test(s)) return [{ type: "exileFaceDown", from: "hand" }];
     if (/^Exile a card from your hand face down$/i.test(s)) return [{ type: "exileFaceDown", from: "handCard" }];
     if (/^Put all cards exiled with ~ into their owners?'s? graveyards?$/i.test(s)) return [{ type: "moveLinked", dest: "graveyard" }];
-    if ((m = /^Put all (creature )?cards exiled with ~ onto the battlefield under your control(, and they gain decayed)?$/i.exec(s)))
-      return [{ type: "moveLinked", dest: "battlefield", ...(m[1] ? { filter: { kind: "card", types: ["Creature"], text: "creature card" } } : {}), ...(m[2] ? { gain: ["Decayed"] } : {}) }];
+    if ((m = /^Put (?:all (creature )?cards|each (creature )?card) exiled with ~ onto the battlefield under your control(, and they gain decayed)?(?: with an? (flying|\+1\/\+1) counter on it)?$/i.exec(s)))
+      return [{ type: "moveLinked", dest: "battlefield", ...(m[1] || m[2] ? { filter: { kind: "card", types: ["Creature"], text: "creature card" } } : {}), ...(m[3] ? { gain: ["Decayed"] } : {}), ...(m[4] ? { counters: { [m[4]]: 1 } } : {}) }];
     if (/^Put all other cards you own exiled with ~ into your hand$/i.test(s)) return [{ type: "moveLinked", dest: "hand", yours: true, other: true }];
     if (/^Return a card you own exiled with ~ to your hand$/i.test(s)) return [{ type: "moveLinked", dest: "hand", yours: true, one: true }];
     // Currency Converter: one of them, chosen as it resolves.
     if (/^Put a card exiled with ~ into its owner's graveyard$/i.test(s)) return [{ type: "moveLinked", dest: "graveyard", one: true }];
+    // Nautiloid Ship: "put a creature card exiled with ~ onto the battlefield under your control".
+    if (/^Put a creature card exiled with ~ onto the battlefield under your control$/i.test(s)) return [{ type: "moveLinked", dest: "battlefield", one: true, filter: { kind: "card", types: ["Creature"], text: "creature card" } }];
   }
   // "Attach target Equipment you control to target creature you control" (Brass Squire), "attach up to one target
   // Equipment you control to ~" (Cloud), "... to that creature" (Kemba: the creature that entered), Magnetic Theft's

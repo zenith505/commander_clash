@@ -26,6 +26,7 @@ import { runNamesEffect } from "./run-names";
 import { runLibraryEffect } from "./run-library";
 import { runChoicesEffect } from "./run-choices";
 import { runVotesEffect, votedObjects } from "./run-votes";
+import { ringBearer } from "./run-ring";
 import { closeZoneBatch, fireEvent } from "./triggers";
 import { foundWith } from "../mutate";
 
@@ -282,6 +283,10 @@ export function convokedFor(s: GameState, ctx: ResolveCtx): { id: ObjectId; zc: 
 
 export function objects(s: GameState, ref: ObjRef, ctx: ResolveCtx): GameObject[] {
   if (ref.ref === "castSpell") return []; // only counted (amounts.ts)
+  if (ref.ref === "ringBearer") {
+    const b = ringBearer(s, ctx.controller);
+    return b ? [b] : [];
+  }
   if (ref.ref === "voted") return votedObjects(s, !!ref.any);
   if (ref.ref === "countersPutThisWay")
     return [...new Set((s.resolving?.countersPutThisWay ?? []).filter((c) => !ref.kind || c.kind === ref.kind).map((c) => c.id))].flatMap((id) => {
@@ -853,6 +858,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "becomePrepared":
     case "flip":
     case "removeFromCombat":
+    case "reselectAttack":
     case "earthbend":
     case "mustBlockSource":
     case "cantBlockSource":

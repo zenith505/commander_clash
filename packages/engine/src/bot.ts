@@ -5,7 +5,7 @@ import { chooseVote } from "./bot-votes";
 import { autoCrew, autoWaterbend, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, canBeSacrificed, defOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility, manaChoices } from "./manaabilities";
-import { bindChosen, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
+import { reselectOptions, bindChosen, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, manySlot, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
   applyAction,
@@ -495,6 +495,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // "Search your library and/or graveyard": both, for the most to choose from.
     if (pend.kind === "chooseOption" && pend.what === "searchZones") return [{ type: "chooseOption", player: pid, choice: "both" }];
     if (pend.kind === "chooseOption" && pend.what === "attackWhom") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
+    if (pend.kind === "chooseOption" && pend.what === "reselectAttack") {
+      const o = pend.about ? s.objects[pend.about] : undefined;
+      return [{ type: "chooseOption", player: pid, choice: (o && reselectPick(s, pid, o)) ?? pend.options[0]! }];
+    }
     // Tap or untap: tap an opponent's untapped permanent, untap our own tapped one; otherwise leave it if we may.
     // "You may cast a spell with mana value 3 or less from your hand without paying its mana cost": the biggest one.
     if (pend.kind === "chooseOption" && pend.what === "castFromHand") {
@@ -649,6 +653,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   if (shield) return shield;
   const deflect = chooseDeflection(s, pid);
   if (deflect) return deflect;
+  const echo = chooseCopyWithTaps(s, pid);
+  if (echo) return echo;
   // Respond to an opponent's spell with a counterspell if we have one: from hand, or an ability
   // like Spiketail Hatchling's. "Unless its controller pays" only if they can't pay.
   const top = s.stack[s.stack.length - 1];
@@ -1575,9 +1581,9 @@ function altCastPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
     if (plan) return plan;
   }
   // Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" too (CR 118.9).
-  for (const a of [...(c.altCosts ?? []), ...altCostsFor(s, pid, obj(s, id)).filter((x) => x.kind === "evidence" || x.kind === "citadel")]) {
-    // Bolas's Citadel: life for the top card, while we'd still have 15 or more afterwards.
-    if (a.kind === "citadel" && player(s, pid).life - mv(s, id) < 15) continue;
+  for (const a of [...(c.altCosts ?? []), ...altCostsFor(s, pid, obj(s, id)).filter((x) => x.kind === "evidence" || x.kind === "citadel" || x.kind === "lifeForMv")]) {
+    // Bolas's Citadel, Demon of Fate's Design: life rather than mana, while we'd still have 15 or more afterwards.
+    if ((a.kind === "citadel" || a.kind === "lifeForMv") && player(s, pid).life - mv(s, id) < 15) continue;
     if (a.kind === "evoke" && !c.triggers.some((t) => t.event === "selfEnters" && !t.ifEvoked)) continue;
     if (a.kind === "bestow" || a.kind === "overload") continue; // tried first, see bestowPlan and overloadPlan
     const plan = castPlan(s, pid, id, false, undefined, a.kind);
@@ -2535,6 +2541,12 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   if (e.keep && e.otherwise?.length === 1 && e.otherwise[0]!.type === "discard" && e.effects.length === 1 && e.effects[0]!.type === "discard") return true;
   // Duplicity: swap our hand for the cards exiled with it when that's at least as many cards.
   if (e.effects.length === 1 && e.effects[0]!.type === "exileFaceDown" && e.effects[0]!.from === "hand") return linkedOwned(s, r.item.sourceId, pid) >= player(s, pid).hand.length;
+  // Misleading Signpost: only to turn an attack away from us, or one of ours toward the opponent with the least life.
+  if (e.effects.length === 1 && e.effects[0]!.type === "reselectAttack") {
+    const t = r.item.targets?.find((x) => x.kind === "object");
+    const o = t?.kind === "object" ? s.objects[t.id] : undefined;
+    return !!o && reselectPick(s, pid, o) !== undefined;
+  }
   // Demonstrate: a copy for us and one for one opponent, ahead of the other two (CR 702.144a).
   if (e.effects.length === 1 && e.effects[0]!.type === "copySpell" && e.effects[0]!.demonstrate) return true;
   // Hydroelectric Specimen: take an opponent's spell aimed at us or ours, not one of ours (or a helpful one) at theirs.
@@ -3207,6 +3219,49 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
     }
   }
   return null;
+}
+
+/**
+ * "{T}, Tap X untapped artifacts you control: Copy target instant or sorcery spell you control with mana value X"
+ * (Resonance Technician): our own instant or sorcery on top of the stack, with as many artifacts to tap as its mana
+ * value, the ones that make no mana first (Clues before Treasures), then noncreatures.
+ */
+function chooseCopyWithTaps(s: GameState, pid: PlayerId): Action[] | null {
+  const top = s.stack[s.stack.length - 1];
+  if (!top || top.kind !== "spell" || top.controller !== pid || !top.objectId || s.pending) return null;
+  const x = spellManaValue(s, top);
+  if (x < 1) return null;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid) continue;
+    for (const [i, ab] of abilitiesOf(s, o).activated.entries()) {
+      const c = ab.costs?.length === 1 ? ab.costs[0]! : undefined;
+      const spec = ab.body.targets.length === 1 ? ab.body.targets[0]! : undefined;
+      if (c?.kind !== "tap" || !c.x || ab.body.effects.length !== 1 || ab.body.effects[0]!.type !== "copySpell" || spec?.xRange?.key !== "manaValue") continue;
+      const pool = tapCostCandidates(s, pid, o, c)
+        .map((t) => obj(s, t))
+        .sort((a, b) => Number(manaAbilitiesOn(s, a).length > 0 || abilitiesOf(s, a).activated.some((m) => m.mana)) - Number(manaAbilitiesOn(s, b).length > 0 || abilitiesOf(s, b).activated.some((m) => m.mana)) || Number(objIsType(s, a, "Creature")) - Number(objIsType(s, b, "Creature")));
+      if (pool.length < x) continue;
+      const plan = planActivate(s, pid, id, i, [{ kind: "stack", id: top.id }], undefined, undefined, x, { tap: pool.slice(0, x).map((t) => t.id) });
+      if (plan) return plan;
+    }
+  }
+  return null;
+}
+
+/**
+ * What a bot makes an attacking creature attack instead (Misleading Signpost), or undefined to leave it: away from us
+ * and our planeswalkers to the other player with the most life; our own toward the opponent with the least life, when
+ * that's less than the life of the player it attacks.
+ */
+function reselectPick(s: GameState, pid: PlayerId, o: GameObject): string | undefined {
+  if (o.zone !== "battlefield" || o.attacking === undefined) return undefined;
+  const players = reselectOptions(s, o).filter((x) => x.planeswalker === undefined);
+  const life = (x: { player: PlayerId }) => player(s, x.player).life;
+  if (o.attacking === pid) return players.filter((x) => x.player !== pid).sort((a, b) => life(b) - life(a))[0]?.key;
+  if (controllerOf(s, o) !== pid) return undefined;
+  const low = players.sort((a, b) => life(a) - life(b))[0];
+  return low && (o.attackingPermanent || life(low) < player(s, o.attacking).life) ? low.key : undefined;
 }
 
 /** A creature of ours with +1/+1 counters and an adapt ability, not yet refreshed this turn (Biomancer's Familiar). */

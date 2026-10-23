@@ -138,6 +138,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (!each && /^the greatest number of cards an opponent has drawn this turn$/i.test(p)) return { count: { kind: "greatestDrawn" } };
   // "For each card you've drawn this turn", "the number of cards they've drawn this turn" (CR 121.1: cards drawn, not put
   // into the hand otherwise).
+  // Heliod, the Warped Eclipse: "for each card your opponents have drawn this turn": all of them together.
+  if (/^cards? your opponents have drawn this turn$/i.test(p)) return { count: { kind: "drawnThisTurn", who: { ref: "eachOpponent" } } };
   if ((m = /^cards? (you've|you have|they've|they have|that player has) drawn this turn$/i.exec(p))) {
     const who = /^you/i.test(m[1]!) ? ({ ref: "you" } as PlayerRef) : whosePlayer(/^they/i.test(m[1]!) ? "their" : "that player's", ctx);
     return who && { count: { kind: "drawnThisTurn", who } };
@@ -237,6 +239,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^basic land types? among lands you control$/i.test(p)) return count({ kind: "basicLandTypes" });
   // Vivid: "the number of colors among permanents you control".
   if (/^colou?rs? among permanents you control$/i.test(p)) return count({ kind: "colorsAmongPermanents" });
+  // Sisay, Weatherlight Captain: "for each color among other legendary permanents you control".
+  if ((m = /^colou?rs? among (other )?legendary permanents you control$/i.exec(p)))
+    return count({ kind: "colorsAmongPermanents", filter: { kind: "object", types: [], notTypes: [], notColors: [], supertypes: ["Legendary"], controller: "you", text: "legendary permanents you control" }, ...(m[1] ? { other: true as const } : {}) });
   if (/^spells? you've cast this turn$/i.test(p)) return count({ kind: "spellsCastThisTurn" });
   // "Instant and sorcery spells you've cast this turn" (Rionya, Fire Dancer): copies aren't cast (CR 707.10).
   if ((m = /^((?:instant|sorcery|creature|noncreature|artifact|enchantment)(?: (?:and|or) (?:instant|sorcery|creature|artifact|enchantment))?) spells you've cast this turn$/i.exec(p))) {
@@ -262,8 +267,10 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^times? (?:~|it) was kicked$/i.test(p)) return count({ kind: "kicked" });
   // "For each of that spell's colors" in a cast trigger (Ramos, Dragon Engine).
   if (/^of that spell's colors$/i.test(p) && ctx?.castSpell) return count({ kind: "castSpellColors" });
+  // "Your Ring-bearer's power" (One Ring to Rule Them All): 0 without one (CR 701.54a, 107.1b).
+  if ((m = /^your Ring-bearer's (power|toughness)$/.exec(p))) return count({ kind: m[1] as "power" | "toughness", of: { ref: "ringBearer" } });
   // Power, toughness, mana value: "~'s power", "its power", "that creature's toughness".
-  if ((m = /^(~'s|its|that creature's|that artifact's|that enchantment's|the creature's|that permanent's|that spell's|the spell's|that card's|the sacrificed (?:creature|artifact|permanent)'s|the exiled creature's|the amassed Army's) (power|toughness|mana value)$/i.exec(p))) {
+  if ((m = /^(~'s|its|that creature's|that artifact's|that enchantment's|the creature's|that permanent's|that spell's|the spell's|that card's|the sacrificed (?:creature|artifact|enchantment|permanent)'s|the exiled creature's|the amassed Army's) (power|toughness|mana value)$/i.exec(p))) {
     const of = whoseObject(m[1]!, ctx);
     const kind = m[2]!.toLowerCase() === "mana value" ? "manaValue" : (m[2]!.toLowerCase() as "power" | "toughness");
     if (of?.ref === "castSpell" && kind !== "manaValue") return null;
@@ -389,7 +396,7 @@ function whoseObject(w: string, ctx: Ctx | null): ObjRef | null {
   const x = w.toLowerCase();
   if (x === "~'s") return { ref: "self" };
   // What was sacrificed to cast the spell, as it last existed (CR 608.2h); compile() checks there's such a cost.
-  if (/^the sacrificed (creature|artifact|permanent)'s$/.test(x)) return ctx ? { ref: "sacrificed" } : null;
+  if (/^the sacrificed (creature|artifact|enchantment|permanent)'s$/.test(x)) return ctx ? { ref: "sacrificed" } : null;
   // "The exiled creature's mana value" after an "Exile a creature you control" cost (Food Chain); compile() checks it has one.
   if (x === "the exiled creature's") return ctx ? { ref: "sacrificed", exiledCost: true } : null;
   // A reflexive trigger after "you may sacrifice another creature": that creature, as it last existed (CR 608.2h).

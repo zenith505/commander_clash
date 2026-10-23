@@ -125,10 +125,17 @@ export function parseGrants(text: string): Modification[] | null {
   // A quoted ability ends with a period even where the sentence around it cuts it ('"{T}: Add {C}" and loses ...').
   const quoted = [...text.matchAll(/"([^"]+)"/g)].map((q) => q[1]!.replace(/,$/, "").replace(/([^.!?])$/, "$1."));
   // "Protection from black and from red" is two protection abilities (CR 702.16g).
-  const words = text.replace(/(protection|hexproof) from (\w+) and from (\w+)/gi, "$1 from $2, $1 from $3").replace(/"[^"]+"/g, "\u0000").split(/,\s*(?:and\s+)?|\s+and\s+/).map((x) => x.trim()).filter(Boolean);
+  const words = text.replace(/(protection|hexproof) from (\w+) and from (\w+)/gi, "$1 from $2, $1 from $3").replace(/"[^"]+"/g, "\u0000").replace(/\bmobilize X, where X is its power$/i, "\u0001").split(/,\s*(?:and\s+)?|\s+and\s+/).map((x) => x.trim()).filter(Boolean);
   const kws: string[] = [];
-  for (const w of words) {
-    if (w === "\u0000") continue;
+  for (const w0 of words) {
+    if (w0 === "\u0000") continue;
+    // Mobilize is a triggered ability (CR 702.181a), each instance on its own (702.181b): "has menace and mobilize X, where
+    // X is its power" (Infantry Shield), the creature's own power as the trigger resolves.
+    const w = w0 === "\u0001" ? "mobilize X, where X is ~'s power" : w0;
+    if (/^mobilize (?:\d+|X, where X is ~'s power)$/i.test(w)) {
+      out.push({ kind: "addAbility", text: `Mobilize ${w.slice("mobilize ".length)}` });
+      continue;
+    }
     // Keywords that are triggered abilities: each grant is its own instance, which triggers separately (CR 702.121b).
     if (/^melee$/i.test(w)) {
       out.push({ kind: "addAbility", text: "Melee" });

@@ -5,7 +5,7 @@ import { characteristics, controllerOf, invalidateCharacteristics } from "../lay
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { castProblem, freeCastable, describeTargets, log, millCount, moveObject, newObject, obj, opponents, player } from "../game";
 import { compileCard, spellTargetSpecs } from "../oracle";
-import type { DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
+import type { CardDef, DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
 import { isLegalTarget, legalTargets, pickOptions, printedMatches, sameTarget, sourceQuality, spellManaValue, spellQuality, stampTargets, swapKeepsOthersLegal } from "./targeting";
 import { ResolveCtx, objects, amountNow, players } from "./resolve";
 import { closeZoneBatch, fireEvent } from "./triggers";
@@ -688,7 +688,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         }
       }
       const spellObj = e.suspend ? s.stack.find((x) => x.id === t.id && x.kind === "spell")?.objectId : undefined;
-      const done = counterOnStack(s, ctx, t.id, src, e.unless, e.exile ? "exile" : e.top ? "libraryTop" : e.hand || e.bounce ? "hand" : undefined, e.bounce);
+      const done = counterOnStack(s, ctx, t.id, src, e.unless, e.exile ? "exile" : e.librarySecond ? "librarySecond" : e.top ? "libraryTop" : e.hand || e.bounce ? "hand" : undefined, e.bounce);
       if (done === "paused") return done;
       // Delay: the card it was, countered and exiled this way (a copy has ceased to exist, CR 707.10a).
       const o = spellObj ? s.objects[spellObj] : undefined;
@@ -725,7 +725,7 @@ function spellNameOf(s: GameState, ctx: ResolveCtx, index: number): string | und
   return o && !o.faceDown ? defOf(s, o).name : undefined;
 }
 
-function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefined, by: string, unless?: UnlessPays, instead?: "exile" | "libraryTop" | "hand", bounce?: true): "paused" | void {
+function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefined, by: string, unless?: UnlessPays, instead?: "exile" | "libraryTop" | "hand" | "librarySecond", bounce?: true): "paused" | void {
   const i = s.stack.findIndex((x) => x.id === stackId);
   const item = s.stack[i];
   if (!item) return; // it already left the stack
@@ -733,6 +733,17 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
   if (bounce) {
     // Returned or exiled, not countered (Reprieve, Mindbreak Trap). A copy of a spell ceases to exist (CR 707.10a).
     s.stack.splice(i, 1);
+    // Commit: second from the top, or the only card of an empty library (rulings).
+    if (instead === "librarySecond") {
+      const o = item.objectId ? s.objects[item.objectId] : undefined;
+      if (o) {
+        moveObject(s, o.id, "library", { top: true });
+        const lib = s.players[o.owner]!.library;
+        if (o.zone === "library" && lib[0] === o.id) lib.splice(Math.min(1, lib.length - 1), 0, lib.shift()!);
+      }
+      log(s, `${by} puts ${what} into its owner's library second from the top.`);
+      return;
+    }
     if (item.objectId) moveObject(s, item.objectId, instead === "exile" ? "exile" : "hand");
     log(s, instead === "exile" ? `${by} exiles ${what}.` : `${by} returns ${what} to its owner's hand.`);
     return;
@@ -762,6 +773,12 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
  * A spell that can't be countered (CR 101.2): its own "~ can't be countered", or a permanent's "Creature spells you
  * control can't be countered". The counter effect still does whatever else it does (rulings on Prowling Serpopard).
  */
+/** A spell's mana value on the stack: its mana cost with the X chosen for it (CR 202.3e). */
+const spellMv = (d: CardDef, x = 0) => {
+  const cost = parseManaCost(d.manaCost);
+  return manaValue(cost) + x * xCount(cost);
+};
+
 export function cantBeCountered(s: GameState, item: StackItem): boolean {
   const o = item.objectId ? s.objects[item.objectId] : undefined;
   if (!o) return false;
@@ -776,7 +793,7 @@ export function cantBeCountered(s: GameState, item: StackItem): boolean {
   if (!item.copy && isType(d, "Creature") && (s.turnRules ?? []).some((r) => r.turn === s.turn && r.player === item.controller && r.rule === "creatureSpellsUncounterable")) return true;
   return s.battlefield.some((id) => {
     const p = obj(s, id);
-    return !!abilitiesOf(s, p).uncounterable?.some((u) => (u.anyone || controllerOf(s, p) === item.controller) && printedMatches(u.filter, d));
+    return !!abilitiesOf(s, p).uncounterable?.some((u) => (u.anyone || controllerOf(s, p) === item.controller) && printedMatches(u.filter, d) && (u.minMv === undefined || (!item.copy && spellMv(d, item.x) >= u.minMv)));
   });
 }
 

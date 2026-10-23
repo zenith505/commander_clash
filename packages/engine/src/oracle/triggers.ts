@@ -271,6 +271,24 @@ function parseDamagesCreatureTrigger(line: string): TriggeredAbility | "fail" | 
  * (Michiko Konda): once for each source (CR 603.2c). A creature or permanent is "it" and "that creature"; for a source of
  * any kind, "that player" is its controller and "that many" the damage.
  */
+function parseGroupDamagesPlayers(line: string): TriggeredAbility | "fail" | null {
+  // "Whenever one or more Pirates you control deal damage to your opponents, you create a Treasure token for each opponent
+  // dealt damage" (Malcolm, Keen-Eyed Navigator): combat damage or not (rulings), once for the damage dealt at the same
+  // time (CR 603.2c), even to one opponent (rulings). "Whenever one or more Pirates you control deal damage to a player"
+  // (Francisco, Fowl Marauder): once for each player they deal damage to at once (rulings), "that player" them.
+  const m = /^Whenever one or more (.+?) you control deal damage to (your opponents|a player), (.+)$/.exec(line);
+  if (!m) return null;
+  const spec = parseTargetPhrase(m[1]!.split(/\s+/).map(singularWord).join(" "));
+  if (spec?.kind !== "object" || /\b(?:they|them|their|those)\b/.test(m[3]!)) return "fail";
+  const opponents = m[2] === "your opponents";
+  const each = opponents ? /^you create (an?) (.+?) token for each opponent dealt damage(\.?)$/.exec(m[3]!) : null;
+  if (opponents && !each) return "fail";
+  const body0 = parseBody(each ? `Create X ${each[2]} tokens${each[3]}` : m[3]!, { eventPlayer: !opponents });
+  if (!body0) return "fail";
+  const body = each ? { ...replaceX(body0, { count: { kind: "eventAmount" } }), text: m[3]! } : body0;
+  return { event: "groupDealsDamageToPlayers", body, damageGroup: { filter: { ...spec, text: m[1]! }, ...(opponents ? { opponents: true as const } : { perPlayer: true as const }) } };
+}
+
 function parseSourceDamagesOpponent(line: string): TriggeredAbility | "fail" | null {
   // "Whenever a source you control deals noncombat damage to an opponent, you draw that many cards" (Niv-Mizzet,
   // Visionary): "that player" is the opponent, "that many" the damage. Not from a graveyard (Asgardian Inspiration).
@@ -1279,6 +1297,11 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
     const body = parseBody(attacks[1]!.replace(/\bthat creature\b/g, "it"), { subjectIt: true });
     return body ? { event: "creatureAttacksEnchantedPlayer", body } : "fail";
   }
+  const truce = /^When you attack enchanted (?:opponent|player) or a planeswalker they control or when they attack you or a planeswalker you control, (.+)$/.exec(line);
+  if (truce) {
+    const body = parseBody(truce[1]!);
+    return body ? { event: "attackBetweenYouAndEnchanted", body } : "fail";
+  }
   const attacked = /^Whenever enchanted player is attacked, (.+)$/.exec(line);
   if (attacked) {
     const same = / Each opponent attacking that player does the same\.$/;
@@ -1319,6 +1342,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const host: TargetSpec = { kind: "object", types: ["Creature"], controller: "you", text: "creature you control" };
     return { ...t, body: { targets: [], effects: [{ type: "if", cond: { kind: "state", cond: { kind: "attachedIs", filter: host } }, effects: t.body.effects }, { type: "if", cond: { kind: "createdNone" }, effects: insect.effects }], text: line.replace(/^[^,]+, /, "") } };
   }
+  const groupDamage = parseGroupDamagesPlayers(line);
+  if (groupDamage) return groupDamage;
   const sourceDamage = parseSourceDamagesOpponent(line);
   if (sourceDamage) return sourceDamage;
   // Ruby, Daring Tracker: "Whenever ~ attacks while you control a creature with power 4 or greater, ...": a condition on
@@ -1503,6 +1528,16 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         text: "If it was a creature, return it to the battlefield under its owner's control. It's an enchantment.",
       },
     };
+  // Yedora, Grave Gardener: "..., you may return it to the battlefield face down under its owner's control. It's a Forest
+  // land. (It has no other types or abilities.)": face down, its characteristics those the effect gives it (CR 708.2a).
+  const forest = /^(.+), (you may )?return it to the battlefield face down under its owner's control\. It's a Forest land\.(?: \(It has no other types or abilities\.\))?$/.exec(line);
+  if (forest) {
+    const t = parseTrigger(`${forest[1]}, ${forest[2] ?? ""}return it to the battlefield under its owner's control.`);
+    if (!t || t === "fail") return "fail";
+    const put = (e: Effect): Effect | null => (e.type === "putOntoBattlefield" && e.what.ref === "subjectCard" && e.owner && !e.tapped && !e.counters ? { ...e, faceDown: "forest" } : e.type === "may" && e.effects.length === 1 ? (((x) => x && { ...e, effects: [x], text: `${e.text.replace(/ to the battlefield/, " to the battlefield face down")}. It's a Forest land` })(put(e.effects[0]!))) : null);
+    const fx = t.body.effects.length === 1 ? put(t.body.effects[0]!) : null;
+    return fx ? { ...t, body: { ...t.body, effects: [fx], text: line.replace(/^[^,]+, /, "") } } : "fail";
+  }
   // Eminence (C17): "Whenever you cast another Vampire spell, if ~ is in the command zone or on the battlefield, ..." (Edgar
   // Markov), "... This ability triggers only if ~ is in the command zone or on the battlefield" (Sahir): the ability
   // works in the command zone too (CR 113.6), with an intervening if (CR 603.4) for the first.
@@ -1833,6 +1868,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const state = parseStaticCondition(st[1]!, { affects: { kind: "self" }, mods: [], text: "" });
     const body = state && parseBody(st[st.length - 1]!, { selfIt: true });
     return state && body ? { event: "state", state, body } : "fail";
+  }
+  // "When this artifact enters during the declare attackers step" (Misleading Signpost): only then does it trigger at all
+  // (rulings), not an intervening if.
+  const entersDuring = /^When ~ enters during the declare attackers step, (.+)$/.exec(line);
+  if (entersDuring) {
+    const t = parseTrigger(`When ~ enters, ${entersDuring[1]}`);
+    return t && t !== "fail" && t.event === "selfEnters" && !t.activeIf ? { ...t, activeIf: { kind: "during", window: "declareAttackers" } } : "fail";
   }
   // "Whenever this creature becomes tapped during your turn" (granted by Dionus, Elvish Archdruid): only while it's its
   // controller's turn, whether it triggers at all.

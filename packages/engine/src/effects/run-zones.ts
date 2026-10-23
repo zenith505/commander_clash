@@ -1080,7 +1080,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         .filter((id) => exiled(id) && !st.declined.includes(id) && id !== st.excluded && (isLand(id) ? !!e.lands && canPlayLandNow(s, you.id, id) : (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (!st.hits || st.hits.includes(id)) && (!e.sharesTypeWithYours || sharesType(id)) && castable(id)));
       if (!options.length || (e.max !== undefined && (st.cast ?? 0) >= e.max)) return finish();
       const left = st.budget !== undefined ? ` (total mana value ${st.budget} left)` : "";
-      s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Done"], prompt: `${e.lands ? "play a land or " : ""}cast a spell from among ${e.fromHand ? `the cards in ${player(s, obj(s, options[0]!).owner).name}'s hand` : `the ${e.reveal ? "revealed" : "exiled"} cards`} without paying its mana cost${left}?` };
+      s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Done"], prompt: `${e.lands ? "play a land or " : ""}cast a spell from ${e.fromHand ? (obj(s, options[0]!).owner === you.id ? "your hand" : `among the cards in ${player(s, obj(s, options[0]!).owner).name}'s hand`) : "among "}${e.fromHand ? "" : `the ${e.reveal ? "revealed" : "exiled"} cards`} without paying its mana cost${left}?` };
       return "paused";
     }
     case "exileCastEachType": {
@@ -1367,29 +1367,30 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (e.ifLinkedNow && !s.resolving!.linkedNow?.length) return;
       let cards = linked.map((l) => obj(s, l.id)).filter((c) => (!e.yours || c.owner === ctx.controller) && !(e.other && s.resolving!.faceDownExiled?.includes(c.id)) && !(e.ifLinkedNow && s.resolving!.linkedNow?.includes(c.id)));
       const p = player(s, ctx.controller);
+      if (e.filter) cards = cards.filter((c) => printedMatches(e.filter!, defOf(s, c)));
       if (e.one) {
         if (!sc.linkedPick) {
           if (!cards.length) return;
           sc.linkedPick = true;
           delete sc.found;
           const ids = cards.map((c) => c.id);
-          s.pending = { kind: "searchLibrary", player: p.id, source: src, what: "a card exiled with " + src, cards: ids, min: 1, max: 1, dig: { looked: ids, to: e.dest === "hand" ? "into your hand" : "into its owner's graveyard", rest: "stay exiled" } };
+          s.pending = { kind: "searchLibrary", player: p.id, source: src, what: `a ${e.filter ? `${e.filter.text} ` : "card "}exiled with ${src}`.replace("card card", "card"), cards: ids, min: 1, max: 1, dig: { looked: ids, to: e.dest === "hand" ? "into your hand" : e.dest === "battlefield" ? "onto the battlefield" : "into its owner's graveyard", rest: "stay exiled" } };
           return "paused";
         }
         sc.linkedPick = undefined;
         cards = cards.filter((c) => sc.found?.includes(c.id));
       }
-      if (e.filter) cards = cards.filter((c) => printedMatches(e.filter!, defOf(s, c)));
       if (!cards.length) return;
       if (e.dest === "battlefield") {
         // All at once (CR 608.2f), under this ability's controller's control.
         log(s, `${p.name} puts ${cards.map((c) => defOf(s, c).name).join(", ")} onto the battlefield from exile (${src}).`);
         const ids = cards.map((c) => c.id);
         enterTogether(s, () => {
-          for (const c of cards) moveObject(s, c.id, "battlefield", { controller: p.id });
+          for (const c of cards) moveObject(s, c.id, "battlefield", { controller: p.id, ...(e.counters ? { counters: { ...e.counters } } : {}) });
         });
         const now = ids.filter((id) => obj(s, id).zone === "battlefield");
         if (e.gain && now.length) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: p.id, sourceName: src, duration: "game", affected: now, mods: [{ kind: "addKeywords", keywords: e.gain }] });
+        if (e.alsoMods && now.length) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: p.id, sourceName: src, duration: "game", affected: now, mods: e.alsoMods });
         invalidateCharacteristics(s);
         if (s.linkedExile?.[key]) s.linkedExile[key] = s.linkedExile[key]!.filter((l) => !ids.includes(l.id));
         return;
@@ -1644,6 +1645,18 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         return;
       }
       const under = (o: GameObject) => (e.owner ? o.owner : ctx.controller);
+      if (e.faceDown) {
+        // Yedora: face down as a Forest land, whatever the card is (CR 708.2a); not an Aura there, so it enchants nothing.
+        if (s.resolving) s.resolving.created = [];
+        enterTogether(s, () => {
+          for (const o of list) {
+            log(s, `${src} returns ${defOf(s, o).name} to the battlefield face down under ${player(s, under(o)).name}'s control: it's a Forest land.`);
+            moveObject(s, o.id, "battlefield", { controller: under(o), faceDown: e.faceDown });
+            if (o.zone === "battlefield") s.resolving?.created?.push(o.id);
+          }
+        });
+        return;
+      }
       // Auras: their controller chooses what each enchants as it enters (CR 303.4f), all before any card moves; one with
       // nothing to enchant stays where it is (303.4g).
       // "Transformed": a double-faced card with its back face up; anything else stays where it is (CR 712.14a).
@@ -2026,6 +2039,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           const o = obj(s, id);
           if (s.resolving && objIsType(s, o, "Creature")) (s.resolving.exiledPowers ??= []).push(power(s, o));
           moveObject(s, id, "exile");
+          if (e.linked && ctx.sourceId && o.zone === "exile") ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
         }
         log(s, `${src} exiles ${p.name}'s graveyard (${n} card${n === 1 ? "" : "s"}).`);
       }

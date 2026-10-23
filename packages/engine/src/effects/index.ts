@@ -13,7 +13,7 @@ export { beginResolution, continueResolution, resolveManaAbility, type Resolutio
 export { becomeMonarch } from "./run-basics";
 export { takeInitiative, dungeonSBAs } from "./run-dungeons";
 export { ringBearer, isRingBearer, timesTempted, loseRingBearer, ringBearerOptions } from "./run-ring";
-export { harmfulCounter } from "./run-permanents";
+export { harmfulCounter, reselectOptions } from "./run-permanents";
 export { tokenDef } from "./run-tokens";
 export { unlessCost, addDelayed, kickedMatches, changeTargetOptions } from "./run-spells";
 export { discardCards } from "./run-library";

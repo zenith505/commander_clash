@@ -1253,6 +1253,7 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
   const toPlayers = playerBatch;
   playerBatch = outer;
   for (const [pid, amount] of toPlayers) fireEvent(s, { type: "playerDealtDamage", player: pid, amount });
+  firePlayersDealt(s, out);
   // "If damage is prevented this way, ~ deals that much damage to that source's controller" (Deflecting Palm), after it.
   for (const b of back) {
     const d = s.cards[b.cardId];
@@ -1261,7 +1262,16 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
       // Comeuppance deals it, not the creature (rulings): only if the creature is still that permanent (CR 400.7).
       const o = s.objects[b.toObject.object];
       if (o?.zone === "battlefield" && (o.zoneChanges ?? 0) === b.toObject.zc) dealDamage(s, cardSource(d, b.controller), { object: o }, b.n);
-    } else if (!player(s, b.to).lost) dealDamage(s, cardSource(d, b.controller), { player: b.to }, b.n);
+    } else if (!player(s, b.to).lost) {
+      const src = cardSource(d, b.controller);
+      firePlayersDealt(s, [{ src, to: { player: b.to }, dealt: dealDamage(s, src, { player: b.to }, b.n) }]);
+    }
   }
   return out;
+}
+
+/** "Whenever one or more Pirates you control deal damage to your opponents": the damage to players dealt at once. */
+function firePlayersDealt(s: GameState, out: { src: DamageSource; to: DamageEvent["to"]; dealt: number }[]) {
+  const hits = out.flatMap((e) => ("player" in e.to && e.dealt > 0 ? [{ player: e.to.player, by: e.src.controller, amount: e.dealt, ...(e.src.id && !e.src.spell ? { source: e.src.id } : {}), types: e.src.types, subtypes: e.src.subtypes }] : []));
+  if (hits.length) fireEvent(s, { type: "playersDealtDamage", hits });
 }

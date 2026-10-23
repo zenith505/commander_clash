@@ -157,7 +157,8 @@ export interface CardFace {
 
 /** How a face-down spell or permanent got that way (CR 708): which ability lets it be turned face up. */
 /** How it became face down: cast with morph, megamorph or disguise, or put onto the battlefield manifested or cloaked (CR 701.40, 701.58). */
-export type FaceDownKind = "morph" | "megamorph" | "disguise" | "manifest" | "cloak";
+/** "forest": put onto the battlefield face down as a Forest land with no other types or abilities (Yedora, CR 708.2a). */
+export type FaceDownKind = "morph" | "megamorph" | "disguise" | "manifest" | "cloak" | "forest";
 
 /**
  * "merged": a card or token that's a component of a merged permanent other than the permanent's own object (CR 730.2):
@@ -606,6 +607,8 @@ export interface Player {
   shuffles?: number;
   /** "You have no maximum hand size for the rest of the game" from a resolved spell or ability (CR 402.2). */
   noMaxHandSize?: true;
+  /** "You have no maximum hand size for as long as you control ~" (The Great Synthesis): while they control that object (CR 611.2b). */
+  noMaxHandSizeWhile?: { id: ObjectId; zc: number }[];
   /** Epic (CR 702.50a-b): "for the rest of the game, you can't cast spells", and the spell that said so. */
   cantCastSpells?: string;
   /** The names of paradigm spells this player has had resolve (CR 702.192a): only the first of each name counts. */
@@ -1172,7 +1175,7 @@ export type PendingDecision =
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "commander" | "drawUpTo" | "payX" | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | /** "Then choose one of them. You may play that card this turn." (Party Thrasher): one of the exiled cards. */ "impulseChoice" | /** Eladamri: a card in the hand, or "top". */ "revealHandOrTop" | "pile" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom" | "searchZones" | "vote" | /** One of the words of "each opponent chooses fame or fortune". */ "word" | "mutate" | "either" | "payOrTop" | "counterKind" | /** "Remove up to three counters": the next one to remove, or "done". */ "removeCounter" | /** Which target of a spell or ability becomes ~ (Spellskite). */ "targetSlot" | /** Which legendary permanent of a group to keep (CR 704.5j); the options are their ids. */ "legend" | /** A number chosen secretly (Wheel of Misfortune): any whole number in `numberRange`. */ "secretNumber" | /** Effect "choosePlayer" (Gluntch): one more player. */ "nthPlayer"; options: string[]; /** Any whole number from `min` to `max` may be chosen, not only `options`. */ numberRange?: { min: number; max: number }; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** "removeCounter": the permanent the counters are moved onto (Resourceful Defense). */ onto?: ObjectId; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId; /** "pile": the two piles, the first then the second (Fact or Fiction); `of`, the player whose hand the chosen one goes to. */ piles?: [ObjectId[], ObjectId[]]; /** "pile": the chosen pile is sacrificed, not put into a hand (Liliana of the Veil). */ sacrificePile?: true }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "commander" | "drawUpTo" | "payX" | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | /** "Then choose one of them. You may play that card this turn." (Party Thrasher): one of the exiled cards. */ "impulseChoice" | /** Eladamri: a card in the hand, or "top". */ "revealHandOrTop" | "pile" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom" | /** Effect "reselectAttack" (Misleading Signpost): what the creature (`about`) attacks now. */ "reselectAttack" | "searchZones" | "vote" | /** One of the words of "each opponent chooses fame or fortune". */ "word" | "mutate" | "either" | "payOrTop" | "counterKind" | /** "Remove up to three counters": the next one to remove, or "done". */ "removeCounter" | /** Which target of a spell or ability becomes ~ (Spellskite). */ "targetSlot" | /** Which legendary permanent of a group to keep (CR 704.5j); the options are their ids. */ "legend" | /** A number chosen secretly (Wheel of Misfortune): any whole number in `numberRange`. */ "secretNumber" | /** Effect "choosePlayer" (Gluntch): one more player. */ "nthPlayer"; options: string[]; /** Any whole number from `min` to `max` may be chosen, not only `options`. */ numberRange?: { min: number; max: number }; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** "removeCounter": the permanent the counters are moved onto (Resourceful Defense). */ onto?: ObjectId; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId; /** "pile": the two piles, the first then the second (Fact or Fiction); `of`, the player whose hand the chosen one goes to. */ piles?: [ObjectId[], ObjectId[]]; /** "pile": the chosen pile is sacrificed, not put into a hand (Liliana of the Veil). */ sacrificePile?: true }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -1442,6 +1445,8 @@ export interface GameState {
    */
   /** Phases added after the current one (CR 500.8); `{ combat: key }` is a combat phase a delayed trigger waits for ("at the beginning of that combat"). */
   addedPhases?: ("combat" | "main" | "beginning" | { combat: number })[];
+  /** Phases waiting for this turn's second main phase, to come after it (World at War, CR 500.8). */
+  afterSecondMain?: ("combat" | "main" | "beginning" | { combat: number })[];
   /** Additional end steps still to come directly after this end step (Y'shtola Rhul, CR 500.8): no cleanup in between. */
   extraEndSteps?: number;
   /** Additional upkeep steps still to come directly after this upkeep (Paradox Haze, CR 500.8). */
@@ -1999,6 +2004,8 @@ export interface Resolving {
     topOrBottom?: string; // the owner's choice: "top" or "bottom"
     /** The player a creature put onto the battlefield attacking attacks (CR 508.4), as a PlayerId string. */
     attackWhom?: string;
+    /** reselectAttack: what the creature attacks now (as attackChoices keys it). */
+    reselect?: string;
     /** Token copies created attacking: what each one attacks, chosen so far (attackChoices keys). */
     attackPicks?: string[];
     /** "Tapped and attacking that player or a planeswalker they control": each opponent's pick (an attackChoices key). */

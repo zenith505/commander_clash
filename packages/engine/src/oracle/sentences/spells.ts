@@ -139,6 +139,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // choice to make). Wheels: "each player discards their hand, then draws seven cards" (all of them discard, then all
   // of them draw, CR 608.2c), "then draw that many cards", "then draws cards equal to the greatest number of cards a
   // player discarded this way" (Windfall).
+  // Clive, Ifrit's Dominant: "you may discard your hand, then draw cards equal to your devotion to red": both, if you
+  // choose to, even with no cards in hand (rulings).
+  if ((m = /^[Yy]ou may discard your hand, then draw (.+)$/.exec(s))) {
+    const inner = parseSpellsSentence(`Discard your hand, then draw ${m[1]}`, ctx);
+    return inner ? [{ type: "may", effects: inner, text: `discard your hand, then draw ${m[1]}` }] : null;
+  }
   if ((m = /^(Discard|.+? discards?) (?:all the cards in )?(?:your|their|his or her) hand(?:, then draws? (.+))?$/i.exec(s))) {
     const who = /^Discard$/i.test(m[1]!) ? ({ ref: "you" } as const) : parsePlayer(m[1]!.replace(/ discards?$/i, ""), ctx);
     if (!who || (/^Discard$/i.test(m[1]!) && /your/.test(s) === false)) return null;
@@ -153,6 +159,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
         // Dark Deal: "that many cards minus one", none for a player who discarded one or none (rulings).
         : /^that many cards minus one$/i.test(m[2]) ? { count: { kind: "discardedThisWay" as const, ...own }, plus: -1 }
         : /^cards equal to the greatest number of cards a player discarded this way$/i.test(m[2]) ? { count: { kind: "discardedThisWay" as const, greatest: true as const } }
+        // "Then draw cards equal to your devotion to red" (Clive), counted after the discard (rulings).
+        : who.ref === "you" && /^cards equal to your devotion to /i.test(m[2]) ? parseCount(m[2].replace(/^cards equal to /i, ""), ctx)
         : null;
       if (!n) return null;
       out.push({ type: "draw", who, n });
@@ -340,8 +348,11 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Copying spells (CR 707.10): "Copy target instant or sorcery spell", and in "when you cast" abilities "copy it".
   // Double Major: "Copy target creature spell you control, except it isn't legendary if the spell is legendary" (CR 707.9b):
   // the copy's copiable values aren't legendary, nor is the token it becomes (CR 608.3f).
-  if ((m = /^Copy target (.*?spell(?: you control)?)(, except it isn't legendary if the spell is legendary)?$/i.exec(s))) {
-    const spec = parseTargetPhrase(m[1]!);
+  // Resonance Technician: "Copy target instant or sorcery spell you control with mana value X", the X of the ability's
+  // "Tap X untapped artifacts you control" (CR 107.3a, TargetSpec.xRange).
+  if ((m = /^Copy target (.*?spell(?: you control)?(?: with mana value X)?)(, except it isn't legendary if the spell is legendary)?$/i.exec(s))) {
+    if (/ X$/.test(m[1]!) && !ctx.activated) return null;
+    const spec = parseTargetPhrase(m[1]!, { x: true });
     return spec?.kind === "spell" ? [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n: 1, newTargets: false, ...(m[2] ? { except: { notLegendary: true } } : {}) }] : null;
   }
   // Copying an ability on the stack (CR 707.10, 707.10c): Strionic Resonator's "Copy target triggered ability you control.
@@ -413,6 +424,14 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const spec: TargetSpec = { kind: "spell", types: [], notTypes: [], notColors: [], ...(perm.controller ? { controller: perm.controller } : {}), orPermanent: perm, text: `target spell or ${m[1]!.toLowerCase()}` };
     const i = addTarget(ctx, spec);
     return [{ type: "counterSpell", index: i, bounce: true }, { type: "bounce", what: { ref: "target", index: i } }];
+  }
+  // Commit: "Put target spell or nonland permanent into its owner's library second from the top": a spell isn't countered
+  // (rulings), a permanent goes there as for "put target creature ...".
+  if ((m = /^Put target spell or (.+?) into its owner's library second from the top$/i.exec(s))) {
+    const perm = parseTargetPhrase(m[1]!);
+    if (perm?.kind !== "object" || perm.controller || perm.tapped !== undefined || perm.combat || perm.xRange || perm.bound) return null;
+    const i = addTarget(ctx, { kind: "spell", types: [], notTypes: [], notColors: [], orPermanent: perm, text: `target spell or ${m[1]!.toLowerCase()}` });
+    return [{ type: "counterSpell", index: i, bounce: true, librarySecond: true }, { type: "putInLibrary", what: { ref: "target", index: i }, position: "second" }];
   }
   // "Return target spell to its owner's hand" (Reprieve): it leaves the stack without being countered.
   if ((m = /^Return target (.*?spell(?: you don't control| an opponent controls)?) to its owner's hand$/i.exec(s))) {

@@ -200,7 +200,7 @@ export type Count =
   /** Domain: "basic land type among lands you control". */
   | { kind: "basicLandTypes" }
   /** Vivid: "the number of colors among permanents you control" (white, blue, black, red, green; colorless isn't one, CR 105.2c). */
-  | { kind: "colorsAmongPermanents" }
+  | { kind: "colorsAmongPermanents"; /** "Among other legendary permanents you control" (Sisay, Weatherlight Captain). */ filter?: TargetSpec; other?: true }
   /** "For each spell you've cast this turn" (Aetherflux Reservoir): the spells its controller cast this turn, copies not (CR 707.10). */
   /** `filter`: "the number of instant and sorcery spells you've cast this turn" (Rionya), by the cards cast. */
   | { kind: "spellsCastThisTurn"; filter?: TargetSpec }
@@ -663,6 +663,7 @@ export type ObjRef =
       card?: true;
     }
   | { ref: "self" } // the source permanent ("this creature")
+  | { ref: "ringBearer" } // "your Ring-bearer" (CR 701.54a): the controller's, if they have one
   /** "That spell" in a cast trigger (Monstrous Vortex): the spell whose casting triggered it, as it was cast. Counts only. */
   | { ref: "castSpell" }
   /** "Each creature dealt damage this way" (Aurelia's Fury): `filter` for the kind of permanent. */
@@ -1337,7 +1338,7 @@ export type StaticCondition =
   /** Corrupted: "as long as an opponent has three or more poison counters" (CR 122.1f). */
   | { kind: "opponentPoison"; n: number }
   /** "If an opponent has eight or more cards in their graveyard" (Sheoldred // The True Scriptures): one still in the game. */
-  | { kind: "opponentGraveyard"; n: number }
+  | { kind: "opponentGraveyard"; n: number; /** "If a graveyard has twenty or more cards in it" (Visions of Beyond): yours too. */ anyone?: true }
   /** Raid: "if you attacked this turn" (with one or more creatures); `not`: "if you didn't attack with a creature this turn" (Curious Obsession). */
   | { kind: "attackedThisTurn"; not?: true }
   /** The Chain Veil: "if you didn't activate a loyalty ability of a planeswalker this turn" (`not`). */
@@ -1555,7 +1556,7 @@ export type Effect =
    * `dest` "battlefield": "Put all creature cards exiled with ~ onto the battlefield under your control. They gain
    * decayed." (Gisa, Glorious Resurrector): those matching `filter`, all at once, gaining `gain` for good.
    */
-  | { type: "moveLinked"; dest: "hand" | "graveyard" | "battlefield"; filter?: TargetSpec; gain?: string[]; one?: true; yours?: true; other?: true; /** "You may exile that card. If you do, return each other card exiled with ~ to its owner's graveyard" (Mimic Vat): only if this resolution linked a card, and not those. */ ifLinkedNow?: true }
+  | { type: "moveLinked"; dest: "hand" | "graveyard" | "battlefield"; filter?: TargetSpec; gain?: string[]; /** Ghost Vacuum: "with a flying counter on it", "Each of them is a 1/1 Spirit in addition to its other types" (from then on, CR 611.2c). */ counters?: Record<string, number>; alsoMods?: Modification[]; one?: true; yours?: true; other?: true; /** "You may exile that card. If you do, return each other card exiled with ~ to its owner's graveyard" (Mimic Vat): only if this resolution linked a card, and not those. */ ifLinkedNow?: true }
   /**
    * Memory Jar: "At the beginning of the next end step, each player ... returns to their hand each card they exiled this
    * way": the cards the ability exiled face down (`cards`, filled in as the delayed trigger is made), if they're still
@@ -1699,6 +1700,12 @@ export type Effect =
   /** "Remove it from combat" (CR 506.4): it stops being an attacking, blocking, blocked or unblocked creature. */
   | { type: "removeFromCombat"; what: ObjRef }
   /**
+   * "Reselect which player or permanent target attacking creature is attacking" (Misleading Signpost): its controller's
+   * choice as it resolves of another player, planeswalker or battle it could attack, ignoring requirements, restrictions
+   * and costs (rulings). It still attacked what it was declared attacking.
+   */
+  | { type: "reselectAttack"; what: ObjRef }
+  /**
    * "Return a creature card at random from your graveyard to your hand" (Haunted Fengraf); "an opponent chooses a card at
    * random in your graveyard. If it's a creature card, put it onto the battlefield. Otherwise, exile it." (Search for
    * Survivors, `dest` "creatureOrExile"). Chosen by the game, and everyone sees which (rulings on Fossil Find).
@@ -1730,6 +1737,8 @@ export type Effect =
        * resolves, or was last attached to if it has left (rulings); each card only if it could be attached to it.
        */
       attachToEnchanted?: true;
+      /** "Face down ... It's a Forest land" (Yedora, Grave Gardener): face down as a Forest land (FaceDownKind "forest"). */
+      faceDown?: "forest";
       /** The Enduring cycle's "It's an enchantment. (It's not a creature.)": its new card types as it enters. */
       becomes?: { types: string[]; subtypes: string[] };
       /** "That creature gains haste until end of turn" ("endOfTurn"), "It gains haste" ("game": for as long as it's that object). */
@@ -1757,7 +1766,7 @@ export type Effect =
    * creature's owner puts it on their choice of the top or bottom of their library".
    */
   | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" | "ownersChoice" | "second" | "third" }
-  | { type: "exileGraveyard"; who: PlayerRef } // "Exile target player's graveyard"
+  | { type: "exileGraveyard"; who: PlayerRef; /** The cards are linked to the source (Nautiloid Ship's "a creature card exiled with ~", CR 607.2a). */ linked?: true } // "Exile target player's graveyard"
   /**
    * Living Death, Living End: "Each player exiles all creature cards from their graveyard, then sacrifices all creatures
    * they control, then puts all cards they exiled this way onto the battlefield." Each part for all players at once
@@ -1843,7 +1852,7 @@ export type Effect =
   /** "That creature doesn't untap during its controller's next untap step." */
   | { type: "skipUntap"; what: ObjRef }
   /** "You have no maximum hand size for the rest of the game" (Player.noMaxHandSize). */
-  | { type: "noMaxHandSize" }
+  | { type: "noMaxHandSize"; /** "For as long as you control ~" (The Great Synthesis): see Player.noMaxHandSizeWhile. */ whileControlled?: true }
   /** "Until your next turn, creatures your opponents control enter tapped" (Cone of Cold): GameState.entersTappedUntil. */
   | { type: "enterTappedUntil"; filter: TargetSpec }
   /** `perLastKnownCounter`: modular's "a +1/+1 counter for each +1/+1 counter on this permanent", as it last was. */
@@ -2408,6 +2417,8 @@ export type Effect =
        * (CR 101.2 doesn't apply); otherwise like Remand's.
        */
       bounce?: true;
+      /** With `bounce`: "Put target spell ... into its owner's library second from the top" (Commit): there instead of the hand. */
+      librarySecond?: true;
       /** "Exile any number of target spells" (Mindbreak Trap): not a counter either, so it exiles one that can't be countered (rulings). */
       exileSpell?: true;
       /** "Exile target spell. It becomes plotted." (Aven Interrupter, CR 702.170c). */
@@ -2728,7 +2739,8 @@ export type Effect =
       type: "addPhases";
       /** "beginning": "there is an additional beginning phase after this phase" (Sphinx of the Second Sun): untap, upkeep and draw steps. */
       phases: ("combat" | "main" | "beginning")[];
-      after?: "main" | "combat";
+      /** "secondMain": "after the second main phase this turn" (World at War): after the turn's second main phase, whenever it ends. */
+      after?: "main" | "combat" | "secondMain";
       /** "At the beginning of that combat, untap all creatures you control" (Moraug): a delayed trigger for the added combat phase only (CR 603.7). */
       thatCombat?: { effects: Effect[]; text: string };
     }
@@ -3256,6 +3268,8 @@ export type TriggerEvent =
   | "creatureAttacksEnchantedPlayer"
   /** "Whenever enchanted player is attacked": once as attackers are declared, if a creature attacks that player (rulings). */
   | "enchantedPlayerAttacked"
+  /** Tenuous Truce: you attack enchanted player or their planeswalkers, or they attack you or yours (once per declaration). */
+  | "attackBetweenYouAndEnchanted"
   /** "Whenever you discard a card", "whenever a player cycles a card": see TriggeredAbility.discards. */
   | "playerDiscards"
   /** "Whenever an opponent searches their library" (Archivist of Oghma): their own library, not another's (rulings). */
@@ -3306,6 +3320,8 @@ export type TriggerEvent =
   | "creaturesYouControlAttack"
   /** "Whenever one or more creatures you control deal combat damage to a player": once per player dealt damage. */
   | "creaturesYouControlDealCombatDamageToPlayer"
+  /** "Whenever one or more Pirates you control deal damage to your opponents" (Malcolm, Keen-Eyed Navigator): see `damageGroup`. */
+  | "groupDealsDamageToPlayers"
   /** "Whenever one or more creatures deal combat damage to you" (Witch-king of Angmar). */
   | "creaturesDealCombatDamageToYou"
   /** "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix): see `spellDamage`; once for each one dealt damage. */
@@ -3436,6 +3452,12 @@ export interface TriggeredAbility {
    * controller); `combat`: only combat damage.
    */
   damagesYou?: { by?: "you" | "opponent" | "any"; combat?: true };
+  /**
+   * For "groupDealsDamageToPlayers": the permanents you control dealing it (`filter`), all damage dealt at the same time
+   * one event (CR 603.2c). `opponents`: to your opponents, "that many" how many of them were dealt damage; `perPlayer`:
+   * once for each player dealt damage, "that player" them.
+   */
+  damageGroup?: { filter: TargetSpec; opponents?: true; perPlayer?: true };
   /** For "sourceYouControlDamagesOpponent": only noncombat damage. */
   noncombatOnly?: true;
   /** For "creaturesYouControlAttack": "Whenever you attack with two or more creatures", at least this many of them. */
@@ -4064,7 +4086,8 @@ export type CostOption = { mana: string; cost?: undefined; text: string } | { co
 /** `evidence`: Conspiracy Unraveler's "collect evidence 10 rather than pay the mana cost" (CompiledCard.payEvidence). */
 /** `citadel`: Bolas's Citadel's "pay life equal to its mana value rather than pay its mana cost" for the top card of your library. */
 /** `payZero`: "you may pay {0} rather than pay the mana cost" for some spells you cast (CompiledCard.payZero: As Foretold, Rooftop Storm). */
-export type AltCostKind = "payZero" | "impending" | "citadel" | "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle" | "convert" | "omniscience" | "cleave";
+/** `lifeForMv`: Demon of Fate's Design's "by paying life equal to its mana value rather than paying its mana cost" (CompiledCard.payZero `life`). */
+export type AltCostKind = "payZero" | "impending" | "citadel" | "evidence" | "evoke" | "dash" | "bestow" | "mutate" | "madness" | "blitz" | "warp" | "alternative" | "prototype" | "wubrg" | "emerge" | "freerunning" | "foretell" | "sneak" | "surge" | "spectacle" | "overload" | "awaken" | "miracle" | "convert" | "omniscience" | "cleave" | "lifeForMv";
 
 /** `grantedFlashback`: flashback an effect gave the card, with its mana cost as the cost (Snapcaster Mage), next to any of its own (rulings). */
 /** `aftermath`: the half of a split card with aftermath (CR 702.127a), cast only from a graveyard. */
@@ -4157,7 +4180,7 @@ export interface CompiledCard {
    * its controller's). "~" in them means this object (rulings). Only activated abilities: not triggered or static ones.
    * Abilities that work only from a hand or graveyard, equip and loyalty abilities aren't borrowed.
    */
-  borrows?: { filter: TargetSpec; other?: boolean; notSameName?: true; graveyard?: true; yours?: true; noMana?: true; /** "You may spend mana as though it were mana of any color to activate those abilities" (Drana and Linvala, CR 609.4b). */ anyColor?: true };
+  borrows?: { filter: TargetSpec; other?: boolean; notSameName?: true; graveyard?: true; yours?: true; noMana?: true; /** Conspicuous Snoop: the top card of your library, while it matches `filter`. */ top?: true; /** "You may spend mana as though it were mana of any color to activate those abilities" (Drana and Linvala, CR 609.4b). */ anyColor?: true };
   spell?: AbilityBody; // instants and sorceries
   /**
    * "As this creature transforms into Sephiroth, One-Winged Angel, you get an emblem with ..." (a back face's): done while
@@ -4338,7 +4361,7 @@ export interface CompiledCard {
    * "Creature spells you control can't be countered", "Creature spells can't be countered", "Spells you control can't be
    * countered": spells matching `filter`, controlled by this permanent's controller unless `anyone` (CR 101.2).
    */
-  uncounterable?: { filter: TargetSpec; anyone?: true }[];
+  uncounterable?: { filter: TargetSpec; anyone?: true; /** Thryx: "spells you cast with mana value 5 or greater": X counted (rulings), copies weren't cast (CR 707.10). */ minMv?: number }[];
   /** "Your opponents can't cast spells during your turn." (a "can't" that wins over any "can", CR 101.2) */
   /** Compleated (CR 702.150a): two fewer loyalty counters for each Phyrexian symbol its caster paid with life. */
   compleated?: true;
@@ -4632,6 +4655,11 @@ export interface CompiledCard {
    */
   activationLess?: { n: number; filter: TargetSpec; atLeastOne?: true }[];
   /**
+   * Zirda, the Dawnwaker: "Abilities you activate that aren't mana abilities cost {2} less to activate. This effect can't
+   * reduce the mana in that cost to less than one mana." Any such ability its controller activates, from any zone (rulings).
+   */
+  youActivateLess?: { n: number; atLeastOne?: true };
+  /**
    * "Players can't untap more than one nonbasic land during their untap steps" (Winter Moon), "You can't untap more than
    * one land during your untap step" (Mungha Wurm, `you`), "As long as ~ is untapped, players can't untap more than two
    * permanents ..." (Static Orb, `whileUntapped`): the active player chooses which of them untap (CR 502.3).
@@ -4696,6 +4724,8 @@ export interface CompiledCard {
     /** One with the Multiverse: "once during each of your turns, you may cast a spell from your hand or the top of your library without paying its mana cost". */
     yourTurn?: true;
     fromHandOrTop?: true;
+    /** Demon of Fate's Design: life equal to the spell's mana value rather than {0} (AltCostKind "lifeForMv"). */
+    life?: true;
   };
   /**
    * Obstinate Baloth: "If a spell or ability an opponent controls causes you to discard ~, put it onto the battlefield

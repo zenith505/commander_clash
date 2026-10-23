@@ -1,6 +1,6 @@
 import type { Effect, Modification, TokenSpec } from "../abilities";
 import { abilitiesOf, basePowerNow, cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
-import { auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, provokersOf, moveObject, obj, opponents, player, removeFromCombat, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds } from "../game";
+import { attackablePermanentProblem, attackedName, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, provokersOf, moveObject, obj, opponents, player, removeFromCombat, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { putPlayerCounters, putCounters, tokenBatch, withPutter } from "../counters";
 import { compileCard } from "../oracle";
@@ -123,6 +123,19 @@ export function proliferateTimes(s: GameState, you: PlayerId, n: number): number
   return n * 2 ** doublers;
 }
 
+/** What an attacking creature could be made to attack instead (reselectAttack): not what it attacks now. */
+export function reselectOptions(s: GameState, o: GameObject): { key: string; label: string; player: PlayerId; planeswalker?: ObjectId }[] {
+  const you = controllerOf(s, o);
+  const now = o.attackingPermanent ? `${o.attacking}:${o.attackingPermanent.id}` : String(o.attacking);
+  return livingPlayers(s)
+    .filter((x) => x !== you)
+    .flatMap((x) => [
+      { key: String(x), label: player(s, x).name, player: x as PlayerId },
+      ...s.battlefield.filter((id) => attackablePermanentProblem(s, you, x, id) === null).map((id) => ({ key: `${x}:${id}`, label: `${defOf(s, obj(s, id)).name} (${objIsType(s, obj(s, id), "Battle") ? "protected by " : ""}${player(s, x).name})`, player: x as PlayerId, planeswalker: id })),
+    ])
+    .filter((x) => x.key !== now);
+}
+
 /** Counters that hurt the permanent they're on: -1/-1 shrinks it, stun keeps it from untapping (CR 122.1d). */
 export const harmfulCounter = (k: string) => k === "-1/-1" || k === "stun";
 
@@ -137,6 +150,26 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         log(s, `${src} removes ${defOf(s, o).name} from combat.`);
       }
       return;
+    case "reselectAttack": {
+      // Another player, or a planeswalker or battle it could attack (CR 506.2, 310.9b), never its controller or theirs;
+      // requirements, restrictions and costs ignored, and it still attacked what it did (rulings).
+      const o = objects(s, e.what, ctx)[0];
+      if (!o || o.zone !== "battlefield" || o.attacking === undefined) return;
+      const options = reselectOptions(s, o);
+      if (!options.length) return;
+      const sc = (s.resolving!.scratch ??= {});
+      if (sc.reselect === undefined) {
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "reselectAttack", options: options.map((x) => x.key), labels: options.map((x) => x.label), about: o.id, prompt: `choose what ${defOf(s, o).name} attacks now` };
+        return "paused";
+      }
+      const pick = options.find((x) => x.key === sc.reselect);
+      sc.reselect = undefined;
+      if (!pick) return;
+      o.attacking = pick.player;
+      o.attackingPermanent = pick.planeswalker !== undefined ? attackingPermanentOf(s, pick.planeswalker) : undefined;
+      log(s, `${src}: ${defOf(s, o).name} now attacks ${attackedName(s, o)}.`);
+      return;
+    }
     case "suspect":
       // Only permanents can be suspected (CR 701.60b); a suspected one isn't suspected again (701.60d), so it keeps its
       // timestamp.
@@ -446,6 +479,14 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       for (const o of objects(s, e.what, ctx)) o.skipNextUntap = true;
       return;
     case "noMaxHandSize":
+      // "For as long as you control ~": nothing if you no longer do (CR 611.2b; rulings on The Great Synthesis).
+      if (e.whileControlled) {
+        const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+        if (!me || me.zone !== "battlefield" || (me.zoneChanges ?? 0) !== (ctx.sourceZc ?? 0) || controllerOf(s, me) !== ctx.controller) return;
+        (player(s, ctx.controller).noMaxHandSizeWhile ??= []).push({ id: me.id, zc: me.zoneChanges ?? 0 });
+        log(s, `${player(s, ctx.controller).name} has no maximum hand size for as long as they control ${src}.`);
+        return;
+      }
       player(s, ctx.controller).noMaxHandSize = true;
       log(s, `${player(s, ctx.controller).name} has no maximum hand size for the rest of the game.`);
       return;

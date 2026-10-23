@@ -42,6 +42,13 @@ const faceDownCard = (oracleId: string, ward: boolean): CardDef => ({
 });
 export const FACE_DOWN = faceDownCard("face-down", false);
 export const FACE_DOWN_WARD = faceDownCard("face-down-ward", true);
+/**
+ * Yedora, Grave Gardener's face-down card: no name or colors, its only type land, its only subtype Forest, so its only
+ * ability "{T}: Add {G}" (rulings, CR 305.6, 708.2a).
+ */
+export const FACE_DOWN_FOREST: CardDef = { oracleId: "face-down-forest", name: "Face-down Forest", manaCost: "", cmc: 0, typeLine: "Land — Forest", supertypes: [], types: ["Land"], subtypes: ["Forest"], oracleText: "", colors: [], colorIdentity: [], keywords: [] };
+/** The copiable values a face-down permanent has (CR 708.2). */
+const faceDownDef = (o: GameObject): CardDef => (o.faceDown === "forest" ? FACE_DOWN_FOREST : withWard(o) ? FACE_DOWN_WARD : FACE_DOWN);
 
 /**
  * Its copiable values before face-down status (CR 613.2a): the latest copy effect that began after it entered
@@ -81,7 +88,7 @@ const ownId = (o: GameObject): string => o.melded ?? (o.face !== undefined ? fac
 /** Its definition's key: face-down values (layer 1b, CR 613.2b), or what it's a copy of (layer 1a), or its own card. */
 /** Disguised and cloaked permanents have ward {2} (CR 702.168a, 701.58a). */
 const withWard = (o: GameObject) => o.faceDown === "disguise" || o.faceDown === "cloak";
-export const cardIdOf = (o: GameObject): string => (o.faceDown ? (withWard(o) ? FACE_DOWN_WARD.oracleId : FACE_DOWN.oracleId) : textKey(o) ?? copiedId(o));
+export const cardIdOf = (o: GameObject): string => (o.faceDown ? faceDownDef(o).oracleId : textKey(o) ?? copiedId(o));
 
 /** With its text box exchanged (GameObject.textFrom), on the battlefield: the key its definition with that text has. */
 const textKey = (o: GameObject): string | undefined => (o.textFrom && (o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged") ? `${copiedId(o)}|text:${o.textFrom}` : undefined);
@@ -135,7 +142,7 @@ export function offFieldCreatureDef(d: CardDef): CardDef {
  * those aren't copiable values (CR 707.2).
  */
 export const ownDefOf = (s: GameState, o: GameObject): CardDef => {
-  if (o.faceDown) return withWard(o) ? FACE_DOWN_WARD : FACE_DOWN;
+  if (o.faceDown) return faceDownDef(o);
   const key = copiedId(o);
   // A face's definition is registered as the face is turned up (setFace); a game built by hand may not have done that.
   if (!s.cards[key] && key === ownId(o) && o.face !== undefined) registerFace(s, o, o.face);
@@ -365,7 +372,10 @@ export function lendersOf(s: GameState, o: GameObject, b: NonNullable<CompiledCa
   const c = characteristics(s, o);
   borrowing = true;
   try {
-    if (b.graveyard) {
+    if (b.top) {
+      const top = s.objects[s.players[c.controller]!.library[0] ?? ""];
+      if (top && printedMatches(b.filter, defOf(s, top))) out.cards.push(defOf(s, top));
+    } else if (b.graveyard) {
       for (const pid of s.turnOrder)
         if (!b.yours || pid === c.controller)
           for (const id of s.players[pid]!.graveyard) {

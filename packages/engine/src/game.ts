@@ -9,7 +9,7 @@ import { asFace, castableFaces, defMv, hasName, isRoom, landFaces, layoutOf, reg
 import { checkDayNight, dayNightUntapCheck } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
-import { abilitiesOf, canBeSacrificed, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
+import { abilitiesOf, canBeSacrificed, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
 import { bindBound, pickOptions, playerProtectedFrom, spellManaValue, targetsMatch } from "./effects/targeting";
@@ -89,7 +89,7 @@ export function createGame(setup: PlayerSetup[], seed = Date.now() >>> 0, opts: 
     turnOrder: setup.map((_, i) => i),
     players: [],
     objects: {},
-    cards: { [FACE_DOWN.oracleId]: FACE_DOWN, [FACE_DOWN_WARD.oracleId]: FACE_DOWN_WARD },
+    cards: { [FACE_DOWN.oracleId]: FACE_DOWN, [FACE_DOWN_WARD.oracleId]: FACE_DOWN_WARD, [FACE_DOWN_FOREST.oracleId]: FACE_DOWN_FOREST },
     battlefield: [],
     stack: [],
     triggerQueue: [],
@@ -2381,6 +2381,7 @@ export function endTheTurn(s: GameState, item?: StackItem): void {
   s.blockLimits = undefined;
   // The phases and steps skipped go with the ones added after them (CR 500.8) and the end steps added to this one.
   s.addedPhases = undefined;
+  s.afterSecondMain = undefined;
   s.resumeStep = undefined;
   s.extraEndSteps = undefined;
   s.extraUpkeeps = undefined;
@@ -2396,11 +2397,22 @@ const PHASE_ENDS = new Set<Step>(["draw", "main1", "endCombat", "main2"]);
  * directly after the current phase, before any added after it earlier. "After this main phase" and "after this combat
  * phase" add nothing when it isn't one (rulings on Relentless Assault and Full Throttle).
  */
-export function addPhases(s: GameState, phases: ("combat" | "main" | "beginning")[], after?: "main" | "combat", combatKey?: number): boolean {
+export function addPhases(s: GameState, phases: ("combat" | "main" | "beginning")[], after?: "main" | "combat" | "secondMain", combatKey?: number): boolean {
+  const added = phases.map((p) => (p === "combat" && combatKey !== undefined ? { combat: combatKey } : p));
+  // "After the second main phase this turn" (World at War): before it begins, they wait for it, the most recently created
+  // first (CR 500.8; rulings); during it, they come after it; after it has ended, there are none.
+  if (after === "secondMain") {
+    const mains = s.mainPhasesThisTurn ?? 0;
+    if (mains < 2) {
+      s.afterSecondMain = [...added, ...(s.afterSecondMain ?? [])];
+      return true;
+    }
+    if (mains > 2 || !isMainPhase(s)) return false;
+  }
   if (after === "main" && !isMainPhase(s)) return false;
   if (after === "combat" && !inCombatPhase(s)) return false;
   if (s.step === "end" || s.step === "cleanup") return false; // nothing comes after the ending phase but the next turn
-  s.addedPhases = [...phases.map((p) => (p === "combat" && combatKey !== undefined ? { combat: combatKey } : p)), ...(s.addedPhases ?? [])];
+  s.addedPhases = [...added, ...(s.addedPhases ?? [])];
   return true;
 }
 
@@ -2541,6 +2553,7 @@ function startNextTurn(s: GameState, skipping = false) {
   s.mainPhasesThisTurn = undefined;
   s.blockersStep = undefined;
   s.addedPhases = undefined;
+  s.afterSecondMain = undefined;
   s.resumeStep = undefined;
   s.lostLifeThisTurn = undefined;
   s.permanentLeftThisTurn = undefined;
@@ -2742,6 +2755,11 @@ function beginStep(s: GameState, step: Step): void {
     case "main2":
       // Every main phase after the first is a postcombat main phase, an added one too (CR 505.1a).
       s.mainPhasesThisTurn = (s.mainPhasesThisTurn ?? 0) + 1;
+      // World at War's phases, waiting for the turn's second main phase, now come right after it.
+      if (s.mainPhasesThisTurn === 2 && s.afterSecondMain) {
+        s.addedPhases = [...s.afterSecondMain, ...(s.addedPhases ?? [])];
+        s.afterSecondMain = undefined;
+      }
       fireEvent(s, { type: "step", step: "main2", active: ap });
       break;
     case "beginCombat":
@@ -2801,6 +2819,7 @@ function sagaSBAs(s: GameState): boolean {
 /** "You have no maximum hand size" on a permanent the player controls, or "Players have ..." on any (CR 402.2, 514.1). */
 export const hasNoMaxHandSize = (s: GameState, pid: PlayerId) =>
   !!player(s, pid).noMaxHandSize ||
+  !!player(s, pid).noMaxHandSizeWhile?.some((w) => s.objects[w.id]?.zone === "battlefield" && (s.objects[w.id]!.zoneChanges ?? 0) === w.zc && controllerOf(s, s.objects[w.id]!) === pid) ||
   s.battlefield.some((id) => {
     const a = abilitiesOf(s, obj(s, id)).noMaxHandSize;
     return a === "all" || (!!a && controllerOf(s, obj(s, id)) === pid);
@@ -3700,6 +3719,7 @@ export function castProblem(
     if (choices.alt === "wubrg" && x) return "X is 0 when you pay {W}{U}{B}{R}{G} rather than the mana cost";
     if (choices.alt === "payZero" && x) return "X is 0 when you pay {0} rather than the mana cost";
     if (choices.alt === "payZero" && !payZeroSource(s, pid, o)) return `nothing lets you pay {0} rather than ${d.name}'s mana cost now`;
+    if (choices.alt === "lifeForMv" && !payZeroSource(s, pid, o, true)) return `nothing lets you pay life rather than ${d.name}'s mana cost now`;
     if (choices.alt === "omniscience" && o.zone !== "hand") return "only spells cast from your hand are free";
     if (choices.alt === "citadel" && o.zone !== "library" && !castFromExileForLife(s, o, pid)) return "only the top card of your library is cast for life";
     // A foretell cost is paid only for a foretold card, after the turn it was foretold (CR 702.143a).
@@ -4218,6 +4238,12 @@ export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: Play
   }
   // As Foretold, Rooftop Storm: {0}, while one of `pid`'s permanents lets them (castProblem checks it's for this spell).
   if (alt === "payZero") return s && pid !== undefined && s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && compileCard(defOf(s, obj(s, id))).payZero && characteristics(s, obj(s, id)).hasPrintedAbilities) ? { kind: "payZero", mana: "{0}" } : undefined;
+  // Demon of Fate's Design: life equal to the spell's mana value, X at 0 (rulings); castProblem checks it covers this spell.
+  if (alt === "lifeForMv") {
+    if (!s || pid === undefined || !s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && compileCard(defOf(s, obj(s, id))).payZero?.life && characteristics(s, obj(s, id)).hasPrintedAbilities)) return undefined;
+    const n = manaValue(parseManaCost(d.manaCost));
+    return { kind: "lifeForMv", mana: "", costs: [{ kind: "payLife", n }], text: `pay ${n} life` };
+  }
   if (alt === "evidence") {
     const n = s && pid !== undefined ? payEvidenceOf(s, pid) : undefined;
     return n === undefined ? undefined : { kind: "evidence", mana: "", costs: [{ kind: "collectEvidence", n }], text: `collect evidence ${n}` };
@@ -4255,13 +4281,13 @@ function payEvidenceOf(s: GameState, pid: PlayerId): number | undefined {
  * The permanent of `pid`'s whose "you may pay {0} rather than pay the mana cost" covers this spell now (As Foretold, Rooftop
  * Storm, Darksteel Monolith), X counted as 0 (rulings): one with no once-each-turn limit first, then the first unused one.
  */
-export function payZeroSource(s: GameState, pid: PlayerId, o: GameObject): GameObject | undefined {
+export function payZeroSource(s: GameState, pid: PlayerId, o: GameObject, life = false): GameObject | undefined {
   const d = defOf(s, o);
   if (isType(d, "Land")) return undefined;
   const used = s.turnLog?.payZeroUsed ?? [];
   const ok = s.battlefield.map((id) => obj(s, id)).filter((p) => {
     const z = compileCard(defOf(s, p)).payZero;
-    if (!z || controllerOf(s, p) !== pid || !characteristics(s, p).hasPrintedAbilities) return false;
+    if (!z || !!z.life !== life || controllerOf(s, p) !== pid || !characteristics(s, p).hasPrintedAbilities) return false;
     if (z.once && used.includes(`${p.id}@${p.zoneChanges ?? 0}`)) return false;
     if (z.fromHand && o.zone !== "hand") return false;
     if (z.fromExile && o.zone !== "exile") return false;
@@ -4277,7 +4303,7 @@ export function payZeroSource(s: GameState, pid: PlayerId, o: GameObject): GameO
 export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): NonNullable<CompiledCard["altCosts"]> {
   const own = compileCard(defOf(s, o)).altCosts ?? [];
   if (isType(defOf(s, o), "Land")) return own;
-  return [...own, ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(["evidence" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
+  return [...own, ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(["evidence" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
 }
 
 /** Artifacts tapped for improvise: untapped artifacts you control, each once, not also tapped for convoke. */
@@ -4505,6 +4531,11 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     if (compileCard(defOf(s, by)).payZero!.once) ((s.turnLog ??= {}).payZeroUsed ??= []).push(`${by.id}@${by.zoneChanges ?? 0}`);
     log(s, `${p.name} pays {0} rather than ${d.name}'s mana cost (${characteristics(s, by).name}).`);
   }
+  if (choices.alt === "lifeForMv") {
+    const by = payZeroSource(s, p.id, o, true)!;
+    ((s.turnLog ??= {}).payZeroUsed ??= []).push(`${by.id}@${by.zoneChanges ?? 0}`);
+    log(s, `${p.name} pays life rather than ${d.name}'s mana cost (${characteristics(s, by).name}).`);
+  }
   const from = zoneList(s, o)!;
   from.splice(from.indexOf(id), 1);
   o.zone = "stack";
@@ -4566,7 +4597,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   const howText =
     (via ? ` from their graveyard (${describeVia(via.kind)})` : castFrom === "exile" ? " from exile" : "") +
     (choices.prototyped && choices.alt !== "prototype" ? " prototyped" : "") +
-    (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "payZero" ? " for {0}" : choices.alt === "omniscience" ? " without paying its mana cost" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt === "convert" ? " converted, for its More Than Meets the Eye cost" : choices.alt ? ` for its ${choices.alt} cost` : "") +
+    (choices.alt === "bestow" ? " bestowed" : choices.alt === "prototype" ? " prototyped" : choices.alt === "wubrg" ? " for {W}{U}{B}{R}{G}" : choices.alt === "payZero" ? " for {0}" : choices.alt === "lifeForMv" ? " for life" : choices.alt === "omniscience" ? " without paying its mana cost" : choices.alt === "evidence" ? " collecting evidence rather than paying its mana cost" : choices.alt === "convert" ? " converted, for its More Than Meets the Eye cost" : choices.alt ? ` for its ${choices.alt} cost` : "") +
     (madness && o.castAlt === "madness" ? " for its madness cost" : madness && o.castAlt === "miracle" ? " for its miracle cost" : "") +
     (choices.buyback ? ", paying buyback" : "") +
     (choices.splice?.length ? `, splicing ${choices.splice.map((c) => nameOf(s, c)).join(" and ")} onto it` : "") +
@@ -5649,7 +5680,18 @@ export function lessWaterbend(cost: ParsedCost, extra: number, ab: ActivatedAbil
  * (CR 602.2b applies 601.2f): reductions only take off generic mana. Without `targets` chosen yet, as if the best one were.
  */
 export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, targets?: TargetChoice[], x = 0): ParsedCost {
-  return activationLessCost(s, o, activationCostBefore(s, pid, o, ab, targets), x);
+  // Zirda, the Dawnwaker: abilities `pid` activates that aren't mana abilities, wherever they are (rulings).
+  let less = 0;
+  let atLeastOne = false;
+  if (!ab.mana)
+    for (const id of s.battlefield) {
+      const src = obj(s, id);
+      const z = controllerOf(s, src) === pid ? abilitiesOf(s, src).youActivateLess : undefined;
+      if (!z) continue;
+      less += z.n;
+      if (z.atLeastOne) atLeastOne = true;
+    }
+  return activationLessCost(s, o, activationCostBefore(s, pid, o, ab, targets), x, less ? { n: less, atLeastOne } : undefined);
 }
 
 /**
@@ -5658,11 +5700,10 @@ export function activationCost(s: GameState, pid: PlayerId, o: GameObject, ab: A
  * counting (its symbols become that much generic mana then), and not below one mana where the reduction says so (rulings
  * on Training Grounds: a cost with no generic mana, {0} included, stays as it is). Only for a permanent on the battlefield.
  */
-export function activationLessCost(s: GameState, o: GameObject, cost: ParsedCost, x = 0): ParsedCost {
-  if (o.zone !== "battlefield") return cost;
-  let less = 0;
-  let atLeastOne = false;
-  for (const id of s.battlefield) {
+export function activationLessCost(s: GameState, o: GameObject, cost: ParsedCost, x = 0, also?: { n: number; atLeastOne: boolean }): ParsedCost {
+  let less = also?.n ?? 0;
+  let atLeastOne = !!also?.atLeastOne;
+  for (const id of o.zone === "battlefield" ? s.battlefield : []) {
     const src = obj(s, id);
     for (const m of abilitiesOf(s, src).activationLess ?? []) {
       if (!objectMatches(s, m.filter, o, controllerOf(s, src), false)) continue;
@@ -5675,6 +5716,7 @@ export function activationLessCost(s: GameState, o: GameObject, cost: ParsedCost
   const g = splitGeneric(cost, xs);
   if (!g.extra) return cost;
   const others = g.cost.symbols.filter((sym) => sym.kind !== "x");
+  // Not below one mana (rulings on Training Grounds and Zirda: {1}{R} becomes {R}, {2} becomes {1}).
   const left = Math.max(atLeastOne && !others.length ? 1 : 0, g.extra - less);
   // Still "with X" (CR 107.3): the X chosen is its value for the ability, now paid as generic mana.
   return { ...g.cost, symbols: [...(left ? [{ kind: "generic" as const, amount: left }] : []), ...others] };
@@ -6485,6 +6527,12 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   if (pend.what === "targetSlot") {
     (r.scratch ??= {}).targetSlot = Number(choice);
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "reselectAttack") {
+    if (!pend.options.includes(choice)) throw new RulesError("choose one of the players or permanents offered");
+    (r.scratch ??= {}).reselect = choice;
     continueResolution(s);
     return;
   }

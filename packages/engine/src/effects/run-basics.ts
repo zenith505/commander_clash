@@ -479,7 +479,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       }
       if (e.anyColors) {
         // "Add X mana in any combination of colors" (CR 106.1b): X worked out first (CR 608.2h), then how much of each
-        // color, chosen by the player adding it (608.2d). No mana ability makes this, so it's never tapped-for mana.
+        // color, chosen by the player adding it (608.2d). Hazel of the Rootbloom's has {T} in its cost: tapped for mana,
+        // so Mana Reflection multiplies it (CR 106.12b).
         const sc = (s.resolving!.scratch ??= {});
         if (!sc.manaMix) {
           const n = Math.max(0, amountNow(s, e.times ?? 1, ctx));
@@ -490,7 +491,8 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const mix = sc.manaMix;
         delete sc.manaMix;
         const from = manaSourceOrigins(s, ctx);
-        const colors = COLORS.flatMap((c) => Array<ManaType>(mix[c] ?? 0).fill(c));
+        const mixed = COLORS.flatMap((c) => Array<ManaType>(mix[c] ?? 0).fill(c));
+        const colors = s.resolving?.item.manaAbility?.tapped ? timesAsMuch(mixed, tapManaTimes(s, ctx.controller, ctx.sourceId ? s.objects[ctx.sourceId] : undefined)) : mixed;
         for (const c of colors) addMana(s, p.id, [c], { from, ...(e.only ? { only: e.only } : {}), ...(e.keep ? { keep: "turn" as const } : {}) });
         if (colors.length) log(s, `${p.name} adds ${colors.map((c) => `{${c}}`).join("")}.`);
         return;

@@ -158,7 +158,7 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     return condition ? { ...self, condition } : null;
   }
   // "During your turn, equipped creature gets +1/+0": the statement starts a sentence of its own.
-  const st = parseStatic(`${statement.replace(/\bgets an additional\b/, "gets").replace(/^(it|this creature|this permanent)\b/i, "~").replace(/^(enchanted|equipped|creatures|other|commanders) /, (w) => w.charAt(0).toUpperCase() + w.slice(1))}.`);
+  const st = parseStatic(`${statement.replace(/\bgets an additional\b/, "gets").replace(/^(it|this creature|this permanent)\b/i, "~").replace(/^(enchanted|equipped|creatures|other|commanders|untap) /, (w) => w.charAt(0).toUpperCase() + w.slice(1))}.`);
   if (!st || st.condition) return null;
   // "This spell has flash as long as ...": it works from your hand, which a static ability of a permanent can't.
   if (st.mods.some((x) => x.kind === "addKeywords" && x.keywords.includes("Flash"))) return null;
@@ -304,7 +304,8 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   // "Spells you cast", "Instant and sorcery spells", "Noncreature spells", "Dragon spells", "Blue spells"
   // "Creature spells you cast with power 4 or greater" (Goreclaw): the spell's power as it's cast (see costModsFor).
   const pw = / with power (\d+) or (greater|less)$/.exec(m[4] ?? "");
-  const parsed = words ? parseTargetPhrase(`${words} spell${pw ? "" : (m[4] ?? "")}`) : { kind: "spell" as const, text: "spell" };
+  // "Spells you cast with mana value 5 or greater" (Thryx): the mana value bound with no other words.
+  const parsed = words || (m[4] && !pw) ? parseTargetPhrase(`${words ? `${words} ` : ""}spell${pw ? "" : (m[4] ?? "")}`) : { kind: "spell" as const, text: "spell" };
   if (!parsed || parsed.kind !== "spell" || (pw && !parsed.types?.includes("Creature"))) return "fail";
   const filter: TargetSpec = pw ? { ...parsed, power: pw[2] === "greater" ? { min: Number(pw[1]) } : { max: Number(pw[1]) } } : parsed;
   const who = m[3] === " you cast" ? "you" : m[3] === " your opponents cast" ? "opponents" : "all";
@@ -629,6 +630,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   }
   if ((m = new RegExp(`^an opponent has ${NUM} or more poison counters$`).exec(text))) return { kind: "opponentPoison", n: num(m[1]!) };
   if ((m = new RegExp(`^an opponent has ${NUM} or more cards in their graveyard$`).exec(text))) return { kind: "opponentGraveyard", n: num(m[1]!) };
+  if ((m = new RegExp(`^a graveyard has ${NUM} or more cards in it$`).exec(text))) return { kind: "opponentGraveyard", n: num(m[1]!), anyone: true };
   // "Activate only if ~'s power is 3 or greater" (Kitsa, Otterball Elite): as it is now.
   if ((m = new RegExp(`^(~'s (?:power|toughness)) is ${NUM} or (greater|less)$`).exec(text))) {
     const amount = parseCount(m[1]!, null);
@@ -1337,8 +1339,9 @@ function parseStaticLine(line: string): StaticAbility | null {
   }
   const cda = parseDefinedPT(text);
   if (cda) return { affects: { kind: "self" }, mods: [cda], text: line };
-  // Not a "where X is" inside a quoted ability: that X belongs to the ability granted (Hardy Outlander).
-  const where = /^([^"]+), where X is ([^"]+)$/.exec(text);
+  // Not a "where X is" inside a quoted ability: that X belongs to the ability granted (Hardy Outlander), nor mobilize's
+  // (Infantry Shield: "has menace and mobilize X, where X is its power").
+  const where = /\bmobilize X, where X is [^,"]+$/i.test(text) ? null : /^([^"]+), where X is ([^"]+)$/.exec(text);
   if (where) text = where[1]!;
   // "Creatures with power less than ~'s power can't block it." "All creatures able to block ~ do so." (CR 509.1b-c)
   if (/^Creatures with power less than ~'s power can't block it$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "cantBeBlockedByLesserPower" }], text: line };

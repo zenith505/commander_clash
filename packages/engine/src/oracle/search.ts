@@ -101,6 +101,15 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
     if (!spec || head === null || spec.kind !== "card" || !spec.bound) return null;
     return { ...(head ?? { kind: "card" }), bound: spec.bound, text: p };
   }
+  // Sisay, Weatherlight Captain: "a legendary permanent card with mana value less than ~'s power": at most one less, which
+  // below 0 matches nothing.
+  const under = count && / with mana value less than (?!or )(.+)$/.exec(p);
+  if (under) {
+    const head = parseSearchFilter(p.slice(0, under.index));
+    const amount = count(under[1]!);
+    if (head === null || !amount || amount.plus !== undefined || amount.times !== undefined) return null;
+    return { ...(head ?? { kind: "card" }), bound: { key: "manaValue", at: "most", amount: { ...amount, plus: -1, signed: true } }, text: p };
+  }
   if (/^card$/i.test(p)) return undefined;
   if (p === "card that shares a color with a legendary creature you control") return { kind: "card", colorOfYourLegend: true, text: p };
   // "If it's a land or double-faced card" (Invasion of Pyrulea, CR 712.1).

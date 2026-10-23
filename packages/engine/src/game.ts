@@ -3898,6 +3898,8 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   if (how.evidence && !how.faceDown) mods.less += compileCard(d).evidenceReduction ?? 0;
   // The Marches: "~ costs {2} less to cast for each card exiled this way" (CR 601.2f).
   if (how.exileFromHand?.length && !how.faceDown) mods.less += (compileCard(d).exiledReduction ?? 0) * how.exileFromHand.length;
+  // Rottenmouth Viper: "~ costs {1} less to cast for each permanent sacrificed this way", its X (CR 601.2f).
+  if (!how.faceDown) mods.less += (compileCard(d).sacrificedReduction ?? 0) * x;
   // "Spells your opponents cast that target ~ cost {2} more": each such permanent once, however often it's targeted.
   for (const id of new Set((how.targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])))) {
     const t = s.objects[id];

@@ -476,6 +476,22 @@ function maxX(plan: (x: number) => unknown): number {
   return lo;
 }
 
+/**
+ * The X values a cost that gets cheaper as X grows can be paid with (Rottenmouth Viper: each permanent sacrificed takes
+ * {1} off): from the fewest the mana allows to the most there are, none if none can be paid.
+ */
+function xRange(plan: (x: number) => unknown, limit = 60): { min: number; max: number } | undefined {
+  let min = -1;
+  let max = -1;
+  for (let n = 0; n <= limit; n++) {
+    if (plan(n)) {
+      if (min < 0) min = n;
+      max = n;
+    } else if (min >= 0) break;
+  }
+  return min < 0 ? undefined : { min, max };
+}
+
 function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) {
   const { state: s, dispatch, error, intent, priorityMode, setPriorityMode, stops, toggleStop, loop, startLoop, cancelLoop, repeatLoop, shortcutNote } = useGame(initial);
   // While you control another player, you see the table as they do and act for them (CR 723.4, 723.5).
@@ -856,11 +872,16 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const altMana = d.alt ? altCost(card, d.alt)?.mana : undefined;
     const altX = !!altMana && parseManaCost(altMana).hasX;
     if (d.x === undefined && ((parseManaCost(card.manaCost).hasX && (!free || parseManaCost(madnessCastOf(s, HUMAN, d.objectId) ?? "").hasX) && !d.via && !d.alt) || altX || costX)) {
-      const max = maxX((n) => planCast(s, HUMAN, d.objectId, undefined, d.modes, d.convoke ?? "auto", n, kicks));
+      // Rottenmouth Viper: with as many sacrificed as X (the ones picked later may differ).
+      const plan = (n: number) => planCast(s, HUMAN, d.objectId, undefined, d.modes, d.convoke ?? "auto", n, compiled.sacrificedReduction ? { ...kicks, sacrifice: reducingSacrifices(s, d.objectId).slice(0, n) } : kicks);
       // "You may sacrifice one or more creatures" (Plumb the Forbidden): X is how many, none unless you pick more.
       const optional = compiled.additionalCosts?.find((c) => c.kind === "sacrifice" && c.optional);
-      const extra = optional?.kind === "sacrifice" ? `sacrifice X ${optional.filter.text.replace(/s?$/, "s")} (X can be 0)` : costX ? (/\b(?:pay|discard|sacrifice|return|exile) X [^.(]*/i.exec(card.oracleText)?.[0]?.trim().replace(/^./, (c) => c.toLowerCase()) ?? "its cost") : undefined;
-      return setXPick({ mode: "cast", draft: d, label: card.name, cost: (free && madnessCastOf(s, HUMAN, d.objectId)) || (altX ? altMana! : card.manaCost), max, value: optional ? 0 : max, ...(extra ? { extra } : {}) });
+      // Rottenmouth Viper: each one sacrificed makes it cheaper, so the X that can be paid runs from the fewest
+      // sacrifices the mana allows to as many as there are; the fewest is offered (none payable: the engine says why).
+      const range = compiled.sacrificedReduction ? xRange(plan) : undefined;
+      const max = range ? range.max : maxX(plan);
+      const extra = optional?.kind === "sacrifice" ? (compiled.sacrificedReduction ? `sacrifice X ${optional.filter.text.replace(/s?$/, "s")}, each making it {${compiled.sacrificedReduction}} cheaper` : `sacrifice X ${optional.filter.text.replace(/s?$/, "s")} (X can be 0)`) : costX ? (/\b(?:pay|discard|sacrifice|return|exile) X [^.(]*/i.exec(card.oracleText)?.[0]?.trim().replace(/^./, (c) => c.toLowerCase()) ?? "its cost") : undefined;
+      return setXPick({ mode: "cast", draft: d, label: card.name, cost: (free && madnessCastOf(s, HUMAN, d.objectId)) || (altX ? altMana! : card.manaCost), max, value: range ? range.min : optional ? 0 : max, ...(range?.min ? { min: range.min } : {}), ...(extra ? { extra } : {}) });
     }
     // "Kicker {X}": X is announced once it's kicked (CR 601.2b), "X can't be 0" (Thieving Skydiver).
     const kickX = d.kicks?.map((i) => compiled.kicker?.costs[i] ?? "").find((c) => parseManaCost(c).hasX);
@@ -1942,6 +1963,17 @@ function graveyardOptions(s: GameState, id: string): boolean {
   return abilitiesOf(s, s.objects[id]!).activated.some((ab, i) => ab.zone === "graveyard" && planActivate(s, HUMAN, id, i) !== null);
 }
 
+/**
+ * What Rottenmouth Viper's "you may sacrifice any number of nonland permanents" could take, those that make no mana
+ * first (sacrificing one of them takes its mana away).
+ */
+function reducingSacrifices(s: GameState, id: string): string[] {
+  const c = compileCard(cardOf(s, id)).additionalCosts?.find((x) => x.kind === "sacrifice" && x.optional);
+  if (c?.kind !== "sacrifice") return [];
+  const makesMana = (x: string) => abilitiesOf(s, s.objects[x]!).mana.length > 0;
+  return s.battlefield.filter((x) => x !== id && controllerOf(s, s.objects[x]!) === HUMAN && objectMatches(s, c.filter, s.objects[x]!, HUMAN, false)).sort((a, b) => Number(makesMana(a)) - Number(makesMana(b)));
+}
+
 function canCastWithTaps(s: GameState, id: string, convoke?: string[], teamwork?: string[]) {
   if (teamwork?.length) return planCast(s, HUMAN, id, undefined, undefined, convoke ?? "auto", undefined, { teamwork }) !== null;
   if ((!convoke && canCast(s, HUMAN, id)) || planCast(s, HUMAN, id, undefined, undefined, convoke ?? "auto") !== null) return true;
@@ -1956,6 +1988,11 @@ function canCastWithTaps(s: GameState, id: string, convoke?: string[], teamwork?
       total += teamworkPower(s, x);
     }
     if (total >= c.teamwork && pick.length && planCast(s, HUMAN, id, undefined, undefined, convoke ?? "auto", undefined, { teamwork: pick }) !== null) return true;
+  }
+  // Rottenmouth Viper: cheaper for each permanent sacrificed as it's cast, so with some of them.
+  if (!convoke && c?.sacrificedReduction) {
+    const pool = reducingSacrifices(s, id);
+    for (let n = 1; n <= pool.length; n++) if (planCast(s, HUMAN, id, undefined, undefined, "auto", n, { sacrifice: pool.slice(0, n) }) !== null) return true;
   }
   // Cheaper if you collect evidence as you cast it (Bite Down on Crime): with the cards it would pick (CR 701.59a).
   if (!convoke && c?.evidence !== undefined && c.evidenceReduction) {

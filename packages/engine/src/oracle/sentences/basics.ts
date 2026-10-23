@@ -10,6 +10,7 @@ import { parseSearch, parseSearchFilter } from "../search";
 import { parseDamageRecipient, parsePlayer, parseObject, parseTargetPhrase, pickFilter } from "../targets";
 import { parseSentence } from "../sentence";
 import type { Ctx } from "../body";
+import { STARTING_LIFE } from "../../types";
 import type { ManaType } from "../../types";
 import { parsePreventAll } from "../statics";
 import { emblemAbilityOk } from "../grants";
@@ -261,6 +262,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^(Your|Target player's|Target opponent's|That player's|Each player's) life total becomes (\d+)$/i.exec(s))) {
     const who = m[1]!.toLowerCase() === "your" ? ({ ref: "you" } as const) : parsePlayer(m[1]!.replace(/'s$/, "").toLowerCase(), ctx);
     return who ? [{ type: "setLife", who, n: Number(m[2]) }] : null;
+  }
+  // "Your life total becomes half your starting life total, rounded up" (The Endstone), "up to one target player's life
+  // total becomes half their starting life total, rounded down" (Torgaar): 20 in Commander (CR 903.7, 119.5).
+  if ((m = /^(Your|Target player's|Up to one target player's|Target opponent's) life total becomes half (?:your|their) starting life total, rounded (up|down)$/i.exec(s))) {
+    const who = m[1]!.toLowerCase() === "your" ? ({ ref: "you" } as const) : parsePlayer(m[1]!.replace(/'s$/, "").toLowerCase(), ctx);
+    return who ? [{ type: "setLife", who, n: (m[2] === "up" ? Math.ceil : Math.floor)(STARTING_LIFE / 2) }] : null;
   }
   // Beacon of Immortality: "Double target player's life total": they gain (or, below 0, lose) as much life as it takes
   // (CR 701.10d).

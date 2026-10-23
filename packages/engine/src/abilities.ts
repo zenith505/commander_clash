@@ -4866,6 +4866,11 @@ export interface CompiledCard {
   xMaxPlayers?: true;
   /** The Marches: "~ costs {2} less to cast for each card exiled this way" (its optional exileFromHand cost, CR 601.2f). */
   exiledReduction?: number;
+  /**
+   * Rottenmouth Viper, Torgaar: "you may sacrifice any number of nonland permanents. This spell costs {1} less to cast
+   * for each permanent sacrificed this way" (its optional sacrifice cost, whose X is how many; CR 601.2b, 601.2f).
+   */
+  sacrificedReduction?: number;
   /** "You may collect evidence N rather than pay the mana cost for spells you cast" (Conspiracy Unraveler, CR 118.9). */
   payEvidence?: number;
   /** Teamwork N: as an additional cost, you may tap any number of creatures you control with total power N or more. */

@@ -1139,6 +1139,19 @@ export function compile(d: CardDef): CompiledCard {
       }
       continue;
     }
+    // Rottenmouth Viper, Torgaar: "you may sacrifice any number of nonland permanents. This spell costs {1} less to cast
+    // for each permanent sacrificed this way." An additional cost with an X of 0 or more (CR 601.2b, 107.3a), then a
+    // reduction of the total by that much generic mana (CR 601.2f).
+    const sacLess = /^As an additional cost to cast ~, you may sacrifice any number of (.+?)\. ~ costs \{(\d+)\} less to cast for each (permanent|creature) sacrificed this way\.$/.exec(line);
+    if (sacLess) {
+      const spec = parseTargetPhrase(sacLess[1]!.split(" ").map(singularWord).join(" "));
+      if (spec?.kind !== "object" || spec.controller || spec.combat || parseManaCost(d.manaCost).hasX || out.sacrificedReduction !== undefined || out.additionalCosts?.some((c) => c.kind === "sacrifice")) out.unsupported.push(raw);
+      else {
+        (out.additionalCosts ??= []).push({ kind: "sacrifice", filter: { ...spec, text: singularWord(sacLess[1]!) }, n: 0, x: true, optional: true });
+        out.sacrificedReduction = Number(sacLess[2]);
+      }
+      continue;
+    }
     // Plumb the Forbidden: "you may sacrifice one or more creatures. When you do, copy this spell for each creature
     // sacrificed this way." An additional cost with an X of 0 or more (CR 601.2b, 107.3a), and a reflexive trigger as
     // it's cast (CR 603.12) copying it that many times.

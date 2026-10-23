@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, putOnBattlefield, setup } from "./helpers";
-import { botActions, isFullySupported, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { botActions, compileCard, isFullySupported, manaValue, planCast, spellCost, waitingOn, type Action, type CardDef, type GameState } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -109,5 +109,92 @@ describe("Library of Leng (CR 614.1a)", () => {
     if (s.pending?.kind === "discard") s = act(s, { type: "discard", player: ap, objectIds: [a!] });
     expect(s.pending?.kind).not.toBe("handToTop");
     expect(s.objects[a!]!.zone).toBe("graveyard");
+  });
+});
+
+const viper = card("Rottenmouth Viper", "Creature — Elemental Snake", "{5}{B}", {
+  power: "6",
+  toughness: "6",
+  oracleText: "As an additional cost to cast this spell, you may sacrifice any number of nonland permanents. This spell costs {1} less to cast for each permanent sacrificed this way.\nWhenever this creature enters or attacks, put a blight counter on it. Then for each blight counter on it, each opponent loses 4 life unless that player sacrifices a nonland permanent of their choice or discards a card.",
+});
+const torgaar = card("Torgaar, Famine Incarnate", "Legendary Creature — Avatar", "{6}{B}{B}", {
+  power: "7",
+  toughness: "6",
+  oracleText: "As an additional cost to cast this spell, you may sacrifice any number of creatures. This spell costs {2} less to cast for each creature sacrificed this way.\nWhen Torgaar enters, up to one target player's life total becomes half their starting life total, rounded down.",
+});
+const token = (name: string) => card(name, "Artifact — Clue", "", { oracleText: "{2}, Sacrifice this artifact: Draw a card." });
+
+describe("Rottenmouth Viper: sacrifice any number of nonland permanents, {1} less for each (CR 601.2b, 601.2f)", () => {
+  /** Only `lands` lands untapped (a Swamp among them), and `n` Clues. */
+  const scene = (lands: number, n: number) => {
+    const { s, ap, ids } = setup([viper]);
+    // A Swamp first, then other lands.
+    const mine = s.battlefield.filter((id) => s.objects[id]!.controller === ap).sort((a, b) => Number(s.cards[s.objects[b]!.cardId]!.name === "Swamp") - Number(s.cards[s.objects[a]!.cardId]!.name === "Swamp"));
+    mine.forEach((id, i) => (s.objects[id]!.tapped = i >= lands));
+    const clues = Array.from({ length: n }, (_, i) => putOnBattlefield(s, ap, token(`Clue ${i}`)));
+    for (const c of clues) s.objects[c]!.isToken = true;
+    return { s, ap, id: ids[0]!, clues };
+  };
+
+  it("with three lands: three sacrificed make it {2}{B}", () => {
+    supported(viper);
+    const { s: s0, ap, id, clues } = scene(3, 4);
+    expect(spellCost(s0, ap, s0.objects[id]!, 3).extra + manaValue(spellCost(s0, ap, s0.objects[id]!, 3).cost)).toBe(3);
+    expect(planCast(s0, ap, id, undefined, undefined, "auto", 2, { sacrifice: clues.slice(0, 2) })).toBeNull();
+    const s = run(s0, planCast(s0, ap, id, undefined, undefined, "auto", 3, { sacrifice: clues.slice(0, 3) }));
+    expect(clues.filter((c) => s.objects[c]?.zone !== "battlefield")).toHaveLength(3);
+    expect(s.stack).toHaveLength(1);
+  });
+
+  it("the reduction only takes generic mana: six sacrificed still cost {B}", () => {
+    const { s: s0, ap, id, clues } = scene(1, 6);
+    const { cost, extra } = spellCost(s0, ap, s0.objects[id]!, 6);
+    expect(manaValue(cost) + extra).toBe(1);
+    expect(planCast(s0, ap, id, undefined, undefined, "auto", 6, { sacrifice: clues })).not.toBeNull();
+  });
+
+  it("none sacrificed: the full {5}{B}", () => {
+    const { s: s0, ap, id } = scene(14, 2);
+    const s = run(s0, planCast(s0, ap, id, undefined, undefined, "auto", 0));
+    expect(s.battlefield.filter((x) => s.objects[x]!.controller === ap && s.cards[s.objects[x]!.cardId]!.name.startsWith("Clue"))).toHaveLength(2);
+  });
+
+  it("a bot sacrifices no more tokens than it needs to cast it", () => {
+    const { s: s0, ap, id, clues } = scene(4, 4);
+    s0.players[ap]!.hand = [id];
+    const acts = botActions(s0, ap);
+    const cast = acts.find((a) => a.type === "castSpell" && a.objectId === id);
+    expect(cast).toBeTruthy();
+    const s = acts.reduce((x, a) => act(x, a), s0);
+    expect(clues.filter((c) => s.objects[c]?.zone !== "battlefield")).toHaveLength(2);
+  });
+
+  it("Torgaar's sacrifice is creatures, {2} each", () => {
+    const { s, ap } = setup([torgaar]);
+    const id = s.players[ap]!.hand.at(-1)!;
+    expect(manaValue(spellCost(s, ap, s.objects[id]!, 2).cost) + spellCost(s, ap, s.objects[id]!, 2).extra).toBe(4);
+  });
+});
+
+describe("Torgaar and The Endstone: a life total becomes half the starting life total (CR 119.5, 903.7)", () => {
+  it("Torgaar's enters trigger: a bot sets the opponent with the most life to 20", () => {
+    supported(torgaar);
+    const { s: s0, ap, opp } = setup([]);
+    s0.players[opp]!.life = 55;
+    const t = putOnBattlefield(s0, ap, torgaar);
+    let s = s0;
+    s.triggerQueue.push({ sourceId: t, sourceCardId: s.objects[t]!.cardId, controller: ap, index: 0, body: compileCard(torgaar).triggers[0]!.body });
+    for (let i = 0; i < 30 && (s.triggerQueue.length || s.stack.length || s.pending); i++) {
+      const who = s.pending ? s.pending.player : waitingOn(s)!;
+      const acts = botActions(s, who);
+      s = acts.length ? acts.reduce((x, a) => act(x, a), s) : act(s, { type: "passPriority", player: who });
+    }
+    expect(s.players[opp]!.life).toBe(20);
+  });
+
+  it("The Endstone at your end step: 20", () => {
+    const endstone = card("The Endstone", "Legendary Artifact", "{7}", { oracleText: "Whenever you play a land or cast a spell, draw a card.\nAt the beginning of your end step, your life total becomes half your starting life total, rounded up." });
+    supported(endstone);
+    expect(compileCard(endstone).triggers[1]!.body.effects).toEqual([{ type: "setLife", who: { ref: "you" }, n: 20 }]);
   });
 });

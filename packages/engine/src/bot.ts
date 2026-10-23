@@ -1206,6 +1206,17 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
       out.push(pick);
       continue;
     }
+    // "Target player's life total becomes 20" (Torgaar): the opponent with the most life above it, else us if we have
+    // less.
+    const setLife = allEffects(body.effects).find((e): e is Extract<Effect, { type: "setLife" }> => e.type === "setLife" && !e.double && e.who.ref === "target" && e.who.index === i);
+    if (setLife && spec.kind === "player") {
+      const richest = all.filter((t) => t.kind === "player" && t.id !== pid && player(s, t.id as PlayerId).life > setLife.n).sort((a, b) => player(s, b.id as PlayerId).life - player(s, a.id as PlayerId).life)[0];
+      const me = player(s, pid).life < setLife.n ? all.find((t) => t.kind === "player" && t.id === pid) : undefined;
+      const pick = richest && (!me || player(s, richest.id as PlayerId).life - setLife.n >= setLife.n - player(s, pid).life) ? richest : (me ?? richest);
+      if (!pick && !spec.optional && !forced) return null;
+      out.push(pick ?? (spec.optional ? { kind: "none" } : (all[0] ?? { kind: "none" })));
+      continue;
+    }
     // An "up to" target is only chosen when there's something we'd like it to be (CR 115.6).
     const pool = preferred.length ? preferred : forced && !spec.optional ? all : [];
     if (!pool.length) {
@@ -1506,6 +1517,8 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
     xs = cost.hasX ? xs.filter((x) => x! <= most) : xChoices(most, 1);
     // "You may sacrifice one or more creatures" (Plumb the Forbidden): none is fine too.
     if (castExtraCosts(d, { via, alt }).some((c) => c.kind === "sacrifice" && c.optional)) xs.push(0);
+    // Rottenmouth Viper: each one sacrificed makes it cheaper, so as few as we can cast it with.
+    if (compileCard(d).sacrificedReduction && !via && !alt) xs = Array.from({ length: most + 1 }, (_, i) => i);
   }
   for (const x of xs) {
     const plan = castPlanWithX(s, pid, id, free, x, via, alt);

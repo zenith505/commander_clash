@@ -9746,6 +9746,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "2c75623c-59f4-4449-ab43-9d1225185ad9",
+  "name": "Rottenmouth Viper",
+  "manaCost": "{5}{B}",
+  "cmc": 6,
+  "typeLine": "Creature — Elemental Snake",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental",
+   "Snake"
+  ],
+  "oracleText": "As an additional cost to cast this spell, you may sacrifice any number of nonland permanents. This spell costs {1} less to cast for each permanent sacrificed this way.\nWhenever this creature enters or attacks, put a blight counter on it. Then for each blight counter on it, each opponent loses 4 life unless that player sacrifices a nonland permanent of their choice or discards a card.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "blb",
+  "releasedAt": "2024-08-02",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "ec49dfcf-d16d-4621-af4b-4a6f09043221",
   "name": "Runeclaw Bear",
   "manaCost": "{1}{G}",

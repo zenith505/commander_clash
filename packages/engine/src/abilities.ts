@@ -3785,6 +3785,8 @@ export interface ManaAbility {
    * (rulings: two mana from it give two counters for each cast).
    */
   spentCommanderCounters?: true;
+  /** Biophagus: "If this mana is spent to cast a creature spell, that creature enters with an additional +1/+1 counter on it" (one for each such mana). */
+  spentCreatureCounter?: true;
   /** Depletion lands: "Put a depletion counter on ~." after the mana is added. */
   putCounter?: CounterKind;
   /** Depletion lands: "If there are no depletion counters on ~, sacrifice it." after the mana is added. */

@@ -146,7 +146,7 @@ export type SpentFrom = Record<"treasure" | "creature" | "artifact", number>;
  * (CR 601.2h): restricted mana it may be spent on first; then, on a spell or an ability, mana from a Treasure, a creature
  * or an artifact ("if mana from a Treasure was spent"), but on anything else the rest first; mana kept as steps end last.
  */
-export function spendFromPool(s: GameState, pid: PlayerId, cost0: ParsedCost, use: ManaUse, extraGeneric = 0, life = Infinity, opts: { spreadColors?: boolean; want?: Partial<Record<Color, number>>; avoid?: Partial<Record<Color, number>>; wantSnow?: boolean } = {}): (Payment & { spent: ManaPool; treasure: number; from: SpentFrom; uncounterable?: true; spentTriggers?: ManaSpentTrigger[]; haste?: "endOfTurn" | "game"; commanderCounters?: number; sources?: string[] }) | null {
+export function spendFromPool(s: GameState, pid: PlayerId, cost0: ParsedCost, use: ManaUse, extraGeneric = 0, life = Infinity, opts: { spreadColors?: boolean; want?: Partial<Record<Color, number>>; avoid?: Partial<Record<Color, number>>; wantSnow?: boolean } = {}): (Payment & { spent: ManaPool; treasure: number; from: SpentFrom; uncounterable?: true; spentTriggers?: ManaSpentTrigger[]; haste?: "endOfTurn" | "game"; commanderCounters?: number; creatureCounters?: number; sources?: string[] }) | null {
   const p = s.players[pid]!;
   const cost = payableCost(s, pid, cost0, use);
   const { pool, prefer, treasure, snow } = poolFor(s, pid, use);
@@ -162,6 +162,7 @@ export function spendFromPool(s: GameState, pid: PlayerId, cost0: ParsedCost, us
   const spentTriggers: ManaSpentTrigger[] = [];
   let haste: "endOfTurn" | "game" | undefined;
   let commanderCounters = 0;
+  let creatureCounters = 0;
   const sources = new Set<string>();
   // Mana that gives a creature spell haste is spent on one first, and kept back from anything else; Opal Palace's
   // mana the same way for its controller's commander.
@@ -173,7 +174,7 @@ export function spendFromPool(s: GameState, pid: PlayerId, cost0: ParsedCost, us
   const hasteFits = (l: ManaLot) => creatureSpell && (!l.hasteType || (!!spellDef && (spellDef.subtypes.includes(l.hasteType) || everyCreatureType(spellDef))));
   // Boseiju's mana goes to an instant or sorcery spell first, which it makes uncounterable.
   const instantOrSorcery = !!spellDef && (isType(spellDef, "Instant") || isType(spellDef, "Sorcery"));
-  const rank = (l: ManaLot, plain: boolean) => (l.keep ? 10 : 0) + (l.haste ? (hasteFits(l) ? -1 : 3) : 0) + (l.uncounterableInstantSorcery ? (instantOrSorcery ? -1 : 3) : 0) + (l.commanderCounters ? (ownCommander ? -1 : 3) : 0) + (l.only ? 0 : plain === (use === "other") ? 1 : 2);
+  const rank = (l: ManaLot, plain: boolean) => (l.keep ? 10 : 0) + (l.haste ? (hasteFits(l) ? -1 : 3) : 0) + (l.uncounterableInstantSorcery ? (instantOrSorcery ? -1 : 3) : 0) + (l.commanderCounters ? (ownCommander ? -1 : 3) : 0) + (l.creatureCounter ? (creatureSpell ? -1 : 3) : 0) + (l.only ? 0 : plain === (use === "other") ? 1 : 2);
   for (const m of Object.keys(spent) as ManaType[]) {
     spent[m] = pool[m] - paid.pool[m];
     if (!spent[m]) continue;
@@ -188,6 +189,7 @@ export function spendFromPool(s: GameState, pid: PlayerId, cost0: ParsedCost, us
         if (k && l.uncounterableInstantSorcery && instantOrSorcery) uncounterable = true;
         if (k && l.haste && hasteFits(l) && haste !== "game") haste = l.haste;
         if (l.commanderCounters && ownCommander) commanderCounters += k;
+        if (l.creatureCounter && creatureSpell) creatureCounters += k;
         if (k && l.source) sources.add(l.source);
         if (l.spentTrigger && use !== "other" && "spell" in use) for (let j = 0; j < k; j++) spentTriggers.push(l.spentTrigger);
         for (const f of l.from ?? []) if (f !== "snow") from[f] += k;
@@ -199,7 +201,7 @@ export function spendFromPool(s: GameState, pid: PlayerId, cost0: ParsedCost, us
   }
   if (p.manaLots) p.manaLots = p.manaLots.filter((l) => l.n > 0);
   if (!p.manaLots?.length) p.manaLots = undefined;
-  return { ...paid, pool: { ...p.manaPool }, spent, treasure: from.treasure, from, ...(uncounterable ? { uncounterable: true as const } : {}), ...(spentTriggers.length ? { spentTriggers } : {}), ...(haste ? { haste } : {}), ...(commanderCounters ? { commanderCounters } : {}), ...(sources.size ? { sources: [...sources] } : {}) };
+  return { ...paid, pool: { ...p.manaPool }, spent, treasure: from.treasure, from, ...(uncounterable ? { uncounterable: true as const } : {}), ...(spentTriggers.length ? { spentTriggers } : {}), ...(haste ? { haste } : {}), ...(commanderCounters ? { commanderCounters } : {}), ...(creatureCounters ? { creatureCounters } : {}), ...(sources.size ? { sources: [...sources] } : {}) };
 }
 
 /**
@@ -226,15 +228,15 @@ export function boundSpend(o: GameObject, only: ManaSpend | undefined): ManaSpen
  * Add mana to `pid`'s pool (CR 106.4): restricted if `only` says how it can be spent (106.6), `from` what its source was
  * (106.3), `keep` if it isn't lost as steps end (until end of turn, or until end of combat for firebending).
  */
-export function addMana(s: GameState, pid: PlayerId, mana: ManaType[], how: { only?: ManaSpend; from?: ManaOrigin[]; keep?: ManaLot["keep"]; spentTrigger?: ManaSpentTrigger; haste?: ManaLot["haste"]; hasteType?: string; commanderCounters?: true; uncounterableInstantSorcery?: true; source?: string } = {}): void {
+export function addMana(s: GameState, pid: PlayerId, mana: ManaType[], how: { only?: ManaSpend; from?: ManaOrigin[]; keep?: ManaLot["keep"]; spentTrigger?: ManaSpentTrigger; haste?: ManaLot["haste"]; hasteType?: string; commanderCounters?: true; creatureCounter?: true; uncounterableInstantSorcery?: true; source?: string } = {}): void {
   const p = s.players[pid]!;
   const from = how.from?.length ? [...new Set(how.from)].sort() : undefined;
   const trig = (t: ManaSpentTrigger | undefined) => (t ? `${t.sourceId}#${t.sourceZc}` : "");
   for (const m of mana) {
     p.manaPool[m]++;
-    if (!how.only && !from && !how.keep && !how.spentTrigger && !how.haste && !how.commanderCounters && !how.uncounterableInstantSorcery && !how.source) continue;
-    const same = p.manaLots?.find((l) => l.mana === m && l.only?.text === how.only?.text && (l.from ?? []).join() === (from ?? []).join() && l.keep === how.keep && trig(l.spentTrigger) === trig(how.spentTrigger) && l.haste === how.haste && l.hasteType === how.hasteType && l.commanderCounters === how.commanderCounters && l.uncounterableInstantSorcery === how.uncounterableInstantSorcery && l.source === how.source);
+    if (!how.only && !from && !how.keep && !how.spentTrigger && !how.haste && !how.commanderCounters && !how.creatureCounter && !how.uncounterableInstantSorcery && !how.source) continue;
+    const same = p.manaLots?.find((l) => l.mana === m && l.only?.text === how.only?.text && (l.from ?? []).join() === (from ?? []).join() && l.keep === how.keep && trig(l.spentTrigger) === trig(how.spentTrigger) && l.haste === how.haste && l.hasteType === how.hasteType && l.commanderCounters === how.commanderCounters && l.creatureCounter === how.creatureCounter && l.uncounterableInstantSorcery === how.uncounterableInstantSorcery && l.source === how.source);
     if (same) same.n++;
-    else (p.manaLots ??= []).push({ mana: m, n: 1, ...(how.only ? { only: how.only } : {}), ...(from ? { from } : {}), ...(how.keep ? { keep: how.keep } : {}), ...(how.spentTrigger ? { spentTrigger: how.spentTrigger } : {}), ...(how.haste ? { haste: how.haste, ...(how.hasteType ? { hasteType: how.hasteType } : {}) } : {}), ...(how.commanderCounters ? { commanderCounters: true as const } : {}), ...(how.uncounterableInstantSorcery ? { uncounterableInstantSorcery: true as const } : {}), ...(how.source ? { source: how.source } : {}) });
+    else (p.manaLots ??= []).push({ mana: m, n: 1, ...(how.only ? { only: how.only } : {}), ...(from ? { from } : {}), ...(how.keep ? { keep: how.keep } : {}), ...(how.spentTrigger ? { spentTrigger: how.spentTrigger } : {}), ...(how.haste ? { haste: how.haste, ...(how.hasteType ? { hasteType: how.hasteType } : {}) } : {}), ...(how.commanderCounters ? { commanderCounters: true as const } : {}), ...(how.creatureCounter ? { creatureCounter: true as const } : {}), ...(how.uncounterableInstantSorcery ? { uncounterableInstantSorcery: true as const } : {}), ...(how.source ? { source: how.source } : {}) });
   }
 }

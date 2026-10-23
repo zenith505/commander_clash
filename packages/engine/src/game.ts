@@ -2919,8 +2919,10 @@ function resolvePermanentSpell(s: GameState, item: StackItem, o: GameObject, d: 
   const haste = o.hasteCast;
   o.hasteCast = undefined;
   // Opal Palace: as many more +1/+1 counters as times it's been cast from the command zone, for each of its mana spent.
-  const opal = (o.commanderCountersCast ?? 0) * (player(s, o.owner).commanderCasts[o.id] ?? 0);
+  // Biophagus: one more for each of its mana spent (CR 614.1c).
+  const opal = (o.commanderCountersCast ?? 0) * (player(s, o.owner).commanderCasts[o.id] ?? 0) + (o.creatureCountersCast ?? 0);
   o.commanderCountersCast = undefined;
+  o.creatureCountersCast = undefined;
   // Impending: "If you chose to pay this permanent's impending cost, it enters with N time counters on it" (CR 702.176a).
   const impending = o.castAlt === "impending" ? (compileCard(d).impending ?? 0) : 0;
   const enterCounters = { ...(opal ? { "+1/+1": opal } : {}), ...(impending ? { time: impending } : {}) };
@@ -3428,7 +3430,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const spentTrigger: ManaSpentTrigger | undefined = ab.spentTrigger && { ...ab.spentTrigger, sourceId: o.id, sourceCardId: cardIdOf(o), sourceZc: o.zoneChanges ?? 0 };
   // "Whenever you cast a permanent spell using mana produced by Tecutlan": its mana is kept apart, to tell.
   const source = abilitiesOf(s, o).triggers.some((t) => t.cast?.manaFromSelf) ? `${o.id}#${o.zoneChanges ?? 0}` : undefined;
-  addMana(s, p.id, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(ab.spentUncounterable ? { uncounterableInstantSorcery: true as const } : {}), ...(source ? { source } : {}) });
+  addMana(s, p.id, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(ab.spentCreatureCounter ? { creatureCounter: true as const } : {}), ...(ab.spentUncounterable ? { uncounterableInstantSorcery: true as const } : {}), ...(source ? { source } : {}) });
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
   addTriggeredMana(s, p.id, picked);
   if (ab.skipNextUntap && o.zone === "battlefield") o.skipNextUntap = true;
@@ -4335,6 +4337,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // "If any of that mana is spent on a creature spell, it gains haste" (Arena of Glory): the spell and the creature it becomes.
   o.hasteCast = paid.haste;
   o.commanderCountersCast = paid.commanderCounters;
+  o.creatureCountersCast = paid.creatureCounters;
   // "When that mana is spent to cast a creature spell that shares a creature type with your commander" (Path of
   // Ancestry): one trigger for each such mana, its commanders' types checked now (rulings). "... to cast a red instant
   // or sorcery spell" (Pyromancer's Goggles): queued once the spell is on the stack, "that spell" being it.

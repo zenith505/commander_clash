@@ -469,6 +469,8 @@ export interface GameObject {
   hasteCast?: "endOfTurn" | "game";
   /** How much Opal Palace mana was spent to cast this commander (ManaAbility.spentCommanderCounters), until it enters. */
   commanderCountersCast?: number;
+  /** Biophagus: additional +1/+1 counters it enters with, one for each such mana spent to cast it. */
+  creatureCountersCast?: number;
   /** A spell: "that creature enters with an additional +1/+1 counter on it" (Boreal Outrider, CR 614.1c), as it resolves. */
   extraCounters?: Record<string, number>;
   /** A spell: "it gains haste until end of turn" from a cast trigger (Tyvar Kell's emblem), applying to the permanent it becomes (CR 400.7a). */
@@ -573,6 +575,8 @@ export interface ManaLot {
   hasteType?: string;
   /** Opal Palace's "if you spend this mana to cast your commander": see ManaAbility.spentCommanderCounters. */
   commanderCounters?: true;
+  /** Biophagus: see ManaAbility.spentCreatureCounter. */
+  creatureCounter?: true;
   /** Boseiju, Who Shelters All: see ManaAbility.spentUncounterable. */
   uncounterableInstantSorcery?: true;
   /** "Using mana produced by Tecutlan": the permanent that made it, "id#zoneChanges" (TriggeredAbility.cast.manaFromSelf). */

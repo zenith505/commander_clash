@@ -3704,6 +3704,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ ...e, duration: "game", whileCounter: counter });
       continue;
     }
+    // Ultima, Origin of Oblivion: "Put a blight counter on target land. For as long as that land has a blight counter on it,
+    // it loses all land types and abilities and has "{T}: Add {C}."": its land types go (CR 305.7; card types and
+    // supertypes stay, rulings), then all its abilities, then it has that one, all in this effect's timestamp.
+    const blight = new RegExp(`^For as long as that land has an? ${COUNTER} counter on it, it loses all land types and abilities and has "(\\{T\\}: Add \\{[WUBRGC]\\}\\.)"$`).exec(s);
+    if (blight) {
+      const prev = effects[effects.length - 1];
+      const counter = counterKind(blight[1]!);
+      if (prev?.type !== "counters" || prev.counter !== counter || prev.what.ref !== "target") return null;
+      effects.push({ type: "continuous", what: prev.what, mods: [{ kind: "setLandTypes", subtypes: [] }, { kind: "loseAllAbilities" }, { kind: "addAbility", text: blight[2]! }], duration: "game", whileCounter: counter });
+      continue;
+    }
     // "Put target creature card from a graveyard onto the battlefield under your control. That creature is a black Zombie in
     // addition to its other colors and types." (Rise from the Grave, Liliana, Death's Majesty, Dread Slaver): an effect on
     // the permanent the card became, from then on (CR 611.2c, 400.7); a later color or type change overwrites it (rulings).

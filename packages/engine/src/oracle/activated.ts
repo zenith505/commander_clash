@@ -24,7 +24,9 @@ export const KEYWORD_WORDS = KEYWORD_NAMES;
 /** A line without its ability word ("Threshold — "), which has no rules meaning (CR 207.2c). */
 export function stripAbilityWord(raw: string): string {
   const word = /^([A-Z][A-Za-z' 0-9]+) — /.exec(raw);
-  return word && ABILITY_WORDS.has(word[1]!.toLowerCase()) ? raw.slice(word[0].length) : raw;
+  // A flavor word ("Genomic Enhancement — {T}: Add ...", Biophagus) has no rules meaning either (CR 207.2d); a keyword
+  // written with a dash does ("Exhaust — ", CR 702).
+  return word && (ABILITY_WORDS.has(word[1]!.toLowerCase()) || (!KEYWORD_NAMES.has(word[1]!.toLowerCase()) && !/^(?:Exhaust|Boast|Power-up)$/.test(word[1]!))) ? raw.slice(word[0].length) : raw;
 }
 
 export function parseActivated(raw: string): ActivatedAbility | "fail" | null {

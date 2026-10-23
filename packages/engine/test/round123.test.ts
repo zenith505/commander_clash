@@ -644,3 +644,50 @@ describe("Comeuppance", () => {
     expect(life(opp)).toBe(theirs - 2);
   });
 });
+
+const ultima = card("Ultima, Origin of Oblivion", "Legendary Creature — Avatar", "{5}", { power: "4", toughness: "4", keywords: ["Flying"], oracleText: "Flying\nWhenever Ultima attacks, put a blight counter on target land. For as long as that land has a blight counter on it, it loses all land types and abilities and has \"{T}: Add {C}.\"\nWhenever you tap a land for {C}, add an additional {C}." });
+
+describe("Ultima, Origin of Oblivion", () => {
+  it("attacking, a blight counter on a Forest: no land types, only {T}: Add {C}, while the counter stays (CR 305.7)", () => {
+    supported(ultima);
+    const { s: s0, ap } = setup([]);
+    const u = putOnBattlefield(s0, ap, ultima);
+    const opp = s0.turnOrder[(s0.turnOrder.indexOf(ap) + 1) % 4]!;
+    const forest = putOnBattlefield(s0, opp, card("Snow-Covered Forest", "Basic Snow Land — Forest"));
+    invalidateCharacteristics(s0);
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: u, defender: opp }] });
+    for (let i = 0; i < 20 && (s.stack.length || s.triggerQueue.length || s.pending); i++)
+      s = s.pending?.kind === "chooseTargets" ? act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: forest }] }) : act(s, { type: "passPriority", player: waitingOn(s)! });
+    const f = s.objects[forest]!;
+    expect(f.counters.blight).toBe(1);
+    const c = characteristics(s, f);
+    expect(c.subtypes).toEqual([]);
+    expect(c.supertypes.sort()).toEqual(["Basic", "Snow"]);
+    expect(manaAbilitiesOn(s, f).map((m) => m.produces)).toEqual([{ kind: "fixed", mana: ["C"] }]);
+    f.counters.blight = 0;
+    invalidateCharacteristics(s);
+    expect(characteristics(s, f).subtypes).toEqual(["Forest"]);
+    expect(manaAbilitiesOn(s, f).map((m) => m.produces)).toEqual([{ kind: "fixed", mana: ["G"] }]);
+  });
+});
+
+const biophagus = card("Biophagus", "Creature — Tyranid", "{1}{G}", { power: "1", toughness: "1", oracleText: "Genomic Enhancement — {T}: Add one mana of any color. If this mana is spent to cast a creature spell, that creature enters with an additional +1/+1 counter on it." });
+
+describe("Biophagus", () => {
+  it("its mana spent on a creature spell: that creature enters with an additional +1/+1 counter", () => {
+    supported(biophagus);
+    const { s: s0, ap, ids } = setup([bear()]);
+    const b = putOnBattlefield(s0, ap, biophagus);
+    // Only Biophagus and one Forest to pay for the Bears.
+    for (const id of [...s0.battlefield]) if (id !== b && s0.objects[id]!.controller === ap) s0.objects[id]!.tapped = true;
+    const f = putOnBattlefield(s0, ap, card("Forest", "Basic Land — Forest"));
+    invalidateCharacteristics(s0);
+    const plan = planCast(s0, ap, ids[0]!);
+    expect(plan?.some((a) => a.type === "activateMana" && a.objectId === b)).toBe(true);
+    const s = settle(run(s0, plan));
+    expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
+    expect(s.objects[ids[0]!]!.counters["+1/+1"]).toBe(1);
+    expect(f).toBeDefined();
+  });
+});

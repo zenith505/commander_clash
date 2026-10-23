@@ -1,7 +1,7 @@
 // Round 133: round 132's gaps (bots and automatic payment use Doubling Cube), then the most played cards.
 
 import { describe, expect, it } from "vitest";
-import { act, card, forest, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
+import { act, bear, card, forest, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
 import { invalidateCharacteristics } from "../src/layers";
 import { addMana } from "../src/spend";
 import { spellCost } from "../src/game";
@@ -444,5 +444,41 @@ describe("Ral, Monsoon Mage // Ral, Leyline Prodigy", () => {
     const s = passToPending(run(s0, planActivate(s0, ap, r, 2)));
     expect(putTop.map((id) => s.objects[id]!.zone)).toEqual(["exile", "exile", "exile"]);
     expect(putTop.map((id) => !!s.objects[id]!.mayPlay?.free)).toEqual([true, true, false]);
+  });
+});
+
+describe("Crovax the Cursed: \"you may sacrifice a creature. If you do, ... If you don't, ...\"", () => {
+  const crovax = card("Crovax the Cursed", "Legendary Creature — Vampire Noble", "{2}{B}{B}", {
+    oracleText: "Crovax enters with four +1/+1 counters on it.\nAt the beginning of your upkeep, you may sacrifice a creature. If you do, put a +1/+1 counter on Crovax. If you don't, remove a +1/+1 counter from Crovax.\n{B}: Crovax gains flying until end of turn.",
+    power: "0",
+    toughness: "0",
+  });
+  /** Crovax's upkeep trigger, asking whether to sacrifice. */
+  const upkeep = () => {
+    const { s: s0, ap } = setup([]);
+    const id = putOnBattlefield(s0, ap, crovax);
+    s0.objects[id]!.counters["+1/+1"] = 4;
+    invalidateCharacteristics(s0);
+    const s = passToPending(passUntil(passUntil(s0, "upkeep", nextOf(s0, ap)), "upkeep", ap));
+    return { s, ap, id };
+  };
+
+  it("declining removes a counter", () => {
+    supported(crovax);
+    const { s: s0, ap, id } = upkeep();
+    expect(s0.pending?.kind).toBe("chooseMay");
+    const s = passToPending(act(s0, { type: "chooseMay", player: ap, yes: false }));
+    expect(s.objects[id]!.counters["+1/+1"]).toBe(3);
+  });
+
+  it("sacrificing a creature adds one", () => {
+    const { s: s0, ap, id } = upkeep();
+    const other = putOnBattlefield(s0, ap, bear());
+    let s = act(s0, { type: "chooseMay", player: ap, yes: true });
+    expect(s.pending?.kind === "pickPermanents" && s.pending.options).toContain(other);
+    s = act(s, { type: "pickPermanents", player: ap, ids: [other] });
+    s = passToPending(s);
+    expect(s.objects[other]!.zone).toBe("graveyard");
+    expect(s.objects[id]!.counters["+1/+1"]).toBe(5);
   });
 });

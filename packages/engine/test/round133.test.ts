@@ -323,3 +323,43 @@ describe("Jeweled Amulet: the type of mana spent on its first ability, added by 
     expect(manaOptions(s0, s0.objects[id]!).every((x) => x.adds.length === 0)).toBe(true);
   });
 });
+
+const clavileno = card("Clavileño, First of the Blessed", "Legendary Creature — Vampire Cleric", "{1}{W}{B}", { power: "2", toughness: "2", oracleText: "Whenever you attack, target attacking Vampire that isn't a Demon becomes a Demon in addition to its other types. It gains \"When this creature dies, draw a card and create a tapped 4/3 white and black Vampire Demon creature token with flying.\"" });
+
+describe("Clavileño, First of the Blessed: an attacking Vampire becomes a Demon with a dies trigger, for good", () => {
+  it("the Vampire becomes a Demon and, when it dies, its controller draws and gets a tapped 4/3 flier", () => {
+    supported(clavileno);
+    const vamp = card("Test Vampire", "Creature — Vampire", "{1}{B}", { power: "2", toughness: "2" });
+    const murder = card("Murder", "Instant", "{1}{B}{B}", { oracleText: "Destroy target creature." });
+    const { s: s0, ap, ids, opp } = setup([murder]);
+    putOnBattlefield(s0, ap, clavileno);
+    const v = putOnBattlefield(s0, ap, vamp);
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: v, defender: opp }] });
+    if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [target(v)] } as Action);
+    s = passToPending(s);
+    expect(characteristics(s, s.objects[v]!).subtypes).toEqual(expect.arrayContaining(["Vampire", "Demon"]));
+    // Still a Demon after the turn: no duration.
+    s = passUntil(s, "upkeep", nextOf(s, ap));
+    expect(characteristics(s, s.objects[v]!).subtypes).toContain("Demon");
+    s = passUntil(s, "main1", ap, 4000);
+    const hand = s.players[ap]!.hand.length;
+    s = passToPending(run(s, planCast(s, ap, ids[0]!, [target(v)])));
+    expect(s.objects[v]!.zone).toBe("graveyard");
+    expect(s.players[ap]!.hand.length).toBe(hand); // Murder left, a card drawn
+    const token = s.battlefield.map((id) => s.objects[id]!).find((o) => o.isToken && controllerOf(s, o) === ap);
+    expect(token && characteristics(s, token).subtypes).toEqual(["Vampire", "Demon"]);
+    expect(token?.tapped).toBe(true);
+  });
+
+  it("a Vampire that's already a Demon can't be targeted", () => {
+    const demon = card("Test Vampire Demon", "Creature — Vampire Demon", "{1}{B}", { power: "2", toughness: "2" });
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, clavileno);
+    const v = putOnBattlefield(s0, ap, demon);
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = passToPending(act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: v, defender: opp }] }));
+    expect(s.pending).toBeNull();
+    expect(s.stack.length).toBe(0);
+  });
+});

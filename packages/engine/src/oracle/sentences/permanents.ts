@@ -800,6 +800,13 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // "~ becomes a Kithkin Spirit with base power and toughness 2/2" (Figure of Destiny), '~ gains "Whenever ~ deals combat
   // damage to a player, draw a card."' (Ascendant Spirit): no duration, so for as long as it stays on the battlefield
   // (CR 611.2a; a new object after a zone change, CR 400.7). New creature types replace its others (rulings).
+  // Clavileño: 'It gains "When this creature dies, ..."' about a target: no duration, so for as long as it stays on the
+  // battlefield (CR 611.2a), even if it stops being what it was targeted as.
+  if ((m = /^([Tt]arget .+?|It) gains ("[^"]+")$/.exec(s))) {
+    const what = parseObject(m[1]!.replace(/^It$/, "it"), ctx);
+    const grant = what?.ref === "target" && !what.n ? parseGrants(m[2]!) : null;
+    if (what && grant?.length && grant.every((x) => x.kind === "addAbility")) return [{ type: "continuous", what, mods: grant, duration: "game" }];
+  }
   if ((m = /^~ ((?:becomes?|gains?) .+)$/.exec(s)) && !ctx.spell) {
     const what = parseObject("~", ctx);
     const mods = what?.ref === "self" ? parseChanges(m[1]!) : null;

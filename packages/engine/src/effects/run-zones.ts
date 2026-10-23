@@ -2388,6 +2388,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         if (o.zone === "exile" && !o.isToken) o.mayPlay = { player: o.owner, zc: o.zoneChanges ?? 0, until: "warp", turn: s.turn };
       }
       return;
+    case "castLinkedFree": {
+      // Court of Locthwain: one spell from among the cards its own exile took (CR 607.2a), for the rest of this turn.
+      if (!ctx.sourceId) return;
+      (s.linkedFreeCasts ??= []).push({ player: ctx.controller, source: `${ctx.sourceId}@${ctx.sourceZc ?? 0}`, turn: s.turn, sourceName: src });
+      log(s, `${player(s, ctx.controller).name} may cast a spell from among the cards exiled with ${src} this turn without paying its mana cost.`);
+      return;
+    }
     case "impulse": {
       // Exiled face up (CR 406.3); the permission belongs to this object only (CR 400.7).
       const p = player(s, ctx.controller);

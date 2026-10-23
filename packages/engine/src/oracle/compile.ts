@@ -1672,7 +1672,7 @@ export function compile(d: CardDef): CompiledCard {
       out.extraVote = extraVote[1]!.startsWith("get") ? "get" : "may";
       continue;
     }
-    const faceUpCounters = new RegExp(`^As ~ is turned face up, put (${NUM}) ${COUNTER} counters? on it\\.$`).exec(line);
+    const faceUpCounters = new RegExp(`^As ~ is turned face up, put ${NUM} ${COUNTER} counters? on it\\.$`).exec(line);
     if (faceUpCounters && !out.faceUpCounters) {
       out.faceUpCounters = { counter: counterKind(faceUpCounters[2]!), n: num(faceUpCounters[1]!) };
       continue;
@@ -2967,13 +2967,16 @@ function linkExile(out: CompiledCard) {
     else exiles[0]!.linked = true;
   }
   // Valakut Exploration: "cards exiled with ~" are the ones its one impulse exiled (CR 607.2a).
-  const usesLinked = (b: AbilityBody) => allEffects(b.effects).some((e) => e.type === "moveLinked") || JSON.stringify(b).includes('"linkedExiled"');
+  // Court of Locthwain: "cast a spell from among cards exiled with ~" too.
+  const usesLinked = (b: AbilityBody) => allEffects(b.effects).some((e) => e.type === "moveLinked" || e.type === "castLinkedFree") || JSON.stringify(b).includes('"linkedExiled"');
   const impulses = bodies.flatMap((b) => allEffects(b.effects)).filter((e): e is Extract<Effect, { type: "impulse" }> => e.type === "impulse");
   if (impulses.length && (bodies.some(usesLinked) || out.triggers.some((t) => JSON.stringify(t.ifCond ?? null).includes('"linkedExiled"')))) {
     const others = bodies.flatMap((b) => allEffects(b.effects)).some((e) => e.type === "exile" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
     if (others || impulses.length !== 1) out.unsupported.push("(refers to cards exiled with it that it can't link to one exile ability)");
     else impulses[0]!.linked = true;
   }
+  // "Cast a spell from among cards exiled with ~" with no one impulse to link it to (Idol of Endurance's exile until it leaves).
+  if (!impulses.length && bodies.some((b) => allEffects(b.effects).some((e) => e.type === "castLinkedFree"))) out.unsupported.push("(casts a card exiled with it that it can't link to one exile ability)");
   // Currency Converter: "Whenever you discard a card, you may exile that card from your graveyard" and "Put a card exiled
   // with ~ into its owner's graveyard": the cards its one exile instruction exiled (CR 607.2a).
   if (!impulses.length && bodies.some((b) => allEffects(b.effects).some((e) => e.type === "moveLinked"))) {

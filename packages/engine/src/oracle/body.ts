@@ -1905,6 +1905,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         continue;
       }
     }
+    // Court of Locthwain: "exile the top card of target opponent's library. You may play that card for as long as it
+    // remains exiled, and mana of any type can be spent to cast it." Face up (CR 406.3), a land played as your land play,
+    // mana of any type for a spell (CR 609.4b), for as long as it stays exiled (CR 400.7).
+    if (!exTop && !impulseIf && /^[Ee]xile the top card of target opponent's library$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "You may play that card for as long as it remains exiled, and mana of any type can be spent to cast it") {
+      const who = parsePlayer("target opponent", ctx);
+      if (!who) return null;
+      effects.push({ type: "impulse", n: 1, until: "exiled", who, anyType: true });
+      ctx.exiledTop = true;
+      si++;
+      continue;
+    }
     // Cunning Rhetoric: "exile the top card of that player's library. You may play that card for as long as it remains
     // exiled, and you may spend mana as though it were mana of any color to cast it." Face up (CR 406.3), a land played
     // as your land play (rulings), mana of any type for a spell (CR 609.4b).

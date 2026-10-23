@@ -38,6 +38,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // without being countered, so even a spell that can't be countered goes (rulings).
   if (/^(?:Then )?[Rr]eturn (?:it|that spell) to its owner's hand$/.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "spell")
     return ctx.targets[ctx.lastObjectTarget]!.stackAbilities ? null : [{ type: "counterSpell", index: ctx.lastObjectTarget, bounce: true }];
+  // Court of Locthwain: "until end of turn, you may cast a spell from among cards exiled with ~ without paying its mana
+  // cost": one spell, from the cards its linked exile took (compile.ts links it, CR 607.2a).
+  if (/^[Uu]ntil end of turn, you may cast a spell from among cards exiled with ~ without paying its mana cost$/.test(s)) return [{ type: "castLinkedFree" }];
   // Emry: "Choose target artifact card in your graveyard. You may cast that card this turn."
   // The one target so far is that card, in your graveyard.
   if (/^You may cast (?:that card|it) this turn$/.test(s) && ctx.targets.length === 1) {

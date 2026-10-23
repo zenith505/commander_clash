@@ -831,6 +831,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "soulbond":
     case "ninjutsu":
     case "impulse":
+    case "castLinkedFree":
     case "madness":
     case "miracle":
     case "castFromHand":

@@ -1475,6 +1475,11 @@ export interface GameState {
   /** "Your opponents can't cast spells this turn" (Silence): who can't cast what, until that turn ends (CR 101.2). */
   /** The "one of those cards" groups (GameObject.mayPlay.oneOf) a card of which has been played: the rest can't be. */
   oneOfUsed?: string[];
+  /**
+   * Court of Locthwain's "until end of turn, you may cast a spell from among cards exiled with ~ without paying its mana
+   * cost": one each, for `player`, from the cards linked to `source` ("id@zc", GameState.linkedExile), this turn only.
+   */
+  linkedFreeCasts?: { player: PlayerId; source: string; turn: number; sourceName: string }[];
   /** The nonland card types of each card cast with a "for each nonland card type" permission (GameObject.mayPlay.byType), by group. */
   byTypeCast?: Record<string, string[][]>;
   cantCastThisTurn?: { player: PlayerId; turn: number; filter?: TargetSpec; source: string; /** Until the end of this player's next turn (Single Combat), kept past this turn's cleanup. */ untilEndOfTurnOf?: PlayerId; /** Until this player's next turn begins (Hope of Ghirapur). */ untilTurnOf?: PlayerId }[];

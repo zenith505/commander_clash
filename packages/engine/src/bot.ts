@@ -63,6 +63,7 @@ import {
   evidenceProblem,
   altCostsFor,
   payZeroSource,
+  linkedFreeGrant,
   commanderTax,
   legendBotKeep,
   unlockCost,
@@ -777,7 +778,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       })
       .filter((x): x is { plan: Action[]; mv: number } => !!x)
       .sort((a, b) => b.mv - a.mv);
-    const expiring = options.find((x) => x.plan.some((a) => a.type === "castSpell" && obj(s, a.objectId).zone === "exile" && /Turn$|EndStep$/.test(obj(s, a.objectId).mayPlay?.until ?? "")));
+    // Court of Locthwain's free spell is for this turn only too.
+    const expiring = options.find((x) => x.plan.some((a) => a.type === "castSpell" && obj(s, a.objectId).zone === "exile" && (a.alt === "linkedFree" || /Turn$|EndStep$/.test(obj(s, a.objectId).mayPlay?.until ?? ""))));
     if (expiring) return expiring.plan;
     if (options[0]) return options[0].plan;
     // Food Chain, Ashnod's Altar: a creature given up for mana, to cast a card that does more.
@@ -1683,6 +1685,11 @@ function freeAltPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
   // Omniscience: every spell from our hand for nothing.
   if (o.zone === "hand" && altCost(defOf(s, o), "omniscience", s, pid)) {
     const plan = castPlan(s, pid, id, false, undefined, "omniscience");
+    if (plan) return plan;
+  }
+  // Court of Locthwain: a card exiled with it, for nothing.
+  if (linkedFreeGrant(s, o, pid) >= 0) {
+    const plan = castPlan(s, pid, id, false, undefined, "linkedFree");
     if (plan) return plan;
   }
   // As Foretold, Rooftop Storm: {0} rather than the mana cost (a commander's tax is still paid).

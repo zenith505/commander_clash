@@ -712,6 +712,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         const n = Math.min(had, e.n === "all" ? had : amountNow(s, e.n, ctx));
         if (n <= 0) continue;
         o.counters[e.counter] = had - n;
+        // "For each charge counter removed this way" (Coalition Relic).
+        if (s.resolving) s.resolving.countersRemoved = (s.resolving.countersRemoved ?? 0) + n;
         invalidateCharacteristics(s);
         log(s, `${characteristics(s, o).name} loses ${n} ${e.counter} counter${n > 1 ? "s" : ""}.`);
         if (had === n) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: e.counter });
@@ -1198,31 +1200,38 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       return;
     }
     case "attachToChosen": {
-      const me = objects(s, e.source, ctx).find((o) => o.zone === "battlefield");
-      if (!me) return;
-      const ch = characteristics(s, me);
-      if (e.equipmentOnly && !ch.subtypes.includes("Equipment")) return;
       const sc = (s.resolving!.scratch ??= {});
       const hosts = (sc.auraHosts ??= {});
-      if (hosts[me.id] === undefined) {
-        // The biggest creature first: what a bot picks.
-        const options = s.battlefield
-          .filter((id) => objectMatches(s, e.filter, obj(s, id), ctx.controller, false) && canAttachTo(s, me, obj(s, id)))
-          .sort((a, b) => power(s, obj(s, b)) - power(s, obj(s, a)));
-        if (!options.length) return;
-        if (options.length > 1 || e.may) {
-          sc.auraAsking = me.id;
-          const choices = [...options, ...(e.may ? ["none"] : [])];
-          const labels = choices.map((id) => (id === "none" ? "Don't attach it" : `${defOf(s, obj(s, id)).name}${controllerOf(s, obj(s, id)) === ctx.controller ? "" : ` (${player(s, controllerOf(s, obj(s, id))).name})`}`));
-          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "enchant", options: choices, labels, prompt: `choose ${e.filter.text.replace(/^an? /, "a ")} to attach ${defOf(s, me).name} to${e.may ? ", or none" : ""}` };
-          return "paused";
+      // "For each Aura and Equipment you control" (Inventory Management): each of those there as it resolves, one at a
+      // time, each attached as its creature is chosen.
+      const each = e.source.ref === "each";
+      const all = each ? (sc.attachEach ??= objects(s, e.source, ctx).filter((o) => o.zone === "battlefield").map((o) => o.id)) : objects(s, e.source, ctx).filter((o) => o.zone === "battlefield").slice(0, 1).map((o) => o.id);
+      for (const id of all) {
+        const me = s.objects[id];
+        if (!me || me.zone !== "battlefield" || hosts[id] === "done") continue;
+        const ch = characteristics(s, me);
+        if (e.equipmentOnly && !ch.subtypes.includes("Equipment")) continue;
+        if (hosts[me.id] === undefined) {
+          // The biggest creature first: what a bot picks. Not the one it's already attached to (CR 701.3b: nothing would happen).
+          const options = s.battlefield
+            .filter((x) => objectMatches(s, e.filter, obj(s, x), ctx.controller, false) && canAttachTo(s, me, obj(s, x)) && (!each || me.attachedTo !== x))
+            .sort((a, b) => power(s, obj(s, b)) - power(s, obj(s, a)));
+          if (!options.length) continue;
+          if (options.length > 1 || e.may) {
+            sc.auraAsking = me.id;
+            const choices = [...options, ...(e.may ? ["none"] : [])];
+            const labels = choices.map((x) => (x === "none" ? (each && me.attachedTo ? "Leave it where it is" : "Don't attach it") : `${defOf(s, obj(s, x)).name}${controllerOf(s, obj(s, x)) === ctx.controller ? "" : ` (${player(s, controllerOf(s, obj(s, x))).name})`}`));
+            s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "enchant", options: choices, labels, prompt: `choose ${e.filter.text.replace(/^an? /, "a ")} to attach ${defOf(s, me).name} to${e.may ? ", or none" : ""}` };
+            return "paused";
+          }
+          hosts[me.id] = options[0]!;
         }
-        hosts[me.id] = options[0]!;
-      }
-      const host = s.objects[hosts[me.id]!];
-      if (host && canAttachTo(s, me, host)) {
-        attachTo(s, me, host);
-        log(s, `${defOf(s, me).name} is attached to ${defOf(s, host).name}.`);
+        const host = s.objects[hosts[me.id]!];
+        if (host && canAttachTo(s, me, host)) {
+          attachTo(s, me, host);
+          log(s, `${defOf(s, me).name} is attached to ${defOf(s, host).name}.`);
+        }
+        if (each) hosts[me.id] = "done";
       }
       return;
     }

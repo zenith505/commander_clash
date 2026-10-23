@@ -186,6 +186,32 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       for (const inner of e.options[sc.either] ?? []) if (runEffect(s, inner, ctx) === "paused") return "paused";
       return;
     }
+    case "villainous": {
+      // CR 701.55: each player facing it in APNAP order chooses an option, and all of it is done before the next one
+      // chooses (701.55d); an option that can't be done is still a choice, done as far as it can be (701.55b). Each run
+      // starts with what the one before it chose and found forgotten.
+      const sc = (s.resolving!.scratch ??= {});
+      const st = (sc.villain ??= { queue: apnap(s, players(s, e.who, ctx)), keep: [...Object.keys(sc), "villain"] });
+      while (st.queue.length) {
+        const pid = st.queue[0]!;
+        if (st.pick === undefined) {
+          if (player(s, pid).lost) {
+            st.queue.shift();
+            continue;
+          }
+          s.pending = { kind: "chooseOption", player: pid, source: src, what: "villainous", options: ["0", "1"], labels: [...e.labels], prompt: "you face a villainous choice" };
+          return "paused";
+        }
+        const sub: ResolveCtx = { ...ctx, event: { ...ctx.event, player: pid }, eachOne: pid };
+        const fx = e.options[st.pick] ?? [];
+        for (st.step ??= 0; st.step < fx.length; st.step++) if (runEffect(s, fx[st.step]!, sub) === "paused") return "paused";
+        for (const k of Object.keys(sc) as (keyof typeof sc)[]) if (!st.keep.includes(k)) delete sc[k];
+        st.pick = st.step = undefined;
+        st.queue.shift();
+      }
+      sc.villain = undefined;
+      return;
+    }
     case "eachMay": {
       // Each player decides in APNAP order, seeing the earlier answers (CR 101.4); then it happens to those who chose to.
       const sc = (s.resolving!.scratch ??= {});

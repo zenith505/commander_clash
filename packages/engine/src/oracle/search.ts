@@ -23,8 +23,9 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
   const m = /^Search your library for (up to )?(a|an|one|two|three|four|five|six|seven|eight|nine|ten|X|any number of) (.+?)(?:, reveal (?:it|them|that card|those cards))?(?:,| and) ((?:put|then) .+)$/i.exec(s);
   if (!m) return null;
   const upTo = !!m[1] || m[2] === "any number of";
-  // "Up to X basic land cards" (New Frontiers): the X it was cast with.
-  if (m[2] === "X" && !m[1]) return null;
+  // "Up to X basic land cards" (New Frontiers): the X it was cast with. "X cards" (Insidious Dreams) too: as many as
+  // there are, up to X (CR 701.23d).
+  if (m[2] === "X" && !m[1] && !/^cards$/.test(m[3]!)) return null;
   const n = m[2] === "any number of" ? 99 : m[2] === "X" ? X : NUMBER_WORDS[m[2]!.toLowerCase()]!;
   const reveal = /, reveal /.test(s);
   const rest = m[4]!;
@@ -80,7 +81,7 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
   if ((r = new RegExp(`^put ${SEARCH_PRONOUN} ${SEARCH_DEST}, then shuffle$`, "i").exec(rest))) return [{ ...base, dest: searchDest(r[1]!) }];
   // "Put that card onto the battlefield attached to ~" (Light-Paws): an Aura, if it could enchant the source (rulings).
   if (filter?.subtypes?.length === 1 && filter.subtypes[0] === "Aura" && n === 1 && new RegExp(`^put ${SEARCH_PRONOUN} onto the battlefield attached to ~, then shuffle$`).test(rest)) return [{ ...base, dest: { zone: "battlefield", attachToSelf: true } }];
-  if ((r = new RegExp(`^put one ${SEARCH_DEST} and the other ${SEARCH_DEST}, then shuffle$`, "i").exec(rest)) && n === 2)
+  if ((r = new RegExp(`^put one ${SEARCH_DEST} and the (?:other|rest) ${SEARCH_DEST}, then shuffle$`, "i").exec(rest)) && n === 2)
     return [{ ...base, dest: searchDest(r[1]!), others: searchDest(r[2]!) }];
   // The shuffle and putting the card on top are one action (rulings).
   if (/^then shuffle and put (?:that card|the card|it) on top(?: of your library)?$/i.test(rest) && n === 1) return [{ ...base, dest: { zone: "libraryTop" } }];

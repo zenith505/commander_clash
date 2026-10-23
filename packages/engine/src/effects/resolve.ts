@@ -462,6 +462,8 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     }
     case "eventPlayer":
       return ctx.event?.player !== undefined && !player(s, ctx.event.player).lost ? [ctx.event.player] : [];
+    case "eventPlayers":
+      return s.turnOrder.filter((p) => ctx.event?.players?.includes(p) && !player(s, p).lost);
     case "attackingPlayer":
       return ctx.event?.attacker !== undefined && !player(s, ctx.event.attacker).lost ? [ctx.event.attacker] : [];
     case "otherOpponents":
@@ -951,6 +953,8 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "revealUntilLandToGraveyard":
     case "exileUntilTotalMv":
     case "exileTop":
+    case "putFromExiledTop":
+    case "returnDiedThisWay":
     case "revealTopToHand":
     case "duelReveal":
     case "revealTop":
@@ -1001,6 +1005,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "repeatIf":
     case "rollAgain":
     case "either":
+    case "villainous":
     case "eachMay":
     case "punisher":
     case "cumulativeUpkeep":

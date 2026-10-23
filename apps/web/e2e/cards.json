@@ -6488,6 +6488,36 @@
   ]
  },
  {
+  "oracleId": "b20eae3d-d0ff-42c3-a060-d06629506781",
+  "name": "Inventory Management",
+  "manaCost": "{R}{W}",
+  "cmc": 2,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "Split second (As long as this spell is on the stack, players can't cast spells or activate abilities that aren't mana abilities.)\nFor each Aura and Equipment you control, you may attach it to a creature you control.",
+  "colors": [
+   "R",
+   "W"
+  ],
+  "colorIdentity": [
+   "R",
+   "W"
+  ],
+  "keywords": [
+   "Split second"
+  ],
+  "commanderLegal": "legal",
+  "set": "pip",
+  "releasedAt": "2024-03-08",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9264c198-76c7-4ac0-9334-37c691de1b54",
   "name": "Invigorate",
   "manaCost": "{2}{G}",
@@ -8977,6 +9007,32 @@
   "set": "clb",
   "releasedAt": "2022-06-10",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "b48a149c-aead-43b2-a99e-c964d6d28aa0",
+  "name": "Necromantic Selection",
+  "manaCost": "{4}{B}{B}{B}",
+  "cmc": 7,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Destroy all creatures, then return a creature card put into a graveyard this way to the battlefield under your control. It's a black Zombie in addition to its other colors and types. Exile Necromantic Selection.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c14",
+  "releasedAt": "2014-11-07",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -12610,6 +12666,43 @@
   "commanderLegal": "legal",
   "set": "dsc",
   "releasedAt": "2024-09-27",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "07799012-7051-400e-adde-b54b41b80c70",
+  "name": "The Dalek Emperor",
+  "manaCost": "{5}{B}{R}",
+  "cmc": 7,
+  "typeLine": "Legendary Artifact Creature — Dalek",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Dalek"
+  ],
+  "oracleText": "Affinity for Daleks (This spell costs {1} less to cast for each Dalek you control.)\nOther Daleks you control have haste.\nAt the beginning of combat on your turn, each opponent faces a villainous choice — That player sacrifices a creature of their choice, or you create a 3/3 black Dalek artifact creature token with menace.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [
+   "Affinity"
+  ],
+  "commanderLegal": "legal",
+  "set": "who",
+  "releasedAt": "2023-10-13",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false

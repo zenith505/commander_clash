@@ -955,6 +955,8 @@ export function moveObject(
   if (merged) o.movedWith = scatterMerged(s, merged.parts.filter((x) => x !== id), partsTo, !!opts.top);
   // Into its owner's library, its owner arranges its cards there (CR 730.3a).
   if (merged && partsTo === "library") noteMergedToLibrary(s, o.owner, [{ id, zc: o.zoneChanges ?? 0 }, ...o.movedWith!], !opts.top);
+  // A countered Serra Paragon spell doesn't keep the ability for later (CR 400.7).
+  if (to !== "battlefield" && to !== "stack") o.entersGaining = undefined;
   if (to === "battlefield") {
     const printed = compileCard(defOf(s, o));
     // A spell that will "enter with an additional +1/+1 counter" (Boreal Outrider) as it resolves.
@@ -964,6 +966,9 @@ export function moveObject(
     // "It gains haste until end of turn" while it was a spell (Tyvar Kell's emblem): the permanent it becomes has it (CR 400.7a).
     for (const g of fromZone === "stack" ? (o.spellGains ?? []) : []) s.effects.push({ id: `e${s.nextId++}`, timestamp: g.timestamp, controller: g.controller, sourceName: g.source, duration: g.forever ? "game" : "endOfTurn", affected: [o.id], mods: g.mods });
     o.spellGains = undefined;
+    // Serra Paragon: "If you do, it gains '...'": the permanent the land or spell becomes has the ability for good.
+    if (o.entersGaining && (fromZone === "stack" || fromZone === "graveyard")) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: o.controller, sourceName: "Serra Paragon", duration: "game", affected: [o.id], mods: [{ kind: "addAbility", text: o.entersGaining }] });
+    o.entersGaining = undefined;
     const how: EnterOpts = { ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(opts.countersIfCreature ? { countersIfCreature: opts.countersIfCreature } : {}), ...(opts.countersIfPlaneswalker ? { countersIfPlaneswalker: opts.countersIfPlaneswalker } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
     // "You may have ~ enter as a copy of ...": it becomes the copy as it enters (CR 707.5), so how it
     // enters and what it triggers wait for that choice.
@@ -3295,8 +3300,10 @@ function landPermit(s: GameState, pid: PlayerId): string | undefined {
   const used = s.turnLog?.gravePermits ?? [];
   for (const id of s.battlefield) {
     const p = obj(s, id);
-    if (controllerOf(s, p) !== pid || !abilitiesOf(s, p).landFromGraveyardOnce) continue;
-    const key = `${p.id}@${p.zoneChanges ?? 0}:Land`;
+    const once = controllerOf(s, p) === pid ? abilitiesOf(s, p).landFromGraveyardOnce : undefined;
+    if (!once) continue;
+    // Serra Paragon: the one use it shares with its spell permission.
+    const key = `${p.id}@${p.zoneChanges ?? 0}:${once === "shared" ? "" : "Land"}`;
     if (!used.includes(key)) return key;
   }
   return undefined;
@@ -3448,7 +3455,13 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
     log(s, `${p.name} reveals ${nameOf(s, shown)} so ${d.name} enters untapped.`);
   }
   // Muldrotha's land from the graveyard is used up, unless something lets every land be played from there (Crucible).
-  if (o.zone === "graveyard" && !landsFromGraveyardNow(s, p.id)) ((s.turnLog ??= {}).gravePermits ??= []).push(landPermit(s, p.id)!);
+  if (o.zone === "graveyard" && !landsFromGraveyardNow(s, p.id)) {
+    const permit = landPermit(s, p.id)!;
+    ((s.turnLog ??= {}).gravePermits ??= []).push(permit);
+    // Serra Paragon: "it gains ..." as the land it becomes.
+    const gains = permitGains(s, permit);
+    if (gains) o.entersGaining = gains;
+  }
   const fromZone = o.zone;
   const from = o.zone === "exile" || o.zone === "graveyard" || o.zone === "library" ? ` from ${o.zone === "exile" ? "exile" : o.zone === "library" ? "their library" : "their graveyard"}` : "";
   // Under the control of the player who plays it (CR 305.1, 110.2), an opponent's card from exile too (Opposition Agent).
@@ -4540,6 +4553,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     ((s.turnLog ??= {}).gravePermits ??= []).push(permit);
     log(s, `${p.name} uses ${permitLabel(s, permit)} to cast it from their graveyard.`);
     choices = { ...choices, permit }; // its costs are paid below
+    const gains = permitGains(s, permit);
+    if (gains) o.entersGaining = gains;
   }
   // "Once each turn, you may pay {0} ..." (As Foretold): that permanent's permission is used up for this turn.
   if (choices.alt === "payZero") {
@@ -4884,6 +4899,12 @@ export function pickPermit(s: GameState, o: GameObject, permits: string[], chose
  * costs" (CR 601.2f-h).
  */
 /** Whether a once-each-turn permission exiles the spell instead of putting it into a graveyard (Maestros Ascendancy). */
+/** Serra Paragon: the ability a land or spell played with this once-each-turn permission gains ("If you do, it gains ..."). */
+function permitGains(s: GameState, key: string): string | undefined {
+  const src = s.objects[key.split("@")[0]!];
+  return src ? abilitiesOf(s, src).graveyardGrants?.find((g) => g.once && g.gains)?.gains : undefined;
+}
+
 function permitExiles(s: GameState, key: string): boolean {
   const src = s.objects[key.split("@")[0]!];
   return !!(src && abilitiesOf(s, src).graveyardGrants?.find((g) => g.once)?.way.exile);
@@ -6647,6 +6668,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     if (!pend.options.includes(choice)) throw new RulesError("choose one of the kinds of counter it has");
     (r.scratch ??= {}).counterKind = choice;
     if (choice !== "done") log(s, `${p.name} chooses a ${choice} counter to remove (${pend.source}).`);
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "villainous") {
+    const v = r.scratch?.villain;
+    if (!v || !pend.options.includes(choice)) throw new RulesError("choose one of the two options");
+    v.pick = Number(choice);
+    log(s, `${p.name} faces a villainous choice and chooses: ${(pend.labels?.[v.pick] ?? choice).replace(/^[A-Z](?=[a-z])/, (c) => c.toLowerCase())} (${pend.source}).`);
     continueResolution(s);
     return;
   }

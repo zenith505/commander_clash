@@ -520,6 +520,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Party Thrasher: the exiled card we'd rather play this turn, a land while we still have a land play, else the
     // costliest spell we can pay for, else the cheapest.
+    // Lord of the Void: the costliest card to put onto the battlefield.
+    if (pend.kind === "chooseOption" && pend.what === "impulseChoice" && /onto the battlefield/.test(pend.prompt ?? ""))
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => mv(s, b) - mv(s, a))[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "impulseChoice") {
       const p = player(s, pid);
       const land = pend.options.find((o) => isType(defOf(s, obj(s, o)), "Land"));
@@ -578,6 +581,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const t = s.resolving?.item.targets?.[0];
       const it = t?.kind === "object" ? s.objects[t.id] : undefined;
       return [{ type: "chooseOption", player: pid, choice: it && controllerOf(s, it) === pid ? "0" : "1" }];
+    }
+    // A villainous choice (CR 701.55): the option that costs us less, as roughly guessed.
+    if (pend.kind === "chooseOption" && pend.what === "villainous") {
+      const v = s.resolving ? allEffects(s.resolving.body.effects).find((e) => e.type === "villainous") : undefined;
+      const costs = v?.type === "villainous" ? v.options.map((fx) => villainCost(s, pid, fx)) : [0, 0];
+      return [{ type: "chooseOption", player: pid, choice: costs[1]! < costs[0]! ? "1" : "0" }];
     }
     if (pend.kind === "chooseOption" && pend.what === "either") {
       const i = pend.labels?.findIndex((l) => /Treasure/.test(l)) ?? -1;
@@ -828,6 +837,42 @@ function forageChoice(s: GameState, pid: PlayerId, o: GameObject, busy: ObjectId
 /** "End the turn" and nothing more (Time Stop, Discontinuity, Sundial of the Infinite). */
 function endsTurnOnly(body: AbilityBody): boolean {
   return !body.targets.length && !body.modal && body.effects.length > 0 && body.effects.every((e) => e.type === "endTurn");
+}
+
+/**
+ * What one option of a villainous choice we face would cost us, roughly, in life points: what we'd lose (life, cards,
+ * permanents) plus what its controller would gain (cards, tokens, a free spell). "eventPlayer" in it is us.
+ */
+function villainCost(s: GameState, pid: PlayerId, fx: Effect[]): number {
+  const me = player(s, pid);
+  const n = (a: unknown, guess: number) => (typeof a === "number" ? a : guess);
+  const us = (w: { ref: string } | undefined) => w?.ref === "eventPlayer";
+  return fx.reduce((sum, e) => {
+    switch (e.type) {
+      case "loseLife":
+        return sum + (us(e.who) ? n(e.n, 3) : 0);
+      case "damage": {
+        const to = e.to as { ref: string };
+        if (!us(to)) return sum + 1;
+        const c = typeof e.amount === "object" && "count" in e.amount ? e.amount.count : undefined;
+        return sum + (c?.kind === "cardsInHand" ? me.hand.length : c?.kind === "exiledTopManaValue" ? 8 : n(e.amount, 4));
+      }
+      case "pick":
+        return sum + (us(e.who) && e.action === "sacrifice" ? (s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && objectMatches(s, e.filter, obj(s, id), pid, false)) ? 5 : 0) : 2);
+      case "discard":
+        return sum + (us(e.who) ? Math.min(me.hand.length, e.hand ? me.hand.length : n(e.n, 1)) * 1.5 : 0);
+      case "draw":
+        return sum + (us(e.who) ? -1.5 * n(e.n, 1) : e.who.ref === "you" ? 1.5 * n(e.n, 1) : 0);
+      case "exileTop":
+        return sum + (us(e.who) ? 0.3 * n(e.n, 1) : 0);
+      case "exileUntilNonland":
+        return sum + 5;
+      case "createToken":
+        return sum + 3 * n(e.n, 1);
+      default:
+        return sum + 3;
+    }
+  }, 0);
 }
 
 /** castPlan may plan a spell that ends the turn (endTurnCast). */
@@ -1527,6 +1572,8 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
     const value = (x: string) => (obj(s, x).zone === "battlefield" ? characteristics(s, obj(s, x)).manaValue : mv(s, x));
     if (!mine.some((x) => value(x) > 0 && player(s, pid).life - value(x) > 4)) return null;
   }
+  // Doomsday exiles all but five cards of our library and graveyard: a combo piece bots have no plan for.
+  if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "search" && e.exileRest)) return null;
   // "End the turn" (CR 724.1): see endTurnCast.
   if (!endingTurn && allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "endTurn")) return null;
   // A foretold card is cast for its foretell cost (CR 702.143a).

@@ -434,6 +434,7 @@ export function compile(d: CardDef): CompiledCard {
   // "Choose three. You may choose the same mode more than once." (the Confluences, CR 700.2d).
   let repeat = false;
   let cipher = false;
+  let uncopyableSpell = false;
   const all = joinModes(
     normalizeSelf(d)
       // "As ~ enters, choose a creature type. ~ enters with a fellowship counter on it for each ..." (Banner of Kinship):
@@ -464,6 +465,14 @@ export function compile(d: CardDef): CompiledCard {
           return "Choose one —";
         }
         const m = /^Choose one\. If (~ was cast using teamwork, choose|you control a commander as you cast ~, you may choose) both instead\.$/.exec(l.trim());
+        // "If an opponent has eight or more cards in their graveyard" (See Double), "if you descended this turn" (Molten
+        // Collapse): about the caster as the spell is cast (CR 601.2b), like Flame of Anor's.
+        const other = !m && !control ? /^Choose one\. If (an opponent has .+ in their graveyard|you descended this turn), you may choose both instead\.$/.exec(l.trim()) : null;
+        if (other) {
+          both = "control";
+          bothIf = `?${other[1]}`;
+          return "Choose one —";
+        }
         if (!m) return l;
         both = m[1]!.startsWith("~") ? "teamwork" : "commander";
         return "Choose one —";
@@ -498,10 +507,16 @@ export function compile(d: CardDef): CompiledCard {
     // 714.2b) or a modal choice.
     // "10,000 Needles — " (Jumbo Cactuar) starts with a number.
     const word = !isSpell ? /^([A-Z][^—•":{}]*?|\d[\d,]* [A-Z][^—•":{}]*?) — (?![{+•])/.exec(line) : null;
-    if (word && !KEYWORD_WORDS.has(word[1]!.toLowerCase()) && !/^[IVX]+(?:, [IVX]+)*$/.test(word[1]!) && !/^(?:Choose\b|To solve$)/.test(word[1]!)) line = line.slice(word[0].length);
+    // "... faces a villainous choice — " (CR 701.55a) is the instruction itself.
+    if (word && !KEYWORD_WORDS.has(word[1]!.toLowerCase()) && !/^[IVX]+(?:, [IVX]+)*$/.test(word[1]!) && !/^(?:Choose\b|To solve$)/.test(word[1]!) && !/\bfaces? a villainous choice$/.test(word[1]!)) line = line.slice(word[0].length);
     // "Vivid — {T}: For each color among permanents you control, add ..." (Bloom Tender): an ability word too.
     else if (!isSpell && /^Vivid — \{/.test(line)) line = line.replace(/^Vivid — /, "");
     if (!line) continue;
+    // "~ can't be copied." (See Double): copy effects make no copy of this spell (CR 707.10).
+    if (isSpell && line === "~ can't be copied.") {
+      uncopyableSpell = true;
+      continue;
+    }
     // "~ has all activated abilities of ..." (CompiledCard.borrows).
     const borrow = /^(?:As long as ~ is on the battlefield, it|~) has all activated abilities of (.+?)( except mana abilities)?\.( You may spend mana as though it were mana of any color to activate those abilities\.)?$/.exec(line);
     // Conspicuous Snoop: "As long as the top card of your library is a Goblin card, ~ has all activated abilities of that
@@ -1346,6 +1361,20 @@ export function compile(d: CardDef): CompiledCard {
       }
       continue;
     }
+    // Serra Paragon: "Once during each of your turns, you may play a land from your graveyard or cast a permanent spell with
+    // mana value 3 or less from your graveyard. If you do, it gains ...": one use each turn for either (a land played or a
+    // spell cast), and the permanent it becomes has the quoted ability (as this object, CR 400.7).
+    const paragon = /^Once during each of your turns, you may play a land from your graveyard or cast a permanent spell with mana value (\d+) or less from your graveyard\. If you do, it gains "(When (?:this permanent|~) is put into a graveyard from the battlefield, exile it and you gain \d+ life\.)"$/.exec(line);
+    if (paragon) {
+      const filter = parseTargetPhrase("permanent card from a graveyard");
+      if (filter?.kind !== "card") out.unsupported.push(raw);
+      else {
+        const { owner: _, ...f } = filter;
+        (out.graveyardGrants ??= []).push({ filter: { ...f, text: "permanent cards" }, way: { kind: "turnPermission", costs: [], exile: false }, yourTurn: true, once: [""], maxMv: Number(paragon[1]), gains: paragon[2]!.replace(/^When ~ /, "When this permanent ") });
+        out.landFromGraveyardOnce = "shared";
+      }
+      continue;
+    }
     // "Once during each of your turns, you may cast a creature spell from your graveyard" (Karador, Gisa and Geralf): a
     // permission used once each turn (rulings: the spell's costs are paid, its timing rules followed). Muldrotha: "During
     // each of your turns, you may play a land and cast a permanent spell of each permanent type from your graveyard."
@@ -2151,6 +2180,12 @@ export function compile(d: CardDef): CompiledCard {
       // The cost half is read by the cost-change lines below.
       line = `Spells you cast with mana value ${thryx[1]} or greater ${thryx[2].replace(/ and $/, "")}.`;
     }
+    // Spider-Punk: "Spells and abilities can't be countered." (CR 101.2): any player's.
+    if (line === "Spells and abilities can't be countered.") {
+      (out.uncounterable ??= []).push({ filter: { kind: "spell", text: "spells" }, anyone: true });
+      out.abilitiesUncounterable = true;
+      continue;
+    }
     // "Creature spells you control can't be countered." "Creature spells can't be countered." (CR 101.2)
     const uncounterable = /^(.*?)[Ss]pells( you control)? can't be countered\.$/.exec(line);
     if (uncounterable && !/\b(this turn|by)\b/.test(line)) {
@@ -2674,8 +2709,8 @@ export function compile(d: CardDef): CompiledCard {
   } else if (both) {
     // Teamwork's "choose both" needs teamwork; either way, a list of exactly two modes.
     const modal = out.spell?.modal;
-    const cond = bothIf !== undefined ? parseStaticCondition(`you control ${bothIf}`, { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
-    const playerCond = cond?.kind === "control" && !cond.other && (cond.who ?? "you") === "you";
+    const cond = bothIf !== undefined ? parseStaticCondition(bothIf.startsWith("?") ? bothIf.slice(1) : `you control ${bothIf}`, { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
+    const playerCond = (cond?.kind === "control" && !cond.other && (cond.who ?? "you") === "you") || cond?.kind === "opponentGraveyard" || cond?.kind === "descended";
     if (both === "control" && modal && modal.min === 1 && modal.max === 1 && modal.modes.length >= 2 && playerCond) {
       modal.both = both;
       modal.bothIf = cond!;
@@ -2684,6 +2719,10 @@ export function compile(d: CardDef): CompiledCard {
       delete out.spell;
       out.unsupported.push("Choose one. If ... choose both instead.");
     }
+  }
+  if (uncopyableSpell) {
+    if (out.spell) out.spell.uncopyable = true;
+    else out.unsupported.push("~ can't be copied.");
   }
   if (cipher) {
     if (out.spell && !out.spell.modal) out.spell = { ...out.spell, effects: [...out.spell.effects, { type: "cipher" }] };

@@ -3,7 +3,7 @@
 import { parseBoundCount, parseCount, roundOf } from "../counts";
 import type { Effect, PlayerRef, TargetSpec } from "../../abilities";
 import type { SkipWhat } from "../../types";
-import { NUM, NUMX, amt, isGroup, isSeveral, num } from "../words";
+import { NUM, NUMX, X, amt, isGroup, isSeveral, num } from "../words";
 import { parseUnlessPays, addTarget } from "../body";
 import { parseDamageRecipient, parsePlayer, parseObject, parseTargetPhrase } from "../targets";
 import { parseSentence } from "../sentence";
@@ -357,11 +357,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Copying an ability on the stack (CR 707.10, 707.10c): Strionic Resonator's "Copy target triggered ability you control.
   // You may choose new targets for the copy." (the copy is controlled by you, its source the same, CR 113.7a).
-  if ((m = /^Copy target ((?:activated or )?triggered ability|activated ability) you control( from an? (colorless|artifact|creature|enchantment|land|planeswalker) source)?$/i.exec(s))) {
+  // Gogo, Master of Mimicry: "... you control X times", the X paid for the ability (CR 107.3a).
+  if ((m = /^Copy target ((?:activated or )?triggered ability|activated ability) you control( from an? (colorless|artifact|creature|enchantment|land|planeswalker) source)?( X times)?$/i.exec(s))) {
+    if (m[4] && (!ctx.activated || m[2])) return null;
     const from = m[3]?.toLowerCase();
     const abilityFrom = from === "colorless" ? { colorless: true as const } : from ? { types: [from[0]!.toUpperCase() + from.slice(1)] } : undefined;
     const spec: TargetSpec = { ...stackSpec(m[1]!), controller: "you", ...(abilityFrom ? { abilityFrom } : {}), text: `target ${m[1]!.toLowerCase()} you control${m[2] ?? ""}` };
-    return [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n: 1, newTargets: false }];
+    return [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n: m[4] ? X : 1, newTargets: false }];
   }
   // Return the Favor: "Copy target instant spell, sorcery spell, activated ability, or triggered ability": a spell or an
   // ability on the stack (CR 707.10, 115.1c-d).

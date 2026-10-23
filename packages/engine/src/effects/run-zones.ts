@@ -2393,7 +2393,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const p = player(s, ctx.controller);
       // "Exile the top card of each player's library" (Nashi): each library in turn, all part of one group.
       // "Exile the top card of each opponent's library" (Brainstealer Dragon, Stolen Strategy): the same, opponents only.
-      if (e.who?.ref === "eachPlayer" || e.who?.ref === "eachOpponent") {
+      // "Each of those opponents' libraries" (Breeches, Brazen Plunderer): the opponents dealt damage.
+      if (e.who?.ref === "eachPlayer" || e.who?.ref === "eachOpponent" || e.who?.ref === "eventPlayers") {
         const oneOf = e.oneOf ? `g${s.nextId++}` : undefined;
         const all: ObjectId[] = [];
         for (const pid of apnap(s, players(s, e.who, ctx))) {

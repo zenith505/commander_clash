@@ -23,6 +23,11 @@ function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId, targe
   if (!card) return;
   // A copy of a nonmodal double-faced spell's back face (cast transformed: disturb) has mana value 0 (CR 202.3b).
   const def = s.cards[cardIdOf(card)]!;
+  // "~ can't be copied" (See Double): no copy is made (CR 707.10).
+  if (compileCard(def).spell?.uncopyable) {
+    log(s, `${def.name} can't be copied.`);
+    return;
+  }
   const base = def.faceOf && def.faceOf.face > 0 && def.layout === "transform" ? s.cards[copyKey(s, def)]! : def;
   // "Except it isn't legendary" (Double Major): an exception to the copy's copiable values (CR 707.9b).
   const o = newObject(s, except ? s.cards[copyKey(s, base, except)]! : base, controller, "stack");
@@ -302,6 +307,12 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const id = e.spell === "self" ? r.item.id : typeof e.spell === "object" && "epic" in e.spell ? e.spell.epic : i < 0 ? ctx.cause : t?.kind === "stack" && ctx.legal[i] ? t.id : undefined;
         const orig = e.spell === "self" ? r.item : id ? (s.stack.find((x) => x.id === id) ?? s.castItems?.[id] ?? s.epics?.[id]) : undefined;
         if (!orig || (orig.kind !== "spell" && !(orig.kind === "ability" && orig.body))) return;
+        // "This ability can't be copied" (Gogo), "~ can't be copied" (See Double): no copy is made.
+        const origCard = orig.kind === "spell" && orig.objectId ? s.objects[orig.objectId] : undefined;
+        if (orig.body?.uncopyable || (origCard && compileCard(s.cards[cardIdOf(origCard)]!).spell?.uncopyable)) {
+          log(s, `${orig.description} can't be copied.`);
+          return;
+        }
         const n =
           e.n === "storm"
             ? (orig.castNth ?? 0)
@@ -746,6 +757,10 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
     }
     if (item.objectId) moveObject(s, item.objectId, instead === "exile" ? "exile" : "hand");
     log(s, instead === "exile" ? `${by} exiles ${what}.` : `${by} returns ${what} to its owner's hand.`);
+    return;
+  }
+  if (item.kind !== "spell" && s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).abilitiesUncounterable)) {
+    log(s, `${what} can't be countered.`); // CR 101.2 (Spider-Punk)
     return;
   }
   if (item.objectId && cantBeCountered(s, item)) {

@@ -683,6 +683,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (source?.ref !== "target" || source.n || !what || (what.ref === "target" && what.n) || !["self", "subject", "target"].includes(what.ref)) return null;
     return [{ type: "attach", what, source }];
   }
+  // Inventory Management: "For each Aura and Equipment you control, you may attach it to a creature you control": each in
+  // turn, to a creature chosen as it resolves (not targeted), or left where it is; only where it could legally be attached
+  // (rulings, CR 701.3a-b).
+  if (/^For each Aura and Equipment you control, you may attach it to a creature you control$/.test(s))
+    return [{ type: "attachToChosen", source: { ref: "each", filter: { kind: "object", subtypes: ["Aura", "Equipment"], controller: "you", text: "Aura or Equipment you control" } }, filter: { kind: "object", types: ["Creature"], controller: "you", text: "a creature you control" }, may: true }];
   // Ardenn: "attach any number of Auras and Equipment you control to target permanent or player": chosen as it resolves
   // (rulings), each that could be attached to it (CR 701.3a-b).
   if ((m = /^(?:you may )?attach any number of Auras and Equipment you control to (target permanent or player)$/i.exec(s)) && !ctx.spell) {

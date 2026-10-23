@@ -561,6 +561,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Add two mana in any combination of colors" (Manamorphose), "add X mana in any combination of colors" (Klauth, with
   // its "where X is ..."): the colors are chosen as it resolves (CR 106.1b, 608.2d).
   if ((m = new RegExp(`^[Aa]dd ${NUMX} mana in any combination of colors$`).exec(s))) return [{ type: "addMana", anyColors: true, times: amt(m[1]!) }];
+  // Coalition Relic: "Add one mana of any color for each charge counter removed this way": a color for each one.
+  if ((m = /^[Aa]dd one mana of any color for each [a-z]+ counter removed this way$/.exec(s))) return [{ type: "addMana", anyColors: true, times: { count: { kind: "countersRemovedThisWay" } } }];
   // Energy (CR 107.14): "You get {E}{E}", "you get X {E}", "you get an amount of {E} equal to ~'s power".
   if ((m = /^(?:[Yy]ou )?[Gg]et ((?:\{E\})+)$/.exec(s))) return [{ type: "getEnergy", who: { ref: "you" }, n: m[1]!.length / 3 }];
   if ((m = new RegExp(`^(?:[Yy]ou )?[Gg]et ${NUMX} \\{E\\}$`).exec(s))) return [{ type: "getEnergy", who: { ref: "you" }, n: amt(m[1]!) }];

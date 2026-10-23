@@ -23,7 +23,9 @@ const HISTORIC: TargetSpec[] = [{ kind: "object", types: ["Artifact"], text: "ar
 export function parseDamageRecipient(p: string, ctx: Ctx): DamageRecipient | null {
   // "The player or planeswalker it's attacking" in an attack trigger about the source (Myr Battlesphere, Fathom Fleet
   // Swordjack), or about the creature that attacked (Hellrider, Mage Slayer): not targeted (CR 506.2).
-  const attacked = /^the player or planeswalker (it's|~'s) attacking$/i.exec(p);
+  // Raid Bombardment: "the player or planeswalker that creature is attacking": the same, about the creature that attacked.
+  const attacked = /^the player or planeswalker (it's|it is|~'s|that creature is) attacking$/i.exec(p);
+  if (attacked && (attacked[1] === "that creature is" || attacked[1] === "it is")) return ctx.defending && (ctx.subject || ctx.subjectIt) ? { ref: "attackedBySelf", subject: true } : null;
   if (attacked) return !ctx.defending ? null : attacked[1] === "it's" && ctx.subjectIt ? { ref: "attackedBySelf", subject: true } : attacked[1] === "~'s" || !ctx.subject ? { ref: "attackedBySelf" } : null;
   if (/^any target$/i.test(p)) return { ref: "anyTarget", index: addTarget(ctx, { kind: "any", text: "any target" }) };
   // "target player or planeswalker", "target opponent or planeswalker" (Lava Axe): a player, or a planeswalker permanent.
@@ -944,6 +946,11 @@ export function parseTargetPhrase(
   if (!inGraveyard && / (?:you don't|an opponent) owns?$/.test(p)) {
     owner = "opponent";
     p = p.replace(/ (?:you don't|an opponent) owns?$/, "");
+  }
+  // "Target creature attacking you" (Lulu, Stern Guardian): attacking you, not your planeswalkers (CR 506.3, 508.1b).
+  if (!inGraveyard && !extra.combat && /^creature (?:that's )?attacking you$/.test(p)) {
+    extra.combat = "attackingYou";
+    p = "creature";
   }
   if (/ (an opponent controls|you don't control)$/.test(p)) {
     controller = "opponent";

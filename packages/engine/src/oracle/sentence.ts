@@ -2,7 +2,7 @@ import type { Amount, AmountExpr, Modification, Effect, PlayerRef } from "../abi
 import { CHOSEN_LAND_TYPE, CHOSEN_TYPE, CREATURE_TYPES } from "../keywords";
 import type { Color } from "../types";
 import { num, PT, ptAmt, COLOR_WORDS, TYPE_WORDS, WHEEL, COUNTER, counterKind, X, capital } from "./words";
-import { Ctx } from "./body";
+import { Ctx, parseBody } from "./body";
 import { parseSearchFilter } from "./search";
 import { parseCount } from "./counts";
 import { parseKeywordList, parseObject, parsePlayer } from "./targets";
@@ -47,6 +47,11 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       if (specs.some((f) => !f)) return null;
       const anyOf = specs as NonNullable<(typeof specs)[number]>[];
       Object.assign(dig, { count: 2, upTo: true, filter: { kind: "card", anyOf, text: `${m[1] ?? m[3]} and/or ${m[2] ?? m[4]}`.replace(/^an? /, "") }, oneOfEach: anyOf, into: "hand" });
+    } else if ((m = /^You may reveal any number of ([^,]+? cards) from among them and put (?:them|the revealed cards) into your hand$/.exec(s))) {
+      // "You may reveal any number of Rat cards from among them and put the revealed cards into your hand" (Karumonix).
+      const filter = parseSearchFilter(m[1]!.replace(/\bcards\b/, "card"));
+      if (!filter || / of the chosen /.test(m[1]!)) return null;
+      Object.assign(dig, { count: 99, upTo: true, filter, into: "hand", reveal: true });
     } else if ((m = /^You may (?:reveal (an? .+?) from among them and put it|put (an? .+?) from among them) into your hand$/.exec(s))) {
       // "A creature card of the chosen type" (Icon of Ancestry): the type chosen as the permanent entered (bindChosen).
       const phrase = (m[1] ?? m[2])!.replace(/^an? /, "");
@@ -125,6 +130,9 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   // (CR 102.3, 903.2). Not where another player is in play ("Whenever a player casts ..., each other player draws a card",
   // Zenith Chronicler: other than that player).
   if (/^[Ee]ach other player /.test(s) && !ctx.eventPlayer) s = s.replace(/^[Ee]ach other player /, "Each opponent ");
+  // CR 701.55a: "[A player] faces a villainous choice — [option A], or [option B]".
+  const villain = /^(.+?) faces? a villainous choice — (.+)$/.exec(s);
+  if (villain) return parseVillainous(villain[1]!, villain[2]!, ctx);
   if (WHEEL.test(s)) return parseSpellsSentence(s, ctx) ?? null;
   const tapped = /^(?:For as long as ~ remains tapped, (.+)|(.+?) for as long as (you control ~ and )?~ remains tapped)$/i.exec(s);
   if (tapped) return parseWhileTapped((tapped[1] ?? tapped[2])!, !!tapped[3], ctx);
@@ -185,6 +193,41 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   for (const parse of SENTENCE_PARSERS) {
     const r = parse(s, ctx);
     if (r !== undefined) return r;
+  }
+  return null;
+}
+
+/**
+ * A villainous choice (CR 701.55): the player (each of them in APNAP order, 701.55d) chooses one of the two options, then
+ * all of it is done (701.55a), as much as can be (701.55b). In the options the player facing it is "that player",
+ * "that opponent" or "they": the event player as each option runs (Effect villainous). Each option is one sentence that
+ * doesn't target; the text is split at the ", or " that leaves two options that are both understood.
+ */
+function parseVillainous(subject: string, rest: string, ctx: Ctx): Effect[] | null {
+  const facing = subject.replace(/^Then /, "").toLowerCase();
+  const who = facing === "each opponent" ? ({ ref: "eachOpponent" } as const) : facing === "target opponent" || facing === "that player" || facing === "defending player" ? parsePlayer(facing, ctx) : null;
+  if (!who || /\bvillainous\b/.test(rest)) return null;
+  const option = (text: string): Effect[] | null => {
+    const before = ctx.targets.length;
+    const t = capital(text.replace(/\b([Tt])hat opponent\b/g, "$1hat player"));
+    const sub: Ctx = { ...ctx, eventPlayer: true, chosenOpponent: false, lastPlayerTarget: undefined };
+    const fx = parseSentence(t, sub);
+    if (ctx.targets.length !== before) {
+      ctx.targets.length = before;
+      return null;
+    }
+    if (fx) return fx;
+    // Two instructions in one option ("they lose 2 life and you draw two cards"): read as a text of their own.
+    // "That player exiles the top four cards of their library and ~ deals damage ...": two instructions, in order.
+    const body = parseBody(`${t.replace(/ and (?=~ deals )/, ". ")}.`, { eventPlayer: true, ...(ctx.spell ? { spell: true } : {}) });
+    return body && !body.targets.length && !body.modal ? body.effects : null;
+  };
+  for (const m of rest.matchAll(/, or /g)) {
+    const a = rest.slice(0, m.index);
+    const b = rest.slice(m.index + m[0].length);
+    const first = option(a);
+    const second = first && option(b);
+    if (first && second) return [{ type: "villainous", who, options: [first, second], labels: [capital(a), capital(b)] }];
   }
   return null;
 }

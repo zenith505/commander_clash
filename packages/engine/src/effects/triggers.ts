@@ -586,7 +586,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
     // "Whenever a creature you control enters", "another Ally", "~ or another artifact": on every permanent,
     // the entering one too, which is the subject ("that creature"). It sees itself enter (CR 603.6a).
-    const entersWatch = (o: GameObject, ctrl: PlayerId) => add(o, ctrl, (e, t) => e === "permanentEnters" && !!t.enters && entersMatches(s, t.enters, o, entering, ctrl), undefined, undefined, entering);
+    const entersWatch = (o: GameObject, ctrl: PlayerId) => add(o, ctrl, (e, t) => e === "permanentEnters" && !!t.enters && entersMatches(s, t.enters, o, entering, ctrl) && (!t.ifFromGraveyard || (!!entering.enteredFromGraveyard && (t.ifFromGraveyard === "any" || entering.owner === ctrl))), undefined, undefined, entering);
     for (const id of s.battlefield) entersWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(entersWatch);
     fromEmblems(entersWatch);
@@ -1207,7 +1207,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (!hit.length) continue;
         const same = (e: string, tt: TriggeredAbility) => e === "groupDealsDamageToPlayers" && tt.body.text === t.body.text && JSON.stringify(tt.damageGroup) === JSON.stringify(g);
         if (g.perPlayer) for (const p of s.turnOrder.filter((q) => hit.includes(q))) add(w, wc, same, undefined, undefined, undefined, undefined, undefined, undefined, { player: p });
-        else add(w, wc, same, undefined, undefined, undefined, undefined, undefined, undefined, { amount: hit.length });
+        else add(w, wc, same, undefined, undefined, undefined, undefined, undefined, undefined, { amount: hit.length, players: hit });
       }
     }
   } else if (ev.type === "excessDamage") {

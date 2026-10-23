@@ -219,6 +219,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.sacrificedThisWay?.length ?? 0;
     case "milledManaValue":
       return (s.resolving?.milled ?? []).reduce((a, { id }) => a + defMv(defOf(s, s.objects[id]!)), 0);
+    case "exiledTopManaValue":
+      return (s.resolving?.exiledTopCards ?? []).reduce((a, id) => a + defMv(defOf(s, s.objects[id]!)), 0);
     case "revealedFromHand":
     case "bottomedFromHand":
       return s.resolving?.revealedFromHand ?? s.resolving?.item.revealed ?? 0;
@@ -577,6 +579,8 @@ function describeCount(c: Count): string {
       return "#sacrificed";
     case "milledManaValue":
       return "the total mana value of the milled cards";
+    case "exiledTopManaValue":
+      return "the total mana value of the exiled cards";
     case "revealedFromHand":
       return "#cards revealed";
     case "bottomedFromHand":

@@ -15,6 +15,7 @@ import { describePay } from "./describe";
 import { doesNothingNow } from "./heuristics";
 import { cardNameOptions } from "../names";
 import { voteWins } from "./run-votes";
+import { defMv } from "../faces";
 
 /** Choices while resolving: "you may", cumulative upkeep, choosing, "if". */
 export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
@@ -430,6 +431,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (s.resolving!.movedLinkedIds ?? []).some((id) => s.objects[id] && printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, s.objects[id]!)))
             : e.cond.kind === "revealedSharesCreatureType"
             ? revealedSharesType(s, ctx)
+            : e.cond.kind === "revealedMv"
+            ? revealedMv(s) === amountNow(s, e.cond.mv, ctx)
             : e.cond.kind === "createdNone"
             ? !s.resolving!.created?.length
             : e.cond.kind === "putThisWayIs"
@@ -543,6 +546,13 @@ function revealedIs(s: GameState, filter: TargetSpec): boolean {
   const rv = s.resolving?.revealed;
   const o = rv && s.objects[rv.id];
   return !!o && (o.zoneChanges ?? 0) === rv.zc && printedMatches(filter, defOf(s, o));
+}
+
+/** The revealed card's mana value, by its printed mana cost (X is 0 off the stack, CR 202.3e); none revealed, none. */
+function revealedMv(s: GameState): number | undefined {
+  const rv = s.resolving?.revealed;
+  const o = rv && s.objects[rv.id];
+  return o && (o.zoneChanges ?? 0) === rv.zc ? defMv(defOf(s, o)) : undefined;
 }
 
 /**

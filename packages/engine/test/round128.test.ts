@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, scry, setup } from "./helpers";
-import { abilitiesOf, abilityProblem, botActions, characteristics, compileCard, isFullySupported, nextRandom, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { abilitiesOf, abilityProblem, botActions, characteristics, compileCard, invalidateCharacteristics, isFullySupported, nextRandom, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -627,5 +627,92 @@ describe("Jace, the Mind Sculptor (rulings)", () => {
     expect(lib.every((id) => s.objects[id]!.zone === "exile")).toBe(true);
     expect(s.players[opp]!.hand).toEqual([]);
     expect([...s.players[opp]!.library].sort()).toEqual([...hand].sort());
+  });
+});
+
+const oaka = card("O'aka, Traveling Merchant", "Legendary Creature — Human Citizen", "{1}{U}", { power: "1", toughness: "2", oracleText: "{T}, Remove a counter from a nonland permanent you control: Draw a card." });
+
+describe("O'aka, Traveling Merchant: any counter from a nonland permanent you control", () => {
+  it("a charge counter from an artifact draws a card; a land's counter can't pay", () => {
+    supported(oaka);
+    const { s: s0, ap } = setup([]);
+    const o = putOnBattlefield(s0, ap, oaka);
+    const rock = putOnBattlefield(s0, ap, card("Test Rock", "Artifact", "{1}"));
+    s0.objects[rock]!.counters = { charge: 1 };
+    const land = s0.battlefield.find((id) => s0.objects[id]!.controller === ap && s0.cards[s0.objects[id]!.cardId]!.types.includes("Land"))!;
+    s0.objects[land]!.counters = { charge: 1 };
+    expect(() => run(s0, planActivate(s0, ap, o, 0, undefined, undefined, undefined, undefined, { counters: [{ id: land, kind: "charge" }] }))).toThrow();
+    const hand = s0.players[ap]!.hand.length;
+    const s = settleBots(run(s0, planActivate(s0, ap, o, 0, undefined, undefined, undefined, undefined, { counters: [{ id: rock, kind: "charge" }] })));
+    expect(s.objects[rock]!.counters.charge ?? 0).toBe(0);
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+  });
+});
+
+const songbirds = card("Songbirds' Blessing", "Enchantment — Aura", "{3}{W}", {
+  oracleText:
+    "Enchant creature\nWhenever enchanted creature attacks, reveal cards from the top of your library until you reveal an Aura card. You may put that card onto the battlefield. If you don't, put it into your hand. Put the rest on the bottom of your library in a random order.",
+});
+
+describe("Songbirds' Blessing: an Aura revealed may go onto the battlefield, else into your hand (rulings)", () => {
+  const attackWith = () => {
+    const { s: s0, ap, opp } = setup([]);
+    const b = putOnBattlefield(s0, ap, testBear());
+    s0.objects[putOnBattlefield(s0, ap, songbirds)]!.attachedTo = b;
+    const aura = putOnBattlefield(s0, ap, card("Test Aura", "Enchantment — Aura", "{W}", { oracleText: "Enchant creature\nEnchanted creature gets +1/+1." }));
+    s0.battlefield.splice(s0.battlefield.indexOf(aura), 1);
+    s0.objects[aura]!.zone = "library";
+    s0.players[ap]!.library.splice(2, 0, aura);
+    const above = s0.players[ap]!.library.slice(0, 2);
+    invalidateCharacteristics(s0);
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: b, defender: opp }] });
+    for (let i = 0; i < 20 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    return { s, ap, b, aura, above };
+  };
+  it("yes: onto the battlefield on the creature you choose; the rest on the bottom", () => {
+    supported(songbirds);
+    let { s, ap, aura, above } = attackWith();
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap, card: aura });
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    for (let i = 0; i < 5 && s.pending && s.pending.kind !== "chooseMay"; i++) s = act(s, botActions(s, ap)[0]!);
+    expect(s.objects[aura]!.zone).toBe("battlefield");
+    expect(s.objects[aura]!.attachedTo).toBeDefined();
+    expect(s.players[ap]!.library.slice(-2).sort()).toEqual([...above].sort());
+  });
+  it("no: into your hand", () => {
+    let { s, ap, aura } = attackWith();
+    s = act(s, { type: "chooseMay", player: ap, yes: false });
+    expect(s.objects[aura]!.zone).toBe("hand");
+  });
+});
+
+const counterbalance = card("Counterbalance", "Enchantment", "{U}{U}", {
+  oracleText: "Whenever an opponent casts a spell, you may reveal the top card of your library. If you do, counter that spell if it has the same mana value as the revealed card.",
+});
+
+describe("Counterbalance (rulings)", () => {
+  const castInto = (topMv: 0 | 2, reveal: boolean) => {
+    const { s: s0, ap, ids, opp } = setup([testBear()]);
+    putOnBattlefield(s0, opp, counterbalance);
+    const top = putOnBattlefield(s0, opp, topMv ? testBear() : card("Test Forest", "Basic Land — Forest", ""));
+    s0.battlefield.splice(s0.battlefield.indexOf(top), 1);
+    s0.objects[top]!.zone = "library";
+    s0.players[opp]!.library.unshift(top);
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    for (let i = 0; i < 20 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: opp });
+    expect(botActions(s, opp)).toEqual([{ type: "chooseMay", player: opp, yes: true }]); // a bot always reveals
+    s = act(s, { type: "chooseMay", player: opp, yes: reveal });
+    for (let i = 0; i < 20 && (s.stack.length || s.triggerQueue.length) && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    return s.objects[ids[0]!]!.zone;
+  };
+  it("a revealed card with the same mana value counters the spell", () => {
+    supported(counterbalance);
+    expect(castInto(2, true)).toBe("graveyard");
+  });
+  it("a different mana value, or no reveal: the spell resolves", () => {
+    expect(castInto(0, true)).toBe("battlefield");
+    expect(castInto(2, false)).toBe("battlefield");
   });
 });

@@ -2111,6 +2111,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si++;
       continue;
     }
+    // Counterbalance, in an opponent's cast trigger: "You may reveal the top card of your library. If you do, counter that
+    // spell if it has the same mana value as the revealed card." The spell's with X as chosen for it, the card's with X
+    // as 0 (rulings, CR 202.3e).
+    if (/^[Yy]ou may reveal the top card of your library$/.test(s) && ctx.castSpell && sentences[si + 1]?.replace(/\.$/, "") === "If you do, counter that spell if it has the same mana value as the revealed card") {
+      const mv = parseCount("that spell's mana value", ctx);
+      if (!mv) return null;
+      effects.push({ type: "may", effects: [{ type: "revealTop" }, { type: "if", cond: { kind: "revealedMv", mv }, effects: [{ type: "counterCause" }] }], text: "reveal the top card of your library" });
+      si++;
+      continue;
+    }
     const sunbird = /^[Rr]eveal the top X cards of your library, where X is (that spell's mana value)$/.exec(s);
     if (sunbird && sentences[si + 1]?.replace(/\.$/, "") === "You may cast a spell with mana value X or less from among cards revealed this way without paying its mana cost" && sentences[si + 2]?.replace(/\.$/, "") === "Put the rest on the bottom of your library in a random order") {
       const x = parseCount(sunbird[1]!, ctx);
@@ -4441,6 +4451,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     const until = /^[Rr]eveal cards from the top of your library until you reveal (?:an? )?(.+? card)$/.exec(s);
+    // Songbirds' Blessing: "... until you reveal an Aura card. You may put that card onto the battlefield. If you don't, put
+    // it into your hand. Put the rest on the bottom of your library in a random order."
+    if (until && sentences[si + 1] === "You may put that card onto the battlefield" && sentences[si + 2] === "If you don't, put it into your hand" && /^Put the rest on the bottom of your library in a random order\.?$/.test(sentences[si + 3] ?? "") && !/\b(?:named|chosen|that name)\b/.test(until[1]!)) {
+      const filter = parseSearchFilter(until[1]!);
+      // An Aura card (its host chosen as it enters, CR 303.4f), or a permanent card of a kind that needs no choice.
+      const aura = !filter?.types?.length && filter?.subtypes?.length === 1 && filter.subtypes[0] === "Aura";
+      if (!filter || filter.kind !== "card" || filter.anyOf || (!aura && (!filter.types?.length || !filter.types.every((x) => x === "Creature" || x === "Artifact" || x === "Land" || x === "Enchantment") || filter.subtypes?.length))) return null;
+      effects.push({ type: "revealUntil", filter, found: "battlefield", mayElseHand: true, rest: "bottom" });
+      si += 3;
+      continue;
+    }
     // Hermit Druid: "Put that card into your hand and all other cards revealed this way into your graveyard."
     const untilPut = /^Put that card (into your hand|onto the battlefield( tapped)?) and (the rest on the bottom of your library in a random order|all other cards revealed this way into your graveyard|the rest into your graveyard)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "");
     if (until && untilPut && !/\b(?:named|chosen|that name)\b/.test(until[1]!)) {

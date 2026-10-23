@@ -2071,6 +2071,8 @@ export type Effect =
       type: "revealUntil";
       filter: TargetSpec;
       found: "hand" | "battlefield";
+      /** "You may put that card onto the battlefield. If you don't, put it into your hand." (Songbirds' Blessing): `found` is "battlefield", if its controller chooses and it can go there. */
+      mayElseHand?: true;
       tapped?: true;
       /** "Shuffle": "then shuffles all other cards revealed this way into their library" (Polymorph), a shuffle of the library. */
       /** "Graveyard": "and all other cards revealed this way into your graveyard" (Hermit Druid): the whole library if none is found. */
@@ -3042,6 +3044,8 @@ export type SpellCondition =
   | { kind: "unlessPaid" }
   /** "If it's a creature card" about the card "reveal the top card of your library" revealed, by its printed characteristics; `not`: "if it isn't". */
   | { kind: "revealedIs"; filter: TargetSpec; not?: true }
+  /** "If it has the same mana value as the revealed card" (Counterbalance): the revealed card's (X as 0 off the stack, CR 202.3e) is `mv`. */
+  | { kind: "revealedMv"; mv: AmountExpr }
   /** "Put a card exiled with ~ into its owner's graveyard. If it's a land card, ..." (Currency Converter): the card moved. */
   | { kind: "movedLinkedIs"; filter: TargetSpec }
   /** Kinship: the card "look at the top card of your library" found shares a creature type with this ability's source. */

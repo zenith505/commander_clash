@@ -8051,6 +8051,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a1230e78-0bfa-489e-a1b9-3c227bceb6fb",
+  "name": "North Pole Patrol",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Soldier Ally",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Soldier",
+   "Ally"
+  ],
+  "oracleText": "{T}: Untap another target permanent you control.\nWaterbend {3}, {T}: Tap target creature an opponent controls. (While paying a waterbend cost, you can tap your artifacts and creatures to help. Each one pays for {1}.)",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Waterbend"
+  ],
+  "commanderLegal": "legal",
+  "set": "tla",
+  "releasedAt": "2025-11-21",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d39b9f64-dc9b-413f-8d05-e21ef46d6756",
   "name": "Oblivion Sower",
   "manaCost": "{6}",

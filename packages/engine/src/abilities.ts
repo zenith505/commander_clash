@@ -3578,6 +3578,11 @@ export interface ActivatedAbility {
   /** "Spend only mana of the chosen color to activate this ability" (Throne of Eldraine): the color chosen as its source entered. */
   spendOnlyChosenColor?: true;
   manaCost: string; // "{2}{R}" or ""
+  /**
+   * "Waterbend {N}" (CR 701.67a): the {N} is part of `manaCost`, and up to N of its generic mana (X for "Waterbend {X}")
+   * may be paid by tapping untapped artifacts and creatures you control, the activation's `tapCreatures`.
+   */
+  waterbend?: number | "X";
   tap: boolean;
   sacrificeSelf: boolean;
   sorcerySpeed: boolean;

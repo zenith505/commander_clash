@@ -5435,6 +5435,11 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
       const tp = tapCreaturesProblem(s, pid, tapCreatures, "station");
       if (tp) return tp;
     }
+  } else if (ab.waterbend !== undefined) {
+    if (tapCreatures?.length) {
+      const wp = waterbendProblem(s, pid, o, ab, tapCreatures, x ?? 0, costs);
+      if (wp) return wp;
+    }
   } else if (tapCreatures?.length) return "this ability doesn't tap creatures";
   if (ab.body.modal) {
     const mp = modes === undefined ? (canChooseModes(s, ab.body, pid, sourceQuality(s, id), id) ? null : "no mode can be chosen") : modesProblem(s, ab.body, modes, pid, sourceQuality(s, id), false, id);
@@ -5471,8 +5476,33 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   const xp = ab.loyaltyX || abilityCostsHaveX(ab) ? (x !== undefined && (!Number.isInteger(x) || x < 0) ? "X must be a whole number, 0 or more" : (x ?? 0) < (ab.xMin ?? 0) ? "X can't be 0" : null) : (x ?? 0) < (ab.xMin ?? 0) ? "X can't be 0" : xProblem(cost, x);
   if (xp) return xp;
   if (ab.energyX && (x ?? 0) > (p.energy ?? 0)) return `you need ${x} energy`; // CR 107.14
-  if (!canPayFromPool(s, pid, cost, abilityUse(o, ab, s), ab.loyaltyX ? 0 : (x ?? 0) * xCount(cost), p.life)) return `not enough mana for ${d.name}'s ability`;
+  const due = lessWaterbend(cost, ab.loyaltyX ? 0 : (x ?? 0) * xCount(cost), ab, tapCreatures);
+  if (!canPayFromPool(s, pid, due.cost, abilityUse(o, ab, s), due.extra, p.life)) return `not enough mana for ${d.name}'s ability`;
   return null;
+}
+
+/**
+ * Waterbend (CR 701.67a-b): "Pay [cost]. For each generic mana in that cost, you may tap an untapped artifact or creature
+ * you control rather than pay that mana." The ones tapped are the activation's `tapCreatures`: no more than the generic
+ * mana in the waterbend cost itself, even if the total cost went up or down (rulings), each one once.
+ */
+function waterbendProblem(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, ids: ObjectId[], x: number, costs?: CostChoices): string | null {
+  const cap = ab.waterbend === "X" ? x : (ab.waterbend ?? 0);
+  if (ids.length > cap) return `waterbend {${cap}} can be paid by tapping no more than ${cap} artifact${cap === 1 ? "" : "s"} or creature${cap === 1 ? "" : "s"}`;
+  if (new Set(ids).size !== ids.length) return "each artifact or creature can only be tapped once to waterbend";
+  for (const id of ids) {
+    const c = s.objects[id];
+    if (!c || c.zone !== "battlefield" || controllerOf(s, c) !== pid || !(objIsType(s, c, "Artifact") || objIsType(s, c, "Creature"))) return "only artifacts and creatures you control can be tapped to waterbend";
+    // The source tapped by its own {T} cost, or tapped or sacrificed for another cost, can't be tapped again (rulings).
+    if (c.tapped || (ab.tap && id === o.id) || costs?.tap?.includes(id) || costs?.sacrifice?.includes(id)) return `${nameOf(s, id)} is already tapped`;
+  }
+  return null;
+}
+
+/** An activation's mana cost after the artifacts and creatures tapped to waterbend each pay {1} of its generic mana (CR 701.67a). */
+export function lessWaterbend(cost: ParsedCost, extra: number, ab: ActivatedAbility, taps?: ObjectId[]): { cost: ParsedCost; extra: number } {
+  if (ab.waterbend === undefined || !taps?.length) return { cost, extra };
+  return payGenericWith(cost, extra, taps.length) ?? { cost, extra };
 }
 
 /**
@@ -5666,7 +5696,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // "Pay half your life, rounded up": worked out with the rest of the cost, before any of it is paid (CR 601.2f-h).
   const halfLife = halfLifeCost(s, p.id, ab);
   const lifeCost = activatedLifeCost(s, p.id, ab);
-  const paid = spendFromPool(s, p.id, abCost, abilityUse(o, ab, s), ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), payableLife(s, p.id) - halfLife - lifeCost)!;
+  const due = lessWaterbend(abCost, ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), ab, tapCreatures);
+  const paid = spendFromPool(s, p.id, due.cost, abilityUse(o, ab, s), due.extra, payableLife(s, p.id) - halfLife - lifeCost)!;
   // A Treasure's mana ability makes "mana from a Treasure" (CR 106.3), even though it's sacrificed as it's activated.
   const manaFrom = manaPick ? manaOriginsOf(s, o) : [];
   // The source as it is now, for "its power" after it's sacrificed as a cost (CR 608.2h).
@@ -5721,6 +5752,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     invalidateCharacteristics(s);
   }
   for (const c of tapCreatures ?? []) tapPermanent(s, obj(s, c));
+  if (ab.waterbend !== undefined && tapCreatures?.length) log(s, `${p.name} taps ${tapCreatures.map((c) => nameOf(s, c)).join(", ")} to waterbend.`);
   const sourceZc = o.zoneChanges ?? 0;
   const stamped = stampTargets(s, targets);
   const costCardNames: string[] = [];

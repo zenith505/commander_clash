@@ -7,6 +7,7 @@ import { botActions, castProblem, moveObject, planActivate, isFullySupported, pl
 import { characteristics, invalidateCharacteristics } from "../src/layers";
 import { defOf, power, toughness } from "../src/cards";
 import { manaAbilitiesOn } from "../src/manaabilities";
+import { abilityProblem } from "../src/game";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const settle = (s: GameState, yes = true) => {
@@ -689,5 +690,72 @@ describe("Biophagus", () => {
     expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
     expect(s.objects[ids[0]!]!.counters["+1/+1"]).toBe(1);
     expect(f).toBeDefined();
+  });
+});
+
+const REMIND = " (While paying a waterbend cost, you can tap your artifacts and creatures to help. Each one pays for {1}.)";
+const geyserLeaper = card("Geyser Leaper", "Creature — Human Warrior Ally", "{4}{U}", { power: "4", toughness: "3", keywords: ["Flying", "Waterbend"], oracleText: `Flying\nWaterbend {4}: Draw a card, then discard a card.${REMIND}` });
+const northPolePatrol = card("North Pole Patrol", "Creature — Human Soldier Ally", "{2}{U}", { power: "2", toughness: "3", keywords: ["Waterbend"], oracleText: `{T}: Untap another target permanent you control.\nWaterbend {3}, {T}: Tap target creature an opponent controls.${REMIND}` });
+const kataraHope = card("Katara, Water Tribe's Hope", "Legendary Creature — Human Warrior Ally", "{2}{W}{U}{U}", { power: "3", toughness: "3", keywords: ["Vigilance", "Waterbend"], oracleText: `Vigilance\nWhen Katara enters, create a 1/1 white Ally creature token.\nWaterbend {X}: Creatures you control have base power and toughness X/X until end of turn. X can't be 0. Activate only during your turn.${REMIND}` });
+
+describe("Waterbend (CR 701.67)", () => {
+  /** `ap` with only `lands` untapped lands and the given permanents. */
+  const board = (lands: number, ...defs: CardDef[]) => {
+    const { s, ap, opp } = setup([]);
+    const mine = s.battlefield.filter((id) => s.objects[id]!.controller === ap);
+    mine.slice(lands).forEach((id) => (s.objects[id]!.tapped = true));
+    const ids = defs.map((d) => putOnBattlefield(s, ap, d));
+    invalidateCharacteristics(s);
+    return { s, ap, opp, ids };
+  };
+
+  it("tapped artifacts and creatures each pay {1} of the waterbend cost; mana pays the rest", () => {
+    supported(geyserLeaper, northPolePatrol, kataraHope);
+    const { s: s0, ap, ids } = board(2, geyserLeaper, bear(), bear());
+    const [leaper, b1, b2] = ids as [string, string, string];
+    const plan = planActivate(s0, ap, leaper, 0);
+    const a = plan?.find((x) => x.type === "activateAbility");
+    expect(a?.type === "activateAbility" && a.tapCreatures?.length).toBe(2);
+    let s = run(s0, plan);
+    expect(s.objects[b1]!.tapped && s.objects[b2]!.tapped).toBe(true);
+    expect(s.log.some((l) => /to waterbend/.test(l.text))).toBe(true);
+    const hand = s.players[ap]!.hand.length;
+    s = settle(s);
+    expect(s.players[ap]!.hand.length).toBe(hand); // drew one, discarded one
+  });
+
+  it("no more than the waterbend cost's generic mana, and only untapped artifacts and creatures you control", () => {
+    const { s, ap, opp, ids } = board(0, geyserLeaper, bear(), bear(), bear(), bear(), bear());
+    const [leaper, ...bears] = ids as string[];
+    expect(abilityProblem(s, ap, leaper!, 0, undefined, undefined, bears)).toMatch(/no more than 4/);
+    expect(abilityProblem(s, ap, leaper!, 0, undefined, undefined, bears.slice(0, 4))).toBeNull();
+    expect(abilityProblem(s, ap, leaper!, 0, undefined, undefined, bears.slice(0, 3))).toMatch(/not enough mana/);
+    const land = s.battlefield.find((id) => s.objects[id]!.controller === ap && s.cards[s.objects[id]!.cardId]!.name === "Forest")!;
+    expect(abilityProblem(s, ap, leaper!, 0, undefined, undefined, [land])).toMatch(/only artifacts and creatures/);
+    const theirs = putOnBattlefield(s, opp, bear());
+    expect(abilityProblem(s, ap, leaper!, 0, undefined, undefined, [theirs])).toMatch(/only artifacts and creatures/);
+  });
+
+  it("the source tapped by its own {T} cost can't also be tapped to waterbend", () => {
+    const { s: s0, ap, opp, ids } = board(0, northPolePatrol, bear(), bear(), bear());
+    const [patrol, ...bears] = ids as string[];
+    const target = putOnBattlefield(s0, opp, bear());
+    const t = [{ kind: "object" as const, id: target }];
+    expect(abilityProblem(s0, ap, patrol!, 1, t, undefined, [patrol!, bears[0]!, bears[1]!])).toMatch(/already tapped/);
+    const plan = planActivate(s0, ap, patrol!, 1, t);
+    const a = plan?.find((x) => x.type === "activateAbility");
+    expect(a?.type === "activateAbility" && [...(a.tapCreatures ?? [])].sort()).toEqual([...bears].sort());
+    const s = settle(run(s0, plan));
+    expect(s.objects[target]!.tapped).toBe(true);
+  });
+
+  it("Waterbend {X}: up to X of them, X chosen as it's activated", () => {
+    const { s: s0, ap, ids } = board(0, kataraHope, bear(), bear(), bear(), bear());
+    const [katara, ...bears] = ids as string[];
+    expect(abilityProblem(s0, ap, katara!, 0, undefined, undefined, bears, 3)).toMatch(/no more than 3/);
+    let s = act(s0, { type: "activateAbility", player: ap, objectId: katara!, index: 0, tapCreatures: bears.slice(0, 3), x: 3 });
+    s = settle(s);
+    expect(power(s, s.objects[katara!]!)).toBe(3);
+    expect(toughness(s, s.objects[bears[3]!]!)).toBe(3);
   });
 });

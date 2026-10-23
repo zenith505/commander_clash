@@ -44,7 +44,9 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   const line = (word && (keyword || ABILITY_WORDS.has(word[1]!.toLowerCase()) || !KEYWORD_NAMES.has(word[1]!.toLowerCase())) ? raw.slice(word[0].length) : raw).replace(/(^|, )(Remove [^,:]+? counters? from ~) and sacrifice it:/, "$1$2, Sacrifice ~:");
   // Costs: mana symbols run together ("{1}{R}"), other parts are comma-separated ("{2}, {T}, Sacrifice ~").
   const piece = String.raw`(?:\{[^}]+\})+|Reveal the player you chose|Sacrifice ~ and an? [^,:]+?|Sacrifice ~|Exert ~|Unattach ~|Return ~ to its owner's hand|Discard ~|Exile ~ from your graveyard|Exile ~ from your hand|Exile ~|Remove (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|\d+|X) (?:[+-]1/[+-]1|[a-z]+) counters? from ~|Remove (?:a|one|two|three|four|five|six|seven|eight|nine|ten) (?:(?:[+-]1/[+-]1|[a-z]+) )?counters? from among (?:[^,:]+?, )*?[^,:]+? you control|Remove an? (?:(?:[+-]1/[+-]1|[a-z]+) )?counter from an? (?:permanent|creature|artifact) you control|Put (?:a|an|one|two|three) (?:[+-]1/[+-]1|[a-z]+) counters? on ~|Pay \d+ life|Pay life equal to the number of colors in your commanders' color identity|Pay half your life, rounded (?:up|down)|Pay (?:\{E\})+|Pay \w+ \{E\}|Sacrifice (?:an?|another|one|two|three|four|five|six|seven|eight|nine|ten|X) [^,:]+?|Discard (?:an?|one|two|three) [^,:]*?cards?(?: at random)?|Discard a card with mana value X|Discard X cards|Put (?:a|one|two|three) cards? from your hand on top of your library|Put a card exiled with ~ into its owner's graveyard|Tap (?:an|another|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty) untapped [^,:]+? you control|Untap (?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty) tapped [^,:]+? you control|Collect evidence \d+|Mill (?:a card|\w+ cards)|Exile the top (?:[a-z]+ )?cards? of your graveyard|Exile (?:a|an|one|two|three|four|five) [^,:]*?cards? from your graveyard|Exile (?:a|an|one|two) [^,:]*?cards? from your hand|Exile (?:an?|another) [^,:]+? you control|Return (?:an?|two|three) [^,:]+? you control to (?:its|their) owner's hand|Forage`;
-  const m = new RegExp(`^((?:${piece})(?:, (?:${piece}))*): (.+)$`).exec(line);
+  // "Waterbend {N}" (CR 701.67a) is paying {N}, part of which tapped artifacts and creatures can pay.
+  const water = /^Waterbend \{(\d+|X)\}(?=[,:])/.exec(line);
+  const m = new RegExp(`^((?:${piece})(?:, (?:${piece}))*): (.+)$`).exec(water ? line.slice("Waterbend ".length) : line);
   if (!m) return null;
   // "Pay half your life, rounded up" (Murderous Betrayal) has a comma of its own: read it apart from the other costs.
   const halfLife = /Pay half your life, rounded (up|down)/.exec(m[1]!);
@@ -291,7 +293,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
   // libraries isn't compiled.
   // A cost that mills moves a card from a library: it uses the stack (CR 605.1a; Millikin rulings).
   const mana = extra.some((c) => c.kind === "mill") ? "stack" : manaAbilityKind(body);
-  if (mana === "fail" || (mana === "mana" && (fromHand || exileOwn || bounceOwn || keyword || halfLife || untapSelf))) return "fail";
+  if (mana === "fail" || (mana === "mana" && (water || fromHand || exileOwn || bounceOwn || keyword || halfLife || untapSelf))) return "fail";
   if (exileFromHand && (mana !== "mana" || anyPlayer || sorcerySpeed || oncePerTurn || activateIf || extra.length)) return "fail";
   // X in the effect is the X paid in the cost (CR 107.3a); with none to pay, it isn't defined.
   if (usesX(body) && !symbols.includes("X") && !energyX && !extra.some((c) => ("x" in c && c.x) || (c.kind === "discard" && c.mvX))) return "fail";
@@ -304,6 +306,7 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     ...(anyPlayer ? { anyPlayer: true as const } : {}),
     ...(spendOnlyChosenColor ? { spendOnlyChosenColor: true as const } : {}),
     manaCost,
+    ...(water ? { waterbend: water[1] === "X" ? ("X" as const) : Number(water[1]) } : {}),
     tap,
     sacrificeSelf: /Sacrifice ~/.test(costs),
     ...(/Exert ~/.test(costs) ? { exertCost: true as const } : {}),

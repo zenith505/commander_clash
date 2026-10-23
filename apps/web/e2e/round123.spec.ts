@@ -1,11 +1,12 @@
 // Round 123's prompts: the question what a token entering attacking attacks (CR 508.4) offers "All N attack ..." for
 // the tokens still to ask about; Lightning Bolt at you with two redirections (Pariah, Palisade Giant) asks you which
 // applies (CR 616.1), now for damage a spell deals too, not only combat damage. Underrealm Lich replaces a draw: keep one
-// of the top three cards, the rest go to the graveyard.
+// of the top three cards, the rest go to the graveyard. A waterbend ability is paid with mana and, for what mana can't
+// pay, by tapping your artifacts and creatures (CR 701.67a).
 import { expect, test } from "@playwright/test";
 import { applyAction } from "@cc/engine";
 import { LANDS, one, open, pageErrors, playUntil, scene } from "./scene";
-import { card, clickPlayer, controls, resolveUntil } from "./ui";
+import { card, clickPlayer, controls, menu, resolveUntil } from "./ui";
 
 test("Hero of Bladehold: \"All 2 attack Ben\" answers for both Soldier tokens at once", async ({ page }) => {
   let s = scene({ board: [...LANDS, "Hero of Bladehold"] }, [{}, {}]);
@@ -56,5 +57,19 @@ test("Underrealm Lich: drawing, you keep one of the top three cards and the othe
   const names = (ids: string[]) => ids.map((id) => after.cards[after.objects[id]!.cardId]!.name).sort();
   expect(names(after.players[0]!.hand)).toEqual(["Hill Giant", "Lightning Bolt"]);
   expect(names(after.players[0]!.graveyard)).toEqual(["Craw Wurm", "Divination", "Goblin Piker", "Grizzly Bears", "Llanowar Elves"]);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("North Pole Patrol: waterbend {3} with two Islands taps Grizzly Bears for the third mana", async ({ page }) => {
+  const s = scene({ board: ["Island", "Island", "North Pole Patrol", "Grizzly Bears"] }, [{ board: ["Hill Giant"] }]);
+  const [bears, giant] = [one(s, "Grizzly Bears"), one(s, "Hill Giant")];
+  await open(page, s);
+  await card(page, "North Pole Patrol", s).click();
+  await menu(page).locator("button", { hasText: "Waterbend" }).click();
+  await card(page, "Hill Giant", s, 0, 1).click();
+  const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && st.objects[giant]!.tapped);
+  expect(after.objects[bears]!.tapped).toBe(true);
+  expect(after.objects[one(s, "North Pole Patrol")]!.tapped).toBe(true);
+  expect(after.battlefield.filter((id) => after.cards[after.objects[id]!.cardId]!.name === "Island").every((id) => after.objects[id]!.tapped)).toBe(true);
   expect(pageErrors(page)).toEqual([]);
 });

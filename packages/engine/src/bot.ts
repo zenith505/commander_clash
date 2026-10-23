@@ -3113,6 +3113,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
         plan = planActivate(s, pid, id, i, targets.length ? targets : undefined, modes, undefined, x, costs);
         if (plan) break;
       }
+      // Waterbend (CR 701.67a): not by tapping creatures that could still attack this turn.
+      const wb = ab.waterbend !== undefined ? plan?.find((a) => a.type === "activateAbility" && a.objectId === id) : undefined;
+      if (wb?.type === "activateAbility" && s.activePlayer === pid && (s.step === "main1" || s.step === "upkeep" || s.step === "draw" || s.step === "beginCombat") && wb.tapCreatures?.some((c) => objIsType(s, obj(s, c), "Creature") && !isSummoningSick(s, obj(s, c)))) continue;
       // Not worth sacrificing a Treasure to cash in a Food or Clue.
       if (cashIn && plan?.some((a) => a.type === "activateMana" && manaActionAbility(s, a)?.sacrificeSelf)) continue;
       if (plan) return plan;

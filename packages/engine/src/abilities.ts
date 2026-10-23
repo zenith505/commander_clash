@@ -363,6 +363,8 @@ export interface TargetSpec {
   manaValue?: Range; // "with mana value 3 or less" (CR 202.3)
   /** "With mana cost {0} or {1}" (Urza's Saga): its mana cost is exactly one of these (CR 202.1; not {X} or none, rulings). */
   manaCostIn?: string[];
+  /** "Target spell with {X} in its mana cost" (Frontline Medic; CR 107.3). */
+  xInCost?: true;
   /**
    * "Counter target spell with mana value X", "destroy target creature with power X or less": the X announced for the
    * spell or ability (CR 107.3a), made into that range of `key` as its targets are chosen (settleDivided). Until then,
@@ -1768,6 +1770,8 @@ export type Effect =
       owner?: boolean;
       /** An Aura "attached to that creature": the trigger's subject (CR 303.4f). */
       attachToSubject?: boolean;
+      /** "And attach ~ to it" (Nim Deathmantle): the source, if it's still on the battlefield, attached to the permanent (CR 701.3). */
+      attachSelf?: true;
       /** An Aura "attached to target opponent" (Accursed Witch): this target, if the Aura could enchant it (CR 303.4f). */
       attachToTarget?: number;
       /**
@@ -2269,7 +2273,7 @@ export type Effect =
    * control" (Necromantic Selection): one of the cards this resolution's destroy put into graveyards, chosen as it
    * resolves; `alsoMods`: "It's a black Zombie in addition to its other colors and types", for good.
    */
-  | { type: "returnDiedThisWay"; filter: TargetSpec; alsoMods?: Modification[] }
+  | { type: "returnDiedThisWay"; filter: TargetSpec; alsoMods?: Modification[]; /** "Sacrifice it at the beginning of your next end step" (Come Back Wrong). */ atEndStep?: "nextEndStep" | "yourNextEndStep" }
   | { type: "exileTop"; who: PlayerRef; n: Amount; /** "Put all artifact cards from among them onto the battlefield" (Tezzeret, Master of the Bridge): together, under your control. */ putAll?: TargetSpec }
   /**
    * Dark Confidant: "reveal the top card of your library and put that card into your hand", then maybe "[you] lose
@@ -5100,4 +5104,6 @@ export interface FromTop {
    * spell cast with this permission is cast for that alternative cost (AltCostKind "citadel", CR 118.9).
    */
   payLife?: true;
+  /** "If you cast a creature spell this way, it gains haste until end of turn" (Thundermane Dragon). */
+  haste?: "endOfTurn";
 }

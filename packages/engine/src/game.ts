@@ -3394,7 +3394,7 @@ export function mayPlayFromTop(s: GameState, o: GameObject, pid: PlayerId, way?:
  * The permanent whose permission lets `pid` play `o` from the top of their library: one without "once each turn" if
  * there is one, so a once-a-turn permission is kept for later (Johann). "Of the chosen type" is the permanent's choice.
  */
-function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" | "life"): { by?: GameObject; once?: true } | undefined {
+function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" | "life"): { by?: GameObject; once?: true; haste?: "endOfTurn" } | undefined {
   if (o.zone !== "library" || o.owner !== pid || player(s, pid).library[0] !== o.id) return undefined;
   const d = defOf(s, o);
   const land = isType(d, "Land");
@@ -3405,6 +3405,8 @@ function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" 
     if (land ? top.lands && (!top.landFilter || printedMatches(top.landFilter, d)) : top.spells === "any" || !!top.spells?.some((f) => printedMatches(f, d))) return {};
   }
   let once: GameObject | undefined;
+  // A permission that also gives haste (Thundermane Dragon) is the one used when several apply: its controller's pick.
+  let plain: GameObject | undefined;
   for (const id of s.battlefield) {
     const src = obj(s, id);
     if (controllerOf(s, src) !== pid) continue;
@@ -3412,10 +3414,12 @@ function topPermission(s: GameState, o: GameObject, pid: PlayerId, way?: "mana" 
       // Bolas's Citadel's spells are cast for life (`way` "life"); the other permissions' for their mana costs.
       if (!land && way && !!top.payLife !== (way === "life")) continue;
       if ((top.if && !staticConditionNow(s, top.if, src.id, pid)) || !(land ? top.lands && (!top.landFilter || printedMatches(top.landFilter, d)) : top.spells === "any" || !!top.spells?.some((f) => printedMatches(bindChosen(f, src.chosen), d)))) continue;
-      if (!top.once) return { by: src };
-      if (src.topUsedTurn !== s.turn) once ??= src;
+      if (!top.once && top.haste) return { by: src, haste: top.haste };
+      if (!top.once) plain ??= src;
+      else if (src.topUsedTurn !== s.turn) once ??= src;
     }
   }
+  if (plain) return { by: plain };
   return once && { by: once, once: true };
 }
 
@@ -4625,6 +4629,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   if (castFrom === "library") {
     const how = topPermission(s, o, p.id);
     if (how?.once && how.by) how.by.topUsedTurn = s.turn;
+    // "If you cast a creature spell this way, it gains haste until end of turn": the spell and the creature it becomes.
+    if (how?.haste && isType(d, "Creature") && o.hasteCast !== "game") o.hasteCast = how.haste;
   }
   const via = graveyardWay(s, o, choices.via, p.id);
   // A once-each-turn permission is used up (Karador; Muldrotha's slot for one of the spell's types).

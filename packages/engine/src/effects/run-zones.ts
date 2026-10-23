@@ -13,6 +13,7 @@ import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { askWholeGraveyardOrder } from "../graveyard";
 import { foundWith, newObjects } from "../mutate";
+import { attachTo } from "./run-permanents";
 import { addDelayed, paidUnless, removeCopy } from "./run-spells";
 import { toBottom } from "./run-library";
 import { attackDefault, fireEvent, inCombat } from "./triggers";
@@ -1801,6 +1802,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (o.zone !== "battlefield") continue;
           s.resolving?.created?.push(o.id);
           if (e.alsoMods) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: [o.id], mods: e.alsoMods });
+          // Nim Deathmantle: attached to it if it could be; otherwise it stays where it is (CR 701.3b; rulings).
+          if (e.attachSelf) {
+            const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+            if (me?.zone === "battlefield") attachTo(s, me, o);
+          }
           if (e.haste) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: e.haste, affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
           if (e.atEndStep)
             addDelayed(s, "nextEndStep", ctx.controller, o, { targets: [], effects: [e.atEndStep === "exile" ? { type: "exile", what: { ref: "subject" } } : { type: "sacrifice", what: { ref: "subject" } }], text: `${e.atEndStep === "exile" ? "Exile" : "Sacrifice"} ~.` });

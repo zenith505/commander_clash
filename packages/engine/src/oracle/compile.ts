@@ -1449,7 +1449,13 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Bolas's Citadel: "... If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost."
     const lifeTop = /^(.+?)\. If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost\.$/.exec(line);
-    const top = lifeTop ? ((t) => (t?.spells ? { ...t, payLife: true as const } : t && null))(parseFromTop(lifeTop[1]!)) : parseFromTop(line.replace(/\.$/, ""));
+    // Thundermane Dragon: "... If you cast a creature spell this way, it gains haste until end of turn."
+    const hasteTop = !lifeTop && /^(.+?)\. If you cast a creature spell this way, it gains haste until end of turn\.$/.exec(line);
+    const top = lifeTop
+      ? ((t) => (t?.spells ? { ...t, payLife: true as const } : t && null))(parseFromTop(lifeTop[1]!))
+      : hasteTop
+        ? ((t) => (t?.spells && !t.lands && !t.once ? { ...t, haste: "endOfTurn" as const } : t && null))(parseFromTop(hasteTop[1]!))
+        : parseFromTop(line.replace(/\.$/, ""));
     if (top !== undefined) {
       if (top === null) out.unsupported.push(raw);
       else (out.fromTop ??= []).push(top);

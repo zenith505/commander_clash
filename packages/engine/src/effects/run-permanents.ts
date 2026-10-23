@@ -1308,7 +1308,7 @@ function attachToPlayer(s: GameState, me: GameObject, pid: PlayerId) {
  * nor to itself (701.3b-c); only to something it could be attached to: an Equipment to a creature (CR 301.5c), an Aura
  * to what it can enchant (CR 303.4d), neither to something with protection from it (CR 702.16c-d).
  */
-function attachTo(s: GameState, me: GameObject, host: GameObject) {
+export function attachTo(s: GameState, me: GameObject, host: GameObject) {
   if (!canAttachTo(s, me, host)) return;
   const was = me.attachedTo;
   me.attachedTo = host.id;

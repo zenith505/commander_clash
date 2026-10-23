@@ -580,3 +580,141 @@ describe("Dragonborn Champion: a source you control dealing 5 or more damage to 
     expect(hand(s)).toBe(h1 - 2 + 1);
   });
 });
+
+const frontlineMedic = card("Frontline Medic", "Creature — Human Cleric", "{2}{W}", { power: "3", toughness: "3", keywords: ["Battalion"], oracleText: "Battalion — Whenever this creature and at least two other creatures attack, creatures you control gain indestructible until end of turn.\nSacrifice this creature: Counter target spell with {X} in its mana cost unless its controller pays {3}." });
+const xBurn = card("Test X Burn", "Instant", "{X}{R}", { oracleText: "Test X Burn deals X damage to any target." });
+
+describe("Frontline Medic: \"counter target spell with {X} in its mana cost\" (CR 107.3)", () => {
+  it("only a spell with {X} in its mana cost can be targeted; unpaid, it's countered", () => {
+    supported(frontlineMedic);
+    const { s: s0, ap, opp, ids } = setup([xBurn, blast(1)]);
+    const m = putOnBattlefield(s0, ap, frontlineMedic);
+    let s = run(s0, planCast(s0, ap, ids[0]!, [{ kind: "player", id: opp }], undefined, "auto", 1));
+    const spell = s.stack[s.stack.length - 1]!;
+    s = run(s, planActivate(s, ap, m, 0, [{ kind: "stack", id: spell.id }]));
+    s = passToPending(s);
+    expect(s.pending).toMatchObject({ kind: "payUnless", player: ap, cost: "{3}" });
+    const life = s.players[opp]!.life;
+    s = settleBots(act(s, { type: "payUnless", player: ap, pay: false }));
+    expect(s.players[opp]!.life).toBe(life);
+    expect(s.objects[ids[0]!]!.zone).toBe("graveyard");
+    // A spell without {X}: not a legal target.
+    const { s: t0, ap: ap2, opp: opp2, ids: ids2 } = setup([blast(1)]);
+    const m2 = putOnBattlefield(t0, ap2, frontlineMedic);
+    const t = run(t0, planCast(t0, ap2, ids2[0]!, [{ kind: "player", id: opp2 }]));
+    const plain = t.stack[t.stack.length - 1]!;
+    expect(() => run(t, planActivate(t, ap2, m2, 0, [{ kind: "stack", id: plain.id }]))).toThrow();
+  });
+});
+
+const maester = card("Maester Seymour", "Legendary Creature — Human Elf Cleric", "{2}{G}", { power: "1", toughness: "3", keywords: ["Monstrosity"], oracleText: "At the beginning of combat on your turn, put a number of +1/+1 counters equal to Maester Seymour's power on another target creature you control.\n{3}{G}{G}: Monstrosity X, where X is the number of counters among creatures you control. (If this creature isn't monstrous, put X +1/+1 counters on it and it becomes monstrous.)" });
+
+describe("Maester Seymour: counters equal to its power; monstrosity X counting counters among creatures you control", () => {
+  it("beginning of combat: its power in +1/+1 counters on another creature; monstrosity X counts every kind of counter, X fixed as it resolves", () => {
+    supported(maester);
+    const { s: s0, ap } = setup([]);
+    const m = putOnBattlefield(s0, ap, maester);
+    const o = putOnBattlefield(s0, ap, ogre());
+    s0.objects[o]!.counters["-0/-1"] = 1;
+    let s = passUntil(s0, "beginCombat", ap);
+    for (let i = 0; i < 20 && s.triggerQueue.length + s.stack.length > 0 || (i < 20 && s.pending); i++) {
+      if (s.pending?.kind === "chooseTargets" || s.pending) s = botActions(s, s.pending!.player).reduce((x, a) => act(x, a), s);
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(s.objects[o]!.counters["+1/+1"]).toBe(1);
+    // Two counters among them: monstrosity 2.
+    s = settleBots(run(s, planActivate(s, ap, m, 0)));
+    expect(s.objects[m]!.counters["+1/+1"]).toBe(2);
+    expect(s.objects[m]!.monstrous).toBe(true);
+  });
+});
+
+const comeBackWrong = card("Come Back Wrong", "Sorcery", "{2}{B}", { oracleText: "Destroy target creature. If a creature card is put into a graveyard this way, return it to the battlefield under your control. Sacrifice it at the beginning of your next end step." });
+const testToken = card("Test Token Maker", "Sorcery", "{G}", { oracleText: "Create a 2/2 green Bear creature token." });
+
+describe("Come Back Wrong: the destroyed creature's card returns under your control, sacrificed at your next end step", () => {
+  it("an opponent's creature comes back under your control and is sacrificed at your end step, to its owner's graveyard", () => {
+    supported(comeBackWrong);
+    const { s: s0, ap, opp, ids } = setup([comeBackWrong]);
+    const o = putOnBattlefield(s0, opp, ogre("Their Ogre"));
+    let s = settleBots(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: o }])));
+    const back = s.battlefield.find((id) => nameOf(s, id) === "Their Ogre")!;
+    expect(back).toBeDefined();
+    expect(s.objects[back]!.controller).toBe(ap);
+    s = passUntil(s, "end", ap);
+    s = settleBots(s);
+    expect(s.battlefield.some((id) => nameOf(s, id) === "Their Ogre")).toBe(false);
+    expect(s.players[opp]!.graveyard.some((id) => nameOf(s, id) === "Their Ogre")).toBe(true);
+  });
+  it("a token isn't a card: nothing comes back", () => {
+    const { s: s0, ap, opp, ids } = setup([testToken, comeBackWrong]);
+    const t0 = settleBots(run(s0, planCast(s0, ap, ids[0]!)));
+    const bear = t0.battlefield.find((id) => t0.objects[id]!.isToken)!;
+    const s = settleBots(run(t0, planCast(t0, ap, ids[1]!, [{ kind: "object", id: bear }])));
+    expect(s.battlefield.some((id) => s.objects[id]!.isToken)).toBe(false);
+    void opp;
+  });
+});
+
+const thundermane = card("Thundermane Dragon", "Creature — Dragon", "{3}{R}", { power: "4", toughness: "4", keywords: ["Flying"], oracleText: "Flying\nYou may look at the top card of your library any time.\nYou may cast creature spells with power 4 or greater from the top of your library. If you cast a creature spell this way, it gains haste until end of turn." });
+
+describe("Thundermane Dragon: creature spells with power 4 or greater from the top of your library, with haste", () => {
+  it("a 5/5 on top is cast from there and has haste this turn only; a 3/3 can't be cast this way", () => {
+    supported(thundermane);
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, thundermane);
+    const g = putIn(s0, ap, giant, "library");
+    s0.players[ap]!.library = [g, ...s0.players[ap]!.library.filter((x) => x !== g)];
+    let s = settleBots(run(s0, planCast(s0, ap, g)));
+    expect(s.objects[g]!.zone).toBe("battlefield");
+    expect(characteristics(s, s.objects[g]!).keywords).toContain("Haste");
+    const o = putIn(s, ap, ogre("Top Ogre"), "library");
+    s.players[ap]!.library = [o, ...s.players[ap]!.library.filter((x) => x !== o)];
+    expect(castProblem(s, ap, o)).not.toBeNull();
+    s = passUntil(s, "upkeep", s.turnOrder[(s.turnOrder.indexOf(ap) + 1) % 4]!);
+    expect(characteristics(s, s.objects[g]!).keywords).not.toContain("Haste");
+  });
+});
+
+const nimDeathmantle = card("Nim Deathmantle", "Artifact — Equipment", "{2}", { keywords: ["Equip"], oracleText: "Equipped creature gets +2/+2, has intimidate, and is a black Zombie. (A creature with intimidate can't be blocked except by artifact creatures and/or creatures that share a color with it.)\nWhenever a nontoken creature is put into your graveyard from the battlefield, you may pay {4}. If you do, return that card to the battlefield and attach this Equipment to it.\nEquip {4}" });
+
+describe("Nim Deathmantle: pay {4} to return the creature card and attach it", () => {
+  it("paying returns the card attached, a black Zombie 5/5; declining leaves it in the graveyard", () => {
+    supported(nimDeathmantle);
+    const { s: s0, ap, ids } = setup([kill, kill]);
+    const nim = putOnBattlefield(s0, ap, nimDeathmantle);
+    const o = putOnBattlefield(s0, ap, ogre("Doomed Ogre"));
+    let s = passToPending(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: o }])));
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    for (const a of planMana(s, ap, parseManaCost("{4}"))!) s = act(s, a);
+    s = settleBots(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect(s.objects[o]!.zone).toBe("battlefield");
+    expect(s.objects[nim]!.attachedTo).toBe(o);
+    const ch = characteristics(s, s.objects[o]!);
+    expect([ch.power, ch.toughness, ch.colors, ch.subtypes]).toEqual([5, 5, ["B"], ["Zombie"]]);
+    s = passToPending(run(s, planCast(s, ap, ids[1]!, [{ kind: "object", id: o }])));
+    s = settleBots(act(s, { type: "chooseMay", player: ap, yes: false }));
+    expect(s.objects[o]!.zone).toBe("graveyard");
+  });
+});
+
+const galuf = card("Galuf's Final Act", "Instant", "{1}{G}", { oracleText: "Until end of turn, target creature gets +1/+0 and gains \"When this creature dies, put a number of +1/+1 counters equal to its power on up to one target creature.\"" });
+
+describe("\"Put a number of +1/+1 counters equal to its power\" as it last existed (CR 608.2h)", () => {
+  it("Galuf's Final Act: the 4/3 that died gives four counters", () => {
+    supported(galuf);
+    const { s: s0, ap, ids } = setup([galuf, kill]);
+    const o = putOnBattlefield(s0, ap, ogre("Doomed Ogre"));
+    const other = putOnBattlefield(s0, ap, ogre("Other Ogre"));
+    let s = settleBots(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: o }])));
+    s = run(s, planCast(s, ap, ids[1]!, [{ kind: "object", id: o }]));
+    for (let i = 0; i < 30 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+      const p = s.pending;
+      if (p?.kind === "chooseTargets" && p.player === ap) s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: other }] });
+      else if (p) s = botActions(s, p.player).reduce((x, a) => act(x, a), s);
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(s.objects[o]!.zone).toBe("graveyard");
+    expect(s.objects[other]!.counters["+1/+1"]).toBe(4);
+  });
+});

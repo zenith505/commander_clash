@@ -11,6 +11,7 @@ import { ResolveCtx, apnap, players, amountNow, amountCtx, amountFor, objects } 
 import { describeDest } from "./describe";
 import { fireEvent } from "./triggers";
 import { chooseAuraHosts } from "./run-zones";
+import { addDelayed } from "./run-spells";
 import type { AuraHost } from "../game";
 import { defMv, sameName } from "../faces";
 import { characteristics } from "../layers";
@@ -127,6 +128,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: [o.id], mods: e.alsoMods });
         invalidateCharacteristics(s);
       }
+      // A delayed trigger about the permanent it became (CR 603.7c, 400.7).
+      if (e.atEndStep && o.zone === "battlefield") addDelayed(s, e.atEndStep, ctx.controller, o, { targets: [], effects: [{ type: "sacrifice", what: { ref: "subject" } }], text: "Sacrifice ~." });
       return;
     }
     case "revealTop": {

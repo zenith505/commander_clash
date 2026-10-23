@@ -590,10 +590,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Broodmoth: "... with a flying counter on it" (a keyword counter, CR 122.1b).
   // With no "under ... control" (Daretti's emblem: "return that card to the battlefield"), under the control of the player
   // who puts it there, the ability's controller (CR 110.2a).
-  if ((m = new RegExp(`^(?:Return (that card|it) to|Put (that card) onto) the battlefield( tapped)?(?: under (your|its owner's) control)?(?: with an additional (\\+1\\/\\+1) counter on it| with an? ${COUNTER} counter on it)?$`, "i").exec(s)) && ctx.subjectLeft) {
+  if ((m = new RegExp(`^(?:Return (that card|it) to|Put (that card) onto) the battlefield( tapped)?(?: under (your|its owner's) control)?(?: with an additional (\\+1\\/\\+1) counter on it| with an? ${COUNTER} counter on it)?( and attach ~ to it)?$`, "i").exec(s)) && ctx.subjectLeft && !(m[7] && ctx.spell)) {
+    // Nim Deathmantle: "return that card to the battlefield and attach ~ to it": the permanent it became (CR 701.3).
     const what = parseObject(m[1] ?? m[2]!, ctx);
     const counter = m[5] ?? m[6];
-    return what?.ref === "subjectCard" ? [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}), ...(m[4]?.toLowerCase() === "its owner's" ? { owner: true } : {}), ...(counter ? { counters: { [counterKind(counter)]: 1 } } : {}) }] : null;
+    return what?.ref === "subjectCard" ? [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}), ...(m[4]?.toLowerCase() === "its owner's" ? { owner: true } : {}), ...(counter ? { counters: { [counterKind(counter)]: 1 } } : {}), ...(m[7] ? { attachSelf: true as const } : {}) }] : null;
   }
   // "... on the bottom of your library in any order" (Bow of Nylea): in the order the targets were chosen, which the
   // controller picks (CR 401.4).

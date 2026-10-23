@@ -1436,6 +1436,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push(diedBack[1] ? { type: "if", cond: { kind: "xAtLeast", n: Number(diedBack[1]) }, effects: [back] } : back);
       continue;
     }
+    // Come Back Wrong: "Destroy target creature. If a creature card is put into a graveyard this way, return it to the
+    // battlefield under your control. Sacrifice it at the beginning of your next end step." The card the destroy put
+    // there (a token isn't a card), with no chance to act in between (rulings).
+    const cardBack = /^If an? (creature card) is put into a graveyard this way, return it to the battlefield under your control$/.exec(s);
+    const lastDestroy = effects[effects.length - 1];
+    if (cardBack && lastDestroy?.type === "destroy" && lastDestroy.what.ref === "target" && effects.filter((x) => x.type === "destroy").length === 1) {
+      const filter = parseSearchFilter(cardBack[1]!);
+      if (!filter) return null;
+      const sac = /^Sacrifice it at the beginning of (the|your) next end step$/.exec(sentences[si + 1] ?? "");
+      effects.push({ type: "returnDiedThisWay", filter, ...(sac ? { atEndStep: sac[1] === "your" ? ("yourNextEndStep" as const) : ("nextEndStep" as const) } : {}) });
+      if (sac) si++;
+      continue;
+    }
     // Nissa's Pilgrimage: "If there are two or more instant and/or sorcery cards in your graveyard, search your library
     // for up to three basic Forest cards instead of two": the same search, for more cards while that's true as it resolves.
     const moreIf = /^If (.+), search your library for up to (two|three|four|five) (.+?) instead of (one|two|three|four)$/.exec(s);
@@ -5554,6 +5567,9 @@ function parseEqualTo(s: string, ctx: Ctx): Effect[] | null {
     [/^(.*?)([Dd]raws?) cards equal to (.+)$/, (m) => `${m[1]}${m[2]} X cards`],
     [/^(.*?)([Mm]ills?) cards equal to (.+)$/, (m) => `${m[1]}${m[2]} X cards`],
     [/^Put a number of ([+-]1\/[+-]1|[a-z]+) counters on (.+) equal to (.+)$/i, (m) => `Put X ${m[1]} counters on ${m[2]}`],
+    // "Put a number of +1/+1 counters equal to ~'s power on another target creature you control" (Maester Seymour).
+    // "Equal to its power on up to one target creature" (Galuf's Final Act): "its" comes before the target, so it's ~'s.
+    [/^Put a number of ([+-]1\/[+-]1|[a-z]+) counters equal to (.+?) on (.+)$/i, (m) => `Put X ${m[1]} counters on ${m[3]}`, 2],
     [/^(?:You )?[Cc]reate a number of (.+?) tokens( with [^,]+?)? equal to (.+)$/, (m) => `Create X ${m[1]} tokens${m[2] ?? ""}`],
   ];
   // "You gain life and draw cards equal to its power" (Lifeblood Hydra): both by that much.
@@ -5567,6 +5583,7 @@ function parseEqualTo(s: string, ctx: Ctx): Effect[] | null {
   for (const [re, rewrite, group] of forms) {
     const m = re.exec(s);
     if (!m) continue;
+    if (group === 2 && /^Put a number of /i.test(s)) m[2] = m[2]!.replace(/^its (power|toughness)$/, "~'s $1");
     const fx = parseSentence(rewrite(m), ctx);
     // "Draw cards equal to the power of target creature you control" (Soul's Majesty): that target's power as it resolves,
     // a target of its own after the sentence's others.

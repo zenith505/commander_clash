@@ -425,6 +425,8 @@ export interface TargetSpec {
     counter?: CounterKind;
     /** "Among up to two target creatures": none at all is fine too. */
     upTo?: true;
+    /** "Distribute up to that many counters" (Lathiel): any total from none to `total`, at least 1 for each target. */
+    atMost?: true;
     /**
      * "X damage divided as you choose among any number of targets": the amount, worked out as the targets are chosen
      * (CR 601.2d: as it's cast or put on the stack) and kept in `total` from then on (`settleDivided`). With it the

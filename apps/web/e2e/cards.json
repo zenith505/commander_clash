@@ -7494,6 +7494,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "d3c56fc4-3611-41b1-952e-4c5311b1510b",
+  "name": "Lathiel, the Bounteous Dawn",
+  "manaCost": "{2}{G}{W}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Unicorn",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Unicorn"
+  ],
+  "oracleText": "Lifelink\nAt the beginning of each end step, if you gained life this turn, distribute up to that many +1/+1 counters among any number of other target creatures.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "G",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "W"
+  ],
+  "keywords": [
+   "Lifelink"
+  ],
+  "commanderLegal": "legal",
+  "set": "mul",
+  "releasedAt": "2023-04-21",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "6496eea7-38f5-4428-a379-b08b0eeb5239",
   "name": "Leonardo, Big Brother",
   "manaCost": "{2}{W}",
@@ -11997,6 +12033,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "115bc79e-a109-42d7-ac58-2ee8dc0a959f",
+  "name": "Stinging Study",
+  "manaCost": "{4}{B}",
+  "cmc": 5,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "You draw X cards and you lose X life, where X is the mana value of a commander you own on the battlefield or in the command zone.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c21",
+  "releasedAt": "2021-04-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9fbab5bc-c651-46dc-89b6-0bcfeadb3891",
   "name": "Stonerise Spirit",
   "manaCost": "{1}{W}",
@@ -14028,6 +14090,39 @@
   "set": "kld",
   "releasedAt": "2016-09-30",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c47050c2-9b46-427e-85d6-058fd6a61e67",
+  "name": "Windshaper Planetar",
+  "manaCost": "{4}{W}",
+  "cmc": 5,
+  "typeLine": "Creature — Angel",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Angel"
+  ],
+  "oracleText": "Flash\nFlying\nWhen this creature enters during the declare attackers step, for each attacking creature, you may reselect which player or permanent that creature is attacking. (It can't attack its controller or their permanents.)",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Flash"
+  ],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

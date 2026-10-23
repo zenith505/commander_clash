@@ -261,3 +261,46 @@ describe("Court of Vantress: a token copy as the monarch, else it becomes a copy
     expect(abilitiesOf(s, s.objects[court]!).mana.length).toBe(1);
   });
 });
+
+const lathiel = card("Lathiel, the Bounteous Dawn", "Legendary Creature — Unicorn", "{2}{G}{W}", {
+  power: "2",
+  toughness: "2",
+  keywords: ["Lifelink"],
+  oracleText: "Lifelink\nAt the beginning of each end step, if you gained life this turn, distribute up to that many +1/+1 counters among any number of other target creatures.",
+});
+
+describe("Lathiel, the Bounteous Dawn: up to that many counters, at least one each (rulings)", () => {
+  const heal = card("Test Heal", "Sorcery", "{W}", { oracleText: "You gain 3 life." });
+  /** `ap` gained 3 life with Lathiel and two Bears out; at the end step, Lathiel's trigger asking for targets. */
+  const endStep = () => {
+    const { s: s0, ap, ids } = setup([heal]);
+    const l = putOnBattlefield(s0, ap, lathiel);
+    const bears = [putOnBattlefield(s0, ap, testBear()), putOnBattlefield(s0, ap, testBear())];
+    let s = settleBots(run(s0, planCast(s0, ap, ids[0]!)));
+    for (let i = 0; i < 60 && !(s.pending?.kind === "chooseTargets"); i++) s = s.pending?.kind === "declareAttackers" ? act(s, { type: "declareAttackers", player: ap, attacks: [] }) : act(s, { type: "passPriority", player: waitingOn(s)! });
+    return { s, ap, l, bears };
+  };
+  it("two counters among two Bears out of three: fine; Lathiel can't be one", () => {
+    supported(lathiel);
+    const { s: s0, ap, l, bears } = endStep();
+    expect(s0.step).toBe("end");
+    expect(s0.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    expect(() => act(s0, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: l, amount: 1 }] } as Action)).toThrow();
+    expect(() => act(s0, { type: "chooseTargets", player: ap, targets: bears.map((id) => ({ kind: "object", id, amount: 2 })) } as Action)).toThrow();
+    let s = act(s0, { type: "chooseTargets", player: ap, targets: bears.map((id) => ({ kind: "object", id, amount: 1 })) } as Action);
+    for (let i = 0; i < 8 && s.stack.length; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(bears.map((id) => s.objects[id]!.counters["+1/+1"])).toEqual([1, 1]);
+  });
+  it("no life gained this turn: no trigger", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, lathiel);
+    putOnBattlefield(s0, ap, testBear());
+    const s = passUntil(s0, "cleanup", ap);
+    expect(logText(s)).not.toMatch(/Lathiel, the Bounteous Dawn's ability triggers/);
+  });
+  it("a bot puts all three on its creatures", () => {
+    const { s: s0, ap, bears } = endStep();
+    const s = settleBots(botActions(s0, ap).reduce((x, a) => act(x, a), s0));
+    expect(bears.reduce((n, id) => n + (s.objects[id]!.counters["+1/+1"] ?? 0), 0)).toBe(3);
+  });
+});

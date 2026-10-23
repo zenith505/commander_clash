@@ -1360,7 +1360,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           {dividing && (
             <div className="targeting">
               <span>
-                <strong>{dividing.targeting.label}</strong>: {dividing.targeting.specs.find((x) => x.divided)?.divided?.counter ? `distribute the ${dividing.targeting.specs.find((x) => x.divided)!.divided!.counter} counters` : "divide the damage"}
+                <strong>{dividing.targeting.label}</strong>: {dividing.targeting.specs.find((x) => x.divided)?.divided?.atMost ? `distribute up to ${dividing.targeting.specs.find((x) => x.divided)!.divided!.total} ${dividing.targeting.specs.find((x) => x.divided)!.divided!.counter} counters` : dividing.targeting.specs.find((x) => x.divided)?.divided?.counter ? `distribute the ${dividing.targeting.specs.find((x) => x.divided)!.divided!.counter} counters` : "divide the damage"}
               </span>
               {dividing.chosen.map((c, i) => {
                 if ((c.kind !== "object" && c.kind !== "player") || c.amount === undefined) return null;

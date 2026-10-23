@@ -1,6 +1,6 @@
 // Sentences that act on permanents: destroy, tap, connive, regenerate, counters, gaining control, continuous changes until end of turn.
 
-import type { Effect, ObjRef } from "../../abilities";
+import type { AmountExpr, Effect, ObjRef } from "../../abilities";
 import { NUM, NUMX, COUNTER, counterKind, amt, isGroup, num, capital, singular } from "../words";
 import { pickFilter, parseGroup, parseObject, parsePlayer, parseTargetPhrase } from "../targets";
 import { addTarget } from "../body";
@@ -478,6 +478,19 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
       addTarget(ctx, { ...spec, text: `target ${one}`, divided, ...(k || upTo ? { optional: true } : {}), ...(k ? { distinctFrom: Array.from({ length: k }, (_, j) => first + j) } : {}) });
     ctx.lastTargets = { index: first, n };
     return [{ type: "counters", what: { ref: "target", index: first, n }, counter: counterKind(m[2]!), n: total, divided: true }];
+  }
+  // "Distribute up to X +1/+1 counters among any number of other target creatures, where X is ..." (Lathiel, rewritten in
+  // triggers.ts): X worked out as the targets are chosen, then any number of them each getting at least 1, X in all at
+  // most (rulings; CR 601.2d).
+  if ((m = /^[Dd]istribute up to X ([+-]1\/[+-]1) counters among any number of ((?:other )?target creatures)$/.exec(s)) && ctx.whereX) {
+    const spec = parseTargetPhrase(m[2]!.replace(/^(?:other )?target /, "").replace(/creatures$/, "creature"));
+    if (spec?.kind !== "object" || ctx.targets.some((t) => t.many)) return null;
+    const first = ctx.targets.length;
+    const x: AmountExpr = { count: { kind: "x" } };
+    addTarget(ctx, { ...spec, ...(/^other /.test(m[2]!) ? { notSource: true } : {}), text: m[2]!.replace(/creatures$/, "creature"), divided: { first, n: 1, total: 0, amount: x, counter: counterKind(m[1]!), atMost: true }, many: "any" });
+    ctx.lastObjectTarget = undefined;
+    ctx.lastTargets = { index: first, n: 2 };
+    return [{ type: "counters", what: { ref: "target", index: first, n: 2 }, counter: counterKind(m[1]!), n: x, divided: true }];
   }
   // "Distribute X +1/+1 counters among any number of creatures you control" (Blessing of Frost), "distribute a number of
   // +1/+1 counters equal to the number of +1/+1 counters on ~ among ..." (Vastwood Hydra): no targets, divided as it

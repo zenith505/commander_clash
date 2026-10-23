@@ -1660,6 +1660,11 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       rest = rest.replace(/\byou gain that much life\b/g, `you gain life equal to ${died}`).replace(new RegExp(`\\bdistribute that many ${COUNTER} counters\\b`, "g"), `distribute a number of $1 counters equal to ${died}`).replace(/ and (distribute a number of)/, ". Distribute a number of");
       if (/\bthat (much|many)\b/.test(rest)) return "fail";
     }
+    // Lathiel, the Bounteous Dawn: "if you gained life this turn, distribute up to that many +1/+1 counters": the life
+    // gained this turn, counted as it's put on the stack, where the counters are divided (rulings, CR 601.2d).
+    if (/^you gained life this turn$/.test(intervening[2]!) && /^distribute up to that many /.test(rest)) {
+      rest = `${rest.replace(/^distribute up to that many /, "distribute up to X ").replace(/\.$/, "")}, where X is the amount of life you gained this turn.`;
+    }
     // "If there are cards exiled with ~, put them into their owner's graveyard" (Valakut Exploration): those cards.
     if (/^there are cards exiled with ~$/.test(intervening[2]!)) rest = rest.replace(/^put them into their owner's graveyard,/, "put all cards exiled with ~ into their owners' graveyards,");
     // "At the beginning of your upkeep, if ~ is tapped, put a storage counter on it" (Bottomless Vault): "it" is ~, the

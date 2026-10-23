@@ -353,7 +353,9 @@ function createTokensFor(s: GameState, e0: Extract<Effect, { type: "createToken"
       if (pw && o.zone === "battlefield" && o.attacking !== undefined && pw.zone === "battlefield") o.attackingPermanent = { id: pw.id, zc: pw.zoneChanges ?? 0 };
       if (o.zone === "battlefield" && o.attacking !== undefined) whom.add(o.attackingPermanent ? `${defOf(s, s.objects[o.attackingPermanent.id]!).name} (${player(s, o.attacking).name})` : player(s, o.attacking).name);
     }
-    if (k) log(s, `${src} creates ${k === 1 ? "a" : k}${tapped ? " tapped" : ""}${defender !== undefined ? `${tapped ? " and" : ""} attacking` : ""}${blocking && blocking.attacking !== undefined ? ` blocking ${defOf(s, blocking).name}` : ""} ${e.token.power !== undefined ? `${e.token.power}/${e.token.toughness} ` : ""}${e.token.name} token${k > 1 ? "s" : ""}${whom.size && livingPlayers(s).length > 2 ? ` (attacking ${[...whom].join(" and ")})` : ""}.`);
+    // Another player's tokens (Gluntch's "choose a third player to create two Treasure tokens"): they create them.
+    const maker = pid === ctx.controller ? src : player(s, pid).name;
+    if (k) log(s, `${maker} creates ${k === 1 ? "a" : k}${tapped ? " tapped" : ""}${defender !== undefined ? `${tapped ? " and" : ""} attacking` : ""}${blocking && blocking.attacking !== undefined ? ` blocking ${defOf(s, blocking).name}` : ""} ${e.token.power !== undefined ? `${e.token.power}/${e.token.toughness} ` : ""}${e.token.name} token${k > 1 ? "s" : ""}${whom.size && livingPlayers(s).length > 2 ? ` (attacking ${[...whom].join(" and ")})` : ""}${pid === ctx.controller ? "" : ` (${src})`}.`);
     createExtraTokens(s, pid, extra, opts);
   }
 }

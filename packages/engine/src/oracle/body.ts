@@ -671,6 +671,23 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects: [{ type: "weld", artifact: 0, card: 1 }],
       text,
     };
+  // Gluntch, the Bestower: "Choose a player. They put two +1/+1 counters on a creature they control. Choose a second
+  // player to draw a card. Then choose a third player to create two Treasure tokens." Three different players, you among
+  // them or not, each chosen as it's reached (CR 608.2d, rulings); each instruction is one that player does.
+  const gifts = /^[Cc]hoose a player\. They (put [^.]+ on a creature they control)\. Choose a second player to ([^.]+)\. Then choose a third player to ([^.]+)\.$/.exec(text.trim());
+  if (gifts) {
+    const out: Effect[] = [];
+    const clauses = [gifts[1]!.replace(/they control$/, "you control"), gifts[2]!, gifts[3]!];
+    for (const [i, x] of clauses.entries()) {
+      const fx = attempt(ctx, () => parseOne(x.charAt(0).toUpperCase() + x.slice(1), ctx));
+      const e = fx?.length === 1 ? fx[0]! : undefined;
+      if (!e || !("who" in e) || (e.who as PlayerRef).ref !== "you" || ctx.targets.length) return null;
+      const theirs = { ...e, who: { ref: "chosenPlayer", nth: i } } as Effect;
+      if (JSON.stringify(theirs).includes('"ref":"you"')) return null;
+      out.push({ type: "choosePlayer", prompt: `to ${i === 0 ? gifts[1]! : x}` }, theirs);
+    }
+    return { targets: [], effects: out, text };
+  }
   // Aminatou's Augury (see Effect "exileCastEachType").
   const augury = /^Exile the top (\w+) cards of your library\. You may put a land card from among them onto the battlefield\. Until end of turn, for each nonland card type, you may cast a spell of that type from among the exiled cards without paying its mana cost\.$/.exec(text.trim());
   if (augury && opts.spell && num(augury[1]!)) return { targets: [], effects: [{ type: "exileCastEachType", n: num(augury[1]!) }], text };

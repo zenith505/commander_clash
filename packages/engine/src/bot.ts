@@ -423,6 +423,17 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const best = [...(opps.length ? opps : pend.options)].sort((a, b) => might(Number(b)) - might(Number(a)) || player(s, Number(b)).life - player(s, Number(a)).life)[0]!;
       return [{ type: "chooseOption", player: pid, choice: best }];
     }
+    // Gluntch: ourselves for the first gift we'd get something from (the counters only with a creature), the rest to the
+    // opponent with the least power on the battlefield.
+    if (pend.kind === "chooseOption" && pend.what === "nthPlayer") {
+      const r = s.resolving;
+      const next = r ? r.body.effects[r.next + 1] : undefined;
+      const useful = next?.type !== "pick" || s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature"));
+      const might = (x: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === x && objIsType(s, obj(s, id), "Creature")).reduce((n, id) => n + Math.max(0, power(s, obj(s, id))), 0);
+      const others = pend.options.filter((x) => Number(x) !== pid).sort((a, b) => might(Number(a)) - might(Number(b)) || player(s, Number(a)).life - player(s, Number(b)).life);
+      const pick = pend.options.includes(String(pid)) && (useful || !others.length) ? String(pid) : others[0]!;
+      return [{ type: "chooseOption", player: pid, choice: pick }];
+    }
     // The legend rule (CR 704.5j): the one with Auras, Equipment or counters on it, else the card, else the oldest.
     if (pend.kind === "chooseOption" && pend.what === "legend") return [{ type: "chooseOption", player: pid, choice: legendBotKeep(s, pend.options) }];
     // A Siege's protector (CR 310.12a): the opponent least able to defend it, so we can defeat it and flip it.

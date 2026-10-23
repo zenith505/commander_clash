@@ -6578,6 +6578,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     continueResolution(s);
     return;
   }
+  if (pend.what === "nthPlayer") {
+    // Gluntch: one more player chosen (see Effect "choosePlayer").
+    if (!pend.options.includes(choice)) throw new RulesError("choose one of the players offered");
+    r.chosen = { ...r.chosen, players: [...(r.chosen?.players ?? []), Number(choice) as PlayerId] };
+    log(s, `${p.name} chooses ${player(s, Number(choice)).name} ${pend.prompt ?? `for ${pend.source}`}.`);
+    continueResolution(s);
+    return;
+  }
   if (pend.what === "word") {
     // "Each opponent chooses fame or fortune" (see runVotesEffect's eachChooses).
     const st = r.scratch?.words;

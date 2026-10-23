@@ -473,7 +473,7 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     case "eachOne":
       return ctx.eachOne !== undefined ? [ctx.eachOne] : [];
     case "chosenPlayer": {
-      const p = s.resolving?.chosen?.player;
+      const p = ref.nth !== undefined ? s.resolving?.chosen?.players?.[ref.nth] : s.resolving?.chosen?.player;
       return p !== undefined && !player(s, p).lost ? [p] : [];
     }
     case "selfChosenPlayer": {
@@ -980,6 +980,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "collectEvidence":
     case "reflexive":
     case "choose":
+    case "choosePlayer":
     case "if":
       return runChoicesEffect(s, e, ctx, src);
   }

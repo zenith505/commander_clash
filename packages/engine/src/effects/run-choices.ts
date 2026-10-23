@@ -274,6 +274,19 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // "If [cost] has choices ... either the entire set of costs is paid, or none of them is" (CR 702.24a).
       return runEffect(s, { type: "may", effects: [], pay, otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Pay ${describePay(pay)} to keep ~ (cumulative upkeep)`, keep: true }, ctx);
     }
+    case "choosePlayer": {
+      // Gluntch: one more player, different from those chosen before (rulings), any of them you; asked each time the
+      // instruction is reached. With one left there's still that one to choose; with none, nobody is chosen.
+      const r = s.resolving!;
+      const sc = (r.scratch ??= {});
+      if (sc.asked) return;
+      sc.asked = true;
+      const left = apnap(s, s.turnOrder).filter((x) => !player(s, x).lost && !r.chosen?.players?.includes(x));
+      r.chosen = { ...r.chosen, players: [...(r.chosen?.players ?? [])] };
+      if (!left.length) return;
+      s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "nthPlayer", options: left.map(String), labels: left.map((x) => (x === ctx.controller ? "You" : player(s, x).name)), prompt: e.prompt };
+      return "paused";
+    }
     case "choose": {
       // "Choose a creature type": the controller names one as it resolves (CR 608.2c-d); it's kept for the rest.
       const r = s.resolving!;

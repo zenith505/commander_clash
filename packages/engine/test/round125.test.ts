@@ -1,7 +1,7 @@
 // Round 125: round 124's gaps (Library of Leng, Rottenmouth Viper, ...), then the most played cards.
 
 import { describe, expect, it } from "vitest";
-import { act, card, putOnBattlefield, setup } from "./helpers";
+import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
 import { botActions, compileCard, isFullySupported, manaValue, planCast, spellCost, waitingOn, type Action, type CardDef, type GameState } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -13,6 +13,15 @@ const run = (s: GameState, plan: Action[] | null) => {
 /** Pass priority until something waits on a choice or the stack is empty. */
 const untilChoice = (s: GameState) => {
   for (let i = 0; i < 40 && !s.pending && s.stack.length; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  return s;
+};
+/** Bots answer every choice and everyone passes until the stack and trigger queue are empty. */
+const settleBots = (s: GameState) => {
+  for (let i = 0; i < 80 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+    const who = s.pending ? s.pending.player : waitingOn(s)!;
+    const acts = s.pending ? botActions(s, who) : [];
+    s = acts.length ? acts.reduce((x, a) => act(x, a), s) : act(s, { type: "passPriority", player: who });
+  }
   return s;
 };
 const logText = (s: GameState) => s.log.map((l) => (typeof l === "string" ? l : JSON.stringify(l))).join("\n");
@@ -196,5 +205,59 @@ describe("Torgaar and The Endstone: a life total becomes half the starting life 
     const endstone = card("The Endstone", "Legendary Artifact", "{7}", { oracleText: "Whenever you play a land or cast a spell, draw a card.\nAt the beginning of your end step, your life total becomes half your starting life total, rounded up." });
     supported(endstone);
     expect(compileCard(endstone).triggers[1]!.body.effects).toEqual([{ type: "setLife", who: { ref: "you" }, n: 20 }]);
+  });
+});
+
+const gluntch = card("Gluntch, the Bestower", "Legendary Creature — Jellyfish", "{1}{G}{W}", {
+  power: "0",
+  toughness: "5",
+  keywords: ["Flying"],
+  oracleText: "Flying\nAt the beginning of your end step, choose a player. They put two +1/+1 counters on a creature they control. Choose a second player to draw a card. Then choose a third player to create two Treasure tokens.",
+});
+
+describe("Gluntch, the Bestower: three different players, chosen in turn (rulings)", () => {
+  const atEnd = () => {
+    const { s: s0, ap, opp } = setup([]);
+    const g = putOnBattlefield(s0, ap, gluntch);
+    let s = passUntil(s0, "end", ap);
+    s = untilChoice(s);
+    return { s, ap, opp, g };
+  };
+
+  it("you choose yourself for the counters (put on Gluntch), an opponent draws, a third player gets the Treasures", () => {
+    supported(gluntch);
+    const { s: s0, ap, opp, g } = atEnd();
+    expect(s0.pending).toMatchObject({ kind: "chooseOption", player: ap, what: "nthPlayer", prompt: "to put two +1/+1 counters on a creature they control" });
+    expect((s0.pending as { options: string[] }).options).toHaveLength(4);
+    let s = act(s0, { type: "chooseOption", player: ap, choice: String(ap) });
+    // Gluntch is our only creature: no choice of which.
+    if (s.pending?.kind === "pickPermanents") s = act(s, { type: "pickPermanents", player: ap, ids: [g] });
+    expect(s.objects[g]!.counters["+1/+1"]).toBe(2);
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "nthPlayer", prompt: "to draw a card" });
+    expect((s.pending as { options: string[] }).options).not.toContain(String(ap));
+    const hand = s.players[opp]!.hand.length;
+    s = act(s, { type: "chooseOption", player: ap, choice: String(opp) });
+    expect(s.players[opp]!.hand).toHaveLength(hand + 1);
+    expect((s.pending as { options: string[] }).options).toHaveLength(2);
+    expect(() => act(s, { type: "chooseOption", player: ap, choice: String(opp) })).toThrow(/isn.t an option/);
+    const third = Number((s.pending as { options: string[] }).options[0]);
+    s = act(s, { type: "chooseOption", player: ap, choice: String(third) });
+    expect(s.battlefield.filter((id) => s.objects[id]!.controller === third && s.cards[s.objects[id]!.cardId]!.name === "Treasure Token")).toHaveLength(2);
+  });
+
+  it("with only two players left, there's no third player, and no Treasures (rulings)", () => {
+    const { s: s0, ap, opp } = atEnd();
+    for (const p of s0.players) if (p.id !== ap && p.id !== opp) p.lost = true;
+    let s = act(s0, { type: "chooseOption", player: ap, choice: String(opp) });
+    s = settleBots(s);
+    expect(s.battlefield.some((id) => s.cards[s.objects[id]!.cardId]!.name === "Treasure Token")).toBe(false);
+  });
+
+  it("a bot takes the counters itself, and gives the rest to the opponents with the least power", () => {
+    const { s: s0, ap, g } = atEnd();
+    const s = settleBots(s0);
+    expect(s.objects[g]!.counters["+1/+1"]).toBe(2);
+    expect(s.battlefield.filter((id) => s.cards[s.objects[id]!.cardId]!.name === "Treasure Token" && s.objects[id]!.controller !== ap)).toHaveLength(2);
+    expect(logText(s)).toMatch(/[ACD] creates 2 Treasure tokens \(Gluntch, the Bestower\)\./);
   });
 });

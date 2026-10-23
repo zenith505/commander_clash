@@ -774,8 +774,11 @@ export type PlayerRef =
    * is being done to, one at a time.
    */
   | { ref: "eachOne" }
-  /** "Choose an opponent. That player ...": the opponent chosen as this resolves (ChoiceKind "opponent"). */
-  | { ref: "chosenPlayer" }
+  /**
+   * "Choose an opponent. That player ...": the opponent chosen as this resolves (ChoiceKind "opponent"). `nth`: the nth
+   * player chosen by Effect "choosePlayer" (Gluntch's "a second player"), counting from 0.
+   */
+  | { ref: "chosenPlayer"; nth?: number }
   /** "The chosen player" of "As ~ enters, choose a player" (Stuffy Doll): its source's (CR 614.12), as it last existed. */
   | { ref: "selfChosenPlayer" }
   /** "~'s controller" (Xantcha, which any player may activate): its source's controller, not necessarily this ability's, as it last existed (CR 608.2h). */
@@ -2802,6 +2805,13 @@ export type Effect =
       theirs?: true;
       text: string;
     }
+  /**
+   * Gluntch, the Bestower: "Choose a player. ... Choose a second player to draw a card. Then choose a third player to
+   * ...": the controller chooses one more player, any player but those already chosen this way (rulings), as it resolves
+   * (CR 608.2d), into Chosen.players; with none left to choose (a two-player game's third), none is (rulings).
+   * PlayerRef "chosenPlayer" `nth` is that player. `prompt`: what the player is chosen for.
+   */
+  | { type: "choosePlayer"; prompt: string }
   | { type: "choose"; choice: ChoiceKind; /** "Each player chooses a creature type" (Patriarch's Bidding): every player in turn order, starting with the active player, into Chosen.types. */ each?: true; /** With "opponent": "a player with the most life or tied for most life" (The Black Gate), checked as it resolves; you can be one. */ mostLife?: true; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose; /** "Choose a number between 0 and 10" (Expel the Interlopers): any whole number in it, into Chosen.number. */ range?: { min: number; max: number } };
 
 /** What a player chooses by name: a creature type (CR 205.3m) or a color (CR 105.1). */

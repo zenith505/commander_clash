@@ -2823,6 +2823,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "6106ba65-f07b-41ec-8b59-e052bbde5529",
+  "name": "Court of Locthwain",
+  "manaCost": "{2}{B}{B}",
+  "cmc": 4,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "When this enchantment enters, you become the monarch.\nAt the beginning of your upkeep, exile the top card of target opponent's library. You may play that card for as long as it remains exiled, and mana of any type can be spent to cast it. If you're the monarch, until end of turn, you may cast a spell from among cards exiled with this enchantment without paying its mana cost.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "woc",
+  "releasedAt": "2023-09-08",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "dd69ef80-d30c-4b15-aec8-4154dc20cb25",
   "name": "Covetous Elegy",
   "manaCost": "{4}{W}{B}",
@@ -9436,6 +9462,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "473a7998-669d-4181-83fe-f178a2e781f0",
+  "name": "Out of the Tombs",
+  "manaCost": "{2}{B}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "At the beginning of your upkeep, put two eon counters on this enchantment, then mill cards equal to the number of eon counters on it.\nIf you would draw a card while your library has no cards in it, instead return a creature card from your graveyard to the battlefield. If you can't, you lose the game.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "40k",
+  "releasedAt": "2022-10-07",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4669e8c7-fc37-4b97-9cb7-8d29b43d9176",
   "name": "Overlord of the Hauntwoods",
   "manaCost": "{3}{G}{G}",
@@ -13285,6 +13339,30 @@
   "set": "msc",
   "releasedAt": "2026-06-26",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "a68e57f3-f138-4c26-b8d5-55d1adec44a8",
+  "name": "Transmutation Font",
+  "manaCost": "{5}",
+  "cmc": 5,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "{T}: Create your choice of a Blood token, a Clue token, or a Food token.\n{3}, {T}, Sacrifice three artifact tokens with different names: Search your library for an artifact card, put it onto the battlefield, then shuffle. Activate only as a sorcery.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Food"
+  ],
+  "commanderLegal": "legal",
+  "set": "big",
+  "releasedAt": "2024-04-19",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

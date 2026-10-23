@@ -346,7 +346,8 @@ export function normalizeSelf(d: CardDef): string {
   const short = ofThe ?? first ?? comma;
   if (short && short !== full) {
     // Not "Nissa's Chosen" in Nissa Revane, another card's name.
-    const re = new RegExp(`\\b${esc(short)}\\b${ofThe ? "(?! (?:of|the) [A-Z])" : ""}${first ? "(?!'s [A-Z])" : ""}`, "g");
+    // Letter boundaries that know accented letters ("Éowyn" for "Éowyn, Fearless Knight"), which \b doesn't.
+    const re = new RegExp(`(?<![\\p{L}\\p{N}_])${esc(short)}(?![\\p{L}\\p{N}_])${ofThe ? "(?! (?:of|the) [A-Z])" : ""}${first ? "(?!'s [A-Z])" : ""}`, "gu");
     t = t.replace(/"[^"]*"/g, (q) => q.replace(re, QUOTED_SOURCE_NAME));
     t = t.replace(re, "~");
   }
@@ -585,6 +586,12 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "Max speed — [Ability]": "As long as your speed is 4, this object has '[Ability]'" (CR 702.178a).
     const maxSpeed = /^Max speed — (.+)$/.exec(line);
+    // Vnwxt: "Max speed — If you would draw a card, draw two cards instead": the replacement only at max speed.
+    if (maxSpeed?.[1] === "If you would draw a card, draw two cards instead.") {
+      out.drawTwoInstead = "always";
+      out.drawTwoIf = { kind: "maxSpeed" };
+      continue;
+    }
     if (maxSpeed) {
       if (!conditionalAbility(d, maxSpeed[1]!, out, { kind: "maxSpeed" })) out.unsupported.push(raw);
       continue;
@@ -840,11 +847,15 @@ export function compile(d: CardDef): CompiledCard {
     // without "other" that could describe itself applies to itself isn't worked out, so that stays out.
     // "Each other creature you control enters with a number of additional +1/+1 counters on it equal to ~'s toughness"
     // (Arwen, Weaver of Hope): its toughness as the creature enters (rulings).
-    const byToughness = new RegExp(`^Each other (creature you control) enters with a number of additional ${COUNTER} counters on it equal to ~'s toughness\\.$`).exec(line);
+    // "Each other creature you control enters with a number of additional +1/+1 counters on it equal to ~'s power and as a
+    // Mutant in addition to its other types" (Master Biomancer): its power as the creature enters (rulings), and the type
+    // whatever that power is.
+    const byToughness = new RegExp(`^Each other (creature you control) enters with a number of additional ${COUNTER} counters on it equal to ~'s (toughness|power)(?: and as an? ([A-Z][a-z]+) in addition to its other types)?\\.$`).exec(line);
     if (byToughness) {
       const g = parseGroup(`each ${byToughness[1]}`);
-      if (!g || g.filter.kind !== "object" || g.filter.controller !== "you") out.unsupported.push(raw);
-      else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(byToughness[2]!), n: 1, perSourceToughness: true, text: line });
+      const sub = byToughness[4];
+      if (!g || g.filter.kind !== "object" || g.filter.controller !== "you" || (sub && !CREATURE_TYPES.has(sub))) out.unsupported.push(raw);
+      else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(byToughness[2]!), n: 1, ...(byToughness[3] === "power" ? { perSourcePower: true as const } : { perSourceToughness: true as const }), ...(sub ? { asSubtype: sub } : {}), text: line });
       continue;
     }
     const othersExtra = new RegExp(`^Each (other )?(.+? you control(?: [^,]+?)?) enters with (an|a|one|two|three) additional ${COUNTER} counters? on it( for each [A-Z][a-z]+ you already control)?\\.$`).exec(line);
@@ -920,6 +931,15 @@ export function compile(d: CardDef): CompiledCard {
         const c = /^an? (creature type|color)(?: other than (\w+))?$/.exec(part)!;
         (out.entersChoose ??= []).push({ what: c[1] === "color" ? "color" : "creatureType", ...(c[2] ? { except: c[2] } : {}) });
       }
+      continue;
+    }
+    // "As this land enters, choose Elemental, Elf, Faerie, Giant, Goblin, Kithkin, Merfolk, or Treefolk." (Eclipsed Realms,
+    // CR 614.12): one of these creature types.
+    const asTypeList = /^As (?:~|it) enters, choose ((?:[A-Z][a-z]+, )+or [A-Z][a-z]+)\.$/.exec(line);
+    if (asTypeList) {
+      const types = asTypeList[1]!.split(/, (?:or )?/);
+      if (!types.every((t) => CREATURE_TYPES.has(t)) || out.entersChoose?.some((c) => c.what === "creatureType")) out.unsupported.push(raw);
+      else (out.entersChoose ??= []).push({ what: "creatureType", options: types });
       continue;
     }
     // "As Arachne enters, look at an opponent's hand, then choose a card type other than creature." (CR 614.12): an

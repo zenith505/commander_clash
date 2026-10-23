@@ -95,7 +95,7 @@ import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { castingBody, compileCard } from "./oracle";
 import { COLORS, type Action, type CardDef, type Chosen, type Color, type CostChoices, type GameObject, type GameState, type ObjectId, type PendingDecision, type PlayerId, type StackItem } from "./types";
 import { evalAmount } from "./amounts";
-import { CHOSEN_HEXPROOF, CHOSEN_PROTECTION } from "./keywords";
+import { CHOSEN_HEXPROOF, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION } from "./keywords";
 import { groupValue, ofPlayerPick, ofPlayerTargets, worth } from "./value";
 import { damageEstimate } from "./damage";
 
@@ -1912,7 +1912,9 @@ function costXRoom(s: GameState, pid: PlayerId, id: string, costs: AdditionalCos
             ? p.graveyard.filter((x) => x !== id && (!c.filter || printedMatches(c.filter, defOf(s, obj(s, x))))).length
             : c.kind === "sacrifice"
               ? sacrificePool(s, pid, c, new Set()).filter((o) => !c.optional || o.isToken).length
-              : returnCandidates(s, pid, c).length;
+              : c.kind === "tap"
+                ? 0 // "Tap X untapped ... you control" is an activated ability's cost only
+                : returnCandidates(s, pid, c).length;
     most = Math.min(most, room);
   }
   return Math.max(0, most === Infinity ? 0 : most);
@@ -2781,6 +2783,12 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
   const c = card ? compileCard(card) : undefined;
   // Serra's Emissary: protection from creatures for you and yours shuts off most attacks and blockers.
   if (what === "cardType" && c?.youProtectedFromChosenType && options.includes("Creature")) return "Creature";
+  // Pippin: protection from the type of the opponent's spell or ability about to resolve, or else from creatures.
+  if (what === "cardType" && c && JSON.stringify(c).includes(CHOSEN_TYPE_PROTECTION)) {
+    const top = [...s.stack].reverse().find((x) => x.controller !== pid && x.objectId && s.objects[x.objectId]);
+    const ty = top ? defOf(s, obj(s, top.objectId!)).types.find((x) => options.includes(x)) : undefined;
+    return ty ?? (options.includes("Creature") ? "Creature" : options[0]!);
+  }
   if (what === "cardType") {
     // "Destroy all permanents of the chosen type": the type that costs the opponents the most, net of what we'd lose.
     const hurts = c ? choiceHurts(c) : true;
@@ -3581,7 +3589,9 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
   if (!ab.costs?.length) return undefined;
   const out: CostChoices = {};
   const targeted = new Set(targets.flatMap((t) => (t.kind === "none" ? [] : [t.id])));
-  for (const c of ab.costs) {
+  for (const c0 of ab.costs) {
+    // "Sacrifice a creature of the chosen type" (Etchings of the Chosen): the source's chosen type.
+    const c = c0.kind === "sacrifice" && c0.filter.chosen ? { ...c0, filter: bindChosen(c0.filter, o.chosen) } : c0;
     if (c.kind === "forage") {
       const f = forageChoice(s, pid, o, [...[...targeted].map(String), ...(keep ? [keep] : [])]);
       if (!f) return null;

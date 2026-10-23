@@ -529,12 +529,17 @@ function parseEntersTrigger(line: string): TriggeredAbility | "fail" | null {
   if (!ench && filter.controller === "opponent") bodyText = bodyText.replace(/\bthat player\b/g, "its controller");
   // "They lose life equal to its mana value" after "a nonland permanent an opponent owns" (Brainstealer Dragon): its owner.
   if (owned) bodyText = bodyText.replace(/^they lose\b/, "its owner loses");
+  // "Whenever an Aura you control enters, if you cast it, ..." (Light-Paws): an intervening if (CR 603.4) on how it got
+  // there, which can't change. Only of what you control: a permanent spell enters under its caster's control (CR 608.3).
+  const ifCast = /^if you cast it, /.exec(bodyText);
+  if (ifCast && filter.controller !== "you") return "fail";
+  if (ifCast) bodyText = bodyText.slice(ifCast[0].length);
   const body = parseBody(bodyText, { subjectIt: true });
   if (!body) return "fail";
   const kind = m[1]!.toLowerCase();
   return {
     event: "permanentEnters",
-    enters: { filter: { ...filter, text: phrase }, ...(kind === "another" ? { other: true } : {}), ...(kind === "~ or another" ? { orSelf: true } : {}) },
+    enters: { filter: { ...filter, text: phrase }, ...(kind === "another" ? { other: true } : {}), ...(kind === "~ or another" ? { orSelf: true } : {}), ...(ifCast ? { ifCast: true as const } : {}) },
     body,
   };
 }
@@ -549,7 +554,7 @@ function enchantedControls(phrase: string): TargetSpec | null {
 
 // "Is put into a graveyard from the battlefield" is what "dies" means (CR 700.4), for any permanent.
 // "Is exiled from the battlefield" (Soulherder) is leaving it for exile (CR 406.3).
-const DIES_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) (dies|is put into a graveyard from the battlefield|leaves the battlefield(?: without dying)?|is (?:exiled|put into exile) from the battlefield), (.+)$/;
+const DIES_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) (dies or is put into exile|dies|is put into a graveyard from the battlefield|leaves the battlefield(?: without dying)?|is (?:exiled|put into exile) from the battlefield), (.+)$/;
 
 /**
  * "Whenever another creature dies", "Whenever a creature you control dies", "Whenever ~ or another Zombie
@@ -585,7 +590,10 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever another Zombie you control dies, if it didn't have decayed, ..." (Wilhelt): an intervening if (CR 603.4) on
   // the creature as it last existed (CR 603.10a), which can't change, so part of what dies.
   const exiled = !attached && /^is (?:exiled|put into exile) /.test(m![3]!);
-  const leaves = !attached && (m![3]!.startsWith("leaves") || exiled);
+  // "Whenever a creature with a coin counter on it dies or is put into exile" (Athreos, Shroud-Veiled): from the
+  // battlefield to either one (CR 700.4, 603.6c).
+  const diesOrExiled = !attached && m![3] === "dies or is put into exile";
+  const leaves = !attached && (m![3]!.startsWith("leaves") || exiled || diesOrExiled);
   // "Whenever another creature you control leaves the battlefield, if it didn't die, ..." (Taeko): where it went can't
   // change, so it's part of the event, like "without dying".
   const didntDie = leaves && /^if it didn't die, /.exec(bodyText);
@@ -645,7 +653,7 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
       ...(kind === "~ or another" ? { orSelf: true } : {}),
       ...(damaged ? { damagedBySelf: true } : {}),
       ...(leaves ? { leaves: true as const } : {}),
-      ...(exiled ? { toZones: ["exile"] as ("graveyard" | "exile")[] } : {}),
+      ...(exiled ? { toZones: ["exile"] as ("graveyard" | "exile")[] } : diesOrExiled ? { toZones: ["graveyard", "exile"] as ("graveyard" | "exile")[] } : {}),
       ...(notDies ? { notDies: true as const } : {}),
       ...(hadCounter ? { hadCounter: hadKindOf ?? (true as const) } : {}),
     },
@@ -883,6 +891,14 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!draw) return "fail";
     const body: AbilityBody = { ...draw, effects: [{ type: "if", cond: { kind: "noneAttackedYou" }, effects: draw.effects }], text: m[0].replace(/^[^,]+, /, "") };
     return { event: "creaturesYouControlAttack", body, minAttackers: num(m[1]!), anyoneAttacks: true, anotherPlayer: true };
+  } else if ((m = /^Whenever one or more creatures attack one of your opponents( or a planeswalker they control)?, (.+)$/.exec(line))) {
+    // Frontier Warmonger, Frenzied Gorespawn: any player's creatures (rulings), once for each of your opponents they attack
+    // (with their planeswalkers, when it says so; not battles), as for "whenever you attack a player" (CR 508.3e). "Those
+    // creatures" are the ones attacking that opponent, "defending player" that opponent.
+    if (/\b(they|them|their|it|that player)\b/.test(m[2]!.replace(/\bthose creatures\b/g, ""))) return "fail";
+    const body = parseBody(m[2]!.replace(/\bdefending player\b/g, "that player"), { eventPlayer: true, eventGroup: true });
+    if (!body) return "fail";
+    return { event: "creaturesYouControlAttack", body, anyoneAttacks: true, attacksOpponent: { ...(m[1] ? { orPlaneswalkers: true as const } : {}) } };
   } else if ((m = /^Whenever (?:one or more creatures attack|a player attacks with (two|three|four|five) or more creatures), (.+)$/.exec(line))) {
     // Duelist's Heritage: whoever attacks (rulings), once for each declaration (CR 508.1, 603.2c). "Whenever a player
     // attacks with three or more creatures" (Aurelia, the Law Above): any player's attack, counting all their attackers.

@@ -514,11 +514,12 @@ export function madnessCastOf(s: GameState, pid: PlayerId, id: ObjectId): string
  * A decision that asks for a mana payment, during which mana abilities can be activated (CR 605.3a): paying a cost
  * mid-resolution, like ward's; casting a card for its madness cost as madness's trigger resolves (CR 702.35a, 601.2g);
  * helping to pay for a spell with assist, or paying the rest of it (CR 702.132a); declaring attackers, to pay what
- * attacking costs (CR 508.1i); declaring blockers, to pay what blocking costs (CR 509.1f).
+ * attacking costs (CR 508.1i); declaring blockers, to pay what blocking costs (CR 509.1f); casting a commander free
+ * from the command zone, for the commander tax (Geode Golem, CR 903.8).
  */
 export function paysManaNow(s: GameState): boolean {
   const pd = s.pending;
-  return pd?.kind === "payUnless" || pd?.kind === "declareAttackers" || (pd?.kind === "declareBlockers" && !!blockCost(s, 1)) || pd?.kind === "assist" || pd?.kind === "assistCast" || (pd?.kind === "chooseMay" && !!pd.pay?.mana) || (pd?.kind === "castFree" && (pd.how === "madness" || pd.how === "miracle" || pd.how === "paid"));
+  return pd?.kind === "payUnless" || pd?.kind === "declareAttackers" || (pd?.kind === "declareBlockers" && !!blockCost(s, 1)) || pd?.kind === "assist" || pd?.kind === "assistCast" || (pd?.kind === "chooseMay" && !!pd.pay?.mana) || (pd?.kind === "castFree" && (pd.how === "madness" || pd.how === "miracle" || pd.how === "paid" || s.objects[pd.objectId]?.zone === "command"));
 }
 
 function requireNoPending(s: GameState) {
@@ -1080,7 +1081,14 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   for (const [k, n] of Object.entries(opts.counters ?? {})) add(k, n);
   if (characteristics(s, o).types.includes("Creature")) for (const [k, n] of Object.entries(opts.countersIfCreature ?? {})) add(k, n);
   if (characteristics(s, o).types.includes("Planeswalker")) for (const [k, n] of Object.entries(opts.countersIfPlaneswalker ?? {})) add(k, n);
-  for (const [k, n] of Object.entries(othersAddCounters(s, o))) add(k, n);
+  // "And as a Mutant in addition to its other types" (Master Biomancer): a type it has from the moment it enters, for as
+  // long as it's on the battlefield (CR 614.1c, 613.1d).
+  const asTypes: string[] = [];
+  for (const [k, n] of Object.entries(othersAddCounters(s, o, asTypes))) add(k, n);
+  if (asTypes.length) {
+    s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: controllerOf(s, o), sourceName: defOf(s, o).name, duration: "game", affected: [o.id], mods: [{ kind: "addTypes", types: [], subtypes: asTypes, supertypes: [] }] });
+    invalidateCharacteristics(s);
+  }
   // Its own "enters with an additional counter", printed or granted as it enters (Master Chef, CR 614.12).
   for (const e of withGranted(printed, characteristics(s, o).grantedAbilities).entersWithAdditional ?? []) add(e.counter, e.n);
   for (const [k, n] of Object.entries(entering)) putCounters(s, o, k, n, true);
@@ -1372,7 +1380,7 @@ function auraObjectHost(s: GameState, aura: GameObject, pid: PlayerId, enchant: 
  * Globe), judged by the permanent as it would exist there: one entering as a copy of a Human is a Human (CR 614.12,
  * rulings on Grumgully).
  */
-function othersAddCounters(s: GameState, o: GameObject): Record<string, number> {
+function othersAddCounters(s: GameState, o: GameObject, subtypes: string[] = []): Record<string, number> {
   const out: Record<string, number> = {};
   for (const id of s.battlefield) {
     if (id === o.id) continue;
@@ -1386,8 +1394,10 @@ function othersAddCounters(s: GameState, o: GameObject): Record<string, number> 
       if (!filter.chosen && objectMatches(s, filter, o, you, false)) {
         // Giada: "for each Angel you already control", the entering one aside, Giada included (rulings).
         // Arwen: its toughness as the creature enters (rulings), none if 0 or less.
-        const times = r.perControlled ? s.battlefield.filter((x) => x !== o.id && controllerOf(s, obj(s, x)) === you && objectMatches(s, r.perControlled!, obj(s, x), you, false)).length : r.perSourceToughness ? Math.max(0, toughness(s, src)) : 1;
+        // Master Biomancer: its power, likewise.
+        const times = r.perControlled ? s.battlefield.filter((x) => x !== o.id && controllerOf(s, obj(s, x)) === you && objectMatches(s, r.perControlled!, obj(s, x), you, false)).length : r.perSourceToughness ? Math.max(0, toughness(s, src)) : r.perSourcePower ? Math.max(0, power(s, src)) : 1;
         if (times) out[r.counter] = (out[r.counter] ?? 0) + r.n * times;
+        if (r.asSubtype && !subtypes.includes(r.asSubtype)) subtypes.push(r.asSubtype);
       }
     }
   }
@@ -2064,7 +2074,10 @@ function archivesFor(s: GameState, pid: PlayerId): number {
 function archiveDraws(s: GameState, pid: PlayerId): number {
   const first = s.step === "draw" && s.activePlayer === pid && player(s, pid).firstDrawStepDraw !== s.turn;
   return 2 ** s.battlefield.filter((id) => {
-    const two = controllerOf(s, obj(s, id)) === pid ? abilitiesOf(s, obj(s, id)).drawTwoInstead : undefined;
+    const ab = controllerOf(s, obj(s, id)) === pid ? abilitiesOf(s, obj(s, id)) : undefined;
+    const two = ab?.drawTwoInstead;
+    // Vnwxt: only at max speed (CR 702.178a).
+    if (two && ab.drawTwoIf && !staticConditionNow(s, ab.drawTwoIf, id, pid)) return false;
     return two === "always" || (two && !first);
   }).length;
 }
@@ -3944,7 +3957,9 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   if ((freeCastOf(s, pid) === o.id && !madness) || (!how.faceDown && !realAlt && plottedCast(s, pid, o)) || freeFromExile) {
     const kicked = anyType(lessColored(parseManaCost(kickCost)));
     const kx = x * xCount(kicked);
-    return { cost: kx ? splitGeneric(kicked, 0).cost : kicked, extra: Math.max(0, mods.more - mods.less) + (kx ? splitGeneric(kicked, kx).extra : 0) };
+    // From the command zone (Geode Golem): the commander tax is an additional cost, still paid (CR 903.8, 118.9d).
+    const freeTax = o.zone === "command" ? commanderTax(player(s, pid), o) : 0;
+    return { cost: kx ? splitGeneric(kicked, 0).cost : kicked, extra: Math.max(0, mods.more - mods.less) + freeTax + (kx ? splitGeneric(kicked, kx).extra : 0) };
   }
   const tax = o.zone === "command" ? commanderTax(player(s, pid), o) : 0;
   // {X} is generic mana, paid once for each {X} (CR 107.4b); reductions can take it down too (CR 601.2f).
@@ -5085,8 +5100,12 @@ export function castExtraCosts(d: CardDef, choices?: Pick<CostChoices, "via" | "
 const xCost = (c: AdditionalCost) => "x" in c && !!c.x;
 
 /** An activated ability's costs beyond mana with its X announced: "Sacrifice X Squirrels" is X of them (CR 107.3a, 602.2b). */
-export function activatedCosts(ab: ActivatedAbility, x: number | undefined): AdditionalCost[] {
-  return (ab.costs ?? []).map((c) => (xCost(c) ? { ...c, n: x ?? 0 } : c.kind === "discard" && c.mvX && c.filter ? { ...c, filter: { ...c.filter, manaValue: { min: x ?? 0, max: x ?? 0 }, text: c.filter.text.replace(/\bX\b/, String(x ?? 0)) } } : c));
+export function activatedCosts(ab: ActivatedAbility, x: number | undefined, src?: GameObject): AdditionalCost[] {
+  return (ab.costs ?? []).map((c0) => {
+    // "Sacrifice a creature of the chosen type" (Etchings of the Chosen): the type chosen for the source (linked, CR 607.2d).
+    const c = c0.kind === "sacrifice" && c0.filter.chosen ? { ...c0, filter: bindChosen(c0.filter, src?.chosen) } : c0;
+    return xCost(c) ? { ...c, n: x ?? 0 } : c.kind === "discard" && c.mvX && c.filter ? { ...c, filter: { ...c.filter, manaValue: { min: x ?? 0, max: x ?? 0 }, text: c.filter.text.replace(/\bX\b/, String(x ?? 0)) } } : c;
+  });
 }
 
 /** "Discard a card with mana value X" (Kozilek, the Great Distortion): X announced, then a card with that mana value. */
@@ -5589,7 +5608,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
     if (tp) return tp;
   }
   if (ab.costs?.length || costs?.sacrifice?.length || costs?.discard?.length || costs?.returnToHand?.length || costs?.tap?.length) {
-    const cp = extraCostProblem(s, pid, o, activatedCosts(ab, x), costs, `activate ${d.name}'s ability`);
+    const cp = extraCostProblem(s, pid, o, activatedCosts(ab, x, o), costs, `activate ${d.name}'s ability`);
     if (cp) return cp;
   }
   const cost = activationCost(s, pid, o, ab, targets, x);
@@ -5800,7 +5819,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   if (ab?.crew !== undefined && !tapCreatures) throw new RulesError(abilityProblem(s, p.id, id, index) ?? `choose creatures to ${ab.saddle ? "saddle" : "crew"} with`);
   // What pays each cost beyond mana is chosen as it's activated (CR 602.2b, 601.2h): an activation that doesn't say,
   // or says for one cost and not another, can't skip it. As for spells (castSpell).
-  if (ab && activatedCosts(ab, x).some((c) => "n" in c && c.n > 0 && costNeedsPick(c) && !costs?.[costPickKey(c)]?.length)) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
+  if (ab && activatedCosts(ab, x, o).some((c) => "n" in c && c.n > 0 && costNeedsPick(c) && !costs?.[costPickKey(c)]?.length)) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose what to pay the cost with");
   if (ab?.costs?.some((c) => c.kind === "forage") && !costs?.sacrifice?.length && !costs?.exileCards?.length) throw new RulesError(abilityProblem(s, p.id, id, index) ?? "choose how to forage: three cards in your graveyard to exile, or a Food to sacrifice");
   let body = ab ? settleDivided(s, withModes(ab.body, modes), { controller: p.id, sourceId: id, x: x ?? 0 }) : undefined;
   const problem = abilityProblem(s, p.id, id, index, body?.targets.length ? (targets ?? []) : undefined, ab?.body.modal ? modes : undefined, tapCreatures, x, costs ?? {});
@@ -5880,7 +5899,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   const costCardNames: string[] = [];
   const costDiscarded: string[] = [];
   const costExiled: { id: ObjectId; zc: number }[] = [];
-  const sacrificed = ab.costs?.length ? payExtraCosts(s, p, activatedCosts(ab, x), costs ?? {}, lki, costCardNames, costDiscarded, costExiled) : [];
+  const sacrificed = ab.costs?.length ? payExtraCosts(s, p, activatedCosts(ab, x, o), costs ?? {}, lki, costCardNames, costDiscarded, costExiled) : [];
   if (ab.sacrificeSelf && o.zone === "battlefield" && (o.zoneChanges ?? 0) === sourceZc) moveObject(s, id, "graveyard", { sacrificed: true });
   if (ab.discardSelf) discardCards(s, p.id, [id], "", true, !!ab.cycling, undefined, ab.cycling ? x : undefined);
   // Scavenge (CR 702.97a) from the graveyard; "Exile ~" on the battlefield, if it's still the same object (CR 400.7).

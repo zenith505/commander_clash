@@ -17,7 +17,7 @@
 // objects in later layers even if its source loses the ability meanwhile (CR 613.6).
 
 import { creatureCardAbove } from "./graveyard";
-import type { Affects, Amount, DamageMod, Modification, StaticAbility, StaticCondition, TargetSpec, TimingWindow, TurnPoint, Untargetable } from "./abilities";
+import type { AbilityBody, Affects, Amount, DamageMod, Modification, StaticAbility, StaticCondition, TargetSpec, TimingWindow, TurnPoint, Untargetable } from "./abilities";
 import { evalAmount, partySize } from "./amounts";
 import { bindChosen, objectMatches, printedMatches } from "./effects";
 import { basePower, baseToughness, defOf, pairedWith } from "./cards";
@@ -145,7 +145,7 @@ export interface Characteristics {
    */
   untargetable?: (Untargetable & { of: PlayerId })[];
   /** "Prevent all damage that would be dealt to / by ~" (CR 615.1). */
-  preventDamage?: { to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[]; plusOnes?: true; /** With plusOnes: the ability's controller and source. */ you?: PlayerId; from?: ObjectId }[];
+  preventDamage?: { to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[]; plusOnes?: true; reflect?: AbilityBody; /** With plusOnes or reflect: the ability's controller and source. */ you?: PlayerId; from?: ObjectId }[];
   /** Damage amount replacements this permanent's static abilities make (see DamageMod): `you` is the ability's controller, `from` its source. */
   damageMods?: (DamageMod & { you: PlayerId; from: ObjectId })[];
   /** The damage it would deal can't be prevented (CR 615.12): all of it, or only its combat damage. */
@@ -1196,7 +1196,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       return;
     case "preventDamage": {
       const { kind: _, ...p } = m;
-      c.preventDamage = [...(c.preventDamage ?? []), p.plusOnes ? { ...p, you: controllerOfInst(e, chars), from: e.sourceId ?? "" } : p];
+      c.preventDamage = [...(c.preventDamage ?? []), p.plusOnes || p.reflect ? { ...p, you: controllerOfInst(e, chars), from: e.sourceId ?? "" } : p];
       return;
     }
     case "unpreventable":

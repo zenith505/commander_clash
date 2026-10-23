@@ -703,7 +703,8 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: mv !== undefined && mv <= max && fits(mv) ? mv : max, modes, extra: "discard a card with mana value X" });
       }
       const max = maxX((n) => planActivate(s, HUMAN, objectId, index, undefined, modes, undefined, n));
-      const extra = [...(ab.energyX ? ["pay X energy"] : []), ...(ab.costs ?? []).flatMap((c) => ("x" in c && c.x ? [`${c.kind === "sacrifice" ? "sacrifice" : c.kind} X ${c.kind === "sacrifice" ? c.filter.text.replace(/s?$/, "s") : ""}`.trim()] : []))].join(" and ");
+      // "Tap X untapped Knights you control" (Aryel): the noun before "you control" in the plural.
+      const extra = [...(ab.energyX ? ["pay X energy"] : []), ...(ab.costs ?? []).flatMap((c) => ("x" in c && c.x ? [`${c.kind === "sacrifice" ? "sacrifice" : c.kind} X ${c.kind === "sacrifice" ? c.filter.text.replace(/s?$/, "s") : c.kind === "tap" ? c.filter.text.replace(/(\w)( you control)$/, "$1s$2") : ""}`.trim()] : []))].join(" and ");
       return setXPick({ mode: "activate", objectId, index, label, cost: ab.manaCost, max, value: Math.min(max, Math.max(ab.xMin ?? 0, 1)), modes, extra });
     }
     // −X loyalty abilities: X loyalty counters, up to how many it has (CR 606.6).
@@ -722,7 +723,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
   function continueActivate(d: ActivateDraft) {
     if (!s) return;
     const ab = abilitiesOf(s, s.objects[d.objectId]!).activated[d.index]!;
-    for (const c of activatedCosts(ab, d.x)) {
+    for (const c of activatedCosts(ab, d.x, s.objects[d.objectId])) {
       if (c.kind === "forage") {
         // Forage (CR 701.61a): three cards from your graveyard or a Food, whichever you can and choose.
         if (d.sacrifice !== undefined || d.exileCards !== undefined) continue;
@@ -752,7 +753,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         // "Tap an untapped creature you control": click what to tap (CR 602.2b).
         if (d.tap !== undefined) continue;
         // "Untap a tapped creature you control" (Halo Fountain) likewise, or one to tap for mana first.
-        return setCostPick({ activate: d, kind: "tap", ...(c.untap ? { untap: true as const } : {}), label: cardOf(s, d.objectId).name, what: `${c.untap ? "untap" : "tap"} ${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`, n: c.n, candidates: [...tapCostCandidates(s, HUMAN, s.objects[d.objectId]!, c), ...(c.untap ? untapViaMana(s, HUMAN, s.objects[d.objectId]!, c) : [])].filter((id) => !d.sacrifice?.includes(id)), chosen: [] });
+        return setCostPick({ activate: d, kind: "tap", ...(c.untap ? { untap: true as const } : {}), label: cardOf(s, d.objectId).name, what: `${c.untap ? "untap" : "tap"} ${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.n === 1 ? c.filter.text : c.filter.text.replace(/([^s])( you control)$/, "$1s$2")}`, n: c.n, candidates: [...tapCostCandidates(s, HUMAN, s.objects[d.objectId]!, c), ...(c.untap ? untapViaMana(s, HUMAN, s.objects[d.objectId]!, c) : [])].filter((id) => !d.sacrifice?.includes(id)), chosen: [] });
       }
       if (c.kind === "exileFromHand" && c.toLibrary) {
         // "Put a card from your hand on top of your library" (Penance): click the cards in your hand.
@@ -3493,7 +3494,8 @@ function TypePicker({
               </div>
             </>
           )}
-          <h4>{q ? `Types matching “${query.trim()}”` : "All creature types"}</h4>
+          {/* Eclipsed Realms: only the eight types it names. */}
+          <h4>{q ? `Types matching “${query.trim()}”` : pending.options.length <= 20 ? "The creature types it offers" : "All creature types"}</h4>
           <div className="type-list">
             {matches.length === 0 && <span className="muted">No creature type matches.</span>}
             {matches.map((t) => (
@@ -4324,6 +4326,12 @@ function Controls({
             <>
               <strong>Suspend:</strong> the last time counter is gone. Cast <strong>{d.name}</strong> without paying its mana cost? If you don&apos;t, it stays in exile.
             </>
+          ) : o.zone === "command" ? (
+            <>
+              {/* Geode Golem: the commander tax is still paid (CR 903.8). */}
+              <strong>{pending.source}:</strong> cast <strong>{d.name}</strong> from the command zone without paying its mana cost?
+              {commanderTax(s.players[HUMAN]!, o) ? <> You still pay the commander tax, <ManaCost cost={`{${commanderTax(s.players[HUMAN]!, o)}}`} size="sm" />.</> : null}
+            </>
           ) : (
             <>
               <strong>{pending.source}:</strong> cast <strong>{d.name}</strong> without paying its mana cost?
@@ -4332,7 +4340,7 @@ function Controls({
         </span>
         {s.cards[o.cardId]?.layout !== "split" && !transformed && (
           <button
-            disabled={((pending.how === "madness" || pending.how === "miracle" || pending.how === "paid") && planCast(s, HUMAN, pending.objectId, undefined, undefined, "auto") === null) || (!!pending.mv && /mana value/.test(castProblem(s, HUMAN, pending.objectId) ?? ""))}
+            disabled={((pending.how === "madness" || pending.how === "miracle" || pending.how === "paid" || (o.zone === "command" && commanderTax(s.players[HUMAN]!, o) > 0)) && planCast(s, HUMAN, pending.objectId, undefined, undefined, "auto") === null) || (!!pending.mv && /mana value/.test(castProblem(s, HUMAN, pending.objectId) ?? ""))}
             title={pending.how === "madness" || pending.how === "miracle" || pending.how === "paid" || pending.mv ? (castProblem(s, HUMAN, pending.objectId) ?? "") : ""}
             onClick={() => onCastFree(pending.objectId)}
           >
@@ -4609,7 +4617,7 @@ function Controls({
     return <DistributeChoice key={`${pending.source}:${pending.total}:${pending.options.join(",")}`} s={s} pending={pending} dispatch={dispatch} onHover={onHover} />;
   if (pending?.kind === "pickPermanents" && pending.player === HUMAN) {
     const theirs = pending.of !== undefined && pending.of !== HUMAN ? s.players[pending.of]!.name : undefined;
-    const verb = pending.action === "sacrifice" ? "sacrifice" : pending.action === "counters" ? `put a ${pending.counter} counter on` : pending.action === "populate" ? "copy" : pending.action === "choose" ? "choose" : theirs ? "return to their owner's hand" : "return to your hand";
+    const verb = pending.action === "sacrifice" ? "sacrifice" : pending.action === "exile" ? "exile" : pending.action === "counters" ? `put a ${pending.counter} counter on` : pending.action === "populate" ? "copy" : pending.action === "choose" ? "choose" : theirs ? "return to their owner's hand" : "return to your hand";
     // "other creature" reads "another creature".
     const an = /^other /.test(pending.what) ? `an${pending.what}` : `${/^[aeiou]/i.test(pending.what) ? "an" : "a"} ${pending.what}`;
     // Devour: any number of them; exploit: none or one (pending.min).
@@ -4672,7 +4680,7 @@ function Controls({
                 : `click ${what} ${theirs ? `${theirs} controls` : "of yours"} to ${verb}.`}
         </span>
         <button disabled={!ok} onClick={() => dispatch([{ type: "pickPermanents", player: HUMAN, ids: discards }])}>
-          {pending.action === "attach" ? (n ? `Attach ${n}` : "Attach none") : pending.action === "keep" ? (n ? `Keep ${n}` : "Keep none") : pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "encode" ? (n ? "Encode" : "Don't encode") : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "keepTapped" ? (n ? `Keep ${n} tapped` : "Untap all") : pending.action === "untapLimited" ? `Untap ${n}` : pending.action === "phaseOut" ? (n ? `Phase out ${n}` : "Phase out none") : pending.action === "untap" ? (n ? `Untap ${n}` : "Untap none") : pending.action === "tap" ? (n ? `Tap ${n}` : "Tap none") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.action === "pile" ? `First pile: ${n}, second pile: ${pending.count - n}` : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : pending.action === "choose" ? "Choose none" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : pending.action === "choose" ? "Choose" : pending.action === "meld" ? "Meld" : pending.action === "unattach" ? "Unattach" : "Return"}
+          {pending.action === "attach" ? (n ? `Attach ${n}` : "Attach none") : pending.action === "keep" ? (n ? `Keep ${n}` : "Keep none") : pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "encode" ? (n ? "Encode" : "Don't encode") : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "keepTapped" ? (n ? `Keep ${n} tapped` : "Untap all") : pending.action === "untapLimited" ? `Untap ${n}` : pending.action === "phaseOut" ? (n ? `Phase out ${n}` : "Phase out none") : pending.action === "untap" ? (n ? `Untap ${n}` : "Untap none") : pending.action === "tap" ? (n ? `Tap ${n}` : "Tap none") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.action === "pile" ? `First pile: ${n}, second pile: ${pending.count - n}` : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : pending.action === "choose" ? "Choose none" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "exile" ? "Exile" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : pending.action === "choose" ? "Choose" : pending.action === "meld" ? "Meld" : pending.action === "unattach" ? "Unattach" : "Return"}
         </button>
       </div>
     );
@@ -4948,7 +4956,7 @@ function Controls({
     return (
       <div className="controls">
         <span>
-          <strong>{pending.source}:</strong> {pending.prompt.charAt(0).toUpperCase() + pending.prompt.slice(1)}?
+          <strong>{pending.source}:</strong> {pending.prompt.charAt(0).toUpperCase() + pending.prompt.slice(1)}?{pending.otherwise ? ` ${pending.otherwise}` : ""}
         </span>
         <button onClick={() => dispatch([{ type: "chooseMay", player: HUMAN, yes: true }])}>Yes</button>
         <button className="ghost" onClick={() => dispatch([{ type: "chooseMay", player: HUMAN, yes: false }])}>

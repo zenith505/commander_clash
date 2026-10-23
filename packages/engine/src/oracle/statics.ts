@@ -2,7 +2,7 @@ import type { Amount, AmountExpr, Affects, Modification, StaticAbility, StaticCo
 import { CREATURE_TYPES, SUPPORTED_KEYWORDS, subtypeSet } from "../keywords";
 import { STARTING_LIFE, type Color } from "../types";
 import { NUM, num, COUNTER, counterKind, X, PT, ptAmt, COLOR_WORDS, BASIC_TYPES, TYPE_WORDS, capital, singular } from "./words";
-import { replaceX, usesX, scaleAmount } from "./body";
+import { parseBody, replaceX, usesX, scaleAmount } from "./body";
 import { parseCount } from "./counts";
 import { pickFilter, parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
 import { parseGrants } from "./grants";
@@ -738,6 +738,9 @@ export function parseAffected(subject: string): Affects | null {
     return { ...a, spec, controller: "enchanted" };
   }
   if (/^(Enchanted|Equipped) (creature|permanent|artifact|land)$/.test(x)) return { kind: "attached" };
+  // "Each creature that's attacking one of your opponents has trample" (Oviya, Automech Artisan): any player's creature
+  // attacking that player (not their planeswalkers or battles), whichever are now (CR 611.3a).
+  if (/^(?:Each creature that's|Creatures) attacking one of your opponents$/.test(x)) return { kind: "filter", types: ["Creature"], spec: { kind: "object", combat: "attackingOpponent", text: "creature attacking one of your opponents" } };
   // "Commander creatures you control get +2/+2", "Commanders you control have ward {2}" (CR 903.3): any player's.
   if (/^Commanders? (?:creatures )?you control$/.test(x))
     return { kind: "filter", types: x.includes("creatures") ? ["Creature"] : [], controller: "you", spec: { kind: "object", commander: true, text: "commander" } };
@@ -1303,6 +1306,13 @@ function parseStaticLine(line: string): StaticAbility | null {
   // creature for each 1 damage prevented this way." A prevention effect with an additional effect (CR 615.5).
   const vigor = /^If damage would be dealt to (another creature you control|other creatures you control), prevent that damage\. Put a \+1\/\+1 counter on that creature for each 1 damage prevented this way$/.exec(text);
   if (vigor) return { affects: { kind: "filter", types: ["Creature"], controller: "you", other: true }, mods: [{ kind: "preventDamage", to: true, plusOnes: true }], text: line };
+  // Phyrexian Vindicator: "If damage would be dealt to ~, prevent that damage. When damage is prevented this way, ~ deals
+  // that much damage to any other target." The prevention's reflexive trigger (CR 603.12), once for each damage event.
+  if (/^If damage would be dealt to ~, prevent that damage\. When damage is prevented this way, ~ deals that much damage to any other target$/.test(text)) {
+    const body = parseBody("~ deals X damage to any other target.");
+    if (!body) return null;
+    return { affects: { kind: "self" }, mods: [{ kind: "preventDamage", to: true, reflect: { ...replaceX(body, { count: { kind: "eventAmount" } }), text: "~ deals that much damage to any other target." } }], text: line };
+  }
   const prevent = parsePreventAll(text);
   if (prevent) {
     const affects = prevent.subject === "~" ? ({ kind: "self" } as const) : parseAffected(prevent.subject.replace(/^./, (c) => c.toUpperCase()));

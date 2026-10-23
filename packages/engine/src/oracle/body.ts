@@ -2,7 +2,7 @@ import { parseFromTop } from "./compile";
 import { allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose } from "../abilities";
 import { substituteX } from "../amounts";
 import { differenceInHand, num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS, singularWord } from "./words";
-import { canonicalKeyword, CHOSEN_KEYWORD, CHOSEN_PROTECTION, CREATURE_TYPES, THAT_PLAYER_PROTECTION } from "../keywords";
+import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_KEYWORD, CHOSEN_PROTECTION, CREATURE_TYPES, THAT_PLAYER_PROTECTION } from "../keywords";
 import { parsePreventAll, parseStaticCondition } from "./statics";
 import { parseBoundCount, parseCount } from "./counts";
 import { parseBecomes, parseDig, parseSentence } from "./sentence";
@@ -296,7 +296,9 @@ function parseRevealedIf(sentences0: string[], at: number, ctx: Ctx): { effect: 
   // "If it's a creature card of the chosen type, ..." (Herald's Horn): the type chosen for its source.
   const ofChosen = /^If (?:it's|that card is) an? [^,]+? card of the chosen type, /.test(sentences0[at] ?? "");
   const sentences = ofChosen ? sentences0.map((x, i) => (i === at ? x.replace(/ card of the chosen type, /, " card, ") : x)) : sentences0;
-  const first = /^If (?:it's|that card is) (not |)(an? .+?|snow) card, (.+)$/.exec(sentences[at] ?? "") ?? /^If it (isn't) (an? .+?) card, (.+)$/.exec(sentences[at] ?? "") ?? /^If that card is ()(snow), (.+)$/.exec(sentences[at] ?? "");
+  // "If it's a card of the chosen type, ..." (Gathering Stone): any card with that creature type (CR 205.3m).
+  const anyOfChosen = /^If (?:it's|that card is) a card of the chosen type, (.+)$/.exec(sentences0[at] ?? "");
+  const first = anyOfChosen ? (["", "", "card", anyOfChosen[1]!] as const) : (/^If (?:it's|that card is) (not |)(an? .+?|snow) card, (.+)$/.exec(sentences[at] ?? "") ?? /^If it (isn't) (an? .+?) card, (.+)$/.exec(sentences[at] ?? "") ?? /^If that card is ()(snow), (.+)$/.exec(sentences[at] ?? ""));
   // "If that card has the chosen name, sacrifice ~ and draw three cards" (Diviner's Lockbox), after "choose a card name".
   const named = !first && /^If (?:it|that card) has the chosen name, (.+)$/.exec(sentences[at] ?? "");
   if (named) {
@@ -305,8 +307,8 @@ function parseRevealedIf(sentences0: string[], at: number, ctx: Ctx): { effect: 
     return then && { effect: { type: "if", cond: { kind: "revealedIs", filter: { kind: "card", chosen: "name", text: "card with the chosen name" } }, effects: then }, next: at + 1 };
   }
   if (!first) return null;
-  const filter0 = parseSearchFilter(`${first[2]!.replace(/^an? /, "")} card`);
-  const filter = filter0 && ofChosen ? { ...filter0, chosen: "type" as const, text: `${filter0.text} of the chosen type` } : filter0;
+  const filter0: TargetSpec | null = anyOfChosen ? { kind: "card", chosen: "type", text: "card of the chosen type" } : (parseSearchFilter(`${first[2]!.replace(/^an? /, "")} card`) ?? null);
+  const filter = filter0 && ofChosen && !anyOfChosen ? { ...filter0, chosen: "type" as const, text: `${filter0.text} of the chosen type` } : filter0;
   const then = filter && revealedAction(first[3]!, ctx);
   if (!filter || !then) return null;
   let next = at + 1;
@@ -321,9 +323,13 @@ function parseRevealedIf(sentences0: string[], at: number, ctx: Ctx): { effect: 
   // "If it's a land card, you may put it onto the battlefield tapped. If you don't put the card onto the battlefield, put
   // it into your hand." (Risen Reef), "If you didn't put a card onto the battlefield this way, create ..." (Rulik Mons):
   // when it isn't one, or when you choose not to.
-  const notPut = !other && /^If you (?:don't put the card onto the battlefield|didn't put a card onto the battlefield this way), (.+)$/.exec(sentences[next] ?? "");
+  // Gathering Stone: "If it's a card of the chosen type, you may reveal it and put it into your hand. If you don't put the
+  // card into your hand, you may put it into your graveyard": also when it is one and you don't reveal it (rulings).
+  const notPut = !other && /^If you (?:don't put the card onto the battlefield|didn't put a card onto the battlefield this way|don't put the card into your hand), (.+)$/.exec(sentences[next] ?? "");
   if (notPut) {
-    const may = then.length === 1 && then[0]!.type === "may" && !then[0]!.otherwise && !then[0]!.pay && then[0]!.effects.length === 1 && then[0]!.effects[0]!.type === "putOntoBattlefield" ? then[0]! : null;
+    const toHand = /^If you don't put the card into your hand, /.test(sentences[next] ?? "");
+    const one = then.length === 1 && then[0]!.type === "may" && !then[0]!.otherwise && !then[0]!.pay ? then[0]! : null;
+    const may = one && (toHand ? one.effects.length === 2 && one.effects[0]!.type === "revealRevealed" && one.effects[1]!.type === "bounce" : one.effects.length === 1 && one.effects[0]!.type === "putOntoBattlefield") ? one : null;
     const before = ctx.targets.length;
     const rest = may && (revealedAction(notPut[1]!, ctx) ?? parseOne(capital(notPut[1]!), ctx));
     if (!may || !rest || ctx.targets.length !== before || rest.some((e) => pauses(e) && e.type !== "may")) return null;
@@ -448,6 +454,17 @@ function parseUntilNonland(sentences: string[], at: number, ctx: Ctx): { effect:
     const who = { ref: "targetController" as const, index: 0 };
     return { effect: { type: "exileUntilNonland", who, then: "castFree", ownerCasts: true, millFirst: 3, notNamedAs: 0, restBottom: true }, next: at + 1 };
   }
+  // Gríma, Saruman's Footman: "that player exiles cards from the top of their library until they exile an instant or
+  // sorcery card. You may cast that card without paying its mana cost. Then that player puts the exiled cards that weren't
+  // cast this way on the bottom of their library in a random order." Cast as it resolves; not cast, it goes to the bottom
+  // with the rest (rulings).
+  if (
+    ctx.eventPlayer &&
+    /^[Tt]hat player exiles cards from the top of their library until they exile an instant or sorcery card$/.test(sentences[at]!) &&
+    sentences[at + 1] === "You may cast that card without paying its mana cost" &&
+    /^Then that player puts the exiled cards that weren't cast this way on the bottom of their library in a random order\.?$/.test(sentences[at + 2] ?? "")
+  )
+    return { effect: { type: "exileUntilNonland", who: { ref: "eventPlayer" }, then: "castFree", restBottom: true, untilTypes: ["Instant", "Sorcery"] }, next: at + 3 };
   // Jodah, the Unifier: cascade that only stops at a legendary card, measured against the spell that triggered it.
   if (
     /^[Ee]xile cards from the top of your library until you exile a legendary nonland card with lesser mana value$/.test(sentences[at]!) &&
@@ -558,7 +575,15 @@ function splitSentences(text: string): string[] {
 const LIM_DULS_VAULT =
   "Look at the top five cards of your library. As many times as you choose, you may pay 1 life, put those cards on the bottom of your library in any order, then look at the top five cards of your library. Then shuffle and put the last cards you looked at this way on top in any order.";
 
-export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; discardedSelf?: true } = {}): AbilityBody | null {
+/** One ability's text to its targets and effects, or null if any of it can't be compiled. */
+export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true } = {}): AbilityBody | null {
+  const body = parseBodyText(text, opts);
+  // Éowyn: "protection from each of that creature's colors" is the colors of the ability's one target (TARGET_COLORS_PROTECTION).
+  if (body && text.includes("each of that creature's colors") && (body.targets.length !== 1 || body.targets[0]!.kind !== "object")) return null;
+  return body;
+}
+
+function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true } = {}): AbilityBody | null {
   // "Put a +1/+1 counter on ~ and untap it" (Gwenna): "it" is ~, the one thing named.
   text = differenceInHand(text).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~");
   // Witch-king of Angmar: "sacrifices a creature of their choice that dealt combat damage to you this turn" (the
@@ -615,6 +640,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     ...(opts.amassed ? { amassed: true } : {}),
     ...(opts.revealedFromHand ? { revealedFromHand: true } : {}),
     ...(opts.tappedThisWay ? { tappedThisWay: true } : {}),
+    ...(opts.eventGroup ? { lastGroup: { ref: "eventGroup" as const } } : {}),
   };
   // "Each player loses half their life, then discards half the cards in their hand, ... Round up each time." (Fraying
   // Omnipotence): the last sentence says how each "half" in the others is rounded (CR 107.1a).
@@ -2417,6 +2443,21 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si = r.next - 1;
       continue;
     }
+    // Keen Duelist: "you and target opponent each reveal the top card of your library. You each lose life equal to the mana
+    // value of the card revealed by the other player. You each put the card you revealed into your hand." Parker Luck: "two
+    // target players each reveal ... They each lose life ... Then they each put the card they revealed into their hand."
+    const duel = /^(you and target opponent|two target players) each reveal the top card of (?:your|their) library$/i.exec(s);
+    if (duel) {
+      const you = /^you/i.test(duel[1]!);
+      const loss = you ? /^You each lose life equal to the mana value of the card revealed by the other player\.?$/ : /^They each lose life equal to the mana value of the card revealed by the other player\.?$/;
+      const hand = you ? /^You each put the card you revealed into your hand\.?$/ : /^Then they each put the card they revealed into their hand\.?$/;
+      if (!loss.test(sentences[si + 1] ?? "") || !hand.test(sentences[si + 2] ?? "")) return null;
+      const who = parsePlayer(you ? "target opponent" : "two target players", ctx);
+      if (!who) return null;
+      effects.push({ type: "duelReveal", between: you ? [{ ref: "you" }, who] : [who] });
+      si += 2;
+      continue;
+    }
     // Dark Confidant: "Reveal the top card of your library and put that card into your hand. You lose life equal to
     // its mana value."
     if (/^[Rr]eveal the top card of your library and put (?:that card|it) into your hand$/.test(s)) {
@@ -3527,17 +3568,22 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // put the rest on the bottom of that library in a random order. You may cast that card for as long as it remains
     // exiled, and mana of any type can be spent to cast that spell." Cast only (no land play), with its usual timing and
     // costs (rulings).
-    const gonti = new RegExp(`^[Ll]ook at the top ${NUMX} cards of (target opponent's|target player's) library, exile one of them face down(?:, then put| and put)? ?(?:the rest on the bottom of that library in a random order)?$`).exec(s);
-    if (gonti) {
+    // Thief of Sanity: "look at the top three cards of that player's library, exile one of them face down, then put the
+    // rest into their graveyard. You may cast that card ...", the player dealt combat damage.
+    const gonti = new RegExp(`^[Ll]ook at the top ${NUMX} cards of (target opponent's|target player's|that player's) library, exile one of them face down(?:, then put| and put)? ?(the rest on the bottom of that library in a random order|the rest into their graveyard)?$`).exec(s);
+    if (gonti && (gonti[2] !== "that player's" || ctx.eventPlayer)) {
       let k = si + 1;
-      if (!/the rest on the bottom/.test(s)) {
-        if (!/^(?:Then )?[Pp]ut the rest on the bottom of that library in a random order$/.test(sentences[k] ?? "")) return null;
+      let toYard = gonti[3] === "the rest into their graveyard";
+      if (!gonti[3]) {
+        const rest = /^(?:Then )?[Pp]ut the rest (on the bottom of that library in a random order|into their graveyard)$/.exec(sentences[k]?.replace(/\.$/, "") ?? "");
+        if (!rest) return null;
+        toYard = rest[1] === "into their graveyard";
         k++;
       }
       if ((sentences[k] ?? "").replace(/\.$/, "") !== "You may cast that card for as long as it remains exiled, and mana of any type can be spent to cast that spell") return null;
       const who = parsePlayer(gonti[2]!.replace(/'s$/, ""), ctx);
       if (!who) return null;
-      effects.push({ type: "hideaway", n: num(gonti[1]!), from: who, castAnyType: true });
+      effects.push({ type: "hideaway", n: num(gonti[1]!), from: who, castAnyType: true, ...(toYard ? { restToGraveyard: true as const } : {}) });
       si = k;
       continue;
     }
@@ -3604,15 +3650,27 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       continue;
     }
     // "Then you may put a land card from your hand onto the battlefield. If you put a Cave onto the battlefield this way,
-    // you gain 4 life." (Spelunking): about the permanent it became.
+    // you gain 4 life." (Spelunking): about the permanent it became. "If you put an artifact onto the battlefield this way,
+    // put two +1/+1 counters on it" (Oviya, Automech Artisan): "it" is that permanent.
     const putThisWay = /^If you put an? ([A-Z][a-z]+|[a-z]+) onto the battlefield this way, (.+)$/.exec(s);
     if (putThisWay) {
       const last = effects[effects.length - 1];
       const put = last?.type === "may" && last.effects.length === 1 ? last.effects[0] : last;
       const filter = parseTargetPhrase(putThisWay[1]!);
       const inner = parseOne(putThisWay[2]!.charAt(0).toUpperCase() + putThisWay[2]!.slice(1), ctx);
-      if (put?.type !== "putFromHand" || put.who || put.any || filter?.kind !== "object" || !inner || /\b(?:it|its|that)\b/.test(putThisWay[2]!)) return null;
+      const aboutIt = /\bit\b/.test(putThisWay[2]!) && !(ctx.lastPut && /^put (?:a|an|one|two|three) [^ ]+ counters? on it$/.test(putThisWay[2]!));
+      if (put?.type !== "putFromHand" || put.who || put.any || filter?.kind !== "object" || !inner || aboutIt || /\b(?:its|that)\b/.test(putThisWay[2]!)) return null;
       effects.push({ type: "if", cond: { kind: "putThisWayIs", filter }, effects: inner });
+      continue;
+    }
+    // Hazel of the Rootbloom: "create a token that's a copy of target token you control. If that token is a Squirrel, instead
+    // create two tokens that are copies of it": the target as it is when this resolves.
+    const insteadTwo = /^If that token is an? ([A-Z][a-z]+), instead create (two|three) tokens that are copies of it$/.exec(s);
+    if (insteadTwo) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "createTokenCopy" || last.what.ref !== "target" || last.what.n || last.n !== 1 || last.each || !CREATURE_TYPES.has(insteadTwo[1]!)) return null;
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], subtypes: [insteadTwo[1]!], text: insteadTwo[1]! };
+      effects[effects.length - 1] = { type: "if", cond: { kind: "targetIs", index: last.what.index, filter }, effects: [{ ...last, n: num(insteadTwo[2]!) }], otherwise: [last] };
       continue;
     }
     // Yenna, Redtooth Regent: "Create a token that's a copy of it, except it isn't legendary. If the token is an Aura, untap
@@ -4191,7 +4249,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "You may play the exiled card without paying its mana cost" asks as it plays it (see the playLinked effect).
     // "You may play an additional land this turn" is a permission, not a choice made now (CR 305.2a).
     // "You may draw a card unless that player pays {1}" (Rhystic Study): they decide first (see the punisher sentences).
-    const may = /^[Yy]ou may (?!play the exiled card |cast a copy of the exiled card |play (?:an|up to \w+) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast spells this turn as though they had flash$|cast (?:that card|it) this turn$)(.+)$/.exec(s);
+    const may = /^[Yy]ou may (?!play the exiled card |cast a copy of the exiled card |play (?:an|up to \w+) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$)(.+)$/.exec(s);
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
       // don't control": ~ does it, if you choose.
@@ -4408,6 +4466,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       if (options.length < 2 || options.some((k) => !k || k === CHOSEN_PROTECTION) || effects.some((x) => x.type === "choose" && x.choice === "keyword")) return null;
       effects.push({ type: "choose", choice: "keyword", options: options as string[] });
       s = s.replace(choiceOf[0]!, ` ${choiceOf[1]} ${CHOSEN_KEYWORD}`);
+    }
+    // "Gains protection from the card type of your choice until end of turn" (Pippin, Guard of the Citadel): any card type
+    // (rulings; kindred cards aren't supported), chosen as it resolves (CR 608.2d).
+    if (/ gains? protection from the card type of your choice\b/.test(s)) {
+      if (effects.some((x) => x.type === "choose" && x.choice === "cardType")) return null;
+      effects.push({ type: "choose", choice: "cardType", options: Object.keys(CARD_TYPE_PLURAL) });
+      s = s.replace("the card type of your choice", "the chosen card type");
     }
     if (/ gains? protection from the color of your choice\b/.test(s)) {
       effects.push({ type: "choose", choice: "color" });

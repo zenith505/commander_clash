@@ -3,7 +3,7 @@ import type { AbilityBody, ChosenTarget, ChoiceKind, EntersOption, Modification,
 import { compileCard } from "../oracle";
 import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, basePowerNow, canBeSacrificed, defOf, objHasKeyword, objIsType, power, toughness, withCastThisTurn } from "../cards";
-import { attackedPlaneswalker, creatureTypesOf, livingPlayers, obj, player, shareCreatureType } from "../game";
+import { attackedPlaneswalker, creatureTypesOf, livingPlayers, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, type Characteristics } from "../layers";
 import { expandMany, expandPerOpponent, manySlot, modeCountProblem } from "../modes";
 import { CREATURE_TYPES, hexproofFrom, protectedFromPlayer, type SourceQuality } from "../keywords";
@@ -86,6 +86,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.manaCostIn && !spec.manaCostIn.includes(defOf(s, o).manaCost)) return false;
   if (spec.combat === "attacking" && o.attacking === undefined) return false;
   if (spec.combat === "attackingYou" && (o.attacking !== controller || o.attackingPermanent)) return false;
+  if (spec.combat === "attackingOpponent" && (o.attacking === undefined || o.attacking === controller || o.attackingPermanent || !opponents(s, controller).includes(o.attacking))) return false;
   if (spec.combat === "blocking" && !o.blocking) return false;
   if (spec.combat === "attackingOrBlocking" && o.attacking === undefined && !o.blocking) return false;
   if (spec.combat === "attackedThisTurn" && o.attacked?.turn !== s.turn) return false;
@@ -285,6 +286,8 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.manaCostIn && !spec.manaCostIn.includes(d.manaCost)) return false;
   if (spec.named !== undefined && !hasName(d.name, spec.named)) return false;
   if (spec.notNamed !== undefined && hasName(d.name, spec.notNamed)) return false;
+  if (spec.notNamedAny?.some((n) => sameName(d.name, n))) return false;
+  if (spec.notNamedAsYours) return false; // not worked out yet
   if (spec.doubleFaced && !isDoubleFacedDef(d)) return false;
   if (spec.manaAbility && !(compileCard(d).mana.length || compileCard(d).manaTriggers?.length)) return false;
   if (spec.transformed || spec.powerAboveBase || spec.toughnessAbovePower || spec.colorOfYourLegend) return false;
@@ -679,11 +682,11 @@ export function lesserPowerOk(s: GameState, spec: TargetSpec, t: TargetChoice, s
     const blocking = onField ? me.blocking : lk && (sourceZc === undefined || lk.zc === sourceZc) ? lk.blocking : undefined;
     if (!blocking?.includes(t.id) || s.objects[t.id]?.attacking === undefined) return false;
   }
-  if (!spec.lesserPowerThanSource || t.kind !== "object" || !sourceId) return true; // without the source, checked later
+  if ((!spec.lesserPowerThanSource && !spec.greaterPowerThanSource) || t.kind !== "object" || !sourceId) return true; // without the source, checked later
   const me = s.objects[sourceId];
   const mine = me?.zone === "battlefield" ? power(s, me) : s.lastKnown?.[sourceId]?.power;
   const o = s.objects[t.id];
-  return mine !== undefined && !!o && power(s, o) < mine;
+  return mine !== undefined && !!o && (spec.greaterPowerThanSource ? power(s, o) > mine : power(s, o) < mine);
 }
 
 /** Throws a message if `targets` isn't a legal, complete choice for `specs`. CR 601.2c */

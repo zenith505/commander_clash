@@ -6,7 +6,7 @@ import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { castProblem, freeCastable, draw, gainLife, log, loseLife, millCount, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
-import { bindBound, bindChosen, printedMatches } from "./targeting";
+import { bindBound, bindChosen, objectMatches, printedMatches } from "./targeting";
 import { ResolveCtx, apnap, players, amountNow, amountCtx, amountFor, objects } from "./resolve";
 import { describeDest } from "./describe";
 import { fireEvent } from "./triggers";
@@ -141,6 +141,26 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         gainLife(s, p.id, n);
         log(s, `${p.name} gains ${n} life.`);
       }
+      return;
+    }
+    case "duelReveal": {
+      // Both cards are revealed at once; an empty library reveals nothing, a mana value of 0 for the other player. Then
+      // both lose life at once, then each puts their card into their hand.
+      // With one of them no longer a legal target, the other still reveals and takes their card, losing nothing (CR 608.2b).
+      const who = e.between.flatMap((r) => players(s, r, ctx)).slice(0, 2);
+      const top = who.map((pid) => player(s, pid).library[0]);
+      who.forEach((pid, i) => top[i] && log(s, `${player(s, pid).name} reveals ${defOf(s, obj(s, top[i]!)).name}.`));
+      const mv = top.map((id) => (id ? defMv(defOf(s, obj(s, id))) : 0));
+      who.forEach((pid, i) => {
+        const n = mv[1 - i] ?? 0;
+        if (n <= 0) return;
+        loseLife(s, pid, n);
+        log(s, `${player(s, pid).name} loses ${n} life.`);
+      });
+      who.forEach((pid, i) => {
+        const id = top[i];
+        if (id && s.objects[id]?.zone === "library" && player(s, pid).library.includes(id)) moveObject(s, id, "hand");
+      });
       return;
     }
     case "discard": {
@@ -285,7 +305,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const cards = lib.library.slice(0, e.n);
         if (!cards.length) return;
         sc.looked = cards;
-        s.pending = { kind: "searchLibrary", player: p.id, source: src, what: "a card", cards, min: 1, max: 1, dig: { looked: cards, to: e.castAnyType ? "into exile face down: you may cast it while it's exiled, with mana of any type" : "into exile face down (hideaway)", rest: e.from ? `on the bottom of ${lib.name}'s library in a random order` : "on the bottom of your library in a random order" } };
+        s.pending = { kind: "searchLibrary", player: p.id, source: src, what: "a card", cards, min: 1, max: 1, dig: { looked: cards, to: e.castAnyType ? "into exile face down: you may cast it while it's exiled, with mana of any type" : "into exile face down (hideaway)", rest: e.restToGraveyard ? `into ${lib.name}'s graveyard` : e.from ? `on the bottom of ${lib.name}'s library in a random order` : "on the bottom of your library in a random order" } };
         return "paused";
       }
       const looked = sc.looked ?? [];
@@ -307,6 +327,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         log(s, `You exiled ${defOf(s, o).name} face down with ${src}.`, p.id);
       }
       const rest = looked.filter((id) => obj(s, id).zone === "library");
+      if (e.restToGraveyard) {
+        for (const id of rest) moveObject(s, id, "graveyard");
+        if (rest.length) log(s, `${p.name} puts ${rest.length} card${rest.length === 1 ? "" : "s"} into ${fromId === p.id ? "their" : `${lib.name}'s`} graveyard.`);
+        return;
+      }
       shuffle(s, rest);
       for (const id of rest) moveObject(s, id, "library"); // to the bottom, in a random order
       if (rest.length) log(s, `${p.name} puts ${rest.length} card${rest.length === 1 ? "" : "s"} on the bottom of ${fromId === p.id ? "their" : `${lib.name}'s`} library in a random order.`);
@@ -638,7 +663,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // "With mana value less than or equal to ..." (TargetSpec.bound): as it resolves.
       const filter0 = e.filter && bindBound(s, e.filter, amountCtx(s, ctx));
       const filter1 = filter0?.named === "~" ? { ...filter0, named: src } : filter0?.notNamed === "~" ? { ...filter0, notNamed: src } : filter0;
-      const filter = filter1?.colorOfYourLegend ? legendColors(s, filter1, ctx.controller) : filter1;
+      const filter2 = filter1?.colorOfYourLegend ? legendColors(s, filter1, ctx.controller) : filter1;
+      // "With a different name than each Aura you control" (Light-Paws): the names of those you control as it resolves.
+      const filter = filter2?.notNamedAsYours ? (({ notNamedAsYours: yours, ...rest }) => ({ ...rest, notNamedAny: s.battlefield.map((id) => s.objects[id]!).filter((o) => !o.faceDown && controllerOf(s, o) === ctx.controller && objectMatches(s, yours!, o, ctx.controller, false)).map((o) => characteristics(s, o).name) }))(filter2) : filter2;
       const who = e.who ? (e.who.ref === "eachPlayer" || e.who.ref === "eachOpponent" || (e.who.ref === "target" && (e.who.n ?? 1) > 1) ? apnap(s, players(s, e.who, ctx)) : players(s, e.who, ctx).slice(0, 1)) : [ctx.controller];
       const queue = (sc.searchQueue ??= who.filter((pid) => !player(s, pid).lost));
       const searchedBy = (sc.searchedBy ??= []);
@@ -750,7 +777,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const instead = !!sc.mayInstead && sc.may === true;
       const dest = (pid: PlayerId, id: ObjectId): SearchDest => (instead ? e.mayInstead!.dest : exiledFor(pid) !== undefined ? { zone: "exile" } : picked.includes(id) ? e.split!.to : foundBy(pid).indexOf(id) > 0 && e.others ? e.others : e.landTo && isType(defOf(s, obj(s, id)), "Land") ? e.landTo : e.dest);
       const onto = searchers.flatMap((pid) => foundBy(pid).filter((id) => dest(pid, id).zone === "battlefield").map((id) => ({ o: obj(s, id), under: pid })));
-      const hosts = chooseAuraHosts(s, onto, src);
+      // "Attached to ~" (Light-Paws): only to the source, if it's still on the battlefield as the same object (rulings,
+      // CR 400.7).
+      const me = ctx.sourceId !== undefined ? s.objects[ctx.sourceId] : undefined;
+      const self = me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? me.id : null;
+      const hosts = chooseAuraHosts(s, onto, src, e.dest.attachToSelf ? self : undefined);
       if (hosts === "paused") return "paused";
       const moves: { pid: PlayerId; id: ObjectId }[] = [];
       for (const pid of searchers) {

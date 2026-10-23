@@ -61,6 +61,15 @@ function putAbilityCopy(s: GameState, orig: StackItem, controller: PlayerId, tar
 }
 
 /** Twinning Staff: how many additional copies a player gets when they copy a spell (one per permanent with it, rulings). */
+/** Whether `pid` could cast this card as a pending free cast of it (PendingDecision "castFree") now, mana for its additional costs (the commander tax) aside. */
+function freeCastableFor(s: GameState, pid: PlayerId, id: ObjectId, src: string): boolean {
+  const keep = s.pending;
+  s.pending = { kind: "castFree", player: pid, objectId: id, source: src };
+  const ok = freeCastable(s, pid, id, true);
+  s.pending = keep;
+  return ok;
+}
+
 export function extraSpellCopies(s: GameState, pid: PlayerId): number {
   return s.battlefield.filter((id) => abilitiesOf(s, obj(s, id)).extraSpellCopy && controllerOf(s, obj(s, id)) === pid).length;
 }
@@ -173,6 +182,25 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       s.pending = null;
       log(s, `${defOf(s, obj(s, id)).name} can't be cast.`);
       return;
+    }
+    case "castCommanderFree": {
+      // Geode Golem: a commander you own (CR 903.3) in the command zone as this resolves, cast then (CR 608.2g); the
+      // commander tax is an additional cost, still paid (CR 903.8, 118.9d; rulings). With two, either one (rulings on
+      // partner): the choice first, then whether to cast it.
+      const sc = (s.resolving!.scratch ??= {});
+      const p = player(s, ctx.controller);
+      if (sc.playLinked) return;
+      const mine = p.command.filter((id) => obj(s, id).isCommander && obj(s, id).owner === p.id && freeCastableFor(s, p.id, id, src));
+      if (!mine.length) return;
+      if (mine.length > 1 && (sc.commander === undefined || !mine.includes(sc.commander))) {
+        s.pending = { kind: "chooseOption", player: p.id, source: src, what: "commander", options: mine, labels: mine.map((id) => defOf(s, obj(s, id)).name), prompt: "cast which commander without paying its mana cost?" };
+        return "paused";
+      }
+      const id = mine.length > 1 ? sc.commander! : mine[0]!;
+      sc.commander = undefined;
+      sc.playLinked = true;
+      s.pending = { kind: "castFree", player: p.id, objectId: id, source: src };
+      return "paused";
     }
     case "castCipher": {
       // "You may copy the encoded card and you may cast the copy without paying its mana cost" (CR 702.99a): the copy
@@ -447,12 +475,13 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         }
         // "With a different name than that spell": the countered spell's name (CR 201.2).
         const other = e.notNamedAs !== undefined ? spellNameOf(s, ctx, e.notNamedAs) : undefined;
-        const at = p.library.findIndex((id) => !isType(defOf(s, obj(s, id)), "Land") && (other === undefined || !sameName(defOf(s, obj(s, id)).name, other)));
+        const fits = (id: ObjectId) => (e.untilTypes ? e.untilTypes.some((t) => isType(defOf(s, obj(s, id)), t)) : !isType(defOf(s, obj(s, id)), "Land"));
+        const at = p.library.findIndex((id) => fits(id) && (other === undefined || !sameName(defOf(s, obj(s, id)).name, other)));
         // No nonland card: every card is revealed or exiled (rulings on Stolen Goods and Treasure Hunt).
         const seen = p.library.slice(0, at < 0 ? p.library.length : at + 1);
         const hit = at < 0 ? undefined : p.library[at];
         const names = seen.map((id) => defOf(s, obj(s, id)).name).join(", ");
-        log(s, `${p.name} ${e.reveal ? "reveals" : "exiles"} ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${names})` : ""}${hit ? "" : ", finding no nonland card"}.`);
+        log(s, `${p.name} ${e.reveal ? "reveals" : "exiles"} ${seen.length} card${seen.length === 1 ? "" : "s"} from the top of their library${seen.length ? ` (${names})` : ""}${hit ? "" : `, finding no ${e.untilTypes ? "instant or sorcery" : "nonland"} card`}.`);
         if (e.then === "hand") {
           for (const id of seen) moveObject(s, id, "hand");
           return;

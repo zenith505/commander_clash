@@ -272,6 +272,7 @@ function diesMatches(
 
 /** Does `entering` set off `o`'s "whenever a/another/~ or another ... enters" ability? */
 function entersMatches(s: GameState, en: NonNullable<TriggeredAbility["enters"]>, o: GameObject, entering: GameObject, you: PlayerId): boolean {
+  if (en.ifCast && !entering.wasCast) return false;
   if (o.id === entering.id) {
     if (en.orSelf) return true;
     if (en.other) return false;
@@ -1012,6 +1013,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const watcher = controllerOf(s, o);
         // Otherwise, "that many": how many of them attacked (The Ur-Dragon).
         const attacked = t.anotherPlayer ? { player: ev.controller, amount: hit.filter(([x]) => obj(s, x).attacking === watcher && !obj(s, x).attackingPermanent).length } : ev.type === "groupAttack" && !anyone ? { amount: hit.length } : undefined;
+        // "Whenever one or more creatures attack one of your opponents" (Frontier Warmonger): once for each of the
+        // watcher's opponents attacked, about the creatures attacking them (CR 508.3e).
+        if (t.attacksOpponent) {
+          for (const p of s.turnOrder.filter((q) => opponents(s, watcher).includes(q))) {
+            const at = hit.filter(([x]) => attackingYouNow(s, x, p, !!t.attacksOpponent!.orPlaneswalkers)).map(([x]) => ({ id: x, zc: obj(s, x).zoneChanges ?? 0 }));
+            if (at.length) add(o, watcher, (_, tt) => same(tt) && JSON.stringify(tt.attacksOpponent) === JSON.stringify(t.attacksOpponent), list, undefined, undefined, undefined, undefined, undefined, { player: p, group: at });
+          }
+          continue;
+        }
         // "Whenever you attack a player": once for each player the matching creatures attack (CR 508.3e).
         if (t.perPlayer) {
           for (const p of s.turnOrder)

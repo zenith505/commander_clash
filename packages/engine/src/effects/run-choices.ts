@@ -25,6 +25,13 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const sc = (r.scratch ??= {});
       const source = e.once && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       const key = `${ctx.sourceZc ?? source?.zoneChanges ?? 0}|do:${e.text}`;
+      // Declined, and what happens instead is another "you may" (Gathering Stone: "If you don't put the card into your hand,
+      // you may put it into your graveyard"): that one is asked on its own.
+      if (sc.mayOtherwise === e.text) {
+        for (const inner of e.otherwise ?? []) if (runEffect(s, inner, ctx) === "paused") return "paused";
+        sc.mayOtherwise = undefined;
+        return;
+      }
       if (sc.may === undefined && source?.triggeredThisTurn?.includes(key)) sc.may = false; // done already this turn (CR 603.2h)
       // "You may pay {X}": X first (CR 107.1c), at most what the player could pay, then the payment with that X.
       if (e.payX && e.pay?.mana && sc.may === undefined) {
@@ -97,6 +104,13 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       r.did = sc.may;
       if (!sc.may) {
+        if (e.otherwise?.some((x) => x.type === "may")) {
+          sc.mayOtherwise = e.text;
+          sc.may = undefined;
+          for (const inner of e.otherwise) if (runEffect(s, inner, ctx) === "paused") return "paused";
+          sc.mayOtherwise = undefined;
+          return;
+        }
         for (const inner of e.otherwise ?? []) if (runEffect(s, inner, ctx) === "paused") return "paused";
         return;
       }
@@ -190,7 +204,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       while (sc.mayQueue.length) {
         const pid = sc.mayQueue[0]!;
         if (sc.may === undefined) {
-          s.pending = { kind: "chooseMay", player: pid, prompt: e.text.replace(/~/g, src), source: src, ...(e.wheel !== undefined ? { wheel: e.wheel } : {}), ...(e.pay ? { pay: e.pay } : {}) };
+          // "Each opponent who doesn't loses 2 life for each ..." (Fandaniel): the prompt says what declining costs.
+          const after = e.each ? s.resolving!.body.effects[s.resolving!.next + 1] : undefined;
+          const loss = after?.type === "loseLife" && after.who.ref === "notChoseThisWay" ? amountNow(s, after.n, ctx) : undefined;
+          s.pending = { kind: "chooseMay", player: pid, prompt: e.text.replace(/~/g, src), source: src, ...(e.wheel !== undefined ? { wheel: e.wheel } : {}), ...(e.pay ? { pay: e.pay } : {}), ...(loss !== undefined ? { otherwise: `If you don't, you lose ${loss} life.` } : {}) };
           return "paused";
         }
         if (sc.may) sc.mayers!.push(pid);

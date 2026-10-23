@@ -75,6 +75,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "Put your commander into your hand from the command zone" (Command Beacon): one you own, of your choice with two
   // (rulings); nothing if none is there (CR 903.3).
   if (/^[Pp]ut your commander into your hand from the command zone$/.test(s)) return [{ type: "commanderToHand" }];
+  // Geode Golem: the pending free cast is the "may" (it can be declined).
+  if (/^[Yy]ou may cast your commander from the command zone without paying its mana cost$/.test(s)) return [{ type: "castCommanderFree" }];
   // Hellkite Courser: "you may put a commander you own from the command zone onto the battlefield" (not cast, so no tax).
   if (/^[Pp]ut a commander you own from the command zone onto the battlefield$/.test(s)) return [{ type: "commanderToBattlefield" }];
   // "Return to their owners' hands all creatures with ..." (Engulf the Shore), "Return to the battlefield target ... card in
@@ -878,6 +880,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^[Ss]acrifice another ([a-z][^,]*?)$/.exec(s)) && !ctx.spell) {
     const filter = pickFilter(m[1]!);
     return filter && filter.kind === "object" ? [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true, text: `other ${filter.text}` }, n: 1, action: "sacrifice" }] : null;
+  }
+  // "Defending player exiles two permanents they control" (Bane of Bala Ged): their own, chosen as it resolves, not
+  // targeted; with no more than that many, all of them (rulings).
+  if ((m = new RegExp(`^(.+?) exiles ${NUMX} (.+?) they control$`).exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    const filter = pickFilter(m[3]!);
+    return who && who.ref !== "you" && filter?.kind === "object" ? [{ type: "pick", who, filter, n: amt(m[2]!), action: "exile" }] : null;
   }
   if ((m = new RegExp(`^(?:(.+?) )?[Ss]acrifices? ${NUMX} (.+?)(?: of (?:their|his or her) choice)?(?: unless (?:they pay|that player pays) (.+))?$`).exec(s)) && !/^(~|it|them|that creature)$/i.test(m[3]!)) {
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };

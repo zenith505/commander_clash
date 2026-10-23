@@ -328,12 +328,20 @@ export function parseManaSpend(sentence: string): ManaSpend | null {
   // "Of the chosen type" (Unclaimed Territory): the type its source's controller chose for it (see spend.ts boundSpend).
   for (const part of m[1]!.split(/,? or (?=activate |cast )/)) {
     let x: RegExpExecArray | null;
-    if ((x = /^cast (?:an? )?(.+? spells? of the chosen type|.+?) spells?$/.exec(part) ?? /^cast (?:an? )?(.+? spells? of the chosen type)$/.exec(part)) && !only.spells) {
+    // "Cast a spell of the chosen type" (Eclipsed Realms): any spell with that creature type (CR 205.3m).
+    if (/^cast (?:a spell|spells) of the chosen type$/.test(part) && !only.spells) only.spells = { kind: "spell", chosen: "type", text: "spells of the chosen type" };
+    else if ((x = /^cast (?:an? )?(.+? spells? of the chosen type|.+?) spells?$/.exec(part) ?? /^cast (?:an? )?(.+? spells? of the chosen type)$/.exec(part)) && !only.spells) {
       const spec = spellFilter(x[1]!);
       if (!spec) return null;
       only.spells = spec;
     } else if (part === "cast spells" && !only.spells) only.spells = { kind: "spell", text: "spells" };
     else if ((part === "activate abilities" || part === "activate an ability") && !only.abilities) only.abilities = "any";
+    // "Activate an ability of a source of the chosen type" (Eclipsed Realms): a permanent or a card anywhere with that
+    // creature type (rulings).
+    else if (part === "activate an ability of a source of the chosen type" && !only.abilities) {
+      only.abilities = { kind: "object", chosen: "type", text: "source of the chosen type" };
+      only.anyZone = true;
+    }
     else if ((x = /^activate (?:abilities of|an ability of an?) (.+?)( sources?)?( of the chosen type)?$/.exec(part)) && !only.abilities) {
       const words = x[1]!.split(" ");
       const spec = parseTargetPhrase([...words.slice(0, -1), singular(words[words.length - 1]!)].join(" "));

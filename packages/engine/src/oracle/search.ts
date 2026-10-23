@@ -60,17 +60,26 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
   // with {X} in its mana cost counting X as 0 (CR 202.3e, rulings).
   const total = / with total mana value (\d+) or less$/.exec(m[3]!);
   if (total && (n === 1 || eachX || share)) return null;
-  const phrase = eachX ? m[3]!.slice(0, eachX.index) : share ? m[3]!.slice(0, share.index) : total ? m[3]!.slice(0, total.index) : m[3]!;
+  // Light-Paws: "an Aura card with mana value less than or equal to that Aura and with a different name than each Aura you
+  // control": the Aura that entered (the trigger's subject, as it last existed), and the names of those you control as it
+  // resolves.
+  const unlike = / and with a different name than each ([A-Z][a-z]+) you control$/.exec(m[3]!);
+  const unlikeSpec = unlike ? parseSearchFilter(`${unlike[1]} card`) : undefined;
+  if (unlike && (!unlikeSpec || n !== 1 || eachX || share || total)) return null;
+  const phrase = eachX ? m[3]!.slice(0, eachX.index) : share ? m[3]!.slice(0, share.index) : total ? m[3]!.slice(0, total.index) : unlike ? m[3]!.slice(0, unlike.index).replace(/ with mana value less than or equal to that Aura$/, " with mana value less than or equal to that permanent's mana value") : m[3]!;
   // "That each have different names" (Tiamat) says the same.
   const different = / (?:with|that each have) different names$/.exec(phrase);
   if ((different && n === 1) || (eachX && !different)) return null;
-  const filter0 = parseSearchFilter(different ? phrase.slice(0, different.index) : phrase, count);
-  if (filter0 === null || (eachX && (!filter0 || filter0.bound))) return null;
+  const filter00 = parseSearchFilter(different ? phrase.slice(0, different.index) : phrase, count);
+  if (filter00 === null || (eachX && (!filter00 || filter00.bound)) || (unlike && !filter00)) return null;
+  const filter0 = unlike ? { ...filter00!, notNamedAsYours: { ...unlikeSpec!, kind: "object" as const, text: `${unlike[1]} you control` }, text: m[3]! } : filter00;
   const filter = eachX ? { ...filter0!, bound: { key: "manaValue" as const, at: "exact" as const, amount: X }, text: `${filter0!.text} with mana value X` } : filter0;
   let r: RegExpExecArray | null;
   // An Aura put onto the battlefield this way: its controller chooses what it enchants as it enters (CR 303.4f).
   const base = { type: "search" as const, ...(filter ? { filter: different ? { ...filter, text: `${filter.text} with different names` } : share ? { ...filter, text: `${filter.text} that share a land type` } : total ? { ...filter, text: `${filter.text} with total mana value ${total[1]} or less` } : filter } : {}), n, upTo, reveal, ...(different ? { oneEach: true as const } : {}), ...(share ? { shareLandType: true as const } : {}), ...(total ? { totalMv: Number(total[1]) } : {}) };
   if ((r = new RegExp(`^put ${SEARCH_PRONOUN} ${SEARCH_DEST}, then shuffle$`, "i").exec(rest))) return [{ ...base, dest: searchDest(r[1]!) }];
+  // "Put that card onto the battlefield attached to ~" (Light-Paws): an Aura, if it could enchant the source (rulings).
+  if (filter?.subtypes?.length === 1 && filter.subtypes[0] === "Aura" && n === 1 && new RegExp(`^put ${SEARCH_PRONOUN} onto the battlefield attached to ~, then shuffle$`).test(rest)) return [{ ...base, dest: { zone: "battlefield", attachToSelf: true } }];
   if ((r = new RegExp(`^put one ${SEARCH_DEST} and the other ${SEARCH_DEST}, then shuffle$`, "i").exec(rest)) && n === 2)
     return [{ ...base, dest: searchDest(r[1]!), others: searchDest(r[2]!) }];
   // The shuffle and putting the card on top are one action (rulings).

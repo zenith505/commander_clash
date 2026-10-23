@@ -359,7 +359,7 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     return { ref: "target", index: addTarget(ctx, { kind: "object", types: ["Planeswalker", "Battle"], anyOf, text: `target ${m[1]!}` }) };
   }
   const [phrase, theirs] = thatPlayerControls(m[1]!, ctx);
-  const spec = parseTargetPhrase(phrase, { x: true, count: boundCount(ctx) });
+  const spec = parseTargetPhrase(phrase, { x: true, count: boundCount(ctx), target: true });
   if (!spec || spec.kind === "player" || spec.kind === "spell" || (spec.kind === "card") !== cards || (theirs && (spec.kind === "card" ? !!spec.owner : spec.kind !== "object" || spec.controller))) return null;
   // "Target creature with power X or less": the X of a spell or of an activated ability's cost (CR 107.3a).
   // With "where X is ...", body.ts makes it a bound (TargetSpec.bound) once X is read, or gives up.
@@ -466,7 +466,7 @@ function parseSeveralTargets(m: RegExpExecArray, ctx: Ctx, cards: boolean): ObjR
   const mine = mine0.replace(/ controlled by different players$/, "").replace(/ that each have a different mana value (\d+|X) or less(?= from |$)/, " with mana value $1 or less").replace(/ from a single graveyard$/, " from a graveyard").replace(/ that share a creature type(?= from |$)/, "").replace(/ with different names(?= from |$)/, "").replace(/ with total (?:mana value|power) (?:\d+|X) or less(?= from | in |$)/, "");
   // "Up to X target artifact cards each with mana value X or less" (Dance of the Manse): each one's, with the spell's X.
   const each = (n > 1 || !!many) && / each with mana value X or less(?= from |$)/.test(mine);
-  const parsed = differMv || each ? parseTargetPhrase(singularPhrase(mine.replace(/ each with mana value X or less(?= from |$)/, " with mana value X or less")), { x: true }) : n > 1 || many ? parseTargetPhrase(singularPhrase(mine)) : parseTargetPhrase(mine, { x: true, count: boundCount(ctx) });
+  const parsed = differMv || each ? parseTargetPhrase(singularPhrase(mine.replace(/ each with mana value X or less(?= from |$)/, " with mana value X or less")), { x: true }) : n > 1 || many ? parseTargetPhrase(singularPhrase(mine)) : parseTargetPhrase(mine, { x: true, count: boundCount(ctx), target: true });
   if (!parsed || parsed.kind === "player" || parsed.kind === "spell" || (parsed.kind === "card") !== cards || (theirs && (parsed.kind !== "object" || parsed.controller))) return null;
   // "Up to one target creature card with mana value X or less": as for one target (see parseTarget).
   if (parsed.xRange && !ctx.whereX && !ctx.spell && !ctx.activated && !ctx.ownX) return null;
@@ -654,6 +654,8 @@ export function parseTargetPhrase(
     x?: boolean;
     /** Reads the amount of "with mana value less than or equal to <amount>" (TargetSpec.bound); without it, unsupported. */
     count?: (text: string) => AmountExpr | null;
+    /** One target ("target creature ..."), as it's chosen. */
+    target?: true;
   } = {},
 ): TargetSpec | null {
   // Yenna, Redtooth Regent: "enchantment you control that doesn't have the same name as another permanent you control".
@@ -661,6 +663,13 @@ export function parseTargetPhrase(
   if (unique) {
     const rest = parseTargetPhrase(phrase.trim().slice(0, unique.index), opts);
     return rest?.kind === "object" && rest.controller === "you" ? { ...rest, uniqueNameAmongYours: true, text: `target ${phrase.trim().toLowerCase()}` } : null;
+  }
+  // Éowyn, Fearless Knight: "target creature an opponent controls with greater power": than the source's, or its last
+  // known power if it has left (as mentor's "lesser power", CR 702.134a). Only a target: it's checked as targets are.
+  const greater = opts.target && /^(.+) with greater power$/i.exec(phrase.trim());
+  if (greater) {
+    const rest = parseTargetPhrase(greater[1]!, opts);
+    return rest?.kind === "object" && !rest.power && !rest.many ? { ...rest, greaterPowerThanSource: true, text: `${rest.text} with greater power` } : null;
   }
   // Magewright's Stone: "creature that has an activated ability with {T} in its cost", printed or granted (rulings).
   const tapAb = / that has an activated ability with \{T\} in its cost$/.exec(phrase.trim());
@@ -808,7 +817,7 @@ export function parseTargetPhrase(
   }
   // "creature with a +1/+1 counter on it", "creatures with ice counters on them", "creature you control with a counter on
   // it", "permanents you control with counters on them" (any kind)
-  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood) counter on it|([+-]1\/[+-]1|ice|slime|flood) counters on them|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
+  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood|coin) counter on it|([+-]1\/[+-]1|ice|slime|flood|coin) counters on them|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
   if (counter) {
     extra.counter = counter[1] ?? counter[2] ?? ANY_COUNTER;
     p = (p.slice(0, counter.index) + p.slice(counter.index + counter[0].length)).trim();

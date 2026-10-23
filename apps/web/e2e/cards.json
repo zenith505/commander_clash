@@ -3080,6 +3080,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4b96c22a-0d5b-44fd-b326-5f3ffcc3917b",
+  "name": "Deadpool, Trading Card",
+  "manaCost": "{2}{B}{R}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Mutant Mercenary Hero",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Mutant",
+   "Mercenary",
+   "Hero"
+  ],
+  "oracleText": "As Deadpool enters, you may exchange his text box and another creature's.\nAt the beginning of your upkeep, you lose 3 life.\n{3}, Sacrifice this creature: Each other player draws a card.",
+  "power": "5",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2025-04-01",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0a1dc797-7531-4494-afe6-add6ac3f74c0",
   "name": "Defiler of Vigor",
   "manaCost": "{3}{G}{G}",

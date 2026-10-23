@@ -81,12 +81,15 @@ const ownId = (o: GameObject): string => o.melded ?? (o.face !== undefined ? fac
 /** Its definition's key: face-down values (layer 1b, CR 613.2b), or what it's a copy of (layer 1a), or its own card. */
 /** Disguised and cloaked permanents have ward {2} (CR 702.168a, 701.58a). */
 const withWard = (o: GameObject) => o.faceDown === "disguise" || o.faceDown === "cloak";
-export const cardIdOf = (o: GameObject): string => (o.faceDown ? (withWard(o) ? FACE_DOWN_WARD.oracleId : FACE_DOWN.oracleId) : copiedId(o));
+export const cardIdOf = (o: GameObject): string => (o.faceDown ? (withWard(o) ? FACE_DOWN_WARD.oracleId : FACE_DOWN.oracleId) : textKey(o) ?? copiedId(o));
+
+/** With its text box exchanged (GameObject.textFrom), on the battlefield: the key its definition with that text has. */
+const textKey = (o: GameObject): string | undefined => (o.textFrom && (o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged") ? `${copiedId(o)}|text:${o.textFrom}` : undefined);
 
 /** The card definition an object uses right now: its own, what it copies, or a face-down one (CR 613.2, 708.2). */
 export const defOf = (s: GameState, o: GameObject): CardDef => {
   const out = ownDefOf(s, o);
-  if (o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged") return o.textFrom ? withTextOf(s, out, o.textFrom) : out;
+  if (o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged") return o.textFrom && !o.faceDown ? withTextOf(s, out, o.textFrom, textKey(o)!) : out;
   // Outside the battlefield, effects like Maskwood Nexus's change a creature card's or spell's creature types.
   return offFieldColored(s, o, offFieldTyped(s, o, offFieldCreatureDef(out)));
 };
@@ -96,8 +99,7 @@ export const defOf = (s: GameState, o: GameObject): CardDef => {
  * that card's name, which meant that object, now means this one (CR 201.5). Registered in GameState.cards under a key of
  * its own, so it compiles and caches like any card.
  */
-function withTextOf(s: GameState, d: CardDef, from: string): CardDef {
-  const key = `${d.oracleId}|text:${from}`;
+function withTextOf(s: GameState, d: CardDef, from: string, key: string): CardDef {
   const hit = s.cards[key];
   if (hit) return hit;
   const src = s.cards[from];

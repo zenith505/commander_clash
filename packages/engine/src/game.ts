@@ -1146,6 +1146,9 @@ export function exchangeText(s: GameState, a: GameObject, b: GameObject) {
   s.cards[db.oracleId] ??= db;
   a.textFrom = db.oracleId;
   b.textFrom = da.oracleId;
+  // Their new definitions, registered now (cardIdOf names them for triggers and the like).
+  defOf(s, a);
+  defOf(s, b);
   invalidateCharacteristics(s);
 }
 

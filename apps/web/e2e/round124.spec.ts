@@ -1,7 +1,7 @@
 // Round 124's prompts: ward—waterbend asks the targeting player to pay, and the Pay button taps their artifacts and
 // creatures for what their mana can't pay (CR 701.67a).
 import { expect, test } from "@playwright/test";
-import { one, open, pageErrors, scene } from "./scene";
+import { LANDS, one, open, pageErrors, scene } from "./scene";
 import { card, controls, resolveUntil } from "./ui";
 
 test("The Unagi of Kyoshi Island: Lightning Bolt at it, ward—waterbend {4} paid by tapping four creatures", async ({ page }) => {
@@ -41,5 +41,21 @@ test("Benevolent River Spirit: cast with two Islands, its waterbend {5} paid by 
   await card(page, "Benevolent River Spirit", s).click();
   const after = await resolveUntil(page, (st) => st.objects[spirit]!.zone === "battlefield" && st.stack.length === 0);
   expect(after.battlefield.filter((id) => after.cards[after.objects[id]!.cardId]!.name === "Grizzly Bears").every((id) => after.objects[id]!.tapped)).toBe(true);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Deadpool, Trading Card: as it enters, exchange its text box with Ana's Serra Angel", async ({ page }) => {
+  const s = scene({ hand: ["Deadpool, Trading Card"], board: LANDS }, [{ board: ["Serra Angel"] }]);
+  const [deadpool, angel] = [one(s, "Deadpool, Trading Card"), one(s, "Serra Angel")];
+  await open(page, s);
+  await card(page, "Deadpool, Trading Card", s).click();
+  await resolveUntil(page, (st) => st.pending?.kind === "chooseOption" && st.pending.what === "exchangeText");
+  const bar = controls(page);
+  await expect(bar).toContainText("you may exchange its text box with another creature's");
+  await expect(bar.getByRole("button", { name: "Don't exchange", exact: true })).toBeVisible();
+  await bar.getByRole("button", { name: "Serra Angel (Ana)", exact: true }).click();
+  const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && st.objects[deadpool]!.zone === "battlefield");
+  expect(after.objects[deadpool]!.textFrom).toBeTruthy();
+  expect(after.objects[angel]!.textFrom).toBeTruthy();
   expect(pageErrors(page)).toEqual([]);
 });

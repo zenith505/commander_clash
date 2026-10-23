@@ -1,9 +1,10 @@
 // Round 124: round 123's gaps (ward—waterbend, ...), then the most played cards.
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, putOnBattlefield, setup } from "./helpers";
-import { botActions, castProblem, isFullySupported, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
-import { invalidateCharacteristics } from "../src/layers";
+import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
+import { botActions, castProblem, isFullySupported, moveObject, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { characteristics, invalidateCharacteristics } from "../src/layers";
+import { abilitiesOf, power, toughness } from "../src/cards";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const settle = (s: GameState, yes = true) => {
@@ -199,5 +200,68 @@ describe("waterbend as an additional cost to cast a spell (CR 701.67a)", () => {
     expect(paid.objects[yard]!.zone).toBe("library");
     expect(paid.objects[ids[0]!]!.zone).toBe("exile");
     expect(paid.players[ap]!.noMaxHandSize).toBeTruthy();
+  });
+});
+
+const deadpool = card("Deadpool, Trading Card", "Legendary Creature — Mutant Mercenary Hero", "{2}{B}{R}", {
+  power: "5",
+  toughness: "3",
+  oracleText: "As Deadpool enters, you may exchange his text box and another creature's.\nAt the beginning of your upkeep, you lose 3 life.\n{3}, Sacrifice this creature: Each other player draws a card.",
+});
+const serra = card("Serra Angel", "Creature — Angel", "{3}{W}{W}", { power: "4", toughness: "4", keywords: ["Flying", "Vigilance"], oracleText: "Flying\nVigilance (Attacking doesn't cause this creature to tap.)" });
+const visionary = card("Elvish Visionary", "Creature — Elf Shaman", "{1}{G}", { power: "1", toughness: "1", oracleText: "When this creature enters, draw a card." });
+
+describe("Deadpool, Trading Card: exchanging text boxes (CR 612.5, 701.12h)", () => {
+  const enter = (other: CardDef, theirs = true) => {
+    const { s: s0, ap, ids, opp } = setup([deadpool]);
+    const o = putOnBattlefield(s0, theirs ? opp : ap, other);
+    const s = untilChoice(run(s0, planCast(s0, ap, ids[0]!)));
+    return { s, ap, opp, dp: ids[0]!, o };
+  };
+
+  it("as it enters, its controller may choose another creature; then each has the other's text, keeping its name and P/T", () => {
+    supported(deadpool);
+    const { s: s0, ap, opp, dp, o } = enter(serra);
+    expect(s0.pending).toMatchObject({ kind: "chooseOption", what: "exchangeText", player: ap, options: [o, "none"] });
+    const s = settle(act(s0, { type: "chooseOption", player: ap, choice: o }));
+    const d = characteristics(s, s.objects[dp]!);
+    expect(d.name).toBe("Deadpool, Trading Card");
+    expect(d.keywords).toEqual(expect.arrayContaining(["Flying", "Vigilance"]));
+    expect(`${power(s, s.objects[dp]!)}/${toughness(s, s.objects[dp]!)}`).toBe("5/3");
+    expect(characteristics(s, s.objects[o]!).keywords).not.toContain("Flying");
+    // Serra Angel now has "At the beginning of your upkeep, you lose 3 life" for its controller, and the sacrifice ability.
+    expect(abilitiesOf(s, s.objects[o]!).activated).toHaveLength(1);
+    let t = passUntil(s, "upkeep", opp);
+    const life = t.players[opp]!.life;
+    t = settle(t);
+    expect(t.players[opp]!.life).toBe(life - 3);
+  });
+
+  it("an enters ability it gets this way triggers: it enters with that text (CR 614.12)", () => {
+    const { s: s0, ap, dp, o } = enter(visionary, false);
+    let s = act(s0, { type: "chooseOption", player: ap, choice: o });
+    const hand = s.players[ap]!.hand.length;
+    s = settle(s);
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+    expect(abilitiesOf(s, s.objects[dp]!).activated).toHaveLength(0);
+  });
+
+  it("choosing not to: nothing changes, and Deadpool keeps its own text", () => {
+    const { s: s0, ap, dp, o } = enter(serra);
+    const s = settle(act(s0, { type: "chooseOption", player: ap, choice: "none" }));
+    expect(characteristics(s, s.objects[o]!).keywords).toContain("Flying");
+    expect(abilitiesOf(s, s.objects[dp]!).activated).toHaveLength(1);
+  });
+
+  it("the other creature keeps Deadpool's text after Deadpool leaves; a bot trades its text onto an opponent's best creature", () => {
+    const { s: s0, ap, dp, o } = enter(serra);
+    let s = settle(s0);
+    expect(characteristics(s, s.objects[dp]!).keywords).toContain("Flying");
+    s = moveObject(s, dp, "graveyard") ?? s;
+    invalidateCharacteristics(s);
+    expect(characteristics(s, s.objects[o]!).keywords).not.toContain("Flying");
+    expect(abilitiesOf(s, s.objects[o]!).activated).toHaveLength(1);
+    expect(s.objects[dp]!.textFrom).toBeUndefined();
+    void ap;
   });
 });

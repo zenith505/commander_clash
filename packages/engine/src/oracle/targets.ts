@@ -188,6 +188,12 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
     ctx.lastPlayerTarget = index;
     return { ref: "target", index };
   }
+  // Hope of Ghirapur: "target player who was dealt combat damage by ~ this turn" (turnLog.combatDamagedBy, ~ as it is).
+  if (x === "target player who was dealt combat damage by ~ this turn") {
+    const index = addTarget(ctx, { kind: "player", combatDamagedBySource: true, text: x });
+    ctx.lastPlayerTarget = index;
+    return { ref: "target", index };
+  }
   if (x === "target player" || x === "target opponent") {
     const index = addTarget(ctx, { kind: "player", opponent: x === "target opponent", text: x });
     ctx.lastPlayerTarget = index;

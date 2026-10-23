@@ -336,3 +336,61 @@ describe("Ojer Pakpatiq, Deepest Epoch // Temple of Cyclical Time: time counters
     expect(characteristics(s, s.objects[temple]!).name).toBe("Ojer Pakpatiq, Deepest Epoch");
   });
 });
+
+const roxanne = card("Roxanne, Starfall Savant", "Legendary Creature — Cat Druid", "{3}{R}{G}", {
+  power: "4",
+  toughness: "3",
+  oracleText: 'Whenever Roxanne enters or attacks, create a tapped colorless artifact token named Meteorite with "When this token enters, it deals 2 damage to any target" and "{T}: Add one mana of any color."\nWhenever you tap an artifact token for mana, add one mana of any type that artifact token produced.',
+});
+
+describe("Roxanne, Starfall Savant: a tapped Meteorite with two abilities", () => {
+  it("enters: a tapped Meteorite token, whose own trigger deals 2 damage", () => {
+    supported(roxanne);
+    const { s: s0, ap, ids } = setup([roxanne]);
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    for (let i = 0; i < 20 && s.pending?.kind !== "chooseTargets"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    const meteor = s.battlefield.find((id) => s.cards[s.objects[id]!.cardId]!.name === "Meteorite")!;
+    expect(s.objects[meteor]!.tapped).toBe(true);
+    expect(abilitiesOf(s, s.objects[meteor]!).mana).toHaveLength(1);
+    const opp = s.turnOrder.find((p) => p !== ap)!;
+    const life = s.players[opp]!.life;
+    s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] } as Action);
+    s = settleBots(s);
+    expect(s.players[opp]!.life).toBe(life - 2);
+  });
+});
+
+const hope = card("Hope of Ghirapur", "Legendary Artifact Creature — Thopter", "{1}", {
+  power: "1",
+  toughness: "1",
+  keywords: ["Flying"],
+  oracleText: "Flying\nSacrifice Hope of Ghirapur: Until your next turn, target player who was dealt combat damage by Hope of Ghirapur this turn can't cast noncreature spells.",
+});
+
+describe("Hope of Ghirapur: only a player it dealt combat damage this turn, until your next turn (rulings)", () => {
+  it("hits Ana; Ana (not Ben) is the target; Ana can't cast noncreature spells until your next turn", () => {
+    supported(hope);
+    const { s: s0, ap } = setup([]);
+    const h = putOnBattlefield(s0, ap, hope);
+    const [ana, ben] = [1, 2].map((n) => s0.turnOrder[(s0.turnOrder.indexOf(ap) + n) % 4]!);
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: h, defender: ana! }] });
+    for (let i = 0; i < 60 && s.step !== "main2"; i++) {
+      const pid = waitingOn(s)!;
+      s = s.pending?.kind === "declareBlockers" ? act(s, { type: "declareBlockers", player: pid, blocks: [] }) : act(s, { type: "passPriority", player: pid });
+    }
+    expect(planActivate(s, ap, h, 0, [{ kind: "player", id: ben! }])).toBeNull();
+    s = settleBots(run(s, planActivate(s, ap, h, 0, [{ kind: "player", id: ana! }])));
+    expect(s.objects[h]!.zone).toBe("graveyard");
+    const sorcery = card("Test Sorcery", "Sorcery", "{G}", { oracleText: "Draw a card." });
+    const spell = putOnBattlefield(s, ana!, sorcery);
+    s.battlefield.splice(s.battlefield.indexOf(spell), 1);
+    s.objects[spell]!.zone = "hand";
+    s.players[ana!]!.hand.push(spell);
+    putOnBattlefield(s, ana!, card("Forest", "Basic Land — Forest"));
+    s = passUntil(s, "main1", ana);
+    expect(planCast(s, ana!, spell)).toBeNull();
+    s = passUntil(s, "upkeep", ap);
+    expect(s.cantCastThisTurn ?? []).toHaveLength(0);
+  });
+});

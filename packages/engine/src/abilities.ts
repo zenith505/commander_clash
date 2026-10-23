@@ -408,6 +408,11 @@ export interface TargetSpec {
   protectedBy?: PlayerId;
   /** For players: only opponents. */
   opponent?: boolean;
+  /**
+   * For players: "who was dealt combat damage by ~ this turn" (Hope of Ghirapur): by the source as the permanent it is
+   * now, checked as it's chosen (a fact that can't change by the time it resolves).
+   */
+  combatDamagedBySource?: true;
   /** For players: not the one a trigger is about ("choose another target player", The Lord of Pain); `notPlayer` once it's known. */
   notEventPlayer?: true;
   notPlayer?: PlayerId;
@@ -2685,7 +2690,7 @@ export type Effect =
    * noncreature spells this turn" (Calamity's Wake): those players, chosen as it resolves, until the turn ends; `filter`
    * is the kind of spell.
    */
-  | { type: "cantCast"; who: PlayerRef; filter?: TargetSpec; /** "Until the end of your next turn" (Single Combat), not just this turn. */ untilYourNextTurnEnds?: true }
+  | { type: "cantCast"; who: PlayerRef; filter?: TargetSpec; /** "Until the end of your next turn" (Single Combat), not just this turn. */ untilYourNextTurnEnds?: true; /** "Until your next turn" (Hope of Ghirapur). */ untilYourNextTurn?: true }
   /** "Target player can't play lands this turn" (Moonhold): no land plays for them until the turn ends (CR 305.2, 101.2). */
   | { type: "cantPlayLands"; who: PlayerRef }
   /**

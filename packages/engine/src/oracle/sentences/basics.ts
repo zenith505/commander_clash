@@ -643,6 +643,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (filter === null || (filter && filter.kind !== "spell")) return null;
     return [{ type: "cantCast", who, ...(filter ? { filter: { ...filter, text: `${m[2]!.toLowerCase()} spell` } } : {}), ...(m[3] !== "this turn" ? { untilYourNextTurnEnds: true as const } : {}) }];
   }
+  // Hope of Ghirapur: "Until your next turn, target player ... can't cast noncreature spells": until this effect's
+  // controller's next turn begins (CR 611.2b).
+  if ((m = /^Until your next turn, (.+?) can't cast (?:(noncreature) )?spells$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    if (!who || who.ref !== "target") return null;
+    const filter = m[2] ? parseTargetPhrase("noncreature spell") : undefined;
+    if (filter === null || (filter && filter.kind !== "spell")) return null;
+    return [{ type: "cantCast", who, ...(filter ? { filter: { ...filter, text: "noncreature spell" } } : {}), untilYourNextTurn: true }];
+  }
   // "Target player can't play lands this turn" (Moonhold): one player, until the turn ends.
   if ((m = /^(target player|that player) can't play lands this turn$/i.exec(s))) {
     const who = parsePlayer(m[1]!.toLowerCase(), ctx);

@@ -76,14 +76,14 @@ function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObjec
  * from it stays put. Cards that aren't Auras are skipped. `onlyTo`: "attached to ~" (Light-Paws), only that permanent, if
  * it could enchant it (null: it's gone, so nothing).
  */
-export function chooseAuraHosts(s: GameState, cards: { o: GameObject; under: PlayerId; face?: number }[], src: string, onlyTo?: ObjectId | null): "paused" | Map<ObjectId, AuraHost> {
+export function chooseAuraHosts(s: GameState, cards: { o: GameObject; under: PlayerId; face?: number }[], src: string, onlyTo?: ObjectId | null, onCreature?: boolean): "paused" | Map<ObjectId, AuraHost> {
   const sc = (s.resolving!.scratch ??= {});
   const hosts = (sc.auraHosts ??= {});
   for (const { o, under, face } of cards) {
     // A card entering transformed is an Aura, and enchants, as its back face (CR 712.14a, 303.4f).
     const d = asFace(s, o, face, () => defOf(s, o));
     if (!d.subtypes.includes("Aura") || hosts[o.id] !== undefined) continue;
-    const options = asFace(s, o, face, () => auraHostOptions(s, o, under)).filter((h) => onlyTo === undefined || ("attachTo" in h && h.attachTo === onlyTo));
+    const options = asFace(s, o, face, () => auraHostOptions(s, o, under)).filter((h) => (onlyTo === undefined || ("attachTo" in h && h.attachTo === onlyTo)) && (!onCreature || ("attachTo" in h && s.objects[h.attachTo]?.zone === "battlefield" && objIsType(s, obj(s, h.attachTo), "Creature"))));
     if (options.length <= 1) {
       hosts[o.id] = options[0] ? auraHostKey(options[0]) : "none";
       continue;
@@ -2035,7 +2035,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       const cards = sc.found.map((id) => obj(s, id)).filter((o) => o.zone === "graveyard");
       const under = (o: GameObject) => (e.owners ? o.owner : ctx.controller);
-      const hosts = chooseAuraHosts(s, cards.map((o) => ({ o, under: under(o) })), src);
+      const hosts = chooseAuraHosts(s, cards.map((o) => ({ o, under: under(o) })), src, undefined, e.auraOnCreature);
       if (hosts === "paused") return "paused";
       const ids = cards.filter((o) => !defOf(s, o).subtypes.includes("Aura") || hosts.has(o.id)).map((o) => o.id);
       if (ids.length) log(s, `${src} returns ${ids.map((id) => defOf(s, s.objects[id]!).name + (hosts.has(id) ? ` (enchanting ${auraHostName(s, hosts.get(id)!)})` : "")).join(", ")} to the battlefield${e.tapped ? ", tapped" : ""}.`);

@@ -426,6 +426,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (spec?.kind !== "card" || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
     return [{ type: "returnAllFromGraveyard", who: { ref: "eachPlayer" }, filter: { ...spec, text: `${yours[1]} card` }, ...(yours[2] ? { tapped: true } : {}) }];
   }
+  // "Return each Aura card from your graveyard to the battlefield" (Retether): its controller chooses what each enchants as
+  // it enters (CR 303.4f); one with nothing to enchant stays in the graveyard (303.4g).
+  if (/^[Rr]eturn each Aura card from your graveyard to the battlefield$/.test(s)) {
+    return [{ type: "returnAllFromGraveyard", who: { ref: "you" }, filter: { kind: "card", types: [], notTypes: [], notColors: [], subtypes: ["Aura"], text: "Aura card" } }];
+  }
   // "Return all creature cards with mana value 2 or less from your graveyard to the battlefield" (Raise the Past).
   if ((m = /^[Rr]eturn all (.+? cards(?: with mana value (?:X|\d+) or less)?) from (your graveyard|all graveyards) to the battlefield( tapped)?( under their owners' control)?$/.exec(s)) && (m[2] === "your graveyard") === !m[4]) {
     m[1] = m[1]!.replace(/ cards( with mana value (?:X|\d+) or less)?$/, "$1");

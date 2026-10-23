@@ -660,3 +660,50 @@ describe("\"Put your choice of a +1/+1 counter or two charge counters on ...\": 
     expect(s.players[ap]!.energy ?? 0).toBe(0);
   });
 });
+
+describe("Retether: each Aura card from your graveyard returns, enchanting only creatures", () => {
+  const retether = card("Retether", "Sorcery", "{3}{W}", { oracleText: "Return each Aura card from your graveyard to the battlefield. Only creatures can be enchanted this way. (Aura cards that can't enchant a creature on the battlefield remain in your graveyard.)" });
+  const holy = card("Holy Strength", "Enchantment — Aura", "{W}", { oracleText: "Enchant creature\nEnchanted creature gets +1/+2." });
+  const growth = card("Wild Growth", "Enchantment — Aura", "{G}", { oracleText: "Enchant land\nWhenever enchanted land is tapped for mana, its controller adds an additional {G}." });
+  const curse = card("Curse of Test", "Enchantment — Aura Curse", "{B}", { oracleText: "Enchant player\nEnchanted player's upkeeps are slow." });
+  const toYard = (s: GameState, pid: PlayerId, d: CardDef) => {
+    const id = putOnBattlefield(s, pid, d);
+    s.battlefield.splice(s.battlefield.indexOf(id), 1);
+    s.objects[id]!.zone = "graveyard";
+    s.players[pid]!.graveyard.push(id);
+    return id;
+  };
+
+  it("an Aura for a creature returns on one; one for a land or a player stays in the graveyard", () => {
+    supported(retether);
+    const { s: s0, ap, ids } = setup([retether]);
+    addMana(s0, ap, ["W", "C", "C", "C"]);
+    const b = putOnBattlefield(s0, ap, bear());
+    const [h, g] = [toYard(s0, ap, holy), toYard(s0, ap, growth)];
+    const s = passToPending(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.objects[h]!.zone).toBe("battlefield");
+    expect(s.objects[h]!.attachedTo).toBe(b);
+    expect(s.objects[g]!.zone).toBe("graveyard");
+  });
+
+  it("with two creatures, its controller chooses which one", () => {
+    const { s: s0, ap, ids } = setup([retether]);
+    addMana(s0, ap, ["W", "C", "C", "C"]);
+    putOnBattlefield(s0, ap, bear());
+    const theirs = putOnBattlefield(s0, nextOf(s0, ap), bear());
+    const h = toYard(s0, ap, holy);
+    let s = passToPending(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "enchant" });
+    s = passToPending(act(s, { type: "chooseOption", player: ap, choice: theirs }));
+    expect(s.objects[h]!.attachedTo).toBe(theirs);
+  });
+
+  it("an Aura that would enchant a player doesn't return", () => {
+    const { s: s0, ap, ids } = setup([retether]);
+    addMana(s0, ap, ["W", "C", "C", "C"]);
+    const c = toYard(s0, ap, curse);
+    const s = passToPending(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.pending).toBeFalsy();
+    expect(s.objects[c]!.zone).toBe("graveyard");
+  });
+});

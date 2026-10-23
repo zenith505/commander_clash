@@ -1753,7 +1753,7 @@ export type Effect =
    * "Return all land cards from your graveyard to the battlefield tapped" (CR 110.2a: under your control), "from all graveyards
    * ... under their owners' control". All at once. Never Auras: those need a choice of what they enchant (CR 303.4f).
    */
-  | { type: "returnAllFromGraveyard"; who: PlayerRef; filter: TargetSpec; tapped?: boolean; owners?: true; /** "... to your hand" instead of the battlefield. */ toHand?: true }
+  | { type: "returnAllFromGraveyard"; who: PlayerRef; filter: TargetSpec; tapped?: boolean; owners?: true; /** "... to your hand" instead of the battlefield. */ toHand?: true; /** "Only creatures can be enchanted this way" (Retether): an Aura can attach only to a creature. */ auraOnCreature?: true }
   /** "Remove it from combat" (CR 506.4): it stops being an attacking, blocking, blocked or unblocked creature. */
   | { type: "removeFromCombat"; what: ObjRef }
   /**

@@ -4831,6 +4831,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "choose", choice: "creatureType" });
       s = s.replace(/\b(becomes?) the creature type of your choice\b/, "$1 the chosen creature type").replace(/\bof the creature type of your choice\b/, "of the chosen type");
     }
+    // Retether: "Return each Aura card from your graveyard to the battlefield. Only creatures can be enchanted this way."
+    if (/^Only creatures can be enchanted this way$/.test(s)) {
+      const last = effects[effects.length - 1];
+      if (last?.type !== "returnAllFromGraveyard" || last.toHand || last.auraOnCreature) return null;
+      last.auraOnCreature = true;
+      continue;
+    }
     // "~ deals 4 damage to target creature. Excess damage is dealt to that creature's controller instead." (Flame Spill):
     // the damage beyond lethal goes to its controller (CR 120.4a).
     if (/^Excess damage is dealt to that creature's controller instead$/.test(s)) {

@@ -2180,6 +2180,12 @@ export function compile(d: CardDef): CompiledCard {
       // The cost half is read by the cost-change lines below.
       line = `Spells you cast with mana value ${thryx[1]} or greater ${thryx[2].replace(/ and $/, "")}.`;
     }
+    // Spider-Punk: "Spells and abilities can't be countered." (CR 101.2): any player's.
+    if (line === "Spells and abilities can't be countered.") {
+      (out.uncounterable ??= []).push({ filter: { kind: "spell", text: "spells" }, anyone: true });
+      out.abilitiesUncounterable = true;
+      continue;
+    }
     // "Creature spells you control can't be countered." "Creature spells can't be countered." (CR 101.2)
     const uncounterable = /^(.*?)[Ss]pells( you control)? can't be countered\.$/.exec(line);
     if (uncounterable && !/\b(this turn|by)\b/.test(line)) {

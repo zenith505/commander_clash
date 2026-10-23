@@ -91,6 +91,13 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     if (!st || st.condition || st.affects.kind !== "attached") return null;
     return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], subtypes: [m[2]!], text: `${m[2]} creature` } } };
   }
+  // Steel of the Godhead: "As long as enchanted creature is white, it gets +1/+1 and has lifelink": white among its colors
+  // now (CR 105.2).
+  if ((m = /^As long as (enchanted|equipped) creature is (white|blue|black|red|green), it (gets|has) (.+)$/.exec(text))) {
+    const st = parseStatic(`${capital(m[1]!)} creature ${m[3]} ${m[4]}.`);
+    if (!st || st.condition || st.affects.kind !== "attached") return null;
+    return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], colors: [COLOR_WORDS[m[2]!]!], text: `${m[2]} creature` } } };
+  }
   // Champion's Helm: "As long as equipped creature is legendary, it has hexproof" (CR 205.4d).
   if ((m = /^As long as (enchanted|equipped) creature is legendary, it (gets|has) (.+)$/.exec(text))) {
     const st = parseStatic(`${capital(m[1]!)} creature ${m[2]} ${m[3]}.`);
@@ -578,6 +585,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return { kind: "eventPlayerMost", what: (m[1] ?? (m[2] === "life" ? "life" : "hand")) as "lands" | "creatures" | "life" | "hand" };
   if (/^~ is attached to a creature$/.test(text)) return { kind: "self", is: "attachedToCreature" };
   if (/^~ attacked this turn$/.test(text)) return { kind: "self", is: "attackedThisTurn" };
+  // Agent Frank Horrigan: "~ has indestructible as long as it attacked this turn": declared as an attacker (CR 508.1).
+  if (/^it attacked this turn$/.test(text) && st.affects.kind === "self") return { kind: "self", is: "attackedThisTurn" };
   // "~ has indestructible as long as it attacked a battle this turn" (War Historian), "~ has hexproof as long as it
   // entered this turn" (Zurgo and Ojutai): about ~ itself.
   if (/^(?:~|it) attacked a battle this turn$/.test(text) && (st.affects.kind === "self" || text.startsWith("~"))) return { kind: "self", is: "attackedBattleThisTurn" };
@@ -768,6 +777,12 @@ export function parseAffected(subject: string): Affects | null {
     const first: TargetSpec = either[2] === "snow" ? { kind: "object", supertypes: ["Snow"], text: "snow creature" } : { kind: "object", subtypes: [either[2]!], text: `${either[2]} creature` };
     const anyOf: TargetSpec[] = [first, { kind: "object", subtypes: [either[3]!], text: `${either[3]} creature` }];
     return { kind: "filter", types: ["Creature"], controller: "you", other: !!either[1], spec: { kind: "object", anyOf, text: `${either[2]} and ${either[3]} creature` } };
+  }
+  // On Wings of Gold: "Creatures you control that are Zombies and/or tokens": either one, a Zombie token once.
+  const orToken = /^Creatures you control that are ([A-Z][a-z]+)s and\/or tokens$/.exec(x);
+  if (orToken && CREATURE_TYPES.has(orToken[1]!)) {
+    const anyOf: TargetSpec[] = [{ kind: "object", subtypes: [orToken[1]!], text: `${orToken[1]} creature` }, { kind: "object", token: true, text: "creature token" }];
+    return { kind: "filter", types: ["Creature"], controller: "you", spec: { kind: "object", anyOf, text: `${orToken[1]} and/or token creature` } };
   }
   let m = /^(Other )?((?:[A-Z]?[a-z]+ )*?)creatures (you control|your opponents control)$/i.exec(x);
   if (m) {

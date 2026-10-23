@@ -759,6 +759,10 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
     log(s, instead === "exile" ? `${by} exiles ${what}.` : `${by} returns ${what} to its owner's hand.`);
     return;
   }
+  if (item.kind !== "spell" && s.battlefield.some((id) => abilitiesOf(s, obj(s, id)).abilitiesUncounterable)) {
+    log(s, `${what} can't be countered.`); // CR 101.2 (Spider-Punk)
+    return;
+  }
   if (item.objectId && cantBeCountered(s, item)) {
     log(s, `${item.description} can't be countered.`); // CR 101.2
     return;

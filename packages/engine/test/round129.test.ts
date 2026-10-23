@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, island, passUntil, putOnBattlefield, setup, swamp } from "./helpers";
-import { botActions, characteristics, isFullySupported, legalActions, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { botActions, characteristics, invalidateCharacteristics, isFullySupported, legalActions, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -529,5 +529,122 @@ describe("round 129: more popular cards", () => {
     expect(s.objects[r]!.counters.charge ?? 0).toBe(0);
     const pool = s.players[ap]!.manaPool as Record<string, number>;
     expect(Object.values(pool).reduce((a, b) => a + b, 0)).toBe(2);
+  });
+});
+
+const frank = card("Agent Frank Horrigan", "Legendary Creature — Mutant Warrior", "{5}{B}{G}", {
+  power: "8",
+  toughness: "6",
+  keywords: ["Trample", "Proliferate"],
+  oracleText: "Trample\nAgent Frank Horrigan has indestructible as long as it attacked this turn.\nWhenever Agent Frank Horrigan enters or attacks, proliferate twice. (To proliferate, choose any number of permanents and/or players, then give each another counter of each kind already there.)",
+});
+const steel = card("Steel of the Godhead", "Enchantment — Aura", "{2}{W/U}", {
+  keywords: ["Enchant"],
+  oracleText: "Enchant creature\nAs long as enchanted creature is white, it gets +1/+1 and has lifelink. (Damage dealt by the creature also causes its controller to gain that much life.)\nAs long as enchanted creature is blue, it gets +1/+1 and can't be blocked.",
+});
+const wingsOfGold = card("On Wings of Gold", "Enchantment", "{3}{W}", {
+  oracleText: "Creatures you control that are Zombies and/or tokens get +1/+1 and have flying.\nWhenever one or more cards leave your graveyard, create a 1/1 white Zombie creature token.",
+});
+const raidBombardment = card("Raid Bombardment", "Enchantment", "{2}{R}", {
+  oracleText: "Whenever a creature you control with power 2 or less attacks, this enchantment deals 1 damage to the player or planeswalker that creature is attacking.",
+});
+const spiderPunk = card("Spider-Punk", "Legendary Creature — Spider Human Hero", "{1}{R}", {
+  power: "2",
+  toughness: "1",
+  keywords: ["Riot"],
+  oracleText: "Riot (This creature enters with your choice of a +1/+1 counter or haste.)\nOther Spiders you control have riot.\nSpells and abilities can't be countered.\nDamage can't be prevented.",
+});
+const karumonix = card("Karumonix, the Rat King", "Legendary Creature — Phyrexian Rat", "{1}{B}{B}", {
+  power: "3",
+  toughness: "3",
+  keywords: ["Toxic"],
+  oracleText: "Toxic 1 (Players dealt combat damage by this creature also get a poison counter.)\nOther Rats you control have toxic 1.\nWhen Karumonix enters, look at the top five cards of your library. You may reveal any number of Rat cards from among them and put the revealed cards into your hand. Put the rest on the bottom of your library in a random order.",
+});
+
+describe("round 129: statics and attack triggers", () => {
+  it("Agent Frank Horrigan: indestructible only once it has attacked this turn", () => {
+    supported(frank);
+    const { s: s0, ap, opp } = setup([]);
+    const f = putOnBattlefield(s0, ap, frank);
+    expect(characteristics(s0, s0.objects[f]!).keywords).not.toContain("Indestructible");
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: f, defender: opp }] });
+    expect(characteristics(s, s.objects[f]!).keywords).toContain("Indestructible");
+  });
+  it("Steel of the Godhead: lifelink on a white creature, unblockable on a blue one, nothing on a green one", () => {
+    supported(steel);
+    for (const [color, cost] of [["white", "{1}{W}"], ["blue", "{1}{U}"], ["green", "{1}{G}"]] as const) {
+      const { s, ap } = setup([]);
+      const c = putOnBattlefield(s, ap, card(`A ${color} Knight`, "Creature — Knight", cost, { power: "2", toughness: "2", colors: [color === "white" ? "W" : color === "blue" ? "U" : "G"] }));
+      const a = putOnBattlefield(s, ap, steel);
+      s.objects[a]!.attachedTo = c;
+      invalidateCharacteristics(s);
+      const ch = characteristics(s, s.objects[c]!);
+      expect(`${ch.power}/${ch.toughness}`).toBe(color === "green" ? "2/2" : "3/3");
+      expect(ch.keywords.includes("Lifelink")).toBe(color === "white");
+    }
+  });
+  it("On Wings of Gold: Zombies and tokens you control get +1/+1 and flying, a Zombie token once", () => {
+    supported(wingsOfGold);
+    const { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, wingsOfGold);
+    const z = putOnBattlefield(s, ap, card("Test Zombie", "Creature — Zombie", "{1}{B}", { power: "2", toughness: "2" }));
+    const b = putOnBattlefield(s, ap, card("Test Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    const t = putOnBattlefield(s, ap, card("Test Zombie Token", "Creature — Zombie", "", { power: "2", toughness: "2" }));
+    s.objects[t]!.isToken = true;
+    const theirs = putOnBattlefield(s, opp, card("Their Zombie", "Creature — Zombie", "{1}{B}", { power: "2", toughness: "2" }));
+    invalidateCharacteristics(s);
+    const pt = (id: string) => `${characteristics(s, s.objects[id]!).power}/${characteristics(s, s.objects[id]!).toughness}`;
+    expect([pt(z), pt(b), pt(t), pt(theirs)]).toEqual(["3/3", "2/2", "3/3", "2/2"]);
+    expect(characteristics(s, s.objects[t]!).keywords).toContain("Flying");
+  });
+  it("Raid Bombardment: 1 damage to the player a small attacker attacks, none for a big one", () => {
+    supported(raidBombardment);
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, raidBombardment);
+    const small = putOnBattlefield(s0, ap, card("Small Raider", "Creature — Goblin", "{R}", { power: "2", toughness: "1" }));
+    const other = s0.turnOrder[(s0.turnOrder.indexOf(ap) + 2) % 4]!;
+    const big = putOnBattlefield(s0, ap, card("Big Raider", "Creature — Giant", "{4}{R}", { power: "5", toughness: "5" }));
+    const lives = [s0.players[opp]!.life, s0.players[other]!.life];
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: small, defender: opp }, { attacker: big, defender: other }] });
+    s = settleBots(s);
+    expect(s.players[opp]!.life).toBe(lives[0]! - 1);
+    expect(s.players[other]!.life).toBe(lives[1]!);
+  });
+  it("Spider-Punk: a spell and an ability on the stack can't be countered", () => {
+    supported(spiderPunk);
+    const negate = card("Test Counterspell", "Instant", "{U}", { oracleText: "Counter target spell." });
+    const stifle = card("Test Stifle", "Instant", "{U}", { oracleText: "Counter target activated or triggered ability." });
+    const shock = card("Test Shock", "Instant", "{R}", { oracleText: "Test Shock deals 2 damage to any target." });
+    const { s: s0, ap, opp, ids } = setup([shock, negate, stifle]);
+    putOnBattlefield(s0, opp, spiderPunk);
+    const pinger = putOnBattlefield(s0, ap, card("Test Healer", "Creature — Cleric", "{W}", { power: "1", toughness: "1", oracleText: "{1}: You gain 1 life." }));
+    const life = s0.players[opp]!.life;
+    let s = run(s0, planCast(s0, ap, ids[0]!, [{ kind: "player", id: opp }]));
+    s = run(s, planCast(s, ap, ids[1]!, [{ kind: "stack", id: s.stack[s.stack.length - 1]!.id }]));
+    s = settleBots(s);
+    expect(s.players[opp]!.life).toBe(life - 2);
+    const myLife = s.players[ap]!.life;
+    s = run(s, planActivate(s, ap, pinger, 0));
+    s = run(s, planCast(s, ap, ids[2]!, [{ kind: "stack", id: s.stack[s.stack.length - 1]!.id }]));
+    s = settleBots(s);
+    expect(s.players[ap]!.life).toBe(myLife + 1);
+    expect(logText(s)).toMatch(/can't be countered/);
+  });
+  it("Karumonix: reveal any number of Rat cards from the top five, the rest to the bottom", () => {
+    supported(karumonix);
+    const { s: s0, ap, ids } = setup([karumonix]);
+    putOnBattlefield(s0, ap, swamp);
+    const rats = ["Rat A", "Rat B"].map((n) => putIn(s0, ap, card(n, "Creature — Rat", "{B}", { power: "1", toughness: "1" }), "library"));
+    putIn(s0, ap, card("Not a Rat", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }), "library");
+    let s = passToPending(run(s0, planCast(s0, ap, ids[0]!)));
+    s = passToPending(s);
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap, min: 0 });
+    const p = s.pending as { cards: string[]; max: number };
+    expect(p.cards.sort()).toEqual([...rats].sort());
+    s = act(s, { type: "searchLibrary", player: ap, found: rats });
+    s = settleBots(s);
+    for (const r of rats) expect(s.objects[r]!.zone).toBe("hand");
   });
 });

@@ -678,3 +678,24 @@ describe("Mind's Desire: shuffle, then exile the top card; it may be played free
     expect(logText(s)).toMatch(/shuffles/i);
   });
 });
+
+describe("Papalymo Totolymo: each opponent who lost life this turn sacrifices its greatest-power creature", () => {
+  it("only the opponent who lost life sacrifices, and its biggest creature", () => {
+    const papalymo = card("Papalymo Totolymo", "Legendary Creature — Dwarf Wizard", "{2}{U}{R}", {
+      power: "2",
+      toughness: "3",
+      oracleText: "Whenever you cast a noncreature spell, Papalymo Totolymo deals 1 damage to each opponent and you gain 1 life.\n{4}, {T}, Sacrifice Papalymo Totolymo: Each opponent who lost life this turn sacrifices a creature with the greatest power among creatures they control.",
+    });
+    supported(papalymo);
+    const { s: s0, ap } = setup([]);
+    const p = putOnBattlefield(s0, ap, papalymo);
+    const [hit, other] = opponentsOf(s0, ap);
+    const small = putOnBattlefield(s0, hit!, card("Test Squire", "Creature — Human", "{W}", { power: "1", toughness: "1" }));
+    const big = putOnBattlefield(s0, hit!, ogre("Big Ogre"));
+    const theirs = putOnBattlefield(s0, other!, ogre("Spared Ogre"));
+    // Only `hit` has lost life this turn.
+    s0.turnLog = { ...s0.turnLog, lifeLost: { [hit!]: 3 } } as GameState["turnLog"];
+    const s = settleBots(run(s0, planActivate(s0, ap, p, 0)));
+    expect([small, big, theirs].map((id) => s.objects[id]!.zone)).toEqual(["battlefield", "graveyard", "battlefield"]);
+  });
+});

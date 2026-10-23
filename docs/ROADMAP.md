@@ -1,7 +1,7 @@
 # Roadmap
 
-23,477 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,433 of 4,988 (88%).
+23,506 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,450 of 4,988 (89%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,18 +22,20 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 129, most played first: Out of the Tombs (a draw from an
-   empty library replaced; eon counters), Court of Locthwain, Hooded Hydra, Vincent Valentine, Daybreak Coronet,
-   Transmutation Font, Nyxborn Hydra, Zada, Dalkovan Encampment, Eidolon of Countless Battles, Planetarium of Wan Shi
-   Tong, Hashaton, The Mending of Dominaria, Trailtracker Scout, Doubling Cube, Slicer, Neyali, Ignite the Future,
-   Andúril, Thundermane Dragon, Rona, Titan's Presence, Dihada, Selective Obliteration, Species Specialist. Smaller
-   gaps from round 129: Zirda's companion condition is still ignored (companions play as normal cards); villainous
-   choices with a third kind of option are out (The Valeyard, Davros, Hunted by The Family, Missy, The Master, This Is
-   How It Ends); bots pick the villainous option that looks cheaper to them by a rough count, never cast Doomsday, and
-   take the costliest card for Lord of the Void and Necromantic Selection; "play that card this turn" after a mill
-   (Tablet of Discovery, Ark of Hunger), Master of Cruelties ("assigns no combat damage this combat", "can only attack
-   alone"), Zero Point Ballad and Danse Macabre (a creature card put into a graveyard this way after a condition or a
-   sacrifice) are out; the log reads "You faces a villainous choice". Smaller gaps from round 128: bots take
+00. Most played first (`npm run popular`). Out after round 130, most played first: Dalkovan Encampment, Eidolon of
+   Countless Battles ("~ and enchanted creature each get"), Planetarium of Wan Shi Tong, Hashaton, Trailtracker Scout,
+   Doubling Cube, Slicer, Neyali, Ignite the Future, Blitzball, Thundermane Dragon, Rona, Titan's Presence, Dihada,
+   Selective Obliteration, Bonny Pall, Pit of Offerings, Mana Sculpt, Wall of Roots, Frontline Medic, Moon-Circuit
+   Hacker. Smaller gaps from round 130: Zada, Ink-Treader Nephilim and Precursor Golem put their copies on the stack in
+   battlefield order (rulings: the copies' controller chooses the order); Laboratory Maniac is taken over Out of the
+   Tombs when both would replace a draw (no choice between the two, CR 616.1), and bots return the creature card with
+   the highest mana value; "cast a spell from among cards exiled with ~" works only linked to one impulse exile (Court
+   of Locthwain), so Idol of Endurance (an exile until it leaves) is out, and Thought-String Analyst (face down) too;
+   The Master, Gallifrey's End ("you may exile it. If you do" for a dying creature, then a copy of that card, also
+   Nightmare Shepherd and Myrkul), This Is How It Ends, Hunted by The Family, Missy, Midnight Crusader Shuttle, Genesis
+   of the Daleks and Danse Macabre are still out. Smaller gaps from round 129: Zirda's companion condition is still
+   ignored (companions play as normal cards); bots pick the villainous option that looks cheaper to them by a rough
+   count, never cast Doomsday, and take the costliest card for Lord of the Void and Necromantic Selection. Smaller gaps from round 128: bots take
    Orzhov Advokist's counters unless its controller is the only opponent they could attack, and always reveal for
    Counterbalance; "untap a creature you control" (White Plume Adventurer) offers only the tapped ones, or none;
    Songbirds' Blessing asks before choosing the Aura's host. Smaller gaps from round 127: bots use Demon of Fate's

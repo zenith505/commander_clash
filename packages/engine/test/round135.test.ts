@@ -3,6 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, pt, putOnBattlefield, setup } from "./helpers";
+import { createEmblem } from "../src/emblems";
 import { botActions, characteristics, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -390,5 +391,104 @@ describe("Bello, Bard of the Brambles: during your turn, big noncreature artifac
     const s = passToPending(attack(s0, ap, [m], opp));
     expect(s.players[opp]!.life).toBe(36);
     expect(s.players[ap]!.hand.length).toBe(hand + 1);
+  });
+});
+
+describe("Summon: Leviathan: until end of turn, whenever a Kraken, Leviathan, Merfolk, Octopus, or Serpent attacks, draw a card", () => {
+  const leviathan = card("Summon: Leviathan", "Enchantment Creature — Saga Leviathan", "{4}{U}{U}", {
+    power: "6",
+    toughness: "6",
+    keywords: ["Ward"],
+    oracleText: "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI — Return each creature that isn't a Kraken, Leviathan, Merfolk, Octopus, or Serpent to its owner's hand.\nII, III — Until end of turn, whenever a Kraken, Leviathan, Merfolk, Octopus, or Serpent attacks, draw a card.\nWard {2}",
+  });
+  const merfolk = card("Test Merfolk", "Creature — Merfolk", "{U}", { power: "1", toughness: "1" });
+
+  it("chapter II: the Leviathan and a Merfolk attack, two cards; a Bear attacking draws nothing", () => {
+    supported(leviathan);
+    const { s: s0, ap, opp } = setup([]);
+    const l = putOnBattlefield(s0, ap, leviathan);
+    s0.objects[l]!.counters.lore = 1;
+    const mf = putOnBattlefield(s0, ap, merfolk);
+    const b = putOnBattlefield(s0, ap, bear());
+    let s = passUntil(s0, "main1", nextOf(s0, ap));
+    s = passUntil(s, "main1", ap);
+    s = passToPending(s);
+    expect(s.objects[l]!.counters.lore).toBe(2);
+    const hand = s.players[ap]!.hand.length;
+    s = attack(s, ap, [l, mf, b], opp);
+    s = passToPending(s);
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
+  });
+
+  it("it lasts until end of turn: a Merfolk attacking on the next turn draws nothing", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const l = putOnBattlefield(s0, ap, leviathan);
+    s0.objects[l]!.counters.lore = 1;
+    const theirs = putOnBattlefield(s0, opp, merfolk);
+    let s = passUntil(s0, "main1", nextOf(s0, ap));
+    s = passUntil(s, "main1", ap);
+    s = passToPending(s);
+    expect(s.floatingTriggers?.length).toBe(1);
+    // The next turn is the opponent's: the effect ended with this turn.
+    s = passUntil(s, "main1", opp);
+    expect(s.floatingTriggers?.length ?? 0).toBe(0);
+    const hand = s.players[ap]!.hand.length;
+    s = attack(s, opp, [theirs], ap);
+    expect(s.players[ap]!.hand.length).toBe(hand);
+  });
+});
+
+describe("The Masamune: first strike and must be blocked while attacking; dying creatures trigger its creature's and your emblems' abilities twice", () => {
+  const masamune = card("The Masamune", "Legendary Artifact — Equipment", "{3}", {
+    keywords: ["Equip"],
+    oracleText: 'As long as equipped creature is attacking, it has first strike and must be blocked if able.\nEquipped creature has "If a creature dying causes a triggered ability of this creature or an emblem you own to trigger, that ability triggers an additional time."\nEquip {2}',
+  });
+  const mourner = card("Test Mourner", "Creature — Human", "{2}{B}", { power: "2", toughness: "2", oracleText: "Whenever another creature dies, you gain 1 life.\nWhen this creature dies, draw a card." });
+  const plainMourner = card("Test Other Mourner", "Creature — Human", "{2}{B}", { power: "2", toughness: "2", oracleText: "Whenever another creature dies, you gain 1 life." });
+  const kill = card("Test Kill", "Instant", "{B}", { oracleText: "Destroy target creature." });
+  const scene = () => {
+    const { s, ap, opp, ids } = setup([kill]);
+    const m = putOnBattlefield(s, ap, mourner);
+    const sword = putOnBattlefield(s, ap, masamune);
+    s.objects[sword]!.attachedTo = m;
+    const other = putOnBattlefield(s, ap, plainMourner);
+    const victim = putOnBattlefield(s, opp, bear());
+    return { s, ap, opp, m, sword, other, victim, killId: ids[0]! };
+  };
+
+  it("another creature dies: the equipped creature's trigger twice, the unequipped one's once", () => {
+    supported(masamune);
+    const { s: s0, ap, victim, killId } = scene();
+    const life = s0.players[ap]!.life;
+    const s = passToPending(run(s0, planCast(s0, ap, killId, [{ kind: "object", id: victim }])));
+    expect(s.objects[victim]!.zone).toBe("graveyard");
+    expect(s.players[ap]!.life).toBe(life + 3);
+  });
+
+  it("the equipped creature itself dies: its own dies trigger twice", () => {
+    const { s: s0, ap, m, killId } = scene();
+    const hand = s0.players[ap]!.hand.length;
+    const s = passToPending(run(s0, planCast(s0, ap, killId, [{ kind: "object", id: m }])));
+    // Kill left the hand; two cards drawn.
+    expect(s.players[ap]!.hand.length).toBe(hand - 1 + 2);
+  });
+
+  it("an emblem you own: its dies trigger twice", () => {
+    const { s: s0, ap, m, sword, victim, killId } = scene();
+    // Only the emblem now: the equipped creature has no dies triggers of its own.
+    s0.objects[sword]!.attachedTo = putOnBattlefield(s0, ap, bear({ name: "Test Bearer" }));
+    s0.battlefield = s0.battlefield.filter((x) => x !== m && s0.cards[s0.objects[x]!.cardId]!.name !== "Test Other Mourner");
+    createEmblem(s0, ap, ["Whenever a creature dies, you gain 1 life."], "Test");
+    const life = s0.players[ap]!.life;
+    const s = passToPending(run(s0, planCast(s0, ap, killId, [{ kind: "object", id: victim }])));
+    expect(s.players[ap]!.life).toBe(life + 2);
+  });
+
+  it("while attacking it has first strike; not otherwise", () => {
+    const { s: s0, ap, opp, m } = scene();
+    expect(objHasKeyword(s0, s0.objects[m]!, "First strike")).toBe(false);
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: m, defender: opp }] });
+    expect(objHasKeyword(s, s.objects[m]!, "First strike")).toBe(true);
   });
 });

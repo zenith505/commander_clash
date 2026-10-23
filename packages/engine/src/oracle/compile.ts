@@ -3402,6 +3402,10 @@ function triggersAgainLine(line: string): NonNullable<CompiledCard["triggersAgai
     const filter = kinds(m[1]!, false);
     return filter ? { by: { event, filter: filter.map((x) => x.filter) } } : null;
   }
+  // The Masamune's granted ability: "If a creature dying causes a triggered ability of this creature or an emblem you own
+  // to trigger, that ability triggers an additional time" (CR 603.2d): only the abilities of the permanent that has it and
+  // of its controller's emblems, about any creature dying (rulings).
+  if (line === "If a creature dying causes a triggered ability of ~ or an emblem you own to trigger, that ability triggers an additional time.") return { by: { event: "dies", filter: [{ kind: "object", types: ["Creature"], text: "creature" }] }, selfOrEmblems: true };
   // Cloud, Midgar Mercenary: its own abilities and its Equipment's, while it's equipped.
   if (line === "As long as ~ is equipped, if a triggered ability of ~ or an Equipment attached to it triggers, that ability triggers an additional time.") return { selfOrEquipment: true };
   // Veyran, Voice of Duality.

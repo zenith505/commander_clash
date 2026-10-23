@@ -98,6 +98,13 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     if (!st || st.condition || st.affects.kind !== "attached") return null;
     return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], colors: [COLOR_WORDS[m[2]!]!], text: `${m[2]} creature` } } };
   }
+  // The Masamune: "As long as equipped creature is attacking, it has first strike and must be blocked if able": while it's
+  // an attacking creature (CR 506.4, 611.3a).
+  if ((m = /^As long as (enchanted|equipped) creature is attacking, it (gets|has) (.+)$/.exec(text))) {
+    const st = parseStatic(`${capital(m[1]!)} creature ${m[2]} ${m[3]}.`);
+    if (!st || st.condition || st.affects.kind !== "attached") return null;
+    return { ...st, text: line, condition: { kind: "attachedIs", filter: { kind: "object", types: ["Creature"], combat: "attacking", text: "attacking creature" } } };
+  }
   // Champion's Helm: "As long as equipped creature is legendary, it has hexproof" (CR 205.4d).
   if ((m = /^As long as (enchanted|equipped) creature is legendary, it (gets|has) (.+)$/.exec(text))) {
     const st = parseStatic(`${capital(m[1]!)} creature ${m[2]} ${m[3]}.`);

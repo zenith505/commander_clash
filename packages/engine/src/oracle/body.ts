@@ -157,8 +157,8 @@ const CARD_TYPE_WORD = "(?:artifact|battle|creature|enchantment|instant|land|pla
  * The events a delayed triggered ability with a duration can wait for (see GameState.floatingTriggers), and the parts of
  * a trigger it can have: an intervening "if" or a zone would need more about its source than it has.
  */
-const FLOATING_EVENTS = new Set<string>(["castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "creaturesYouControlDealCombatDamageToPlayer", "eachBeginCombat", "creaturesYouControlAttack"]);
-const FLOATING_KEYS = new Set<string>(["event", "cast", "dies", "dealer", "toOpponent", "orPlaneswalker", "body"]);
+const FLOATING_EVENTS = new Set<string>(["castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "creaturesYouControlDealCombatDamageToPlayer", "eachBeginCombat", "creaturesYouControlAttack", "creatureYouControlAttacks"]);
+const FLOATING_KEYS = new Set<string>(["event", "cast", "dies", "dealer", "attacker", "toOpponent", "orPlaneswalker", "body"]);
 
 /**
  * "Until end of turn, whenever you cast a spell, copy it. You may choose new targets for the copy.": a delayed triggered

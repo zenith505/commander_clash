@@ -819,7 +819,8 @@ function parseAttackerTrigger(line0: string): TriggeredAbility | "fail" | null {
   // "Whenever a Zombie token you control with power 6 or greater attacks" (Dreadhorde Invasion): its power as it's declared.
   const m = /^Whenever (another|an?) (.+? you control(?: of the chosen type| with power \d+ or (?:greater|less))?) attacks, (.+)$/.exec(line);
   // "Whenever a creature attacks": anyone's, each one as it's declared as an attacker (Caltrops, Righteous Cause).
-  const any = m ? null : /^Whenever (another|an?) ((?:[a-z]+ )?creature) attacks, (.+)$/.exec(line);
+  // "Whenever a Kraken, Leviathan, Merfolk, Octopus, or Serpent attacks" (Summon: Leviathan): anyone's, of those types.
+  const any = m ? null : /^Whenever (another|an?) ((?:[a-z]+ )?creature|(?:[A-Z][a-z]+, )*[A-Z][a-z]+,? or [A-Z][a-z]+|[A-Z][a-z]+) attacks, (.+)$/.exec(line);
   // "Whenever a creature attacks you or a planeswalker you control" (Blood Reckoning, Isperia): one attacking this
   // permanent's controller, or a planeswalker they control (CR 506.2, 508.3a); "attacks you" alone, not a planeswalker.
   const you = m || any ? null : /^Whenever (an?) ((?:[a-z]+ )?creature(?: with(?:out)? [a-z]+| with power \d+ or (?:greater|less))?) attacks you( or a planeswalker you control)?, (.+)$/.exec(line);

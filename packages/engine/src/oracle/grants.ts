@@ -42,7 +42,7 @@ export function compileGranted(text: string): CompiledCard {
  * your opponents can't win the game" (The Book of Exalted Deeds; read by gameEndBlocked in game.ts). Ones that
  * change types, colors or abilities would have to come out of the same layers that grant them, so they stay out.
  */
-const GRANTED_FIELDS = new Set(["costMods", "countMods", "othersEnterWithCounters", "entersWithAdditional", "roomsTwice", "firstDrawLook", "cantLose", "cantWin"]);
+const GRANTED_FIELDS = new Set(["costMods", "countMods", "othersEnterWithCounters", "entersWithAdditional", "roomsTwice", "firstDrawLook", "cantLose", "cantWin", "triggersAgain"]);
 export const grantedStaticOk = (mods: Modification[]) => mods.every((m) => !["2", "4", "5", "6"].includes(layerOf(m)) && !(m.kind === "definePT" && (m.power === undefined || m.toughness === undefined)));
 
 /**

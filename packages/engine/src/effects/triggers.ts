@@ -45,19 +45,22 @@ function triggersAgain(s: GameState, src: GameObject, controller: PlayerId, caus
   // A spell's own triggered abilities ("When you cast ~", storm, cascade): only for "a triggered ability of a colorless
   // spell you control" (Echoes of Eternity).
   const spell = !permanent && src.zone === "stack" ? s.stack.find((x) => x.objectId === src.id && x.kind === "spell") : undefined;
-  if (!permanent && !spell) return 0;
+  // An emblem's (CR 114.4): only for The Masamune's "a triggered ability of this creature or an emblem you own".
+  const emblem = !permanent && !spell && !!src.emblem && src.zone === "command";
+  if (!permanent && !spell && !emblem) return 0;
   const statics: { id: ObjectId; again: NonNullable<CompiledCard["triggersAgain"]> }[] = [];
   for (const id of s.battlefield) {
     const o = obj(s, id);
-    const again = compileCard(defOf(s, o)).triggersAgain;
-    if (!again) continue;
     const c = characteristics(s, o);
-    if (c.hasPrintedAbilities && c.controller === controller) statics.push({ id, again });
+    // Printed, or granted (The Masamune's equipped creature).
+    const again = [...(c.hasPrintedAbilities ? (compileCard(defOf(s, o)).triggersAgain ?? []) : []), ...(c.grantedAbilities?.length ? (withGranted(NO_ABILITIES, c.grantedAbilities).triggersAgain ?? []) : [])];
+    if (again.length && c.controller === controller) statics.push({ id, again });
   }
   for (const l of s.leftTogether ?? []) {
     const o = s.objects[l.id];
-    const again = o && l.hadAbilities && o.zone !== "battlefield" ? compileCard(defOf(s, o)).triggersAgain : undefined;
-    if (again && l.controller === controller && !statics.some((x) => x.id === l.id)) statics.push({ id: l.id, again });
+    if (!o || o.zone === "battlefield") continue;
+    const again = [...(l.hadAbilities ? (compileCard(defOf(s, o)).triggersAgain ?? []) : []), ...(l.granted?.length ? (withGranted(NO_ABILITIES, l.granted).triggersAgain ?? []) : [])];
+    if (again.length && l.controller === controller && !statics.some((x) => x.id === l.id)) statics.push({ id: l.id, again });
   }
   if (!statics.length) return 0;
   // Whose ability it is: as it is, or as it last existed.
@@ -70,6 +73,7 @@ function triggersAgain(s: GameState, src: GameObject, controller: PlayerId, caus
       if (a.anchor !== undefined && s.objects[id]?.chosen?.anchor !== a.anchor) continue;
       // The others are about abilities of permanents only.
       if (spell && !a.of) continue;
+      if (emblem !== !!a.selfOrEmblems && !(a.selfOrEmblems && view.o.id === id)) continue;
       if (a.selfOrEquipment) {
         const host = s.objects[id]!;
         const equipped = host.zone === "battlefield" && s.battlefield.some((e) => s.objects[e]!.attachedTo === id && characteristics(s, s.objects[e]!).subtypes.includes("Equipment"));
@@ -1002,12 +1006,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     // "Whenever a creature you control attacks": each permanent its controller controls that watches for one (CR 508.3a).
     const by = controllerOf(s, o);
     // "Whenever a creature attacks": anyone's, for the watcher's controller.
-    const attackWatch = (w: GameObject, wc: PlayerId) => {
+    const attackWatch = (w: GameObject, wc: PlayerId, triggers?: TriggeredAbility[]) => {
       const at = attackingYou(o, wc);
-      add(w, wc, (e, t) => e === "creatureYouControlAttacks" && !!t.attacker && (wc === by || !!t.attacker.anyone) && !(t.attacker.other && w.id === o.id) && (!t.attacker.attacksYou || at[t.attacker.attacksYou]) && objectMatches(s, bindChosen(t.attacker.filter, w.chosen), o, wc, false), undefined, undefined, o, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
+      add(w, wc, (e, t) => e === "creatureYouControlAttacks" && !!t.attacker && (wc === by || !!t.attacker.anyone) && !(t.attacker.other && w.id === o.id) && (!t.attacker.attacksYou || at[t.attacker.attacksYou]) && objectMatches(s, bindChosen(t.attacker.filter, w.chosen), o, wc, false), triggers, undefined, o, undefined, undefined, undefined, o.attacking !== undefined ? { player: o.attacking } : undefined);
     };
     for (const id of s.battlefield) attackWatch(obj(s, id), controllerOf(s, obj(s, id)));
-    fromEmblems(attackWatch);
+    fromEmblems((w, wc) => attackWatch(w, wc));
+    // "Until end of turn, whenever a Kraken, ... or Serpent attacks, draw a card" (Summon: Leviathan, CR 603.7b).
+    fromFloating((src, ctrl, triggers) => attackWatch(src, ctrl, triggers));
     // "Whenever your Ring-bearer attacks, draw a card, then discard a card" (CR 701.54c).
     if (isRingBearer(s, o)) ringTrigger(s, controllerOf(s, o), 0);
     // "Whenever a creature attacks enchanted player": not one attacking a planeswalker of theirs (rulings).

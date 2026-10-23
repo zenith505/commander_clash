@@ -305,3 +305,58 @@ describe("Twilight Diviner", () => {
     expect(tokens(s, "Grizzly Bears")).toHaveLength(0);
   });
 });
+
+const emet = card("Emet-Selch of the Third Seat", "Legendary Creature — Elder Wizard", "{2}{U}{B}", {
+  power: "3",
+  toughness: "4",
+  oracleText: "Spells you cast from your graveyard cost {2} less to cast.\nWhenever one or more opponents lose life, you may cast target instant or sorcery card from your graveyard. If that spell would be put into your graveyard, exile it instead. Do this only once each turn.",
+});
+const drain = card("Test Drain", "Sorcery", "{B}", { oracleText: "Each opponent loses 1 life." });
+const divination = card("Divination", "Sorcery", "{2}{U}", { oracleText: "Draw two cards." });
+
+describe("Emet-Selch of the Third Seat", () => {
+  const scene = () => {
+    const { s: s0, ap, ids } = setup([drain, drain]);
+    putOnBattlefield(s0, ap, emet);
+    const div = putOnBattlefield(s0, ap, divination);
+    s0.battlefield.splice(s0.battlefield.indexOf(div), 1);
+    s0.objects[div]!.zone = "graveyard";
+    s0.players[ap]!.graveyard.push(div);
+    invalidateCharacteristics(s0);
+    return { s0, ap, ids, div };
+  };
+  /** Cast a drain, and let its Emet-Selch trigger(s) reach the stack. */
+  const castDrain = (s: GameState, ap: number, id: string) => {
+    s = run(s, planCast(s, ap, id));
+    for (let i = 0; i < 10 && s.stack.some((x) => x.kind === "spell"); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    return s;
+  };
+
+  it("three opponents losing life at once trigger it once; Divination is cast for {1}{U} and exiled after", () => {
+    supported(emet);
+    const { s0, ap, ids, div } = scene();
+    let s = castDrain(s0, ap, ids[0]!);
+    // One trigger for the three opponents, its target chosen as it's put on the stack.
+    expect(s.triggerQueue).toHaveLength(1);
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    s = untilChoice(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: div }] }));
+    expect(s.pending).toMatchObject({ kind: "castFree", how: "paid", objectId: div });
+    const hand = s.players[ap]!.hand.length;
+    s = settle(s);
+    expect(s.objects[div]!.zone).toBe("exile");
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
+    // Done once this turn: the next drain doesn't trigger it.
+    s = castDrain(s, ap, ids[1]!);
+    expect(s.pending).toBeNull();
+    expect(s.stack).toHaveLength(0);
+  });
+
+  it("not casting it doesn't use it up: it triggers again", () => {
+    const { s0, ap, ids, div } = scene();
+    let s = untilChoice(act(castDrain(s0, ap, ids[0]!), { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: div }] }));
+    s = settle(act(s, { type: "chooseMay", player: ap, yes: false }));
+    expect(s.objects[div]!.zone).toBe("graveyard");
+    s = castDrain(s, ap, ids[1]!);
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+  });
+});

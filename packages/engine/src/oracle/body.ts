@@ -2037,6 +2037,20 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "castNow", what, anyOwner: true, anyType: true });
       continue;
     }
+    // "You may cast target instant or sorcery card from your graveyard. If that spell would be put into your graveyard, exile
+    // it instead." (Emet-Selch, Toshiro Umezawa, Chandra, Flame's Catalyst): cast as it resolves or not at all, paying its
+    // costs, timing ignored (CR 608.2g, 601.2).
+    const castPaid = /^[Yy]ou may cast (target .+? card from your graveyard)$/.exec(s);
+    const paidRider = sentences[si + 1]?.replace(/\.$/, "");
+    if (castPaid && (paidRider === "If that spell would be put into your graveyard, exile it instead" || paidRider === "If that spell would be put into a graveyard, exile it instead")) {
+      const before = ctx.targets.length;
+      const what = parseCardTarget(castPaid[1]!, ctx, "you");
+      const t = ctx.targets[before];
+      if (!what || ctx.targets.length !== before + 1 || t?.kind !== "card" || !t.types?.length || t.types.includes("Land")) return null;
+      effects.push({ type: "castNow", what, exileAfter: true });
+      si++;
+      continue;
+    }
     // "You may cast target instant card from your graveyard without paying its mana cost. If that spell would be put into
     // your graveyard, exile it instead." (Torrential Gearhulk): cast as it resolves (CR 608.2g), or not.
     const castTarget = /^[Yy]ou may cast (target .+? card(?: with .+?)? from your graveyard) without paying its mana cost$/.exec(s);

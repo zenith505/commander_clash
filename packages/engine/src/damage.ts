@@ -14,7 +14,7 @@ import { batchPlayerCounters, putPlayerCounters, putCounters, tokenBatch, withPu
 import { createExtraTokens, createToken } from "./effects/run-tokens";
 import { fireEvent } from "./effects";
 import { bindChosen, objectMatches, playerProtectedFrom } from "./effects/targeting";
-import { canPreventDamage, enterTogether, gainLife, log, loseLife, millCount, moveObject, obj, player, syncControl, turnOrderFrom, useShieldCounter } from "./game";
+import { canPreventDamage, enterTogether, gainLife, log, loseLife, simultaneousLifeLoss, millCount, moveObject, obj, player, syncControl, turnOrderFrom, useShieldCounter } from "./game";
 import { protectedFrom, toxicValue } from "./keywords";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
 import type { CardDef, Color, DamageRule, GameObject, GameState, ObjectId, PlayerId, RedirectShield } from "./types";
@@ -1190,13 +1190,13 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
   creatureBatch = [];
   // Poison counters from several sources at once are put as one event (rulings on All Will Be One).
   const out = batchPlayerCounters(s, () =>
-    plan.final.map((e) => {
+    simultaneousLifeLoss(s, () => plan.final.map((e) => {
       const lifelink = typeof opts.lifelink === "function" ? opts.lifelink(e) : opts.lifelink;
       const o = "object" in e.to ? obj(s, e.to.object) : undefined;
       const to = o ? { object: o } : { player: (e.to as { player: PlayerId }).player };
       const dealt = o && o.zone !== "battlefield" ? 0 : dealDamage(s, e.src, to, e.n, { combat: e.combat, lifelink, shielded: true, witherCounters });
       return { ...e, dealt };
-    }),
+    })),
   );
   for (const [key, n] of witherCounters) {
     const [id, by] = key.split("|") as [ObjectId, PlayerId];

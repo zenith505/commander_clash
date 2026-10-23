@@ -1657,7 +1657,18 @@ export type Effect =
    * `anyOwner`: "you may cast target nonland permanent card from that player's graveyard" (Tinybones), a card another
    * player owns; `anyType`: "and mana of any type can be spent to cast that spell" (CR 609.4b).
    */
-  | { type: "castNow"; what: ObjRef; thenNoMore?: true; unlessCast?: true; anyOwner?: true; anyType?: true }
+  | {
+      type: "castNow";
+      what: ObjRef;
+      thenNoMore?: true;
+      unlessCast?: true;
+      anyOwner?: true;
+      anyType?: true;
+      /** "If that spell would be put into your graveyard, exile it instead." */
+      exileAfter?: true;
+      /** "Do this only once each turn" (Emet-Selch, CR 603.2h): casting it is doing it; then the ability doesn't trigger again this turn. */
+      once?: true;
+    }
   | { type: "putFromHand"; who?: PlayerRef; filter?: TargetSpec; tapped?: boolean; attacking?: boolean; may: boolean; any?: boolean; /** With `any`: "up to seven" (Ugin, the Spirit Dragon), "up to X" (Worldsoul's Rage). */ upTo?: Amount; /** "From your hand and/or graveyard" (Worldsoul's Rage): cards from either, together. */ orGraveyard?: true; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand"; /** "If you do, draw a card and repeat this process" (Cultivator Colossus): after each card put, a draw, then again until you put none (rulings). */ drawRepeat?: true; /** "Each manifest two cards from their hands" (Kozilek, the Broken Reality): exactly this many (all with fewer), face down (CR 701.40a). */ manifest?: number }
   /**
    * "Return all land cards from your graveyard to the battlefield tapped" (CR 110.2a: under your control), "from all graveyards
@@ -3165,6 +3176,7 @@ export type TriggerEvent =
   | "youPlayAnotherLand" // "When you play another land" (City of Traitors): playing a land (CR 305.1), not this one
   | "youLoseLife" // "Whenever you lose life" (Vilis, Broker of Blood): once per life-loss event, as "opponentLosesLife"
   | "opponentLosesLife" // "Whenever an opponent loses life": once per life-loss event, damage and paying life included (CR 119.2, 119.4)
+  | "opponentsLoseLife" // "Whenever one or more opponents lose life" (Emet-Selch): once for life lost at the same time
   | "youCreateToken" // "Whenever you create a token": once for each token you create (CR 111.2), whoever ends up controlling it
   /**
    * "Whenever you're dealt damage", "whenever an opponent is dealt damage", "whenever enchanted player is dealt damage": once

@@ -135,7 +135,7 @@ export type TriggerSourceEvent =
   /** A player gained life (one life-gain event, CR 119.9). */
   | { type: "lifeGained"; player: PlayerId; amount: number }
   /** A player lost life: from damage, an effect, or paying life (one life-loss event, CR 119.2-119.4). */
-  | { type: "lifeLost"; player: PlayerId; amount: number; /** The player's first life loss this turn. */ first?: boolean }
+  | { type: "lifeLost"; player: PlayerId; amount: number; /** The player's first life loss this turn. */ first?: boolean; /** Life lost at the same time by several players shares this number ("one or more opponents lose life"). */ batch?: number }
   /** `player` created a token (CR 111.2), `id` (it may have left already: "whenever you create a token" still triggers). */
   | { type: "tokenCreated"; player: PlayerId; id: ObjectId }
   /** All the damage dealt to a player at the same time (CR 120.3a): "whenever you're dealt damage". */
@@ -382,6 +382,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (t.oncePerTurn && onceUsed(o, t.zone, onceKey, nth)) return;
       const once = t.body.effects[0];
       if (once?.type === "may" && once.once && onceUsed(o, t.zone, `do:${once.text}`)) return; // CR 603.2h
+      if (once?.type === "castNow" && once.once && onceUsed(o, t.zone, "do:castNow")) return;
       if (pred(t.event, t) && (!t.ifCond || staticConditionNow(s, t.ifCond, o.id, controller, event?.player, event?.amount, undefined, subject?.id, subject?.zoneChanges ?? 0))) {
         if (t.oncePerTurn) (o.triggeredThisTurn ??= []).push(`${lookingBack(o, t.zone) ? (o.zoneChanges ?? 0) - 1 : (o.zoneChanges ?? 0)}|${onceKey}`);
         const queued: PendingTrigger = {
@@ -817,6 +818,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const you = controllerOf(s, o);
       // Valgavoth: "for the first time during each of their turns".
       if (you !== ev.player) add(o, you, (e, t) => e === "opponentLosesLife" && (!t.firstOnTheirTurn || (!!ev.first && s.activePlayer === ev.player)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
+      // "Whenever one or more opponents lose life": once for life lost at the same time (Emet-Selch), not once per player.
+      if (you !== ev.player)
+        add(o, you, (e, t) => e === "opponentsLoseLife" && !s.triggerQueue.some((q) => q.sourceId === o.id && q.event?.lifeBatch !== undefined && q.event.lifeBatch === ev.batch && (q.body ?? triggerOf(s, q)?.body)?.text === t.body.text), undefined, undefined, undefined, undefined, undefined, undefined, { ...(ev.batch !== undefined ? { lifeBatch: ev.batch } : {}) });
       else add(o, you, (e) => e === "youLoseLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
     speedTrigger(s, ev.player);

@@ -1510,6 +1510,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const cast = !!o && o.zone === "stack";
       sc.castNow = undefined;
       s.resolving!.did = cast;
+      if (cast && e.exileAfter) o.exileIfToGraveyard = true;
+      // "Do this only once each turn": done (CR 603.2h).
+      const source = cast && e.once && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (source) (source.triggeredThisTurn ??= []).push(`${ctx.sourceZc ?? source.zoneChanges ?? 0}|do:castNow`);
       if (cast && e.thenNoMore) {
         (s.cantCastThisTurn ??= []).push({ player: ctx.controller, turn: s.turn, source: src });
         log(s, `${player(s, ctx.controller).name} can't cast additional spells this turn.`);

@@ -1567,7 +1567,21 @@ export function loseLife(s: GameState, pid: PlayerId, n: number) {
   if (first) s.lostLifeThisTurn.push(pid);
   const lost = ((s.turnLog ??= {}).lifeLost ??= {});
   lost[pid] = (lost[pid] ?? 0) + n;
-  fireEvent(s, { type: "lifeLost", player: pid, amount: n, first });
+  const batch = lifeBatch ?? (s.lifeLossEvents = (s.lifeLossEvents ?? 0) + 1);
+  fireEvent(s, { type: "lifeLost", player: pid, amount: n, first, batch });
+}
+
+let lifeBatch: number | undefined;
+
+/** Life that several players lose at the same time inside `fn` (damage dealt at once, "each opponent loses 2 life") is one event. */
+export function simultaneousLifeLoss<T>(s: GameState, fn: () => T): T {
+  if (lifeBatch !== undefined) return fn();
+  lifeBatch = s.lifeLossEvents = (s.lifeLossEvents ?? 0) + 1;
+  try {
+    return fn();
+  } finally {
+    lifeBatch = undefined;
+  }
 }
 
 /**

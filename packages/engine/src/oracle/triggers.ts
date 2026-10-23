@@ -77,6 +77,8 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever an opponent commits a crime, (.+)$/, "opponentCommitsCrime"],
   [/^Whenever you choose a creature as your Ring-bearer, (.+)$/, "youChooseRingBearer"],
   [/^Whenever an opponent loses life, (.+)$/, "opponentLosesLife"],
+  // Emet-Selch: once for life lost at the same time, however many opponents lost it.
+  [/^Whenever one or more opponents lose life, (.+)$/, "opponentsLoseLife"],
   [/^Whenever an opponent gains life, (.+)$/, "opponentGainsLife"],
   [/^Whenever you lose life, (.+)$/, "youLoseLife"],
   // Playing a land (CR 305.1), not putting one onto the battlefield with an effect (rulings on Burgeoning).
@@ -1427,6 +1429,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(doOnce[1]!);
     if (!t || t === "fail" || t.oncePerTurn || t.event === "state") return "fail";
     const may = t.body.effects[0];
+    // "You may cast target instant or sorcery card from your graveyard" (Emet-Selch): casting it is doing it.
+    if (may?.type === "castNow" && !may.once && t.body.effects.length === 1) return { ...t, body: { ...t.body, effects: [{ ...may, once: true }] } };
     // "You may discard a card. If you do, draw a card": choosing to discard is doing it.
     if (may?.type !== "may" || may.once || !t.body.effects.slice(1).every((e) => e.type === "if" && e.cond.kind === "youDid")) return "fail";
     return { ...t, body: { ...t.body, effects: [{ ...may, once: true }, ...t.body.effects.slice(1)] } };

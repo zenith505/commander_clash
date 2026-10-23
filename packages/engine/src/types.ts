@@ -1495,6 +1495,8 @@ export interface GameState {
   damageMods?: { id: string; mod: DamageMod; you: PlayerId; name: string; turn: number; until?: "yourNextTurn" }[];
   /** Players who lost life this turn ("if an opponent lost life this turn", CR 119.3). */
   lostLifeThisTurn?: PlayerId[];
+  /** A count of life-loss events, numbering those that happen at the same time (loseLife, simultaneousLifeLoss). */
+  lifeLossEvents?: number;
   /** Revolt: the players a permanent left the battlefield under the control of this turn, tokens too (rulings). */
   permanentLeftThisTurn?: PlayerId[];
   /** Players whose Assassin creature or commander dealt combat damage to a player this turn: they may pay freerunning costs (CR 702.173a). */
@@ -1662,6 +1664,8 @@ export interface TurnRule {
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */
 export interface TriggerEventInfo {
   amount?: number;
+  /** "One or more opponents lose life": the life loss event it triggered on (lifeLost's batch). */
+  lifeBatch?: number;
   /** A cast or play-a-land trigger: the spell or land, as the object it was (TriggeredAbility cast.sharesTypeWithLinked). */
   played?: { id: ObjectId; zc: number };
   /** "Deals damage to a creature": the excess damage that creature has been dealt this turn (CR 120.10). */

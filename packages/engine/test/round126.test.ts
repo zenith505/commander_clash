@@ -585,3 +585,20 @@ describe("Light-Paws, Emperor's Voice: a cast Aura fetches a cheaper, differentl
     expect(s.objects[libIds[0]!]!.zone).toBe("library");
   });
 });
+
+const sibsig = card("The Sibsig Ceremony", "Legendary Enchantment", "{B}{B}{B}", {
+  oracleText: "Creature spells you cast cost {2} less to cast.\nWhenever a creature you control enters, if you cast it, destroy that creature, then create a 2/2 black Zombie Druid creature token.",
+});
+
+describe("The Sibsig Ceremony: \"if you cast it\" on another permanent entering (CR 603.4)", () => {
+  it("a creature cast is destroyed and replaced by a Zombie Druid; the token entering doesn't trigger it", () => {
+    supported(sibsig);
+    const { s: s0, ap, ids } = setup([bears()]);
+    putOnBattlefield(s0, ap, sibsig);
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    s = settleBots(s);
+    expect(s.objects[ids[0]!]!.zone).toBe("graveyard");
+    const zombies = s.battlefield.filter((id) => s.objects[id]!.isToken && characteristics(s, s.objects[id]!).subtypes.includes("Zombie"));
+    expect(zombies).toHaveLength(1);
+  });
+});

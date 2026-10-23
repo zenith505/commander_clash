@@ -4,7 +4,9 @@
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, scry, setup } from "./helpers";
 import { botActions, castProblem, isFullySupported, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
-import { invalidateCharacteristics } from "../src/layers";
+import { characteristics, invalidateCharacteristics } from "../src/layers";
+import { power, toughness } from "../src/cards";
+import { manaAbilitiesOn } from "../src/manaabilities";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const settle = (s: GameState, yes = true) => {
@@ -334,4 +336,91 @@ describe("Toph, Hardheaded Teacher", () => {
       expect(lands).toHaveLength(1);
       expect(s.objects[lands[0]!]!.counters["+1/+1"]).toBe(n);
     });
+});
+
+const duplicant = card("Duplicant", "Artifact Creature — Shapeshifter", "{6}", { power: "2", toughness: "4", oracleText: "Imprint — When this creature enters, you may exile target nontoken creature.\nAs long as a card exiled with this creature is a creature card, this creature has the power, toughness, and creature types of the last creature card exiled with it. It's still a Shapeshifter." });
+const wurm = card("Craw Wurm", "Creature — Wurm", "{4}{G}{G}", { power: "6", toughness: "4" });
+const crusader = card("Crusader of Odric", "Creature — Human Soldier", "{2}{W}", { power: "*", toughness: "*", oracleText: "Crusader of Odric's power and toughness are each equal to the number of creatures you control." });
+
+describe("Duplicant", () => {
+  const imprint = (victim: CardDef, extra = 0) => {
+    supported(duplicant, crusader);
+    const { s: s0, ap, ids, opp } = setup([duplicant]);
+    const v = putOnBattlefield(s0, opp, victim);
+    for (let i = 0; i < extra; i++) putOnBattlefield(s0, opp, bear());
+    invalidateCharacteristics(s0);
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    for (let i = 0; i < 30 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+      const p = s.pending;
+      if (p?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: v }] });
+      else if (p?.kind === "chooseMay") s = act(s, { type: "chooseMay", player: p.player, yes: true });
+      else if (p) throw new Error(JSON.stringify(p));
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(s.objects[v]!.zone).toBe("exile");
+    return { s, d: ids[0]!, opp };
+  };
+
+  it("exiling Craw Wurm: a 6/4 Wurm Shapeshifter; a +1/+1 counter still counts (rulings)", () => {
+    const { s, d } = imprint(wurm);
+    expect([power(s, s.objects[d]!), toughness(s, s.objects[d]!)]).toEqual([6, 4]);
+    expect(characteristics(s, s.objects[d]!).subtypes.sort()).toEqual(["Shapeshifter", "Wurm"]);
+    s.objects[d]!.counters["+1/+1"] = 1;
+    invalidateCharacteristics(s);
+    expect([power(s, s.objects[d]!), toughness(s, s.objects[d]!)]).toEqual([7, 5]);
+  });
+
+  it("exiling Crusader of Odric: its */* ability works in exile, counting its owner's creatures (rulings)", () => {
+    const { s, d, opp } = imprint(crusader, 2);
+    expect([power(s, s.objects[d]!), toughness(s, s.objects[d]!)]).toEqual([2, 2]);
+    expect(characteristics(s, s.objects[d]!).subtypes.sort()).toEqual(["Human", "Shapeshifter", "Soldier"]);
+    putOnBattlefield(s, opp, bear());
+    invalidateCharacteristics(s);
+    expect([power(s, s.objects[d]!), toughness(s, s.objects[d]!)]).toEqual([3, 3]);
+  });
+
+  it("once the card leaves exile, it's a 2/4 Shapeshifter again", () => {
+    const { s, d } = imprint(wurm);
+    const card = Object.values(s.objects).find((o) => o.zone === "exile")!;
+    card.zone = "graveyard";
+    card.zoneChanges = (card.zoneChanges ?? 0) + 1;
+    invalidateCharacteristics(s);
+    expect([power(s, s.objects[d]!), toughness(s, s.objects[d]!)]).toEqual([2, 4]);
+    expect(characteristics(s, s.objects[d]!).subtypes).toEqual(["Shapeshifter"]);
+  });
+});
+
+const effigy = card("Machine God's Effigy", "Artifact", "{4}", { oracleText: "You may have this artifact enter as a copy of any creature on the battlefield, except it's an artifact and it has \"{T}: Add {U}.\" (It's not a creature.)\n{T}: Add {U}." });
+const elves = card("Llanowar Elves", "Creature — Elf Druid", "{G}", { power: "1", toughness: "1", oracleText: "{T}: Add {G}." });
+const treasureCreature = card("Test Treasure Golem", "Legendary Artifact Creature — Treasure Golem", "{3}", { power: "3", toughness: "3" });
+
+describe("Machine God's Effigy", () => {
+  const enter = (victim: CardDef) => {
+    supported(effigy);
+    const { s: s0, ap, ids, opp } = setup([effigy]);
+    const v = putOnBattlefield(s0, opp, victim);
+    invalidateCharacteristics(s0);
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    for (let i = 0; i < 40 && !(s.pending?.kind === "chooseOption" && s.pending.what === "copy"); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "copy" });
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: v }));
+    return { s, e: s.objects[ids[0]!]! };
+  };
+
+  it("copying Llanowar Elves: an artifact named Llanowar Elves, not a creature or an Elf, with both mana abilities (rulings)", () => {
+    const { s, e } = enter(elves);
+    const c = characteristics(s, e);
+    expect(c.name).toBe("Llanowar Elves");
+    expect(c.types).toEqual(["Artifact"]);
+    expect(c.subtypes).toEqual([]);
+    expect(manaAbilitiesOn(s, e).map((m) => m.produces)).toEqual([{ kind: "fixed", mana: ["G"] }, { kind: "fixed", mana: ["U"] }]);
+  });
+
+  it("it keeps supertypes and artifact subtypes: a legendary Treasure artifact, no Golem (rulings)", () => {
+    const { s, e } = enter(treasureCreature);
+    const c = characteristics(s, e);
+    expect(c.types).toEqual(["Artifact"]);
+    expect(c.supertypes).toEqual(["Legendary"]);
+    expect(c.subtypes).toEqual(["Treasure"]);
+  });
 });

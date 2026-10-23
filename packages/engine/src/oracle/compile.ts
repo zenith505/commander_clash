@@ -2762,6 +2762,14 @@ function linkExile(out: CompiledCard) {
     if (others || out.spell || exiles.length + (out.exileInsteadOfDying?.linked ? 1 : 0) !== 1) out.unsupported.push("(targets a card exiled with it that it can't link to one exile ability)");
     else if (exiles[0]) exiles[0].linked = true;
   }
+  // Duplicant: "the last creature card exiled with it" is one its one exile ability exiled (CR 607.2a).
+  if (out.statics.some((st) => st.mods.some((m) => m.kind === "linkedCreature"))) {
+    const all = bodies.flatMap((b) => allEffects(b.effects));
+    const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
+    const others = all.some((e) => (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || (e.type === "discard" && !!e.exile));
+    if (others || out.spell || exiles.length !== 1) out.unsupported.push("(copies a card exiled with it that it can't link to one exile ability)");
+    else exiles[0]!.linked = true;
+  }
   // Valakut Exploration: "cards exiled with ~" are the ones its one impulse exiled (CR 607.2a).
   const usesLinked = (b: AbilityBody) => allEffects(b.effects).some((e) => e.type === "moveLinked") || JSON.stringify(b).includes('"linkedExiled"');
   const impulses = bodies.flatMap((b) => allEffects(b.effects)).filter((e): e is Extract<Effect, { type: "impulse" }> => e.type === "impulse");

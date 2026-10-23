@@ -178,6 +178,9 @@ export function parseCopyExcept(text: string, round?: "up" | "down"): CopyExcept
     if (/^(?:isn't|aren't|is not|are not|it's not|they're not) legendary$/.test(p)) out.notLegendary = true;
     // "Enters with an additional +1/+1 counter on it if it's a creature" (Spark Double), "... loyalty counter on it if it's
     // a planeswalker", "enters with an additional +1/+1 counter on it" (Littjara Mirrorlake).
+    // Machine God's Effigy: "except it's an artifact": its only card type, keeping its supertypes and artifact subtypes,
+    // losing the other subtypes (rulings, CR 205.1a).
+    else if (/^(?:it's|they're) an artifact$/.test(p)) out.setTypes = ["Artifact"];
     else if ((m = /^enters with an additional (\+1\/\+1|loyalty) counter on it(?: if it's an? (creature|planeswalker))?$/.exec(p))) (out.enterCounters ??= []).push({ counter: m[1]!, ...(m[2] ? { ifType: m[2] === "creature" ? "Creature" : "Planeswalker" } : {}) });
     else if (/^(?:'s|’s|is|are|'re) legendary$/.test(p) || /^(?:it's|they're|he's|she's) legendary$/.test(p)) out.legendary = true;
     // "It doesn't copy that creature's color": it keeps its own (CR 707.9c).

@@ -945,6 +945,13 @@ export type Modification =
   | { kind: "definePT"; power?: Amount; toughness?: Amount }
   | { kind: "modifyPT"; power: Amount; toughness: Amount } // layer 7c
   | { kind: "switchPT" } // layer 7d
+  /**
+   * Duplicant: "As long as a card exiled with ~ is a creature card, ~ has the power, toughness, and creature types of the
+   * last creature card exiled with it. It's still a Shapeshifter." `part` "types": its creature types become that card's
+   * and Shapeshifter (layer 4); "pt": its base power and toughness become that card's (layer 7b, rulings). Nothing
+   * while no card exiled with it (CR 607.2a) is a creature card.
+   */
+  | { kind: "linkedCreature"; part: "types" | "pt" }
   // Rules effects about what the object can do (CR 613.11), checked after the layers.
   | { kind: "cantAttack" }
   /** `ability`: "This creature can't block" as an ability it has (a suspected creature's, CR 701.60c), so in layer 6. */

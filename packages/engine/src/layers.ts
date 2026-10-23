@@ -43,6 +43,8 @@ export function layerOf(m: Modification): Layer {
     case "setLandTypes":
     case "loseTypes":
       return "4";
+    case "linkedCreature":
+      return m.part === "types" ? "4" : "7b";
     case "setColors":
     case "addColors":
       return "5";
@@ -958,6 +960,18 @@ function appliesTo(s: GameState, e: Inst, chars: CharMap): ObjectId[] {
   return out;
 }
 
+/** Duplicant: the last creature card exiled with this object that's still in exile (CR 607.2a). */
+function lastLinkedCreatureCard(s: GameState, sourceId: ObjectId | undefined): GameObject | undefined {
+  const src = sourceId ? s.objects[sourceId] : undefined;
+  if (!src) return undefined;
+  const linked = s.linkedExile?.[`${src.id}@${src.zoneChanges ?? 0}`] ?? [];
+  for (let i = linked.length - 1; i >= 0; i--) {
+    const o = s.objects[linked[i]!.id];
+    if (o?.zone === "exile" && (o.zoneChanges ?? 0) === linked[i]!.zc && !o.faceDown && defOf(s, o).types.includes("Creature")) return o;
+  }
+  return undefined;
+}
+
 /**
  * New subtypes replace the existing ones of the same kind only (CR 205.1a): "becomes a Frog"
  * replaces creature types and leaves an Equipment an Equipment.
@@ -1074,6 +1088,30 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
       if (m.toughness !== undefined) c.toughness = num(m.toughness);
       c.pt.push({ source: e.sourceName, kind: "set", power: c.power, toughness: c.toughness, untilEndOfTurn: false });
       return;
+    case "linkedCreature": {
+      const card = lastLinkedCreatureCard(s, e.sourceId);
+      if (!card) return;
+      if (m.part === "types") {
+        const theirs = characteristics(s, card);
+        setSubtypes(c, [...new Set([...theirs.subtypes.filter((st) => subtypeSet(st) === "Creature"), "Shapeshifter"])]);
+        if (theirs.allCreatureTypes) c.allCreatureTypes = true;
+        return;
+      }
+      // A "*" comes from the card's characteristic-defining ability, which works in exile (CR 604.3); effects that add
+      // to or subtract from its power don't apply there (rulings).
+      const d = defOf(s, card);
+      const cda = compileCard(d).statics.find((st) => st.affects.kind === "self" && !st.condition && st.mods.some((x) => x.kind === "definePT"));
+      const def = cda?.mods.find((x) => x.kind === "definePT") as Extract<Modification, { kind: "definePT" }> | undefined;
+      const pt = (key: "power" | "toughness", printedN: number) => {
+        if (/^\d+$/.test(d[key] ?? "0")) return printedN;
+        const a = def?.[key];
+        return a === undefined ? printedN : evalAmount(s, a, { controller: card.owner, sourceId: card.id, view: (o) => chars.get(o.id) });
+      };
+      c.power = pt("power", basePower(d));
+      c.toughness = pt("toughness", baseToughness(d));
+      c.pt.push({ source: e.sourceName, kind: "set", power: c.power, toughness: c.toughness, untilEndOfTurn: false });
+      return;
+    }
     case "setPT": {
       const [p, t] = [num(m.power), num(m.toughness)];
       c.power = p;
@@ -1394,7 +1432,7 @@ function countsSomething(st: StaticAbility): boolean {
   if (st.condition) return true; // "as long as": attacking, tapped lands, the graveyard, whose turn it is
   if (st.affects.kind === "filter" && (st.affects.spec?.combat || st.affects.spec?.tapped !== undefined || st.affects.spec?.status)) return true; // "attacking/untapped/modified creatures you control"
   for (const m of st.mods) {
-    if (m.kind === "definePT") return true;
+    if (m.kind === "definePT" || m.kind === "linkedCreature") return true;
     if ((m.kind === "modifyPT" || m.kind === "setPT") && (isCounted(m.power) || isCounted(m.toughness))) return true;
     if (m.kind === "setToughness" && isCounted(m.toughness)) return true;
     if (m.kind === "attackTax" && m.amount !== undefined && isCounted(m.amount)) return true;

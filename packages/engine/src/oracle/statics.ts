@@ -1184,6 +1184,9 @@ function parseStaticLine(line: string): StaticAbility | null {
   // snow supertype added in the type-changing layer (CR 205.4a, 613.1d).
   const snow = { kind: "addTypes" as const, types: [], subtypes: [], supertypes: ["Snow"] };
   if (/^Enchanted (?:land|permanent) is snow$/.test(text)) return { affects: { kind: "attached" }, mods: [snow], text: line };
+  // Duplicant: its imprint exile is linked to this ability (CR 607.2a, see linkExile).
+  if (/^As long as a card exiled with ~ is a creature card, ~ has the power, toughness, and creature types of the last creature card exiled with it\. It's still a Shapeshifter$/.test(text))
+    return { affects: { kind: "self" }, mods: [{ kind: "linkedCreature", part: "types" }, { kind: "linkedCreature", part: "pt" }], text: line };
   // "This creature is the chosen type in addition to its other types" (Metallic Mimic, Roaming Throne): the creature type
   // chosen as it entered, added in the type-changing layer (CR 613.1d).
   if (/^~ is the chosen type in addition to its other types$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "addTypes", types: [], subtypes: [], chosenType: true }], text: line };

@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { altCostsFor, botActions, castProblem, characteristics, defOf, isFullySupported, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { altCostsFor, botActions, castProblem, characteristics, defOf, isFullySupported, parseManaCost, planActivate, planCast, planMana, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -256,4 +256,327 @@ describe("Idol of Endurance: creature cards with mana value 3 or less exiled unt
   });
 });
 
-void passUntil;
+const dalkovan = card("Dalkovan Encampment", "Land", "", { oracleText: "This land enters tapped unless you control a Swamp or a Mountain.\n{T}: Add {W}.\n{2}{W}, {T}: Whenever you attack this turn, create two 1/1 red Warrior creature tokens that are tapped and attacking. Sacrifice them at the beginning of the next end step." });
+
+describe("Dalkovan Encampment: \"whenever you attack this turn\", a delayed trigger made by an activated ability (CR 603.7)", () => {
+  it("attacking makes two tapped and attacking Warriors, sacrificed at the next end step; not attacking makes none", () => {
+    supported(dalkovan);
+    const { s: s0, ap, opp } = setup([]);
+    const d = putOnBattlefield(s0, ap, dalkovan);
+    const o = putOnBattlefield(s0, ap, ogre("Attacker"));
+    let s = settleBots(run(s0, planActivate(s0, ap, d, 0)));
+    expect(s.floatingTriggers?.length).toBe(1);
+    s = passUntil(s, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: o, defender: opp }] });
+    s = settleBots(s);
+    const warriors = tokensNamed(s, "Warrior Token");
+    expect(warriors.length).toBe(2);
+    expect(warriors.every((id) => s.objects[id]!.tapped && s.objects[id]!.attacking !== undefined)).toBe(true);
+    s = passUntil(s, "end", ap);
+    s = settleBots(s);
+    expect(tokensNamed(s, "Warrior Token")).toEqual([]);
+  });
+  it("its ability lasts this turn only: attacking on a later turn makes nothing", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const d = putOnBattlefield(s0, ap, dalkovan);
+    const o = putOnBattlefield(s0, ap, ogre("Attacker"));
+    let s = settleBots(run(s0, planActivate(s0, ap, d, 0)));
+    s = passUntil(s, "end", ap);
+    s = passUntil(s, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: o, defender: opp }] });
+    s = settleBots(s);
+    expect(tokensNamed(s, "Warrior Token")).toEqual([]);
+  });
+});
+
+const eidolon = card("Eidolon of Countless Battles", "Enchantment Creature — Spirit", "{1}{W}{W}", { power: "0", toughness: "0", keywords: ["Bestow"], oracleText: "Bestow {2}{W}{W} (If you cast this card for its bestow cost, it's an Aura spell with enchant creature. It becomes a creature again if it's not attached.)\nThis creature and enchanted creature each get +1/+1 for each creature you control and +1/+1 for each Aura you control." });
+const testAura = card("Test Aura", "Enchantment — Aura", "{W}", { oracleText: "Enchant creature" });
+
+describe("Eidolon of Countless Battles: it and enchanted creature each get +1/+1 for each creature and each Aura you control", () => {
+  it("as a creature it counts itself as a creature, not an Aura (rulings)", () => {
+    supported(eidolon);
+    const { s: s0, ap } = setup([]);
+    const e = putOnBattlefield(s0, ap, eidolon);
+    putOnBattlefield(s0, ap, ogre());
+    const pt = (s: GameState, id: string) => [characteristics(s, s.objects[id]!).power, characteristics(s, s.objects[id]!).toughness];
+    expect(pt(s0, e)).toEqual([2, 2]);
+  });
+  it("bestowed: the enchanted creature gets it, counting the Eidolon as an Aura", () => {
+    const { s: s0, ap, ids } = setup([eidolon, eidolon]);
+    const o = putOnBattlefield(s0, ap, ogre());
+    putOnBattlefield(s0, ap, ogre("Other Ogre"));
+    let s = settleBots(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: o }], undefined, "auto", undefined, { alt: "bestow" })));
+    expect(s.objects[ids[0]!]!.attachedTo).toBe(o);
+    // Two creatures, one Aura: +3/+3.
+    expect([characteristics(s, s.objects[o]!).power, characteristics(s, s.objects[o]!).toughness]).toEqual([6, 6]);
+    // The Eidolon itself isn't a creature now and gets nothing.
+    expect(characteristics(s, s.objects[ids[0]!]!).types).not.toContain("Creature");
+  });
+});
+
+const nighthowler = card("Nighthowler", "Enchantment Creature — Horror", "{1}{B}{B}", { power: "0", toughness: "0", keywords: ["Bestow"], oracleText: "Bestow {2}{B}{B} (If you cast this card for its bestow cost, it's an Aura spell with enchant creature. It becomes a creature again if it's not attached.)\nThis creature and enchanted creature each get +X/+X, where X is the number of creature cards in all graveyards." });
+
+describe("Nighthowler: it and enchanted creature each get +X/+X, X the creature cards in all graveyards", () => {
+  it("as a creature it gets +X/+X; bestowed, the enchanted creature does", () => {
+    supported(nighthowler);
+    const { s: s0, ap, opp, ids } = setup([nighthowler, nighthowler]);
+    putIn(s0, ap, ogre("Yard Ogre"), "graveyard");
+    putIn(s0, opp, ogre("Their Ogre"), "graveyard");
+    putIn(s0, opp, opt, "graveyard");
+    const n = putOnBattlefield(s0, ap, nighthowler);
+    const pt = (s: GameState, id: string) => [characteristics(s, s.objects[id]!).power, characteristics(s, s.objects[id]!).toughness];
+    expect(pt(s0, n)).toEqual([2, 2]);
+    const o = putOnBattlefield(s0, ap, ogre());
+    const s = settleBots(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: o }], undefined, "auto", undefined, { alt: "bestow" })));
+    expect(s.objects[ids[0]!]!.attachedTo).toBe(o);
+    expect(pt(s, o)).toEqual([5, 5]);
+  });
+});
+
+const matoya = card("Matoya, Archon Elder", "Legendary Creature — Human Warlock", "{2}{U}", { power: "1", toughness: "4", oracleText: "Whenever you scry or surveil, draw a card. (Draw after you scry or surveil.)" });
+const chanceMet = card("Chance-Met Elves", "Creature — Elf Warrior", "{2}{G}", { power: "3", toughness: "2", oracleText: "Whenever you scry, put a +1/+1 counter on this creature. This ability triggers only once each turn." });
+const phantasm = card("Thoughtbound Phantasm", "Creature — Spirit", "{U}", { power: "2", toughness: "2", keywords: ["Defender"], oracleText: "Defender\nWhenever you surveil, put a +1/+1 counter on this creature.\nAs long as this creature has three or more +1/+1 counters on it, it can attack as though it didn't have defender." });
+const opt = card("Test Opt", "Instant", "{U}", { oracleText: "Scry 1." });
+const surveil = card("Test Surveil", "Instant", "{U}", { oracleText: "Surveil 2." });
+const scryZero = card("Test Scry X", "Instant", "{X}{U}", { oracleText: "Scry X." });
+/** Cast `id`, keeping every looked-at card on top, and let everything resolve. */
+const castScry = (s: GameState, pid: PlayerId, id: string, x?: number) => {
+  s = run(s, planCast(s, pid, id, undefined, undefined, "auto", x));
+  for (let i = 0; i < 60 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+    const p = s.pending;
+    if (p?.kind === "arrangeTop") s = act(s, { type: "arrangeTop", player: p.player, top: p.cards, away: [] });
+    else if (p) s = botActions(s, p.player).reduce((x2, a) => act(x2, a), s);
+    else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+  }
+  return s;
+};
+
+describe("\"Whenever you scry\", \"whenever you surveil\" (CR 701.22d, 701.25d)", () => {
+  it("Matoya draws after a scry and after a surveil; Chance-Met Elves only once a turn; the Phantasm only on surveil", () => {
+    supported(matoya, chanceMet, phantasm);
+    const { s: s0, ap, ids } = setup([opt, opt, surveil]);
+    putOnBattlefield(s0, ap, matoya);
+    const elves = putOnBattlefield(s0, ap, chanceMet);
+    const ph = putOnBattlefield(s0, ap, phantasm);
+    const hand = () => s.players[ap]!.hand.length;
+    let s = s0;
+    const h0 = hand();
+    s = castScry(s, ap, ids[0]!);
+    expect(hand()).toBe(h0 - 1 + 1);
+    s = castScry(s, ap, ids[1]!);
+    s = castScry(s, ap, ids[2]!);
+    expect(hand()).toBe(h0 - 3 + 3);
+    expect(s.objects[elves]!.counters["+1/+1"] ?? 0).toBe(1);
+    expect(s.objects[ph]!.counters["+1/+1"] ?? 0).toBe(1);
+  });
+  it("scry 0 is no scry (CR 701.22b); scry 1 with an empty library still is (CR 701.22d)", () => {
+    const { s: s0, ap, ids } = setup([scryZero, opt]);
+    const elves = putOnBattlefield(s0, ap, chanceMet);
+    let s = castScry(s0, ap, ids[0]!, 0);
+    expect(s.objects[elves]!.counters["+1/+1"] ?? 0).toBe(0);
+    for (const id of [...s.players[ap]!.library]) s.objects[id]!.zone = "exile";
+    s.players[ap]!.exile.push(...s.players[ap]!.library);
+    s.players[ap]!.library = [];
+    s = castScry(s, ap, ids[1]!);
+    expect(s.objects[elves]!.counters["+1/+1"] ?? 0).toBe(1);
+  });
+});
+
+const planetarium = card("Planetarium of Wan Shi Tong", "Legendary Artifact", "{6}", { keywords: ["Scry"], oracleText: "{1}, {T}: Scry 2.\nWhenever you scry or surveil, look at the top card of your library. You may cast that card without paying its mana cost. Do this only once each turn. (Look at the card after you scry or surveil.)" });
+const giant = card("Test Giant", "Creature — Giant", "{4}{R}", { power: "5", toughness: "5" });
+
+describe("Planetarium of Wan Shi Tong: cast the top card free after you scry or surveil, once each turn", () => {
+  it("the top card may be cast free as the trigger resolves; once cast, it doesn't trigger again this turn (rulings)", () => {
+    supported(planetarium);
+    const { s: s0, ap, ids } = setup([opt]);
+    putOnBattlefield(s0, ap, planetarium);
+    const g = putIn(s0, ap, giant, "library");
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    s = passToPending(s);
+    expect(s.pending).toMatchObject({ kind: "arrangeTop" });
+    s = act(s, { type: "arrangeTop", player: ap, top: (s.pending as { cards: string[] }).cards, away: [] });
+    s = passToPending(s);
+    expect(s.pending).toMatchObject({ kind: "castFree", objectId: g, player: ap });
+    // The log names no card: it was only looked at.
+    expect(logText(s)).toMatch(/looks at the top card of their library/);
+    s = settleBots(act(s, { type: "castSpell", player: ap, objectId: g }));
+    expect(s.objects[g]!.zone).toBe("battlefield");
+    // Its own scry: no second trigger this turn.
+    const p = s.battlefield.find((id) => nameOf(s, id) === "Planetarium of Wan Shi Tong")!;
+    s = run(s, planActivate(s, ap, p, 0));
+    s = passToPending(s);
+    expect(s.pending).toMatchObject({ kind: "arrangeTop" });
+    s = act(s, { type: "arrangeTop", player: ap, top: (s.pending as { cards: string[] }).cards, away: [] });
+    s = passToPending(s);
+    expect(s.pending).toBeNull();
+    expect(s.stack).toEqual([]);
+  });
+  it("declining to cast it lets it trigger again this turn", () => {
+    const { s: s0, ap, ids } = setup([opt, opt]);
+    putOnBattlefield(s0, ap, planetarium);
+    putIn(s0, ap, giant, "library");
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    s = passToPending(s);
+    s = act(s, { type: "arrangeTop", player: ap, top: (s.pending as { cards: string[] }).cards, away: [] });
+    s = passToPending(s);
+    expect(s.pending?.kind).toBe("castFree");
+    s = passToPending(act(s, { type: "chooseMay", player: ap, yes: false }));
+    s = run(s, planCast(s, ap, ids[1]!));
+    s = passToPending(s);
+    s = act(s, { type: "arrangeTop", player: ap, top: (s.pending as { cards: string[] }).cards, away: [] });
+    s = passToPending(s);
+    expect(s.pending?.kind).toBe("castFree");
+  });
+});
+
+const hashaton = card("Hashaton, Scarab's Fist", "Legendary Creature — Zombie Wizard", "{W}{B}", { power: "1", toughness: "3", oracleText: "Whenever you discard a creature card, you may pay {2}{U}. If you do, create a tapped token that's a copy of that card, except it's a 4/4 black Zombie." });
+const loot = card("Test Loot", "Sorcery", "{U}", { oracleText: "Draw a card, then discard a card." });
+const flier = card("Test Flier", "Creature — Bird", "{1}{U}", { power: "1", toughness: "1", keywords: ["Flying"], oracleText: "Flying" });
+
+describe("Hashaton, Scarab's Fist: a 4/4 black Zombie copy of a discarded creature card", () => {
+  it("paying {2}{U} makes a tapped token copy, a 4/4 black Zombie with the card's abilities", () => {
+    supported(hashaton);
+    const { s: s0, ap, ids } = setup([loot]);
+    putOnBattlefield(s0, ap, hashaton);
+    const f = putIn(s0, ap, flier, "hand");
+    let s = passToPending(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.pending).toMatchObject({ kind: "discard", player: ap });
+    s = passToPending(act(s, { type: "discard", player: ap, objectIds: [f] }));
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    for (const a of planMana(s, ap, parseManaCost("{2}{U}"))!) s = act(s, a);
+    s = settleBots(act(s, { type: "chooseMay", player: ap, yes: true }));
+    const [t] = tokensNamed(s, "Test Flier");
+    const ch = characteristics(s, s.objects[t!]!);
+    expect([ch.power, ch.toughness, ch.colors, ch.subtypes]).toEqual([4, 4, ["B"], ["Zombie"]]);
+    expect(ch.keywords).toContain("Flying");
+    expect(s.objects[t!]!.tapped).toBe(true);
+  });
+  it("discarding a noncreature card doesn't trigger it", () => {
+    const { s: s0, ap, ids } = setup([loot]);
+    putOnBattlefield(s0, ap, hashaton);
+    const l = putIn(s0, ap, opt, "hand");
+    let s = passToPending(run(s0, planCast(s0, ap, ids[0]!)));
+    s = passToPending(act(s, { type: "discard", player: ap, objectIds: [l] }));
+    expect(s.pending).toBeNull();
+  });
+});
+
+const boxer = card("Bark-Knuckle Boxer", "Creature — Raccoon Berserker", "{1}{G}", { power: "3", toughness: "2", oracleText: "Whenever you expend 4, this creature gains indestructible until end of turn. (You expend 4 as you spend your fourth total mana to cast spells during a turn.)" });
+const scout = card("Trailtracker Scout", "Creature — Raccoon Scout", "{1}{G}", { power: "1", toughness: "3", oracleText: "{T}: Add one mana of any color.\nWhenever you expend 8, return up to one target permanent card from your graveyard to your hand. (You expend 8 as you spend your eighth total mana to cast spells during a turn.)" });
+const two = card("Test Two", "Sorcery", "{1}{G}", { oracleText: "You gain 1 life." });
+const five = card("Test Five", "Sorcery", "{4}{G}", { oracleText: "You gain 1 life." });
+
+describe("Expend (CR 700.14): the total mana spent casting spells this turn reaching N", () => {
+  it("2 then 5: the second spell takes the total from 2 to 7, past 4 (the CR's example) but not 8; then a free spell adds nothing", () => {
+    supported(boxer, scout);
+    const { s: s0, ap, ids } = setup([two, five, two]);
+    const b = putOnBattlefield(s0, ap, boxer);
+    putOnBattlefield(s0, ap, scout);
+    const y = putIn(s0, ap, ogre("Yard Ogre"), "graveyard");
+    let s = settleBots(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(characteristics(s, s.objects[b]!).keywords).not.toContain("Indestructible");
+    s = settleBots(run(s, planCast(s, ap, ids[1]!)));
+    expect(characteristics(s, s.objects[b]!).keywords).toContain("Indestructible");
+    expect(s.objects[y]!.zone).toBe("graveyard");
+    // From 7 to 9: past 8.
+    s = passToPending(run(s, planCast(s, ap, ids[2]!)));
+    s = settleBots(s);
+    expect(s.objects[y]!.zone).toBe("hand");
+  });
+  it("it's counted per turn, and only spells count", () => {
+    const { s: s0, ap, ids } = setup([five]);
+    const b = putOnBattlefield(s0, ap, boxer);
+    s0.players[ap]!.expended = { turn: s0.turn - 1, n: 3 };
+    let s = settleBots(run(s0, planCast(s0, ap, ids[0]!)));
+    // Last turn's 3 don't count: 0 to 5 is still past 4.
+    expect(characteristics(s, s.objects[b]!).keywords).toContain("Indestructible");
+    expect(s.players[ap]!.expended).toEqual({ turn: s.turn, n: 5 });
+  });
+});
+
+const wallOfRoots = card("Wall of Roots", "Creature — Plant Wall", "{1}{G}", { power: "0", toughness: "5", keywords: ["Defender"], oracleText: "Defender\nPut a -0/-1 counter on this creature: Add {G}. Activate only once each turn." });
+const armorThrull = card("Armor Thrull", "Creature — Thrull", "{2}{B}", { power: "1", toughness: "3", oracleText: "{T}, Sacrifice this creature: Put a +1/+2 counter on target creature." });
+const shieldSphere = card("Shield Sphere", "Artifact Creature — Wall", "{0}", { power: "0", toughness: "6", keywords: ["Defender"], oracleText: "Defender\nWhenever this creature blocks, put a -0/-1 counter on it." });
+
+describe("Power/toughness counters other than +1/+1 and -1/-1: each +X/+Y counter gives +X/+Y (CR 122.1a, 613.4c)", () => {
+  it("Wall of Roots: the -0/-1 counter is its mana ability's cost, once each turn, on any player's turn", () => {
+    supported(wallOfRoots, armorThrull, shieldSphere);
+    const { s: s0, ap } = setup([]);
+    const nxt = s0.turnOrder[(s0.turnOrder.indexOf(ap) + 1) % 4]!;
+    const w = putOnBattlefield(s0, nxt, wallOfRoots);
+    const pt = (s: GameState) => [characteristics(s, s.objects[w]!).power, characteristics(s, s.objects[w]!).toughness];
+    // On the active player's turn, once it has priority (CR 605.3a).
+    let s = act(s0, { type: "passPriority", player: ap });
+    expect(waitingOn(s)).toBe(nxt);
+    s = act(s, { type: "activateMana", player: nxt, objectId: w, mana: "G" });
+    expect(s.players[nxt]!.manaPool.G).toBe(1);
+    expect(s.objects[w]!.counters["-0/-1"]).toBe(1);
+    expect(pt(s)).toEqual([0, 4]);
+    expect(() => act(s, { type: "activateMana", player: nxt, objectId: w, mana: "G" })).toThrow();
+    // Its own turn: again.
+    s = passUntil(s, "upkeep", nxt);
+    s = act(s, { type: "activateMana", player: nxt, objectId: w, mana: "G" });
+    expect(s.objects[w]!.counters["-0/-1"]).toBe(2);
+    expect(pt(s)).toEqual([0, 3]);
+  });
+  it("Armor Thrull: a +1/+2 counter, and a +1/+1 counter with it adds up", () => {
+    const { s: s0, ap } = setup([]);
+    const t = putOnBattlefield(s0, ap, armorThrull);
+    const o = putOnBattlefield(s0, ap, ogre());
+    s0.objects[o]!.counters["+1/+1"] = 1;
+    const s = settleBots(run(s0, planActivate(s0, ap, t, 0, [{ kind: "object", id: o }])));
+    expect(s.objects[o]!.counters["+1/+2"]).toBe(1);
+    expect([characteristics(s, s.objects[o]!).power, characteristics(s, s.objects[o]!).toughness]).toEqual([5, 6]);
+  });
+});
+
+const champions = card("Champions from Beyond", "Enchantment", "{X}{W}{W}", { keywords: ["Full Party", "Light Party", "Scry"], oracleText: "When this enchantment enters, create X 1/1 colorless Hero creature tokens.\nLight Party — Whenever you attack with four or more creatures, scry 2, then draw a card.\nFull Party — Whenever you attack with eight or more creatures, those creatures get +4/+4 until end of turn." });
+
+describe("Champions from Beyond: \"whenever you attack with eight or more creatures, those creatures get +4/+4\"", () => {
+  const attackWith = (n: number) => {
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, champions);
+    const mine = Array.from({ length: n }, (_, i) => putOnBattlefield(s0, ap, ogre(`Ogre ${i}`)));
+    const home = putOnBattlefield(s0, ap, ogre("Home Ogre"));
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: mine.map((attacker) => ({ attacker, defender: opp })) });
+    for (let i = 0; i < 40 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+      const p = s.pending;
+      if (p?.kind === "arrangeTop") s = act(s, { type: "arrangeTop", player: p.player, top: p.cards, away: [] });
+      else if (p) s = botActions(s, p.player).reduce((x, a) => act(x, a), s);
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    return { s, ap, mine, home };
+  };
+  it("eight attackers: each of them gets +4/+4, not the creature that stayed home; four or more: scry 2 and draw", () => {
+    supported(champions);
+    const { s, ap, mine, home } = attackWith(8);
+    expect(mine.every((id) => characteristics(s, s.objects[id]!).power === 7)).toBe(true);
+    expect(characteristics(s, s.objects[home]!).power).toBe(3);
+    expect(logText(s)).toMatch(/scr(y|ies) 2/i);
+    expect(s.players[ap]!.hand.length).toBeGreaterThan(0);
+  });
+  it("seven attackers: no +4/+4", () => {
+    const { s, mine } = attackWith(7);
+    expect(mine.every((id) => characteristics(s, s.objects[id]!).power === 3)).toBe(true);
+  });
+});
+
+const dragonborn = card("Dragonborn Champion", "Creature — Dragon Warrior", "{2}{R}{G}", { power: "5", toughness: "3", keywords: ["Trample"], oracleText: "Trample\nWhenever a source you control deals 5 or more damage to a player, draw a card." });
+const blast = (n: number) => card(`Test Blast ${n}`, "Instant", "{R}", { oracleText: `Test Blast ${n} deals ${n} damage to any target.` });
+
+describe("Dragonborn Champion: a source you control dealing 5 or more damage to a player at once (rulings)", () => {
+  it("5 to an opponent draws; 4 doesn't; 5 to yourself does (a player)", () => {
+    supported(dragonborn);
+    const { s: s0, ap, opp, ids } = setup([blast(5), blast(4), blast(5)]);
+    putOnBattlefield(s0, ap, dragonborn);
+    const hand = (s: GameState) => s.players[ap]!.hand.length;
+    let s = settleBots(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "player", id: opp }])));
+    expect(hand(s)).toBe(hand(s0) - 1 + 1);
+    const h1 = hand(s);
+    s = settleBots(run(s, planCast(s, ap, ids[1]!, [{ kind: "player", id: opp }])));
+    expect(hand(s)).toBe(h1 - 1);
+    s = settleBots(run(s, planCast(s, ap, ids[2]!, [{ kind: "player", id: ap }])));
+    expect(hand(s)).toBe(h1 - 2 + 1);
+  });
+});

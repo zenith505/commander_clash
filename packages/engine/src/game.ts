@@ -4788,8 +4788,14 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv, castColors: [...characteristics(s, o).colors] };
   // A copy of a prepare spell: its permanent stops being prepared as it becomes cast (CR 722.3c, 601.2i).
   if (o.preparedFrom) unprepareFor(s, o);
+  // Expend (CR 700.14): the mana this player spent to cast spells this turn, before and after paying this cost (the
+  // mana another player paid with assist isn't theirs).
+  const own = Object.values(paid.spent).reduce((a, b) => a + b, 0);
+  const before = p.expended?.turn === s.turn ? p.expended.n : 0;
+  p.expended = { turn: s.turn, n: before + own };
   // Once it's cast, "whenever you cast" and "becomes the target" abilities trigger (CR 601.2i).
   fireEvent(s, { type: "cast", stackId, controller: p.id, card: d, manaSpent, ...(paid.treasure ? { treasureSpent: paid.treasure } : {}), ...(o.spent ? { spent: o.spent } : {}), ...(paid.sources ? { manaSources: paid.sources } : {}) });
+  if (own) fireEvent(s, { type: "expended", player: p.id, before, after: before + own });
   fireEvent(s, { type: "targeted", stackId });
 }
 

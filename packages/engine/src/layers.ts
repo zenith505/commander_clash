@@ -314,6 +314,22 @@ type CharMap = Map<ObjectId, Characteristics>;
  * The keywords a keyword counter can be (CR 122.1b): the keyword a counter of this kind gives, if it's one.
  */
 const KEYWORD_COUNTERS = ["flying", "first strike", "double strike", "deathtouch", "decayed", "exalted", "haste", "hexproof", "indestructible", "lifelink", "menace", "reach", "shadow", "trample", "vigilance"];
+/**
+ * What its power/toughness counters add up to: each +X/+Y counter gives +X/+Y (CR 122.1a), "+1/+1", "-1/-1", "+1/+0",
+ * "-0/-1" (Wall of Roots) alike.
+ */
+export function ptFromCounters(o: GameObject): [number, number] {
+  let p = 0;
+  let t = 0;
+  for (const [kind, n] of Object.entries(o.counters)) {
+    const m = /^([+-]\d+)\/([+-]\d+)$/.exec(kind);
+    if (!m || !n) continue;
+    p += Number(m[1]) * n;
+    t += Number(m[2]) * n;
+  }
+  return [p, t];
+}
+
 export function keywordOfCounter(kind: string): string | undefined {
   return KEYWORD_COUNTERS.includes(kind) ? kind[0]!.toUpperCase() + kind.slice(1) : undefined;
 }
@@ -1396,11 +1412,11 @@ function computeLayers(s: GameState, counted: { yes: boolean }, grants: OffField
       // Counters apply in 7c (CR 613.4c). Everything in 7c adds up, so order doesn't matter.
       for (const [id, c] of chars) {
         const o = s.objects[id]!;
-        const n = (o.counters["+1/+1"] ?? 0) - (o.counters["-1/-1"] ?? 0);
-        if (!n) continue;
-        c.power += n;
-        c.toughness += n;
-        c.pt.push({ source: "counters", kind: "counters", power: n, toughness: n, untilEndOfTurn: false });
+        const [dp, dt] = ptFromCounters(o);
+        if (!dp && !dt) continue;
+        c.power += dp;
+        c.toughness += dt;
+        c.pt.push({ source: "counters", kind: "counters", power: dp, toughness: dt, untilEndOfTurn: false });
       }
     }
   }
@@ -1501,11 +1517,11 @@ function withCounters(o: GameObject, c: Characteristics): Characteristics {
     const kw = (n ?? 0) > 0 ? keywordOfCounter(kind) : undefined;
     if (kw && !c.keywords.some((k) => sameCI(k, kw))) c.keywords.push(kw);
   }
-  const n = (o.counters["+1/+1"] ?? 0) - (o.counters["-1/-1"] ?? 0);
-  if (n && c.types.includes("Creature")) {
-    c.power += n;
-    c.toughness += n;
-    c.pt.push({ source: "counters", kind: "counters", power: n, toughness: n, untilEndOfTurn: false });
+  const [dp, dt] = ptFromCounters(o);
+  if ((dp || dt) && c.types.includes("Creature")) {
+    c.power += dp;
+    c.toughness += dt;
+    c.pt.push({ source: "counters", kind: "counters", power: dp, toughness: dt, untilEndOfTurn: false });
   }
   return c;
 }

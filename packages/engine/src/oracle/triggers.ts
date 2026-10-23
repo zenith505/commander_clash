@@ -314,7 +314,10 @@ function parseGroupDamagesPlayers(line: string): TriggeredAbility | "fail" | nul
 function parseSourceDamagesOpponent(line: string): TriggeredAbility | "fail" | null {
   // "Whenever a source you control deals noncombat damage to an opponent, you draw that many cards" (Niv-Mizzet,
   // Visionary): "that player" is the opponent, "that many" the damage. Not from a graveyard (Asgardian Inspiration).
-  const m = /^Whenever a source you control deals (noncombat )?damage to an opponent, (.+)$/.exec(line);
+  // "Whenever a source you control deals 5 or more damage to a player" (Dragonborn Champion): one source at one time
+  // (rulings), to any player, you included.
+  const m0 = /^Whenever a source you control deals (one|two|three|four|five|six|seven|eight|nine|ten|\d+) or more damage to a player, (.+)$/.exec(line);
+  const m = m0 ? ([m0[0], undefined, m0[2]] as const) : /^Whenever a source you control deals (noncombat )?damage to an opponent, (.+)$/.exec(line);
   if (!m) return null;
   let text = m[2]!;
   if (/\b(it|its|that source|that creature|from your graveyard)\b/.test(text)) return "fail";
@@ -326,7 +329,7 @@ function parseSourceDamagesOpponent(line: string): TriggeredAbility | "fail" | n
   let body = parseBody(text, { eventPlayer: true });
   if (!body) return "fail";
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: unX(body.text, m[2]!) };
-  return { event: "sourceYouControlDamagesOpponent", body, ...(m[1] ? { noncombatOnly: true as const } : {}) };
+  return { event: "sourceYouControlDamagesOpponent", body, ...(m[1] ? { noncombatOnly: true as const } : {}), ...(m0 ? { minDamage: num(m0[1]!), anyPlayer: true as const } : {}) };
 }
 
 function parseDamagesYouTrigger(line: string): TriggeredAbility | "fail" | null {
@@ -919,7 +922,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   }
   // "Whenever one or more creatures you control with power 4 or greater attack" (The Earth King): the same group.
   line = line.replace(/^(Whenever one or more creatures) (you control) (with power \d+ or greater) attack, /, "$1 $3 $2 attack, ");
-  if ((m = /^Whenever (?:one or more (.+?) you control attack|you attack with (one|two|three|four|five) or more (.+?)|you attack), (.+)$/.exec(line))) {
+  if ((m = /^Whenever (?:one or more (.+?) you control attack|you attack with (one|two|three|four|five|six|seven|eight|nine|ten) or more (.+?)|you attack), (.+)$/.exec(line))) {
     event = "creaturesYouControlAttack";
     phrase = m[1] ?? m[3];
     bodyText = m[4]!;
@@ -983,7 +986,10 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Create two 1/1 red Warrior creature tokens that are tapped and attacking. Sacrifice them at the beginning of the next
   // end step." (Dalkovan Encampment): the tokens.
   const sacCreated = /\b[Cc]reate [^.]+ tokens that are tapped and attacking\. Sacrifice them at the beginning of the next end step\./;
-  if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(meldThem, "").replace(lookAt, "").replace(searched, "").replace(sacCreated, "")) && !/that player/.test(bodyText)) return "fail";
+  // "Whenever you attack with eight or more creatures, those creatures get +4/+4 until end of turn" (Champions from
+  // Beyond): the creatures that attacked, as they were declared.
+  const those = event === "creaturesYouControlAttack" && !anyone && !perPlayer && !selfOrCommander && !returnOne && /\bthose creatures\b/.test(bodyText) && !/\b(they|them|their)\b/.test(bodyText);
+  if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(meldThem, "").replace(lookAt, "").replace(searched, "").replace(sacCreated, "").replace(those ? /\bthose creatures\b/g : /^$/, "")) && !/that player/.test(bodyText)) return "fail";
   let group: TargetSpec | undefined;
   if (phrase && !/^creatures$/.test(phrase)) {
     const spec = parseTargetPhrase(phrase.split(/\s+/).map(singularWord).join(" "));
@@ -998,7 +1004,7 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     if (/\bX\b/.test(text)) return "fail";
     text = text.replace(/\bthat (?:much|many)\b/g, "X");
   }
-  let body = parseBody(text, { eventPlayer: event === "creaturesYouControlDealCombatDamageToPlayer" || perPlayer });
+  let body = parseBody(text, { eventPlayer: event === "creaturesYouControlDealCombatDamageToPlayer" || perPlayer, ...(those ? { eventGroup: true as const } : {}) });
   if (!body) return "fail";
   if (thatMuch) body = { ...replaceX(body, { count: { kind: "eventAmount" } }), text: damageX ? body.text : unX(body.text, bodyText) };
   if (toOpponent) {
@@ -1273,7 +1279,10 @@ function parseDiscardTrigger(line: string): TriggeredAbility | "fail" | null {
     : exileTheirs
       ? { type: "exile", what: { ref: "subjectCard", zone: "graveyard" }, counters: { [exileTheirs[1]!]: 1 } }
       : undefined;
-  const body = exile ? { targets: [], effects: [exileIt?.[1] ? { type: "may" as const, effects: [exile], text: m[5]!.replace(/^you may /, "").replace(/\.$/, "") } : exile], text: m[5]! } : parseBody(m[5]!, { eventPlayer: true });
+  // Hashaton: "create a tapped token that's a copy of that card": the discarded card, as it last existed in the
+  // graveyard if it has left (CR 608.2h).
+  const copyIt = /\bcopy of that card\b/.test(m[5]!) && !/\b(?:it|its)\b/.test(m[5]!.replace(/\bexcept it's\b/, ""));
+  const body = exile ? { targets: [], effects: [exileIt?.[1] ? { type: "may" as const, effects: [exile], text: m[5]!.replace(/^you may /, "").replace(/\.$/, "") } : exile], text: m[5]! } : parseBody(m[5]!, { eventPlayer: true, ...(copyIt ? { subjectIt: true, subjectLeft: true } : {}) });
   if (!body) return "fail";
   const by = m[1] === "you" ? "you" : m[1] === "an opponent" ? "opponent" : "any";
   return { event: "playerDiscards", discards: { by, ...(/^cycles?$/.test(m[2]!) ? { cycled: true as const } : {}), ...(m[3] === "another" ? { other: true as const } : {}), ...(filter ? { filter } : {}) }, body };
@@ -1350,6 +1359,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // "Whenever your commander enters" (Nakia, Tome of Legends): the commander you own (CR 903.3), whoever controls it.
   const line = differenceInHand(raw.replace(/^[A-Z][A-Za-z' -]+ — (?=(When|Whenever|At)\b)/, "")).replace(/^Whenever your commander enters, /, "Whenever a commander you own enters, ");
   if (!/^(When|Whenever|At)\b/.test(line)) return null;
+  // "Whenever you expend 4, ..." (CR 700.14): read as any "whenever you" trigger with no event of its own to refer to.
+  const expend = /^Whenever you expend (\d+), (.+)$/.exec(line);
+  if (expend) {
+    const t = parseTrigger(`Whenever you proliferate, ${expend[2]}`);
+    return t && t !== "fail" && t.event === "youProliferate" && Object.keys(t).every((k) => k === "event" || k === "body") ? { ...t, event: "youExpend", expend: Number(expend[1]) } : "fail";
+  }
   // Kefka, Ruler of Ruin: "Whenever an opponent loses life during your turn, you draw that many cards": it triggers only
   // during its controller's turn.
   const lossOnYourTurn = /^Whenever an opponent loses life during your turn, (.+)$/.exec(line);

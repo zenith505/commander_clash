@@ -3326,6 +3326,8 @@ export type TriggerEvent =
   | "attackCausesTrigger"
   /** "Whenever you sacrifice another permanent", "a Food", "~ or another creature": see TriggeredAbility.sacrifices. */
   | "youSacrifice"
+  /** "Whenever you expend 4" (CR 700.14): see TriggeredAbility.expend. */
+  | "youExpend"
   /** "Whenever you collect evidence" (CR 701.59a): for any reason, also collecting evidence 0 (rulings). */
   | "youCollectEvidence"
   /** "Whenever you scry", "whenever you surveil", "whenever you scry or surveil": after it's done (CR 701.22d, 701.25d). */
@@ -3542,8 +3544,14 @@ export interface TriggeredAbility {
   damageGroup?: { filter: TargetSpec; opponents?: true; perPlayer?: true; /** "Deal combat damage" (Hordewing Skaab): only combat damage. */ combat?: true };
   /** For "sourceYouControlDamagesOpponent": only noncombat damage. */
   noncombatOnly?: true;
+  /** For "sourceYouControlDamagesOpponent": "deals 5 or more damage" at once (Dragonborn Champion). */
+  minDamage?: number;
+  /** For "sourceYouControlDamagesOpponent": "to a player", you included. */
+  anyPlayer?: true;
   /** For "creaturesYouControlAttack": "Whenever you attack with two or more creatures", at least this many of them. */
   minAttackers?: number;
+  /** "Whenever you expend N": the total mana spent casting spells this turn reaching N as a cost is paid (CR 700.14). */
+  expend?: number;
   /** For "creaturesYouControlAttack": "Whenever one or more creatures attack" (Duelist's Heritage), any player's, not only its controller's. */
   anyoneAttacks?: true;
   /** For "creaturesYouControlAttack": "Whenever you attack a player", once for each player attacked (CR 508.3e); the event's player is that player. */

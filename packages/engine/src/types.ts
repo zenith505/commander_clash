@@ -709,6 +709,8 @@ export interface Player {
   loyaltyTurn?: number;
   /** The turn this player last committed a crime (CR 700.13), for "if you've committed a crime this turn". */
   crimeTurn?: number;
+  /** The mana this player has spent to cast spells this turn (`turn`), for expend (CR 700.14). */
+  expended?: { turn: number; n: number };
   /**
    * The creatures this player declared as attackers this turn ("id@zoneChanges"): one declared in two combats counts once,
    * one put onto the battlefield attacking not at all (Windbrisk Heights rulings).

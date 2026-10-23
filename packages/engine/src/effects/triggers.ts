@@ -145,6 +145,8 @@ export type TriggerSourceEvent =
   /** A player collected evidence (CR 701.59a), once for each time. */
   | { type: "evidenceCollected"; player: PlayerId }
   | { type: "proliferated"; player: PlayerId }
+  /** A player paid mana to cast a spell: what they had spent this turn on spells before and after (CR 700.14). */
+  | { type: "expended"; player: PlayerId; before: number; after: number }
   /** A player scried or surveilled (CR 701.22d, 701.25d): `n`, how many cards they looked at. */
   | { type: "scried"; player: PlayerId; how: "scry" | "surveil"; n: number }
   /** A spell was countered by a spell or ability `by` controls (CR 701.6a). */
@@ -812,6 +814,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       if (controllerOf(s, o) === ev.player) add(o, ev.player, (e) => e === kind, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
     }
+  } else if (ev.type === "expended") {
+    // "Whenever you expend 4": the total crossed 4 with this payment (CR 700.14).
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      if (controllerOf(s, o) === ev.player) add(o, ev.player, (e, t) => e === "youExpend" && t.expend !== undefined && ev.before < t.expend && ev.after >= t.expend, undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player });
+    }
   } else if (ev.type === "scried") {
     const kind = ev.how === "scry" ? "youScry" : "youSurveil";
     const watch = (o: GameObject) => add(o, ev.player, (e) => e === kind || e === "youScryOrSurveil", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.n });
@@ -1028,7 +1036,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         // controller, as they were declared (rulings on Firemane Commando).
         const watcher = controllerOf(s, o);
         // Otherwise, "that many": how many of them attacked (The Ur-Dragon).
-        const attacked = t.anotherPlayer ? { player: ev.controller, amount: hit.filter(([x]) => obj(s, x).attacking === watcher && !obj(s, x).attackingPermanent).length } : ev.type === "groupAttack" && !anyone ? { amount: hit.length } : undefined;
+        const attacked = t.anotherPlayer ? { player: ev.controller, amount: hit.filter(([x]) => obj(s, x).attacking === watcher && !obj(s, x).attackingPermanent).length } : ev.type === "groupAttack" && !anyone ? { amount: hit.length, group } : undefined;
         // "Whenever one or more creatures attack one of your opponents" (Frontier Warmonger): once for each of the
         // watcher's opponents attacked, about the creatures attacking them (CR 508.3e).
         if (t.attacksOpponent) {
@@ -1165,10 +1173,11 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
     // "Whenever a source you control deals noncombat damage to an opponent" (Niv-Mizzet, Visionary): the source's
     // controller's permanents, once for each source and player.
-    if (ev.by !== ev.player)
+    // "Whenever a source you control deals 5 or more damage to a player" (Dragonborn Champion): that much at once (rulings).
+    if (ev.by !== undefined)
       for (const id of s.battlefield) {
         const w = obj(s, id);
-        if (controllerOf(s, w) === ev.by) add(w, ev.by, (e, t) => e === "sourceYouControlDamagesOpponent" && !(t.noncombatOnly && ev.combat), undefined, undefined, undefined, undefined, undefined, undefined, info);
+        if (controllerOf(s, w) === ev.by) add(w, ev.by, (e, t) => e === "sourceYouControlDamagesOpponent" && (ev.by !== ev.player || !!t.anyPlayer) && !(t.noncombatOnly && ev.combat) && ev.amount >= (t.minDamage ?? 0), undefined, undefined, undefined, undefined, undefined, undefined, info);
       }
     // "Whenever a creature deals damage to you", "Whenever a source an opponent controls deals damage to you": the damaged
     // player's permanents, once for each source. A permanent source is the subject; whose source it is, the event player.

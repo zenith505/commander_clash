@@ -1,7 +1,7 @@
 # Roadmap
 
-23,506 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,450 of 4,988 (89%).
+23,566 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,469 of 4,988 (89%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,18 +22,21 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 130, most played first: Dalkovan Encampment, Eidolon of
-   Countless Battles ("~ and enchanted creature each get"), Planetarium of Wan Shi Tong, Hashaton, Trailtracker Scout,
-   Doubling Cube, Slicer, Neyali, Ignite the Future, Blitzball, Thundermane Dragon, Rona, Titan's Presence, Dihada,
-   Selective Obliteration, Bonny Pall, Pit of Offerings, Mana Sculpt, Wall of Roots, Frontline Medic, Moon-Circuit
-   Hacker. Smaller gaps from round 130: Zada, Ink-Treader Nephilim and Precursor Golem put their copies on the stack in
-   battlefield order (rulings: the copies' controller chooses the order); Laboratory Maniac is taken over Out of the
-   Tombs when both would replace a draw (no choice between the two, CR 616.1), and bots return the creature card with
-   the highest mana value; "cast a spell from among cards exiled with ~" works only linked to one impulse exile (Court
-   of Locthwain), so Idol of Endurance (an exile until it leaves) is out, and Thought-String Analyst (face down) too;
-   The Master, Gallifrey's End ("you may exile it. If you do" for a dying creature, then a copy of that card, also
-   Nightmare Shepherd and Myrkul), This Is How It Ends, Hunted by The Family, Missy, Midnight Crusader Shuttle, Genesis
-   of the Daleks and Danse Macabre are still out. Smaller gaps from round 129: Zirda's companion condition is still
+00. Most played first (`npm run popular`). Out after round 131, most played first: Doubling Cube (its mana has to be
+   worked out after its {3} is paid, and the UI lists mana options before costs; restrictions on the mana aren't
+   copied, rulings), Slicer, Neyali, Ignite the Future, Blitzball ("an opponent was dealt combat damage by a legendary
+   creature this turn"), Rona, Titan's Presence (the revealed card's power, as it last existed in your hand), Dihada,
+   Selective Obliteration, Bonny Pall, Pit of Offerings, Mana Sculpt, Study Hall, Yuna, Jeweled Amulet, Clavileño,
+   Echoing Assault, Atraxa, Grand Unifier, Lord of the Nazgûl (protection from Ring-bearers), Aetherworks Marvel, Fear
+   of Sleep Paralysis (stun counters can't be removed: every way counters are removed or moved has to check it), Krark,
+   All-Out Assault, Nesting Dragon. Smaller gaps from round 131: Thundermane Dragon checks a creature card's printed
+   power (a */* card counts as 0); with several "cast from the top" permissions the one that gives haste is used;
+   Hoarder's Overflow ("When ~ enters and whenever you expend 4"), Blood Operative and Council's Deliberation
+   ("whenever you surveil, if ~ is in your graveyard") are out; bots answer Zada's copy order with the first creature
+   offered. Smaller gaps from round 130: Laboratory Maniac is taken over Out of the Tombs when both would replace a draw
+   (no choice between the two, CR 616.1), and bots return the creature card with the highest mana value;
+   Thought-String Analyst (face down), This Is How It Ends, Hunted by The Family, Missy, Midnight Crusader Shuttle,
+   Genesis of the Daleks and Danse Macabre are still out. Smaller gaps from round 129: Zirda's companion condition is still
    ignored (companions play as normal cards); bots pick the villainous option that looks cheaper to them by a rough
    count, never cast Doomsday, and take the costliest card for Lord of the Void and Necromantic Selection. Smaller gaps from round 128: bots take
    Orzhov Advokist's counters unless its controller is the only opponent they could attack, and always reveal for

@@ -466,7 +466,8 @@ export function bindBound(s: GameState, spec: TargetSpec, ctx: AmountCtx): Targe
   const { bound, ...rest } = spec;
   // Power and toughness may be below 0 (CR 107.1b): "power greater than target creature's power" with that at -2 takes a 0.
   const n0 = evalAmount(s, bound.amount, ctx);
-  const n = bound.key === "manaValue" ? Math.max(0, n0) : n0;
+  // "Less than ~'s power" (Sisay) is one less, signed: below 0 it matches nothing.
+  const n = bound.key === "manaValue" && !bound.amount.signed ? Math.max(0, n0) : n0;
   const old = rest[bound.key];
   const range: Range = bound.at === "exact" ? { min: Math.max(old?.min ?? n, n), max: Math.min(old?.max ?? n, n) } : bound.at === "most" ? { ...old, max: old?.max === undefined ? n : Math.min(old.max, n) } : { ...old, min: old?.min === undefined ? n : Math.max(old.min, n) };
   return { ...rest, [bound.key]: range };
@@ -479,7 +480,7 @@ export function bindBound(s: GameState, spec: TargetSpec, ctx: AmountCtx): Targe
 export function sayBound(s: GameState, text: string, spec: TargetSpec | undefined, ctx: AmountCtx): string {
   if (spec?.bound?.key !== "manaValue" || spec.bound.at !== "most") return text;
   const most = bindBound(s, spec, ctx).manaValue?.max;
-  return most === undefined ? text : text.replace(/ with mana value less than or equal to (?:that|its|the|this|~'s) [^,]+?(?= and |,|$)/, ` with mana value ${most} or less`);
+  return most === undefined || most < 0 ? text : text.replace(/ with mana value less than (?:or equal to )?(?:that|its|the|this|~'s) [^,]+?(?= and |,|$)/, ` with mana value ${most} or less`);
 }
 
 /**

@@ -1,7 +1,7 @@
 // Round 127: round 126's gaps (Hazel of the Rootbloom's mana in autopay, ...), then the most played cards.
 
 import { describe, expect, it } from "vitest";
-import { act, card, cast, passAll, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
+import { act, addEffect, card, cast, passAll, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
 import { abilitiesOf, altCostsFor, botActions, invalidateCharacteristics, characteristics, power, isFullySupported, manaAbilitiesOn, objHasKeyword, objIsType, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -691,5 +691,45 @@ describe("Take the Bait: the attackers untap, goaded, and attack again in an add
     expect(() => act(s, { type: "declareAttackers", player: opp, attacks: [{ attacker: bear, defender: ap }] })).toThrow();
     s = act(s, { type: "declareAttackers", player: opp, attacks: [{ attacker: bear, defender: third }] });
     expect(s.objects[bear]!.attacking).toBe(third);
+  });
+});
+
+const sisay = card("Sisay, Weatherlight Captain", "Legendary Creature — Human Soldier", "{2}{W}", {
+  power: "2",
+  toughness: "2",
+  oracleText: "Sisay gets +1/+1 for each color among other legendary permanents you control.\n{W}{U}{B}{R}{G}: Search your library for a legendary permanent card with mana value less than Sisay's power, put that card onto the battlefield, then shuffle.",
+});
+
+describe("Sisay, Weatherlight Captain: colors among other legendaries; a search for mana value less than its power", () => {
+  it("+3/+3 for three colors; the search offers legendary permanent cards with mana value 4 or less", () => {
+    supported(sisay);
+    const { s: s0, ap } = setup([]);
+    const si = putOnBattlefield(s0, ap, sisay);
+    putOnBattlefield(s0, ap, card("Test Azorius Legend", "Legendary Creature — Human", "{W}{U}", { power: "2", toughness: "2" }));
+    putOnBattlefield(s0, ap, card("Test Black Relic", "Legendary Artifact", "{B}"));
+    putOnBattlefield(s0, ap, card("Test Red Bear", "Creature — Bear", "{R}", { power: "1", toughness: "1" })); // not legendary
+    expect(power(s0, s0.objects[si]!)).toBe(5);
+    const four = onTop(s0, ap, card("Test Four Legend", "Legendary Creature — Elf", "{3}{G}", { power: "4", toughness: "4" }));
+    const five = onTop(s0, ap, card("Test Five Legend", "Legendary Creature — Elf", "{4}{G}", { power: "5", toughness: "5" }));
+    onTop(s0, ap, card("Test Plain Four", "Creature — Elf", "{3}{G}", { power: "4", toughness: "4" }));
+    let s = run(s0, planActivate(s0, ap, si, 0));
+    for (let i = 0; i < 10 && s.pending?.kind !== "searchLibrary"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    const pend = s.pending as Extract<GameState["pending"], { kind: "searchLibrary" }>;
+    expect(pend.cards).toContain(four);
+    expect(pend.cards).not.toContain(five);
+    expect(pend.what).toMatch(/mana value 4 or less/);
+    s = act(s, { type: "searchLibrary", player: ap, found: [four] });
+    expect(s.objects[four]!.zone).toBe("battlefield");
+  });
+  it("with power 0, nothing can be found (less than 0)", () => {
+    const { s: s0, ap } = setup([]);
+    const si = putOnBattlefield(s0, ap, sisay);
+    addEffect(s0, ap, [si], [{ kind: "modifyPT", power: -2, toughness: 0 }], "game");
+    onTop(s0, ap, card("Test Zero Legend", "Legendary Artifact", "{0}"));
+    expect(power(s0, s0.objects[si]!)).toBe(0);
+    let s = run(s0, planActivate(s0, ap, si, 0));
+    for (let i = 0; i < 10 && s.pending?.kind !== "searchLibrary" && s.stack.length; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    const pend = s.pending as Extract<GameState["pending"], { kind: "searchLibrary" }> | null;
+    expect(pend?.cards ?? []).toHaveLength(0);
   });
 });

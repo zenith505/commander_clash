@@ -488,8 +488,9 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
     case "colorsAmongPermanents": {
       const colors = new Set<string>();
       for (const id of s.battlefield) {
+        if (c.other && id === ctx.sourceId) continue;
         const ch = view(s.objects[id]!);
-        if (ch && ch.controller === ctx.controller) for (const col of ch.colors) colors.add(col);
+        if (ch && ch.controller === ctx.controller && (!c.filter || objectMatches(s, c.filter, s.objects[id]!, ctx.controller, false, undefined, ch, ctx.view))) for (const col of ch.colors) colors.add(col);
       }
       return colors.size;
     }
@@ -662,7 +663,7 @@ function describeCount(c: Count): string {
     case "basicLandTypes":
       return "#basic land types";
     case "colorsAmongPermanents":
-      return "#colors among your permanents";
+      return c.filter ? `#colors among ${c.other ? "other " : ""}${c.filter.text}` : "#colors among your permanents";
     case "spellsCastThisTurn":
       return `#${c.filter ? `${c.filter.text.replace(/ card$/, "")} ` : ""}spells you've cast this turn`;
     case "graveyardCardTypes":

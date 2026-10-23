@@ -200,7 +200,7 @@ export type Count =
   /** Domain: "basic land type among lands you control". */
   | { kind: "basicLandTypes" }
   /** Vivid: "the number of colors among permanents you control" (white, blue, black, red, green; colorless isn't one, CR 105.2c). */
-  | { kind: "colorsAmongPermanents" }
+  | { kind: "colorsAmongPermanents"; /** "Among other legendary permanents you control" (Sisay, Weatherlight Captain). */ filter?: TargetSpec; other?: true }
   /** "For each spell you've cast this turn" (Aetherflux Reservoir): the spells its controller cast this turn, copies not (CR 707.10). */
   /** `filter`: "the number of instant and sorcery spells you've cast this turn" (Rionya), by the cards cast. */
   | { kind: "spellsCastThisTurn"; filter?: TargetSpec }

@@ -716,3 +716,46 @@ describe("Autumn's Veil (rulings)", () => {
     expect(red.s.objects[red.bear]!.zone).toBe("graveyard");
   });
 });
+
+const mask = card("Mask of Griselbrand", "Legendary Artifact — Equipment", "{1}{B}{B}", {
+  keywords: ["Equip"],
+  oracleText: "Equipped creature has flying and lifelink.\nWhenever equipped creature dies, you may pay X life, where X is its power. If you do, draw X cards.\nEquip {3}",
+});
+
+describe("Mask of Griselbrand: pay X life, where X is its power, to draw X (rulings)", () => {
+  it("a 3/3 dies: pay 3 life, draw 3", () => {
+    supported(mask);
+    const kill = card("Test Murder", "Instant", "{B}", { oracleText: "Destroy target creature." });
+    const { s: s0, ap, ids } = setup([kill]);
+    const m = putOnBattlefield(s0, ap, mask);
+    const g = putOnBattlefield(s0, ap, card("Hill Giant", "Creature — Giant", "{3}{R}", { power: "3", toughness: "3" }));
+    s0.objects[m]!.attachedTo = g;
+    invalidateCharacteristics(s0);
+    const [life, hand] = [s0.players[ap]!.life, s0.players[ap]!.hand.length];
+    let s = untilChoice(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: g }])));
+    for (let i = 0; i < 20 && !s.pending && (s.stack.length || s.triggerQueue.length); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap, pay: { life: 3 } });
+    s = settleBots(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect(s.players[ap]!.life).toBe(life - 3);
+    expect(s.players[ap]!.hand.length).toBe(hand - 1 + 3);
+  });
+});
+
+const endrek = card("Endrek Sahr, Master Breeder", "Legendary Creature — Human Wizard", "{4}{B}", {
+  power: "2", toughness: "2",
+  oracleText: "Whenever you cast a creature spell, create X 1/1 black Thrull creature tokens, where X is that spell's mana value.\nWhen you control seven or more Thrulls, sacrifice Endrek Sahr.",
+});
+
+describe("Endrek Sahr: a state trigger (CR 603.8) at seven Thrulls", () => {
+  it("five Thrulls and a 2-drop: seven Thrulls, then Endrek Sahr is sacrificed", () => {
+    supported(endrek);
+    const { s: s0, ap, ids } = setup([card("Grizzly Bears", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" })]);
+    const e = putOnBattlefield(s0, ap, endrek);
+    for (let i = 0; i < 5; i++) putOnBattlefield(s0, ap, card("Thrull", "Creature — Thrull", "", { power: "1", toughness: "1" }));
+    invalidateCharacteristics(s0);
+    let s = settleBots(run(s0, planCast(s0, ap, ids[0]!)));
+    const thrulls = s.battlefield.filter((id) => characteristics(s, s.objects[id]!).subtypes.includes("Thrull")).length;
+    expect(thrulls).toBe(7);
+    expect(s.objects[e]!.zone).toBe("graveyard");
+  });
+});

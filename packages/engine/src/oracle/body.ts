@@ -1064,7 +1064,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   let prevTargets = 0;
   let curTargets = 0;
   // "You may pay {2}" waits for the sentence after: "If you do, draw a card."
-  let payFirst: { pay: PayCost; text: string; payX?: { max?: Amount; color?: "W" | "U" | "B" | "R" | "G" } } | null = null;
+  let payFirst: { pay: PayCost; text: string; payX?: { max?: Amount; color?: "W" | "U" | "B" | "R" | "G" }; /** "Pay X life, where X is its power" (Mask of Griselbrand). */ payLife?: AmountExpr } | null = null;
   // "Look at the top four cards of your library" waits for what to do with them (see parseDig).
   let dig: Partial<Extract<Effect, { type: "dig" }>> | null = null;
   // The look's own "where X is ...", for "with mana value X or less" after it (Hatchery Spider).
@@ -2720,6 +2720,14 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       }
       const then = /^If you do, (.+)$/.exec(s);
       if (!then) return null;
+      // Mask of Griselbrand: "If you do, draw X cards", the X of the life paid; that sentence alone.
+      if (payFirst.payLife) {
+        const inner = si + 1 === sentences.length ? attempt(ctx, () => parseOne(capital(then[1]!), ctx)) : null;
+        if (!inner || !/\bX\b/.test(then[1]!)) return null;
+        effects.push({ type: "may", effects: replaceX(inner, payFirst.payLife), payLife: payFirst.payLife, text: `${payFirst.text}. If you do, ${then[1]}` });
+        payFirst = null;
+        continue;
+      }
       // "Whenever ~ attacks, you may pay {X}{R}. If you do, it deals X damage to any target." (Flameblast Dragon): "it" is ~.
       if (ctx.selfIt && !ctx.subjectIt) then[1] = then[1]!.replace(/^it deals /, "~ deals ");
       // "You may pay {1}. If you do, look at the top two cards of your library. Put one of them into your hand and the
@@ -2788,6 +2796,14 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const payAny = /^[Yy]ou may pay any amount of \{([WUBRG])\}$/.exec(s);
     if (payAny) {
       payFirst = { pay: { mana: "{X}" }, text: `pay any amount of {${payAny[1]}}`, payX: { color: payAny[1] as "W" | "U" | "B" | "R" | "G" } };
+      continue;
+    }
+    // "You may pay X life, where X is its power" (Mask of Griselbrand): counted as it resolves (CR 608.2h).
+    const payLifeX = /^[Yy]ou may pay X life, where X is (.+)$/.exec(s);
+    if (payLifeX) {
+      const n = parseCount(payLifeX[1]!, ctx);
+      if (!n || typeof n !== "object" || !("count" in n)) return null;
+      payFirst = { pay: {}, payLife: n, text: `pay X life, where X is ${payLifeX[1]}` };
       continue;
     }
     const mayPay = /^[Yy]ou may pay (.+)$/.exec(s);

@@ -1810,7 +1810,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   }
   // A state trigger (CR 603.8): "When you control no Islands, sacrifice ~."
   // "When you have 30 or more life, flip ~" (Rune-Tail), "When ~ has flying, flip it" (Student of Elements).
-  const st = new RegExp(`^When (you control no .+?|you have ${NUM} or more life|~ has [a-z ]+), (.+)$`).exec(line);
+  // "When you control seven or more Thrulls, sacrifice ~" (Endrek Sahr).
+  const st = new RegExp(`^When (you control no .+?|you control ${NUM} or more [A-Za-z]+?|you have ${NUM} or more life|~ has [a-z ]+), (.+)$`).exec(line);
   if (st) {
     const state = parseStaticCondition(st[1]!, { affects: { kind: "self" }, mods: [], text: "" });
     const body = state && parseBody(st[st.length - 1]!, { selfIt: true });

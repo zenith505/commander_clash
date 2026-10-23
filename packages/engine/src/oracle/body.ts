@@ -5269,12 +5269,13 @@ function parseForEach(s: string, ctx: Ctx): Effect[] | null {
   }
   // "Each opponent loses 1 life for each creature card in that player's graveyard" (One Ring to Rule Them All): the same,
   // each one's own graveyard.
+  // Other players ("defending player", "target player") are read below, as "their" is for them.
   const theirYard = /^(.+?) in (?:that player's|their) graveyard$/.exec(phrase);
-  if (theirYard) {
-    const e = fx[0]!;
-    if (e.type !== "loseLife" && e.type !== "gainLife" && e.type !== "draw") return null;
-    const who: PlayerRef | null = e.who.ref === "eachPlayer" || e.who.ref === "eachOpponent" ? { ref: "eachOne" } : e.who.ref === "target" && !e.who.n ? e.who : null;
-    const count = who && parseCount(`${theirYard[1]} in your graveyard`, ctx, true);
+  const e0 = fx[0]!;
+  if (theirYard && (e0.type === "loseLife" || e0.type === "gainLife" || e0.type === "draw") && (e0.who.ref === "eachPlayer" || e0.who.ref === "eachOpponent")) {
+    const e = e0;
+    const who: PlayerRef = { ref: "eachOne" };
+    const count = parseCount(`${theirYard[1]} in your graveyard`, ctx, true);
     if (!count || count.count.kind !== "cardsInGraveyard" || count.times || count.plus) return null;
     const scaled = scaleEffect(e, { count: { ...count.count, who } });
     return scaled ? [scaled] : null;

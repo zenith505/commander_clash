@@ -984,3 +984,25 @@ describe("Thryx, the Sudden Storm and Quest for Renewal", () => {
     expect(s.objects[bear]!.tapped).toBe(false);
   });
 });
+
+describe("\"Their graveyard\" for one player still reads as that player's", () => {
+  it("Guiltfeeder: the defending player loses 1 life for each card in their own graveyard", () => {
+    const guiltfeeder = card("Guiltfeeder", "Creature — Horror", "{3}{B}{B}", { power: "0", toughness: "4", keywords: ["Fear"], oracleText: "Fear (This creature can't be blocked except by artifact creatures and/or black creatures.)\nWhenever this creature attacks and isn't blocked, defending player loses 1 life for each card in their graveyard." });
+    supported(guiltfeeder);
+    const { s: s0, ap, opp } = setup([]);
+    const g = putOnBattlefield(s0, ap, guiltfeeder);
+    for (let i = 0; i < 3; i++) {
+      const id = s0.players[opp]!.library.shift()!;
+      s0.objects[id]!.zone = "graveyard";
+      s0.players[opp]!.graveyard.push(id);
+    }
+    const life = s0.players[opp]!.life;
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: g, defender: opp }] });
+    for (let i = 0; i < 40 && s.step !== "combatDamage"; i++) {
+      if (s.pending?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: s.pending.player, blocks: [] });
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(s.players[opp]!.life).toBe(life - 3);
+  });
+});

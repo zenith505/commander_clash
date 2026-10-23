@@ -1,7 +1,7 @@
 # Roadmap
 
-23,365 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,362 of 4,988 (87%).
+23,399 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,386 of 4,988 (87%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,15 +22,15 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 126, most played first: Malcolm, Keen-Eyed Navigator
-   ("one or more Pirates deal damage to your opponents", a Treasure for each opponent dealt damage), Misleading Signpost
-   (reselect what an attacker attacks), One Ring to Rule Them All, Infantry Shield (an Equipment granting mobilize X),
-   Yedora, Tenuous Truce, Demon of Fate's Design, World at War, Conspicuous Snoop, Nautiloid Ship, Jin-Gitaxias // The
-   Great Synthesis, Court of Vantress, Take the Bait, Sisay, Vorinclex // The Grand Evolution, Lathiel, Ghost Vacuum,
-   Ojer Pakpatiq, Zirda, Roxanne, Commit // Memory, Hope of Ghirapur, Dargo, Counterbalance, Consult the Star Charts.
-   Smaller gaps from round 126: bots never activate Hazel of the Rootbloom's mana ability, and autopay doesn't use it (it
-   needs X and the tokens to tap); Resonance Technician is still out; Light-Paws' search prompt reads "with mana value
-   less than or equal to that Aura" (not the number); with two commanders, Geode Golem asks which one first, then
+00. Most played first (`npm run popular`). Out after round 127, most played first: Court of Vantress (become a copy
+   "except it has this ability"), Lathiel, the Bounteous Dawn (distribute up to that many counters), Ojer Pakpatiq //
+   Temple of Cyclical Time, Roxanne, Starfall Savant (a named artifact token with two abilities), Hope of Ghirapur,
+   Orzhov Advokist, Teferi, Temporal Pilgrim, White Plume Adventurer, Dire Fleet Daredevil, Goblin Recruiter, Consult
+   the Star Charts, Jace, the Mind Sculptor, O'aka, Traveling Merchant, Dargo, Counterbalance. Smaller gaps from round
+   127: bots cast Misleading Signpost like any artifact rather than holding it for an attack (they answer its
+   prompt well); Zirda's companion condition is ignored (companions play as normal cards); bots use Demon of Fate's Design's life
+   cast only while they'd stay at 15 life or more; Breeches, Windshaper Planetar, Hordewing Skaab, Stinging Study are
+   still out. Smaller gaps from round 126: with two commanders, Geode Golem asks which one first, then
    whether to cast it; bots choose Pippin's card type from the opponent's spell or ability on the stack, else creatures;
    Bane of Bala Ged's pick prompt reads "click 2 (permanent) of yours". Smaller gaps from round 125: bots sacrifice for
    Fandaniel when the loss is at least a quarter of their life, or at least 4 with a creature worth 3 or less; Strong

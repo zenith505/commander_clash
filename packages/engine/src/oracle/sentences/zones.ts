@@ -552,8 +552,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const flipped = m[2] === " flipped";
     if (m[2] && !flipped && !m[1] !== !/ and/.test(m[2])) return null; // "tapped and transformed", or "transformed" alone
     if (flipped && (m[1] || m[3] || m[4] || m[6] || m[7])) return null; // only Homura's "return it to the battlefield flipped"
-    // No "under ... control": the ability's controller puts it there, so it enters under their control (CR 110.2a).
-    if (!m[3] && !flipped) return null;
+    // No "under ... control": the ability's controller puts it there, so it enters under their control (CR 110.2a);
+    // Galian Beast's "return it to the battlefield tapped (front face up)": a double-faced card enters front face up
+    // (CR 712.14). Only with "tapped" and nothing else, as yet.
+    if (!m[3] && !flipped && !(m[1] && !m[2] && !m[4] && !m[6] && !m[7])) return null;
     let attachToTarget: number | undefined;
     if (m[7]) {
       if (!m[2] || m[6] || m[4]) return null;

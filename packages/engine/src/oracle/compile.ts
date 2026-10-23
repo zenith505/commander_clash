@@ -1672,6 +1672,11 @@ export function compile(d: CardDef): CompiledCard {
       out.extraVote = extraVote[1]!.startsWith("get") ? "get" : "may";
       continue;
     }
+    const faceUpCounters = new RegExp(`^As ~ is turned face up, put (${NUM}) ${COUNTER} counters? on it\\.$`).exec(line);
+    if (faceUpCounters && !out.faceUpCounters) {
+      out.faceUpCounters = { counter: counterKind(faceUpCounters[2]!), n: num(faceUpCounters[1]!) };
+      continue;
+    }
     if (line === "If an opponent would face a villainous choice, they face that choice an additional time.") {
       out.villainAgain = true;
       continue;
@@ -2409,6 +2414,13 @@ export function compile(d: CardDef): CompiledCard {
       out.animate = true;
       out.triggers.push({ event: "selfEnters", body: { targets: [{ kind: "card", types: ["Creature"], text: "target creature card from a graveyard" }], effects: [{ type: "animateDead", target: 0 }], text: "Put target creature card from a graveyard onto the battlefield under your control and attach ~ to it." } });
       out.triggers.push({ event: "selfLeaves", body: { targets: [], effects: [{ type: "sacrificeAnimated" }], text: "That creature's controller sacrifices it." } });
+      continue;
+    }
+    // Daybreak Coronet: as a spell, any enchanted creature (no Aura of its own is attached yet); on the battlefield, one
+    // with an Aura other than this one (see attachmentSBAs).
+    if (line === "Enchant creature with another Aura attached to it" && !out.enchant) {
+      out.enchant = { kind: "object", types: ["Creature"], status: "enchanted", text: "creature with another Aura attached to it to enchant" };
+      out.enchantAnotherAura = true;
       continue;
     }
     const enchant = /^Enchant (.+)$/.exec(line);

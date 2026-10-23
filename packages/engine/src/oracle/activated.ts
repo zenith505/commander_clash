@@ -95,6 +95,12 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
       const selfIf = pickFilter(c[2]!);
       if (!filter || !selfIf) return "fail";
       extra.push({ kind: "sacrifice", filter: { ...filter, text: `${c[1]} or ${/^[aeiou]/i.test(c[2]!) ? "an" : "a"} ${c[2]}` }, n: 1, other: true, selfIf });
+    } else if ((c = new RegExp(`^Sacrifice ${NUM} (.+) with different names$`).exec(part)) && num(c[1]!) > 1) {
+      // Transmutation Font: "three artifact tokens with different names", each name once (a face-down permanent has none,
+      // CR 708.2, so it shares none).
+      const filter = pickFilter(c[2]!);
+      if (!filter) return "fail";
+      extra.push({ kind: "sacrifice", filter: { ...filter, text: `${c[2]} with different names` }, n: num(c[1]!), differentNames: true });
     } else if (part !== "Sacrifice ~" && (c = new RegExp(`^Sacrifice (another|X|${NUM}) (other )?(.+)$`).exec(part))) {
       // "Sacrifice two other artifacts and/or creatures" (Mondrak): not this permanent; any mix of the two.
       const andOr = / and\/or /.test(c[4]!) ? c[4]!.split(" and/or ").map((w) => singular(w)).join(" or ") : undefined;

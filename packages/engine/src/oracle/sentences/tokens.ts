@@ -44,11 +44,12 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Create a Food token or a Treasure token" (Tireless Provisioner): one of the two predefined tokens, chosen as it
   // resolves (Effect "either").
-  if ((m = /^[Cc]reate (an? [A-Z][a-z]+ token) or (an? [A-Z][a-z]+ token)$/.exec(s))) {
-    const a = parseSentence(`Create ${m[1]}`, ctx);
-    const b = parseSentence(`Create ${m[2]}`, ctx);
-    if (!a || !b || a.length !== 1 || b.length !== 1 || a[0]!.type !== "createToken" || b[0]!.type !== "createToken") return null;
-    return [{ type: "either", options: [a, b], labels: [`Create ${m[1]}`, `Create ${m[2]}`] }];
+  // "Create your choice of a Blood token, a Clue token, or a Food token" (Transmutation Font): the same, of three.
+  if ((m = /^[Cc]reate (an? [A-Z][a-z]+ token) or (an? [A-Z][a-z]+ token)$/.exec(s) ?? /^[Cc]reate your choice of (an? [A-Z][a-z]+ token), (an? [A-Z][a-z]+ token),? or (an? [A-Z][a-z]+ token)$/.exec(s))) {
+    const names = m.slice(1).filter((x): x is string => !!x);
+    const fx = names.map((x) => parseSentence(`Create ${x}`, ctx));
+    if (fx.some((x) => !x || x.length !== 1 || x[0]!.type !== "createToken")) return null;
+    return [{ type: "either", options: fx as Effect[][], labels: names.map((x) => `Create ${x}`) }];
   }
 
   // Tokens, maybe "tapped and attacking" (CR 508.4): "Create a tapped and attacking 1/1 red Warrior creature

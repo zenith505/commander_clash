@@ -84,6 +84,7 @@ import {
   maxHandSize,
   stackItemQuality,
   oneOfEachFits,
+  differentlyNamed,
   abilityCostsHaveX,
   deciderOf,
   landsAllowed,
@@ -2305,7 +2306,9 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
       }
       out.sacrifice = picked;
     } else if (c.kind === "sacrifice") {
-      const pool = sacrificePool(s, pid, c, targeted, alt);
+      const pool0 = sacrificePool(s, pid, c, targeted, alt);
+      // "With different names" (Transmutation Font): the first of each name.
+      const pool = c.differentNames ? differentlyNamed(s, pool0.map((o) => o.id)).map((id) => obj(s, id)) : pool0;
       if (pool.length < c.n) return null;
       out.sacrifice = pool.slice(0, c.n).map((o) => o.id);
     } else if (c.kind === "discard" && c.oneOf) {
@@ -3761,8 +3764,9 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
         out.sacrifice = [...(out.sacrifice ?? []), ...picks];
         continue;
       }
-      if (pool.length < c.n) return null;
-      out.sacrifice = [...(out.sacrifice ?? []), ...pool.slice(0, c.n).map((x) => x.id)];
+      const named = c.differentNames ? differentlyNamed(s, pool.map((x) => x.id)) : pool.map((x) => x.id);
+      if (named.length < c.n) return null;
+      out.sacrifice = [...(out.sacrifice ?? []), ...named.slice(0, c.n)];
     } else if (c.kind === "tap" && c.untap) {
       // "Untap a tapped creature you control" (Halo Fountain): untapping is all gain, the most valuable first.
       // Then a mana creature, tapped for mana while paying and untapped for the cost (rulings).

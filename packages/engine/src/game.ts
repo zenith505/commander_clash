@@ -5396,11 +5396,26 @@ function extraCostProblem(s: GameState, pid: PlayerId, o: GameObject, costs: Add
       // Untapping: also what can be tapped for mana first (Halo Fountain).
       const can = c.kind === "tap" && c.untap ? [...pool, ...untapViaMana(s, pid, o, c)] : pool;
       if (c.n > 0 && (can.length < c.n || !can.some(fits))) return `you need to ${verb} ${full} to ${doing}`;
+      if (c.kind === "sacrifice" && c.differentNames && differentlyNamed(s, pool).length < c.n) return `you need to ${verb} ${full} to ${doing}`;
       continue;
     }
     if (chosen.length !== c.n || new Set(chosen).size !== chosen.length || chosen.some((id) => !pool.includes(id)) || !chosen.some(fits)) return `choose ${full} to ${verb}`;
+    if (c.kind === "sacrifice" && c.differentNames && !namesDiffer(s, chosen)) return `choose ${full} to ${verb}`;
   }
   return null;
+}
+
+/** "With different names" (Transmutation Font): no two share a name; a face-down permanent has none (CR 708.2). */
+export function namesDiffer(s: GameState, ids: ObjectId[]): boolean {
+  const names = ids.map((id) => characteristics(s, obj(s, id)).name).filter((n) => n);
+  return new Set(names).size === names.length;
+}
+
+/** As many of `ids` as can be taken with different names, in their order (see namesDiffer). */
+export function differentlyNamed(s: GameState, ids: ObjectId[]): ObjectId[] {
+  const out: ObjectId[] = [];
+  for (const id of ids) if (namesDiffer(s, [...out, id])) out.push(id);
+  return out;
 }
 
 const FOOD: TargetSpec = { kind: "object", types: ["Artifact"], subtypes: ["Food"], text: "Food" };
@@ -8263,7 +8278,15 @@ function attachmentSBAs(s: GameState): boolean {
       // effect that "doesn't remove" this Aura.
       const hc = host && characteristics(s, host);
       const shielding = hc ? hc.keywords.filter((k) => hc.sparedBy?.[k.toLowerCase()] !== o.id) : [];
-      const legal = !!host && host.zone === "battlefield" && host.id !== o.id && !!enchant && objectMatches(s, enchant, host, c.controller, false) && !protectedFrom(shielding, withCastThisTurn(s, o, c), protectionHolder(s, host));
+      const legal =
+        !!host &&
+        host.zone === "battlefield" &&
+        host.id !== o.id &&
+        !!enchant &&
+        objectMatches(s, enchant, host, c.controller, false) &&
+        !protectedFrom(shielding, withCastThisTurn(s, o, c), protectionHolder(s, host)) &&
+        // Daybreak Coronet: another Aura attached to it (rulings: once they're all gone, the Coronet goes too).
+        (!compileCard(defOf(s, o)).enchantAnotherAura || s.battlefield.some((x) => x !== o.id && s.objects[x]!.attachedTo === host.id && characteristics(s, s.objects[x]!).subtypes.includes("Aura")));
       if (!legal && o.bestowed) {
         // A bestowed Aura becomes unattached and stops being bestowed: it's an enchantment creature (CR 702.103f).
         o.attachedTo = undefined;
@@ -8824,6 +8847,9 @@ function turnFaceUp(s: GameState, p: Player, id: ObjectId, way = 0) {
   log(s, `${p.name} turns a face-down creature face up: it's ${d.name} (${fd.kind === "manifest" || fd.kind === "cloak" ? "its mana cost" : describeVia(fd.kind)} ${fd.cost}).`);
   // Megamorph: a +1/+1 counter as it's turned face up, if its megamorph cost was paid (CR 702.37b).
   if (fd.kind === "megamorph") putCounters(s, o, "+1/+1", 1);
+  // Hooded Hydra: its counters as it's turned face up, not a trigger (CR 614.1e, rulings).
+  const up = compileCard(d).faceUpCounters;
+  if (up) putCounters(s, o, up.counter, up.n);
   fireEvent(s, { type: "turnedFaceUp", id });
   s.passedInSuccession = [];
 }

@@ -86,8 +86,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if (s === "~ becomes solved") return [{ type: "solve" }];
   if (s === "Harness ~") return [{ type: "harness" }];
   if (s === "The next spell you cast this turn has improvise") return [{ type: "nextSpellImprovise" }];
-  // "Transform ~" (CR 701.27a).
-  if (/^[Tt]ransform ~$/.test(s)) return [{ type: "transform", what: { ref: "self" } }];
+  // "Transform ~" (CR 701.27a); "you may transform it" in a trigger about itself (Vincent Valentine).
+  if (/^[Tt]ransform ~$/.test(s) || (ctx.selfIt && /^[Tt]ransform it$/.test(s))) return [{ type: "transform", what: { ref: "self" } }];
   // "Transform up to one target Incubator token you control" (Attentive Skywarden), "transform target Werewolf you
   // control": a permanent that isn't a transforming one doesn't (CR 701.27c).
   if ((m = /^[Tt]ransform ((?:up to one )?target .+)$/.exec(s))) {

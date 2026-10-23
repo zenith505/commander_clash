@@ -139,6 +139,12 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // choice to make). Wheels: "each player discards their hand, then draws seven cards" (all of them discard, then all
   // of them draw, CR 608.2c), "then draw that many cards", "then draws cards equal to the greatest number of cards a
   // player discarded this way" (Windfall).
+  // Clive, Ifrit's Dominant: "you may discard your hand, then draw cards equal to your devotion to red": both, if you
+  // choose to, even with no cards in hand (rulings).
+  if ((m = /^[Yy]ou may discard your hand, then draw (.+)$/.exec(s))) {
+    const inner = parseSpellsSentence(`Discard your hand, then draw ${m[1]}`, ctx);
+    return inner ? [{ type: "may", effects: inner, text: `discard your hand, then draw ${m[1]}` }] : null;
+  }
   if ((m = /^(Discard|.+? discards?) (?:all the cards in )?(?:your|their|his or her) hand(?:, then draws? (.+))?$/i.exec(s))) {
     const who = /^Discard$/i.test(m[1]!) ? ({ ref: "you" } as const) : parsePlayer(m[1]!.replace(/ discards?$/i, ""), ctx);
     if (!who || (/^Discard$/i.test(m[1]!) && /your/.test(s) === false)) return null;
@@ -153,6 +159,8 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
         // Dark Deal: "that many cards minus one", none for a player who discarded one or none (rulings).
         : /^that many cards minus one$/i.test(m[2]) ? { count: { kind: "discardedThisWay" as const, ...own }, plus: -1 }
         : /^cards equal to the greatest number of cards a player discarded this way$/i.test(m[2]) ? { count: { kind: "discardedThisWay" as const, greatest: true as const } }
+        // "Then draw cards equal to your devotion to red" (Clive), counted after the discard (rulings).
+        : who.ref === "you" && /^cards equal to your devotion to /i.test(m[2]) ? parseCount(m[2].replace(/^cards equal to /i, ""), ctx)
         : null;
       if (!n) return null;
       out.push({ type: "draw", who, n });

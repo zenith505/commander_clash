@@ -997,6 +997,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "Each player secretly votes for truth or consequences, then those votes are revealed" is one instruction (a vote whose
   // votes nobody sees until all are made), not two.
   text = text.replace(/\b(secretly votes for [^.]+?), then those votes are revealed\./g, "$1.");
+  // Ifrit, Warden of Inferno: "If ~ has three or more lore counters on it, exile it, then return it ...": "it" is ~.
+  text = text.replace(/\b(If ~ has [^,.]+ counters on it), exile it, then return it to the battlefield\./, "$1, exile ~, then return it to the battlefield.");
   // Gisa, Glorious Resurrector: "They gain decayed" is about the cards just put onto the battlefield.
   text = text.replace(/([Pp]ut all creature cards exiled with ~ onto the battlefield under your control)\. They gain decayed\./, "$1, and they gain decayed.");
   // "Until your next turn, it gains indestructible." (Hydaelyn) says the same as "It gains indestructible until your next turn."
@@ -4268,7 +4270,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "You may play the exiled card without paying its mana cost" asks as it plays it (see the playLinked effect).
     // "You may play an additional land this turn" is a permission, not a choice made now (CR 305.2a).
     // "You may draw a card unless that player pays {1}" (Rhystic Study): they decide first (see the punisher sentences).
-    const may = /^[Yy]ou may (?!play the exiled card |cast a copy of the exiled card |play (?:an|up to \w+) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$)(.+)$/.exec(s);
+    const may = /^[Yy]ou may (?!play the exiled card |cast a copy of the exiled card |play (?:an|up to \w+) additional lands? this turn|draw [^.]+ unless (?:that player|they|he or she) pays? |draw up to |choose new targets for target |cast spells this turn as though they had flash$|cast (?:that card|it) this turn$|cast your commander from the command zone without paying its mana cost$|discard your hand, then draw )(.+)$/.exec(s);
     if (may) {
       // "You may have ~ deal damage equal to its power to target creature", "you may have it fight target creature you
       // don't control": ~ does it, if you choose.
@@ -4934,6 +4936,9 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
   const moreCopies = instead ? new RegExp(`^Create ${NUM} of those tokens$`).exec(t) : null;
   if (moreCopies) {
     const prev = previous[0];
+    // "Create five 1/1 white Human creature tokens. If ~ was cast from a graveyard, create ten of those tokens instead"
+    // (Increasing Devotion): more of the same tokens.
+    if (previous.length === 1 && prev?.type === "createToken" && typeof prev.n === "number") return { effects: [{ ...prev, n: num(moreCopies[1]!) }], instead };
     if (previous.length !== 1 || prev?.type !== "createTokenCopy") return null;
     return { effects: [{ ...prev, n: num(moreCopies[1]!) }], instead };
   }

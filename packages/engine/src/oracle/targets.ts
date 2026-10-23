@@ -658,6 +658,9 @@ export function parseTargetPhrase(
     target?: true;
   } = {},
 ): TargetSpec | null {
+  // Heliod, the Radiant Dawn: "enchantment card that isn't a God" is a non-God enchantment card.
+  const isnt = /^(target )?([a-z]+) card that isn't an? ([A-Z][a-z]+)(\b.*)$/.exec(phrase.trim());
+  if (isnt) return parseTargetPhrase(`${isnt[1] ?? ""}non-${isnt[3]} ${isnt[2]} card${isnt[4]}`, opts);
   // Yenna, Redtooth Regent: "enchantment you control that doesn't have the same name as another permanent you control".
   const unique = / that doesn't have the same name as another permanent you control$/.exec(phrase.trim());
   if (unique) {

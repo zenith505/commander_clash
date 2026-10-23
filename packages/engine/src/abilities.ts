@@ -1338,7 +1338,7 @@ export type StaticCondition =
   /** Corrupted: "as long as an opponent has three or more poison counters" (CR 122.1f). */
   | { kind: "opponentPoison"; n: number }
   /** "If an opponent has eight or more cards in their graveyard" (Sheoldred // The True Scriptures): one still in the game. */
-  | { kind: "opponentGraveyard"; n: number }
+  | { kind: "opponentGraveyard"; n: number; /** "If a graveyard has twenty or more cards in it" (Visions of Beyond): yours too. */ anyone?: true }
   /** Raid: "if you attacked this turn" (with one or more creatures); `not`: "if you didn't attack with a creature this turn" (Curious Obsession). */
   | { kind: "attackedThisTurn"; not?: true }
   /** The Chain Veil: "if you didn't activate a loyalty ability of a planeswalker this turn" (`not`). */

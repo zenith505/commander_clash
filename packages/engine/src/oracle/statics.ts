@@ -629,6 +629,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   }
   if ((m = new RegExp(`^an opponent has ${NUM} or more poison counters$`).exec(text))) return { kind: "opponentPoison", n: num(m[1]!) };
   if ((m = new RegExp(`^an opponent has ${NUM} or more cards in their graveyard$`).exec(text))) return { kind: "opponentGraveyard", n: num(m[1]!) };
+  if ((m = new RegExp(`^a graveyard has ${NUM} or more cards in it$`).exec(text))) return { kind: "opponentGraveyard", n: num(m[1]!), anyone: true };
   // "Activate only if ~'s power is 3 or greater" (Kitsa, Otterball Elite): as it is now.
   if ((m = new RegExp(`^(~'s (?:power|toughness)) is ${NUM} or (greater|less)$`).exec(text))) {
     const amount = parseCount(m[1]!, null);

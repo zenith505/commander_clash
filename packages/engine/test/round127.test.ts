@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, addEffect, card, cast, passAll, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
-import { abilitiesOf, activationCost, altCostsFor, botActions, invalidateCharacteristics, characteristics, power, isFullySupported, manaAbilitiesOn, objHasKeyword, objIsType, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { abilitiesOf, activationCost, altCostsFor, botActions, manaValue, spellCost, invalidateCharacteristics, characteristics, power, isFullySupported, manaAbilitiesOn, objHasKeyword, objIsType, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -814,5 +814,90 @@ describe("Zirda, the Dawnwaker: abilities you activate cost {2} less, not below 
     const z = putOnBattlefield(s, ap, zirda);
     invalidateCharacteristics(s);
     expect([costOf(s, ap, a), costOf(s, ap, b), costOf(s, ap, c), costOf(s, ap, ids[0]!), costOf(s, ap, z)]).toEqual(["{1}{G}", "{1}", "{R}", "{1}", "{1}"]);
+  });
+});
+
+describe("Increasing Devotion, Visions of Beyond, Clive // Ifrit, Heliod", () => {
+  const devotion = card("Increasing Devotion", "Sorcery", "{3}{W}{W}", { oracleText: "Create five 1/1 white Human creature tokens. If this spell was cast from a graveyard, create ten of those tokens instead.\nFlashback {7}{W}{W} (You may cast this card from your graveyard for its flashback cost. Then exile it.)" });
+  const humans = (s: GameState, pid: number) => s.battlefield.filter((id) => s.objects[id]!.controller === pid && s.objects[id]!.isToken && characteristics(s, s.objects[id]!).subtypes.includes("Human")).length;
+  it("Increasing Devotion: five Humans from hand, ten with flashback", () => {
+    supported(devotion);
+    const { s: s0, ap, ids } = setup([devotion]);
+    expect(humans(cast(s0, ap, ids[0]!), ap)).toBe(5);
+    const { s: s1, ap: ap1, ids: ids1 } = setup([devotion]);
+    for (let i = 0; i < 3; i++) putOnBattlefield(s1, ap1, card("Plains", "Basic Land — Plains"));
+    const o = s1.objects[ids1[0]!]!;
+    s1.players[ap1]!.hand.splice(s1.players[ap1]!.hand.indexOf(o.id), 1);
+    o.zone = "graveyard";
+    s1.players[ap1]!.graveyard.push(o.id);
+    const s = passAll(run(s1, planCast(s1, ap1, o.id, undefined, undefined, undefined, undefined, { via: "flashback" })));
+    expect(humans(s, ap1)).toBe(10);
+  });
+  it("Visions of Beyond: three cards if any graveyard has twenty or more cards, else one", () => {
+    const visions = card("Visions of Beyond", "Instant", "{U}", { oracleText: "Draw a card. If a graveyard has twenty or more cards in it, draw three cards instead." });
+    supported(visions);
+    const { s: s0, ap, ids, opp } = setup([visions, visions]);
+    const h = s0.players[ap]!.hand.length;
+    let s = cast(s0, ap, ids[0]!);
+    expect(s.players[ap]!.hand.length).toBe(h - 1 + 1);
+    s.players[opp]!.graveyard.push(...s.players[opp]!.library.splice(0, 20));
+    for (const id of s.players[opp]!.graveyard) s.objects[id]!.zone = "graveyard";
+    s = cast(s, ap, ids[1]!);
+    expect(s.players[ap]!.hand.length).toBe(h - 2 + 1 + 3);
+  });
+  const clive = scry("transform", [
+    { name: "Clive, Ifrit's Dominant", type_line: "Legendary Creature — Human Noble Warrior", mana_cost: "{4}{R}{R}", power: "5", toughness: "5", oracle_text: "When Clive enters, you may discard your hand, then draw cards equal to your devotion to red. (Each {R} in the mana costs of permanents you control counts toward your devotion to red.)\n{4}{R}{R}, {T}: Exile Clive, then return it to the battlefield transformed under its owner's control. Activate only as a sorcery." },
+    { name: "Ifrit, Warden of Inferno", type_line: "Legendary Enchantment Creature — Saga Demon", power: "9", toughness: "9", oracle_text: "(As this Saga enters and after your draw step, add a lore counter.)\nI — Lunge — Ifrit fights up to one other target creature.\nII, III — Brimstone — Add {R}{R}{R}{R}. If Ifrit has three or more lore counters on it, exile it, then return it to the battlefield (front face up)." },
+  ]);
+  it("Clive: discard your hand, then draw cards equal to your devotion to red (Clive's own {R}{R} counted)", () => {
+    supported(clive);
+    const { s: s0, ap, ids } = setup([clive, card("Test Junk", "Sorcery", "{1}", { oracleText: "Draw a card." })]);
+    putOnBattlefield(s0, ap, card("Test Red Bear", "Creature — Bear", "{1}{R}", { power: "2", toughness: "2" }));
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    for (let i = 0; i < 20 && s.pending?.kind !== "chooseMay"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    const before = s.players[ap]!.hand.length;
+    expect(before).toBeGreaterThan(0);
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect(s.players[ap]!.hand).toHaveLength(3);
+    expect(s.players[ap]!.hand).not.toContain(ids[1]);
+  });
+  it("Ifrit's chapter III: four red mana, then it returns as Clive (front face up)", () => {
+    const { s: s0, ap } = setup([]);
+    const c = putOnBattlefield(s0, ap, clive);
+    s0.objects[c]!.face = 1;
+    s0.objects[c]!.counters.lore = 2;
+    invalidateCharacteristics(s0);
+    expect(characteristics(s0, s0.objects[c]!).name).toBe("Ifrit, Warden of Inferno");
+    let s = passUntil(passUntil(s0, "upkeep", s0.turnOrder[(s0.turnOrder.indexOf(ap) + 1) % 4]!), "main1", ap);
+    for (let i = 0; i < 20 && (s.stack.length || s.triggerQueue.length) && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    const back = s.battlefield.map((id) => s.objects[id]!).find((o) => characteristics(s, o).name === "Clive, Ifrit's Dominant");
+    expect(back, logText(s)).toBeDefined();
+    expect(logText(s)).toMatch(/Ifrit/);
+  });
+  const heliod = scry("transform", [
+    { name: "Heliod, the Radiant Dawn", type_line: "Legendary Enchantment Creature — God", mana_cost: "{2}{W}{W}", power: "4", toughness: "4", oracle_text: "When Heliod enters, return target enchantment card that isn't a God from your graveyard to your hand.\n{3}{U/P}: Transform Heliod. Activate only as a sorcery. ({U/P} can be paid with either {U} or 2 life.)" },
+    { name: "Heliod, the Warped Eclipse", type_line: "Legendary Enchantment Creature — Phyrexian God", power: "4", toughness: "6", oracle_text: "You may cast spells as though they had flash.\nSpells you cast cost {1} less to cast for each card your opponents have drawn this turn." },
+  ]);
+  it("Heliod: only a non-God enchantment card can be returned; the back face's spells cost less for each card opponents drew", () => {
+    supported(heliod);
+    const { s: s0, ap, ids, opp } = setup([heliod, card("Test Big Spell", "Sorcery", "{6}{W}", { oracleText: "Draw a card." })]);
+    const yard = [card("Test Omen", "Enchantment", "{1}{W}", { oracleText: "At the beginning of your upkeep, you gain 1 life." }), card("Test God", "Legendary Enchantment Creature — God", "{3}{W}", { power: "4", toughness: "4" })].map((d) => {
+      const id = putOnBattlefield(s0, ap, d);
+      s0.battlefield.splice(s0.battlefield.indexOf(id), 1);
+      s0.objects[id]!.zone = "graveyard";
+      s0.players[ap]!.graveyard.push(id);
+      return id;
+    });
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    for (let i = 0; i < 20 && s.pending?.kind !== "chooseTargets"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(() => act(s, { type: "chooseTargets", player: ap, targets: [target(yard[1]!)] })).toThrow();
+    s = passAll(act(s, { type: "chooseTargets", player: ap, targets: [target(yard[0]!)] }));
+    expect(s.objects[yard[0]!]!.zone).toBe("hand");
+    s.objects[ids[0]!]!.face = 1;
+    s.players[opp]!.draws = { turn: s.turn, n: 2 };
+    invalidateCharacteristics(s);
+    const big = s.objects[ids[1]!]!;
+    const due = spellCost(s, ap, big);
+    expect(manaValue(due.cost) + due.extra).toBe(5);
   });
 });

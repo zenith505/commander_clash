@@ -138,6 +138,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (!each && /^the greatest number of cards an opponent has drawn this turn$/i.test(p)) return { count: { kind: "greatestDrawn" } };
   // "For each card you've drawn this turn", "the number of cards they've drawn this turn" (CR 121.1: cards drawn, not put
   // into the hand otherwise).
+  // Heliod, the Warped Eclipse: "for each card your opponents have drawn this turn": all of them together.
+  if (/^cards? your opponents have drawn this turn$/i.test(p)) return { count: { kind: "drawnThisTurn", who: { ref: "eachOpponent" } } };
   if ((m = /^cards? (you've|you have|they've|they have|that player has) drawn this turn$/i.exec(p))) {
     const who = /^you/i.test(m[1]!) ? ({ ref: "you" } as PlayerRef) : whosePlayer(/^they/i.test(m[1]!) ? "their" : "that player's", ctx);
     return who && { count: { kind: "drawnThisTurn", who } };

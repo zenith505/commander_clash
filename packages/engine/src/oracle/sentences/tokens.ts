@@ -237,7 +237,7 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Confluence): it enters tapped.
   // "Exile this Saga, then return it to the battlefield (front face up)" (The Great Synthesis): under your control, since
   // you put it there (CR 110.2a), front face up (CR 712.14a).
-  if (/^Exile ~, then return it to the battlefield$/.test(s)) return [{ type: "flicker", what: { ref: "self" }, under: "you" }];
+  if (/^[Ee]xile ~, then return it to the battlefield$/.test(s)) return [{ type: "flicker", what: { ref: "self" }, under: "you" }];
   if ((m = /^Exile (.+?),? then return (?:it|that card|them|those cards) to the battlefield( transformed| tapped)? under (its owner's|their owner's|their owners'|your) control(?: with an? (\+1\/\+1) counter on it)?$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     if (m[2] === " transformed" && what?.ref !== "self") return null;

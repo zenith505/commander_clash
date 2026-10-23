@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { botActions, compileCard, isFullySupported, nextRandom, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { abilitiesOf, botActions, characteristics, compileCard, isFullySupported, nextRandom, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -221,5 +221,43 @@ describe("Breeches, the Blastmaker: sacrifice, flip, then one of two reflexive t
     s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] } as Action);
     for (let i = 0; i < 8 && s.stack.length; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
     expect(s.players[opp]!.life).toBe(life - 2);
+  });
+});
+
+const vantress = card("Court of Vantress", "Enchantment", "{2}{U}{U}", {
+  oracleText: "When this enchantment enters, you become the monarch.\nAt the beginning of your upkeep, choose up to one other target enchantment or artifact. If you're the monarch, you may create a token that's a copy of it. If you're not the monarch, you may have this enchantment become a copy of it, except it has this ability.",
+});
+
+describe("Court of Vantress: a token copy as the monarch, else it becomes a copy with this ability (rulings)", () => {
+  const rock = card("Test Rock", "Artifact", "{1}", { oracleText: "{T}: Add {C}." });
+  /** Court and a Test Rock on `ap`'s battlefield, `monarch` the monarch; on to `ap`'s next upkeep, the trigger's target asked. */
+  const upkeep = (monarch: "ap" | "opp") => {
+    const { s: s0, ap, opp } = setup([]);
+    const court = putOnBattlefield(s0, ap, vantress);
+    const r = putOnBattlefield(s0, ap, rock);
+    s0.monarch = monarch === "ap" ? ap : opp;
+    let s = passUntil(s0, "upkeep", opp);
+    s.monarch = monarch === "ap" ? ap : opp;
+    for (let i = 0; i < 400 && !(s.activePlayer === ap && s.pending?.kind === "chooseTargets"); i++) s = s.pending?.kind === "discardToHandSize" ? act(s, { type: "discard", player: waitingOn(s)!, objectIds: s.players[waitingOn(s)!]!.hand.slice(0, s.pending.count) }) : s.pending?.kind === "declareAttackers" ? act(s, { type: "declareAttackers", player: waitingOn(s)!, attacks: [] }) : act(s, { type: "passPriority", player: waitingOn(s)! });
+    s.monarch = monarch === "ap" ? ap : opp;
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: r }] } as Action);
+    for (let i = 0; i < 8 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    return { s: act(s, { type: "chooseMay", player: ap, yes: true }), ap, court, r };
+  };
+  it("the monarch: a token copy of the artifact", () => {
+    supported(vantress);
+    const { s, ap } = upkeep("ap");
+    const rocks = s.battlefield.filter((id) => s.cards[s.objects[id]!.cardId]!.name === "Test Rock" && s.objects[id]!.controller === ap);
+    expect(rocks).toHaveLength(2);
+  });
+  it("not the monarch: Court becomes a Test Rock that still has the upkeep ability", () => {
+    const { s, court } = upkeep("opp");
+    const c = characteristics(s, s.objects[court]!);
+    expect(c.name).toBe("Test Rock");
+    expect(c.types).toEqual(["Artifact"]);
+    expect(abilitiesOf(s, s.objects[court]!).triggers.some((t) => t.event === "yourUpkeep")).toBe(true);
+    expect(abilitiesOf(s, s.objects[court]!).mana.length).toBe(1);
   });
 });

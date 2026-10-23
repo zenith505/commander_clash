@@ -19,7 +19,7 @@ export function parseCopiesSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // "Choose target creature you control. Each other creature becomes a copy of that creature": the first sentence
   // only chooses the target the second refers to.
   // "Choose any number of target creatures. Each of those creatures gains persist until end of turn." too.
-  if ((m = /^[Cc]hoose ((?:any number of |up to one |two )?target .+)$/.exec(s))) {
+  if ((m = /^[Cc]hoose ((?:any number of |up to one (?:other )?|two )?target .+)$/.exec(s))) {
     // "Choose two target creatures controlled by different players. Return those creatures ..." (Run Away Together).
     // "Choose two target players. Each of them ..." (Scheming Symmetry).
     if (m[1] === "two target players") return parsePlayer(m[1], ctx) ? [] : null;
@@ -100,6 +100,8 @@ function parseOf(text: string, ctx: Ctx): ObjRef | null {
   if (/^the sacrificed (creature|artifact|permanent)$/.test(text)) return { ref: "sacrificed" };
   // "Choose target artifact you control. Each other artifact you control becomes a copy of that artifact."
   if (/^that (artifact|enchantment|land|token)$/.test(text) && ctx.lastObjectTarget !== undefined) return { ref: "target", index: ctx.lastObjectTarget };
+  // Court of Vantress (rewritten in body.ts): the target an earlier sentence chose, not the token another made.
+  if (/^the chosen permanent$/.test(text) && ctx.lastObjectTarget !== undefined) return { ref: "target", index: ctx.lastObjectTarget };
   const of = parseObject(text, ctx, /\bcards?\b/.test(text) && /\btarget\b/.test(text));
   return of && !isGroup(of) && !("n" in of && (of.n ?? 1) > 1) ? of : null;
 }

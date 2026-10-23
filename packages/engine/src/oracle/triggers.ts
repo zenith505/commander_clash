@@ -77,6 +77,8 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever an opponent commits a crime, (.+)$/, "opponentCommitsCrime"],
   [/^Whenever you choose a creature as your Ring-bearer, (.+)$/, "youChooseRingBearer"],
   [/^Whenever an opponent loses life, (.+)$/, "opponentLosesLife"],
+  // Emet-Selch: once for life lost at the same time, however many opponents lost it.
+  [/^Whenever one or more opponents lose life, (.+)$/, "opponentsLoseLife"],
   [/^Whenever an opponent gains life, (.+)$/, "opponentGainsLife"],
   [/^Whenever you lose life, (.+)$/, "youLoseLife"],
   // Playing a land (CR 305.1), not putting one onto the battlefield with an effect (rulings on Burgeoning).
@@ -590,7 +592,9 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   if (didntDie) bodyText = bodyText.slice(didntDie[0].length);
   const notDies = !!didntDie || (!attached && m![3]! === "leaves the battlefield without dying");
   // "If it had a counter on it", "if it had one or more counters on it": as it last existed, so it can't change.
-  const hadCounter = !attached && /^if it had (?:a counter|one or more counters|counters) on it, /.exec(bodyText);
+  // "If it had a -1/-1 counter on it" (Blowfly Infestation): of that kind.
+  const hadCounter = !attached && new RegExp(`^if it had (?:a counter|one or more counters|counters|an? ${COUNTER} counter|one or more ${COUNTER} counters) on it, `).exec(bodyText);
+  const hadKindOf = hadCounter ? (hadCounter[1] ?? hadCounter[2]) : undefined;
   if (hadCounter) bodyText = bodyText.slice(hadCounter[0].length);
   // "If its toughness was less than 1" (Massacre Girl, Known Killer): as it last existed (CR 603.10a), so it can't change
   // and is part of what dies, like a keyword it had.
@@ -643,7 +647,7 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
       ...(leaves ? { leaves: true as const } : {}),
       ...(exiled ? { toZones: ["exile"] as ("graveyard" | "exile")[] } : {}),
       ...(notDies ? { notDies: true as const } : {}),
-      ...(hadCounter ? { hadCounter: true as const } : {}),
+      ...(hadCounter ? { hadCounter: hadKindOf ?? (true as const) } : {}),
     },
     body,
   };
@@ -1064,6 +1068,17 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     batch.fromGraveyard = true;
     rest = fromYard[1]!;
   }
+  // Twilight Diviner: "if they entered or were cast from a graveyard, create a token that's a copy of one of them": an
+  // intervening if (CR 603.4) about those that did, and one of them of your choice, while it's still that permanent.
+  const diviner = /^if they entered or were cast from a graveyard, create a token that's a copy of one of them\.?$/.exec(rest);
+  if (diviner && batch.what === "enters" && batch.filter && !yourTurn) {
+    const filter = { ...batch.filter, text: batch.filter.text.replace(/^creatures\b/, "creature") };
+    return {
+      event: "batch",
+      batch: { ...batch, fromGraveyard: true, onlyFromGraveyard: true },
+      body: { targets: [], effects: [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "choose", fromGroup: true }, { type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "created" } }], text: rest.replace(/\.$/, "") },
+    };
+  }
   // Kambal, Profiteering Mayor: "for each of them, create a tapped token that's a copy of it", those that entered.
   const eachCopy = /^for each of them, create an? (tapped )?token that's a copy of it\.?$/.exec(rest);
   if (eachCopy && batch.what === "enters" && !yourTurn) return { event: "batch", batch, body: { targets: [], effects: [{ type: "createTokenCopy", who: { ref: "you" }, n: 1, what: { ref: "eventGroup" }, each: true, ...(eachCopy[1] ? { tapped: true } : {}) }], text: rest.replace(/\.$/, "") } };
@@ -1416,6 +1431,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const t = parseTrigger(doOnce[1]!);
     if (!t || t === "fail" || t.oncePerTurn || t.event === "state") return "fail";
     const may = t.body.effects[0];
+    // "You may cast target instant or sorcery card from your graveyard" (Emet-Selch): casting it is doing it.
+    if (may?.type === "castNow" && !may.once && t.body.effects.length === 1) return { ...t, body: { ...t.body, effects: [{ ...may, once: true }] } };
     // "You may discard a card. If you do, draw a card": choosing to discard is doing it.
     if (may?.type !== "may" || may.once || !t.body.effects.slice(1).every((e) => e.type === "if" && e.cond.kind === "youDid")) return "fail";
     return { ...t, body: { ...t.body, effects: [{ ...may, once: true }, ...t.body.effects.slice(1)] } };

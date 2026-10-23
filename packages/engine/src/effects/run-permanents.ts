@@ -480,8 +480,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         return;
       }
       // Sovereign Okinec Ahau: each creature's difference between its power and base power, all found before any are put.
-      if (e.aboveBase) {
-        const each = objects(s, e.what, ctx).map((o) => [o, power(s, o) - basePowerNow(s, o)] as const);
+      if (e.aboveBase || e.perOwn) {
+        const each = objects(s, e.what, ctx).map((o) => [o, e.perOwn === "toughness" ? toughness(s, o) : e.perOwn === "power" ? power(s, o) : power(s, o) - basePowerNow(s, o)] as const);
         for (const [o, n] of each) {
           if (n <= 0 || o.zone !== "battlefield") continue;
           invalidateCharacteristics(s);
@@ -508,12 +508,26 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const n = e.perLastKnownCounter ? base * (ctx.lki?.counters?.[e.perLastKnownCounter] ?? 0) : base;
       if (n <= 0) return;
       const by = e.by && players(s, e.by, ctx)[0];
+      // "A +1/+1 counter or a loyalty counter": its controller chooses which as this resolves (rulings on Elspeth Conquers Death).
+      let kind = e.counter;
+      if (e.orCounter) {
+        const sc = (s.resolving!.scratch ??= {});
+        const on = objects(s, e.what, ctx)[0];
+        if (!on) return;
+        if (!sc.counterKind) {
+          const kinds = [e.counter, e.orCounter];
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "counterKind", options: kinds, labels: kinds.map((k) => `A ${k} counter`), prompt: `choose the kind of counter to put on ${characteristics(s, on).name}`, about: on.id };
+          return "paused";
+        }
+        kind = sc.counterKind;
+        sc.counterKind = undefined;
+      }
       for (const o of objects(s, e.what, ctx)) {
         invalidateCharacteristics(s);
-        const put = by !== undefined ? withPutter(by, () => putCounters(s, o, e.counter, n)) : putCounters(s, o, e.counter, n);
-        log(s, `${defOf(s, o).name} gets ${put} ${e.counter} counter${put > 1 ? "s" : ""}.`);
+        const put = by !== undefined ? withPutter(by, () => putCounters(s, o, kind, n)) : putCounters(s, o, kind, n);
+        log(s, `${defOf(s, o).name} gets ${put} ${kind} counter${put > 1 ? "s" : ""}.`);
         // "Each creature that had a +1/+1 counter put on it this way" (Fangs of Kalonia): not one a replacement kept them off.
-        if (put > 0 && s.resolving) (s.resolving.countersPutThisWay ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, kind: e.counter });
+        if (put > 0 && s.resolving) (s.resolving.countersPutThisWay ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, kind });
       }
       return;
     }

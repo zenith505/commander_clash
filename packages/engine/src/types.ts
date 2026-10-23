@@ -179,6 +179,12 @@ export interface GameObject {
   /** A copy effect's values (CR 707.2), a key into GameState.cards: Clone as it entered, until it leaves. */
   copyOf?: string;
   /**
+   * Its text box was exchanged with another permanent's (CR 612.5, 701.12h, a text-changing effect in layer 3): the key
+   * in GameState.cards of the definition whose rules text it has now, until it leaves the battlefield. Not a copiable
+   * value (CR 707.2).
+   */
+  textFrom?: string;
+  /**
    * "Becomes a copy" effects on it (CR 707.4), in timestamp order. Each one overwrites every copiable value, so the
    * latest decides (CR 613.2a); `until` is when it ends (see CopyEffect). They end with the object (CR 400.7).
    */
@@ -209,6 +215,8 @@ export interface GameObject {
   controlledSinceTurn: number;
   /** Turn number it last entered the battlefield ("activate only if ~ entered this turn"); phasing in isn't entering (CR 702.26d). */
   enteredTurn?: number;
+  /** Turn number it was last put into a graveyard ("a card from a graveyard that was put there this turn", Abyssal Harvester). */
+  toGraveyardTurn?: number;
   damage: number;
   deathtouchDamage: boolean;
   counters: Record<string, number>;
@@ -967,6 +975,8 @@ export interface CostChoices {
   exileCards?: ObjectId[];
   /** Untapped permanents to tap for "Tap an untapped creature you control" (CR 602.2b). */
   tap?: ObjectId[];
+  /** Waterbend as an additional cost to cast it (CR 701.67a): untapped artifacts and creatures you control, each paying {1}. */
+  waterbend?: ObjectId[];
   /** Cards in hand revealed for "reveal a Pirate card from your hand". */
   reveal?: ObjectId[];
   /** Cards exiled from your hand for "exile a blue card from your hand" (Force of Will). */
@@ -1081,7 +1091,7 @@ export type PendingDecision =
    * "Counter that spell or ability unless its controller pays {2}" (ward, CR 702.21a). The player
    * may activate mana abilities first (CR 605.3a), then pays or declines.
    */
-  | { kind: "payUnless"; player: PlayerId; cost: string; life?: number; /** Cards to discard as (part of) the payment. */ discard?: number; /** Permanents to sacrifice as (part of) the payment ("Ward—Sacrifice a creature"), chosen after saying yes. */ sacrifice?: { n: number; filter: TargetSpec }; source: string; what: string; /** What happens if they don't, when it isn't "[what] is countered". */ otherwise?: string }
+  | { kind: "payUnless"; player: PlayerId; cost: string; life?: number; /** Cards to discard as (part of) the payment. */ discard?: number; /** Permanents to sacrifice as (part of) the payment ("Ward—Sacrifice a creature"), chosen after saying yes. */ sacrifice?: { n: number; filter: TargetSpec }; /** "Ward—Waterbend {4}": up to this many artifacts and creatures they control may be tapped to pay {1} each of it (CR 701.67a). */ waterbend?: number; source: string; what: string; /** What happens if they don't, when it isn't "[what] is countered". */ otherwise?: string }
   /**
    * "You may cast that card without paying its mana cost" (cascade, CR 702.85a), as an ability
    * resolves: answered by casting it (castSpell, targets and modes as usual) or chooseMay "no".
@@ -1363,7 +1373,7 @@ export interface GameState {
   /** Who cast each spell this turn, and its card (a key into `cards`) as it was cast: "can't cast more than one spell each turn". */
   castThisTurn?: { player: PlayerId; card: string; /** Its colors as it was cast (Ricochet Trap). */ colors?: Color[]; /** The zone it was cast from. */ from?: ZoneName; /** Mana from a Treasure was spent to cast it (CR 106.3). */ treasure?: true; /** Its mana value on the stack (CR 202.3e). */ mv?: number }[];
   /** "Instant and sorcery spells you cast this turn cost {1} less to cast": cost changes for one player this turn (CR 601.2f). */
-  costModsThisTurn?: { player: PlayerId; mod: CostMod }[];
+  costModsThisTurn?: { player: PlayerId; mod: CostMod; /** Until that player's next turn begins, not just this turn (CR 611.2b, 800.4m). */ untilYourNextTurn?: true }[];
   /** "Until end of turn, you don't lose unspent red mana as steps and phases end" (CR 500.4): who, and which color (all if unset). */
   keepManaThisTurn?: { player: PlayerId; color?: ManaType }[];
   /** High Tide's "until end of turn, whenever a player taps an Island for mana ...": `controller` is "you", `source` the card's name. */
@@ -1487,6 +1497,8 @@ export interface GameState {
   damageMods?: { id: string; mod: DamageMod; you: PlayerId; name: string; turn: number; until?: "yourNextTurn" }[];
   /** Players who lost life this turn ("if an opponent lost life this turn", CR 119.3). */
   lostLifeThisTurn?: PlayerId[];
+  /** A count of life-loss events, numbering those that happen at the same time (loseLife, simultaneousLifeLoss). */
+  lifeLossEvents?: number;
   /** Revolt: the players a permanent left the battlefield under the control of this turn, tokens too (rulings). */
   permanentLeftThisTurn?: PlayerId[];
   /** Players whose Assassin creature or commander dealt combat damage to a player this turn: they may pay freerunning costs (CR 702.173a). */
@@ -1579,7 +1591,7 @@ export interface GameState {
   untilReturns?: { auras: { id: ObjectId; zc: number; under: PlayerId; source: string; asking?: true }[]; returned: ObjectId[] };
   /** Legends chosen to keep under the legend rule (CR 704.5j), until the state-based actions are next performed. */
   legendKeep?: ObjectId[];
-  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; names?: TargetSpec; purpose?: NamePurpose; options?: string[]; range?: { min: number; max: number }; secret?: true; /** "Look at an opponent's hand" once that opponent is chosen (Arachne). */ lookHand?: true; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean } }[];
+  entersChoices?: { id: ObjectId; zc: number; what: ChoiceKind | EntersOption; except?: string; names?: TargetSpec; purpose?: NamePurpose; options?: string[]; range?: { min: number; max: number }; secret?: true; /** "Look at an opponent's hand" once that opponent is chosen (Arachne). */ lookHand?: true; enters?: { x?: number }; together?: ObjectId[]; enterOpts?: { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; escaped?: boolean; fromStack?: boolean; controlChosen?: boolean } }[];
   nextId: number;
   /**
    * Resolutions in a row in this step with every player only passing priority, and the states they left (as hashes,
@@ -1654,6 +1666,8 @@ export interface TurnRule {
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */
 export interface TriggerEventInfo {
   amount?: number;
+  /** "One or more opponents lose life": the life loss event it triggered on (lifeLost's batch). */
+  lifeBatch?: number;
   /** A cast or play-a-land trigger: the spell or land, as the object it was (TriggeredAbility cast.sharesTypeWithLinked). */
   played?: { id: ObjectId; zc: number };
   /** "Deals damage to a creature": the excess damage that creature has been dealt this turn (CR 120.10). */
@@ -1701,6 +1715,8 @@ export interface Resolving {
   affected?: { id: ObjectId; zc: number }[];
   /** Permanents its damage effects dealt damage to, for "a creature dealt damage this way". */
   damagedThisWay?: ObjectId[];
+  /** The permanents a flicker returned to the battlefield (Splash Portal's "if that creature is ..."). */
+  flickeredBack?: ObjectId[];
   /** Players its damage effects dealt damage to, for "players dealt damage this way". */
   playersDamagedThisWay?: PlayerId[];
   /** "Each player may put ... onto the battlefield": those who did, for the instructions after it ("each opponent who didn't"). */
@@ -2072,7 +2088,7 @@ export type Action =
   /** Turn a face-down permanent face up by paying its morph or disguise cost: a special action (CR 116.2b, 702.37e). */
   | { type: "turnFaceUp"; player: PlayerId; objectId: ObjectId; /** Which of faceUpWays (a manifested card with morph has two). */ way?: number }
   /** Answer to payUnless: pay the cost from your mana pool, or let it be countered. */
-  | { type: "payUnless"; player: PlayerId; pay: boolean }
+  | { type: "payUnless"; player: PlayerId; pay: boolean; /** Waterbend (CR 701.67a): untapped artifacts and creatures tapped to pay {1} each of the cost. */ tap?: ObjectId[] }
   | { type: "concede"; player: PlayerId };
 
 export class RulesError extends Error {}

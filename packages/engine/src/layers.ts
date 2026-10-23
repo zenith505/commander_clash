@@ -181,6 +181,8 @@ export interface Characteristics {
   cantAttackSamePlayer: boolean;
   /** "Can't attack its owner" (Alexios). */
   cantAttackOwner: boolean;
+  /** Xantcha: nor the planeswalkers its owner controls. */
+  cantAttackOwnerWalkers?: boolean;
   /** "Can't be sacrificed" (CR 701.21). */
   cantBeSacrificed: boolean;
   /** "Can't attack you or planeswalkers you control" (Promise of Loyalty): those players and their planeswalkers. */
@@ -1240,12 +1242,15 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     case "cantAttackAlone":
     case "cantBlockAlone":
     case "cantAttackSamePlayer":
-    case "cantAttackOwner":
     case "cantBeSacrificed":
     case "mustBeBlocked":
     case "allMustBlock":
     case "mustBlock":
       c[m.kind] = true;
+      return;
+    case "cantAttackOwner":
+      c.cantAttackOwner = true;
+      if (m.planeswalkers) c.cantAttackOwnerWalkers = true;
       return;
     case "attackDespiteDefender":
       if (m.vsAttackedYou) c.attackDespiteDefenderVs = true;
@@ -1278,7 +1283,9 @@ function applyInLayer(s: GameState, e: Inst, layer: Layer, chars: CharMap, lock:
  * controller, types, colors, and whether a source still has its abilities, so only these
  * can create a dependency (CR 613.8a).
  */
-const CAN_CREATE_DEPENDENCY = new Set<Modification["kind"]>(["control", "addTypes", "setTypes", "setSubtypes", "setLandTypes", "loseTypes", "setColors", "addColors", "loseAllAbilities"]);
+// Goading too: whether a creature is goaded (CR 701.15) decides what "goaded creatures your opponents control can't block"
+// applies to (Bothersome Quasit), whatever the order the two came in.
+const CAN_CREATE_DEPENDENCY = new Set<Modification["kind"]>(["control", "addTypes", "setTypes", "setSubtypes", "setLandTypes", "loseTypes", "setColors", "addColors", "loseAllAbilities", "goad"]);
 
 function signature(s: GameState, e: Inst, chars: CharMap): string {
   if (!exists(s, e, chars)) return "gone";

@@ -415,7 +415,7 @@ export function applyInPlace(s: GameState, action: Action): void {
       chooseNewTargets(s, p, action.targets);
       break;
     case "payUnless":
-      payUnless(s, p, action.pay);
+      payUnless(s, p, action.pay, action.tap);
       break;
     case "mulligan":
       declareMulligan(s, p, action.keep);
@@ -839,6 +839,7 @@ export function moveObject(
   else if (to === "battlefield" && s.dayNight === "night" && o.face === undefined && !o.faceDown && transformedFace(s, o) === 1 && hasKeyword(defOf(s, o), "Daybound")) setFace(s, o, 1);
   o.zoneChanges = (o.zoneChanges ?? 0) + 1; // a new object (CR 400.7)
   o.copyOf = undefined; // copy effects end with the object (CR 400.7)
+  o.textFrom = undefined; // so do text-changing effects
   o.melded = undefined; // a melded permanent's cards are separate cards again (CR 712.21)
   o.copyEffects = undefined;
   // Krovikan Vampire: a creature that died after being dealt damage this turn, and what dealt it (rulings: any damage).
@@ -913,6 +914,7 @@ export function moveObject(
       }
   }
   if (to === "battlefield") [o.controlledSinceTurn, o.enteredTurn] = [s.turn, s.turn];
+  o.toGraveyardTurn = to === "graveyard" ? s.turn : undefined;
   o.castFromHand = to === "battlefield" && castFromHand ? true : undefined;
   o.castFromGraveyard = to === "battlefield" && castFromGraveyard ? true : undefined;
   o.wasCast = to === "battlefield" && fromZone === "stack" && !o.spellCopy ? true : undefined;
@@ -964,6 +966,8 @@ export function moveObject(
     // "You may have ~ enter as a copy of ...": it becomes the copy as it enters (CR 707.5), so how it
     // enters and what it triggers wait for that choice.
     if (printed.entersAsCopy && copyCandidates(s, o, printed.entersAsCopy.filter).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });
+    else if (printed.entersExchangeText && textExchangeCandidates(s, o).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "exchangeText", enterOpts: how });
+    else if (printed.entersUnderOpponent && opponents(s, o.controller).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "controlOpponent", enterOpts: how });
     else finishEntering(s, o, printed, how, withCounters && counterN ? { counter: withCounters.counter, n: counterN } : undefined);
     // Entering with others (enterTogether): off the list until they all have, so the next ones don't see it.
     if (together && o.zone === "battlefield") {
@@ -1046,7 +1050,7 @@ function scatterMerged(s: GameState, ids: ObjectId[], to: ZoneName, top: boolean
 }
 
 /** `fromStack`: it's a resolving spell becoming a permanent (sunburst, CR 702.44b). */
-type EnterOpts = { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; countersIfCreature?: Record<string, number>; countersIfPlaneswalker?: Record<string, number>; escaped?: boolean; fromStack?: boolean };
+type EnterOpts = { x?: number; tapped?: boolean; untapped?: boolean; counters?: Record<string, number>; countersIfCreature?: Record<string, number>; countersIfPlaneswalker?: Record<string, number>; escaped?: boolean; fromStack?: boolean; /** Its "enters under the control of an opponent of your choice" was applied. */ controlChosen?: boolean };
 
 /**
  * The rest of entering the battlefield (CR 614.1c, 614.12): tapped or not, counters, "as it enters" choices,
@@ -1129,6 +1133,39 @@ export function copyCandidates(s: GameState, o: GameObject, filter: TargetSpec):
   return s.battlefield.filter((id) => id !== o.id && objectMatches(s, bound, obj(s, id), controllerOf(s, o), false));
 }
 
+/** What Deadpool can exchange its text box with as it enters: another creature on the battlefield (not one entering with it). */
+export function textExchangeCandidates(s: GameState, o: GameObject): ObjectId[] {
+  return s.battlefield.filter((id) => id !== o.id && objIsType(s, obj(s, id), "Creature"));
+}
+
+/**
+ * Exchange the text boxes of two permanents (CR 612.5, 701.12h): the rules text of each becomes the other's previous rules
+ * text, a text-changing effect (layer 3, CR 613.1c) that lasts as long as each is on the battlefield.
+ */
+export function exchangeText(s: GameState, a: GameObject, b: GameObject) {
+  const [da, db] = [defOf(s, a), defOf(s, b)];
+  s.cards[da.oracleId] ??= da;
+  s.cards[db.oracleId] ??= db;
+  a.textFrom = db.oracleId;
+  b.textFrom = da.oracleId;
+  // Their new definitions, registered now (cardIdOf names them for triggers and the like).
+  defOf(s, a);
+  defOf(s, b);
+  invalidateCharacteristics(s);
+}
+
+/** "As ~ enters, you may exchange ~'s text box and another creature's" (Deadpool): with `choice`, or not ("none"). */
+function enterExchangingText(s: GameState, o: GameObject, choice: ObjectId | "none", opts: EnterOpts) {
+  if (choice !== "none") {
+    const other = obj(s, choice);
+    if (other.zone !== "battlefield" || !objIsType(s, other, "Creature") || other.id === o.id) throw new RulesError("choose another creature on the battlefield");
+    const [mine, theirs] = [defOf(s, o).name, defOf(s, other).name];
+    exchangeText(s, o, other);
+    log(s, `${mine} exchanges its text box with ${theirs}'s.`);
+  }
+  finishEnteringAs(s, o, opts);
+}
+
 /** It enters as a copy of `target`, or of nothing ("none"), then finishes entering as what it now is (CR 707.5). */
 function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opts: EnterOpts) {
   const own = compileCard(defOf(s, o)).entersAsCopy;
@@ -1149,7 +1186,17 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
       opts = { ...opts, counters };
     }
   }
+  finishEnteringAs(s, o, opts);
+}
+
+/** Finish entering as what it now is, after "as it enters" copy or text choices (CR 614.12). */
+function finishEnteringAs(s: GameState, o: GameObject, opts: EnterOpts) {
   const printed = compileCard(defOf(s, o));
+  // A Clone entering as a copy of Xantcha enters under an opponent's control too (CR 614.12, 707.5).
+  if (printed.entersUnderOpponent && !opts.controlChosen && opponents(s, o.controller).length) {
+    (s.entersChoices ??= []).unshift({ id: o.id, zc: o.zoneChanges ?? 0, what: "controlOpponent", enterOpts: opts });
+    return;
+  }
   // A Clone entering as a copy of Primeval Spawn has its "If ~ would enter and it wasn't cast or no mana was spent to cast
   // it, exile it instead" as it would exist on the battlefield (CR 614.12, 707.5), judged by the Clone's own casting. It
   // never was on the battlefield, so nothing sees it leave.
@@ -1527,7 +1574,21 @@ export function loseLife(s: GameState, pid: PlayerId, n: number) {
   if (first) s.lostLifeThisTurn.push(pid);
   const lost = ((s.turnLog ??= {}).lifeLost ??= {});
   lost[pid] = (lost[pid] ?? 0) + n;
-  fireEvent(s, { type: "lifeLost", player: pid, amount: n, first });
+  const batch = lifeBatch ?? (s.lifeLossEvents = (s.lifeLossEvents ?? 0) + 1);
+  fireEvent(s, { type: "lifeLost", player: pid, amount: n, first, batch });
+}
+
+let lifeBatch: number | undefined;
+
+/** Life that several players lose at the same time inside `fn` (damage dealt at once, "each opponent loses 2 life") is one event. */
+export function simultaneousLifeLoss<T>(s: GameState, fn: () => T): T {
+  if (lifeBatch !== undefined) return fn();
+  lifeBatch = s.lifeLossEvents = (s.lifeLossEvents ?? 0) + 1;
+  try {
+    return fn();
+  } finally {
+    lifeBatch = undefined;
+  }
 }
 
 /**
@@ -2418,6 +2479,8 @@ function startNextTurn(s: GameState, skipping = false) {
   // "Until your next turn, whenever ...": those end as that turn begins (CR 603.7b, 611.2b, 800.4m).
   s.floatingTriggers = s.floatingTriggers?.filter((f) => !(f.until === "yourNextTurn" && began.has(f.controller)));
   if (!s.floatingTriggers?.length) s.floatingTriggers = undefined;
+  // "Noncreature spells your opponents cast cost {2} more to cast until your next turn" (Elspeth Conquers Death).
+  s.costModsThisTurn = s.costModsThisTurn?.filter((c) => c.untilYourNextTurn && !began.has(c.player));
   if (s.entersTappedUntil) s.entersTappedUntil = s.entersTappedUntil.filter((r) => !began.has(r.controller));
   for (const p of s.players)
     if (began.has(p.id)) {
@@ -2484,7 +2547,7 @@ function startNextTurn(s: GameState, skipping = false) {
   s.castThisTurn = undefined;
   s.cantBlockThisTurn = undefined;
   s.cantAttackThisTurn = undefined;
-  s.costModsThisTurn = undefined;
+  if (!s.costModsThisTurn?.length) s.costModsThisTurn = undefined;
   s.keepManaThisTurn = undefined;
   s.nextCast = undefined;
   s.castItems = undefined;
@@ -3820,7 +3883,8 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   const strive = compileCard(d).strive?.repeat(Math.max(0, (how.targets ?? []).filter((t) => t.kind !== "none").length - 1)) ?? "";
   // Escalate's for each mode beyond the first (CR 702.120a), paid even when it's cast without paying its mana cost (rulings).
   const escalate = spell?.modal?.escalate?.mana?.repeat(Math.max(0, (how.modes?.length ?? 0) - 1)) ?? "";
-  const kickCost = kicks.map((i) => kicker?.costs[i] ?? "").join("") + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "") + entwine + strive + escalate + spliceMana(s, how.splice);
+  // "As an additional cost to cast this spell, waterbend {5}": always paid, with or without kicks (CR 601.2b).
+  const kickCost = (kicker?.required ? kicker.costs[0]! : kicks.map((i) => kicker?.costs[i] ?? "").join("")) + (how.buyback ? (compileCard(d).buyback ?? "") : "") + costOrMana(d, how.costOr) + (spree ? (how.modes ?? []).map((i) => spree[i] ?? "").join("") : "") + entwine + strive + escalate + spliceMana(s, how.splice);
   // Cost increases and reductions from permanents (CR 601.2f), worked out for what's cast: a bestowed creature card is
   // an Aura spell (CR 702.103b, Hero of Iroas rulings).
   const mods = costModsFor(s, pid, o, how.alt === "bestow" && !o.bestowed && !how.faceDown ? bestowedDef(d) : d, x, how.lifeFor);
@@ -3960,8 +4024,9 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
     }
   }
   // "Spells you cast this turn cost {2} less to cast" (Urza, Planeswalker): from resolved spells and abilities (CR 611.2a).
+  // "Spells your opponents cast" (Elspeth Conquers Death): the opponents of who it's from.
   for (const { player: who, mod: m } of s.costModsThisTurn ?? []) {
-    if (who !== pid) continue;
+    if (m.who === "opponents" ? who === pid || !opponents(s, who).includes(pid) : who !== pid) continue;
     const { manaValue: range, ...rest } = m.filter;
     if (!printedMatches(rest, d)) continue;
     if (range && !((range.min === undefined || mv >= range.min) && (range.max === undefined || mv <= range.max))) continue;
@@ -4028,6 +4093,17 @@ function costToPay(s: GameState, pid: PlayerId, o: GameObject, convoke?: ObjectI
     if (!reduced) return `that's more artifacts than ${d.name}'s cost has generic mana for`;
     ({ cost, extra } = reduced);
   }
+  if (how.waterbend?.length) {
+    // Waterbend as an additional cost (CR 701.67a): up to the waterbend cost's own generic mana, if it's being paid.
+    const k = compileCard(d).kicker;
+    const cap = k?.waterbend !== undefined && (k.required || kicks?.includes(0)) ? k.waterbend : 0;
+    if (!cap) return `${d.name} has no waterbend cost being paid`;
+    const problem = castWaterbendProblem(s, pid, how.waterbend, cap, [...(convoke ?? []), ...(improvise ?? []), ...(how.tap ?? []), ...(how.teamwork ?? []), ...(how.conspire ?? []), ...(how.harmonize !== undefined ? [how.harmonize] : []), ...(how.sacrifice ?? [])]);
+    if (problem) return problem;
+    const reduced = payGenericWith(cost, extra, how.waterbend.length);
+    if (!reduced) return `that's more artifacts and creatures than ${d.name}'s cost has generic mana for`;
+    ({ cost, extra } = reduced);
+  }
   if (how.assisted) {
     // The assisting player pays for generic mana only (CR 702.132a).
     const reduced = payGenericWith(cost, extra, how.assisted);
@@ -4044,6 +4120,18 @@ function costToPay(s: GameState, pid: PlayerId, o: GameObject, convoke?: ObjectI
     ({ cost, extra } = reduced);
   }
   return { cost, extra };
+}
+
+/** Artifacts and creatures tapped to waterbend as a spell is cast: untapped ones you control, each once, no more than `cap` (CR 701.67a). */
+function castWaterbendProblem(s: GameState, pid: PlayerId, ids: ObjectId[], cap: number, used: ObjectId[]): string | null {
+  if (ids.length > cap) return `waterbend {${cap}} can be paid by tapping no more than ${cap} artifact${cap === 1 ? "" : "s"} or creature${cap === 1 ? "" : "s"}`;
+  if (new Set(ids).size !== ids.length) return "each artifact or creature can only be tapped once to waterbend";
+  for (const id of ids) {
+    const c = s.objects[id];
+    if (!c || c.zone !== "battlefield" || controllerOf(s, c) !== pid || !(objIsType(s, c, "Artifact") || objIsType(s, c, "Creature"))) return "only artifacts and creatures you control can be tapped to waterbend";
+    if (c.tapped || used.includes(id)) return `${nameOf(s, id)} is already tapped`;
+  }
+  return null;
 }
 
 /** Cards exiled for delve: other cards in your graveyard, each once, not also exiled for another cost. */
@@ -4315,7 +4403,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     spendFromPool(s, helper.id, parseManaCost(`{${choices.assisted}}`), { spell: d });
     log(s, `${helper.name} pays {${choices.assisted}} of ${d.name}'s cost (assist).`);
   }
-  for (const c of [...(convoke ?? []), ...(improvise ?? [])]) tapPermanent(s, obj(s, c));
+  for (const c of [...(convoke ?? []), ...(improvise ?? []), ...(choices.waterbend ?? [])]) tapPermanent(s, obj(s, c));
+  if (choices.waterbend?.length) log(s, `${p.name} taps ${choices.waterbend.map((c) => nameOf(s, c)).join(", ")} to waterbend.`);
   const kicks = choices.kicks?.length ? [...choices.kicks].sort() : undefined;
   o.kicked = kicks;
   o.colorsSpent = colorsSpent.length ? colorsSpent : undefined;
@@ -4758,6 +4847,8 @@ function describeKicks(d: CardDef, kicks: number[]): string {
 function kickProblem(d: CardDef, kicks?: number[]): string | null {
   if (!kicks?.length) return null;
   const k = compileCard(d).kicker;
+  // "As an additional cost to cast this spell, waterbend {5}": always paid, so nothing to choose.
+  if (k?.required) return `${d.name}'s ${kickerName(k)} cost is always paid`;
   if (!k) return `${d.name} has no kicker`;
   if (kicks.some((i) => !Number.isInteger(i) || i < 0 || i >= k.costs.length)) return `${d.name} has no such kicker cost`;
   if (!k.multi && new Set(kicks).size !== kicks.length) return "each kicker cost can be paid only once";
@@ -6222,6 +6313,20 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       enterAsCopy(s, o, choice, entry?.enterOpts ?? {});
       return;
     }
+    if (pend.what === "exchangeText") {
+      if (!pend.options.includes(choice)) throw new RulesError("choose a creature offered, or none");
+      enterExchangingText(s, o, choice, entry?.enterOpts ?? {});
+      return;
+    }
+    if (pend.what === "controlOpponent") {
+      if (!pend.options.includes(choice)) throw new RulesError("choose an opponent offered");
+      // It enters under that player's control (CR 614.1c, 110.2).
+      o.controller = Number(choice);
+      invalidateCharacteristics(s);
+      log(s, `${defOf(s, o).name} enters under ${player(s, o.controller).name}'s control.`);
+      finishEnteringAs(s, o, { ...(entry?.enterOpts ?? {}), controlChosen: true });
+      return;
+    }
     if (pend.what === "discardInstead") {
       if (!pend.options.includes(choice)) throw new RulesError("choose a card offered, or none");
       if (choice !== "none" && obj(s, choice).zone === "hand") {
@@ -6313,7 +6418,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "discardInstead" || pend.what === "copy" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "discardInstead" || pend.what === "copy" || pend.what === "exchangeText" || pend.what === "controlOpponent" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector") throw new RulesError("nothing to choose");
   if (pend.what === "searchZones") {
     if (!pend.options.includes(choice)) throw new RulesError("choose both or the graveyard only");
     (r.scratch ??= {}).searchZones = choice;
@@ -6594,6 +6699,19 @@ function askEntersChoice(s: GameState): boolean {
       s.pending = { kind: "pickPermanents", player: controllerOf(s, o), source: defOf(s, o).name, action: "reveal", what: "card that shares a creature type with it", options, count: options.length, min: 0, objectId: o.id };
       return true;
     }
+    if (c.what === "controlOpponent") {
+      // "~ enters under the control of an opponent of your choice": the player it would have entered under chooses.
+      const you = o.controller;
+      const opps = opponents(s, you);
+      s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "controlOpponent", options: opps.map(String), labels: opps.map((x) => player(s, x).name), objectId: o.id, prompt: "choose an opponent to control it" };
+      return true;
+    }
+    if (c.what === "exchangeText") {
+      const ids = textExchangeCandidates(s, o).filter((id) => !c.together?.includes(id));
+      const labels = ids.map((id) => `${defOf(s, obj(s, id)).name} (${player(s, controllerOf(s, obj(s, id))).name})`);
+      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "exchangeText", options: [...ids, "none"], labels: [...labels, "Don't exchange"], objectId: o.id, prompt: "you may exchange its text box with another creature's" };
+      return true;
+    }
     if (c.what === "copy") {
       // "You may have ~ enter as a copy of ...": any of them, or none (CR 707.5).
       // Not one that entered at the same time (CR 614.12, rulings on Clone).
@@ -6770,18 +6888,36 @@ function chooseEvidence(s: GameState, p: Player, ids: ObjectId[]) {
 }
 
 /** "Counter it unless its controller pays": pay from the mana pool, or don't (CR 702.21a, 118.12). */
-function payUnless(s: GameState, p: Player, pay: boolean) {
+function payUnless(s: GameState, p: Player, pay: boolean, tap?: ObjectId[]) {
   const pend = s.pending;
   const r = s.resolving;
   if (pend?.kind !== "payUnless" || pend.player !== p.id || !r) throw new RulesError("nothing to pay for");
+  // Waterbend (CR 701.67a): each untapped artifact or creature they control pays {1} of its generic mana, no more than
+  // the waterbend cost's own, each one once.
+  let due = { cost: parseManaCost(pend.cost), extra: 0 };
+  if (pay && tap?.length) {
+    const cap = pend.waterbend ?? 0;
+    if (tap.length > cap) throw new RulesError(cap ? `no more than ${cap} artifact${cap === 1 ? "" : "s"} or creature${cap === 1 ? "" : "s"} can be tapped to waterbend` : "this cost can't be paid by tapping");
+    if (new Set(tap).size !== tap.length) throw new RulesError("each artifact or creature can only be tapped once to waterbend");
+    for (const id of tap) {
+      const c = s.objects[id];
+      if (!c || c.zone !== "battlefield" || controllerOf(s, c) !== p.id || !(objIsType(s, c, "Artifact") || objIsType(s, c, "Creature"))) throw new RulesError("only artifacts and creatures you control can be tapped to waterbend");
+      if (c.tapped) throw new RulesError(`${nameOf(s, id)} is already tapped`);
+    }
+    due = payGenericWith(due.cost, 0, tap.length) ?? due;
+  }
   if (pay) {
     const life = pend.life ?? 0;
     // You can pay life only if your life total is at least that much (CR 119.4).
     if (life && payableLife(s, p.id) < life) throw new RulesError(`you can't pay ${life} life`); // CR 119.8
     const sacrificeOptions = pend.sacrifice ? pickOptions(s, pend.sacrifice, p.id) : [];
     if (pend.sacrifice && sacrificeOptions.length < pend.sacrifice.n) throw new RulesError(`you don't control enough of ${pend.sacrifice.filter.text} to sacrifice`); // CR 118.3
-    const paid = spendFromPool(s, p.id, parseManaCost(pend.cost), "other", 0, payableLife(s, p.id) - life);
+    const paid = spendFromPool(s, p.id, due.cost, "other", due.extra, payableLife(s, p.id) - life);
     if (!paid) throw new RulesError(`not enough mana in your pool to pay ${pend.cost}`);
+    if (tap?.length) {
+      for (const id of tap) tapPermanent(s, obj(s, id));
+      log(s, `${p.name} taps ${tap.map((id) => nameOf(s, id)).join(", ")} to waterbend.`);
+    }
     loseLife(s, p.id, paid.lifePaid + life);
     log(s, `${p.name} pays ${pend.cost}${life ? ` and ${life} life` : ""} for ${pend.source}.`);
     if (pend.sacrifice) {
@@ -6915,6 +7051,8 @@ export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, p
   if (c.cantAttackPlayers.includes(defender) && !atBattle) return `${c.name} can't attack ${player(s, defender).name}${planeswalker ? "'s planeswalkers" : ""}`;
   // Alexios: its owner, but not their planeswalkers or the battles they protect (rulings).
   if (c.cantAttackOwner && !planeswalker && attacked === undefined && defender === o.owner) return `${c.name} can't attack its owner`;
+  // Xantcha: nor its owner's planeswalkers (a battle its owner protects isn't one).
+  if (c.cantAttackOwnerWalkers && planeswalker && !atBattle && defender === o.owner) return `${c.name} can't attack planeswalkers its owner controls`;
   if (c.cantAttackSamePlayer && !planeswalker && o.attacked?.turn === s.turn && o.attacked.players?.includes(defender)) return `${c.name} can't attack a player it has already attacked this turn`;
   for (const f of c.attackUnless)
     if (!s.battlefield.some((id) => controllerOf(s, obj(s, id)) === defender && objectMatches(s, f, obj(s, id), c.controller, false)))

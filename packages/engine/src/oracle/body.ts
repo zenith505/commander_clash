@@ -639,7 +639,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   text = text.replace(/(^|\. )([Ee]ach opponent loses X life) and you (scry X|draw X cards), where X is ([^.]+)\./, (_, lead: string, a: string, b: string, x: string) => `${lead}${a}, where X is ${x}. ${b.charAt(0).toUpperCase()}${b.slice(1)}, where X is ${x}.`);
   // Brass's Tunnel-Grinder: "Then if there are three or more bore counters on it, remove those counters and transform it."
   // Primal Amulet: "..., you may remove those counters and transform it."
-  text = text.replace(/^([Pp]ut an? ([a-z]+) counter on ~\.) Then if (?:it has|there are) ([a-z]+) or more \2 counters on it, (you may )?remove (?:all of them|those counters) and /, (_, put: string, kind: string, n: string, may?: string) => `${put} If there are ${n} or more ${kind} counters on ~, ${may ?? ""}remove all ${kind} counters from ~ and `);
+  text = text.replace(/(^|\. )([Pp]ut an? ([a-z]+) counter on ~\.) Then if (?:it has|there are) ([a-z]+) or more \3 counters on it, (you may )?remove (?:all of them|those counters)( and |(?=, transform ~, and ))/, (_, lead: string, put: string, kind: string, n: string, may: string | undefined, and: string) => `${lead}${put} If there are ${n} or more ${kind} counters on ~, ${may ?? ""}remove all ${kind} counters from ~${and}`);
   // Firebender Ascension: "Put a quest counter on ~. Then if it has four or more quest counters on it, you may copy that
   // ability": the same check of ~'s counters as it resolves.
   text = text.replace(/^([Pp]ut an? ([a-z]+) counter on ~\.) Then if it has ([a-z]+) or more \2 counters on it, (you may copy that ability\.)/, "$1 If there are $3 or more $2 counters on ~, $4");
@@ -902,6 +902,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   text = text.replace(/^(~ deals [^.]+? damage to [^.]+?) and you gain life equal to the damage dealt this way\./, "$1. You gain life equal to the damage dealt this way.");
   // "They lose 1 life and you put a -1/-1 counter on up to one target creature they control" (Persistent Constrictor): the
   // life, then the counter (the target chosen as the ability is put on the stack, CR 603.3d).
+  // Ziatora: "~ deals damage equal to that creature's power to any target and you create three Treasure tokens": two
+  // instructions in order (the amount's words would otherwise swallow the second).
+  text = text.replace(/^(~ deals damage equal to [^.]+? to any target) and you (create|gain|draw) /, (_, a: string, v: string) => `${a}. You ${v} `);
   text = text.replace(/^(they|that player) (loses?) (\d+) life and you (put an? [^.]+? counter on up to one target creature) (they|that player) controls?\./, (_, w: string, v: string, n: string, rest: string) => `${w === "they" ? "They" : "That player"} ${v} ${n} life. ${capital(rest)} that player controls.`);
   // Reckless Handling: "..., put it into your hand, shuffle, then discard a card at random." The discard comes after the
   // shuffle, found or not (rulings).
@@ -1243,6 +1246,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // creatures tapped for it, at most one for each mana its cost could have (here up to ten).
     if (s === "Each creature that convoked ~ connives" && ctx.spell) {
       for (let i = 0; i < 10; i++) effects.push({ type: "connive", what: { ref: "convoker", index: i }, n: 1 });
+      continue;
+    }
+    // Abdel Adrian: "exile any number of other nonland permanents you control until ~ leaves the battlefield" (CR 610.3),
+    // Glorious Protector: "you may exile any number of non-Angel creatures you control ...": chosen as it resolves, none
+    // too, then exiled together.
+    const anyExile = !ctx.spell ? /^(?:[Yy]ou may )?[Ee]xile any number of (other )?(.+?) you control until ~ leaves the battlefield$/.exec(s) : null;
+    if (anyExile) {
+      const filter = pickFilter(anyExile[2]!);
+      if (!filter) return null;
+      effects.push({ type: "pick", who: { ref: "you" }, filter: anyExile[1] ? { ...filter, notSource: true, text: `other ${filter.text}` } : filter, n: 1, action: "choose", anyNumber: true }, { type: "exile", what: { ref: "created" }, until: "sourceLeaves" });
       continue;
     }
     // "Sacrifice any number of lands. Search your library for up to that many land cards, put them onto the battlefield
@@ -1683,6 +1696,15 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si++;
       continue;
     }
+    // Tectonic Giant: "Exile the top two cards of your library. Choose one of them. Until the end of your next turn, you may
+    // play that card." The same, the card chosen as it resolves (rulings).
+    const exChoose2 = !impulseIf && new RegExp(`^[Ee]xile the top (${NUM}) cards of your library$`).exec(s);
+    const playChosen = exChoose2 && /^Choose one of them\.?$/.test(sentences[si + 1] ?? "") ? /^(?:Until (end of turn|the end of your next turn), you may play that card|You may play that card (this turn|until the end of your next turn))\.?$/.exec(sentences[si + 2] ?? "") : null;
+    if (exChoose2 && playChosen) {
+      effects.push({ type: "impulse", n: amt(exChoose2[1]!), until: /next turn/.test(playChosen[0]) ? "nextTurn" : "thisTurn", choose: true });
+      si += 2;
+      continue;
+    }
     const exTop = exEqual ? (["", "X"] as unknown as RegExpExecArray) : new RegExp(`^[Ee]xile the top (?:card|${NUMX} cards) of your library$`).exec(impulseIf && !impulseIf.not ? impulseIf.text : s);
     // "Exile the top card of that player's library. Until end of turn, you may cast that card." (Ragavan, after combat
     // damage to a player): that player's card, cast only (no land play, rulings), paying its costs.
@@ -2035,6 +2057,20 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const t = ctx.targets[before];
       if (what?.ref !== "target" || ctx.targets.length !== before + 1 || t?.kind !== "card" || !t.types?.length || !t.notTypes?.includes("Land")) return null;
       effects.push({ type: "castNow", what, anyOwner: true, anyType: true });
+      continue;
+    }
+    // "You may cast target instant or sorcery card from your graveyard. If that spell would be put into your graveyard, exile
+    // it instead." (Emet-Selch, Toshiro Umezawa, Chandra, Flame's Catalyst): cast as it resolves or not at all, paying its
+    // costs, timing ignored (CR 608.2g, 601.2).
+    const castPaid = /^[Yy]ou may cast (target .+? card from your graveyard)$/.exec(s);
+    const paidRider = sentences[si + 1]?.replace(/\.$/, "");
+    if (castPaid && (paidRider === "If that spell would be put into your graveyard, exile it instead" || paidRider === "If that spell would be put into a graveyard, exile it instead")) {
+      const before = ctx.targets.length;
+      const what = parseCardTarget(castPaid[1]!, ctx, "you");
+      const t = ctx.targets[before];
+      if (!what || ctx.targets.length !== before + 1 || t?.kind !== "card" || !t.types?.length || t.types.includes("Land")) return null;
+      effects.push({ type: "castNow", what, exileAfter: true });
+      si++;
       continue;
     }
     // "You may cast target instant card from your graveyard without paying its mana cost. If that spell would be put into
@@ -2421,6 +2457,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // Tezzeret, Cruel Captain: "Untap target artifact or creature. If it's an artifact creature, put a +1/+1 counter on
     // it." "Put three +1/+1 counters on target artifact you control. If it's not a creature, it becomes a 0/0 Robot
     // artifact creature." The target still on the battlefield, checked as it resolves (CR 608.2c).
+    // Splash Portal: "Exile target creature you control, then return it .... If that creature is a Bird, Frog, Otter, or Rat,
+    // draw a card": the permanent it returned as, as it is now (rulings); a token doesn't come back.
+    const ifBack = /^If (?:that creature|it) is an? ([A-Z][a-z]+(?:, [A-Z][a-z]+)*,? or [A-Z][a-z]+|[A-Z][a-z]+), (.+)$/.exec(s);
+    const lastFx = effects[effects.length - 1];
+    if (ifBack && lastFx?.type === "flicker" && !lastFx.at && !lastFx.hold) {
+      const typed = parseTargetPhrase(ifBack[1]!);
+      if (typed?.kind !== "object" || !typed.subtypes?.length || Object.entries(typed).some(([k, v]) => v !== undefined && !["kind", "types", "notTypes", "notColors", "subtypes", "text"].includes(k)) || typed.types?.length) return null;
+      const fx = parseOne(capital(ifBack[2]!), ctx);
+      if (!fx) return null;
+      effects.push({ type: "if", cond: { kind: "flickeredIs", filter: { ...typed, text: ifBack[1]! } }, effects: fx });
+      continue;
+    }
     const ifIts = /^If it's (not )?an? ([a-z]+(?: [a-z]+)?), (.+)$/.exec(s);
     if (ifIts) {
       const i = ctx.targets.length - 1;
@@ -4015,7 +4063,20 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       // Amulet): optional, decided as it resolves (CR 608.2d).
       // Other "you may" sentences that read on their own come first ("you may cast the discarded card ...", Malcolm).
       const mayThen = /^you may (.+)$/.exec(then);
-      const own = attempt(ctx, () => parseOne(capital(then), ctx));
+      // "..., remove those counters, transform ~, and create three Treasure tokens" (Treasure Map): a list of instructions,
+      // in order, each read on its own.
+      const list = (): Effect[] | null => {
+        const parts = then.split(/, (?:and )?/);
+        if (parts.length < 3 || !/, and /.test(then)) return null;
+        const out: Effect[] = [];
+        for (const p of parts) {
+          const one = parseOne(capital(p), ctx);
+          if (!one) return null;
+          out.push(...one);
+        }
+        return out;
+      };
+      const own = attempt(ctx, () => parseOne(capital(then), ctx)) ?? (mayThen ? null : attempt(ctx, list));
       const mayInner = !own && mayThen ? parseOne(capital(mayThen[1]!), ctx) : null;
       const inner: Effect[] | null = own ?? (mayInner ? [{ type: "may", effects: mayInner, text: mayThen![1]! }] : null);
       // Its instructions run one at a time, so one may wait on a player ("draw a card, then discard a card", see the "if"
@@ -4513,6 +4574,8 @@ const HOW_CAST: { re: string; cond: SpellCondition; not?: true; spellOnly?: true
   { re: "the sacrificed creature was suspected", cond: { kind: "sacrificedSuspected" }, noTargets: true },
   { re: "the sacrificed creature was legendary", cond: { kind: "sacrificedLegendary" }, noTargets: true },
   { re: "~'s surge cost was paid", cond: { kind: "altPaid", alt: "surge" } },
+  // "As an additional cost to cast this spell, you may waterbend {2}" is paid like kicker (CompiledCard.kicker.waterbend).
+  { re: "~'s waterbend cost was paid", cond: { kind: "kicked" } },
   // The Masteries: "If the {1}{B} cost was paid" (compile checks it's the card's "rather than pay" cost).
   { re: "the (?:\\{[^}]+\\})+ cost was paid", cond: { kind: "altPaid", alt: "alternative" }, spellOnly: true },
   { re: "~'s madness cost was paid", cond: { kind: "altPaid", alt: "madness" }, spellOnly: true },
@@ -4716,7 +4779,24 @@ function parseKicked(text: string, previous: Effect[], ctx: Ctx, newTargets = fa
     }
     return out;
   };
-  const fx = parseOne(t, ctx) ?? (/, then (?!shuffle)/.test(t) ? attempt(ctx, thenParts) : null);
+  // "If this spell's additional cost was paid, whenever a creature dies this turn, you gain 1 life" (Ruinous Waterbending):
+  // a trigger for the rest of the turn, made only then (CR 603.7b).
+  const floating = instead ? undefined : floatingTrigger(t, [], ctx);
+  if (floating !== undefined) return floating && { effects: [floating], instead };
+  // "Instead shuffle your graveyard into your library, draw seven cards, and you have no maximum hand size for the rest of
+  // the game" (Spirit Water Revival): three instructions in a list, in order.
+  const listParts = (): Effect[] | null => {
+    const parts = t.split(/, (?:and )?/);
+    if (parts.length < 3 || !/, and /.test(t)) return null;
+    const out: Effect[] = [];
+    for (const p of parts) {
+      const one = parseOne(p.charAt(0).toUpperCase() + p.slice(1), ctx);
+      if (!one) return null;
+      out.push(...one);
+    }
+    return out;
+  };
+  const fx = parseOne(t, ctx) ?? (/, then (?!shuffle)/.test(t) ? attempt(ctx, thenParts) : null) ?? (/, and /.test(t) ? attempt(ctx, listParts) : null);
   if (!fx || (!newTargets && ctx.targets.length !== before)) return null;
   // Under an "if", either branch's instructions run one at a time, so one may wait on a player (see the "if" effect).
   const done = instead ? insteadOfAffected(fx, previous) : fx;

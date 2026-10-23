@@ -1,7 +1,7 @@
 import type { DamageRecipient, Effect, PlayerRef } from "../abilities";
 import { putPlayerCounters } from "../counters";
 import { cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
-import { addPhases, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, livingPlayers, log, loseLife, millCount, moveObject, obj, player, playerLoses, winGame } from "../game";
+import { addPhases, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, livingPlayers, log, loseLife, millCount, moveObject, obj, player, playerLoses, simultaneousLifeLoss, winGame } from "../game";
 import { MONARCH } from "../oracle";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { cardSource, dealDamage, dealDamageBatch, dealPlanned, excessOver, lethalAmounts, objectSource, planDamage, type DamageEvent, type DamageSource } from "../damage";
@@ -526,7 +526,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       log(s, `${e.filter.text[0]!.toUpperCase()}${e.filter.text.slice(1)} can't attack this turn.`);
       return;
     case "costModThisTurn":
-      (s.costModsThisTurn ??= []).push({ player: ctx.controller, mod: e.mod });
+      (s.costModsThisTurn ??= []).push({ player: ctx.controller, mod: e.mod, ...(e.untilYourNextTurn ? { untilYourNextTurn: true as const } : {}) });
       log(s, `${player(s, ctx.controller).name}: ${e.mod.text.replace(/ you cast this turn /, " they cast this turn ")}`);
       return;
     case "cantBlockRule":
@@ -621,13 +621,15 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     }
     case "loseLife": {
       let total = 0;
-      for (const pid of players(s, e.who, ctx)) {
-        const n = amountNow(s, e.n, { ...ctx, eachOne: pid });
-        if (n <= 0) continue;
-        loseLife(s, pid, n);
-        total += n;
-        log(s, `${player(s, pid).name} loses ${n} life.`);
-      }
+      simultaneousLifeLoss(s, () => {
+        for (const pid of players(s, e.who, ctx)) {
+          const n = amountNow(s, e.n, { ...ctx, eachOne: pid });
+          if (n <= 0) continue;
+          loseLife(s, pid, n);
+          total += n;
+          log(s, `${player(s, pid).name} loses ${n} life.`);
+        }
+      });
       if (e.drain && total > 0) {
         gainLife(s, ctx.controller, total);
         log(s, `${player(s, ctx.controller).name} gains ${total} life.`);

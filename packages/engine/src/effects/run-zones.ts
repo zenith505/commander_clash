@@ -1510,6 +1510,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       const cast = !!o && o.zone === "stack";
       sc.castNow = undefined;
       s.resolving!.did = cast;
+      if (cast && e.exileAfter) o.exileIfToGraveyard = true;
+      // "Do this only once each turn": done (CR 603.2h).
+      const source = cast && e.once && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+      if (source) (source.triggeredThisTurn ??= []).push(`${ctx.sourceZc ?? source.zoneChanges ?? 0}|do:castNow`);
       if (cast && e.thenNoMore) {
         (s.cantCastThisTurn ??= []).push({ player: ctx.controller, turn: s.turn, source: src });
         log(s, `${player(s, ctx.controller).name} can't cast additional spells this turn.`);
@@ -2052,6 +2056,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       const back = sc.flickered.map((l) => s.objects[l.id]).filter((c, i): c is GameObject => c?.zone === "exile" && (c.zoneChanges ?? 0) === sc.flickered![i]!.zc);
       if (returnFromExile(s, back, (c) => (e.under === "owner" ? c.owner : ctx.controller), src, e.counter, e.tapped, e.transformed) === "paused") return "paused";
+      s.resolving!.flickeredBack = back.filter((c) => c.zone === "battlefield").map((c) => c.id);
       if (e.counterIf) {
         for (const c of back) {
           if (c.zone !== "battlefield" || !objectMatches(s, e.counterIf.filter, c, ctx.controller, false)) continue;
@@ -2321,7 +2326,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           sc.impulseChoice = { ids };
           if (ids.length) log(s, `${p.name} exiles ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} from the top of their library.`);
           if (ids.length > 1) {
-            s.pending = { kind: "chooseOption", player: p.id, source: src, what: "impulseChoice", options: ids, labels: ids.map((id) => defOf(s, obj(s, id)).name), prompt: `choose one of them; you may play it${e.until === "thisTurn" ? " this turn" : ""}` };
+            s.pending = { kind: "chooseOption", player: p.id, source: src, what: "impulseChoice", options: ids, labels: ids.map((id) => defOf(s, obj(s, id)).name), prompt: `choose one of them; you may play it${e.until === "thisTurn" ? " this turn" : e.until === "nextTurn" ? " until the end of your next turn" : ""}` };
             return "paused";
           }
         }

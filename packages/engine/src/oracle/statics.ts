@@ -760,7 +760,8 @@ export function parseAffected(subject: string): Affects | null {
       // "Legendary creatures you control get +2/+2" (supertype, CR 205.4d), "nonlegendary creatures".
       else if (/^(non)?legendary$/i.test(w) && legendary === undefined) legendary = w.toLowerCase() === "legendary";
       // "Enchanted creatures you control get +1/+1", "Equipped creatures", "Modified creatures" (CR 700.9).
-      else if (/^(enchanted|equipped|modified)$/i.test(w) && !status) status = w.toLowerCase() as TargetSpec["status"];
+      // "Goaded creatures your opponents control can't block" (Bothersome Quasit, CR 701.15).
+      else if (/^(enchanted|equipped|modified|goaded)$/i.test(w) && !status) status = w.toLowerCase() as TargetSpec["status"];
       // "Nontoken creatures you control have riot" (Rhythm of the Wild).
       else if (/^nontoken$/i.test(w) && !nontoken) nontoken = true;
       else return null;
@@ -972,6 +973,12 @@ export function parseStaticMods(rest: string): Modification[] | null {
   // source's controller.
   if (/^can't attack you or planeswalkers you control$/.test(rest)) return [{ kind: "cantAttackYou" }];
   if (/^can't attack its owner$/.test(rest)) return [{ kind: "cantAttackOwner" }];
+  if (/^can't attack its owner or planeswalkers its owner controls$/.test(rest)) return [{ kind: "cantAttackOwner", planeswalkers: true }];
+  // Xantcha: "attacks each combat if able and can't attack its owner or planeswalkers its owner controls".
+  if ((m = /^(attacks each combat if able) and (can't .+)$/.exec(rest))) {
+    const parts = [m[1]!, m[2]!].map((p) => parseStaticMods(p));
+    return parts.every((p) => p) ? parts.flatMap((p) => p!) : null;
+  }
   if (/^can't be sacrificed$/.test(rest)) return [{ kind: "cantBeSacrificed" }];
   // Alexios: "attacks each combat if able, can't be sacrificed, and can't attack its owner".
   if ((m = /^((?:attacks each combat if able|can't [^,]+)), ((?:attacks each combat if able|can't [^,]+)),? and (attacks each combat if able|can't [^,]+)$/.exec(rest))) {
@@ -1338,7 +1345,7 @@ function parseStaticLine(line: string): StaticAbility | null {
   // greater is checked as it assigns combat damage, which comes to the same thing as a group that changes with it.
   const greater = /^(.+?) with toughness greater than (?:its|their) power (assigns? .+)$/.exec(text);
   if (greater) text = `${greater[1]} ${greater[2]}`;
-  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|are [A-Z][a-z]+ artifacts in addition to their other types.*|(?:is|are) all colors|can't .+|can block .+|can attack as though .+|can attack players who attacked you during their last turn as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:, .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses? all abilities(?: and (?:has|have) base power and toughness \d+\/\d+)?|loses? [a-z ,]+? and can't have or gain [a-z ,]+)$/.exec(text);
+  const m = /^(.+?) (gets? .+|(?:has|have) .+|is an? [A-Z][a-z]+ in addition to its other types.*|are [A-Z][a-z]+ artifacts in addition to their other types.*|(?:is|are) all colors|can't .+|can block .+|can attack as though .+|can attack players who attacked you during their last turn as though .+|assigns? combat damage .+|must be blocked if able|attacks? each combat if able(?:,? .+)?|blocks? each combat if able|attacks or blocks each combat if able|doesn't untap .+|don't untap .+|loses? all abilities(?: and (?:has|have) base power and toughness \d+\/\d+)?|loses? [a-z ,]+? and can't have or gain [a-z ,]+)$/.exec(text);
   if (!m) return null;
   const affects = parseAffected(m[1]!);
   if (!affects) return null;

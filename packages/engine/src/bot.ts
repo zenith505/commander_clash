@@ -2,7 +2,7 @@ import { playerProtectedFrom } from "./effects/targeting";
 import { allEffects, refCovers, timedCondition, type AbilityBody, type ActivatedAbility, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
-import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
+import { autoCrew, autoWaterbend, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, canBeSacrificed, defOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility, manaChoices } from "./manaabilities";
 import { bindChosen, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
@@ -225,6 +225,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const generic = [...pend.cost.matchAll(/\{(\d+)\}|\{[^}]+\}/g)].reduce((n, x) => n + (x[1] ? Number(x[1]) : 1), 0);
       if (pu && pu.lose === undefined && generic >= 2 && !planMana(s, pid, parseManaCost(`{${generic + 3}}`))) return [{ type: "payUnless", player: pid, pay: false }];
       const taps = planMana(s, pid, parseManaCost(pend.cost));
+      // Ward—Waterbend: mana first, then artifacts and creatures for the rest (CR 701.67a).
+      const wb = !taps && pend.waterbend ? autoWaterbend(s, pid, parseManaCost(pend.cost), 0, pend.waterbend, []) : null;
+      if (wb) return [...wb.taps, { type: "payUnless", player: pid, pay: true, tap: wb.tapped }];
       return taps ? [...taps, { type: "payUnless", player: pid, pay: true }] : [{ type: "payUnless", player: pid, pay: false }];
     }
     if (pend.kind === "discard") return [{ type: "discard", player: pid, objectIds: chooseDiscards(s, pid, pend.count, undefined, pend.filter, pend.upTo) }];
@@ -419,6 +422,18 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "chooseOption", player: pid, choice: pick }];
     }
     if (pend.kind === "chooseOption" && pend.what === "tributePay") return [{ type: "chooseOption", player: pid, choice: payTribute(s, pend.objectId!) ? "pay" : "no" }];
+    // Xantcha, Captive Audience: the opponent with the least life, who loses the most from controlling it.
+    if (pend.kind === "chooseOption" && pend.what === "controlOpponent") {
+      const pick = [...pend.options].sort((a, b) => player(s, Number(a)).life - player(s, Number(b)).life)[0]!;
+      return [{ type: "chooseOption", player: pid, choice: pick }];
+    }
+    if (pend.kind === "chooseOption" && pend.what === "exchangeText") {
+      // Deadpool: its own text is a drawback ("you lose 3 life" each upkeep), so trade it to an opponent for the text of
+      // their best creature; never onto one of our own.
+      const theirs = pend.options.filter((x) => x !== "none" && s.objects[x] && controllerOf(s, obj(s, x)) !== pid && defOf(s, obj(s, x)).oracleText.trim() !== "");
+      const best = theirs.sort((a, b) => worth(s, pid, obj(s, b)) + mv(s, b) - (worth(s, pid, obj(s, a)) + mv(s, a)))[0];
+      return [{ type: "chooseOption", player: pid, choice: best ?? "none" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "copy") {
       // Clone the best permanent, but not a legendary one we already control (the legend rule, CR 704.5j).
       const ids = pend.options.filter((x) => x !== "none" && s.objects[x]);
@@ -515,6 +530,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const good = kinds.filter((k) => harmfulCounter(k) === mine).sort((a, b) => Number(b === "loyalty") - Number(a === "loyalty") || Number(b === "+1/+1") - Number(a === "+1/+1"));
       return [{ type: "chooseOption", player: pid, choice: good[0] ?? (pend.options.includes("done") ? "done" : kinds[0]!) }];
     }
+    // Elspeth Conquers Death: a loyalty counter on a planeswalker that isn't a creature.
+    if (pend.kind === "chooseOption" && pend.what === "counterKind" && pend.about && pend.options.includes("loyalty") && s.objects[pend.about] && objIsType(s, obj(s, pend.about), "Planeswalker") && !objIsType(s, obj(s, pend.about), "Creature"))
+      return [{ type: "chooseOption", player: pid, choice: "loyalty" }];
     if (pend.kind === "chooseOption" && pend.what === "counterKind") return [{ type: "chooseOption", player: pid, choice: pend.options.includes("+1/+1") ? "+1/+1" : pend.options[0]! }];
     // Two piles: the better one for our own hand, the worse one for an opponent's.
     if (pend.kind === "chooseOption" && pend.what === "pile" && pend.piles) {
@@ -2076,6 +2094,8 @@ function wantsEvidence(c: CompiledCard): boolean {
 function kickOptions(s: GameState, pid: PlayerId, id: string, free: boolean, x?: number): number[][] {
   const k = compileCard(defOf(s, obj(s, id))).kicker;
   if (!k) return [[]];
+  // "As an additional cost to cast this spell, waterbend {5}": always paid, nothing to choose.
+  if (k.required) return [[]];
   // "Kicker {X}": kicked only with an X chosen for it, else not.
   if (parseManaCost(k.costs[0]!).hasX && !parseManaCost(defOf(s, obj(s, id)).manaCost).hasX) return x ? [[0]] : [[]];
   if (k.multi) {
@@ -2364,6 +2384,12 @@ function chooseOptionalSacrifices(s: GameState, pid: PlayerId, pend: Extract<Pen
   if (here?.type === "pick" && here.anyNumber) {
     const next = r!.body.effects[r!.next + 1];
     if (next?.type === "search" && next.filter?.types?.includes("Land")) return pend.options.filter((id) => objIsType(s, obj(s, id), "Land") && obj(s, id).tapped);
+    // "Exile any number of ... until ~ leaves the battlefield" (Abdel Adrian, Glorious Protector): the nontoken ones that
+    // come back with an enters ability, and, when a token is made for each, cheap tokens.
+    if (next?.type === "exile" && next.until) {
+      const tokensFor = r!.body.effects.slice(r!.next + 2).some((e) => e.type === "createToken");
+      return ok.filter((o) => (o.isToken ? tokensFor && worth(s, pid, o) <= 1 : !o.isCommander && compileCard(defOf(s, o)).triggers.some((t) => t.event === "selfEnters"))).map((o) => o.id);
+    }
     return ok.filter((o) => o.isToken && worth(s, pid, o) <= 2).map((o) => o.id);
   }
   const cheapest = ok.sort((a, b) => worth(s, pid, a) - worth(s, pid, b))[0];

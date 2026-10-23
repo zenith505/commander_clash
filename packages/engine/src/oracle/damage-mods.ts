@@ -30,6 +30,8 @@ function sourceKind(t: string): { spec: TargetSpec; spell?: true } | null {
   if (rest === "noncreature source") return { spec: { kind: "object", notTypes: ["Creature"], ...extra, text: t } };
   // "Sources with the chosen name" (Gideon's Intervention): the name chosen as the permanent entered (CR 201.4).
   if (rest === "source with the chosen name" && !colors.length) return { spec: { kind: "object", chosen: "name", ...extra, text: t } };
+  // "Sources you control of the chosen type" (Collective Inferno): the creature type chosen as it entered (CR 205.3m).
+  if (rest === "source of the chosen type" && !colors.length) return { spec: { kind: "object", chosen: "type", ...extra, text: t } };
   if (rest === "source an opponent controls" && !colors.length) return { spec: { kind: "object", controller: "opponent", text: t } };
   const typed = /^(Giant|instant or sorcery|artifact|creature) source$/.exec(rest);
   if (typed) {
@@ -117,7 +119,10 @@ export function parseDamageMod(line: string): StaticAbility | null {
     // chosen name" is the same prevention, for each source (CR 615.1a).
     .replace(/^Prevent all damage that would be dealt to you and permanents you control by sources with the chosen name$/, "If a source with the chosen name would deal damage to you or a permanent you control, prevent that damage")
     // Glacial Chasm, Solitary Confinement: "Prevent all damage that would be dealt to you" is the same, from any source.
-    .replace(/^Prevent all (combat )?damage that would be dealt to you$/, "If a source would deal $1damage to you, prevent that damage");
+    .replace(/^Prevent all (combat )?damage that would be dealt to you$/, "If a source would deal $1damage to you, prevent that damage")
+    // Collective Inferno: "Double all damage that sources you control of the chosen type would deal" is the same, for each
+    // source (CR 614.1a).
+    .replace(/^Double all damage that sources you control of the chosen type would deal$/, "If a source of the chosen type you control would deal damage, it deals double that damage instead");
   // Ojer Axonil: "If a red source you control would deal an amount of noncombat damage less than ~'s power to an opponent,
   // that source deals damage equal to ~'s power instead."
   const raise = /^If (.+?) would deal an amount of (combat |noncombat )?damage less than (.+?) to (.+?), that source deals damage equal to \3 instead$/.exec(text);

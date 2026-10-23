@@ -64,6 +64,8 @@ export interface UnlessPays {
   lifeAmount?: Amount;
   /** "Ward—Sacrifice a creature" (Vein Ripper): `n` permanents of their choice they control that match `filter`. */
   sacrifice?: { n: number; filter: TargetSpec };
+  /** "Ward—Waterbend {4}" (CR 701.67a): up to this much of the cost's generic mana may be paid by tapping untapped artifacts and creatures they control, {1} each. */
+  waterbend?: number;
 }
 
 /**
@@ -382,6 +384,8 @@ export interface TargetSpec {
   combat?: "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | "couldButDidntAttack" | "attackingBattle" | "attackingYou";
   /** "Each green creature that entered this turn" (Oran-Rief): this object came onto the battlefield this turn (CR 400.7). */
   enteredThisTurn?: true;
+  /** "Target creature card from a graveyard that was put there this turn" (Abyssal Harvester): from anywhere (GameObject.toGraveyardTurn). */
+  putThereThisTurn?: true;
   /** "With lesser power" than the ability's source (mentor, CR 702.134a). */
   lesserPowerThanSource?: boolean;
   /** "Target creature it's blocking" (Tinder Wall): one the source is blocking, or was as it last existed (CR 608.2h). */
@@ -774,6 +778,8 @@ export type PlayerRef =
   | { ref: "chosenPlayer" }
   /** "The chosen player" of "As ~ enters, choose a player" (Stuffy Doll): its source's (CR 614.12), as it last existed. */
   | { ref: "selfChosenPlayer" }
+  /** "~'s controller" (Xantcha, which any player may activate): its source's controller, not necessarily this ability's, as it last existed (CR 608.2h). */
+  | { ref: "selfController" }
   /** "Whose controller was dealt combat damage by ~ this turn" (Steel Hellkite): the players this object dealt combat damage to this turn. */
   | { ref: "combatDamagedBySelf" };
 
@@ -816,8 +822,8 @@ export const refCovers = (r: object, i: number): boolean =>
   "index" in r && typeof r.index === "number" && i >= r.index && i < r.index + ("n" in r && typeof r.n === "number" ? r.n : 1);
 
 /** What a card's kicker-like cost is called (see CompiledCard.kicker). */
-export const kickerName = (k: NonNullable<CompiledCard["kicker"]>): "kicker" | "multikicker" | "replicate" | "squad" | "offspring" =>
-  k.replicate ? "replicate" : k.squad ? "squad" : k.offspring ? "offspring" : k.multi ? "multikicker" : "kicker";
+export const kickerName = (k: NonNullable<CompiledCard["kicker"]>): "kicker" | "multikicker" | "replicate" | "squad" | "offspring" | "waterbend" =>
+  k.replicate ? "replicate" : k.squad ? "squad" : k.offspring ? "offspring" : k.waterbend !== undefined ? "waterbend" : k.multi ? "multikicker" : "kicker";
 
 export interface TokenSpec {
   name: string;
@@ -1036,7 +1042,7 @@ export type Modification =
   /** "Can't attack you or planeswalkers you control" (Promise of Loyalty, CR 508.1c): "you" is the effect's controller. */
   | { kind: "cantAttackYou" }
   /** "Can't attack its owner" (Alexios): that player, not their planeswalkers or battles (rulings). */
-  | { kind: "cantAttackOwner" }
+  | { kind: "cantAttackOwner"; /** Xantcha: "or planeswalkers its owner controls" too. */ planeswalkers?: true }
   /** "Can't be sacrificed" (CR 701.21): an instruction to sacrifice it does nothing; it can't be chosen to be sacrificed, for a cost either (rulings on Alexios). */
   | { kind: "cantBeSacrificed" }
   /** Blocking requirements (CR 509.1c): "must be blocked if able", "all creatures able to block ~ do so". */
@@ -1655,7 +1661,18 @@ export type Effect =
    * `anyOwner`: "you may cast target nonland permanent card from that player's graveyard" (Tinybones), a card another
    * player owns; `anyType`: "and mana of any type can be spent to cast that spell" (CR 609.4b).
    */
-  | { type: "castNow"; what: ObjRef; thenNoMore?: true; unlessCast?: true; anyOwner?: true; anyType?: true }
+  | {
+      type: "castNow";
+      what: ObjRef;
+      thenNoMore?: true;
+      unlessCast?: true;
+      anyOwner?: true;
+      anyType?: true;
+      /** "If that spell would be put into your graveyard, exile it instead." */
+      exileAfter?: true;
+      /** "Do this only once each turn" (Emet-Selch, CR 603.2h): casting it is doing it; then the ability doesn't trigger again this turn. */
+      once?: true;
+    }
   | { type: "putFromHand"; who?: PlayerRef; filter?: TargetSpec; tapped?: boolean; attacking?: boolean; may: boolean; any?: boolean; /** With `any`: "up to seven" (Ugin, the Spirit Dragon), "up to X" (Worldsoul's Rage). */ upTo?: Amount; /** "From your hand and/or graveyard" (Worldsoul's Rage): cards from either, together. */ orGraveyard?: true; lesserPower?: true; attackingEvent?: true; haste?: "endOfTurn" | "game"; atEndStep?: "exile" | "sacrifice" | "hand"; /** "If you do, draw a card and repeat this process" (Cultivator Colossus): after each card put, a draw, then again until you put none (rulings). */ drawRepeat?: true; /** "Each manifest two cards from their hands" (Kozilek, the Broken Reality): exactly this many (all with fewer), face down (CR 701.40a). */ manifest?: number }
   /**
    * "Return all land cards from your graveyard to the battlefield tapped" (CR 110.2a: under your control), "from all graveyards
@@ -1818,7 +1835,7 @@ export type Effect =
    * `double`: "double the number of +1/+1 counters on each creature you control": each gets as many more as it has (CR
    * 701.10e), `n` aside; with `everyKind`, of each kind of counter it has ("double the number of each kind of counter").
    */
-  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true; /** As many as its power is above its base power, each its own (Sovereign Okinec Ahau). */ aboveBase?: true; double?: true; everyKind?: true; /** "That player ... puts a +1/+1 counter on it" (Alexios): who puts them, when not the ability's controller. */ by?: PlayerRef; /** With what "voted": each chosen permanent gets them from the player who chose it (Agitator Ant). */ byVoter?: true }
+  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; /** "A +1/+1 counter or a loyalty counter" (Elspeth Conquers Death): either kind, chosen as it resolves. */ orCounter?: CounterKind; /** "Equal to that creature's toughness" (Canopy Gargantuan): each its own number, all worked out first; `n` is ignored. */ perOwn?: "power" | "toughness"; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true; /** As many as its power is above its base power, each its own (Sovereign Okinec Ahau). */ aboveBase?: true; double?: true; everyKind?: true; /** "That player ... puts a +1/+1 counter on it" (Alexios): who puts them, when not the ability's controller. */ by?: PlayerRef; /** With what "voted": each chosen permanent gets them from the player who chose it (Agitator Ant). */ byVoter?: true }
   /**
    * "Distribute X +1/+1 counters among any number of creatures you control" (no targets): its controller divides them
    * among the permanents like `filter` they control as it resolves (rulings on Blessing of Frost, CR 608.2d), each
@@ -1947,7 +1964,7 @@ export type Effect =
    */
   /** `epic`: the spell with epic as it resolved, by its stack id in `GameState.epics` (CR 702.50a). */
   /** `self`: the spell that's resolving ("you may copy this spell", Sevinne's Reclamation), as it is on the stack. */
-  | { type: "copySpell"; spell: "cause" | "self" | { target: number } | { epic: string }; /** "stormInstantSorcery": the instant and sorcery spells its controller cast before it this turn (Thousand-Year Storm). */ n: Amount | "storm" | "kicked" | "stormInstantSorcery"; newTargets: boolean; /** Then an opponent you choose copies it too (CR 702.144a). */ demonstrate?: true; /** "If it's a permanent spell, the copy gains haste and "..."" (Nalfeshnee): what the token it becomes has (CR 400.7a, 608.3f). */ gains?: Modification[] }
+  | { type: "copySpell"; spell: "cause" | "self" | { target: number } | { epic: string }; /** "stormInstantSorcery": the instant and sorcery spells its controller cast before it this turn (Thousand-Year Storm). */ n: Amount | "storm" | "kicked" | "stormInstantSorcery"; newTargets: boolean; /** Then an opponent you choose copies it too (CR 702.144a). */ demonstrate?: true; /** "If it's a permanent spell, the copy gains haste and "..."" (Nalfeshnee): what the token it becomes has (CR 400.7a, 608.3f). */ gains?: Modification[]; /** "Except it isn't legendary" (Double Major): exceptions to its copiable values (CR 707.9b). */ except?: CopyExcept }
   | { type: "removeCounters"; what: ObjRef; counter: CounterKind; n: Amount | "all" }
   /** "Remove (up to) three counters from target permanent": of any kinds, chosen as it resolves (rulings on Glissa Sunslayer); fewer than that, all of them. */
   /**
@@ -2606,7 +2623,7 @@ export type Effect =
   | { type: "topTurn"; top: FromTop }
   | { type: "graveyardTurn"; cast?: TargetSpec; lands?: true; exileInstead?: true; /** "From any graveyard" (The Great Work). */ anyGraveyard?: true; /** "If a spell cast this way would be put into a graveyard, exile it instead." */ exileCast?: true }
   /** "Artifact, instant, and sorcery spells you cast this turn cost {2} less to cast" (Urza, Planeswalker): `mod`'s "you" is the ability's controller (CR 601.2f, 611.2a). */
-  | { type: "costModThisTurn"; mod: CostMod }
+  | { type: "costModThisTurn"; mod: CostMod; /** "... until your next turn" (Elspeth Conquers Death): as that turn begins (CR 611.2b). */ untilYourNextTurn?: true }
   /**
    * "Your opponents can't cast spells this turn" (Silence), "target player can't ..." (Orim's Chant), "players can't cast
    * noncreature spells this turn" (Calamity's Wake): those players, chosen as it resolves, until the turn ends; `filter`
@@ -2803,7 +2820,7 @@ export type ChoiceKind = "creatureType" | "color" | "basicLandType" | "keyword" 
 export type NamePurpose = "deny" | "theirs" | "find" | "guess" | "guessHand" | "own";
 
 /** A choice made as a permanent enters that adds a +1/+1 counter or not (see CompiledCard.entersOptions). */
-export type EntersOption = "riot" | "unleash" | "copy" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead";
+export type EntersOption = "riot" | "unleash" | "copy" | "exchangeText" | "controlOpponent" | "devour" | "amplify" | "tribute" | "tributePay" | "readAhead" | "player" | "anchor" | "protector" | "discardInstead";
 
 /**
  * What mana was spent to cast a spell (CR 601.2h): at least so much of some colors ("if {U}{B} was spent", "at least three
@@ -2928,6 +2945,8 @@ export type SpellCondition =
   | { kind: "targetIs"; index: number; filter: TargetSpec }
   /** "If a Dinosaur is dealt damage this way" (Marauding Raptor): a permanent this resolution dealt damage to, as it is now. */
   | { kind: "damagedThisWayIs"; filter: TargetSpec }
+  /** "If that creature is a Bird, Frog, Otter, or Rat" after a flicker (Splash Portal): a permanent it returned, as it is now (rulings). */
+  | { kind: "flickeredIs"; filter: TargetSpec }
   /** "If that land is a Plains" (Emeria Shepherd): the trigger's subject as it is now, or as it last existed (CR 608.2h). */
   | { kind: "subjectIs"; filter: TargetSpec }
   /** "If that spell is a Lesson" in a cast trigger (Toph, Hardheaded Teacher): the spell it's about, by its card's characteristics. */
@@ -3163,6 +3182,7 @@ export type TriggerEvent =
   | "youPlayAnotherLand" // "When you play another land" (City of Traitors): playing a land (CR 305.1), not this one
   | "youLoseLife" // "Whenever you lose life" (Vilis, Broker of Blood): once per life-loss event, as "opponentLosesLife"
   | "opponentLosesLife" // "Whenever an opponent loses life": once per life-loss event, damage and paying life included (CR 119.2, 119.4)
+  | "opponentsLoseLife" // "Whenever one or more opponents lose life" (Emet-Selch): once for life lost at the same time
   | "youCreateToken" // "Whenever you create a token": once for each token you create (CR 111.2), whoever ends up controlling it
   /**
    * "Whenever you're dealt damage", "whenever an opponent is dealt damage", "whenever enchanted player is dealt damage": once
@@ -3409,7 +3429,7 @@ export interface TriggeredAbility {
    * `leaves`: "leaves the battlefield", wherever it went, not only into a graveyard (CR 603.6c, 603.10a); `notDies` with it:
    * "without dying" (anywhere but a graveyard, CR 700.4).
    */
-  dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; attached?: boolean; damagedBySelf?: boolean; leaves?: true; notDies?: true; /** With `leaves`: only when it went to one of these zones ("dies or is put into exile", Kaya's Ghostform). */ toZones?: ("graveyard" | "exile")[]; /** "If it had a counter on it" (Leader's Talent): any kind, as it last existed (CR 603.10a). */ hadCounter?: true };
+  dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; attached?: boolean; damagedBySelf?: boolean; leaves?: true; notDies?: true; /** With `leaves`: only when it went to one of these zones ("dies or is put into exile", Kaya's Ghostform). */ toZones?: ("graveyard" | "exile")[]; /** "If it had a counter on it" (Leader's Talent): any kind, or "a -1/-1 counter" (Blowfly Infestation) that kind, as it last existed (CR 603.10a). */ hadCounter?: true | CounterKind };
   /**
    * For "youSacrifice": what its controller sacrificed (CR 701.21a), as it last existed on the battlefield, wherever it
    * went. The card is the subject ("exile it").
@@ -3555,6 +3575,8 @@ export interface BatchTrigger {
   noneCastWithMana?: true;
   /** Kotis: "if one or more of them entered from a graveyard or was cast from a graveyard" (an intervening if, CR 603.4). */
   fromGraveyard?: true;
+  /** With `fromGraveyard`: "them" are only those of them that entered or were cast from a graveyard (Twilight Diviner). */
+  onlyFromGraveyard?: true;
   dies?: true;
   notDies?: true;
   /** `notBattlefield`: "from anywhere other than the battlefield" (Syr Konrad). */
@@ -4129,6 +4151,8 @@ export interface CompiledCard {
   shuffleInsteadOfGraveyard?: boolean;
   /** "If ~ would be put into a graveyard from anywhere, exile it instead" (a disturb card's back face, CR 614.1a). */
   exileInsteadOfGraveyard?: boolean;
+  /** An instant or sorcery whose last instruction is "Exile ~.": exiled as it finishes resolving (CR 608.2n). */
+  exileSelfOnResolve?: true;
   /**
    * "If a card or token would be put into a graveyard from anywhere, exile it instead." (Rest in Peace), "If a card would
    * be put into an opponent's graveyard from anywhere, exile it instead." (Leyline of the Void), "..., instead exile it
@@ -4197,6 +4221,10 @@ export interface CompiledCard {
   entersOptions?: EntersOption[];
   /** Read ahead (CR 702.155): a Saga that enters with the chapter number its controller chooses in lore counters. */
   readAhead?: true;
+  /** "As ~ enters, you may exchange ~'s text box and another creature's" (Deadpool, Trading Card; CR 612.5, 701.12h). */
+  entersExchangeText?: true;
+  /** "~ enters under the control of an opponent of your choice" (Xantcha, Captive Audience): how it enters (CR 614.1c, 614.12). */
+  entersUnderOpponent?: true;
   /**
    * "You may have ~ enter as a copy of any creature on the battlefield[, except ...]" (CR 707.5, 707.9). Cursed
    * Mirror's "as ~ enters, you may have it become a copy of ... until end of turn": the copy ends with the turn.
@@ -4742,7 +4770,20 @@ export interface CompiledCard {
    * same way; `offspring` is offspring (CR 702.175a), paid once like kicker. None of these is "kicked" for other cards.
    */
   /** `xMin`: "Kicker {X}. X can't be 0." (Thieving Skydiver): a kicker cost with X, chosen as it's cast (CR 107.3a, 601.2b). */
-  kicker?: { costs: string[]; multi?: boolean; replicate?: boolean; squad?: boolean; offspring?: boolean; xMin?: number };
+  kicker?: {
+    costs: string[];
+    multi?: boolean;
+    replicate?: boolean;
+    squad?: boolean;
+    offspring?: boolean;
+    xMin?: number;
+    /**
+     * "As an additional cost to cast this spell, (you may) waterbend {N}" (CR 701.67a): paid like kicker, and up to N of
+     * its generic mana may be paid by tapping artifacts and creatures (CostChoices.waterbend). `required`: it must be paid.
+     */
+    waterbend?: number;
+    required?: true;
+  };
   /** "As an additional cost to cast this spell, sacrifice a creature" and the like (CR 601.2b, 601.2f-h). */
   additionalCosts?: AdditionalCost[];
   /** "As an additional cost to cast this spell, sacrifice a creature or pay {3}{B}": exactly one of these, announced as it's cast (CR 601.2b). */

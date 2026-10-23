@@ -1,7 +1,7 @@
 # Roadmap
 
-23,217 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,282 of 4,988 (86%).
+23,254 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,302 of 4,988 (86%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,21 +22,23 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 123, most played first: Deadpool, Trading Card (exchanging
-   text boxes, a text-changing effect, CR 612), Twilight Diviner, The Unagi of Kyoshi Island (ward—waterbend), Emet-Selch
-   (casting a card from your graveyard during a trigger's resolution, "do this only once each turn"), Library of Leng (a
-   discard replacement with a choice), Rottenmouth Viper (an optional sacrifice of any number as an additional cost with a
-   reduction; the UI's X search assumes a cost that only grows), Xantcha (enters under an opponent's control of your
-   choice; "can't attack its owner"), Treasure Map, Abdel Adrian, Tectonic Giant, Abyssal Harvester, Surge of Salvation,
-   Blowfly Infestation, Collective Inferno, Fertilid, Gluntch, Splash Portal, Elspeth Conquers Death, Canopy Gargantuan,
-   Master of Ceremonies, Crawling Sensation, Keen Duelist, Geode Golem, Master Biomancer, Frontier Warmonger, Etchings of
-   the Chosen. Smaller gaps from round 123: waterbend works for activated abilities only: as an additional cost to cast a
-   spell (Benevolent River Spirit, Water Whip, the "you may waterbend" spells), "unless you waterbend" (Waterbending
-   Lesson), ward—waterbend and "whenever you waterbend" (Avatar Aang) are out, as are Watery Grasp and Aang's Iceberg (other
-   lines); you don't pick what waterbend taps: autopay pays mana first, then taps what makes no mana, noncreatures, then
-   the smallest creatures (as for improvise); bots don't waterbend with creatures that could still attack this turn; a
-   draw an opponent's Notion Thief replaces isn't offered Underrealm Lich's replacement too (CR 616.1); a token doubler
-   with Yenna attaches every Aura token copy to the same chosen permanent. Smaller gaps from round 122: Veteran Bodyguard and Weathered Bodyguards are out; autopay
+00. Most played first (`npm run popular`). Out after round 124, most played first: Library of Leng (a discard
+   replacement with a choice), Rottenmouth Viper (an optional sacrifice of any number as an additional cost with a
+   reduction; the UI's X search assumes a cost that only grows), Biomancer's Familiar, Gluntch, the Bestower (three
+   players chosen in turn), Hollowmurk Siege, Nuclear Fallout, Meathook Massacre II, Lost Monarch of Ifnir, Master of
+   Ceremonies, Eluge, Crawling Sensation ("for the first time each turn" on a batch trigger), Light-Paws, Keen Duelist,
+   Geode Golem, Master Biomancer, Frontier Warmonger, Etchings of the Chosen. Smaller gaps from round 124: Chandra, Flame's
+   Catalyst is still out (Emet-Selch's "cast target card from your graveyard" works only for a whole line); "a card that
+   was put there this turn" works for exile targets only (Reenact the Crime, Night Nurse and Garna are out); Abdel Adrian
+   and Glorious Protector ask what to exile even when they've already left the battlefield (nothing is exiled then); bots
+   give Xantcha and Captive Audience to the opponent with the least life; goading is handled as a layer 6 effect, so
+   "goaded creatures" (Bothersome Quasit) waits on the goad as a dependency (CR 613.8). Smaller gaps from round 123:
+   "unless you waterbend" (Waterbending Lesson), waterbend {X} costs, "whenever you waterbend" (Avatar Aang), Watery Grasp
+   and Aang's Iceberg (other lines) are out; you don't pick what waterbend taps: autopay pays mana first, then taps what
+   makes no mana, noncreatures, then the smallest creatures (as for improvise), for ward—waterbend and spells too; bots
+   don't waterbend with creatures that could still attack this turn; a draw an opponent's Notion Thief replaces isn't
+   offered Underrealm Lich's replacement too (CR 616.1); a token doubler with Yenna attaches every Aura token copy to the
+   same chosen permanent. Smaller gaps from round 122: Veteran Bodyguard and Weathered Bodyguards are out; autopay
    never forages for mana (on purpose: what to forage is the player's choice; bots do); "you may forage. If you do"
    (Bushy Bodyguard, Treetop Sentries, Curious Forager) and "whenever you forage" (Corpseberry Cultivator) are still out;
    Nuclear Fallout and the other rad cards with milled-card triggers are out; Alchemist's Gambit, Inspired Idea and

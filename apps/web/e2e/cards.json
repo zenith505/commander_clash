@@ -1,5 +1,40 @@
 [
  {
+  "oracleId": "cab092f9-b7ff-43b9-935f-310869a4daf8",
+  "name": "Abdel Adrian, Gorion's Ward",
+  "manaCost": "{4}{W}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Human Warrior",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Warrior"
+  ],
+  "oracleText": "When Abdel Adrian enters, exile any number of other nonland permanents you control until Abdel Adrian leaves the battlefield. Create a 1/1 white Soldier creature token for each permanent exiled this way.\nChoose a Background (You can have a Background as a second commander.)",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Choose a background"
+  ],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "eccc9a54-2b56-4a02-9926-258d5b2e25fb",
   "name": "Abundance",
   "manaCost": "{2}{G}{G}",
@@ -985,6 +1020,41 @@
     "artUrl": "https://cards.scryfall.io/art_crop/back/a/3/a3d5a0d4-1f7b-4a88-b375-b241c8e5e117.jpg?1783924485"
    }
   ]
+ },
+ {
+  "oracleId": "12d91743-1ccb-4f2b-b2a9-1c2b34f7c8eb",
+  "name": "Benevolent River Spirit",
+  "manaCost": "{U}{U}",
+  "cmc": 2,
+  "typeLine": "Creature — Spirit",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Spirit"
+  ],
+  "oracleText": "As an additional cost to cast this spell, waterbend {5}. (While paying a waterbend cost, you can tap your artifacts and creatures to help. Each one pays for {1}.)\nFlying, ward {2} (Whenever this creature becomes the target of a spell or ability an opponent controls, counter it unless that player pays {2}.)\nWhen this creature enters, scry 2.",
+  "power": "4",
+  "toughness": "5",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Scry",
+   "Flying",
+   "Ward",
+   "Waterbend"
+  ],
+  "commanderLegal": "legal",
+  "set": "tla",
+  "releasedAt": "2025-11-21",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
  },
  {
   "oracleId": "8f351961-69e3-4637-b010-d13f19daca39",
@@ -3045,6 +3115,42 @@
   "gameChanger": false
  },
  {
+  "oracleId": "4b96c22a-0d5b-44fd-b326-5f3ffcc3917b",
+  "name": "Deadpool, Trading Card",
+  "manaCost": "{2}{B}{R}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Mutant Mercenary Hero",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Mutant",
+   "Mercenary",
+   "Hero"
+  ],
+  "oracleText": "As Deadpool enters, you may exchange his text box and another creature's.\nAt the beginning of your upkeep, you lose 3 life.\n{3}, Sacrifice this creature: Each other player draws a card.",
+  "power": "5",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "sld",
+  "releasedAt": "2025-04-01",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "0a1dc797-7531-4494-afe6-add6ac3f74c0",
   "name": "Defiler of Vigor",
   "manaCost": "{3}{G}{G}",
@@ -3456,6 +3562,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "40c88392-2aa7-4e12-86a4-8d680219e670",
+  "name": "Elspeth Conquers Death",
+  "manaCost": "{3}{W}{W}",
+  "cmc": 5,
+  "typeLine": "Enchantment — Saga",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Saga"
+  ],
+  "oracleText": "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI — Exile target permanent an opponent controls with mana value 3 or greater.\nII — Noncreature spells your opponents cast cost {2} more to cast until your next turn.\nIII — Return target creature or planeswalker card from your graveyard to the battlefield. Put a +1/+1 counter or a loyalty counter on it.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "thb",
+  "releasedAt": "2020-01-24",
+  "rarity": "rare",
+  "layout": "saga",
+  "gameChanger": false
+ },
+ {
   "oracleId": "05e6b243-48a6-4a42-bc5f-413441de9c33",
   "name": "Elspeth, Sun's Champion",
   "manaCost": "{4}{W}{W}",
@@ -3542,6 +3676,37 @@
   "set": "sth",
   "releasedAt": "1998-03-02",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c6a3a882-a127-4590-93d7-679ef4313efe",
+  "name": "Elvish Visionary",
+  "manaCost": "{1}{G}",
+  "cmc": 2,
+  "typeLine": "Creature — Elf Shaman",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elf",
+   "Shaman"
+  ],
+  "oracleText": "When this creature enters, draw a card.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "j25",
+  "releasedAt": "2024-11-15",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -6180,6 +6345,44 @@
   "set": "sld",
   "releasedAt": "2021-01-01",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "124cc815-0877-40f2-98c8-e7c4f8cd6598",
+  "name": "Katara, Seeking Revenge",
+  "manaCost": "{3}{U/B}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Warrior Ally",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Warrior",
+   "Ally"
+  ],
+  "oracleText": "As an additional cost to cast this spell, you may waterbend {2}. (While paying a waterbend cost, you can tap your artifacts and creatures to help. Each one pays for {1}.)\nWhen Katara enters, draw a card, then discard a card unless her additional cost was paid.\nKatara gets +1/+1 for each Lesson card in your graveyard.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Waterbend"
+  ],
+  "commanderLegal": "legal",
+  "set": "tle",
+  "releasedAt": "2025-11-21",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -11414,6 +11617,42 @@
   "gameChanger": true
  },
  {
+  "oracleId": "be922360-ee9f-4cfb-bf10-d481c5de5cb1",
+  "name": "The Unagi of Kyoshi Island",
+  "manaCost": "{3}{U}{U}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Serpent",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Serpent"
+  ],
+  "oracleText": "Flash\nWard—Waterbend {4}. (Whenever this creature becomes the target of a spell or ability an opponent controls, counter it unless that player pays {4}. They can tap their artifacts and creatures to help. Each one pays for {1}.)\nWhenever an opponent draws their second card each turn, you draw two cards.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Ward",
+   "Flash",
+   "Waterbend"
+  ],
+  "commanderLegal": "legal",
+  "set": "tla",
+  "releasedAt": "2025-11-21",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "7d723a6f-854f-43df-9401-a4eb0c0f639f",
   "name": "The Weatherseed Treaty",
   "manaCost": "{2}{G}",
@@ -12999,6 +13238,41 @@
   "set": "emn",
   "releasedAt": "2016-07-22",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0f0f3712-8d13-41a5-b332-2ab34e48d79d",
+  "name": "Xantcha, Sleeper Agent",
+  "manaCost": "{1}{B}{R}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Phyrexian Minion",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Phyrexian",
+   "Minion"
+  ],
+  "oracleText": "Xantcha enters under the control of an opponent of your choice.\nXantcha attacks each combat if able and can't attack its owner or planeswalkers its owner controls.\n{3}: Xantcha's controller loses 2 life and you draw a card. Any player may activate this ability.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "B",
+   "R"
+  ],
+  "colorIdentity": [
+   "B",
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c18",
+  "releasedAt": "2018-08-10",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

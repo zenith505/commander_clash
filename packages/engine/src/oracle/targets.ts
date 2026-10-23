@@ -117,6 +117,8 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (x === "that player" && ctx.chosenOpponent) return { ref: "chosenPlayer" };
   // Stuffy Doll: "the chosen player" of "As ~ enters, choose a player" (compile checks there is one).
   if (x === "the chosen player") return { ref: "selfChosenPlayer" };
+  // "~'s controller loses 2 life" (Xantcha): whoever controls the source, who may not be the ability's controller.
+  if (x === "~'s controller") return { ref: "selfController" };
   // "Whenever ~ deals combat damage to a player, that player discards a card."
   if (x === "that player" && ctx.eventPlayer) return { ref: "eventPlayer" };
   // "Whenever ~ deals combat damage to an opponent, it deals that much damage to each other opponent" (Hydra Omnivore).
@@ -825,6 +827,12 @@ export function parseTargetPhrase(
   // "Target creature card in your graveyard with mana value X" (Likeness Looter): the same as "with mana value X in your graveyard".
   const inWith = / in (your|a|an opponent's) graveyard( with mana value (?:\d+|x)(?: or (?:greater|less))?)$/i.exec(p);
   if (inWith) p = `${p.slice(0, inWith.index)}${inWith[2]} in ${inWith[1]} graveyard`;
+  // "Target creature card from a graveyard that was put there this turn" (Abyssal Harvester), "... from anywhere this turn".
+  const putThere = / (?:from|in) (?:your|a|an opponent's) graveyard( that was put there (?:from anywhere )?this turn)$/.exec(p);
+  if (putThere) {
+    extra.putThereThisTurn = true;
+    p = p.slice(0, putThere.index + putThere[0].length - putThere[1]!.length);
+  }
   const gy = / (?:from|in) (your|a|an opponent's) graveyard$/.exec(p) ?? / exiled with (?:~|it)$/.exec(p);
   if (gy) {
     p = p.slice(0, gy.index);

@@ -135,7 +135,7 @@ export type TriggerSourceEvent =
   /** A player gained life (one life-gain event, CR 119.9). */
   | { type: "lifeGained"; player: PlayerId; amount: number }
   /** A player lost life: from damage, an effect, or paying life (one life-loss event, CR 119.2-119.4). */
-  | { type: "lifeLost"; player: PlayerId; amount: number; /** The player's first life loss this turn. */ first?: boolean }
+  | { type: "lifeLost"; player: PlayerId; amount: number; /** The player's first life loss this turn. */ first?: boolean; /** Life lost at the same time by several players shares this number ("one or more opponents lose life"). */ batch?: number }
   /** `player` created a token (CR 111.2), `id` (it may have left already: "whenever you create a token" still triggers). */
   | { type: "tokenCreated"; player: PlayerId; id: ObjectId }
   /** All the damage dealt to a player at the same time (CR 120.3a): "whenever you're dealt damage". */
@@ -382,6 +382,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (t.oncePerTurn && onceUsed(o, t.zone, onceKey, nth)) return;
       const once = t.body.effects[0];
       if (once?.type === "may" && once.once && onceUsed(o, t.zone, `do:${once.text}`)) return; // CR 603.2h
+      if (once?.type === "castNow" && once.once && onceUsed(o, t.zone, "do:castNow")) return;
       if (pred(t.event, t) && (!t.ifCond || staticConditionNow(s, t.ifCond, o.id, controller, event?.player, event?.amount, undefined, subject?.id, subject?.zoneChanges ?? 0))) {
         if (t.oncePerTurn) (o.triggeredThisTurn ??= []).push(`${lookingBack(o, t.zone) ? (o.zoneChanges ?? 0) - 1 : (o.zoneChanges ?? 0)}|${onceKey}`);
         const queued: PendingTrigger = {
@@ -651,7 +652,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const lki = { counters: ev.counters, copyKey: cardIdOf(ev.snapshot), controller: ev.controller, manaValue: defMv(defOf(s, ev.snapshot)), ...(ev.wasCreature ? { power: ev.power, toughness: ev.toughness } : {}), ...(ev.snapshot.attacking !== undefined ? { attacking: ev.snapshot.attacking } : {}), ...(ev.movedWith?.length ? { mergedCards: { of: ev.id, cards: ev.movedWith } } : {}) };
       const dying = { o: ev.snapshot, c: ev.chars };
       const hadCounter = Object.values(ev.counters).some((n) => n > 0);
-      const went = (d: NonNullable<TriggeredAbility["dies"]>) => (d.leaves ? !(d.notDies && ev.to === "graveyard") && (!d.toZones || (d.toZones as string[]).includes(ev.to)) : ev.to === "graveyard") && (!d.hadCounter || hadCounter);
+      const went = (d: NonNullable<TriggeredAbility["dies"]>) => (d.leaves ? !(d.notDies && ev.to === "graveyard") && (!d.toZones || (d.toZones as string[]).includes(ev.to)) : ev.to === "graveyard") && (!d.hadCounter || (d.hadCounter === true ? hadCounter : (ev.counters[d.hadCounter] ?? 0) > 0));
       const consider = (src: GameObject, ctrl: PlayerId, attachedTo: ObjectId | undefined, triggers?: TriggeredAbility[]) =>
         add(src, ctrl, (e, t) => e === "permanentDies" && !!t.dies && went(t.dies) && diesMatches(s, t.dies, src.id, attachedTo, dying, ctrl), triggers, undefined, o, lki);
       for (const id of s.battlefield) {
@@ -817,6 +818,9 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const you = controllerOf(s, o);
       // Valgavoth: "for the first time during each of their turns".
       if (you !== ev.player) add(o, you, (e, t) => e === "opponentLosesLife" && (!t.firstOnTheirTurn || (!!ev.first && s.activePlayer === ev.player)), undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
+      // "Whenever one or more opponents lose life": once for life lost at the same time (Emet-Selch), not once per player.
+      if (you !== ev.player)
+        add(o, you, (e, t) => e === "opponentsLoseLife" && !s.triggerQueue.some((q) => q.sourceId === o.id && q.event?.lifeBatch !== undefined && q.event.lifeBatch === ev.batch && (q.body ?? triggerOf(s, q)?.body)?.text === t.body.text), undefined, undefined, undefined, undefined, undefined, undefined, { ...(ev.batch !== undefined ? { lifeBatch: ev.batch } : {}) });
       else add(o, you, (e) => e === "youLoseLife", undefined, undefined, undefined, undefined, undefined, undefined, { player: ev.player, amount: ev.amount });
     }
     speedTrigger(s, ev.player);
@@ -1442,12 +1446,13 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.event !== "batch" || !t.batch) continue;
         const b = t.batch;
         if (gone ? !lookBack(b) : lookBack(b) && arrived.has(`${w.id}@${w.zoneChanges ?? 0}`)) continue;
-        const matched = ev.moves.filter((m) => batchMoveMatches(s, b, m, w, you, gone));
+        const fromYard = (m: { id: ObjectId }) => !!(s.objects[m.id]?.enteredFromGraveyard || s.objects[m.id]?.castFromGraveyard);
+        const matched = ev.moves.filter((m) => batchMoveMatches(s, b, m, w, you, gone) && (!b.onlyFromGraveyard || fromYard(m)));
         const n = matched.length;
         if (!n) continue;
         // Satoru: not if any of them was cast with mana spent on it (rulings: mana for additional costs counts too).
         if (b.noneCastWithMana && matched.some((m) => s.objects[m.id]?.wasCast && (s.objects[m.id]!.manaSpent ?? 0) > 0)) continue;
-        if (b.fromGraveyard && !matched.some((m) => s.objects[m.id]?.enteredFromGraveyard || s.objects[m.id]?.castFromGraveyard)) continue;
+        if (b.fromGraveyard && !matched.some(fromYard)) continue;
         if (b.first && b.what === "created" && (s.turnLog?.tokensCreated ?? []).filter((c) => c.player === you).length > n) continue;
         if (b.first && b.what === "discards" && (s.turnLog?.discards ?? []).some((d) => (b.whose !== "you" || d.player === you) && d.cards.some((c) => !b.filter || printedMatches(b.filter, s.cards[c]!)))) continue;
         // "Whenever one or more creatures enter / die": caused by each of them entering or dying (CR 603.2d).

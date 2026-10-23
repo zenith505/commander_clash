@@ -441,6 +441,9 @@ export function compile(d: CardDef): CompiledCard {
       // "~ gets +1/+1 for each land you control and each land card in your graveyard" (Multani, Yavimaya's Avatar): the
       // sum, which is two such effects with the same timestamp (CR 613.4c, 613.7).
       .replace(/^(.+? gets? [+-]\d+\/[+-]\d+ for each )([^.]+?) and each ([^.]+?)\.$/m, "$1$2.\n$1$3.")
+      // "If this spell's additional cost was paid" with "you may waterbend" as that cost: whether it was paid, like kicker.
+      .replace(/\bIf ~'s additional cost was paid\b/g, (x, _i, text: string) => (/^As an additional cost to cast ~, you may waterbend \{\d+\}\.$/m.test(text) ? "If ~ was kicked" : x))
+      .replace(/\bunless (?:her|his|its|~'s) additional cost was paid\b/g, (x, _i, text: string) => (/^As an additional cost to cast ~, you may waterbend \{\d+\}\.$/m.test(text) ? "unless ~'s waterbend cost was paid" : x))
       .split("\n")
       .map((l) => {
         const same = /^Choose (one|two|three|four|five)\. You may choose the same mode more than once\.$/.exec(l.trim());
@@ -1025,6 +1028,30 @@ export function compile(d: CardDef): CompiledCard {
     // additional cost to cast this spell, you may pay [cost] any number of times" and "When this creature enters, if its
     // squad cost was paid, create a token that's a copy of it for each time its squad cost was paid." Both are paid
     // like kicker; the copy is of it as it last existed if it has left (rulings, CR 608.2h).
+    // Deadpool, Trading Card: a replacement effect on how it enters (CR 614.1c, 614.12), a text-changing effect (CR 612.5).
+    if (/^As ~ enters, you may exchange (?:~'s|his|her|its) text box and another creature's\.$/.test(line) && !isSpell) {
+      out.entersExchangeText = true;
+      continue;
+    }
+    // Xantcha: a replacement effect on how it enters (CR 614.1c, 614.12); "your" is the player it would enter under.
+    if (line === "~ enters under the control of an opponent of your choice." && !isSpell) {
+      out.entersUnderOpponent = true;
+      continue;
+    }
+    // "Exile ~." as an instant's or sorcery's last instruction (Spirit Water Revival): it's exiled as it finishes
+    // resolving, instead of going to its owner's graveyard (CR 608.2n).
+    if (line === "Exile ~." && isSpell && li === lines.length - 1) {
+      out.exileSelfOnResolve = true;
+      continue;
+    }
+    // "As an additional cost to cast this spell, (you may) waterbend {5}" (CR 701.67a): a cost paid like kicker, part of
+    // which tapped artifacts and creatures can pay. "If this spell's additional cost was paid" reads as kicked.
+    const waterbendCost = /^As an additional cost to cast ~, (you may )?waterbend \{(\d+)\}\.$/.exec(line);
+    if (waterbendCost) {
+      if (out.kicker) out.unsupported.push(raw);
+      else out.kicker = { costs: [`{${waterbendCost[2]}}`], waterbend: Number(waterbendCost[2]), ...(waterbendCost[1] ? {} : { required: true as const }) };
+      continue;
+    }
     const offspring = /^(Offspring|Squad) ((?:\{[^}]+\})+)$/.exec(line);
     if (offspring) {
       const squad = offspring[1] === "Squad";
@@ -2439,7 +2466,8 @@ export function compile(d: CardDef): CompiledCard {
       /^When ~ (transforms into ~) or dies, (.+)$/.exec(line) ??
       /^When ~ enters and whenever it (attacks while saddled), (.+)$/.exec(line) ??
       // "Whenever ~ attacks or becomes the target of a spell, create a Treasure token" (Goldspan Dragon).
-      /^Whenever ~ (attacks) or (becomes the target of a spell), (.+)$/.exec(line) ??
+      // Tectonic Giant: "... or becomes the target of a spell an opponent controls".
+      /^Whenever ~ (attacks) or (becomes the target of a spell(?: an opponent controls)?), (.+)$/.exec(line) ??
       // "Whenever this creature attacks, blocks, or becomes the target of a spell, ..." (Giggling Skitterspike).
       /^Whenever ~ attacks, blocks, or becomes the target of a spell, (.+)$/.exec(line) ??
       // "Whenever you create or sacrifice a token, ..." (Mirkwood Bats); "When ~ enters and whenever an opponent draws a
@@ -2483,8 +2511,8 @@ export function compile(d: CardDef): CompiledCard {
               ? [`When ~ enters, ${effect}`, `W${twice[1]!.slice(1)}, ${effect}`]
             : /^Whenever ~ attacks, blocks, or becomes the target of a spell, /.test(line)
               ? [`Whenever ~ attacks, ${effect}`, `Whenever ~ blocks, ${effect}`, `Whenever ~ becomes the target of a spell, ${effect}`]
-            : /^Whenever ~ attacks or becomes the target of a spell, /.test(line)
-              ? [`Whenever ~ attacks, ${effect}`, `Whenever ~ becomes the target of a spell, ${effect}`]
+            : /^Whenever ~ attacks or becomes the target of a spell(?: an opponent controls)?, /.test(line)
+              ? [`Whenever ~ attacks, ${effect}`, `Whenever ~ ${twice[2]}, ${effect}`]
             : twice.length === 5
               ? twice.slice(1, 4).map((e) => `Whenever ${/^Whenever an opponent /.test(line) ? "an opponent " : ""}${e}, ${effect}`)
             : /^Whenever (?:an? [^,]+?|your commander) enters or attacks, /.test(line)

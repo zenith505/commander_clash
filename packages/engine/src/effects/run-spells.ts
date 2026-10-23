@@ -12,18 +12,20 @@ import { closeZoneBatch, fireEvent } from "./triggers";
 import { discardCards, toBottom } from "./run-library";
 import { suspendExiled } from "./run-zones";
 import { defMv, sameName } from "../faces";
-import { copyKey } from "../copies";
+import { copyKey, type CopyExcept } from "../copies";
 
 /**
  * Put a copy of this spell on the stack under `controller` (CR 707.10): its values and every choice made casting
  * it (modes, X, kicker, what was sacrificed), with these targets. It isn't cast.
  */
-function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId, targets: TargetChoice[] | undefined, gains?: { mods: Modification[]; source: string }) {
+function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId, targets: TargetChoice[] | undefined, gains?: { mods: Modification[]; source: string }, except?: CopyExcept) {
   const card = orig.objectId ? s.objects[orig.objectId] : undefined;
   if (!card) return;
   // A copy of a nonmodal double-faced spell's back face (cast transformed: disturb) has mana value 0 (CR 202.3b).
   const def = s.cards[cardIdOf(card)]!;
-  const o = newObject(s, def.faceOf && def.faceOf.face > 0 && def.layout === "transform" ? s.cards[copyKey(s, def)]! : def, controller, "stack");
+  const base = def.faceOf && def.faceOf.face > 0 && def.layout === "transform" ? s.cards[copyKey(s, def)]! : def;
+  // "Except it isn't legendary" (Double Major): an exception to the copy's copiable values (CR 707.9b).
+  const o = newObject(s, except ? s.cards[copyKey(s, base, except)]! : base, controller, "stack");
   o.spellCopy = true;
   if (gains) o.copyGains = { mods: gains.mods, timestamp: s.nextTimestamp++, controller, source: gains.source };
   o.kicked = card.kicked;
@@ -296,7 +298,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           return "paused";
         }
         if (orig.kind === "ability") putAbilityCopy(s, orig, ctx.controller, c.targets ?? orig.targets);
-        else putSpellCopy(s, orig, ctx.controller, c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src });
+        else putSpellCopy(s, orig, ctx.controller, c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src }, e.except);
         c.targets = undefined;
         c.left--;
       }
@@ -306,7 +308,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           s.pending = { kind: "copyTargets", player: ctx.controller, source: src, copyOf: orig.description, specs, current: orig.targets ?? [], left: c.extra };
           return "paused";
         }
-        putSpellCopy(s, orig, ctx.controller, c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src });
+        putSpellCopy(s, orig, ctx.controller, c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src }, e.except);
         c.targets = undefined;
         c.extra--;
       }
@@ -781,7 +783,7 @@ export function paidUnless(s: GameState, ctx: ResolveCtx, payer: PlayerId, unles
       log(s, `${p.name} pays {0}${unless.lifeAmount ? " (0 life)" : ""} for ${by}.`);
       sc.paid = true;
     } else {
-      s.pending = { kind: "payUnless", player: p.id, cost, source: by, what, ...(otherwise ? { otherwise } : {}), ...(life ? { life } : {}), ...(unless.discard ? { discard: unless.discard } : {}), ...(unless.sacrifice ? { sacrifice: unless.sacrifice } : {}) };
+      s.pending = { kind: "payUnless", player: p.id, cost, source: by, what, ...(otherwise ? { otherwise } : {}), ...(life ? { life } : {}), ...(unless.discard ? { discard: unless.discard } : {}), ...(unless.sacrifice ? { sacrifice: unless.sacrifice } : {}), ...(unless.waterbend ? { waterbend: unless.waterbend } : {}) };
       return "paused";
     }
   }

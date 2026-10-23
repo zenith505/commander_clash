@@ -1547,11 +1547,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Hostage Taker: "exile another target creature or artifact until ~ leaves the battlefield. You may cast that card for
     // as long as it remains exiled, and mana of any type can be spent to cast that spell": a permission for the
     // ability's controller (CR 609.4b), that card only while it stays exiled (CR 400.7).
-    const youCast = /^You may cast (?:that card|it) for as long as it remains exiled(, and mana of any type can be spent to cast (?:that spell|it))?$/.exec(s);
+    // Dire Fleet Daredevil: "exile target instant or sorcery card from an opponent's graveyard. You may cast it this turn, and
+    // mana of any type can be spent to cast that spell. If that spell would be put into a graveyard, exile it instead": a
+    // card from a graveyard, cast with its usual timing this turn (rulings).
+    const youCast = /^You may cast (?:that card|it) (for as long as it remains exiled|this turn)(, and mana of any type can be spent to cast (?:that spell|it))?$/.exec(s);
     if (youCast) {
       const prev = effects[effects.length - 1];
       if (prev?.type !== "exile" || prev.linked || prev.ownerMay || prev.youMay || prev.what.ref !== "target" || (prev.what.n ?? 1) !== 1) return null;
-      prev.youMay = youCast[1] ? { anyType: true } : {};
+      const thisTurn = youCast[1] === "this turn";
+      const exileAfter = sentences[si + 1]?.replace(/\.$/, "") === "If that spell would be put into a graveyard, exile it instead";
+      if (thisTurn && ctx.targets[prev.what.index]?.kind !== "card") return null;
+      prev.youMay = { ...(youCast[2] ? { anyType: true as const } : {}), ...(thisTurn ? { thisTurn: true as const } : {}), ...(exileAfter ? { exileAfter: true as const } : {}) };
+      if (exileAfter) si++;
       continue;
     }
     // A tempting offer and the like: "Each opponent may create a Treasure token. For each opponent who does, you create a
@@ -4242,8 +4249,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // Only one of the two happens, so neither may wait on a choice or need targets of its own (one "you may"
       // instead would leave nothing done on a "no").
       // A punisher waits on its players but always does its whole process (Court of Ambition's "instead" one), and so do
-      // sacrificing and discarding, which only wait on which ones (Vona's Hunger), and so does a search (Entish Restoration).
-      if (!inner || !previous.length || ctx.targets.length !== before || [...previous, ...inner].some((e) => pauses(e) && e !== prevCounter && e.type !== "punisher" && !(e.type === "pick" && e.action === "sacrifice") && e.type !== "discard" && e.type !== "search")) return null;
+      // sacrificing and discarding, which only wait on which ones (Vona's Hunger), and so does a search (Entish Restoration),
+      // and untapping one of yours (White Plume Adventurer).
+      if (!inner || !previous.length || ctx.targets.length !== before || [...previous, ...inner].some((e) => pauses(e) && e !== prevCounter && e.type !== "punisher" && !(e.type === "pick" && e.action === "sacrifice") && e.type !== "discard" && e.type !== "search" && e.type !== "untapUpTo")) return null;
       const done = insteadOfAffected(inner, previous);
       if (!done) return null;
       effects.splice(from, effects.length - from, { type: "if", cond: { kind: "state", cond: insteadOf }, effects: done, otherwise: previous });

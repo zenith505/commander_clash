@@ -109,6 +109,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // "Untap up to seven lands" (Palinchron), "You untap up to six lands" (Time Spiral): chosen as it resolves (CR 608.2d),
   // anyone's (rulings).
   if ((m = new RegExp(`^(?:You )?[Uu]ntap up to ${NUM} lands?$`).exec(s))) return [{ type: "untapUpTo", n: num(m[1]!), filter: { kind: "object", types: ["Land"], notTypes: [], notColors: [], text: "land" } }];
+  // "Untap a creature you control" (White Plume Adventurer): one of yours, chosen as it resolves (CR 608.2d); choosing an
+  // untapped one does nothing, so the choice is among the tapped ones, or none.
+  if ((m = new RegExp(`^[Uu]ntap (a|an|${NUM}) ([a-z][a-z ]*?) you control$`).exec(s))) {
+    const filter = pickFilter(m.at(-1)!);
+    return filter?.kind === "object" ? [{ type: "untapUpTo", n: /^an?$/.test(m[1]!) ? 1 : num(m[1]!), filter: { ...filter, controller: "you", text: `${filter.text} you control` } }] : null;
+  }
   // "Tap or untap target permanent" (Twiddle, Pestermite): which is chosen as it resolves (CR 608.2d).
   if ((m = /^Tap or untap ((?:another )?target .+|that creature|it|~|enchanted \w+|equipped \w+)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);

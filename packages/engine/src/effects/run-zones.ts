@@ -1275,7 +1275,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           // Suspend: the card gets its time counters and suspend (CR 702.62); a token ceases to exist (CR 704.5d).
           if (e.suspend && !card.isToken) suspendExiled(s, card, e.suspend);
           // Hostage Taker: its controller may cast the card, not a token (rulings), for as long as it remains exiled.
-          if (e.youMay && !card.isToken) card.mayPlay = { player: ctx.controller, zc: card.zoneChanges ?? 0, until: "exiled", turn: s.turn, castOnly: true, ...(e.youMay.anyType ? { anyType: true as const } : {}) };
+          // Dire Fleet Daredevil: this turn only, with its usual timing (rulings).
+          if (e.youMay && !card.isToken) card.mayPlay = { player: ctx.controller, zc: card.zoneChanges ?? 0, until: e.youMay.thisTurn ? "thisTurn" : "exiled", turn: s.turn, castOnly: true, ...(e.youMay.anyType ? { anyType: true as const } : {}), ...(e.youMay.exileAfter ? { exileAfter: true as const } : {}) };
         }
       }
       return;

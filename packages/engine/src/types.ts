@@ -354,6 +354,8 @@ export interface GameObject {
     free?: true;
     /** "Mana of any type can be spent to cast it" (CR 609.4b). */
     anyType?: true;
+    /** "If that spell would be put into a graveyard, exile it instead" (Dire Fleet Daredevil): see exileIfToGraveyard. */
+    exileAfter?: true;
     /** "You may cast that card": not played as a land (rulings on Rev, Tithe Extractor). */
     castOnly?: true;
     /** Airbend's "by paying {2} rather than paying its mana cost" (CR 701.65a): an alternative cost, the only way. */

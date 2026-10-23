@@ -1529,7 +1529,7 @@ export type Effect =
        */
       ownerMay?: { play?: true; free?: true; cost?: string; more?: number; moreOpponents?: true; /** Only this turn, or until the end of their next turn (Containment Construct, Moonstone), not for as long as it's exiled. */ until?: "thisTurn" | "nextTurn" };
       /** "You may cast that card for as long as it remains exiled, and mana of any type can be spent to cast that spell" (Hostage Taker): the ability's controller's permission (CR 609.4b). */
-      youMay?: { anyType?: true };
+      youMay?: { anyType?: true; /** "You may cast it this turn" (Dire Fleet Daredevil). */ thisTurn?: true; /** "If that spell would be put into a graveyard, exile it instead." */ exileAfter?: true };
       /** "Exile target creature and put two time counters on it. If it doesn't have suspend, it gains suspend." (Suspend, Doom's Time Platform, Epochrasite). */
       suspend?: number;
       /** "Exile it with a hit counter on it" (Mari, Tinybones): put on the card in exile (CR 122.1), not a permanent's. */

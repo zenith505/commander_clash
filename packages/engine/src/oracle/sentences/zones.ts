@@ -198,6 +198,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseCardTarget(m[1]!, ctx, "you");
     return what?.ref === "target" ? [{ type: "shuffleIntoLibrary", what, yours: true }] : null;
   }
+  // Teferi, Temporal Pilgrim: "Then they shuffle each nonland permanent they control into its owner's library", "they"
+  // being the target opponent: each of them goes into its owner's library, then each of those libraries is shuffled (CR
+  // 701.24c).
+  if (ctx.lastPlayerTarget !== undefined && (m = /^(?:[Tt]hey shuffle|[Tt]hat player shuffles) (each [^,]+?) they control into its owner's library$/.exec(s))) {
+    const what = parseObject(`${m[1]} that player controls`, ctx);
+    return what?.ref === "each" ? [{ type: "shuffleIntoLibrary", what }] : null;
+  }
   // "The owner of target nonland permanent shuffles it into their library."
   if ((m = /^The owner of (target .+?) shuffles it into their library$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
@@ -883,6 +890,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^[Ss]acrifice another ([a-z][^,]*?)$/.exec(s)) && !ctx.spell) {
     const filter = pickFilter(m[1]!);
     return filter && filter.kind === "object" ? [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true, text: `other ${filter.text}` }, n: 1, action: "sacrifice" }] : null;
+  }
+  // Teferi, Temporal Pilgrim: "Target opponent chooses a permanent they control and returns it to its owner's hand": theirs,
+  // chosen as it resolves, not targeted.
+  if ((m = /^(.+?) chooses (?:a|an) (.+?) they control and returns it to its owner's hand$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    const filter = pickFilter(m[2]!);
+    return who && who.ref !== "you" && filter?.kind === "object" ? [{ type: "pick", who, filter, n: 1, action: "bounce" }] : null;
   }
   // "Defending player exiles two permanents they control" (Bane of Bala Ged): their own, chosen as it resolves, not
   // targeted; with no more than that many, all of them (rulings).

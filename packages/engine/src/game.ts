@@ -4539,6 +4539,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     ((s.turnLog ??= {}).payZeroUsed ??= []).push(`${by.id}@${by.zoneChanges ?? 0}`);
     log(s, `${p.name} pays life rather than ${d.name}'s mana cost (${characteristics(s, by).name}).`);
   }
+  // Cast with a permission that says "if that spell would be put into a graveyard, exile it instead" (Dire Fleet Daredevil).
+  const exileAfter = castFrom === "exile" && !!o.mayPlay?.exileAfter && ownExilePermission(s, o, p.id);
   const from = zoneList(s, o)!;
   from.splice(from.indexOf(id), 1);
   o.zone = "stack";
@@ -4559,7 +4561,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // A once-each-turn permission's own "exile it instead" (Maestros Ascendancy), not another's it shares the way with.
   const exiles = via?.kind === "turnPermission" ? !!choices.permit && permitExiles(s, choices.permit) : via?.exile;
   if (exiles || (castFrom === "graveyard" && compileCard(d).fromGraveyard?.some((g) => g.kind === "aftermath"))) o.exileIfLeaves = "stack";
-  if (via?.exileIfToGraveyard) o.exileIfToGraveyard = true;
+  if (via?.exileIfToGraveyard || exileAfter) o.exileIfToGraveyard = true;
   o.controller = p.id;
   o.timestamp = s.nextTimestamp++;
   const chosen = spell?.modal ? modes : undefined;

@@ -433,3 +433,109 @@ describe("Orzhov Advokist: each player may take two counters; those who do can't
     expect(s.players[ap]!.attackBansUntil).toBeUndefined();
   });
 });
+
+const pilgrim = card("Teferi, Temporal Pilgrim", "Legendary Planeswalker — Teferi", "{3}{U}{U}", {
+  loyalty: "4",
+  oracleText:
+    'Whenever you draw a card, put a loyalty counter on Teferi.\n0: Draw a card.\n−2: Create a 2/2 blue Spirit creature token with vigilance and "Whenever you draw a card, put a +1/+1 counter on this token."\n−12: Target opponent chooses a permanent they control and returns it to its owner\'s hand. Then they shuffle each nonland permanent they control into its owner\'s library.',
+});
+
+describe("Teferi, Temporal Pilgrim", () => {
+  it("0: draw a card, and the draw puts a loyalty counter on Teferi", () => {
+    supported(pilgrim);
+    const { s: s0, ap } = setup([]);
+    const t = putOnBattlefield(s0, ap, pilgrim);
+    s0.objects[t]!.counters.loyalty = 4;
+    const hand = s0.players[ap]!.hand.length;
+    const s = settleBots(run(s0, planActivate(s0, ap, t, 0)));
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+    expect(s.objects[t]!.counters.loyalty).toBe(5);
+  });
+  it("−12: the opponent returns the land they choose, then shuffles each nonland permanent they control into its owner's library", () => {
+    const { s: s0, ap } = setup([]);
+    const t = putOnBattlefield(s0, ap, pilgrim);
+    s0.objects[t]!.counters.loyalty = 12;
+    const opp = s0.turnOrder[(s0.turnOrder.indexOf(ap) + 1) % 4]!;
+    const [bear1, bear2] = [putOnBattlefield(s0, opp, testBear()), putOnBattlefield(s0, opp, testBear())];
+    const land = putOnBattlefield(s0, opp, card("Forest", "Basic Land — Forest", "", { oracleText: "({T}: Add {G}.)" }));
+    const lib = s0.players[opp]!.library.length;
+    let s = run(s0, planActivate(s0, ap, t, 2, [{ kind: "player", id: opp }]));
+    for (let i = 0; i < 20 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", player: opp, count: 1 });
+    s = act(s, { type: "pickPermanents", player: opp, ids: [land] });
+    expect(s.objects[land]!.zone).toBe("hand");
+    expect([s.objects[bear1]!.zone, s.objects[bear2]!.zone]).toEqual(["library", "library"]);
+    expect(s.players[opp]!.library.length).toBe(lib + 2);
+    expect(s.objects[t]!.zone).toBe("graveyard"); // no loyalty left
+  });
+});
+
+const whitePlume = card("White Plume Adventurer", "Creature — Orc Cleric", "{2}{W}", {
+  power: "3",
+  toughness: "3",
+  oracleText: "When this creature enters, you take the initiative.\nAt the beginning of each opponent's upkeep, untap a creature you control. If you've completed a dungeon, untap all creatures you control instead.",
+});
+
+describe("White Plume Adventurer: at each opponent's upkeep, untap a creature you control (all of them after a dungeon)", () => {
+  const atOppUpkeep = (completed: boolean) => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, whitePlume);
+    const bears = [putOnBattlefield(s0, ap, testBear()), putOnBattlefield(s0, ap, testBear())];
+    if (completed) s0.players[ap]!.completedDungeons = ["Lost Mine of Phandelver"];
+    const opp = s0.turnOrder[(s0.turnOrder.indexOf(ap) + 1) % 4]!;
+    let s = passUntil(s0, "upkeep", opp);
+    for (const b of bears) s.objects[b]!.tapped = true;
+    for (let i = 0; i < 20 && !s.pending && (s.stack.length || s.triggerQueue.length || i === 0); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    return { s, ap, bears };
+  };
+  it("you choose one of your tapped creatures", () => {
+    supported(whitePlume);
+    let { s, ap, bears } = atOppUpkeep(false);
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", player: ap, action: "untap", count: 1 });
+    s = act(s, { type: "pickPermanents", player: ap, ids: [bears[1]!] });
+    expect(bears.map((b) => s.objects[b]!.tapped)).toEqual([true, false]);
+  });
+  it("after a dungeon, all of them, with no choice", () => {
+    const { s, bears } = atOppUpkeep(true);
+    expect(s.pending).toBeFalsy();
+    expect(bears.map((b) => s.objects[b]!.tapped)).toEqual([false, false]);
+  });
+});
+
+const daredevil = card("Dire Fleet Daredevil", "Creature — Human Pirate", "{1}{R}", {
+  power: "2",
+  toughness: "1",
+  keywords: ["First strike"],
+  oracleText:
+    "First strike\nWhen this creature enters, exile target instant or sorcery card from an opponent's graveyard. You may cast it this turn, and mana of any type can be spent to cast that spell. If that spell would be put into a graveyard, exile it instead.",
+});
+
+describe("Dire Fleet Daredevil: an opponent's instant or sorcery card, cast this turn with any type of mana, then exiled (rulings)", () => {
+  it("casts the exiled sorcery with mana of any type; it's exiled after it resolves", () => {
+    supported(daredevil);
+    const { s: s0, ap, ids, opp } = setup([daredevil]);
+    const sorcery = putOnBattlefield(s0, opp, card("Deep Study", "Sorcery", "{U}{U}{U}{U}", { oracleText: "Draw two cards." }));
+    s0.battlefield.splice(s0.battlefield.indexOf(sorcery), 1);
+    s0.objects[sorcery]!.zone = "graveyard";
+    s0.players[opp]!.graveyard.push(sorcery);
+    let s = settleBots(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: sorcery }])));
+    expect(s.objects[sorcery]!.zone).toBe("exile");
+    // Four blue mana from three Islands and anything else.
+    const hand = s.players[ap]!.hand.length;
+    s = settleBots(run(s, planCast(s, ap, sorcery)));
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
+    expect(s.objects[sorcery]!.zone).toBe("exile");
+    expect(s.players[opp]!.graveyard).not.toContain(sorcery);
+  });
+  it("not cast this turn: the permission ends", () => {
+    const { s: s0, ap, ids, opp } = setup([daredevil]);
+    const instant = putOnBattlefield(s0, opp, card("Quick Study", "Instant", "{U}", { oracleText: "Draw a card." }));
+    s0.battlefield.splice(s0.battlefield.indexOf(instant), 1);
+    s0.objects[instant]!.zone = "graveyard";
+    s0.players[opp]!.graveyard.push(instant);
+    let s = settleBots(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: instant }])));
+    expect(planCast(s, ap, instant)).not.toBeNull();
+    s = passUntil(s, "upkeep", opp);
+    expect(planCast(s, ap, instant)).toBeNull();
+  });
+});

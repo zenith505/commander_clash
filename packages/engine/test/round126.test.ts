@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { botActions, characteristics, isFullySupported, objHasKeyword, objIsType, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { botActions, characteristics, controllerOf, isFullySupported, objHasKeyword, objIsType, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -674,5 +674,43 @@ describe("Geode Golem: cast your commander free, paying the commander tax (CR 90
     expect(s.battlefield.filter((id) => s.objects[id]!.tapped).length).toBe(s0.battlefield.filter((id) => s0.objects[id]!.tapped).length);
     const b = botActions(s0, ap).reduce((x, a) => act(x, a), s0);
     expect(b.stack.some((x) => x.objectId === cmd)).toBe(true);
+  });
+});
+
+const athreos = card("Athreos, Shroud-Veiled", "Legendary Enchantment Creature — God", "{4}{W}{B}", {
+  power: "4",
+  toughness: "7",
+  keywords: ["Indestructible"],
+  oracleText: "Indestructible\nAs long as your devotion to white and black is less than seven, Athreos isn't a creature.\nAt the beginning of your end step, put a coin counter on another target creature.\nWhenever a creature with a coin counter on it dies or is put into exile, return that card to the battlefield under your control.",
+});
+
+describe("Athreos, Shroud-Veiled: a creature with a coin counter that dies or is exiled returns under your control", () => {
+  const scene = (spell: CardDef) => {
+    const { s, ap, ids, opp } = setup([spell]);
+    putOnBattlefield(s, ap, athreos);
+    const theirs = putOnBattlefield(s, opp, bears("Their Bear"));
+    const plain = putOnBattlefield(s, opp, bears("Other Bear"));
+    s.objects[theirs]!.counters.coin = 1;
+    return { s, ap, opp, spell: ids[0]!, theirs, plain };
+  };
+  const murder = card("Test Murder", "Instant", "{B}", { oracleText: "Destroy target creature." });
+  const path = card("Test Path", "Instant", "{W}", { oracleText: "Exile target creature." });
+  it("destroyed: it comes back under your control", () => {
+    supported(athreos);
+    const { s: s0, ap, spell, theirs } = scene(murder);
+    const s = settleBots(run(s0, planCast(s0, ap, spell, [{ kind: "object", id: theirs }])));
+    expect(s.objects[theirs]!.zone).toBe("battlefield");
+    expect(controllerOf(s, s.objects[theirs]!)).toBe(ap);
+  });
+  it("exiled: it comes back too", () => {
+    const { s: s0, ap, spell, theirs } = scene(path);
+    const s = settleBots(run(s0, planCast(s0, ap, spell, [{ kind: "object", id: theirs }])));
+    expect(s.objects[theirs]!.zone).toBe("battlefield");
+    expect(controllerOf(s, s.objects[theirs]!)).toBe(ap);
+  });
+  it("without a coin counter: it stays dead", () => {
+    const { s: s0, ap, spell, plain } = scene(murder);
+    const s = settleBots(run(s0, planCast(s0, ap, spell, [{ kind: "object", id: plain }])));
+    expect(s.objects[plain]!.zone).toBe("graveyard");
   });
 });

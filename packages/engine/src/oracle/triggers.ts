@@ -554,7 +554,7 @@ function enchantedControls(phrase: string): TargetSpec | null {
 
 // "Is put into a graveyard from the battlefield" is what "dies" means (CR 700.4), for any permanent.
 // "Is exiled from the battlefield" (Soulherder) is leaving it for exile (CR 406.3).
-const DIES_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) (dies|is put into a graveyard from the battlefield|leaves the battlefield(?: without dying)?|is (?:exiled|put into exile) from the battlefield), (.+)$/;
+const DIES_TRIGGER = /^When(?:ever)? (~ or another|another|an?) (.+?) (dies or is put into exile|dies|is put into a graveyard from the battlefield|leaves the battlefield(?: without dying)?|is (?:exiled|put into exile) from the battlefield), (.+)$/;
 
 /**
  * "Whenever another creature dies", "Whenever a creature you control dies", "Whenever ~ or another Zombie
@@ -590,7 +590,10 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // "Whenever another Zombie you control dies, if it didn't have decayed, ..." (Wilhelt): an intervening if (CR 603.4) on
   // the creature as it last existed (CR 603.10a), which can't change, so part of what dies.
   const exiled = !attached && /^is (?:exiled|put into exile) /.test(m![3]!);
-  const leaves = !attached && (m![3]!.startsWith("leaves") || exiled);
+  // "Whenever a creature with a coin counter on it dies or is put into exile" (Athreos, Shroud-Veiled): from the
+  // battlefield to either one (CR 700.4, 603.6c).
+  const diesOrExiled = !attached && m![3] === "dies or is put into exile";
+  const leaves = !attached && (m![3]!.startsWith("leaves") || exiled || diesOrExiled);
   // "Whenever another creature you control leaves the battlefield, if it didn't die, ..." (Taeko): where it went can't
   // change, so it's part of the event, like "without dying".
   const didntDie = leaves && /^if it didn't die, /.exec(bodyText);
@@ -650,7 +653,7 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
       ...(kind === "~ or another" ? { orSelf: true } : {}),
       ...(damaged ? { damagedBySelf: true } : {}),
       ...(leaves ? { leaves: true as const } : {}),
-      ...(exiled ? { toZones: ["exile"] as ("graveyard" | "exile")[] } : {}),
+      ...(exiled ? { toZones: ["exile"] as ("graveyard" | "exile")[] } : diesOrExiled ? { toZones: ["graveyard", "exile"] as ("graveyard" | "exile")[] } : {}),
       ...(notDies ? { notDies: true as const } : {}),
       ...(hadCounter ? { hadCounter: hadKindOf ?? (true as const) } : {}),
     },

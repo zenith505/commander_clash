@@ -2356,6 +2356,11 @@ function chooseWord(s: GameState, pid: PlayerId, options: string[]): string {
     const best = Math.max(0, ...s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature")).map((id) => power(s, obj(s, id))));
     return best <= 2 ? "fame" : "fortune";
   }
+  // Master of Ceremonies: a card with a short hand, a creature with few of them, else a Treasure.
+  if (options.join() === "money,friends,secrets") {
+    if (player(s, pid).hand.length <= 3) return "secrets";
+    return s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature")).length <= 2 ? "friends" : "money";
+  }
   return options[0]!;
 }
 

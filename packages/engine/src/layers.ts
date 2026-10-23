@@ -700,6 +700,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
       const p = s.players[you];
       return !p || p.combatDamagedTurn === undefined || p.combatDamagedTurn < (p.lastTurnBegan ?? 0);
     }
+    case "playerCombatDamaged":
+      return (s.turnLog?.combatDamageSubtypes ?? []).some((t) => t === "*" || t === cond.subtype);
     case "opponentSearched":
       return (s.turnLog?.searched ?? []).some((p) => p !== you);
     case "opponentEntered": {

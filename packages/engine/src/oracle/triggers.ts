@@ -1423,7 +1423,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // count; a new object starts over, CR 400.7).
   const once = /^(.+?) This ability triggers only once each turn\.?$/.exec(line);
   if (once) {
-    const t = parseTrigger(once[1]!);
+    // "Whenever a counter is put on a creature you control, ..." (Hollowmurk Siege): once for each counter, but only the
+    // first of them each turn does anything, so it's the same as "one or more counters".
+    const t = parseTrigger(once[1]!.replace(/^Whenever a counter is put on (a creature you control|another creature you control), /, "Whenever one or more counters are put on $1, "));
     return t && t !== "fail" && !t.oncePerTurn && t.event !== "state" ? { ...t, oncePerTurn: true } : "fail";
   }
   // "You may draw a card. Do this only once each turn." (CR 603.2h): it triggers only if its controller hasn't done it

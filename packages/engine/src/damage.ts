@@ -235,6 +235,11 @@ export function dealDamage(
         const by = (((s.turnLog ??= {}).combatDamagedBy ??= {})[p.id] ??= []);
         if (!by.includes(`${from.id}@${zc}`)) by.push(`${from.id}@${zc}`);
       }
+      if (src.types.includes("Creature")) {
+        const seen = ((s.turnLog ??= {}).combatDamageSubtypes ??= []);
+        // A changeling has every creature type (CR 702.73a): "*".
+        for (const t of from && from.zone === "battlefield" && characteristics(s, from).allCreatureTypes ? ["*"] : src.subtypes) if (!seen.includes(t)) seen.push(t);
+      }
       if (src.commanderId) p.commanderDamage[src.commanderId] = (p.commanderDamage[src.commanderId] ?? 0) + n;
       // Freerunning (CR 702.173a): an Assassin creature or a commander, as it was when it dealt the damage, lets its
       // controller pay freerunning costs this turn.

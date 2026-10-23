@@ -33,6 +33,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (m[2]) n = typeof n === "number" ? 2 * n : { ...n, times: 2 * (n.times ?? 1) };
     return [{ type: "getRad", who, n }];
   }
+  // "Each creature gets twice -X/-X until end of turn" (Nuclear Fallout): -X/-X with X doubled.
+  if ((m = /^(.+? gets?) twice ([+-]X\/[+-]X .+)$/.exec(s))) {
+    const fx = parseSentence(`${m[1]} ${m[2]}`, ctx);
+    const pt = fx?.length === 1 && fx[0]!.type === "continuous" && fx[0]!.mods.length === 1 ? fx[0]!.mods[0]! : undefined;
+    if (fx?.[0]?.type !== "continuous" || pt?.kind !== "modifyPT") return null;
+    const twice = (a: Amount): Amount | null => (typeof a === "object" && "count" in a && a.count.kind === "x" && !a.times ? { ...a, times: 2 } : null);
+    const [power, toughness] = [twice(pt.power), twice(pt.toughness)];
+    return power && toughness ? [{ ...fx[0]!, mods: [{ ...pt, power, toughness }] }] : null;
+  }
 
   // "You get an emblem with "..."", "Each opponent gets an emblem with ...", "Target opponent gets ..." (CR 114.2), one
   // or more quoted abilities ('with "..." and "..."'). "This emblem" in them is the emblem; a quoted ability inside one

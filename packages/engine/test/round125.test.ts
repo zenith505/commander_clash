@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { botActions, compileCard, isFullySupported, manaValue, planActivate, planCast, spellCost, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { botActions, power, compileCard, isFullySupported, manaValue, planActivate, planCast, spellCost, waitingOn, type Action, type CardDef, type GameState } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -420,5 +420,111 @@ describe("Biomancer's Familiar: adapting as though it had no +1/+1 counters (CR 
     }
     expect(s.objects[f]!.tapped).toBe(true);
     expect(s.objects[a]!.counters["+1/+1"]).toBe(4);
+  });
+});
+
+const hollowmurk = card("Hollowmurk Siege", "Enchantment", "{B}{G}", {
+  oracleText: "As this enchantment enters, choose Sultai or Abzan.\n• Sultai — Whenever a counter is put on a creature you control, draw a card. This ability triggers only once each turn.\n• Abzan — Whenever you attack, put a +1/+1 counter on target attacking creature. It gains menace until end of turn.",
+});
+const fallout = card("Nuclear Fallout", "Sorcery", "{X}{B}{B}", { oracleText: "Each creature gets twice -X/-X until end of turn. Each player gets X rad counters." });
+const monarch = card("Lost Monarch of Ifnir", "Creature — Zombie Noble", "{3}{B}", {
+  power: "4", toughness: "4", keywords: ["Afflict", "Mill"],
+  oracleText: "Afflict 3 (Whenever this creature becomes blocked, defending player loses 3 life.)\nOther Zombies you control have afflict 3.\nAt the beginning of your second main phase, if a player was dealt combat damage by a Zombie this turn, mill three cards, then you may return a creature card from your graveyard to your hand.",
+});
+const ceremonies = card("Master of Ceremonies", "Creature — Rhino Druid", "{3}{W}", {
+  power: "3", toughness: "4", keywords: ["Treasure"],
+  oracleText: "At the beginning of your upkeep, each opponent chooses money, friends, or secrets. For each player who chose money, you and that player each create a Treasure token. For each player who chose friends, you and that player each create a 1/1 green and white Citizen creature token. For each player who chose secrets, you and that player each draw a card.",
+});
+const counterOn = card("Test Counter Spell", "Sorcery", "{G}", { oracleText: "Put a +1/+1 counter on target creature." });
+const names = (s: GameState, pid: number) => s.battlefield.filter((id) => s.objects[id]!.controller === pid).map((id) => s.cards[s.objects[id]!.cardId]!.name);
+
+describe("Hollowmurk Siege, Sultai: \"whenever a counter is put on a creature you control\", only once each turn", () => {
+  it("the first counter draws a card; the second doesn't, nor does one on an opponent's creature", () => {
+    supported(hollowmurk);
+    const { s: s0, ap, ids, opp } = setup([counterOn, counterOn, counterOn]);
+    const siege = putOnBattlefield(s0, ap, hollowmurk);
+    s0.objects[siege]!.chosen = { anchor: "Sultai" };
+    const mine = putOnBattlefield(s0, ap, card("Grizzly Bears", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    const theirs = putOnBattlefield(s0, opp, card("Grizzly Bears", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    const hand = s0.players[ap]!.hand.length;
+    let s = settleBots(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: theirs }])));
+    expect(s.players[ap]!.hand.length).toBe(hand - 1);
+    s = settleBots(run(s, planCast(s, ap, ids[1]!, [{ kind: "object", id: mine }])));
+    expect(s.players[ap]!.hand.length).toBe(hand - 1);
+    s = settleBots(run(s, planCast(s, ap, ids[2]!, [{ kind: "object", id: mine }])));
+    expect(s.players[ap]!.hand.length).toBe(hand - 2);
+    expect(s.objects[mine]!.counters["+1/+1"]).toBe(2);
+  });
+});
+
+describe("Nuclear Fallout: twice -X/-X, then X rad counters each", () => {
+  it("X = 1: each creature gets -2/-2; every player gets a rad counter", () => {
+    supported(fallout);
+    const { s: s0, ap, ids, opp } = setup([fallout]);
+    const b = putOnBattlefield(s0, opp, card("Grizzly Bears", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    const g = putOnBattlefield(s0, ap, card("Hill Giant", "Creature — Giant", "{3}{R}", { power: "3", toughness: "3" }));
+    const s = settleBots(run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "auto", 1)));
+    expect(s.objects[b]!.zone).toBe("graveyard");
+    expect(s.objects[g]!.zone).toBe("battlefield");
+    expect(power(s, s.objects[g]!)).toBe(1);
+    expect(s.players.every((p) => p.rad === 1)).toBe(true);
+  });
+});
+
+describe("Lost Monarch of Ifnir: \"if a player was dealt combat damage by a Zombie this turn\"", () => {
+  const swing = (s0: GameState, ap: number, opp: number, attacker: string) => {
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker, defender: opp }] });
+    return untilChoice(passUntil(s, "main2"));
+  };
+  it("after a Zombie's combat damage: mill three, then return a creature card", () => {
+    supported(monarch);
+    const { s: s0, ap, opp } = setup([]);
+    const m = putOnBattlefield(s0, ap, monarch);
+    const bearCard = toHand(s0, ap, card("Grizzly Bears", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }))[0]!;
+    s0.players[ap]!.hand.splice(s0.players[ap]!.hand.indexOf(bearCard), 1);
+    s0.objects[bearCard]!.zone = "graveyard";
+    s0.players[ap]!.graveyard.push(bearCard);
+    const library = s0.players[ap]!.library.length;
+    let s = swing(s0, ap, opp, m);
+    expect(s.players[opp]!.life).toBe(s0.players[opp]!.life - 4);
+    expect(s.players[ap]!.library.length).toBe(library - 3);
+    expect(s.pending?.player).toBe(ap);
+    s = settleBots(s);
+    expect(s.players[ap]!.hand.some((id) => s.cards[s.objects[id]!.cardId]!.types.includes("Creature"))).toBe(true);
+  });
+  it("a non-Zombie's combat damage: nothing", () => {
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, monarch);
+    const hill = putOnBattlefield(s0, ap, card("Hill Giant", "Creature — Giant", "{3}{R}", { power: "3", toughness: "3" }));
+    const library = s0.players[ap]!.library.length;
+    const s = swing(s0, ap, opp, hill);
+    expect(s.players[opp]!.life).toBe(s0.players[opp]!.life - 3);
+    expect(s.players[ap]!.library.length).toBe(library);
+  });
+});
+
+describe("Master of Ceremonies: each opponent chooses money, friends, or secrets", () => {
+  it("you and each chooser get what they chose: a Treasure, a Citizen, a card", () => {
+    supported(ceremonies);
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, ceremonies);
+    const opps = s0.turnOrder.filter((p) => p !== ap);
+    const want: Record<number, string> = { [opps[0]!]: "money", [opps[1]!]: "friends", [opps[2]!]: "money" };
+    let s = passUntil(s0, "upkeep", ap);
+    const hands = s.players.map((p) => p.hand.length);
+    for (let i = 0; i < 40 && (s.stack.length || s.triggerQueue.length || s.pending); i++) {
+      const p = s.pending;
+      if (p?.kind === "chooseOption" && p.what === "word") {
+        expect(p.prompt).toBe("choose money, friends, or secrets");
+        s = act(s, { type: "chooseOption", player: p.player, choice: want[p.player]! });
+      } else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(names(s, ap).filter((n) => n === "Treasure Token")).toHaveLength(2);
+    expect(names(s, ap).filter((n) => n === "Citizen Token")).toHaveLength(1);
+    expect(names(s, opps[0]!).filter((n) => n === "Treasure Token")).toHaveLength(1);
+    expect(names(s, opps[1]!).filter((n) => n === "Citizen Token")).toHaveLength(1);
+    expect(names(s, opps[2]!).filter((n) => n === "Treasure Token")).toHaveLength(1);
+    expect(s.players[ap]!.hand.length).toBe(hands[ap]);
   });
 });

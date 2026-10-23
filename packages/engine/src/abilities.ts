@@ -784,7 +784,9 @@ export type PlayerRef =
   /** "~'s controller" (Xantcha, which any player may activate): its source's controller, not necessarily this ability's, as it last existed (CR 608.2h). */
   | { ref: "selfController" }
   /** "Whose controller was dealt combat damage by ~ this turn" (Steel Hellkite): the players this object dealt combat damage to this turn. */
-  | { ref: "combatDamagedBySelf" };
+  | { ref: "combatDamagedBySelf" }
+  /** "Each player who chose money" (Master of Ceremonies): those who chose that word in this one's "each opponent chooses". */
+  | { ref: "choseWord"; option: string };
 
 export type DamageRecipient =
   | ObjRef
@@ -1244,6 +1246,8 @@ export type StaticCondition =
    * your previous turn (Player.lastTurnBegan; the whole game if you haven't had one) until now.
    */
   | { kind: "noCombatDamageSinceLastTurn" }
+  /** "If a player was dealt combat damage by a Zombie this turn" (Lost Monarch of Ifnir): by a creature of that type. */
+  | { kind: "playerCombatDamaged"; subtype: string }
   /** "If an opponent was dealt 7 or more damage this turn" (Spinerock Knoll): in total, from any sources (rulings). */
   | { kind: "opponentDealtDamage"; n: number }
   /** "If you attacked with three or more creatures this turn" (Windbrisk Heights): different creatures you declared as attackers. */

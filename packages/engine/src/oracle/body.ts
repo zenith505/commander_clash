@@ -3326,11 +3326,12 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       continue;
     }
     // "Each opponent chooses fame or fortune" (Seize the Spotlight): words chosen in APNAP order (CR 101.4), not a vote.
-    const choosesWord = /^Each (opponent|player) chooses ([a-z]+) or ([a-z]+)$/.exec(s);
+    // "Each opponent chooses money, friends, or secrets" (Master of Ceremonies).
+    const choosesWord = /^[Ee]ach (opponent|player) chooses (?:([a-z]+), )?([a-z]+),? or ([a-z]+)$/.exec(s);
     if (choosesWord) {
-      if (ctx.chooseWords || ctx.vote || choosesWord[2] === choosesWord[3]) return null;
-      const options = [choosesWord[2]!, choosesWord[3]!];
-      effects.push({ type: "eachChooses", who: { ref: choosesWord[1] === "opponent" ? "eachOpponent" : "eachPlayer" }, options, text: `choose ${options.join(" or ")}` });
+      const options = choosesWord.slice(2).filter((w): w is string => !!w);
+      if (ctx.chooseWords || ctx.vote || new Set(options).size !== options.length) return null;
+      effects.push({ type: "eachChooses", who: { ref: choosesWord[1] === "opponent" ? "eachOpponent" : "eachPlayer" }, options, text: `choose ${options.length > 2 ? `${options.slice(0, -1).join(", ")}, or ${options.at(-1)}` : options.join(" or ")}` });
       ctx.chooseWords = options;
       continue;
     }
@@ -3341,6 +3342,20 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     if (perVote) {
       if (!ctx.vote!.options?.includes(perVote[1]!)) return null;
       effects.push({ type: "controlFromEach", votedFor: perVote[1]!, duration: "game" });
+      continue;
+    }
+    // "For each player who chose money, you and that player each create a Treasure token" (Master of Ceremonies): you, once
+    // for each of them, and each of them once.
+    const youAndThey = /^For each player who chose ([a-z]+), you and that player each (create|draw) (.+)$/.exec(s);
+    if (youAndThey) {
+      if (!ctx.chooseWords?.includes(youAndThey[1]!)) return null;
+      const yours = parseOne(`For each player who chose ${youAndThey[1]}, ${youAndThey[2]} ${youAndThey[3]}`, ctx);
+      const theirs = parseOne(`Each opponent ${youAndThey[2]}s ${youAndThey[3]}`, ctx);
+      const who = { ref: "choseWord" as const, option: youAndThey[1]! };
+      if (!yours || theirs?.length !== 1) return null;
+      const t = theirs[0]!;
+      if (!((t.type === "createToken" || t.type === "draw") && t.who.ref === "eachOpponent")) return null;
+      effects.push(...yours, { ...t, who });
       continue;
     }
     const fromEach = /^For each player who chose ([a-z]+), gain control of a creature that player controls until end of turn$/.exec(s);

@@ -1243,6 +1243,8 @@ export interface TurnLog {
   noncombatDamage?: Record<number, number>;
   /** For each player, the sources (`id@zoneChanges`) that dealt them combat damage (Steel Hellkite). */
   combatDamagedBy?: Record<number, string[]>;
+  /** The creature types of the creatures that dealt combat damage to a player, as they dealt it (Lost Monarch of Ifnir). */
+  combatDamageSubtypes?: string[];
   /**
    * "Once during each of your turns, you may cast ... from your graveyard" (Karador), Muldrotha's "a permanent spell of
    * each permanent type": the permissions used, `id@zoneChanges:slot` (a new object gets a new one, rulings).

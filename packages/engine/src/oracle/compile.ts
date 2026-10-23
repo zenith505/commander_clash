@@ -2327,6 +2327,13 @@ export function compile(d: CardDef): CompiledCard {
       out.noLoyaltyAbilities = true;
       continue;
     }
+    {
+      const stay = /^([A-Z][a-z]+) counters can't be removed from permanents your opponents control\.$/.exec(line);
+      if (stay) {
+        out.opponentsCountersStay = stay[1]!.toLowerCase();
+        continue;
+      }
+    }
     if (line === "During your turn, your opponents can't cast spells or activate abilities of artifacts, creatures, or enchantments.") {
       out.opponentsCantCastYourTurn = true;
       out.opponentsCantActivateYourTurn = true;
@@ -2912,9 +2919,15 @@ function linkExile(out: CompiledCard) {
   // Imprint (an ability word, CR 207.2c): "{T}: Add one mana of any of the exiled card's colors" (Chrome Mox) is
   // linked to the one ability that exiles it as it enters (CR 607.2a).
   if (out.mana.some((m) => m.produces.kind === "colorsAmong" && m.produces.linked)) {
-    const imprints = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e) => e.type === "takeFromHand" && e.action === "exile");
-    if (imprints.length !== 1 || out.triggers.some((t) => allEffects(t.body.effects).some((e) => e.type === "returnLinked"))) out.unsupported.push("(its mana ability can't be linked to one imprint ability)");
-    else (imprints[0] as Extract<Effect, { type: "takeFromHand" }>).linked = true;
+    const enters = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects));
+    const imprints = enters.filter((e) => e.type === "takeFromHand" && e.action === "exile");
+    // Pit of Offerings: "When this land enters, exile up to three target cards from graveyards", its only exile.
+    const yardExiles = enters.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
+    const others = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)].flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || e.type === "returnLinked");
+    if (out.triggers.some((t) => allEffects(t.body.effects).some((e) => e.type === "returnLinked"))) out.unsupported.push("(its mana ability can't be linked to one imprint ability)");
+    else if (imprints.length === 1) (imprints[0] as Extract<Effect, { type: "takeFromHand" }>).linked = true;
+    else if (!imprints.length && yardExiles.length === 1 && others.length === 1) yardExiles[0]!.linked = true;
+    else out.unsupported.push("(its mana ability can't be linked to one imprint ability)");
   }
   // Extraplanar Lens: "a land with the same name as the exiled card" is the one its imprint ability exiled (CR 607.2a).
   if (out.manaTriggers?.some((t) => t.sameNameAsLinked)) {
@@ -3065,8 +3078,10 @@ function checkCastingLinks(out: CompiledCard) {
       visit(o.otherwise);
       return;
     }
-    if ((o.ref === "sacrificed" || o.kind === "sacrificedSuspected" || o.kind === "sacrificedLegendary") && !canSac) bad = true;
+    if (((o.ref === "sacrificed" && !o.revealedCost) || o.kind === "sacrificedSuspected" || o.kind === "sacrificedLegendary") && !canSac) bad = true;
     if (o.ref === "sacrificed" && o.exiledCost && !exileCost) bad = true;
+    // "The revealed card" needs one card revealed as a cost, and nothing sacrificed or exiled to share the record.
+    if (o.ref === "sacrificed" && o.revealedCost && !revealCost) bad = true;
     // "The exiled card" of an "Exile a nonland card from your hand" cost (Jhoira of the Ghitu): that ability's own cost.
     if (o.ref === "costExiled" && !handExileCost) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
@@ -3085,13 +3100,17 @@ function checkCastingLinks(out: CompiledCard) {
   let canSac = !!out.additionalCosts?.some((c) => c.kind === "sacrifice");
   let exileCost = false;
   let handExileCost = false;
+  const oneReveal = (costs: AdditionalCost[] | undefined) => !!costs?.some((c) => c.kind === "reveal" && c.n === 1) && !costs.some((c) => c.kind === "sacrifice" || c.kind === "forage");
+  let revealCost = oneReveal(out.additionalCosts);
   visit([out.spell, out.triggers, out.statics, out.mana]);
   for (const ab of out.activated) {
     canSac = !!ab.costs?.some((c) => c.kind === "sacrifice");
     exileCost = !!ab.costs?.some((c) => c.kind === "sacrifice" && c.exile);
     handExileCost = !!ab.costs?.some((c) => c.kind === "exileFromHand" && !c.toLibrary && c.n === 1);
+    revealCost = oneReveal(ab.costs);
     visit(ab);
   }
+  revealCost = false;
   exileCost = false;
   handExileCost = false;
   visit([out.costMods, out.activationTaxes]);

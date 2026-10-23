@@ -2,7 +2,7 @@ import type { Effect, Modification, TokenSpec } from "../abilities";
 import { abilitiesOf, basePowerNow, cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } from "../cards";
 import { attackablePermanentProblem, attackedName, attackingPermanentOf, auraHostKey, auraHostLabels, auraHostOptions, clearCombat, draw, enterTogether, livingPlayers, log, provokersOf, moveObject, obj, opponents, player, removeFromCombat, tapPermanent, untapPermanent, whileControlledHolds, whileTappedHolds } from "../game";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
-import { putPlayerCounters, putCounters, tokenBatch, withPutter } from "../counters";
+import { countersStay, putPlayerCounters, putCounters, removableCounters, tokenBatch, withPutter } from "../counters";
 import { compileCard } from "../oracle";
 import type { ContinuousEffect, GameObject, GameState, ObjectId, PlayerId } from "../types";
 import { setFace } from "../faces";
@@ -608,9 +608,9 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         const o = obj(s, id);
         if (k <= 0) continue;
         if (self) {
-          // Only as many as are still on it.
+          // Only as many as are still on it (and can come off it, Fear of Sleep Paralysis).
           const has = self.counters[e.counter] ?? 0;
-          const m = Math.min(k, has);
+          const m = Math.min(k, removableCounters(s, self, e.counter));
           if (m <= 0) continue;
           self.counters[e.counter] = has - m;
           invalidateCharacteristics(s);
@@ -671,7 +671,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       let counter = e.counter;
       if (counter === "any") {
         // "Move a counter": a kind it has, chosen as it resolves (rulings on Nesting Grounds).
-        const kinds = Object.keys(from.counters).filter((k) => (from.counters[k] ?? 0) > 0);
+        const kinds = Object.keys(from.counters).filter((k) => removableCounters(s, from, k) > 0);
         const sc = (s.resolving!.scratch ??= {});
         if (kinds.length > 1 && sc.counterKind === undefined) {
           s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "counterKind", options: kinds, labels: kinds.map((k) => `A ${k} counter`), prompt: `choose the kind of counter to move from ${characteristics(s, from).name} onto ${characteristics(s, to).name}` };
@@ -680,7 +680,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         counter = sc.counterKind ?? kinds[0] ?? "";
         sc.counterKind = undefined;
       }
-      if (!(from.counters[counter] ?? 0)) return;
+      // A counter that can't be removed doesn't move: none is put on the other one either (rulings on Fear of Sleep Paralysis).
+      if (!removableCounters(s, from, counter)) return;
       from.counters[counter]! -= 1;
       const put = putCounters(s, to, counter, 1);
       invalidateCharacteristics(s);
@@ -709,7 +710,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     case "removeCounters":
       for (const o of objects(s, e.what, ctx)) {
         const had = o.counters[e.counter] ?? 0;
-        const n = Math.min(had, e.n === "all" ? had : amountNow(s, e.n, ctx));
+        const can = removableCounters(s, o, e.counter);
+        const n = Math.min(can, e.n === "all" ? had : amountNow(s, e.n, ctx));
         if (n <= 0) continue;
         o.counters[e.counter] = had - n;
         // "For each charge counter removed this way" (Coalition Relic).
@@ -732,7 +734,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const left = (k: string) => (o!.counters[k] ?? 0) - (picked[k] ?? 0);
       const count = () => Object.values(picked).reduce((a, b) => a + b, 0);
       while (o && count() < n && !sc.countersDone) {
-        const kinds = Object.keys(o.counters).filter((k) => left(k) > 0);
+        const kinds = Object.keys(o.counters).filter((k) => left(k) > 0 && !countersStay(s, o, k));
         if (!kinds.length) break;
         if (sc.counterKind !== undefined) {
           if (sc.counterKind === "done") sc.countersDone = true;
@@ -798,7 +800,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       return;
     case "removeAllCounters":
       for (const o of objects(s, e.what, ctx)) {
-        const kinds = Object.entries(o.counters).filter(([, n]) => n > 0);
+        const kinds = Object.entries(o.counters).filter(([k, n]) => n > 0 && !countersStay(s, o, k));
         if (!kinds.length) continue;
         const total = kinds.reduce((a, [, n]) => a + n, 0);
         for (const [kind] of kinds) o.counters[kind] = 0;
@@ -813,7 +815,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       const from = objects(s, e.from, ctx)[0];
       const to = objects(s, e.to, ctx)[0];
       if (!from || !to || from.id === to.id) return;
-      const kinds = Object.entries(from.counters).filter(([, n]) => n > 0);
+      const kinds = Object.entries(from.counters).filter(([k, n]) => n > 0 && !countersStay(s, from, k));
       for (const [kind, n] of kinds) {
         from.counters[kind] = 0;
         // Put onto the other one, so replacement effects and "whenever counters are put" apply (Nexus Mentality rulings).
@@ -830,7 +832,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       if (!o) return;
       const name = characteristics(s, o).name;
       const had = o.counters[e.counter] ?? 0;
-      if (had > 0) {
+      if (removableCounters(s, o, e.counter) > 0) {
         o.counters[e.counter] = had - 1;
         log(s, `${name} loses a ${e.counter} counter (${had - 1} left).`);
         if (had === 1) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: e.counter });

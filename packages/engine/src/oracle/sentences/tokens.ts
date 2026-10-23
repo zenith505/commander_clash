@@ -73,7 +73,7 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // same as with the name last.
   // "... token named Lightning Rager with trample, haste, and "..."" (Rite of the Raging Storm) likewise.
   if ((m = /^(.+? creature tokens?) named ([A-Z][\w'-]*(?: [A-Z][\w'-]*)*) with (.+)$/.exec(s))) return parseSentence(`${m[1]} with ${m[3]} named ${m[2]}`, ctx);
-  if ((m = new RegExp(`^(?:(.+?) creates|(?:You )?[Cc]reate) ${NUMX} (tapped (?:and attacking )?)?(\\d+|X)/(\\d+|X) (.+?) creature tokens?(?: with (.+?))?(?: named ([A-Z][\\w'-]*(?: (?:of |the )?[A-Z][\\w'-]*)*))?(?: that(?:'s| are) (tapped(?: and attacking)?|attacking|blocking that creature))?$`, "i").exec(s))) {
+  if ((m = new RegExp(`^(?:(.+?) creates|(?:You )?[Cc]reate) ${NUMX} (tapped (?:and attacking )?)?(\\d+|X)/(\\d+|X) (.+?) creature tokens?(?: with (.+?))?(?: named ([A-Z][\\w'-]*(?: (?:of |the )?[A-Z][\\w'-]*)*))?(?: that(?:'s| are) (tapped(?: and attacking(?: that player)?)?|attacking|blocking that creature))?$`, "i").exec(s))) {
     const xx = m[4] === "X" || m[5] === "X";
     // "An X/1 red Phyrexian Horror creature token" (Urabrask's Forge): only its power is X.
     const xPower = m[4] === "X" && m[5] !== "X";
@@ -84,7 +84,9 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     // "That's attacking" (Brimaz): attacking, untapped; "that's blocking that creature": blocking the creature it means.
     const blocking = /blocking that creature/.test(how) ? parseObject("that creature", ctx) : undefined;
     if (/blocking/.test(how) && !blocking) return null;
-    const state = { ...(/tapped/.test(how) ? { tapped: true } : {}), ...(/attacking/.test(how) ? { attacking: true } : {}), ...(/attacking/.test(how) && !/tapped/.test(how) ? { untapped: true as const } : {}), ...(blocking ? { blocking } : {}), ...(xx ? { pt: X } : {}), ...(xPower ? { ptPowerOnly: true as const } : {}) };
+    // "That's tapped and attacking that player" (Soaring Lightbringer): the player "whenever you attack a player" is about.
+    if (/that player/.test(how) && !ctx.eventPlayer) return null;
+    const state = { ...(/that player/.test(how) ? { attackingEvent: true as const } : {}), ...(/tapped/.test(how) ? { tapped: true } : {}), ...(/attacking/.test(how) ? { attacking: true } : {}), ...(/attacking/.test(how) && !/tapped/.test(how) ? { untapped: true as const } : {}), ...(blocking ? { blocking } : {}), ...(xx ? { pt: X } : {}), ...(xPower ? { ptPowerOnly: true as const } : {}) };
     const named = m[8] ? { name: m[8], named: true as const } : {};
     return token && who ? [{ type: "createToken", who, n: amt(m[2]!), token: { ...token, ...named }, ...state }] : null;
   }
@@ -114,12 +116,15 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // A named legendary token (CR 111.4, 205.4d): "Create Ragavan, a legendary 2/1 red Monkey creature token", "create The
   // Atropal, a legendary 4/4 black God Horror creature token with deathtouch". In its quoted abilities the token's name
   // means the token itself ("When Smaug dies, ...").
-  if ((m = /^(?:(.+?) creates|(?:You )?[Cc]reate) ((?:The )?[A-Z][\w'-]*(?: (?:the |of the |of )?[A-Z][\w'-]*)*), a legendary (\d+)\/(\d+) (.+?) creature token(?: with (.+))?$/.exec(s))) {
+  // Bonny Pall: "create Beau, a legendary blue Ox creature token with "Beau's power and toughness are each equal to ..."":
+  // no printed power and toughness, which its characteristic-defining ability sets (CR 604.3).
+  if ((m = /^(?:(.+?) creates|(?:You )?[Cc]reate) ((?:The )?[A-Z][\w'-]*(?: (?:the |of the |of )?[A-Z][\w'-]*)*), a legendary (?:(\d+)\/(\d+) )?(.+?) creature token(?: with (.+))?$/.exec(s))) {
+    if (m[3] === undefined && !/^"[^"]*'s power and toughness are each equal to [^"]+"$/.test(m[6] ?? "")) return null;
     const name = m[2]!;
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
     const esc = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const withText = m[6]?.replace(/"[^"]*"/g, (q) => q.replace(new RegExp(`(^"|\\. )?\\b${esc}\\b`, "g"), (_, start?: string) => (start ? `${start}This creature` : "this creature")));
-    const token = parseToken(Number(m[3]), Number(m[4]), m[5]!, withText);
+    const token = parseToken(Number(m[3] ?? 0), Number(m[4] ?? 0), m[5]!, withText);
     return token && who ? [{ type: "createToken", who, n: 1, token: { ...token, name, named: true, legendary: true } }] : null;
   }
   // "For each token you control, create a token that's a copy of that permanent" (Second Harvest), "For each creature
@@ -141,7 +146,8 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // Token copies (CR 707.2, 111.4): "Create a token that's a copy of target creature you control, except it
   // isn't legendary", "create two tokens that are copies of ~", "its controller creates a token that's a copy of it".
-  if ((m = new RegExp(`^(?:(.+?) creates|(?:You )?[Cc]reate) ${NUMX} (tapped (?:and attacking )?)?tokens? that(?:'s| are) (?:a copy|copies) of (.+?)(?:, except (.+))?$`, "i").exec(s))) {
+  if ((m = new RegExp(`^(?:(.+?) creates|(?:You )?[Cc]reate) ${NUMX} (tapped (?:and attacking (?:that player )?)?)?tokens? that(?:'s| are) (?:a copy|copies) of (.+?)(?:, except (.+))?$`, "i").exec(s))) {
+    if (m[3]?.includes("that player") && !ctx.eventPlayer) return null;
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
     // "A copy of it" after "exile target creature card from a graveyard": that card, now in exile (The Scarab God).
     const cardTargets = ctx.targets.flatMap((t, i) => (t.kind === "card" && !t.many ? [i] : []));
@@ -154,7 +160,7 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const what = what0?.ref === "subjectCard" && m[4] === "that card" ? { ...what0, printed: true as const } : what0;
     const except = m[5] ? parseCopyExcept(m[5], ctx.halfRound) : undefined;
     if (!who || !what || except === null || isGroup(what)) return null;
-    const state = { ...(m[3] ? { tapped: true } : {}), ...(m[3] && /attacking/.test(m[3]) ? { attacking: true } : {}) };
+    const state = { ...(m[3] ? { tapped: true } : {}), ...(m[3] && /attacking/.test(m[3]) ? { attacking: true } : {}), ...(m[3]?.includes("that player") ? { attackingEvent: true as const } : {}) };
     // "A copy of each of any number of target creatures" (Twinflame): one of each of them.
     const each = what.ref === "target" && what.n !== undefined && !what.card;
     if (each && amt(m[2]!) !== 1) return null;

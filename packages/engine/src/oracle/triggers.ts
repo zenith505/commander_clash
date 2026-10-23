@@ -617,6 +617,9 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   // cards go to their owners' graveyards (CR 404.2, 700.4).
   const yours = /^(When(?:ever)? (?:~ or another|another|an?) .+?) is put into your graveyard from the battlefield, /.exec(line);
   if (yours && !/ you (?:own|control)\b/.test(yours[1]!)) line = `${yours[1]} you own dies, ${line.slice(yours[0].length)}`;
+  // "Whenever a permanent you control is put into a graveyard" (Aetherworks Marvel): a permanent is only ever on the
+  // battlefield (CR 110.1), so from there (rulings).
+  line = line.replace(/^(When(?:ever)? (?:~ or another|another|an?) (?:\w+ )*permanents?(?: you control)?) is put into a graveyard, /, "$1 is put into a graveyard from the battlefield, ");
   const m = attached ? null : DIES_TRIGGER.exec(line);
   if (!attached && !m) return null;
   const ench = !attached && ENCHANTED_CONTROLS.test(m![2]!);

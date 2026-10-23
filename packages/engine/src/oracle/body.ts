@@ -208,6 +208,12 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx): Effect | null |
   // Encampment): once for each declaration of attackers this turn (CR 508.1, 603.7b).
   const attack = /^Whenever you attack this turn, (.+)$/.exec(s);
   if (attack) return floatingTrigger(`This turn, whenever you attack, ${attack[1]!}`, after, ctx);
+  // "When you next attack this turn, untap each creature you control" (All-Out Assault): the same, the first time only.
+  const nextAttack = /^When you next attack this turn, (.+)$/.exec(s);
+  if (nextAttack) {
+    const e = floatingTrigger(`This turn, whenever you attack, ${nextAttack[1]!}`, after, ctx);
+    return e?.type === "floatingTrigger" ? { ...e, once: true } : e;
+  }
   const m = /^([Uu]ntil end of turn|[Tt]his turn|[Uu]ntil your next turn|[Uu]ntil the end of your next turn), ([Ww]henever .+)$/.exec(s);
   if (!m) return undefined;
   const text = [m[2]!, ...after.map((x) => x.replace(/\.$/, ""))].join(". ");
@@ -601,6 +607,8 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Thousand-Faced Shadow: "create a token that's a copy of another target attacking creature. The token enters tapped and
   // attacking." (CR 508.4).
   text = text.replace(/\b([Cc]reate) a token that's a copy of ([^.]+)\. The token enters tapped and attacking\./, "$1 a tapped and attacking token that's a copy of $2.");
+  // Echoing Assault: "... The token enters tapped and attacking that player." after "Whenever you attack a player".
+  text = text.replace(/\b([Cc]reate) a token that's a copy of ([^.]+)\. The token enters tapped and attacking that player\./, "$1 a tapped and attacking that player token that's a copy of $2.");
   // Ichormoon Gauntlet: "choose a counter on target permanent. Put an additional counter of that kind on that permanent."
   text = text.replace(/\b[Cc]hoose a counter on (target [a-z ]+?)\. Put an additional counter of that kind on that permanent\./, "Put another counter of a kind already on $1 on it.");
   // Lim-Dûl's Vault: look at the top five; as many times as you choose, pay 1 life and put them on the bottom in any order,
@@ -1970,6 +1978,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     if (exTop && !exTop[1]) ctx.exiledTop = true;
+    // Neyali, Suns' Vanguard: "During any turn you attacked with a token, you may play that card." For as long as it stays
+    // exiled, in any turn its controller declared a token as an attacker (rulings), whatever became of Neyali.
+    if (exTop && !exTop[1] && !exEqual && !impulseIf && sentences[si + 1]?.replace(/\.$/, "") === "During any turn you attacked with a token, you may play that card") {
+      effects.push({ type: "impulse", n: 1, until: "exiled", attackedWithToken: true });
+      si++;
+      continue;
+    }
     // "Exile the top card of your library. You may cast that card. If you don't, ~ deals 2 damage to each opponent."
     // (Chandra, Torch of Defiance): cast as this resolves or not at all, paying its costs (rulings; CR 608.2g).
     const castTopElse = exTop && !exTop[1] && !exEqual && !impulseIf && sentences[si + 1]?.replace(/\.$/, "") === "You may cast that card" ? /^If you don't, (.+)$/.exec(sentences[si + 2]?.replace(/\.$/, "") ?? "") : null;
@@ -1986,6 +2001,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const free = playIt[3] ? { free: true as const } : {};
       if (free.free && (exTop[1] || exEqualN || impulseIf)) return null;
       const impulse: Effect = { type: "impulse", n: exEqualN ?? (exTop[1] ? amt(exTop[1]) : 1), until: !when ? "exiled" : /next end step/.test(when) ? "yourNextEndStep" : /next turn/.test(when) ? "nextTurn" : "thisTurn", ...free };
+      // Ignite the Future: "If this spell was cast from a graveyard, you may play cards this way without paying their mana
+      // costs": then each may be cast for its mana cost, an alternative cost, or without paying its mana cost (rulings).
+      const freeIf = !free.free && !impulseIf && ctx.spell && /^If ~ was cast from a graveyard, you may play cards this way without paying their mana costs\.?$/.test(sentences[si + 2] ?? "");
+      if (freeIf) {
+        effects.push({ type: "if", cond: { kind: "castFromGraveyard" }, effects: [{ ...impulse, free: true, orPay: true }], otherwise: [impulse] });
+        si += 2;
+        continue;
+      }
       effects.push(impulseIf && !impulseIf.not ? { type: "if", cond: impulseIf.cond, effects: [impulse] } : impulse);
       si++;
       continue;
@@ -2218,6 +2241,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!mv) return null;
       effects.push({ type: "may", effects: [{ type: "revealTop" }, { type: "if", cond: { kind: "revealedMv", mv }, effects: [{ type: "counterCause" }] }], text: "reveal the top card of your library" });
       si++;
+      continue;
+    }
+    // Aetherworks Marvel: "Look at the top six cards of your library. You may cast a spell from among them without paying
+    // its mana cost. Put the rest on the bottom of your library in a random order." Cast from the library as this resolves
+    // (CR 608.2g, rulings).
+    const lookCast = /^[Ll]ook at the top (two|three|four|five|six|seven|eight|nine|ten) cards of your library$/.exec(s);
+    if (lookCast && sentences[si + 1]?.replace(/\.$/, "") === "You may cast a spell from among them without paying its mana cost" && sentences[si + 2]?.replace(/\.$/, "") === "Put the rest on the bottom of your library in a random order") {
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: num(lookCast[1]!), reveal: true, look: true, max: 1, rest: { dest: "bottomRandom" } });
+      si += 2;
       continue;
     }
     const sunbird = /^[Rr]eveal the top X cards of your library, where X is (that spell's mana value)$/.exec(s);
@@ -2946,6 +2978,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       afterDig = [];
       noteLast(ctx, [done]);
       dig = null;
+      // Dihada, Binder of Wills: "Create a Treasure token for each card put into your graveyard this way": the rest that
+      // went there (not one a replacement effect sent elsewhere).
+      const forEachYard = done.rest === "graveyard" && !digPaid && !done.each ? /^(Create an? [^.]+? token) for each card put into your graveyard this way\.?$/.exec(sentences[si + 1] ?? "") : null;
+      if (forEachYard) {
+        const made = parseOne(forEachYard[1]!, ctx);
+        const token = made?.length === 1 ? made[0]! : undefined;
+        if (token?.type !== "createToken" || token.n !== 1) return null;
+        effects.push({ ...token, n: { count: { kind: "movedLinkedThisWay" } } });
+        si++;
+      }
       digPaid = null;
       continue;
     }
@@ -4083,6 +4125,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // your graveyard, then create a 0/1 colorless Eldrazi Spawn creature token for each card put into your graveyard this
     // way. Those tokens have "Sacrifice ~: Add {C}."": a delayed trigger about the cards just exiled to play, triggering
     // only if one is still there (CR 603.4, 603.7).
+    // Selective Obliteration: "Each player chooses a color. Then exile each permanent unless it's colorless or it's only the
+    // color its controller chose." In turn order (rulings), each player's color sparing only their own monocolored permanents.
+    if (/^Each player chooses a color$/.test(s) && /^(?:Then e|E)xile each permanent unless it's colorless or it's only the color its controller chose\.?$/.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "choose", choice: "color", each: true }, { type: "exile", what: { ref: "each", filter: { kind: "object", notOnlyControllersColor: true, text: "each permanent unless it's colorless or it's only the color its controller chose" } } });
+      si++;
+      continue;
+    }
     const leftovers = /^At the beginning of the next end step, if any of those cards remain exiled, put them into your graveyard$/.test(s) && /^(Create an? .+? token) for each card put into your graveyard this way\.?$/.exec(sentences[si + 1] ?? "");
     const leftoverHave = leftovers && /^Those tokens have "([^"]+)"\.?$/.exec(sentences[si + 2] ?? "");
     if (leftovers && leftoverHave && effects[effects.length - 1]?.type === "impulse") {

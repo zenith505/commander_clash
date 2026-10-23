@@ -1176,6 +1176,8 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
       } else if (e.rest === "graveyard") {
         if (rest.length) log(s, `${p.name} puts ${names(rest)} into their graveyard.`);
         for (const id of rest) moveObject(s, id, "graveyard");
+        // "For each card put into your graveyard this way" (Dihada): those that got there.
+        if (s.resolving) s.resolving.movedLinked = rest.filter((id) => s.objects[id]?.zone === "graveyard").length;
       } else if (e.rest === "keep") {
         // They stay on top, in the order they were in.
       } else if (e.rest === "hand") {

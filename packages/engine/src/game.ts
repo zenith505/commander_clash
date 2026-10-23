@@ -12,11 +12,11 @@ import { GRANTED_WAY_COSTS } from "./abilities";
 import { abilitiesOf, canBeSacrificed, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
 import { MANA_ABILITY_OFFSET, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
-import { bindBound, pickOptions, playerProtectedFrom, spellManaValue, targetsMatch } from "./effects/targeting";
+import { bindBound, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
 import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTargets, fitMany, manySlot, type CastHow } from "./modes";
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
-import { putCounters, tokenBatch } from "./counters";
+import { countersStay, putCounters, removableCounters, tokenBatch } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
 import { addCopyEffect, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, staticConditionNow } from "./layers";
@@ -1703,6 +1703,8 @@ export function tapPermanent(s: GameState, o: GameObject) {
 export function untapPermanent(s: GameState, o: GameObject) {
   if (!o.tapped) return;
   if ((o.counters.stun ?? 0) > 0) {
+    // Fear of Sleep Paralysis: the counter can't be removed, so it neither untaps nor loses it (rulings).
+    if (countersStay(s, o, "stun")) return;
     o.counters.stun! -= 1;
     log(s, `A stun counter is removed from ${defOf(s, o).name} instead of untapping it.`);
     return;
@@ -3220,7 +3222,7 @@ function linkedPlayPermission(s: GameState, o: GameObject, pid: PlayerId): false
  * How `pid` may play this exiled card now: its own permission, or a "play cards exiled with ~" one (any color of mana;
  * Valgavoth's for life equal to its mana value, `life`).
  */
-function exilePermission(s: GameState, o: GameObject, pid: PlayerId): (Pick<NonNullable<GameObject["mayPlay"]>, "anyType" | "free" | "cost" | "more"> & { life?: true }) | undefined {
+function exilePermission(s: GameState, o: GameObject, pid: PlayerId): (Pick<NonNullable<GameObject["mayPlay"]>, "anyType" | "free" | "orPay" | "cost" | "more"> & { life?: true }) | undefined {
   if (ownExilePermission(s, o, pid)) return o.mayPlay;
   const how = linkedPlayPermission(s, o, pid);
   return how === "anyType" ? { anyType: true } : how === "life" ? { life: true } : undefined;
@@ -3327,6 +3329,8 @@ function ownExilePermission(s: GameState, o: GameObject, pid: PlayerId): boolean
   // "For as long as Intet remains on the battlefield": that object (CR 400.7).
   if (m.until === "source" && !(m.source && s.objects[m.source.id]?.zone === "battlefield" && (s.objects[m.source.id]!.zoneChanges ?? 0) === m.source.zc)) return false;
   if (m.castOnly && isType(defOf(s, o), "Land")) return false;
+  // Neyali: only during a turn they attacked with a token.
+  if (m.attackedWithToken && s.players[pid]?.tokenAttackedTurn !== s.turn) return false;
   // "You may play one of those cards" (Nashi): not once one of them has been played.
   if (m.oneOf && s.oneOfUsed?.includes(m.oneOf)) return false;
   // "For each nonland card type, ... a spell of that type" (Aminatou's Augury): a type still free for it.
@@ -3594,7 +3598,10 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   // What its source was as it was activated, before it's sacrificed (CR 106.3): a Treasure, a snow permanent, ...
   const from = manaOriginsOf(s, o);
   // Pay the costs (CR 602.2b, 605.3a), then add the mana.
-  const manaPaid = ab.manaCost ? spendFromPool(s, p.id, activationLessCost(s, o, parseManaCost(ab.manaCost)), { ability: o }) : null;
+  // Doubling Cube's cost is paid with the mana from the pool chosen for it (`combo`).
+  const payCost = ab.produces.kind === "doublePool" ? parseManaCost(combos![combo!]!.map((m) => `{${m}}`).join("")) : ab.manaCost ? activationLessCost(s, o, parseManaCost(ab.manaCost)) : null;
+  const manaPaid = payCost ? spendFromPool(s, p.id, payCost, { ability: o }) : null;
+  if (payCost && !manaPaid) throw new RulesError("not enough mana");
   if (ab.tap) tapPermanent(s, o);
   // Tapped for mana (CR 106.12): triggers that aren't mana abilities wait for the stack (CR 605.1b, 603.3). Only if it
   // makes mana (CR 106.12a): not a storage land tapped removing no counters (rulings on Bottomless Vault).
@@ -3936,7 +3943,8 @@ export function castProblem(
   // Cast from exile without paying its mana cost, or for airbend's {2} (CR 107.3b, 701.65a; rulings on Airbending Lesson).
   const fromExile = !free && !choices?.via && o.zone === "exile" ? exilePermission(s, o, pid) : undefined;
   if (fromExile?.cost && (choices?.alt || choices?.faceDown)) return `${d.name} can be cast from exile only for ${fromExile.cost}`;
-  if (fromExile?.free && !choices?.alt && x && manaX) return "X is 0 when a spell is cast without paying its mana cost";
+  // Ignite the Future's: with an X, its mana cost is paid instead (`orPay`).
+  if (fromExile?.free && !fromExile.orPay && !choices?.alt && x && manaX) return "X is 0 when a spell is cast without paying its mana cost";
   if (fromExile?.cost && !parseManaCost(fromExile.cost).hasX && x && manaX) return "X is 0 unless the cost you pay has {X}"; // airbend's {2} (CR 107.3b)
   if (madness && x && manaX && !parseManaCost(madness).hasX) return "X is 0 unless the cost you pay has {X}";
   // Open the Way: "X can't be greater than the number of players in the game" (a player who left isn't, CR 800.4a).
@@ -4079,7 +4087,8 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // "You may play that card without paying its mana cost" (Intet, CR 118.9): additional costs are still paid.
   // Prototyped isn't an alternative cost (CR 718.3): it's still free.
   const realAlt = how.alt && how.alt !== "prototype";
-  const freeFromExile = !!exiled?.free && !how.faceDown && !realAlt;
+  // "With or without paying its mana cost" (Ignite the Future): paying it only to choose an X other than 0.
+  const freeFromExile = !!exiled?.free && !how.faceDown && !realAlt && !(exiled.orPay && x > 0 && parseManaCost(d.manaCost).hasX);
   // "A spell cast this way costs {2} more" (Soul Partition): an increase (CR 601.2f).
   if (exiled?.more && !madness && freeCastOf(s, pid) !== o.id) mods.more += exiled.more;
   // A "Kicker {X}" is still paid, with its X (CR 118.9d).
@@ -4618,6 +4627,10 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
       const mine = kinds(d.subtypes, everyCreatureType(d));
       const theirs = Object.values(s.objects).flatMap((c) => (c.isCommander && c.owner === p.id ? kinds(characteristics(s, c).subtypes, characteristics(s, c).allCreatureTypes) : []));
       if (mine.some((x) => theirs.includes(x))) spentQueue.push(t);
+    } else if ("spell" in t) spentQueue.push(t); // checked once it's on the stack
+    // "Your commander": a commander you own (CR 903.3).
+    else if ("commander" in t) {
+      if (o.isCommander && o.owner === p.id) spentQueue.push(t);
     } else if ((isType(d, "Instant") || isType(d, "Sorcery")) && (!t.color || characteristics(s, o).colors.includes(t.color))) spentQueue.push(t);
   }
   if (fromCommand) p.commanderCasts[o.id] = (p.commanderCasts[o.id] ?? 0) + 1;
@@ -4696,7 +4709,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   });
   const item = s.stack[s.stack.length - 1]!;
   const stackId = item.id;
-  for (const t of spentQueue) s.triggerQueue.push({ sourceId: t.sourceId, sourceCardId: t.sourceCardId, sourceZc: t.sourceZc, controller: p.id, index: -1, body: t.body, cause: stackId });
+  for (const t of spentQueue) if (!("spell" in t) || spellMatches(s, t.spell, item)) s.triggerQueue.push({ sourceId: t.sourceId, sourceCardId: t.sourceCardId, sourceZc: t.sourceZc, controller: p.id, index: -1, body: t.body, cause: stackId });
   // "... the controller of the permanent it becomes sacrifices it at the beginning of the next cleanup step": about
   // the permanent it becomes as it enters (one more zone change, CR 400.7).
   if (flashSacrifice)
@@ -5501,7 +5514,7 @@ export function counterCostCandidates(s: GameState, pid: PlayerId, source: GameO
   return s.battlefield.flatMap((id) => {
     const x = obj(s, id);
     if (controllerOf(s, x) !== pid || (c.other && id === source.id) || !objectMatches(s, c.filter, x, pid, false)) return [];
-    return Object.entries(x.counters).filter(([k, n]) => n > 0 && (!c.counter || k === c.counter)).map(([kind, n]) => ({ id, kind, n }));
+    return Object.entries(x.counters).filter(([k, n]) => n > 0 && (!c.counter || k === c.counter) && !countersStay(s, x, k)).map(([kind, n]) => ({ id, kind, n }));
   });
 }
 
@@ -5620,7 +5633,15 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
       discarded?.push(...(choices.discard ?? []).map((id) => cardIdOf(obj(s, id))));
       discardCards(s, p.id, choices.discard ?? []);
     }
-    else if (c.kind === "reveal") log(s, `${p.name} reveals ${(choices.reveal ?? []).map((id) => nameOf(s, id)).join(", ")} from their hand.`);
+    else if (c.kind === "reveal") {
+      log(s, `${p.name} reveals ${(choices.reveal ?? []).map((id) => nameOf(s, id)).join(", ")} from their hand.`);
+      // "The revealed card's power" (Titan's Presence): as it last existed in the hand, wherever it goes (rulings).
+      for (const id of choices.reveal ?? []) {
+        const o = obj(s, id);
+        const ch = characteristics(s, o);
+        sacrificed.push({ power: ch.power, toughness: ch.toughness, manaValue: defMv(defOf(s, o)), counters: {}, copyKey: cardIdOf(o) });
+      }
+    }
     else if (c.kind === "mill") {
       const n = millCount(s, p.id, c.n);
       log(s, `${p.name} mills ${n === 1 ? "a card" : `${n} cards`}.`);
@@ -5713,6 +5734,8 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (ab.tap && o.tapped) return `${d.name} is tapped`;
   if (ab.tap && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${d.name} has summoning sickness`; // CR 602.5a
   if (ab.untapSelf && !o.tapped) return `${d.name} is untapped`; // CR 107.6
+  // A stun counter that can't be removed keeps it tapped, so {Q} can't be paid (rulings on Fear of Sleep Paralysis).
+  if (ab.untapSelf && (o.counters.stun ?? 0) > 0 && countersStay(s, o, "stun")) return `${d.name}'s stun counter can't be removed`;
   if (ab.untapSelf && objIsType(s, o, "Creature") && tapAbilitySick(s, o)) return `${d.name} has summoning sickness`; // CR 302.6
   if (ab.sacrificeSelf && o.zone === "battlefield" && !canBeSacrificed(s, o)) return `${d.name} can't be sacrificed`; // CR 701.21, 602.2b
   if (ab.oncePerTurn && (o.activatedThisTurn?.filter((n) => n === index).length ?? 0) >= (ab.keyword === "Boast" && boastsTwice(s, pid) ? 2 : 1)) return `${d.name}'s ability can be activated only ${ab.keyword === "Boast" && boastsTwice(s, pid) ? "twice" : "once"} each turn`; // CR 602.5b
@@ -5736,7 +5759,7 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   if (lifeCost && payableLife(s, p.id) < lifeCost) return `you can't pay ${lifeCost} life`; // CR 119.4, 119.8
   const half = halfLifeCost(s, p.id, ab);
   if (half && payableLife(s, p.id) < half + lifeCost) return `you can't pay ${half} life`; // CR 119.4, 119.8
-  if (ab.removeCounters && (o.counters[ab.removeCounters.counter] ?? 0) < ab.removeCounters.n) return `${d.name} doesn't have ${ab.removeCounters.n} ${ab.removeCounters.counter} counter${ab.removeCounters.n === 1 ? "" : "s"} to remove`;
+  if (ab.removeCounters && removableCounters(s, o, ab.removeCounters.counter) < ab.removeCounters.n) return `${d.name} doesn't have ${ab.removeCounters.n} ${ab.removeCounters.counter} counter${ab.removeCounters.n === 1 ? "" : "s"} to remove`;
   if (ab.energyCost && (p.energy ?? 0) < ab.energyCost) return `you need ${ab.energyCost} energy`; // CR 107.14
   if (ab.crew !== undefined) {
     const cp = crewProblem(s, pid, o, ab.crew, tapCreatures, ab.saddle);
@@ -6875,6 +6898,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   // "Each player chooses a creature type": one more for "a type chosen this way".
   if (pend.what === "creatureType" && r.scratch?.eachAsked && r.chosen?.types) r.chosen = { ...r.chosen, types: [...r.chosen.types, choice] };
+  else if (pend.what === "color" && r.scratch?.eachAsked && r.chosen?.colorsBy) r.chosen = { ...r.chosen, colorsBy: { ...r.chosen.colorsBy, [p.id]: withChoice({}, "color", choice).color! } };
   else r.chosen = withChoice(r.chosen, pend.what, choice);
   log(s, `${p.name} chooses ${pend.what === "opponent" ? player(s, Number(choice)).name : choice}${pend.what === "opponent" ? ` for ${pend.source}` : ""}.`);
   continueResolution(s);
@@ -7529,6 +7553,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   // Attacking and "each time it has attacked this turn" (Moraug) change what the layers give it.
   if (attacks.length) invalidateCharacteristics(s);
   if (attacks.length) p.attackedTurn = s.turn; // raid
+  if (attacks.some((a) => obj(s, a.attacker).isToken)) p.tokenAttackedTurn = s.turn; // Neyali
   const w = p.attackedWith?.turn === s.turn ? p.attackedWith.keys : [];
   const keys = attacks.map((a) => `${a.attacker}@${obj(s, a.attacker).zoneChanges ?? 0}`);
   if (attacks.length) p.attackedWith = { turn: s.turn, keys: [...new Set([...w, ...keys])] };

@@ -5,6 +5,13 @@ import { textKeywords, isKeywordLine } from "./keyword-abilities";
 import { parseKeywordList } from "./targets";
 import { layerOf } from "../layers";
 
+/**
+ * A quoted ability inside a quoted ability is in single quotes ('... token with 'This token gets +1/+1 ...'', Urza's Saga;
+ * '... token with flying and '{R}: This token gets +1/+0 until end of turn.'', Nesting Dragon): double quotes once it's
+ * an ability of its own.
+ */
+export const innerQuotes = (text: string) => text.replace(/ (with|and) '([^']+?\.)'/g, ' $1 "$2"');
+
 /** Can we run an ability given in quotes (a token's or one granted to something)? */
 export function compileQuoted(text: string): boolean {
   const c = compile({ name: "Quoted Ability Source", oracleText: text, types: [], subtypes: [], supertypes: [], keywords: [], colors: [], colorIdentity: [], manaCost: "", oracleId: "" } as unknown as CardDef);
@@ -18,7 +25,7 @@ export function compileGranted(text: string): CompiledCard {
   if (!hit) {
     // A quoted ability inside the granted one is in single quotes ('... token with 'This token gets +1/+1 ...'', Urza's
     // Saga): double quotes once it's an ability of its own.
-    const own = text.replace(/ with '([^']+?\.)'/g, ' with "$1"');
+    const own = innerQuotes(text);
     // An equip ability given to Equipment (Puresteel Paladin's "Equipment you control have equip {0}").
     const subtypes = /^Equip \{\d+\}$/.test(text) ? ["Equipment"] : [];
     hit = compile({ name: "", oracleText: own, types: [], subtypes, supertypes: [], keywords: [], colors: [], colorIdentity: [], manaCost: "", cmc: 0, typeLine: "", oracleId: `granted:${text}` });

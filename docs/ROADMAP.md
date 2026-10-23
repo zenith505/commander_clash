@@ -1,7 +1,7 @@
 # Roadmap
 
-23,566 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,469 of 4,988 (89%).
+23,600 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,491 of 4,988 (90%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,14 +22,17 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 131, most played first: Doubling Cube (its mana has to be
-   worked out after its {3} is paid, and the UI lists mana options before costs; restrictions on the mana aren't
-   copied, rulings), Slicer, Neyali, Ignite the Future, Blitzball ("an opponent was dealt combat damage by a legendary
-   creature this turn"), Rona, Titan's Presence (the revealed card's power, as it last existed in your hand), Dihada,
-   Selective Obliteration, Bonny Pall, Pit of Offerings, Mana Sculpt, Study Hall, Yuna, Jeweled Amulet, Clavileño,
-   Echoing Assault, Atraxa, Grand Unifier, Lord of the Nazgûl (protection from Ring-bearers), Aetherworks Marvel, Fear
-   of Sleep Paralysis (stun counters can't be removed: every way counters are removed or moved has to check it), Krark,
-   All-Out Assault, Nesting Dragon. Smaller gaps from round 131: Thundermane Dragon checks a creature card's printed
+00. Most played first (`npm run popular`). Out after round 132, most played first: Slicer (the opponent gains control
+   of it until end of turn, it's goaded and can't be sacrificed, else it converts), Rona's back face (a random card
+   exiled from the hand of a source's controller, then put onto the battlefield or cast free), Oscorp Industries
+   (mayhem), Yuna, Grand Summoner (counters for the next creature cast; "if it had counters on it"), Jeweled Amulet
+   ("note the type of mana spent to pay this activation cost"), Clavileño (becomes a Demon and gains a quoted dies
+   trigger), Ral, Monsoon Mage (exile it and return it transformed on a won flip), Aang, Swift Savior, The Book of
+   Exalted Deeds, Inspirit, Retether, Sower of Discord, Bumi, Detection Tower, Rashmi, Communal Brewing, Rose Room
+   Treasurer, Sphinx's Tutelage. Karazikar's "whenever an opponent attacks another one of your opponents" has no rulings
+   on planeswalkers and battles, so it stays out. Smaller gaps from round 132: bots and autopay never use Doubling Cube
+   (it's offered in its own menu only); bots choose Selective Obliteration's color by the worth of their own one-color
+   permanents and take Atraxa's cards one at a time, the first that fits. Smaller gaps from round 131: Thundermane Dragon checks a creature card's printed
    power (a */* card counts as 0); with several "cast from the top" permissions the one that gives haste is used;
    Hoarder's Overflow ("When ~ enters and whenever you expend 4"), Blood Operative and Council's Deliberation
    ("whenever you surveil, if ~ is in your graveyard") are out; bots answer Zada's copy order with the first creature

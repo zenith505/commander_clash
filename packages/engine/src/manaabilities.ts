@@ -12,6 +12,7 @@ import { canPayFromPool, manaOriginsOf } from "./spend";
 import { compileCard, compileGranted } from "./oracle";
 import { nameActivationBan } from "./names";
 import { sameName } from "./faces";
+import { removableCounters } from "./counters";
 import { COLORS, type Action, type Color, type GameObject, type GameState, type ManaOrigin, type ManaType, type ObjectId, type PlayerId } from "./types";
 
 /** activatedThisTurn holds activated ability indexes; mana abilities are recorded past this offset. */
@@ -98,6 +99,7 @@ export function manaChoices(s: GameState, o: GameObject, ab: ManaAbility): ManaT
   // "For each color among permanents you control": all of them at once, whichever is named (none with no color).
   if (p.kind === "eachColorAmong") return eachColorAmong(s, o);
   if (p.kind === "devotion") return [...COLORS];
+  if (p.kind === "doublePool") return [...COLORS, "C"];
   return commanderIdentity(s, controllerOf(s, o));
 }
 
@@ -153,7 +155,24 @@ export function anyColorsCount(s: GameState, o: GameObject, p: Extract<ManaProdu
 /** The combinations an ability is activated with (ManaOption.combo), or null if it has none to choose from. */
 export function manaCombos(s: GameState, o: GameObject, ab: ManaAbility): ManaType[][] | null {
   const p = ab.produces;
-  return p.kind === "combos" ? p.options : p.kind === "removeX" ? removeXCombos(o, p) : p.kind === "anyColors" ? colorCombos(anyColorsCount(s, o, p), p.colors) : null;
+  return p.kind === "combos" ? p.options : p.kind === "removeX" ? removeXCombos(o, p) : p.kind === "anyColors" ? colorCombos(anyColorsCount(s, o, p), p.colors) : p.kind === "doublePool" ? doublePoolPayments(s, o, ab) : null;
+}
+
+/**
+ * Doubling Cube (ManaProduce "doublePool"): each way to pay its mana cost with the mana in its controller's pool, as
+ * the types of mana spent (CR 601.2h, 605.3a). The pool is what's doubled, so the cost is paid from the pool only.
+ */
+export function doublePoolPayments(s: GameState, o: GameObject, ab: ManaAbility): ManaType[][] {
+  const pid = controllerOf(s, o);
+  const pool = player(s, pid).manaPool;
+  const cost = activationLessCost(s, o, parseManaCost(ab.manaCost));
+  if (cost.symbols.some((x) => x.kind !== "generic")) return [];
+  const n = cost.symbols.reduce((a, x) => a + (x.kind === "generic" ? x.amount : 0), 0);
+  const types: ManaType[] = [...COLORS, "C"];
+  let ways: ManaType[][] = [[]];
+  for (let i = 0; i < n; i++)
+    ways = ways.flatMap((w) => types.filter((m) => types.indexOf(m) >= types.indexOf(w[w.length - 1] ?? "W") && w.filter((x) => x === m).length < pool[m]).map((m) => [...w, m]));
+  return ways.filter((w) => canPayFromPool(s, pid, parseManaCost(w.map((m) => `{${m}}`).join("")), { ability: o }));
 }
 
 /**
@@ -190,6 +209,13 @@ function baseManaProduced(s: GameState, o: GameObject, ab: ManaAbility, choice: 
   const p = ab.produces;
   if (p.kind === "combos") return p.options[combo ?? -1] ?? [];
   if (p.kind === "removeX") return removeXCombos(o, p)[combo ?? -1] ?? [];
+  if (p.kind === "doublePool") {
+    // As much again of each type as is left in the pool once that payment is made.
+    const paid = doublePoolPayments(s, o, ab)[combo ?? -1];
+    if (!paid) return [];
+    const pool = player(s, controllerOf(s, o)).manaPool;
+    return ([...COLORS, "C"] as ManaType[]).flatMap((m) => Array<ManaType>(Math.max(0, pool[m] - paid.filter((x) => x === m).length)).fill(m));
+  }
   if (p.kind === "anyColors") return colorCombos(anyColorsCount(s, o, p), p.colors)[combo ?? -1] ?? [];
   if ((p.kind === "fixed" || p.kind === "oneOf") && p.n) {
     // CR 106.1: worked out as the ability resolves, with the permanent as "~" and its controller as "you".
@@ -223,6 +249,8 @@ export interface ManaOption {
   combo?: number;
   /** A storage land's: how many counters it removes. */
   removes?: number;
+  /** Doubling Cube's: the mana from the pool that pays its cost (ManaProduce "doublePool"). */
+  pays?: ManaType[];
   adds: ManaType[];
   extra?: ManaType[];
   /** The part of `adds` that's snow mana (CR 107.4h): its own if the source is snow, a triggered ability's if that one's is. */
@@ -307,7 +335,8 @@ export function manaOptions(s: GameState, o: GameObject): ManaOption[] {
     return picks.flatMap(({ mana, combo }) => {
       const adds = manaProduced(s, o, ab, mana, combo);
       const removed = ab.produces.kind === "removeX" ? { removes: combos![combo!]!.length } : {};
-      return manaTriggerResults(s, pid, o, ab, adds, sources).map((r) => ({ ability, mana, ...(combo !== undefined ? { combo } : {}), ...removed, adds: [...adds, ...r.adds], ...(r.extra.length ? { extra: r.extra } : {}), ...snowPart(s, o, adds, r) }));
+      const pays = ab.produces.kind === "doublePool" ? { pays: combos![combo!]! } : {};
+      return manaTriggerResults(s, pid, o, ab, adds, sources).map((r) => ({ ability, mana, ...(combo !== undefined ? { combo } : {}), ...removed, ...pays, adds: [...adds, ...r.adds], ...(r.extra.length ? { extra: r.extra } : {}), ...snowPart(s, o, adds, r) }));
     });
   });
 }
@@ -356,7 +385,7 @@ export function manaAbilityProblem(s: GameState, pid: PlayerId, o: GameObject, i
   const p = player(s, pid);
   if (ab.lifeCost && payableLife(s, pid) < ab.lifeCost) return `you need ${ab.lifeCost} life to pay`; // CR 119.4, 119.8
   if (ab.energyCost && (p.energy ?? 0) < ab.energyCost) return `you need ${ab.energyCost} energy`; // CR 107.14
-  if (ab.removeCounters && (o.counters[ab.removeCounters.counter] ?? 0) < ab.removeCounters.n) return `${name} doesn't have enough ${ab.removeCounters.counter} counters`;
+  if (ab.removeCounters && removableCounters(s, o, ab.removeCounters.counter) < ab.removeCounters.n) return `${name} doesn't have enough ${ab.removeCounters.counter} counters`;
   if (ab.produces.kind === "removeX" && (o.counters[ab.produces.counter] ?? 0) < ab.produces.min) return `${name} has no ${ab.produces.counter} counters`;
   if (!ignorePool && ab.manaCost && !canPayFromPool(s, pid, activationLessCost(s, o, parseManaCost(ab.manaCost)), { ability: o })) return "not enough mana";
   // "Tap an untapped creature you control" (CR 602.2b): without a choice, whether there's enough to tap.

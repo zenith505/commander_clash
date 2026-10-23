@@ -200,7 +200,7 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // "Tapped and attacking": its controller declares what each one attacks as it's created (CR 508.4; rulings on
       // Delina, Wild Mage: not necessarily what the source attacks). Asked for each before they're all created.
       const who = players(s, e.who, ctx);
-      const choices = e.attacking && who.length === 1 ? attackChoices(s, who[0]!, ctx.sourceId) : [];
+      const choices = e.attacking && !e.attackingEvent && who.length === 1 ? attackChoices(s, who[0]!, ctx.sourceId) : [];
       const sc = (s.resolving!.scratch ??= {});
       const picks: string[] = [];
       if (choices.length > 1) {
@@ -223,7 +223,7 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (auraHost === "paused") return "paused";
       if (s.resolving) s.resolving.created = [];
       enterTogether(s, () => {
-        for (const pid of who) tokenCopies(s, pid, base, n, ctx, { ...e, ...(attackAt.length ? { attackAt } : {}), ...(auraHost !== undefined ? { auraHost } : {}) });
+        for (const pid of who) tokenCopies(s, pid, base, n, ctx, { ...e, ...(attackAt.length ? { attackAt } : {}), ...(auraHost !== undefined ? { auraHost } : {}), ...(e.attackingEvent ? { attacking: false, tapped: true, defender: eventDefender(s, ctx, pid) } : {}) });
       });
       return;
     }
@@ -273,7 +273,7 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       // "That's attacking" (Brimaz, Hero of Bladehold): its controller chooses what each one attacks as it's created
       // (CR 508.4; rulings on Brimaz: not necessarily what the source attacks), asked for each before they're all created.
       let attackAt: ReturnType<typeof attackChoices> | undefined;
-      if (e.attacking && !e.attackingEach && !e.attachTo) {
+      if (e.attacking && !e.attackingEach && !e.attackingEvent && !e.attachTo) {
         const who = players(s, e.who, ctx);
         const choices = who.length === 1 ? attackChoices(s, who[0]!, ctx.sourceId) : [];
         if (choices.length > 1) {
@@ -304,6 +304,15 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       return;
     }
   }
+}
+
+/**
+ * "Tapped and attacking that player" after "Whenever you attack a player" (CR 508.4): the player the trigger is about, if
+ * it's still this player's combat and that player is still in the game; otherwise the token is only tapped.
+ */
+function eventDefender(s: GameState, ctx: ResolveCtx, pid: PlayerId): PlayerId | undefined {
+  const them = ctx.event?.player;
+  return them !== undefined && inCombat(s) && s.activePlayer === pid && !player(s, them).lost && opponents(s, pid).includes(them) ? them : undefined;
 }
 
 /** "Create N ... tokens" for each player it names. */
@@ -339,7 +348,7 @@ function createTokensFor(s: GameState, e0: Extract<Effect, { type: "createToken"
   for (const pid of players(s, e.who, ctx)) {
     const { same: k, extra } = tokenBatch(s, pid, e.token, n);
     // "Tapped and attacking" (CR 508.4): put onto the battlefield attacking, never declared as attackers.
-    const defender = e.attacking ? attackDefault(s, pid, ctx.sourceId) : undefined;
+    const defender = e.attackingEvent ? eventDefender(s, ctx, pid) : e.attacking ? attackDefault(s, pid, ctx.sourceId) : undefined;
     const counters = e.counters ? { [e.counters.counter]: amountNow(s, e.counters.n, ctx) } : undefined;
     const blocking = e.blocking ? objects(s, e.blocking, ctx)[0] : undefined;
     const tapped = e.tapped || (e.attacking && !e.untapped);

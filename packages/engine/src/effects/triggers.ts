@@ -518,11 +518,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (ft.toPlayer !== undefined && ft.toPlayer !== dealtTo) continue;
       if (self && (ft.about ? ft.about.id !== self.id || (self.zoneChanges ?? 0) !== ft.about.zc : o.id !== self.id || (o.zoneChanges ?? 0) !== ft.sourceZc)) continue;
       floating = ft;
+      const queued = s.triggerQueue.length;
       try {
         f(o, ft.controller, [ft.trigger]);
       } finally {
         floating = null;
       }
+      // "When you next ... this turn": gone once it has triggered (CR 603.7c).
+      if (ft.once && s.triggerQueue.length > queued) s.floatingTriggers = s.floatingTriggers!.filter((x) => x !== ft);
     }
   };
   if (ev.type === "enters") {
@@ -1790,7 +1793,7 @@ export function triggerBody(s: GameState, t: PendingTrigger): AbilityBody {
   const body = settleDivided(s, t.body ?? compileCard(s.cards[t.sourceCardId]!).triggers[t.index]!.body, { controller: t.controller, sourceId: t.sourceId, ...(t.sourceZc !== undefined ? { sourceZc: t.sourceZc } : {}), x: t.x ?? 0, ...(t.lki ? { lki: t.lki } : {}), ...(t.event ? { event: t.event } : {}), ...(t.cause ? { cause: t.cause } : {}), ...(t.tapped !== undefined ? { tapped: t.tapped } : {}), ...(t.rolled !== undefined ? { rolled: t.rolled } : {}) });
   // "Target creature that player controls": that player is known once it triggers.
   const who = t.event?.player;
-  const isEvent = (x: TargetSpec): boolean => x.controller === "eventPlayer" || x.protector === "eventPlayer" || !!x.notEventPlayer || !!x.anyOf?.some(isEvent);
+  const isEvent = (x: TargetSpec): boolean => x.controller === "eventPlayer" || x.protector === "eventPlayer" || x.attackingWhom === "eventPlayer" || !!x.notEventPlayer || !!x.anyOf?.some(isEvent);
   if (!body.targets.some(isEvent) && !body.modal?.modes.some((m) => m.targets?.some(isEvent))) return body;
   const fix = (x0: TargetSpec): TargetSpec => {
     const x = x0.anyOf ? { ...x0, anyOf: x0.anyOf.map(fix) } : x0;
@@ -1798,6 +1801,7 @@ export function triggerBody(s: GameState, t: PendingTrigger): AbilityBody {
       const { notEventPlayer: _, ...rest } = x;
       return { ...rest, notPlayer: who };
     }
+    if (x.attackingWhom === "eventPlayer" && who !== undefined) return fix({ ...x, attackingWhom: who });
     if (x.protector === "eventPlayer" && who !== undefined) {
       const { protector: _, ...rest } = x;
       return fix({ ...rest, protectedBy: who });

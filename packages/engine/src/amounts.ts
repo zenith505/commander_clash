@@ -303,8 +303,21 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       const o = item?.objectId ? s.objects[item.objectId] : undefined;
       return o?.zone === "stack" ? characteristics(s, o).colors.length : (item?.castColors?.length ?? 0);
     }
+    case "castSpellCommanderCasts": {
+      const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
+      const o = item?.objectId ? s.objects[item.objectId] : undefined;
+      return o ? (s.players[o.owner]?.commanderCasts[o.id] ?? 0) : 0;
+    }
     case "manaSpent":
       return ctx.manaSpent ?? 0;
+    case "manaSpentOn": {
+      const o = refObjects(s, c.of, ctx)[0];
+      if (!o) return 0;
+      if (o.zone === "stack") return o.manaSpent ?? 0;
+      // Countered by this spell earlier (CR 608.2h).
+      const countered = s.resolving?.countered?.[o.id];
+      return countered?.zc === (o.zoneChanges ?? 0) ? (countered.manaSpent ?? 0) : 0;
+    }
     case "webSlungMv":
       return ctx.webSlungMv ?? 0;
     case "treasureSpent":
@@ -692,8 +705,12 @@ function describeCount(c: Count): string {
       return "colors of mana spent";
     case "castSpellColors":
       return "that spell's colors";
+    case "castSpellCommanderCasts":
+      return "times it's been cast from the command zone";
     case "manaSpent":
       return "mana spent to cast it";
+    case "manaSpentOn":
+      return "mana spent to cast that spell";
     case "webSlungMv":
       return "the returned creature's mana value";
     case "greatestControlled":

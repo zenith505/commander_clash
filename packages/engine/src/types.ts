@@ -354,6 +354,10 @@ export interface GameObject {
     source?: { id: ObjectId; zc: number };
     /** "Without paying its mana cost" (CR 118.9). */
     free?: true;
+    /** With `free`: it may be cast paying its costs instead (Ignite the Future, rulings), as it is when X isn't 0. */
+    orPay?: true;
+    /** "During any turn you attacked with a token" (Neyali): only in a turn its player declared a token as an attacker (Player.tokenAttackedTurn). */
+    attackedWithToken?: true;
     /** "Mana of any type can be spent to cast it" (CR 609.4b). */
     anyType?: true;
     /** "If that spell would be put into a graveyard, exile it instead" (Dire Fleet Daredevil): see exileIfToGraveyard. */
@@ -727,6 +731,8 @@ export interface Player {
    * times it has tempted them, and their Ring-bearer (CR 701.54a-b), the creature it was as it was chosen.
    */
   ring?: { tempted: number; timestamp: number; bearer?: { id: ObjectId; zc: number } };
+  /** The last turn they declared a token as an attacker (Neyali's "during any turn you attacked with a token"; CR 508.1). */
+  tokenAttackedTurn?: number;
   /** The dungeon card they own in the command zone and the room their venture marker is on (CR 309.4). */
   dungeon?: { name: string; room: number };
   /** The dungeons they've completed, in order (CR 309.7). */
@@ -1268,6 +1274,8 @@ export interface TurnLog {
   combatDamagedBy?: Record<number, string[]>;
   /** The creature types of the creatures that dealt combat damage to a player, as they dealt it (Lost Monarch of Ifnir). */
   combatDamageSubtypes?: string[];
+  /** The players dealt combat damage by a legendary creature, legendary as it dealt it (Blitzball). */
+  legendaryCombatDamaged?: PlayerId[];
   /**
    * "Once during each of your turns, you may cast ... from your graveyard" (Karador), Muldrotha's "a permanent spell of
    * each permanent type": the permissions used, `id@zoneChanges:slot` (a new object gets a new one, rulings).
@@ -1396,7 +1404,7 @@ export interface GameState {
    * them (603.7d-e), `sourceZc` as it was then: an ability about "~" is about that object only (603.7c, 400.7). `turn`: the
    * turn it was made, for "until the end of your next turn".
    */
-  floatingTriggers?: { id: string; controller: PlayerId; sourceId: ObjectId; sourceCardId: string; sourceZc: number; fromSpell?: true; trigger: TriggeredAbility; until: TriggerDuration; turn: number; /** What its self events are about, if not its source (Effect floatingTrigger's `about`). */ about?: { id: ObjectId; zc: number }; /** Only for combat damage dealt to this player (`aboutPlayer`). */ toPlayer?: PlayerId }[];
+  floatingTriggers?: { id: string; controller: PlayerId; sourceId: ObjectId; sourceCardId: string; sourceZc: number; fromSpell?: true; trigger: TriggeredAbility; until: TriggerDuration; turn: number; /** What its self events are about, if not its source (Effect floatingTrigger's `about`). */ about?: { id: ObjectId; zc: number }; /** Only for combat damage dealt to this player (`aboutPlayer`). */ toPlayer?: PlayerId; /** It triggers only once ("when you next attack this turn"), then is gone. */ once?: true }[];
   /** Spells cast this turn, by anyone (storm, CR 702.40a). */
   spellsCastThisTurn?: number;
   /** Who cast each spell this turn, and its card (a key into `cards`) as it was cast: "can't cast more than one spell each turn". */
@@ -1681,6 +1689,8 @@ export interface Chosen {
   number?: number;
   /** "Each player chooses a creature type" (Patriarch's Bidding): every type chosen, in the order chosen. */
   types?: string[];
+  /** "Each player chooses a color" (Selective Obliteration): each player's color. */
+  colorsBy?: Record<number, Color>;
   /** Gluntch: the players chosen by Effect "choosePlayer", in the order chosen. */
   players?: PlayerId[];
 }
@@ -1788,7 +1798,7 @@ export interface Resolving {
   /** The cards this resolution's linked exiles took (Mimic Vat's "each other card exiled with ~"). */
   linkedNow?: ObjectId[];
   /** Spells with an X its counter instructions countered, as the cards they became, and the X they had (CR 202.3e). */
-  countered?: Record<ObjectId, { zc: number; x: number }>;
+  countered?: Record<ObjectId, { zc: number; x: number; /** The mana spent to cast it (Mana Sculpt). */ manaSpent?: number }>;
   /** The source of an activated or triggered ability its counter instructions countered (Tishana's Tidebinder). */
   counteredSource?: { id: ObjectId; zc: number };
   /** The card its "reveal the top card of your library" revealed (CR 701.20a), for "if it's a creature card, put it ...". */

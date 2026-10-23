@@ -5,6 +5,7 @@ import { COLORS, type CardDef, type Color, type GameObject, type GameState, type
 import { manaValue, parseManaCost } from "./mana";
 import { faceKey, isRoom, registerFace, registerRoom, restingDef, roomKey, sameName } from "./faces";
 import { objectMatches, printedMatches } from "./effects/targeting";
+import { isRingBearer } from "./effects/run-ring";
 
 /** The creature this one is paired with (CR 702.95b), if the pair still stands. See checkPairs for when it breaks. */
 export function pairedWith(s: GameState, o: GameObject): GameObject | undefined {
@@ -253,7 +254,11 @@ export const describeAbility = (d: CardDef, text: string) => `${d.name}: ${text.
 /** A permanent that was cast this turn: it entered as its spell resolved, this turn (Emrakul, the World Anew's protection). */
 export const wasCastThisTurn = (s: GameState, o: GameObject) => o.zone === "battlefield" && !!o.wasCast && o.enteredTurn === s.turn;
 /** Its characteristics as a source of protection-relevant quality, with whether it was cast this turn. */
-export const withCastThisTurn = <T extends object>(s: GameState, o: GameObject, c: T): T & { castThisTurn?: true } => (wasCastThisTurn(s, o) ? { ...c, castThisTurn: true as const } : c);
+export const withCastThisTurn = <T extends object>(s: GameState, o: GameObject, c: T): T & { castThisTurn?: true; ringBearer?: true } => {
+  const out: T & { castThisTurn?: true; ringBearer?: true } = wasCastThisTurn(s, o) ? { ...c, castThisTurn: true as const } : c;
+  return isRingBearer(s, o) ? { ...out, ringBearer: true as const } : out;
+};
+
 export const isPermanentCard = (d: CardDef) =>
   ["Artifact", "Creature", "Enchantment", "Land", "Planeswalker", "Battle"].some((t) => d.types.includes(t));
 export const hasKeyword = (d: CardDef, k: SupportedKeyword) => d.keywords.some((x) => x.toLowerCase() === k.toLowerCase());

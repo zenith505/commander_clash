@@ -469,6 +469,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           trigger: e.trigger,
           until: e.until,
           turn: s.turn,
+          ...(e.once ? { once: true as const } : {}),
         });
       }
       return;
@@ -701,7 +702,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     }
     case "counterSpell": {
       // The spell itself, if it's still on the stack (CR 701.6a).
-      if (e.cause) return ctx.cause && s.stack.some((x) => x.id === ctx.cause) ? counterOnStack(s, ctx, ctx.cause, src) : undefined;
+      // "Return that spell to its owner's hand" (Krark): not a counter (CR 701.6a), so even one that can't be countered.
+      if (e.cause) return ctx.cause && s.stack.some((x) => x.id === ctx.cause) ? counterOnStack(s, ctx, ctx.cause, src, undefined, e.bounce ? "hand" : undefined, e.bounce) : undefined;
       // "Exile any number of target spells" (Mindbreak Trap): each target still legal.
       if (e.exileSpell) {
         for (let k = e.index; k < e.index + (e.n ?? 1); k++) {
@@ -818,10 +820,12 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
     if (paid) return;
   }
   s.stack.splice(i, 1);
+  const spent = item.objectId ? s.objects[item.objectId]?.manaSpent : undefined;
   if (item.objectId) moveObject(s, item.objectId, instead === "exile" ? "exile" : instead === "hand" ? "hand" : instead ? "library" : "graveyard", instead === "libraryTop" ? { top: true } : {});
   // "Discover X, where X is that spell's mana value" (Hurl into History): with the X chosen for it (CR 202.3e, rulings).
   const gone = item.objectId && s.objects[item.objectId];
-  if (gone && item.x && s.resolving) (s.resolving.countered ??= {})[gone.id] = { zc: gone.zoneChanges ?? 0, x: item.x };
+  // "The amount of mana spent to cast that spell" (Mana Sculpt): as it was on the stack.
+  if (gone && (item.x || spent) && s.resolving) (s.resolving.countered ??= {})[gone.id] = { zc: gone.zoneChanges ?? 0, x: item.x ?? 0, ...(spent ? { manaSpent: spent } : {}) };
   if (item.kind !== "spell" && item.sourceId && s.resolving) s.resolving.counteredSource = { id: item.sourceId, zc: item.sourceZc ?? 0 };
   log(s, `${by} counters ${what}${!item.objectId ? "" : instead === "exile" ? " and exiles it" : instead === "hand" ? " and returns it to its owner's hand" : instead ? " and puts it on top of its owner's library" : ""}.`);
   // "Whenever a spell or ability you control counters a spell" (Baral): only a spell, and only when it's countered.

@@ -6,6 +6,7 @@ import { PREDEFINED_TOKENS } from "./oracle/tokens";
 import { abilitiesOf } from "./cards";
 import { controllerOf, characteristics, invalidateCharacteristics, keywordOfCounter } from "./layers";
 import type { GameObject, GameState, PlayerId } from "./types";
+import { opponents } from "./game";
 import { fireEvent } from "./effects";
 
 function modsInPlay(s: GameState): { mod: CountMod; controller: PlayerId; source: string }[] {
@@ -224,3 +225,20 @@ export function putCounters(s: GameState, o: GameObject, kind: string, n: number
   }
   return m;
 }
+
+/**
+ * Whether counters of `kind` can't be removed from `o` now: "Stun counters can't be removed from permanents your
+ * opponents control" (Fear of Sleep Paralysis). They can't be moved off it either, and an untap they'd replace does
+ * nothing (rulings).
+ */
+export function countersStay(s: GameState, o: GameObject, kind: string): boolean {
+  if (o.zone !== "battlefield") return false;
+  const pid = controllerOf(s, o);
+  return s.battlefield.some((id) => {
+    const x = s.objects[id]!;
+    return abilitiesOf(s, x).opponentsCountersStay === kind && opponents(s, controllerOf(s, x)).includes(pid);
+  });
+}
+
+/** How many counters of `kind` could be removed from `o` now (none that `countersStay`). */
+export const removableCounters = (s: GameState, o: GameObject, kind: string): number => (countersStay(s, o, kind) ? 0 : Math.max(0, o.counters[kind] ?? 0));

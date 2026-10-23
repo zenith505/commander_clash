@@ -2142,6 +2142,15 @@ export function compile(d: CardDef): CompiledCard {
       out.cantBeCountered = true;
       continue;
     }
+    // Thryx, the Sudden Storm: "Spells you cast with mana value 5 or greater cost {1} less to cast and can't be countered":
+    // two statics about the same spells.
+    const thryx = /^Spells you cast with mana value (\d+) or greater (cost \{\d+\} less to cast and )?can't be countered\.$/.exec(line);
+    if (thryx) {
+      (out.uncounterable ??= []).push({ filter: { kind: "spell", text: `spells you cast with mana value ${thryx[1]} or greater` }, minMv: Number(thryx[1]) });
+      if (!thryx[2]) continue;
+      // The cost half is read by the cost-change lines below.
+      line = `Spells you cast with mana value ${thryx[1]} or greater ${thryx[2].replace(/ and $/, "")}.`;
+    }
     // "Creature spells you control can't be countered." "Creature spells can't be countered." (CR 101.2)
     const uncounterable = /^(.*?)[Ss]pells( you control)? can't be countered\.$/.exec(line);
     if (uncounterable && !/\b(this turn|by)\b/.test(line)) {

@@ -5,7 +5,7 @@ import { characteristics, controllerOf, invalidateCharacteristics } from "../lay
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { castProblem, freeCastable, describeTargets, log, millCount, moveObject, newObject, obj, opponents, player } from "../game";
 import { compileCard, spellTargetSpecs } from "../oracle";
-import type { DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
+import type { CardDef, DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
 import { isLegalTarget, legalTargets, pickOptions, printedMatches, sameTarget, sourceQuality, spellManaValue, spellQuality, stampTargets, swapKeepsOthersLegal } from "./targeting";
 import { ResolveCtx, objects, amountNow, players } from "./resolve";
 import { closeZoneBatch, fireEvent } from "./triggers";
@@ -773,6 +773,12 @@ function counterOnStack(s: GameState, ctx: ResolveCtx, stackId: string | undefin
  * A spell that can't be countered (CR 101.2): its own "~ can't be countered", or a permanent's "Creature spells you
  * control can't be countered". The counter effect still does whatever else it does (rulings on Prowling Serpopard).
  */
+/** A spell's mana value on the stack: its mana cost with the X chosen for it (CR 202.3e). */
+const spellMv = (d: CardDef, x = 0) => {
+  const cost = parseManaCost(d.manaCost);
+  return manaValue(cost) + x * xCount(cost);
+};
+
 export function cantBeCountered(s: GameState, item: StackItem): boolean {
   const o = item.objectId ? s.objects[item.objectId] : undefined;
   if (!o) return false;
@@ -787,7 +793,7 @@ export function cantBeCountered(s: GameState, item: StackItem): boolean {
   if (!item.copy && isType(d, "Creature") && (s.turnRules ?? []).some((r) => r.turn === s.turn && r.player === item.controller && r.rule === "creatureSpellsUncounterable")) return true;
   return s.battlefield.some((id) => {
     const p = obj(s, id);
-    return !!abilitiesOf(s, p).uncounterable?.some((u) => (u.anyone || controllerOf(s, p) === item.controller) && printedMatches(u.filter, d));
+    return !!abilitiesOf(s, p).uncounterable?.some((u) => (u.anyone || controllerOf(s, p) === item.controller) && printedMatches(u.filter, d) && (u.minMv === undefined || (!item.copy && spellMv(d, item.x) >= u.minMv)));
   });
 }
 

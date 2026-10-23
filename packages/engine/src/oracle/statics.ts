@@ -158,7 +158,7 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
     return condition ? { ...self, condition } : null;
   }
   // "During your turn, equipped creature gets +1/+0": the statement starts a sentence of its own.
-  const st = parseStatic(`${statement.replace(/\bgets an additional\b/, "gets").replace(/^(it|this creature|this permanent)\b/i, "~").replace(/^(enchanted|equipped|creatures|other|commanders) /, (w) => w.charAt(0).toUpperCase() + w.slice(1))}.`);
+  const st = parseStatic(`${statement.replace(/\bgets an additional\b/, "gets").replace(/^(it|this creature|this permanent)\b/i, "~").replace(/^(enchanted|equipped|creatures|other|commanders|untap) /, (w) => w.charAt(0).toUpperCase() + w.slice(1))}.`);
   if (!st || st.condition) return null;
   // "This spell has flash as long as ...": it works from your hand, which a static ability of a permanent can't.
   if (st.mods.some((x) => x.kind === "addKeywords" && x.keywords.includes("Flash"))) return null;
@@ -304,7 +304,8 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   // "Spells you cast", "Instant and sorcery spells", "Noncreature spells", "Dragon spells", "Blue spells"
   // "Creature spells you cast with power 4 or greater" (Goreclaw): the spell's power as it's cast (see costModsFor).
   const pw = / with power (\d+) or (greater|less)$/.exec(m[4] ?? "");
-  const parsed = words ? parseTargetPhrase(`${words} spell${pw ? "" : (m[4] ?? "")}`) : { kind: "spell" as const, text: "spell" };
+  // "Spells you cast with mana value 5 or greater" (Thryx): the mana value bound with no other words.
+  const parsed = words || (m[4] && !pw) ? parseTargetPhrase(`${words ? `${words} ` : ""}spell${pw ? "" : (m[4] ?? "")}`) : { kind: "spell" as const, text: "spell" };
   if (!parsed || parsed.kind !== "spell" || (pw && !parsed.types?.includes("Creature"))) return "fail";
   const filter: TargetSpec = pw ? { ...parsed, power: pw[2] === "greater" ? { min: Number(pw[1]) } : { max: Number(pw[1]) } } : parsed;
   const who = m[3] === " you cast" ? "you" : m[3] === " your opponents cast" ? "opponents" : "all";

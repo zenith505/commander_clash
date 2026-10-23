@@ -4361,7 +4361,7 @@ export interface CompiledCard {
    * "Creature spells you control can't be countered", "Creature spells can't be countered", "Spells you control can't be
    * countered": spells matching `filter`, controlled by this permanent's controller unless `anyone` (CR 101.2).
    */
-  uncounterable?: { filter: TargetSpec; anyone?: true }[];
+  uncounterable?: { filter: TargetSpec; anyone?: true; /** Thryx: "spells you cast with mana value 5 or greater": X counted (rulings), copies weren't cast (CR 707.10). */ minMv?: number }[];
   /** "Your opponents can't cast spells during your turn." (a "can't" that wins over any "can", CR 101.2) */
   /** Compleated (CR 702.150a): two fewer loyalty counters for each Phyrexian symbol its caster paid with life. */
   compleated?: true;

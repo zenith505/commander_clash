@@ -901,3 +901,86 @@ describe("Increasing Devotion, Visions of Beyond, Clive // Ifrit, Heliod", () =>
     expect(manaValue(due.cost) + due.extra).toBe(5);
   });
 });
+
+describe("Thryx, the Sudden Storm and Quest for Renewal", () => {
+  const thryx = card("Thryx, the Sudden Storm", "Legendary Creature — Elemental Bird", "{3}{U}{U}", { power: "2", toughness: "2", keywords: ["Flash", "Flying"], oracleText: "Flash (You may cast this spell any time you could cast an instant.)\nFlying\nSpells you cast with mana value 5 or greater cost {1} less to cast and can't be countered." });
+  const counterspell = card("Counterspell", "Instant", "{U}{U}", { oracleText: "Counter target spell." });
+  const island = card("Island", "Basic Land — Island");
+  const big = card("Test Big Spell", "Sorcery", "{4}{U}", { oracleText: "Draw a card." });
+  const small = card("Test Small Spell", "Sorcery", "{3}{U}", { oracleText: "Draw a card." });
+  const xSpell = card("Test X Spell", "Sorcery", "{X}{U}", { oracleText: "Draw X cards." });
+  const toHand = (s: GameState, pid: number, def: CardDef) => {
+    const id = putOnBattlefield(s, pid, def);
+    s.battlefield.splice(s.battlefield.indexOf(id), 1);
+    s.objects[id]!.zone = "hand";
+    s.players[pid]!.hand.push(id);
+    return id;
+  };
+  const counterIt = (s0: GameState, opp: number) => {
+    let s = s0;
+    for (let i = 0; i < 4 && waitingOn(s) !== opp; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    const c = toHand(s, opp, counterspell);
+    s = run(s, planCast(s, opp, c, [{ kind: "stack", id: s.stack[0]!.id }]));
+    for (let i = 0; i < 20 && s.stack.length; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    return s;
+  };
+  it("a spell with mana value 5 or more costs {1} less and can't be countered; a smaller one can", () => {
+    supported(thryx);
+    const { s: s0, ap, ids, opp } = setup([big, small]);
+    putOnBattlefield(s0, ap, thryx);
+    putOnBattlefield(s0, opp, island);
+    putOnBattlefield(s0, opp, island);
+    const due = (id: string) => {
+      const c = spellCost(s0, ap, s0.objects[id]!);
+      return manaValue(c.cost) + c.extra;
+    };
+    expect(due(ids[0]!)).toBe(4);
+    expect(due(ids[1]!)).toBe(4);
+    let s = counterIt(run(s0, planCast(s0, ap, ids[0]!)), opp);
+    expect(s.objects[ids[0]!]!.zone).toBe("graveyard");
+    expect(logText(s)).not.toMatch(/Test Big Spell is countered/);
+    expect(s.players[ap]!.hand).not.toContain(ids[0]);
+    const { s: t0, ap: ap2, ids: ids2, opp: opp2 } = setup([small]);
+    putOnBattlefield(t0, ap2, thryx);
+    putOnBattlefield(t0, opp2, island);
+    putOnBattlefield(t0, opp2, island);
+    const h = t0.players[ap2]!.hand.length;
+    s = counterIt(run(t0, planCast(t0, ap2, ids2[0]!)), opp2);
+    expect(s.objects[ids2[0]!]!.zone).toBe("graveyard");
+    expect(s.players[ap2]!.hand.length).toBe(h - 1); // countered: no card drawn
+  });
+  it("an X spell counts the X chosen (CR 202.3e): X=4 makes mana value 5", () => {
+    const { s, ap, ids } = setup([xSpell]);
+    putOnBattlefield(s, ap, thryx);
+    const at = (x: number) => {
+      const c = spellCost(s, ap, s.objects[ids[0]!]!, x);
+      return manaValue(c.cost) + c.extra;
+    };
+    expect(at(4)).toBe(4);
+    expect(at(3)).toBe(4);
+  });
+  const quest = card("Quest for Renewal", "Enchantment", "{1}{G}", { oracleText: "Whenever a creature card is put into your graveyard from anywhere, you may put a quest counter on this enchantment.\nAs long as there are four or more quest counters on this enchantment, untap all creatures you control during each other player's untap step." });
+  it("Quest for Renewal: four quest counters untap your creatures during each other player's untap step", () => {
+    supported(quest);
+    const { s: s0, ap } = setup([]);
+    const q = putOnBattlefield(s0, ap, quest);
+    const bear = putOnBattlefield(s0, ap, card("Test Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    s0.objects[bear]!.tapped = true;
+    s0.objects[q]!.counters.quest = 3;
+    const next = s0.turnOrder[(s0.turnOrder.indexOf(ap) + 1) % 4]!;
+    // Discarding a creature card in the cleanup step triggers the quest: decline it.
+    const toUpkeep = (t: GameState) => {
+      for (let i = 0; i < 400 && !(t.step === "upkeep" && t.activePlayer === next); i++)
+        if (t.pending?.kind === "chooseMay") t = act(t, { type: "chooseMay", player: t.pending.player, yes: false });
+        else if (t.pending?.kind === "discardToHandSize") t = act(t, { type: "discard", player: t.pending.player, objectIds: t.players[t.pending.player]!.hand.slice(0, t.pending.count) });
+        else if (t.pending?.kind === "declareAttackers") t = act(t, { type: "declareAttackers", player: t.pending.player, attacks: [] });
+        else t = act(t, { type: "passPriority", player: waitingOn(t)! });
+      return t;
+    };
+    let s = toUpkeep(s0);
+    expect(s.objects[bear]!.tapped).toBe(true);
+    s0.objects[q]!.counters.quest = 4;
+    s = toUpkeep(s0);
+    expect(s.objects[bear]!.tapped).toBe(false);
+  });
+});

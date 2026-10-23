@@ -2885,7 +2885,8 @@ function linkExile(out: CompiledCard) {
   // with ~ into its owner's graveyard": the cards its one exile instruction exiled (CR 607.2a).
   if (!impulses.length && bodies.some((b) => allEffects(b.effects).some((e) => e.type === "moveLinked"))) {
     const all = bodies.flatMap((b) => allEffects(b.effects));
-    const exiles = all.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
+    // Nautiloid Ship: "exile target player's graveyard" is the one exile instruction too.
+    const exiles = all.filter((e): e is Extract<Effect, { type: "exile" | "exileGraveyard" }> => (e.type === "exile" && !e.until) || e.type === "exileGraveyard");
     const others = all.some((e) => (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
     if (!others && exiles.length === 1) exiles[0]!.linked = true;
   }

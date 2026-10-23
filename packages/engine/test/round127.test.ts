@@ -562,3 +562,47 @@ describe("Conspicuous Snoop: the activated abilities of the Goblin card on top o
     expect(manaAbilitiesOn(s, s.objects[sn]!)).toHaveLength(0);
   });
 });
+
+const nautiloid = card("Nautiloid Ship", "Artifact — Vehicle", "{4}", {
+  power: "6",
+  toughness: "6",
+  oracleText: "Flying\nWhen this Vehicle enters, exile target player's graveyard.\nWhenever this Vehicle deals combat damage to a player, you may put a creature card exiled with this Vehicle onto the battlefield under your control.\nCrew 3",
+});
+
+describe("Nautiloid Ship: a creature card from the graveyard it exiled (CR 607.2a)", () => {
+  it("exiles the graveyard as it enters; on combat damage, you choose one of its creature cards to put onto the battlefield", () => {
+    supported(nautiloid);
+    const { s: s0, ap, ids, opp } = setup([nautiloid]);
+    const victim = s0.turnOrder.find((p) => p !== ap && p !== opp)!;
+    const yard = [card("Dead Giant", "Creature — Giant", "{5}{R}", { power: "5", toughness: "5" }), card("Dead Elf", "Creature — Elf", "{G}", { power: "1", toughness: "1" }), card("Old Spell", "Sorcery", "{R}", { oracleText: "Draw a card." })].map((d) => {
+      const id = putOnBattlefield(s0, victim, d);
+      s0.battlefield.splice(s0.battlefield.indexOf(id), 1);
+      s0.objects[id]!.zone = "graveyard";
+      s0.players[victim]!.graveyard.push(id);
+      return id;
+    });
+    const crew = putOnBattlefield(s0, ap, card("Test Giant", "Creature — Giant", "{3}{R}", { power: "3", toughness: "3" }));
+    let s = cast(s0, ap, ids[0]!);
+    s = passAll(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: victim }] }));
+    expect(s.players[victim]!.graveyard).toHaveLength(0);
+    expect(yard.every((id) => s.objects[id]!.zone === "exile")).toBe(true);
+    s.objects[ids[0]!]!.controlledSinceTurn = -1;
+    s = passUntil(s, "beginCombat", ap);
+    s = passAll(run(s, planActivate(s, ap, ids[0]!, 0, undefined, undefined, [crew])));
+    s = passUntil(s, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: ids[0]!, defender: opp }] });
+    for (let i = 0; i < 40 && s.pending?.kind !== "chooseMay"; i++) {
+      if (s.pending?.kind === "declareBlockers") s = act(s, { type: "declareBlockers", player: s.pending.player, blocks: [] });
+      else s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    }
+    expect(s.pending?.kind).toBe("chooseMay");
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect(s.pending?.kind).toBe("searchLibrary");
+    const pend = s.pending as Extract<GameState["pending"], { kind: "searchLibrary" }>;
+    expect([...pend.cards].sort()).toEqual([yard[0], yard[1]].sort()); // not the sorcery
+    s = act(s, { type: "searchLibrary", player: ap, found: [yard[0]!] });
+    expect(s.objects[yard[0]!]!.zone).toBe("battlefield");
+    expect(s.objects[yard[0]!]!.controller).toBe(ap);
+    expect(s.objects[yard[1]!]!.zone).toBe("exile");
+  });
+});

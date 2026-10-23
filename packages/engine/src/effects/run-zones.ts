@@ -1367,19 +1367,19 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (e.ifLinkedNow && !s.resolving!.linkedNow?.length) return;
       let cards = linked.map((l) => obj(s, l.id)).filter((c) => (!e.yours || c.owner === ctx.controller) && !(e.other && s.resolving!.faceDownExiled?.includes(c.id)) && !(e.ifLinkedNow && s.resolving!.linkedNow?.includes(c.id)));
       const p = player(s, ctx.controller);
+      if (e.filter) cards = cards.filter((c) => printedMatches(e.filter!, defOf(s, c)));
       if (e.one) {
         if (!sc.linkedPick) {
           if (!cards.length) return;
           sc.linkedPick = true;
           delete sc.found;
           const ids = cards.map((c) => c.id);
-          s.pending = { kind: "searchLibrary", player: p.id, source: src, what: "a card exiled with " + src, cards: ids, min: 1, max: 1, dig: { looked: ids, to: e.dest === "hand" ? "into your hand" : "into its owner's graveyard", rest: "stay exiled" } };
+          s.pending = { kind: "searchLibrary", player: p.id, source: src, what: `a ${e.filter ? `${e.filter.text} ` : "card "}exiled with ${src}`.replace("card card", "card"), cards: ids, min: 1, max: 1, dig: { looked: ids, to: e.dest === "hand" ? "into your hand" : e.dest === "battlefield" ? "onto the battlefield" : "into its owner's graveyard", rest: "stay exiled" } };
           return "paused";
         }
         sc.linkedPick = undefined;
         cards = cards.filter((c) => sc.found?.includes(c.id));
       }
-      if (e.filter) cards = cards.filter((c) => printedMatches(e.filter!, defOf(s, c)));
       if (!cards.length) return;
       if (e.dest === "battlefield") {
         // All at once (CR 608.2f), under this ability's controller's control.
@@ -2038,6 +2038,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           const o = obj(s, id);
           if (s.resolving && objIsType(s, o, "Creature")) (s.resolving.exiledPowers ??= []).push(power(s, o));
           moveObject(s, id, "exile");
+          if (e.linked && ctx.sourceId && o.zone === "exile") ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
         }
         log(s, `${src} exiles ${p.name}'s graveyard (${n} card${n === 1 ? "" : "s"}).`);
       }

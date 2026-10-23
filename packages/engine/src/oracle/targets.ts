@@ -368,6 +368,14 @@ function parseObjectNow(p: string, ctx: Ctx, cards = false): ObjRef | null {
     ];
     return { ref: "target", index: addTarget(ctx, { kind: "object", types: ["Planeswalker", "Battle"], anyOf, text: `target ${m[1]!}` }) };
   }
+  // "Target creature that's attacking that player" (Ordruun Mentor), "target nontoken creature that's attacking that
+  // player" (Echoing Assault), after "Whenever you attack a player": that player, known once it triggers.
+  const attackingThem = !cards && ctx.eventPlayer ? /^(.+?) that's attacking that player$/i.exec(m[1]!) : null;
+  if (attackingThem) {
+    const spec = parseTargetPhrase(`attacking ${attackingThem[1]!}`, { target: true });
+    if (spec?.kind !== "object" || spec.combat !== "attacking" || spec.controller) return null;
+    return { ref: "target", index: addTarget(ctx, { ...spec, attackingWhom: "eventPlayer", text: `target ${m[1]!}` }) };
+  }
   const [phrase, theirs] = thatPlayerControls(m[1]!, ctx);
   const spec = parseTargetPhrase(phrase, { x: true, count: boundCount(ctx), target: true });
   if (!spec || spec.kind === "player" || spec.kind === "spell" || (spec.kind === "card") !== cards || (theirs && (spec.kind === "card" ? !!spec.owner : spec.kind !== "object" || spec.controller))) return null;

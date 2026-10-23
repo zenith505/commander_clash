@@ -281,6 +281,11 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     if (of?.ref === "castSpell" && kind !== "manaValue") return null;
     return of && count({ kind, of });
   }
+  // "The amount of mana spent to cast that spell" (Mana Sculpt): the targeted spell's, as it last existed on the stack.
+  if ((m = /^(?:the )?amount of mana spent to cast that spell$/.exec(p))) {
+    const of = whoseObject("that spell's", ctx);
+    return of?.ref === "target" ? count({ kind: "manaSpentOn", of }) : null;
+  }
   // "For each counter on ~" (Twitching Doll): every kind.
   if ((m = /^counters? on (~|it)$/.exec(p))) {
     const of = whoseObject(m[1] === "~" ? "~'s" : "its", ctx);

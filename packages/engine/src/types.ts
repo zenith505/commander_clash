@@ -1798,7 +1798,7 @@ export interface Resolving {
   /** The cards this resolution's linked exiles took (Mimic Vat's "each other card exiled with ~"). */
   linkedNow?: ObjectId[];
   /** Spells with an X its counter instructions countered, as the cards they became, and the X they had (CR 202.3e). */
-  countered?: Record<ObjectId, { zc: number; x: number }>;
+  countered?: Record<ObjectId, { zc: number; x: number; /** The mana spent to cast it (Mana Sculpt). */ manaSpent?: number }>;
   /** The source of an activated or triggered ability its counter instructions countered (Tishana's Tidebinder). */
   counteredSource?: { id: ObjectId; zc: number };
   /** The card its "reveal the top card of your library" revealed (CR 701.20a), for "if it's a creature card, put it ...". */

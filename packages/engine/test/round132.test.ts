@@ -2,9 +2,10 @@
 // then the most played cards.
 
 import { describe, expect, it } from "vitest";
-import { act, card, passUntil, pt, putOnBattlefield, setup } from "./helpers";
+import { act, card, fourPlayerGame, passUntil, pt, putOnBattlefield, setup } from "./helpers";
 import { addMana, canPayFromPool } from "../src/spend";
 import { dealDamage, objectSource } from "../src/damage";
+import { manaAbilitiesOn, manaChoices } from "../src/manaabilities";
 import { abilityProblem, blockProblem, botActions, parseManaCost, characteristics, defOf, isFullySupported, manaOptions, planActivate, planCast, planManaAbility, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -390,5 +391,242 @@ describe("Bonny Pall, Clearcutter: Beau, and a land from the hand or graveyard w
     s = act(s, { type: "searchLibrary", player: ap, found: [yardLand] });
     expect(s.objects[yardLand]!.zone).toBe("battlefield");
     expect(pt(s, beau)).toBe("15/15");
+  });
+});
+
+const pitOfOfferings = card("Pit of Offerings", "Land — Cave", "", { oracleText: "This land enters tapped.\nWhen this land enters, exile up to three target cards from graveyards.\n{T}: Add {C}.\n{T}: Add one mana of any of the exiled cards' colors." });
+
+describe("Pit of Offerings: mana of the colors of the cards its enters ability exiled (CR 607.2a)", () => {
+  it("taps for the colors of the cards it exiled from graveyards, and none of a card that left exile", () => {
+    supported(pitOfOfferings);
+    const { s: s0, ap, ids, opp } = setup([pitOfOfferings]);
+    const red = putIn(s0, opp, card("Test Bolt", "Instant", "{R}"), "graveyard");
+    const blue = putIn(s0, ap, card("Test Wisp", "Creature — Spirit", "{U}", { power: "1", toughness: "1" }), "graveyard");
+    let s = act(s0, { type: "playLand", player: ap, objectId: ids[0]! });
+    s = passToPending(s);
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    s = settleBots(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: red }, { kind: "object", id: blue }, { kind: "none" }] }));
+    expect([s.objects[red]!.zone, s.objects[blue]!.zone]).toEqual(["exile", "exile"]);
+    const pit = s.objects[ids[0]!]!;
+    expect(pit.tapped).toBe(true);
+    const ab = manaAbilitiesOn(s, pit)[1]!;
+    expect(manaChoices(s, pit, ab).sort()).toEqual(["R", "U"]);
+    // A card that leaves exile is no longer "the exiled card" (CR 400.7).
+    s.objects[red]!.zone = "graveyard";
+    s.objects[red]!.zoneChanges = (s.objects[red]!.zoneChanges ?? 0) + 1;
+    expect(manaChoices(s, pit, ab)).toEqual(["U"]);
+  });
+
+  it("with nothing exiled, its last ability can't add mana (rulings)", () => {
+    const { s: s0, ap } = setup([]);
+    const pit = putOnBattlefield(s0, ap, pitOfOfferings);
+    expect(manaChoices(s0, s0.objects[pit]!, manaAbilitiesOn(s0, s0.objects[pit]!)[1]!)).toEqual([]);
+  });
+});
+
+const manaSculpt = card("Mana Sculpt", "Instant", "{1}{U}{U}", { oracleText: "Counter target spell. If you control a Wizard, add an amount of {C} equal to the amount of mana spent to cast that spell at the beginning of your next main phase." });
+const kickedDraw = card("Test Kicked Insight", "Sorcery", "{1}{U}", { oracleText: "Kicker {2}\nDraw a card." });
+const wizard = card("Test Wizard", "Creature — Human Wizard", "{U}", { power: "1", toughness: "1" });
+
+describe("Mana Sculpt: the mana spent to cast the countered spell, at your next main phase (rulings)", () => {
+  const stackTarget = (s: GameState, name: string) => ({ kind: "stack" as const, id: s.stack.find((x) => x.description.startsWith(name))!.id });
+  const island = card("Island", "Basic Land — Island");
+  const castWith = (s: GameState, pid: PlayerId, id: string, targets?: Parameters<typeof planCast>[3], kicks?: number[]) => run(s, planCast(s, pid, id, targets, undefined, "auto", undefined, kicks ? { kicks } : undefined));
+
+  it("with a Wizard: the kicked spell's mana spent (4, not its mana value 2), added in the second main phase", () => {
+    supported(manaSculpt, kickedDraw);
+    const { s: s0, ap, ids } = setup([kickedDraw, manaSculpt]);
+    for (let i = 0; i < 7; i++) putOnBattlefield(s0, ap, island);
+    putOnBattlefield(s0, ap, wizard);
+    let s = castWith(s0, ap, ids[0]!, undefined, [0]);
+    s = passToPending(castWith(s, ap, ids[1]!, [stackTarget(s, "Test Kicked Insight")]));
+    expect(s.objects[ids[0]!]!.zone).toBe("graveyard");
+    expect(s.players[ap]!.manaPool.C).toBe(0);
+    s = passToPending(passUntil(s, "main2", ap));
+    expect(s.players[ap]!.manaPool.C).toBe(4);
+  });
+
+  it("without a Wizard, no mana", () => {
+    const { s: s0, ap, ids } = setup([kickedDraw, manaSculpt]);
+    for (let i = 0; i < 7; i++) putOnBattlefield(s0, ap, island);
+    let s = castWith(s0, ap, ids[0]!, undefined, [0]);
+    s = passToPending(castWith(s, ap, ids[1]!, [stackTarget(s, "Test Kicked Insight")]));
+    s = passToPending(passUntil(s, "main2", ap));
+    expect(s.players[ap]!.manaPool.C).toBe(0);
+  });
+});
+
+const studyHall = card("Study Hall", "Land", "", { oracleText: "{T}: Add {C}.\n{1}, {T}: Add one mana of any color. When you spend this mana to cast your commander, scry X, where X is the number of times it's been cast from the command zone this game." });
+const gilanra = card("Gilanra, Caller of Wirewood", "Legendary Creature — Elf Druid", "{2}{G}", { power: "2", toughness: "3", keywords: ["Partner"], oracleText: "{T}: Add {G}. When you spend this mana to cast a spell with mana value 6 or greater, draw a card.\nPartner (You can have two commanders if both have partner.)" });
+const lapisOrb = card("Lapis Orb of Dragonkind", "Artifact", "{1}{U}", { oracleText: "{T}: Add {U}. When you spend this mana to cast a Dragon creature spell, scry 2. (Look at the top two cards of your library, then put any number of them on the bottom of your library and the rest on top in any order.)" });
+
+describe("\"When you spend this mana to cast ...\": a delayed trigger for each mana (CR 106.6a, rulings)", () => {
+  const fresh = () => {
+    const s = passUntil(fourPlayerGame(), "main1");
+    return { s, ap: s.activePlayer };
+  };
+  const give = (s: GameState, pid: PlayerId, def: CardDef) => putIn(s, pid, def, "hand");
+  const forest = card("Forest", "Basic Land — Forest");
+  const sources = (s: GameState, id: string) => s.triggerQueue.filter((t) => t.sourceId === id).length + s.stack.filter((x) => x.kind === "ability" && x.sourceId === id).length;
+
+  it("Study Hall: casting your commander from the command zone scries the times it's been cast from there", () => {
+    supported(studyHall);
+    const { s: s0, ap } = fresh();
+    const hall = putOnBattlefield(s0, ap, studyHall);
+    putOnBattlefield(s0, ap, forest);
+    putOnBattlefield(s0, ap, forest);
+    const cmd = s0.players[ap]!.command[0]!;
+    let s = act(s0, { type: "activateMana", player: ap, objectId: s0.battlefield.find((id) => nameOf(s0, id) === "Forest" && s0.objects[id]!.controller === ap)!, mana: "G" });
+    s = act(s, { type: "activateMana", player: ap, objectId: hall, mana: "G", ability: 1 });
+    expect(s.players[ap]!.manaPool.G).toBe(1);
+    s = run(s, planCast(s, ap, cmd));
+    expect(sources(s, hall)).toBe(1);
+    s = passToPending(s);
+    expect(s.pending).toMatchObject({ kind: "arrangeTop", how: "scry", player: ap });
+    expect((s.pending as { cards: string[] }).cards).toHaveLength(1);
+  });
+
+  it("Study Hall's mana on another spell doesn't trigger", () => {
+    const { s: s0, ap } = fresh();
+    const hall = putOnBattlefield(s0, ap, studyHall);
+    putOnBattlefield(s0, ap, forest);
+    putOnBattlefield(s0, ap, forest);
+    const b = give(s0, ap, card("Test Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    let s = act(s0, { type: "activateMana", player: ap, objectId: s0.battlefield.find((id) => nameOf(s0, id) === "Forest" && s0.objects[id]!.controller === ap)!, mana: "G" });
+    s = act(s, { type: "activateMana", player: ap, objectId: hall, mana: "G", ability: 1 });
+    s = run(s, planCast(s, ap, b));
+    expect(sources(s, hall)).toBe(0);
+  });
+
+  it("Gilanra draws only for a spell with mana value 6 or greater; Lapis Orb scries 2 for a Dragon creature spell", () => {
+    supported(gilanra, lapisOrb);
+    for (const [def, draws] of [[card("Test Colossus", "Creature — Giant", "{5}{G}", { power: "6", toughness: "6" }), true], [card("Test Elk", "Creature — Elk", "{1}{G}", { power: "2", toughness: "2" }), false]] as const) {
+      const { s: s0, ap } = fresh();
+      const g = putOnBattlefield(s0, ap, gilanra);
+      for (let i = 0; i < 5; i++) putOnBattlefield(s0, ap, forest);
+      const c = give(s0, ap, def);
+      let s = act(s0, { type: "activateMana", player: ap, objectId: g, mana: "G" });
+      s = run(s, planCast(s, ap, c));
+      expect(sources(s, g), def.name).toBe(draws ? 1 : 0);
+      const hand = s.players[ap]!.hand.length;
+      s = settleBots(s);
+      expect(s.players[ap]!.hand.length).toBe(hand + (draws ? 1 : 0));
+    }
+    const { s: s0, ap } = fresh();
+    const orb = putOnBattlefield(s0, ap, lapisOrb);
+    for (let i = 0; i < 4; i++) putOnBattlefield(s0, ap, forest);
+    const dragon = give(s0, ap, card("Test Dragon", "Creature — Dragon", "{3}{U}{G}", { power: "4", toughness: "4" }));
+    let s = act(s0, { type: "activateMana", player: ap, objectId: orb, mana: "U" });
+    s = passToPending(run(s, planCast(s, ap, dragon)));
+    expect(s.pending).toMatchObject({ kind: "arrangeTop", how: "scry", player: ap });
+    expect((s.pending as { cards: string[] }).cards).toHaveLength(2);
+  });
+});
+
+const echoingAssault = card("Echoing Assault", "Enchantment", "{2}{R}{W}", { oracleText: "Creature tokens you control have menace.\nWhenever you attack a player, choose target nontoken creature that's attacking that player. Create a token that's a copy of that creature, except it's 1/1. The token enters tapped and attacking that player. Sacrifice it at the beginning of the next end step." });
+const lightbringer = card("Soaring Lightbringer", "Enchantment Creature — Bird", "{4}{W}", { power: "4", toughness: "5", keywords: ["Flying"], oracleText: "Flying\nWhenever you attack a player, create a 1/1 white Glimmer enchantment creature token that's tapped and attacking that player." });
+const ordruun = card("Ordruun Mentor", "Creature — Minotaur Soldier", "{1}{R/W}{R/W}", { power: "3", toughness: "2", oracleText: "Whenever you attack a player, target creature that's attacking that player gains first strike until end of turn." });
+
+describe("\"Whenever you attack a player\": targets and tokens attacking that player (rulings)", () => {
+  /** Two attackers, at the first two opponents; the triggers are waiting for targets or on the stack. */
+  const attackTwo = (def: CardDef) => {
+    const { s: s0, ap } = setup([]);
+    const [o1, o2] = opponentsOf(s0, ap);
+    putOnBattlefield(s0, ap, def);
+    const a1 = putOnBattlefield(s0, ap, ogre("Ogre One"));
+    const a2 = putOnBattlefield(s0, ap, ogre("Ogre Two"));
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: a1, defender: o1! }, { attacker: a2, defender: o2! }] });
+    return { s, ap, o1: o1!, o2: o2!, a1, a2 };
+  };
+
+  it("Echoing Assault: a 1/1 copy of the creature attacking each player, attacking that player, sacrificed at the end step", () => {
+    supported(echoingAssault);
+    let { s, ap, o1, o2, a1, a2 } = attackTwo(echoingAssault);
+    for (let n = 0; n < 2; n++) {
+      s = passToPending(s);
+      expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+      // Only the creature attacking that trigger's player can be chosen.
+      let chose: GameState | undefined;
+      for (const a of [a1, a2]) {
+        try {
+          const next = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: a }] });
+          expect(chose, "only one of the attackers is a legal target").toBeUndefined();
+          chose = next;
+        } catch {
+          /* attacking the other player */
+        }
+      }
+      s = chose!;
+    }
+    s = passToPending(s);
+    const tokens = s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === ap);
+    expect(tokens.map((id) => [nameOf(s, id), pt(s, id), s.objects[id]!.tapped, s.objects[id]!.attacking]).sort()).toEqual([["Ogre One", "1/1", true, o1], ["Ogre Two", "1/1", true, o2]].sort());
+    s = passUntil(s, "end", ap);
+    s = settleBots(s);
+    expect(tokens.every((id) => s.objects[id]?.zone !== "battlefield")).toBe(true);
+  });
+
+  it("Soaring Lightbringer: one Glimmer attacking each player attacked; Ordruun Mentor targets only a creature attacking that player", () => {
+    supported(lightbringer, ordruun);
+    let { s, ap, o1, o2 } = attackTwo(lightbringer);
+    s = settleBots(s);
+    const glimmers = s.battlefield.filter((id) => nameOf(s, id).startsWith("Glimmer"));
+    expect(glimmers.map((id) => s.objects[id]!.attacking).sort()).toEqual([o1, o2].sort());
+    expect(glimmers.every((id) => s.objects[id]!.tapped && s.objects[id]!.controller === ap)).toBe(true);
+
+    const m = attackTwo(ordruun);
+    const t = passToPending(m.s);
+    expect(t.pending).toMatchObject({ kind: "chooseTargets" });
+    const legal = [m.a1, m.a2].filter((a) => {
+      try {
+        act(t, { type: "chooseTargets", player: m.ap, targets: [{ kind: "object", id: a }] });
+        return true;
+      } catch {
+        return false;
+      }
+    });
+    expect(legal).toHaveLength(1);
+  });
+});
+
+const atraxa = card("Atraxa, Grand Unifier", "Legendary Creature — Phyrexian Angel", "{3}{G}{W}{U}{B}", { power: "7", toughness: "7", keywords: ["Flying", "Vigilance", "Deathtouch", "Lifelink"], oracleText: "Flying, vigilance, deathtouch, lifelink\nWhen Atraxa enters, reveal the top ten cards of your library. For each card type, you may put a card of that type from among the revealed cards into your hand. Put the rest on the bottom of your library in a random order. (Artifact, battle, creature, enchantment, instant, land, planeswalker, and sorcery are card types.)" });
+
+describe("Atraxa, Grand Unifier: one card of each card type, a card with two types counting as either (rulings)", () => {
+  it("an artifact creature can be the artifact while another creature is the creature, but not two creatures", () => {
+    supported(atraxa);
+    const { s: s0, ap, ids } = setup([atraxa]);
+    const top = [
+      card("Test Golem", "Artifact Creature — Golem", "{3}", { power: "3", toughness: "3" }),
+      card("Test Wolf", "Creature — Wolf", "{1}{G}", { power: "2", toughness: "2" }),
+      card("Test Elk", "Creature — Elk", "{1}{G}", { power: "2", toughness: "2" }),
+      card("Test Forest", "Land", "", { oracleText: "{T}: Add {G}." }),
+      card("Test Bolt", "Instant", "{R}"),
+    ];
+    const tops = top.map((d) => putIn(s0, ap, d, "library"));
+    let s = passToPending(run(s0, planCast(s0, ap, ids[0]!)));
+    s = passToPending(s);
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap });
+    expect((s.pending as { cards: string[] }).cards).toEqual(expect.arrayContaining(tops));
+    const [golem, wolf, elk, forest, bolt] = tops;
+    // Golem as the artifact, Wolf as the creature: fine; Wolf and Elk both creatures: not.
+    expect(() => act(s, { type: "searchLibrary", player: ap, found: [wolf!, elk!] })).toThrow();
+    const hand = s.players[ap]!.hand.length;
+    s = settleBots(act(s, { type: "searchLibrary", player: ap, found: [golem!, wolf!, forest!, bolt!] }));
+    expect([golem, wolf, forest, bolt].map((id) => s.objects[id!]!.zone)).toEqual(["hand", "hand", "hand", "hand"]);
+    expect(s.players[ap]!.hand.length).toBe(hand + 4);
+    expect(s.objects[elk!]!.zone).toBe("library");
+    expect(s.players[ap]!.library.slice(0, 5)).not.toContain(elk);
+  });
+
+  it("the bot takes one of each type it can", () => {
+    const { s: s0, ap, ids } = setup([atraxa]);
+    const tops = [card("Test Wolf", "Creature — Wolf", "{1}{G}", { power: "2", toughness: "2" }), card("Test Elk", "Creature — Elk", "{1}{G}", { power: "2", toughness: "2" }), card("Test Bolt", "Instant", "{R}")].map((d) => putIn(s0, ap, d, "library"));
+    let s = passToPending(run(s0, planCast(s0, ap, ids[0]!)));
+    s = passToPending(s);
+    s = settleBots(s);
+    const taken = tops.filter((id) => s.objects[id]!.zone === "hand").map((id) => nameOf(s, id));
+    expect(taken).toContain("Test Bolt");
+    expect(taken.filter((n) => n !== "Test Bolt")).toHaveLength(1);
   });
 });

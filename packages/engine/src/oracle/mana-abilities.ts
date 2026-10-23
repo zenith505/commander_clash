@@ -4,6 +4,8 @@ import { NUM, num, COUNTER, counterKind, ALL_COLORS, sacrificeSelf, singular } f
 import { energyIn } from "./activated";
 import { parseTargetPhrase, pickFilter } from "./targets";
 import { parseCount } from "./counts";
+import { parseBody } from "./body";
+import { allEffects } from "../abilities";
 import { CREATURE_TYPES } from "../keywords";
 import { parseOnlyClauses, parseStaticCondition } from "./statics";
 
@@ -149,6 +151,18 @@ export function parseManaAbility(line0: string): ManaAbility | null {
       // Primal Wellspring, Pyromancer's Goggles: a triggered ability of its source (CR 603.1), the spell it paid for
       // copied as the trigger resolves (CR 707.10).
       out.spentTrigger = { instantOrSorcery: true, ...(m2[1] ? { color: "R" as const } : {}), body: { targets: [], effects: [{ type: "copySpell", spell: "cause", n: 1, newTargets: true }], text: "Copy that spell and you may choose new targets for the copy." } };
+    } else if ((m2 = /^When you spend this mana to cast (your commander|an? (?:[^,]+? )?spell(?: with [^,]+)?), (.+)\.$/.exec(extra)) && !out.spentTrigger) {
+      // A delayed triggered ability made by the mana ability, one for each mana it makes, that triggers when that mana is
+      // spent (CR 106.6, 106.6a, 603.7a, rulings on Gilanra): "draw a card" (Gilanra), "scry 2" (Lapis Orb), "you gain 2 life" (Scaled
+      // Nurturer), "scry X, where X is the number of times it's been cast from the command zone this game" (Study Hall).
+      const commander = m2[1] === "your commander";
+      const spell = commander ? undefined : parseTargetPhrase(m2[1]!.replace(/^an? /, ""));
+      if (!commander && (spell?.kind !== "spell" || spell.controller || spell.chosen)) return null;
+      const effect = m2[2]!.replace(/^./, (c) => c.toUpperCase());
+      const studyX = commander && effect === "Scry X, where X is the number of times it's been cast from the command zone this game";
+      const body = studyX ? { targets: [], effects: [{ type: "scry" as const, n: { count: { kind: "castSpellCommanderCasts" as const } } }], text: `${effect}.` } : parseBody(`${effect}.`, {});
+      if (!body || body.targets.length || !body.effects.length || allEffects(body.effects).some((e) => "what" in e)) return null;
+      out.spentTrigger = { ...(commander ? { commander: true as const } : { spell: spell! }), body };
     } else if (/^Spend this mana only /.test(extra) && !out.spendOnly) {
       const only = parseManaSpend(extra);
       if (!only) return null;
@@ -285,8 +299,9 @@ function parseManaProduced(text: string): ManaProduce | null {
   }
   // "One mana of any color among legendary creatures and planeswalkers you control" (Mox Amber), "... among legendary
   // permanents you control" (Plaza of Heroes); "one mana of any of the exiled card's colors" (Chrome Mox: the card its
-  // imprint ability exiled, linked in compile.ts).
-  if (text === "one mana of any of the exiled card's colors") return { kind: "colorsAmong", linked: true };
+  // imprint ability exiled, linked in compile.ts); "... of the exiled cards' colors" (Pit of Offerings: the cards its
+  // enters ability exiled from graveyards).
+  if (text === "one mana of any of the exiled card's colors" || text === "one mana of any of the exiled cards' colors") return { kind: "colorsAmong", linked: true };
   const among = /^one mana of any color among (legendary )?(.+?) you control$/.exec(text);
   if (among) {
     const words = among[2]!.split(/ and | or /).map((w) => singular(w));

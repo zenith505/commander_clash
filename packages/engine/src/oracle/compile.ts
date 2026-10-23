@@ -2919,9 +2919,15 @@ function linkExile(out: CompiledCard) {
   // Imprint (an ability word, CR 207.2c): "{T}: Add one mana of any of the exiled card's colors" (Chrome Mox) is
   // linked to the one ability that exiles it as it enters (CR 607.2a).
   if (out.mana.some((m) => m.produces.kind === "colorsAmong" && m.produces.linked)) {
-    const imprints = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects)).filter((e) => e.type === "takeFromHand" && e.action === "exile");
-    if (imprints.length !== 1 || out.triggers.some((t) => allEffects(t.body.effects).some((e) => e.type === "returnLinked"))) out.unsupported.push("(its mana ability can't be linked to one imprint ability)");
-    else (imprints[0] as Extract<Effect, { type: "takeFromHand" }>).linked = true;
+    const enters = out.triggers.filter((t) => t.event === "selfEnters").flatMap((t) => allEffects(t.body.effects));
+    const imprints = enters.filter((e) => e.type === "takeFromHand" && e.action === "exile");
+    // Pit of Offerings: "When this land enters, exile up to three target cards from graveyards", its only exile.
+    const yardExiles = enters.filter((e): e is Extract<Effect, { type: "exile" }> => e.type === "exile" && !e.until);
+    const others = [...out.triggers.map((t) => t.body), ...out.activated.map((a) => a.body)].flatMap((b) => allEffects(b.effects)).filter((e) => e.type === "exile" || e.type === "takeFromHand" || e.type === "hideaway" || e.type === "exileFaceDown" || e.type === "impulse" || e.type === "returnLinked");
+    if (out.triggers.some((t) => allEffects(t.body.effects).some((e) => e.type === "returnLinked"))) out.unsupported.push("(its mana ability can't be linked to one imprint ability)");
+    else if (imprints.length === 1) (imprints[0] as Extract<Effect, { type: "takeFromHand" }>).linked = true;
+    else if (!imprints.length && yardExiles.length === 1 && others.length === 1) yardExiles[0]!.linked = true;
+    else out.unsupported.push("(its mana ability can't be linked to one imprint ability)");
   }
   // Extraplanar Lens: "a land with the same name as the exiled card" is the one its imprint ability exiled (CR 607.2a).
   if (out.manaTriggers?.some((t) => t.sameNameAsLinked)) {

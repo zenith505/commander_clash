@@ -244,11 +244,18 @@ export type Count =
   | { kind: "colorsSpent" }
   /** "For each of that spell's colors" in a cast trigger (Ramos, Dragon Engine): as it is, or as it was cast if it's gone. */
   | { kind: "castSpellColors" }
+  /** "The number of times it's been cast from the command zone this game" (Study Hall): the commander spell cast's. */
+  | { kind: "castSpellCommanderCasts" }
   /**
    * "Enters with a number of +1/+1 counters on it equal to the amount of mana spent to cast it" (Marath): only in an
    * "enters with" (the spell it was); 0 if it wasn't cast.
    */
   | { kind: "manaSpent" }
+  /**
+   * "The amount of mana spent to cast that spell" (Mana Sculpt): the target spell's (CR 601.2h), as it last existed on the
+   * stack if this countered it; 0 for a copy, which wasn't cast (CR 707.10).
+   */
+  | { kind: "manaSpentOn"; of: ObjRef }
   /** "The mana value of the returned creature" (Scarlet Spider): the creature returned to cast it using web-slinging, as it last existed; only in an "enters with". */
   | { kind: "webSlungMv" }
   /** "The greatest number of creatures a player controls" (Investigator's Journal), `opponents`: "an opponent controls". */
@@ -390,6 +397,12 @@ export interface TargetSpec {
    */
   /** `attackingYou`: "creatures attacking you", attacking that player and not a planeswalker or battle (CR 506.3, 508.1b). */
   combat?: "attacking" | "blocking" | "attackingOrBlocking" | "attackedThisTurn" | "couldButDidntAttack" | "attackingBattle" | "attackingYou" | /** "Attacking one of your opponents" (Oviya, Automech Artisan): that player, not a planeswalker or battle. */ "attackingOpponent";
+  /**
+   * "Target creature that's attacking that player" after "Whenever you attack a player" (Ordruun Mentor, Echoing Assault):
+   * attacking that player itself, not a planeswalker or battle (CR 506.3, 508.1b); "eventPlayer" until the trigger knows
+   * that player, then that player.
+   */
+  attackingWhom?: "eventPlayer" | PlayerId;
   /** "Each green creature that entered this turn" (Oran-Rief): this object came onto the battlefield this turn (CR 400.7). */
   enteredThisTurn?: true;
   /** "Target creature card from a graveyard that was put there this turn" (Abyssal Harvester): from anywhere (GameObject.toGraveyardTurn). */
@@ -653,7 +666,11 @@ export type ChosenTarget = Exclude<TargetChoice, { kind: "none" }>;
  * type with your commander (Path of Ancestry), an instant or sorcery spell (Primal Wellspring), a red one (Pyromancer's
  * Goggles).
  */
-export type SpentFor = { sharesCommanderType: true } | { instantOrSorcery: true; color?: Color };
+/**
+ * `spell`: "When you spend this mana to cast a spell with mana value 6 or greater" (Gilanra), "a Dragon creature spell"
+ * (Lapis Orb of Dragonkind), checked once the spell is on the stack; `commander`: "to cast your commander" (Study Hall).
+ */
+export type SpentFor = { sharesCommanderType: true } | { instantOrSorcery: true; color?: Color } | { spell: TargetSpec } | { commander: true };
 
 export type ObjRef =
   /** "Each creature that convoked ~" (Lethal Scheme): the `index`th creature tapped to convoke the resolving spell (CR 702.51a), while it's that permanent. */
@@ -2228,7 +2245,7 @@ export type Effect =
   /** "Create a token that's a copy of target creature you control[, except ...]" (CR 707.2, 707.9, 111.4). */
   /** `ofSource`: a copy of the card the ability came from, as it last existed (embalm, eternalize: exiled to pay the cost). */
   /** `each`: "For each token you control, create a token that's a copy of that permanent" (Second Harvest): one copy of each object in the group `what`, as it is now. */
-  | { type: "createTokenCopy"; who: PlayerRef; n: Amount; what: ObjRef; except?: CopyExcept; tapped?: boolean; attacking?: boolean; ofSource?: boolean; each?: true }
+  | { type: "createTokenCopy"; who: PlayerRef; n: Amount; what: ObjRef; except?: CopyExcept; tapped?: boolean; attacking?: boolean; ofSource?: boolean; each?: true; /** "Tapped and attacking that player" after "Whenever you attack a player" (Echoing Assault): the event player. */ attackingEvent?: true }
   /**
    * "~ becomes a copy of target creature until end of turn, except it has this ability" (CR 707.4): each permanent
    * `what` refers to becomes a copy of `of`'s copiable values (as it last existed, if it's gone, CR 608.2h), with
@@ -2245,6 +2262,8 @@ export type Effect =
       attacking?: boolean;
       /** "That's attacking" (Brimaz, King of Oreskos): attacking but not tapped (CR 508.4). */
       untapped?: true;
+      /** "That's tapped and attacking that player" after "Whenever you attack a player" (Soaring Lightbringer): attacking the event player. */
+      attackingEvent?: true;
       /** "That's blocking that creature" (Brimaz): it enters blocking it, if that creature is still attacking (CR 509.1). */
       blocking?: ObjRef;
       /** "For each opponent, create ... that's tapped and attacking that player": `n` for each opponent, attacking them. */

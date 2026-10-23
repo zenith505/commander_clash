@@ -1,4 +1,4 @@
-import type { Amount, AmountExpr, Modification, Effect, PlayerRef } from "../abilities";
+import type { Amount, AmountExpr, Modification, Effect, PlayerRef, TargetSpec } from "../abilities";
 import { CHOSEN_LAND_TYPE, CHOSEN_TYPE, CREATURE_TYPES } from "../keywords";
 import type { Color } from "../types";
 import { num, PT, ptAmt, COLOR_WORDS, TYPE_WORDS, WHEEL, COUNTER, counterKind, X, capital } from "./words";
@@ -22,6 +22,9 @@ import { parseNamesSentence } from "./sentences/names";
  * put one of those cards back on top of your library") and where the rest go ("Put the rest into your
  * graveyard", "on the bottom of your library in a random order"). "more" while the rest is still to come.
  */
+/** The card types a card in a library can have (CR 205.2a); not the ones of cards outside the game (plane, scheme, ...). */
+const CARD_TYPES_IN_DECKS = ["Artifact", "Battle", "Creature", "Enchantment", "Instant", "Kindred", "Land", "Planeswalker", "Sorcery"];
+
 export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }>>, ctx?: Ctx, whereX?: AmountExpr): Extract<Effect, { type: "dig" }> | "more" | null {
   const REST = "(into your graveyard|into your hand|on the bottom(?: of your library)?(?: in (?:any|a random) order)?)";
   // "You may reveal a creature card ... from among them and put it onto the battlefield" (Loot, Exuberant Explorer): the
@@ -47,6 +50,11 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       if (specs.some((f) => !f)) return null;
       const anyOf = specs as NonNullable<(typeof specs)[number]>[];
       Object.assign(dig, { count: 2, upTo: true, filter: { kind: "card", anyOf, text: `${m[1] ?? m[3]} and/or ${m[2] ?? m[4]}`.replace(/^an? /, "") }, oneOfEach: anyOf, into: "hand" });
+    } else if (/^For each card type, you may put a card of that type from among (?:them|the revealed cards) into your hand$/.test(s)) {
+      // Atraxa, Grand Unifier: up to one card for each card type (CR 205.2a), a card with more than one type taken as any
+      // one of them (rulings), as Kiora's "and/or" (oneOfEach).
+      const anyOf: TargetSpec[] = CARD_TYPES_IN_DECKS.map((t) => ({ kind: "card", types: [t], text: `${t.toLowerCase()} card` }));
+      Object.assign(dig, { count: anyOf.length, upTo: true, filter: { kind: "card", anyOf, text: "card of each card type" }, oneOfEach: anyOf, into: "hand" });
     } else if ((m = new RegExp(`^Put any number of ([^,]+? cards) from among them into your hand and the rest ${REST}$`).exec(s))) {
       // "Put any number of legendary cards from among them into your hand and the rest into your graveyard" (Dihada).
       const filter = parseSearchFilter(m[1]!.replace(/\bcards\b/, "card"));
@@ -139,6 +147,10 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   const villain = /^(.+?) faces? a villainous choice — (.+)$/.exec(s);
   if (villain) return parseVillainous(villain[1]!, villain[2]!, ctx);
   if (WHEEL.test(s)) return parseSpellsSentence(s, ctx) ?? null;
+  // "Add an amount of {C} equal to the amount of mana spent to cast that spell at the beginning of your next main phase"
+  // (Mana Sculpt): the same as with the time first (Mana Drain).
+  const addLater = /^([Aa]dd .+) at the beginning of your next main phase$/.exec(s);
+  if (addLater) return parseSentence(`At the beginning of your next main phase, ${addLater[1]!.replace(/^A/, "a")}`, ctx);
   const tapped = /^(?:For as long as ~ remains tapped, (.+)|(.+?) for as long as (you control ~ and )?~ remains tapped)$/i.exec(s);
   if (tapped) return parseWhileTapped((tapped[1] ?? tapped[2])!, !!tapped[3], ctx);
   // Take the Bait: "Untap all attacking creatures and goad them": the same creatures, untapped then goaded (CR 701.15a).

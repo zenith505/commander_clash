@@ -63,6 +63,7 @@ import {
   evidenceProblem,
   altCostsFor,
   payZeroSource,
+  linkedFreeGrant,
   commanderTax,
   legendBotKeep,
   unlockCost,
@@ -84,6 +85,7 @@ import {
   maxHandSize,
   stackItemQuality,
   oneOfEachFits,
+  differentlyNamed,
   abilityCostsHaveX,
   deciderOf,
   landsAllowed,
@@ -162,6 +164,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const bin = wantOnTop(s, pid, a) && !wantOnTop(s, pid, b) ? b : !wantOnTop(s, pid, a) && wantOnTop(s, pid, b) ? a : mv(s, a) >= mv(s, b) ? b : a;
       return [{ type: "drawLook", player: pid, objectId: bin }];
     }
+    // Out of the Tombs: the creature card that costs the most comes back.
+    if (pend.kind === "drawEmptyReturn") return [{ type: "drawEmptyReturn", player: pid, objectId: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a))[0]! }];
     if (pend.kind === "dredge") {
       // With an Alhammarret's Archive too, the Archive first: each of the two draws it makes can still be dredged.
       const pick = pend.archive ? undefined : chooseDredge(s, pid, pend.options);
@@ -774,7 +778,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       })
       .filter((x): x is { plan: Action[]; mv: number } => !!x)
       .sort((a, b) => b.mv - a.mv);
-    const expiring = options.find((x) => x.plan.some((a) => a.type === "castSpell" && obj(s, a.objectId).zone === "exile" && /Turn$|EndStep$/.test(obj(s, a.objectId).mayPlay?.until ?? "")));
+    // Court of Locthwain's free spell is for this turn only too.
+    const expiring = options.find((x) => x.plan.some((a) => a.type === "castSpell" && obj(s, a.objectId).zone === "exile" && (a.alt === "linkedFree" || /Turn$|EndStep$/.test(obj(s, a.objectId).mayPlay?.until ?? ""))));
     if (expiring) return expiring.plan;
     if (options[0]) return options[0].plan;
     // Food Chain, Ashnod's Altar: a creature given up for mana, to cast a card that does more.
@@ -1682,6 +1687,11 @@ function freeAltPlan(s: GameState, pid: PlayerId, id: string): Action[] | null {
     const plan = castPlan(s, pid, id, false, undefined, "omniscience");
     if (plan) return plan;
   }
+  // Court of Locthwain: a card exiled with it, for nothing.
+  if (linkedFreeGrant(s, o, pid) >= 0) {
+    const plan = castPlan(s, pid, id, false, undefined, "linkedFree");
+    if (plan) return plan;
+  }
   // As Foretold, Rooftop Storm: {0} rather than the mana cost (a commander's tax is still paid).
   if (payZeroSource(s, pid, o)) {
     const plan = castPlan(s, pid, id, false, undefined, "payZero");
@@ -2303,7 +2313,9 @@ function chooseExtraCosts(s: GameState, pid: PlayerId, id: string, targets: Targ
       }
       out.sacrifice = picked;
     } else if (c.kind === "sacrifice") {
-      const pool = sacrificePool(s, pid, c, targeted, alt);
+      const pool0 = sacrificePool(s, pid, c, targeted, alt);
+      // "With different names" (Transmutation Font): the first of each name.
+      const pool = c.differentNames ? differentlyNamed(s, pool0.map((o) => o.id)).map((id) => obj(s, id)) : pool0;
       if (pool.length < c.n) return null;
       out.sacrifice = pool.slice(0, c.n).map((o) => o.id);
     } else if (c.kind === "discard" && c.oneOf) {
@@ -3759,8 +3771,9 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
         out.sacrifice = [...(out.sacrifice ?? []), ...picks];
         continue;
       }
-      if (pool.length < c.n) return null;
-      out.sacrifice = [...(out.sacrifice ?? []), ...pool.slice(0, c.n).map((x) => x.id)];
+      const named = c.differentNames ? differentlyNamed(s, pool.map((x) => x.id)) : pool.map((x) => x.id);
+      if (named.length < c.n) return null;
+      out.sacrifice = [...(out.sacrifice ?? []), ...named.slice(0, c.n)];
     } else if (c.kind === "tap" && c.untap) {
       // "Untap a tapped creature you control" (Halo Fountain): untapping is all gain, the most valuable first.
       // Then a mana creature, tapped for mana while paying and untapped for the cost (rulings).
@@ -4542,6 +4555,8 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   }
   // One that can't attack alone stays home rather than attack by itself (CR 506.5).
   if (attacks.length === 1 && characteristics(s, obj(s, attacks[0]!.attacker)).cantAttackAlone) attacks = [];
+  // One that can only attack alone (Master of Cruelties) stays home when others attack (CR 506.5).
+  if (attacks.length > 1) attacks = attacks.filter((a) => !characteristics(s, obj(s, a.attacker)).onlyAttacksAlone);
   let declared = attackBattles(s, pid, attackPlaneswalkers(s, pid, attacks, hit), hit);
   // "No more than one creature can attack each combat" (Silent Arbiter): the ones that have to attack, then the strongest.
   const cap = combatLimit(s, "attack");

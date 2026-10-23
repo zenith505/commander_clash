@@ -38,6 +38,9 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // without being countered, so even a spell that can't be countered goes (rulings).
   if (/^(?:Then )?[Rr]eturn (?:it|that spell) to its owner's hand$/.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "spell")
     return ctx.targets[ctx.lastObjectTarget]!.stackAbilities ? null : [{ type: "counterSpell", index: ctx.lastObjectTarget, bounce: true }];
+  // Court of Locthwain: "until end of turn, you may cast a spell from among cards exiled with ~ without paying its mana
+  // cost": one spell, from the cards its linked exile took (compile.ts links it, CR 607.2a).
+  if (/^[Uu]ntil end of turn, you may cast a spell from among cards exiled with ~ without paying its mana cost$/.test(s)) return [{ type: "castLinkedFree" }];
   // Emry: "Choose target artifact card in your graveyard. You may cast that card this turn."
   // The one target so far is that card, in your graveyard.
   if (/^You may cast (?:that card|it) this turn$/.test(s) && ctx.targets.length === 1) {
@@ -552,8 +555,10 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const flipped = m[2] === " flipped";
     if (m[2] && !flipped && !m[1] !== !/ and/.test(m[2])) return null; // "tapped and transformed", or "transformed" alone
     if (flipped && (m[1] || m[3] || m[4] || m[6] || m[7])) return null; // only Homura's "return it to the battlefield flipped"
-    // No "under ... control": the ability's controller puts it there, so it enters under their control (CR 110.2a).
-    if (!m[3] && !flipped) return null;
+    // No "under ... control": the ability's controller puts it there, so it enters under their control (CR 110.2a);
+    // Galian Beast's "return it to the battlefield tapped (front face up)": a double-faced card enters front face up
+    // (CR 712.14). Only with "tapped" and nothing else, as yet.
+    if (!m[3] && !flipped && !(m[1] && !m[2] && !m[4] && !m[6] && !m[7])) return null;
     let attachToTarget: number | undefined;
     if (m[7]) {
       if (!m[2] || m[6] || m[4]) return null;

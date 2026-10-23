@@ -11,7 +11,7 @@ import { RulesError } from "../types";
 import { parseManaCost, spentMeets } from "../mana";
 import { nextRandom } from "../rng";
 import { evalAmount } from "../amounts";
-import { objectMatches, bindBound, bindChosen, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, hasLegalTargets, legalModes, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
+import { objectMatches, bindBound, bindChosen, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, targetsOnlyOne, hasLegalTargets, legalModes, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
 import { monarchTrigger } from "./run-basics";
 import { initiativeTrigger } from "./run-dungeons";
 import { INITIATIVE, RAD } from "../oracle";
@@ -265,6 +265,7 @@ function diesMatches(
   attachedTo: ObjectId | undefined,
   dying: { o: GameObject; c: Characteristics },
   you: PlayerId,
+  chosen?: GameObject["chosen"],
 ): boolean {
   if (d.attached) return attachedTo === dying.o.id && dying.c.types.includes("Creature");
   if (d.damagedBySelf && !dying.o.damagedBy?.includes(srcId)) return false;
@@ -272,7 +273,9 @@ function diesMatches(
     if (d.orSelf) return true;
     if (d.other) return false;
   }
-  return objectMatches(s, bindEnchanted(d.filter, s.objects[srcId]), dying.o, you, false, undefined, dying.c);
+  // "A creature of the chosen type" (Species Specialist): the type chosen for the watcher, as it last existed if it's
+  // dying too (rulings; CR 603.10a).
+  return objectMatches(s, bindChosen(bindEnchanted(d.filter, s.objects[srcId]), chosen), dying.o, you, false, undefined, dying.c);
 }
 
 /** Does `entering` set off `o`'s "whenever a/another/~ or another ... enters" ability? */
@@ -660,7 +663,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const hadCounter = Object.values(ev.counters).some((n) => n > 0);
       const went = (d: NonNullable<TriggeredAbility["dies"]>) => (d.leaves ? !(d.notDies && ev.to === "graveyard") && (!d.toZones || (d.toZones as string[]).includes(ev.to)) : ev.to === "graveyard") && (!d.hadCounter || (d.hadCounter === true ? hadCounter : (ev.counters[d.hadCounter] ?? 0) > 0));
       const consider = (src: GameObject, ctrl: PlayerId, attachedTo: ObjectId | undefined, triggers?: TriggeredAbility[]) =>
-        add(src, ctrl, (e, t) => e === "permanentDies" && !!t.dies && went(t.dies) && diesMatches(s, t.dies, src.id, attachedTo, dying, ctrl), triggers, undefined, o, lki);
+        add(src, ctrl, (e, t) => e === "permanentDies" && !!t.dies && went(t.dies) && diesMatches(s, t.dies, src.id, attachedTo, dying, ctrl, src.chosen), triggers, undefined, o, lki);
       for (const id of s.battlefield) {
         const src = obj(s, id);
         consider(src, controllerOf(s, src), ev.attachments?.includes(id) ? ev.id : src.attachedTo);
@@ -732,7 +735,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       }
       // "Whenever ~ attacks and isn't blocked": no creature was declared to block it (rulings).
       if (o.attacking !== undefined && !o.blockedBy) {
-        add(o, you, (e) => e === "selfAttacksUnblocked", undefined, undefined, undefined, undefined, undefined, undefined, { player: o.attacking });
+        add(o, you, (e, t) => e === "selfAttacksUnblocked" && (!t.attacksPlayer || !o.attackingPermanent), undefined, undefined, undefined, undefined, undefined, undefined, { player: o.attacking });
         addHosted(o, (e) => e === "selfAttacksUnblocked", undefined, o, { player: o.attacking });
       }
       if (o.attacking !== undefined && o.blockedBy?.length) {
@@ -1329,6 +1332,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.cast.spent && !spentMeets(ev.copy ? undefined : ev.spent, t.cast.spent, spell ? characteristics(s, spell).colors : ev.card.colors)) return false;
         // "A spell that targets a creature you control": its targets as it was cast (CR 601.2c), once however many match.
         if (t.cast.targets && !t.cast.targets.some((w) => targetsMatch(s, item?.targets ?? [], w, you))) return false;
+        // "That targets only ~" (Zada), "only a single Golem": every target it has names one permanent.
+        if (t.cast.targetsOnly && !targetsOnlyOne(s, item?.targets ?? [], t.cast.targetsOnly, o, you)) return false;
         // Where it was cast from (CR 601.2a); a copy wasn't cast from anywhere.
         if (t.cast.from && !castFromMatches(t.cast.from, ev.copy ? undefined : spell, ev.controller)) return false;
         if (t.cast.notOwned && !(spell && !ev.copy && spell.owner !== ev.controller)) return false;

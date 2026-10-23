@@ -334,6 +334,8 @@ export interface GameObject {
   noRegenTurn?: number;
   /** "~ assigns no combat damage this turn": the turn (CR 510.1). */
   noCombatDamageTurn?: number;
+  /** "~ assigns no combat damage this combat" (Master of Cruelties): the turn and its combat phase (GameState.combatsThisTurn). */
+  noCombatDamageCombat?: { turn: number; combat: number };
   /**
    * "Until the end of your next turn, you may play that card" (impulse draw): who may play it from exile,
    * while it's still the same object (`zc`), until the end of this turn or of their next turn, or ("exiled") for as
@@ -1151,6 +1153,11 @@ export type PendingDecision =
       made?: number[];
       archives?: number;
     }
+  /**
+   * Out of the Tombs (CompiledCard.drawEmptyReturn): a draw from an empty library is replaced; `player` picks which of
+   * `cards`, the creature cards in their graveyard, returns to the battlefield. `left` and `made` are the draws after it.
+   */
+  | { kind: "drawEmptyReturn"; player: PlayerId; source: string; cards: ObjectId[]; left: number; made?: number[]; after?: "drawStep" }
   | {
       kind: "dredge";
       player: PlayerId;
@@ -1468,6 +1475,11 @@ export interface GameState {
   /** "Your opponents can't cast spells this turn" (Silence): who can't cast what, until that turn ends (CR 101.2). */
   /** The "one of those cards" groups (GameObject.mayPlay.oneOf) a card of which has been played: the rest can't be. */
   oneOfUsed?: string[];
+  /**
+   * Court of Locthwain's "until end of turn, you may cast a spell from among cards exiled with ~ without paying its mana
+   * cost": one each, for `player`, from the cards linked to `source` ("id@zc", GameState.linkedExile), this turn only.
+   */
+  linkedFreeCasts?: { player: PlayerId; source: string; turn: number; sourceName: string }[];
   /** The nonland card types of each card cast with a "for each nonland card type" permission (GameObject.mayPlay.byType), by group. */
   byTypeCast?: Record<string, string[][]>;
   cantCastThisTurn?: { player: PlayerId; turn: number; filter?: TargetSpec; source: string; /** Until the end of this player's next turn (Single Combat), kept past this turn's cleanup. */ untilEndOfTurnOf?: PlayerId; /** Until this player's next turn begins (Hope of Ghirapur). */ untilTurnOf?: PlayerId }[];
@@ -1981,7 +1993,7 @@ export interface Resolving {
     cipherCopy?: ObjectId; // the copy of an encoded card offered to cast (CR 702.99a)
     looked?: ObjectId[]; // the top cards a "look at the top N" effect is choosing from
     connive?: { pid: PlayerId; id?: ObjectId; zc?: number }; // who connives, and the conniving permanent (CR 701.50)
-    copies?: { of: string; left: number; targets?: TargetChoice[]; /** Demonstrate: the opponent who copies it too, and whether they have. */ opp?: PlayerId; oppDone?: true; /** Twinning Staff's additional copies still to make (CR 614.1a), and the opponent's copies left. */ extra?: number; oppLeft?: number }; // spell copies still to make, and the next one's targets
+    copies?: { of: string; left: number; targets?: TargetChoice[]; /** Demonstrate: the opponent who copies it too, and whether they have. */ opp?: PlayerId; oppDone?: true; /** Twinning Staff's additional copies still to make (CR 614.1a), and the opponent's copies left. */ extra?: number; oppLeft?: number; /** Copy "eachOther" (Zada): the permanent each copy still to make targets, in order; who controls them. */ each?: ObjectId[]; by?: PlayerId }; // spell copies still to make, and the next one's targets
     /** A clash (CR 701.30): the opponent, the revealed cards, who still decides, who puts theirs on the bottom. */
     endure?: string; // "counters" or "token" (CR 701.63a)
     either?: number; // which of an "either" effect's options
@@ -2130,6 +2142,8 @@ export type Action =
   /** Answer to assistCast: pay the rest of the cost and cast it, or `cancel` the cast (CR 733.1). */
   | { type: "finishAssistedCast"; player: PlayerId; cancel?: boolean }
   /** Answer to dredge: the card to dredge instead of drawing, or none to draw (CR 702.52a). */
+  /** Answers PendingDecision "drawEmptyReturn": the creature card to return. */
+  | { type: "drawEmptyReturn"; player: PlayerId; objectId: ObjectId }
   | { type: "dredge"; player: PlayerId; objectId?: ObjectId; /** Abundance instead: reveal until a card of this kind. */ abundance?: "land" | "nonland" }
   /** Which of the cards looked at instead of drawing goes to the graveyard (Scion of Halaster). */
   | { type: "drawLook"; player: PlayerId; /** The card to put into the graveyard, or with Underrealm Lich (`keep`) into the hand (none when fewer than two to look at). */ objectId?: ObjectId; /** Apply another replacement first (see the drawLook prompt). */ instead?: "archive" | "dig" | { dredge: ObjectId } | { abundance: "land" | "nonland" } }

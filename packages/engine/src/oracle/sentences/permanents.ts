@@ -86,8 +86,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   if (s === "~ becomes solved") return [{ type: "solve" }];
   if (s === "Harness ~") return [{ type: "harness" }];
   if (s === "The next spell you cast this turn has improvise") return [{ type: "nextSpellImprovise" }];
-  // "Transform ~" (CR 701.27a).
-  if (/^[Tt]ransform ~$/.test(s)) return [{ type: "transform", what: { ref: "self" } }];
+  // "Transform ~" (CR 701.27a); "you may transform it" in a trigger about itself (Vincent Valentine).
+  if (/^[Tt]ransform ~$/.test(s) || (ctx.selfIt && /^[Tt]ransform it$/.test(s))) return [{ type: "transform", what: { ref: "self" } }];
   // "Transform up to one target Incubator token you control" (Attentive Skywarden), "transform target Werewolf you
   // control": a permanent that isn't a transforming one doesn't (CR 701.27c).
   if ((m = /^[Tt]ransform ((?:up to one )?target .+)$/.exec(s))) {
@@ -282,9 +282,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return [{ type: "noRegen", what, ifCreature: true }, { type: "exileIfDies", what, ifCreature: true }];
   }
   // "~ assigns no combat damage this turn" (CR 510.1): the Laccoliths, Ophidian.
-  if ((m = /^(.+?) assigns no combat damage this turn$/i.exec(s))) {
+  if ((m = /^(.+?) assigns no combat damage this (turn|combat)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
-    return what && !isGroup(what) ? [{ type: "noCombatDamage", what }] : null;
+    return what && !isGroup(what) ? [{ type: "noCombatDamage", what, ...(m[2] === "combat" ? { combat: true as const } : {}) }] : null;
   }
   // "That creature doesn't untap during its controller's next untap step", "Those creatures don't untap during their controllers' next untap steps"
   if ((m = /^(.+?) (?:doesn't|don't|do not|does not) untap during (?:its controller's|their controllers?'s?|your) next untap steps?$/i.exec(s))) {

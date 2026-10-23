@@ -6,13 +6,36 @@ import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { castProblem, freeCastable, describeTargets, log, millCount, moveObject, newObject, obj, opponents, player } from "../game";
 import { compileCard, spellTargetSpecs } from "../oracle";
 import type { CardDef, DelayedTrigger, GameObject, GameState, ObjectId, PlayerId, StackItem } from "../types";
-import { isLegalTarget, legalTargets, pickOptions, printedMatches, sameTarget, sourceQuality, spellManaValue, spellQuality, stampTargets, swapKeepsOthersLegal } from "./targeting";
+import { isLegalTarget, legalTargets, objectMatches, pickOptions, printedMatches, sameTarget, sourceQuality, spellManaValue, spellQuality, stampTargets, swapKeepsOthersLegal } from "./targeting";
 import { ResolveCtx, objects, amountNow, players } from "./resolve";
 import { closeZoneBatch, fireEvent } from "./triggers";
 import { discardCards, toBottom } from "./run-library";
 import { suspendExiled } from "./run-zones";
 import { defMv, sameName } from "../faces";
 import { copyKey, type CopyExcept } from "../copies";
+
+/**
+ * Zada, Ink-Treader Nephilim, Precursor Golem: the permanents a copy of `orig` is made for (see Effect copySpell's
+ * `eachOther`), in the order they're on the battlefield. Each must be one every target of the spell could name, as its
+ * caster and with the spell as the source (rulings: shroud, protection and targeting restrictions leave one out).
+ */
+function eachOtherTargets(s: GameState, orig: StackItem, eo: NonNullable<Extract<Effect, { type: "copySpell" }>["eachOther"]>, ctx: ResolveCtx): ObjectId[] {
+  const chosen = (orig.targets ?? []).map((t, i) => ({ t, spec: orig.body?.targets[i] })).filter((x) => x.t.kind !== "none");
+  const first = chosen[0]?.t;
+  if (first?.kind !== "object" || chosen.some((x) => x.t.kind !== "object" || x.t.id !== first.id || !x.spec)) return [];
+  const me = ctx.sourceId;
+  // "If that spell targets only ~" (Ink-Treader Nephilim): again as it resolves (CR 603.4).
+  if (eo.onlySelf && first.id !== me) return [];
+  const card = orig.objectId ? s.objects[orig.objectId] : undefined;
+  const src = card ? spellQuality(s, cardIdOf(card), orig) : undefined;
+  return s.battlefield.filter((id) => {
+    if (id === first.id || (eo.self && id === me)) return false;
+    if (!objectMatchesFor(s, eo.among, id, ctx.controller)) return false;
+    return chosen.every((x) => isLegalTarget(s, x.spec!, { kind: "object", id }, orig.controller, src));
+  });
+}
+
+const objectMatchesFor = (s: GameState, spec: TargetSpec, id: ObjectId, you: PlayerId) => objectMatches(s, spec, obj(s, id), you, false);
 
 /**
  * Put a copy of this spell on the stack under `controller` (CR 707.10): its values and every choice made casting
@@ -313,6 +336,15 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           log(s, `${orig.description} can't be copied.`);
           return;
         }
+        if (e.n === "eachOther") {
+          // Zada, Ink-Treader Nephilim, Precursor Golem: no copy is made if the spell has left the stack.
+          if (orig.kind !== "spell" || !s.stack.some((x) => x.id === orig.id)) return;
+          const each = eachOtherTargets(s, orig, e.eachOther!, ctx);
+          if (!each.length) return;
+          const by = e.eachOther!.caster ? orig.controller : ctx.controller;
+          const extra = extraSpellCopies(s, by);
+          sc.copies = { of: id!, left: each.length, each, by, ...(extra ? { extra } : {}) };
+        } else {
         const n =
           e.n === "storm"
             ? (orig.castNth ?? 0)
@@ -326,6 +358,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         // always be chosen anew. Only for spells: copying a card or an ability isn't copying a spell.
         const extra = orig.kind === "spell" ? extraSpellCopies(s, ctx.controller) : 0;
         sc.copies = { of: id!, left: n, ...(extra ? { extra } : {}) };
+        }
       }
       const c = sc.copies;
       // As it is now, or as it was cast if it has left the stack.
@@ -336,8 +369,11 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           s.pending = { kind: "copyTargets", player: ctx.controller, source: src, copyOf: orig.description, specs, current: orig.targets ?? [], left: c.left };
           return "paused";
         }
+        // "Each copy targets a different one of those creatures": that one in each target the spell has.
+        const one = c.each?.[c.each.length - c.left];
+        const aimed = one !== undefined ? (orig.targets ?? []).map((t): TargetChoice => (t.kind === "object" ? { kind: "object", id: one } : t)) : undefined;
         if (orig.kind === "ability") putAbilityCopy(s, orig, ctx.controller, c.targets ?? orig.targets);
-        else putSpellCopy(s, orig, ctx.controller, c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src }, e.except);
+        else putSpellCopy(s, orig, c.by ?? ctx.controller, aimed ?? c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src }, e.except);
         c.targets = undefined;
         c.left--;
       }
@@ -347,7 +383,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           s.pending = { kind: "copyTargets", player: ctx.controller, source: src, copyOf: orig.description, specs, current: orig.targets ?? [], left: c.extra };
           return "paused";
         }
-        putSpellCopy(s, orig, ctx.controller, c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src }, e.except);
+        putSpellCopy(s, orig, c.by ?? ctx.controller, c.targets ?? orig.targets, e.gains && { mods: e.gains, source: src }, e.except);
         c.targets = undefined;
         c.extra--;
       }

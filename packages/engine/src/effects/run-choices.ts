@@ -3,7 +3,7 @@ import { manaValue, parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
 import { autoEvidence, availableMana, canLoseLife, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, moveObject, obj, opponents, payableLife, player, shareCreatureType } from "../game";
-import { cardIdOf, defOf } from "../cards";
+import { abilitiesOf, cardIdOf, defOf } from "../cards";
 import { controllerOf, staticConditionNow } from "../layers";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, choiceOptions, objectMatches, pickOptions, printedMatches, sayBound, spellMatches } from "./targeting";
@@ -189,9 +189,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
     case "villainous": {
       // CR 701.55: each player facing it in APNAP order chooses an option, and all of it is done before the next one
       // chooses (701.55d); an option that can't be done is still a choice, done as far as it can be (701.55b). Each run
-      // starts with what the one before it chose and found forgotten.
+      // starts with what the one before it chose and found forgotten. The Valeyard has an opponent of its controller face
+      // it once more for each, one time after the other (701.55c).
       const sc = (s.resolving!.scratch ??= {});
-      const st = (sc.villain ??= { queue: apnap(s, players(s, e.who, ctx)), keep: [...Object.keys(sc), "villain"] });
+      const st = (sc.villain ??= { queue: apnap(s, players(s, e.who, ctx)).flatMap((pid) => Array<PlayerId>(1 + villainAgain(s, pid)).fill(pid)), keep: [...Object.keys(sc), "villain"] });
       while (st.queue.length) {
         const pid = st.queue[0]!;
         if (st.pick === undefined) {
@@ -343,7 +344,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (e.choice === "opponent") {
         // "Choose an opponent" (CR 608.2d): one still in the game (CR 800.4a); with one, there's nothing to ask.
         if (r.chosen?.player !== undefined) return;
-        const living = apnap(s, s.turnOrder).filter((x) => !player(s, x).lost);
+        const living = apnap(s, s.turnOrder).filter((x) => !player(s, x).lost && (e.mostLife !== "opponents" || x !== ctx.controller));
         const most = Math.max(...living.map((x) => player(s, x).life));
         const opps = e.mostLife ? living.filter((x) => player(s, x).life === most) : opponents(s, ctx.controller);
         if (opps.length === 1) {
@@ -351,7 +352,7 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           log(s, `${player(s, ctx.controller).name} chooses ${player(s, opps[0]!).name} for ${src}.`);
         }
         if (opps.length <= 1) return;
-        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "opponent", options: opps.map(String), labels: opps.map((x) => player(s, x).name), prompt: e.mostLife ? "choose a player with the most life" : "choose an opponent" };
+        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "opponent", options: opps.map(String), labels: opps.map((x) => player(s, x).name), prompt: e.mostLife === "opponents" ? "choose an opponent with the most life" : e.mostLife ? "choose a player with the most life" : "choose an opponent" };
         return "paused";
       }
       if (e.each) {
@@ -934,4 +935,12 @@ export function exiledWithCounter(s: GameState, owners: PlayerId[], counter: str
     .flatMap((pid) => player(s, pid).exile)
     .filter((id) => (obj(s, id).counters[counter] ?? 0) > 0)
     .sort((a, b) => (obj(s, b).counters[counter] ?? 0) - (obj(s, a).counters[counter] ?? 0));
+}
+
+/** How many more times `pid` faces a villainous choice: one for each The Valeyard an opponent of theirs controls (CR 701.55c). */
+function villainAgain(s: GameState, pid: PlayerId): number {
+  return s.battlefield.filter((id) => {
+    const o = obj(s, id);
+    return abilitiesOf(s, o).villainAgain && controllerOf(s, o) !== pid;
+  }).length;
 }

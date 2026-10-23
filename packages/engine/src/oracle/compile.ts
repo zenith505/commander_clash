@@ -1604,6 +1604,10 @@ export function compile(d: CardDef): CompiledCard {
       out.drawEmptyWins = true;
       continue;
     }
+    if (line === "If you would draw a card while your library has no cards in it, instead return a creature card from your graveyard to the battlefield. If you can't, you lose the game.") {
+      out.drawEmptyReturn = true;
+      continue;
+    }
     if (line === "If you would draw a card, you may instead choose land or nonland and reveal cards from the top of your library until you reveal a card of the chosen kind. Put that card into your hand and put all other cards revealed this way on the bottom of your library in any order.") {
       out.drawAbundance = true;
       continue;
@@ -1666,6 +1670,15 @@ export function compile(d: CardDef): CompiledCard {
     const extraVote = /^While voting, you (get an additional vote|may vote an additional time)\.$/.exec(line);
     if (extraVote && !out.extraVote) {
       out.extraVote = extraVote[1]!.startsWith("get") ? "get" : "may";
+      continue;
+    }
+    const faceUpCounters = new RegExp(`^As ~ is turned face up, put ${NUM} ${COUNTER} counters? on it\\.$`).exec(line);
+    if (faceUpCounters && !out.faceUpCounters) {
+      out.faceUpCounters = { counter: counterKind(faceUpCounters[2]!), n: num(faceUpCounters[1]!) };
+      continue;
+    }
+    if (line === "If an opponent would face a villainous choice, they face that choice an additional time.") {
+      out.villainAgain = true;
       continue;
     }
     if (line === "If ~ is in your opening hand, you may begin the game with it on the battlefield.") {
@@ -2403,6 +2416,13 @@ export function compile(d: CardDef): CompiledCard {
       out.triggers.push({ event: "selfLeaves", body: { targets: [], effects: [{ type: "sacrificeAnimated" }], text: "That creature's controller sacrifices it." } });
       continue;
     }
+    // Daybreak Coronet: as a spell, any enchanted creature (no Aura of its own is attached yet); on the battlefield, one
+    // with an Aura other than this one (see attachmentSBAs).
+    if (line === "Enchant creature with another Aura attached to it" && !out.enchant) {
+      out.enchant = { kind: "object", types: ["Creature"], status: "enchanted", text: "creature with another Aura attached to it to enchant" };
+      out.enchantAnotherAura = true;
+      continue;
+    }
     const enchant = /^Enchant (.+)$/.exec(line);
     if (enchant) {
       const spec = parseTargetPhrase(enchant[1]!);
@@ -2530,6 +2550,24 @@ export function compile(d: CardDef): CompiledCard {
       const ok = st?.affects.kind === "attached" && st.mods.length > 0 && st.mods.every((m) => m.kind === "addKeywords" && m.keywords.every((k) => /^Protection from /.test(k)));
       if (ok) out.statics.push({ ...st, mods: st.mods.map((m) => ({ ...m, spares: true as const })) as typeof st.mods, text: line });
       else out.unsupported.push(raw);
+      continue;
+    }
+    // Zada, Hedron Grinder; Ink-Treader Nephilim; Precursor Golem (CR 707.10): a copy of the spell for each other creature
+    // (or Golem) it could target, each copy targeting that one.
+    const eachOther = /^Whenever (you cast|a player casts) an instant or sorcery spell(?: that targets only (~|a single ([A-Z][a-z]+)))?(, if that spell targets only ~)?, (copy (?:that|the) spell|that player copies that spell) for each other (creature you control|creature|[A-Z][a-z]+) that (?:the )?spell could target\. Each copy targets a different one of those (?:creatures|[A-Z][a-z]+s)\.$/.exec(line);
+    if (eachOther && !eachOther[2] !== !eachOther[4]) {
+      const single = eachOther[3] ? parseTargetPhrase(eachOther[3]) : null;
+      const among = parseTargetPhrase(eachOther[6]!);
+      const self = !eachOther[3];
+      if ((eachOther[3] && (single?.kind !== "object" || eachOther[6] !== eachOther[3])) || among?.kind !== "object" || (eachOther[5] === "that player copies that spell") !== !!eachOther[3]) {
+        out.unsupported.push(raw);
+        continue;
+      }
+      out.triggers.push({
+        event: "castSpell",
+        cast: { by: eachOther[1] === "you cast" ? "you" : "any", spell: { kind: "spell", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery spell" }, targetsOnly: single ? { ...single, text: eachOther[3]! } : "self" },
+        body: { targets: [], effects: [{ type: "copySpell", spell: "cause", n: "eachOther", newTargets: false, eachOther: { among: { ...among, text: eachOther[6]! }, ...(self ? { self: true as const } : {}), ...(eachOther[3] ? { caster: true as const } : {}), ...(eachOther[4] ? { onlySelf: true as const } : {}) } }], text: line.replace(/^Whenever [^,]+(?:, if that spell targets only ~)?, /, "") },
+      });
       continue;
     }
     // Thrumming Stone: "Spells you cast have ripple 4." Each spell's granted ripple triggers as it's cast (CR 702.60a),
@@ -2929,13 +2967,16 @@ function linkExile(out: CompiledCard) {
     else exiles[0]!.linked = true;
   }
   // Valakut Exploration: "cards exiled with ~" are the ones its one impulse exiled (CR 607.2a).
-  const usesLinked = (b: AbilityBody) => allEffects(b.effects).some((e) => e.type === "moveLinked") || JSON.stringify(b).includes('"linkedExiled"');
+  // Court of Locthwain: "cast a spell from among cards exiled with ~" too.
+  const usesLinked = (b: AbilityBody) => allEffects(b.effects).some((e) => e.type === "moveLinked" || e.type === "castLinkedFree") || JSON.stringify(b).includes('"linkedExiled"');
   const impulses = bodies.flatMap((b) => allEffects(b.effects)).filter((e): e is Extract<Effect, { type: "impulse" }> => e.type === "impulse");
   if (impulses.length && (bodies.some(usesLinked) || out.triggers.some((t) => JSON.stringify(t.ifCond ?? null).includes('"linkedExiled"')))) {
     const others = bodies.flatMap((b) => allEffects(b.effects)).some((e) => e.type === "exile" || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
     if (others || impulses.length !== 1) out.unsupported.push("(refers to cards exiled with it that it can't link to one exile ability)");
     else impulses[0]!.linked = true;
   }
+  // "Cast a spell from among cards exiled with ~" with no one impulse to link it to (Idol of Endurance's exile until it leaves).
+  if (!impulses.length && bodies.some((b) => allEffects(b.effects).some((e) => e.type === "castLinkedFree"))) out.unsupported.push("(casts a card exiled with it that it can't link to one exile ability)");
   // Currency Converter: "Whenever you discard a card, you may exile that card from your graveyard" and "Put a card exiled
   // with ~ into its owner's graveyard": the cards its one exile instruction exiled (CR 607.2a).
   if (!impulses.length && bodies.some((b) => allEffects(b.effects).some((e) => e.type === "moveLinked"))) {

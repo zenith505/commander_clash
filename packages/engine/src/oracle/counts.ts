@@ -103,8 +103,9 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // Profane Transfusion: "where X is the difference between those players' life totals", after they exchanged them.
   if (!each && ctx?.exchanged && /^the difference between those players' life totals$/i.test(p)) return { count: { kind: "exchangedLifeDifference" } };
   // "Draw a card for each creature destroyed this way" (Decree of Pain), "for each permanent destroyed this way", "the
-  // number of enchantments destroyed this way": what this spell's or ability's destroy instructions destroyed.
-  if ((m = /^(.+?) (destroyed|exiled) this way$/i.exec(p)) && !/\b(you|your|that|they|their|cards?)\b/i.test(m[1]!)) {
+  // number of enchantments destroyed this way": what this spell's or ability's destroy instructions destroyed. "Incubate
+  // X, where X is the number of creatures exiled this way" (Sunfall): the same.
+  if ((m = /^(?:the number of )?(.+?) (destroyed|exiled) this way$/i.exec(p)) && !/\b(you|your|that|they|their|cards?)\b/i.test(m[1]!)) {
     const spec = parseTargetPhrase(m[1]!.split(/\s+/).map(singularWord).join(" "), { chosen: true });
     if (spec?.kind !== "object") return null;
     return { count: { kind: m[2]!.toLowerCase() === "destroyed" ? "destroyedThisWay" : "exiledThisWay", filter: { ...spec, text: m[1]! } } };

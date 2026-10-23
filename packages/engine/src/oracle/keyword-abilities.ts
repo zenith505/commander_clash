@@ -193,7 +193,9 @@ export function parseCostKeyword(
   // (see mutatingDef).
   if ((m = /^Mutate ((?:\{[^}]+\})+)$/.exec(line))) return plainMana(m[1]!) && d.types.includes("Creature") ? { alt: { kind: "mutate", mana: m[1]! } } : "fail";
   // Bestow (CR 702.103a); "Bestow—{R}, Collect evidence 6" isn't modeled. (Cast bestowed, the card is an Aura: see bestowedDef.)
-  if ((m = /^Bestow(?: |—)(.+?)\.?$/.exec(line))) return /^(\{[^}]+\})+$/.test(m[1]!) && plainMana(m[1]!) ? { alt: { kind: "bestow", mana: m[1]! } } : "fail";
+  // A bestow cost with {X} (Nyxborn Hydra's {X}{G}{G}): X is announced and paid as for the mana cost (CR 107.3a), only when
+  // the card's own mana cost has the X its text uses.
+  if ((m = /^Bestow(?: |—)(.+?)\.?$/.exec(line))) return /^(\{[^}]+\})+$/.test(m[1]!) && (plainMana(m[1]!) || (plainMana(m[1]!.replace(/\{X\}/g, "")) && parseManaCost(m[1]!).supported && /\{X\}/.test(d.manaCost))) ? { alt: { kind: "bestow", mana: m[1]! } } : "fail";
   // Madness (CR 702.35a): "Madness—{1}{B}, Pay 1 life" and X madness costs aren't modeled.
   // Miracle [cost] (CR 702.94a): a mana cost, without an X the mana cost doesn't have.
   if ((m = /^Miracle ((?:\{[^}]+\})+)$/.exec(line))) return parseManaCost(m[1]!).supported && (!/\{X\}/.test(m[1]!) || /\{X\}/.test(d.manaCost)) ? { miracle: m[1]! } : "fail";

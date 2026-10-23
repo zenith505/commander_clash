@@ -434,6 +434,11 @@ export function parseUntargetable(t: string): Untargetable | null {
 export function parseStaticCondition(text: string, st: StaticAbility): StaticCondition | null {
   let m: RegExpExecArray | null;
   if ((m = new RegExp(`^(?:there are )?${NUM} or more cards (?:are )?in your graveyard$`).exec(text))) return { kind: "graveyardAtLeast", n: num(m[1]!) };
+  // "As long as there are fewer than eight cards in your graveyard, ~ isn't a creature" (The Warring Triad).
+  if ((m = new RegExp(`^there are fewer than ${NUM} cards in your graveyard$`).exec(text))) {
+    const amount = parseCount("the number of cards in your graveyard", null);
+    return amount && typeof amount === "object" ? { kind: "amount", amount, max: num(m[1]!) - 1 } : null;
+  }
   if ((m = new RegExp(`^there are ${NUM} or more card types among cards in your graveyard$`).exec(text))) return { kind: "graveyardTypes", n: num(m[1]!) };
   // "If there are four or more permanent types among cards in your graveyard" (Matzalantli): artifact, battle, creature,
   // enchantment, land and planeswalker (CR 110.4a).

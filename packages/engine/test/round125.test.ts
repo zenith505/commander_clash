@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { botActions, power, characteristics, invalidateCharacteristics, compileCard, isFullySupported, manaValue, planActivate, planCast, spellCost, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { botActions, castProblem, power, characteristics, invalidateCharacteristics, compileCard, isFullySupported, manaValue, planActivate, planCast, spellCost, waitingOn, type Action, type CardDef, type GameState } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -757,5 +757,58 @@ describe("Endrek Sahr: a state trigger (CR 603.8) at seven Thrulls", () => {
     const thrulls = s.battlefield.filter((id) => characteristics(s, s.objects[id]!).subtypes.includes("Thrull")).length;
     expect(thrulls).toBe(7);
     expect(s.objects[e]!.zone).toBe("graveyard");
+  });
+});
+
+const triad = card("The Warring Triad", "Legendary Artifact Creature — God", "{3}", {
+  power: "5", toughness: "5", keywords: ["Flying", "Haste", "Trample", "Mill"],
+  oracleText: "Flying, trample, haste\nAs long as there are fewer than eight cards in your graveyard, The Warring Triad isn't a creature.\n{T}, Mill a card: Target player adds one mana of any color. (Activate only as an instant.)",
+});
+
+describe("The Warring Triad: not a creature with fewer than eight cards in your graveyard", () => {
+  it("seven cards: an artifact only; eight: a creature", () => {
+    supported(triad);
+    const { s, ap } = setup([]);
+    const t = putOnBattlefield(s, ap, triad);
+    const yard = (n: number) => {
+      while (s.players[ap]!.graveyard.length < n) {
+        const c = s.players[ap]!.library.shift()!;
+        s.objects[c]!.zone = "graveyard";
+        s.players[ap]!.graveyard.push(c);
+      }
+      invalidateCharacteristics(s);
+    };
+    yard(7);
+    expect(characteristics(s, s.objects[t]!).types).toEqual(["Artifact"]);
+    yard(8);
+    expect(characteristics(s, s.objects[t]!).types).toContain("Creature");
+  });
+});
+
+const lavinia = card("Lavinia, Azorius Renegade", "Legendary Creature — Human Soldier", "{W}{U}", {
+  power: "2", toughness: "2",
+  oracleText: "Each opponent can't cast noncreature spells with mana value greater than the number of lands that player controls.\nWhenever an opponent casts a spell, if no mana was spent to cast it, counter that spell.",
+});
+
+describe("Lavinia, Azorius Renegade: no noncreature spells with mana value above your land count", () => {
+  it("three lands: a 4-mana sorcery can't be cast, a 4-mana creature can; X counts as chosen", () => {
+    supported(lavinia);
+    const sorcery = card("Test Four Sorcery", "Sorcery", "{3}{R}", { oracleText: "Draw a card." });
+    const creature = card("Test Four Creature", "Creature — Giant", "{3}{R}", { power: "4", toughness: "4" });
+    const xSpell = card("Test X Sorcery", "Sorcery", "{X}{R}", { oracleText: "Draw X cards." });
+    const { s, ap, ids, opp } = setup([sorcery, creature, xSpell]);
+    putOnBattlefield(s, opp, lavinia);
+    const lands = s.battlefield.filter((id) => s.objects[id]!.controller === ap && s.cards[s.objects[id]!.cardId]!.types.includes("Land"));
+    for (const l of lands.slice(3)) {
+      s.battlefield.splice(s.battlefield.indexOf(l), 1);
+      s.objects[l]!.zone = "graveyard";
+      s.players[ap]!.graveyard.push(l);
+    }
+    s.players[ap]!.manaPool = { W: 0, U: 0, B: 0, R: 5, G: 0, C: 0 };
+    invalidateCharacteristics(s);
+    expect(castProblem(s, ap, ids[0]!)).toMatch(/Lavinia/);
+    expect(castProblem(s, ap, ids[1]!)).toBeNull();
+    expect(castProblem(s, ap, ids[2]!, undefined, undefined, undefined, undefined, 2)).toBeNull();
+    expect(castProblem(s, ap, ids[2]!, undefined, undefined, undefined, undefined, 3)).toMatch(/Lavinia/);
   });
 });

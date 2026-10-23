@@ -4338,6 +4338,8 @@ export interface CompiledCard {
   opponentsCantCastMvAtMost?: number;
   /** "Your opponents can't cast spells with even mana values." (Void Winnower). */
   opponentsCantCastEven?: true;
+  /** Lavinia, Azorius Renegade: "Each opponent can't cast noncreature spells with mana value greater than the number of lands that player controls." */
+  opponentsNoncreatureMvAboveLands?: true;
   /** "Your opponents can't block with creatures with even mana values." (Void Winnower). */
   opponentsCantBlockEven?: true;
   /** "You can't cast creature spells." (Steel Golem), "You can't cast noncreature spells." (Nikya): its controller. */

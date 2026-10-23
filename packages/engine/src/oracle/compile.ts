@@ -2113,6 +2113,11 @@ export function compile(d: CardDef): CompiledCard {
       out.opponentsCantCastEven = true;
       continue;
     }
+    // Lavinia, Azorius Renegade: X as chosen (rulings), the lands that player controls as they cast it (CR 601.3).
+    if (line === "Each opponent can't cast noncreature spells with mana value greater than the number of lands that player controls.") {
+      out.opponentsNoncreatureMvAboveLands = true;
+      continue;
+    }
     if (line === "Your opponents can't block with creatures with even mana values.") {
       out.opponentsCantBlockEven = true;
       continue;

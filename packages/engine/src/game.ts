@@ -4676,6 +4676,8 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
     // Sanctum Prelate: anyone's noncreature spell with that mana value, X as chosen (rulings).
     if (abilitiesOf(s, o).noncreatureChosenMvCantBeCast && o.chosen?.number !== undefined && !isType(d, "Creature") && value === o.chosen.number)
       return `${characteristics(s, o).name}: noncreature spells with mana value ${o.chosen.number} can't be cast`;
+    if (abilitiesOf(s, o).opponentsNoncreatureMvAboveLands && controllerOf(s, o) !== pid && value !== undefined && !isType(d, "Creature") && value > s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length)
+      return `${characteristics(s, o).name}: opponents can't cast noncreature spells with mana value greater than the number of lands they control`;
     if (abilitiesOf(s, o).opponentsCantCastEven && controllerOf(s, o) !== pid && value !== undefined && value % 2 === 0)
       return `${characteristics(s, o).name}: opponents can't cast spells with even mana values`;
     for (const f of abilitiesOf(s, o).youCantCast ?? [])

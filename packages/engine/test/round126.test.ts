@@ -602,3 +602,35 @@ describe("The Sibsig Ceremony: \"if you cast it\" on another permanent entering 
     expect(zombies).toHaveLength(1);
   });
 });
+
+const etchings = card("Etchings of the Chosen", "Enchantment", "{1}{W}{B}", {
+  oracleText: "As this enchantment enters, choose a creature type.\nCreatures you control of the chosen type get +1/+1.\n{1}, Sacrifice a creature of the chosen type: Target creature you control gains indestructible until end of turn. (Damage and effects that say \"destroy\" don't destroy it.)",
+});
+
+describe("Etchings of the Chosen: \"Sacrifice a creature of the chosen type\" (CR 607.2d)", () => {
+  const scene = () => {
+    const { s, ap } = setup([]);
+    const e = putOnBattlefield(s, ap, etchings);
+    s.objects[e]!.chosen = { type: "Elf" };
+    const elf = putOnBattlefield(s, ap, card("Llanowar Elves", "Creature — Elf Druid", "{G}", { power: "1", toughness: "1", oracleText: "{T}: Add {G}." }));
+    const bear = putOnBattlefield(s, ap, bears());
+    return { s, ap, e, elf, bear };
+  };
+  it("an Elf can be sacrificed; the bear gains indestructible", () => {
+    supported(etchings);
+    const { s: s0, ap, e, elf, bear } = scene();
+    let s = run(s0, planActivate(s0, ap, e, 0, [{ kind: "object", id: bear }], undefined, undefined, undefined, { sacrifice: [elf] }));
+    s = untilChoice(s);
+    expect(s.objects[elf]!.zone).toBe("graveyard");
+    expect(objHasKeyword(s, s.objects[bear]!, "Indestructible")).toBe(true);
+  });
+  it("a creature of another type can't pay the cost", () => {
+    const { s: s0, ap, e, elf, bear } = scene();
+    expect(planActivate(s0, ap, e, 0, [{ kind: "object", id: elf }], undefined, undefined, undefined, { sacrifice: [bear] })).toBeNull();
+  });
+  it("with Bear chosen, the bear pays instead", () => {
+    const { s: s0, ap, e, elf, bear } = scene();
+    s0.objects[e]!.chosen = { type: "Bear" };
+    expect(planActivate(s0, ap, e, 0, [{ kind: "object", id: elf }], undefined, undefined, undefined, { sacrifice: [bear] })).not.toBeNull();
+  });
+});

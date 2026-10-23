@@ -3583,7 +3583,9 @@ function abilityCosts(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedA
   if (!ab.costs?.length) return undefined;
   const out: CostChoices = {};
   const targeted = new Set(targets.flatMap((t) => (t.kind === "none" ? [] : [t.id])));
-  for (const c of ab.costs) {
+  for (const c0 of ab.costs) {
+    // "Sacrifice a creature of the chosen type" (Etchings of the Chosen): the source's chosen type.
+    const c = c0.kind === "sacrifice" && c0.filter.chosen ? { ...c0, filter: bindChosen(c0.filter, o.chosen) } : c0;
     if (c.kind === "forage") {
       const f = forageChoice(s, pid, o, [...[...targeted].map(String), ...(keep ? [keep] : [])]);
       if (!f) return null;

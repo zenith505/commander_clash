@@ -296,7 +296,9 @@ function parseRevealedIf(sentences0: string[], at: number, ctx: Ctx): { effect: 
   // "If it's a creature card of the chosen type, ..." (Herald's Horn): the type chosen for its source.
   const ofChosen = /^If (?:it's|that card is) an? [^,]+? card of the chosen type, /.test(sentences0[at] ?? "");
   const sentences = ofChosen ? sentences0.map((x, i) => (i === at ? x.replace(/ card of the chosen type, /, " card, ") : x)) : sentences0;
-  const first = /^If (?:it's|that card is) (not |)(an? .+?|snow) card, (.+)$/.exec(sentences[at] ?? "") ?? /^If it (isn't) (an? .+?) card, (.+)$/.exec(sentences[at] ?? "") ?? /^If that card is ()(snow), (.+)$/.exec(sentences[at] ?? "");
+  // "If it's a card of the chosen type, ..." (Gathering Stone): any card with that creature type (CR 205.3m).
+  const anyOfChosen = /^If (?:it's|that card is) a card of the chosen type, (.+)$/.exec(sentences0[at] ?? "");
+  const first = anyOfChosen ? (["", "", "card", anyOfChosen[1]!] as const) : (/^If (?:it's|that card is) (not |)(an? .+?|snow) card, (.+)$/.exec(sentences[at] ?? "") ?? /^If it (isn't) (an? .+?) card, (.+)$/.exec(sentences[at] ?? "") ?? /^If that card is ()(snow), (.+)$/.exec(sentences[at] ?? ""));
   // "If that card has the chosen name, sacrifice ~ and draw three cards" (Diviner's Lockbox), after "choose a card name".
   const named = !first && /^If (?:it|that card) has the chosen name, (.+)$/.exec(sentences[at] ?? "");
   if (named) {
@@ -305,8 +307,8 @@ function parseRevealedIf(sentences0: string[], at: number, ctx: Ctx): { effect: 
     return then && { effect: { type: "if", cond: { kind: "revealedIs", filter: { kind: "card", chosen: "name", text: "card with the chosen name" } }, effects: then }, next: at + 1 };
   }
   if (!first) return null;
-  const filter0 = parseSearchFilter(`${first[2]!.replace(/^an? /, "")} card`);
-  const filter = filter0 && ofChosen ? { ...filter0, chosen: "type" as const, text: `${filter0.text} of the chosen type` } : filter0;
+  const filter0: TargetSpec | null = anyOfChosen ? { kind: "card", chosen: "type", text: "card of the chosen type" } : (parseSearchFilter(`${first[2]!.replace(/^an? /, "")} card`) ?? null);
+  const filter = filter0 && ofChosen && !anyOfChosen ? { ...filter0, chosen: "type" as const, text: `${filter0.text} of the chosen type` } : filter0;
   const then = filter && revealedAction(first[3]!, ctx);
   if (!filter || !then) return null;
   let next = at + 1;
@@ -321,9 +323,13 @@ function parseRevealedIf(sentences0: string[], at: number, ctx: Ctx): { effect: 
   // "If it's a land card, you may put it onto the battlefield tapped. If you don't put the card onto the battlefield, put
   // it into your hand." (Risen Reef), "If you didn't put a card onto the battlefield this way, create ..." (Rulik Mons):
   // when it isn't one, or when you choose not to.
-  const notPut = !other && /^If you (?:don't put the card onto the battlefield|didn't put a card onto the battlefield this way), (.+)$/.exec(sentences[next] ?? "");
+  // Gathering Stone: "If it's a card of the chosen type, you may reveal it and put it into your hand. If you don't put the
+  // card into your hand, you may put it into your graveyard": also when it is one and you don't reveal it (rulings).
+  const notPut = !other && /^If you (?:don't put the card onto the battlefield|didn't put a card onto the battlefield this way|don't put the card into your hand), (.+)$/.exec(sentences[next] ?? "");
   if (notPut) {
-    const may = then.length === 1 && then[0]!.type === "may" && !then[0]!.otherwise && !then[0]!.pay && then[0]!.effects.length === 1 && then[0]!.effects[0]!.type === "putOntoBattlefield" ? then[0]! : null;
+    const toHand = /^If you don't put the card into your hand, /.test(sentences[next] ?? "");
+    const one = then.length === 1 && then[0]!.type === "may" && !then[0]!.otherwise && !then[0]!.pay ? then[0]! : null;
+    const may = one && (toHand ? one.effects.length === 2 && one.effects[0]!.type === "revealRevealed" && one.effects[1]!.type === "bounce" : one.effects.length === 1 && one.effects[0]!.type === "putOntoBattlefield") ? one : null;
     const before = ctx.targets.length;
     const rest = may && (revealedAction(notPut[1]!, ctx) ?? parseOne(capital(notPut[1]!), ctx));
     if (!may || !rest || ctx.targets.length !== before || rest.some((e) => pauses(e) && e.type !== "may")) return null;

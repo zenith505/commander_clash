@@ -460,3 +460,80 @@ describe("Hazel of the Rootbloom", () => {
     }
   });
 });
+
+const realms = card("Eclipsed Realms", "Land", "", {
+  oracleText: "As this land enters, choose Elemental, Elf, Faerie, Giant, Goblin, Kithkin, Merfolk, or Treefolk.\n{T}: Add {C}.\n{T}: Add one mana of any color. Spend this mana only to cast a spell of the chosen type or activate an ability of a source of the chosen type.",
+});
+
+describe("Eclipsed Realms: one of eight creature types; its colored mana only for that type's spells and abilities", () => {
+  /** Only Eclipsed Realms for mana, Elf chosen. */
+  const scene = (...hand: CardDef[]) => {
+    const { s, ap, ids } = setup(hand);
+    s.battlefield = s.battlefield.filter((id) => !s.cards[s.objects[id]!.cardId]!.types.includes("Land") || s.objects[id]!.controller !== ap);
+    const r = putOnBattlefield(s, ap, realms);
+    s.objects[r]!.chosen = { type: "Elf" };
+    return { s, ap, ids, r };
+  };
+  it("an Elf spell: yes; a Bear: no", () => {
+    supported(realms);
+    const elf = card("Test Elf", "Creature — Elf", "{G}", { power: "1", toughness: "1" });
+    const { s, ap, ids } = scene(elf, bears("Bear One"));
+    expect(planCast(s, ap, ids[0]!)).not.toBeNull();
+    const bear = card("Green Bear", "Creature — Bear", "{G}", { power: "1", toughness: "1" });
+    const t = scene(bear);
+    expect(planCast(t.s, t.ap, t.ids[0]!)).toBeNull();
+  });
+  it("an Elf's activated ability: yes; another creature's: no", () => {
+    const pump = (name: string, sub: string) => card(name, `Creature — ${sub}`, "{1}", { power: "1", toughness: "1", oracleText: `{G}: ${name} gets +1/+1 until end of turn.` });
+    const { s, ap } = scene();
+    const e = putOnBattlefield(s, ap, pump("Pump Elf", "Elf"));
+    const b = putOnBattlefield(s, ap, pump("Pump Bear", "Bear"));
+    expect(planActivate(s, ap, e, 0)).not.toBeNull();
+    expect(planActivate(s, ap, b, 0)).toBeNull();
+  });
+  it("as it enters, only the eight types are offered", () => {
+    const t = setup([realms]);
+    const u = act(t.s, { type: "playLand", player: t.ap, objectId: t.ids[0]! });
+    expect(u.pending).toMatchObject({ kind: "chooseOption", what: "creatureType", options: ["Elemental", "Elf", "Faerie", "Giant", "Goblin", "Kithkin", "Merfolk", "Treefolk"] });
+  });
+});
+
+const stone = card("Gathering Stone", "Artifact", "{4}", {
+  oracleText: "As this artifact enters, choose a creature type.\nSpells you cast of the chosen type cost {1} less to cast.\nWhen this artifact enters and at the beginning of your upkeep, look at the top card of your library. If it's a card of the chosen type, you may reveal it and put it into your hand. If you don't put the card into your hand, you may put it into your graveyard.",
+});
+
+describe("Gathering Stone: a card of the chosen type may go to your hand; otherwise it may go to the graveyard (rulings)", () => {
+  const upkeep = (top: CardDef) => {
+    const { s: s0, ap } = setup([]);
+    const g = putOnBattlefield(s0, ap, stone);
+    s0.objects[g]!.chosen = { type: "Elf" };
+    let s = passUntil(s0, "upkeep", nextOf(s0, ap, 1));
+    s = passUntil(s, "upkeep", ap);
+    const id = putOnBattlefield(s, ap, top);
+    s.battlefield.splice(s.battlefield.indexOf(id), 1);
+    s.objects[id]!.zone = "library";
+    s.players[ap]!.library.unshift(id);
+    return { s: untilChoice(s), ap, id };
+  };
+  it("an Elf: reveal it and put it into your hand", () => {
+    supported(stone);
+    let { s, ap, id } = upkeep(card("Llanowar Test", "Creature — Elf Druid", "{G}", { power: "1", toughness: "1" }));
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect(s.objects[id]!.zone).toBe("hand");
+  });
+  it("an Elf not revealed: it may still go to the graveyard", () => {
+    let { s, ap, id } = upkeep(card("Llanowar Test", "Creature — Elf Druid", "{G}", { power: "1", toughness: "1" }));
+    s = act(s, { type: "chooseMay", player: ap, yes: false });
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect(s.objects[id]!.zone).toBe("graveyard");
+  });
+  it("not an Elf: only the graveyard is offered; declining keeps it on top", () => {
+    let { s, ap, id } = upkeep(bears("Top Bear"));
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    expect(s.pending!.kind === "chooseMay" && s.pending.prompt).toMatch(/graveyard/);
+    s = act(s, { type: "chooseMay", player: ap, yes: false });
+    expect(s.players[ap]!.library[0]).toBe(id);
+  });
+});

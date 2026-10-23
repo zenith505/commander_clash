@@ -1870,6 +1870,8 @@ export interface Resolving {
     moved?: boolean; // a dig already moved the cards it took, and waits on the order of the rest (CR 401.4)
     ripple?: { revealed: ObjectId[]; queue: ObjectId[] }; // ripple's revealed cards, and those it may still cast (CR 702.60a)
     may?: boolean; // the answer to "you may ..."
+    /** A "you may" declined whose `otherwise` asks another "you may" (Gathering Stone): that one's text, while it's asked. */
+    mayOtherwise?: string;
     /** Scholar of New Horizons (Effect search `mayInstead`): asked whether the found card goes there instead (the answer is `may`). */
     mayInstead?: boolean;
     castNow?: { id: ObjectId }; // the card "you may cast that card" offered (Effect castNow)

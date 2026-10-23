@@ -25,6 +25,13 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const sc = (r.scratch ??= {});
       const source = e.once && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
       const key = `${ctx.sourceZc ?? source?.zoneChanges ?? 0}|do:${e.text}`;
+      // Declined, and what happens instead is another "you may" (Gathering Stone: "If you don't put the card into your hand,
+      // you may put it into your graveyard"): that one is asked on its own.
+      if (sc.mayOtherwise === e.text) {
+        for (const inner of e.otherwise ?? []) if (runEffect(s, inner, ctx) === "paused") return "paused";
+        sc.mayOtherwise = undefined;
+        return;
+      }
       if (sc.may === undefined && source?.triggeredThisTurn?.includes(key)) sc.may = false; // done already this turn (CR 603.2h)
       // "You may pay {X}": X first (CR 107.1c), at most what the player could pay, then the payment with that X.
       if (e.payX && e.pay?.mana && sc.may === undefined) {
@@ -97,6 +104,13 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       r.did = sc.may;
       if (!sc.may) {
+        if (e.otherwise?.some((x) => x.type === "may")) {
+          sc.mayOtherwise = e.text;
+          sc.may = undefined;
+          for (const inner of e.otherwise) if (runEffect(s, inner, ctx) === "paused") return "paused";
+          sc.mayOtherwise = undefined;
+          return;
+        }
         for (const inner of e.otherwise ?? []) if (runEffect(s, inner, ctx) === "paused") return "paused";
         return;
       }

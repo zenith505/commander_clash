@@ -932,6 +932,15 @@ export function compile(d: CardDef): CompiledCard {
       }
       continue;
     }
+    // "As this land enters, choose Elemental, Elf, Faerie, Giant, Goblin, Kithkin, Merfolk, or Treefolk." (Eclipsed Realms,
+    // CR 614.12): one of these creature types.
+    const asTypeList = /^As (?:~|it) enters, choose ((?:[A-Z][a-z]+, )+or [A-Z][a-z]+)\.$/.exec(line);
+    if (asTypeList) {
+      const types = asTypeList[1]!.split(/, (?:or )?/);
+      if (!types.every((t) => CREATURE_TYPES.has(t)) || out.entersChoose?.some((c) => c.what === "creatureType")) out.unsupported.push(raw);
+      else (out.entersChoose ??= []).push({ what: "creatureType", options: types });
+      continue;
+    }
     // "As Arachne enters, look at an opponent's hand, then choose a card type other than creature." (CR 614.12): an
     // opponent, then their hand is seen, then a card type. Kindred is a card type too, but no kindred card plays here.
     const lookThenType = /^As ~ enters, look at an opponent's hand, then choose a card type other than (\w+)\.$/.exec(line);

@@ -2,8 +2,8 @@
 // abilities), then the most played cards.
 
 import { describe, expect, it } from "vitest";
-import { act, bear, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { botActions, isFullySupported, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { act, bear, card, passUntil, pt, putOnBattlefield, setup } from "./helpers";
+import { botActions, characteristics, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -339,5 +339,56 @@ describe("Shadow of the Second Sun: an additional beginning phase after each of 
     const acts = botActions(s0, ap);
     const cast = acts.find((x) => x.type === "castSpell");
     expect(cast?.type === "castSpell" && cast.targets).toEqual([{ kind: "player", id: ap }]);
+  });
+});
+
+describe("Bello, Bard of the Brambles: during your turn, big noncreature artifacts and enchantments are 4/4 Elementals", () => {
+  const bello = card("Bello, Bard of the Brambles", "Legendary Creature — Raccoon Bard", "{1}{R}{G}", {
+    power: "3",
+    toughness: "3",
+    oracleText: 'During your turn, each non-Equipment artifact and non-Aura enchantment you control with mana value 4 or greater is a 4/4 Elemental creature in addition to its other types and has indestructible, haste, and "Whenever this creature deals combat damage to a player, draw a card."',
+  });
+  const monolith = card("Test Monolith", "Artifact", "{4}", { oracleText: "" });
+  const shrine = card("Test Shrine", "Enchantment", "{2}{G}{G}", { oracleText: "" });
+  const small = card("Test Trinket", "Artifact", "{3}", { oracleText: "" });
+  const sword = card("Test Greatsword", "Artifact — Equipment", "{4}", { oracleText: "Equipped creature gets +1/+1.\nEquip {2}" });
+  const bigAura = card("Test Big Aura", "Enchantment — Aura", "{3}{W}", { keywords: ["Enchant"], oracleText: "Enchant creature\nEnchanted creature gets +1/+1." });
+  const scene = () => {
+    const { s, ap, opp } = setup([]);
+    putOnBattlefield(s, ap, bello);
+    const ids = { m: putOnBattlefield(s, ap, monolith, { sick: true }), e: putOnBattlefield(s, ap, shrine), t: putOnBattlefield(s, ap, small), w: putOnBattlefield(s, ap, sword) };
+    const b = putOnBattlefield(s, ap, bear());
+    const a = putOnBattlefield(s, ap, bigAura);
+    s.objects[a]!.attachedTo = b;
+    return { s, ap, opp, a, ...ids };
+  };
+  const isCreature = (s: GameState, id: string) => characteristics(s, s.objects[id]!).types.includes("Creature");
+
+  it("on your turn: the artifact and the enchantment with mana value 4 are 4/4 Elementals with indestructible and haste", () => {
+    supported(bello);
+    const { s, m, e, t, w, a } = scene();
+    for (const id of [m, e]) {
+      expect(isCreature(s, id)).toBe(true);
+      expect(pt(s, id)).toBe("4/4");
+      expect(characteristics(s, s.objects[id]!).subtypes).toContain("Elemental");
+      expect(objHasKeyword(s, s.objects[id]!, "Indestructible")).toBe(true);
+      expect(objHasKeyword(s, s.objects[id]!, "Haste")).toBe(true);
+    }
+    // Mana value 3, an Equipment, an Aura: not.
+    for (const id of [t, w, a]) expect(isCreature(s, id)).toBe(false);
+  });
+
+  it("not on an opponent's turn", () => {
+    const { s: s0, opp, m, e } = scene();
+    const s = passUntil(s0, "main1", opp);
+    for (const id of [m, e]) expect(isCreature(s, id)).toBe(false);
+  });
+
+  it("the Monolith that came in this turn attacks (haste) and draws a card when it connects", () => {
+    const { s: s0, ap, opp, m } = scene();
+    const hand = s0.players[ap]!.hand.length;
+    const s = passToPending(attack(s0, ap, [m], opp));
+    expect(s.players[opp]!.life).toBe(36);
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
   });
 });

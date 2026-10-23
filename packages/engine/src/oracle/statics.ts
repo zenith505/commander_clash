@@ -927,6 +927,14 @@ export function parseStaticMods(rest: string): Modification[] | null {
     const more = m[2] ? parseStaticMods(m[2]) : [];
     return more ? [{ kind: "addTypes", types: ["Artifact"], subtypes: [m[1]!] }, ...more] : null;
   }
+  // Bello, Bard of the Brambles: "is a 4/4 Elemental creature in addition to its other types and has indestructible, haste,
+  // and "..."": the card type and creature type in layer 4, the base power and toughness in 7b, the abilities in 6
+  // (CR 613.1d, 613.1f, 613.4b, 205.1b).
+  if ((m = /^is an? (\d+)\/(\d+) (?:([A-Z][a-z]+) )?creature in addition to its other types(?:,? and ((?:has|have) .+))?$/.exec(rest))) {
+    if (m[3] && !CREATURE_TYPES.has(m[3])) return null;
+    const more = m[4] ? parseStaticMods(m[4]) : [];
+    return more && [{ kind: "addTypes", types: ["Creature"], subtypes: m[3] ? [m[3]] : [] }, { kind: "setPT", power: Number(m[1]), toughness: Number(m[2]) }, ...more];
+  }
   const IS = "is an? ([A-Z][a-z]+) in addition to its other types";
   if ((m = new RegExp(`^${IS}$`).exec(rest))) return typed(m[1]!, []);
   if ((m = new RegExp(`^${IS},? and ((?:has|have) .+)$`).exec(rest))) return typed(m[1]!, [m[2]!]);
@@ -1271,6 +1279,16 @@ function parseStaticLine(line: string): StaticAbility | null {
     const ench = !animate[1]!.endsWith("artifact");
     const spec: TargetSpec = ench ? { kind: "object", types: ["Enchantment"], notSubtypes: ["Aura"], text: "non-Aura enchantment" } : { kind: "object", types: ["Artifact"], notTypes: ["Creature"], text: "noncreature artifact" };
     return { affects: { kind: "filter", types: [ench ? "Enchantment" : "Artifact"], spec, ...(animate[2] ? { other: true } : {}), ...(animate[3] ? { controller: "you" as const } : {}) }, mods, text: line };
+  }
+  // Bello, Bard of the Brambles: "each non-Equipment artifact and non-Aura enchantment you control with mana value 4 or
+  // greater is a 4/4 Elemental creature in addition to its other types and has ...": the group as the effect applies in
+  // layer 4, the same set for 6 and 7b (CR 613.6).
+  const animated = /^([Ee]ach (?:non-[A-Z][a-z]+ |non)?[a-z]+(?: and (?:non-[A-Z][a-z]+ |non)?[a-z]+)? you control(?: with mana value \d+ or greater)?) (is an? \d+\/\d+ (?:[A-Z][a-z]+ )?creature in addition to its other types.*)$/.exec(text);
+  if (animated) {
+    const affects = parseAffected(animated[1]!);
+    const mods = parseStaticMods(animated[2]!);
+    if (affects?.kind !== "filter" || !mods) return null;
+    return { affects, mods, text: line };
   }
   // Maskwood Nexus ("Creatures you control are every creature type"), Arcane Adaptation and Xenograft ("... the chosen type
   // in addition to their other types"), Conspiracy ("... the chosen type": it replaces their creature types, rulings):

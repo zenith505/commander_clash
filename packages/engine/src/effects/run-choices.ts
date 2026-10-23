@@ -3,7 +3,7 @@ import { manaValue, parseManaCost, spentMeets, type ManaSpent } from "../mana";
 import { canPayFromPool } from "../spend";
 import { planMana } from "../autopay";
 import { autoEvidence, availableMana, canLoseLife, collectEvidence, creatureTypesOf, draw, evidenceProblem, log, loseLife, moveObject, obj, opponents, payableLife, player, shareCreatureType } from "../game";
-import { abilitiesOf, cardIdOf, defOf } from "../cards";
+import { abilitiesOf, cardIdOf, defOf, isType } from "../cards";
 import { controllerOf, staticConditionNow } from "../layers";
 import type { GameState, ObjectId, PlayerId } from "../types";
 import { bindBound, bindChosen, choiceOptions, objectMatches, pickOptions, printedMatches, sayBound, spellMatches } from "./targeting";
@@ -149,7 +149,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       for (let pass = 0; pass < 1000; pass++) {
         for (sc.repeatStep ??= 0; sc.repeatStep < e.effects.length; sc.repeatStep++) if (runEffect(s, e.effects[sc.repeatStep]!, ctx) === "paused") return "paused";
         sc.repeatStep = undefined;
-        const hit = (s.resolving!.milled ?? []).some(({ id }) => printedMatches(e.cond.filter, defOf(s, s.objects[id]!)));
+        const milled = (s.resolving!.milled ?? []).map(({ id }) => defOf(s, s.objects[id]!));
+        const cond = e.cond;
+        // Sphinx's Tutelage: both cards nonland with a color in common, as they are in the graveyard (colorless isn't a color, rulings).
+        const hit = cond.kind === "milledIs" ? milled.some((d) => printedMatches(cond.filter, d)) : milled.length === 2 && milled.every((d) => !isType(d, "Land")) && milled[0]!.colors.some((c) => milled[1]!.colors.includes(c));
         if (!hit) return;
         for (const inner of e.then) runEffect(s, inner, ctx);
         log(s, `${src} repeats the process.`);

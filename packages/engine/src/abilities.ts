@@ -2325,7 +2325,8 @@ export type Effect =
    * "Create a 1/1 Insect token, then mill a card. If an Insect card was milled this way, put a loyalty counter on ~ and
    * repeat this process." (Grist): `effects`, then `then` and all of it again for as long as `cond` holds after them.
    */
-  | { type: "repeatIf"; effects: Effect[]; cond: { kind: "milledIs"; filter: TargetSpec }; then: Effect[] }
+  /** Sphinx's Tutelage: "If two nonland cards that share a color were milled this way, repeat this process" (cond "milledShareColor"). */
+  | { type: "repeatIf"; effects: Effect[]; cond: { kind: "milledIs"; filter: TargetSpec } | { kind: "milledShareColor" }; then: Effect[] }
   /** "You may roll again" in a results table's row (Delina, Wild Mage): if its controller wants, the ability's roll and the rows after it happen again (CR 706.3c). */
   | { type: "rollAgain" }
   /**

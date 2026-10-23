@@ -7,7 +7,7 @@ import { addMana } from "../src/spend";
 import { moveObject, spellCost } from "../src/game";
 import { manaValue as manaValueOf } from "../src/mana";
 import { setFace } from "../src/faces";
-import { abilityProblem, botActions, potentialAttackers, compileCard, faceDef, legalActions, manaOptions, planActivate, canBeSacrificed, characteristics, controllerOf, isFullySupported, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { abilityProblem, botActions, potentialAttackers, compileCard, faceDef, legalActions, manaOptions, planActivate, canBeSacrificed, characteristics, controllerOf, isFullySupported, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId, type TargetChoice } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -789,7 +789,7 @@ describe("Detection Tower, Glaring Spotlight: targeting as though they didn't ha
     addMana(s, ap, ["R"]);
     return { s, ap, opp, t, boltId: ids[0]! };
   };
-  const canTarget = (s: GameState, ap: PlayerId, id: string, t: { kind: "player"; id: PlayerId } | { kind: "object"; id: string }) => {
+  const canTarget = (s: GameState, ap: PlayerId, id: string, t: TargetChoice) => {
     try {
       return !!planCast(s, ap, id, [t]);
     } catch {
@@ -925,5 +925,47 @@ describe("Rose Room Treasurer: a Treasure the first two times each turn, then pa
     expect(s.pending?.kind).toBe("chooseTargets");
     s = passToPending(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] }));
     expect(s.players[opp]!.life).toBe(38);
+  });
+});
+
+describe("Sphinx's Tutelage: mill two, again while two nonland cards share a color", () => {
+  const tutelage = card("Sphinx's Tutelage", "Enchantment", "{2}{U}", { oracleText: "Whenever you draw a card, target opponent mills two cards. If two nonland cards that share a color were milled this way, repeat this process.\n{5}{U}: Draw a card, then discard a card." });
+  const red = (n: string) => card(n, "Instant", "{R}", { oracleText: "Draw a card." });
+  const azorius = card("Test Azorius", "Instant", "{W}{U}", { oracleText: "Draw a card." });
+  const blue = card("Test Blue", "Instant", "{U}", { oracleText: "Draw a card." });
+  const relic = card("Test Relic", "Artifact", "{1}", { oracleText: "" });
+
+  /** The opponent's library from the top: `top`; then our draw step's trigger, targeting them. */
+  const milled = (top: CardDef[]) => {
+    const { s: s00, ap } = setup([]);
+    putOnBattlefield(s00, ap, tutelage);
+    const opp = nextOf(s00, ap);
+    // Our next upkeep, before our draw.
+    const s0 = passUntil(passUntil(s00, "upkeep", opp), "upkeep", ap);
+    const ids = top.map((d) => {
+      const id = putOnBattlefield(s0, opp, d);
+      s0.battlefield.splice(s0.battlefield.indexOf(id), 1);
+      s0.objects[id]!.zone = "library";
+      return id;
+    });
+    s0.players[opp]!.library.unshift(...ids);
+    let s = passUntil(s0, "draw", ap);
+    for (let i = 0; i < 10 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] });
+    s = passToPending(s);
+    return { s, ids };
+  };
+
+  it("two red cards, then a red and a white-blue: it stops after the second pair", () => {
+    supported(tutelage);
+    const { s, ids } = milled([red("Red One"), red("Red Two"), red("Red Three"), azorius, blue, blue]);
+    expect(ids.map((id) => s.objects[id]!.zone)).toEqual(["graveyard", "graveyard", "graveyard", "graveyard", "library", "library"]);
+  });
+
+  it("a land or a colorless card stops it", () => {
+    for (const second of [forest, relic]) {
+      const { s, ids } = milled([red("Red One"), second, red("Red Two"), red("Red Three")]);
+      expect(ids.map((id) => s.objects[id]!.zone)).toEqual(["graveyard", "graveyard", "library", "library"]);
+    }
   });
 });

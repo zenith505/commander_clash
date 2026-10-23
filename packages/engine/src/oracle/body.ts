@@ -3912,6 +3912,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Grist, the Hunger Tide: "Create a 1/1 black and green Insect creature token, then mill a card. If an Insect card was
     // milled this way, put a loyalty counter on ~ and repeat this process." All of it again, for as long as it hits.
+    // Sphinx's Tutelage: "Target opponent mills two cards. If two nonland cards that share a color were milled this way,
+    // repeat this process." The same opponent each time, for as long as it hits (rulings).
+    if (/^If two nonland cards that share a color were milled this way, repeat this process$/.test(s)) {
+      const prev = effects[effects.length - 1];
+      if (effects.length !== 1 || prev?.type !== "mill" || prev.n !== 2 || si + 1 !== sentences.length) return null;
+      effects.splice(0, 1, { type: "repeatIf", effects: [prev], cond: { kind: "milledShareColor" }, then: [] });
+      continue;
+    }
     const milledRepeat = /^If an? ([A-Za-z]+ card) was milled this way, (.+) and repeat this process$/.exec(s);
     if (milledRepeat) {
       const filter = parseSearchFilter(milledRepeat[1]!);

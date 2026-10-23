@@ -2454,6 +2454,18 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // Tezzeret, Cruel Captain: "Untap target artifact or creature. If it's an artifact creature, put a +1/+1 counter on
     // it." "Put three +1/+1 counters on target artifact you control. If it's not a creature, it becomes a 0/0 Robot
     // artifact creature." The target still on the battlefield, checked as it resolves (CR 608.2c).
+    // Splash Portal: "Exile target creature you control, then return it .... If that creature is a Bird, Frog, Otter, or Rat,
+    // draw a card": the permanent it returned as, as it is now (rulings); a token doesn't come back.
+    const ifBack = /^If (?:that creature|it) is an? ([A-Z][a-z]+(?:, [A-Z][a-z]+)*,? or [A-Z][a-z]+|[A-Z][a-z]+), (.+)$/.exec(s);
+    const lastFx = effects[effects.length - 1];
+    if (ifBack && lastFx?.type === "flicker" && !lastFx.at && !lastFx.hold) {
+      const typed = parseTargetPhrase(ifBack[1]!);
+      if (typed?.kind !== "object" || !typed.subtypes?.length || Object.entries(typed).some(([k, v]) => v !== undefined && !["kind", "types", "notTypes", "notColors", "subtypes", "text"].includes(k)) || typed.types?.length) return null;
+      const fx = parseOne(capital(ifBack[2]!), ctx);
+      if (!fx) return null;
+      effects.push({ type: "if", cond: { kind: "flickeredIs", filter: { ...typed, text: ifBack[1]! } }, effects: fx });
+      continue;
+    }
     const ifIts = /^If it's (not )?an? ([a-z]+(?: [a-z]+)?), (.+)$/.exec(s);
     if (ifIts) {
       const i = ctx.targets.length - 1;

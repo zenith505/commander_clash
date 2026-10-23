@@ -91,3 +91,21 @@ test("Abdel Adrian: choose any number of your other nonland permanents to exile,
   expect(after.battlefield.filter((id) => after.objects[id]!.isToken)).toHaveLength(1);
   expect(pageErrors(page)).toEqual([]);
 });
+
+test("Elspeth Conquers Death III: the returned card gets the kind of counter you choose", async ({ page }) => {
+  const s = scene({ board: [...LANDS, "Elspeth Conquers Death"], yard: ["Grizzly Bears"] });
+  const [saga, bears] = [one(s, "Elspeth Conquers Death"), one(s, "Grizzly Bears")];
+  s.objects[saga]!.counters = { lore: 2 };
+  // Its third lore counter comes as the precombat main phase begins (CR 714.3b).
+  s.step = "draw";
+  await open(page, s);
+  await resolveUntil(page, (st) => st.pending?.kind === "chooseTargets");
+  await page.locator(`[data-pick="${bears}"]`).click();
+  await resolveUntil(page, (st) => st.pending?.kind === "chooseOption" && st.pending.what === "counterKind");
+  const bar = controls(page);
+  await expect(bar).toContainText("choose the kind of counter to put on Grizzly Bears");
+  await bar.getByRole("button", { name: "A +1/+1 counter", exact: true }).click();
+  const after = await resolveUntil(page, (st) => st.stack.length === 0 && !st.pending && st.objects[bears]!.zone === "battlefield");
+  expect(after.objects[bears]!.counters["+1/+1"]).toBe(1);
+  expect(pageErrors(page)).toEqual([]);
+});

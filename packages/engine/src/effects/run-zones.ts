@@ -2056,6 +2056,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       const back = sc.flickered.map((l) => s.objects[l.id]).filter((c, i): c is GameObject => c?.zone === "exile" && (c.zoneChanges ?? 0) === sc.flickered![i]!.zc);
       if (returnFromExile(s, back, (c) => (e.under === "owner" ? c.owner : ctx.controller), src, e.counter, e.tapped, e.transformed) === "paused") return "paused";
+      s.resolving!.flickeredBack = back.filter((c) => c.zone === "battlefield").map((c) => c.id);
       if (e.counterIf) {
         for (const c of back) {
           if (c.zone !== "battlefield" || !objectMatches(s, e.counterIf.filter, c, ctx.controller, false)) continue;

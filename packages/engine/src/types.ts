@@ -1373,7 +1373,7 @@ export interface GameState {
   /** Who cast each spell this turn, and its card (a key into `cards`) as it was cast: "can't cast more than one spell each turn". */
   castThisTurn?: { player: PlayerId; card: string; /** Its colors as it was cast (Ricochet Trap). */ colors?: Color[]; /** The zone it was cast from. */ from?: ZoneName; /** Mana from a Treasure was spent to cast it (CR 106.3). */ treasure?: true; /** Its mana value on the stack (CR 202.3e). */ mv?: number }[];
   /** "Instant and sorcery spells you cast this turn cost {1} less to cast": cost changes for one player this turn (CR 601.2f). */
-  costModsThisTurn?: { player: PlayerId; mod: CostMod }[];
+  costModsThisTurn?: { player: PlayerId; mod: CostMod; /** Until that player's next turn begins, not just this turn (CR 611.2b, 800.4m). */ untilYourNextTurn?: true }[];
   /** "Until end of turn, you don't lose unspent red mana as steps and phases end" (CR 500.4): who, and which color (all if unset). */
   keepManaThisTurn?: { player: PlayerId; color?: ManaType }[];
   /** High Tide's "until end of turn, whenever a player taps an Island for mana ...": `controller` is "you", `source` the card's name. */
@@ -1715,6 +1715,8 @@ export interface Resolving {
   affected?: { id: ObjectId; zc: number }[];
   /** Permanents its damage effects dealt damage to, for "a creature dealt damage this way". */
   damagedThisWay?: ObjectId[];
+  /** The permanents a flicker returned to the battlefield (Splash Portal's "if that creature is ..."). */
+  flickeredBack?: ObjectId[];
   /** Players its damage effects dealt damage to, for "players dealt damage this way". */
   playersDamagedThisWay?: PlayerId[];
   /** "Each player may put ... onto the battlefield": those who did, for the instructions after it ("each opponent who didn't"). */

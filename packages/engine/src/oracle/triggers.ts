@@ -592,7 +592,9 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   if (didntDie) bodyText = bodyText.slice(didntDie[0].length);
   const notDies = !!didntDie || (!attached && m![3]! === "leaves the battlefield without dying");
   // "If it had a counter on it", "if it had one or more counters on it": as it last existed, so it can't change.
-  const hadCounter = !attached && /^if it had (?:a counter|one or more counters|counters) on it, /.exec(bodyText);
+  // "If it had a -1/-1 counter on it" (Blowfly Infestation): of that kind.
+  const hadCounter = !attached && new RegExp(`^if it had (?:a counter|one or more counters|counters|an? ${COUNTER} counter|one or more ${COUNTER} counters) on it, `).exec(bodyText);
+  const hadKindOf = hadCounter ? (hadCounter[1] ?? hadCounter[2]) : undefined;
   if (hadCounter) bodyText = bodyText.slice(hadCounter[0].length);
   // "If its toughness was less than 1" (Massacre Girl, Known Killer): as it last existed (CR 603.10a), so it can't change
   // and is part of what dies, like a keyword it had.
@@ -645,7 +647,7 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
       ...(leaves ? { leaves: true as const } : {}),
       ...(exiled ? { toZones: ["exile"] as ("graveyard" | "exile")[] } : {}),
       ...(notDies ? { notDies: true as const } : {}),
-      ...(hadCounter ? { hadCounter: true as const } : {}),
+      ...(hadCounter ? { hadCounter: hadKindOf ?? (true as const) } : {}),
     },
     body,
   };

@@ -3562,6 +3562,34 @@
   "gameChanger": false
  },
  {
+  "oracleId": "40c88392-2aa7-4e12-86a4-8d680219e670",
+  "name": "Elspeth Conquers Death",
+  "manaCost": "{3}{W}{W}",
+  "cmc": 5,
+  "typeLine": "Enchantment — Saga",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Saga"
+  ],
+  "oracleText": "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI — Exile target permanent an opponent controls with mana value 3 or greater.\nII — Noncreature spells your opponents cast cost {2} more to cast until your next turn.\nIII — Return target creature or planeswalker card from your graveyard to the battlefield. Put a +1/+1 counter or a loyalty counter on it.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "thb",
+  "releasedAt": "2020-01-24",
+  "rarity": "rare",
+  "layout": "saga",
+  "gameChanger": false
+ },
+ {
   "oracleId": "05e6b243-48a6-4a42-bc5f-413441de9c33",
   "name": "Elspeth, Sun's Champion",
   "manaCost": "{4}{W}{W}",

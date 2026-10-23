@@ -2479,6 +2479,8 @@ function startNextTurn(s: GameState, skipping = false) {
   // "Until your next turn, whenever ...": those end as that turn begins (CR 603.7b, 611.2b, 800.4m).
   s.floatingTriggers = s.floatingTriggers?.filter((f) => !(f.until === "yourNextTurn" && began.has(f.controller)));
   if (!s.floatingTriggers?.length) s.floatingTriggers = undefined;
+  // "Noncreature spells your opponents cast cost {2} more to cast until your next turn" (Elspeth Conquers Death).
+  s.costModsThisTurn = s.costModsThisTurn?.filter((c) => c.untilYourNextTurn && !began.has(c.player));
   if (s.entersTappedUntil) s.entersTappedUntil = s.entersTappedUntil.filter((r) => !began.has(r.controller));
   for (const p of s.players)
     if (began.has(p.id)) {
@@ -2545,7 +2547,7 @@ function startNextTurn(s: GameState, skipping = false) {
   s.castThisTurn = undefined;
   s.cantBlockThisTurn = undefined;
   s.cantAttackThisTurn = undefined;
-  s.costModsThisTurn = undefined;
+  if (!s.costModsThisTurn?.length) s.costModsThisTurn = undefined;
   s.keepManaThisTurn = undefined;
   s.nextCast = undefined;
   s.castItems = undefined;
@@ -4022,8 +4024,9 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
     }
   }
   // "Spells you cast this turn cost {2} less to cast" (Urza, Planeswalker): from resolved spells and abilities (CR 611.2a).
+  // "Spells your opponents cast" (Elspeth Conquers Death): the opponents of who it's from.
   for (const { player: who, mod: m } of s.costModsThisTurn ?? []) {
-    if (who !== pid) continue;
+    if (m.who === "opponents" ? who === pid || !opponents(s, who).includes(pid) : who !== pid) continue;
     const { manaValue: range, ...rest } = m.filter;
     if (!printedMatches(rest, d)) continue;
     if (range && !((range.min === undefined || mv >= range.min) && (range.max === undefined || mv <= range.max))) continue;

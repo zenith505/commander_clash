@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, scry, setup } from "./helpers";
-import { botActions, castProblem, isFullySupported, moveObject, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { botActions, castProblem, isFullySupported, manaValue, moveObject, planActivate, planCast, spellCost, waitingOn, type Action, type CardDef, type GameState } from "../src";
 import { characteristics, invalidateCharacteristics } from "../src/layers";
 import { abilitiesOf, power, toughness } from "../src/cards";
 
@@ -581,5 +581,167 @@ describe("Surge of Salvation", () => {
     expect(s.objects[mine]!.zone).toBe("battlefield");
     expect(s.objects[mine]!.damage).toBe(0);
     expect(s.objects[theirs]!.zone).toBe("graveyard");
+  });
+});
+
+const blowfly = card("Blowfly Infestation", "Enchantment", "{2}{B}", { oracleText: "Whenever a creature dies, if it had a -1/-1 counter on it, put a -1/-1 counter on target creature." });
+
+describe("Blowfly Infestation", () => {
+  it("only a creature that had a -1/-1 counter on it as it died triggers it (CR 603.10a), not one with a +1/+1 counter", () => {
+    supported(blowfly);
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, blowfly);
+    const [a, b, victim] = [putOnBattlefield(s0, opp, bear({ name: "Minus Bear" })), putOnBattlefield(s0, opp, bear({ name: "Plus Bear" })), putOnBattlefield(s0, opp, serra)];
+    s0.objects[a]!.counters["-1/-1"] = 1;
+    s0.objects[b]!.counters["+1/+1"] = 1;
+    invalidateCharacteristics(s0);
+    let s = moveObject(s0, b, "graveyard") ?? s0;
+    s = settle(s);
+    expect(s.objects[victim]!.counters["-1/-1"] ?? 0).toBe(0);
+    s = moveObject(s, a, "graveyard") ?? s;
+    for (let i = 0; i < 20 && !s.pending && (s.triggerQueue.length || s.stack.length); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: victim }] });
+    s = settle(s);
+    expect(s.objects[victim]!.counters["-1/-1"]).toBe(1);
+  });
+});
+
+const inferno = card("Collective Inferno", "Enchantment", "{3}{R}{R}", {
+  keywords: ["Double", "Convoke"],
+  oracleText: "Convoke (Your creatures can help cast this spell. Each creature you tap while casting this spell pays for {1} or one mana of that creature's color.)\nAs this enchantment enters, choose a creature type.\nDouble all damage that sources you control of the chosen type would deal.",
+});
+const pinger = (name: string, type: string) => card(name, `Creature — ${type}`, "{1}{R}", { power: "1", toughness: "1", oracleText: `{T}: ${name} deals 1 damage to target player.` });
+
+describe("Collective Inferno", () => {
+  it("doubles damage from your sources of the chosen type only", () => {
+    supported(inferno);
+    const { s: s0, ap, opp } = setup([]);
+    const inf = putOnBattlefield(s0, ap, inferno);
+    s0.objects[inf]!.chosen = { type: "Goblin" };
+    const gob = putOnBattlefield(s0, ap, pinger("Test Goblin", "Goblin"));
+    const elf = putOnBattlefield(s0, ap, pinger("Test Elf", "Elf"));
+    const life = s0.players[opp]!.life;
+    let s = settle(run(s0, planActivate(s0, ap, gob, 0, [{ kind: "player", id: opp }])));
+    expect(s.players[opp]!.life).toBe(life - 2);
+    s = settle(run(s, planActivate(s, ap, elf, 0, [{ kind: "player", id: opp }])));
+    expect(s.players[opp]!.life).toBe(life - 3);
+  });
+});
+
+const fertilid = card("Fertilid", "Creature — Elemental", "{2}{G}", {
+  power: "0",
+  toughness: "0",
+  oracleText: "This creature enters with two +1/+1 counters on it.\n{1}{G}, Remove a +1/+1 counter from this creature: Target player searches their library for a basic land card, puts it onto the battlefield tapped, then shuffles.",
+});
+
+describe("Fertilid", () => {
+  it("the target player searches their own library, and the land enters tapped under their control", () => {
+    supported(fertilid);
+    const { s: s0, ap, opp } = setup([]);
+    const f = putOnBattlefield(s0, ap, fertilid);
+    s0.objects[f]!.counters["+1/+1"] = 2;
+    invalidateCharacteristics(s0);
+    const lands = (s: GameState, p: number) => s.battlefield.filter((id) => s.objects[id]!.controller === p && characteristics(s, s.objects[id]!).types.includes("Land"));
+    const [mine, theirs] = [lands(s0, ap).length, lands(s0, opp).length];
+    let s = run(s0, planActivate(s0, ap, f, 0, [{ kind: "player", id: opp }]));
+    s = settle(s);
+    expect(lands(s, opp)).toHaveLength(theirs + 1);
+    expect(lands(s, ap)).toHaveLength(mine);
+    const got = lands(s, opp).find((id) => !lands(s0, opp).includes(id))!;
+    expect(s.objects[got]!.tapped).toBe(true);
+    expect(s.objects[got]!.owner).toBe(opp);
+    expect(s.objects[f]!.counters["+1/+1"]).toBe(1);
+  });
+});
+
+const splash = card("Splash Portal", "Sorcery", "{U}", { oracleText: "Exile target creature you control, then return it to the battlefield under its owner's control. If that creature is a Bird, Frog, Otter, or Rat, draw a card." });
+
+describe("Splash Portal", () => {
+  it("blinks your creature; a card only if it returns as a Bird, Frog, Otter, or Rat", () => {
+    supported(splash);
+    for (const [type, draws] of [["Frog", 1], ["Bear", 0]] as const) {
+      const { s: s0, ap, ids } = setup([splash]);
+      const c = putOnBattlefield(s0, ap, bear({ name: `Test ${type}`, typeLine: `Creature — ${type}`, subtypes: [type] }));
+      const hand = s0.players[ap]!.hand.length - 1;
+      const s = settle(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: c }])));
+      expect(s.objects[c]!.zone).toBe("battlefield");
+      expect(s.objects[c]!.zoneChanges).toBeGreaterThan(s0.objects[c]!.zoneChanges ?? 0);
+      expect(s.players[ap]!.hand.length).toBe(hand + draws);
+    }
+  });
+});
+
+const ecd = card("Elspeth Conquers Death", "Enchantment — Saga", "{3}{W}{W}", {
+  oracleText: "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI — Exile target permanent an opponent controls with mana value 3 or greater.\nII — Noncreature spells your opponents cast cost {2} more to cast until your next turn.\nIII — Return target creature or planeswalker card from your graveyard to the battlefield. Put a +1/+1 counter or a loyalty counter on it.",
+});
+const walker = card("Test Walker", "Legendary Planeswalker — Test", "{2}{W}", { loyalty: "3", oracleText: "+1: You gain 1 life." });
+
+describe("Elspeth Conquers Death", () => {
+  it("II: opponents' noncreature spells cost {2} more until your next turn; III: back from your graveyard with the counter you choose", () => {
+    supported(ecd);
+    const { s: s0, ap, ids, opp } = setup([ecd, divination]);
+    const w = putOnBattlefield(s0, ap, walker);
+    let s = moveObject(s0, w, "graveyard") ?? s0;
+    s = settle(run(s, planCast(s, ap, ids[0]!)));
+    // Chapter II on ap's next turn.
+    s = passUntil(s, "main1", ap);
+    s = passUntil(s, "end", ap);
+    s = passUntil(s, "main1", ap);
+    s = settle(s);
+    expect(s.costModsThisTurn?.some((c) => c.untilYourNextTurn)).toBe(true);
+    const div = s.players[ap]!.hand.find((id) => s.cards[s.objects[id]!.cardId]!.name === "Divination")!;
+    const cost = (p: number) => ((c) => manaValue(c.cost) + c.extra)(spellCost(s, p, s.objects[div]!));
+    expect(cost(opp) - cost(ap)).toBe(2);
+    // Still there on the opponent's turn, gone as ap's next turn begins (CR 611.2b).
+    s = passUntil(s, "main1", opp);
+    expect(s.costModsThisTurn?.length).toBeTruthy();
+    s = passUntil(s, "upkeep", ap);
+    expect(s.costModsThisTurn ?? []).toHaveLength(0);
+    // Chapter III: the planeswalker card returns, and its controller chooses a loyalty counter.
+    s = passUntil(s, "main1", ap);
+    for (let i = 0; i < 20 && !s.pending && (s.triggerQueue.length || s.stack.length); i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: w }] });
+    for (let i = 0; i < 20 && !s.pending && s.stack.length; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "counterKind", options: ["+1/+1", "loyalty"], about: w });
+    expect(botActions(s, ap)).toEqual([{ type: "chooseOption", player: ap, choice: "loyalty" }]);
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: "loyalty" }));
+    expect(s.objects[w]!.zone).toBe("battlefield");
+    expect(s.objects[w]!.counters.loyalty).toBe(4);
+  });
+});
+
+const canopy = card("Canopy Gargantuan", "Creature — Dragon", "{5}{G}{G}", { power: "7", toughness: "7", keywords: ["Flying", "Ward"], oracleText: "Flying, ward {2}\nAt the beginning of your upkeep, put a number of +1/+1 counters on each other creature you control equal to that creature's toughness." });
+
+describe("Canopy Gargantuan", () => {
+  it("each other creature you control gets as many +1/+1 counters as its toughness", () => {
+    supported(canopy);
+    const { s: s0, ap } = setup([]);
+    const g = putOnBattlefield(s0, ap, canopy);
+    const b = putOnBattlefield(s0, ap, bear());
+    const a = putOnBattlefield(s0, ap, serra);
+    let s = passUntil(s0, "upkeep", ap);
+    s = passUntil(s, "upkeep", ap);
+    s = settle(s);
+    expect(s.objects[b]!.counters["+1/+1"]).toBe(2);
+    expect(s.objects[a]!.counters["+1/+1"]).toBe(4);
+    expect(s.objects[g]!.counters["+1/+1"] ?? 0).toBe(0);
+  });
+});
+
+const doubleMajor = card("Double Major", "Instant", "{G}{U}", { oracleText: "Copy target creature spell you control, except it isn't legendary if the spell is legendary. (A copy of a creature spell becomes a token.)" });
+const legend = card("Test Legend", "Legendary Creature — Elf", "{G}", { power: "2", toughness: "2", oracleText: "" });
+
+describe("Double Major", () => {
+  it("copies your legendary creature spell; the token isn't legendary, so both stay (CR 707.9b, 704.5j)", () => {
+    supported(doubleMajor);
+    const { s: s0, ap, ids } = setup([legend, doubleMajor]);
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    s = run(s, planCast(s, ap, ids[1]!, [{ kind: "stack", id: s.stack[s.stack.length - 1]!.id }]));
+    s = settle(s);
+    const legends = s.battlefield.filter((id) => characteristics(s, s.objects[id]!).name === "Test Legend");
+    expect(legends).toHaveLength(2);
+    const token = legends.find((id) => s.objects[id]!.isToken)!;
+    expect(characteristics(s, s.objects[token]!).supertypes).not.toContain("Legendary");
+    expect(characteristics(s, s.objects[ids[0]!]!).supertypes).toContain("Legendary");
   });
 });

@@ -487,11 +487,22 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // of +1/+1 counters on that creature equal to the difference": each its own number, all worked out first.
   if (/^[Ff]or each creature you control with power greater than that creature's base power, put a number of \+1\/\+1 counters on that creature equal to the difference$/.test(s))
     return [{ type: "counters", what: { ref: "each", filter: { kind: "object", types: ["Creature"], controller: "you", powerAboveBase: true, text: "each creature you control with power greater than its base power" } }, counter: "+1/+1", n: 1, aboveBase: true }];
+  // Canopy Gargantuan: "put a number of +1/+1 counters on each other creature you control equal to that creature's
+  // toughness": each its own number, all worked out first.
+  if ((m = new RegExp(`^[Pp]ut a number of ${COUNTER} counters on (each (?:other )?creature you control) equal to (?:that creature's|its) (power|toughness)$`).exec(s))) {
+    const what = parseObject(m[2]!, ctx);
+    return what?.ref === "each" ? [{ type: "counters", what, counter: counterKind(m[1]!), n: 1, perOwn: m[3] as "power" | "toughness" }] : null;
+  }
   // "Double the number of +1/+1 counters on each creature you control" (Kalonian Hydra), "... of each kind of counter on
   // any number of target permanents" (Deepglow Skate): as many more as each has as it resolves (CR 701.10e), put on it.
   if ((m = new RegExp(`^Double the number of (?:${COUNTER} counters|(each kind of) counter) on (.+)$`, "i").exec(s))) {
     const what = parseObject(m[3]!, ctx);
     return what ? [{ type: "counters", what, counter: m[2] ? "+1/+1" : counterKind(m[1]!), n: 1, double: true, ...(m[2] ? { everyKind: true as const } : {}) }] : null;
+  }
+  // Elspeth Conquers Death: "Put a +1/+1 counter or a loyalty counter on it": either kind, chosen as it resolves (rulings).
+  if ((m = new RegExp(`^Put an? ${COUNTER} counter or an? ${COUNTER} counter on (.+)$`, "i").exec(s)) && m[1] !== m[2]) {
+    const what = parseObject(m[3]!, ctx);
+    return what && !isGroup(what) ? [{ type: "counters", what, counter: counterKind(m[1]!), orCounter: counterKind(m[2]!), n: 1 }] : null;
   }
   if ((m = new RegExp(`^Put ${NUMX} ${COUNTER} counters? on (.+)$`, "i").exec(s))) {
     const what = parseObject(m[3]!, ctx);

@@ -526,7 +526,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       log(s, `${e.filter.text[0]!.toUpperCase()}${e.filter.text.slice(1)} can't attack this turn.`);
       return;
     case "costModThisTurn":
-      (s.costModsThisTurn ??= []).push({ player: ctx.controller, mod: e.mod });
+      (s.costModsThisTurn ??= []).push({ player: ctx.controller, mod: e.mod, ...(e.untilYourNextTurn ? { untilYourNextTurn: true as const } : {}) });
       log(s, `${player(s, ctx.controller).name}: ${e.mod.text.replace(/ you cast this turn /, " they cast this turn ")}`);
       return;
     case "cantBlockRule":

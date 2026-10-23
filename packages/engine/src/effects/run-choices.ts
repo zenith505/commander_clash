@@ -398,6 +398,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (s.resolving!.milled ?? []).some(({ id }) => printedMatches(bindChosen((e.cond as { filter: TargetSpec }).filter, ctx.chosen), defOf(s, s.objects[id]!)))
             : e.cond.kind === "targetIs"
             ? targetIs(s, ctx, e.cond.index, e.cond.filter)
+            : e.cond.kind === "flickeredIs"
+            ? (s.resolving!.flickeredBack ?? []).some((id) => s.objects[id]?.zone === "battlefield" && objectMatches(s, (e.cond as { filter: TargetSpec }).filter, s.objects[id]!, ctx.controller, false))
             : e.cond.kind === "damagedThisWayIs"
             ? (s.resolving!.damagedThisWay ?? []).some((id) => s.objects[id]?.zone === "battlefield" && objectMatches(s, (e.cond as { filter: TargetSpec }).filter, s.objects[id]!, ctx.controller, false))
             : e.cond.kind === "subjectWasAttacking"

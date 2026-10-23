@@ -530,6 +530,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const good = kinds.filter((k) => harmfulCounter(k) === mine).sort((a, b) => Number(b === "loyalty") - Number(a === "loyalty") || Number(b === "+1/+1") - Number(a === "+1/+1"));
       return [{ type: "chooseOption", player: pid, choice: good[0] ?? (pend.options.includes("done") ? "done" : kinds[0]!) }];
     }
+    // Elspeth Conquers Death: a loyalty counter on a planeswalker that isn't a creature.
+    if (pend.kind === "chooseOption" && pend.what === "counterKind" && pend.about && pend.options.includes("loyalty") && s.objects[pend.about] && objIsType(s, obj(s, pend.about), "Planeswalker") && !objIsType(s, obj(s, pend.about), "Creature"))
+      return [{ type: "chooseOption", player: pid, choice: "loyalty" }];
     if (pend.kind === "chooseOption" && pend.what === "counterKind") return [{ type: "chooseOption", player: pid, choice: pend.options.includes("+1/+1") ? "+1/+1" : pend.options[0]! }];
     // Two piles: the better one for our own hand, the worse one for an opponent's.
     if (pend.kind === "chooseOption" && pend.what === "pile" && pend.piles) {

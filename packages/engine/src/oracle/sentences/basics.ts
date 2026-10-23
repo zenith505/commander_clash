@@ -149,6 +149,14 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (fx?.length !== 1 || fx[0]!.type !== "search") return null;
     return [{ type: "eachMay", who, text: `search their library for ${m[2]!}`, effects: [{ ...fx[0]!, who: { ref: "choseThisWay" } }] }];
   }
+  // Fertilid: "Target player searches their library for a basic land card, puts it onto the battlefield tapped, then
+  // shuffles": that player searches, and must (CR 701.23).
+  if ((m = /^([Tt]arget player|[Tt]arget opponent) searches their library for (.+?), puts (it|that card) onto the battlefield( tapped)?, then shuffles$/.exec(s))) {
+    const who = parsePlayer(m[1]!.toLowerCase(), ctx);
+    const fx = who && parseSearch(`Search your library for ${m[2]!}, put ${m[3]} onto the battlefield${m[4] ?? ""}, then shuffle`);
+    if (fx?.length !== 1 || fx[0]!.type !== "search") return null;
+    return [{ ...fx[0]!, who: who! }];
+  }
   // "Its controller may draw a card if its power is greater than each other creature's power" (Selvala, Heart of the
   // Wilds): the creature the trigger is about, its controller deciding; its power compared as it resolves, or as it last
   // existed (rulings).

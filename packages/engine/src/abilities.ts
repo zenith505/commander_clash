@@ -1835,7 +1835,7 @@ export type Effect =
    * `double`: "double the number of +1/+1 counters on each creature you control": each gets as many more as it has (CR
    * 701.10e), `n` aside; with `everyKind`, of each kind of counter it has ("double the number of each kind of counter").
    */
-  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true; /** As many as its power is above its base power, each its own (Sovereign Okinec Ahau). */ aboveBase?: true; double?: true; everyKind?: true; /** "That player ... puts a +1/+1 counter on it" (Alexios): who puts them, when not the ability's controller. */ by?: PlayerRef; /** With what "voted": each chosen permanent gets them from the player who chose it (Agitator Ant). */ byVoter?: true }
+  | { type: "counters"; what: ObjRef; counter: CounterKind; n: Amount; /** "A +1/+1 counter or a loyalty counter" (Elspeth Conquers Death): either kind, chosen as it resolves. */ orCounter?: CounterKind; /** "Equal to that creature's toughness" (Canopy Gargantuan): each its own number, all worked out first; `n` is ignored. */ perOwn?: "power" | "toughness"; perLastKnownCounter?: "+1/+1" | "-1/-1"; divided?: true; /** As many as its power is above its base power, each its own (Sovereign Okinec Ahau). */ aboveBase?: true; double?: true; everyKind?: true; /** "That player ... puts a +1/+1 counter on it" (Alexios): who puts them, when not the ability's controller. */ by?: PlayerRef; /** With what "voted": each chosen permanent gets them from the player who chose it (Agitator Ant). */ byVoter?: true }
   /**
    * "Distribute X +1/+1 counters among any number of creatures you control" (no targets): its controller divides them
    * among the permanents like `filter` they control as it resolves (rulings on Blessing of Frost, CR 608.2d), each
@@ -1964,7 +1964,7 @@ export type Effect =
    */
   /** `epic`: the spell with epic as it resolved, by its stack id in `GameState.epics` (CR 702.50a). */
   /** `self`: the spell that's resolving ("you may copy this spell", Sevinne's Reclamation), as it is on the stack. */
-  | { type: "copySpell"; spell: "cause" | "self" | { target: number } | { epic: string }; /** "stormInstantSorcery": the instant and sorcery spells its controller cast before it this turn (Thousand-Year Storm). */ n: Amount | "storm" | "kicked" | "stormInstantSorcery"; newTargets: boolean; /** Then an opponent you choose copies it too (CR 702.144a). */ demonstrate?: true; /** "If it's a permanent spell, the copy gains haste and "..."" (Nalfeshnee): what the token it becomes has (CR 400.7a, 608.3f). */ gains?: Modification[] }
+  | { type: "copySpell"; spell: "cause" | "self" | { target: number } | { epic: string }; /** "stormInstantSorcery": the instant and sorcery spells its controller cast before it this turn (Thousand-Year Storm). */ n: Amount | "storm" | "kicked" | "stormInstantSorcery"; newTargets: boolean; /** Then an opponent you choose copies it too (CR 702.144a). */ demonstrate?: true; /** "If it's a permanent spell, the copy gains haste and "..."" (Nalfeshnee): what the token it becomes has (CR 400.7a, 608.3f). */ gains?: Modification[]; /** "Except it isn't legendary" (Double Major): exceptions to its copiable values (CR 707.9b). */ except?: CopyExcept }
   | { type: "removeCounters"; what: ObjRef; counter: CounterKind; n: Amount | "all" }
   /** "Remove (up to) three counters from target permanent": of any kinds, chosen as it resolves (rulings on Glissa Sunslayer); fewer than that, all of them. */
   /**
@@ -2623,7 +2623,7 @@ export type Effect =
   | { type: "topTurn"; top: FromTop }
   | { type: "graveyardTurn"; cast?: TargetSpec; lands?: true; exileInstead?: true; /** "From any graveyard" (The Great Work). */ anyGraveyard?: true; /** "If a spell cast this way would be put into a graveyard, exile it instead." */ exileCast?: true }
   /** "Artifact, instant, and sorcery spells you cast this turn cost {2} less to cast" (Urza, Planeswalker): `mod`'s "you" is the ability's controller (CR 601.2f, 611.2a). */
-  | { type: "costModThisTurn"; mod: CostMod }
+  | { type: "costModThisTurn"; mod: CostMod; /** "... until your next turn" (Elspeth Conquers Death): as that turn begins (CR 611.2b). */ untilYourNextTurn?: true }
   /**
    * "Your opponents can't cast spells this turn" (Silence), "target player can't ..." (Orim's Chant), "players can't cast
    * noncreature spells this turn" (Calamity's Wake): those players, chosen as it resolves, until the turn ends; `filter`
@@ -2945,6 +2945,8 @@ export type SpellCondition =
   | { kind: "targetIs"; index: number; filter: TargetSpec }
   /** "If a Dinosaur is dealt damage this way" (Marauding Raptor): a permanent this resolution dealt damage to, as it is now. */
   | { kind: "damagedThisWayIs"; filter: TargetSpec }
+  /** "If that creature is a Bird, Frog, Otter, or Rat" after a flicker (Splash Portal): a permanent it returned, as it is now (rulings). */
+  | { kind: "flickeredIs"; filter: TargetSpec }
   /** "If that land is a Plains" (Emeria Shepherd): the trigger's subject as it is now, or as it last existed (CR 608.2h). */
   | { kind: "subjectIs"; filter: TargetSpec }
   /** "If that spell is a Lesson" in a cast trigger (Toph, Hardheaded Teacher): the spell it's about, by its card's characteristics. */
@@ -3427,7 +3429,7 @@ export interface TriggeredAbility {
    * `leaves`: "leaves the battlefield", wherever it went, not only into a graveyard (CR 603.6c, 603.10a); `notDies` with it:
    * "without dying" (anywhere but a graveyard, CR 700.4).
    */
-  dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; attached?: boolean; damagedBySelf?: boolean; leaves?: true; notDies?: true; /** With `leaves`: only when it went to one of these zones ("dies or is put into exile", Kaya's Ghostform). */ toZones?: ("graveyard" | "exile")[]; /** "If it had a counter on it" (Leader's Talent): any kind, as it last existed (CR 603.10a). */ hadCounter?: true };
+  dies?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; attached?: boolean; damagedBySelf?: boolean; leaves?: true; notDies?: true; /** With `leaves`: only when it went to one of these zones ("dies or is put into exile", Kaya's Ghostform). */ toZones?: ("graveyard" | "exile")[]; /** "If it had a counter on it" (Leader's Talent): any kind, or "a -1/-1 counter" (Blowfly Infestation) that kind, as it last existed (CR 603.10a). */ hadCounter?: true | CounterKind };
   /**
    * For "youSacrifice": what its controller sacrificed (CR 701.21a), as it last existed on the battlefield, wherever it
    * went. The card is the subject ("exile it").

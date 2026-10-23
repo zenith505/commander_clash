@@ -36,6 +36,13 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!change || change === "fail" || !("costMod" in change) || change.costMod.who !== "you" || change.costMod.turn || change.costMod.fromGraveyard) return null;
     return [{ type: "costModThisTurn", mod: { ...change.costMod, text: `${s}.` } }];
   }
+  // Elspeth Conquers Death: "Noncreature spells your opponents cast cost {2} more to cast until your next turn": the same,
+  // until its controller's next turn begins (CR 611.2b).
+  if ((m = /^(.+? spells) your opponents cast cost (\{\d+\}) more to cast until your next turn$/.exec(s)) && !/\bwith\b|\bfrom\b/.test(m[1]!)) {
+    const change = parseCostChange(`${m[1]} your opponents cast cost ${m[2]} more to cast`);
+    if (!change || change === "fail" || !("costMod" in change) || change.costMod.who !== "opponents" || change.costMod.turn || change.costMod.fromGraveyard) return null;
+    return [{ type: "costModThisTurn", mod: { ...change.costMod, text: `${s}.` }, untilYourNextTurn: true }];
+  }
   // Extra turns (CR 500.7): "Take an extra turn after this one", "Target player takes two extra turns after this one".
   if ((m = /^(?:(.+?) )?(?:take|takes) (an|two|three) extra turns? after this one$/i.exec(s))) {
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
@@ -331,9 +338,11 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return filter?.kind === "spell" ? [{ type: "nextCast", filter, effects: [], text: `the next ${m[1]} you cast this turn can't be countered`, uncounterable: true }] : null;
   }
   // Copying spells (CR 707.10): "Copy target instant or sorcery spell", and in "when you cast" abilities "copy it".
-  if ((m = /^Copy target (.*?spell(?: you control)?)$/i.exec(s))) {
+  // Double Major: "Copy target creature spell you control, except it isn't legendary if the spell is legendary" (CR 707.9b):
+  // the copy's copiable values aren't legendary, nor is the token it becomes (CR 608.3f).
+  if ((m = /^Copy target (.*?spell(?: you control)?)(, except it isn't legendary if the spell is legendary)?$/i.exec(s))) {
     const spec = parseTargetPhrase(m[1]!);
-    return spec?.kind === "spell" ? [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n: 1, newTargets: false }] : null;
+    return spec?.kind === "spell" ? [{ type: "copySpell", spell: { target: addTarget(ctx, spec) }, n: 1, newTargets: false, ...(m[2] ? { except: { notLegendary: true } } : {}) }] : null;
   }
   // Copying an ability on the stack (CR 707.10, 707.10c): Strionic Resonator's "Copy target triggered ability you control.
   // You may choose new targets for the copy." (the copy is controlled by you, its source the same, CR 113.7a).

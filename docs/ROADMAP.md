@@ -1,7 +1,7 @@
 # Roadmap
 
-23,185 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,264 of 4,988 (85%).
+23,217 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,282 of 4,988 (86%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,18 +22,21 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 122, most played first: Sheoldred // The True Scriptures
-   ("a nontoken creature or planeswalker": whether "nontoken" covers both isn't settled by a ruling), Deadpool, Trading
-   Card (exchanging text boxes, a text-changing effect, CR 612), Wyll's Reversal, Silent-Blade Oni (casting from an
-   opponent's hand), Twilight Diviner, The Unagi of Kyoshi Island (ward—waterbend), Toph, Hardheaded Teacher, Duplicant,
-   Machine God's Effigy, Ultima, Origin of Oblivion, Underrealm Lich, Doppelgang, Yenna, Rivaz, Emet-Selch, Comeuppance,
-   Library of Leng, Biophagus, Rottenmouth Viper, Zellix, Xantcha, The Legend of Kyoshi, Tiamat, Treasure Map, Abdel
-   Adrian, Tectonic Giant, Abyssal Harvester, Surge of Salvation, Blowfly Infestation, Collective Inferno, Reaver Titan
-   (protection from a mana value: protection's source qualities have no mana value yet), Fertilid, Gluntch, Splash
-   Portal, Elspeth Conquers Death, Canopy Gargantuan, Master of Ceremonies, Crawling Sensation, Keen Duelist, Geode Golem,
-   Master Biomancer, Frontier Warmonger, Etchings of the Chosen. Smaller gaps from round 122: two "dealt to ... instead"
-   redirections that apply to the same damage (Pariah and Palisade Giant both on you) apply in the order the engine
-   finds them, not the affected player's choice (CR 616.1); Veteran Bodyguard and Weathered Bodyguards are out; autopay
+00. Most played first (`npm run popular`). Out after round 123, most played first: Deadpool, Trading Card (exchanging
+   text boxes, a text-changing effect, CR 612), Twilight Diviner, The Unagi of Kyoshi Island (ward—waterbend), Emet-Selch
+   (casting a card from your graveyard during a trigger's resolution, "do this only once each turn"), Library of Leng (a
+   discard replacement with a choice), Rottenmouth Viper (an optional sacrifice of any number as an additional cost with a
+   reduction; the UI's X search assumes a cost that only grows), Xantcha (enters under an opponent's control of your
+   choice; "can't attack its owner"), Treasure Map, Abdel Adrian, Tectonic Giant, Abyssal Harvester, Surge of Salvation,
+   Blowfly Infestation, Collective Inferno, Fertilid, Gluntch, Splash Portal, Elspeth Conquers Death, Canopy Gargantuan,
+   Master of Ceremonies, Crawling Sensation, Keen Duelist, Geode Golem, Master Biomancer, Frontier Warmonger, Etchings of
+   the Chosen. Smaller gaps from round 123: waterbend works for activated abilities only: as an additional cost to cast a
+   spell (Benevolent River Spirit, Water Whip, the "you may waterbend" spells), "unless you waterbend" (Waterbending
+   Lesson), ward—waterbend and "whenever you waterbend" (Avatar Aang) are out, as are Watery Grasp and Aang's Iceberg (other
+   lines); you don't pick what waterbend taps: autopay pays mana first, then taps what makes no mana, noncreatures, then
+   the smallest creatures (as for improvise); bots don't waterbend with creatures that could still attack this turn; a
+   draw an opponent's Notion Thief replaces isn't offered Underrealm Lich's replacement too (CR 616.1); a token doubler
+   with Yenna attaches every Aura token copy to the same chosen permanent. Smaller gaps from round 122: Veteran Bodyguard and Weathered Bodyguards are out; autopay
    never forages for mana (on purpose: what to forage is the player's choice; bots do); "you may forage. If you do"
    (Bushy Bodyguard, Treetop Sentries, Curious Forager) and "whenever you forage" (Corpseberry Cultivator) are still out;
    Nuclear Fallout and the other rad cards with milled-card triggers are out; Alchemist's Gambit, Inspired Idea and

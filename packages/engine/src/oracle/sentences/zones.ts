@@ -395,6 +395,20 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (withX && !withN && (spec.xRange?.key !== "manaValue" || spec.xRange.at !== "most" || !ctx.spell)) return null;
     return [{ type: "returnAllFromGraveyard", who: { ref: m[4] ? "eachPlayer" : "you" }, filter: { ...spec, text: withX ? `${m[1]!.slice(0, -withX[0].length)} card${withX[0]}` : `${m[1]} card` }, ...(m[3] ? { tapped: true } : {}), ...(m[4] ? { owners: true as const } : {}) }];
   }
+  // Garna, the Bloodflame: "return to your hand all creature cards in your graveyard that were put there from anywhere
+  // this turn", which cards worked out as it resolves (rulings).
+  if ((m = /^[Rr]eturn to your hand all (.+?) cards in your graveyard that were put there from anywhere this turn$/.exec(s))) {
+    const spec = parseTargetPhrase(`${m[1]!.split(/\s+/).map(singularWord).join(" ")} card from a graveyard`, { chosen: true });
+    if (spec?.kind !== "card") return null;
+    return [{ type: "returnAllFromGraveyard", who: { ref: "you" }, filter: { ...spec, putThereThisTurn: true, text: `${m[1]} card that was put there this turn` }, toHand: true }];
+  }
+  // Myojin of Grim Betrayal: "Put onto the battlefield under your control all creature cards in all graveyards that were
+  // put there from anywhere this turn."
+  if ((m = /^Put onto the battlefield under your control all (.+?) cards in all graveyards that were put there from anywhere this turn$/.exec(s))) {
+    const spec = parseTargetPhrase(`${m[1]!.split(/\s+/).map(singularWord).join(" ")} card from a graveyard`, { chosen: true });
+    if (spec?.kind !== "card") return null;
+    return [{ type: "returnAllFromGraveyard", who: { ref: "eachPlayer" }, filter: { ...spec, putThereThisTurn: true, text: `${m[1]} card that was put there this turn` } }];
+  }
   // "Return all instant and sorcery cards from your graveyard to your hand" (Wisdom of Ages), "Return all cards from your
   // graveyard to your hand" (Praetor's Counsel), "Return all creature cards with power 2 or less from your graveyard to
   // your hand" (Dawn).
@@ -468,7 +482,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!, ctx, true);
     return what ? [{ type: "exile", what }] : null;
   }
-  if ((m = /^Return ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyard) to (your|its owner's) hand$/i.exec(s))) {
+  if ((m = /^Return ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyard(?: that was put there (?:from anywhere )?this turn)?) to (your|its owner's) hand$/i.exec(s))) {
     const what = parseCardTarget(m[1]!, ctx, m[2]!.toLowerCase() === "your" ? "you" : undefined);
     return what ? [{ type: "bounce", what }] : null;
   }

@@ -907,7 +907,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const ids = e.fromYard.target !== undefined ? objects(s, { ref: "target", index: e.fromYard.target }, ctx).map((o) => o.id) : you.graveyard.filter((id) => printedMatches(e.fromYard!.filter!, defOf(s, obj(s, id))));
         for (const id of ids) moveObject(s, id, "exile");
         const gone = ids.filter((id) => obj(s, id).zone === "exile");
-        if (gone.length) log(s, `${you.name} exiles ${gone.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their graveyard.`);
+        if (gone.length) log(s, `${you.name} exiles ${gone.map((id) => `${defOf(s, obj(s, id)).name}${obj(s, id).owner === you.id ? "" : ` (${player(s, obj(s, id).owner).name}'s)`}`).join(", ")} from ${gone.every((id) => obj(s, id).owner === you.id) ? "their" : "a"} graveyard.`);
         sc.castAmong = { ids: gone.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
       }
       if (!sc.castAmong && e.fromHand) {
@@ -1870,7 +1870,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "returnAllFromGraveyard": {
       if (e.toHand) {
         // All at once (CR 608.2c), whatever they are.
-        const ids = players(s, e.who, ctx).flatMap((pid) => player(s, pid).graveyard.filter((id) => printedMatches(e.filter, defOf(s, obj(s, id)))));
+        // Garna: only those put there this turn (GameObject.toGraveyardTurn).
+        const ids = players(s, e.who, ctx).flatMap((pid) => player(s, pid).graveyard.filter((id) => printedMatches(e.filter, defOf(s, obj(s, id))) && (!e.filter.putThereThisTurn || obj(s, id).toGraveyardTurn === s.turn)));
         if (ids.length) log(s, `${src} returns ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} to ${player(s, ctx.controller).name}'s hand.`);
         for (const id of ids) moveObject(s, id, "hand");
         return;
@@ -1888,7 +1889,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         for (const pid of apnap(s, players(s, e.who, ctx)))
           for (const id of player(s, pid).graveyard) {
             const d = defOf(s, s.objects[id]!);
-            if (isPermanentCard(d) && printedMatches(filter, d)) sc.found.push(id);
+            if (isPermanentCard(d) && printedMatches(filter, d) && (!filter.putThereThisTurn || obj(s, id).toGraveyardTurn === s.turn)) sc.found.push(id);
           }
       }
       const cards = sc.found.map((id) => obj(s, id)).filter((o) => o.zone === "graveyard");

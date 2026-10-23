@@ -623,6 +623,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // "... gains flashback until end of turn. The flashback cost is equal to its mana cost." is one instruction.
   // "Choose target artifact or enchantment. Its owner shuffles it into their library." (Deglamer) is one instruction.
   text = text.replace(/^Choose (target [^.]+?)\. Its owner shuffles it into their library\./, "The owner of $1 shuffles it into their library.");
+  // Night Nurse: "choose target permanent card in your graveyard that was put there from anywhere this turn. Return it to
+  // your hand." is one instruction.
+  text = text.replace(/^[Cc]hoose (target [^.]+? in your graveyard(?: that was put there (?:from anywhere )?this turn)?)\. Return it to your hand\.$/, "Return $1 to your hand.");
   // Tibalt's Trickery: one instruction about the countered spell's controller (read in parseUntilNonland).
   // "Search your library for up to X basic land cards, where X is .... Put those cards onto the battlefield tapped, then
   // shuffle." (Traverse the Outlands): the same as "... put them onto the battlefield tapped, then shuffle, where X is ...".
@@ -1924,6 +1927,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const fromYard = mizzix[1] === "target" ? { target: ctx.targets.push(filter) - 1 } : { filter };
       effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, fromYard });
       si++;
+      continue;
+    }
+    // Reenact the Crime: "Exile target nonland card in a graveyard that was put there from anywhere this turn. Copy it. You
+    // may cast the copy without paying its mana cost." Cast as it resolves, or never (rulings); a permanent spell copy
+    // becomes a token (CR 608.3f).
+    const reenact = /^Exile (target nonland card in a graveyard that was put there from anywhere this turn)$/.exec(s);
+    if (reenact && sentences[si + 1]?.replace(/\.$/, "") === "Copy it" && sentences[si + 2]?.replace(/\.$/, "") === "You may cast the copy without paying its mana cost") {
+      const what = parseObject(reenact[1]!, ctx, true);
+      if (what?.ref !== "target") return null;
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, fromYard: { target: what.index } });
+      si += 2;
       continue;
     }
     // Arcane Bombardment: "exile an instant or sorcery card at random from your graveyard. Then copy each card exiled with

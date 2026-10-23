@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { botActions, compileCard, isFullySupported, manaValue, planCast, spellCost, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { botActions, compileCard, isFullySupported, manaValue, planActivate, planCast, spellCost, waitingOn, type Action, type CardDef, type GameState } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -295,5 +295,84 @@ describe("Crawling Sensation: \"for the first time each turn\" on a batch of lan
     putOnBattlefield(s, ap, crawling);
     s = settleBots(run(s, planCast(s, ap, ids[1]!)));
     expect(insects(s, ap)).toBe(0);
+  });
+});
+
+const garna = card("Garna, the Bloodflame", "Legendary Creature — Human Warrior", "{3}{B}{R}", {
+  power: "3",
+  toughness: "3",
+  keywords: ["Flash"],
+  oracleText: "Flash\nWhen Garna enters, return to your hand all creature cards in your graveyard that were put there from anywhere this turn.\nOther creatures you control have haste.",
+});
+const nurse = card("Night Nurse, Healer of Heroes", "Legendary Creature — Human Doctor Hero", "{1}{W}", {
+  power: "2",
+  toughness: "1",
+  keywords: ["Lifelink", "Flash"],
+  oracleText: "Flash\nLifelink\nWhen Night Nurse enters, choose target permanent card in your graveyard that was put there from anywhere this turn. Return it to your hand.",
+});
+const reenact = card("Reenact the Crime", "Instant", "{1}{U}{U}{U}", { oracleText: "Exile target nonland card in a graveyard that was put there from anywhere this turn. Copy it. You may cast the copy without paying its mana cost." });
+const myojin = card("Myojin of Grim Betrayal", "Legendary Creature — Spirit", "{5}{B}{B}{B}", {
+  power: "5",
+  toughness: "2",
+  oracleText: "Myojin of Grim Betrayal enters with an indestructible counter on it if you cast it from your hand.\nRemove an indestructible counter from Myojin of Grim Betrayal: Put onto the battlefield under your control all creature cards in all graveyards that were put there from anywhere this turn.",
+});
+
+describe("\"a card in a graveyard that was put there from anywhere this turn\"", () => {
+  /** A card of `pid`'s in their graveyard, put there on turn `turn`. */
+  const inYard = (s: GameState, pid: number, def: CardDef, turn: number) => {
+    const id = putOnBattlefield(s, pid, def);
+    s.battlefield.splice(s.battlefield.indexOf(id), 1);
+    s.objects[id]!.zone = "graveyard";
+    s.objects[id]!.toGraveyardTurn = turn;
+    s.players[pid]!.graveyard.push(id);
+    return id;
+  };
+  const bears = (n: string) => card(n, "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" });
+
+  it("Garna returns only the creature cards put into your graveyard this turn", () => {
+    supported(garna, nurse, reenact, myojin);
+    const { s: s0, ap, ids } = setup([garna]);
+    const now = inYard(s0, ap, bears("Fresh Bear"), s0.turn);
+    const old = inYard(s0, ap, bears("Old Bear"), s0.turn - 1);
+    const s = settleBots(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.objects[now]!.zone).toBe("hand");
+    expect(s.objects[old]!.zone).toBe("graveyard");
+  });
+
+  it("Night Nurse can only target a card put there this turn", () => {
+    const { s: s0, ap, ids } = setup([nurse]);
+    const now = inYard(s0, ap, bears("Fresh Bear"), s0.turn);
+    const old = inYard(s0, ap, bears("Old Bear"), s0.turn - 1);
+    let s = untilChoice(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.pending).toMatchObject({ kind: "chooseTargets" });
+    expect(() => act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: old }] })).toThrow();
+    s = settleBots(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: now }] }));
+    expect(s.objects[now]!.zone).toBe("hand");
+  });
+
+  it("Reenact the Crime: an opponent's creature card put there this turn is exiled and its copy cast for free, a token", () => {
+    const { s: s0, ap, ids, opp } = setup([reenact]);
+    const giant = inYard(s0, opp, card("Hill Giant", "Creature — Giant", "{3}{R}", { power: "3", toughness: "3" }), s0.turn);
+    let s = untilChoice(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: giant }])));
+    expect(s.objects[giant]!.zone).toBe("exile");
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "castFromAmong" });
+    s = act(s, { type: "chooseOption", player: ap, choice: giant });
+    expect(s.pending).toMatchObject({ kind: "castFree" });
+    const copy = (s.pending as { objectId: string }).objectId;
+    s = run(s, planCast(s, ap, copy));
+    s = settleBots(s);
+    expect(s.objects[copy]).toMatchObject({ zone: "battlefield", controller: ap, isToken: true });
+    expect(logText(s)).toMatch(/exiles Hill Giant \(.+'s\) from a graveyard/);
+  });
+
+  it("Myojin of Grim Betrayal puts this turn's creature cards from all graveyards onto the battlefield under your control", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const m = putOnBattlefield(s0, ap, myojin);
+    s0.objects[m]!.counters.indestructible = 1;
+    const theirs = inYard(s0, opp, bears("Their Bear"), s0.turn);
+    const old = inYard(s0, opp, bears("Old Bear"), s0.turn - 1);
+    const s = settleBots(run(s0, planActivate(s0, ap, m, 0)));
+    expect(s.objects[theirs]).toMatchObject({ zone: "battlefield", controller: ap });
+    expect(s.objects[old]!.zone).toBe("graveyard");
   });
 });

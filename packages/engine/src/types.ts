@@ -284,6 +284,8 @@ export interface GameObject {
   renowned?: boolean;
   /** Monstrous (CR 701.37b): a designation it keeps until it leaves the battlefield. */
   monstrous?: boolean;
+  /** Biomancer's Familiar: the turn in which, the next time it adapts, it adapts as though it had no +1/+1 counters. */
+  adaptFresh?: number;
   /**
    * Suspected (CR 701.60): a designation, not copiable (701.60b), until it leaves the battlefield or an effect ends it. It
    * gives menace and "can't block" (701.60c) with the timestamp it became suspected, so losing all abilities later removes
@@ -773,6 +775,8 @@ export interface StackItem {
    * the stack by the time something asks (a countered spell's cascade uses its last known information, CR 113.7a).
    */
   castMv?: number;
+  /** The spell's colors as it was cast (Ramos, Dragon Engine), for when it has left the stack (CR 113.7a). */
+  castColors?: Color[];
   /** An amount "as you cast this spell" (Count asCast), counted as it became cast (rulings on Lifestream's Blessing). */
   asCast?: number;
   /** Kicker costs paid (CR 702.33d), for a spell or its permanent's enters trigger. */
@@ -1075,7 +1079,7 @@ export type PendingDecision =
   /** A resolving spell or ability makes this player discard `count` cards of their choice (CR 701.9b). */
   | { kind: "discard"; player: PlayerId; count: number; source: string; /** Only cards like this: "discard a creature card". */ filter?: TargetSpec; /** Exiled, not discarded ("exiles a card from their hand"). */ exile?: true; /** Up to `count` ("discard any number of cards"), none too. */ upTo?: true }
   /** "Put two cards from your hand on top of your library in any order": which, and their order (first on top). */
-  | { kind: "handToTop"; player: PlayerId; count: number; source: string; /** On the bottom instead, the first pick lowest. */ bottom?: true; /** Scroll Rack: any number up to `count`, exiled face down first and traded for as many from the top of the library. */ upTo?: true }
+  | { kind: "handToTop"; player: PlayerId; count: number; source: string; /** On the bottom instead, the first pick lowest. */ bottom?: true; /** Scroll Rack: any number up to `count`, exiled face down first and traded for as many from the top of the library. */ upTo?: true; /** Library of Leng: these cards are being discarded because of an effect, and any of them may go on top of the library instead of into the graveyard (`upTo`, the first pick ending on top). */ discarding?: ObjectId[] }
   /** Scry or surveil (CR 701.22, 701.25): `cards` are the top of their library, top first. */
   /** `order`: put them all back in any order (no bottom or graveyard); `owner` = whose library, if not the player's. */
   /** "bottom": the cards go to the bottom of the library together and their owner orders them (CR 401.4). */
@@ -1168,7 +1172,7 @@ export type PendingDecision =
    * while a spell or ability resolves. `options` are the names allowed.
    */
   /** `labels`: what to show for each option, when the options are ids (entering as a copy of a permanent). */
-  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "commander" | "drawUpTo" | "payX" | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | /** "Then choose one of them. You may play that card this turn." (Party Thrasher): one of the exiled cards. */ "impulseChoice" | /** Eladamri: a card in the hand, or "top". */ "revealHandOrTop" | "pile" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom" | "searchZones" | "vote" | /** One of the words of "each opponent chooses fame or fortune". */ "word" | "mutate" | "either" | "payOrTop" | "counterKind" | /** "Remove up to three counters": the next one to remove, or "done". */ "removeCounter" | /** Which target of a spell or ability becomes ~ (Spellskite). */ "targetSlot" | /** Which legendary permanent of a group to keep (CR 704.5j); the options are their ids. */ "legend" | /** A number chosen secretly (Wheel of Misfortune): any whole number in `numberRange`. */ "secretNumber"; options: string[]; /** Any whole number from `min` to `max` may be chosen, not only `options`. */ numberRange?: { min: number; max: number }; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** "removeCounter": the permanent the counters are moved onto (Resourceful Defense). */ onto?: ObjectId; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId; /** "pile": the two piles, the first then the second (Fact or Fiction); `of`, the player whose hand the chosen one goes to. */ piles?: [ObjectId[], ObjectId[]]; /** "pile": the chosen pile is sacrificed, not put into a hand (Liliana of the Veil). */ sacrificePile?: true }
+  | { kind: "chooseOption"; player: PlayerId; source: string; what: ChoiceKind | EntersOption | "commander" | "drawUpTo" | "payX" | "venture" | "clash" | "endure" | "tapOrUntap" | "punisher" | "castFromHand" | "castFromAmong" | /** "Then choose one of them. You may play that card this turn." (Party Thrasher): one of the exiled cards. */ "impulseChoice" | /** Eladamri: a card in the hand, or "top". */ "revealHandOrTop" | "pile" | "demonstrate" | "damageShield" | "topOrBottom" | "damageSource" | "enchant" | "rollResult" | "attackWhom" | "searchZones" | "vote" | /** One of the words of "each opponent chooses fame or fortune". */ "word" | "mutate" | "either" | "payOrTop" | "counterKind" | /** "Remove up to three counters": the next one to remove, or "done". */ "removeCounter" | /** Which target of a spell or ability becomes ~ (Spellskite). */ "targetSlot" | /** Which legendary permanent of a group to keep (CR 704.5j); the options are their ids. */ "legend" | /** A number chosen secretly (Wheel of Misfortune): any whole number in `numberRange`. */ "secretNumber" | /** Effect "choosePlayer" (Gluntch): one more player. */ "nthPlayer"; options: string[]; /** Any whole number from `min` to `max` may be chosen, not only `options`. */ numberRange?: { min: number; max: number }; labels?: string[]; objectId?: ObjectId; /** The question, when `source` alone doesn't say it (damage shields). */ prompt?: string; /** The permanent a choice is about, as it resolves ("tap or untap target permanent"). */ about?: ObjectId; /** "removeCounter": the permanent the counters are moved onto (Resourceful Defense). */ onto?: ObjectId; /** A card name: what it's for (bots). */ purpose?: NamePurpose; /** A card name: the player whose cards it's about ("target player reveals their hand"). */ of?: PlayerId; /** A vote made by `player` for another player (Illusion of Choice): whose vote it is. */ voter?: PlayerId; /** "pile": the two piles, the first then the second (Fact or Fiction); `of`, the player whose hand the chosen one goes to. */ piles?: [ObjectId[], ObjectId[]]; /** "pile": the chosen pile is sacrificed, not put into a hand (Liliana of the Veil). */ sacrificePile?: true }
   /**
    * "Sacrifice a creature", "return a land you control to its owner's hand": pick `count` of `options`
    * (your own permanents) as a spell or ability resolves. With `min`, anywhere from `min` to `count` of them
@@ -1241,6 +1245,8 @@ export interface TurnLog {
   noncombatDamage?: Record<number, number>;
   /** For each player, the sources (`id@zoneChanges`) that dealt them combat damage (Steel Hellkite). */
   combatDamagedBy?: Record<number, string[]>;
+  /** The creature types of the creatures that dealt combat damage to a player, as they dealt it (Lost Monarch of Ifnir). */
+  combatDamageSubtypes?: string[];
   /**
    * "Once during each of your turns, you may cast ... from your graveyard" (Karador), Muldrotha's "a permanent spell of
    * each permanent type": the permissions used, `id@zoneChanges:slot` (a new object gets a new one, rulings).
@@ -1256,6 +1262,8 @@ export interface TurnLog {
   toGraveyard?: Record<number, number>;
   /** Each event this turn that discarded cards: who discarded them, and the cards (keys into `cards`). */
   discards?: { player: PlayerId; cards: string[] }[];
+  /** Each event that put cards into graveyards this turn: the cards (CardDef keys), by their owner (Crawling Sensation's "for the first time each turn"). */
+  toGraveyardEvents?: { player: PlayerId; cards: string[] }[];
   /** Cards put into graveyards from anywhere, anyone's, counted by each card type they had there (Case of the Gorgon's Kiss). */
   toGraveyardTypes?: Record<string, number>;
   /** Life each player gained in total (Case of the Uneaten Feast). */
@@ -1645,6 +1653,8 @@ export interface Chosen {
   number?: number;
   /** "Each player chooses a creature type" (Patriarch's Bidding): every type chosen, in the order chosen. */
   types?: string[];
+  /** Gluntch: the players chosen by Effect "choosePlayer", in the order chosen. */
+  players?: PlayerId[];
 }
 
 export interface TurnRule {
@@ -1661,6 +1671,8 @@ export interface TurnRule {
    * this turn as though none of its loyalty abilities have been activated this turn": one more each, each time (rulings).
    */
   rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable" | "creatureSpellsUncounterable" | "extraLoyalty";
+  /** "Can't be countered by blue or black spells this turn" (Autumn's Veil): only by spells of these colors, as they resolve. */
+  byColors?: Color[];
 }
 
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */
@@ -1844,6 +1856,10 @@ export interface Resolving {
     drawQueue?: PlayerId[]; // players still to draw: a draw can stop for dredge (CR 702.52a)
     digQueue?: PlayerId[]; // "each player looks at the top five cards": players still to look (Explore the Vastlands)
     chosen?: Record<string, ObjectId[]>; // cards each player chose to discard
+    /** Library of Leng: the discarded cards each player put on top of their library instead, the first ending on top. */
+    toTop?: Record<string, ObjectId[]>;
+    /** The cards each player discards at random, picked before they're asked about Library of Leng. */
+    randomPicks?: Record<string, ObjectId[]>;
     venture?: string; // the dungeon or room chosen while venturing (CR 701.49a-b)
     arranged?: { top: ObjectId[]; away: ObjectId[] };
     /** Teferi's Puzzle Box: how many cards the hand put on the bottom (then drawn). */

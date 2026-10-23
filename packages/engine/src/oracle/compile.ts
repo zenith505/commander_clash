@@ -1139,6 +1139,19 @@ export function compile(d: CardDef): CompiledCard {
       }
       continue;
     }
+    // Rottenmouth Viper, Torgaar: "you may sacrifice any number of nonland permanents. This spell costs {1} less to cast
+    // for each permanent sacrificed this way." An additional cost with an X of 0 or more (CR 601.2b, 107.3a), then a
+    // reduction of the total by that much generic mana (CR 601.2f).
+    const sacLess = /^As an additional cost to cast ~, you may sacrifice any number of (.+?)\. ~ costs \{(\d+)\} less to cast for each (permanent|creature) sacrificed this way\.$/.exec(line);
+    if (sacLess) {
+      const spec = parseTargetPhrase(sacLess[1]!.split(" ").map(singularWord).join(" "));
+      if (spec?.kind !== "object" || spec.controller || spec.combat || parseManaCost(d.manaCost).hasX || out.sacrificedReduction !== undefined || out.additionalCosts?.some((c) => c.kind === "sacrifice")) out.unsupported.push(raw);
+      else {
+        (out.additionalCosts ??= []).push({ kind: "sacrifice", filter: { ...spec, text: singularWord(sacLess[1]!) }, n: 0, x: true, optional: true });
+        out.sacrificedReduction = Number(sacLess[2]);
+      }
+      continue;
+    }
     // Plumb the Forbidden: "you may sacrifice one or more creatures. When you do, copy this spell for each creature
     // sacrificed this way." An additional cost with an X of 0 or more (CR 601.2b, 107.3a), and a reflexive trigger as
     // it's cast (CR 603.12) copying it that many times.
@@ -1547,6 +1560,10 @@ export function compile(d: CardDef): CompiledCard {
       out.drawTwoInstead = true;
       continue;
     }
+    if (line === "If you would draw a card, draw two cards instead.") {
+      out.drawTwoInstead = "always";
+      continue;
+    }
     // "You have protection from each of your opponents" (CR 702.16k): their spells and abilities can't target you, their
     // Auras can't enchant you, and damage from their sources is prevented.
     // "You, planeswalkers you control, and other creatures you control have hexproof." (Shalai, Voice of Plenty): you have
@@ -1672,9 +1689,15 @@ export function compile(d: CardDef): CompiledCard {
       out.powerUpLess = Number(powerUpLess[1]);
       continue;
     }
-    const equipLess = /^Equip abilities you activate( of other Equipment| that target ~)? cost \{(\d+)\} less to activate\.$/.exec(line);
+    const equipLess = /^Equip abilities you activate( of other Equipment| that target ~| that target enchanted creature)? cost \{(\d+)\} less to activate\.$/.exec(line);
     if (equipLess) {
-      (out.equipLess ??= []).push({ n: Number(equipLess[2]), ...(equipLess[1] === " that target ~" ? { targetSelf: true as const } : equipLess[1] ? { otherEquipment: true as const } : {}) });
+      (out.equipLess ??= []).push({ n: Number(equipLess[2]), ...(equipLess[1] === " that target ~" ? { targetSelf: true as const } : equipLess[1] === " that target enchanted creature" ? { targetEnchanted: true as const } : equipLess[1] ? { otherEquipment: true as const } : {}) });
+      continue;
+    }
+    // "Aura spells you cast that target enchanted creature cost {3} less to cast." (Strong Back)
+    const auraLess = /^Aura spells you cast that target enchanted creature cost \{(\d+)\} less to cast\.$/.exec(line);
+    if (auraLess) {
+      out.auraLessEnchanted = (out.auraLessEnchanted ?? 0) + Number(auraLess[1]);
       continue;
     }
     const lockEnd = /^You can't (lose|win) the game and your opponents can't (win|lose) the game\.$/.exec(line);
@@ -2100,6 +2123,11 @@ export function compile(d: CardDef): CompiledCard {
       out.opponentsCantCastEven = true;
       continue;
     }
+    // Lavinia, Azorius Renegade: X as chosen (rulings), the lands that player controls as they cast it (CR 601.3).
+    if (line === "Each opponent can't cast noncreature spells with mana value greater than the number of lands that player controls.") {
+      out.opponentsNoncreatureMvAboveLands = true;
+      continue;
+    }
     if (line === "Your opponents can't block with creatures with even mana values.") {
       out.opponentsCantBlockEven = true;
       continue;
@@ -2134,6 +2162,10 @@ export function compile(d: CardDef): CompiledCard {
     const mindcensor = new RegExp(`^If an opponent would search a library, that player searches the top ${NUM} cards of that library instead\\.$`).exec(line);
     if (mindcensor) {
       out.opponentsSearchTop = num(mindcensor[1]!);
+      continue;
+    }
+    if (line === "If an effect causes you to discard a card, discard it, but you may put it on top of your library instead of into your graveyard.") {
+      out.discardToTop = true;
       continue;
     }
     if (line === "Spells and abilities your opponents control can't cause their controller to search their library.") {
@@ -2387,7 +2419,9 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "Enchantment spells you cast have affinity for Auras" (Pearl-Ear): each such spell costs {1} less to cast for each
     // Aura you control (CR 702.41a); two of them, {2} less (CR 702.41b, rulings).
-    const grantAffinity = /^((?:[A-Z][a-z]+ )?spells) you cast have affinity for ([A-Z][a-z]+s)\.$/.exec(line);
+    // "Creature and planeswalker spells you cast have affinity for artifacts" (Tezzeret, Master of the Bridge), "Artifact
+    // creature spells ..." (Mycosynth Golem).
+    const grantAffinity = /^((?:[A-Z][a-z]+ (?:(?:and )?[a-z]+ )?)?spells) you cast have affinity for ([A-Za-z]+s)\.$/.exec(line);
     if (grantAffinity) line = `${grantAffinity[1]} you cast cost {1} less to cast for each ${grantAffinity[2]!.slice(0, -1)} you control.`;
     const cost = parseCostChange(line);
     if (cost) {
@@ -2448,7 +2482,7 @@ export function compile(d: CardDef): CompiledCard {
     // A spell's "When you next cast ... this turn, ..." creates a delayed trigger as it resolves (CR 603.7); it isn't a triggered ability of the card.
     // So does a Pact's "At the beginning of your next upkeep, pay {2}{B}. If you don't, you lose the game." (CR 603.7a), and
     // Glorious End's "At the beginning of your next end step, you lose the game."
-    if (isSpell && (/^When you next cast /.test(line) || /^At the beginning of each combat this turn, /.test(line) || /^At the beginning of your next upkeep, pay (?:\{[^}]+\})+\. If you don't, you lose the game\.$/.test(line) || /^At the beginning of your next end step, you lose the game\.$/.test(line))) {
+    if (isSpell && (/^When you next cast /.test(line) || /^At the beginning of each combat this turn, /.test(line) || /^Whenever one or more creatures you control deal combat damage to one or more players this turn, /.test(line) || /^At the beginning of your next upkeep, pay (?:\{[^}]+\})+\. If you don't, you lose the game\.$/.test(line) || /^At the beginning of your next end step, you lose the game\.$/.test(line))) {
       spellLines.push(line);
       continue;
     }

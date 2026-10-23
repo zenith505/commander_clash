@@ -907,7 +907,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         const ids = e.fromYard.target !== undefined ? objects(s, { ref: "target", index: e.fromYard.target }, ctx).map((o) => o.id) : you.graveyard.filter((id) => printedMatches(e.fromYard!.filter!, defOf(s, obj(s, id))));
         for (const id of ids) moveObject(s, id, "exile");
         const gone = ids.filter((id) => obj(s, id).zone === "exile");
-        if (gone.length) log(s, `${you.name} exiles ${gone.map((id) => defOf(s, obj(s, id)).name).join(", ")} from their graveyard.`);
+        if (gone.length) log(s, `${you.name} exiles ${gone.map((id) => `${defOf(s, obj(s, id)).name}${obj(s, id).owner === you.id ? "" : ` (${player(s, obj(s, id).owner).name}'s)`}`).join(", ")} from ${gone.every((id) => obj(s, id).owner === you.id) ? "their" : "a"} graveyard.`);
         sc.castAmong = { ids: gone.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [] };
       }
       if (!sc.castAmong && e.fromHand) {
@@ -1785,17 +1785,26 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         // "Exile a card from a graveyard" (Cemetery Prowler): you choose one in any graveyard as it resolves (CR 608.2c);
         // it's linked to this source (CR 607.2a).
         const sc = (s.resolving!.scratch ??= {});
-        const yards = () => livingPlayers(s).flatMap((pid) => player(s, pid).graveyard);
+        // "Put a creature card from a graveyard onto the battlefield under your control" (Extract from Darkness): not
+        // targeted; any permanent card matching, chosen as it resolves (CR 110.4b).
+        const toField = e.dest === "battlefield";
+        const fits = (id: ObjectId) => (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (!toField || isPermanentCard(defOf(s, obj(s, id))));
+        const yards = () => livingPlayers(s).flatMap((pid) => player(s, pid).graveyard).filter(fits);
         if (!sc.found) {
           const cards = yards();
           if (!cards.length) return;
-          s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what: "a card", cards, min: 1, max: 1, fromGraveyard: "exile", anyGraveyard: true };
+          s.pending = { kind: "searchLibrary", player: ctx.controller, source: src, what: e.filter?.text ? `a ${e.filter.text}` : "a card", cards, min: 1, max: 1, fromGraveyard: toField ? "battlefield" : "exile", anyGraveyard: true };
           return "paused";
         }
         const found = sc.found.filter((id) => yards().includes(id));
         sc.found = undefined;
         for (const id of found) {
           const o = obj(s, id);
+          if (toField) {
+            log(s, `${player(s, ctx.controller).name} puts ${defOf(s, o).name} from ${o.owner === ctx.controller ? "their" : `${player(s, o.owner).name}'s`} graveyard onto the battlefield.`);
+            moveObject(s, id, "battlefield", { controller: ctx.controller });
+            continue;
+          }
           log(s, `${player(s, ctx.controller).name} exiles ${defOf(s, o).name} from ${o.owner === ctx.controller ? "their" : `${player(s, o.owner).name}'s`} graveyard.`);
           moveObject(s, id, "exile");
           if (e.linked && ctx.sourceId) ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: obj(s, id).zoneChanges ?? 0 });
@@ -1870,7 +1879,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "returnAllFromGraveyard": {
       if (e.toHand) {
         // All at once (CR 608.2c), whatever they are.
-        const ids = players(s, e.who, ctx).flatMap((pid) => player(s, pid).graveyard.filter((id) => printedMatches(e.filter, defOf(s, obj(s, id)))));
+        // Garna: only those put there this turn (GameObject.toGraveyardTurn).
+        const ids = players(s, e.who, ctx).flatMap((pid) => player(s, pid).graveyard.filter((id) => printedMatches(e.filter, defOf(s, obj(s, id))) && (!e.filter.putThereThisTurn || obj(s, id).toGraveyardTurn === s.turn)));
         if (ids.length) log(s, `${src} returns ${ids.map((id) => defOf(s, obj(s, id)).name).join(", ")} to ${player(s, ctx.controller).name}'s hand.`);
         for (const id of ids) moveObject(s, id, "hand");
         return;
@@ -1888,7 +1898,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         for (const pid of apnap(s, players(s, e.who, ctx)))
           for (const id of player(s, pid).graveyard) {
             const d = defOf(s, s.objects[id]!);
-            if (isPermanentCard(d) && printedMatches(filter, d)) sc.found.push(id);
+            if (isPermanentCard(d) && printedMatches(filter, d) && (!filter.putThereThisTurn || obj(s, id).toGraveyardTurn === s.turn)) sc.found.push(id);
           }
       }
       const cards = sc.found.map((id) => obj(s, id)).filter((o) => o.zone === "graveyard");

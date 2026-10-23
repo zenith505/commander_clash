@@ -223,6 +223,14 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   // "Instant and sorcery spells you cast cost {1} less to cast for each experience counter you have" (Mizzix): that much
   // less for each, counted as the spell is cast (CR 601.2f).
   // "Angel spells and Human spells you cast cost {1} less to cast for each +1/+1 counter on ~" (Herald of War).
+  // Eluge: "The first instant or sorcery spell you cast each turn costs {U} (or {1}) less to cast for each land you control
+  // with a flood counter on it": {U} off for each while there's {U} in the cost, then {1} (rulings).
+  if ((m = /^(The first .*?spell you cast each turn) costs \{([WUBRG])\} \(or \{1\}\) less to cast for each (.+)$/.exec(text))) {
+    const base = parseCostChange(`${m[1]} costs {1} less to cast`);
+    const c = parseCount(m[3]!, null, true);
+    if (!base || base === "fail" || !("costMod" in base) || !c) return "fail";
+    return { costMod: { ...base.costMod, n: 0, times: c, coloredOrGeneric: m[2] as Color, text: line } };
+  }
   if ((m = /^(.+ you cast costs? \{\d+\} less to cast) for each (.+)$/.exec(text)) && !/^~/.test(text)) {
     const base = parseCostChange(m[1]!);
     const c = parseCount(m[2]!, null, true);
@@ -426,6 +434,11 @@ export function parseUntargetable(t: string): Untargetable | null {
 export function parseStaticCondition(text: string, st: StaticAbility): StaticCondition | null {
   let m: RegExpExecArray | null;
   if ((m = new RegExp(`^(?:there are )?${NUM} or more cards (?:are )?in your graveyard$`).exec(text))) return { kind: "graveyardAtLeast", n: num(m[1]!) };
+  // "As long as there are fewer than eight cards in your graveyard, ~ isn't a creature" (The Warring Triad).
+  if ((m = new RegExp(`^there are fewer than ${NUM} cards in your graveyard$`).exec(text))) {
+    const amount = parseCount("the number of cards in your graveyard", null);
+    return amount && typeof amount === "object" ? { kind: "amount", amount, max: num(m[1]!) - 1 } : null;
+  }
   if ((m = new RegExp(`^there are ${NUM} or more card types among cards in your graveyard$`).exec(text))) return { kind: "graveyardTypes", n: num(m[1]!) };
   // "If there are four or more permanent types among cards in your graveyard" (Matzalantli): artifact, battle, creature,
   // enchantment, land and planeswalker (CR 110.4a).
@@ -509,13 +522,16 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if (/^no spells were cast last turn$/.test(text)) return { kind: "castLastTurn", none: true };
   if ((m = new RegExp(`^a player cast ${NUM} or more spells last turn$`).exec(text))) return { kind: "castLastTurn", onePlayer: num(m[1]!) };
   if (/^you(?:'ve)? gained life this turn$/.test(text)) return { kind: "lifeGainedThisTurn", n: 1 };
+  // "If you didn't lose life this turn" (Luminarch Ascension), "if you lost life this turn".
+  if ((m = /^you (didn't lose|lost) life this turn$/.exec(text))) return { kind: "amount", amount: { count: { kind: "lifeLostThisTurn", who: { ref: "you" } } }, ...(m[1] === "lost" ? { min: 1 } : { max: 0 }) };
   // "If you gained and lost life this turn" (Lunar Convocation): both, whatever the net change (rulings).
   if (/^you gained and lost life this turn$/.test(text)) return { kind: "allOf", conds: [{ kind: "lifeGainedThisTurn", n: 1 }, { kind: "amount", amount: { count: { kind: "lifeLostThisTurn", who: { ref: "you" } } }, min: 1 }] };
   // "If you created a token this turn" (Bennie Bracks, Zoologist).
   if (/^you created a token this turn$/.test(text)) return { kind: "amount", amount: { count: { kind: "tokensCreatedThisTurn" } }, min: 1 };
   // "If you gained 3 or more life this turn" (The Gaffer, Resplendent Angel).
   if ((m = /^you(?:'ve)? gained (\d+) or more life this turn$/.exec(text))) return { kind: "lifeGainedThisTurn", n: Number(m[1]) };
-  if ((m = /^creatures you control have total power (\d+) or greater$/.exec(text))) return { kind: "totalPower", n: Number(m[1]) };
+  // Betor, Kin to All: "creatures you control have total toughness 10 or greater".
+  if ((m = /^creatures you control have total (power|toughness) (\d+) or greater$/.exec(text))) return { kind: "totalPower", n: Number(m[2]), ...(m[1] === "toughness" ? { toughness: true as const } : {}) };
   if ((m = new RegExp(`^a library has ${NUM} or fewer cards in it$`).exec(text))) return { kind: "libraryAtMost", n: num(m[1]!) };
   if (/^your library has no cards in it$/.test(text)) return { kind: "libraryAtMost", n: 0, yours: true };
   if (/^you're the monarch$/.test(text)) return { kind: "monarch" };
@@ -574,6 +590,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^an opponent lost ${NUM} or more life this turn$`).exec(text))) return { kind: "opponentLostLife", n: num(m[1]!) };
   if ((m = new RegExp(`^a player lost ${NUM} or more life this turn$`).exec(text))) return { kind: "opponentLostLife", n: num(m[1]!), anyPlayer: true };
   if (/^you haven't been dealt combat damage since your last turn$/.test(text)) return { kind: "noCombatDamageSinceLastTurn" };
+  if ((m = /^a player was dealt combat damage by an? ([A-Z][a-z]+) this turn$/.exec(text)) && subtypeSet(m[1]!) === "Creature") return { kind: "playerCombatDamaged", subtype: m[1]! };
   // The Traps' "this turn" conditions (see StaticCondition opponentSearched).
   if (/^an opponent searched their library this turn$/.test(text)) return { kind: "opponentSearched" };
   if ((m = new RegExp(`^an opponent had (?:an?|${NUM} or more) (?:(white|blue|black|red|green) )?(artifact|creature|land|enchantment|planeswalker)s? enter the battlefield under their control this turn$`).exec(text)))

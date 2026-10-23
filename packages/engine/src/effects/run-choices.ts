@@ -72,7 +72,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         }
       }
       // "An amount of {E} equal to its mana value" (Volatile Stormdrake): counted now (CR 608.2h).
-      const pay = e.payEnergy !== undefined ? { ...e.pay, energy: Math.max(0, amountNow(s, e.payEnergy, ctx)) } : e.pay;
+      // "Pay X life, where X is its power" (Mask of Griselbrand): counted now too. Paying 0 life is paying (CR 119.4, 107.1b).
+      const pay = e.payEnergy !== undefined ? { ...e.pay, energy: Math.max(0, amountNow(s, e.payEnergy, ctx)) } : e.payLife !== undefined ? { ...e.pay, life: Math.max(0, amountNow(s, e.payLife, ctx)) } : e.pay;
       if (sc.may === undefined) {
         // Fabricate: with the permanent gone, the counters can't be put on it, so it's the tokens (rulings).
         const onSelf = e.effects.every((x) => "what" in x && x.what?.ref === "self") && (e.effects.length > 0 || !!e.otherwise?.every((x) => "what" in x && x.what?.ref === "self"));
@@ -100,8 +101,14 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         return;
       }
       if (source && !source.triggeredThisTurn?.includes(key)) (source.triggeredThisTurn ??= []).push(key);
+      // "You may [do something]. If you do, ...": what they do is a cost, paid as it resolves (CR 118.12), so a discard
+      // isn't one an effect causes (Library of Leng's rulings).
+      const next = r.body.effects[r.body.effects.indexOf(e) + 1];
+      const asCost = r.body.effects.includes(e) && next?.type === "if" && next.cond.kind === "youDid";
       const xctx = e.payX ? { ...ctx, x: Number(sc.payX) } : ctx;
-      for (const inner of e.effects) if (runEffect(s, inner, xctx) === "paused") return "paused";
+      // A copy that keeps ctx's live "chosen".
+      const cctx: ResolveCtx = asCost ? (Object.defineProperties({ asCost: true }, Object.getOwnPropertyDescriptors(xctx)) as ResolveCtx) : xctx;
+      for (const inner of e.effects) if (runEffect(s, inner, cctx) === "paused") return "paused";
       return;
     }
     case "repeatMay": {
@@ -267,6 +274,19 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const pay = timesPay(e.pay, sc.n);
       // "If [cost] has choices ... either the entire set of costs is paid, or none of them is" (CR 702.24a).
       return runEffect(s, { type: "may", effects: [], pay, otherwise: [{ type: "sacrifice", what: { ref: "self" } }], text: `Pay ${describePay(pay)} to keep ~ (cumulative upkeep)`, keep: true }, ctx);
+    }
+    case "choosePlayer": {
+      // Gluntch: one more player, different from those chosen before (rulings), any of them you; asked each time the
+      // instruction is reached. With one left there's still that one to choose; with none, nobody is chosen.
+      const r = s.resolving!;
+      const sc = (r.scratch ??= {});
+      if (sc.asked) return;
+      sc.asked = true;
+      const left = apnap(s, s.turnOrder).filter((x) => !player(s, x).lost && !r.chosen?.players?.includes(x));
+      r.chosen = { ...r.chosen, players: [...(r.chosen?.players ?? [])] };
+      if (!left.length) return;
+      s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "nthPlayer", options: left.map(String), labels: left.map((x) => (x === ctx.controller ? "You" : player(s, x).name)), prompt: e.prompt };
+      return "paused";
     }
     case "choose": {
       // "Choose a creature type": the controller names one as it resolves (CR 608.2c-d); it's kept for the rest.
@@ -744,6 +764,7 @@ function punisher(s: GameState, e: Extract<Effect, { type: "punisher" }>, ctx: R
     }
     if (!pu.acted) {
       const who = apnap(s, Object.keys(pu.made).map(Number) as PlayerId[]);
+      // "Unless that player discards a card": a cost, paid as it resolves (CR 118.12a), so not Library of Leng's.
       for (const pid of who) discardCards(s, pid, (pu.chosen?.[pid]?.discard ?? []).filter((id) => player(s, pid).hand.includes(id)), "", false, false, ctx.controller);
       for (const pid of who)
         for (const id of pu.chosen?.[pid]?.sacrifice ?? []) {

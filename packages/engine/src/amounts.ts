@@ -294,6 +294,11 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return spentMeets(ctx.spent, c.req) ? 1 : 0;
     case "colorsSpent":
       return ctx.colorsSpent ?? 0;
+    case "castSpellColors": {
+      const item = ctx.cause !== undefined ? s.castItems?.[ctx.cause] : undefined;
+      const o = item?.objectId ? s.objects[item.objectId] : undefined;
+      return o?.zone === "stack" ? characteristics(s, o).colors.length : (item?.castColors?.length ?? 0);
+    }
     case "manaSpent":
       return ctx.manaSpent ?? 0;
     case "webSlungMv":
@@ -676,6 +681,8 @@ function describeCount(c: Count): string {
       return "mana spent";
     case "colorsSpent":
       return "colors of mana spent";
+    case "castSpellColors":
+      return "that spell's colors";
     case "manaSpent":
       return "mana spent to cast it";
     case "webSlungMv":

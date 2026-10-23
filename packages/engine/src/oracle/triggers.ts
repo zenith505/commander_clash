@@ -996,11 +996,13 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     // Laelia: cards exiled from either zone in one event, by anyone, for any reason (rulings).
     batch = { what: "exiledFromLibraryOrGraveyard", whose: "you" };
     rest = m[1]!;
-  } else if ((m = /^Whenever one or more (?:(.+?) )?cards are put into your graveyard from (anywhere|your library)( during your turn)?, (.+)$/.exec(line))) {
+  } else if ((m = /^Whenever one or more (?:(.+?) )?cards are put into your graveyard from (anywhere|your library)( during your turn| for the first time each turn)?, (.+)$/.exec(line))) {
+    // Crawling Sensation: "for the first time each turn", counting events before it was on the battlefield.
     const filter = batchCards(m[1]);
     if (filter === null) return "fail";
-    batch = { what: "toGraveyard", whose: "you", ...(filter ? { filter } : {}), ...(m[2] === "your library" ? { from: "library" as const } : {}) };
-    yourTurn = !!m[3];
+    const first = m[3] === " for the first time each turn";
+    batch = { what: "toGraveyard", whose: "you", ...(filter ? { filter } : {}), ...(m[2] === "your library" ? { from: "library" as const } : {}), ...(first ? { first: true as const } : {}) };
+    yourTurn = !!m[3] && !first;
     rest = m[4]!;
   } else if ((m = /^Whenever a player mills one or more (?:(.+?) )?cards, (.+)$/.exec(line))) {
     // Zellix, Sanity Flayer: cards a mill instruction put there (CR 701.17a), once for each player who milled them.
@@ -1421,7 +1423,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // count; a new object starts over, CR 400.7).
   const once = /^(.+?) This ability triggers only once each turn\.?$/.exec(line);
   if (once) {
-    const t = parseTrigger(once[1]!);
+    // "Whenever a counter is put on a creature you control, ..." (Hollowmurk Siege): once for each counter, but only the
+    // first of them each turn does anything, so it's the same as "one or more counters".
+    const t = parseTrigger(once[1]!.replace(/^Whenever a counter is put on (a creature you control|another creature you control), /, "Whenever one or more counters are put on $1, "));
     return t && t !== "fail" && !t.oncePerTurn && t.event !== "state" ? { ...t, oncePerTurn: true } : "fail";
   }
   // "You may draw a card. Do this only once each turn." (CR 603.2h): it triggers only if its controller hasn't done it
@@ -1602,7 +1606,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     // turn" (Erg Raiders), with no target or other object in the text.
     // So is "it" after "if there are two or more ki counters on ~" (the Kamigawa flip cards).
     if ((/^~ /.test(intervening[2]!) || / counters on ~$/.test(intervening[2]!)) && /^At /.test(intervening[1]!))
-      rest = /\b(a|an|target|that|those|another|other|each|all|cards?|tokens?|creatures?|permanents?|spells?)\b|"/.test(rest) ? rest.replace(/( counters? on) it\.$/, "$1 ~.") : rest.replace(/\bit\b/g, "~");
+      // "You may remove a +1/+1 counter from it" (Ingenious Prodigy) likewise.
+      rest = /\b(a|an|target|that|those|another|other|each|all|cards?|tokens?|creatures?|permanents?|spells?)\b|"/.test(rest) ? rest.replace(/( counters? on) it\.$/, "$1 ~.").replace(/^(you may remove an? \S+ counter from) it\./, "$1 ~.") : rest.replace(/\bit\b/g, "~");
     const t = parseTrigger(`${intervening[1]}, ${rest}`);
     if (!t || t === "fail" || t.ifCond) return "fail";
     // "Whenever a Mountain you control enters, if you control at least five other Mountains" (Valakut, the Molten
@@ -1806,7 +1811,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   }
   // A state trigger (CR 603.8): "When you control no Islands, sacrifice ~."
   // "When you have 30 or more life, flip ~" (Rune-Tail), "When ~ has flying, flip it" (Student of Elements).
-  const st = new RegExp(`^When (you control no .+?|you have ${NUM} or more life|~ has [a-z ]+), (.+)$`).exec(line);
+  // "When you control seven or more Thrulls, sacrifice ~" (Endrek Sahr).
+  const st = new RegExp(`^When (you control no .+?|you control ${NUM} or more [A-Za-z]+?|you have ${NUM} or more life|~ has [a-z ]+), (.+)$`).exec(line);
   if (st) {
     const state = parseStaticCondition(st[1]!, { affects: { kind: "self" }, mods: [], text: "" });
     const body = state && parseBody(st[st.length - 1]!, { selfIt: true });

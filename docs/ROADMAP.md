@@ -1,7 +1,7 @@
 # Roadmap
 
-23,254 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
-1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,302 of 4,988 (86%).
+23,324 of 31,936 Commander-legal cards are fully supported (`npm run coverage`). Most played (EDHREC rank): top
+1,000: 992 of 992 (100%), top 2,000: 1,989 of 1,989 (100%), top 5,000: 4,340 of 4,988 (87%).
 
 Since round 89 (Oct 20 2026) rounds take cards in popularity order: `npm run popular` lists the most played Commander
 cards that don't play yet, most played first, with the lines that block each one (EDHREC rank from
@@ -22,14 +22,20 @@ line blocks.
 
 ## Next rounds
 
-00. Most played first (`npm run popular`). Out after round 124, most played first: Library of Leng (a discard
-   replacement with a choice), Rottenmouth Viper (an optional sacrifice of any number as an additional cost with a
-   reduction; the UI's X search assumes a cost that only grows), Biomancer's Familiar, Gluntch, the Bestower (three
-   players chosen in turn), Hollowmurk Siege, Nuclear Fallout, Meathook Massacre II, Lost Monarch of Ifnir, Master of
-   Ceremonies, Eluge, Crawling Sensation ("for the first time each turn" on a batch trigger), Light-Paws, Keen Duelist,
-   Geode Golem, Master Biomancer, Frontier Warmonger, Etchings of the Chosen. Smaller gaps from round 124: Chandra, Flame's
-   Catalyst is still out (Emet-Selch's "cast target card from your graveyard" works only for a whole line); "a card that
-   was put there this turn" works for exile targets only (Reenact the Crime, Night Nurse and Garna are out); Abdel Adrian
+00. Most played first (`npm run popular`). Out after round 125, most played first: Light-Paws, Emperor's Voice ("if
+   you cast it" for another permanent, a search put attached to ~), Eclipsed Realms and Gathering Stone (spend-only mana
+   for a chosen type), Hazel of the Rootbloom, Phyrexian Vindicator, Gríma, Oviya, Etchings of the Chosen, Frontier
+   Warmonger ("those creatures" in an "attack one of your opponents" trigger), Keen Duelist, Malcolm, Master Biomancer
+   (enters "as a Mutant in addition to its other types"), Geode Golem, Redoubled Stormsinger, Thief of Sanity, Pippin,
+   Athreos, Shroud-Veiled (coin counters), Infantry Shield (mobilize X), Yedora, Dargo, Bane of Bala Ged
+   (a player exiles permanents they control: needs an "exile" pick), Vnwxt (Max speed with a draw replacement),
+   Lathiel, Counterbalance, Zirda, Consult the Star Charts, Hope of Ghirapur. Smaller gaps from round 125: Fandaniel's
+   prompt says only "Sacrifice a nontoken creature of your choice?" (the life loss isn't named); bots sacrifice for it
+   when the loss is at least a quarter of their life, or at least 4 with a creature worth 3 or less; Strong Back's
+   reductions apply to the equip or Aura spell's first target only; Tezzeret, Master of the Bridge's affinity is a cost
+   reduction from Tezzeret, not a keyword on the spells; Godo's "untap it and all Samurai" untaps in two steps (nothing
+   can happen between them). Smaller gaps from round 124: Chandra, Flame's
+   Catalyst is still out (Emet-Selch's "cast target card from your graveyard" works only for a whole line); Abdel Adrian
    and Glorious Protector ask what to exile even when they've already left the battlefield (nothing is exiled then); bots
    give Xantcha and Captive Audience to the opponent with the least life; goading is handled as a layer 6 effect, so
    "goaded creatures" (Bothersome Quasit) waits on the goad as a dependency (CR 613.8). Smaller gaps from round 123:

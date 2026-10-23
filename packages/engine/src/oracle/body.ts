@@ -151,7 +151,7 @@ const CARD_TYPE_WORD = "(?:artifact|battle|creature|enchantment|instant|land|pla
  * The events a delayed triggered ability with a duration can wait for (see GameState.floatingTriggers), and the parts of
  * a trigger it can have: an intervening "if" or a zone would need more about its source than it has.
  */
-const FLOATING_EVENTS = new Set<string>(["castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "eachBeginCombat"]);
+const FLOATING_EVENTS = new Set<string>(["castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "creaturesYouControlDealCombatDamageToPlayer", "eachBeginCombat"]);
 const FLOATING_KEYS = new Set<string>(["event", "cast", "dies", "dealer", "toOpponent", "orPlaneswalker", "body"]);
 
 /**
@@ -200,6 +200,10 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx): Effect | null |
   // same as "This turn, whenever a creature dies, ..." (CR 603.7b).
   const dies = /^Whenever (an?(?: [a-z]+)? creature(?: you control| an opponent controls)?) dies this turn, (.+)$/.exec(s);
   if (dies) return floatingTrigger(`This turn, whenever ${dies[1]!} dies, ${dies[2]!}`, after, ctx);
+  // "Whenever one or more creatures you control deal combat damage to one or more players this turn, you become the
+  // monarch" (Forth Eorlingas!): the same, once for each combat damage step (CR 510.2, 603.2c).
+  const dealt = /^Whenever (one or more creatures you control deal combat damage to one or more players) this turn, (.+)$/.exec(s);
+  if (dealt) return floatingTrigger(`This turn, whenever ${dealt[1]!}, ${dealt[2]!}`, after, ctx);
   const m = /^([Uu]ntil end of turn|[Tt]his turn|[Uu]ntil your next turn|[Uu]ntil the end of your next turn), ([Ww]henever .+)$/.exec(s);
   if (!m) return undefined;
   const text = [m[2]!, ...after.map((x) => x.replace(/\.$/, ""))].join(". ");
@@ -623,19 +627,35 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // "... gains flashback until end of turn. The flashback cost is equal to its mana cost." is one instruction.
   // "Choose target artifact or enchantment. Its owner shuffles it into their library." (Deglamer) is one instruction.
   text = text.replace(/^Choose (target [^.]+?)\. Its owner shuffles it into their library\./, "The owner of $1 shuffles it into their library.");
+  // Night Nurse: "choose target permanent card in your graveyard that was put there from anywhere this turn. Return it to
+  // your hand." is one instruction.
+  text = text.replace(/^[Cc]hoose (target [^.]+? in your graveyard(?: that was put there (?:from anywhere )?this turn)?)\. Return it to your hand\.$/, "Return $1 to your hand.");
+  // Autumn's Veil: "Spells you control can't be countered by blue or black spells this turn, and creatures you control
+  // can't be the targets of blue or black spells this turn": two instructions.
+  text = text.replace(/^(Spells you control can't be countered by [a-z]+ or [a-z]+ spells this turn), and (creatures you control can't be the targets of [a-z]+ or [a-z]+ spells this turn)\./, "$1. $2.");
+  // Meathook Massacre II: "return that card under your control" (its Oracle wording) is from the graveyard to the battlefield.
+  text = text.replace(/\breturn that card under your control\b/g, "return that card to the battlefield under your control");
   // Tibalt's Trickery: one instruction about the countered spell's controller (read in parseUntilNonland).
   // "Search your library for up to X basic land cards, where X is .... Put those cards onto the battlefield tapped, then
   // shuffle." (Traverse the Outlands): the same as "... put them onto the battlefield tapped, then shuffle, where X is ...".
   text = text.replace(/(^|\. )Search your library for up to X ([^.,]+), where X is ([^.]+)\. Put those cards onto the battlefield( tapped)?, then shuffle\./, "$1Search your library for up to X $2, put them onto the battlefield$4, then shuffle, where X is $3.");
   // Harvest Season: "Search your library for up to X basic land cards, where X is ..., put those cards onto the
-  // battlefield tapped, then shuffle." The same.
-  text = text.replace(/(^|\. )Search your library for up to X ([^.,]+), where X is ([^.,]+), put those cards onto the battlefield( tapped)?, then shuffle\./, "$1Search your library for up to X $2, put them onto the battlefield$4, then shuffle, where X is $3.");
+  // battlefield tapped, then shuffle." The same; "put them" too (Rampant Rejuvenator, its power as it last existed).
+  text = text.replace(/(^|\. )([Ss])earch your library for up to X ([^.,]+), where X is ([^.,]+), put (?:those cards|them) onto the battlefield( tapped)?, then shuffle\./, "$1$2earch your library for up to X $3, put them onto the battlefield$5, then shuffle, where X is $4.");
   // Avatar's Wrath: "Choose up to one target creature, then airbend all other creatures": the target only says which one
   // isn't airbent (CR 701.65a), the same as two sentences.
   // "Put a night counter on ~. Then if it has eight or more night counters on it, remove all of them and create ..."
   // (Replicating Ring): ~'s counters, checked as it resolves (rulings).
   // The Scarab God: "each opponent loses X life and you scry X, where X is the number of Zombies you control": the same X
   // for both, which losing life doesn't change, so two instructions each with it.
+  // "Untap it and all Samurai you control" (Godo, Bandit Warlord): two untaps, nothing in between.
+  text = text.replace(/(^|\. )([Uu])ntap (it|~) and all ([^.]+)\./, "$1$2ntap $3. Untap all $4.");
+  // "~ deals damage to each opponent equal to the number of tapped creatures that opponent controls" (Mjölnir, Storm
+  // Hammer): each opponent's own count.
+  text = text.replace(/(deals damage to each opponent equal to the number of [^.]+?) that opponent controls\b/g, "$1 that player controls");
+  // "~ deals X damage to each opponent, where X is the number of artifacts you control. You gain X life." (Tezzeret, Master
+  // of the Bridge): the same X, counted again (nothing between them changes it).
+  text = text.replace(/(^|\. )(~ deals X damage to [^.]+), where X is ([^.]+)\. You gain X life\./, "$1$2, where X is $3. You gain X life, where X is $3.");
   text = text.replace(/(^|\. )([Ee]ach opponent loses X life) and you (scry X|draw X cards), where X is ([^.]+)\./, (_, lead: string, a: string, b: string, x: string) => `${lead}${a}, where X is ${x}. ${b.charAt(0).toUpperCase()}${b.slice(1)}, where X is ${x}.`);
   // Brass's Tunnel-Grinder: "Then if there are three or more bore counters on it, remove those counters and transform it."
   // Primal Amulet: "..., you may remove those counters and transform it."
@@ -671,6 +691,23 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects: [{ type: "weld", artifact: 0, card: 1 }],
       text,
     };
+  // Gluntch, the Bestower: "Choose a player. They put two +1/+1 counters on a creature they control. Choose a second
+  // player to draw a card. Then choose a third player to create two Treasure tokens." Three different players, you among
+  // them or not, each chosen as it's reached (CR 608.2d, rulings); each instruction is one that player does.
+  const gifts = /^[Cc]hoose a player\. They (put [^.]+ on a creature they control)\. Choose a second player to ([^.]+)\. Then choose a third player to ([^.]+)\.$/.exec(text.trim());
+  if (gifts) {
+    const out: Effect[] = [];
+    const clauses = [gifts[1]!.replace(/they control$/, "you control"), gifts[2]!, gifts[3]!];
+    for (const [i, x] of clauses.entries()) {
+      const fx = attempt(ctx, () => parseOne(x.charAt(0).toUpperCase() + x.slice(1), ctx));
+      const e = fx?.length === 1 ? fx[0]! : undefined;
+      if (!e || !("who" in e) || (e.who as PlayerRef).ref !== "you" || ctx.targets.length) return null;
+      const theirs = { ...e, who: { ref: "chosenPlayer", nth: i } } as Effect;
+      if (JSON.stringify(theirs).includes('"ref":"you"')) return null;
+      out.push({ type: "choosePlayer", prompt: `to ${i === 0 ? gifts[1]! : x}` }, theirs);
+    }
+    return { targets: [], effects: out, text };
+  }
   // Aminatou's Augury (see Effect "exileCastEachType").
   const augury = /^Exile the top (\w+) cards of your library\. You may put a land card from among them onto the battlefield\. Until end of turn, for each nonland card type, you may cast a spell of that type from among the exiled cards without paying its mana cost\.$/.exec(text.trim());
   if (augury && opts.spell && num(augury[1]!)) return { targets: [], effects: [{ type: "exileCastEachType", n: num(augury[1]!) }], text };
@@ -1039,7 +1076,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   let prevTargets = 0;
   let curTargets = 0;
   // "You may pay {2}" waits for the sentence after: "If you do, draw a card."
-  let payFirst: { pay: PayCost; text: string; payX?: { max?: Amount; color?: "W" | "U" | "B" | "R" | "G" } } | null = null;
+  let payFirst: { pay: PayCost; text: string; payX?: { max?: Amount; color?: "W" | "U" | "B" | "R" | "G" }; /** "Pay X life, where X is its power" (Mask of Griselbrand). */ payLife?: AmountExpr } | null = null;
   // "Look at the top four cards of your library" waits for what to do with them (see parseDig).
   let dig: Partial<Extract<Effect, { type: "dig" }>> | null = null;
   // The look's own "where X is ...", for "with mana value X or less" after it (Hatchery Spider).
@@ -1594,9 +1631,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "Whenever an opponent draws a card, that player may pay {2}. If the player doesn't, you create a Treasure token."
     // (Smothering Tithe): a punisher whose only way out is the payment.
     const thatMay = /^([Tt]hat player|[Tt]hey|[Tt]arget opponent|[Tt]arget player|[Ee]ach opponent) may pay (.+)$/.exec(s);
-    const thatThen = thatMay && /^If (?:the player|that player|they|he or she) (?:doesn't|don't), (you .+)$/.exec(sentences[si + 1] ?? "");
+    // "If they don't, return that card to the battlefield under your control ..." (Meathook Massacre II): what you do.
+    const thatThen = thatMay && /^If (?:the player|that player|they|he or she) (?:doesn't|don't), (you .+|return that card to the battlefield under your control.*)$/.exec(sentences[si + 1] ?? "");
     if (thatMay && thatThen) {
-      const who = parsePlayer(thatMay[1]!.toLowerCase(), ctx);
+      // "Whenever a creature an opponent controls dies, they may pay 3 life" (Meathook Massacre II): its controller.
+      const who = parsePlayer(thatMay[1]!.toLowerCase(), ctx) ?? (ctx.subjectIt && /^they$/i.test(thatMay[1]!) ? { ref: "subjectController" as const } : null);
       const options = parsePunisherOptions(`pays ${thatMay[2]!}`, ctx);
       const then = options && parseOne(capital(thatThen[1]!), ctx);
       // "They may pay {2}. If they don't, you may copy that spell." (Wandering Archaic): your choice comes after theirs, so
@@ -1613,7 +1652,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
         continue;
       }
       if (!who || who.ref === "you" || !options || !then || then.some((e) => pauses(e))) return null;
-      effects.push({ type: "punisher", who, options, effects: then, thenText: thatThen[1]!.replace(/^you (\w+)/, (_, v: string) => `${v}s`) });
+      effects.push({ type: "punisher", who, options, effects: then, thenText: thatThen[1]!.replace(/^you (\w+)/, (_, v: string) => `${v}s`).replace(/^return that card (.+?) under your control/, "returns that card $1 under their control").replace(/\.$/, "") });
       si++;
       continue;
     }
@@ -1631,7 +1670,10 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "Each player may scry 1" (Eager Construct), "then each opponent may scry 1" (Myr Custodian), "each player may draw a
     // card" (Kwain): each decides in turn order, knowing the earlier answers, then those who did each do it, in turn
     // order (rulings on Eager Construct and Kaya, Intangible Slayer).
-    const alone = offer && !does && /^(?:scry \d+|surveil \d+|draw a card)$/.test(offer[2]!) ? parseOffer(offer[2]!, ctx) : null;
+    // "Each opponent may sacrifice a nontoken creature of their choice. Each opponent who doesn't loses ..." (Fandaniel):
+    // each chooses in turn order, then the chosen ones are sacrificed (rulings); only one who has such a creature can.
+    const sacAlone = offer && !does && /^sacrifice an? [a-z ]+?(?: of their choice)?$/.test(offer[2]!) && /^(?:Then )?[Ee]ach (?:opponent|player) who (?:doesn't|didn't) /.test(sentences[si + 1] ?? "");
+    const alone = offer && !does && (sacAlone || /^(?:scry \d+|surveil \d+|draw a card)$/.test(offer[2]!)) ? parseOffer(offer[2]!.replace(/ of their choice$/, ""), ctx) : null;
     // "Each player may put two +1/+1 counters on a creature they control. Goad each creature that had counters put on
     // it this way." (Agitator Ant): each decides in turn order, then puts them; then those creatures are goaded (rulings).
     const goadPut = offer && !does && /^put .+ counters? on a creature they control$/.test(offer[2]!) && /^Goad each creature that had counters put on it this way$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "");
@@ -1650,7 +1692,10 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       continue;
     }
     if (offer && alone) {
-      effects.push({ type: "eachMay", who: { ref: offer[1] === "player" ? "eachPlayer" : "eachOpponent" }, effects: alone, text: offer[2]!, each: true });
+      const one = alone.length === 1 ? alone[0]! : undefined;
+      if (sacAlone && (one?.type !== "pick" || one.action !== "sacrifice" || one.n !== 1)) return null;
+      const need = sacAlone && one?.type === "pick" ? { zone: "battlefield" as const, filter: one.filter } : undefined;
+      effects.push({ type: "eachMay", who: { ref: offer[1] === "player" ? "eachPlayer" : "eachOpponent" }, effects: alone, text: offer[2]!.replace(/\btheir\b/g, "your"), each: true, ...(need ? { need } : {}) });
       ctx.eachChose = true;
       continue;
     }
@@ -1865,6 +1910,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si += 2;
       continue;
     }
+    // "Exile the top ten cards of your library. Put all artifact cards from among them onto the battlefield." (Tezzeret,
+    // Master of the Bridge): the rest stay exiled.
+    const exileTopN = new RegExp(`^[Ee]xile the top ${NUM} cards of your library$`).exec(s);
+    const exilePutAll = exileTopN && /^Put all (.+? cards) from among them onto the battlefield$/.exec(sentences[si + 1] ?? "");
+    if (exileTopN && exilePutAll) {
+      const filter = parseSearchFilter(exilePutAll[1]!.replace(/cards$/, "card"));
+      if (!filter) return null;
+      effects.push({ type: "exileTop", who: { ref: "you" }, n: num(exileTopN[1]!), putAll: filter });
+      si++;
+      continue;
+    }
     // "Exile the top ten cards of your library. You may cast any number of spells with total mana value 10 or less from
     // among them without paying their mana costs." (Primeval Spawn), "Target opponent exiles the top X cards of their
     // library. You may cast any number of spells with mana value X or less from among them ..." (Villainous Wealth): cast
@@ -1907,6 +1963,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const fromYard = mizzix[1] === "target" ? { target: ctx.targets.push(filter) - 1 } : { filter };
       effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, fromYard });
       si++;
+      continue;
+    }
+    // Reenact the Crime: "Exile target nonland card in a graveyard that was put there from anywhere this turn. Copy it. You
+    // may cast the copy without paying its mana cost." Cast as it resolves, or never (rulings); a permanent spell copy
+    // becomes a token (CR 608.3f).
+    const reenact = /^Exile (target nonland card in a graveyard that was put there from anywhere this turn)$/.exec(s);
+    if (reenact && sentences[si + 1]?.replace(/\.$/, "") === "Copy it" && sentences[si + 2]?.replace(/\.$/, "") === "You may cast the copy without paying its mana cost") {
+      const what = parseObject(reenact[1]!, ctx, true);
+      if (what?.ref !== "target") return null;
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 0, copies: true, fromYard: { target: what.index } });
+      si += 2;
       continue;
     }
     // Arcane Bombardment: "exile an instant or sorcery card at random from your graveyard. Then copy each card exiled with
@@ -2682,6 +2749,14 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       }
       const then = /^If you do, (.+)$/.exec(s);
       if (!then) return null;
+      // Mask of Griselbrand: "If you do, draw X cards", the X of the life paid; that sentence alone.
+      if (payFirst.payLife) {
+        const inner = si + 1 === sentences.length ? attempt(ctx, () => parseOne(capital(then[1]!), ctx)) : null;
+        if (!inner || !/\bX\b/.test(then[1]!)) return null;
+        effects.push({ type: "may", effects: replaceX(inner, payFirst.payLife), payLife: payFirst.payLife, text: `${payFirst.text}. If you do, ${then[1]}` });
+        payFirst = null;
+        continue;
+      }
       // "Whenever ~ attacks, you may pay {X}{R}. If you do, it deals X damage to any target." (Flameblast Dragon): "it" is ~.
       if (ctx.selfIt && !ctx.subjectIt) then[1] = then[1]!.replace(/^it deals /, "~ deals ");
       // "You may pay {1}. If you do, look at the top two cards of your library. Put one of them into your hand and the
@@ -2750,6 +2825,14 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const payAny = /^[Yy]ou may pay any amount of \{([WUBRG])\}$/.exec(s);
     if (payAny) {
       payFirst = { pay: { mana: "{X}" }, text: `pay any amount of {${payAny[1]}}`, payX: { color: payAny[1] as "W" | "U" | "B" | "R" | "G" } };
+      continue;
+    }
+    // "You may pay X life, where X is its power" (Mask of Griselbrand): counted as it resolves (CR 608.2h).
+    const payLifeX = /^[Yy]ou may pay X life, where X is (.+)$/.exec(s);
+    if (payLifeX) {
+      const n = parseCount(payLifeX[1]!, ctx);
+      if (!n || typeof n !== "object" || !("count" in n)) return null;
+      payFirst = { pay: {}, payLife: n, text: `pay X life, where X is ${payLifeX[1]}` };
       continue;
     }
     const mayPay = /^[Yy]ou may pay (.+)$/.exec(s);
@@ -3295,11 +3378,12 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       continue;
     }
     // "Each opponent chooses fame or fortune" (Seize the Spotlight): words chosen in APNAP order (CR 101.4), not a vote.
-    const choosesWord = /^Each (opponent|player) chooses ([a-z]+) or ([a-z]+)$/.exec(s);
+    // "Each opponent chooses money, friends, or secrets" (Master of Ceremonies).
+    const choosesWord = /^[Ee]ach (opponent|player) chooses (?:([a-z]+), )?([a-z]+),? or ([a-z]+)$/.exec(s);
     if (choosesWord) {
-      if (ctx.chooseWords || ctx.vote || choosesWord[2] === choosesWord[3]) return null;
-      const options = [choosesWord[2]!, choosesWord[3]!];
-      effects.push({ type: "eachChooses", who: { ref: choosesWord[1] === "opponent" ? "eachOpponent" : "eachPlayer" }, options, text: `choose ${options.join(" or ")}` });
+      const options = choosesWord.slice(2).filter((w): w is string => !!w);
+      if (ctx.chooseWords || ctx.vote || new Set(options).size !== options.length) return null;
+      effects.push({ type: "eachChooses", who: { ref: choosesWord[1] === "opponent" ? "eachOpponent" : "eachPlayer" }, options, text: `choose ${options.length > 2 ? `${options.slice(0, -1).join(", ")}, or ${options.at(-1)}` : options.join(" or ")}` });
       ctx.chooseWords = options;
       continue;
     }
@@ -3310,6 +3394,20 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     if (perVote) {
       if (!ctx.vote!.options?.includes(perVote[1]!)) return null;
       effects.push({ type: "controlFromEach", votedFor: perVote[1]!, duration: "game" });
+      continue;
+    }
+    // "For each player who chose money, you and that player each create a Treasure token" (Master of Ceremonies): you, once
+    // for each of them, and each of them once.
+    const youAndThey = /^For each player who chose ([a-z]+), you and that player each (create|draw) (.+)$/.exec(s);
+    if (youAndThey) {
+      if (!ctx.chooseWords?.includes(youAndThey[1]!)) return null;
+      const yours = parseOne(`For each player who chose ${youAndThey[1]}, ${youAndThey[2]} ${youAndThey[3]}`, ctx);
+      const theirs = parseOne(`Each opponent ${youAndThey[2]}s ${youAndThey[3]}`, ctx);
+      const who = { ref: "choseWord" as const, option: youAndThey[1]! };
+      if (!yours || theirs?.length !== 1) return null;
+      const t = theirs[0]!;
+      if (!((t.type === "createToken" || t.type === "draw") && t.who.ref === "eachOpponent")) return null;
+      effects.push(...yours, { ...t, who });
       continue;
     }
     const fromEach = /^For each player who chose ([a-z]+), gain control of a creature that player controls until end of turn$/.exec(s);
@@ -4034,7 +4132,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       // battlefield instead if there are seven or more cards in your graveyard." (Stitch Together): the same card.
       const prevBack = previous.length === 1 && previous[0]!.type === "bounce" && previous[0]!.what.ref === "target" && ctx.targets[previous[0]!.what.index]?.kind === "card" ? previous[0]! : null;
       const toField = /^(?:return|put) (?:that card|it)(?: from your graveyard)? (?:to|onto) the battlefield$/i.test(t);
-      const inner = those ? (prevToken ? [{ ...prevToken, n: amt(those[1]!) }] : null) : t === "counter that spell" ? (prevCounter ? [uncond as Effect] : null) : toField ? (prevBack ? [{ type: "putOntoBattlefield" as const, what: prevBack.what }] : null) : parseOne(t.charAt(0).toUpperCase() + t.slice(1), ctx);
+      // "~ deals 2 damage to any target. If you're the monarch, it deals 7 damage instead." (Court of Ire): the same target.
+      const moreDamage = /^(?:it|~) deals (\d+) damage$/i.exec(t);
+      const prevDamage = previous.length === 1 && previous[0]!.type === "damage" && !previous[0]!.divided ? previous[0]! : null;
+      if (moreDamage && !prevDamage) return null;
+      const inner = moreDamage && prevDamage ? [{ ...prevDamage, amount: num(moreDamage[1]!) }] : those ? (prevToken ? [{ ...prevToken, n: amt(those[1]!) }] : null) : t === "counter that spell" ? (prevCounter ? [uncond as Effect] : null) : toField ? (prevBack ? [{ type: "putOntoBattlefield" as const, what: prevBack.what }] : null) : parseOne(t.charAt(0).toUpperCase() + t.slice(1), ctx);
       // Only one of the two happens, so neither may wait on a choice or need targets of its own (one "you may"
       // instead would leave nothing done on a "no").
       // A punisher waits on its players but always does its whole process (Court of Ambition's "instead" one), and so do
@@ -4947,7 +5049,10 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
  * opponent (TargetSpec.perOpponent, CR 601.2c, 115.6), all done at once as it resolves. "Those creatures" after it are
  * all of them; "it" and "that player" aren't any one of them.
  */
-function parsePerOpponent(s: string, ctx: Ctx): Effect[] | null {
+function parsePerOpponent(s0: string, ctx: Ctx): Effect[] | null {
+  // "For any number of opponents, destroy target nonland permanent that player controls" (Windgrace's Judgment): a target
+  // for each opponent chosen, the same as up to one for each opponent (CR 601.2c).
+  const s = s0.replace(/^For any number of opponents, (\w+) target (.+? that player controls)$/, "For each opponent, $1 up to one target $2");
   const m = /^[Ff]or each opponent, (.+)$/.exec(s);
   if (!m || ctx.targets.some((t) => t.many || t.perOpponent)) return null;
   const who = / up to one target (.+?) (?:that player|that opponent|they) controls?\b/;
@@ -5140,6 +5245,14 @@ function parseEqualTo(s: string, ctx: Ctx): Effect[] | null {
     const m = re.exec(s);
     if (!m) continue;
     const fx = parseSentence(rewrite(m), ctx);
+    // "Draw cards equal to the power of target creature you control" (Soul's Majesty): that target's power as it resolves,
+    // a target of its own after the sentence's others.
+    const of = /^(?:the (power|toughness) of (target creature(?: you control)?)|(target creature(?: you control)?)'s (power|toughness))$/.exec(m[group ?? m.length - 1]!);
+    if (fx && of) {
+      const what = (of[2] ?? of[3])!;
+      const index = addTarget(ctx, { kind: "object", types: ["Creature"], ...(/you control$/.test(what) ? { controller: "you" as const } : {}), text: what });
+      return replaceX(fx, { count: { kind: (of[1] ?? of[4]) as "power" | "toughness", of: { ref: "target", index } } });
+    }
     const def = fx && parseCount(m[group ?? m.length - 1]!, ctx);
     return fx && def ? replaceX(fx, def) : null;
   }

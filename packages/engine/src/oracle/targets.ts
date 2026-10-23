@@ -556,6 +556,9 @@ const PLURAL_TYPES: Record<string, string> = {
   vehicles: "Vehicle",
 };
 
+/** Creature types whose plural is the same word ("all Merfolk", "all Samurai"). */
+const SAME_PLURAL = new Set(["Merfolk", "Treefolk", "Moonfolk", "Kithkin", "Samurai", "Sheep", "Kor", "Kavu", "Elk", "Fish", "Vedalken"]);
+
 /**
  * A group of permanents an effect or static ability applies to without targeting them: "all
  * creatures", "each artifact and enchantment", "other creatures you control", "all creatures without
@@ -600,7 +603,8 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   const tail = cut ? p.slice(cut.index).replace(/^your opponents control/i, "an opponent controls").replace(/ your opponents control/i, " an opponent controls") : "";
   const words = head.replace(/,? and |, or |, /g, " or ").split(/\s+/);
   // A plural noun is a group; a singular one only after "each" ("each creature", but not "all creature").
-  const plural = words.some((w) => PLURAL_TYPES[w.toLowerCase()] || (/s$/.test(w) && CREATURE_TYPES.has(singular(capital(w)))));
+  // "All Samurai you control" (Godo, Bandit Warlord): a creature type whose plural is the same word.
+  const plural = words.some((w) => PLURAL_TYPES[w.toLowerCase()] || (/s$/.test(w) && CREATURE_TYPES.has(singular(capital(w)))) || (!!all && SAME_PLURAL.has(w)));
   if (!plural && !(all && all[1]!.toLowerCase() === "each")) return null;
   head = words
     .map((w) => PLURAL_TYPES[w.toLowerCase()] ?? (/^[A-Z]/.test(w) && w !== "Plains" && CREATURE_TYPES.has(singular(w)) ? singular(w) : w))
@@ -804,7 +808,7 @@ export function parseTargetPhrase(
   }
   // "creature with a +1/+1 counter on it", "creatures with ice counters on them", "creature you control with a counter on
   // it", "permanents you control with counters on them" (any kind)
-  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime) counter on it|([+-]1\/[+-]1|ice|slime) counters on them|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
+  const counter = / with (?:an? ([+-]1\/[+-]1|ice|slime|flood) counter on it|([+-]1\/[+-]1|ice|slime|flood) counters on them|a counter on (?:it|them)|(?:one or more )?counters on (?:it|them))/.exec(p);
   if (counter) {
     extra.counter = counter[1] ?? counter[2] ?? ANY_COUNTER;
     p = (p.slice(0, counter.index) + p.slice(counter.index + counter[0].length)).trim();
@@ -960,6 +964,11 @@ export function parseTargetPhrase(
   const notSubtypes: string[] = [];
   const subtypes: string[] = [];
   const SUPERTYPE_WORDS: Record<string, string> = { basic: "Basic", legendary: "Legendary", snow: "Snow" };
+  // "Nontoken artifact creature or Vehicle" (Canoptek Spyder): nontoken, whichever it is.
+  if (/^nontoken (?:artifact )?creature (?:and\/)?or vehicle$/.test(p)) {
+    extra.token = false;
+    p = p.slice("nontoken ".length);
+  }
   // "Creature or Vehicle": a creature, or a Vehicle whether or not it's a creature right now.
   if (p === "creature or vehicle") {
     extra.orSubtypes = ["Vehicle"];

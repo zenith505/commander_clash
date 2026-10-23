@@ -44,6 +44,8 @@ export interface ResolveCtx {
   lki?: LastKnown;
   /** The announced X (CR 107.3a). */
   x?: number;
+  /** Its instructions are run as a cost paid as it resolves ("You may discard a card. If you do, ...", CR 118.12). */
+  asCost?: true;
   event?: TriggerEventInfo;
   /** Kicker costs paid for it (CR 702.33d). */
   kicked?: number[];
@@ -471,7 +473,7 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
     case "eachOne":
       return ctx.eachOne !== undefined ? [ctx.eachOne] : [];
     case "chosenPlayer": {
-      const p = s.resolving?.chosen?.player;
+      const p = ref.nth !== undefined ? s.resolving?.chosen?.players?.[ref.nth] : s.resolving?.chosen?.player;
       return p !== undefined && !player(s, p).lost ? [p] : [];
     }
     case "selfChosenPlayer": {
@@ -493,6 +495,8 @@ export function players(s: GameState, ref: PlayerRef, ctx: ResolveCtx): PlayerId
       const key = ctx.sourceId !== undefined ? `${ctx.sourceId}@${ctx.sourceZc ?? s.objects[ctx.sourceId]?.zoneChanges ?? 0}` : undefined;
       return s.turnOrder.filter((p) => !player(s, p).lost && !!key && !!s.turnLog?.combatDamagedBy?.[p]?.includes(key));
     }
+    case "choseWord":
+      return apnap(s, Object.entries(s.resolving?.chose ?? {}).filter(([, w]) => w === ref.option).map(([k]) => Number(k) as PlayerId)).filter((p) => !player(s, p).lost);
     case "choseThisWay":
       return (s.resolving?.scratch?.mayers ?? s.resolving?.choseThisWay ?? []).filter((p) => !player(s, p).lost);
     case "notChoseThisWay": {
@@ -861,6 +865,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "removeSelfCounter":
     case "renown":
     case "adapt":
+    case "adaptFresh":
     case "monstrosity":
     case "evolve":
     case "explore":
@@ -978,6 +983,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "collectEvidence":
     case "reflexive":
     case "choose":
+    case "choosePlayer":
     case "if":
       return runChoicesEffect(s, e, ctx, src);
   }

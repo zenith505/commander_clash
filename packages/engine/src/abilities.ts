@@ -240,6 +240,8 @@ export type Count =
   | { kind: "eventExcess" }
   /** "The number of colors of mana spent to cast this spell" (converge, CR 207.2c; sunburst counts the same way, 702.44a). 0 if it wasn't cast. */
   | { kind: "colorsSpent" }
+  /** "For each of that spell's colors" in a cast trigger (Ramos, Dragon Engine): as it is, or as it was cast if it's gone. */
+  | { kind: "castSpellColors" }
   /**
    * "Enters with a number of +1/+1 counters on it equal to the amount of mana spent to cast it" (Marath): only in an
    * "enters with" (the spell it was); 0 if it wasn't cast.
@@ -774,14 +776,19 @@ export type PlayerRef =
    * is being done to, one at a time.
    */
   | { ref: "eachOne" }
-  /** "Choose an opponent. That player ...": the opponent chosen as this resolves (ChoiceKind "opponent"). */
-  | { ref: "chosenPlayer" }
+  /**
+   * "Choose an opponent. That player ...": the opponent chosen as this resolves (ChoiceKind "opponent"). `nth`: the nth
+   * player chosen by Effect "choosePlayer" (Gluntch's "a second player"), counting from 0.
+   */
+  | { ref: "chosenPlayer"; nth?: number }
   /** "The chosen player" of "As ~ enters, choose a player" (Stuffy Doll): its source's (CR 614.12), as it last existed. */
   | { ref: "selfChosenPlayer" }
   /** "~'s controller" (Xantcha, which any player may activate): its source's controller, not necessarily this ability's, as it last existed (CR 608.2h). */
   | { ref: "selfController" }
   /** "Whose controller was dealt combat damage by ~ this turn" (Steel Hellkite): the players this object dealt combat damage to this turn. */
-  | { ref: "combatDamagedBySelf" };
+  | { ref: "combatDamagedBySelf" }
+  /** "Each player who chose money" (Master of Ceremonies): those who chose that word in this one's "each opponent chooses". */
+  | { ref: "choseWord"; option: string };
 
 export type DamageRecipient =
   | ObjRef
@@ -1241,6 +1248,8 @@ export type StaticCondition =
    * your previous turn (Player.lastTurnBegan; the whole game if you haven't had one) until now.
    */
   | { kind: "noCombatDamageSinceLastTurn" }
+  /** "If a player was dealt combat damage by a Zombie this turn" (Lost Monarch of Ifnir): by a creature of that type. */
+  | { kind: "playerCombatDamaged"; subtype: string }
   /** "If an opponent was dealt 7 or more damage this turn" (Spinerock Knoll): in total, from any sources (rulings). */
   | { kind: "opponentDealtDamage"; n: number }
   /** "If you attacked with three or more creatures this turn" (Windbrisk Heights): different creatures you declared as attackers. */
@@ -1313,7 +1322,7 @@ export type StaticCondition =
   /** "If a player has one or fewer cards in hand" (Temple of the Dead): some player in the game. */
   | { kind: "someHandAtMost"; n: number }
   /** "If creatures you control have total power 10 or greater" (Mosswort Bridge). */
-  | { kind: "totalPower"; n: number }
+  | { kind: "totalPower"; n: number; toughness?: true }
   /** "If a library has twenty or fewer cards in it": any player's (Shelldock Isle). */
   /** `yours`: "if your library has no cards in it" (Jace, Wielder of Mysteries): your library only. */
   | { kind: "libraryAtMost"; n: number; yours?: true }
@@ -1868,6 +1877,8 @@ export type Effect =
   | { type: "renown"; n: number }
   /** Adapt N (CR 701.46a): if this permanent has no +1/+1 counters on it, put N +1/+1 counters on it. */
   | { type: "adapt"; n: Amount }
+  /** Biomancer's Familiar: "The next time target creature adapts this turn, it adapts as though it had no +1/+1 counters on it." (GameObject.adaptFresh) */
+  | { type: "adaptFresh"; what: ObjRef }
   /** Monstrosity N (CR 701.37a): if this permanent isn't monstrous, put N +1/+1 counters on it and it becomes monstrous. */
   | { type: "monstrosity"; n: Amount }
   /** Fading: "remove a fade counter from ~. If you can't, sacrifice it"; vanishing: "remove a time counter from it". */
@@ -2174,7 +2185,7 @@ export type Effect =
   | { type: "together"; effects: Effect[] }
   | { type: "mill"; who: PlayerRef; n: Amount }
   /** "That player exiles the top card of their library" (ingest, CR 702.115a): face up (CR 406.3), with no permission to play it. */
-  | { type: "exileTop"; who: PlayerRef; n: Amount }
+  | { type: "exileTop"; who: PlayerRef; n: Amount; /** "Put all artifact cards from among them onto the battlefield" (Tezzeret, Master of the Bridge): together, under your control. */ putAll?: TargetSpec }
   /**
    * Dark Confidant: "reveal the top card of your library and put that card into your hand", then maybe "[you] lose
    * (gain) life equal to its mana value" (X is 0 in a library, CR 202.3e).
@@ -2435,7 +2446,7 @@ export type Effect =
    * chooses X as it resolves (CR 107.1c, 608.2d), at most `max` ("where X is less than or equal to the amount of life you
    * gained", Well of Lost Dreams), then pays `pay` with that X; `effects` use it as X.
    */
-  | { type: "may"; effects: Effect[]; text: string; otherwise?: Effect[]; pay?: PayCost; keep?: boolean; once?: boolean; payX?: { max?: Amount; /** "You may pay any amount of {R}" (Leyline Tyrant): X paid in mana of that color only. */ color?: "W" | "U" | "B" | "R" | "G" }; /** "Unless you pay an amount of {E} equal to its mana value" (Volatile Stormdrake): energy counted as it resolves. */ payEnergy?: Amount; /**
+  | { type: "may"; effects: Effect[]; text: string; otherwise?: Effect[]; pay?: PayCost; keep?: boolean; once?: boolean; payX?: { max?: Amount; /** "You may pay any amount of {R}" (Leyline Tyrant): X paid in mana of that color only. */ color?: "W" | "U" | "B" | "R" | "G" }; /** "Unless you pay an amount of {E} equal to its mana value" (Volatile Stormdrake): energy counted as it resolves. */ payEnergy?: Amount; /** "Pay X life, where X is its power" (Mask of Griselbrand): life counted as it resolves. */ payLife?: Amount; /**
    * "For each opponent, you may put up to one target creature card from that player's graveyard onto the battlefield"
    * (Sepulchral Primordial): asked about each target in turn, then done at once to the ones chosen (rulings: they enter
    * simultaneously). The targets turned down aren't affected.
@@ -2601,7 +2612,7 @@ export type Effect =
   | { type: "noLifeGain"; players: "all" | "opponents" }
   /** "You can't lose life this turn, you can't lose the game this turn, and your opponents can't win the game this turn" (Courageous Resolve). */
   /** `everyone`: "Players can't lose life this turn" (Everybody Lives!), each player in the game as it resolves. */
-  | { type: "turnRules"; rules: TurnRule["rule"][]; everyone?: true }
+  | { type: "turnRules"; rules: TurnRule["rule"][]; everyone?: true; /** "Can't be countered by blue or black spells" (Autumn's Veil): only by spells of these colors. */ byColors?: Color[] }
   /** "Until your next turn, you may cast sorcery spells as though they had flash." (Teferi, Time Raveler; CR 702.8a) */
   | { type: "flashUntilNextTurn"; filter: TargetSpec }
   /**
@@ -2802,6 +2813,13 @@ export type Effect =
       theirs?: true;
       text: string;
     }
+  /**
+   * Gluntch, the Bestower: "Choose a player. ... Choose a second player to draw a card. Then choose a third player to
+   * ...": the controller chooses one more player, any player but those already chosen this way (rulings), as it resolves
+   * (CR 608.2d), into Chosen.players; with none left to choose (a two-player game's third), none is (rulings).
+   * PlayerRef "chosenPlayer" `nth` is that player. `prompt`: what the player is chosen for.
+   */
+  | { type: "choosePlayer"; prompt: string }
   | { type: "choose"; choice: ChoiceKind; /** "Each player chooses a creature type" (Patriarch's Bidding): every player in turn order, starting with the active player, into Chosen.types. */ each?: true; /** With "opponent": "a player with the most life or tied for most life" (The Black Gate), checked as it resolves; you can be one. */ mostLife?: true; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose; /** "Choose a number between 0 and 10" (Expel the Interlopers): any whole number in it, into Chosen.number. */ range?: { min: number; max: number } };
 
 /** What a player chooses by name: a creature type (CR 205.3m) or a color (CR 105.1). */
@@ -3921,6 +3939,8 @@ export interface CostMod {
   times?: AmountExpr;
   /** "Cost {W}{U}{B}{R}{G} less to cast. This effect reduces only the amount of colored mana you pay" (Morophon): `n` is 0. */
   colored?: Color[];
+  /** Eluge: "costs {U} (or {1}) less ... for each": `times` that color, each one {1} once the cost has none of it left. */
+  coloredOrGeneric?: Color;
   /** The Defilers: only if the caster chose to pay this much life for it as an additional cost (CostChoices.lifeFor). */
   payLife?: number;
   /** Eminence (The Ur-Dragon): it also works while its commander is in the command zone (CR 113.6). */
@@ -4318,6 +4338,8 @@ export interface CompiledCard {
   opponentsCantCastMvAtMost?: number;
   /** "Your opponents can't cast spells with even mana values." (Void Winnower). */
   opponentsCantCastEven?: true;
+  /** Lavinia, Azorius Renegade: "Each opponent can't cast noncreature spells with mana value greater than the number of lands that player controls." */
+  opponentsNoncreatureMvAboveLands?: true;
   /** "Your opponents can't block with creatures with even mana values." (Void Winnower). */
   opponentsCantBlockEven?: true;
   /** "You can't cast creature spells." (Steel Golem), "You can't cast noncreature spells." (Nikya): its controller. */
@@ -4400,8 +4422,9 @@ export interface CompiledCard {
   lifeGainPlus?: number;
   /** "Damage that would reduce your life total to less than 1 reduces it to 1 instead" (Ali from Cairo): that number. */
   lifeFloor?: number;
-  /** "If you would draw a card except the first one you draw in each of your draw steps, draw two cards instead." */
-  drawTwoInstead?: true;
+  /** "If you would draw a card except the first one you draw in each of your draw steps, draw two cards instead";
+   * "always": "If you would draw a card, draw two cards instead" (Thought Reflection), the draw step's first draw too. */
+  drawTwoInstead?: true | "always";
   /**
    * Abundance: "If you would draw a card, you may instead choose land or nonland and reveal cards from the top of your
    * library until you reveal a card of the chosen kind. Put that card into your hand and put all other cards revealed this
@@ -4431,6 +4454,11 @@ export interface CompiledCard {
    * library." Only that player's own library, searched by them; any shuffle the effect calls for still happens (rulings).
    */
   opponentsCantSearchOwn?: true;
+  /**
+   * Library of Leng: "If an effect causes you to discard a card, discard it, but you may put it on top of your library
+   * instead of into your graveyard." (CR 614.1a). Never a discard as a cost (rulings).
+   */
+  discardToTop?: true;
   /** Opposition Agent: "You control your opponents while they're searching their libraries." (CR 723.2) */
   controlsOpponentSearches?: true;
   /**
@@ -4598,7 +4626,9 @@ export interface CompiledCard {
   powerUpLess?: number;
   /** "Each power-up ability of permanents you control can be activated an additional time." (Wonder Man; CR 702.193a) */
   powerUpAgain?: true;
-  equipLess?: { n: number; targetSelf?: true; otherEquipment?: true; /** Only while this holds (a Class level's). */ if?: StaticCondition }[];
+  equipLess?: { n: number; targetSelf?: true; otherEquipment?: true; /** "That target enchanted creature" (Strong Back): the creature this Aura is attached to. */ targetEnchanted?: true; /** Only while this holds (a Class level's). */ if?: StaticCondition }[];
+  /** "Aura spells you cast that target enchanted creature cost {3} less to cast" (Strong Back, CR 601.2f). */
+  auraLessEnchanted?: number;
   /** "You may activate equip abilities any time you could cast an instant" (Leonin Shikari); Forge Anew's "During your turn, ...". */
   equipAtInstantSpeed?: "always" | "yourTurn";
   /**
@@ -4861,6 +4891,11 @@ export interface CompiledCard {
   xMaxPlayers?: true;
   /** The Marches: "~ costs {2} less to cast for each card exiled this way" (its optional exileFromHand cost, CR 601.2f). */
   exiledReduction?: number;
+  /**
+   * Rottenmouth Viper, Torgaar: "you may sacrifice any number of nonland permanents. This spell costs {1} less to cast
+   * for each permanent sacrificed this way" (its optional sacrifice cost, whose X is how many; CR 601.2b, 601.2f).
+   */
+  sacrificedReduction?: number;
   /** "You may collect evidence N rather than pay the mana cost for spells you cast" (Conspiracy Unraveler, CR 118.9). */
   payEvidence?: number;
   /** Teamwork N: as an additional cost, you may tap any number of creatures you control with total power N or more. */

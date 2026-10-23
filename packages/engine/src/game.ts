@@ -859,6 +859,7 @@ export function moveObject(
   o.skipNextUntap = undefined;
   o.renowned = undefined;
   o.monstrous = undefined;
+  o.adaptFresh = undefined;
   o.suspected = undefined; // CR 701.60a
   o.putBy = undefined;
   o.classLevel = undefined; // CR 716.2b
@@ -2054,17 +2055,18 @@ function chooseDig(s: GameState, p: Player, pend: Extract<PendingDecision, { kin
  */
 function archivesFor(s: GameState, pid: PlayerId): number {
   const p = player(s, pid);
-  if (s.step === "draw" && s.activePlayer === pid && p.firstDrawStepDraw !== s.turn) {
-    p.firstDrawStepDraw = s.turn;
-    return 0;
-  }
-  return Math.log2(archiveDraws(s, pid));
+  const n = Math.log2(archiveDraws(s, pid));
+  if (s.step === "draw" && s.activePlayer === pid && p.firstDrawStepDraw !== s.turn) p.firstDrawStepDraw = s.turn;
+  return n;
 }
 
-/** What archivesFor makes of `pid`'s next draw, without counting it. */
+/** What archivesFor makes of `pid`'s next draw, without counting it. Thought Reflection's doubles the first one too. */
 function archiveDraws(s: GameState, pid: PlayerId): number {
-  if (s.step === "draw" && s.activePlayer === pid && player(s, pid).firstDrawStepDraw !== s.turn) return 1;
-  return 2 ** s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawTwoInstead).length;
+  const first = s.step === "draw" && s.activePlayer === pid && player(s, pid).firstDrawStepDraw !== s.turn;
+  return 2 ** s.battlefield.filter((id) => {
+    const two = controllerOf(s, obj(s, id)) === pid ? abilitiesOf(s, obj(s, id)).drawTwoInstead : undefined;
+    return two === "always" || (two && !first);
+  }).length;
 }
 
 function drawOne(s: GameState, pid: PlayerId): boolean {
@@ -3891,18 +3893,37 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   // "During your turn, ~ costs {2}{U}{U} less to cast" (Discontinuity): its colored part.
   for (const c of compileCard(d).costLessIf ?? []) if (c.colored && staticConditionNow(s, c.cond, o.id, pid)) mods.lessColored.push(...c.colored);
   // Colored reductions (Morophon) after the costs are added up, on any of their colored mana (CR 601.2f, rulings).
-  const lessColored = (c: ParsedCost) => reduceColored(c, mods.lessColored);
+  // Eluge's "{U} (or {1})": the {U} it can take off, the rest as generic (rulings).
+  const lessColored = (c: ParsedCost) => {
+    const r = reduceColored(c, mods.lessColored);
+    if (!mods.lessColoredOrGeneric.length) return r;
+    const r2 = reduceColored(r, mods.lessColoredOrGeneric);
+    mods.less += mods.lessColoredOrGeneric.length - (r.symbols.length - r2.symbols.length);
+    return r2;
+  };
   // "~ costs {2} less to cast if it's bargained" (a cost reduction, CR 601.2f).
   if (how.bargain && !how.faceDown) mods.less += compileCard(d).bargainReduction ?? 0;
   // "This spell costs {2} less to cast if evidence was collected" (CR 601.2f).
   if (how.evidence && !how.faceDown) mods.less += compileCard(d).evidenceReduction ?? 0;
   // The Marches: "~ costs {2} less to cast for each card exiled this way" (CR 601.2f).
   if (how.exileFromHand?.length && !how.faceDown) mods.less += (compileCard(d).exiledReduction ?? 0) * how.exileFromHand.length;
+  // Rottenmouth Viper: "~ costs {1} less to cast for each permanent sacrificed this way", its X (CR 601.2f).
+  if (!how.faceDown) mods.less += (compileCard(d).sacrificedReduction ?? 0) * x;
   // "Spells your opponents cast that target ~ cost {2} more": each such permanent once, however often it's targeted.
   for (const id of new Set((how.targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])))) {
     const t = s.objects[id];
     if (t?.zone === "battlefield" && controllerOf(s, t) !== pid) mods.more += abilitiesOf(s, t).targetTax ?? 0;
   }
+  // "Aura spells you cast that target enchanted creature cost {3} less to cast" (Strong Back): its target is what it
+  // will enchant (CR 303.4a), chosen before the cost is worked out (CR 601.2c, 601.2f).
+  const auraTarget = how.targets?.[0]?.kind === "object" ? how.targets[0].id : undefined;
+  const asAura = how.alt === "bestow" && !o.bestowed && !how.faceDown ? bestowedDef(d) : d;
+  if (auraTarget && asAura.subtypes.includes("Aura") && !how.faceDown)
+    for (const id of s.battlefield) {
+      const src = obj(s, id);
+      const n = src.attachedTo === auraTarget ? compileCard(defOf(s, src)).auraLessEnchanted : undefined;
+      if (n && controllerOf(s, src) === pid && characteristics(s, src).hasPrintedAbilities) mods.less += n;
+    }
   // "Without paying its mana cost": additional costs like kicker are still paid, and so are cost
   // increases (CR 118.9d, 601.2f).
   const madness = madnessCastOf(s, pid, o.id);
@@ -3970,9 +3991,10 @@ export function eminenceCommanders(s: GameState): GameObject[] {
   return s.players.filter((p) => !p.lost).flatMap((p) => p.command.map((id) => s.objects[id]!)).filter((o) => o?.zone === "command" && !o.emblem && !!compileCard(defOf(s, o)).costMods?.some((m) => m.eminence));
 }
 
-function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: number, lifeFor?: ObjectId[]): { more: number; less: number; lessColored: Color[]; lifeOffers: { id: ObjectId; life: number }[] } {
+function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: number, lifeFor?: ObjectId[]): { more: number; less: number; lessColored: Color[]; lessColoredOrGeneric: Color[]; lifeOffers: { id: ObjectId; life: number }[] } {
   let [more, less] = [0, 0];
   const lessColored: Color[] = [];
+  const lessColoredOrGeneric: Color[] = [];
   const lifeOffers: { id: ObjectId; life: number }[] = [];
   const mv = defMv(d) + x * xCount(parseManaCost(d.manaCost));
   // Emblems' too, which work in the command zone (CR 114.4).
@@ -4016,6 +4038,11 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
         lessColored.push(...m.colored);
         continue;
       }
+      if (m.coloredOrGeneric) {
+        const k = Math.max(0, m.times ? evalAmount(s, m.times, { controller: c.controller, sourceId: src.id }) : 0);
+        for (let i = 0; i < k; i++) lessColoredOrGeneric.push(m.coloredOrGeneric);
+        continue;
+      }
       // Cemetery Prowler: once for each card type of the spell among the cards exiled with it (rulings: not per card).
       const shared = m.perTypeSharedWithLinked ? new Set(linkedExileCards(s, src).flatMap((x) => defOf(s, obj(s, x)).types)) : undefined;
       const n = shared ? m.n * d.types.filter((t) => shared.has(t)).length : m.times ? m.n * Math.max(0, evalAmount(s, m.times, { controller: c.controller, sourceId: src.id })) : m.n;
@@ -4033,7 +4060,7 @@ function costModsFor(s: GameState, pid: PlayerId, o: GameObject, d: CardDef, x: 
     if (m.n > 0) more += m.n;
     else less -= m.n;
   }
-  return { more, less, lessColored, lifeOffers };
+  return { more, less, lessColored, lessColoredOrGeneric, lifeOffers };
 }
 
 /**
@@ -4599,7 +4626,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   (p.castNames ??= {})[d.name] = (p.castNames[d.name] ?? 0) + 1;
   const castMv = spellManaValue(s, item);
   (s.castThisTurn ??= []).push({ player: p.id, card: d.oracleId, colors: [...characteristics(s, o).colors], from: castFrom, ...(paid.treasure ? { treasure: true as const } : {}), mv: castMv });
-  (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv };
+  (s.castItems ??= {})[stackId] = { ...structuredClone(item), castMv, castColors: [...characteristics(s, o).colors] };
   // A copy of a prepare spell: its permanent stops being prepared as it becomes cast (CR 722.3c, 601.2i).
   if (o.preparedFrom) unprepareFor(s, o);
   // Once it's cast, "whenever you cast" and "becomes the target" abilities trigger (CR 601.2i).
@@ -4660,6 +4687,8 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
     // Sanctum Prelate: anyone's noncreature spell with that mana value, X as chosen (rulings).
     if (abilitiesOf(s, o).noncreatureChosenMvCantBeCast && o.chosen?.number !== undefined && !isType(d, "Creature") && value === o.chosen.number)
       return `${characteristics(s, o).name}: noncreature spells with mana value ${o.chosen.number} can't be cast`;
+    if (abilitiesOf(s, o).opponentsNoncreatureMvAboveLands && controllerOf(s, o) !== pid && value !== undefined && !isType(d, "Creature") && value > s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Land")).length)
+      return `${characteristics(s, o).name}: opponents can't cast noncreature spells with mana value greater than the number of lands they control`;
     if (abilitiesOf(s, o).opponentsCantCastEven && controllerOf(s, o) !== pid && value !== undefined && value % 2 === 0)
       return `${characteristics(s, o).name}: opponents can't cast spells with even mana values`;
     for (const f of abilitiesOf(s, o).youCantCast ?? [])
@@ -5694,6 +5723,8 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
       if (m.if && !staticConditionNow(s, m.if, src.id, pid)) continue;
       // "That target ~": it's a creature you control, so it could be the target (CR 702.6a).
       if (m.targetSelf && (targets ? target !== src.id : !c.types.includes("Creature"))) continue;
+      // "That target enchanted creature" (Strong Back): the creature it's attached to (CR 601.2f, after targets).
+      if (m.targetEnchanted && (!src.attachedTo || (targets ? target !== src.attachedTo : !s.objects[src.attachedTo] || controllerOf(s, obj(s, src.attachedTo)) !== pid))) continue;
       less += m.n;
     }
   }
@@ -6067,6 +6098,14 @@ function chooseHandToTop(s: GameState, p: Player, ids: ObjectId[]) {
   const pend = s.pending;
   const r = s.resolving;
   if (pend?.kind !== "handToTop" || pend.player !== p.id || !r) throw new RulesError("no cards to put on top");
+  if (pend.discarding) {
+    // Library of Leng: which of the cards being discarded go on top instead (see discardToTop).
+    if (new Set(ids).size !== ids.length || ids.some((id) => !pend.discarding!.includes(id))) throw new RulesError("choose from the cards being discarded");
+    ((r.scratch ??= {}).toTop ??= {})[p.id] = ids;
+    s.pending = null;
+    continueResolution(s);
+    return;
+  }
   if (new Set(ids).size !== ids.length || (pend.upTo ? ids.length > pend.count : ids.length !== pend.count) || ids.some((id) => !p.hand.includes(id))) throw new RulesError(pend.upTo ? "choose cards from your hand" : `choose exactly ${pend.count} card(s) from your hand`);
   ((r.scratch ??= {}).chosen ??= {})[p.id] = ids;
   s.pending = null;
@@ -6565,6 +6604,14 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   if (pend.what === "damageSource") {
     // The source of damage a prevention or redirection effect is about, chosen as it resolves (CR 609.7a).
     (r.scratch ??= {}).damageSource = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "nthPlayer") {
+    // Gluntch: one more player chosen (see Effect "choosePlayer").
+    if (!pend.options.includes(choice)) throw new RulesError("choose one of the players offered");
+    r.chosen = { ...r.chosen, players: [...(r.chosen?.players ?? []), Number(choice) as PlayerId] };
+    log(s, `${p.name} chooses ${player(s, Number(choice)).name} ${pend.prompt ?? `for ${pend.source}`}.`);
     continueResolution(s);
     return;
   }

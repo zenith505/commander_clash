@@ -4066,6 +4066,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e597d8a1-3bbc-4001-b642-f4421447970f",
+  "name": "Extract from Darkness",
+  "manaCost": "{3}{U}{B}",
+  "cmc": 5,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Each player mills two cards. Then you put a creature card from a graveyard onto the battlefield under your control.",
+  "colors": [
+   "B",
+   "U"
+  ],
+  "colorIdentity": [
+   "B",
+   "U"
+  ],
+  "keywords": [
+   "Mill"
+  ],
+  "commanderLegal": "legal",
+  "set": "cns",
+  "releasedAt": "2014-06-06",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "437b2dab-15e0-4b9a-a204-58622d37a3b3",
   "name": "Fact or Fiction",
   "manaCost": "{3}{U}",
@@ -4088,6 +4118,34 @@
   "set": "dmr",
   "releasedAt": "2023-01-13",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "3d6fa57a-aa53-4b5c-b8af-a7612c823117",
+  "name": "Faithless Looting",
+  "manaCost": "{R}",
+  "cmc": 1,
+  "typeLine": "Sorcery",
+  "supertypes": [],
+  "types": [
+   "Sorcery"
+  ],
+  "subtypes": [],
+  "oracleText": "Draw two cards, then discard two cards.\nFlashback {2}{R} (You may cast this card from your graveyard for its flashback cost. Then exile it.)",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [
+   "Flashback"
+  ],
+  "commanderLegal": "legal",
+  "set": "cmm",
+  "releasedAt": "2023-08-04",
+  "rarity": "common",
   "layout": "normal",
   "gameChanger": false
  },
@@ -4124,6 +4182,41 @@
   "set": "bng",
   "releasedAt": "2014-02-07",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "3909ff79-2103-407c-a812-a5a5a996fce2",
+  "name": "Fandaniel, Telophoroi Ascian",
+  "manaCost": "{4}{B}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Elder Wizard",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elder",
+   "Wizard"
+  ],
+  "oracleText": "Whenever you cast an instant or sorcery spell, surveil 1.\nAt the beginning of your end step, each opponent may sacrifice a nontoken creature of their choice. Each opponent who doesn't loses 2 life for each instant and sorcery card in your graveyard.",
+  "power": "4",
+  "toughness": "5",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [
+   "Surveil"
+  ],
+  "commanderLegal": "legal",
+  "set": "fic",
+  "releasedAt": "2025-06-13",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -4983,6 +5076,43 @@
   "commanderLegal": "legal",
   "set": "usg",
   "releasedAt": "1998-10-12",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0222dc7c-459b-4909-a037-72b2eb248599",
+  "name": "Gluntch, the Bestower",
+  "manaCost": "{1}{G}{W}",
+  "cmc": 3,
+  "typeLine": "Legendary Creature — Jellyfish",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Jellyfish"
+  ],
+  "oracleText": "Flying\nAt the beginning of your end step, choose a player. They put two +1/+1 counters on a creature they control. Choose a second player to draw a card. Then choose a third player to create two Treasure tokens.",
+  "power": "0",
+  "toughness": "5",
+  "colors": [
+   "G",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Treasure"
+  ],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -7032,6 +7162,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "867def48-4be8-4056-bcf1-d6b00450b9a3",
+  "name": "Library of Leng",
+  "manaCost": "{1}",
+  "cmc": 1,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "You have no maximum hand size.\nIf an effect causes you to discard a card, discard it, but you may put it on top of your library instead of into your graveyard.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "spg",
+  "releasedAt": "2026-04-24",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "4fe8316a-9cff-43e9-a1d5-993a0c9daf3a",
   "name": "Lifelink",
   "manaCost": "{W}",
@@ -7321,6 +7473,39 @@
   ],
   "colorIdentity": [
    "B"
+  ],
+  "keywords": [
+   "Treasure"
+  ],
+  "commanderLegal": "legal",
+  "set": "ncc",
+  "releasedAt": "2022-04-29",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "18ed0c8a-db8f-4247-87c4-544b833f01bd",
+  "name": "Master of Ceremonies",
+  "manaCost": "{3}{W}",
+  "cmc": 4,
+  "typeLine": "Creature — Rhino Druid",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Rhino",
+   "Druid"
+  ],
+  "oracleText": "At the beginning of your upkeep, each opponent chooses money, friends, or secrets. For each player who chose money, you and that player each create a Treasure token. For each player who chose friends, you and that player each create a 1/1 green and white Citizen creature token. For each player who chose secrets, you and that player each draw a card.",
+  "power": "3",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
   ],
   "keywords": [
    "Treasure"
@@ -9692,6 +9877,37 @@
   "set": "bfz",
   "releasedAt": "2015-10-02",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2c75623c-59f4-4449-ab43-9d1225185ad9",
+  "name": "Rottenmouth Viper",
+  "manaCost": "{5}{B}",
+  "cmc": 6,
+  "typeLine": "Creature — Elemental Snake",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Elemental",
+   "Snake"
+  ],
+  "oracleText": "As an additional cost to cast this spell, you may sacrifice any number of nonland permanents. This spell costs {1} less to cast for each permanent sacrificed this way.\nWhenever this creature enters or attacks, put a blight counter on it. Then for each blight counter on it, each opponent loses 4 life unless that player sacrifices a nonland permanent of their choice or discards a card.",
+  "power": "6",
+  "toughness": "6",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "blb",
+  "releasedAt": "2024-08-02",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

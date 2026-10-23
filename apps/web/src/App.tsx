@@ -476,6 +476,22 @@ function maxX(plan: (x: number) => unknown): number {
   return lo;
 }
 
+/**
+ * The X values a cost that gets cheaper as X grows can be paid with (Rottenmouth Viper: each permanent sacrificed takes
+ * {1} off): from the fewest the mana allows to the most there are, none if none can be paid.
+ */
+function xRange(plan: (x: number) => unknown, limit = 60): { min: number; max: number } | undefined {
+  let min = -1;
+  let max = -1;
+  for (let n = 0; n <= limit; n++) {
+    if (plan(n)) {
+      if (min < 0) min = n;
+      max = n;
+    } else if (min >= 0) break;
+  }
+  return min < 0 ? undefined : { min, max };
+}
+
 function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) {
   const { state: s, dispatch, error, intent, priorityMode, setPriorityMode, stops, toggleStop, loop, startLoop, cancelLoop, repeatLoop, shortcutNote } = useGame(initial);
   // While you control another player, you see the table as they do and act for them (CR 723.4, 723.5).
@@ -856,11 +872,16 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     const altMana = d.alt ? altCost(card, d.alt)?.mana : undefined;
     const altX = !!altMana && parseManaCost(altMana).hasX;
     if (d.x === undefined && ((parseManaCost(card.manaCost).hasX && (!free || parseManaCost(madnessCastOf(s, HUMAN, d.objectId) ?? "").hasX) && !d.via && !d.alt) || altX || costX)) {
-      const max = maxX((n) => planCast(s, HUMAN, d.objectId, undefined, d.modes, d.convoke ?? "auto", n, kicks));
+      // Rottenmouth Viper: with as many sacrificed as X (the ones picked later may differ).
+      const plan = (n: number) => planCast(s, HUMAN, d.objectId, undefined, d.modes, d.convoke ?? "auto", n, compiled.sacrificedReduction ? { ...kicks, sacrifice: reducingSacrifices(s, d.objectId).slice(0, n) } : kicks);
       // "You may sacrifice one or more creatures" (Plumb the Forbidden): X is how many, none unless you pick more.
       const optional = compiled.additionalCosts?.find((c) => c.kind === "sacrifice" && c.optional);
-      const extra = optional?.kind === "sacrifice" ? `sacrifice X ${optional.filter.text.replace(/s?$/, "s")} (X can be 0)` : costX ? (/\b(?:pay|discard|sacrifice|return|exile) X [^.(]*/i.exec(card.oracleText)?.[0]?.trim().replace(/^./, (c) => c.toLowerCase()) ?? "its cost") : undefined;
-      return setXPick({ mode: "cast", draft: d, label: card.name, cost: (free && madnessCastOf(s, HUMAN, d.objectId)) || (altX ? altMana! : card.manaCost), max, value: optional ? 0 : max, ...(extra ? { extra } : {}) });
+      // Rottenmouth Viper: each one sacrificed makes it cheaper, so the X that can be paid runs from the fewest
+      // sacrifices the mana allows to as many as there are; the fewest is offered (none payable: the engine says why).
+      const range = compiled.sacrificedReduction ? xRange(plan) : undefined;
+      const max = range ? range.max : maxX(plan);
+      const extra = optional?.kind === "sacrifice" ? (compiled.sacrificedReduction ? `sacrifice X ${optional.filter.text.replace(/s?$/, "s")}, each making it {${compiled.sacrificedReduction}} cheaper` : `sacrifice X ${optional.filter.text.replace(/s?$/, "s")} (X can be 0)`) : costX ? (/\b(?:pay|discard|sacrifice|return|exile) X [^.(]*/i.exec(card.oracleText)?.[0]?.trim().replace(/^./, (c) => c.toLowerCase()) ?? "its cost") : undefined;
+      return setXPick({ mode: "cast", draft: d, label: card.name, cost: (free && madnessCastOf(s, HUMAN, d.objectId)) || (altX ? altMana! : card.manaCost), max, value: range ? range.min : optional ? 0 : max, ...(range?.min ? { min: range.min } : {}), ...(extra ? { extra } : {}) });
     }
     // "Kicker {X}": X is announced once it's kicked (CR 601.2b), "X can't be 0" (Thieving Skydiver).
     const kickX = d.kicks?.map((i) => compiled.kicker?.costs[i] ?? "").find((c) => parseManaCost(c).hasX);
@@ -1144,7 +1165,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
     }
     if (pending?.kind === "chooseMay" || pending?.kind === "payUnless" || pending?.kind === "mulligan") return;
     if (pending?.kind === "discardToHandSize" || pending?.kind === "discard" || pending?.kind === "bottomCards" || pending?.kind === "handToTop") {
-      if (o.zone === "hand" && o.owner === HUMAN)
+      if (o.zone === "hand" && o.owner === HUMAN && (pending.kind !== "handToTop" || !pending.discarding || pending.discarding.includes(o.id)))
         setDiscards((prev) => (prev.includes(o.id) ? prev.filter((x) => x !== o.id) : [...prev, o.id].slice(-pending.count)));
       return;
     }
@@ -1942,6 +1963,17 @@ function graveyardOptions(s: GameState, id: string): boolean {
   return abilitiesOf(s, s.objects[id]!).activated.some((ab, i) => ab.zone === "graveyard" && planActivate(s, HUMAN, id, i) !== null);
 }
 
+/**
+ * What Rottenmouth Viper's "you may sacrifice any number of nonland permanents" could take, those that make no mana
+ * first (sacrificing one of them takes its mana away).
+ */
+function reducingSacrifices(s: GameState, id: string): string[] {
+  const c = compileCard(cardOf(s, id)).additionalCosts?.find((x) => x.kind === "sacrifice" && x.optional);
+  if (c?.kind !== "sacrifice") return [];
+  const makesMana = (x: string) => abilitiesOf(s, s.objects[x]!).mana.length > 0;
+  return s.battlefield.filter((x) => x !== id && controllerOf(s, s.objects[x]!) === HUMAN && objectMatches(s, c.filter, s.objects[x]!, HUMAN, false)).sort((a, b) => Number(makesMana(a)) - Number(makesMana(b)));
+}
+
 function canCastWithTaps(s: GameState, id: string, convoke?: string[], teamwork?: string[]) {
   if (teamwork?.length) return planCast(s, HUMAN, id, undefined, undefined, convoke ?? "auto", undefined, { teamwork }) !== null;
   if ((!convoke && canCast(s, HUMAN, id)) || planCast(s, HUMAN, id, undefined, undefined, convoke ?? "auto") !== null) return true;
@@ -1956,6 +1988,11 @@ function canCastWithTaps(s: GameState, id: string, convoke?: string[], teamwork?
       total += teamworkPower(s, x);
     }
     if (total >= c.teamwork && pick.length && planCast(s, HUMAN, id, undefined, undefined, convoke ?? "auto", undefined, { teamwork: pick }) !== null) return true;
+  }
+  // Rottenmouth Viper: cheaper for each permanent sacrificed as it's cast, so with some of them.
+  if (!convoke && c?.sacrificedReduction) {
+    const pool = reducingSacrifices(s, id);
+    for (let n = 1; n <= pool.length; n++) if (planCast(s, HUMAN, id, undefined, undefined, "auto", n, { sacrifice: pool.slice(0, n) }) !== null) return true;
   }
   // Cheaper if you collect evidence as you cast it (Bite Down on Crime): with the cards it would pick (CR 701.59a).
   if (!convoke && c?.evidence !== undefined && c.evidenceReduction) {
@@ -3657,6 +3694,8 @@ function LibrarySearch({
                 ? `${pending.source}: ${pending.min ? "put" : "you may put"} ${pending.what} from your hand onto the battlefield`
                 : pending.fromGraveyard === "exile"
                   ? `${pending.source}: ${pending.min ? "exile" : "you may exile"} ${pending.what} from ${pending.anyGraveyard ? "a" : "your"} graveyard`
+                  : pending.fromGraveyard === "battlefield" && pending.anyGraveyard
+                  ? `${pending.source}: put ${pending.what} from a graveyard onto the battlefield under your control`
                   : pending.fromGraveyard === "libraryTop"
                   ? `${pending.source}: ${pending.min ? "put" : "you may put"} ${pending.what} from your graveyard on top of your library`
                   : pending.fromGraveyard
@@ -4538,11 +4577,11 @@ function Controls({
       </div>
     );
   if (pending?.kind === "chooseOption" && (pending.what === "secretNumber" || pending.what === "number") && pending.player === HUMAN) return <NumberChoice key={`${pending.source}:${s.log.length}`} pending={pending} dispatch={dispatch} />;
-  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "anchor" || pending.what === "exchangeText" || pending.what === "controlOpponent" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "word" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot") && pending.player === HUMAN)
+  if (pending?.kind === "chooseOption" && (pending.what === "damageShield" || pending.what === "topOrBottom" || pending.what === "attackWhom" || pending.what === "searchZones" || pending.what === "tapOrUntap" || pending.what === "punisher" || pending.what === "tribute" || pending.what === "tributePay" || pending.what === "readAhead" || pending.what === "player" || pending.what === "protector" || pending.what === "anchor" || pending.what === "exchangeText" || pending.what === "controlOpponent" || pending.what === "opponent" || pending.what === "rollResult" || pending.what === "mutate" || pending.what === "commander" || pending.what === "drawUpTo" || pending.what === "payX" || pending.what === "either" || pending.what === "word" || pending.what === "payOrTop" || pending.what === "discardInstead" || pending.what === "counterKind" || pending.what === "removeCounter" || pending.what === "targetSlot" || pending.what === "nthPlayer") && pending.player === HUMAN)
     return (
       <div className="controls">
         <span>
-          <strong>{pending.source}:</strong> {pending.prompt}
+          <strong>{pending.source}:</strong> {pending.what === "nthPlayer" ? `choose a player ${pending.prompt}.` : pending.prompt}
         </span>
         {pending.options.map((o, i) => (
           <button key={o} className={i === 0 ? "" : "ghost"} onClick={() => dispatch([{ type: "chooseOption", player: HUMAN, choice: o }])}>
@@ -4986,6 +5025,19 @@ function Controls({
         </span>
         <button disabled={discards.length !== pending.count} onClick={() => dispatch([{ type: "bottomCards", player: HUMAN, objectIds: discards }])}>
           Put on bottom
+        </button>
+      </div>
+    );
+  // Library of Leng: which of the cards being discarded go on top of the library instead.
+  if (pending?.kind === "handToTop" && pending.player === HUMAN && pending.discarding)
+    return (
+      <div className="controls">
+        <span>
+          <strong>{pending.source}: </strong>you discard {pending.discarding.map((id) => cardOf(s, id).name).join(", ")}. Click any of {pending.discarding.length === 1 ? "it" : "them"} to put on top of your
+          library instead of into your graveyard{discards.length > 1 ? " (first pick ends on top)" : ""}.
+        </span>
+        <button onClick={() => dispatch([{ type: "handToTop", player: HUMAN, objectIds: discards }])}>
+          {discards.length ? `Put ${discards.length} on top` : "All to the graveyard"}
         </button>
       </div>
     );

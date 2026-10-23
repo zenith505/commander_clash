@@ -8,7 +8,7 @@ import { parseSentence } from "../sentence";
 import { parseBoundCount, parseCount, roundOf } from "../counts";
 import { pickFilter, parsePlayer, parseObject, parseTargetPhrase, PERMANENT_TYPES, parseCardTarget } from "../targets";
 import { addTarget, parseUnlessPays, type Ctx } from "../body";
-import { parseStaticCondition, parseStaticMods, parseUntargetable } from "../statics";
+import { parseAffected, parseStaticCondition, parseStaticMods, parseUntargetable } from "../statics";
 
 /**
  * Whole sentences about every player's cards that other templates would take apart (tried before them), or undefined.
@@ -340,6 +340,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Exile a card from a graveyard" (Cemetery Prowler): any player's, chosen as it resolves (not targeted).
   if (/^[Ee]xile a card from a graveyard$/.test(s)) return [{ type: "chooseFromGraveyard", n: 1, dest: "exile", anyGraveyard: true }];
+  // "Put a creature card from a graveyard onto the battlefield under your control" (Extract from Darkness): the same,
+  // under your control.
+  if ((m = /^(?:[Yy]ou put|[Pp]ut) an? (.+? card) from a graveyard onto the battlefield under your control$/.exec(s))) {
+    const filter = parseSearchFilter(m[1]!);
+    if (!filter) return null;
+    return [{ type: "chooseFromGraveyard", n: 1, dest: "battlefield", anyGraveyard: true, filter }];
+  }
   if (/^Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it$/.test(s)) return [{ type: "randomFromGraveyard", dest: "creatureOrExile" }];
   if ((m = /^Reorder your graveyard (as you choose|at random)$/.exec(s))) return [{ type: "reorderGraveyard", ...(m[1] === "at random" ? { random: true as const } : {}) }];
   if ((m = /^Put the top card of your graveyard on (top|the bottom) of your library$/i.exec(s))) return [{ type: "putInLibrary", what: { ref: "graveyardEnd", who: { ref: "you" } }, position: m[1] === "top" ? "top" : "bottom" }];
@@ -394,6 +401,20 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (spec?.kind !== "card" || !spec.types?.length || spec.types.some((ty) => !PERMANENT_TYPES.includes(ty))) return null;
     if (withX && !withN && (spec.xRange?.key !== "manaValue" || spec.xRange.at !== "most" || !ctx.spell)) return null;
     return [{ type: "returnAllFromGraveyard", who: { ref: m[4] ? "eachPlayer" : "you" }, filter: { ...spec, text: withX ? `${m[1]!.slice(0, -withX[0].length)} card${withX[0]}` : `${m[1]} card` }, ...(m[3] ? { tapped: true } : {}), ...(m[4] ? { owners: true as const } : {}) }];
+  }
+  // Garna, the Bloodflame: "return to your hand all creature cards in your graveyard that were put there from anywhere
+  // this turn", which cards worked out as it resolves (rulings).
+  if ((m = /^[Rr]eturn to your hand all (.+?) cards in your graveyard that were put there from anywhere this turn$/.exec(s))) {
+    const spec = parseTargetPhrase(`${m[1]!.split(/\s+/).map(singularWord).join(" ")} card from a graveyard`, { chosen: true });
+    if (spec?.kind !== "card") return null;
+    return [{ type: "returnAllFromGraveyard", who: { ref: "you" }, filter: { ...spec, putThereThisTurn: true, text: `${m[1]} card that was put there this turn` }, toHand: true }];
+  }
+  // Myojin of Grim Betrayal: "Put onto the battlefield under your control all creature cards in all graveyards that were
+  // put there from anywhere this turn."
+  if ((m = /^Put onto the battlefield under your control all (.+?) cards in all graveyards that were put there from anywhere this turn$/.exec(s))) {
+    const spec = parseTargetPhrase(`${m[1]!.split(/\s+/).map(singularWord).join(" ")} card from a graveyard`, { chosen: true });
+    if (spec?.kind !== "card") return null;
+    return [{ type: "returnAllFromGraveyard", who: { ref: "eachPlayer" }, filter: { ...spec, putThereThisTurn: true, text: `${m[1]} card that was put there this turn` } }];
   }
   // "Return all instant and sorcery cards from your graveyard to your hand" (Wisdom of Ages), "Return all cards from your
   // graveyard to your hand" (Praetor's Counsel), "Return all creature cards with power 2 or less from your graveyard to
@@ -468,7 +489,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const what = parseObject(m[1]!, ctx, true);
     return what ? [{ type: "exile", what }] : null;
   }
-  if ((m = /^Return ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyard) to (your|its owner's) hand$/i.exec(s))) {
+  if ((m = /^Return ((?:(?:up to )?(?:one|two|three|four|five|six|\d+) (?:other )?|another |one or two |one, two, or three |any number of (?:other )?|(?:up to )?X (?:other )?)?target .+ graveyard(?: that was put there (?:from anywhere )?this turn)?) to (your|its owner's) hand$/i.exec(s))) {
     const what = parseCardTarget(m[1]!, ctx, m[2]!.toLowerCase() === "your" ? "you" : undefined);
     return what ? [{ type: "bounce", what }] : null;
   }
@@ -735,6 +756,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Target creature can't be the target of spells or abilities your opponents control this turn" (Vines of Vastwood): the
   // opponents of whoever controls the effect, its spell's controller (rulings on Vines of Vastwood).
+  // Autumn's Veil: "creatures you control can't be the targets of blue or black spells this turn": a rule about every
+  // creature you control this turn, those that come later too (rulings; CR 611.2c is only for characteristics).
+  if ((m = /^(Creatures you control) can't be the targets of (.+) this turn$/i.exec(s))) {
+    const affects = parseAffected("Creatures you control");
+    const by = parseUntargetable(m[2]!);
+    return affects && by ? [{ type: "groupRules", affects, text: "creatures you control", mods: [{ kind: "untargetable", by }], duration: "endOfTurn" }] : null;
+  }
   if ((m = /^(.+?) can't be the target of (.+) this turn$/.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const by = parseUntargetable(m[2]!);

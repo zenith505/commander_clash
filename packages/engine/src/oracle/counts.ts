@@ -16,6 +16,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "For each artifact and/or enchantment you control" (All That Glitters): each that's one or the other, counted once.
   // "For each creature you control that's an Insect, Rat, Spider, or Squirrel" (Swarmyard Massacre): see subtypeClause.
   let p = subtypeClause(text.trim().replace(/\.$/, "").replace(/ and\/or /g, " or "));
+  // "The mana value of that spell" (Ovika, Enigma Goliath): the same as "that spell's mana value".
+  p = p.replace(/^the (power|toughness|mana value) of (that spell|that creature|~)$/, "$2's $1");
   let m: RegExpExecArray | null;
   // "The number of other Squirrels, Bats, Lizards, and Rats you control" (Valley Rotcaller): each that's any of them,
   // counted once, as "A or B" is.
@@ -258,6 +260,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if ((m = /^(?:the )?(?:amount of )?\{S\} spent to cast (~|it)$/i.exec(p)) && ctx !== null && (ctx.spell || (ctx.selfIt && m[1] === "it") || m[1] === "~")) return count({ kind: "snowSpent" });
   // Multikicker: "for each time it was kicked", "the number of times ~ was kicked" (CR 702.33d).
   if (/^times? (?:~|it) was kicked$/i.test(p)) return count({ kind: "kicked" });
+  // "For each of that spell's colors" in a cast trigger (Ramos, Dragon Engine).
+  if (/^of that spell's colors$/i.test(p) && ctx?.castSpell) return count({ kind: "castSpellColors" });
   // Power, toughness, mana value: "~'s power", "its power", "that creature's toughness".
   if ((m = /^(~'s|its|that creature's|that artifact's|that enchantment's|the creature's|that permanent's|that spell's|the spell's|that card's|the sacrificed (?:creature|artifact|permanent)'s|the exiled creature's|the amassed Army's) (power|toughness|mana value)$/i.exec(p))) {
     const of = whoseObject(m[1]!, ctx);

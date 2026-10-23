@@ -291,6 +291,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [{ type: "endure", what, n: amt(m[2]!) }] : null;
   }
+  // Biomancer's Familiar: "The next time target creature adapts this turn, it adapts as though it had no +1/+1
+  // counters on it" (CR 701.46a: adapting normally does nothing if it has any).
+  if ((m = /^The next time (target creature) adapts this turn, it adapts as though it had no \+1\/\+1 counters on it$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what && !isGroup(what) ? [{ type: "adaptFresh", what }] : null;
+  }
   // Adapt N (CR 701.46a), Monstrosity N (CR 701.37a): only the permanent's own activated abilities do it.
   if ((m = /^(Adapt|Monstrosity) (\d+|X)$/.exec(s))) return ctx.activated ? [{ type: m[1] === "Adapt" ? "adapt" : "monstrosity", n: amt(m[2]!) }] : null;
   // Regeneration (CR 701.19a)
@@ -396,10 +402,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   }
   // "Move a +1/+1 counter from target creature you control onto another target creature", Nesting Grounds' "move a
   // counter from target permanent you control onto a second target permanent" (a kind it has, chosen as it resolves).
-  if ((m = new RegExp(`^Move (?:a|one) (?:(?<kind>${COUNTER}) )?counter from (?<from>target .+?) onto (?<to>another target .+|a second target .+)$`, "i").exec(s))) {
+  // Diamond City: "Move a shield counter from ~ onto target creature".
+  if ((m = new RegExp(`^Move (?:a|one) (?:(?<kind>${COUNTER}) )?counter from (?:(?<from>target .+?) onto (?<to>another target .+|a second target .+)|(?<self>~) onto (?<to2>target [^,]+))$`, "i").exec(s))) {
     const g = m.groups!;
-    const from = parseObject(g.from!, ctx);
-    const to = from && !isGroup(from) ? parseObject(g.to!.replace(/^a second /i, ""), ctx) : null;
+    const from = parseObject(g.from ?? g.self!, ctx);
+    const to = from && !isGroup(from) ? parseObject((g.to ?? g.to2!).replace(/^a second /i, ""), ctx) : null;
     return from && to && !isGroup(to) ? [{ type: "moveCounter", counter: g.kind ? counterKind(g.kind) : "any", from, to }] : null;
   }
   // Portent Tracker (see parseBody): an opponent's battle loses defense, anyone else's gains it.

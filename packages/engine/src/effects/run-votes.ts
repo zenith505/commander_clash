@@ -4,9 +4,9 @@ import { draw, log, loseLife, obj, player } from "../game";
 import { invalidateCharacteristics } from "../layers";
 import { putCounters, withPutter } from "../counters";
 import { dealDamageBatch } from "../damage";
-import { discardCards } from "./run-library";
+import { discardCards, discardToTop } from "./run-library";
 import { controllerOf } from "../layers";
-import type { GameObject, GameState, PlayerId } from "../types";
+import type { GameObject, GameState, ObjectId, PlayerId } from "../types";
 import { ResolveCtx, apnap, ctxSource, players, runEffect } from "./resolve";
 import { objectMatches, printedMatches } from "./targeting";
 
@@ -67,9 +67,15 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (st.step === "discard") {
         // Each player who didn't choose the lowest number discards their hand, then they draw seven (CR 101.4).
         const wheel = apnap(s, entries.filter((x) => x.n !== low).map((x) => x.pid)).filter((pid) => !player(s, pid).lost);
+        const tops: Record<string, ObjectId[]> = {};
+        for (const pid of wheel) {
+          const t = discardToTop(s, pid, [...player(s, pid).hand], src, ctx);
+          if (t === "paused") return "paused";
+          tops[pid] = t;
+        }
         for (const pid of wheel) {
           const hand = [...player(s, pid).hand];
-          if (hand.length) discardCards(s, pid, hand);
+          if (hand.length) discardCards(s, pid, hand, "", false, false, ctx.controller, undefined, tops[pid]);
         }
         st.step = "draw";
         st.draws = wheel;

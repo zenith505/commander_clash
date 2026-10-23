@@ -77,6 +77,12 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (ids.length === 1 && s.resolving) s.resolving.exiledTop = { id: ids[0]!, zc: s.objects[ids[0]!]!.zoneChanges ?? 0 };
         // An empty library: nothing happens (ingest rulings).
         if (ids.length) log(s, `${p.name} exiles ${ids.map((id) => defOf(s, s.objects[id]!).name).join(", ")} from the top of their library.`);
+        // Only permanent cards can be put onto the battlefield (CR 110.4b); they enter at the same time.
+        const put = e.putAll ? ids.filter((id) => p.exile.includes(id) && printedMatches(e.putAll!, defOf(s, obj(s, id))) && isPermanentCard(defOf(s, obj(s, id)))) : [];
+        if (put.length) {
+          log(s, `${player(s, ctx.controller).name} puts ${put.map((id) => defOf(s, obj(s, id)).name).join(", ")} onto the battlefield.`);
+          enterTogether(s, () => put.forEach((id) => moveObject(s, id, "battlefield", { controller: ctx.controller })));
+        }
       }
       return;
     case "revealTop": {
@@ -148,14 +154,19 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const fewest = e.downToFewest ? (sc0.n ??= who.length ? Math.min(...who.map((pid) => player(s, pid).hand.length)) : 0) : 0;
       const nFor = e.downToFewest ? {} : amountFor(s, e.n, ctx, who);
       if (e.random && !e.hand) {
-        for (const pid of apnap(s, who)) {
-          const hand = player(s, pid).hand;
-          const picked: ObjectId[] = [];
-          const pool = [...hand];
-          const n = nFor[pid] ?? 0;
-          for (let i = 0; i < n && pool.length; i++) picked.push(pool.splice(Math.floor(nextRandom(s) * pool.length), 1)[0]!);
-          discardCards(s, pid, picked, " at random", false, false, ctx.controller);
-        }
+        // Picked once, before anyone is asked about Library of Leng.
+        const rp = (sc0.randomPicks ??= Object.fromEntries(
+          apnap(s, who).map((pid) => {
+            const picked: ObjectId[] = [];
+            const pool = [...player(s, pid).hand];
+            const n = nFor[pid] ?? 0;
+            for (let i = 0; i < n && pool.length; i++) picked.push(pool.splice(Math.floor(nextRandom(s) * pool.length), 1)[0]!);
+            return [pid, picked];
+          }),
+        ));
+        const tops = discardToTopEach(s, rp, apnap(s, who), src, ctx);
+        if (tops === "paused") return "paused";
+        for (const pid of apnap(s, who)) discardCards(s, pid, rp[pid] ?? [], " at random", false, false, ctx.controller, undefined, tops[pid]);
         return;
       }
       // Each player chooses in APNAP order, then the cards are discarded at the same time (CR 101.4, 701.9b).
@@ -207,7 +218,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           }
         return;
       }
-      for (const pid of apnap(s, who)) discardCards(s, pid, sc.chosen![pid] ?? [], "", false, false, ctx.controller);
+      const tops = discardToTopEach(s, sc.chosen!, apnap(s, who), src, ctx);
+      if (tops === "paused") return "paused";
+      for (const pid of apnap(s, who)) discardCards(s, pid, sc.chosen![pid] ?? [], "", false, false, ctx.controller, undefined, tops[pid]);
       return;
     }
     case "takeFromHand": {
@@ -235,8 +248,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       const ids = sc.found.filter((id) => obj(s, id).zone === "hand" && obj(s, id).owner === pid);
       s.resolving!.tookFromHand = ids.length;
-      if (e.action === "discard") discardCards(s, pid, ids, "", false, false, ctx.controller);
-      else if (e.action === "libraryThird")
+      if (e.action === "discard") {
+        const tops = discardToTop(s, pid, ids, src, ctx);
+        if (tops === "paused") return "paused";
+        discardCards(s, pid, ids, "", false, false, ctx.controller, undefined, tops);
+      } else if (e.action === "libraryThird")
         for (const id of ids) {
           log(s, `${p.name} puts ${defOf(s, obj(s, id)).name} into their library third from the top.`);
           moveObject(s, id, "library", { top: true });
@@ -1093,7 +1109,7 @@ export function toBottom(s: GameState, pid: PlayerId, ids: ObjectId[], src: stri
  * madness ability triggers (CR 702.35a): it's still discarded. `quiet`: the caller says what happened (cycling).
  */
 /** `cause`: the controller of the spell or ability that made them discard, if one did. */
-export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how = "", quiet = false, cycled = false, cause?: PlayerId, /** The X chosen for a cycling cost (Shark Typhoon). */ cycledX?: number) {
+export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how = "", quiet = false, cycled = false, cause?: PlayerId, /** The X chosen for a cycling cost (Shark Typhoon). */ cycledX?: number, /** Library of Leng: those that go on top of the library instead, the first ending on top (see discardToTop). */ toTop: ObjectId[] = []) {
   if (!ids.length) return;
   if (s.resolving) (s.resolving.discarded ??= {})[pid] = (s.resolving.discarded[pid] ?? 0) + ids.length;
   if (s.resolving) (s.resolving.discardedAll ??= []).push(...ids);
@@ -1103,6 +1119,8 @@ export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how =
   for (const id of ids) {
     const o = obj(s, id);
     const c = compileCard(defOf(s, o));
+    // Library of Leng: its owner chose this replacement over any other (CR 616.1); put on top below, in their order.
+    if (toTop.includes(id)) continue;
     // Obstinate Baloth: its owner picks this replacement over madness or a graveyard one (CR 616.1, rulings).
     if (c.discardedToBattlefield && cause !== undefined && cause !== pid) {
       log(s, `${defOf(s, o).name} is put onto the battlefield instead.`);
@@ -1128,9 +1146,45 @@ export function discardCards(s: GameState, pid: PlayerId, ids: ObjectId[], how =
       body: { targets: [], effects: [{ type: "madness" }], text: `Madness ${madness}: you may cast ~ for its madness cost. If you don't, put it into your graveyard.` },
     });
   }
+  const tops = toTop.filter((id) => ids.includes(id));
+  for (const id of [...tops].reverse()) moveObject(s, id, "library", { top: true });
+  if (tops.length) log(s, `${player(s, pid).name} puts ${tops.length === 1 ? names[ids.indexOf(tops[0]!)] : `${tops.length} of them`} on top of their library instead (${lengName(s, pid)}).`);
   // They were discarded at the same time (CR 701.9b); each one triggers "whenever you discard a card" (CR 603.2c).
   ids.forEach((id, i) => fireEvent(s, { type: "discarded", player: pid, id, card: cards[i]!, ...(cycled ? { cycled: true } : {}), ...(cycledX ? { x: cycledX } : {}) }));
   if (s.resolving) s.resolving.discardedCards = ids.flatMap((id) => (obj(s, id).zone === "graveyard" ? [{ id, zc: obj(s, id).zoneChanges ?? 0 }] : []));
+}
+
+/** The Library of Leng `pid` controls, if any: its name. */
+function lengName(s: GameState, pid: PlayerId): string | undefined {
+  const o = s.battlefield.map((id) => obj(s, id)).find((o) => controllerOf(s, o) === pid && abilitiesOf(s, o).discardToTop);
+  return o && defOf(s, o).name;
+}
+
+/**
+ * Library of Leng: "If an effect causes you to discard a card, discard it, but you may put it on top of your library
+ * instead of into your graveyard." (CR 614.1a). Asked as an effect makes `pid` discard `ids` (never for a cost:
+ * rulings), before they're discarded: which of them go on top, each card on its own, in the order they choose (the
+ * first ending on top), a randomly discarded one too, once it's been picked (rulings). "paused" while they choose.
+ */
+export function discardToTop(s: GameState, pid: PlayerId, ids: ObjectId[], src: string, ctx: ResolveCtx): ObjectId[] | "paused" {
+  if (!ids.length || !s.resolving || ctx.asCost) return [];
+  const sc = (s.resolving.scratch ??= {});
+  const done = sc.toTop?.[pid];
+  if (done) return done;
+  if (!lengName(s, pid)) return [];
+  s.pending = { kind: "handToTop", player: pid, count: ids.length, source: src, upTo: true, discarding: ids };
+  return "paused";
+}
+
+/** discardToTop for each player of `who` in turn (APNAP, CR 101.4): "paused" while one of them chooses. */
+function discardToTopEach(s: GameState, chosen: Record<string, ObjectId[]>, who: PlayerId[], src: string, ctx: ResolveCtx): Record<string, ObjectId[]> | "paused" {
+  const out: Record<string, ObjectId[]> = {};
+  for (const pid of who) {
+    const t = discardToTop(s, pid, chosen[pid] ?? [], src, ctx);
+    if (t === "paused") return "paused";
+    out[pid] = t;
+  }
+  return out;
 }
 
 /** A card's mana value in a library: a split card's halves together (CR 709.4a). */

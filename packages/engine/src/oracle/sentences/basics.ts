@@ -3,13 +3,14 @@
 import { DUNGEONS, UNDERCITY, dungeonSupported } from "../dungeons";
 import { allEffects } from "../../abilities";
 import type { Amount, AmountExpr, DamageRecipient, Effect, ObjRef, PlayerRef, PunisherOption, TargetSpec } from "../../abilities";
-import { NUM, NUMX, amt, isGroup, num, plainMana, sacrificeSelf } from "../words";
+import { COLOR_WORDS, NUM, NUMX, amt, isGroup, num, plainMana, sacrificeSelf } from "../words";
 import { parsePayCost, addTarget, parseUnlessPays } from "../body";
 import { halfX, parseBoundCount, parseCount, roundOf } from "../counts";
 import { parseSearch, parseSearchFilter } from "../search";
 import { parseDamageRecipient, parsePlayer, parseObject, parseTargetPhrase, pickFilter } from "../targets";
 import { parseSentence } from "../sentence";
 import type { Ctx } from "../body";
+import { STARTING_LIFE } from "../../types";
 import type { ManaType } from "../../types";
 import { parsePreventAll } from "../statics";
 import { emblemAbilityOk } from "../grants";
@@ -31,6 +32,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (n === null) return null;
     if (m[2]) n = typeof n === "number" ? 2 * n : { ...n, times: 2 * (n.times ?? 1) };
     return [{ type: "getRad", who, n }];
+  }
+  // "Each creature gets twice -X/-X until end of turn" (Nuclear Fallout): -X/-X with X doubled.
+  if ((m = /^(.+? gets?) twice ([+-]X\/[+-]X .+)$/.exec(s))) {
+    const fx = parseSentence(`${m[1]} ${m[2]}`, ctx);
+    const pt = fx?.length === 1 && fx[0]!.type === "continuous" && fx[0]!.mods.length === 1 ? fx[0]!.mods[0]! : undefined;
+    if (fx?.[0]?.type !== "continuous" || pt?.kind !== "modifyPT") return null;
+    const twice = (a: Amount): Amount | null => (typeof a === "object" && "count" in a && a.count.kind === "x" && !a.times ? { ...a, times: 2 } : null);
+    const [power, toughness] = [twice(pt.power), twice(pt.toughness)];
+    return power && toughness ? [{ ...fx[0]!, mods: [{ ...pt, power, toughness }] }] : null;
   }
 
   // "You get an emblem with "..."", "Each opponent gets an emblem with ...", "Target opponent gets ..." (CR 114.2), one
@@ -261,6 +271,12 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^(Your|Target player's|Target opponent's|That player's|Each player's) life total becomes (\d+)$/i.exec(s))) {
     const who = m[1]!.toLowerCase() === "your" ? ({ ref: "you" } as const) : parsePlayer(m[1]!.replace(/'s$/, "").toLowerCase(), ctx);
     return who ? [{ type: "setLife", who, n: Number(m[2]) }] : null;
+  }
+  // "Your life total becomes half your starting life total, rounded up" (The Endstone), "up to one target player's life
+  // total becomes half their starting life total, rounded down" (Torgaar): 20 in Commander (CR 903.7, 119.5).
+  if ((m = /^(Your|Target player's|Up to one target player's|Target opponent's) life total becomes half (?:your|their) starting life total, rounded (up|down)$/i.exec(s))) {
+    const who = m[1]!.toLowerCase() === "your" ? ({ ref: "you" } as const) : parsePlayer(m[1]!.replace(/'s$/, "").toLowerCase(), ctx);
+    return who ? [{ type: "setLife", who, n: (m[2] === "up" ? Math.ceil : Math.floor)(STARTING_LIFE / 2) }] : null;
   }
   // Beacon of Immortality: "Double target player's life total": they gain (or, below 0, lose) as much life as it takes
   // (CR 701.10d).
@@ -606,6 +622,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   if (/^Until your next turn, your opponents can't cast spells from anywhere other than their hands$/.test(s)) return [{ type: "opponentsHandOnlyUntilNextTurn" }];
   if (/^Spells you control can't be countered this turn$/i.test(s)) return [{ type: "turnRules", rules: ["spellsUncounterable"] }];
+  // Autumn's Veil: "Spells you control can't be countered by blue or black spells this turn".
+  if ((m = /^Spells you control can't be countered by (white|blue|black|red|green) or (white|blue|black|red|green) spells this turn$/i.exec(s)) && m[1] !== m[2])
+    return [{ type: "turnRules", rules: ["spellsUncounterable"], byColors: [COLOR_WORDS[m[1]!.toLowerCase()]!, COLOR_WORDS[m[2]!.toLowerCase()]!] }];
   // Domri, Anarch of Bolas: "Creature spells you cast this turn can't be countered" (rulings: every one, after it resolves).
   if (/^Creature spells you cast this turn can't be countered$/i.test(s)) return [{ type: "turnRules", rules: ["creatureSpellsUncounterable"] }];
   if ((m = /^(Players|Your opponents) can't gain life this turn$/i.exec(s))) return [{ type: "noLifeGain", players: /^players$/i.test(m[1]!) ? "all" : "opponents" }];

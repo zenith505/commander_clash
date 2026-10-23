@@ -231,6 +231,16 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return taps ? [...taps, { type: "payUnless", player: pid, pay: true }] : [{ type: "payUnless", player: pid, pay: false }];
     }
     if (pend.kind === "discard") return [{ type: "discard", player: pid, objectIds: chooseDiscards(s, pid, pend.count, undefined, pend.filter, pend.upTo) }];
+    // Library of Leng: back on top go the spells we'd draw again, lands only while we're short of them; not a card
+    // that wants the graveyard (madness, flashback and the like).
+    if (pend.kind === "handToTop" && pend.discarding) {
+      const wantsYard = (d: CardDef) => !!compileCard(d).madness || d.keywords.some((k) => ["Flashback", "Unearth", "Escape", "Embalm", "Eternalize", "Disturb", "Retrace", "Jump-start", "Aftermath", "Scavenge", "Dredge"].includes(k));
+      const keep = pend.discarding.filter((id) => {
+        const d = defOf(s, obj(s, id));
+        return !wantsYard(d) && (!isType(d, "Land") || lands(s, pid) < 5);
+      });
+      return [{ type: "handToTop", player: pid, objectIds: keep }];
+    }
     // Brainstorm: back go the cards we'd most readily discard, the better of them on top.
     // Scroll Rack: the lands we don't need, traded for fresh cards (a library short of cards trades fewer).
     if (pend.kind === "handToTop" && pend.upTo) {
@@ -412,6 +422,17 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const opps = pend.options.filter((x) => Number(x) !== pid);
       const best = [...(opps.length ? opps : pend.options)].sort((a, b) => might(Number(b)) - might(Number(a)) || player(s, Number(b)).life - player(s, Number(a)).life)[0]!;
       return [{ type: "chooseOption", player: pid, choice: best }];
+    }
+    // Gluntch: ourselves for the first gift we'd get something from (the counters only with a creature), the rest to the
+    // opponent with the least power on the battlefield.
+    if (pend.kind === "chooseOption" && pend.what === "nthPlayer") {
+      const r = s.resolving;
+      const next = r ? r.body.effects[r.next + 1] : undefined;
+      const useful = next?.type !== "pick" || s.battlefield.some((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature"));
+      const might = (x: PlayerId) => s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === x && objIsType(s, obj(s, id), "Creature")).reduce((n, id) => n + Math.max(0, power(s, obj(s, id))), 0);
+      const others = pend.options.filter((x) => Number(x) !== pid).sort((a, b) => might(Number(a)) - might(Number(b)) || player(s, Number(a)).life - player(s, Number(b)).life);
+      const pick = pend.options.includes(String(pid)) && (useful || !others.length) ? String(pid) : others[0]!;
+      return [{ type: "chooseOption", player: pid, choice: pick }];
     }
     // The legend rule (CR 704.5j): the one with Auras, Equipment or counters on it, else the card, else the oldest.
     if (pend.kind === "chooseOption" && pend.what === "legend") return [{ type: "chooseOption", player: pid, choice: legendBotKeep(s, pend.options) }];
@@ -1196,6 +1217,17 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
       out.push(pick);
       continue;
     }
+    // "Target player's life total becomes 20" (Torgaar): the opponent with the most life above it, else us if we have
+    // less.
+    const setLife = allEffects(body.effects).find((e): e is Extract<Effect, { type: "setLife" }> => e.type === "setLife" && !e.double && e.who.ref === "target" && e.who.index === i);
+    if (setLife && spec.kind === "player") {
+      const richest = all.filter((t) => t.kind === "player" && t.id !== pid && player(s, t.id as PlayerId).life > setLife.n).sort((a, b) => player(s, b.id as PlayerId).life - player(s, a.id as PlayerId).life)[0];
+      const me = player(s, pid).life < setLife.n ? all.find((t) => t.kind === "player" && t.id === pid) : undefined;
+      const pick = richest && (!me || player(s, richest.id as PlayerId).life - setLife.n >= setLife.n - player(s, pid).life) ? richest : (me ?? richest);
+      if (!pick && !spec.optional && !forced) return null;
+      out.push(pick ?? (spec.optional ? { kind: "none" } : (all[0] ?? { kind: "none" })));
+      continue;
+    }
     // An "up to" target is only chosen when there's something we'd like it to be (CR 115.6).
     const pool = preferred.length ? preferred : forced && !spec.optional ? all : [];
     if (!pool.length) {
@@ -1496,6 +1528,8 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
     xs = cost.hasX ? xs.filter((x) => x! <= most) : xChoices(most, 1);
     // "You may sacrifice one or more creatures" (Plumb the Forbidden): none is fine too.
     if (castExtraCosts(d, { via, alt }).some((c) => c.kind === "sacrifice" && c.optional)) xs.push(0);
+    // Rottenmouth Viper: each one sacrificed makes it cheaper, so as few as we can cast it with.
+    if (compileCard(d).sacrificedReduction && !via && !alt) xs = Array.from({ length: most + 1 }, (_, i) => i);
   }
   for (const x of xs) {
     const plan = castPlanWithX(s, pid, id, free, x, via, alt);
@@ -2322,6 +2356,11 @@ function chooseWord(s: GameState, pid: PlayerId, options: string[]): string {
     const best = Math.max(0, ...s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature")).map((id) => power(s, obj(s, id))));
     return best <= 2 ? "fame" : "fortune";
   }
+  // Master of Ceremonies: a card with a short hand, a creature with few of them, else a Treasure.
+  if (options.join() === "money,friends,secrets") {
+    if (player(s, pid).hand.length <= 3) return "secrets";
+    return s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature")).length <= 2 ? "friends" : "money";
+  }
   return options[0]!;
 }
 
@@ -2477,6 +2516,15 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
       return !!sub && !objIsType(s, sub, "Creature");
     }
     return allEffects(after.effects).some((x) => x.type === "damage" || x.type === "loseLife") ? life <= 15 : false;
+  }
+  // "Each opponent may sacrifice a nontoken creature of their choice. Each opponent who doesn't loses 2 life for each ..."
+  // (Fandaniel): the creature when the life would hurt (a lot of it, or a quarter of what's left), a spare one sooner.
+  if (r && e?.type === "eachMay" && e.each && e.need && after?.type === "loseLife" && after.who.ref === "notChoseThisWay") {
+    const loss = evalAmount(s, after.n, { controller: r.item.controller, sourceId: r.item.sourceId });
+    const life = player(s, pid).life;
+    const sac = e.effects[0];
+    const spare = sac?.type === "pick" && pickOptions(s, sac, pid, r.item.sourceId).some((id) => !obj(s, id).isCommander && worth(s, pid, obj(s, id)) <= 3);
+    return loss >= life || loss * 4 >= life || (spare && loss >= 4);
   }
   if (!r || e?.type !== "may") return true;
   // "Sacrifice it unless you discard a creature card", "discard two cards unless you discard an artifact card": the
@@ -3110,6 +3158,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // "~ becomes a Kithkin Spirit with base power and toughness 2/2" when it's that big already, or bigger (Figure of
       // Destiny after its later steps): it would only shrink.
       if (shrinksSelf(s, o, ab.body)) continue;
+      // Biomancer's Familiar: only for a creature of ours with +1/+1 counters that could adapt again this turn.
+      const refresh = ab.body.effects.some((e) => e.type === "adaptFresh") ? adaptAgain(s, pid) : undefined;
+      if (refresh === null) continue;
       // "{1}: Look at the top card of your library" (Brutal Deceiver): nothing a bot can use.
       if (!ab.body.modal && ab.body.effects.every((e) => e.type === "orderTop" && e.n === 1)) continue;
       const problem = abilityProblem(s, pid, id, i);
@@ -3123,7 +3174,7 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       const xs = discardX !== undefined ? [discardX] : energyX > 0 ? [energyX] : energyTargetX >= 3 ? Array.from({ length: energyTargetX - 2 }, (_, k) => energyTargetX - k) : cost.hasX ? xChoices(availableMana(s, pid) - (ab.tap ? 1 : 0) - manaValue(cost), xCount(cost)) : [undefined];
       let plan: Action[] | null = null;
       for (const x of xs) {
-        const targets = body.targets.length ? chooseTargets(s, pid, body, false, id, x) : [];
+        const targets: TargetChoice[] | null = refresh ? [{ kind: "object", id: refresh }] : body.targets.length ? chooseTargets(s, pid, body, false, id, x) : [];
         if (!targets || pointlessAttach(s, body, targets, id)) continue;
         const costs = discardX !== undefined ? discardXCosts(s, pid, o, ab, targets, discardX) : abilityCosts(s, pid, o, ab, targets);
         if (costs === null) continue;
@@ -3148,6 +3199,14 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
     }
   }
   return null;
+}
+
+/** A creature of ours with +1/+1 counters and an adapt ability, not yet refreshed this turn (Biomancer's Familiar). */
+function adaptAgain(s: GameState, pid: PlayerId): ObjectId | null {
+  return s.battlefield.find((id) => {
+    const o = obj(s, id);
+    return controllerOf(s, o) === pid && objIsType(s, o, "Creature") && (o.counters["+1/+1"] ?? 0) > 0 && o.adaptFresh !== s.turn && abilitiesOf(s, o).activated.some((a) => a.body.effects.some((e) => e.type === "adapt"));
+  }) ?? null;
 }
 
 /** The cards in our hand and command zone we could cast now, the dearest first. */

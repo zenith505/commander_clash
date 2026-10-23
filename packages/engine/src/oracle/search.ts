@@ -20,7 +20,7 @@ function searchDest(text: string): SearchDest {
  * hand" (Cultivate), "then shuffle and put that card on top" (Vampiric Tutor).
  */
 export function parseSearch(s: string, count?: (text: string) => AmountExpr | null): Effect[] | null {
-  const m = /^Search your library for (up to )?(a|an|one|two|three|four|five|X|any number of) (.+?)(?:, reveal (?:it|them|that card|those cards))?(?:,| and) ((?:put|then) .+)$/i.exec(s);
+  const m = /^Search your library for (up to )?(a|an|one|two|three|four|five|six|seven|eight|nine|ten|X|any number of) (.+?)(?:, reveal (?:it|them|that card|those cards))?(?:,| and) ((?:put|then) .+)$/i.exec(s);
   if (!m) return null;
   const upTo = !!m[1] || m[2] === "any number of";
   // "Up to X basic land cards" (New Frontiers): the X it was cast with.

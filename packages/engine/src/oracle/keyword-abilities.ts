@@ -8,6 +8,7 @@ import { parsePayCost } from "./body";
 import { parseSearchFilter } from "./search";
 import { parseTargetPhrase } from "./targets";
 import { parseStaticCondition } from "./statics";
+import { parseCount } from "./counts";
 
 /** "sacrifice a creature", "discard a card", "pay 3 life", "exile a creature card from your graveyard". */
 /**
@@ -634,8 +635,8 @@ export function firebending(n: Amount, text: string): TriggeredAbility {
 export function keywordAbilities(line: string, d: CardDef): KeywordParts | null {
   const out: KeywordParts = { triggers: [], activated: [], convoke: false, improvise: false, affinity: [], plusCounters: 0, bloodthirst: 0, entersOptions: [], statics: [] };
   const plus = (n: number, what: ObjRef = { ref: "self" }): Effect => ({ type: "counters", what, counter: "+1/+1", n });
-  // "Ward—{2}, Pay 2 life" is one keyword.
-  for (const raw of line.split(/(?<!ward—(?:\{[^}]+\})+)[,;]\s*/i)) {
+  // "Ward—{2}, Pay 2 life" is one keyword; so is "Mobilize X, where X is ...".
+  for (const raw of line.split(/(?<!ward—(?:\{[^}]+\})+)(?<!^mobilize X)[,;]\s*/i)) {
     const p = raw.trim();
     let m: RegExpExecArray | null;
     if (keywordOf(p)) continue;
@@ -1039,10 +1040,14 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
           text: "Myriad: for each opponent other than defending player, you may create a token copy of ~ that's tapped and attacking that player. Exile the tokens at end of combat.",
         },
       });
-    } else if ((m = /^mobilize (\d+)$/i.exec(p))) {
+    } else if ((m = /^mobilize (\d+)$/i.exec(p) ?? /^mobilize X, where X is (?:the number of )?(.+)$/i.exec(p))) {
       // CR 702.181a: "Whenever this creature attacks, create N tapped and attacking 1/1 red Warrior creature tokens.
-      // Sacrifice them at the beginning of the next end step."
-      const n = Number(m[1]);
+      // Sacrifice them at the beginning of the next end step." "Mobilize X, where X is ..." (Avenger of the Fallen; "its
+      // power" granted by Infantry Shield): X counted as the trigger resolves (CR 608.2h).
+      const fixed = /^\d+$/.test(m[1]!);
+      const x = fixed ? null : parseCount(m[1]!.replace(/^its power$/, "~'s power"), null, true);
+      if (!fixed && !x) return null;
+      const n: Amount = fixed ? Number(m[1]) : x!;
       const warrior: TokenSpec = { name: "Warrior", power: 1, toughness: 1, colors: ["R"], types: ["Creature"], subtypes: ["Warrior"], keywords: [] };
       out.triggers.push({
         event: "selfAttacks",
@@ -1052,7 +1057,7 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
             { type: "createToken", who: { ref: "you" }, n, token: warrior, tapped: true, attacking: true },
             { type: "delayed", when: "nextEndStep", each: "created", effects: [{ type: "sacrifice", what: { ref: "subject" } }], text: "sacrifice ~" },
           ],
-          text: `Mobilize ${n}: create ${n === 1 ? "a" : n} tapped and attacking 1/1 red Warrior creature token${n > 1 ? "s" : ""}. Sacrifice ${n > 1 ? "them" : "it"} at the beginning of the next end step.`,
+          text: fixed ? `Mobilize ${n}: create ${n === 1 ? "a" : n} tapped and attacking 1/1 red Warrior creature token${(n as number) > 1 ? "s" : ""}. Sacrifice ${(n as number) > 1 ? "them" : "it"} at the beginning of the next end step.` : `Mobilize X, where X is ${m[1]}: create X tapped and attacking 1/1 red Warrior creature tokens. Sacrifice them at the beginning of the next end step.`,
         },
       });
     } else if ((m = /^cycling ((?:\{(?:\d+|X|[WUBRGC]|[WUBRG]\/[WUBRGP])\})+)$/i.exec(p))) {

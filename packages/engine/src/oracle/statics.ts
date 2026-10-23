@@ -1337,8 +1337,9 @@ function parseStaticLine(line: string): StaticAbility | null {
   }
   const cda = parseDefinedPT(text);
   if (cda) return { affects: { kind: "self" }, mods: [cda], text: line };
-  // Not a "where X is" inside a quoted ability: that X belongs to the ability granted (Hardy Outlander).
-  const where = /^([^"]+), where X is ([^"]+)$/.exec(text);
+  // Not a "where X is" inside a quoted ability: that X belongs to the ability granted (Hardy Outlander), nor mobilize's
+  // (Infantry Shield: "has menace and mobilize X, where X is its power").
+  const where = /\bmobilize X, where X is [^,"]+$/i.test(text) ? null : /^([^"]+), where X is ([^"]+)$/.exec(text);
   if (where) text = where[1]!;
   // "Creatures with power less than ~'s power can't block it." "All creatures able to block ~ do so." (CR 509.1b-c)
   if (/^Creatures with power less than ~'s power can't block it$/.test(text)) return { affects: { kind: "self" }, mods: [{ kind: "cantBeBlockedByLesserPower" }], text: line };

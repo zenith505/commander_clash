@@ -86,6 +86,25 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         }
       }
       return;
+    case "putFromExiledTop": {
+      const sc = (s.resolving!.scratch ??= {});
+      if (!sc.impulseChoice) {
+        // Only permanent cards can be put onto the battlefield (CR 110.4b).
+        const ids = (s.resolving?.exiledTopCards ?? []).filter((id) => s.objects[id]?.zone === "exile" && printedMatches(e.filter, defOf(s, obj(s, id))) && isPermanentCard(defOf(s, obj(s, id))));
+        sc.impulseChoice = { ids };
+        if (ids.length > 1) {
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "impulseChoice", options: ids, labels: ids.map((id) => defOf(s, obj(s, id)).name), prompt: `choose ${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text} to put onto the battlefield under your control` };
+          return "paused";
+        }
+      }
+      const st = sc.impulseChoice;
+      sc.impulseChoice = undefined;
+      const id = st.pick ?? st.ids[0];
+      if (!id || s.objects[id]?.zone !== "exile") return;
+      log(s, `${player(s, ctx.controller).name} puts ${defOf(s, obj(s, id)).name} onto the battlefield.`);
+      moveObject(s, id, "battlefield", { controller: ctx.controller });
+      return;
+    }
     case "revealTop": {
       // An empty library: nothing is revealed, and an "if it's a ... card" after it is false.
       const whose = e.who ? players(s, e.who, ctx)[0] : ctx.controller;

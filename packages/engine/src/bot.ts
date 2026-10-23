@@ -520,6 +520,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     }
     // Party Thrasher: the exiled card we'd rather play this turn, a land while we still have a land play, else the
     // costliest spell we can pay for, else the cheapest.
+    // Lord of the Void: the costliest card to put onto the battlefield.
+    if (pend.kind === "chooseOption" && pend.what === "impulseChoice" && /onto the battlefield/.test(pend.prompt ?? ""))
+      return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => mv(s, b) - mv(s, a))[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "impulseChoice") {
       const p = player(s, pid);
       const land = pend.options.find((o) => isType(defOf(s, obj(s, o)), "Land"));

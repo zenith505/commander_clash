@@ -218,7 +218,7 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx): Effect | null |
 const ROW_MARK = "\u0001";
 
 /** Effects that can stop a resolution to wait for a player's choice. */
-const PAUSING = new Set<Effect["type"]>(["vote", "attachAny", "discard", "reorderGraveyard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure", "tapOrUntap", "untapUpTo", "castFromHand", "punisher", "sacrificeEach", "venture", "chooseFromGraveyard", "keepRest", "villainous"]);
+const PAUSING = new Set<Effect["type"]>(["vote", "attachAny", "discard", "reorderGraveyard", "takeFromHand", "scry", "surveil", "orderTop", "handToTop", "may", "explore", "search", "choose", "connive", "recruit", "pick", "clash", "endure", "tapOrUntap", "untapUpTo", "castFromHand", "punisher", "sacrificeEach", "venture", "chooseFromGraveyard", "keepRest", "villainous", "putFromExiledTop"]);
 /** Effects that can stop for a choice partway: they can't share a conditional or a loop with other effects. */
 const pauses = (e: Effect) => PAUSING.has(e.type) || (e.type === "putInLibrary" && e.position === "ownersChoice") || (e.type === "roll" && !!e.chooseOne);
 
@@ -1977,6 +1977,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const filter = parseSearchFilter(exilePutAll[1]!.replace(/cards$/, "card"));
       if (!filter) return null;
       effects.push({ type: "exileTop", who: { ref: "you" }, n: num(exileTopN[1]!), putAll: filter });
+      si++;
+      continue;
+    }
+    // Lord of the Void: "exile the top seven cards of that player's library, then put a creature card from among them onto
+    // the battlefield under your control" (split at ", then" by now).
+    const exileTheirs = new RegExp(`^[Ee]xile the top ${NUM} cards of (that player's|your) library$`).exec(s);
+    const putOne = exileTheirs && /^Put an? (.+? card) from among them onto the battlefield under your control$/.exec(sentences[si + 1] ?? "");
+    if (exileTheirs && putOne) {
+      const who = exileTheirs[2] === "your" ? ({ ref: "you" } as const) : parsePlayer("that player", ctx);
+      const filter = parseSearchFilter(putOne[1]!);
+      if (!who || !filter) return null;
+      effects.push({ type: "exileTop", who, n: num(exileTheirs[1]!) }, { type: "putFromExiledTop", filter });
       si++;
       continue;
     }

@@ -2238,6 +2238,12 @@ export type Effect =
   | { type: "together"; effects: Effect[] }
   | { type: "mill"; who: PlayerRef; n: Amount }
   /** "That player exiles the top card of their library" (ingest, CR 702.115a): face up (CR 406.3), with no permission to play it. */
+  /**
+   * "Exile the top seven cards of that player's library, then put a creature card from among them onto the battlefield
+   * under your control" (Lord of the Void): one of the cards the "exileTop" before it exiled that match `filter`, chosen as
+   * it resolves; not optional when there is one (rulings).
+   */
+  | { type: "putFromExiledTop"; filter: TargetSpec }
   | { type: "exileTop"; who: PlayerRef; n: Amount; /** "Put all artifact cards from among them onto the battlefield" (Tezzeret, Master of the Bridge): together, under your control. */ putAll?: TargetSpec }
   /**
    * Dark Confidant: "reveal the top card of your library and put that card into your hand", then maybe "[you] lose

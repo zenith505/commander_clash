@@ -953,6 +953,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "revealUntilLandToGraveyard":
     case "exileUntilTotalMv":
     case "exileTop":
+    case "putFromExiledTop":
     case "revealTopToHand":
     case "duelReveal":
     case "revealTop":

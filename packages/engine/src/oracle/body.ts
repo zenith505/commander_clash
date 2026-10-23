@@ -1427,6 +1427,21 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "discard", who: { ref: "couldntPick" }, n: cant[2] === "a card" ? 1 : 2, random: false });
       continue;
     }
+    // Transmute Artifact: "Search your library for an artifact card. If that card's mana value is less than or equal to the
+    // sacrificed artifact's mana value, put it onto the battlefield. If it's greater, you may pay {X}, where X is the
+    // difference. If you do, put it onto the battlefield. If you don't, put it into its owner's graveyard. Then shuffle."
+    // One search; the {X} is paid as it resolves, after the card is found (rulings).
+    const payDiff = /^If you do, (search your library for an? [A-Za-z ]+? card)$/.exec(s);
+    const payPrev = effects[effects.length - 1];
+    const payMv = payDiff && /^If that card's mana value is less than or equal to (the sacrificed (?:artifact|creature|enchantment|permanent)'s mana value), put it onto the battlefield$/.exec(sentences[si + 1] ?? "");
+    if (payMv && payPrev?.type === "pick" && payPrev.action === "sacrifice" && payPrev.who.ref === "you" && payPrev.n === 1 && !payPrev.unless && sentences[si + 2] === "If it's greater, you may pay {X}, where X is the difference" && sentences[si + 3] === "If you do, put it onto the battlefield" && sentences[si + 4] === "If you don't, put it into its owner's graveyard" && /^Then,? shuffle$/.test(sentences[si + 5] ?? "")) {
+      const fx = parseOne(`${capital(payDiff![1]!)}, put it onto the battlefield, then shuffle`, ctx);
+      const mv = parseCount(payMv[1]!, ctx);
+      if (!mv || fx?.length !== 1 || fx[0]!.type !== "search" || fx[0]!.n !== 1 || fx[0]!.upTo || fx[0]!.others) return null;
+      effects.push({ type: "if", cond: { kind: "sacrificedThisWay" }, effects: [{ ...fx[0]!, payDiff: mv }] });
+      si += 5;
+      continue;
+    }
     // "Search your library for a creature or land card and reveal it. Put it onto the battlefield tapped if it's a land
     // card. Otherwise, put it into your hand. Then shuffle." (Archdruid's Charm): one search, the land card's own destination.
     const searchReveal = /^Search your library for (an? [A-Za-z ]+? card) and reveal it$/.exec(s);

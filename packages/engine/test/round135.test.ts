@@ -492,3 +492,64 @@ describe("The Masamune: first strike and must be blocked while attacking; dying 
     expect(objHasKeyword(s, s.objects[m]!, "First strike")).toBe(true);
   });
 });
+
+describe("Transmute Artifact: sacrifice an artifact, search for one; paying the difference if it costs more", () => {
+  const transmute = card("Transmute Artifact", "Sorcery", "{U}{U}", {
+    oracleText:
+      "Sacrifice an artifact. If you do, search your library for an artifact card. If that card's mana value is less than or equal to the sacrificed artifact's mana value, put it onto the battlefield. If it's greater, you may pay {X}, where X is the difference. If you do, put it onto the battlefield. If you don't, put it into its owner's graveyard. Then shuffle.",
+  });
+  const rock = card("Test Rock", "Artifact", "{3}");
+  const cheap = card("Test Trinket", "Artifact", "{2}");
+  const big = card("Test Colossus", "Artifact Creature — Golem", "{6}", { power: "6", toughness: "6" });
+  /** Transmute in hand, a three-mana artifact on the battlefield (or none), `inLibrary` in the library. */
+  const scene = (inLibrary: CardDef, withRock = true) => {
+    const { s, ap, ids } = setup([transmute]);
+    emptyPools(s);
+    const rockId = withRock ? putOnBattlefield(s, ap, rock) : undefined;
+    const found = putOnBattlefield(s, ap, inLibrary);
+    s.battlefield.splice(s.battlefield.indexOf(found), 1);
+    s.objects[found]!.zone = "library";
+    s.players[ap]!.library.push(found);
+    return { s: passToPending(run(s, planCast(s, ap, ids[0]!))), ap, rockId, found };
+  };
+  const search = (s: GameState, ap: PlayerId, found: string) => act(s, { type: "searchLibrary", player: ap, found: [found] });
+
+  it("is fully supported", () => supported(transmute));
+
+  it("a card costing no more than the sacrificed artifact goes onto the battlefield, no payment asked", () => {
+    const { s: s0, ap, rockId, found } = scene(cheap);
+    expect(s0.objects[rockId!]!.zone).toBe("graveyard");
+    expect(s0.pending).toMatchObject({ kind: "searchLibrary", player: ap });
+    const s = search(s0, ap, found);
+    expect(s.pending).toBeFalsy();
+    expect(s.objects[found]!.zone).toBe("battlefield");
+  });
+
+  it("a card costing more: pay the difference, {3}, and it goes onto the battlefield", () => {
+    const { s: s0, ap, found } = scene(big);
+    let s = search(s0, ap, found);
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap, pay: { mana: "{3}" } });
+    s.players[ap]!.manaPool.C = 3;
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect(s.objects[found]!.zone).toBe("battlefield");
+    expect(s.players[ap]!.manaPool.C).toBe(0);
+  });
+
+  it("not paying: it's put into its owner's graveyard", () => {
+    const { s: s0, ap, found } = scene(big);
+    const s = act(search(s0, ap, found), { type: "chooseMay", player: ap, yes: false });
+    expect(s.objects[found]!.zone).toBe("graveyard");
+  });
+
+  it("a bot pays the difference with its lands", () => {
+    const { s: s0, ap, found } = scene(big);
+    const s = run(search(s0, ap, found), botActions(search(s0, ap, found), ap));
+    expect(s.objects[found]!.zone).toBe("battlefield");
+  });
+
+  it("with no artifact to sacrifice, there's no search", () => {
+    const { s, found } = scene(big, false);
+    expect(s.pending).toBeFalsy();
+    expect(s.objects[found]!.zone).toBe("library");
+  });
+});

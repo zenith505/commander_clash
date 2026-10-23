@@ -206,7 +206,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       // A Pact's "If you don't, you lose the game": always pay when we can.
       const e = s.resolving?.body.effects[s.resolving.next];
       const orLose = e?.type === "may" && !!e.otherwise?.some((x) => x.type === "loseGame");
-      const ok = !!taps && (orLose || (player(s, pid).life > life + 5 && wantsMay(s, pid)));
+      // Transmute Artifact: unpaid, the card found goes to the graveyard; pay when we can.
+      const orYard = !!s.resolving?.scratch?.payDiff;
+      const ok = !!taps && (orLose || orYard || (player(s, pid).life > life + 5 && wantsMay(s, pid)));
       return ok ? [...taps!, { type: "chooseMay", player: pid, yes: true }] : [{ type: "chooseMay", player: pid, yes: false }];
     }
     // Clash (CR 701.30a): keep a card we'd like to draw on top, put the rest on the bottom.

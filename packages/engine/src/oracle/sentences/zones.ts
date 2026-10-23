@@ -481,7 +481,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     if (filter === null) return null;
     return [{ type: "putFromHand", ...(filter ? { filter } : {}), may: true, any: true, upTo: m[1] === "X" ? amt("X") : num(m[1]!), ...(m[3] ? { orGraveyard: true as const } : {}), ...(m[4] ? { tapped: true } : {}) }];
   }
-  if ((m = /^(You may )?[Pp]ut (a|an|any number of) (.+?) from your hand onto the battlefield( tapped)?( and attacking( that opponent)?)?$/.exec(s))) {
+  // "You may put a land card from your hand or graveyard onto the battlefield" (Bonny Pall): one card, from either zone.
+  if ((m = /^(You may )?[Pp]ut (a|an|any number of) (.+?) from your hand( or graveyard)? onto the battlefield( tapped)?( and attacking( that opponent)?)?$/.exec(s))) {
+    const orYard = !!m[4];
+    m.splice(4, 1);
+    if (orYard && (m[2] === "any number of" || m[5])) return null;
     if (m[5] && m[2] === "any number of") return null;
     // "Tapped and attacking that opponent" (Kaalia of the Vast): the player the trigger's creature attacked.
     if (m[6] && !ctx.defending) return null;
@@ -496,7 +500,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter0 = parseSearchFilter(phrase, (t) => parseBoundCount(t, ctx));
     if (filter0 === null) return null;
     const filter = filter0 && (lesser || equal) ? { ...filter0, text: m[3]! } : filter0;
-    return [{ type: "putFromHand", ...(filter ? { filter } : {}), ...(m[4] ? { tapped: true } : {}), ...(m[5] ? { attacking: true } : {}), may: !!m[1] || m[2] === "any number of", ...(m[2] === "any number of" ? { any: true } : {}), ...(lesser ? { lesserPower: true as const } : {}), ...(m[6] ? { attackingEvent: true as const } : {}) }];
+    return [{ type: "putFromHand", ...(filter ? { filter } : {}), ...(m[4] ? { tapped: true } : {}), ...(m[5] ? { attacking: true } : {}), may: !!m[1] || m[2] === "any number of", ...(m[2] === "any number of" ? { any: true } : {}), ...(lesser ? { lesserPower: true as const } : {}), ...(m[6] ? { attackingEvent: true as const } : {}), ...(orYard ? { orGraveyard: true as const } : {}) }];
   }
   // Imprint: "You may exile a nonartifact, nonland card from your hand" (Chrome Mox), "... an instant card with mana value 2
   // or less ..." (Isochron Scepter): one card of your own hand, chosen as it resolves; linked to the ability that refers

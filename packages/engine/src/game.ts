@@ -3329,6 +3329,8 @@ function ownExilePermission(s: GameState, o: GameObject, pid: PlayerId): boolean
   // "For as long as Intet remains on the battlefield": that object (CR 400.7).
   if (m.until === "source" && !(m.source && s.objects[m.source.id]?.zone === "battlefield" && (s.objects[m.source.id]!.zoneChanges ?? 0) === m.source.zc)) return false;
   if (m.castOnly && isType(defOf(s, o), "Land")) return false;
+  // Neyali: only during a turn they attacked with a token.
+  if (m.attackedWithToken && s.players[pid]?.tokenAttackedTurn !== s.turn) return false;
   // "You may play one of those cards" (Nashi): not once one of them has been played.
   if (m.oneOf && s.oneOfUsed?.includes(m.oneOf)) return false;
   // "For each nonland card type, ... a spell of that type" (Aminatou's Augury): a type still free for it.
@@ -7547,6 +7549,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   // Attacking and "each time it has attacked this turn" (Moraug) change what the layers give it.
   if (attacks.length) invalidateCharacteristics(s);
   if (attacks.length) p.attackedTurn = s.turn; // raid
+  if (attacks.some((a) => obj(s, a.attacker).isToken)) p.tokenAttackedTurn = s.turn; // Neyali
   const w = p.attackedWith?.turn === s.turn ? p.attackedWith.keys : [];
   const keys = attacks.map((a) => `${a.attacker}@${obj(s, a.attacker).zoneChanges ?? 0}`);
   if (attacks.length) p.attackedWith = { turn: s.turn, keys: [...new Set([...w, ...keys])] };

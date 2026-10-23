@@ -356,6 +356,8 @@ export interface GameObject {
     free?: true;
     /** With `free`: it may be cast paying its costs instead (Ignite the Future, rulings), as it is when X isn't 0. */
     orPay?: true;
+    /** "During any turn you attacked with a token" (Neyali): only in a turn its player declared a token as an attacker (Player.tokenAttackedTurn). */
+    attackedWithToken?: true;
     /** "Mana of any type can be spent to cast it" (CR 609.4b). */
     anyType?: true;
     /** "If that spell would be put into a graveyard, exile it instead" (Dire Fleet Daredevil): see exileIfToGraveyard. */
@@ -729,6 +731,8 @@ export interface Player {
    * times it has tempted them, and their Ring-bearer (CR 701.54a-b), the creature it was as it was chosen.
    */
   ring?: { tempted: number; timestamp: number; bearer?: { id: ObjectId; zc: number } };
+  /** The last turn they declared a token as an attacker (Neyali's "during any turn you attacked with a token"; CR 508.1). */
+  tokenAttackedTurn?: number;
   /** The dungeon card they own in the command zone and the room their venture marker is on (CR 309.4). */
   dungeon?: { name: string; room: number };
   /** The dungeons they've completed, in order (CR 309.7). */

@@ -2,7 +2,7 @@
 // then the most played cards.
 
 import { describe, expect, it } from "vitest";
-import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
+import { act, card, passUntil, pt, putOnBattlefield, setup } from "./helpers";
 import { addMana, canPayFromPool } from "../src/spend";
 import { dealDamage, objectSource } from "../src/damage";
 import { abilityProblem, blockProblem, botActions, parseManaCost, characteristics, defOf, isFullySupported, manaOptions, planActivate, planCast, planManaAbility, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
@@ -334,5 +334,61 @@ describe("Selective Obliteration: each player's color spares only their own mono
     s = act(s, { type: "chooseOption", player: ap, choice: "Red" });
     while (s.pending?.kind === "chooseOption" && s.pending.player !== opp) s = act(s, { type: "chooseOption", player: s.pending.player, choice: "Blue" });
     expect(botActions(s, opp)).toEqual([{ type: "chooseOption", player: opp, choice: "Green" }]);
+  });
+});
+
+const neyali = card("Neyali, Suns' Vanguard", "Legendary Creature — Human Rebel", "{2}{R}{W}", { power: "3", toughness: "3", oracleText: "Attacking tokens you control have double strike.\nWhenever one or more tokens you control attack a player, exile the top card of your library. During any turn you attacked with a token, you may play that card." });
+
+describe("Neyali, Suns' Vanguard: the exiled card is playable during any turn you attacked with a token (rulings)", () => {
+  it("once for each player attacked; playable that turn, not in a turn without a token attack, again in a later one", () => {
+    supported(neyali);
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, neyali);
+    const t1 = putOnBattlefield(s0, ap, card("Soldier Token", "Token Creature — Soldier", "", { power: "1", toughness: "1" }));
+    const t2 = putOnBattlefield(s0, ap, card("Soldier Token", "Token Creature — Soldier", "", { power: "1", toughness: "1" }));
+    s0.objects[t1]!.isToken = s0.objects[t2]!.isToken = true;
+    const top = [ogre("Second Exiled"), ogre("First Exiled")].map((c) => putIn(s0, ap, c, "library"));
+    const other = opponentsOf(s0, ap)[1]!;
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: t1, defender: opp }, { attacker: t2, defender: other }] });
+    s = settleBots(s);
+    // Two players attacked: two cards.
+    expect(top.map((id) => s.objects[id]!.zone)).toEqual(["exile", "exile"]);
+    s = passUntil(s, "main2", ap);
+    expect(planCast(s, ap, top[1]!)).not.toBeNull();
+    // The next turn of ours, without attacking: not playable.
+    s = passUntil(s, "main1", ap, 4000);
+    expect(planCast(s, ap, top[1]!)).toBeNull();
+    // Attacking with a token again: it is.
+    s = passUntil(s, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: t1, defender: opp }] });
+    s = passUntil(s, "main2", ap);
+    expect(planCast(s, ap, top[0]!)).not.toBeNull();
+  });
+});
+
+const bonnyPall = card("Bonny Pall, Clearcutter", "Legendary Creature — Giant Scout", "{3}{G}{U}", { power: "6", toughness: "5", keywords: ["Reach"], oracleText: "Reach\nWhen Bonny Pall enters, create Beau, a legendary blue Ox creature token with \"Beau's power and toughness are each equal to the number of lands you control.\"\nWhenever you attack, draw a card, then you may put a land card from your hand or graveyard onto the battlefield." });
+
+describe("Bonny Pall, Clearcutter: Beau, and a land from the hand or graveyard whenever you attack", () => {
+  it("Beau's power and toughness are the lands you control; attacking draws, then a land comes from the graveyard", () => {
+    supported(bonnyPall);
+    const { s: s0, ap, ids, opp } = setup([bonnyPall]);
+    const yardLand = putIn(s0, ap, card("Test Grove", "Land", "", { oracleText: "{T}: Add {G}." }), "graveyard");
+    let s = settleBots(run(s0, planCast(s0, ap, ids[0]!)));
+    const beau = s.battlefield.find((id) => nameOf(s, id) === "Beau")!;
+    expect(s.objects[beau]!.isToken).toBe(true);
+    expect(characteristics(s, s.objects[beau]!).supertypes).toContain("Legendary");
+    expect(pt(s, beau)).toBe("14/14");
+    const attacker = putOnBattlefield(s, ap, ogre());
+    s = passUntil(s, "declareAttackers", ap);
+    const hand = s.players[ap]!.hand.length;
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker, defender: opp }] });
+    s = passToPending(s);
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap });
+    expect((s.pending as { cards: string[] }).cards).toContain(yardLand);
+    s = act(s, { type: "searchLibrary", player: ap, found: [yardLand] });
+    expect(s.objects[yardLand]!.zone).toBe("battlefield");
+    expect(pt(s, beau)).toBe("15/15");
   });
 });

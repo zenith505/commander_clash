@@ -1970,6 +1970,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     if (exTop && !exTop[1]) ctx.exiledTop = true;
+    // Neyali, Suns' Vanguard: "During any turn you attacked with a token, you may play that card." For as long as it stays
+    // exiled, in any turn its controller declared a token as an attacker (rulings), whatever became of Neyali.
+    if (exTop && !exTop[1] && !exEqual && !impulseIf && sentences[si + 1]?.replace(/\.$/, "") === "During any turn you attacked with a token, you may play that card") {
+      effects.push({ type: "impulse", n: 1, until: "exiled", attackedWithToken: true });
+      si++;
+      continue;
+    }
     // "Exile the top card of your library. You may cast that card. If you don't, ~ deals 2 damage to each opponent."
     // (Chandra, Torch of Defiance): cast as this resolves or not at all, paying its costs (rulings; CR 608.2g).
     const castTopElse = exTop && !exTop[1] && !exEqual && !impulseIf && sentences[si + 1]?.replace(/\.$/, "") === "You may cast that card" ? /^If you don't, (.+)$/.exec(sentences[si + 2]?.replace(/\.$/, "") ?? "") : null;

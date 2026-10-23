@@ -114,12 +114,15 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // A named legendary token (CR 111.4, 205.4d): "Create Ragavan, a legendary 2/1 red Monkey creature token", "create The
   // Atropal, a legendary 4/4 black God Horror creature token with deathtouch". In its quoted abilities the token's name
   // means the token itself ("When Smaug dies, ...").
-  if ((m = /^(?:(.+?) creates|(?:You )?[Cc]reate) ((?:The )?[A-Z][\w'-]*(?: (?:the |of the |of )?[A-Z][\w'-]*)*), a legendary (\d+)\/(\d+) (.+?) creature token(?: with (.+))?$/.exec(s))) {
+  // Bonny Pall: "create Beau, a legendary blue Ox creature token with "Beau's power and toughness are each equal to ..."":
+  // no printed power and toughness, which its characteristic-defining ability sets (CR 604.3).
+  if ((m = /^(?:(.+?) creates|(?:You )?[Cc]reate) ((?:The )?[A-Z][\w'-]*(?: (?:the |of the |of )?[A-Z][\w'-]*)*), a legendary (?:(\d+)\/(\d+) )?(.+?) creature token(?: with (.+))?$/.exec(s))) {
+    if (m[3] === undefined && !/^"[^"]*'s power and toughness are each equal to [^"]+"$/.test(m[6] ?? "")) return null;
     const name = m[2]!;
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
     const esc = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const withText = m[6]?.replace(/"[^"]*"/g, (q) => q.replace(new RegExp(`(^"|\\. )?\\b${esc}\\b`, "g"), (_, start?: string) => (start ? `${start}This creature` : "this creature")));
-    const token = parseToken(Number(m[3]), Number(m[4]), m[5]!, withText);
+    const token = parseToken(Number(m[3] ?? 0), Number(m[4] ?? 0), m[5]!, withText);
     return token && who ? [{ type: "createToken", who, n: 1, token: { ...token, name, named: true, legendary: true } }] : null;
   }
   // "For each token you control, create a token that's a copy of that permanent" (Second Harvest), "For each creature

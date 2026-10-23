@@ -2,7 +2,7 @@
 // played cards.
 
 import { describe, expect, it } from "vitest";
-import { act, card, passUntil, putOnBattlefield, setup, swamp } from "./helpers";
+import { act, card, island, passUntil, putOnBattlefield, setup, swamp } from "./helpers";
 import { botActions, characteristics, isFullySupported, legalActions, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -362,5 +362,172 @@ describe("Lord of the Void: exile seven of the player's cards, then take a creat
     expect(s.objects[elf]!.controller).toBe(ap);
     expect(s.objects[ogre]!.zone).toBe("exile");
     expect(s.objects[rock]!.zone).toBe("exile");
+  });
+});
+
+const forgottenCreation = card("Forgotten Creation", "Creature — Zombie Horror", "{3}{U}", {
+  power: "3",
+  toughness: "3",
+  keywords: ["Skulk"],
+  oracleText: "Skulk (This creature can't be blocked by creatures with greater power.)\nAt the beginning of your upkeep, you may discard all the cards in your hand. If you do, draw that many cards.",
+});
+const shadowheart = card("Shadowheart, Dark Justiciar", "Legendary Creature — Human Elf Cleric", "{3}{B}", {
+  power: "3",
+  toughness: "4",
+  keywords: ["Choose a background"],
+  oracleText: "{1}{B}, {T}, Sacrifice another creature: Draw X cards, where X is that creature's power.\nChoose a Background (You can have a Background as a second commander.)",
+});
+const lulu = card("Lulu, Stern Guardian", "Legendary Creature — Human Wizard", "{2}{U}", {
+  power: "2",
+  toughness: "3",
+  keywords: ["Proliferate"],
+  oracleText: "Whenever an opponent attacks you, choose target creature attacking you. Put a stun counter on that creature.\n{3}{U}: Proliferate. (Choose any number of permanents and/or players, then give each another counter of each kind already there.)",
+});
+const riverKelpie = card("River Kelpie", "Creature — Beast", "{3}{U}{U}", {
+  power: "3",
+  toughness: "3",
+  keywords: ["Persist"],
+  oracleText: "Whenever this creature or another permanent enters from a graveyard, draw a card.\nWhenever a player casts a spell from a graveyard, draw a card.\nPersist (When this creature dies, if it had no -1/-1 counters on it, return it to the battlefield under its owner's control with a -1/-1 counter on it.)",
+});
+const berserk = card("Berserk", "Instant", "{G}", {
+  oracleText: "Cast this spell only before the combat damage step.\nTarget creature gains trample and gets +X/+0 until end of turn, where X is its power. At the beginning of the next end step, destroy that creature if it attacked this turn.",
+});
+const seeDouble = card("See Double", "Instant", "{2}{U}{U}", {
+  oracleText: "This spell can't be copied.\nChoose one. If an opponent has eight or more cards in their graveyard, you may choose both instead.\n• Copy target spell. You may choose new targets for the copy. (A copy of a permanent spell becomes a token.)\n• Create a token that's a copy of target creature.",
+});
+const pilgrimage = card("Nissa's Pilgrimage", "Sorcery", "{2}{G}", {
+  keywords: ["Spell mastery"],
+  oracleText: "Search your library for up to two basic Forest cards, reveal those cards, and put one onto the battlefield tapped and the rest into your hand. Then shuffle.\nSpell mastery — If there are two or more instant and/or sorcery cards in your graveyard, search your library for up to three basic Forest cards instead of two.",
+});
+const selection = card("Necromantic Selection", "Sorcery", "{4}{B}{B}{B}", {
+  oracleText: "Destroy all creatures, then return a creature card put into a graveyard this way to the battlefield under your control. It's a black Zombie in addition to its other colors and types. Exile Necromantic Selection.",
+});
+const coalitionRelic = card("Coalition Relic", "Artifact", "{3}", {
+  oracleText: "{T}: Add one mana of any color.\n{T}: Put a charge counter on this artifact.\nAt the beginning of your first main phase, remove all charge counters from this artifact. Add one mana of any color for each charge counter removed this way.",
+});
+
+describe("round 129: more popular cards", () => {
+  it("Forgotten Creation: discard the hand at upkeep, then draw that many", () => {
+    supported(forgottenCreation);
+    const { s: s0, ap } = setup([card("Hand A", "Sorcery", "{1}"), card("Hand B", "Sorcery", "{1}"), card("Hand C", "Sorcery", "{1}")]);
+    putOnBattlefield(s0, ap, forgottenCreation);
+    let s = passUntil(s0, "upkeep", ap);
+    s = passToPending(s);
+    const hand = s.players[ap]!.hand.length;
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    s = settleBots(s);
+    expect(s.players[ap]!.hand.length).toBe(hand);
+    expect(s.players[ap]!.hand.some((id) => nameOf(s, id).startsWith("Hand "))).toBe(false);
+    expect(s.players[ap]!.graveyard.filter((id) => nameOf(s, id).startsWith("Hand ")).length).toBe(3);
+  });
+  it("Shadowheart: draws as many cards as the sacrificed creature's power", () => {
+    supported(shadowheart);
+    const { s: s0, ap } = setup([]);
+    const sh = putOnBattlefield(s0, ap, shadowheart);
+    const big = putOnBattlefield(s0, ap, card("Big Ogre", "Creature — Ogre", "{4}", { power: "4", toughness: "4" }));
+    const hand = s0.players[ap]!.hand.length;
+    const s = settleBots(run(s0, planActivate(s0, ap, sh, 0, undefined, undefined, undefined, undefined, { sacrifice: [big] })));
+    expect(s.objects[big]!.zone).toBe("graveyard");
+    expect(s.players[ap]!.hand.length).toBe(hand + 4);
+  });
+  it("Lulu: an opponent attacking you gets a stun counter on one of the creatures attacking you", () => {
+    supported(lulu);
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, opp, lulu);
+    const a = putOnBattlefield(s0, ap, card("Raider", "Creature — Orc", "{1}{R}", { power: "2", toughness: "2" }));
+    const s = attackThrough(s0, ap, [{ attacker: a, defender: opp }]);
+    expect(s.objects[a]!.counters.stun).toBe(1);
+  });
+  it("Lulu: not when the attack is at another player", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const other = s0.turnOrder[(s0.turnOrder.indexOf(ap) + 2) % 4]!;
+    putOnBattlefield(s0, opp, lulu);
+    const a = putOnBattlefield(s0, ap, card("Raider", "Creature — Orc", "{1}{R}", { power: "2", toughness: "2" }));
+    const s = attackThrough(s0, ap, [{ attacker: a, defender: other }]);
+    expect(s.objects[a]!.counters.stun ?? 0).toBe(0);
+  });
+  it("River Kelpie: it persists back from the graveyard and draws; a permanent entering from a hand doesn't", () => {
+    supported(riverKelpie);
+    const { s: s0, ap } = setup([]);
+    const k = putOnBattlefield(s0, ap, riverKelpie);
+    const hand = s0.players[ap]!.hand.length;
+    s0.objects[k]!.damage = 3;
+    const s = settleBots(act(s0, { type: "passPriority", player: waitingOn(s0)! }));
+    expect(s.objects[k]!.zone).toBe("battlefield");
+    expect(s.objects[k]!.counters["-1/-1"]).toBe(1);
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+  });
+  it("Berserk: doubles power (as it resolves) with trample, and the creature is destroyed at end step only if it attacked", () => {
+    supported(berserk);
+    for (const attacks of [true, false]) {
+      const { s: s0, ap, opp, ids } = setup([berserk]);
+      const c = putOnBattlefield(s0, ap, card("Brawler", "Creature — Ogre", "{2}{R}", { power: "3", toughness: "3" }));
+      let s = run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: c }]));
+      s = settleBots(s);
+      expect(characteristics(s, s.objects[c]!).power).toBe(6);
+      expect(characteristics(s, s.objects[c]!).keywords).toContain("Trample");
+      if (attacks) s = attackThrough(s, ap, [{ attacker: c, defender: opp }]);
+      s = passUntil(s, "cleanup", ap);
+      expect(s.objects[c]!.zone).toBe(attacks ? "graveyard" : "battlefield");
+    }
+  });
+  it("See Double: a copy effect makes no copy of it", () => {
+    supported(seeDouble);
+    const twincast = card("Twincast", "Instant", "{U}{U}", { oracleText: "Copy target instant or sorcery spell. You may choose new targets for the copy." });
+    const { s: s0, ap, opp, ids } = setup([seeDouble, twincast]);
+    for (let i = 0; i < 3; i++) putOnBattlefield(s0, ap, island);
+    const c = putOnBattlefield(s0, opp, card("Their Ogre", "Creature — Ogre", "{2}{R}", { power: "3", toughness: "3" }));
+    let s = run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: c }], [1]));
+    const sd = s.stack[s.stack.length - 1]!;
+    s = run(s, planCast(s, ap, ids[1]!, [{ kind: "stack", id: sd.id }]));
+    s = settleBots(s);
+    expect(logText(s)).toMatch(/See Double can't be copied/);
+    expect(s.battlefield.filter((id) => nameOf(s, id) === "Their Ogre" && s.objects[id]!.controller === ap).length).toBe(1);
+  });
+  it("Nissa's Pilgrimage: two Forests, or three with spell mastery", () => {
+    supported(pilgrimage);
+    for (const mastery of [false, true]) {
+      const { s: s0, ap, ids } = setup([pilgrimage]);
+      if (mastery) for (const n of ["Old A", "Old B"]) putIn(s0, ap, card(n, "Instant", "{U}"), "graveyard");
+      const forests = s0.players[ap]!.library.filter((id) => nameOf(s0, id) === "Forest").length;
+      let s = passToPending(run(s0, planCast(s0, ap, ids[0]!)));
+      expect(s.pending?.kind).toBe("searchLibrary");
+      s = settleBots(s);
+      const left = s.players[ap]!.library.filter((id) => nameOf(s, id) === "Forest").length;
+      expect(forests - left).toBe(mastery ? 3 : 2);
+    }
+  });
+  it("Necromantic Selection: destroys all creatures and returns one of the creature cards as a black Zombie", () => {
+    supported(selection);
+    const { s: s0, ap, opp, ids } = setup([selection]);
+    putOnBattlefield(s0, ap, swamp);
+    const mine = putOnBattlefield(s0, ap, card("My Elf", "Creature — Elf", "{G}", { power: "1", toughness: "1" }));
+    const theirs = putOnBattlefield(s0, opp, card("Their Dragon", "Creature — Dragon", "{5}{R}", { power: "5", toughness: "5" }));
+    let s = passToPending(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "impulseChoice", player: ap });
+    expect((s.pending as { options: string[] }).options.sort()).toEqual([mine, theirs].sort());
+    s = act(s, { type: "chooseOption", player: ap, choice: theirs });
+    s = settleBots(s);
+    expect(s.objects[theirs]!.zone).toBe("battlefield");
+    expect(s.objects[theirs]!.controller).toBe(ap);
+    const ch = characteristics(s, s.objects[theirs]!);
+    expect(ch.subtypes).toContain("Zombie");
+    expect(ch.colors).toEqual(expect.arrayContaining(["B", "R"]));
+    expect(s.objects[mine]!.zone).toBe("graveyard");
+    expect(s.objects[ids[0]!]!.zone).toBe("exile");
+  });
+  it("Coalition Relic: its charge counters become mana of any colors at the start of your first main phase", () => {
+    supported(coalitionRelic);
+    const { s: s0, ap } = setup([]);
+    const r = putOnBattlefield(s0, ap, coalitionRelic);
+    s0.objects[r]!.counters.charge = 2;
+    let s = passUntil(s0, "main1", s0.turnOrder[(s0.turnOrder.indexOf(ap) + 1) % 4]!);
+    s = passUntil(s, "main1", ap);
+    s = passToPending(s);
+    for (let i = 0; i < 5 && s.pending; i++) s = botActions(s, s.pending.player).reduce((x, a) => act(x, a), s);
+    expect(s.objects[r]!.counters.charge ?? 0).toBe(0);
+    const pool = s.players[ap]!.manaPool as Record<string, number>;
+    expect(Object.values(pool).reduce((a, b) => a + b, 0)).toBe(2);
   });
 });

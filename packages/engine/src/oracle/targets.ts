@@ -945,6 +945,11 @@ export function parseTargetPhrase(
     owner = "opponent";
     p = p.replace(/ (?:you don't|an opponent) owns?$/, "");
   }
+  // "Target creature attacking you" (Lulu, Stern Guardian): attacking you, not your planeswalkers (CR 506.3, 508.1b).
+  if (!inGraveyard && !extra.combat && /^creature (?:that's )?attacking you$/.test(p)) {
+    extra.combat = "attackingYou";
+    p = "creature";
+  }
   if (/ (an opponent controls|you don't control)$/.test(p)) {
     controller = "opponent";
     p = p.replace(/ (an opponent controls|you don't control)$/, "");

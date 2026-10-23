@@ -586,7 +586,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     }
     // "Whenever a creature you control enters", "another Ally", "~ or another artifact": on every permanent,
     // the entering one too, which is the subject ("that creature"). It sees itself enter (CR 603.6a).
-    const entersWatch = (o: GameObject, ctrl: PlayerId) => add(o, ctrl, (e, t) => e === "permanentEnters" && !!t.enters && entersMatches(s, t.enters, o, entering, ctrl), undefined, undefined, entering);
+    const entersWatch = (o: GameObject, ctrl: PlayerId) => add(o, ctrl, (e, t) => e === "permanentEnters" && !!t.enters && entersMatches(s, t.enters, o, entering, ctrl) && (!t.ifFromGraveyard || (!!entering.enteredFromGraveyard && (t.ifFromGraveyard === "any" || entering.owner === ctrl))), undefined, undefined, entering);
     for (const id of s.battlefield) entersWatch(obj(s, id), controllerOf(s, obj(s, id)));
     fromGraveyards(entersWatch);
     fromEmblems(entersWatch);

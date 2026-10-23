@@ -712,6 +712,8 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
         const n = Math.min(had, e.n === "all" ? had : amountNow(s, e.n, ctx));
         if (n <= 0) continue;
         o.counters[e.counter] = had - n;
+        // "For each charge counter removed this way" (Coalition Relic).
+        if (s.resolving) s.resolving.countersRemoved = (s.resolving.countersRemoved ?? 0) + n;
         invalidateCharacteristics(s);
         log(s, `${characteristics(s, o).name} loses ${n} ${e.counter} counter${n > 1 ? "s" : ""}.`);
         if (had === n) fireEvent(s, { type: "lastCounterRemoved", id: o.id, counter: e.counter });

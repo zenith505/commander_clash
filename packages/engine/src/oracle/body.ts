@@ -1,7 +1,7 @@
 import { parseFromTop } from "./compile";
 import { allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose } from "../abilities";
 import { substituteX } from "../amounts";
-import { differenceInHand, num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS, singularWord } from "./words";
+import { differenceInHand, num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS, singularWord, NUMBER_WORDS } from "./words";
 import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_KEYWORD, CHOSEN_PROTECTION, CREATURE_TYPES, THAT_PLAYER_PROTECTION } from "../keywords";
 import { parsePreventAll, parseStaticCondition } from "./statics";
 import { parseBoundCount, parseCount } from "./counts";
@@ -707,6 +707,11 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "Transform ~, then untap it" (Westvale Abbey): the same permanent, now its back face (CR 712.18).
   text = text.replace(/^Transform ~, then untap it\.$/, "Transform ~, then untap ~.");
   text = text.replace(/Choose 1, 2, or 3 at random\. Its controller mills that many cards, then exiles cards from the top of their library until they exile a nonland card with a different name than that spell\. They may cast that card without paying its mana cost\. Then they put the exiled cards on the bottom of their library in a random order\./, `${TIBALT}.`);
+  // Nissa's Pilgrimage: "..., reveal those cards, and put one onto the battlefield tapped and the rest into your hand. Then
+  // shuffle." is Cultivate's search.
+  text = text.replace(/^(Search your library for up to \w+ [^.]+? cards, reveal those cards), and (put one [^.]+? and the rest into your hand)\. Then shuffle\./, "$1, $2, then shuffle.");
+  // Forgotten Creation: "you may discard all the cards in your hand. If you do, draw that many cards": both or neither.
+  text = text.replace(/^[Yy]ou may discard all the cards in your hand\. If you do, draw that many cards\.$/, "You may discard your hand, then draw that many cards.");
   text = text.replace(/If you haven't cast a spell this turn, you may cast that card\. If you do, you can't cast additional spells this turn\./, "If you haven't cast a spell this turn, you may cast that card, and if you do, you can't cast additional spells this turn.");
   text = text.replace(/ gains flashback until end of turn\. (?:The|Its) flashback cost is equal to (?:its|that card's) mana cost\./g, " gains flashback with its mana cost until end of turn.");
   // Search for Survivors: "An opponent chooses a card at random in your graveyard. If it's a creature card, put it onto the
@@ -1324,6 +1329,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // "At the beginning of the next end step, sacrifice that creature" (Meek Attack) is "Sacrifice that creature at the
     // beginning of the next end step" (one instruction, no condition).
+    // Berserk: "At the beginning of the next end step, destroy that creature if it attacked this turn": checked as the
+    // delayed trigger resolves; it's destroyed even if it stopped being a creature (rulings).
+    if (s === "At the beginning of the next end step, destroy that creature if it attacked this turn") {
+      const later = parseOne("Destroy that creature at the beginning of the next end step", ctx);
+      const d = later?.length === 1 && later[0]!.type === "delayed" ? later[0]! : undefined;
+      if (!d || d.type !== "delayed") return null;
+      effects.push({ ...d, effects: [{ type: "if", cond: { kind: "subjectIs", filter: { kind: "object", types: [], combat: "attackedThisTurn", text: "permanent that attacked this turn" } }, effects: d.effects }], text: "Destroy that creature if it attacked this turn" });
+      continue;
+    }
     const atNext = /^At the beginning of (the|your) next end step, ((?:sacrifice|exile|destroy|return) [^,]+)$/.exec(s);
     if (atNext && !/\b(?:if|unless|then|instead)\b| to the battlefield/.test(atNext[2]!)) s = `${atNext[2]!.charAt(0).toUpperCase()}${atNext[2]!.slice(1)} at the beginning of ${atNext[1]} next end step`;
     // "Sacrifice any number of other permanents, then draw that many cards" (God-Eternal Bontu), "you may sacrifice any
@@ -1397,6 +1411,26 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (fx?.length !== 1 || fx[0]!.type !== "search" || !cond) return null;
       effects.push({ ...fx[0]!, mayInstead: { dest: { zone: "battlefield", ...(mayInstead[2] ? { tapped: true } : {}) }, cond } });
       si += 3;
+      continue;
+    }
+    // Necromantic Selection: "Destroy all creatures, then return a creature card put into a graveyard this way to the
+    // battlefield under your control": one of those that died (CR 700.4), chosen as it resolves.
+    const diedBack = /^Return an? (creature card) put into a graveyard this way to the battlefield under your control$/.exec(s);
+    const prevDestroy = effects[effects.length - 1];
+    if (diedBack && prevDestroy?.type === "destroy" && prevDestroy.what.ref === "each") {
+      const filter = parseSearchFilter(diedBack[1]!);
+      if (!filter) return null;
+      effects.push({ type: "returnDiedThisWay", filter });
+      continue;
+    }
+    // Nissa's Pilgrimage: "If there are two or more instant and/or sorcery cards in your graveyard, search your library
+    // for up to three basic Forest cards instead of two": the same search, for more cards while that's true as it resolves.
+    const moreIf = /^If (.+), search your library for up to (two|three|four|five) (.+?) instead of (one|two|three|four)$/.exec(s);
+    const lastSearch = effects[effects.length - 1];
+    if (moreIf && lastSearch?.type === "search" && lastSearch.upTo && lastSearch.n === NUMBER_WORDS[moreIf[4]!] && lastSearch.filter && parseSearchFilter(moreIf[3]!)?.text === lastSearch.filter.text) {
+      const cond = parseStaticCondition(moreIf[1]!, { affects: { kind: "self" }, mods: [], text: "" });
+      if (!cond) return null;
+      effects[effects.length - 1] = { type: "if", cond: { kind: "state", cond }, effects: [{ ...lastSearch, n: NUMBER_WORDS[moreIf[2]!]! }], otherwise: [lastSearch] };
       continue;
     }
     // "Sacrifice a creature. If you do, ...": only if one was sacrificed (you must if you can, rulings on Victimize).
@@ -4089,6 +4123,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         continue;
       }
       if (/^Each of them/.test(s)) return null;
+      if (prev?.type === "returnDiedThisWay" && mods && !prev.alsoMods) {
+        prev.alsoMods = mods;
+        continue;
+      }
       if (prev?.type !== "putOntoBattlefield" || !mods || (prev.what.ref === "target" && prev.what.n) || prev.alsoMods) return null;
       prev.alsoMods = mods;
       continue;

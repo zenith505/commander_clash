@@ -23,6 +23,11 @@ function putSpellCopy(s: GameState, orig: StackItem, controller: PlayerId, targe
   if (!card) return;
   // A copy of a nonmodal double-faced spell's back face (cast transformed: disturb) has mana value 0 (CR 202.3b).
   const def = s.cards[cardIdOf(card)]!;
+  // "~ can't be copied" (See Double): no copy is made (CR 707.10).
+  if (compileCard(def).spell?.uncopyable) {
+    log(s, `${def.name} can't be copied.`);
+    return;
+  }
   const base = def.faceOf && def.faceOf.face > 0 && def.layout === "transform" ? s.cards[copyKey(s, def)]! : def;
   // "Except it isn't legendary" (Double Major): an exception to the copy's copiable values (CR 707.9b).
   const o = newObject(s, except ? s.cards[copyKey(s, base, except)]! : base, controller, "stack");
@@ -303,7 +308,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         const orig = e.spell === "self" ? r.item : id ? (s.stack.find((x) => x.id === id) ?? s.castItems?.[id] ?? s.epics?.[id]) : undefined;
         if (!orig || (orig.kind !== "spell" && !(orig.kind === "ability" && orig.body))) return;
         // "This ability can't be copied" (Gogo), "~ can't be copied" (See Double): no copy is made.
-        if (orig.body?.uncopyable) {
+        const origCard = orig.kind === "spell" && orig.objectId ? s.objects[orig.objectId] : undefined;
+        if (orig.body?.uncopyable || (origCard && compileCard(s.cards[cardIdOf(origCard)]!).spell?.uncopyable)) {
           log(s, `${orig.description} can't be copied.`);
           return;
         }

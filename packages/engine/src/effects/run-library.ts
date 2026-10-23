@@ -1,6 +1,6 @@
 import type { Effect, PlayerRef, SearchDest } from "../abilities";
 import { abilitiesOf, cardIdOf, defOf, isPermanentCard, isType } from "../cards";
-import { controllerOf, staticConditionNow } from "../layers";
+import { controllerOf, invalidateCharacteristics, staticConditionNow } from "../layers";
 import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { castProblem, freeCastable, draw, gainLife, log, loseLife, millCount, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
@@ -103,6 +103,30 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       if (!id || s.objects[id]?.zone !== "exile") return;
       log(s, `${player(s, ctx.controller).name} puts ${defOf(s, obj(s, id)).name} onto the battlefield.`);
       moveObject(s, id, "battlefield", { controller: ctx.controller });
+      return;
+    }
+    case "returnDiedThisWay": {
+      const sc = (s.resolving!.scratch ??= {});
+      if (!sc.impulseChoice) {
+        // The cards still in the graveyard the destroy put them into (CR 400.7): a token there ceased to exist (CR 704.5d).
+        const ids = (s.resolving?.destroyed ?? []).filter((x) => x.died && s.objects[x.o.id]?.zone === "graveyard" && (s.objects[x.o.id]!.zoneChanges ?? 0) === (x.o.zoneChanges ?? 0) + 1 && !s.objects[x.o.id]!.isToken && printedMatches(e.filter, defOf(s, obj(s, x.o.id)))).map((x) => x.o.id);
+        sc.impulseChoice = { ids };
+        if (ids.length > 1) {
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "impulseChoice", options: ids, labels: ids.map((id) => defOf(s, obj(s, id)).name), prompt: `choose ${/^[aeiou]/i.test(e.filter.text) ? "an" : "a"} ${e.filter.text} put into a graveyard this way to put onto the battlefield under your control` };
+          return "paused";
+        }
+      }
+      const st = sc.impulseChoice;
+      sc.impulseChoice = undefined;
+      const id = st.pick ?? st.ids[0];
+      if (!id || s.objects[id]?.zone !== "graveyard") return;
+      log(s, `${player(s, ctx.controller).name} returns ${defOf(s, obj(s, id)).name} to the battlefield.`);
+      moveObject(s, id, "battlefield", { controller: ctx.controller });
+      const o = obj(s, id);
+      if (e.alsoMods && o.zone === "battlefield") {
+        s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: [o.id], mods: e.alsoMods });
+        invalidateCharacteristics(s);
+      }
       return;
     }
     case "revealTop": {

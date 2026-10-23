@@ -1804,10 +1804,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (draws) return draws;
   // Cunning Rhetoric: "Whenever an opponent attacks you and/or one or more planeswalkers you control": once each combat that
   // opponent attacks with one or more creatures attacking you or your planeswalkers (CR 508.3e).
+  // Lulu, Stern Guardian: "Whenever an opponent attacks you": with one or more creatures attacking you, not your
+  // planeswalkers or battles (rulings).
   // Struggle for Project Purity: "Whenever a player attacks you with one or more creatures, that player gets twice that
   // many rad counters": only an opponent can attack you (CR 506.2); "that many" is how many were declared attacking you
   // (rulings).
-  const attacked = /^Whenever (?:an opponent|a player) attacks (you with (?:two|one) or more creatures|with creatures, if two or more of those creatures are attacking you and\/or planeswalkers you control|you and\/or one or more planeswalkers you control), (.+)$/.exec(line);
+  const attacked = /^Whenever (?:an opponent|a player) attacks (you with (?:two|one) or more creatures|with creatures, if two or more of those creatures are attacking you and\/or planeswalkers you control|you and\/or one or more planeswalkers you control|you), (.+)$/.exec(line);
   if (attacked && (/^Whenever a player/.test(line) ? /^you with one or more creatures$/.test(attacked[1]!) : true)) {
     const thatMany = /\bthat many\b/.test(attacked[2]!);
     if (thatMany && (/\bX\b/.test(attacked[2]!) || !/^you with/.test(attacked[1]!))) return "fail";
@@ -1928,6 +1930,12 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   }
   // "Whenever an artifact or creature an opponent controls enters untapped" (Charismatic Conqueror), "whenever a
   // permanent you control enters tapped" (Amulet of Vigor): how it entered is part of the trigger event.
+  // River Kelpie: "Whenever ~ or another permanent enters from a graveyard": where it came from is part of the event.
+  const othersFromYard = /^Whenever (?!~ enters)(.+?) enters from a graveyard, (.+)$/.exec(line);
+  if (othersFromYard) {
+    const t = parseTrigger(`Whenever ${othersFromYard[1]} enters, ${othersFromYard[2]}`);
+    return !t || t === "fail" || t.event !== "permanentEnters" ? "fail" : { ...t, ifFromGraveyard: "any" };
+  }
   const howEnters = /^Whenever (?!~ )(.+?) enters (tapped|untapped), (.+)$/.exec(line);
   if (howEnters) {
     const t = parseTrigger(`Whenever ${howEnters[1]} enters, ${howEnters[3]}`);

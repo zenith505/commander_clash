@@ -434,6 +434,7 @@ export function compile(d: CardDef): CompiledCard {
   // "Choose three. You may choose the same mode more than once." (the Confluences, CR 700.2d).
   let repeat = false;
   let cipher = false;
+  let uncopyableSpell = false;
   const all = joinModes(
     normalizeSelf(d)
       // "As ~ enters, choose a creature type. ~ enters with a fellowship counter on it for each ..." (Banner of Kinship):
@@ -464,6 +465,14 @@ export function compile(d: CardDef): CompiledCard {
           return "Choose one —";
         }
         const m = /^Choose one\. If (~ was cast using teamwork, choose|you control a commander as you cast ~, you may choose) both instead\.$/.exec(l.trim());
+        // "If an opponent has eight or more cards in their graveyard" (See Double), "if you descended this turn" (Molten
+        // Collapse): about the caster as the spell is cast (CR 601.2b), like Flame of Anor's.
+        const other = !m && !control ? /^Choose one\. If (an opponent has .+ in their graveyard|you descended this turn), you may choose both instead\.$/.exec(l.trim()) : null;
+        if (other) {
+          both = "control";
+          bothIf = `?${other[1]}`;
+          return "Choose one —";
+        }
         if (!m) return l;
         both = m[1]!.startsWith("~") ? "teamwork" : "commander";
         return "Choose one —";
@@ -503,6 +512,11 @@ export function compile(d: CardDef): CompiledCard {
     // "Vivid — {T}: For each color among permanents you control, add ..." (Bloom Tender): an ability word too.
     else if (!isSpell && /^Vivid — \{/.test(line)) line = line.replace(/^Vivid — /, "");
     if (!line) continue;
+    // "~ can't be copied." (See Double): copy effects make no copy of this spell (CR 707.10).
+    if (isSpell && line === "~ can't be copied.") {
+      uncopyableSpell = true;
+      continue;
+    }
     // "~ has all activated abilities of ..." (CompiledCard.borrows).
     const borrow = /^(?:As long as ~ is on the battlefield, it|~) has all activated abilities of (.+?)( except mana abilities)?\.( You may spend mana as though it were mana of any color to activate those abilities\.)?$/.exec(line);
     // Conspicuous Snoop: "As long as the top card of your library is a Goblin card, ~ has all activated abilities of that
@@ -2689,8 +2703,8 @@ export function compile(d: CardDef): CompiledCard {
   } else if (both) {
     // Teamwork's "choose both" needs teamwork; either way, a list of exactly two modes.
     const modal = out.spell?.modal;
-    const cond = bothIf !== undefined ? parseStaticCondition(`you control ${bothIf}`, { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
-    const playerCond = cond?.kind === "control" && !cond.other && (cond.who ?? "you") === "you";
+    const cond = bothIf !== undefined ? parseStaticCondition(bothIf.startsWith("?") ? bothIf.slice(1) : `you control ${bothIf}`, { affects: { kind: "self" }, mods: [], text: "" }) : undefined;
+    const playerCond = (cond?.kind === "control" && !cond.other && (cond.who ?? "you") === "you") || cond?.kind === "opponentGraveyard" || cond?.kind === "descended";
     if (both === "control" && modal && modal.min === 1 && modal.max === 1 && modal.modes.length >= 2 && playerCond) {
       modal.both = both;
       modal.bothIf = cond!;
@@ -2699,6 +2713,10 @@ export function compile(d: CardDef): CompiledCard {
       delete out.spell;
       out.unsupported.push("Choose one. If ... choose both instead.");
     }
+  }
+  if (uncopyableSpell) {
+    if (out.spell) out.spell.uncopyable = true;
+    else out.unsupported.push("~ can't be copied.");
   }
   if (cipher) {
     if (out.spell && !out.spell.modal) out.spell = { ...out.spell, effects: [...out.spell.effects, { type: "cipher" }] };

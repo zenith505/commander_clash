@@ -2244,6 +2244,12 @@ export type Effect =
    * it resolves; not optional when there is one (rulings).
    */
   | { type: "putFromExiledTop"; filter: TargetSpec }
+  /**
+   * "Destroy all creatures, then return a creature card put into a graveyard this way to the battlefield under your
+   * control" (Necromantic Selection): one of the cards this resolution's destroy put into graveyards, chosen as it
+   * resolves; `alsoMods`: "It's a black Zombie in addition to its other colors and types", for good.
+   */
+  | { type: "returnDiedThisWay"; filter: TargetSpec; alsoMods?: Modification[] }
   | { type: "exileTop"; who: PlayerRef; n: Amount; /** "Put all artifact cards from among them onto the battlefield" (Tezzeret, Master of the Bridge): together, under your control. */ putAll?: TargetSpec }
   /**
    * Dark Confidant: "reveal the top card of your library and put that card into your hand", then maybe "[you] lose

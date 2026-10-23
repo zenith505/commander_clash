@@ -306,6 +306,11 @@ export function parseActivated(raw: string): ActivatedAbility | "fail" | null {
     .join("");
   // "Sacrifice ~: It deals damage equal to its power to ...", "Put two +1/+1 counters on ~. It deals 1 damage to any
   // target": "it" is the source, the only object named before it.
+  // Shadowheart: "Sacrifice another creature: Draw X cards, where X is that creature's power": the creature sacrificed to
+  // pay the cost, as it last existed on the battlefield (CR 608.2h).
+  const oneSac = extra.filter((c) => c.kind === "sacrifice");
+  if (oneSac.length === 1 && oneSac[0]!.kind === "sacrifice" && oneSac[0]!.n === 1 && oneSac[0]!.filter.types?.length === 1 && oneSac[0]!.filter.types[0] === "Creature")
+    effectText = effectText.replace(/^Draw X cards, where X is that creature's power\.$/, "Draw cards equal to the sacrificed creature's power.");
   const body = putFromHand || putFromCommand ? { targets: [], effects: [{ type: "putOntoBattlefield" as const, what: { ref: "selfCard" as const } }], text: effectText } : parseBody(effectText.replace(/^It (?=deals\b)/, "~ ").replace(/^(Put [^.]+ counters? on ~\. )It (?=deals\b)/, "$1~ "), { activated: true, ...(returnsSelf || inYard ? { selfCard: true } : {}), ...(fromHand ? { discardedSelf: true as const } : {}), ...(extra.some((c) => c.kind === "exileFromGraveyard" && c.linked) ? { costLinked: true } : {}) });
   if (!body) return "fail";
   if (uncopyable) body.uncopyable = true;

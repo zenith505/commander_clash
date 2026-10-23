@@ -2209,6 +2209,8 @@ export type Effect =
   | { type: "repeatMay"; effects: Effect[]; text: string }
   /** Sunforger: the card a search with dest "cast" found, cast from the library without paying its mana cost (CR 608.2g). */
   | { type: "castSearched" }
+  /** Geode Golem: "you may cast your commander from the command zone without paying its mana cost", as this resolves (CR 608.2g). */
+  | { type: "castCommanderFree" }
   /** Eladamri, Korvecdal: reveal a card from your hand or the top card of your library; one matching `filter` goes onto the battlefield. */
   | { type: "revealHandOrTop"; filter: TargetSpec }
   /**

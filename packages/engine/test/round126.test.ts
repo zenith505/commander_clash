@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { botActions, characteristics, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { botActions, characteristics, isFullySupported, objHasKeyword, objIsType, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -632,5 +632,47 @@ describe("Etchings of the Chosen: \"Sacrifice a creature of the chosen type\" (C
     const { s: s0, ap, e, elf, bear } = scene();
     s0.objects[e]!.chosen = { type: "Bear" };
     expect(planActivate(s0, ap, e, 0, [{ kind: "object", id: elf }], undefined, undefined, undefined, { sacrifice: [bear] })).not.toBeNull();
+  });
+});
+
+const geode = card("Geode Golem", "Artifact Creature — Golem", "{5}", {
+  power: "5",
+  toughness: "3",
+  keywords: ["Trample"],
+  oracleText: "Trample\nWhenever this creature deals combat damage to a player, you may cast your commander from the command zone without paying its mana cost. (You still pay any additional costs.)",
+});
+
+describe("Geode Golem: cast your commander free, paying the commander tax (CR 903.8, 118.9d)", () => {
+  const hit = (casts: number) => {
+    const { s: s0, ap, opp } = setup([]);
+    const g = putOnBattlefield(s0, ap, geode);
+    const cmd = s0.players[ap]!.command.find((id) => s0.objects[id]!.isCommander)!;
+    s0.players[ap]!.commanderCasts[cmd] = casts;
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: g, defender: opp }] });
+    s = untilPending(s, "declareBlockers");
+    s = act(s, { type: "declareBlockers", player: s.pending!.player, blocks: [] });
+    s = passUntil(s, "combatDamage");
+    s = untilChoice(s);
+    return { s, ap, cmd };
+  };
+  it("offers the commander from the command zone; cast, it costs only the tax", () => {
+    supported(geode);
+    const { s: s0, ap, cmd } = hit(1);
+    expect(s0.pending).toMatchObject({ kind: "castFree", player: ap, objectId: cmd });
+    const untapped = (x: GameState) => x.battlefield.filter((id) => x.objects[id]!.controller === ap && !x.objects[id]!.tapped && objIsType(x, x.objects[id]!, "Land")).length;
+    const before = untapped(s0);
+    const s = run(s0, planCast(s0, ap, cmd));
+    expect(s.stack.some((x) => x.objectId === cmd)).toBe(true);
+    expect(before - untapped(s)).toBe(2);
+    expect(s.players[ap]!.commanderCasts[cmd]).toBe(2);
+  });
+  it("never cast before: no mana at all; a bot casts it", () => {
+    const { s: s0, ap, cmd } = hit(0);
+    const s = run(s0, planCast(s0, ap, cmd));
+    expect(s.stack.some((x) => x.objectId === cmd)).toBe(true);
+    expect(s.battlefield.filter((id) => s.objects[id]!.tapped).length).toBe(s0.battlefield.filter((id) => s0.objects[id]!.tapped).length);
+    const b = botActions(s0, ap).reduce((x, a) => act(x, a), s0);
+    expect(b.stack.some((x) => x.objectId === cmd)).toBe(true);
   });
 });

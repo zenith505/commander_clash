@@ -514,11 +514,12 @@ export function madnessCastOf(s: GameState, pid: PlayerId, id: ObjectId): string
  * A decision that asks for a mana payment, during which mana abilities can be activated (CR 605.3a): paying a cost
  * mid-resolution, like ward's; casting a card for its madness cost as madness's trigger resolves (CR 702.35a, 601.2g);
  * helping to pay for a spell with assist, or paying the rest of it (CR 702.132a); declaring attackers, to pay what
- * attacking costs (CR 508.1i); declaring blockers, to pay what blocking costs (CR 509.1f).
+ * attacking costs (CR 508.1i); declaring blockers, to pay what blocking costs (CR 509.1f); casting a commander free
+ * from the command zone, for the commander tax (Geode Golem, CR 903.8).
  */
 export function paysManaNow(s: GameState): boolean {
   const pd = s.pending;
-  return pd?.kind === "payUnless" || pd?.kind === "declareAttackers" || (pd?.kind === "declareBlockers" && !!blockCost(s, 1)) || pd?.kind === "assist" || pd?.kind === "assistCast" || (pd?.kind === "chooseMay" && !!pd.pay?.mana) || (pd?.kind === "castFree" && (pd.how === "madness" || pd.how === "miracle" || pd.how === "paid"));
+  return pd?.kind === "payUnless" || pd?.kind === "declareAttackers" || (pd?.kind === "declareBlockers" && !!blockCost(s, 1)) || pd?.kind === "assist" || pd?.kind === "assistCast" || (pd?.kind === "chooseMay" && !!pd.pay?.mana) || (pd?.kind === "castFree" && (pd.how === "madness" || pd.how === "miracle" || pd.how === "paid" || s.objects[pd.objectId]?.zone === "command"));
 }
 
 function requireNoPending(s: GameState) {
@@ -3956,7 +3957,9 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
   if ((freeCastOf(s, pid) === o.id && !madness) || (!how.faceDown && !realAlt && plottedCast(s, pid, o)) || freeFromExile) {
     const kicked = anyType(lessColored(parseManaCost(kickCost)));
     const kx = x * xCount(kicked);
-    return { cost: kx ? splitGeneric(kicked, 0).cost : kicked, extra: Math.max(0, mods.more - mods.less) + (kx ? splitGeneric(kicked, kx).extra : 0) };
+    // From the command zone (Geode Golem): the commander tax is an additional cost, still paid (CR 903.8, 118.9d).
+    const freeTax = o.zone === "command" ? commanderTax(player(s, pid), o) : 0;
+    return { cost: kx ? splitGeneric(kicked, 0).cost : kicked, extra: Math.max(0, mods.more - mods.less) + freeTax + (kx ? splitGeneric(kicked, kx).extra : 0) };
   }
   const tax = o.zone === "command" ? commanderTax(player(s, pid), o) : 0;
   // {X} is generic mana, paid once for each {X} (CR 107.4b); reductions can take it down too (CR 601.2f).

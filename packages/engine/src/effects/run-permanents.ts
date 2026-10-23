@@ -707,6 +707,15 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       log(s, `${src} puts ${put === 1 ? "a" : put} ${counter} counter${put === 1 ? "" : "s"} on ${characteristics(s, o).name}.`);
       return;
     }
+    case "noteManaSpent": {
+      // Its source, if it's still the same object (CR 400.7); one type of mana spent (the cost {1} paid with one mana).
+      const o = objects(s, { ref: "self" }, ctx)[0];
+      const types = [...new Set(s.resolving?.item.manaSpentTypes ?? [])];
+      if (!o || types.length !== 1) return;
+      o.notedMana = types[0]!;
+      log(s, `${src} notes ${types[0] === "C" ? "colorless" : ({ W: "white", U: "blue", B: "black", R: "red", G: "green" } as const)[types[0] as "W"]} mana.`);
+      return;
+    }
     case "removeCounters":
       for (const o of objects(s, e.what, ctx)) {
         const had = o.counters[e.counter] ?? 0;

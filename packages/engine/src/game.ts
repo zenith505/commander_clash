@@ -882,6 +882,7 @@ export function moveObject(
   o.haunting = undefined; // a haunting card that leaves exile is a new object that haunts nothing (CR 400.7, 702.55b)
   o.escaped = escaped || undefined; // CR 702.138b
   o.chosen = undefined;
+  o.notedMana = undefined; // a new object (CR 400.7)
   o.protector = undefined;
   // A Room enters with the door that was cast unlocked, and from anywhere but the stack with both locked (CR 709.5d,
   // rulings). On the battlefield it's the whole card, its doors locked or unlocked, not a half (709.5).
@@ -6149,6 +6150,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     ...(o.transforms ? { sourceTransforms: o.transforms } : {}),
     ...(manaPick ? { manaAbility: { index, tapped: ab.tap, ...(manaPick.extra ? { extra: manaPick.extra } : {}), ...(manaFrom.length ? { from: manaFrom } : {}) } } : {}),
     ...(paid.treasure ? { treasureSpent: paid.treasure } : {}),
+    ...(paid.spent && Object.values(paid.spent).some((n) => n > 0) ? { manaSpentTypes: (Object.keys(paid.spent) as ManaType[]).flatMap((m) => Array<ManaType>(paid.spent[m]).fill(m)) } : {}),
   };
   if (manaPick) {
     // A mana ability doesn't go on the stack: it resolves as soon as it's activated (CR 605.3b).

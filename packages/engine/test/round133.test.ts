@@ -3,7 +3,8 @@
 import { describe, expect, it } from "vitest";
 import { act, card, forest, passUntil, putOnBattlefield, scry, setup, target } from "./helpers";
 import { invalidateCharacteristics } from "../src/layers";
-import { botActions, legalActions, canBeSacrificed, characteristics, controllerOf, isFullySupported, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { addMana } from "../src/spend";
+import { abilityProblem, botActions, legalActions, manaOptions, canBeSacrificed, characteristics, controllerOf, isFullySupported, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -290,5 +291,35 @@ describe("Yuna, Grand Summoner", () => {
     expect(s.objects[victim]!.zone).toBe("graveyard");
     expect(s.pending).toBeNull();
     expect(s.stack.length).toBe(0);
+  });
+});
+
+const jeweledAmulet = card("Jeweled Amulet", "Artifact", "{0}", { oracleText: "{1}, {T}: Put a charge counter on this artifact. Note the type of mana spent to pay this activation cost. Activate only if there are no charge counters on this artifact.\n{T}, Remove a charge counter from this artifact: Add one mana of this artifact's last noted type." });
+
+describe("Jeweled Amulet: the type of mana spent on its first ability, added by its second", () => {
+  it("{R} spent on the charge: later its counter makes {R}", () => {
+    supported(jeweledAmulet);
+    const { s: s0, ap } = setup([]);
+    emptyPools(s0);
+    const id = putOnBattlefield(s0, ap, jeweledAmulet);
+    addMana(s0, ap, ["R"]);
+    let s = passToPending(act(s0, { type: "activateAbility", player: ap, objectId: id, index: 0 }));
+    expect(s.objects[id]!.counters.charge).toBe(1);
+    expect(s.objects[id]!.notedMana).toBe("R");
+    // Only while it has no charge counters.
+    expect(abilityProblem(s, ap, id, 0)).not.toBeNull();
+    s.objects[id]!.tapped = false;
+    expect(manaOptions(s, s.objects[id]!).map((x) => x.adds)).toEqual([["R"]]);
+    s = act(s, { type: "activateMana", player: ap, objectId: id, mana: "R", ability: 0 });
+    expect(s.players[ap]!.manaPool.R).toBe(1);
+    expect(s.objects[id]!.counters.charge ?? 0).toBe(0);
+  });
+
+  it("a charge counter from elsewhere with no type noted makes no mana (rulings)", () => {
+    const { s: s0, ap } = setup([]);
+    const id = putOnBattlefield(s0, ap, jeweledAmulet);
+    s0.objects[id]!.counters.charge = 1;
+    invalidateCharacteristics(s0);
+    expect(manaOptions(s0, s0.objects[id]!).every((x) => x.adds.length === 0)).toBe(true);
   });
 });

@@ -887,6 +887,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "moveCounter":
     case "counterOfKindOnIt":
     case "removeCounters":
+    case "noteManaSpent":
     case "removeAnyCounters":
     case "battleDefense":
     case "removeAllCounters":

@@ -2668,6 +2668,11 @@ export type Effect =
   /** Rebound's delayed trigger (CR 702.88a): "you may cast this card from exile without paying its mana cost". */
   | { type: "castFromExileFree" }
   /**
+   * Jeweled Amulet: "Note the type of mana spent to pay this activation cost." As the ability resolves, its source notes
+   * that type (GameObject.notedMana); with no mana spent, nothing new is noted.
+   */
+  | { type: "noteManaSpent" }
+  /**
    * Rona, Tolarian Obliterator: "that source's controller exiles a card from their hand at random. If it's a land card,
    * you may put it onto the battlefield under your control. Otherwise, you may cast it without paying its mana cost."
    * The card is cast as this resolves, ignoring timing (CR 608.2g); X is 0, no alternative costs (rulings).
@@ -3900,6 +3905,8 @@ export interface ActivatedAbility {
  */
 export type ManaProduce =
   | { kind: "fixed"; mana: ManaType[]; count?: TargetSpec; n?: AmountExpr }
+  /** Jeweled Amulet: "Add one mana of ~'s last noted type" (GameObject.notedMana); none if no type was noted (rulings). */
+  | { kind: "noted" }
   | { kind: "oneOf"; options: ManaType[]; amount: number; n?: AmountExpr }
   | { kind: "commanderIdentity" }
   /** "Add one mana of the chosen color", "Add {B} or one mana of the chosen color": the color chosen as it entered. */

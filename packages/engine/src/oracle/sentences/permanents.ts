@@ -567,6 +567,8 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return who && what?.ref === "target" && !what.n ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: "game", giveTo: who }] : null;
   }
   // "That player gains control of ~" (Coveted Jewel): the trigger's player, for the rest of the game (layer 2).
+  // Jeweled Amulet: "Note the type of mana spent to pay this activation cost."
+  if (s === "Note the type of mana spent to pay this activation cost" && ctx.activated) return [{ type: "noteManaSpent" }];
   // Slicer, Hired Muscle: "... until end of turn" (CR 611.2a), ending in the cleanup step (514.2).
   if ((m = /^[Tt]hat player gains control of ~( until end of turn)?$/.exec(s)) && ctx.eventPlayer) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: m[1] ? "endOfTurn" : "game", giveTo: { ref: "eventPlayer" } }];
   // Slicer, Hired Muscle: "untap ~, goad it, and it can't be sacrificed this turn". Goaded by the ability's controller

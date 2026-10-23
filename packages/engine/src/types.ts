@@ -542,6 +542,8 @@ export interface GameObject {
   entersGaining?: string;
   /** "As ~ enters, choose a creature type / color": what was chosen (CR 614.12). Forgotten when it leaves (CR 400.7). */
   chosen?: Chosen;
+  /** Jeweled Amulet: the type of mana last noted for it ("note the type of mana spent to pay this activation cost"). */
+  notedMana?: ManaType;
   /** A battle's protector (CR 310.9), chosen as it enters (310.9a) and again when that player can't be (704.5x-y). */
   protector?: PlayerId;
   /** How many permanents it devoured as it entered (CR 702.82b), for "for each creature it devoured". */
@@ -826,6 +828,8 @@ export interface StackItem {
   manaAbility?: { index: number; tapped: boolean; extra?: ManaType[]; /** What its source was as it was activated: a snow permanent, a Treasure, a creature, an artifact (CR 106.3). */ from?: ManaOrigin[] };
   /** For an activated ability: how much mana from Treasures was spent to activate it (CR 106.3). */
   treasureSpent?: number;
+  /** For an activated ability: the mana spent to pay its cost, one entry for each mana (Jeweled Amulet's note). */
+  manaSpentTypes?: ManaType[];
   /** A triggered ability's intervening "if": it does nothing unless this is still true as it resolves (CR 603.4). */
   ifCond?: StaticCondition;
   /** For a spell: how many spells were cast before it this turn (storm, CR 702.40a). */

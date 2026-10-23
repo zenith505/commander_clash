@@ -71,6 +71,8 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.counter && !(spec.counter === ANY_COUNTER ? Object.values(o.counters).some((n) => (n ?? 0) > 0) : (o.counters[spec.counter] ?? 0))) return false;
   // "With the chosen name": its name now (a copy's is what it copies); a face-down one has none (CR 201.2a, 708.2a).
   if (spec.named !== undefined && (o.faceDown || !hasName(c.name, spec.named))) return false;
+  if (spec.notNamed !== undefined && !o.faceDown && hasName(c.name, spec.notNamed)) return false;
+  if (spec.uniqueNameAmongYours && !o.faceDown && s.battlefield.some((id) => id !== o.id && !s.objects[id]!.faceDown && controllerOf(s, s.objects[id]!) === controller && sameName((view?.(s.objects[id]!) ?? characteristics(s, s.objects[id]!)).name, c.name))) return false;
   const hasKw = (k: string) => c.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
   if (spec.keywords?.some((k) => !hasKw(k))) return false;
   if (spec.toxic && !c.keywords.some((x) => /^toxic\b/i.test(x))) return false;
@@ -220,13 +222,21 @@ export function withChoice(chosen: Chosen | undefined, what: ChoiceKind, choice:
  */
 export function sourceQuality(s: GameState, id?: ObjectId, cardId?: string): SourceQuality {
   const o = id ? s.objects[id] : undefined;
-  if (o) return withCastThisTurn(s, o, characteristics(s, o));
+  if (o) {
+    // A spell's mana value counts its X (CR 202.3e).
+    const item = o.zone === "stack" ? s.stack.find((x) => x.kind === "spell" && x.objectId === o.id) : undefined;
+    const c = characteristics(s, o);
+    return withCastThisTurn(s, o, item ? { ...c, manaValue: spellManaValue(s, item) } : c);
+  }
   const d = cardId ? s.cards[cardId] : undefined;
-  return d ? { colors: d.colors, types: d.types, subtypes: d.subtypes, name: d.name } : { colors: [] };
+  return d ? { colors: d.colors, types: d.types, subtypes: d.subtypes, name: d.name, manaValue: defMv(d) } : { colors: [] };
 }
 
-/** A spell's own characteristics (its card's) as a source of targeting: a spell (CR 113.7a doesn't apply to it). */
-export const spellQuality = (s: GameState, cardId?: string): SourceQuality => ({ ...sourceQuality(s, undefined, cardId), spell: true });
+/**
+ * A spell's own characteristics (its card's) as a source of targeting: a spell (CR 113.7a doesn't apply to it). `item`:
+ * the spell on the stack, for its mana value with its X (CR 202.3e).
+ */
+export const spellQuality = (s: GameState, cardId?: string, item?: StackItem): SourceQuality => ({ ...sourceQuality(s, undefined, cardId), spell: true, ...(item ? { manaValue: spellManaValue(s, item) } : {}) });
 
 /**
  * "An ability ... from an enchantment source": the source as it is now if it's still the same object, on the battlefield
@@ -274,6 +284,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.equalsChosen && (spec.equals === undefined || !spec.equalsChosen.some((k) => (k === "manaValue" ? defMv(d) : creature && /^\d+$/.test(d[k] ?? "") ? Number(d[k]) : undefined) === spec.equals))) return false;
   if (spec.manaCostIn && !spec.manaCostIn.includes(d.manaCost)) return false;
   if (spec.named !== undefined && !hasName(d.name, spec.named)) return false;
+  if (spec.notNamed !== undefined && hasName(d.name, spec.notNamed)) return false;
   if (spec.doubleFaced && !isDoubleFacedDef(d)) return false;
   if (spec.manaAbility && !(compileCard(d).mana.length || compileCard(d).manaTriggers?.length)) return false;
   if (spec.transformed || spec.powerAboveBase || spec.toughnessAbovePower || spec.colorOfYourLegend) return false;
@@ -387,6 +398,7 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
     const item = s.stack.find((x) => x.id === t.id) ?? (s.resolving?.item.id === t.id ? s.resolving.item : undefined);
     if (!item) return false;
     if (spec.singleTarget && (item.targets ?? []).filter((x) => x.kind !== "none").length !== 1) return false;
+    if (spec.hasTargets && !(item.targets ?? []).some((x) => x.kind !== "none")) return false;
     // "Target triggered ability you control" (Strionic Resonator).
     const aims = !spec.targetsWhat || targetsMatch(s, item.targets ?? [], spec.targetsWhat, controller) || (!!spec.targetsYouToo && targetsMatch(s, item.targets ?? [], "you", controller));
     if (item.kind === "ability") return aims && !!spec.stackAbilities && (spec.stackAbilities === "both" || (spec.stackAbilities === "triggered") === !!item.triggered) && (spec.controller !== "you" || item.controller === controller) && (spec.controller !== "opponent" || item.controller !== controller) && (!spec.abilityFrom || abilitySourceIs(s, item, spec.abilityFrom));

@@ -43,7 +43,7 @@ export interface DamageRule {
   nextTime?: true;
   redirect?: { object: ObjectId; zc: number } | { player: PlayerId };
   gainLife?: { colors?: Color[] };
-  dealBack?: { colors?: Color[] };
+  dealBack?: { colors?: Color[]; creatureToIt?: true };
   tokens?: TokenSpec;
   /** The Mindskinner: only damage from a source its controller controls; and each opponent mills that much (CR 615.5). */
   sourceYours?: true;
@@ -469,10 +469,12 @@ export interface GameObject {
   hasteCast?: "endOfTurn" | "game";
   /** How much Opal Palace mana was spent to cast this commander (ManaAbility.spentCommanderCounters), until it enters. */
   commanderCountersCast?: number;
+  /** Biophagus: additional +1/+1 counters it enters with, one for each such mana spent to cast it. */
+  creatureCountersCast?: number;
   /** A spell: "that creature enters with an additional +1/+1 counter on it" (Boreal Outrider, CR 614.1c), as it resolves. */
   extraCounters?: Record<string, number>;
   /** A spell: "it gains haste until end of turn" from a cast trigger (Tyvar Kell's emblem), applying to the permanent it becomes (CR 400.7a). */
-  spellGains?: { mods: Modification[]; timestamp: number; controller: PlayerId; source: string }[];
+  spellGains?: { mods: Modification[]; timestamp: number; controller: PlayerId; source: string; forever?: true }[];
   /** A spell that gained rebound (Narset Transcendent), as it resolves (CR 702.88a). */
   reboundGained?: true;
   /** Tribute (CR 702.104): the opponent chosen as it entered, and whether they put the +1/+1 counters on it. */
@@ -573,6 +575,8 @@ export interface ManaLot {
   hasteType?: string;
   /** Opal Palace's "if you spend this mana to cast your commander": see ManaAbility.spentCommanderCounters. */
   commanderCounters?: true;
+  /** Biophagus: see ManaAbility.spentCreatureCounter. */
+  creatureCounter?: true;
   /** Boseiju, Who Shelters All: see ManaAbility.spentUncounterable. */
   uncounterableInstantSorcery?: true;
   /** "Using mana produced by Tecutlan": the permanent that made it, "id#zoneChanges" (TriggeredAbility.cast.manaFromSelf). */
@@ -1111,7 +1115,15 @@ export type PendingDecision =
        * "draw two cards instead" (`archive`, the draws it makes) or dredging one of `dredge`. Either uses up "the
        * first time you would draw", so the look doesn't happen.
        */
-      instead?: { archive?: number; dredge?: ObjectId[] };
+      instead?: { archive?: number; dredge?: ObjectId[]; /** Abundance's "you may instead reveal" (its name). */ abundance?: string; /** Underrealm Lich's look (its name): applied first, the "first time" look is used up. */ dig?: string };
+      /**
+       * Underrealm Lich (CompiledCard.drawDig) instead: which of `cards` goes into the hand, the rest into the graveyard;
+       * no draw follows. `made` are the draws after this one that replacements already made (see draw), `archives` how
+       * many Alhammarret's Archives could still replace this one.
+       */
+      keep?: true;
+      made?: number[];
+      archives?: number;
     }
   | {
       kind: "dredge";
@@ -1289,6 +1301,8 @@ export interface ZoneMove {
   /** A land entering because it was played (CR 305.1), not put onto the battlefield. */
   played?: true;
   discardedBy?: PlayerId;
+  /** Milled (CR 701.17a): put into the graveyard from the library by a mill instruction. */
+  milled?: true;
   /** A token this player created (CR 111.2), for "whenever you create one or more creature tokens". */
   createdBy?: PlayerId;
   /** Torpor Orb: the controllers whose abilities its entering can't trigger (`opponents`: only those of `by`'s opponents). */
@@ -1672,6 +1686,11 @@ export interface Resolving {
   item: StackItem;
   body: AbilityBody;
   legal: boolean[]; // which targets were legal as it began resolving (CR 608.2b)
+  /**
+   * The answers so far to the questions about the shields of the damage the current instruction deals (CR 616.1): it
+   * runs again from its start with them (resolve.ts runAsking).
+   */
+  shieldAnswers?: number[];
   /** Who controlled each targeted spell as resolution began, for "its controller" after it's countered (CR 608.2h). */
   spellControllers?: (PlayerId | null)[];
   /** The cards of targeted spells, for "its mana value" after it's countered (CR 608.2h). */
@@ -2049,7 +2068,7 @@ export type Action =
   /** Answer to dredge: the card to dredge instead of drawing, or none to draw (CR 702.52a). */
   | { type: "dredge"; player: PlayerId; objectId?: ObjectId; /** Abundance instead: reveal until a card of this kind. */ abundance?: "land" | "nonland" }
   /** Which of the cards looked at instead of drawing goes to the graveyard (Scion of Halaster). */
-  | { type: "drawLook"; player: PlayerId; /** The card to put into the graveyard (none when fewer than two to look at). */ objectId?: ObjectId; /** Apply another replacement first (see the drawLook prompt). */ instead?: "archive" | { dredge: ObjectId } }
+  | { type: "drawLook"; player: PlayerId; /** The card to put into the graveyard, or with Underrealm Lich (`keep`) into the hand (none when fewer than two to look at). */ objectId?: ObjectId; /** Apply another replacement first (see the drawLook prompt). */ instead?: "archive" | "dig" | { dredge: ObjectId } | { abundance: "land" | "nonland" } }
   /** Turn a face-down permanent face up by paying its morph or disguise cost: a special action (CR 116.2b, 702.37e). */
   | { type: "turnFaceUp"; player: PlayerId; objectId: ObjectId; /** Which of faceUpWays (a manifested card with morph has two). */ way?: number }
   /** Answer to payUnless: pay the cost from your mana pool, or let it be countered. */

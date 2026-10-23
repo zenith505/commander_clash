@@ -3,7 +3,7 @@ import { liveEmblems } from "./emblems";
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
 import { payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaOptions, manaPenalty } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
-import { abilityProblem, eminenceCommanders, activationCost, applyAction, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
+import { abilityProblem, lessWaterbend, eminenceCommanders, activationCost, applyAction, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
 import { compileCard } from "./oracle";
 import { hopeValues, spendPlan } from "./value";
 import { abilityUse, boundSpend, payableCost, poolFor, spendAllows, usableTypes, type ManaUse } from "./spend";
@@ -427,6 +427,26 @@ export function autoImprovise(s: GameState, pid: PlayerId, cost: ParsedCost, ext
 }
 
 /**
+ * Artifacts and creatures to tap for a waterbend cost (CR 701.67a), no more than `cap`, when mana sources can't pay alone:
+ * ones that make no mana first, then noncreatures, then creatures that can't attack this turn, then the smallest.
+ */
+export function autoWaterbend(s: GameState, pid: PlayerId, cost: ParsedCost, extra: number, cap: number, exclude: ObjectId[], use: ManaUse = "other"): { tapped: ObjectId[]; taps: Action[] } | null {
+  const candidates = s.battlefield
+    .map((id) => obj(s, id))
+    .filter((a) => controllerOf(s, a) === pid && !a.tapped && !exclude.includes(a.id) && (objIsType(s, a, "Artifact") || objIsType(s, a, "Creature")))
+    .sort((a, b) => Number(manaOptions(s, a).length > 0) - Number(manaOptions(s, b).length > 0) || Number(objIsType(s, a, "Creature")) - Number(objIsType(s, b, "Creature")) || Number(isSummoningSick(s, b)) - Number(isSummoningSick(s, a)) || power(s, a) - power(s, b));
+  const tapped: ObjectId[] = [];
+  for (const a of candidates.slice(0, cap)) {
+    tapped.push(a.id);
+    const reduced = payGenericWith(cost, extra, tapped.length);
+    if (!reduced) return null;
+    const taps = planMana(s, pid, reduced.cost, reduced.extra, undefined, [...exclude, ...tapped], use);
+    if (taps) return { tapped, taps };
+  }
+  return null;
+}
+
+/**
  * Pick creatures to convoke with when mana sources can't pay alone: ones that can't attack
  * this turn first (summoning sick), then the smallest. Each must pay for some mana.
  */
@@ -520,7 +540,15 @@ export function planActivate(s: GameState, pid: PlayerId, objectId: ObjectId, in
   const cost = activationCost(s, pid, obj(s, objectId), ab, targets, x);
   // Don't tap the source for mana if the ability itself needs {T}, nor creatures tapped to crew.
   // Don't tap for mana what's about to be sacrificed either.
-  const taps = planMana(s, pid, cost, (x ?? 0) * xCount(cost), ab.tap ? objectId : undefined, [...(tapCreatures ?? []), ...(costs?.sacrifice ?? []), ...(costs?.tap ?? []), ...sacrificedTargets(s, targets)], abilityUse(obj(s, objectId), ab, s));
+  const exclude = [...(costs?.sacrifice ?? []), ...(costs?.tap ?? []), ...sacrificedTargets(s, targets)];
+  const use = abilityUse(obj(s, objectId), ab, s);
+  const due = lessWaterbend(cost, (x ?? 0) * xCount(cost), ab, tapCreatures);
+  let taps = planMana(s, pid, due.cost, due.extra, ab.tap ? objectId : undefined, [...(tapCreatures ?? []), ...exclude], use);
+  // Waterbend with nothing chosen to tap: mana first, then as few artifacts and creatures as it takes (CR 701.67a).
+  if (!taps && ab.waterbend !== undefined && tapCreatures === undefined) {
+    const wb = autoWaterbend(s, pid, cost, (x ?? 0) * xCount(cost), ab.waterbend === "X" ? (x ?? 0) : ab.waterbend, ab.tap ? [objectId, ...exclude] : exclude, use);
+    if (wb) [taps, tapCreatures] = [wb.taps, wb.tapped];
+  }
   if (!taps) return null;
   return [...taps, { type: "activateAbility", player: pid, objectId, index, targets, ...(modes ? { modes } : {}), ...(tapCreatures ? { tapCreatures } : {}), ...(x ? { x } : {}), ...(costs ? { costs } : {}), ...(pick?.mana ? { mana: pick.mana } : {}), ...(pick?.extra?.length ? { extra: pick.extra } : {}) }];
 }

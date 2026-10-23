@@ -1123,6 +1123,22 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       si += 3;
       continue;
     }
+    // Wyll's Reversal: "Choose target spell or ability ... You may choose new targets for that spell or ability" (CR 115.7d):
+    // whether to is part of choosing them (keeping them all is allowed).
+    if (/^You may choose new targets for that spell(?: or ability)?$/.test(s) && ctx.lastObjectTarget !== undefined && ctx.targets[ctx.lastObjectTarget]?.kind === "spell") {
+      effects.push({ type: "newTargets", index: ctx.lastObjectTarget });
+      continue;
+    }
+    // Silent-Blade Oni: "look at that player's hand. You may cast a spell from among those cards without paying its mana
+    // cost"; Mindclaw Shaman: "target opponent reveals their hand. You may cast an instant or sorcery spell from among
+    // those cards ...": cast from that hand as this resolves (CR 608.2g), the spell controlled by you (rulings).
+    const handCast = /^You may cast (a|an instant or sorcery) spell from among those cards without paying its mana cost$/.exec(s);
+    const looked = effects[effects.length - 1];
+    if (handCast && looked?.type === "lookAtHand" && !looked.atRandom) {
+      const filter: TargetSpec | undefined = handCast[1] === "a" ? undefined : { kind: "card", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery card" };
+      effects.push({ type: "castFromAmong", who: looked.who, n: 0, fromHand: true, max: 1, ...(filter ? { filter } : {}) });
+      continue;
+    }
     // "Gain control of target spell. You may choose new targets for it." (Commandeer): after the change of control, so
     // its targets are chosen as its new controller's (rulings).
     if (/^You may choose new targets for it$/.test(s) && effects[effects.length - 1]?.type === "controlSpell") {
@@ -2381,6 +2397,16 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects[effects.length - 1] = holder ? { ...holder, effects: [pick] } : pick;
       continue;
     }
+    // Toph, Hardheaded Teacher: "Whenever you cast a spell, earthbend 1. If that spell is a Lesson, put an additional +1/+1
+    // counter on that land." The land earthbending chose, the spell as it was cast.
+    const lessonIf = ctx.castSpell && /^If that spell is an? ([A-Z][a-z]+), put an additional \+1\/\+1 counter on that land$/.exec(s);
+    if (lessonIf) {
+      const prev = effects[effects.length - 1];
+      const filter = parseTargetPhrase(`${lessonIf[1]} spell`);
+      if (prev?.type !== "earthbend" || filter?.kind !== "spell") return null;
+      effects.push({ type: "if", cond: { kind: "causeSpellIs", filter: { ...filter, kind: "card" } }, effects: [{ type: "counters", what: prev.what, counter: "+1/+1", n: 1 }] });
+      continue;
+    }
     // Essence Flux: "Exile target creature you control, then return that card to the battlefield under its owner's
     // control. If it's a Spirit, put a +1/+1 counter on it.": checked once it has returned (rulings).
     const fluxIf = /^If it's an? ([A-Z][a-z]+), put a \+1\/\+1 counter on it$/.exec(s);
@@ -2445,7 +2471,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const made = perDamage && parseBody(`${perDamage[1]![0]!.toUpperCase()}${perDamage[1]!.slice(1)}.`, {});
     const tokenRider = made && made.targets.length === 0 && made.effects.length === 1 && made.effects[0]!.type === "createToken" ? made.effects[0]! : undefined;
     if (perDamage && !(tokenRider?.type === "createToken" && JSON.stringify(tokenRider.n) === "1" && Object.keys(tokenRider).every((k) => ["type", "token", "n", "who"].includes(k)) && (!tokenRider.who || JSON.stringify(tokenRider.who) === '{"ref":"you"}'))) return null;
-    const rider = tokenRider?.type === "createToken" ? { tokens: tokenRider.token } : parsePreventionRider(s);
+    // Comeuppance: "If damage from a creature source is prevented this way, ~ deals that much damage to that creature. If
+    // damage from a noncreature source is prevented this way, ~ deals that much damage to the source's controller."
+    const toCreature =
+      /^If damage from a creature source is prevented this way, ~ deals that much damage to that creature$/.test(s) &&
+      /^If damage from a noncreature source is prevented this way, ~ deals that much damage to the source's controller\.?$/.test(sentences[si + 1] ?? "");
+    if (toCreature) si++;
+    const rider = toCreature ? { dealBack: { creatureToIt: true as const } } : tokenRider?.type === "createToken" ? { tokens: tokenRider.token } : parsePreventionRider(s);
     if (rider) {
       const prev = effects[effects.length - 1];
       if (prev?.type !== "damageRule" || prev.rule.redirect) return null;
@@ -3437,6 +3469,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "if", cond: { kind: "putThisWayIs", filter }, effects: inner });
       continue;
     }
+    // Yenna, Redtooth Regent: "Create a token that's a copy of it, except it isn't legendary. If the token is an Aura, untap
+    // ~, then scry 2": the token as it is now.
+    const tokenIs = /^If the token is an? ([A-Z][a-z]+), (.+)$/.exec(s);
+    if (tokenIs) {
+      const last = effects[effects.length - 1];
+      const filter = parseTargetPhrase(tokenIs[1]!);
+      const inner = parseOne(capital(tokenIs[2]!), ctx);
+      if (last?.type !== "createTokenCopy" || last.each || last.n !== 1 || filter?.kind !== "object" || !inner || /(?:it|its|that)/.test(tokenIs[2]!)) return null;
+      effects.push({ type: "if", cond: { kind: "putThisWayIs", filter }, effects: inner });
+      continue;
+    }
     // "For each creature exiled this way, its controller creates a 2/2 green Boar creature token" (Curse of the Swine),
     // "For each creature destroyed this way, its controller draws a card": after the destroy or exile instruction.
     // Winds of Abandon: "For each creature exiled this way, its controller searches their library for a basic land card.
@@ -3659,6 +3702,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       const e = fx?.length === 1 ? fx[0]! : undefined;
       if (prev?.type !== "counters" || prev.counter !== counter || e?.type !== "continuous" || e.duration !== "endOfTurn" || JSON.stringify(e.what) !== JSON.stringify(prev.what)) return null;
       effects.push({ ...e, duration: "game", whileCounter: counter });
+      continue;
+    }
+    // Ultima, Origin of Oblivion: "Put a blight counter on target land. For as long as that land has a blight counter on it,
+    // it loses all land types and abilities and has "{T}: Add {C}."": its land types go (CR 305.7; card types and
+    // supertypes stay, rulings), then all its abilities, then it has that one, all in this effect's timestamp.
+    const blight = new RegExp(`^For as long as that land has an? ${COUNTER} counter on it, it loses all land types and abilities and has "(\\{T\\}: Add \\{[WUBRGC]\\}\\.)"$`).exec(s);
+    if (blight) {
+      const prev = effects[effects.length - 1];
+      const counter = counterKind(blight[1]!);
+      if (prev?.type !== "counters" || prev.counter !== counter || prev.what.ref !== "target") return null;
+      effects.push({ type: "continuous", what: prev.what, mods: [{ kind: "setLandTypes", subtypes: [] }, { kind: "loseAllAbilities" }, { kind: "addAbility", text: blight[2]! }], duration: "game", whileCounter: counter });
       continue;
     }
     // "Put target creature card from a graveyard onto the battlefield under your control. That creature is a black Zombie in

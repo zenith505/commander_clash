@@ -1458,6 +1458,15 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
             : (b.what === "leaves" || b.what === "toGraveyard") && died.length
               ? { event: "dies", objs: died.map((m) => ({ o: m.snapshot!, c: m.chars!, controller: m.controller ?? m.owner })) }
               : null;
+        // Zellix: "Whenever a player mills one or more creature cards": once for each player who milled them.
+        if (b.milled) {
+          for (const pid of [...new Set(matched.map((m) => m.owner))]) {
+            const theirs = matched.filter((m) => m.owner === pid);
+            add(w, you, (_, tt) => tt === t, triggers, undefined, undefined, undefined, undefined, undefined, { amount: theirs.length, player: pid, group: theirs.map((m) => ({ id: m.id, zc: m.zc })) });
+          }
+          causedBy = null;
+          continue;
+        }
         // "Whenever a creature card leaves your graveyard": once for each of them (CR 603.2c).
         for (let k = 0; k < (b.each ? n : 1); k++) add(w, you, (_, tt) => tt === t, triggers, undefined, undefined, undefined, undefined, undefined, { amount: b.each ? 1 : n, ...(b.each ? { player: matched[k]!.owner } : b.whose === "you" ? { player: you } : {}), ...((b.what === "enters" || b.what === "toGraveyard") && !b.each ? { group: matched.map((m) => ({ id: m.id, zc: m.zc })) } : {}), ...(b.dies && !b.each ? { groupPower: died.reduce((a, m) => a + (m.chars?.power ?? 0), 0) } : {}) });
         causedBy = null;
@@ -1860,7 +1869,7 @@ function batchMoveMatches(s: GameState, b: BatchTrigger, m: ZoneMove, w: GameObj
   if (!card || (b.filter && !printedMatches(b.filter, card))) return false;
   if (b.what === "leavesGraveyard") return m.from === "graveyard" && m.to !== "graveyard" && whose(m.owner) && (!b.to || m.to === b.to);
   if (b.what === "exiledFromLibraryOrGraveyard") return m.to === "exile" && (m.from === "library" || m.from === "graveyard") && whose(m.owner);
-  if (b.what === "toGraveyard") return m.to === "graveyard" && m.from !== "graveyard" && whose(m.owner) && (!b.from || (b.from === "notBattlefield" ? m.from !== "battlefield" : m.from === b.from));
+  if (b.what === "toGraveyard") return m.to === "graveyard" && m.from !== "graveyard" && whose(m.owner) && (!b.milled || !!m.milled) && (!b.from || (b.from === "notBattlefield" ? m.from !== "battlefield" : m.from === b.from));
   return m.discardedBy !== undefined && whose(m.discardedBy);
 }
 

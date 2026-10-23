@@ -494,6 +494,10 @@ export interface TargetSpec {
   commander?: boolean;
   /** "a card named ~": the source's name; "a card named Ajani, Valiant Protector": that name (only for searches). */
   named?: string;
+  /** "Enchantment you control that doesn't have the same name as another permanent you control" (Yenna): no other permanent `you` control has its name (a face-down one has none, CR 708.2). */
+  uniqueNameAmongYours?: true;
+  /** "Dragon cards not named ~" (Tiamat): any other name; "~" is the source's (only for searches). */
+  notNamed?: string;
   /** None of these subtypes. */
   notSubtypes?: string[];
   /** "creature with a +1/+1 counter on it", "permanents with ice counters on them"; ANY_COUNTER: "with a counter on it". */
@@ -519,6 +523,8 @@ export interface TargetSpec {
    * still legal (rulings on Deflection).
    */
   singleTarget?: boolean;
+  /** "Target spell or ability with one or more targets" (Wyll's Reversal). */
+  hasTargets?: true;
   /**
    * For "spell" targets: abilities on the stack it can also target, "target spell, activated ability, or triggered
    * ability" (CR 115.1c-d; mana abilities never use the stack, 605.3a); `noSpells`: "target activated ability".
@@ -799,7 +805,8 @@ export interface DamageRuleSpec {
   /** "You gain life equal to the damage prevented this way" (CR 615.5); `colors`: only for damage from a source of those colors. */
   gainLife?: { colors?: Color[] };
   /** "~ deals that much damage to that source's controller" (CR 615.5); `colors`: only for damage from a source of those colors. */
-  dealBack?: { colors?: Color[] };
+  /** `creatureToIt` (Comeuppance): damage from a creature source is dealt back to that creature instead, if it's still that permanent. */
+  dealBack?: { colors?: Color[]; creatureToIt?: true };
   /** "For each 1 damage prevented this way, create a ... token" (Inkshield, CR 615.5): its controller creates them. */
   tokens?: TokenSpec;
 }
@@ -943,6 +950,13 @@ export type Modification =
   | { kind: "definePT"; power?: Amount; toughness?: Amount }
   | { kind: "modifyPT"; power: Amount; toughness: Amount } // layer 7c
   | { kind: "switchPT" } // layer 7d
+  /**
+   * Duplicant: "As long as a card exiled with ~ is a creature card, ~ has the power, toughness, and creature types of the
+   * last creature card exiled with it. It's still a Shapeshifter." `part` "types": its creature types become that card's
+   * and Shapeshifter (layer 4); "pt": its base power and toughness become that card's (layer 7b, rulings). Nothing
+   * while no card exiled with it (CR 607.2a) is a creature card.
+   */
+  | { kind: "linkedCreature"; part: "types" | "pt" }
   // Rules effects about what the object can do (CR 613.11), checked after the layers.
   | { kind: "cantAttack" }
   /** `ability`: "This creature can't block" as an ability it has (a suspected creature's, CR 701.60c), so in layer 6. */
@@ -2333,7 +2347,7 @@ export type Effect =
    */
   | { type: "spellEntersWith"; counter: CounterKind; n: Amount }
   /** "It gains haste until end of turn" about the spell a cast trigger is about (Tyvar Kell's emblem): the permanent it becomes has it, until end of turn (CR 400.7a). */
-  | { type: "spellGains"; mods: Modification[] }
+  | { type: "spellGains"; mods: Modification[]; /** No duration (Rivaz of the Claw's 'it gains "When this creature dies, exile it."'): for as long as that permanent is on the battlefield. */ forever?: true }
   | {
       type: "counterSpell";
       index: number;
@@ -2713,7 +2727,7 @@ export type Effect =
    * graveyard, exiled first; what's cast is a copy of each (CR 707.12), the cards staying exiled.
    */
   /** `reveal`: "reveal the top X cards of your library ... from among cards revealed this way" (Sunbird's Invocation): they stay in the library while revealed, cast from there. */
-  | { type: "castFromAmong"; who: PlayerRef; n: Amount; reveal?: true; each?: true; untilNonland?: true; /** With `each` (Wand of Wonder): "each opponent exiles cards ... until they exile an instant or sorcery card, then shuffles the rest into their library": down to the first card matching this; the others shuffled back. */ untilHit?: TargetSpec; /** With `each`: each opponent, not each player. */ opponents?: true; copies?: true; fromYard?: { target?: number; filter?: TargetSpec; /** Arcane Bombardment: one card matching `filter`, at random, exiled with this source; then a copy of each card exiled with it (CR 607.2a). */ randomLinked?: true }; maxMv?: Amount; /** Powerbalance: "if the two spells have the same mana value": only a card with exactly this mana value. */ exactMv?: Amount; totalMv?: Amount; untilMv?: number; untilHits?: { n: number; filter: TargetSpec }; hitToHand?: true; filter?: TargetSpec; max?: number; rest?: { dest: "graveyard" | "bottomRandom"; toHand?: boolean }; /** "You may play lands and cast spells from among ..." (Gix): lands are played too, on your turn with a land play left (rulings). */ lands?: true; /** Descendants' Path: "that shares a creature type with a creature you control", as it's cast. */ sharesTypeWithYours?: true; /** Plargg and Nassari: "An opponent chooses a nonland card exiled this way": an opponent you choose picks one, which can't be cast. */ opponentExcludes?: true }
+  | { type: "castFromAmong"; who: PlayerRef; n: Amount; reveal?: true; each?: true; untilNonland?: true; /** With `each` (Wand of Wonder): "each opponent exiles cards ... until they exile an instant or sorcery card, then shuffles the rest into their library": down to the first card matching this; the others shuffled back. */ untilHit?: TargetSpec; /** With `each`: each opponent, not each player. */ opponents?: true; copies?: true; fromYard?: { target?: number; filter?: TargetSpec; /** Arcane Bombardment: one card matching `filter`, at random, exiled with this source; then a copy of each card exiled with it (CR 607.2a). */ randomLinked?: true }; maxMv?: Amount; /** Powerbalance: "if the two spells have the same mana value": only a card with exactly this mana value. */ exactMv?: Amount; totalMv?: Amount; untilMv?: number; untilHits?: { n: number; filter: TargetSpec }; hitToHand?: true; filter?: TargetSpec; max?: number; rest?: { dest: "graveyard" | "bottomRandom"; toHand?: boolean }; /** "You may play lands and cast spells from among ..." (Gix): lands are played too, on your turn with a land play left (rulings). */ lands?: true; /** Descendants' Path: "that shares a creature type with a creature you control", as it's cast. */ sharesTypeWithYours?: true; /** Plargg and Nassari: "An opponent chooses a nonland card exiled this way": an opponent you choose picks one, which can't be cast. */ opponentExcludes?: true; /** Silent-Blade Oni: "look at that player's hand. You may cast a spell from among those cards": the cards in `who`'s hand, cast from there. */ fromHand?: true }
   /**
    * "You gain shroud until end of turn", "You and permanents you control gain hexproof until end of turn" (the player's
    * half), "you gain protection from the chosen player": see Player.gained (CR 702.11d, 702.16b-e, 702.16k, 702.18d).
@@ -2916,6 +2930,8 @@ export type SpellCondition =
   | { kind: "damagedThisWayIs"; filter: TargetSpec }
   /** "If that land is a Plains" (Emeria Shepherd): the trigger's subject as it is now, or as it last existed (CR 608.2h). */
   | { kind: "subjectIs"; filter: TargetSpec }
+  /** "If that spell is a Lesson" in a cast trigger (Toph, Hardheaded Teacher): the spell it's about, by its card's characteristics. */
+  | { kind: "causeSpellIs"; filter: TargetSpec }
   /** "If it was attacking" (Zurgo Stormrender): the trigger's subject is attacking, or was as it last existed (CR 608.2h). */
   | { kind: "subjectWasAttacking" }
   /**
@@ -3550,6 +3566,8 @@ export interface BatchTrigger {
   first?: true;
   /** "Lands enter ... without being played" (Deep Gnome Terramancer): not a land played (CR 305.1). */
   notPlayed?: true;
+  /** `toGraveyard` from the library: "Whenever a player mills one or more creature cards" (Zellix), milled ones only (CR 701.17a). */
+  milled?: true;
   /** `leaves`: "Whenever you sacrifice one or more Foods" (Camellia): ones `whose` player sacrificed (CR 701.21a). */
   sacrificed?: true;
 }
@@ -3560,6 +3578,11 @@ export interface ActivatedAbility {
   /** "Spend only mana of the chosen color to activate this ability" (Throne of Eldraine): the color chosen as its source entered. */
   spendOnlyChosenColor?: true;
   manaCost: string; // "{2}{R}" or ""
+  /**
+   * "Waterbend {N}" (CR 701.67a): the {N} is part of `manaCost`, and up to N of its generic mana (X for "Waterbend {X}")
+   * may be paid by tapping untapped artifacts and creatures you control, the activation's `tapCreatures`.
+   */
+  waterbend?: number | "X";
   tap: boolean;
   sacrificeSelf: boolean;
   sorcerySpeed: boolean;
@@ -3767,6 +3790,8 @@ export interface ManaAbility {
    * (rulings: two mana from it give two counters for each cast).
    */
   spentCommanderCounters?: true;
+  /** Biophagus: "If this mana is spent to cast a creature spell, that creature enters with an additional +1/+1 counter on it" (one for each such mana). */
+  spentCreatureCounter?: true;
   /** Depletion lands: "Put a depletion counter on ~." after the mana is added. */
   putCounter?: CounterKind;
   /** Depletion lands: "If there are no depletion counters on ~, sacrifice it." after the mana is added. */
@@ -4355,6 +4380,11 @@ export interface CompiledCard {
    * way on the bottom of your library in any order." (CR 614.1a; each draw of several separately, rulings).
    */
   drawAbundance?: true;
+  /**
+   * Underrealm Lich: "If you would draw a card, instead look at the top three cards of your library, then put one into
+   * your hand and the rest into your graveyard." (CR 614.1a): how many it looks at; each draw of several separately (rulings).
+   */
+  drawDig?: number;
   /** "If you would draw a card while your library has no cards in it, you win the game instead." (Laboratory Maniac, CR 614.1a) */
   drawEmptyWins?: true;
   /** "Your opponents can't cast spells from anywhere other than their hands." (Drannith Magistrate) */

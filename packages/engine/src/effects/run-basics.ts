@@ -4,7 +4,7 @@ import { cardIdOf, defOf, isType, objHasKeyword, objIsType, power, toughness } f
 import { addPhases, canGainLife, canLoseLife, draw, gainLife, giveCitysBlessing, livingPlayers, log, loseLife, millCount, moveObject, obj, player, playerLoses, winGame } from "../game";
 import { MONARCH } from "../oracle";
 import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
-import { cardSource, dealDamage, dealDamageBatch, dealPlanned, excessOver, lethalAmounts, objectSource, planShields, type DamageEvent, type DamageSource } from "../damage";
+import { cardSource, dealDamage, dealDamageBatch, dealPlanned, excessOver, lethalAmounts, objectSource, planDamage, type DamageEvent, type DamageSource } from "../damage";
 import { COLORS, type GameObject, type GameState, type ManaOrigin, type ManaType, type ObjectId, type PlayerId, type RedirectShield } from "../types";
 import { addMana, manaOriginsOf } from "../spend";
 import { tapManaTimes, timesAsMuch } from "../manaabilities";
@@ -161,7 +161,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         .filter((o) => o.zone === "battlefield")
         .map((o) => ({ src: objectSource(s, o), to: { player: controllerOf(s, o) }, n }));
       const gains = new Map<PlayerId, { n: number }>();
-      const dealt = dealPlanned(s, planShields(s, events, [], true), { lifelink: (ev) => gains.get(ev.src.controller) ?? gains.set(ev.src.controller, { n: 0 }).get(ev.src.controller)! });
+      const dealt = dealPlanned(s, planDamage(s, events), { lifelink: (ev) => gains.get(ev.src.controller) ?? gains.set(ev.src.controller, { n: 0 }).get(ev.src.controller)! });
       for (const [pid, g] of gains) gainLife(s, pid, g.n);
       const by = new Map<ObjectId, number>();
       for (const d of dealt) if (d.dealt > 0 && d.src.id) by.set(d.src.id, (by.get(d.src.id) ?? 0) + d.dealt);
@@ -405,7 +405,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (n <= 0) return;
       const milled: ObjectId[] = [];
       for (const id of p.library.slice(0, n)) {
-        moveObject(s, id, "graveyard");
+        moveObject(s, id, "graveyard", { milled: true });
         if (obj(s, id).zone === "graveyard") milled.push(id);
       }
       const k = milled.filter((id) => !isType(defOf(s, obj(s, id)), "Land")).length;

@@ -71,6 +71,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // "It gains rebound" (Narset Transcendent): as it resolves (CR 702.88a).
   if (ctx.castSpell && (m = /^(?:[Ii]t|[Tt]hat spell) gains (.+?)( until end of turn)?$/.exec(s)) && (ctx.spellIt || /^[Tt]hat spell/.test(s))) {
     if (m[1] === "rebound" && !m[2]) return [{ type: "spellGains", mods: [{ kind: "addKeywords", keywords: ["Rebound"] }] }];
+    // Rivaz of the Claw: 'it gains "When this creature dies, exile it."': the permanent it becomes has it, with no end
+    // (rulings), even if it stops being a creature.
+    if (!m[2] && /^"[^"]+"$/.test(m[1]!)) {
+      const grant = parseGrants(m[1]!);
+      return grant?.length && grant.every((x) => x.kind === "addAbility") ? [{ type: "spellGains", mods: grant, forever: true }] : null;
+    }
     const mods = m[2] ? parseGrants(m[1]!) : null;
     return mods?.length && mods.every((x) => x.kind === "addKeywords") ? [{ type: "spellGains", mods }] : null;
   }
@@ -722,8 +728,10 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // to its other types" (Breach the Multiverse): no duration, so for as long as each stays on the battlefield (CR 611.2a,
   // 400.7), and only the creatures there as it resolves (CR 611.2c). A creature type, which goes if the permanent stops
   // being a creature (CR 205.3d, rulings).
-  if ((m = /^([Tt]arget .+?|That creature|It|[Ee]ach creature you control) becomes an? ([A-Z][a-z]+) in addition to its other types$/.exec(s)) && CREATURE_TYPES.has(m[2]!)) {
-    const what = parseObject(m[1]!.replace(/^It$/, "it").replace(/^Each/, "each"), ctx);
+  // "Earthbend X, .... That land becomes an Island in addition to its other types" (The Legend of Kyoshi): a basic land
+  // type, with its mana ability (CR 305.6), for as long as it's on the battlefield.
+  if ((m = /^([Tt]arget .+?|That creature|That land|It|[Ee]ach creature you control) becomes an? ([A-Z][a-z]+) in addition to its other types$/.exec(s)) && (m[1] === "That land" ? ["Plains", "Island", "Swamp", "Mountain", "Forest"] : [...CREATURE_TYPES]).includes(m[2]!)) {
+    const what = parseObject(m[1]!.replace(/^It$/, "it").replace(/^Each/, "each").replace(/^That land$/, "that land"), ctx);
     if (what && (what.ref === "target" || what.ref === "each")) return [{ type: "continuous", what, mods: [{ kind: "addTypes", types: [], subtypes: [m[2]!] }], duration: "game" }];
   }
   // "~ becomes a Kithkin Spirit with base power and toughness 2/2" (Figure of Destiny), '~ gains "Whenever ~ deals combat

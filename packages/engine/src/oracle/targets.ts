@@ -650,6 +650,12 @@ export function parseTargetPhrase(
     count?: (text: string) => AmountExpr | null;
   } = {},
 ): TargetSpec | null {
+  // Yenna, Redtooth Regent: "enchantment you control that doesn't have the same name as another permanent you control".
+  const unique = / that doesn't have the same name as another permanent you control$/.exec(phrase.trim());
+  if (unique) {
+    const rest = parseTargetPhrase(phrase.trim().slice(0, unique.index), opts);
+    return rest?.kind === "object" && rest.controller === "you" ? { ...rest, uniqueNameAmongYours: true, text: `target ${phrase.trim().toLowerCase()}` } : null;
+  }
   // Magewright's Stone: "creature that has an activated ability with {T} in its cost", printed or granted (rulings).
   const tapAb = / that has an activated ability with \{T\} in its cost$/.exec(phrase.trim());
   if (tapAb) {
@@ -1017,7 +1023,10 @@ export function parseTargetPhrase(
         if (alts.length > 1 || extra.suspected) return null;
         extra.suspected = true;
       } else if (w === "token" || w === "nontoken") {
-        if (alts.length > 1) return null;
+        // A leading one is for every alternative: "a nontoken creature or planeswalker" (Sheoldred) is a nontoken
+        // creature or a nontoken planeswalker, as "a legendary creature or planeswalker" is a legendary creature or a
+        // legendary planeswalker (CR 205.4e).
+        if (alts.length > 1 && !(alt === alts[0] && i === 0)) return null;
         extra.token = w === "token";
       } else if (w === "enchanted-or-equipped" && !extra.status) {
         if (alts.length > 1) return null;

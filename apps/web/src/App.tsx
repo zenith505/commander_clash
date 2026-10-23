@@ -4317,6 +4317,49 @@ function Controls({
       </div>
     );
   }
+  if (pending?.kind === "drawLook" && pending.keep && pending.player === HUMAN) {
+    // Underrealm Lich: keep one of the top cards; the rest go to the graveyard. Or another replacement of that draw first.
+    return (
+      <div className="controls">
+        <span>
+          <strong>{pending.source}:</strong> instead of drawing, put one of the top {pending.cards.length === 1 ? "card" : `${pending.cards.length} cards`} of your library into your hand and the rest into your graveyard.
+          {pending.instead ? " Or replace the draw another way:" : ""}
+        </span>
+        {pending.cards.length < 2 ? (
+          <button onClick={() => dispatch([{ type: "drawLook", player: HUMAN }])}>{pending.cards.length ? `${cardOf(s, pending.cards[0]!).name} to hand` : "Nothing to look at"}</button>
+        ) : (
+          pending.cards.map((id) => {
+            const d = cardOf(s, id);
+            return (
+              <button key={id} onMouseEnter={() => onHover(d)} onMouseLeave={() => onHover(null)} onClick={() => dispatch([{ type: "drawLook", player: HUMAN, objectId: id }])}>
+                {d.name} to hand
+              </button>
+            );
+          })
+        )}
+        {pending.instead?.archive ? (
+          <button className="ghost" onClick={() => dispatch([{ type: "drawLook", player: HUMAN, instead: "archive" }])}>
+            Draw 2 instead
+          </button>
+        ) : null}
+        {pending.instead?.abundance
+          ? (["land", "nonland"] as const).map((kind) => (
+              <button key={kind} className="ghost" onClick={() => dispatch([{ type: "drawLook", player: HUMAN, instead: { abundance: kind } }])}>
+                Reveal until a {kind} ({pending.instead!.abundance})
+              </button>
+            ))
+          : null}
+        {(pending.instead?.dredge ?? []).map((id) => {
+          const d = cardOf(s, id);
+          return (
+            <button key={id} className="ghost" onMouseEnter={() => onHover(d)} onMouseLeave={() => onHover(null)} onClick={() => dispatch([{ type: "drawLook", player: HUMAN, instead: { dredge: id } }])}>
+              Dredge {d.name} (mill {compileCard(d).dredge})
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
   if (pending?.kind === "drawLook" && pending.player === HUMAN) {
     return (
       <div className="controls">
@@ -4349,6 +4392,11 @@ function Controls({
             </button>
           );
         })}
+        {pending.instead?.dig ? (
+          <button className="ghost" onClick={() => dispatch([{ type: "drawLook", player: HUMAN, instead: "dig" }])}>
+            {pending.instead.dig} instead
+          </button>
+        ) : null}
       </div>
     );
   }

@@ -440,7 +440,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         if (e.millFirst) {
           const n = 1 + Math.floor(nextRandom(s) * e.millFirst);
           const milled = p.library.slice(0, millCount(s, p.id, n));
-          for (const id of milled) moveObject(s, id, "graveyard");
+          for (const id of milled) moveObject(s, id, "graveyard", { milled: true });
           log(s, `${n} is chosen at random: ${p.name} mills ${milled.length} card${milled.length === 1 ? "" : "s"}.`);
         }
         // "With a different name than that spell": the countered spell's name (CR 201.2).
@@ -610,7 +610,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${defOf(s, o).name} gains rebound.`);
       }
       const mods = e.mods.flatMap((x): Modification[] => (x.kind !== "addKeywords" ? [x] : x.keywords.some((k) => k !== "Rebound") ? [{ ...x, keywords: x.keywords.filter((k) => k !== "Rebound") }] : []));
-      if (mods.length) (o.spellGains ??= []).push({ mods, timestamp: s.nextTimestamp++, controller: ctx.controller, source: src });
+      if (mods.length) (o.spellGains ??= []).push({ mods, timestamp: s.nextTimestamp++, controller: ctx.controller, source: src, ...(e.forever ? { forever: true as const } : {}) });
       return;
     }
     case "counterSpell": {
@@ -916,7 +916,7 @@ function newTargets(s: GameState, ctx: ResolveCtx, stackId: string, by: string):
 export function changeTargetOptions(s: GameState, item: StackItem, spec: TargetSpec, current: TargetChoice): TargetChoice[] {
   // A spell's own characteristics, or an ability's source's (CR 113.7a), for protection and hexproof.
   const o = item.objectId ? s.objects[item.objectId] : undefined;
-  const src = o ? spellQuality(s, cardIdOf(o)) : sourceQuality(s, item.sourceId, item.sourceCardId);
+  const src = o ? spellQuality(s, cardIdOf(o), item) : sourceQuality(s, item.sourceId, item.sourceCardId);
   const all: TargetChoice[] = legalTargets(s, spec, item.controller, item.id, src, item.sourceId);
   const self = s.resolving?.item;
   if (spec.kind === "spell" && self && self.id !== item.id && isLegalTarget(s, spec, { kind: "stack", id: self.id }, item.controller, src)) all.push({ kind: "stack", id: self.id });

@@ -63,7 +63,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const p = player(s, pid);
         const n = millCount(s, pid, amountNow(s, e.n, { ...ctx, eachOne: pid }));
         for (const id of p.library.slice(0, n)) {
-          moveObject(s, id, "graveyard");
+          moveObject(s, id, "graveyard", { milled: true });
           if (obj(s, id).zone === "graveyard") s.resolving!.milled.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
         }
         log(s, `${p.name} mills ${n} card${n === 1 ? "" : "s"}.`);
@@ -621,7 +621,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const sc = (r.scratch ??= {});
       // "With mana value less than or equal to ..." (TargetSpec.bound): as it resolves.
       const filter0 = e.filter && bindBound(s, e.filter, amountCtx(s, ctx));
-      const filter1 = filter0?.named === "~" ? { ...filter0, named: src } : filter0;
+      const filter1 = filter0?.named === "~" ? { ...filter0, named: src } : filter0?.notNamed === "~" ? { ...filter0, notNamed: src } : filter0;
       const filter = filter1?.colorOfYourLegend ? legendColors(s, filter1, ctx.controller) : filter1;
       const who = e.who ? (e.who.ref === "eachPlayer" || e.who.ref === "eachOpponent" || (e.who.ref === "target" && (e.who.n ?? 1) > 1) ? apnap(s, players(s, e.who, ctx)) : players(s, e.who, ctx).slice(0, 1)) : [ctx.controller];
       const queue = (sc.searchQueue ??= who.filter((pid) => !player(s, pid).lost));

@@ -73,6 +73,7 @@ export function parseManaAbility(line0: string): ManaAbility | null {
       if (m2[1]) out.spentHasteType = m2[1];
     }
     else if (extra === "If that mana is spent on an instant or sorcery spell, that spell can't be countered.") out.spentUncounterable = true;
+    else if (extra === "If this mana is spent to cast a creature spell, that creature enters with an additional +1/+1 counter on it.") out.spentCreatureCounter = true;
     else if (extra === "If you spend this mana to cast your commander, it enters with a number of additional +1/+1 counters on it equal to the number of times it's been cast from the command zone this game.") out.spentCommanderCounters = true;
     // Depletion lands: "Put a depletion counter on ~.", "If there are no depletion counters on ~, sacrifice it."
     else if ((m2 = new RegExp(`^Put an? ${COUNTER} counter on ~\\.$`).exec(extra)) && !out.putCounter) out.putCounter = counterKind(m2[1]!);

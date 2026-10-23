@@ -620,6 +620,8 @@ export function moveObject(
     x?: number;
     /** Its controller is sacrificing it (CR 701.21a), for "whenever you sacrifice" triggers. */
     sacrificed?: boolean;
+    /** Milled (CR 701.17a), for "whenever a player mills one or more creature cards" (Zellix). */
+    milled?: boolean;
     /** "It's an enchantment": the card types it has from the moment it enters, for as long as it's there. */
     becomes?: { types: string[]; subtypes: string[] };
     /** "Those permanents are 4/4 creatures in addition to their other types" (Dance of the Manse): it enters that way (rulings). */
@@ -941,6 +943,7 @@ export function moveObject(
       to,
       owner: o.owner,
       ...(o.isToken || o.spellCopy ? { notCard: true as const } : {}),
+      ...(opts.milled && fromZone === "library" ? { milled: true as const } : {}),
       card: fromZone === "battlefield" ? snapshotKey : o.cardId,
       ...(fromZone === "battlefield" ? { controller: lastController, snapshot, chars: last, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(opts.sacrificed ? { sacrificed: true as const } : {}) } : {}),
     });
@@ -955,7 +958,7 @@ export function moveObject(
     for (const [k, n] of Object.entries(fromZone === "stack" ? (o.extraCounters ?? {}) : {})) counters[k] = (counters[k] ?? 0) + n;
     o.extraCounters = undefined;
     // "It gains haste until end of turn" while it was a spell (Tyvar Kell's emblem): the permanent it becomes has it (CR 400.7a).
-    for (const g of fromZone === "stack" ? (o.spellGains ?? []) : []) s.effects.push({ id: `e${s.nextId++}`, timestamp: g.timestamp, controller: g.controller, sourceName: g.source, duration: "endOfTurn", affected: [o.id], mods: g.mods });
+    for (const g of fromZone === "stack" ? (o.spellGains ?? []) : []) s.effects.push({ id: `e${s.nextId++}`, timestamp: g.timestamp, controller: g.controller, sourceName: g.source, duration: g.forever ? "game" : "endOfTurn", affected: [o.id], mods: g.mods });
     o.spellGains = undefined;
     const how: EnterOpts = { ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(opts.countersIfCreature ? { countersIfCreature: opts.countersIfCreature } : {}), ...(opts.countersIfPlaneswalker ? { countersIfPlaneswalker: opts.countersIfPlaneswalker } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
     // "You may have ~ enter as a copy of ...": it becomes the copy as it enters (CR 707.5), so how it
@@ -1789,6 +1792,9 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", mad
       if (look === "paused") return false;
       archives = archivesFor(s, pid);
     } else archives = made.shift()!;
+    const dig = digInstead(s, pid, n, after, made, archives);
+    if (dig === "paused") return false;
+    if (dig) continue;
     const options = dredgeOptions(s, pid);
     // Abundance: "you may instead ..." for each draw (rulings), even with nothing left to draw.
     const abundance = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawAbundance);
@@ -1807,6 +1813,37 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", mad
     if (!drawOne(s, pid)) break;
   }
   return true;
+}
+
+/**
+ * Underrealm Lich: "If you would draw a card, instead look at the top three cards of your library, then put one into your
+ * hand and the rest into your graveyard" (CR 614.1a), each draw separately (rulings). Dredge, Abundance or Alhammarret's
+ * Archive could replace the same draw: the player chooses which applies (CR 616.1), so they're offered with it. With one
+ * card or none to look at and nothing else to choose, it just happens (an empty library loses no game: nothing is drawn).
+ * `left` and `made` are the draws after this one. "paused" when it waits for the player, true when it replaced the draw.
+ */
+function digInstead(s: GameState, pid: PlayerId, left: number, after: "drawStep" | undefined, made: number[], archives: number): "paused" | boolean {
+  const src = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawDig);
+  if (!src) return false;
+  const p = player(s, pid);
+  const cards = p.library.slice(0, abilitiesOf(s, obj(s, src)).drawDig!);
+  const dredge = dredgeOptions(s, pid);
+  const abundance = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawAbundance);
+  const instead = archives || dredge.length || abundance ? { ...(archives ? { archive: 2 } : {}), ...(dredge.length ? { dredge } : {}), ...(abundance ? { abundance: nameOf(s, abundance) } : {}) } : undefined;
+  if (cards.length > 1 || instead) {
+    s.pending = { kind: "drawLook", keep: true, player: pid, source: nameOf(s, src), cards, left, made: [...made], ...(archives ? { archives } : {}), ...(after ? { after } : {}), ...(instead ? { instead } : {}) };
+    return "paused";
+  }
+  keepOne(s, p, nameOf(s, src), cards, cards[0]);
+  return true;
+}
+
+function keepOne(s: GameState, p: Player, source: string, cards: ObjectId[], keep?: ObjectId) {
+  log(s, cards.length ? `${p.name} looks at the top ${cards.length === 1 ? "card" : `${cards.length} cards`} of their library instead of drawing (${source}).` : `${p.name} would draw from an empty library; ${source} replaces it, so nothing happens.`);
+  if (keep !== undefined) moveObject(s, keep, "hand");
+  const rest = cards.filter((id) => id !== keep);
+  for (const id of rest) moveObject(s, id, "graveyard");
+  if (cards.length) log(s, `${p.name} puts a card into their hand${rest.length ? ` and ${rest.map((id) => nameOf(s, id)).join(", ")} into their graveyard` : ""}.`);
 }
 
 /** The Notion Thieves that already replaced a draw in the chain of draws being made now (CR 614.5). */
@@ -1864,7 +1901,8 @@ function firstDrawLook(s: GameState, pid: PlayerId, left: number, after?: "drawS
   const cards = p.library.slice(0, 2);
   const archive = archiveDraws(s, pid);
   const dredge = dredgeOptions(s, pid);
-  const instead = archive > 1 || dredge.length ? { ...(archive > 1 ? { archive } : {}), ...(dredge.length ? { dredge } : {}) } : undefined;
+  const dig = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawDig);
+  const instead = archive > 1 || dredge.length || dig ? { ...(archive > 1 ? { archive } : {}), ...(dredge.length ? { dredge } : {}), ...(dig ? { dig: nameOf(s, dig) } : {}) } : undefined;
   if (cards.length === 2 || instead) {
     s.pending = { kind: "drawLook", player: pid, source: nameOf(s, src), cards, left, ...(after ? { after } : {}), ...(instead ? { instead } : {}) };
     return "paused";
@@ -1885,11 +1923,18 @@ function lookInstead(s: GameState, p: Player, source: string, cards: ObjectId[],
  * Answering firstDrawLook: that card to the graveyard, the other stays on top; then the draw, the rest, and what was
  * drawing. Or another replacement first: the Archive's draws, or a dredge, then the rest.
  */
-function chooseDrawLook(s: GameState, p: Player, id?: ObjectId, instead?: "archive" | { dredge: ObjectId }) {
+function chooseDrawLook(s: GameState, p: Player, id?: ObjectId, instead?: "archive" | "dig" | { dredge: ObjectId } | { abundance: "land" | "nonland" }) {
   const pend = s.pending;
   if (pend?.kind !== "drawLook" || pend.player !== p.id) throw new RulesError("no cards to choose from");
+  if (pend.keep) return chooseDig(s, p, pend, id, instead);
+  if (instead !== undefined && typeof instead === "object" && "abundance" in instead) throw new RulesError("nothing lets you reveal instead");
   let more: [number, number[]];
-  if (instead === "archive") {
+  if (instead === "dig") {
+    // Underrealm Lich first: the draw is still to come, and the look is used up (the first time you would draw).
+    if (!pend.instead?.dig) throw new RulesError("no other way to replace that draw");
+    s.pending = null;
+    more = [pend.left + 1, []];
+  } else if (instead === "archive") {
     if (!pend.instead?.archive) throw new RulesError("no other way to replace that draw");
     s.pending = null;
     const n = archivesFor(s, p.id) - 1;
@@ -1909,6 +1954,36 @@ function chooseDrawLook(s: GameState, p: Player, id?: ObjectId, instead?: "archi
   if (!draw(s, p.id, more[0], pend.after, more[1])) return;
   if (pend.after === "drawStep") fireEvent(s, { type: "step", step: "draw", active: s.activePlayer });
   else if (s.resolving) continueResolution(s);
+}
+
+/** Answering Underrealm Lich's look (digInstead): the card to keep, or another replacement of that draw first. */
+function chooseDig(s: GameState, p: Player, pend: Extract<PendingDecision, { kind: "drawLook" }>, id?: ObjectId, instead?: "archive" | "dig" | { dredge: ObjectId } | { abundance: "land" | "nonland" }) {
+  const made = [...(pend.made ?? [])];
+  if (instead === "archive") {
+    if (!pend.instead?.archive || !pend.archives) throw new RulesError("no other way to replace that draw");
+    s.pending = null;
+    log(s, `${p.name} draws two cards instead of one.`);
+    made.unshift(pend.archives - 1, pend.archives - 1);
+  } else if (instead === "dig") throw new RulesError("no other way to replace that draw");
+  else if (instead && "dredge" in instead) {
+    if (!pend.instead?.dredge?.includes(instead.dredge) || !dredgeOptions(s, p.id).includes(instead.dredge)) throw new RulesError("that card can't be dredged");
+    s.pending = null;
+    dredgeInstead(s, p, instead.dredge);
+  } else if (instead) {
+    if (!pend.instead?.abundance) throw new RulesError("nothing lets you reveal instead");
+    s.pending = null;
+    const rest = abundanceInstead(s, p, instead.abundance, pend.instead.abundance);
+    if (rest.length > 1) {
+      s.pending = { kind: "orderLibrary", player: p.id, cards: rest, bottom: true, source: pend.instead.abundance, thenDraw: { left: pend.left, made, ...(pend.after ? { after: pend.after } : {}) } };
+      return;
+    }
+  } else {
+    if (pend.cards.length > 1 && (id === undefined || !pend.cards.includes(id))) throw new RulesError("that isn't one of the cards");
+    if (pend.cards.some((c) => !p.library.includes(c))) throw new RulesError("those cards moved");
+    s.pending = null;
+    keepOne(s, p, pend.source, pend.cards, id ?? pend.cards[0]);
+  }
+  continueDraws(s, p.id, pend.left, pend.after, made);
 }
 
 /**
@@ -2013,7 +2088,7 @@ export function dredgeOptions(s: GameState, pid: PlayerId): ObjectId[] {
 function dredgeInstead(s: GameState, p: Player, id: ObjectId) {
   const n = millCount(s, p.id, compileCard(defOf(s, obj(s, id))).dredge!);
   const milled = p.library.slice(0, n);
-  for (const c of milled) moveObject(s, c, "graveyard");
+  for (const c of milled) moveObject(s, c, "graveyard", { milled: true });
   moveObject(s, id, "hand");
   log(s, `${p.name} dredges ${nameOf(s, id)} instead of drawing, milling ${n} card${n === 1 ? "" : "s"}.`);
 }
@@ -2844,8 +2919,10 @@ function resolvePermanentSpell(s: GameState, item: StackItem, o: GameObject, d: 
   const haste = o.hasteCast;
   o.hasteCast = undefined;
   // Opal Palace: as many more +1/+1 counters as times it's been cast from the command zone, for each of its mana spent.
-  const opal = (o.commanderCountersCast ?? 0) * (player(s, o.owner).commanderCasts[o.id] ?? 0);
+  // Biophagus: one more for each of its mana spent (CR 614.1c).
+  const opal = (o.commanderCountersCast ?? 0) * (player(s, o.owner).commanderCasts[o.id] ?? 0) + (o.creatureCountersCast ?? 0);
   o.commanderCountersCast = undefined;
+  o.creatureCountersCast = undefined;
   // Impending: "If you chose to pay this permanent's impending cost, it enters with N time counters on it" (CR 702.176a).
   const impending = o.castAlt === "impending" ? (compileCard(d).impending ?? 0) : 0;
   const enterCounters = { ...(opal ? { "+1/+1": opal } : {}), ...(impending ? { time: impending } : {}) };
@@ -3353,7 +3430,7 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   const spentTrigger: ManaSpentTrigger | undefined = ab.spentTrigger && { ...ab.spentTrigger, sourceId: o.id, sourceCardId: cardIdOf(o), sourceZc: o.zoneChanges ?? 0 };
   // "Whenever you cast a permanent spell using mana produced by Tecutlan": its mana is kept apart, to tell.
   const source = abilitiesOf(s, o).triggers.some((t) => t.cast?.manaFromSelf) ? `${o.id}#${o.zoneChanges ?? 0}` : undefined;
-  addMana(s, p.id, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(ab.spentUncounterable ? { uncounterableInstantSorcery: true as const } : {}), ...(source ? { source } : {}) });
+  addMana(s, p.id, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(ab.spentCreatureCounter ? { creatureCounter: true as const } : {}), ...(ab.spentUncounterable ? { uncounterableInstantSorcery: true as const } : {}), ...(source ? { source } : {}) });
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
   addTriggeredMana(s, p.id, picked);
   if (ab.skipNextUntap && o.zone === "battlefield") o.skipNextUntap = true;
@@ -3616,7 +3693,9 @@ export function castProblem(
   if (plotted && !canActAtSorcerySpeed(s, pid)) return `a plotted card can only be cast at sorcery speed`;
   const spell = compileCard(d).spell;
   // A spell's colors and name are its card's (CR 702.16b, 201.2), and it's a spell ("can't be the target of spells").
-  const sq: SourceQuality = { colors: d.colors, types: d.types, subtypes: d.subtypes, name: d.name, spell: true };
+  // Its mana value counts the X announced for it (CR 202.3e, rulings on Reaver Titan).
+  const printedCost = parseManaCost(d.manaCost);
+  const sq: SourceQuality = { colors: d.colors, types: d.types, subtypes: d.subtypes, name: d.name, spell: true, manaValue: defMv(d) + (printedCost.hasX ? (x ?? 0) * xCount(printedCost) : 0) };
   if (spell?.modal) {
     if (modes === undefined) {
       if (!canChooseModes(s, spell, pid, sq)) return `${d.name} has no mode that can be chosen`;
@@ -4258,6 +4337,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // "If any of that mana is spent on a creature spell, it gains haste" (Arena of Glory): the spell and the creature it becomes.
   o.hasteCast = paid.haste;
   o.commanderCountersCast = paid.commanderCounters;
+  o.creatureCountersCast = paid.creatureCounters;
   // "When that mana is spent to cast a creature spell that shares a creature type with your commander" (Path of
   // Ancestry): one trigger for each such mana, its commanders' types checked now (rulings). "... to cast a red instant
   // or sorcery spell" (Pyromancer's Goggles): queued once the spell is on the stack, "that spell" being it.
@@ -5228,7 +5308,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
     else if (c.kind === "mill") {
       const n = millCount(s, p.id, c.n);
       log(s, `${p.name} mills ${n === 1 ? "a card" : `${n} cards`}.`);
-      for (const id of p.library.slice(0, n)) moveObject(s, id, "graveyard");
+      for (const id of p.library.slice(0, n)) moveObject(s, id, "graveyard", { milled: true });
     } else if (c.kind === "revealHand") log(s, `${p.name} reveals their hand${p.hand.length ? `: ${p.hand.map((id) => nameOf(s, id)).join(", ")}` : " (it's empty)"}.`);
     else if (c.kind === "giveLife") {
       // Unchosen (a caller that didn't ask), the cost is still paid: by the first opponent who can gain life.
@@ -5355,6 +5435,11 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
       const tp = tapCreaturesProblem(s, pid, tapCreatures, "station");
       if (tp) return tp;
     }
+  } else if (ab.waterbend !== undefined) {
+    if (tapCreatures?.length) {
+      const wp = waterbendProblem(s, pid, o, ab, tapCreatures, x ?? 0, costs);
+      if (wp) return wp;
+    }
   } else if (tapCreatures?.length) return "this ability doesn't tap creatures";
   if (ab.body.modal) {
     const mp = modes === undefined ? (canChooseModes(s, ab.body, pid, sourceQuality(s, id), id) ? null : "no mode can be chosen") : modesProblem(s, ab.body, modes, pid, sourceQuality(s, id), false, id);
@@ -5391,8 +5476,33 @@ export function abilityProblem(s: GameState, pid: PlayerId, id: ObjectId, index:
   const xp = ab.loyaltyX || abilityCostsHaveX(ab) ? (x !== undefined && (!Number.isInteger(x) || x < 0) ? "X must be a whole number, 0 or more" : (x ?? 0) < (ab.xMin ?? 0) ? "X can't be 0" : null) : (x ?? 0) < (ab.xMin ?? 0) ? "X can't be 0" : xProblem(cost, x);
   if (xp) return xp;
   if (ab.energyX && (x ?? 0) > (p.energy ?? 0)) return `you need ${x} energy`; // CR 107.14
-  if (!canPayFromPool(s, pid, cost, abilityUse(o, ab, s), ab.loyaltyX ? 0 : (x ?? 0) * xCount(cost), p.life)) return `not enough mana for ${d.name}'s ability`;
+  const due = lessWaterbend(cost, ab.loyaltyX ? 0 : (x ?? 0) * xCount(cost), ab, tapCreatures);
+  if (!canPayFromPool(s, pid, due.cost, abilityUse(o, ab, s), due.extra, p.life)) return `not enough mana for ${d.name}'s ability`;
   return null;
+}
+
+/**
+ * Waterbend (CR 701.67a-b): "Pay [cost]. For each generic mana in that cost, you may tap an untapped artifact or creature
+ * you control rather than pay that mana." The ones tapped are the activation's `tapCreatures`: no more than the generic
+ * mana in the waterbend cost itself, even if the total cost went up or down (rulings), each one once.
+ */
+function waterbendProblem(s: GameState, pid: PlayerId, o: GameObject, ab: ActivatedAbility, ids: ObjectId[], x: number, costs?: CostChoices): string | null {
+  const cap = ab.waterbend === "X" ? x : (ab.waterbend ?? 0);
+  if (ids.length > cap) return `waterbend {${cap}} can be paid by tapping no more than ${cap} artifact${cap === 1 ? "" : "s"} or creature${cap === 1 ? "" : "s"}`;
+  if (new Set(ids).size !== ids.length) return "each artifact or creature can only be tapped once to waterbend";
+  for (const id of ids) {
+    const c = s.objects[id];
+    if (!c || c.zone !== "battlefield" || controllerOf(s, c) !== pid || !(objIsType(s, c, "Artifact") || objIsType(s, c, "Creature"))) return "only artifacts and creatures you control can be tapped to waterbend";
+    // The source tapped by its own {T} cost, or tapped or sacrificed for another cost, can't be tapped again (rulings).
+    if (c.tapped || (ab.tap && id === o.id) || costs?.tap?.includes(id) || costs?.sacrifice?.includes(id)) return `${nameOf(s, id)} is already tapped`;
+  }
+  return null;
+}
+
+/** An activation's mana cost after the artifacts and creatures tapped to waterbend each pay {1} of its generic mana (CR 701.67a). */
+export function lessWaterbend(cost: ParsedCost, extra: number, ab: ActivatedAbility, taps?: ObjectId[]): { cost: ParsedCost; extra: number } {
+  if (ab.waterbend === undefined || !taps?.length) return { cost, extra };
+  return payGenericWith(cost, extra, taps.length) ?? { cost, extra };
 }
 
 /**
@@ -5586,7 +5696,8 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
   // "Pay half your life, rounded up": worked out with the rest of the cost, before any of it is paid (CR 601.2f-h).
   const halfLife = halfLifeCost(s, p.id, ab);
   const lifeCost = activatedLifeCost(s, p.id, ab);
-  const paid = spendFromPool(s, p.id, abCost, abilityUse(o, ab, s), ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), payableLife(s, p.id) - halfLife - lifeCost)!;
+  const due = lessWaterbend(abCost, ab.loyaltyX ? 0 : (x ?? 0) * xCount(abCost), ab, tapCreatures);
+  const paid = spendFromPool(s, p.id, due.cost, abilityUse(o, ab, s), due.extra, payableLife(s, p.id) - halfLife - lifeCost)!;
   // A Treasure's mana ability makes "mana from a Treasure" (CR 106.3), even though it's sacrificed as it's activated.
   const manaFrom = manaPick ? manaOriginsOf(s, o) : [];
   // The source as it is now, for "its power" after it's sacrificed as a cost (CR 608.2h).
@@ -5641,6 +5752,7 @@ function activateAbility(s: GameState, p: Player, id: ObjectId, index: number, t
     invalidateCharacteristics(s);
   }
   for (const c of tapCreatures ?? []) tapPermanent(s, obj(s, c));
+  if (ab.waterbend !== undefined && tapCreatures?.length) log(s, `${p.name} taps ${tapCreatures.map((c) => nameOf(s, c)).join(", ")} to waterbend.`);
   const sourceZc = o.zoneChanges ?? 0;
   const stamped = stampTargets(s, targets);
   const costCardNames: string[] = [];
@@ -5756,7 +5868,7 @@ export function copyTargetQuality(s: GameState): SourceQuality | undefined {
   const sc = s.resolving?.scratch?.copies;
   const orig = sc ? (s.stack.find((x) => x.id === sc.of) ?? s.castItems?.[sc.of] ?? s.epics?.[sc.of]) : undefined;
   const card = orig?.objectId ? s.objects[orig.objectId] : undefined;
-  return card ? spellQuality(s, cardIdOf(card)) : undefined;
+  return card ? spellQuality(s, cardIdOf(card), orig) : undefined;
 }
 
 /** A spell copy's targets (CR 707.10c): any it keeps may be illegal now; any it changes must be legal. */
@@ -5784,7 +5896,7 @@ function chooseCopyTargets(s: GameState, p: Player, targets?: TargetChoice[]) {
 /** What a spell or ability on the stack is, for its targets: the spell's own characteristics, or its source's (CR 113.7a). */
 export function stackItemQuality(s: GameState, item: StackItem): SourceQuality | undefined {
   const o = item.objectId ? s.objects[item.objectId] : undefined;
-  return o ? spellQuality(s, cardIdOf(o)) : sourceQuality(s, item.sourceId, item.sourceCardId);
+  return o ? spellQuality(s, cardIdOf(o), item) : sourceQuality(s, item.sourceId, item.sourceCardId);
 }
 
 /**
@@ -6067,9 +6179,17 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   if (pend.what === "damageShield") {
-    // Which damage a shield takes, or which shield applies first (CR 615.7, 616.1); combat damage waits for it.
-    s.damageBatch!.answers.push(Number(choice));
-    finishCombatDamage(s);
+    // Which damage a shield takes, or which shield applies first (CR 615.7, 616.1); combat damage waits for it. Damage
+    // a resolving spell or ability deals: its instruction runs again with the answers so far (resolve.ts runAsking).
+    if (s.damageBatch) {
+      s.damageBatch.answers.push(Number(choice));
+      finishCombatDamage(s);
+      return;
+    }
+    const answers = s.resolving?.shieldAnswers;
+    if (!answers) throw new RulesError("no damage is waiting on its shields");
+    answers.push(Number(choice));
+    continueResolution(s);
     return;
   }
   if (pend.what === "mutate") {

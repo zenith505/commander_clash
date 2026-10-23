@@ -402,6 +402,13 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (s.resolving!.damagedThisWay ?? []).some((id) => s.objects[id]?.zone === "battlefield" && objectMatches(s, (e.cond as { filter: TargetSpec }).filter, s.objects[id]!, ctx.controller, false))
             : e.cond.kind === "subjectWasAttacking"
             ? ((o) => (o ? o.attacking !== undefined : ctx.lki?.attacking !== undefined))(objects(s, { ref: "subject" }, ctx)[0])
+            : e.cond.kind === "causeSpellIs"
+            ? ((f) => {
+                // The spell the cast trigger is about, on the stack or gone from it (its card, as it was cast).
+                const item = s.stack.find((x) => x.id === ctx.cause) ?? s.castItems?.[ctx.cause ?? ""];
+                const o = item?.objectId ? s.objects[item.objectId] : undefined;
+                return !!o && printedMatches(f, defOf(s, o));
+              })(e.cond.filter)
             : e.cond.kind === "subjectIs"
             ? ((f) => objects(s, { ref: "subject" }, ctx).some((o) => objectMatches(s, f, o, ctx.controller, false)))(e.cond.filter)
             : e.cond.kind === "targetCardWas"

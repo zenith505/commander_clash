@@ -148,6 +148,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const plan = facePlan(s, pid, pend.objectId, true, "first") ?? castPlan(s, pid, pend.objectId, true) ?? facePlan(s, pid, pend.objectId, true, "after") ?? (altCost(defOf(s, obj(s, pend.objectId)), "prototype") ? castPlan(s, pid, pend.objectId, true, undefined, "prototype") : null);
       return plan ?? [{ type: "chooseMay", player: pid, yes: false }];
     }
+    if (pend.kind === "drawLook" && pend.keep) {
+      // Underrealm Lich: keep the card we'd most like to draw (what scry would keep, the most expensive of those).
+      if (pend.cards.length < 2) return [{ type: "drawLook", player: pid }];
+      const best = [...pend.cards].sort((a, b) => Number(wantOnTop(s, pid, b)) - Number(wantOnTop(s, pid, a)) || mv(s, b) - mv(s, a))[0]!;
+      return [{ type: "drawLook", player: pid, objectId: best }];
+    }
     if (pend.kind === "drawLook") {
       // The look first, even when Alhammarret's Archive or dredge could replace that draw: they can still replace the
       // draw it makes. Keep the card we'd rather draw (what scry would keep), and bin the other.
@@ -3107,6 +3113,9 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
         plan = planActivate(s, pid, id, i, targets.length ? targets : undefined, modes, undefined, x, costs);
         if (plan) break;
       }
+      // Waterbend (CR 701.67a): not by tapping creatures that could still attack this turn.
+      const wb = ab.waterbend !== undefined ? plan?.find((a) => a.type === "activateAbility" && a.objectId === id) : undefined;
+      if (wb?.type === "activateAbility" && s.activePlayer === pid && (s.step === "main1" || s.step === "upkeep" || s.step === "draw" || s.step === "beginCombat") && wb.tapCreatures?.some((c) => objIsType(s, obj(s, c), "Creature") && !isSummoningSick(s, obj(s, c)))) continue;
       // Not worth sacrificing a Treasure to cash in a Food or Clue.
       if (cashIn && plan?.some((a) => a.type === "activateMana" && manaActionAbility(s, a)?.sacrificeSelf)) continue;
       if (plan) return plan;

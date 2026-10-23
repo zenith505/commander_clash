@@ -1,17 +1,17 @@
 import { allEffects, type AbilityBody, type Amount, type DamageRecipient, type Effect, type ManaAbility, type Modification, type ObjRef, type PlayerRef, type TargetChoice } from "../abilities";
 import { withPutter } from "../counters";
 import { cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../cards";
-import { addTriggeredMana, askAuraReturns, creatureTypesOf, draw, endTheTurn, enterTogether, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
+import { addTriggeredMana, askAuraReturns, cloneState, creatureTypesOf, draw, endTheTurn, enterTogether, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics } from "../layers";
 import { compileCard } from "../oracle";
 import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LAND_TYPE, CHOSEN_HEXPROOF, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, protectionFromPlayer } from "../keywords";
 import { evalAmount, type AmountCtx } from "../amounts";
-import { cardSource, objectSource, type DamageSource } from "../damage";
+import { cardSource, objectSource, shieldChoicesPossible, ShieldQuestionPause, withShieldAnswers, type DamageSource } from "../damage";
 import { RulesError, type CardDef, type Chosen, type Color, type GameObject, type GameState, type LastKnown, type ManaType, type ObjectId, type PlayerId, type StackItem, type TriggerEventInfo } from "../types";
 import { manaTriggerResults } from "../manaabilities";
 import { askGraveyardOrder, closeGraveyardBatch, graveyardEnd } from "../graveyard";
 import type { ManaSpent } from "../mana";
-import { objectMatches, bindChosen, bindBound, targetingCtx, sourceQuality, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, checkTotals, relatedOk } from "./targeting";
+import { objectMatches, bindChosen, bindBound, targetingCtx, sourceQuality, spellManaValue, spellQuality, isLegalTarget, lesserPowerOk, sameNamed, checkTotals, relatedOk } from "./targeting";
 import { runPreventionEffect } from "./run-prevention";
 import { runBasicsEffect, becomeMonarch } from "./run-basics";
 import { runCoinEffect, runDiceEffect } from "./run-dice";
@@ -92,7 +92,7 @@ export function gifteeOf(s: GameState, ctx: ResolveCtx): PlayerId | undefined {
  */
 export function beginResolution(s: GameState, item: StackItem, body: AbilityBody): Resolution {
   const targets = item.targets ?? [];
-  const src = item.kind === "spell" ? spellQuality(s, s.objects[item.objectId!] ? cardIdOf(s.objects[item.objectId!]!) : undefined) : sourceQuality(s, item.sourceId, item.sourceCardId);
+  const src = item.kind === "spell" ? spellQuality(s, s.objects[item.objectId!] ? cardIdOf(s.objects[item.objectId!]!) : undefined, item) : sourceQuality(s, item.sourceId, item.sourceCardId);
   // An amount bound ("with power less than or equal to ~'s power") is worked out again now (CR 608.2b), with the source as
   // it last existed if it has left (608.2h).
   const now: AmountCtx = { ...targetingCtx(s, item.controller, item.sourceId), ...(item.sourceZc !== undefined ? { sourceZc: item.sourceZc } : {}), ...(item.lki ? { lki: item.lki } : {}), x: item.x ?? 0 };
@@ -182,7 +182,7 @@ export function continueResolution(s: GameState): Resolution {
     }
     if (r.next >= r.body.effects.length) break;
     if (!r.scratch) s.leftTogether = undefined; // a new instruction, not one resuming after a choice
-    if (runEffect(s, r.body.effects[r.next]!, ctx) === "paused") return "paused";
+    if (runAsking(s, r.body.effects[r.next]!, ctx) === "paused") return "paused";
     r.next++;
     r.scratch = undefined;
   }
@@ -195,6 +195,35 @@ export function continueResolution(s: GameState): Resolution {
 }
 
 /**
+ * Run one instruction of the resolving spell or ability, letting the players choose among the shields of the damage
+ * it deals (which redirection or prevention applies first, which damage a shield takes, CR 616.1) when they could
+ * have a choice. Such a choice comes partway through dealing the damage, so the instruction is run on a copy-backed
+ * state: at a question, the state goes back to how it was before the instruction, the question is asked, and the
+ * instruction runs again from its start with the answers so far, which give the same plan up to the next question.
+ */
+function runAsking(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | void {
+  const r = s.resolving!;
+  if (r.item.manaAbility || !shieldChoicesPossible(s)) return runEffect(s, e, ctx);
+  const before = cloneState(s);
+  return withShieldAnswers(r.shieldAnswers ?? [], (asked) => {
+    try {
+      const out = runEffect(s, e, ctx);
+      r.shieldAnswers = undefined;
+      return out;
+    } catch (err) {
+      const q = asked();
+      if (!(err instanceof ShieldQuestionPause) || !q) throw err;
+      for (const k of Object.keys(s)) delete (s as unknown as Record<string, unknown>)[k];
+      Object.assign(s, before);
+      invalidateCharacteristics(s);
+      s.resolving!.shieldAnswers ??= [];
+      s.pending = { kind: "chooseOption", player: q.player, source: ctx.sourceDef.name, what: "damageShield", prompt: q.prompt, options: q.labels.map((_, i) => String(i)), labels: q.labels };
+      return "paused";
+    }
+  });
+}
+
+/**
  * An activated mana ability resolves as soon as it's activated, without the stack (CR 605.3b), even while another
  * spell or ability is partway through resolving and waiting on a payment (605.3a). That one carries on afterwards.
  * Inside another decision, it can't stop for a choice of its own: the activation is refused instead.
@@ -204,7 +233,8 @@ export function resolveManaAbility(s: GameState, item: StackItem, body: AbilityB
   const inside = !!outer || !!s.pending;
   const left = s.leftTogether;
   s.resolving = { item, body, legal: [], next: 0, ...(color ? { chosen: { color } } : {}) };
-  if (continueResolution(s) === "paused" && inside) throw new RulesError(`${s.cards[item.sourceCardId!]?.name ?? "That"}'s mana ability needs a choice that can't be made now`);
+  // Its damage can't stop for a question (its shields are chosen the way a bot would).
+  if (withShieldAnswers(null, () => continueResolution(s)) === "paused" && inside) throw new RulesError(`${s.cards[item.sourceCardId!]?.name ?? "That"}'s mana ability needs a choice that can't be made now`);
   if (!inside) return;
   s.resolving = outer;
   s.leftTogether = left;
@@ -1051,7 +1081,7 @@ export function ctxSource(s: GameState, ctx: ResolveCtx): DamageSource {
   const spell = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : undefined;
   const ref = spell ? { object: spell.id, zc: spell.zoneChanges ?? 0 } : ctx.sourceId ? { object: ctx.sourceId, zc: ctx.sourceZc ?? s.lastKnown?.[ctx.sourceId]?.zc ?? 0 } : undefined;
   // A spell's reflexive trigger: its source is the spell, gone from the stack, so as it last existed there (CR 113.7a).
-  return { ...cardSource(ctx.sourceDef, ctx.controller, ref), ...(spell || item?.fromSpell ? { spell: true as const } : {}) };
+  return { ...cardSource(ctx.sourceDef, ctx.controller, ref), ...(spell || item?.fromSpell ? { spell: true as const } : {}), ...(spell && item ? { manaValue: spellManaValue(s, item) } : {}) };
 }
 
 /**

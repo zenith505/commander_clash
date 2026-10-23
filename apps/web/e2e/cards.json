@@ -8051,6 +8051,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "a1230e78-0bfa-489e-a1b9-3c227bceb6fb",
+  "name": "North Pole Patrol",
+  "manaCost": "{2}{U}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Soldier Ally",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Soldier",
+   "Ally"
+  ],
+  "oracleText": "{T}: Untap another target permanent you control.\nWaterbend {3}, {T}: Tap target creature an opponent controls. (While paying a waterbend cost, you can tap your artifacts and creatures to help. Each one pays for {1}.)",
+  "power": "2",
+  "toughness": "3",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Waterbend"
+  ],
+  "commanderLegal": "legal",
+  "set": "tla",
+  "releasedAt": "2025-11-21",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d39b9f64-dc9b-413f-8d05-e21ef46d6756",
   "name": "Oblivion Sower",
   "manaCost": "{6}",
@@ -8391,6 +8425,67 @@
   "commanderLegal": "legal",
   "set": "frf",
   "releasedAt": "2015-01-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "f38fe1e9-8997-4b63-9109-7513034bac88",
+  "name": "Palisade Giant",
+  "manaCost": "{4}{W}{W}",
+  "cmc": 6,
+  "typeLine": "Creature — Giant Soldier",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Giant",
+   "Soldier"
+  ],
+  "oracleText": "All damage that would be dealt to you and other permanents you control is dealt to this creature instead.",
+  "power": "2",
+  "toughness": "7",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "rtr",
+  "releasedAt": "2012-10-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "2c5c8250-1860-42a1-a335-071f54830d37",
+  "name": "Pariah",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nAll damage that would be dealt to you is dealt to enchanted creature instead.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "otp",
+  "releasedAt": "2024-04-19",
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
@@ -11920,6 +12015,40 @@
   "set": "cns",
   "releasedAt": "2014-06-06",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "e1bce9c3-300c-4a9d-abe0-a1f02d3a1105",
+  "name": "Underrealm Lich",
+  "manaCost": "{3}{B}{G}",
+  "cmc": 5,
+  "typeLine": "Creature — Zombie Elf Shaman",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie",
+   "Elf",
+   "Shaman"
+  ],
+  "oracleText": "If you would draw a card, instead look at the top three cards of your library, then put one into your hand and the rest into your graveyard.\nPay 4 life: This creature gains indestructible until end of turn. Tap it.",
+  "power": "4",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "G"
+  ],
+  "colorIdentity": [
+   "B",
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "grn",
+  "releasedAt": "2018-10-05",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },

@@ -455,6 +455,9 @@ export function applyInPlace(s: GameState, action: Action): void {
     case "dredge":
       chooseDredge(s, p, action.objectId, action.abundance);
       break;
+    case "drawEmptyReturn":
+      chooseDrawEmptyReturn(s, p, action.objectId);
+      break;
     case "drawLook":
       chooseDrawLook(s, p, action.objectId, action.instead);
       break;
@@ -490,6 +493,9 @@ export function obj(s: GameState, id: ObjectId): GameObject {
 export const livingPlayers = (s: GameState) => s.turnOrder.filter((id) => !player(s, id).lost);
 export const opponents = (s: GameState, pid: PlayerId) => livingPlayers(s).filter((id) => id !== pid);
 export const nameOf = (s: GameState, id: ObjectId) => defOf(s, obj(s, id)).name;
+
+/** "~ assigns no combat damage this turn" or "this combat" (CR 510.1): not the same as preventing it (rulings). */
+const assignsNoCombatDamage = (s: GameState, o: GameObject) => o.noCombatDamageTurn === s.turn || (o.noCombatDamageCombat?.turn === s.turn && o.noCombatDamageCombat.combat === (s.combatsThisTurn ?? 0));
 
 export function log(s: GameState, text: string, to?: PlayerId) {
   s.log.push({ seq: s.log.length, turn: s.turn, step: s.step, text, ...(to !== undefined ? { to } : {}) });
@@ -688,6 +694,7 @@ export function moveObject(
   o.exileIfDiesTurn = undefined;
   o.noRegenTurn = undefined;
   o.noCombatDamageTurn = undefined; // a new object (CR 400.7)
+  o.noCombatDamageCombat = undefined;
   o.attacked = undefined;
   o.couldAttack = undefined;
   o.exertedTurn = undefined;
@@ -1887,7 +1894,9 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", mad
       made.unshift(...Array<number>(2 ** archives).fill(0));
       continue;
     }
-    if (!drawOne(s, pid)) break;
+    const one = drawOne(s, pid, { left: n, made, ...(after ? { after } : {}) });
+    if (one === "paused") return false;
+    if (!one) break;
   }
   return true;
 }
@@ -2087,16 +2096,38 @@ function archiveDraws(s: GameState, pid: PlayerId): number {
   }).length;
 }
 
-function drawOne(s: GameState, pid: PlayerId): boolean {
+/**
+ * One draw, which nothing but an empty library's replacements can change any more. False when nothing was drawn and the
+ * draws stop; "paused" when Out of the Tombs waits for its player to choose (`rest`: the draws after this one).
+ */
+function drawOne(s: GameState, pid: PlayerId, rest: { left: number; made: number[]; after?: "drawStep" } = { left: 0, made: [] }): boolean | "paused" {
   const p = player(s, pid);
   const top = p.library[0];
   if (!top) {
     // Laboratory Maniac: the draw is replaced, so it isn't a draw from an empty library, even if the win is stopped
-    // (Platinum Angel) (CR 614.1a, 104.2b).
+    // (Platinum Angel) (CR 614.1a, 104.2b). With Out of the Tombs too, the player would choose which applies (CR 616.1):
+    // winning is taken.
     const maniac = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawEmptyWins);
     if (maniac) {
       winGame(s, pid, nameOf(s, maniac));
       return false;
+    }
+    // Out of the Tombs: a creature card from the graveyard instead, chosen by its player; with none, they lose (CR
+    // 614.1a). Either way nothing was drawn from an empty library (CR 704.5b), and the draws after this go on.
+    const tombs = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawEmptyReturn);
+    if (tombs) {
+      const cards = p.graveyard.filter((id) => isType(defOf(s, obj(s, id)), "Creature"));
+      if (!cards.length) {
+        log(s, `${p.name} would draw from an empty library, and has no creature card in their graveyard to return instead (${nameOf(s, tombs)}).`);
+        playerLoses(s, pid, `${nameOf(s, tombs)}: no creature card to return`);
+        return false;
+      }
+      if (cards.length === 1) {
+        returnFromTombs(s, pid, cards[0]!, nameOf(s, tombs));
+        return true;
+      }
+      s.pending = { kind: "drawEmptyReturn", player: pid, source: nameOf(s, tombs), cards, left: rest.left, ...(rest.made.length ? { made: [...rest.made] } : {}), ...(rest.after ? { after: rest.after } : {}) };
+      return "paused";
     }
     p.drewFromEmptyLibrary = true; // CR 704.5b
     return false;
@@ -2200,6 +2231,21 @@ export function continueDraws(s: GameState, pid: PlayerId, left: number, after: 
   else if (s.resolving) continueResolution(s);
 }
 
+/** Out of the Tombs instead of a draw: the creature card returns to the battlefield under its owner's control. */
+function returnFromTombs(s: GameState, pid: PlayerId, id: ObjectId, source: string) {
+  log(s, `${player(s, pid).name} would draw from an empty library and returns ${nameOf(s, id)} from their graveyard to the battlefield instead (${source}).`);
+  enterTogether(s, () => moveObject(s, id, "battlefield", { controller: pid }));
+}
+
+function chooseDrawEmptyReturn(s: GameState, p: Player, id: ObjectId) {
+  const pend = s.pending;
+  if (pend?.kind !== "drawEmptyReturn" || pend.player !== p.id) throw new RulesError("no draw to replace");
+  if (!pend.cards.includes(id) || obj(s, id).zone !== "graveyard") throw new RulesError("choose a creature card in your graveyard");
+  s.pending = null;
+  returnFromTombs(s, p.id, id, pend.source);
+  continueDraws(s, p.id, pend.left, pend.after, [...(pend.made ?? [])]);
+}
+
 function chooseDredge(s: GameState, p: Player, id?: ObjectId, abundance?: "land" | "nonland") {
   const pend = s.pending;
   if (pend?.kind !== "dredge" || pend.player !== p.id) throw new RulesError("no draw to replace");
@@ -2221,7 +2267,7 @@ function chooseDredge(s: GameState, p: Player, id?: ObjectId, abundance?: "land"
     // The Archive first: two draws, which the other Archives and dredge can each still replace.
     log(s, `${p.name} draws two cards instead of one.`);
     made.unshift(pend.archive - 1, pend.archive - 1);
-  } else drawOne(s, p.id);
+  } else if (drawOne(s, p.id, { left: pend.left - 1 - (pend.made?.length ?? 0), made, ...(pend.after ? { after: pend.after } : {}) }) === "paused") return;
   if (!draw(s, p.id, pend.left - 1 - (pend.made?.length ?? 0), pend.after, made)) return;
   if (pend.after === "drawStep") fireEvent(s, { type: "step", step: "draw", active: s.activePlayer });
   else if (s.resolving) continueResolution(s);
@@ -3281,12 +3327,19 @@ export function plottedCast(s: GameState, pid: PlayerId, o: GameObject): boolean
 }
 
 /**
- * A land card in `pid`'s own graveyard that "you may play lands from your graveyard" lets them play (Crucible of Worlds).
+ * A land card in `pid`'s own graveyard that "you may play lands from your graveyard" lets them play (Crucible of Worlds),
+ * or that card's own permission (Tablet of Discovery).
  * Playing it is still their land play for the turn, with the usual timing (CR 305.1-2).
  */
 export function mayPlayLandFromGraveyard(s: GameState, o: GameObject, pid: PlayerId): boolean {
   if (o.zone !== "graveyard" || o.owner !== pid || !isType(defOf(s, o), "Land")) return false;
-  return landsFromGraveyardNow(s, pid) || !!landPermit(s, pid);
+  return ownGraveyardPlay(s, o, pid) || landsFromGraveyardNow(s, pid) || !!landPermit(s, pid);
+}
+
+/** "Mill a card. You may play that card this turn." (Tablet of Discovery): that card's own permission (CR 400.7). */
+function ownGraveyardPlay(s: GameState, o: GameObject, pid: PlayerId): boolean {
+  const m = o.mayPlay;
+  return o.zone === "graveyard" && !!m && m.player === pid && m.zc === (o.zoneChanges ?? 0) && m.until === "thisTurn" && m.turn === s.turn && !m.castOnly;
 }
 
 /** Every land may be played from `pid`'s graveyard now: Crucible of Worlds, or an effect this turn (Yawgmoth's Will). */
@@ -3455,7 +3508,7 @@ function putLandPlayed(s: GameState, p: Player, id: ObjectId, untapped?: boolean
     log(s, `${p.name} reveals ${nameOf(s, shown)} so ${d.name} enters untapped.`);
   }
   // Muldrotha's land from the graveyard is used up, unless something lets every land be played from there (Crucible).
-  if (o.zone === "graveyard" && !landsFromGraveyardNow(s, p.id)) {
+  if (o.zone === "graveyard" && !ownGraveyardPlay(s, o, p.id) && !landsFromGraveyardNow(s, p.id)) {
     const permit = landPermit(s, p.id)!;
     ((s.turnLog ??= {}).gravePermits ??= []).push(permit);
     // Serra Paragon: "it gains ..." as the land it becomes.
@@ -7337,6 +7390,8 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
   }
   // "Can't attack alone": the only creature declared as an attacker attacks alone (CR 506.5).
   if (attacks.length === 1 && characteristics(s, obj(s, attacks[0]!.attacker)).cantAttackAlone) throw new RulesError(`${nameOf(s, attacks[0]!.attacker)} can't attack alone`);
+  const loner = attacks.length > 1 ? attacks.find((a) => characteristics(s, obj(s, a.attacker)).onlyAttacksAlone) : undefined;
+  if (loner) throw new RulesError(`${nameOf(s, loner.attacker)} can only attack alone`);
   // Requirements (CR 508.1d): every creature that "attacks each combat if able" and can attack has to,
   // unless that would break a restriction: one that can't attack alone needn't attack by itself.
   // A requirement that would need a cost paid to obey (Ghostly Prison) doesn't oblige anyone to pay it (CR 508.1d).
@@ -7862,7 +7917,7 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
   type Hit = { source: GameObject; toPlayer?: PlayerId; toObject?: GameObject; amount: number };
   const hits: Hit[] = [];
   for (const at of attackers(s)) {
-    if (!dealsDamageThisStep(s, at, firstStrikeStep) || at.noCombatDamageTurn === s.turn) continue;
+    if (!dealsDamageThisStep(s, at, firstStrikeStep) || assignsNoCombatDamage(s, at)) continue;
     let dmg = combatDamageOf(s, at);
     if (dmg <= 0) continue;
     // "As though it weren't blocked": all of it to the player it's attacking, none to blockers (CR 510.1b; rulings).
@@ -7897,7 +7952,7 @@ function dealCombatDamage(s: GameState, firstStrikeStep: boolean): boolean {
   }
   for (const id of s.battlefield) {
     const bl = obj(s, id);
-    if (!bl.blocking || !dealsDamageThisStep(s, bl, firstStrikeStep) || bl.noCombatDamageTurn === s.turn) continue;
+    if (!bl.blocking || !dealsDamageThisStep(s, bl, firstStrikeStep) || assignsNoCombatDamage(s, bl)) continue;
     const blocked = bl.blocking.map((a) => s.objects[a]).filter((at): at is GameObject => !!at && at.zone === "battlefield");
     let dmg = combatDamageOf(s, bl);
     if (dmg <= 0) continue;

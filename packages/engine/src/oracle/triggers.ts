@@ -64,6 +64,9 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever ~ blocks or becomes blocked, (.+)$/, "selfBlocksOrBecomesBlocked"],
   [/^Whenever ~ becomes blocked, (.+)$/, "selfBecomesBlocked"],
   [/^Whenever ~ attacks and isn't blocked, (.+)$/, "selfAttacksUnblocked"],
+  // "Whenever ~ attacks a player and isn't blocked" (Master of Cruelties): not a planeswalker or battle (rulings); "that
+  // player" is the defending player. See TriggeredAbility.attacksPlayer.
+  [/^Whenever ~ attacks a player and isn't blocked, (.+)$/, "selfAttacksUnblocked"],
   [/^Whenever ~ attacks alone, (.+)$/, "selfAttacksAlone"],
   [/^Whenever ~ blocks, (.+)$/, "selfBlocks"],
   [/^Whenever you gain life, (.+)$/, "youGainLife"],
@@ -2105,6 +2108,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
       // permanent, except after it left ("return it to your hand" means the card in the graveyard).
       const left = event === "selfDies" || event === "selfDiesOrExiled" || event === "selfToGraveyard" || event === "selfLeaves";
       if (event === "selfDealtDamageBySource") text = text.replace(/\bthat source's controller\b/g, "that player");
+      if (event === "selfAttacksUnblocked" && /^Whenever ~ attacks a player and isn't blocked, /.test(line)) text = text.replace(/\b[Tt]hat player\b/g, (w) => (w[0] === "T" ? "Defending player" : "defending player"));
       // "At the beginning of each player's upkeep, ~ deals 1 damage to them" (Roiling Vortex): that player.
       if (event === "eachUpkeep" || event === "eachDrawStep") text = text.replace(/^~ deals (\d+) damage to them\.$/, "~ deals $1 damage to that player.");
       // "At the beginning of each postcombat main phase, the active player adds ..." (Belbe): that player is the active one.
@@ -2120,7 +2124,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
         if (!ret || ret.type !== "putOntoBattlefield" || ret.counters) return "fail" as const;
         ret.countersFromLast = { kind: fewer, plus: -1 };
       }
-      const attacksPlayer = /^Whenever ~ attacks (?:a player|an opponent), /.test(line);
+      const attacksPlayer = /^Whenever ~ attacks (?:a player|an opponent)(?: and isn't blocked)?, /.test(line);
       const attacksBattle = /^Whenever ~ attacks a battle, /.test(line);
       // "To a player or planeswalker": "that player" could be either's (a planeswalker's controller isn't dealt it).
       const orPlaneswalker = / to a player or planeswalker, /.test(line);

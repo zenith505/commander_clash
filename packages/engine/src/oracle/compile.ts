@@ -1604,6 +1604,10 @@ export function compile(d: CardDef): CompiledCard {
       out.drawEmptyWins = true;
       continue;
     }
+    if (line === "If you would draw a card while your library has no cards in it, instead return a creature card from your graveyard to the battlefield. If you can't, you lose the game.") {
+      out.drawEmptyReturn = true;
+      continue;
+    }
     if (line === "If you would draw a card, you may instead choose land or nonland and reveal cards from the top of your library until you reveal a card of the chosen kind. Put that card into your hand and put all other cards revealed this way on the bottom of your library in any order.") {
       out.drawAbundance = true;
       continue;
@@ -1666,6 +1670,10 @@ export function compile(d: CardDef): CompiledCard {
     const extraVote = /^While voting, you (get an additional vote|may vote an additional time)\.$/.exec(line);
     if (extraVote && !out.extraVote) {
       out.extraVote = extraVote[1]!.startsWith("get") ? "get" : "may";
+      continue;
+    }
+    if (line === "If an opponent would face a villainous choice, they face that choice an additional time.") {
+      out.villainAgain = true;
       continue;
     }
     if (line === "If ~ is in your opening hand, you may begin the game with it on the battlefield.") {

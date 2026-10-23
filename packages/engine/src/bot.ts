@@ -162,6 +162,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const bin = wantOnTop(s, pid, a) && !wantOnTop(s, pid, b) ? b : !wantOnTop(s, pid, a) && wantOnTop(s, pid, b) ? a : mv(s, a) >= mv(s, b) ? b : a;
       return [{ type: "drawLook", player: pid, objectId: bin }];
     }
+    // Out of the Tombs: the creature card that costs the most comes back.
+    if (pend.kind === "drawEmptyReturn") return [{ type: "drawEmptyReturn", player: pid, objectId: [...pend.cards].sort((a, b) => mv(s, b) - mv(s, a))[0]! }];
     if (pend.kind === "dredge") {
       // With an Alhammarret's Archive too, the Archive first: each of the two draws it makes can still be dredged.
       const pick = pend.archive ? undefined : chooseDredge(s, pid, pend.options);
@@ -4542,6 +4544,8 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
   }
   // One that can't attack alone stays home rather than attack by itself (CR 506.5).
   if (attacks.length === 1 && characteristics(s, obj(s, attacks[0]!.attacker)).cantAttackAlone) attacks = [];
+  // One that can only attack alone (Master of Cruelties) stays home when others attack (CR 506.5).
+  if (attacks.length > 1) attacks = attacks.filter((a) => !characteristics(s, obj(s, a.attacker)).onlyAttacksAlone);
   let declared = attackBattles(s, pid, attackPlaneswalkers(s, pid, attacks, hit), hit);
   // "No more than one creature can attack each combat" (Silent Arbiter): the ones that have to attack, then the strongest.
   const cap = combatLimit(s, "attack");

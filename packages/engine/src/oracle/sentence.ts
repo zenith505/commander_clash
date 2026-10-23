@@ -205,7 +205,7 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
  */
 function parseVillainous(subject: string, rest: string, ctx: Ctx): Effect[] | null {
   const facing = subject.replace(/^Then /, "").toLowerCase();
-  const who = facing === "each opponent" ? ({ ref: "eachOpponent" } as const) : facing === "target opponent" || facing === "that player" || facing === "defending player" ? parsePlayer(facing, ctx) : null;
+  const who = facing === "each opponent" ? ({ ref: "eachOpponent" } as const) : facing === "target opponent" || facing === "that player" || facing === "defending player" || /^each opponent who lost /.test(facing) ? parsePlayer(facing, ctx) : null;
   if (!who || /\bvillainous\b/.test(rest)) return null;
   const option = (text: string): Effect[] | null => {
     const before = ctx.targets.length;

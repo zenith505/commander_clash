@@ -732,7 +732,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       }
       // "Whenever ~ attacks and isn't blocked": no creature was declared to block it (rulings).
       if (o.attacking !== undefined && !o.blockedBy) {
-        add(o, you, (e) => e === "selfAttacksUnblocked", undefined, undefined, undefined, undefined, undefined, undefined, { player: o.attacking });
+        add(o, you, (e, t) => e === "selfAttacksUnblocked" && (!t.attacksPlayer || !o.attackingPermanent), undefined, undefined, undefined, undefined, undefined, undefined, { player: o.attacking });
         addHosted(o, (e) => e === "selfAttacksUnblocked", undefined, o, { player: o.attacking });
       }
       if (o.attacking !== undefined && o.blockedBy?.length) {

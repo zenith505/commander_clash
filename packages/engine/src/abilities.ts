@@ -708,6 +708,8 @@ export type ObjRef =
   | { ref: "linkedCard" }
   /** The card "reveal the top card of your library" revealed, while it's still where it was (CR 400.7). */
   | { ref: "revealed" }
+  /** "That card" after "mill a card" (Tablet of Discovery): each card this resolution's mill put into the graveyard, still there (CR 400.7). */
+  | { ref: "milled" }
   /** The one card "exile the top card of your library" exiled, while it's still that card in exile (CR 400.7). */
   | { ref: "exiledTop" }
   /** "The discarded card" (Malcolm): the one card this resolution's last discard put into a graveyard, while it's still that card there. */
@@ -810,7 +812,9 @@ export type PlayerRef =
   /** "Whose controller was dealt combat damage by ~ this turn" (Steel Hellkite): the players this object dealt combat damage to this turn. */
   | { ref: "combatDamagedBySelf" }
   /** "Each player who chose money" (Master of Ceremonies): those who chose that word in this one's "each opponent chooses". */
-  | { ref: "choseWord"; option: string };
+  | { ref: "choseWord"; option: string }
+  /** "Each opponent who lost 3 or more life this turn" (Davros, Dalek Creator): paid life counts too (CR 119.4). */
+  | { ref: "opponentsLostLife"; n: number };
 
 export type DamageRecipient =
   | ObjRef
@@ -1065,6 +1069,8 @@ export type Modification =
   | { kind: "cantBeBlockedByGreaterPower" }
   /** "Can't attack alone", "can't block alone" (CR 506.5, 508.1c, 509.1b). */
   | { kind: "cantAttackAlone" }
+  /** "Can only attack alone" (Master of Cruelties): if it attacks, it's the only creature declared as an attacker (CR 506.5). */
+  | { kind: "onlyAttacksAlone" }
   | { kind: "cantBlockAlone" }
   /** "Can't attack a player it has already attacked this turn" (Port Razer): attacking a planeswalker still can (rulings). */
   | { kind: "cantAttackSamePlayer" }
@@ -1692,7 +1698,7 @@ export type Effect =
    * "Choose target artifact card in your graveyard. You may cast that card this turn." (Emry): a permission to cast it
    * from there this turn, paying its costs and following the timing rules (CR 601.2, 601.3).
    */
-  | { type: "mayCastFromGraveyard"; what: ObjRef }
+  | { type: "mayCastFromGraveyard"; what: ObjRef; /** "Mill a card. You may play that card this turn." (Tablet of Discovery): a land may be played too (CR 305.1). */ play?: true }
   /**
    * "You may cast that card" as this resolves (Conduit of Worlds), from your graveyard, paying its costs and ignoring
    * timing (CR 608.2g, 601.2, rulings: not later in the turn). `thenNoMore`: "If you do, you can't cast additional spells
@@ -1858,7 +1864,7 @@ export type Effect =
   /** "Look at target opponent's hand" (only you see it, CR 402.3); `reveal`: "target player reveals their hand" (everyone sees it). */
   | { type: "lookAtHand"; who: PlayerRef; reveal?: true; /** "Look at a card at random in target player's hand" (Urza's Bauble). */ atRandom?: true }
   /** "~ assigns no combat damage this turn" (CR 510.1). */
-  | { type: "noCombatDamage"; what: ObjRef }
+  | { type: "noCombatDamage"; what: ObjRef; /** "This combat" rather than "this turn" (Master of Cruelties). */ combat?: true }
   | { type: "untap"; what: ObjRef }
   /**
    * "Untap up to seven lands" (Palinchron, Snap): its controller chooses as it resolves, among any player's tapped lands
@@ -2901,7 +2907,7 @@ export type Effect =
    * PlayerRef "chosenPlayer" `nth` is that player. `prompt`: what the player is chosen for.
    */
   | { type: "choosePlayer"; prompt: string }
-  | { type: "choose"; choice: ChoiceKind; /** "Each player chooses a creature type" (Patriarch's Bidding): every player in turn order, starting with the active player, into Chosen.types. */ each?: true; /** With "opponent": "a player with the most life or tied for most life" (The Black Gate), checked as it resolves; you can be one. */ mostLife?: true; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose; /** "Choose a number between 0 and 10" (Expel the Interlopers): any whole number in it, into Chosen.number. */ range?: { min: number; max: number } };
+  | { type: "choose"; choice: ChoiceKind; /** "Each player chooses a creature type" (Patriarch's Bidding): every player in turn order, starting with the active player, into Chosen.types. */ each?: true; /** With "opponent": "a player with the most life or tied for most life" (The Black Gate), checked as it resolves; you can be one. "opponents": "an opponent with the most life among your opponents" (The Master, Gallifrey's End). */ mostLife?: true | "opponents"; except?: string; /** The choices the text lists (keywords). */ options?: string[]; /** Who chooses: the player told to add the mana; the controller if absent. */ who?: PlayerRef; /** "Choose a nonland card name": the cards whose names may be chosen (CR 201.4a). */ names?: TargetSpec; /** What the name is for, for bots. */ purpose?: NamePurpose; /** "Choose a number between 0 and 10" (Expel the Interlopers): any whole number in it, into Chosen.number. */ range?: { min: number; max: number } };
 
 /** What a player chooses by name: a creature type (CR 205.3m) or a color (CR 105.1). */
 /** "keyword": "gains your choice of flying, vigilance, deathtouch, or haste", from the options listed (CR 608.2d). */
@@ -4546,6 +4552,11 @@ export interface CompiledCard {
   drawDig?: number;
   /** "If you would draw a card while your library has no cards in it, you win the game instead." (Laboratory Maniac, CR 614.1a) */
   drawEmptyWins?: true;
+  /**
+   * Out of the Tombs: "If you would draw a card while your library has no cards in it, instead return a creature card from
+   * your graveyard to the battlefield. If you can't, you lose the game." (CR 614.1a), for each draw (rulings).
+   */
+  drawEmptyReturn?: true;
   /** "Your opponents can't cast spells from anywhere other than their hands." (Drannith Magistrate) */
   opponentsOnlyFromHand?: true;
   /**
@@ -4614,6 +4625,8 @@ export interface CompiledCard {
    * Broker): one more vote each time its controller votes (CR 701.38d); with "may", they can pass on it.
    */
   extraVote?: "get" | "may";
+  /** The Valeyard: "If an opponent would face a villainous choice, they face that choice an additional time" (CR 701.55c). */
+  villainAgain?: true;
   /**
    * Platinum Angel: "You can't lose the game and your opponents can't win the game" (`cantLose` "you", `cantWin`
    * "opponents"); Abyssal Persecutor the other way round. Conceding still works (rulings).

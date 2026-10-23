@@ -115,6 +115,8 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (x === "you") return { ref: "you" };
   if (x === "each opponent") return { ref: "eachOpponent" };
   if (x === "each player") return { ref: "eachPlayer" };
+  const lost = /^each opponent who lost (?:(\d+) or more )?life this turn$/.exec(x);
+  if (lost) return { ref: "opponentsLostLife", n: lost[1] ? Number(lost[1]) : 1 };
   // "Choose an opponent. That player sacrifices a creature of their choice."
   if (x === "that player" && ctx.chosenOpponent) return { ref: "chosenPlayer" };
   // Stuffy Doll: "the chosen player" of "As ~ enters, choose a player" (compile checks there is one).

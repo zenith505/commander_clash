@@ -282,9 +282,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return [{ type: "noRegen", what, ifCreature: true }, { type: "exileIfDies", what, ifCreature: true }];
   }
   // "~ assigns no combat damage this turn" (CR 510.1): the Laccoliths, Ophidian.
-  if ((m = /^(.+?) assigns no combat damage this turn$/i.exec(s))) {
+  if ((m = /^(.+?) assigns no combat damage this (turn|combat)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
-    return what && !isGroup(what) ? [{ type: "noCombatDamage", what }] : null;
+    return what && !isGroup(what) ? [{ type: "noCombatDamage", what, ...(m[2] === "combat" ? { combat: true as const } : {}) }] : null;
   }
   // "That creature doesn't untap during its controller's next untap step", "Those creatures don't untap during their controllers' next untap steps"
   if ((m = /^(.+?) (?:doesn't|don't|do not|does not) untap during (?:its controller's|their controllers?'s?|your) next untap steps?$/i.exec(s))) {

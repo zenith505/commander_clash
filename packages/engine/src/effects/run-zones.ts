@@ -1587,8 +1587,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       // The permission is this object's only (CR 400.7), and ends with the turn (cleanup, like an exiled card's).
       for (const o of objects(s, e.what, ctx)) {
         if (o.zone !== "graveyard") continue;
-        o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, castOnly: true };
-        log(s, `${player(s, ctx.controller).name} may cast ${defOf(s, o).name} from their graveyard this turn.`);
+        o.mayPlay = { player: ctx.controller, zc: o.zoneChanges ?? 0, until: "thisTurn", turn: s.turn, ...(e.play ? {} : { castOnly: true as const }) };
+        log(s, `${player(s, ctx.controller).name} may ${e.play ? "play" : "cast"} ${defOf(s, o).name} from their graveyard this turn.`);
       }
       return;
     }
@@ -2273,7 +2273,7 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       return;
     case "noCombatDamage":
-      for (const o of objects(s, e.what, ctx)) if (o.zone === "battlefield") o.noCombatDamageTurn = s.turn;
+      for (const o of objects(s, e.what, ctx)) if (o.zone === "battlefield") e.combat ? (o.noCombatDamageCombat = { turn: s.turn, combat: s.combatsThisTurn ?? 0 }) : (o.noCombatDamageTurn = s.turn);
       return;
     case "animateDead": {
       // Animate Dead (rulings): nothing happens unless the Aura is still on the battlefield as this resolves, attached to

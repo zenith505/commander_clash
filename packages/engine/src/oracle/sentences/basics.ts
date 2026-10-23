@@ -268,7 +268,7 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     return who ? [{ type: "handToBottomDraw", who }] : null;
   }
   // "Your life total becomes 10", "target player's life total becomes 20" (CR 119.5).
-  if ((m = /^(Your|Target player's|Target opponent's|That player's|Each player's) life total becomes (\d+)$/i.exec(s))) {
+  if ((m = /^(Your|Target player's|Target opponent's|That player's|Each player's|Defending player's) life total becomes (\d+)$/i.exec(s))) {
     const who = m[1]!.toLowerCase() === "your" ? ({ ref: "you" } as const) : parsePlayer(m[1]!.replace(/'s$/, "").toLowerCase(), ctx);
     return who ? [{ type: "setLife", who, n: Number(m[2]) }] : null;
   }

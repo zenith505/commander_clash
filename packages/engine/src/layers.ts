@@ -177,6 +177,7 @@ export interface Characteristics {
   /** The Ring-bearer's (CR 701.54c). */
   cantBeBlockedByGreaterPower: boolean;
   cantAttackAlone: boolean;
+  onlyAttacksAlone: boolean;
   cantBlockAlone: boolean;
   cantAttackSamePlayer: boolean;
   /** "Can't attack its owner" (Alexios). */
@@ -270,6 +271,7 @@ function printed(s: GameState, o: GameObject): Characteristics {
     cantBeBlockedByLesserPowerThan: [],
     cantBeBlockedByGreaterPower: false,
     cantAttackAlone: false,
+    onlyAttacksAlone: false,
     cantBlockAlone: false,
     cantAttackSamePlayer: false,
     cantAttackOwner: false,
@@ -1242,6 +1244,7 @@ function applyMod(s: GameState, c: Characteristics, m: Modification, e: Inst, ch
     }
     case "cantBeBlockedByGreaterPower":
     case "cantAttackAlone":
+    case "onlyAttacksAlone":
     case "cantBlockAlone":
     case "cantAttackSamePlayer":
     case "cantBeSacrificed":

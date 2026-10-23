@@ -334,6 +334,8 @@ export interface GameObject {
   noRegenTurn?: number;
   /** "~ assigns no combat damage this turn": the turn (CR 510.1). */
   noCombatDamageTurn?: number;
+  /** "~ assigns no combat damage this combat" (Master of Cruelties): the turn and its combat phase (GameState.combatsThisTurn). */
+  noCombatDamageCombat?: { turn: number; combat: number };
   /**
    * "Until the end of your next turn, you may play that card" (impulse draw): who may play it from exile,
    * while it's still the same object (`zc`), until the end of this turn or of their next turn, or ("exiled") for as
@@ -1151,6 +1153,11 @@ export type PendingDecision =
       made?: number[];
       archives?: number;
     }
+  /**
+   * Out of the Tombs (CompiledCard.drawEmptyReturn): a draw from an empty library is replaced; `player` picks which of
+   * `cards`, the creature cards in their graveyard, returns to the battlefield. `left` and `made` are the draws after it.
+   */
+  | { kind: "drawEmptyReturn"; player: PlayerId; source: string; cards: ObjectId[]; left: number; made?: number[]; after?: "drawStep" }
   | {
       kind: "dredge";
       player: PlayerId;
@@ -2130,6 +2137,8 @@ export type Action =
   /** Answer to assistCast: pay the rest of the cost and cast it, or `cancel` the cast (CR 733.1). */
   | { type: "finishAssistedCast"; player: PlayerId; cancel?: boolean }
   /** Answer to dredge: the card to dredge instead of drawing, or none to draw (CR 702.52a). */
+  /** Answers PendingDecision "drawEmptyReturn": the creature card to return. */
+  | { type: "drawEmptyReturn"; player: PlayerId; objectId: ObjectId }
   | { type: "dredge"; player: PlayerId; objectId?: ObjectId; /** Abundance instead: reveal until a card of this kind. */ abundance?: "land" | "nonland" }
   /** Which of the cards looked at instead of drawing goes to the graveyard (Scion of Halaster). */
   | { type: "drawLook"; player: PlayerId; /** The card to put into the graveyard, or with Underrealm Lich (`keep`) into the hand (none when fewer than two to look at). */ objectId?: ObjectId; /** Apply another replacement first (see the drawLook prompt). */ instead?: "archive" | "dig" | { dredge: ObjectId } | { abundance: "land" | "nonland" } }

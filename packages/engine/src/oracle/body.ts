@@ -710,6 +710,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Nissa's Pilgrimage: "..., reveal those cards, and put one onto the battlefield tapped and the rest into your hand. Then
   // shuffle." is Cultivate's search.
   text = text.replace(/^(Search your library for up to \w+ [^.]+? cards, reveal those cards), and (put one [^.]+? and the rest into your hand)\. Then shuffle\./, "$1, $2, then shuffle.");
+  // Out of the Tombs: "put two eon counters on ~, then mill cards equal to the number of eon counters on it": ~ is the
+  // only object named, so "it" is ~.
+  text = text.replace(/^([Pp]ut [^.~]+ counters? on ~, then [^.~]+ counters on )it\./, "$1~.");
   // Forgotten Creation: "you may discard all the cards in your hand. If you do, draw that many cards": both or neither.
   text = text.replace(/^[Yy]ou may discard all the cards in your hand\. If you do, draw that many cards\.$/, "You may discard your hand, then draw that many cards.");
   text = text.replace(/If you haven't cast a spell this turn, you may cast that card\. If you do, you can't cast additional spells this turn\./, "If you haven't cast a spell this turn, you may cast that card, and if you do, you can't cast additional spells this turn.");
@@ -1415,12 +1418,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // Necromantic Selection: "Destroy all creatures, then return a creature card put into a graveyard this way to the
     // battlefield under your control": one of those that died (CR 700.4), chosen as it resolves.
-    const diedBack = /^Return an? (creature card) put into a graveyard this way to the battlefield under your control$/.exec(s);
-    const prevDestroy = effects[effects.length - 1];
-    if (diedBack && prevDestroy?.type === "destroy" && prevDestroy.what.ref === "each") {
-      const filter = parseSearchFilter(diedBack[1]!);
+    // Zero Point Ballad: "Destroy all creatures with toughness X or less. You lose X life. If X is 6 or more, return a
+    // creature card put into a graveyard this way ...": the destroy is an earlier instruction, the condition X as cast.
+    const diedBack = /^(?:If X is (\d+) or more, r|R)eturn an? (creature card) put into a graveyard this way to the battlefield under your control$/.exec(s);
+    const prevDestroy = diedBack?.[1] ? effects.find((x) => x.type === "destroy") : effects[effects.length - 1];
+    if (diedBack && prevDestroy?.type === "destroy" && prevDestroy.what.ref === "each" && effects.filter((x) => x.type === "destroy").length === 1) {
+      const filter = parseSearchFilter(diedBack[2]!);
       if (!filter) return null;
-      effects.push({ type: "returnDiedThisWay", filter });
+      const back: Effect = { type: "returnDiedThisWay", filter };
+      effects.push(diedBack[1] ? { type: "if", cond: { kind: "xAtLeast", n: Number(diedBack[1]) }, effects: [back] } : back);
       continue;
     }
     // Nissa's Pilgrimage: "If there are two or more instant and/or sorcery cards in your graveyard, search your library
@@ -3889,6 +3895,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       }
       continue;
     }
+    // "Mill a card. You may play that card this turn." (Tablet of Discovery, Ark of Hunger): each card milled, if a
+    // replacement milled more (rulings), from the graveyard this turn, paying its costs at its usual timing (CR 305.1, 601.3).
+    if (/^You may play that card this turn$/.test(s)) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "mill" || prev.who.ref !== "you" || prev.n !== 1) return null;
+      effects.push({ type: "mayCastFromGraveyard", what: { ref: "milled" }, play: true });
+      continue;
+    }
     // "Mill five cards, then return a creature card milled this way to your hand" (Zoological Study): one of them if
     // any matches, not optional.
     const returnMilled = /^[Rr]eturn an? (.+? card) milled this way to your hand$/.exec(s);
@@ -4581,9 +4595,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       continue;
     }
     // The Black Gate: "Choose a player with the most life or tied for most life", any of them, you too.
-    if (/^Choose (?:an opponent|a player with the most life or tied for most life)$/.test(s)) {
+    // The Master, Gallifrey's End: "Choose an opponent with the most life among your opponents", any of those tied.
+    if (/^Choose (?:an opponent(?: with the most life among your opponents)?|a player with the most life or tied for most life)$/.test(s)) {
       if (ctx.chosenOpponent || ctx.eventPlayer || ctx.lastPlayerTarget !== undefined) return null;
-      effects.push({ type: "choose", choice: "opponent", ...(/most life/.test(s) ? { mostLife: true as const } : {}) });
+      effects.push({ type: "choose", choice: "opponent", ...(/^Choose a player with the most life/.test(s) ? { mostLife: true as const } : / most life /.test(s) ? { mostLife: "opponents" as const } : {}) });
       ctx.chosenOpponent = true;
       continue;
     }

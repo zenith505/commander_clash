@@ -4451,6 +4451,24 @@ function Controls({
       </div>
     );
   }
+  if (pending?.kind === "drawEmptyReturn" && pending.player === HUMAN) {
+    return (
+      <div className="controls">
+        <span>
+          <strong>{pending.source}:</strong> your library is empty, so instead of drawing, return a creature card from your graveyard to the battlefield
+          {pending.left > 0 ? ` (${pending.left} more draw${pending.left === 1 ? "" : "s"} after this)` : ""}
+        </span>
+        {pending.cards.map((id) => {
+          const d = cardOf(s, id);
+          return (
+            <button key={id} onMouseEnter={() => onHover(d)} onMouseLeave={() => onHover(null)} onClick={() => dispatch([{ type: "drawEmptyReturn", player: HUMAN, objectId: id }])}>
+              Return {d.name}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
   if (pending?.kind === "dredge" && pending.player === HUMAN) {
     const options = pending.options.filter((id) => dredgeOptions(s, HUMAN).includes(id));
     return (
@@ -5220,7 +5238,9 @@ function GameLog({ s, onHover }: { s: GameState; onHover: (d: CardDef | null) =>
 /** The engine logs "<name> plays X"; read naturally when the name is "You". */
 function youGrammar(text: string) {
   if (/(^|: )You /.test(text)) text = text.replace(/^You (surveils|scries)\b/, (_, v: string) => `You ${v === "scries" ? "scry" : "surveil"}`).replace(/ their (graveyard|library|hand|next turn)\b/g, " your $1");
-  return text.replace(/(^|\. |: )You (plays|casts|declares|discards|loses|draws|gains|mills|activates|chooses|sacrifices|goes|cycles|crews|saddles|stations|pays|takes|keeps|exiles|reveals|puts|turns|gets|wins|searches|becomes|returns|attaches|creates|deals|taps|untaps|destroys|counters|regenerates|attacks|blocks|looks|connives|proliferates|amasses|copies)\b/g, (_, pre: string, v: string) =>
+  // "You faces a villainous choice and chooses: ..." (CR 701.55).
+  text = text.replace(/(^|\. |: )You faces a villainous choice and chooses\b/g, "$1You face a villainous choice and choose");
+  return text.replace(/(^|\. |: )You (plays|casts|declares|discards|loses|draws|gains|mills|activates|chooses|sacrifices|goes|cycles|crews|saddles|stations|pays|takes|keeps|exiles|reveals|puts|turns|gets|wins|searches|becomes|returns|attaches|creates|deals|taps|untaps|destroys|counters|regenerates|attacks|blocks|looks|connives|proliferates|amasses|copies|votes)\b/g, (_, pre: string, v: string) =>
     `${pre}You ${v === "loses" ? "lose" : v === "goes" ? "go" : v === "searches" ? "search" : v === "amasses" ? "amass" : v === "copies" ? "copy" : v.slice(0, -1)}`,
   );
 }

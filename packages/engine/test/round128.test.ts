@@ -2,8 +2,8 @@
 // played cards.
 
 import { describe, expect, it } from "vitest";
-import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { abilitiesOf, botActions, characteristics, compileCard, isFullySupported, nextRandom, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { act, card, passUntil, putOnBattlefield, scry, setup } from "./helpers";
+import { abilitiesOf, abilityProblem, botActions, characteristics, compileCard, isFullySupported, nextRandom, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -302,5 +302,37 @@ describe("Lathiel, the Bounteous Dawn: up to that many counters, at least one ea
     const { s: s0, ap, bears } = endStep();
     const s = settleBots(botActions(s0, ap).reduce((x, a) => act(x, a), s0));
     expect(bears.reduce((n, id) => n + (s.objects[id]!.counters["+1/+1"] ?? 0), 0)).toBe(3);
+  });
+});
+
+const pakpatiq = scry("transform", [
+  { name: "Ojer Pakpatiq, Deepest Epoch", mana_cost: "{2}{U}{U}", type_line: "Legendary Creature — God", power: "4", toughness: "3", oracle_text: "Flying\nWhenever you cast an instant spell from your hand, it gains rebound. (Exile it as it resolves. At the beginning of your next upkeep, you may cast it from exile without paying its mana cost.)\nWhen Ojer Pakpatiq dies, return it to the battlefield tapped and transformed under its owner's control with three time counters on it." },
+  { name: "Temple of Cyclical Time", type_line: "Land", oracle_text: "(Transforms from Ojer Pakpatiq, Deepest Epoch.)\n{T}: Add {U}. Remove a time counter from this land.\n{2}{U}, {T}: Transform this land. Activate only if it has no time counters on it and only as a sorcery." },
+], { keywords: ["Transform", "Flying"] });
+
+describe("Ojer Pakpatiq, Deepest Epoch // Temple of Cyclical Time: time counters gate the transform", () => {
+  const murder = card("Test Murder", "Instant", "{1}{B}", { oracleText: "Destroy target creature." });
+  it("dies, returns as the Temple with three time counters; tapping for {U} removes one; transforms only at none", () => {
+    supported(pakpatiq);
+    const { s: s0, ap, ids } = setup([murder]);
+    const o = putOnBattlefield(s0, ap, pakpatiq);
+    let s = settleBots(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: o }])));
+    const temple = s.battlefield.find((id) => characteristics(s, s.objects[id]!).name === "Temple of Cyclical Time")!;
+    expect(temple).toBeDefined();
+    expect(s.objects[temple]!.tapped).toBe(true);
+    expect(s.objects[temple]!.counters.time).toBe(3);
+    const transform = abilitiesOf(s, s.objects[temple]!).activated.findIndex((a) => /Transform/.test(a.text));
+    s.objects[temple]!.tapped = false;
+    expect(abilityProblem(s, ap, temple, transform)).toMatch(/can.t be activated/);
+    expect(planActivate(s, ap, temple, transform)).toBeNull();
+    // A mana ability with another effect (CR 605.1a): activated like any other ability, no stack.
+    s = run(s, planActivate(s, ap, temple, 0));
+    expect(s.players[ap]!.manaPool.U).toBe(1);
+    expect(s.objects[temple]!.counters.time).toBe(2);
+    s.objects[temple]!.tapped = false;
+    s.objects[temple]!.counters.time = 0;
+    s = run(s, planActivate(s, ap, temple, transform));
+    s = settleBots(s);
+    expect(characteristics(s, s.objects[temple]!).name).toBe("Ojer Pakpatiq, Deepest Epoch");
   });
 });

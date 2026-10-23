@@ -95,7 +95,7 @@ import { characteristics, controllerOf, staticConditionNow } from "./layers";
 import { castingBody, compileCard } from "./oracle";
 import { COLORS, type Action, type CardDef, type Chosen, type Color, type CostChoices, type GameObject, type GameState, type ObjectId, type PendingDecision, type PlayerId, type StackItem } from "./types";
 import { evalAmount } from "./amounts";
-import { CHOSEN_HEXPROOF, CHOSEN_PROTECTION } from "./keywords";
+import { CHOSEN_HEXPROOF, CHOSEN_PROTECTION, CHOSEN_TYPE_PROTECTION } from "./keywords";
 import { groupValue, ofPlayerPick, ofPlayerTargets, worth } from "./value";
 import { damageEstimate } from "./damage";
 
@@ -2783,6 +2783,12 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
   const c = card ? compileCard(card) : undefined;
   // Serra's Emissary: protection from creatures for you and yours shuts off most attacks and blockers.
   if (what === "cardType" && c?.youProtectedFromChosenType && options.includes("Creature")) return "Creature";
+  // Pippin: protection from the type of the opponent's spell or ability about to resolve, or else from creatures.
+  if (what === "cardType" && c && JSON.stringify(c).includes(CHOSEN_TYPE_PROTECTION)) {
+    const top = [...s.stack].reverse().find((x) => x.controller !== pid && x.objectId && s.objects[x.objectId]);
+    const ty = top ? defOf(s, obj(s, top.objectId!)).types.find((x) => options.includes(x)) : undefined;
+    return ty ?? (options.includes("Creature") ? "Creature" : options[0]!);
+  }
   if (what === "cardType") {
     // "Destroy all permanents of the chosen type": the type that costs the opponents the most, net of what we'd lose.
     const hurts = c ? choiceHurts(c) : true;

@@ -714,3 +714,29 @@ describe("Athreos, Shroud-Veiled: a creature with a coin counter that dies or is
     expect(s.objects[plain]!.zone).toBe("graveyard");
   });
 });
+
+const pippin = card("Pippin, Guard of the Citadel", "Legendary Creature — Halfling Soldier", "{W}{U}", {
+  power: "2",
+  toughness: "2",
+  keywords: ["Vigilance", "Ward"],
+  oracleText: "Vigilance, ward {1}\n{T}: Another target creature you control gains protection from the card type of your choice until end of turn. (It can't be blocked, targeted, dealt damage, enchanted, or equipped by anything of that type.)",
+});
+
+describe("Pippin, Guard of the Citadel: protection from the card type of your choice (CR 702.16a, 608.2d)", () => {
+  it("instant chosen: an instant can't target it, a creature still could block it", () => {
+    supported(pippin);
+    const { s: s0, ap, opp } = setup([]);
+    const p = putOnBattlefield(s0, ap, pippin);
+    const b = putOnBattlefield(s0, ap, bears());
+    let s = untilChoice(run(s0, planActivate(s0, ap, p, 0, [{ kind: "object", id: b }])));
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "cardType", player: ap });
+    expect(s.pending?.kind === "chooseOption" ? s.pending.options : []).toEqual(["Artifact", "Battle", "Creature", "Enchantment", "Instant", "Land", "Planeswalker", "Sorcery"]);
+    s = act(s, { type: "chooseOption", player: ap, choice: "Instant" });
+    s = untilChoice(s);
+    expect(objHasKeyword(s, s.objects[b]!, "Protection from instants")).toBe(true);
+    expect(objHasKeyword(s, s.objects[b]!, "Protection from creatures")).toBe(false);
+    const shock = toHand(s, ap, card("Test Shock", "Instant", "{R}", { oracleText: "Test Shock deals 2 damage to any target." }))[0]!;
+    expect(planCast(s, ap, shock, [{ kind: "object", id: b }])).toBeNull();
+    expect(planCast(s, ap, shock, [{ kind: "player", id: opp }])).not.toBeNull();
+  });
+});

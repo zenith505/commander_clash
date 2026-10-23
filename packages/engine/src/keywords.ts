@@ -130,6 +130,7 @@ export function canonicalKeyword(text: string): string | undefined {
   if (q === "each of your opponents") return PROTECTION_FROM_OPPONENTS;
   if (q === "spells" || q === "permanents that were cast this turn") return `Protection from ${q}`;
   if (q === "the chosen player") return CHOSEN_PLAYER_PROTECTION;
+  if (q === "the chosen card type") return CHOSEN_TYPE_PROTECTION;
   if (q === "each color that's not in your commander's color identity") return IDENTITY_PROTECTION;
   if (q === "everything" || q === "multicolored" || q === "monocolored" || q === "colorless" || q === "each color" || q === "all colors" || q === "the chosen color") return q === "the chosen color" ? CHOSEN_PROTECTION : `Protection from ${q}`;
   if (PROTECTION_TYPES[q]) return `Protection from ${q}`;

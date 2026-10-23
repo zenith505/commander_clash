@@ -4,7 +4,7 @@ import { cardIdOf, defOf, objIsType, pairedWith, power, toughness } from "../car
 import { addTriggeredMana, askAuraReturns, cloneState, creatureTypesOf, draw, endTheTurn, enterTogether, gainLife, livingPlayers, log, moveObject, obj, opponents, player, shareCreatureType } from "../game";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics } from "../layers";
 import { compileCard } from "../oracle";
-import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LAND_TYPE, CHOSEN_HEXPROOF, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, protectionFromPlayer } from "../keywords";
+import { bindChosenKeywords, CREATURE_TYPES, CHOSEN_KEYWORD, CHOSEN_LAND_TYPE, CHOSEN_HEXPROOF, CHOSEN_PLAYER_PROTECTION, CHOSEN_PROTECTION, CHOSEN_TYPE, CHOSEN_TYPE_PROTECTION, protectionFromPlayer } from "../keywords";
 import { evalAmount, type AmountCtx } from "../amounts";
 import { cardSource, objectSource, shieldChoicesPossible, ShieldQuestionPause, withShieldAnswers, type DamageSource } from "../damage";
 import { RulesError, type CardDef, type Chosen, type Color, type GameObject, type GameState, type LastKnown, type ManaType, type ObjectId, type PlayerId, type StackItem, type TriggerEventInfo } from "../types";
@@ -660,9 +660,10 @@ export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx): Mo
       : // Odric, Lunarch Marshal: the keywords creatures its controller controls have now (CR 611.2c), variants included.
         m.kind === "addKeywords" && m.sharedAmongYours
         ? { kind: "addKeywords", keywords: sharedKeywords(s, ctx.controller, m.keywords) }
-        : // "Gains protection from the color of your choice": the color chosen as it resolved.
-        m.kind === "addKeywords" && (m.keywords.includes(CHOSEN_PROTECTION) || m.keywords.includes(CHOSEN_HEXPROOF))
-        ? { ...m, keywords: bindChosenKeywords(m.keywords, s.resolving?.chosen?.color) }
+        : // "Gains protection from the color of your choice": the color chosen as it resolved; "the card type of your choice"
+        // (Pippin), the card type.
+        m.kind === "addKeywords" && (m.keywords.includes(CHOSEN_PROTECTION) || m.keywords.includes(CHOSEN_HEXPROOF) || m.keywords.includes(CHOSEN_TYPE_PROTECTION))
+        ? { ...m, keywords: bindChosenKeywords(m.keywords, s.resolving?.chosen?.color, undefined, s.resolving?.chosen?.cardType) }
         : // "Gains protection from the chosen player" (Guardian Archon): the player chosen for its source.
           m.kind === "addKeywords" && m.keywords.includes(CHOSEN_PLAYER_PROTECTION)
         ? { ...m, keywords: m.keywords.flatMap((k) => (k !== CHOSEN_PLAYER_PROTECTION ? [k] : chosenPlayerOf(s, ctx) !== undefined ? [protectionFromPlayer(chosenPlayerOf(s, ctx)!)] : [])) }

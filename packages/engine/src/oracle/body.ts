@@ -2,7 +2,7 @@ import { parseFromTop } from "./compile";
 import { allEffects, refCovers, type SearchDest, type AbilityBody, type FaceDownPlay, type Amount, type AmountExpr, type Count, type Effect, type ObjRef, type PlayerRef, type SpellCondition, type TargetSpec, type UnlessPays, type PayCost, type NamePurpose } from "../abilities";
 import { substituteX } from "../amounts";
 import { differenceInHand, num, NUM, NUMX, X, amt, ROLL_ROW, counterKind, COUNTER, isGroup, keywordOf, parseSpentReq, SPENT_TO_CAST, WHEEL, capital, COLOR_WORDS, singularWord } from "./words";
-import { canonicalKeyword, CHOSEN_KEYWORD, CHOSEN_PROTECTION, CREATURE_TYPES, THAT_PLAYER_PROTECTION } from "../keywords";
+import { canonicalKeyword, CARD_TYPE_PLURAL, CHOSEN_KEYWORD, CHOSEN_PROTECTION, CREATURE_TYPES, THAT_PLAYER_PROTECTION } from "../keywords";
 import { parsePreventAll, parseStaticCondition } from "./statics";
 import { parseBoundCount, parseCount } from "./counts";
 import { parseBecomes, parseDig, parseSentence } from "./sentence";
@@ -4458,6 +4458,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       if (options.length < 2 || options.some((k) => !k || k === CHOSEN_PROTECTION) || effects.some((x) => x.type === "choose" && x.choice === "keyword")) return null;
       effects.push({ type: "choose", choice: "keyword", options: options as string[] });
       s = s.replace(choiceOf[0]!, ` ${choiceOf[1]} ${CHOSEN_KEYWORD}`);
+    }
+    // "Gains protection from the card type of your choice until end of turn" (Pippin, Guard of the Citadel): any card type
+    // (rulings; kindred cards aren't supported), chosen as it resolves (CR 608.2d).
+    if (/ gains? protection from the card type of your choice\b/.test(s)) {
+      if (effects.some((x) => x.type === "choose" && x.choice === "cardType")) return null;
+      effects.push({ type: "choose", choice: "cardType", options: Object.keys(CARD_TYPE_PLURAL) });
+      s = s.replace("the card type of your choice", "the chosen card type");
     }
     if (/ gains? protection from the color of your choice\b/.test(s)) {
       effects.push({ type: "choose", choice: "color" });

@@ -272,6 +272,7 @@ function diesMatches(
 
 /** Does `entering` set off `o`'s "whenever a/another/~ or another ... enters" ability? */
 function entersMatches(s: GameState, en: NonNullable<TriggeredAbility["enters"]>, o: GameObject, entering: GameObject, you: PlayerId): boolean {
+  if (en.ifCast && !entering.wasCast) return false;
   if (o.id === entering.id) {
     if (en.orSelf) return true;
     if (en.other) return false;

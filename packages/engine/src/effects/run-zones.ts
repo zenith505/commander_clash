@@ -72,16 +72,17 @@ function returnFromExile(s: GameState, cards: GameObject[], under: (c: GameObjec
  * chooses what it enchants, as it enters, among what's on the battlefield before any of them move (Replenish rulings);
  * with nothing legal it stays where it is (303.4g). One Aura at a time, in the order given; no question when only one
  * thing is legal. Returns "paused" while a player chooses, else the host of each Aura that can enter; an Aura missing
- * from it stays put. Cards that aren't Auras are skipped.
+ * from it stays put. Cards that aren't Auras are skipped. `onlyTo`: "attached to ~" (Light-Paws), only that permanent, if
+ * it could enchant it (null: it's gone, so nothing).
  */
-export function chooseAuraHosts(s: GameState, cards: { o: GameObject; under: PlayerId; face?: number }[], src: string): "paused" | Map<ObjectId, AuraHost> {
+export function chooseAuraHosts(s: GameState, cards: { o: GameObject; under: PlayerId; face?: number }[], src: string, onlyTo?: ObjectId | null): "paused" | Map<ObjectId, AuraHost> {
   const sc = (s.resolving!.scratch ??= {});
   const hosts = (sc.auraHosts ??= {});
   for (const { o, under, face } of cards) {
     // A card entering transformed is an Aura, and enchants, as its back face (CR 712.14a, 303.4f).
     const d = asFace(s, o, face, () => defOf(s, o));
     if (!d.subtypes.includes("Aura") || hosts[o.id] !== undefined) continue;
-    const options = asFace(s, o, face, () => auraHostOptions(s, o, under));
+    const options = asFace(s, o, face, () => auraHostOptions(s, o, under)).filter((h) => onlyTo === undefined || ("attachTo" in h && h.attachTo === onlyTo));
     if (options.length <= 1) {
       hosts[o.id] = options[0] ? auraHostKey(options[0]) : "none";
       continue;

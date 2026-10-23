@@ -504,6 +504,10 @@ export interface TargetSpec {
   uniqueNameAmongYours?: true;
   /** "Dragon cards not named ~" (Tiamat): any other name; "~" is the source's (only for searches). */
   notNamed?: string;
+  /** "With a different name than each Aura you control" (Light-Paws): no permanent of this kind its controller controls as the search resolves has its name (only for searches; a face-down one has none, CR 708.2). */
+  notNamedAsYours?: TargetSpec;
+  /** `notNamedAsYours` worked out: none of these names. */
+  notNamedAny?: string[];
   /** None of these subtypes. */
   notSubtypes?: string[];
   /** "creature with a +1/+1 counter on it", "permanents with ice counters on them"; ANY_COUNTER: "with a counter on it". */
@@ -596,6 +600,8 @@ export interface SearchDest {
   third?: true;
   /** "Put it onto the battlefield with X additional +1/+1 counters on it" (Vision Quest, CR 614.1c). */
   counters?: { counter: CounterKind; n: Amount };
+  /** "Put that card onto the battlefield attached to ~" (Light-Paws): an Aura that can't enchant the source stays in the library (rulings). */
+  attachToSelf?: true;
 }
 
 /** Inclusive bounds; either end may be open. */
@@ -3451,7 +3457,7 @@ export interface TriggeredAbility {
    * controller. "Another" leaves this permanent out; "~ or another" counts it whatever it is. Without
    * either, it sees itself enter if it matches (CR 603.6a).
    */
-  enters?: { filter: TargetSpec; other?: boolean; orSelf?: boolean };
+  enters?: { filter: TargetSpec; other?: boolean; orSelf?: boolean; /** "Whenever an Aura you control enters, if you cast it" (Light-Paws): it entered from the stack as a resolving permanent spell, not a copy (an intervening if, CR 603.4; a permanent spell enters under its caster's control, CR 608.3). */ ifCast?: true };
   /**
    * For "permanentDies": what has to die, as it last existed. `attached`: the creature this Aura or
    * Equipment is attached to; `damagedBySelf`: "a creature dealt damage by ~ this turn".

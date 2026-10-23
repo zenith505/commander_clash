@@ -529,12 +529,17 @@ function parseEntersTrigger(line: string): TriggeredAbility | "fail" | null {
   if (!ench && filter.controller === "opponent") bodyText = bodyText.replace(/\bthat player\b/g, "its controller");
   // "They lose life equal to its mana value" after "a nonland permanent an opponent owns" (Brainstealer Dragon): its owner.
   if (owned) bodyText = bodyText.replace(/^they lose\b/, "its owner loses");
+  // "Whenever an Aura you control enters, if you cast it, ..." (Light-Paws): an intervening if (CR 603.4) on how it got
+  // there, which can't change. Only of what you control: a permanent spell enters under its caster's control (CR 608.3).
+  const ifCast = /^if you cast it, /.exec(bodyText);
+  if (ifCast && filter.controller !== "you") return "fail";
+  if (ifCast) bodyText = bodyText.slice(ifCast[0].length);
   const body = parseBody(bodyText, { subjectIt: true });
   if (!body) return "fail";
   const kind = m[1]!.toLowerCase();
   return {
     event: "permanentEnters",
-    enters: { filter: { ...filter, text: phrase }, ...(kind === "another" ? { other: true } : {}), ...(kind === "~ or another" ? { orSelf: true } : {}) },
+    enters: { filter: { ...filter, text: phrase }, ...(kind === "another" ? { other: true } : {}), ...(kind === "~ or another" ? { orSelf: true } : {}), ...(ifCast ? { ifCast: true as const } : {}) },
     body,
   };
 }

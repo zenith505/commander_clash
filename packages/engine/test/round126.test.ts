@@ -537,3 +537,51 @@ describe("Gathering Stone: a card of the chosen type may go to your hand; otherw
     expect(s.players[ap]!.library[0]).toBe(id);
   });
 });
+
+const lightPaws = card("Light-Paws, Emperor's Voice", "Legendary Creature — Fox Advisor", "{1}{W}", {
+  power: "2",
+  toughness: "2",
+  oracleText: "Whenever an Aura you control enters, if you cast it, you may search your library for an Aura card with mana value less than or equal to that Aura and with a different name than each Aura you control, put that card onto the battlefield attached to Light-Paws, then shuffle.",
+});
+const aura = (name: string, cost: string, enchant = "creature") => card(name, "Enchantment — Aura", cost, { oracleText: `Enchant ${enchant}\nEnchanted ${enchant} gets +1/+1.`.replace("Enchanted land gets +1/+1.", "Enchanted land has \"{T}: Add {C}.\"") });
+
+describe("Light-Paws, Emperor's Voice: a cast Aura fetches a cheaper, differently named Aura onto Light-Paws", () => {
+  /** Light-Paws, an Aura in hand, and these Auras on top of the library. */
+  const withLibrary = (...lib: CardDef[]) => {
+    const first = aura("Test Blessing", "{1}{W}");
+    const { s, ap, ids } = setup([first]);
+    const lp = putOnBattlefield(s, ap, lightPaws);
+    const libIds = lib.map((d) => {
+      const id = putOnBattlefield(s, ap, d);
+      s.battlefield.splice(s.battlefield.indexOf(id), 1);
+      s.objects[id]!.zone = "library";
+      s.players[ap]!.library.unshift(id);
+      return id;
+    });
+    return { s, ap, lp, hand: ids[0]!, libIds };
+  };
+  it("offers only Auras with mana value 2 or less and another name; the one found enters attached to Light-Paws", () => {
+    supported(lightPaws);
+    const { s: s0, ap, lp, hand, libIds } = withLibrary(aura("Test Blessing", "{W}"), aura("Test Ward", "{W}"), aura("Test Crown", "{2}{W}{W}"));
+    let s = untilChoice(run(s0, planCast(s0, ap, hand, [{ kind: "object", id: lp }])));
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap });
+    const offered = s.pending!.kind === "searchLibrary" ? s.pending.cards : [];
+    expect(offered).toEqual([libIds[1]]);
+    s = act(s, { type: "searchLibrary", player: ap, found: [libIds[1]!] });
+    s = untilChoice(s);
+    expect(s.objects[libIds[1]!]!.zone).toBe("battlefield");
+    expect(s.objects[libIds[1]!]!.attachedTo).toBe(lp);
+    // Put onto the battlefield, not cast: no second trigger.
+    expect(s.stack).toHaveLength(0);
+    expect(s.pending).toBeFalsy();
+  });
+  it("an Aura that can't enchant Light-Paws stays in the library (rulings)", () => {
+    const { s: s0, ap, lp, hand, libIds } = withLibrary(aura("Test Wild Growth", "{G}", "land"));
+    let s = untilChoice(run(s0, planCast(s0, ap, hand, [{ kind: "object", id: lp }])));
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    s = act(s, { type: "searchLibrary", player: ap, found: [libIds[0]!] });
+    expect(s.objects[libIds[0]!]!.zone).toBe("library");
+  });
+});

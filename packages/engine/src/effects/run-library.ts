@@ -6,7 +6,7 @@ import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { castProblem, freeCastable, draw, gainLife, log, loseLife, millCount, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
-import { bindBound, bindChosen, printedMatches } from "./targeting";
+import { bindBound, bindChosen, objectMatches, printedMatches } from "./targeting";
 import { ResolveCtx, apnap, players, amountNow, amountCtx, amountFor, objects } from "./resolve";
 import { describeDest } from "./describe";
 import { fireEvent } from "./triggers";
@@ -663,7 +663,9 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // "With mana value less than or equal to ..." (TargetSpec.bound): as it resolves.
       const filter0 = e.filter && bindBound(s, e.filter, amountCtx(s, ctx));
       const filter1 = filter0?.named === "~" ? { ...filter0, named: src } : filter0?.notNamed === "~" ? { ...filter0, notNamed: src } : filter0;
-      const filter = filter1?.colorOfYourLegend ? legendColors(s, filter1, ctx.controller) : filter1;
+      const filter2 = filter1?.colorOfYourLegend ? legendColors(s, filter1, ctx.controller) : filter1;
+      // "With a different name than each Aura you control" (Light-Paws): the names of those you control as it resolves.
+      const filter = filter2?.notNamedAsYours ? (({ notNamedAsYours: yours, ...rest }) => ({ ...rest, notNamedAny: s.battlefield.map((id) => s.objects[id]!).filter((o) => !o.faceDown && controllerOf(s, o) === ctx.controller && objectMatches(s, yours!, o, ctx.controller, false)).map((o) => characteristics(s, o).name) }))(filter2) : filter2;
       const who = e.who ? (e.who.ref === "eachPlayer" || e.who.ref === "eachOpponent" || (e.who.ref === "target" && (e.who.n ?? 1) > 1) ? apnap(s, players(s, e.who, ctx)) : players(s, e.who, ctx).slice(0, 1)) : [ctx.controller];
       const queue = (sc.searchQueue ??= who.filter((pid) => !player(s, pid).lost));
       const searchedBy = (sc.searchedBy ??= []);
@@ -775,7 +777,11 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const instead = !!sc.mayInstead && sc.may === true;
       const dest = (pid: PlayerId, id: ObjectId): SearchDest => (instead ? e.mayInstead!.dest : exiledFor(pid) !== undefined ? { zone: "exile" } : picked.includes(id) ? e.split!.to : foundBy(pid).indexOf(id) > 0 && e.others ? e.others : e.landTo && isType(defOf(s, obj(s, id)), "Land") ? e.landTo : e.dest);
       const onto = searchers.flatMap((pid) => foundBy(pid).filter((id) => dest(pid, id).zone === "battlefield").map((id) => ({ o: obj(s, id), under: pid })));
-      const hosts = chooseAuraHosts(s, onto, src);
+      // "Attached to ~" (Light-Paws): only to the source, if it's still on the battlefield as the same object (rulings,
+      // CR 400.7).
+      const me = ctx.sourceId !== undefined ? s.objects[ctx.sourceId] : undefined;
+      const self = me?.zone === "battlefield" && (ctx.sourceZc === undefined || (me.zoneChanges ?? 0) === ctx.sourceZc) ? me.id : null;
+      const hosts = chooseAuraHosts(s, onto, src, e.dest.attachToSelf ? self : undefined);
       if (hosts === "paused") return "paused";
       const moves: { pid: PlayerId; id: ObjectId }[] = [];
       for (const pid of searchers) {

@@ -286,6 +286,8 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.manaCostIn && !spec.manaCostIn.includes(d.manaCost)) return false;
   if (spec.named !== undefined && !hasName(d.name, spec.named)) return false;
   if (spec.notNamed !== undefined && hasName(d.name, spec.notNamed)) return false;
+  if (spec.notNamedAny?.some((n) => sameName(d.name, n))) return false;
+  if (spec.notNamedAsYours) return false; // not worked out yet
   if (spec.doubleFaced && !isDoubleFacedDef(d)) return false;
   if (spec.manaAbility && !(compileCard(d).mana.length || compileCard(d).manaTriggers?.length)) return false;
   if (spec.transformed || spec.powerAboveBase || spec.toughnessAbovePower || spec.colorOfYourLegend) return false;

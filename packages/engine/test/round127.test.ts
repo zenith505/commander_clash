@@ -235,3 +235,55 @@ describe("Misleading Signpost: reselect what an attacking creature attacks (ruli
     expect(s.objects[bear]!.attacking).not.toBe(ap);
   });
 });
+
+const oneRing = card("One Ring to Rule Them All", "Legendary Enchantment — Saga", "{2}{B}{B}", {
+  oracleText: "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI — The Ring tempts you, then each player mills cards equal to your Ring-bearer's power.\nII — Destroy all nonlegendary creatures.\nIII — Each opponent loses 1 life for each creature card in that player's graveyard.",
+});
+
+describe("One Ring to Rule Them All", () => {
+  it("I: the Ring tempts you, then each player mills cards equal to your Ring-bearer's power", () => {
+    supported(oneRing);
+    const { s: s0, ap, ids } = setup([oneRing]);
+    const giant = putOnBattlefield(s0, ap, card("Test Giant", "Creature — Giant", "{3}{R}", { power: "3", toughness: "3" }));
+    const yards = (s: GameState) => s.turnOrder.map((p) => s.players[p]!.graveyard.length);
+    const before = yards(s0);
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    s = settleBots(s);
+    expect(s.players[ap]!.ring?.bearer?.id).toBe(giant);
+    expect(yards(s)).toEqual(before.map((n) => n + 3));
+  });
+  it("I without a creature: nobody mills", () => {
+    const { s: s0, ap, ids } = setup([oneRing]);
+    const before = s0.turnOrder.map((p) => s0.players[p]!.library.length);
+    const s = settleBots(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.turnOrder.map((p) => s.players[p]!.library.length)).toEqual(before);
+  });
+  it("III: each opponent loses 1 life for each creature card in their own graveyard", () => {
+    const { s: s0, ap } = setup([]);
+    const ring = putOnBattlefield(s0, ap, oneRing);
+    s0.objects[ring]!.counters.lore = 2;
+    const [o1, o2, o3] = [1, 2, 3].map((n) => s0.turnOrder[(s0.turnOrder.indexOf(ap) + n) % 4]!);
+    const bear = card("Yard Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" });
+    const toYard = (pid: number, k: number) => {
+      for (let i = 0; i < k; i++) {
+        const id = putOnBattlefield(s0, pid, bear);
+        s0.battlefield.splice(s0.battlefield.indexOf(id), 1);
+        s0.objects[id]!.zone = "graveyard";
+        s0.players[pid]!.graveyard.push(id);
+      }
+    };
+    toYard(o1!, 2);
+    toYard(o2!, 0);
+    toYard(o3!, 1);
+    toYard(ap, 3);
+    const order = [ap, o1!, o2!, o3!];
+    const life = (s: GameState) => order.map((p) => s.players[p]!.life);
+    // On ap's next turn, just before the lore counter is added (after the draw step, CR 714.3b).
+    let s = passUntil(passUntil(s0, "main1", o1), "draw", ap);
+    const creatures = order.map((p) => s.players[p]!.graveyard.filter((id) => s.cards[s.objects[id]!.cardId]!.types.includes("Creature")).length);
+    const start = life(s);
+    s = settleBots(passUntil(s, "main1", ap));
+    expect(life(s).map((n, i) => start[i]! - n)).toEqual([0, creatures[1], creatures[2], creatures[3]]);
+    expect(creatures[1]).toBeGreaterThanOrEqual(2);
+  });
+});

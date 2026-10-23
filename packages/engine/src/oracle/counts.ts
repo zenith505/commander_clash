@@ -262,6 +262,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   if (/^times? (?:~|it) was kicked$/i.test(p)) return count({ kind: "kicked" });
   // "For each of that spell's colors" in a cast trigger (Ramos, Dragon Engine).
   if (/^of that spell's colors$/i.test(p) && ctx?.castSpell) return count({ kind: "castSpellColors" });
+  // "Your Ring-bearer's power" (One Ring to Rule Them All): 0 without one (CR 701.54a, 107.1b).
+  if ((m = /^your Ring-bearer's (power|toughness)$/.exec(p))) return count({ kind: m[1] as "power" | "toughness", of: { ref: "ringBearer" } });
   // Power, toughness, mana value: "~'s power", "its power", "that creature's toughness".
   if ((m = /^(~'s|its|that creature's|that artifact's|that enchantment's|the creature's|that permanent's|that spell's|the spell's|that card's|the sacrificed (?:creature|artifact|permanent)'s|the exiled creature's|the amassed Army's) (power|toughness|mana value)$/i.exec(p))) {
     const of = whoseObject(m[1]!, ctx);

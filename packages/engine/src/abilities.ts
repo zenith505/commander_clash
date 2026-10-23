@@ -663,6 +663,7 @@ export type ObjRef =
       card?: true;
     }
   | { ref: "self" } // the source permanent ("this creature")
+  | { ref: "ringBearer" } // "your Ring-bearer" (CR 701.54a): the controller's, if they have one
   /** "That spell" in a cast trigger (Monstrous Vortex): the spell whose casting triggered it, as it was cast. Counts only. */
   | { ref: "castSpell" }
   /** "Each creature dealt damage this way" (Aurelia's Fury): `filter` for the kind of permanent. */

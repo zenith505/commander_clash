@@ -5243,6 +5243,18 @@ function parseForEach(s: string, ctx: Ctx): Effect[] | null {
     const scaled = scaleEffect(e, { count: { ...count.count, whose } });
     return scaled ? [scaled] : null;
   }
+  // "Each opponent loses 1 life for each creature card in that player's graveyard" (One Ring to Rule Them All): the same,
+  // each one's own graveyard.
+  const theirYard = /^(.+?) in (?:that player's|their) graveyard$/.exec(phrase);
+  if (theirYard) {
+    const e = fx[0]!;
+    if (e.type !== "loseLife" && e.type !== "gainLife" && e.type !== "draw") return null;
+    const who: PlayerRef | null = e.who.ref === "eachPlayer" || e.who.ref === "eachOpponent" ? { ref: "eachOne" } : e.who.ref === "target" && !e.who.n ? e.who : null;
+    const count = who && parseCount(`${theirYard[1]} in your graveyard`, ctx, true);
+    if (!count || count.count.kind !== "cardsInGraveyard" || count.times || count.plus) return null;
+    const scaled = scaleEffect(e, { count: { ...count.count, who } });
+    return scaled ? [scaled] : null;
+  }
   const per = parseCount(phrase, ctx, true);
   if (!per) return null;
   const scaled = scaleEffect(fx[0]!, per);

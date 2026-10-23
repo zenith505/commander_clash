@@ -7,7 +7,7 @@
 import type { Amount, AmountExpr, Count, ObjRef, PlayerRef } from "./abilities";
 import { ANY_COUNTER } from "./abilities";
 import { defOf } from "./cards";
-import { bindChosen, objectMatches, printedMatches, spellManaValue } from "./effects";
+import { bindChosen, objectMatches, printedMatches, ringBearer, spellManaValue } from "./effects";
 import { characteristics, controllerOf, staticConditionNow, type Characteristics } from "./layers";
 import { manaValue, parseManaCost, snowSpent, spentMeets, type ManaSpent } from "./mana";
 import type { Chosen, GameObject, GameState, LastKnown, ObjectId, PlayerId, TriggerEventInfo } from "./types";
@@ -88,7 +88,7 @@ function selfObject(s: GameState, ctx: AmountCtx): GameObject | undefined {
 
 function refObjects(s: GameState, ref: ObjRef, ctx: AmountCtx): GameObject[] {
   if (ctx.objects) return ctx.objects(ref);
-  const o = ref.ref === "self" ? selfObject(s, ctx) : undefined;
+  const o = ref.ref === "self" ? selfObject(s, ctx) : ref.ref === "ringBearer" ? ringBearer(s, ctx.controller) : undefined;
   return o ? [o] : [];
 }
 

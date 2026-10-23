@@ -801,3 +801,30 @@ describe("Éowyn, Fearless Knight: a creature with greater power exiled; protect
     expect(objHasKeyword(s, s.objects[bear]!, "Protection from red")).toBe(false);
   });
 });
+
+const mirrorStyle = card("Mirror-Style Master", "Creature — Human Warrior", "{4}{R}{R}", {
+  power: "3",
+  toughness: "3",
+  oracleText: "Backup 1 (When this creature enters, put a +1/+1 counter on target creature. If that's another creature, it gains the following ability until end of turn.)\nWhenever this creature attacks, for each attacking modified creature you control, create a tapped and attacking token that's a copy of that creature. Exile those tokens at end of combat. (Equipment, Auras you control, and counters are modifications.)",
+});
+
+describe("Mirror-Style Master: a tapped and attacking copy of each attacking modified creature", () => {
+  it("copies the attacker with a counter, not the plain one; the copies are exiled at end of combat", () => {
+    supported(mirrorStyle);
+    const { s: s0, ap, opp } = setup([]);
+    const m = putOnBattlefield(s0, ap, mirrorStyle);
+    const modified = putOnBattlefield(s0, ap, bears("Countered Bear"));
+    const plain = putOnBattlefield(s0, ap, bears("Plain Bear"));
+    s0.objects[modified]!.counters["+1/+1"] = 1;
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [m, modified, plain].map((attacker) => ({ attacker, defender: opp })) });
+    s = settleBots(s);
+    const made = s.battlefield.filter((id) => !s0.battlefield.includes(id));
+    expect(made.map((id) => characteristics(s, s.objects[id]!).name)).toEqual(["Countered Bear"]);
+    expect(s.objects[made[0]!]!.attacking).toBe(opp);
+    s = untilPending(s, "declareBlockers");
+    s = act(s, { type: "declareBlockers", player: s.pending!.player, blocks: [] });
+    s = passUntil(s, "main2", ap);
+    expect(s.battlefield).not.toContain(made[0]);
+  });
+});

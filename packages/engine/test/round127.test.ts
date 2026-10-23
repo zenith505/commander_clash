@@ -665,3 +665,31 @@ describe("The Great Synthesis and The Grand Evolution (Saga back faces, CR 714)"
     expect(pend.cards.slice(0, 2).every((id) => s.objects[id]!.zone === "battlefield" && s.objects[id]!.controller === ap)).toBe(true);
   });
 });
+
+const takeTheBait = card("Take the Bait", "Instant", "{2}{R}{W}", {
+  oracleText: "Cast this spell only during combat on an opponent's turn.\nPrevent all combat damage that would be dealt to you and planeswalkers you control this turn. Untap all attacking creatures and goad them. After this phase, there is an additional combat phase.",
+});
+
+describe("Take the Bait: the attackers untap, goaded, and attack again in an additional combat (CR 701.15)", () => {
+  it("no combat damage to you; in the new combat the goaded creature can't attack you, only someone else", () => {
+    supported(takeTheBait);
+    const { s: s0, ap, ids, opp } = setup([takeTheBait]);
+    const third = s0.turnOrder[(s0.turnOrder.indexOf(opp) + 1) % 4]!;
+    const bear = putOnBattlefield(s0, opp, card("Test Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    let s = passUntil(s0, "declareAttackers", opp);
+    s = act(s, { type: "declareAttackers", player: opp, attacks: [{ attacker: bear, defender: ap }] });
+    for (let i = 0; i < 10 && waitingOn(s) !== ap; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    const life = s.players[ap]!.life;
+    s = run(s, planCast(s, ap, ids[0]!));
+    for (let i = 0; i < 10 && s.stack.length; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.objects[bear]!.tapped).toBe(false);
+    expect(s.objects[bear]!.attacking).toBe(ap); // still attacking (rulings)
+    s = passUntil(s, "endCombat", opp);
+    expect(s.players[ap]!.life).toBe(life);
+    s = passUntil(s, "declareAttackers", opp);
+    expect(s.combatsThisTurn).toBe(2);
+    expect(() => act(s, { type: "declareAttackers", player: opp, attacks: [{ attacker: bear, defender: ap }] })).toThrow();
+    s = act(s, { type: "declareAttackers", player: opp, attacks: [{ attacker: bear, defender: third }] });
+    expect(s.objects[bear]!.attacking).toBe(third);
+  });
+});

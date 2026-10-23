@@ -122,6 +122,13 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   if (WHEEL.test(s)) return parseSpellsSentence(s, ctx) ?? null;
   const tapped = /^(?:For as long as ~ remains tapped, (.+)|(.+?) for as long as (you control ~ and )?~ remains tapped)$/i.exec(s);
   if (tapped) return parseWhileTapped((tapped[1] ?? tapped[2])!, !!tapped[3], ctx);
+  // Take the Bait: "Untap all attacking creatures and goad them": the same creatures, untapped then goaded (CR 701.15a).
+  const untapGoad = /^Untap (all [^,]+?) and goad them$/.exec(s);
+  if (untapGoad) {
+    const untap = parseSentence(`Untap ${untapGoad[1]}`, ctx);
+    const goad = untap && parseSentence(`Goad ${untapGoad[1]}`, ctx);
+    return untap && goad ? [...untap, ...goad] : null;
+  }
   const controlled = /^(.+?) for as long as you control ~$/.exec(s);
   if (controlled?.[1] === "You have no maximum hand size") return ctx.spell ? null : [{ type: "noMaxHandSize", whileControlled: true }];
   if (controlled) return parseWhileTapped(controlled[1]!, "controlled", ctx);

@@ -498,6 +498,9 @@ export function parseSpellsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (spec?.kind !== "spell") return null;
     return [{ type: "newTargets", index: addTarget(ctx, { ...spec, text: `target ${m[1]!}` }) }];
   }
+  // "Return that spell to its owner's hand" in a cast trigger (Krark, the Thumbless): not countering it, so a spell that
+  // can't be countered goes too; nothing happens if it has left the stack (rulings).
+  if (ctx.castSpell && /^[Rr]eturn (?:it|that spell) to its owner's hand$/.test(s)) return [{ type: "counterSpell", index: -1, cause: true, bounce: true, hand: true }];
   // "Whenever a player casts a spell, if no mana was spent to cast it, counter that spell." (Vexing Bauble)
   if (ctx.castSpell && /^Counter (?:it|that spell)$/i.test(s)) return [{ type: "counterCause" }];
   // "Whenever a player casts a spell, counter it unless that player pays {1}."

@@ -630,3 +630,116 @@ describe("Atraxa, Grand Unifier: one card of each card type, a card with two typ
     expect(taken.filter((n) => n !== "Test Bolt")).toHaveLength(1);
   });
 });
+
+const marvel = card("Aetherworks Marvel", "Legendary Artifact", "{4}", { oracleText: "Whenever a permanent you control is put into a graveyard, you get {E} (an energy counter).\n{T}, Pay six {E}: Look at the top six cards of your library. You may cast a spell from among them without paying its mana cost. Put the rest on the bottom of your library in a random order." });
+
+describe("Aetherworks Marvel: energy when a permanent you control goes to a graveyard; a free spell from the top six (rulings)", () => {
+  it("a token dying gives energy; with six, it casts a spell from the top six for free and the rest go to the bottom", () => {
+    supported(marvel);
+    const { s: s0, ap } = setup([]);
+    const m = putOnBattlefield(s0, ap, marvel);
+    const tok = putOnBattlefield(s0, ap, ogre("Test Token Ogre"));
+    s0.objects[tok]!.isToken = true;
+    expect(planActivate(s0, ap, m, 0)).toBeNull(); // no energy yet
+    // A token is put into the graveyard before it ceases to exist (CR 704.5d, rulings).
+    const s1 = structuredClone(s0);
+    s1.objects[tok]!.damage = 5;
+    let s = settleBots(act(s1, { type: "passPriority", player: ap }));
+    expect(s.players[ap]!.energy).toBe(1);
+    s.players[ap]!.energy = 6;
+    const big = putIn(s, ap, card("Test Colossus", "Sorcery", "{9}", { oracleText: "Draw two cards." }), "library");
+    const lib = s.players[ap]!.library.slice(0, 6);
+    s = passToPending(run(s, planActivate(s, ap, m, 0)));
+    expect(s.players[ap]!.energy).toBe(0);
+    for (let i = 0; i < 4 && s.pending?.kind !== "castFree"; i++) {
+      if (s.pending?.kind === "chooseOption") s = act(s, { type: "chooseOption", player: ap, choice: big });
+      else if (s.pending?.kind === "arrangeTop") s = act(s, { type: "arrangeTop", player: ap, top: (s.pending as { cards: string[] }).cards, away: [] });
+      else s = passToPending(s);
+    }
+    expect(s.pending).toMatchObject({ kind: "castFree", objectId: big });
+    s = settleBots(act(s, { type: "castSpell", player: ap, objectId: big }));
+    expect(s.objects[big]!.zone).toBe("graveyard");
+    // The other five are on the bottom.
+    const rest = lib.filter((id) => id !== big);
+    expect(s.players[ap]!.library.slice(-5).sort()).toEqual(rest.sort());
+  });
+});
+
+const krark = card("Krark, the Thumbless", "Legendary Creature — Goblin Wizard", "{1}{R}", { power: "2", toughness: "2", keywords: ["Partner"], oracleText: "Whenever you cast an instant or sorcery spell, flip a coin. If you lose the flip, return that spell to its owner's hand. If you win the flip, copy that spell, and you may choose new targets for the copy.\nPartner (You can have two commanders if both have partner.)" });
+
+describe("Krark, the Thumbless: lose the flip and the spell returns to hand; win and it's copied (rulings)", () => {
+  it("both outcomes, including a spell that can't be countered being returned", () => {
+    supported(krark);
+    const seen = new Set<string>();
+    for (let seed = 1; seed <= 12 && seen.size < 2; seed++) {
+      const insight = card("Test Insight", "Instant", "{U}", { oracleText: "This spell can't be countered.\nDraw a card." });
+      const { s: s0, ap, ids } = setup([insight], seed);
+      putOnBattlefield(s0, ap, krark);
+      const hand = s0.players[ap]!.hand.length;
+      const s = settleBots(run(s0, planCast(s0, ap, ids[0]!)));
+      if (s.objects[ids[0]!]!.zone === "hand") {
+        seen.add("lost");
+        expect(s.players[ap]!.hand.length).toBe(hand); // returned, nothing drawn
+      } else {
+        seen.add("won");
+        expect(s.objects[ids[0]!]!.zone).toBe("graveyard");
+        expect(s.players[ap]!.hand.length).toBe(hand - 1 + 2); // the copy and the spell each drew
+      }
+    }
+    expect([...seen].sort()).toEqual(["lost", "won"]);
+  });
+});
+
+const allOutAssault = card("All-Out Assault", "Enchantment", "{2}{R}{W}{B}", { oracleText: "Creatures you control get +1/+1 and have deathtouch.\nWhen this enchantment enters, if it's your main phase, there is an additional combat phase after this phase followed by an additional main phase. When you next attack this turn, untap each creature you control." });
+
+describe("All-Out Assault: an extra combat, and the creatures untap when you next attack this turn (only then)", () => {
+  it("adds a combat and a main phase; the first attack untaps your creatures, the second doesn't", () => {
+    supported(allOutAssault);
+    const { s: s0, ap, ids, opp } = setup([allOutAssault]);
+    const a = putOnBattlefield(s0, ap, ogre("Test Raider"));
+    let s = settleBots(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(pt(s, a)).toBe("4/4");
+    s = passUntil(s, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: a, defender: opp }] });
+    s = settleBots(s);
+    // Untapped by the trigger (it attacked tapped: no vigilance).
+    expect(s.objects[a]!.tapped).toBe(false);
+    // The second combat: it can attack again; this time it stays tapped.
+    s = passUntil(passUntil(s, "main2", ap), "declareAttackers", ap);
+    expect(s.turn).toBe(s0.turn);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: a, defender: opp }] });
+    s = settleBots(s);
+    expect(s.objects[a]!.tapped).toBe(true);
+  });
+
+  it("not in a main phase: no extra combat (the intervening if)", () => {
+    const { s: s0, ap } = setup([]);
+    const flash = card("All-Out Assault", "Enchantment", "{2}{R}{W}{B}", { keywords: ["Flash"], oracleText: "Flash\n" + allOutAssault.oracleText! });
+    const id = putIn(s0, ap, flash, "hand");
+    let s = passUntil(s0, "beginCombat", ap);
+    s = settleBots(run(s, planCast(s, ap, id)));
+    expect(logText(s)).not.toMatch(/additional combat/i);
+  });
+});
+
+const nestingDragon = card("Nesting Dragon", "Creature — Dragon", "{3}{R}{R}", { power: "5", toughness: "4", keywords: ["Flying"], oracleText: "Flying\nLandfall — Whenever a land you control enters, create a 0/2 red Dragon Egg creature token with defender and \"When this token dies, create a 2/2 red Dragon creature token with flying and '{R}: This token gets +1/+0 until end of turn.'\"" });
+
+describe("Nesting Dragon: a quoted ability inside a token's quoted ability", () => {
+  it("landfall makes a Dragon Egg; when it dies, a 2/2 flying Dragon that can pump itself", () => {
+    supported(nestingDragon);
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, nestingDragon);
+    const land = putIn(s0, ap, card("Test Peak", "Land", "", { oracleText: "{T}: Add {R}." }), "hand");
+    let s = settleBots(act(s0, { type: "playLand", player: ap, objectId: land }));
+    const egg = s.battlefield.find((id) => nameOf(s, id).startsWith("Dragon Egg"))!;
+    expect(pt(s, egg)).toBe("0/2");
+    expect(characteristics(s, s.objects[egg]!).keywords).toContain("Defender");
+    s.objects[egg]!.damage = 2;
+    s = settleBots(act(s, { type: "passPriority", player: ap }));
+    const dragon = s.battlefield.find((id) => nameOf(s, id) === "Dragon Token")!;
+    expect(pt(s, dragon)).toBe("2/2");
+    expect(characteristics(s, s.objects[dragon]!).keywords).toContain("Flying");
+    s = settleBots(run(s, planActivate(s, ap, dragon, 0)));
+    expect(pt(s, dragon)).toBe("3/2");
+  });
+});

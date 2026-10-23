@@ -469,6 +469,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           trigger: e.trigger,
           until: e.until,
           turn: s.turn,
+          ...(e.once ? { once: true as const } : {}),
         });
       }
       return;
@@ -701,7 +702,8 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     }
     case "counterSpell": {
       // The spell itself, if it's still on the stack (CR 701.6a).
-      if (e.cause) return ctx.cause && s.stack.some((x) => x.id === ctx.cause) ? counterOnStack(s, ctx, ctx.cause, src) : undefined;
+      // "Return that spell to its owner's hand" (Krark): not a counter (CR 701.6a), so even one that can't be countered.
+      if (e.cause) return ctx.cause && s.stack.some((x) => x.id === ctx.cause) ? counterOnStack(s, ctx, ctx.cause, src, undefined, e.bounce ? "hand" : undefined, e.bounce) : undefined;
       // "Exile any number of target spells" (Mindbreak Trap): each target still legal.
       if (e.exileSpell) {
         for (let k = e.index; k < e.index + (e.n ?? 1); k++) {

@@ -2056,7 +2056,7 @@ export type Effect =
    */
   /** `about`: its "~" is this target (Hunter's Insight's "that creature"), the object it was as this resolved (CR 603.7c). */
   /** `aboutPlayer`: only for combat damage to the player of that target (Great Train Heist). */
-  | { type: "floatingTrigger"; trigger: TriggeredAbility; until: TriggerDuration; about?: number; aboutPlayer?: number; /** With `about`: that many targets in a row from it, one for each ("either of those creatures", Tamiyo). */ each?: number }
+  | { type: "floatingTrigger"; trigger: TriggeredAbility; until: TriggerDuration; about?: number; aboutPlayer?: number; /** With `about`: that many targets in a row from it, one for each ("either of those creatures", Tamiyo). */ each?: number; /** "When you next attack this turn" (All-Out Assault): only the first time (CR 603.7c). */ once?: true }
   /**
    * Copy a spell (CR 707.10): the one whose casting triggered this ("cause": storm, replicate, "copy that spell") or a
    * target. `n`: "storm" is the spells cast before it this turn, "kicked" the times its replicate cost was paid.

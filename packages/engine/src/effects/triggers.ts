@@ -518,11 +518,14 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       if (ft.toPlayer !== undefined && ft.toPlayer !== dealtTo) continue;
       if (self && (ft.about ? ft.about.id !== self.id || (self.zoneChanges ?? 0) !== ft.about.zc : o.id !== self.id || (o.zoneChanges ?? 0) !== ft.sourceZc)) continue;
       floating = ft;
+      const queued = s.triggerQueue.length;
       try {
         f(o, ft.controller, [ft.trigger]);
       } finally {
         floating = null;
       }
+      // "When you next ... this turn": gone once it has triggered (CR 603.7c).
+      if (ft.once && s.triggerQueue.length > queued) s.floatingTriggers = s.floatingTriggers!.filter((x) => x !== ft);
     }
   };
   if (ev.type === "enters") {

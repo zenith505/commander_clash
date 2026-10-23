@@ -147,6 +147,12 @@ export function parseSentence(s: string, ctx: Ctx): Effect[] | null {
   const villain = /^(.+?) faces? a villainous choice — (.+)$/.exec(s);
   if (villain) return parseVillainous(villain[1]!, villain[2]!, ctx);
   if (WHEEL.test(s)) return parseSpellsSentence(s, ctx) ?? null;
+  // "Copy that spell, and you may choose new targets for the copy" (Krark, the Thumbless): the same as two sentences.
+  const copyNew = /^([Cc]opy (?:that spell|it)), and you may choose new targets for the copy$/.exec(s);
+  if (copyNew) {
+    const copy = parseSentence(copyNew[1]!, ctx);
+    return copy?.length === 1 && copy[0]!.type === "copySpell" ? [{ ...copy[0]!, newTargets: true }] : null;
+  }
   // "Add an amount of {C} equal to the amount of mana spent to cast that spell at the beginning of your next main phase"
   // (Mana Sculpt): the same as with the time first (Mana Drain).
   const addLater = /^([Aa]dd .+) at the beginning of your next main phase$/.exec(s);

@@ -208,6 +208,12 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx): Effect | null |
   // Encampment): once for each declaration of attackers this turn (CR 508.1, 603.7b).
   const attack = /^Whenever you attack this turn, (.+)$/.exec(s);
   if (attack) return floatingTrigger(`This turn, whenever you attack, ${attack[1]!}`, after, ctx);
+  // "When you next attack this turn, untap each creature you control" (All-Out Assault): the same, the first time only.
+  const nextAttack = /^When you next attack this turn, (.+)$/.exec(s);
+  if (nextAttack) {
+    const e = floatingTrigger(`This turn, whenever you attack, ${nextAttack[1]!}`, after, ctx);
+    return e?.type === "floatingTrigger" ? { ...e, once: true } : e;
+  }
   const m = /^([Uu]ntil end of turn|[Tt]his turn|[Uu]ntil your next turn|[Uu]ntil the end of your next turn), ([Ww]henever .+)$/.exec(s);
   if (!m) return undefined;
   const text = [m[2]!, ...after.map((x) => x.replace(/\.$/, ""))].join(". ");
@@ -2235,6 +2241,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!mv) return null;
       effects.push({ type: "may", effects: [{ type: "revealTop" }, { type: "if", cond: { kind: "revealedMv", mv }, effects: [{ type: "counterCause" }] }], text: "reveal the top card of your library" });
       si++;
+      continue;
+    }
+    // Aetherworks Marvel: "Look at the top six cards of your library. You may cast a spell from among them without paying
+    // its mana cost. Put the rest on the bottom of your library in a random order." Cast from the library as this resolves
+    // (CR 608.2g, rulings).
+    const lookCast = /^[Ll]ook at the top (two|three|four|five|six|seven|eight|nine|ten) cards of your library$/.exec(s);
+    if (lookCast && sentences[si + 1]?.replace(/\.$/, "") === "You may cast a spell from among them without paying its mana cost" && sentences[si + 2]?.replace(/\.$/, "") === "Put the rest on the bottom of your library in a random order") {
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: num(lookCast[1]!), reveal: true, look: true, max: 1, rest: { dest: "bottomRandom" } });
+      si += 2;
       continue;
     }
     const sunbird = /^[Rr]eveal the top X cards of your library, where X is (that spell's mana value)$/.exec(s);

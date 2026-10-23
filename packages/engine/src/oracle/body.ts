@@ -3463,6 +3463,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       effects.push({ type: "if", cond: { kind: "putThisWayIs", filter }, effects: inner });
       continue;
     }
+    // Yenna, Redtooth Regent: "Create a token that's a copy of it, except it isn't legendary. If the token is an Aura, untap
+    // ~, then scry 2": the token as it is now.
+    const tokenIs = /^If the token is an? ([A-Z][a-z]+), (.+)$/.exec(s);
+    if (tokenIs) {
+      const last = effects[effects.length - 1];
+      const filter = parseTargetPhrase(tokenIs[1]!);
+      const inner = parseOne(capital(tokenIs[2]!), ctx);
+      if (last?.type !== "createTokenCopy" || last.each || last.n !== 1 || filter?.kind !== "object" || !inner || /(?:it|its|that)/.test(tokenIs[2]!)) return null;
+      effects.push({ type: "if", cond: { kind: "putThisWayIs", filter }, effects: inner });
+      continue;
+    }
     // "For each creature exiled this way, its controller creates a 2/2 green Boar creature token" (Curse of the Swine),
     // "For each creature destroyed this way, its controller draws a card": after the destroy or exile instruction.
     // Winds of Abandon: "For each creature exiled this way, its controller searches their library for a basic land card.

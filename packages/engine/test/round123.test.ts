@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, scry, setup } from "./helpers";
-import { botActions, castProblem, moveObject, isFullySupported, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { botActions, castProblem, moveObject, planActivate, isFullySupported, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
 import { characteristics, invalidateCharacteristics } from "../src/layers";
 import { defOf, power, toughness } from "../src/cards";
 import { manaAbilitiesOn } from "../src/manaabilities";
@@ -546,5 +546,45 @@ describe("Doppelgang", () => {
     const s = settle(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: a }, { kind: "object", id: b }], undefined, "auto", 2)));
     const tokens = s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === ap).map((id) => defOf(s, s.objects[id]!).name).sort();
     expect(tokens).toEqual(["Craw Wurm", "Craw Wurm", "Llanowar Elves", "Llanowar Elves"]);
+  });
+});
+
+const yenna = card("Yenna, Redtooth Regent", "Legendary Creature — Elf Noble", "{2}{G}{W}", { power: "4", toughness: "4", oracleText: "{2}, {T}: Choose target enchantment you control that doesn't have the same name as another permanent you control. Create a token that's a copy of it, except it isn't legendary. If the token is an Aura, untap Yenna, then scry 2. Activate only as a sorcery." });
+const anthem = card("Glorious Anthem", "Enchantment", "{1}{W}{W}", { oracleText: "Creatures you control get +1/+1." });
+const rancor = card("Rancor", "Enchantment — Aura", "{G}", { oracleText: "Enchant creature\nEnchanted creature gets +2/+0 and has trample.\nWhen Rancor is put into a graveyard from the battlefield, return Rancor to its owner's hand." });
+
+describe("Yenna, Redtooth Regent", () => {
+  const scene = () => {
+    supported(yenna, rancor);
+    const { s, ap } = setup([]);
+    const y = putOnBattlefield(s, ap, yenna);
+    const g = putOnBattlefield(s, ap, anthem);
+    const b = putOnBattlefield(s, ap, bear());
+    const r = putOnBattlefield(s, ap, rancor);
+    s.objects[r]!.attachedTo = b;
+    invalidateCharacteristics(s);
+    return { s, ap, y, g, r, b };
+  };
+
+  it("copies a nonlegendary token of Glorious Anthem; Yenna stays tapped", () => {
+    const { s: s0, ap, y, g } = scene();
+    const s = settle(run(s0, planActivate(s0, ap, y, 0, [{ kind: "object", id: g }])));
+    expect(s.battlefield.filter((id) => defOf(s, s.objects[id]!).name === "Glorious Anthem")).toHaveLength(2);
+    expect(s.objects[y]!.tapped).toBe(true);
+    // Now two permanents share the name: neither can be chosen.
+    expect(planActivate(s, ap, y, 0, [{ kind: "object", id: g }])).toBeNull();
+  });
+
+  it("an Aura token: Yenna untaps, then you scry 2", () => {
+    const { s: s0, ap, y, r } = scene();
+    let s = untilChoice(run(s0, planActivate(s0, ap, y, 0, [{ kind: "object", id: r }])));
+    // What the token enchants is chosen as it enters (CR 303.4f): Yenna, not the Bears.
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "enchant" });
+    s = settle(act(s, { type: "chooseOption", player: ap, choice: y }));
+    const copy = s.battlefield.find((id) => s.objects[id]!.isToken && defOf(s, s.objects[id]!).name === "Rancor")!;
+    expect(s.objects[copy]!.attachedTo).toBe(y);
+    expect(s.battlefield.filter((id) => defOf(s, s.objects[id]!).name === "Rancor")).toHaveLength(2);
+    expect(s.objects[y]!.tapped).toBe(false);
+    expect(s.log.some((l) => /scr(y|ies) 2/.test(l.text))).toBe(true);
   });
 });

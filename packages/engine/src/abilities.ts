@@ -494,6 +494,8 @@ export interface TargetSpec {
   commander?: boolean;
   /** "a card named ~": the source's name; "a card named Ajani, Valiant Protector": that name (only for searches). */
   named?: string;
+  /** "Enchantment you control that doesn't have the same name as another permanent you control" (Yenna): no other permanent `you` control has its name (a face-down one has none, CR 708.2). */
+  uniqueNameAmongYours?: true;
   /** "Dragon cards not named ~" (Tiamat): any other name; "~" is the source's (only for searches). */
   notNamed?: string;
   /** None of these subtypes. */

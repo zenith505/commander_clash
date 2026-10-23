@@ -1,6 +1,6 @@
 import type { Effect, ObjRef, TokenSpec } from "../abilities";
 import { defOf, isPermanentCard, isType, power, toughness } from "../cards";
-import { auraHostOptions, enterTogether, livingPlayers, log, moveObject, nameOf, newObject, opponents, player } from "../game";
+import { auraHostKey, auraHostLabels, auraHostName, auraHostOf, auraHostOptions, type AuraHost, enterTogether, livingPlayers, log, moveObject, nameOf, newObject, opponents, player } from "../game";
 import { tokenBatch, type TokenBatch } from "../counters";
 import { copiableDef, copyEnterCounters, tokenCopyKey, type CopyExcept } from "../copies";
 import type { CardDef, GameObject, GameState, ObjectId, PlayerId } from "../types";
@@ -10,23 +10,33 @@ import { attackChoices } from "./run-zones";
 import { copiedValues } from "./run-copies";
 import { controllerOf, invalidateCharacteristics } from "../layers";
 import { defMv } from "../faces";
+import { compileCard } from "../oracle";
 
 /**
  * Create `n` tokens that are copies of `base` for this player (CR 707.2), doubled by token doublers (CR 614.1a). They
  * enter at the same time (CR 608.2f), so each sees the others enter and none counts another as it enters (603.6a, 614.12).
  */
-export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: number, ctx: ResolveCtx, opts: { except?: CopyExcept; tapped?: boolean; attacking?: boolean; defender?: PlayerId; /** What each of the first ones attacks, as chosen (attackChoices). */ attackAt?: { player: PlayerId; planeswalker?: ObjectId }[] } = {}) {
+export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: number, ctx: ResolveCtx, opts: { except?: CopyExcept; tapped?: boolean; attacking?: boolean; defender?: PlayerId; /** What each of the first ones attacks, as chosen (attackChoices). */ attackAt?: { player: PlayerId; planeswalker?: ObjectId }[]; /** An Aura copy: what it enchants as it enters (auraCopyHost), none if nothing it could. */ auraHost?: AuraHost | null } = {}) {
   // A copy of a double-faced object is a double-faced token, with the same face up (CR 707.8a).
   const { key, face } = tokenCopyKey(s, base, opts.except);
   const { same: k, extra } = tokenBatch(s, pid, s.cards[key]!, n);
   const defender = opts.defender ?? (opts.attacking ? attackDefault(s, pid, ctx.sourceId) : undefined);
+  let made = 0;
   enterTogether(s, () => {
     for (let i = 0; i < k; i++) {
       const o = newObject(s, s.cards[key]!, pid, "exile");
       o.isToken = true;
+      // An Aura token enters attached to what its controller chose (CR 303.4f); with nothing it could enchant, it isn't
+      // created at all (CR 303.4g, rulings on Roles).
+      const host = opts.auraHost !== undefined ? (opts.auraHost && auraHostOptions(s, o, pid).some((h) => auraHostKey(h) === auraHostKey(opts.auraHost!)) ? opts.auraHost : null) : undefined;
+      if (host === null) {
+        delete s.objects[o.id];
+        continue;
+      }
+      made++;
       // "Except it enters with an additional +1/+1 counter on it" (Littjara Mirrorlake).
       const counters = copyEnterCounters(opts.except, (type) => isType(s.cards[key]!, type));
-      moveObject(s, o.id, "battlefield", { ...(opts.tapped || opts.attacking ? { tapped: true } : {}), ...(face !== undefined ? { face } : {}), ...(Object.keys(counters).length ? { counters } : {}) });
+      moveObject(s, o.id, "battlefield", { ...(opts.tapped || opts.attacking ? { tapped: true } : {}), ...(face !== undefined ? { face } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(host ?? {}) });
       const at = opts.attackAt?.[i];
       if (defender !== undefined && o.zone === "battlefield") o.attacking = at?.player ?? defender;
       const pw = at?.planeswalker !== undefined ? s.objects[at.planeswalker] : undefined;
@@ -36,7 +46,37 @@ export function tokenCopies(s: GameState, pid: PlayerId, base: CardDef, n: numbe
     }
     createExtraTokens(s, pid, extra, { tapped: opts.tapped || opts.attacking, attacking: defender });
   });
-  if (k) log(s, `${player(s, pid).name} creates ${k === 1 ? "a token that's a copy" : `${k} tokens that are copies`} of ${base.name}.`);
+  if (made) log(s, `${player(s, pid).name} creates ${made === 1 ? "a token that's a copy" : `${made} tokens that are copies`} of ${base.name}${opts.auraHost ? ` attached to ${auraHostName(s, opts.auraHost)}` : ""}.`);
+  else if (k) log(s, `${player(s, pid).name} can't create a token copy of ${base.name}: there's nothing it could enchant.`);
+}
+
+/**
+ * A token copy of an Aura (Yenna, Redtooth Regent): its controller chooses what it enchants as it enters (CR 303.4f),
+ * among what it could enchant, asked once for the copies made now (token doublers' extra ones go with it). `asked` is
+ * the scratch key for the answer: the copied Aura's id. Undefined when it isn't an Aura, null when there's nothing it
+ * could enchant, "paused" while the player chooses.
+ */
+function auraCopyHost(s: GameState, pid: PlayerId, base: CardDef, except: CopyExcept | undefined, asked: ObjectId, src: string): AuraHost | null | undefined | "paused" {
+  const { key } = tokenCopyKey(s, base, except);
+  const d = s.cards[key]!;
+  if (!d.subtypes.includes("Aura") || !compileCard(d).enchant) return undefined;
+  const sc = (s.resolving!.scratch ??= {});
+  const hosts = (sc.auraHosts ??= {});
+  if (hosts[asked] === undefined) {
+    const probe = newObject(s, d, pid, "exile");
+    const options = auraHostOptions(s, probe, pid);
+    delete s.objects[probe.id];
+    if (!options.length) return null;
+    if (options.length > 1) {
+      sc.auraAsking = asked;
+      s.pending = { kind: "chooseOption", player: pid, source: src, what: "enchant", options: options.map(auraHostKey), labels: auraHostLabels(s, options), prompt: `choose what the token copy of ${base.name} enchants` };
+      return "paused";
+    }
+    hosts[asked] = auraHostKey(options[0]!);
+  }
+  const host = auraHostOf(hosts[asked]!);
+  delete hosts[asked];
+  return host;
 }
 
 /** The power and toughness of the object a token copy copies: now, or as it last existed on the battlefield. */
@@ -177,9 +217,13 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         sc.attackPicks = undefined;
       }
       const attackAt = picks.flatMap((k) => choices.filter((a) => a.key === k));
+      // A copy of an Aura: what it enchants (one player creating it; asked about the copied Aura).
+      const copied = e.what.ref === "target" ? objects(s, e.what, ctx)[0] : undefined;
+      const auraHost = who.length === 1 && copied ? auraCopyHost(s, who[0]!, base, e.except, copied.id, src) : undefined;
+      if (auraHost === "paused") return "paused";
       if (s.resolving) s.resolving.created = [];
       enterTogether(s, () => {
-        for (const pid of who) tokenCopies(s, pid, base, n, ctx, { ...e, ...(attackAt.length ? { attackAt } : {}) });
+        for (const pid of who) tokenCopies(s, pid, base, n, ctx, { ...e, ...(attackAt.length ? { attackAt } : {}), ...(auraHost !== undefined ? { auraHost } : {}) });
       });
       return;
     }

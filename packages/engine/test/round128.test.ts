@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { botActions, compileCard, isFullySupported, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { botActions, compileCard, isFullySupported, nextRandom, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -166,5 +166,60 @@ describe("Hordewing Skaab: once for the combat damage, that many opponents (ruli
     const { s0, ap, a } = combat(true);
     const s = settleBots(run(s0, planActivate(s0, ap, a, 0)));
     expect(logText(s)).not.toMatch(/Hordewing Skaab's ability triggers/);
+  });
+});
+
+const breeches = card("Breeches, the Blastmaker", "Legendary Creature — Goblin Pirate", "{1}{U}{R}", {
+  power: "3",
+  toughness: "3",
+  keywords: ["Menace"],
+  oracleText: "Menace\nWhenever you cast your second spell each turn, you may sacrifice an artifact. If you do, flip a coin. When you win the flip, copy that spell. You may choose new targets for the copy. When you lose the flip, Breeches deals damage equal to that spell's mana value to any target.",
+});
+
+describe("Breeches, the Blastmaker: sacrifice, flip, then one of two reflexive triggers (rulings)", () => {
+  const study2 = card("Test Study", "Sorcery", "{1}{U}", { oracleText: "Draw a card." });
+  /** Two spells cast; Breeches' trigger resolving, an artifact sacrificed, the coin set to come up `win`. */
+  const flip = (win: boolean) => {
+    const { s: s0, ap, ids } = setup([study2, study2]);
+    putOnBattlefield(s0, ap, breeches);
+    const rock = putOnBattlefield(s0, ap, card("Test Rock", "Artifact", "{1}", { oracleText: "{T}: Add {C}." }));
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    for (let i = 0; i < 8 && s.stack.length; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = run(s, planCast(s, ap, ids[1]!));
+    expect(s.stack).toHaveLength(2);
+    for (let i = 0; i < 8 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    for (let st = 1; ; st++) {
+      if (nextRandom({ rngState: st }) < 0.5 === win) {
+        s.rngState = st;
+        break;
+      }
+    }
+    // The only artifact: sacrificed without a pick.
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect(s.objects[rock]!.zone).toBe("graveyard");
+    return { s, ap, spell: ids[1]! };
+  };
+  it("won: a copy of the second spell (not cast)", () => {
+    supported(breeches);
+    const { s: s0, ap } = flip(true);
+    const hand = s0.players[ap]!.hand.length;
+    let s = s0;
+    for (let i = 0; i < 12 && (s.stack.length || s.triggerQueue.length); i++) s = s.pending ? s : act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(logText(s)).toMatch(/wins the flip/);
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
+    expect((s.castThisTurn ?? []).filter((c) => c.player === ap)).toHaveLength(2);
+  });
+  it("lost: 2 damage, its target chosen as the reflexive trigger goes on the stack", () => {
+    const { s: s0, ap } = flip(false);
+    let s = s0;
+    for (let i = 0; i < 8 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(logText(s)).toMatch(/loses the flip/);
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    const opp = s.turnOrder.find((p) => p !== ap)!;
+    const life = s.players[opp]!.life;
+    s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] } as Action);
+    for (let i = 0; i < 8 && s.stack.length; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.players[opp]!.life).toBe(life - 2);
   });
 });

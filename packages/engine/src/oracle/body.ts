@@ -3528,9 +3528,24 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // "Flip a coin. If you win the flip, ... If you lose the flip, ...": decided by that flip (CR 705.2); neither if it
     // wasn't flipped ("you may flip a coin").
+    const flipped = (es: Effect[]): boolean => es.some((e) => (e.type === "flipCoin" && !e.untilLose) || ((e.type === "may" || e.type === "if") && flipped(e.effects)));
+    // "When you win the flip, copy that spell. You may choose new targets for the copy. When you lose the flip, ~ deals
+    // damage equal to that spell's mana value to any target." (Breeches, the Blastmaker): two delayed (reflexive)
+    // triggers, only one of which triggers, its targets chosen then (CR 603.12; rulings).
+    const whenFlip = /^When you (win|lose) the flip, (.+)$/.exec(s);
+    if (whenFlip) {
+      let text = whenFlip[2]!;
+      if (sentences[si + 1] === "You may choose new targets for the copy") {
+        text += ". You may choose new targets for the copy";
+        si++;
+      }
+      const reflexive = flipped(effects) && reflexiveBody(text, ctx);
+      if (!reflexive) return null;
+      effects.push({ type: "if", cond: { kind: "wonFlip", ...(whenFlip[1] === "lose" ? { lost: true as const } : {}) }, effects: [{ type: "reflexive", body: reflexive }] });
+      continue;
+    }
     const ifFlip = /^If you (win|lose) the flip, (.+)$/.exec(s);
     if (ifFlip) {
-      const flipped = (es: Effect[]): boolean => es.some((e) => (e.type === "flipCoin" && !e.untilLose) || (e.type === "may" && flipped(e.effects)));
       const inner = flipped(effects) && parseOne(ifFlip[2]!.charAt(0).toUpperCase() + ifFlip[2]!.slice(1), ctx);
       if (!inner || (inner.length > 1 && inner.some((e) => pauses(e)))) return null;
       effects.push({ type: "if", cond: { kind: "wonFlip", ...(ifFlip[1] === "lose" ? { lost: true as const } : {}) }, effects: inner });
@@ -5087,6 +5102,7 @@ function reflexiveBody(text: string, ctx: Ctx, sacrificed = false, about = false
     ...(ctx.activated ? { activated: true } : {}),
     ...(ctx.eventPlayer ? { eventPlayer: true } : {}),
     ...(ctx.defending ? { defending: true } : {}),
+    ...(ctx.castSpell ? { castSpell: true } : {}),
     ...(ownX ? { ownX: true } : {}),
   });
   return body;

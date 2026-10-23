@@ -271,6 +271,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // ~ as it last existed on the battlefield, like the ability that created it (CR 608.2h, 113.7a).
         ...(item.lki ? { lki: item.lki } : {}),
         ...(item.event ? { event: item.event } : {}),
+        // "When you win the flip, copy that spell" in a cast trigger (Breeches, the Blastmaker): the same spell.
+        ...(item.cause ? { cause: item.cause } : {}),
         // "That amount of excess damage" (Unleash the Inferno): the excess this spell dealt, its X (CR 603.12).
         // "You may pay {X}. When you do, ..." (Electro): the X paid, which the "may" put in ctx.
         ...(e.xExcess ? { x: s.resolving!.excessDamage ?? 0 } : ctx.x || item.x ? { x: ctx.x || item.x } : {}),

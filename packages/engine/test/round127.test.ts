@@ -187,3 +187,51 @@ describe("Malcolm, Keen-Eyed Navigator: one trigger for the damage Pirates deal 
     expect(s.objects[f]!.zone).toBe("battlefield");
   });
 });
+
+const signpost = card("Misleading Signpost", "Artifact", "{2}{U}", {
+  keywords: ["Flash"],
+  oracleText: "Flash\nWhen this artifact enters during the declare attackers step, you may reselect which player or permanent target attacking creature is attacking. (It can't attack its controller or their permanents.)\n{T}: Add {U}.",
+});
+
+describe("Misleading Signpost: reselect what an attacking creature attacks (rulings)", () => {
+  /** `opp` attacks `ap` with a Bear; `ap` has Misleading Signpost in hand, in the declare attackers step. */
+  const attacked = () => {
+    const { s: s0, ap, ids, opp } = setup([signpost]);
+    const bear = putOnBattlefield(s0, opp, card("Test Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    let s = passUntil(s0, "declareAttackers", opp);
+    s = act(s, { type: "declareAttackers", player: opp, attacks: [{ attacker: bear, defender: ap }] });
+    for (let i = 0; i < 8 && waitingOn(s) !== ap; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    return { s, ap, opp, bear, sp: ids[0]! };
+  };
+  it("flashed in as Ana's Bear attacks you: it attacks another player now, still declared at you", () => {
+    supported(signpost);
+    const { s: s0, ap, opp, bear, sp } = attacked();
+    let s = run(s0, planCast(s0, ap, sp));
+    for (let i = 0; i < 8 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: bear }] } as Action);
+    for (let i = 0; i < 8 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "reselectAttack", player: ap });
+    const options = s.pending?.kind === "chooseOption" ? s.pending.options : [];
+    expect(options).not.toContain(String(opp)); // never its controller
+    expect(options).not.toContain(String(ap)); // not what it attacks now
+    const other = s.turnOrder.find((p) => p !== ap && p !== opp)!;
+    s = act(s, { type: "chooseOption", player: ap, choice: String(other) });
+    expect(s.objects[bear]!.attacking).toBe(other);
+    expect(s.objects[bear]!.attacked?.players).toEqual([ap]);
+  });
+  it("outside the declare attackers step it doesn't trigger", () => {
+    const { s: s0, ap, ids } = setup([signpost]);
+    const s = run(s0, planCast(s0, ap, ids[0]!));
+    const after = settleBots(s);
+    expect(logText(after)).not.toMatch(/Misleading Signpost's ability triggers/);
+  });
+  it("a bot turns the attack away from itself", () => {
+    const { s: s0, ap, bear, sp } = attacked();
+    let s = run(s0, planCast(s0, ap, sp));
+    s = settleBots(s);
+    expect(s.objects[bear]!.attacking).not.toBe(ap);
+  });
+});

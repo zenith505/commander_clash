@@ -114,6 +114,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) && !(what.ref === "target" && what.n) ? [{ type: "tapOrUntap", what }] : null;
   }
+  // Misleading Signpost, Portal Mage: "reselect which player or permanent target attacking creature is attacking".
+  if ((m = /^[Rr]eselect which player or permanent (target attacking creature) is attacking$/.exec(s))) {
+    const what = parseObject(m[1]!, ctx);
+    return what && !isGroup(what) ? [{ type: "reselectAttack", what }] : null;
+  }
   // Removing from combat (CR 506.4): Gustcloak Runner's "untap it and remove it from combat", "remove ~ from combat".
   if ((m = /^(?:(Untap) (~|it|target .+?) and )?[Rr]emove (~|it|target .+?) from combat$/.exec(s))) {
     if (m[1] && m[3] !== "it" && m[3] !== m[2]) return null;

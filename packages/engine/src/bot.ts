@@ -5,7 +5,7 @@ import { chooseVote } from "./bot-votes";
 import { autoCrew, autoWaterbend, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, canBeSacrificed, defOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility, manaChoices } from "./manaabilities";
-import { bindChosen, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
+import { reselectOptions, bindChosen, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, manySlot, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
   applyAction,
@@ -495,6 +495,10 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // "Search your library and/or graveyard": both, for the most to choose from.
     if (pend.kind === "chooseOption" && pend.what === "searchZones") return [{ type: "chooseOption", player: pid, choice: "both" }];
     if (pend.kind === "chooseOption" && pend.what === "attackWhom") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
+    if (pend.kind === "chooseOption" && pend.what === "reselectAttack") {
+      const o = pend.about ? s.objects[pend.about] : undefined;
+      return [{ type: "chooseOption", player: pid, choice: (o && reselectPick(s, pid, o)) ?? pend.options[0]! }];
+    }
     // Tap or untap: tap an opponent's untapped permanent, untap our own tapped one; otherwise leave it if we may.
     // "You may cast a spell with mana value 3 or less from your hand without paying its mana cost": the biggest one.
     if (pend.kind === "chooseOption" && pend.what === "castFromHand") {
@@ -2537,6 +2541,12 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
   if (e.keep && e.otherwise?.length === 1 && e.otherwise[0]!.type === "discard" && e.effects.length === 1 && e.effects[0]!.type === "discard") return true;
   // Duplicity: swap our hand for the cards exiled with it when that's at least as many cards.
   if (e.effects.length === 1 && e.effects[0]!.type === "exileFaceDown" && e.effects[0]!.from === "hand") return linkedOwned(s, r.item.sourceId, pid) >= player(s, pid).hand.length;
+  // Misleading Signpost: only to turn an attack away from us, or one of ours toward the opponent with the least life.
+  if (e.effects.length === 1 && e.effects[0]!.type === "reselectAttack") {
+    const t = r.item.targets?.find((x) => x.kind === "object");
+    const o = t?.kind === "object" ? s.objects[t.id] : undefined;
+    return !!o && reselectPick(s, pid, o) !== undefined;
+  }
   // Demonstrate: a copy for us and one for one opponent, ahead of the other two (CR 702.144a).
   if (e.effects.length === 1 && e.effects[0]!.type === "copySpell" && e.effects[0]!.demonstrate) return true;
   // Hydroelectric Specimen: take an opponent's spell aimed at us or ours, not one of ours (or a helpful one) at theirs.
@@ -3237,6 +3247,21 @@ function chooseCopyWithTaps(s: GameState, pid: PlayerId): Action[] | null {
     }
   }
   return null;
+}
+
+/**
+ * What a bot makes an attacking creature attack instead (Misleading Signpost), or undefined to leave it: away from us
+ * and our planeswalkers to the other player with the most life; our own toward the opponent with the least life, when
+ * that's less than the life of the player it attacks.
+ */
+function reselectPick(s: GameState, pid: PlayerId, o: GameObject): string | undefined {
+  if (o.zone !== "battlefield" || o.attacking === undefined) return undefined;
+  const players = reselectOptions(s, o).filter((x) => x.planeswalker === undefined);
+  const life = (x: { player: PlayerId }) => player(s, x.player).life;
+  if (o.attacking === pid) return players.filter((x) => x.player !== pid).sort((a, b) => life(b) - life(a))[0]?.key;
+  if (controllerOf(s, o) !== pid) return undefined;
+  const low = players.sort((a, b) => life(a) - life(b))[0];
+  return low && (o.attackingPermanent || life(low) < player(s, o.attacking).life) ? low.key : undefined;
 }
 
 /** A creature of ours with +1/+1 counters and an adapt ability, not yet refreshed this turn (Biomancer's Familiar). */

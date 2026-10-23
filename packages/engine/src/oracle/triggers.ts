@@ -1854,6 +1854,13 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const body = state && parseBody(st[st.length - 1]!, { selfIt: true });
     return state && body ? { event: "state", state, body } : "fail";
   }
+  // "When this artifact enters during the declare attackers step" (Misleading Signpost): only then does it trigger at all
+  // (rulings), not an intervening if.
+  const entersDuring = /^When ~ enters during the declare attackers step, (.+)$/.exec(line);
+  if (entersDuring) {
+    const t = parseTrigger(`When ~ enters, ${entersDuring[1]}`);
+    return t && t !== "fail" && t.event === "selfEnters" && !t.activeIf ? { ...t, activeIf: { kind: "during", window: "declareAttackers" } } : "fail";
+  }
   // "Whenever this creature becomes tapped during your turn" (granted by Dionus, Elvish Archdruid): only while it's its
   // controller's turn, whether it triggers at all.
   const tappedYours = /^Whenever ~ becomes tapped during your turn, (.+)$/.exec(line);

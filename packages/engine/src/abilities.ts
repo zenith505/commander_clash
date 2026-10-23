@@ -1699,6 +1699,12 @@ export type Effect =
   /** "Remove it from combat" (CR 506.4): it stops being an attacking, blocking, blocked or unblocked creature. */
   | { type: "removeFromCombat"; what: ObjRef }
   /**
+   * "Reselect which player or permanent target attacking creature is attacking" (Misleading Signpost): its controller's
+   * choice as it resolves of another player, planeswalker or battle it could attack, ignoring requirements, restrictions
+   * and costs (rulings). It still attacked what it was declared attacking.
+   */
+  | { type: "reselectAttack"; what: ObjRef }
+  /**
    * "Return a creature card at random from your graveyard to your hand" (Haunted Fengraf); "an opponent chooses a card at
    * random in your graveyard. If it's a creature card, put it onto the battlefield. Otherwise, exile it." (Search for
    * Survivors, `dest` "creatureOrExile"). Chosen by the game, and everyone sees which (rulings on Fossil Find).

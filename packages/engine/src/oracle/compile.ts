@@ -2327,6 +2327,13 @@ export function compile(d: CardDef): CompiledCard {
       out.noLoyaltyAbilities = true;
       continue;
     }
+    {
+      const stay = /^([A-Z][a-z]+) counters can't be removed from permanents your opponents control\.$/.exec(line);
+      if (stay) {
+        out.opponentsCountersStay = stay[1]!.toLowerCase();
+        continue;
+      }
+    }
     if (line === "During your turn, your opponents can't cast spells or activate abilities of artifacts, creatures, or enchantments.") {
       out.opponentsCantCastYourTurn = true;
       out.opponentsCantActivateYourTurn = true;
@@ -3065,8 +3072,10 @@ function checkCastingLinks(out: CompiledCard) {
       visit(o.otherwise);
       return;
     }
-    if ((o.ref === "sacrificed" || o.kind === "sacrificedSuspected" || o.kind === "sacrificedLegendary") && !canSac) bad = true;
+    if (((o.ref === "sacrificed" && !o.revealedCost) || o.kind === "sacrificedSuspected" || o.kind === "sacrificedLegendary") && !canSac) bad = true;
     if (o.ref === "sacrificed" && o.exiledCost && !exileCost) bad = true;
+    // "The revealed card" needs one card revealed as a cost, and nothing sacrificed or exiled to share the record.
+    if (o.ref === "sacrificed" && o.revealedCost && !revealCost) bad = true;
     // "The exiled card" of an "Exile a nonland card from your hand" cost (Jhoira of the Ghitu): that ability's own cost.
     if (o.ref === "costExiled" && !handExileCost) bad = true;
     // "The chosen type" needs something that chooses one: "as ~ enters, choose" or "choose a creature type" before it.
@@ -3085,13 +3094,17 @@ function checkCastingLinks(out: CompiledCard) {
   let canSac = !!out.additionalCosts?.some((c) => c.kind === "sacrifice");
   let exileCost = false;
   let handExileCost = false;
+  const oneReveal = (costs: AdditionalCost[] | undefined) => !!costs?.some((c) => c.kind === "reveal" && c.n === 1) && !costs.some((c) => c.kind === "sacrifice" || c.kind === "forage");
+  let revealCost = oneReveal(out.additionalCosts);
   visit([out.spell, out.triggers, out.statics, out.mana]);
   for (const ab of out.activated) {
     canSac = !!ab.costs?.some((c) => c.kind === "sacrifice");
     exileCost = !!ab.costs?.some((c) => c.kind === "sacrifice" && c.exile);
     handExileCost = !!ab.costs?.some((c) => c.kind === "exileFromHand" && !c.toLibrary && c.n === 1);
+    revealCost = oneReveal(ab.costs);
     visit(ab);
   }
+  revealCost = false;
   exileCost = false;
   handExileCost = false;
   visit([out.costMods, out.activationTaxes]);

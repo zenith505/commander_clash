@@ -532,6 +532,11 @@ export interface TargetSpec {
   /** "each creature without a +1/+1 counter on it" (Wave Goodbye). */
   notCounter?: CounterKind;
   /**
+   * "Unless it's colorless or it's only the color its controller chose" (Selective Obliteration): only permanents with a
+   * color other than the one their controller chose as this resolves (Chosen.colorsBy), multicolored ones always.
+   */
+  notOnlyControllersColor?: true;
+  /**
    * "of the chosen type", "that aren't of the chosen type", "of the chosen color": the creature type
    * or color chosen for the source (see GameObject.chosen) or while the spell resolves. Before
    * `bindChosen` fills it in, a filter that needs a choice that wasn't made matches nothing.
@@ -699,9 +704,10 @@ export type ObjRef =
   | { ref: "amassed" }
   /**
    * "The sacrificed creature": what was sacrificed to cast the spell, as it last existed (CR 608.2h). `exiledCost`: "the
-   * exiled creature" for an "Exile a creature you control" cost (Food Chain), likewise.
+   * exiled creature" for an "Exile a creature you control" cost (Food Chain), likewise. `revealedCost`: "the revealed
+   * card" for a "reveal a ... card from your hand" cost (Titan's Presence), as it last existed in the hand (rulings).
    */
-  | { ref: "sacrificed"; exiledCost?: true }
+  | { ref: "sacrificed"; exiledCost?: true; revealedCost?: true }
   /** "The exiled card" of an "Exile a nonland card from your hand" cost (Jhoira of the Ghitu), while it's still that card in exile (CR 400.7). */
   | { ref: "costExiled" }
   /** "If an ability of an artifact, creature, or planeswalker is countered this way, that permanent" (Tishana's Tidebinder): the source of the ability this resolution countered, if it's still that object and fits `filter` now (rulings). */
@@ -1280,6 +1286,8 @@ export type StaticCondition =
   | { kind: "noCombatDamageSinceLastTurn" }
   /** "If a player was dealt combat damage by a Zombie this turn" (Lost Monarch of Ifnir): by a creature of that type. */
   | { kind: "playerCombatDamaged"; subtype: string }
+  /** "If an opponent was dealt combat damage by a legendary creature this turn" (Blitzball): whoever controlled it (rulings). */
+  | { kind: "opponentCombatDamagedByLegendary" }
   /** "If an opponent was dealt 7 or more damage this turn" (Spinerock Knoll): in total, from any sources (rulings). */
   | { kind: "opponentDealtDamage"; n: number }
   /** "If you attacked with three or more creatures this turn" (Windbrisk Heights): different creatures you declared as attackers. */
@@ -2007,7 +2015,7 @@ export type Effect =
    * Locthwain): one spell, from the cards its linked exile took (CR 607.2a), cast for its AltCostKind "linkedFree" (CR 118.9).
    */
   | { type: "castLinkedFree"; /** "A creature spell" (Idol of Endurance): only one of these. */ filter?: TargetSpec }
-  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" | "yourNextEndStep"; who?: PlayerRef; castOnly?: true; free?: true; /** "And you may spend mana as though it were mana of any color to cast that spell" (Grenzo, CR 609.4b). */ anyType?: true; /** The cards are "exiled with ~" for its other abilities (CR 607.2a). */ linked?: true; /** "You may play one of those cards" (Nashi, Moon Sage's Scion): once one is played, the rest can't be. */ oneOf?: true; /** "Exile the top two cards of your library, then choose one of them. You may play that card this turn." (Party Thrasher): only the chosen one. */ choose?: true; /** "If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost" (Nashi). */ life?: true; /** "Exile all opponents' graveyards" (Mnemonic Betrayal): every card in each `who` player's graveyard, `n` aside. */ graveyards?: true }
+  | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" | "yourNextEndStep"; who?: PlayerRef; castOnly?: true; free?: true; /** With `free`: "you may play cards this way without paying their mana costs" (Ignite the Future): or for their costs. */ orPay?: true; /** "And you may spend mana as though it were mana of any color to cast that spell" (Grenzo, CR 609.4b). */ anyType?: true; /** The cards are "exiled with ~" for its other abilities (CR 607.2a). */ linked?: true; /** "You may play one of those cards" (Nashi, Moon Sage's Scion): once one is played, the rest can't be. */ oneOf?: true; /** "Exile the top two cards of your library, then choose one of them. You may play that card this turn." (Party Thrasher): only the chosen one. */ choose?: true; /** "If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost" (Nashi). */ life?: true; /** "Exile all opponents' graveyards" (Mnemonic Betrayal): every card in each `who` player's graveyard, `n` aside. */ graveyards?: true }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
   /** "Remove a +1/+1 counter from it", "remove all -1/-1 counters from ~" (CR 122.8): as many as it has, at most. */
   /**
@@ -3904,7 +3912,14 @@ export type ManaProduce =
    * "Choose a color. Add an amount of mana of that color equal to your devotion to that color." (Nykthos, Shrine to Nyx,
    * CR 700.5): the color chosen as it resolves, then the devotion to it.
    */
-  | { kind: "devotion" };
+  | { kind: "devotion" }
+  /**
+   * "Double the amount of each type of unspent mana you have" (Doubling Cube): as much of each type as is in its
+   * controller's pool once its cost is paid, added as new mana; restrictions on that mana aren't copied (rulings). The
+   * way its mana cost is paid from the pool is chosen as the ability is activated (CR 601.2h, 605.3a), numbered as
+   * `combo` (`doublePoolPayments`).
+   */
+  | { kind: "doublePool" };
 
 /**
  * A mana ability (CR 605.1a): no targets, adds mana, doesn't use the stack (CR 605.3a).
@@ -4495,6 +4510,11 @@ export interface CompiledCard {
    * Abolisher): permanents on the battlefield only, mana abilities too (rulings); see abolisherBan.
    */
   opponentsCantActivateYourTurn?: true;
+  /**
+   * "Stun counters can't be removed from permanents your opponents control." (Fear of Sleep Paralysis): counters of this
+   * kind stay on its controller's opponents' permanents, nor are they moved off them (rulings); see countersStay.
+   */
+  opponentsCountersStay?: CounterKind;
   /** "Players can't activate planeswalkers' loyalty abilities." (The Immortal Sun): while it's on the battlefield. */
   noLoyaltyAbilities?: true;
   /** "Creatures you control can boast twice during each of your turns rather than once." (Birgi, CR 702.142a) */

@@ -47,6 +47,11 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       if (specs.some((f) => !f)) return null;
       const anyOf = specs as NonNullable<(typeof specs)[number]>[];
       Object.assign(dig, { count: 2, upTo: true, filter: { kind: "card", anyOf, text: `${m[1] ?? m[3]} and/or ${m[2] ?? m[4]}`.replace(/^an? /, "") }, oneOfEach: anyOf, into: "hand" });
+    } else if ((m = new RegExp(`^Put any number of ([^,]+? cards) from among them into your hand and the rest ${REST}$`).exec(s))) {
+      // "Put any number of legendary cards from among them into your hand and the rest into your graveyard" (Dihada).
+      const filter = parseSearchFilter(m[1]!.replace(/\bcards\b/, "card"));
+      if (!filter || / of the chosen /.test(m[1]!)) return null;
+      Object.assign(dig, { count: 99, upTo: true, filter, into: "hand" }, restOf(m[2]!));
     } else if ((m = /^You may reveal any number of ([^,]+? cards) from among them and put (?:them|the revealed cards) into your hand$/.exec(s))) {
       // "You may reveal any number of Rat cards from among them and put the revealed cards into your hand" (Karumonix).
       const filter = parseSearchFilter(m[1]!.replace(/\bcards\b/, "card"));

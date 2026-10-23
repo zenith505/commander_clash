@@ -720,6 +720,8 @@ function conditionMet(s: GameState, cond: StaticCondition, sourceId: ObjectId, y
     }
     case "playerCombatDamaged":
       return (s.turnLog?.combatDamageSubtypes ?? []).some((t) => t === "*" || t === cond.subtype);
+    case "opponentCombatDamagedByLegendary":
+      return (s.turnLog?.legendaryCombatDamaged ?? []).some((p) => p !== you);
     case "opponentSearched":
       return (s.turnLog?.searched ?? []).some((p) => p !== you);
     case "opponentEntered": {

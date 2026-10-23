@@ -354,6 +354,8 @@ export interface GameObject {
     source?: { id: ObjectId; zc: number };
     /** "Without paying its mana cost" (CR 118.9). */
     free?: true;
+    /** With `free`: it may be cast paying its costs instead (Ignite the Future, rulings), as it is when X isn't 0. */
+    orPay?: true;
     /** "Mana of any type can be spent to cast it" (CR 609.4b). */
     anyType?: true;
     /** "If that spell would be put into a graveyard, exile it instead" (Dire Fleet Daredevil): see exileIfToGraveyard. */
@@ -1268,6 +1270,8 @@ export interface TurnLog {
   combatDamagedBy?: Record<number, string[]>;
   /** The creature types of the creatures that dealt combat damage to a player, as they dealt it (Lost Monarch of Ifnir). */
   combatDamageSubtypes?: string[];
+  /** The players dealt combat damage by a legendary creature, legendary as it dealt it (Blitzball). */
+  legendaryCombatDamaged?: PlayerId[];
   /**
    * "Once during each of your turns, you may cast ... from your graveyard" (Karador), Muldrotha's "a permanent spell of
    * each permanent type": the permissions used, `id@zoneChanges:slot` (a new object gets a new one, rulings).
@@ -1681,6 +1685,8 @@ export interface Chosen {
   number?: number;
   /** "Each player chooses a creature type" (Patriarch's Bidding): every type chosen, in the order chosen. */
   types?: string[];
+  /** "Each player chooses a color" (Selective Obliteration): each player's color. */
+  colorsBy?: Record<number, Color>;
   /** Gluntch: the players chosen by Effect "choosePlayer", in the order chosen. */
   players?: PlayerId[];
 }

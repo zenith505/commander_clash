@@ -4226,13 +4226,15 @@ function AbilityMenu({
             );
           }
           // A storage land's: how many counters this button removes.
+          // Doubling Cube's text doesn't say "Add": its costs end at the first colon.
           const cost = ab.text
-            .slice(0, ab.text.indexOf(": Add"))
+            .slice(0, ab.text.includes(": Add") ? ab.text.indexOf(": Add") : ab.text.indexOf(": "))
             .replace(/~/g, "it")
             .replace(/Remove (?:any number of|X) (\S+) counters/, (_, k: string) => (x.removes === 1 ? `Remove a ${k} counter` : `Remove ${x.removes === 0 ? "no" : x.removes} ${k} counters`));
           return (
             <button key={`${x.ability}-${x.mana}-${x.combo ?? ""}-${x.extra?.join("") ?? ""}`} className="ghost" onClick={() => onMana(x)}>
-              <RulesText text={cost} />: {x.adds.length ? <>add <ManaCost cost={x.adds.map((m) => `{${m}}`).join("")} size="sm" /></> : "add no mana"}
+              <RulesText text={cost} />: {x.pays ? <>pay with <ManaCost cost={x.pays.map((m) => `{${m}}`).join("")} size="sm" />, </> : null}
+              {x.adds.length ? <>add <ManaCost cost={x.adds.map((m) => `{${m}}`).join("")} size="sm" /></> : "add no mana"}
               {ab.selfDamage ? ` (${ab.selfDamage} damage to you)` : ""}
             </button>
           );

@@ -2901,6 +2901,16 @@ function chooseOption(s: GameState, pid: PlayerId, what: ChoiceKind, card: CardD
     }, 0);
     return [...options].sort((a, b) => score(b) - score(a))[0]!;
   }
+  // Selective Obliteration: the color of our own most worthy monocolored permanents, the ones it would spare.
+  if (what === "color" && c && JSON.stringify(c.spell ?? null).includes('"notOnlyControllersColor":true')) {
+    const kept = new Map<string, number>();
+    for (const id of s.battlefield) {
+      const o = obj(s, id);
+      const cols = characteristics(s, o).colors;
+      if (controllerOf(s, o) === pid && cols.length === 1) kept.set(COLOR_NAMES[cols[0]!], (kept.get(COLOR_NAMES[cols[0]!]) ?? 0) + Math.max(1, worth(s, pid, o)));
+    }
+    return [...options].sort((a, b) => (kept.get(b) ?? 0) - (kept.get(a) ?? 0))[0]!;
+  }
   // Protection from the chosen color is against what opponents have, above all the spell or ability
   // that's about to resolve against us.
   const protects = !!c && what === "color" && (JSON.stringify(c).includes(CHOSEN_PROTECTION) || JSON.stringify(c).includes(CHOSEN_HEXPROOF));

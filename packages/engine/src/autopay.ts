@@ -1,7 +1,7 @@
 import { asFace } from "./faces";
 import { liveEmblems } from "./emblems";
 import { abilitiesOf, bestowedDef, prototypedDef, defOf, FACE_DOWN, objIsType, power } from "./cards";
-import { payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaOptions, manaPenalty } from "./manaabilities";
+import { payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaCombos, manaOptions, manaPenalty } from "./manaabilities";
 import { characteristics, controllerOf } from "./layers";
 import { abilityProblem, lessWaterbend, eminenceCommanders, activationCost, applyAction, activationLessCost, altCost, convertChoices, isTreasure, castProblem, hasConvoke, hasImprovise, unlockCost, unlockProblem, crewCandidates, crewPower, faceUpCost, isSummoningSick, obj, payableLife, player, spellCost, suspendProblem, plotProblem, plotCost, foretellProblem, tapCostCandidates, turnFaceUpProblem, untapViaMana } from "./game";
 import { compileCard } from "./oracle";
@@ -64,7 +64,8 @@ function manaSources(s: GameState, pid: PlayerId, exclude: ObjectId[], use: Mana
         // Mana that can't be spent on this is no help (CR 106.6), nor mana a Treasure didn't make for Security Rhox's cost.
         // A storage land gives one counter's worth at a time, so a payment never takes more of them than it needs.
         // Discarding a hand (Lion's Eye Diamond) is never an automatic choice: the player activates it.
-        .filter((x) => x.adds.length > 0 && (x.removes ?? 1) === 1 && !abs[x.ability]!.discardHand && !manaAbilityProblem(s, pid, o, x.ability, true) && (!abs[x.ability]!.spendOnly || spendAllows(s, pid, boundSpend(o, abs[x.ability]!.spendOnly!), use)) && (!onlyTreasures || (treasure && !abs[x.ability]!.spendOnly)) && (!only || x.adds.every((m) => only.includes(m))))
+        // Doubling Cube is never an automatic choice either: what it adds depends on what's in the pool then.
+        .filter((x) => x.adds.length > 0 && (x.removes ?? 1) === 1 && !abs[x.ability]!.discardHand && abs[x.ability]!.produces.kind !== "doublePool" && !manaAbilityProblem(s, pid, o, x.ability, true) && (!abs[x.ability]!.spendOnly || spendAllows(s, pid, boundSpend(o, abs[x.ability]!.spendOnly!), use)) && (!onlyTreasures || (treasure && !abs[x.ability]!.spendOnly)) && (!only || x.adds.every((m) => only.includes(m))))
         .map((x) => {
           const ab = abs[x.ability]!;
           const tapCost = ab.tapCost && { n: ab.tapCost.n, candidates: tapPreference(s, tapCostCandidates(s, pid, o, ab.tapCost).filter((id) => !exclude.includes(id))) };
@@ -704,6 +705,8 @@ export function planManaAbility(s: GameState, pid: PlayerId, objectId: ObjectId,
   const ab = manaAbilitiesOn(s, o)[ability]!;
   // "Tap an untapped creature you control": what's given, or the best to tap.
   const tapped = ab.tapCost ? (tap ?? tapPreference(s, tapCostCandidates(s, pid, o, ab.tapCost)).slice(0, ab.tapCost.n)) : undefined;
+  // Doubling Cube doubles the pool, so its cost is paid from the pool as it is (ManaProduce "doublePool").
+  if (ab.produces.kind === "doublePool") return manaAbilityProblem(s, pid, o, ability) || !manaCombos(s, o, ab)?.[combo ?? -1] ? null : [{ type: "activateMana", player: pid, objectId, mana, ability, combo: combo! }];
   const taps = ab.manaCost ? planMana(s, pid, activationLessCost(s, o, parseManaCost(ab.manaCost)), 0, objectId, tapped, { ability: o }) : [];
   return taps ? [...taps, { type: "activateMana", player: pid, objectId, mana, ability, ...(combo !== undefined ? { combo } : {}), ...(tapped ? { tap: tapped } : {}), ...(extra?.length ? { extra } : {}) }] : null;
 }

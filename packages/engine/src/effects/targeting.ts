@@ -111,6 +111,10 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.commander !== undefined && !!o.isCommander !== spec.commander) return false;
   if (spec.status && !hasStatus(s, o, c, spec.status, view)) return false;
   if (spec.suspected && o.suspected === undefined) return false;
+  if (spec.notOnlyControllersColor) {
+    const col = s.resolving?.chosen?.colorsBy?.[c.controller];
+    if (!c.colors.length || (c.colors.length === 1 && c.colors[0] === col)) return false;
+  }
   const hexproof = targeting && c.controller !== controller && !exposed(s, o);
   if (hexproof && objHasKeyword(s, o, "Hexproof")) return false;
   if (hexproof && src && hexproofFrom(c.keywords, src)) return false; // CR 702.11d

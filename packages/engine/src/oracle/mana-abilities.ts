@@ -22,7 +22,9 @@ export function parseManaAbility(line0: string): ManaAbility | null {
     .replace(/: Choose a color\. Add an amount of mana of that color equal to your devotion to that color\./, ": Add an amount of mana of the chosen color equal to your devotion to that color.")
     .replace(/: Choose a color\. Add an amount of mana of that color equal to (.+?)\./, ": Add X mana of any one color, where X is $1.")
     // "Choose a color. Add one mana of that color for each charge counter on ~." (Astral Cornucopia): the same.
-    .replace(/: Choose a color\. Add one mana of that color for each ([^.]+? counter) on ~\./, ": Add X mana of any one color, where X is the number of $1s on ~.");
+    .replace(/: Choose a color\. Add one mana of that color for each ([^.]+? counter) on ~\./, ": Add X mana of any one color, where X is the number of $1s on ~.")
+    // Doubling Cube: a mana ability (rulings), adding as much again of each type of mana in the pool.
+    .replace(/: Double the amount of each type of unspent mana you have\.$/, ": Add as much again of each type of unspent mana you have.");
   const part = String.raw`\{[^}]+\}|Sacrifice ~|Exert ~|Discard your hand|Pay \d+ life|Pay (?:\{E\})+|Remove (?:a|an|one|two|three|four|five) [a-z]+ counters? from ~|Put an? [^,:]+? counter on ~|Remove (?:any number of|X) [a-z]+ counters from ~|Tap (?:an|one|two|three) untapped [^,:]+? you control`;
   const m = new RegExp(`^((?:${part})(?:, (?:${part}))*): Add ([^.]+)\\.((?: [^.]+\\.)*)$`).exec(line);
   if (!m) return null;
@@ -301,6 +303,7 @@ function parseManaProduced(text: string): ManaProduce | null {
   }
   if (text === "one mana of each color among permanents you control") return { kind: "eachColorAmong" };
   if (text === "an amount of mana of the chosen color equal to your devotion to that color") return { kind: "devotion" };
+  if (text === "as much again of each type of unspent mana you have") return { kind: "doublePool" };
   const each = /^(\{[WUBRGC]\}) for each (.+) you control$/.exec(text);
   if (each) {
     const spec = parseTargetPhrase(each[2]!);

@@ -94,6 +94,8 @@ export interface SourceQuality {
   name?: string;
   /** A permanent that was cast this turn (it resolved as a spell this turn), for Emrakul, the World Anew's protection. */
   castThisTurn?: true;
+  /** A Ring-bearer (CR 701.54a), for protection from Ring-bearers (Lord of the Nazgûl). */
+  ringBearer?: true;
   /** Its mana value, a spell's with its X (CR 202.3e), for protection from a mana value (Reaver Titan); none is 0 (CR 202.3a). */
   manaValue?: number;
 }
@@ -129,6 +131,7 @@ export function canonicalKeyword(text: string): string | undefined {
   const q = m[1]!;
   if (q === "each of your opponents") return PROTECTION_FROM_OPPONENTS;
   if (q === "spells" || q === "permanents that were cast this turn") return `Protection from ${q}`;
+  if (q === "ring-bearers") return "Protection from Ring-bearers";
   if (q === "the chosen player") return CHOSEN_PLAYER_PROTECTION;
   if (q === "the chosen card type") return CHOSEN_TYPE_PROTECTION;
   if (q === "each of that creature's colors") return TARGET_COLORS_PROTECTION;
@@ -223,6 +226,7 @@ export function protectedFrom(keywords: readonly string[], src: SourceQuality, h
     // which is the spell), "from permanents that were cast this turn" (a permanent that resolved as a cast spell this turn).
     if (q === "spells" && src.spell) return true;
     if (q === "permanents that were cast this turn" && src.castThisTurn && !src.spell) return true;
+    if (q === "ring-bearers" && src.ringBearer) return true;
     if ((q === "each color" || q === "all colors") && src.colors.length > 0) return true;
     if (q === "multicolored" && src.colors.length > 1) return true;
     if (q === "monocolored" && src.colors.length === 1) return true;

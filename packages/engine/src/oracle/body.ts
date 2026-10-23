@@ -1986,6 +1986,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const free = playIt[3] ? { free: true as const } : {};
       if (free.free && (exTop[1] || exEqualN || impulseIf)) return null;
       const impulse: Effect = { type: "impulse", n: exEqualN ?? (exTop[1] ? amt(exTop[1]) : 1), until: !when ? "exiled" : /next end step/.test(when) ? "yourNextEndStep" : /next turn/.test(when) ? "nextTurn" : "thisTurn", ...free };
+      // Ignite the Future: "If this spell was cast from a graveyard, you may play cards this way without paying their mana
+      // costs": then each may be cast for its mana cost, an alternative cost, or without paying its mana cost (rulings).
+      const freeIf = !free.free && !impulseIf && ctx.spell && /^If ~ was cast from a graveyard, you may play cards this way without paying their mana costs\.?$/.test(sentences[si + 2] ?? "");
+      if (freeIf) {
+        effects.push({ type: "if", cond: { kind: "castFromGraveyard" }, effects: [{ ...impulse, free: true, orPay: true }], otherwise: [impulse] });
+        si += 2;
+        continue;
+      }
       effects.push(impulseIf && !impulseIf.not ? { type: "if", cond: impulseIf.cond, effects: [impulse] } : impulse);
       si++;
       continue;
@@ -2946,6 +2954,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       afterDig = [];
       noteLast(ctx, [done]);
       dig = null;
+      // Dihada, Binder of Wills: "Create a Treasure token for each card put into your graveyard this way": the rest that
+      // went there (not one a replacement effect sent elsewhere).
+      const forEachYard = done.rest === "graveyard" && !digPaid && !done.each ? /^(Create an? [^.]+? token) for each card put into your graveyard this way\.?$/.exec(sentences[si + 1] ?? "") : null;
+      if (forEachYard) {
+        const made = parseOne(forEachYard[1]!, ctx);
+        const token = made?.length === 1 ? made[0]! : undefined;
+        if (token?.type !== "createToken" || token.n !== 1) return null;
+        effects.push({ ...token, n: { count: { kind: "movedLinkedThisWay" } } });
+        si++;
+      }
       digPaid = null;
       continue;
     }
@@ -4083,6 +4101,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // your graveyard, then create a 0/1 colorless Eldrazi Spawn creature token for each card put into your graveyard this
     // way. Those tokens have "Sacrifice ~: Add {C}."": a delayed trigger about the cards just exiled to play, triggering
     // only if one is still there (CR 603.4, 603.7).
+    // Selective Obliteration: "Each player chooses a color. Then exile each permanent unless it's colorless or it's only the
+    // color its controller chose." In turn order (rulings), each player's color sparing only their own monocolored permanents.
+    if (/^Each player chooses a color$/.test(s) && /^(?:Then e|E)xile each permanent unless it's colorless or it's only the color its controller chose\.?$/.test(sentences[si + 1] ?? "")) {
+      effects.push({ type: "choose", choice: "color", each: true }, { type: "exile", what: { ref: "each", filter: { kind: "object", notOnlyControllersColor: true, text: "each permanent unless it's colorless or it's only the color its controller chose" } } });
+      si++;
+      continue;
+    }
     const leftovers = /^At the beginning of the next end step, if any of those cards remain exiled, put them into your graveyard$/.test(s) && /^(Create an? .+? token) for each card put into your graveyard this way\.?$/.exec(sentences[si + 1] ?? "");
     const leftoverHave = leftovers && /^Those tokens have "([^"]+)"\.?$/.exec(sentences[si + 2] ?? "");
     if (leftovers && leftoverHave && effects[effects.length - 1]?.type === "impulse") {

@@ -363,6 +363,12 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const next = apnap(s, s.turnOrder).find((x) => !player(s, x).lost && !asked.includes(x));
         if (next === undefined) return;
         asked.push(next);
+        // "Each player chooses a color" (Selective Obliteration): in turn order too, each one's own (rulings).
+        if (e.choice === "color") {
+          r.chosen = { ...r.chosen, colorsBy: r.chosen?.colorsBy ?? {} };
+          s.pending = { kind: "chooseOption", player: next, source: src, what: "color", options: choiceOptions("color") };
+          return "paused";
+        }
         r.chosen = { ...r.chosen, types: r.chosen?.types ?? [] };
         s.pending = { kind: "chooseOption", player: next, source: src, what: "creatureType", options: choiceOptions("creatureType") };
         return "paused";

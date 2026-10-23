@@ -6,6 +6,7 @@
 // deathtouch and lifelink apply (CR 702.2, 702.15).
 
 import { abilitiesOf, cardIdOf, defOf, toughness, wasCastThisTurn } from "./cards";
+import { isRingBearer } from "./effects/run-ring";
 import { compileCard } from "./oracle";
 import { liveEmblems } from "./emblems";
 import { commanderOf } from "./mutate";
@@ -54,7 +55,7 @@ export interface DamageSource {
 export function objectSource(s: GameState, o: GameObject): DamageSource {
   const c = characteristics(s, o);
   const zc = o.zone === "battlefield" ? (o.zoneChanges ?? 0) : (s.lastKnown?.[o.id]?.zc ?? o.zoneChanges ?? 0);
-  return { name: c.name, controller: controllerOf(s, o), colors: c.colors, types: c.types, subtypes: c.subtypes, keywords: c.keywords, manaValue: c.manaValue, id: o.id, ref: { object: o.id, zc }, ...(wasCastThisTurn(s, o) ? { castThisTurn: true as const } : {}), ...(o.isCommander ? { commanderId: commanderOf(s, o)?.id ?? o.id } : {}), ...(c.unpreventable ? { unpreventable: c.unpreventable } : {}) };
+  return { name: c.name, controller: controllerOf(s, o), colors: c.colors, types: c.types, subtypes: c.subtypes, keywords: c.keywords, manaValue: c.manaValue, id: o.id, ref: { object: o.id, zc }, ...(wasCastThisTurn(s, o) ? { castThisTurn: true as const } : {}), ...(isRingBearer(s, o) ? { ringBearer: true as const } : {}), ...(o.isCommander ? { commanderId: commanderOf(s, o)?.id ?? o.id } : {}), ...(c.unpreventable ? { unpreventable: c.unpreventable } : {}) };
 }
 
 /** "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix). */
@@ -239,6 +240,10 @@ export function dealDamage(
         const seen = ((s.turnLog ??= {}).combatDamageSubtypes ??= []);
         // A changeling has every creature type (CR 702.73a): "*".
         for (const t of from && from.zone === "battlefield" && characteristics(s, from).allCreatureTypes ? ["*"] : src.subtypes) if (!seen.includes(t)) seen.push(t);
+        if (from?.zone === "battlefield" && characteristics(s, from).supertypes.includes("Legendary")) {
+          const legends = (s.turnLog.legendaryCombatDamaged ??= []);
+          if (!legends.includes(p.id)) legends.push(p.id);
+        }
       }
       if (src.commanderId) p.commanderDamage[src.commanderId] = (p.commanderDamage[src.commanderId] ?? 0) + n;
       // Freerunning (CR 702.173a): an Assassin creature or a commander, as it was when it dealt the damage, lets its

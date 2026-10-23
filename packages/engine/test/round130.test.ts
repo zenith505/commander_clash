@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { botActions, isFullySupported, legalActions, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { botActions, characteristics, isFullySupported, legalActions, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -280,5 +280,73 @@ describe("Out of the Tombs: eon counters and mills; a draw from an empty library
     emptyLibrary(s0, ap);
     const s = passToPending(run(s0, planCast(s0, ap, ids[0]!)));
     expect(botActions(s, ap)).toEqual([{ type: "drawEmptyReturn", player: ap, objectId: big }]);
+  });
+});
+
+const zada = card("Zada, Hedron Grinder", "Legendary Creature — Goblin Ally", "{3}{R}", {
+  power: "3",
+  toughness: "3",
+  oracleText: "Whenever you cast an instant or sorcery spell that targets only Zada, copy that spell for each other creature you control that the spell could target. Each copy targets a different one of those creatures.",
+});
+const inkTreader = card("Ink-Treader Nephilim", "Creature — Nephilim", "{R}{G}{W}{U}", {
+  power: "3",
+  toughness: "3",
+  oracleText: "Whenever a player casts an instant or sorcery spell, if that spell targets only this creature, copy the spell for each other creature that spell could target. Each copy targets a different one of those creatures.",
+});
+const precursor = card("Precursor Golem", "Artifact Creature — Golem", "{5}", {
+  power: "3",
+  toughness: "3",
+  oracleText: "When this creature enters, create two 3/3 colorless Golem artifact creature tokens.\nWhenever a player casts an instant or sorcery spell that targets only a single Golem, that player copies that spell for each other Golem that spell could target. Each copy targets a different one of those Golems.",
+});
+const giantGrowth = card("Giant Growth", "Instant", "{G}", { oracleText: "Target creature gets +3/+3 until end of turn." });
+const golem = (name: string) => card(name, "Artifact Creature — Golem", "{3}", { power: "3", toughness: "3" });
+const shrouded = card("Shrouded Ogre", "Creature — Ogre", "{2}{R}", { power: "3", toughness: "3", keywords: ["Shroud"], oracleText: "Shroud" });
+const pow = (s: GameState, id: string) => characteristics(s, s.objects[id]!).power;
+/** Cast `spell` from `pid`'s hand at `target`, then everyone passes until the trigger has resolved and the stack is empty. */
+const growAt = (s: GameState, pid: PlayerId, spell: string, target: string) => settleBots(run(s, planCast(s, pid, spell, [{ kind: "object", id: target }])));
+
+describe("Zada, Ink-Treader Nephilim, Precursor Golem: a copy of the spell for each other creature it could target", () => {
+  it("Zada: one copy for each other creature you control it could target, none for shroud or an opponent's (rulings)", () => {
+    supported(zada, inkTreader, precursor);
+    const { s: s0, ap, ids, opp } = setup([giantGrowth]);
+    const z = putOnBattlefield(s0, ap, zada);
+    const a = putOnBattlefield(s0, ap, ogre("Ogre A"));
+    const b = putOnBattlefield(s0, ap, ogre("Ogre B"));
+    const sh = putOnBattlefield(s0, ap, shrouded);
+    const theirs = putOnBattlefield(s0, opp, ogre("Their Ogre"));
+    const s = growAt(s0, ap, ids[0]!, z);
+    expect([z, a, b].map((id) => pow(s, id))).toEqual([6, 6, 6]);
+    expect([sh, theirs].map((id) => pow(s, id))).toEqual([3, 3]);
+  });
+  it("Zada: a spell aimed at another creature doesn't trigger it", () => {
+    const { s: s0, ap, ids } = setup([giantGrowth]);
+    const z = putOnBattlefield(s0, ap, zada);
+    const a = putOnBattlefield(s0, ap, ogre("Ogre A"));
+    const s = growAt(s0, ap, ids[0]!, a);
+    expect([z, a].map((id) => pow(s, id))).toEqual([3, 6]);
+  });
+  it("Ink-Treader: an opponent's spell at it is copied for every other creature, and its controller controls the copies", () => {
+    const { s: s0, ap, ids, opp } = setup([giantGrowth]);
+    const ink = putOnBattlefield(s0, opp, inkTreader);
+    const mine = putOnBattlefield(s0, ap, ogre("My Ogre"));
+    const theirs = putOnBattlefield(s0, opp, ogre("Their Ogre"));
+    let s = run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: ink }]));
+    // The trigger resolves: two copies on the stack above the spell, both under the Nephilim's controller.
+    for (let i = 0; i < 20 && s.stack.length < 3; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.stack.filter((x) => x.copy).map((x) => x.controller)).toEqual([opp, opp]);
+    s = settleBots(s);
+    expect([ink, mine, theirs].map((id) => pow(s, id))).toEqual([6, 6, 6]);
+  });
+  it("Precursor Golem: a spell at one Golem is copied for each other Golem, whoever controls it, under the caster", () => {
+    const { s: s0, ap, ids, opp } = setup([giantGrowth]);
+    const p = putOnBattlefield(s0, opp, precursor);
+    const g1 = putOnBattlefield(s0, opp, golem("Golem One"));
+    const g2 = putOnBattlefield(s0, ap, golem("Golem Two"));
+    const o = putOnBattlefield(s0, ap, ogre("Not a Golem"));
+    let s = run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: g1 }]));
+    for (let i = 0; i < 20 && s.stack.length < 3; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.stack.filter((x) => x.copy).map((x) => x.controller)).toEqual([ap, ap]);
+    s = settleBots(s);
+    expect([p, g1, g2, o].map((id) => pow(s, id))).toEqual([6, 6, 6, 3]);
   });
 });

@@ -2552,6 +2552,24 @@ export function compile(d: CardDef): CompiledCard {
       else out.unsupported.push(raw);
       continue;
     }
+    // Zada, Hedron Grinder; Ink-Treader Nephilim; Precursor Golem (CR 707.10): a copy of the spell for each other creature
+    // (or Golem) it could target, each copy targeting that one.
+    const eachOther = /^Whenever (you cast|a player casts) an instant or sorcery spell(?: that targets only (~|a single ([A-Z][a-z]+)))?(, if that spell targets only ~)?, (copy (?:that|the) spell|that player copies that spell) for each other (creature you control|creature|[A-Z][a-z]+) that (?:the )?spell could target\. Each copy targets a different one of those (?:creatures|[A-Z][a-z]+s)\.$/.exec(line);
+    if (eachOther && !eachOther[2] !== !eachOther[4]) {
+      const single = eachOther[3] ? parseTargetPhrase(eachOther[3]) : null;
+      const among = parseTargetPhrase(eachOther[6]!);
+      const self = !eachOther[3];
+      if ((eachOther[3] && (single?.kind !== "object" || eachOther[6] !== eachOther[3])) || among?.kind !== "object" || (eachOther[5] === "that player copies that spell") !== !!eachOther[3]) {
+        out.unsupported.push(raw);
+        continue;
+      }
+      out.triggers.push({
+        event: "castSpell",
+        cast: { by: eachOther[1] === "you cast" ? "you" : "any", spell: { kind: "spell", types: ["Instant", "Sorcery"], notTypes: [], notColors: [], text: "instant or sorcery spell" }, targetsOnly: single ? { ...single, text: eachOther[3]! } : "self" },
+        body: { targets: [], effects: [{ type: "copySpell", spell: "cause", n: "eachOther", newTargets: false, eachOther: { among: { ...among, text: eachOther[6]! }, ...(self ? { self: true as const } : {}), ...(eachOther[3] ? { caster: true as const } : {}), ...(eachOther[4] ? { onlySelf: true as const } : {}) } }], text: line.replace(/^Whenever [^,]+(?:, if that spell targets only ~)?, /, "") },
+      });
+      continue;
+    }
     // Thrumming Stone: "Spells you cast have ripple 4." Each spell's granted ripple triggers as it's cast (CR 702.60a),
     // like a "whenever you cast a spell" ability; spells cast by ripple trigger it too (rulings).
     const grantedRipple = /^Spells you cast have ripple (\d+)\.$/.exec(line);

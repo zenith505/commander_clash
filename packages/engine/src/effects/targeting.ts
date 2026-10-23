@@ -443,6 +443,19 @@ export function isLegalTarget(s: GameState, spec: TargetSpec, t: TargetChoice, c
 }
 
 /**
+ * The one permanent all of a spell's chosen targets name, if they name only one (rulings on Ink-Treader Nephilim: several
+ * targets all naming it count): with `only` "self", `o`; else a permanent matching it for `you`.
+ */
+export function targetsOnlyOne(s: GameState, targets: TargetChoice[], only: "self" | TargetSpec, o: GameObject | undefined, you: PlayerId): ObjectId | undefined {
+  const chosen = targets.filter((t) => t.kind !== "none");
+  const first = chosen[0];
+  if (first?.kind !== "object" || chosen.some((t) => t.kind !== "object" || t.id !== first.id)) return undefined;
+  const it = s.objects[first.id];
+  if (!it || it.zone !== "battlefield") return undefined;
+  return (only === "self" ? it.id === o?.id : objectMatches(s, only, it, you, false)) ? it.id : undefined;
+}
+
+/**
  * "A spell that targets a permanent you control": one of its targets is still that object on the battlefield and matches
  * (it needn't still be a legal target for that spell), or "you" (rulings on Rebuff the Wicked).
  */

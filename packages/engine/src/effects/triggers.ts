@@ -11,7 +11,7 @@ import { RulesError } from "../types";
 import { parseManaCost, spentMeets } from "../mana";
 import { nextRandom } from "../rng";
 import { evalAmount } from "../amounts";
-import { objectMatches, bindBound, bindChosen, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, hasLegalTargets, legalModes, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
+import { objectMatches, bindBound, bindChosen, sourceQuality, printedMatches, spellManaValue, spellMatches, stampTargets, targetsMatch, targetsOnlyOne, hasLegalTargets, legalModes, noteModesChosen, offerTargets, settleDivided, exposed } from "./targeting";
 import { monarchTrigger } from "./run-basics";
 import { initiativeTrigger } from "./run-dungeons";
 import { INITIATIVE, RAD } from "../oracle";
@@ -1329,6 +1329,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.cast.spent && !spentMeets(ev.copy ? undefined : ev.spent, t.cast.spent, spell ? characteristics(s, spell).colors : ev.card.colors)) return false;
         // "A spell that targets a creature you control": its targets as it was cast (CR 601.2c), once however many match.
         if (t.cast.targets && !t.cast.targets.some((w) => targetsMatch(s, item?.targets ?? [], w, you))) return false;
+        // "That targets only ~" (Zada), "only a single Golem": every target it has names one permanent.
+        if (t.cast.targetsOnly && !targetsOnlyOne(s, item?.targets ?? [], t.cast.targetsOnly, o, you)) return false;
         // Where it was cast from (CR 601.2a); a copy wasn't cast from anywhere.
         if (t.cast.from && !castFromMatches(t.cast.from, ev.copy ? undefined : spell, ev.controller)) return false;
         if (t.cast.notOwned && !(spell && !ev.copy && spell.owner !== ev.controller)) return false;

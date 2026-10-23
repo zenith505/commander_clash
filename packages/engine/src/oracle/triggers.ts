@@ -276,6 +276,17 @@ function parseGroupDamagesPlayers(line: string): TriggeredAbility | "fail" | nul
   // dealt damage" (Malcolm, Keen-Eyed Navigator): combat damage or not (rulings), once for the damage dealt at the same
   // time (CR 603.2c), even to one opponent (rulings). "Whenever one or more Pirates you control deal damage to a player"
   // (Francisco, Fowl Marauder): once for each player they deal damage to at once (rulings), "that player" them.
+  // "Whenever one or more Zombies you control deal combat damage to one or more of your opponents, you may draw cards
+  // equal to the number of opponents dealt damage this way. If you do, discard that many cards." (Hordewing Skaab): once
+  // for each combat damage step (rulings), that many discarded however many were drawn (rulings).
+  const skaab = /^Whenever one or more (.+?) you control deal combat damage to one or more of your opponents, you may draw cards equal to the number of opponents dealt damage this way\. If you do, discard that many cards\.$/.exec(line);
+  if (skaab) {
+    const spec = parseTargetPhrase(skaab[1]!.split(/\s+/).map(singularWord).join(" "));
+    const body0 = parseBody("You may draw X cards. If you do, discard X cards.");
+    if (spec?.kind !== "object" || !body0) return "fail";
+    const body = { ...replaceX(body0, { count: { kind: "eventAmount" } }), text: line.replace(/^[^,]+, /, "") };
+    return { event: "groupDealsDamageToPlayers", body, damageGroup: { filter: { ...spec, text: skaab[1]! }, opponents: true, combat: true } };
+  }
   const m = /^Whenever one or more (.+?) you control deal damage to (your opponents|a player), (.+)$/.exec(line);
   if (!m) return null;
   const spec = parseTargetPhrase(m[1]!.split(/\s+/).map(singularWord).join(" "));

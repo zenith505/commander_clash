@@ -285,6 +285,8 @@ export type Count =
   | { kind: "attackersThisTurn" }
   /** "For each time you've cast your commander from the command zone this game": all of your commanders (CR 903.8, rulings). */
   | { kind: "commanderCasts" }
+  /** The mana value of the commander Effect "chooseOwnCommander" chose in this resolution (0 if none). */
+  | { kind: "chosenCommanderMv" }
   /** Melee: "for each opponent you attacked with a creature this combat" (CR 702.121a). */
   | { kind: "opponentsAttacked" }
   /** "For each player", "for each opponent (you have)": the players still in the game (CR 102.1, 800.4a). */
@@ -1457,6 +1459,11 @@ export type Effect =
   /** "Put your commander into your hand from the command zone" (Command Beacon): one of yours there, chosen with two (rulings). */
   | { type: "commanderToHand" }
   /**
+   * "Where X is the mana value of a commander you own on the battlefield or in the command zone" (Stinging Study): one
+   * of them chosen as it resolves (rulings), counted by Count "chosenCommanderMv"; under another player's control too.
+   */
+  | { type: "chooseOwnCommander" }
+  /**
    * "Put a commander you own from the command zone onto the battlefield" (Hellkite Courser): one of them, chosen with two;
    * "It gains haste" (`haste`), "Return it to the command zone at the beginning of the next end step" (`atEndStep`), if
    * it's still on the battlefield then (rulings).
@@ -1704,7 +1711,15 @@ export type Effect =
    * choice as it resolves of another player, planeswalker or battle it could attack, ignoring requirements, restrictions
    * and costs (rulings). It still attacked what it was declared attacking.
    */
-  | { type: "reselectAttack"; what: ObjRef }
+  | {
+      type: "reselectAttack";
+      what: ObjRef;
+      /**
+       * "For each attacking creature, you may reselect which player or permanent that creature is attacking" (Windshaper
+       * Planetar): each one in turn, each one's own "may" (a "keep" option).
+       */
+      each?: true;
+    }
   /**
    * "Return a creature card at random from your graveyard to your hand" (Haunted Fengraf); "an opponent chooses a card at
    * random in your graveyard. If it's a creature card, put it onto the battlefield. Otherwise, exile it." (Search for
@@ -3457,7 +3472,7 @@ export interface TriggeredAbility {
    * one event (CR 603.2c). `opponents`: to your opponents, "that many" how many of them were dealt damage; `perPlayer`:
    * once for each player dealt damage, "that player" them.
    */
-  damageGroup?: { filter: TargetSpec; opponents?: true; perPlayer?: true };
+  damageGroup?: { filter: TargetSpec; opponents?: true; perPlayer?: true; /** "Deal combat damage" (Hordewing Skaab): only combat damage. */ combat?: true };
   /** For "sourceYouControlDamagesOpponent": only noncombat damage. */
   noncombatOnly?: true;
   /** For "creaturesYouControlAttack": "Whenever you attack with two or more creatures", at least this many of them. */

@@ -655,6 +655,9 @@ function runMeld(s: GameState, e: Extract<Effect, { type: "meld" }>, ctx: Resolv
   meld(s, me.id, partner, pid, attack && { player: attack.player, ...(attack.planeswalker ? { planeswalker: attack.planeswalker } : {}) });
 }
 
+/** A commander's mana value: a permanent's from its characteristics (0 face down, CR 708.2), else its card's. */
+const commanderMv = (s: GameState, o: GameObject) => (o.zone === "battlefield" ? characteristics(s, o).manaValue : defMv(defOf(s, o)));
+
 export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: string): "paused" | void {
   switch (e.type) {
     case "suspendCard":
@@ -674,6 +677,20 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       sc.commander = undefined;
       log(s, `${p.name} puts ${defOf(s, obj(s, id)).name} into their hand from the command zone.`);
       moveObject(s, id, "hand");
+      return;
+    }
+    case "chooseOwnCommander": {
+      const p = player(s, ctx.controller);
+      const mine = [...s.battlefield, ...p.command].filter((id) => obj(s, id).isCommander && obj(s, id).owner === p.id);
+      const sc = (s.resolving!.scratch ??= {});
+      if (mine.length > 1 && (sc.commander === undefined || !mine.includes(sc.commander))) {
+        s.pending = { kind: "chooseOption", player: p.id, source: src, what: "commander", options: mine, labels: mine.map((id) => `${defOf(s, obj(s, id)).name} (mana value ${commanderMv(s, obj(s, id))})`), prompt: "choose which commander's mana value counts" };
+        return "paused";
+      }
+      const id = mine.length > 1 ? sc.commander! : mine[0];
+      sc.commander = undefined;
+      s.resolving!.commanderMv = id ? commanderMv(s, obj(s, id)) : 0;
+      if (id && mine.length > 1) log(s, `${p.name} chooses ${defOf(s, obj(s, id)).name} (${src}).`);
       return;
     }
     case "commanderToBattlefield": {

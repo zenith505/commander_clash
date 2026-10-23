@@ -119,6 +119,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [{ type: "reselectAttack", what }] : null;
   }
+  if (/^[Ff]or each attacking creature, you may reselect which player or permanent that creature is attacking$/.test(s)) return [{ type: "reselectAttack", what: { ref: "allCreatures", attacking: true }, each: true }];
   // Removing from combat (CR 506.4): Gustcloak Runner's "untap it and remove it from combat", "remove ~ from combat".
   if ((m = /^(?:(Untap) (~|it|target .+?) and )?[Rr]emove (~|it|target .+?) from combat$/.exec(s))) {
     if (m[1] && m[3] !== "it" && m[3] !== m[2]) return null;

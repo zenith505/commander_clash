@@ -682,6 +682,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "~ deals X damage to each opponent, where X is the number of artifacts you control. You gain X life." (Tezzeret, Master
   // of the Bridge): the same X, counted again (nothing between them changes it).
   text = text.replace(/(^|\. )(~ deals X damage to [^.]+), where X is ([^.]+)\. You gain X life\./, "$1$2, where X is $3. You gain X life, where X is $3.");
+  // Stinging Study: "where X is the mana value of a commander you own on the battlefield or in the command zone": one of
+  // them chosen as it resolves (rulings), the same one for both.
+  text = text.replace(/(^|\. )You draw X cards and you lose X life, where X is the mana value of a commander you own on the battlefield or in the command zone\./, "$1Choose a commander you own on the battlefield or in the command zone. You draw X cards, where X is the chosen commander's mana value. You lose X life, where X is the chosen commander's mana value.");
   text = text.replace(/(^|\. )([Ee]ach opponent loses X life) and you (scry X|draw X cards), where X is ([^.]+)\./, (_, lead: string, a: string, b: string, x: string) => `${lead}${a}, where X is ${x}. ${b.charAt(0).toUpperCase()}${b.slice(1)}, where X is ${x}.`);
   // Brass's Tunnel-Grinder: "Then if there are three or more bore counters on it, remove those counters and transform it."
   // Primal Amulet: "..., you may remove those counters and transform it."

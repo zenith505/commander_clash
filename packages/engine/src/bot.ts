@@ -497,7 +497,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseOption" && pend.what === "attackWhom") return [{ type: "chooseOption", player: pid, choice: pend.options[0]! }];
     if (pend.kind === "chooseOption" && pend.what === "reselectAttack") {
       const o = pend.about ? s.objects[pend.about] : undefined;
-      return [{ type: "chooseOption", player: pid, choice: (o && reselectPick(s, pid, o)) ?? pend.options[0]! }];
+      return [{ type: "chooseOption", player: pid, choice: (o && reselectPick(s, pid, o)) ?? (pend.options.includes("keep") ? "keep" : pend.options[0]!) }];
     }
     // Tap or untap: tap an opponent's untapped permanent, untap our own tapped one; otherwise leave it if we may.
     // "You may cast a spell with mana value 3 or less from your hand without paying its mana cost": the biggest one.
@@ -615,6 +615,12 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     // Command Beacon with two commanders: the one that costs the most to cast from the command zone.
     // Spellskite: the target of ours the spell or ability would hurt most, else the first.
     if (pend.kind === "chooseOption" && pend.what === "targetSlot") return [{ type: "chooseOption", player: pid, choice: targetSlotFor(s, pid, pend.options) }];
+    // Stinging Study: the commander with the biggest mana value we can lose that much life for and stay above 4.
+    if (pend.kind === "chooseOption" && pend.what === "commander" && /mana value counts/.test(pend.prompt ?? "")) {
+      const value = (id: string) => (obj(s, id).zone === "battlefield" ? characteristics(s, obj(s, id)).manaValue : mv(s, id));
+      const by = [...pend.options].sort((a, b) => value(b) - value(a));
+      return [{ type: "chooseOption", player: pid, choice: by.find((id) => player(s, pid).life - value(id) > 4) ?? by[by.length - 1]! }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "commander")
       return [{ type: "chooseOption", player: pid, choice: [...pend.options].sort((a, b) => mv(s, b) + 2 * (player(s, pid).commanderCasts[b] ?? 0) - mv(s, a) - 2 * (player(s, pid).commanderCasts[a] ?? 0))[0]! }];
     // The color of a mana ability's mana, chosen as it resolves (Food Chain): the one that pays for the dearest card we
@@ -743,6 +749,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       .filter((id) => !isType(defOf(s, obj(s, id)), "Land") || castableFaces(s, obj(s, id)).length)
       // Damage prevention waits for damage coming (chooseDamageShield).
       .filter((id) => !shieldBody(compileCard(defOf(s, obj(s, id))).spell))
+      // Misleading Signpost waits for an attack to turn (chooseTimed); Windshaper Planetar is a creature worth casting anyway.
+      .filter((id) => isType(defOf(s, obj(s, id)), "Creature") || !attackStepOnly(compileCard(defOf(s, obj(s, id)))))
       .map((id) => {
         const plan = obj(s, id).zone === "graveyard" ? graveyardCastPlan(s, pid, id) : (commandZonePlan(s, pid, id) ?? facePlan(s, pid, id, false, "first") ?? freerunPlan(s, pid, id) ?? overloadPlan(s, pid, id) ?? awakenPlan(s, pid, id) ?? cheaperAltPlan(s, pid, id) ?? bestowPlan(s, pid, id) ?? freeAltPlan(s, pid, id) ?? castPlan(s, pid, id, false) ?? altCastPlan(s, pid, id) ?? facePlan(s, pid, id, false, "after"));
         return plan ? { plan, mv: mv(s, id) } : null;
@@ -1115,6 +1123,13 @@ export function chooseTargets(s: GameState, pid: PlayerId, printed: AbilityBody,
       return t;
     }
     return null;
+  }
+  // Misleading Signpost: the attacker we'd turn, the strongest one attacking us first, then one of ours.
+  if (body.targets.length === 1 && body.effects.length === 1 && body.effects[0]!.type === "reselectAttack") {
+    const all = legalTargets(s, body.targets[0]!, pid, undefined, sourceId ? botSource(s, sourceId) : undefined, sourceId);
+    const rank = (t: TargetChoice) => (t.kind !== "object" ? -1 : !reselectPick(s, pid, obj(s, t.id)) ? -1 : (obj(s, t.id).attacking === pid ? 1000 : 0) + power(s, obj(s, t.id)));
+    const pick = [...all].sort((a, b) => rank(b) - rank(a))[0];
+    return pick && rank(pick) >= 0 ? [pick] : forced && all[0] ? [all[0]] : null;
   }
   // Ardenn: our best creature, where our Equipment and helpful Auras can go; with none, ourselves (it must target).
   if (body.targets.length === 1 && body.effects.length === 1 && body.effects[0]!.type === "attachAny") {
@@ -1498,6 +1513,12 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   // A Pact: only when our lands can pay its upkeep cost, and any other Pact's we still owe.
   const pact = pactCost(compileCard(d).spell?.effects ?? []);
   if (pact && pact + owedPacts(s, pid) > lands(s, pid)) return null;
+  // Stinging Study: only with a commander whose mana value in life we can lose and stay above 4.
+  if (allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "chooseOwnCommander")) {
+    const mine = [...s.battlefield, ...player(s, pid).command].filter((x) => obj(s, x).isCommander && obj(s, x).owner === pid);
+    const value = (x: string) => (obj(s, x).zone === "battlefield" ? characteristics(s, obj(s, x)).manaValue : mv(s, x));
+    if (!mine.some((x) => value(x) > 0 && player(s, pid).life - value(x) > 4)) return null;
+  }
   // "End the turn" (CR 724.1): see endTurnCast.
   if (!endingTurn && allEffects(compileCard(d).spell?.effects ?? []).some((e) => e.type === "endTurn")) return null;
   // A foretold card is cast for its foretell cost (CR 702.143a).
@@ -3542,8 +3563,22 @@ function chooseTimed(s: GameState, pid: PlayerId): Action[] | null {
     const plan = castPlan(s, pid, id, false);
     if (plan) return plan;
   }
+  // Misleading Signpost: flashed in during the declare attackers step when there's an attack worth turning.
+  if (s.step === "declareAttackers") {
+    const turnable = s.battlefield.some((x) => reselectPick(s, pid, obj(s, x)) !== undefined);
+    for (const id of turnable ? player(s, pid).hand : []) {
+      if (!attackStepOnly(compileCard(defOf(s, obj(s, id))))) continue;
+      const plan = castPlan(s, pid, id, false);
+      if (plan) return plan;
+    }
+  }
   const timed = (ab: ActivatedAbility) => timedCondition(ab.activateIf);
   return chooseActivation(s, pid, timed) ?? chooseUnearth(s, pid, timed);
+}
+
+/** A card whose point is an "enters during the declare attackers step" trigger (Misleading Signpost). */
+function attackStepOnly(c: CompiledCard): boolean {
+  return c.triggers.some((t) => t.event === "selfEnters" && t.activeIf?.kind === "during" && t.activeIf.window === "declareAttackers");
 }
 
 /**

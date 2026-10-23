@@ -1846,6 +1846,8 @@ export interface Resolving {
   nth?: number;
   /** Its last coin flip (CR 705.2): won or lost, and how many were won ("flip a coin until you lose a flip"). */
   flipped?: { won: boolean; wins: number };
+  /** Effect "chooseOwnCommander" (Stinging Study): the chosen commander's mana value. */
+  commanderMv?: number;
   /** Its last roll (CR 706.2): each die's natural result that counts (not the ignored ones, 706.6), and the result. */
   rolled?: { sides: number; naturals: number[]; result: number; /** "The other result" (Effect roll's chooseOne). */ other?: number };
   scratch?: {
@@ -2006,6 +2008,8 @@ export interface Resolving {
     attackWhom?: string;
     /** reselectAttack: what the creature attacks now (as attackChoices keys it). */
     reselect?: string;
+    /** reselectAttack for each attacking creature (Windshaper Planetar): the ones asked about so far. */
+    reselected?: ObjectId[];
     /** Token copies created attacking: what each one attacks, chosen so far (attackChoices keys). */
     attackPicks?: string[];
     /** "Tapped and attacking that player or a planeswalker they control": each opponent's pick (an attackChoices key). */

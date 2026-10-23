@@ -3694,6 +3694,8 @@ function LibrarySearch({
                 ? `${pending.source}: ${pending.min ? "put" : "you may put"} ${pending.what} from your hand onto the battlefield`
                 : pending.fromGraveyard === "exile"
                   ? `${pending.source}: ${pending.min ? "exile" : "you may exile"} ${pending.what} from ${pending.anyGraveyard ? "a" : "your"} graveyard`
+                  : pending.fromGraveyard === "battlefield" && pending.anyGraveyard
+                  ? `${pending.source}: put ${pending.what} from a graveyard onto the battlefield under your control`
                   : pending.fromGraveyard === "libraryTop"
                   ? `${pending.source}: ${pending.min ? "put" : "you may put"} ${pending.what} from your graveyard on top of your library`
                   : pending.fromGraveyard

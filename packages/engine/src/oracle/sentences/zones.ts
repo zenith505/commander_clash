@@ -340,6 +340,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Exile a card from a graveyard" (Cemetery Prowler): any player's, chosen as it resolves (not targeted).
   if (/^[Ee]xile a card from a graveyard$/.test(s)) return [{ type: "chooseFromGraveyard", n: 1, dest: "exile", anyGraveyard: true }];
+  // "Put a creature card from a graveyard onto the battlefield under your control" (Extract from Darkness): the same,
+  // under your control.
+  if ((m = /^(?:[Yy]ou put|[Pp]ut) an? (.+? card) from a graveyard onto the battlefield under your control$/.exec(s))) {
+    const filter = parseSearchFilter(m[1]!);
+    if (!filter) return null;
+    return [{ type: "chooseFromGraveyard", n: 1, dest: "battlefield", anyGraveyard: true, filter }];
+  }
   if (/^Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it$/.test(s)) return [{ type: "randomFromGraveyard", dest: "creatureOrExile" }];
   if ((m = /^Reorder your graveyard (as you choose|at random)$/.exec(s))) return [{ type: "reorderGraveyard", ...(m[1] === "at random" ? { random: true as const } : {}) }];
   if ((m = /^Put the top card of your graveyard on (top|the bottom) of your library$/i.exec(s))) return [{ type: "putInLibrary", what: { ref: "graveyardEnd", who: { ref: "you" } }, position: m[1] === "top" ? "top" : "bottom" }];

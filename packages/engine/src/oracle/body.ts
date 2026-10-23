@@ -4107,7 +4107,11 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       // battlefield instead if there are seven or more cards in your graveyard." (Stitch Together): the same card.
       const prevBack = previous.length === 1 && previous[0]!.type === "bounce" && previous[0]!.what.ref === "target" && ctx.targets[previous[0]!.what.index]?.kind === "card" ? previous[0]! : null;
       const toField = /^(?:return|put) (?:that card|it)(?: from your graveyard)? (?:to|onto) the battlefield$/i.test(t);
-      const inner = those ? (prevToken ? [{ ...prevToken, n: amt(those[1]!) }] : null) : t === "counter that spell" ? (prevCounter ? [uncond as Effect] : null) : toField ? (prevBack ? [{ type: "putOntoBattlefield" as const, what: prevBack.what }] : null) : parseOne(t.charAt(0).toUpperCase() + t.slice(1), ctx);
+      // "~ deals 2 damage to any target. If you're the monarch, it deals 7 damage instead." (Court of Ire): the same target.
+      const moreDamage = /^(?:it|~) deals (\d+) damage$/i.exec(t);
+      const prevDamage = previous.length === 1 && previous[0]!.type === "damage" && !previous[0]!.divided ? previous[0]! : null;
+      if (moreDamage && !prevDamage) return null;
+      const inner = moreDamage && prevDamage ? [{ ...prevDamage, amount: num(moreDamage[1]!) }] : those ? (prevToken ? [{ ...prevToken, n: amt(those[1]!) }] : null) : t === "counter that spell" ? (prevCounter ? [uncond as Effect] : null) : toField ? (prevBack ? [{ type: "putOntoBattlefield" as const, what: prevBack.what }] : null) : parseOne(t.charAt(0).toUpperCase() + t.slice(1), ctx);
       // Only one of the two happens, so neither may wait on a choice or need targets of its own (one "you may"
       // instead would leave nothing done on a "no").
       // A punisher waits on its players but always does its whole process (Court of Ambition's "instead" one), and so do

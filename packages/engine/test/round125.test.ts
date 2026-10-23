@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { botActions, castProblem, power, characteristics, invalidateCharacteristics, compileCard, isFullySupported, manaValue, planActivate, planCast, spellCost, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { botActions, castProblem, loseLife, power, characteristics, invalidateCharacteristics, compileCard, isFullySupported, manaValue, planActivate, planCast, spellCost, waitingOn, type Action, type CardDef, type GameState } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -839,5 +839,94 @@ describe("Forth Eorlingas!: \"whenever one or more creatures you control deal co
     s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: knight, defender: opp }] });
     s = settleBots(passUntil(s, "endCombat"));
     expect(s.monarch).toBe(ap);
+  });
+});
+
+const nextOf = (s: GameState, pid: number, n: number) => s.turnOrder[(s.turnOrder.indexOf(pid) + n) % 4]!;
+
+describe("Ingenious Prodigy: \"you may remove a +1/+1 counter from it\" after an intervening if (CR 603.4)", () => {
+  it("two counters at upkeep: one removed, a card drawn", () => {
+    const prodigy = card("Ingenious Prodigy", "Creature — Human Wizard", "{X}{U}", {
+      power: "0",
+      toughness: "1",
+      keywords: ["Skulk"],
+      oracleText: "Skulk (This creature can't be blocked by creatures with greater power.)\nThis creature enters with X +1/+1 counters on it.\nAt the beginning of your upkeep, if this creature has one or more +1/+1 counters on it, you may remove a +1/+1 counter from it. If you do, draw a card.",
+    });
+    supported(prodigy);
+    const { s: s0, ap } = setup([]);
+    const id = putOnBattlefield(s0, ap, prodigy);
+    s0.objects[id]!.counters["+1/+1"] = 2;
+    invalidateCharacteristics(s0);
+    let s = passUntil(s0, "upkeep", nextOf(s0, ap, 1));
+    s = passUntil(s, "upkeep", ap);
+    const hand = s.players[ap]!.hand.length;
+    s = settleBots(s);
+    expect(s.objects[id]!.counters["+1/+1"]).toBe(1);
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+  });
+});
+
+describe("Court of Ire: \"if you're the monarch, it deals 7 damage instead\" to the same target", () => {
+  const court = card("Court of Ire", "Enchantment", "{3}{R}{R}", {
+    oracleText: "When this enchantment enters, you become the monarch.\nAt the beginning of your upkeep, this enchantment deals 2 damage to any target. If you're the monarch, it deals 7 damage instead.",
+  });
+  const lost = (s: GameState, before: GameState, ap: number) => [1, 2, 3].reduce((n, k) => n + before.players[nextOf(s, ap, k)]!.life - s.players[nextOf(s, ap, k)]!.life, 0);
+  for (const monarch of [true, false])
+    it(monarch ? "the monarch: 7 damage" : "not the monarch: 2 damage", () => {
+      supported(court);
+      const { s: s0, ap } = setup([]);
+      putOnBattlefield(s0, ap, court);
+      if (monarch) s0.monarch = ap;
+      let s = passUntil(s0, "upkeep", nextOf(s0, ap, 1));
+      s = passUntil(s, "upkeep", ap);
+      if (monarch) s.monarch = ap;
+      const before = JSON.parse(JSON.stringify(s)) as GameState;
+      s = settleBots(s);
+      expect(lost(s, before, ap)).toBe(monarch ? 7 : 2);
+    });
+});
+
+describe("Luminarch Ascension: \"if you didn't lose life this turn\" (CR 603.4)", () => {
+  const ascension = card("Luminarch Ascension", "Enchantment", "{1}{W}", {
+    oracleText: "At the beginning of each opponent's end step, if you didn't lose life this turn, you may put a quest counter on this enchantment. (Damage causes loss of life.)\n{1}{W}: Create a 4/4 white Angel creature token with flying. Activate only if this enchantment has four or more quest counters on it.",
+  });
+  for (const lose of [false, true])
+    it(lose ? "lost life on the opponent's turn: no counter" : "no life lost: a quest counter", () => {
+      supported(ascension);
+      const { s: s0, ap } = setup([]);
+      const id = putOnBattlefield(s0, ap, ascension);
+      let s = passUntil(s0, "main1", nextOf(s0, ap, 1));
+      if (lose) loseLife(s, ap, 1);
+      s = settleBots(passUntil(s, "end", nextOf(s0, ap, 1)));
+      expect(s.objects[id]!.counters.quest ?? 0).toBe(lose ? 0 : 1);
+    });
+});
+
+describe("Extract from Darkness: a creature card from any graveyard, not targeted (rulings)", () => {
+  it("each player mills two, then the best creature card in any graveyard enters under your control", () => {
+    const extract = card("Extract from Darkness", "Sorcery", "{3}{U}{B}", { oracleText: "Each player mills two cards. Then you put a creature card from a graveyard onto the battlefield under your control." });
+    supported(extract);
+    const { s: s0, ap, ids, opp } = setup([extract]);
+    const bears = card("Grizzly Bears", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" });
+    const big = card("Test Wurm", "Creature — Wurm", "{6}{G}", { power: "6", toughness: "6" });
+    for (const [pid, d] of [[ap, bears], [opp, big]] as const) {
+      const id = putOnBattlefield(s0, pid, d);
+      s0.battlefield.splice(s0.battlefield.indexOf(id), 1);
+      s0.objects[id]!.zone = "graveyard";
+      s0.players[pid]!.graveyard.push(id);
+    }
+    const yards = s0.turnOrder.map((p) => s0.players[p]!.graveyard.length);
+    s0.players[ap]!.manaPool = { W: 0, U: 3, B: 2, R: 0, G: 0, C: 0 };
+    let s = untilChoice(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", fromGraveyard: "battlefield", anyGraveyard: true, player: ap });
+    if (s.pending?.kind !== "searchLibrary") throw new Error("no choice");
+    // Every creature card in every graveyard, including the milled ones; no noncreature card.
+    expect(s.pending.cards.every((id) => s.cards[s.objects[id]!.cardId]!.types.includes("Creature"))).toBe(true);
+    expect(s0.turnOrder.map((p) => s.players[p]!.graveyard.length)).toEqual(yards.map((n) => n + 2));
+    s = settleBots(s);
+    const wurm = s.battlefield.find((id) => s.cards[s.objects[id]!.cardId]!.name === "Test Wurm");
+    expect(wurm).toBeDefined();
+    expect(s.objects[wurm!]!.controller).toBe(ap);
+    expect(s.objects[wurm!]!.owner).toBe(opp);
   });
 });

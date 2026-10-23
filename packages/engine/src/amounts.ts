@@ -264,6 +264,10 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return (s.diedThisTurn ?? []).filter((p) => !c.yours || p === ctx.controller).length;
     case "tokensCreatedThisTurn":
       return (s.turnLog?.tokensCreated ?? []).filter((t) => t.player === ctx.controller && (!c.subtype || t.subtypes.includes(c.subtype))).length;
+    case "enteredThisTurn":
+      return (s.turnLog?.entered ?? []).filter((e) => e.controller === ctx.controller && (c.types ?? []).every((t) => e.types.includes(t)) && (!c.subtype || !!e.subtypes?.includes(c.subtype))).length;
+    case "sacrificedThisTurn":
+      return (s.turnLog?.sacrificed ?? []).filter((t) => t.player === ctx.controller && (!c.subtype || t.subtypes.includes(c.subtype)) && (!c.type || t.types.includes(c.type))).length;
     case "attackersThisTurn":
       return s.attackersThisTurn ?? 0;
     case "toGraveyardThisTurn":
@@ -328,6 +332,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return s.resolving?.rolled?.other ?? 0;
     case "flipsWon":
       return s.resolving?.flipped?.wins ?? 0;
+    case "milledThisWay":
+      return (s.resolving?.milled ?? []).filter((m) => !!s.objects[m.id] && (!c.filter || printedMatches(c.filter, defOf(s, s.objects[m.id]!)))).length;
     case "drawnThisWay":
       return (s.resolving?.drawing ? s.resolving.drawnBefore : s.resolving?.drawnThisWay)?.length ?? 0;
     case "asCast":
@@ -657,6 +663,10 @@ function describeCount(c: Count): string {
       return "#creatures that died this turn";
     case "tokensCreatedThisTurn":
       return `#${c.subtype ? `${c.subtype} ` : ""}tokens you created this turn`;
+    case "enteredThisTurn":
+      return `#${c.subtype ?? c.types?.join(" ").toLowerCase() ?? "permanent"}s that entered under your control this turn`;
+    case "sacrificedThisTurn":
+      return `#${c.subtype ?? c.type?.toLowerCase() ?? "permanent"}s you sacrificed this turn`;
     case "attackersThisTurn":
       return "#creatures that attacked this turn";
     case "toGraveyardThisTurn":
@@ -732,6 +742,8 @@ function describeCount(c: Count): string {
       return "the other result";
     case "drawnThisWay":
       return "#cards drawn this way";
+    case "milledThisWay":
+      return `#${c.filter?.text ?? "card"}s milled this way`;
     case "asCast":
       return `${describeCount(c.of)} as cast`;
     case "discardedTypes":

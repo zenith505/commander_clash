@@ -89,6 +89,8 @@ export interface Ctx {
   lastDugLands?: boolean;
   /** The instruction before was "mill N cards" (yours): "those cards" in what follows can be the milled cards (Ripples of Undeath). */
   afterMill?: boolean;
+  /** The instruction before was a mill, anyone's: "for each creature card put into a graveyard this way" (Dread Summons). */
+  afterAnyMill?: boolean;
   /** An instruction before discarded one card of yours: "the discarded card" is that card (Malcolm). */
   discardedOne?: boolean;
   /** An instant or sorcery: "other" can't mean other than its source, which isn't a permanent. */
@@ -128,6 +130,8 @@ export interface Ctx {
   vote?: { options?: string[]; among?: true; /** "Each player may choose ..." (not a vote): "each permanent chosen this way". */ choose?: true };
   /** "Each opponent chooses fame or fortune" came before: its words ("for each player who chose fortune"). */
   chooseWords?: string[];
+  /** Who chose those words: "each opponent" or "each player". */
+  chooseWho?: "opponent" | "player";
   /** "Gain control of a creature that player controls" for each player who chose a word: "those creatures" are they. */
   fromEach?: boolean;
 }
@@ -713,11 +717,12 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   text = text.replace(/(^|\. )([Ee]ach opponent loses X life) and you (scry X|draw X cards), where X is ([^.]+)\./, (_, lead: string, a: string, b: string, x: string) => `${lead}${a}, where X is ${x}. ${b.charAt(0).toUpperCase()}${b.slice(1)}, where X is ${x}.`);
   // Brass's Tunnel-Grinder: "Then if there are three or more bore counters on it, remove those counters and transform it."
   // Primal Amulet: "..., you may remove those counters and transform it."
-  text = text.replace(/(^|\. )([Pp]ut an? ([a-z]+) counter on ~\.) Then if (?:it has|there are) ([a-z]+) or more \3 counters on it, (you may )?remove (?:all of them|those counters)( and |(?=, transform ~, and ))/, (_, lead: string, put: string, kind: string, n: string, may: string | undefined, and: string) => `${lead}${put} If there are ${n} or more ${kind} counters on ~, ${may ?? ""}remove all ${kind} counters from ~${and}`);
+  // Edgar Markov's Coffin: "create a 1/1 ... token with lifelink and put a bloodline counter on ~. Then if ..." too.
+  text = text.replace(/(^|\. | and )([Pp]ut an? ([a-z]+) counter on ~\.) Then if (?:it has|there are) ([a-z]+) or more \3 counters on it, (you may )?remove (?:all of them|those counters)( and |(?=, transform ~, and ))/, (_, lead: string, put: string, kind: string, n: string, may: string | undefined, and: string) => `${lead}${put} If there are ${n} or more ${kind} counters on ~, ${may ?? ""}remove all ${kind} counters from ~${and}`);
   // Firebender Ascension: "Put a quest counter on ~. Then if it has four or more quest counters on it, you may copy that
   // ability": the same check of ~'s counters as it resolves.
   text = text.replace(/^([Pp]ut an? ([a-z]+) counter on ~\.) Then if it has ([a-z]+) or more \2 counters on it, (you may copy that ability\.)/, "$1 If there are $3 or more $2 counters on ~, $4");
-  text = text.replace(/^([Pp]ut an? [a-z]+ counter on ~\. If there are [a-z]+ or more [a-z]+ counters on ~, (?:you may )?remove all [a-z]+ counters from ~ and transform) it\.$/, "$1 ~.");
+  text = text.replace(/((?:^|\. | and )[Pp]ut an? [a-z]+ counter on ~\. If there are [a-z]+ or more [a-z]+ counters on ~, (?:you may )?remove all [a-z]+ counters from ~ and transform) it\.$/, "$1 ~.");
   text = text.replace(/^Choose (up to one target [a-z]+), then (airbend|exile|destroy) all other ([a-z]+)\./, (_, t: string, verb: string, what: string) => `Choose ${t}. ${verb.charAt(0).toUpperCase()}${verb.slice(1)} all other ${what}.`);
   // "Transform ~, then untap it" (Westvale Abbey): the same permanent, now its back face (CR 712.18).
   text = text.replace(/^Transform ~, then untap it\.$/, "Transform ~, then untap ~.");
@@ -1098,7 +1103,7 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // Nor "exile the top two cards of your library, then choose one of them" (Party Thrasher): the choice is of those cards.
     // Nor "you may exile target creature you control, then return that card to the battlefield" (Conjurer's Closet), "...
     // transformed" (Ral, Monsoon Mage): one blink, all of it optional.
-    .flatMap((x) => (/^If [^,]+, /.test(x) || / faces? a villainous choice — /.test(x) || /^[Yy]ou may exile [^,]+, then return (?:it|that card) to the battlefield(?: transformed)? under (?:its owner's|your) control\.?$/.test(x) || WHEEL.test(x) || /^(?:\w+ player shuffles (?:their|the cards from their) .+ into their library, then draws|[Ss]huffle the cards from your hand into your library, then draw) /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then reveals the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|sacrifices all other creatures they control$|destroy the rest$|meld them into |choose one of them$|exile them again$)/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
+    .flatMap((x) => (/^If [^,]+, /.test(x) || / faces? a villainous choice — /.test(x) || /^[Yy]ou may exile [^,]+, then return (?:it|that card) to the battlefield(?: transformed)? under (?:its owner's|your) control\.?$/.test(x) || WHEEL.test(x) || /^(?:\w+ player shuffles (?:their|the cards from their) .+ into their library, then draws|[Ss]huffle the cards from your hand into your library, then draw) /.test(x) || /^The owner of target [^,]+ shuffles it into their library, then reveals the top card of their library\.?$/.test(x) || LIVING_DEATH.test(x) ? [x] : splitOutsideQuotes(x, /, then (?!shuffle|sacrifices the rest$|sacrifices all other creatures they control$|destroy the rest$|meld them into |choose one of them$|exile them again$|the choices are revealed\.?$)/g).map((p, i, all) => (i ? thenPart(thenSubject(all[0]!, p)) : p))))
     // "Target opponent reveals their hand and you choose a nonland card from it": two instructions, in order.
     .flatMap((x) => x.split(/(?<=reveals (?:their|his or her) hand) and (?=you choose )/).map((p, i) => (i ? p.charAt(0).toUpperCase() + p.slice(1) : p)))
     .flatMap(splitSpentPair)
@@ -1190,7 +1195,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     let s = sentences[si]!.replace(/^Then,? (.)/, (_, c: string) => c.toUpperCase());
     const last = effects[effects.length - 1];
     ctx.afterMill = last?.type === "mill" && last.who.ref === "you";
+    ctx.afterAnyMill = last?.type === "mill";
     if (last?.type === "discard" && last.who.ref === "you" && last.n === 1) ctx.discardedOne = true;
+    // Haunting Voyage: "Choose a creature type. Return up to two creature cards of that type ...": the type chosen.
+    if (/ cards? of that type\b/.test(s) && effects.some((e) => e.type === "choose" && e.choice === "creatureType" && !e.each)) s = s.replace(/( cards?) of that type\b/g, "$1 of the chosen type");
     // Lae'zel's Acrobatics: "Exile all nontoken creatures you control, then roll a d20. 1—9 | Return those cards to the
     // battlefield ... at the beginning of the next end step. 10—20 | Return those cards ..., then exile them again. Return
     // those cards ... at the beginning of the next end step." The cards the first exile exiled are held for the returns.
@@ -3437,6 +3445,30 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     const double = /^[Dd]ouble (?:(its|target creature's) power( and toughness)?|the power( and toughness)? of (target creature(?: you control)?)) until end of turn$/.exec(s);
     const doubleBoth = !!double && !!(double[2] ?? double[3]);
     if (double) s = `${double[1] === "its" ? "It" : double[4] ? double[4].charAt(0).toUpperCase() + double[4].slice(1) : "Target creature"} gets +X/+0 until end of turn, where X is its power`;
+    // Astarion's Thirst: "Exile target creature. Put X +1/+1 counters on a commander creature you control, where X is the
+    // power of the creature exiled this way": that target's power as it last existed (CR 608.2h), if it was exiled. A
+    // commander exiled this way is still in exile as this resolves (it can go to the command zone only as a state-based
+    // action afterwards, CR 903.9a).
+    const powerExiled = /^(.+), where X is the power of the creature exiled this way$/.exec(s);
+    if (powerExiled) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "exile" || prev.what.ref !== "target" || ctx.targets[prev.what.index]?.types?.join() !== "Creature") return null;
+      const parsed = parseOne(powerExiled[1]!, ctx);
+      // X stands for that power (amounts.ts reads a target that just left as it last existed).
+      const power = { count: { kind: "power", of: { ref: "target", index: prev.what.index } } };
+      let xs = 0;
+      const subst = (v: unknown): unknown => {
+        if (Array.isArray(v)) return v.map(subst);
+        if (!v || typeof v !== "object") return v;
+        const c = (v as { count?: { kind?: string } }).count;
+        if (c?.kind === "x" && Object.keys(v).length === 1 && Object.keys(c).length === 1) return xs++, power;
+        return Object.fromEntries(Object.entries(v).map(([k, w]) => [k, subst(w)]));
+      };
+      const inner = parsed && (subst(parsed) as Effect[]);
+      if (!inner || xs !== 1) return null;
+      effects.push({ type: "if", cond: { kind: "targetExiled", index: prev.what.index }, effects: inner });
+      continue;
+    }
     // "..., where X is the number of creatures you control": X is defined by the text (CR 107.3c).
     // It's read after the rest of the sentence, which may name what it counts ("that player's hand").
     // Not one inside a quoted ability ('You get an emblem with "..., where X is ..."'), which is that ability's own.
@@ -3701,12 +3733,38 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // "Each opponent chooses fame or fortune" (Seize the Spotlight): words chosen in APNAP order (CR 101.4), not a vote.
     // "Each opponent chooses money, friends, or secrets" (Master of Ceremonies).
-    const choosesWord = /^[Ee]ach (opponent|player) chooses (?:([a-z]+), )?([a-z]+),? or ([a-z]+)$/.exec(s);
-    if (choosesWord) {
-      const options = choosesWord.slice(2).filter((w): w is string => !!w);
+    // "Each opponent secretly chooses silence or snitch, then the choices are revealed" (Prisoner's Dilemma): all are
+    // chosen before any is revealed.
+    const choosesWord = /^[Ee]ach (opponent|player) (secretly )?chooses (?:([a-z]+), )?([a-z]+),? or ([a-z]+)(, then the choices are revealed)?$/.exec(s);
+    if (choosesWord && !choosesWord[2] === !choosesWord[6]) {
+      const options = choosesWord.slice(3, 6).filter((w): w is string => !!w);
       if (ctx.chooseWords || ctx.vote || new Set(options).size !== options.length) return null;
-      effects.push({ type: "eachChooses", who: { ref: choosesWord[1] === "opponent" ? "eachOpponent" : "eachPlayer" }, options, text: `choose ${options.length > 2 ? `${options.slice(0, -1).join(", ")}, or ${options.at(-1)}` : options.join(" or ")}` });
+      effects.push({ type: "eachChooses", who: { ref: choosesWord[1] === "opponent" ? "eachOpponent" : "eachPlayer" }, options, text: `${choosesWord[2] ? "secretly " : ""}choose ${options.length > 2 ? `${options.slice(0, -1).join(", ")}, or ${options.at(-1)}` : options.join(" or ")}`, ...(choosesWord[2] ? { secret: true as const } : {}) });
       ctx.chooseWords = options;
+      ctx.chooseWho = choosesWord[1] as "opponent" | "player";
+      continue;
+    }
+    // "If each opponent chose silence, ~ deals 4 damage to each of them. If each opponent chose snitch, ... Otherwise, ~
+    // deals 12 damage to each opponent who chose silence." (Prisoner's Dilemma): "each of them" are those players; a
+    // second "If each ... chose" can only hold when the first doesn't, so it's the first's otherwise, and "Otherwise"
+    // is when neither did.
+    const allChose = ctx.chooseWords ? /^If each (opponent|player) chose ([a-z]+), (.+)$/.exec(s) : null;
+    if (allChose) {
+      if (allChose[1] !== ctx.chooseWho || !ctx.chooseWords!.includes(allChose[2]!)) return null;
+      const inner = parseOne(capital(allChose[3]!.replace(/\beach of them\b/g, `each ${allChose[1]}`)), ctx);
+      if (!inner) return null;
+      const before = lastAllChose(effects[effects.length - 1]);
+      const e: Effect = { type: "if", cond: { kind: "allChose", option: allChose[2]! }, effects: inner };
+      if (before) before.otherwise = [e];
+      else effects.push(e);
+      continue;
+    }
+    const otherwiseChose = /^Otherwise, (.+)$/.exec(s);
+    const choseChain = otherwiseChose ? lastAllChose(effects[effects.length - 1]) : undefined;
+    if (otherwiseChose && choseChain) {
+      const inner = parseOne(capital(otherwiseChose[1]!), ctx);
+      if (!inner) return null;
+      choseChain.otherwise = inner;
       continue;
     }
     // "For each player who chose fame, gain control of a creature that player controls until end of turn": a creature of
@@ -3750,6 +3808,15 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const inner = parseOne(ifVote[3]!.charAt(0).toUpperCase() + ifVote[3]!.slice(1), ctx);
       if (!inner) return null;
       effects.push({ type: "if", cond: { kind: "voteWins", option: ifVote[1]!, ...(ifVote[2] ? { orTie: true as const } : {}) }, effects: inner });
+      continue;
+    }
+    // Rise and Shine: "Target noncreature artifact you control becomes a 0/0 artifact creature. Put four +1/+1 counters on
+    // each artifact that became a creature this way": the ones that effect changed (overloaded, each of them).
+    const became = new RegExp(`^Put ${NUM} ${COUNTER} counters? on each (?:artifact|creature|permanent) that became a creature this way$`).exec(s);
+    if (became) {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "continuous" || !prev.mods.some((m) => m.kind === "addTypes" && m.types.includes("Creature"))) return null;
+      effects.push({ type: "counters", what: { ref: "affected" }, counter: counterKind(became[2]!), n: num(became[1]!) });
       continue;
     }
     // "Destroy target creature. If that creature dies this way, ..." (Saw in Half, Kaervek's Purge): only if it was put
@@ -4027,14 +4094,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // "Put up to two creature cards from among the milled cards onto the battlefield" (The Grand Evolution): under your
     // control, chosen as it resolves.
     const fromMilled =
-      /^[Yy]ou may put (an? .+?|up to (?:one|two|three|four|five) .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) into your hand$/.exec(s) ?? /^[Yy]ou may put (an? .+?) milled this way into your hand$/.exec(s) ?? /^Put (up to (?:one|two|three|four|five) .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) (onto the battlefield)(?: under your control)?$/.exec(s);
+      /^[Yy]ou may put (an? .+?|up to (?:one|two|three|four|five) .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) into your hand$/.exec(s) ?? /^[Yy]ou may put (an? .+?) milled this way into your hand$/.exec(s) ?? /^Put (up to (?:one|two|three|four|five) .+? cards) from among (?:them|the cards milled this way|the milled cards|those cards) (onto the battlefield)(?: under your control)?$/.exec(s) ?? /^(?:Then )?[Pp]ut (an? .+? card) from among (?:them|the cards milled this way|the milled cards|those cards) (onto the battlefield)(?: under your control)?$/.exec(s);
     if (fromMilled) {
       const prev = effects[effects.length - 1];
       // "Up to two creature and/or land cards from among the milled cards" (Smuggler's Surprise).
       const upTo = /^up to (\w+) (.+) cards$/.exec(fromMilled[1]!);
       const filter = parseSearchFilter(upTo ? `${upTo[2]!.replace(/ and\/or /g, " or ")} card` : fromMilled[1]!.replace(/^an? /, ""));
       if (prev?.type !== "mill" || prev.who.ref !== "you" || filter === null) return null;
-      effects.push({ type: "chooseFromGraveyard", n: upTo ? num(upTo[1]!) : 1, upTo: true, milled: true, ...(filter ? { filter } : {}), ...(fromMilled[2] ? { dest: "battlefield" as const } : {}) });
+      // "Then put a creature, enchantment, or land card from among the milled cards onto the battlefield" (Fetch Quest): one
+      // if any matches, not optional.
+      const must = /^(?:Then )?[Pp]ut an? /.test(s);
+      effects.push({ type: "chooseFromGraveyard", n: upTo ? num(upTo[1]!) : 1, ...(must ? {} : { upTo: true as const }), milled: true, ...(filter ? { filter } : {}), ...(fromMilled[2] ? { dest: "battlefield" as const } : {}) });
       // "If you don't, put a +1/+1 counter on this creature." (Ainok Wayfarer): no card was put into your hand.
       const didnt = /^If you don't, (.+)$/.exec(sentences[si + 1] ?? "");
       if (didnt) {
@@ -5421,6 +5491,13 @@ function parseUnlessEntered(s: string, ctx: Ctx): Effect[] | null {
 }
 
 /** One sentence: a plain instruction, two joined by "and", or one with "for each" / "equal to" in it. */
+/** The last "If each opponent chose ..." of a chain of them (Prisoner's Dilemma) that has no otherwise yet. */
+function lastAllChose(e: Effect | undefined): Extract<Effect, { type: "if" }> | undefined {
+  if (e?.type !== "if" || e.cond.kind !== "allChose") return undefined;
+  if (!e.otherwise) return e;
+  return e.otherwise.length === 1 ? lastAllChose(e.otherwise[0]) : undefined;
+}
+
 function parseOne(s: string, ctx: Ctx): Effect[] | null {
   // "{T}: This creature deals 1 damage to itself" (Stuffy Doll): the source is the one dealt the damage.
   s = s.replace(/^~ deals (\d+) damage to itself$/, "~ deals $1 damage to ~");

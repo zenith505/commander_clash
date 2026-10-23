@@ -115,6 +115,9 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   if (x === "you") return { ref: "you" };
   if (x === "each opponent") return { ref: "eachOpponent" };
   if (x === "each player") return { ref: "eachPlayer" };
+  // "Each opponent who chose silence" (Prisoner's Dilemma): of the words chosen before (Effect eachChooses).
+  const chose = /^each (?:opponent|player) who chose ([a-z]+)$/.exec(x);
+  if (chose && ctx.chooseWords?.includes(chose[1]!)) return { ref: "choseWord", option: chose[1]! };
   const lost = /^each opponent who lost (?:(\d+) or more )?life this turn$/.exec(x);
   if (lost) return { ref: "opponentsLostLife", n: lost[1] ? Number(lost[1]) : 1 };
   // "Choose an opponent. That player sacrifices a creature of their choice."

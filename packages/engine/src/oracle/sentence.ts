@@ -72,7 +72,7 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       const filter = parseSearchFilter(ofChosen ? phrase.slice(0, ofChosen.index) : phrase);
       if (!filter || (ofChosen && (!ctx || ctx.spell || !filter.types?.includes("Creature")))) return null;
       Object.assign(dig, { count: 1, upTo: true, filter: ofChosen ? { ...filter, chosen: "type", text: phrase } : filter, into: "hand" });
-    } else if ((m = new RegExp(`^(You may put|Put) (an?|up to (?:one|two|three)|any number of|all) (.+?) from among them onto the battlefield( tapped)?(?: with an? ${COUNTER} counter on it)?(?: and the rest ${REST})?$`).exec(s))) {
+    } else if ((m = new RegExp(`^(You may put|Put) (an?|up to (?:one|two|three)|any number of|all) (.+?) from among them onto the battlefield( tapped)?(?: with an? ${COUNTER} counter on it)?(?: and the rest ${REST})?$`).exec(s.replace(/, then shuffle$/, "")))) {
       // "You may put a land card from among them onto the battlefield tapped" (Freestrider Lookout), "Put up to two creature
       // cards with mana value 3 or less from among them onto the battlefield" (Collected Company): several enter at the
       // same time (enterTogether). "Put a land card ..." takes one if there is one; "all" every one that matches.
@@ -101,6 +101,8 @@ export function parseDig(s: string, dig: Partial<Extract<Effect, { type: "dig" }
       if (mvX || mvCount) Object.assign(filter, { ...(whereX ? { bound: { key: "manaValue", at: "most", amount: whereX } } : { xRange: { key: "manaValue", at: "most" } }), text: mvCount ? `${filter.text} with mana value less than or equal to ${mvCount[1]}` : `${filter.text} with mana value X or less` });
       Object.assign(dig, { count, upTo: !required, ...(required ? { required: true } : {}), filter, into: "battlefield", ...(m[4] ? { tapped: true } : {}), ...(m[5] ? { counters: { counter: counterKind(m[5]), n: 1 } } : {}) });
       if (m[6]) Object.assign(dig, restOf(m[6]));
+      // "Put any number of land cards from among them onto the battlefield tapped, then shuffle" (Famished Worldsire).
+      else if (/, then shuffle$/.test(s)) Object.assign(dig, { rest: "shuffle" });
     } else if ((m = new RegExp(`^(You may exile|Exile) one of (?:them|those cards)(?: and put the rest ${REST})?$`).exec(s))) {
       // "You may exile one of those cards ... You may play the exiled card this turn" (Nahiri's Warcrafting, Florian): the
       // permission is the sentence after (see parseBody).

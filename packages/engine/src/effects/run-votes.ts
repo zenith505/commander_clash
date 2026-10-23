@@ -105,10 +105,12 @@ export function runVotesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           return "paused";
         }
         r.chose[pid] = st.pick;
-        log(s, `${player(s, pid).name} chooses ${st.pick} (${src}).`);
+        log(s, e.secret ? `${player(s, pid).name} secretly chooses (${src}).` : `${player(s, pid).name} chooses ${st.pick} (${src}).`);
         st.pick = undefined;
         st.queue.shift();
       }
+      // Then the choices are revealed, all at once.
+      if (e.secret) log(s, `The choices are revealed: ${Object.entries(r.chose).map(([p, w]) => `${player(s, Number(p)).name} ${w}`).join(", ")}.`);
       return;
     }
     case "controlFromEach": {

@@ -1950,7 +1950,10 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       if (!sc.found) {
         // Only permanent cards can be put onto the battlefield (CR 110.4b).
         const mvMax = e.mvMax === undefined ? undefined : amountNow(s, e.mvMax, ctx);
-        const filter = e.filter && mvMax !== undefined ? { ...e.filter, manaValue: { max: mvMax }, text: e.filter.text.replace(/ X or less$/, ` ${mvMax} or less`) } : e.filter;
+        // "Of the chosen type" (Haunting Voyage): the type chosen as it resolves; with none, nothing fits.
+        const bound = e.filter?.chosen ? bindChosen(e.filter, ctx.chosen) : e.filter;
+        if (bound?.chosen) return;
+        const filter = bound && mvMax !== undefined ? { ...bound, manaValue: { max: mvMax }, text: bound.text.replace(/ X or less$/, ` ${mvMax} or less`) } : bound;
         // Only the cards milled just before, still in the graveyard (CR 400.7).
         // Colossal Grave-Reaver: only the cards the trigger's event put there, still the same objects.
         const milled = (id: ObjectId) =>

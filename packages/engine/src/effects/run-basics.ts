@@ -268,6 +268,12 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       (s.noLifeGain ??= []).push({ turn: s.turn, controller: ctx.controller, who: e.players });
       log(s, `${src}: ${e.players === "all" ? "players" : `${player(s, ctx.controller).name}'s opponents`} can't gain life this turn.`);
       return;
+    case "noLifeGainForGame":
+      for (const pid of players(s, e.who, ctx)) {
+        player(s, pid).cantGainLifeForGame = true;
+        log(s, `${player(s, pid).name} can't gain life for the rest of the game (${src}).`);
+      }
+      return;
     case "noPrevention":
       s.noPreventionTurn = s.turn;
       log(s, `${src}: damage can't be prevented this turn.`);

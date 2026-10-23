@@ -513,3 +513,38 @@ describe("Underrealm Lich", () => {
     expect(s.players.find((x) => x.id === ap)!.hand.length).toBe(hand + 2);
   });
 });
+
+const tiamat = card("Tiamat", "Legendary Creature — Dragon God", "{2}{W}{U}{B}{R}{G}", { power: "7", toughness: "7", keywords: ["Flying"], oracleText: "Flying\nWhen Tiamat enters, if you cast it, search your library for up to five Dragon cards not named Tiamat that each have different names, reveal them, put them into your hand, then shuffle." });
+
+describe("Tiamat", () => {
+  it("finds up to five Dragons, no Tiamat, no two with the same name", () => {
+    supported(tiamat);
+    const { s: s0, ap, ids } = setup([tiamat]);
+    const p = s0.players.find((x) => x.id === ap)!;
+    const dragons = [tiamat, ...["Shivan Dragon", "Shivan Dragon", "Dragon A", "Dragon B", "Dragon C", "Dragon D", "Dragon E"].map((n) => card(n, "Creature — Dragon", "{4}{R}{R}", { power: "5", toughness: "5" }))];
+    for (const d of dragons) {
+      const id = putOnBattlefield(s0, ap, d);
+      moveObject(s0, id, "library");
+    }
+    const sp = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    const found = sp.players.find((x) => x.id === ap)!.hand.filter((id) => !p.hand.includes(id)).map((id) => defOf(sp, sp.objects[id]!).name);
+    expect(found).toHaveLength(5);
+    expect(found).not.toContain("Tiamat");
+    expect(new Set(found).size).toBe(5);
+  });
+});
+
+const doppelgang = card("Doppelgang", "Sorcery", "{X}{X}{X}{G}{U}", { oracleText: "For each of X target permanents, create X tokens that are copies of that permanent." });
+
+describe("Doppelgang", () => {
+  it("X=2: two copies of each of the two targets", () => {
+    supported(doppelgang);
+    const { s: s0, ap, ids, opp } = setup([doppelgang]);
+    const a = putOnBattlefield(s0, opp, wurm);
+    const b = putOnBattlefield(s0, ap, elves);
+    invalidateCharacteristics(s0);
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: a }, { kind: "object", id: b }], undefined, "auto", 2)));
+    const tokens = s.battlefield.filter((id) => s.objects[id]!.isToken && s.objects[id]!.controller === ap).map((id) => defOf(s, s.objects[id]!).name).sort();
+    expect(tokens).toEqual(["Craw Wurm", "Craw Wurm", "Llanowar Elves", "Llanowar Elves"]);
+  });
+});

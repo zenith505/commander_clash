@@ -61,7 +61,8 @@ export function parseSearch(s: string, count?: (text: string) => AmountExpr | nu
   const total = / with total mana value (\d+) or less$/.exec(m[3]!);
   if (total && (n === 1 || eachX || share)) return null;
   const phrase = eachX ? m[3]!.slice(0, eachX.index) : share ? m[3]!.slice(0, share.index) : total ? m[3]!.slice(0, total.index) : m[3]!;
-  const different = / with different names$/.exec(phrase);
+  // "That each have different names" (Tiamat) says the same.
+  const different = / (?:with|that each have) different names$/.exec(phrase);
   if ((different && n === 1) || (eachX && !different)) return null;
   const filter0 = parseSearchFilter(different ? phrase.slice(0, different.index) : phrase, count);
   if (filter0 === null || (eachX && (!filter0 || filter0.bound))) return null;
@@ -101,6 +102,12 @@ export function parseSearchFilter(phrase: string, count?: (text: string) => Amou
     return first ? { kind: "card", anyOf: [first, { kind: "card", doubleFaced: true, text: "double-faced card" }], text: p } : null;
   }
   if (/^card named ~$/.test(p)) return { kind: "card", named: "~", text: "card named ~" };
+  // "Dragon cards not named ~" (Tiamat): any other name.
+  const notSelf = /^(.+ card) not named ~$/.exec(p);
+  if (notSelf) {
+    const head = parseSearchFilter(notSelf[1]!);
+    return head ? { ...head, notNamed: "~", text: p } : null;
+  }
   // "A card named Ajani, Valiant Protector": that card's name, as printed.
   const named = /^card named ([A-Z][^~]*)$/.exec(phrase);
   if (named && /\b(?:or|and\/or)\b/.test(named[1]!)) {

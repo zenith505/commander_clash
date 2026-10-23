@@ -494,6 +494,8 @@ export interface TargetSpec {
   commander?: boolean;
   /** "a card named ~": the source's name; "a card named Ajani, Valiant Protector": that name (only for searches). */
   named?: string;
+  /** "Dragon cards not named ~" (Tiamat): any other name; "~" is the source's (only for searches). */
+  notNamed?: string;
   /** None of these subtypes. */
   notSubtypes?: string[];
   /** "creature with a +1/+1 counter on it", "permanents with ice counters on them"; ANY_COUNTER: "with a counter on it". */

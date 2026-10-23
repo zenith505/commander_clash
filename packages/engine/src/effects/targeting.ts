@@ -71,6 +71,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.counter && !(spec.counter === ANY_COUNTER ? Object.values(o.counters).some((n) => (n ?? 0) > 0) : (o.counters[spec.counter] ?? 0))) return false;
   // "With the chosen name": its name now (a copy's is what it copies); a face-down one has none (CR 201.2a, 708.2a).
   if (spec.named !== undefined && (o.faceDown || !hasName(c.name, spec.named))) return false;
+  if (spec.notNamed !== undefined && !o.faceDown && hasName(c.name, spec.notNamed)) return false;
   const hasKw = (k: string) => c.keywords.some((x) => x.toLowerCase() === k.toLowerCase());
   if (spec.keywords?.some((k) => !hasKw(k))) return false;
   if (spec.toxic && !c.keywords.some((x) => /^toxic\b/i.test(x))) return false;
@@ -282,6 +283,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.equalsChosen && (spec.equals === undefined || !spec.equalsChosen.some((k) => (k === "manaValue" ? defMv(d) : creature && /^\d+$/.test(d[k] ?? "") ? Number(d[k]) : undefined) === spec.equals))) return false;
   if (spec.manaCostIn && !spec.manaCostIn.includes(d.manaCost)) return false;
   if (spec.named !== undefined && !hasName(d.name, spec.named)) return false;
+  if (spec.notNamed !== undefined && hasName(d.name, spec.notNamed)) return false;
   if (spec.doubleFaced && !isDoubleFacedDef(d)) return false;
   if (spec.manaAbility && !(compileCard(d).mana.length || compileCard(d).manaTriggers?.length)) return false;
   if (spec.transformed || spec.powerAboveBase || spec.toughnessAbovePower || spec.colorOfYourLegend) return false;

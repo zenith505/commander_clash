@@ -106,11 +106,12 @@ export function runTokensEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     }
     case "createTokenCopy": {
       if (e.each) {
-        // One copy of each of them, their copiable values as they are now (CR 707.2), all created at once.
+        // One copy of each of them (`n` of each, Doppelgang), their copiable values as they are now (CR 707.2), all created at once.
         const bases = objects(s, e.what, ctx).map((o) => copiableDef(s, o));
+        const n = amountNow(s, e.n, ctx);
         if (s.resolving) s.resolving.created = [];
         enterTogether(s, () => {
-          for (const pid of players(s, e.who, ctx)) for (const base of bases) tokenCopies(s, pid, base, 1, ctx, e);
+          for (const pid of players(s, e.who, ctx)) for (const base of bases) tokenCopies(s, pid, base, n, ctx, e);
         });
         return;
       }

@@ -125,6 +125,13 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!what || what.ref !== "each" || except === null) return null;
     return [{ type: "createTokenCopy", who: { ref: "you" }, n: 1, what, each: true, ...(except ? { except } : {}) }];
   }
+  // Doppelgang: "For each of X target permanents, create X tokens that are copies of that permanent": that many copies of
+  // each of them, all created at once.
+  if ((m = new RegExp(`^[Ff]or each of (X|two|three) target ([a-z]+s), create ${NUMX} tokens that are copies of that (?:creature|permanent|artifact)$`).exec(s))) {
+    const what = parseObject(`${m[1]} target ${m[2]}`, ctx);
+    if (what?.ref !== "target" || what.n === undefined || what.card) return null;
+    return [{ type: "createTokenCopy", who: { ref: "you" }, n: amt(m[3]!), what, each: true }];
+  }
   // Token copies (CR 707.2, 111.4): "Create a token that's a copy of target creature you control, except it
   // isn't legendary", "create two tokens that are copies of ~", "its controller creates a token that's a copy of it".
   if ((m = new RegExp(`^(?:(.+?) creates|(?:You )?[Cc]reate) ${NUMX} (tapped (?:and attacking )?)?tokens? that(?:'s| are) (?:a copy|copies) of (.+?)(?:, except (.+))?$`, "i").exec(s))) {

@@ -422,6 +422,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       return [{ type: "chooseOption", player: pid, choice: pick }];
     }
     if (pend.kind === "chooseOption" && pend.what === "tributePay") return [{ type: "chooseOption", player: pid, choice: payTribute(s, pend.objectId!) ? "pay" : "no" }];
+    if (pend.kind === "chooseOption" && pend.what === "exchangeText") {
+      // Deadpool: its own text is a drawback ("you lose 3 life" each upkeep), so trade it to an opponent for the text of
+      // their best creature; never onto one of our own.
+      const theirs = pend.options.filter((x) => x !== "none" && s.objects[x] && controllerOf(s, obj(s, x)) !== pid && defOf(s, obj(s, x)).oracleText.trim() !== "");
+      const best = theirs.sort((a, b) => worth(s, pid, obj(s, b)) + mv(s, b) - (worth(s, pid, obj(s, a)) + mv(s, a)))[0];
+      return [{ type: "chooseOption", player: pid, choice: best ?? "none" }];
+    }
     if (pend.kind === "chooseOption" && pend.what === "copy") {
       // Clone the best permanent, but not a legendary one we already control (the legend rule, CR 704.5j).
       const ids = pend.options.filter((x) => x !== "none" && s.objects[x]);

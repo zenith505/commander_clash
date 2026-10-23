@@ -1,6 +1,6 @@
 import type { CompiledCard, ManaAbility, TargetSpec, TriggeredAbility } from "./abilities";
 import { characteristics, offFieldColored, offFieldTyped, printedKeywords, type PTPart } from "./layers";
-import { cleavedText, compileCard, compileGranted, overloadedText } from "./oracle";
+import { cleavedText, compileCard, compileGranted, normalizeSelf, overloadedText } from "./oracle";
 import { COLORS, type CardDef, type Color, type GameObject, type GameState, type ManaType, type ObjectId, type PlayerId } from "./types";
 import { manaValue, parseManaCost } from "./mana";
 import { faceKey, isRoom, registerFace, registerRoom, restingDef, roomKey, sameName } from "./faces";
@@ -86,10 +86,27 @@ export const cardIdOf = (o: GameObject): string => (o.faceDown ? (withWard(o) ? 
 /** The card definition an object uses right now: its own, what it copies, or a face-down one (CR 613.2, 708.2). */
 export const defOf = (s: GameState, o: GameObject): CardDef => {
   const out = ownDefOf(s, o);
-  if (o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged") return out;
+  if (o.zone === "battlefield" || o.zone === "phasedOut" || o.zone === "merged") return o.textFrom ? withTextOf(s, out, o.textFrom) : out;
   // Outside the battlefield, effects like Maskwood Nexus's change a creature card's or spell's creature types.
   return offFieldColored(s, o, offFieldTyped(s, o, offFieldCreatureDef(out)));
 };
+
+/**
+ * `d` with the rules text of the definition `from` (an exchange of text boxes, CR 612.5): its keywords and text, where
+ * that card's name, which meant that object, now means this one (CR 201.5). Registered in GameState.cards under a key of
+ * its own, so it compiles and caches like any card.
+ */
+function withTextOf(s: GameState, d: CardDef, from: string): CardDef {
+  const key = `${d.oracleId}|text:${from}`;
+  const hit = s.cards[key];
+  if (hit) return hit;
+  const src = s.cards[from];
+  if (!src) return d;
+  const text = normalizeSelf(src).replace(/~/g, d.name);
+  const out: CardDef = { ...d, oracleId: key, oracleText: text, keywords: [...src.keywords] };
+  s.cards[key] = out;
+  return out;
+}
 
 const offFieldCreatures = new Map<string, CardDef>();
 

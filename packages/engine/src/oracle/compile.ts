@@ -1028,6 +1028,11 @@ export function compile(d: CardDef): CompiledCard {
     // additional cost to cast this spell, you may pay [cost] any number of times" and "When this creature enters, if its
     // squad cost was paid, create a token that's a copy of it for each time its squad cost was paid." Both are paid
     // like kicker; the copy is of it as it last existed if it has left (rulings, CR 608.2h).
+    // Deadpool, Trading Card: a replacement effect on how it enters (CR 614.1c, 614.12), a text-changing effect (CR 612.5).
+    if (/^As ~ enters, you may exchange (?:~'s|his|her|its) text box and another creature's\.$/.test(line) && !isSpell) {
+      out.entersExchangeText = true;
+      continue;
+    }
     // "Exile ~." as an instant's or sorcery's last instruction (Spirit Water Revival): it's exiled as it finishes
     // resolving, instead of going to its owner's graveyard (CR 608.2n).
     if (line === "Exile ~." && isSpell && li === lines.length - 1) {

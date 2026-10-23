@@ -839,6 +839,7 @@ export function moveObject(
   else if (to === "battlefield" && s.dayNight === "night" && o.face === undefined && !o.faceDown && transformedFace(s, o) === 1 && hasKeyword(defOf(s, o), "Daybound")) setFace(s, o, 1);
   o.zoneChanges = (o.zoneChanges ?? 0) + 1; // a new object (CR 400.7)
   o.copyOf = undefined; // copy effects end with the object (CR 400.7)
+  o.textFrom = undefined; // so do text-changing effects
   o.melded = undefined; // a melded permanent's cards are separate cards again (CR 712.21)
   o.copyEffects = undefined;
   // Krovikan Vampire: a creature that died after being dealt damage this turn, and what dealt it (rulings: any damage).
@@ -964,6 +965,7 @@ export function moveObject(
     // "You may have ~ enter as a copy of ...": it becomes the copy as it enters (CR 707.5), so how it
     // enters and what it triggers wait for that choice.
     if (printed.entersAsCopy && copyCandidates(s, o, printed.entersAsCopy.filter).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "copy", enterOpts: how });
+    else if (printed.entersExchangeText && textExchangeCandidates(s, o).length) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "exchangeText", enterOpts: how });
     else finishEntering(s, o, printed, how, withCounters && counterN ? { counter: withCounters.counter, n: counterN } : undefined);
     // Entering with others (enterTogether): off the list until they all have, so the next ones don't see it.
     if (together && o.zone === "battlefield") {
@@ -1129,6 +1131,36 @@ export function copyCandidates(s: GameState, o: GameObject, filter: TargetSpec):
   return s.battlefield.filter((id) => id !== o.id && objectMatches(s, bound, obj(s, id), controllerOf(s, o), false));
 }
 
+/** What Deadpool can exchange its text box with as it enters: another creature on the battlefield (not one entering with it). */
+export function textExchangeCandidates(s: GameState, o: GameObject): ObjectId[] {
+  return s.battlefield.filter((id) => id !== o.id && objIsType(s, obj(s, id), "Creature"));
+}
+
+/**
+ * Exchange the text boxes of two permanents (CR 612.5, 701.12h): the rules text of each becomes the other's previous rules
+ * text, a text-changing effect (layer 3, CR 613.1c) that lasts as long as each is on the battlefield.
+ */
+export function exchangeText(s: GameState, a: GameObject, b: GameObject) {
+  const [da, db] = [defOf(s, a), defOf(s, b)];
+  s.cards[da.oracleId] ??= da;
+  s.cards[db.oracleId] ??= db;
+  a.textFrom = db.oracleId;
+  b.textFrom = da.oracleId;
+  invalidateCharacteristics(s);
+}
+
+/** "As ~ enters, you may exchange ~'s text box and another creature's" (Deadpool): with `choice`, or not ("none"). */
+function enterExchangingText(s: GameState, o: GameObject, choice: ObjectId | "none", opts: EnterOpts) {
+  if (choice !== "none") {
+    const other = obj(s, choice);
+    if (other.zone !== "battlefield" || !objIsType(s, other, "Creature") || other.id === o.id) throw new RulesError("choose another creature on the battlefield");
+    const [mine, theirs] = [defOf(s, o).name, defOf(s, other).name];
+    exchangeText(s, o, other);
+    log(s, `${mine} exchanges its text box with ${theirs}'s.`);
+  }
+  finishEnteringAs(s, o, opts);
+}
+
 /** It enters as a copy of `target`, or of nothing ("none"), then finishes entering as what it now is (CR 707.5). */
 function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opts: EnterOpts) {
   const own = compileCard(defOf(s, o)).entersAsCopy;
@@ -1149,6 +1181,11 @@ function enterAsCopy(s: GameState, o: GameObject, choice: ObjectId | "none", opt
       opts = { ...opts, counters };
     }
   }
+  finishEnteringAs(s, o, opts);
+}
+
+/** Finish entering as what it now is, after "as it enters" copy or text choices (CR 614.12). */
+function finishEnteringAs(s: GameState, o: GameObject, opts: EnterOpts) {
   const printed = compileCard(defOf(s, o));
   // A Clone entering as a copy of Primeval Spawn has its "If ~ would enter and it wasn't cast or no mana was spent to cast
   // it, exile it instead" as it would exist on the battlefield (CR 614.12, 707.5), judged by the Clone's own casting. It
@@ -6249,6 +6286,11 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       enterAsCopy(s, o, choice, entry?.enterOpts ?? {});
       return;
     }
+    if (pend.what === "exchangeText") {
+      if (!pend.options.includes(choice)) throw new RulesError("choose a creature offered, or none");
+      enterExchangingText(s, o, choice, entry?.enterOpts ?? {});
+      return;
+    }
     if (pend.what === "discardInstead") {
       if (!pend.options.includes(choice)) throw new RulesError("choose a card offered, or none");
       if (choice !== "none" && obj(s, choice).zone === "hand") {
@@ -6340,7 +6382,7 @@ function chooseOption(s: GameState, p: Player, choice: string) {
     return;
   }
   const r = s.resolving;
-  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "discardInstead" || pend.what === "copy" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector") throw new RulesError("nothing to choose");
+  if (!r || pend.what === "riot" || pend.what === "unleash" || pend.what === "discardInstead" || pend.what === "copy" || pend.what === "exchangeText" || pend.what === "tribute" || pend.what === "tributePay" || pend.what === "readAhead" || pend.what === "player" || pend.what === "anchor" || pend.what === "protector") throw new RulesError("nothing to choose");
   if (pend.what === "searchZones") {
     if (!pend.options.includes(choice)) throw new RulesError("choose both or the graveyard only");
     (r.scratch ??= {}).searchZones = choice;
@@ -6619,6 +6661,12 @@ function askEntersChoice(s: GameState): boolean {
         continue;
       }
       s.pending = { kind: "pickPermanents", player: controllerOf(s, o), source: defOf(s, o).name, action: "reveal", what: "card that shares a creature type with it", options, count: options.length, min: 0, objectId: o.id };
+      return true;
+    }
+    if (c.what === "exchangeText") {
+      const ids = textExchangeCandidates(s, o).filter((id) => !c.together?.includes(id));
+      const labels = ids.map((id) => `${defOf(s, obj(s, id)).name} (${player(s, controllerOf(s, obj(s, id))).name})`);
+      s.pending = { kind: "chooseOption", player: controllerOf(s, o), source: defOf(s, o).name, what: "exchangeText", options: [...ids, "none"], labels: [...labels, "Don't exchange"], objectId: o.id, prompt: "you may exchange its text box with another creature's" };
       return true;
     }
     if (c.what === "copy") {

@@ -179,6 +179,12 @@ export interface GameObject {
   /** A copy effect's values (CR 707.2), a key into GameState.cards: Clone as it entered, until it leaves. */
   copyOf?: string;
   /**
+   * Its text box was exchanged with another permanent's (CR 612.5, 701.12h, a text-changing effect in layer 3): the key
+   * in GameState.cards of the definition whose rules text it has now, until it leaves the battlefield. Not a copiable
+   * value (CR 707.2).
+   */
+  textFrom?: string;
+  /**
    * "Becomes a copy" effects on it (CR 707.4), in timestamp order. Each one overwrites every copiable value, so the
    * latest decides (CR 613.2a); `until` is when it ends (see CopyEffect). They end with the object (CR 400.7).
    */

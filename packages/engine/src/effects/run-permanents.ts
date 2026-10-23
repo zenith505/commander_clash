@@ -153,21 +153,32 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
     case "reselectAttack": {
       // Another player, or a planeswalker or battle it could attack (CR 506.2, 310.9b), never its controller or theirs;
       // requirements, restrictions and costs ignored, and it still attacked what it did (rulings).
-      const o = objects(s, e.what, ctx)[0];
-      if (!o || o.zone !== "battlefield" || o.attacking === undefined) return;
-      const options = reselectOptions(s, o);
-      if (!options.length) return;
+      // Windshaper Planetar: each attacking creature in turn (the ones done so far in scratch), each one optional.
       const sc = (s.resolving!.scratch ??= {});
-      if (sc.reselect === undefined) {
-        s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "reselectAttack", options: options.map((x) => x.key), labels: options.map((x) => x.label), about: o.id, prompt: `choose what ${defOf(s, o).name} attacks now` };
-        return "paused";
+      const done = (sc.reselected ??= []);
+      for (const o of objects(s, e.what, ctx)) {
+        if (o.zone !== "battlefield" || o.attacking === undefined || done.includes(o.id)) continue;
+        const options = reselectOptions(s, o);
+        if (!options.length) {
+          if (e.each) done.push(o.id);
+          continue;
+        }
+        if (sc.reselect === undefined) {
+          const keep = e.each ? [{ key: "keep", label: `Keep attacking ${attackedName(s, o)}` }] : [];
+          s.pending = { kind: "chooseOption", player: ctx.controller, source: src, what: "reselectAttack", options: [...keep, ...options].map((x) => x.key), labels: [...keep, ...options].map((x) => x.label), about: o.id, prompt: `choose what ${defOf(s, o).name} attacks now` };
+          return "paused";
+        }
+        const pick = options.find((x) => x.key === sc.reselect);
+        sc.reselect = undefined;
+        if (e.each) done.push(o.id);
+        if (pick) {
+          o.attacking = pick.player;
+          o.attackingPermanent = pick.planeswalker !== undefined ? attackingPermanentOf(s, pick.planeswalker) : undefined;
+          log(s, `${src}: ${defOf(s, o).name} now attacks ${attackedName(s, o)}.`);
+        }
+        if (!e.each) break;
       }
-      const pick = options.find((x) => x.key === sc.reselect);
-      sc.reselect = undefined;
-      if (!pick) return;
-      o.attacking = pick.player;
-      o.attackingPermanent = pick.planeswalker !== undefined ? attackingPermanentOf(s, pick.planeswalker) : undefined;
-      log(s, `${src}: ${defOf(s, o).name} now attacks ${attackedName(s, o)}.`);
+      sc.reselected = undefined;
       return;
     }
     case "suspect":

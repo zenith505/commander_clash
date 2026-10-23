@@ -75,6 +75,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // "Put your commander into your hand from the command zone" (Command Beacon): one you own, of your choice with two
   // (rulings); nothing if none is there (CR 903.3).
   if (/^[Pp]ut your commander into your hand from the command zone$/.test(s)) return [{ type: "commanderToHand" }];
+  if (/^[Cc]hoose a commander you own on the battlefield or in the command zone$/.test(s)) return [{ type: "chooseOwnCommander" }];
   // Geode Golem: the pending free cast is the "may" (it can be declined).
   if (/^[Yy]ou may cast your commander from the command zone without paying its mana cost$/.test(s)) return [{ type: "castCommanderFree" }];
   // Hellkite Courser: "you may put a commander you own from the command zone onto the battlefield" (not cast, so no tax).
@@ -174,7 +175,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if (/^Put ~ on the bottom of its owner's library$/i.test(s) && ctx.spell) return [{ type: "shuffleSpell", bottom: true }];
   // "When ~ dies, shuffle it into its owner's library", "When ~ is put into a graveyard from anywhere, ...": the card where
   // it went. "At the beginning of the end step, ~'s owner shuffles it into their library": the permanent.
-  if (ctx.selfCard && /^[Ss]huffle (?:it|~) into its owner's library$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "selfCard" } }];
+  // Lembas: "When ~ is put into a graveyard from the battlefield, its owner shuffles it into their library."
+  if (ctx.selfCard && /^(?:[Ss]huffle (?:it|~) into its owner's library|[Ii]ts owner shuffles (?:it|~) into their library)$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "selfCard" } }];
   // Kogla and Yidaro: "{2}{R}{G}, Discard this card: ... Shuffle this card into your library from your graveyard": the
   // card discarded to pay for it, while it's still there (CR 400.7).
   if (ctx.discardedSelf && /^[Ss]huffle ~ into your library from your graveyard$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "selfCard", moved: true, yours: true } }];
@@ -182,7 +184,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if (ctx.selfCard && (m = /^[Pp]ut (?:it|~) on (top|the bottom) of its owner's library$/.exec(s))) return [{ type: "putInLibrary", what: { ref: "selfCard" }, position: m[1] === "top" ? "top" : "bottom" }];
   // The God-Eternals: "you may put it into its owner's library third from the top"; Enigma Sphinx's "into your library"
   // (it triggers only from its owner's graveyard); Bookwurm's "Put ~ from your graveyard into your library ...".
-  if (ctx.selfCard && /^[Pp]ut (?:it|~|her|him) (?:from your graveyard )?into (?:its owner's|her owner's|his owner's|your) library third from the top$/.test(s)) return [{ type: "putInLibrary", what: { ref: "selfCard" }, position: "third" }];
+  if (ctx.selfCard && /^[Pp]ut (?:it|~|her|him) (?:from your graveyard )?into (?:its owner's|her owner's|his owner's|~'s owner's|your) library third from the top$/.test(s)) return [{ type: "putInLibrary", what: { ref: "selfCard" }, position: "third" }];
   if (!ctx.spell && !ctx.selfCard && /^~'s owner shuffles (?:it|~) into their library$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "self" } }];
   // "Shuffle target nontoken permanent you control into its owner's library" (Rishadan Pawnshop): it's put into that
   // library, then that library is shuffled (CR 701.24c).
@@ -196,6 +198,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^[Ss]huffle ((?:any number of|up to (?:one|two|three|four|five)) target (?:.+? )?cards?(?: with [^,]+?)? from your graveyard) into your library$/.exec(s))) {
     const what = parseCardTarget(m[1]!, ctx, "you");
     return what?.ref === "target" ? [{ type: "shuffleIntoLibrary", what, yours: true }] : null;
+  }
+  // Teferi, Temporal Pilgrim: "Then they shuffle each nonland permanent they control into its owner's library", "they"
+  // being the target opponent: each of them goes into its owner's library, then each of those libraries is shuffled (CR
+  // 701.24c).
+  if (ctx.lastPlayerTarget !== undefined && (m = /^(?:[Tt]hey shuffle|[Tt]hat player shuffles) (each [^,]+?) they control into its owner's library$/.exec(s))) {
+    const what = parseObject(`${m[1]} that player controls`, ctx);
+    return what?.ref === "each" ? [{ type: "shuffleIntoLibrary", what }] : null;
   }
   // "The owner of target nonland permanent shuffles it into their library."
   if ((m = /^The owner of (target .+?) shuffles it into their library$/i.exec(s))) {
@@ -350,6 +359,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return [{ type: "chooseFromGraveyard", n: 1, dest: "battlefield", anyGraveyard: true, filter }];
   }
   if (/^Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it$/.test(s)) return [{ type: "randomFromGraveyard", dest: "creatureOrExile" }];
+  if (/^Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise into your hand$/.test(s)) return [{ type: "randomFromGraveyard", dest: "creatureOrHand" }];
   if ((m = /^Reorder your graveyard (as you choose|at random)$/.exec(s))) return [{ type: "reorderGraveyard", ...(m[1] === "at random" ? { random: true as const } : {}) }];
   if ((m = /^Put the top card of your graveyard on (top|the bottom) of your library$/i.exec(s))) return [{ type: "putInLibrary", what: { ref: "graveyardEnd", who: { ref: "you" } }, position: m[1] === "top" ? "top" : "bottom" }];
   if ((m = /^If the top card of (target player's|your) graveyard is an? (.+?), put that card on top of (that player's|your) library$/i.exec(s)) && (m[1] === "your") === (m[3] === "your")) {
@@ -480,6 +490,12 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = parseSearchFilter(m[2]!);
     if (filter === null) return null;
     return [{ type: "takeFromHand", who: { ref: "you" }, ...(filter ? { filter } : {}), action: "exile", ...(m[1] ? { optional: true as const } : {}) }];
+  }
+  // Jace, the Mind Sculptor: "Exile all cards from target player's library, then that player shuffles their hand into their
+  // library." With no cards in hand, their library stays empty (rulings).
+  if ((m = /^Exile all cards from (target player's|target opponent's) library$/.exec(s))) {
+    const who = parsePlayer(m[1]!.replace(/'s$/, ""), ctx);
+    return who ? [{ type: "exileGraveyard", who, library: true }] : null;
   }
   if ((m = /^Exile (target player's|target opponent's|each opponent's|all opponents'|all|any number of target players') graveyards?$/i.exec(s))) {
     const w = m[1]!.toLowerCase();
@@ -882,6 +898,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if ((m = /^[Ss]acrifice another ([a-z][^,]*?)$/.exec(s)) && !ctx.spell) {
     const filter = pickFilter(m[1]!);
     return filter && filter.kind === "object" ? [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true, text: `other ${filter.text}` }, n: 1, action: "sacrifice" }] : null;
+  }
+  // Teferi, Temporal Pilgrim: "Target opponent chooses a permanent they control and returns it to its owner's hand": theirs,
+  // chosen as it resolves, not targeted.
+  if ((m = /^(.+?) chooses (?:a|an) (.+?) they control and returns it to its owner's hand$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    const filter = pickFilter(m[2]!);
+    return who && who.ref !== "you" && filter?.kind === "object" ? [{ type: "pick", who, filter, n: 1, action: "bounce" }] : null;
   }
   // "Defending player exiles two permanents they control" (Bane of Bala Ged): their own, chosen as it resolves, not
   // targeted; with no more than that many, all of them (rulings).

@@ -1,6 +1,6 @@
 // Sentences that act on permanents: destroy, tap, connive, regenerate, counters, gaining control, continuous changes until end of turn.
 
-import type { Effect, ObjRef } from "../../abilities";
+import type { AmountExpr, Effect, ObjRef } from "../../abilities";
 import { NUM, NUMX, COUNTER, counterKind, amt, isGroup, num, capital, singular } from "../words";
 import { pickFilter, parseGroup, parseObject, parsePlayer, parseTargetPhrase } from "../targets";
 import { addTarget } from "../body";
@@ -109,6 +109,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // "Untap up to seven lands" (Palinchron), "You untap up to six lands" (Time Spiral): chosen as it resolves (CR 608.2d),
   // anyone's (rulings).
   if ((m = new RegExp(`^(?:You )?[Uu]ntap up to ${NUM} lands?$`).exec(s))) return [{ type: "untapUpTo", n: num(m[1]!), filter: { kind: "object", types: ["Land"], notTypes: [], notColors: [], text: "land" } }];
+  // "Untap a creature you control" (White Plume Adventurer): one of yours, chosen as it resolves (CR 608.2d); choosing an
+  // untapped one does nothing, so the choice is among the tapped ones, or none.
+  if ((m = new RegExp(`^[Uu]ntap (a|an|${NUM}) ([a-z][a-z ]*?) you control$`).exec(s))) {
+    const filter = pickFilter(m.at(-1)!);
+    return filter?.kind === "object" ? [{ type: "untapUpTo", n: /^an?$/.test(m[1]!) ? 1 : num(m[1]!), filter: { ...filter, controller: "you", text: `${filter.text} you control` } }] : null;
+  }
   // "Tap or untap target permanent" (Twiddle, Pestermite): which is chosen as it resolves (CR 608.2d).
   if ((m = /^Tap or untap ((?:another )?target .+|that creature|it|~|enchanted \w+|equipped \w+)$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
@@ -119,6 +125,7 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[1]!, ctx);
     return what && !isGroup(what) ? [{ type: "reselectAttack", what }] : null;
   }
+  if (/^[Ff]or each attacking creature, you may reselect which player or permanent that creature is attacking$/.test(s)) return [{ type: "reselectAttack", what: { ref: "allCreatures", attacking: true }, each: true }];
   // Removing from combat (CR 506.4): Gustcloak Runner's "untap it and remove it from combat", "remove ~ from combat".
   if ((m = /^(?:(Untap) (~|it|target .+?) and )?[Rr]emove (~|it|target .+?) from combat$/.exec(s))) {
     if (m[1] && m[3] !== "it" && m[3] !== m[2]) return null;
@@ -461,6 +468,9 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const what = parseObject(m[2]!, ctx);
     return what && !isGroup(what) ? [{ type: "lastKnownCounters", what, ...(m[1] ? { only: counterKind(m[1]) } : {}) }] : null;
   }
+  // Orzhov Advokist (the two sentences joined in body.ts).
+  if ((m = new RegExp(`^[Ee]ach player may put (two|three) ${COUNTER} counters on a creature they control; if a player does, creatures that player controls can't attack you or planeswalkers you control until your next turn$`).exec(s)))
+    return [{ type: "eachMayCounter", n: num(m[1]!), counter: counterKind(m[2]!), attackBan: true }];
   // "Distribute three +1/+1 counters among one, two, or three target creatures you control": how many targets and how
   // many each gets are chosen with the targets, at least one each (CR 601.2d), like divided damage.
   if ((m = /^Distribute (two|three|four|five|six|seven|eight) ([+-]1\/[+-]1) counters among (one or two|one, two, or three|any number of|up to (?:two|three|four)) ((?:other )?target .+)$/i.exec(s))) {
@@ -477,6 +487,19 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
       addTarget(ctx, { ...spec, text: `target ${one}`, divided, ...(k || upTo ? { optional: true } : {}), ...(k ? { distinctFrom: Array.from({ length: k }, (_, j) => first + j) } : {}) });
     ctx.lastTargets = { index: first, n };
     return [{ type: "counters", what: { ref: "target", index: first, n }, counter: counterKind(m[2]!), n: total, divided: true }];
+  }
+  // "Distribute up to X +1/+1 counters among any number of other target creatures, where X is ..." (Lathiel, rewritten in
+  // triggers.ts): X worked out as the targets are chosen, then any number of them each getting at least 1, X in all at
+  // most (rulings; CR 601.2d).
+  if ((m = /^[Dd]istribute up to X ([+-]1\/[+-]1) counters among any number of ((?:other )?target creatures)$/.exec(s)) && ctx.whereX) {
+    const spec = parseTargetPhrase(m[2]!.replace(/^(?:other )?target /, "").replace(/creatures$/, "creature"));
+    if (spec?.kind !== "object" || ctx.targets.some((t) => t.many)) return null;
+    const first = ctx.targets.length;
+    const x: AmountExpr = { count: { kind: "x" } };
+    addTarget(ctx, { ...spec, ...(/^other /.test(m[2]!) ? { notSource: true } : {}), text: m[2]!.replace(/creatures$/, "creature"), divided: { first, n: 1, total: 0, amount: x, counter: counterKind(m[1]!), atMost: true }, many: "any" });
+    ctx.lastObjectTarget = undefined;
+    ctx.lastTargets = { index: first, n: 2 };
+    return [{ type: "counters", what: { ref: "target", index: first, n: 2 }, counter: counterKind(m[1]!), n: x, divided: true }];
   }
   // "Distribute X +1/+1 counters among any number of creatures you control" (Blessing of Frost), "distribute a number of
   // +1/+1 counters equal to the number of +1/+1 counters on ~ among ..." (Vastwood Hydra): no targets, divided as it

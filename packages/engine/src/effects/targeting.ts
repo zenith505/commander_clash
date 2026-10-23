@@ -594,6 +594,7 @@ export function canChooseTarget(s: GameState, specs: TargetSpec[], chosen: Targe
   if (t.kind === "none") return !!spec.optional;
   if (!isLegalTarget(s, spec, t, controller, src)) return false;
   if (spec.notSource && t.kind === "object" && t.id === sourceId) return false;
+  if (spec.combatDamagedBySource && (t.kind !== "player" || !sourceId || !s.objects[sourceId] || !s.turnLog?.combatDamagedBy?.[t.id]?.includes(`${sourceId}@${s.objects[sourceId]!.zoneChanges ?? 0}`))) return false;
   if (spec.notSourceHost && t.kind === "object" && sourceId && t.id === s.objects[sourceId]?.attachedTo) return false;
   if (!lesserPowerOk(s, spec, t, sourceId)) return false;
   return !(spec.distinctFrom ?? []).some((j) => sameTarget(chosen[j], t)) && relatedOk(s, spec, chosen, t) && totalOk(s, specs, chosen, i, t);
@@ -722,7 +723,7 @@ export function divisionProblem(specs: TargetSpec[], t: TargetChoice[]): string 
     if (i === d.first) {
       let sum = 0;
       for (let k = d.first; k < d.first + d.n; k++) sum += part(t[k]) ?? 0;
-      if (sum !== d.total && !(d.upTo && sum === 0)) return d.counter ? `distribute the ${d.total} counters among the targets` : `divide ${d.total} among the targets`;
+      if (d.atMost ? sum > d.total : sum !== d.total && !(d.upTo && sum === 0)) return d.atMost ? `distribute up to ${d.total} counters among the targets` : d.counter ? `distribute the ${d.total} counters among the targets` : `divide ${d.total} among the targets`;
     }
   }
   return null;

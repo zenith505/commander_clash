@@ -354,6 +354,8 @@ export interface GameObject {
     free?: true;
     /** "Mana of any type can be spent to cast it" (CR 609.4b). */
     anyType?: true;
+    /** "If that spell would be put into a graveyard, exile it instead" (Dire Fleet Daredevil): see exileIfToGraveyard. */
+    exileAfter?: true;
     /** "You may cast that card": not played as a land (rulings on Rev, Tithe Extractor). */
     castOnly?: true;
     /** Airbend's "by paying {2} rather than paying its mana cost" (CR 701.65a): an alternative cost, the only way. */
@@ -648,6 +650,11 @@ export interface Player {
   lifeCantChange?: true;
   /** "Until your next turn, creatures can't attack you unless their controller pays {2} for each" (Summon: Yojimbo), one entry per effect. */
   attackTaxUntil?: { n: number; planeswalkers?: true }[];
+  /**
+   * Orzhov Advokist: the players whose creatures can't attack this player or planeswalkers they control until this
+   * player's next turn begins (whatever creatures they control by then, rulings).
+   */
+  attackBansUntil?: PlayerId[];
   /** "Until end of turn, your life total can't change" (Flare of Fortitude): the turn it's for (CR 119.7-8). */
   lifeCantChangeTurn?: number;
   /** "Until end of turn, damage that would reduce your life total to less than 1 reduces it to 1 instead" (Angel's Grace): the turn it's for. */
@@ -1182,7 +1189,7 @@ export type PendingDecision =
    * (exploit's "you may sacrifice a creature"). With `objectId`, it's devour's choice as that permanent enters
    * (CR 702.82a): any number of them.
    */
-  | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** Expropriate: a permanent `of` owns (anyone may control it), to gain control of. */ owned?: true; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId; /** The player whose permanents these are, when someone else chooses: for "keep" (Mythos of Snapdax), or the target player of Split the Party. */ of?: PlayerId; /** "keep": the rest are destroyed, not sacrificed (Mount Doom). */ destroy?: true; /** "Sacrifice any number of lands" (Scapeshift): as many as they like, none too. */ anyNumber?: true; /** "keep": the chosen ones' powers add up to at most this (Slaughter the Strong; a negative power subtracts). */ maxTotalPower?: number; /** "untapLimited": the permanents already chosen to stay tapped ("You may choose not to untap ~"). */ kept?: ObjectId[] }
+  | { kind: "pickPermanents"; player: PlayerId; source: string; action: PickAction; what: string; options: ObjectId[]; count: number; /** The whole question, when `what` and `action` don't say it (Orzhov Advokist). */ prompt?: string; /** Expropriate: a permanent `of` owns (anyone may control it), to gain control of. */ owned?: true; /** For "counters": the kind put on the picked permanent. */ counter?: CounterKind; min?: number; objectId?: ObjectId; /** The player whose permanents these are, when someone else chooses: for "keep" (Mythos of Snapdax), or the target player of Split the Party. */ of?: PlayerId; /** "keep": the rest are destroyed, not sacrificed (Mount Doom). */ destroy?: true; /** "Sacrifice any number of lands" (Scapeshift): as many as they like, none too. */ anyNumber?: true; /** "keep": the chosen ones' powers add up to at most this (Slaughter the Strong; a negative power subtracts). */ maxTotalPower?: number; /** "untapLimited": the permanents already chosen to stay tapped ("You may choose not to untap ~"). */ kept?: ObjectId[] }
   /** "Distribute X +1/+1 counters among any number of creatures you control": how many each of `options` gets, adding up to `total`. */
   /** `move`: moving the counters on the source, any number of them (Forgotten Ancient); otherwise all `total` are distributed. */
   | { kind: "distribute"; player: PlayerId; source: string; counter: CounterKind; total: number; options: ObjectId[]; what: string; move?: true }
@@ -1461,7 +1468,7 @@ export interface GameState {
   oneOfUsed?: string[];
   /** The nonland card types of each card cast with a "for each nonland card type" permission (GameObject.mayPlay.byType), by group. */
   byTypeCast?: Record<string, string[][]>;
-  cantCastThisTurn?: { player: PlayerId; turn: number; filter?: TargetSpec; source: string; /** Until the end of this player's next turn (Single Combat), kept past this turn's cleanup. */ untilEndOfTurnOf?: PlayerId }[];
+  cantCastThisTurn?: { player: PlayerId; turn: number; filter?: TargetSpec; source: string; /** Until the end of this player's next turn (Single Combat), kept past this turn's cleanup. */ untilEndOfTurnOf?: PlayerId; /** Until this player's next turn begins (Hope of Ghirapur). */ untilTurnOf?: PlayerId }[];
   /** Players who can't play lands this turn (Moonhold), and what said so. */
   cantPlayLandsThisTurn?: { player: PlayerId; turn: number; source: string }[];
   /** "Players can't gain life this turn" effects from resolved spells and abilities, by the turn they were made (CR 119.7). */
@@ -1846,9 +1853,13 @@ export interface Resolving {
   nth?: number;
   /** Its last coin flip (CR 705.2): won or lost, and how many were won ("flip a coin until you lose a flip"). */
   flipped?: { won: boolean; wins: number };
+  /** Effect "chooseOwnCommander" (Stinging Study): the chosen commander's mana value. */
+  commanderMv?: number;
   /** Its last roll (CR 706.2): each die's natural result that counts (not the ignored ones, 706.6), and the result. */
   rolled?: { sides: number; naturals: number[]; result: number; /** "The other result" (Effect roll's chooseOne). */ other?: number };
   scratch?: {
+    /** A search's cards put on top "in any order" (Goblin Recruiter) have been ordered. */
+    topOrdered?: true;
     /** "Each player chooses a creature type": the players asked so far. */
     eachAsked?: PlayerId[];
     /** Secret numbers (Wheel of Misfortune): the players still to choose, each one's number, and where the rest stands. */
@@ -2006,6 +2017,8 @@ export interface Resolving {
     attackWhom?: string;
     /** reselectAttack: what the creature attacks now (as attackChoices keys it). */
     reselect?: string;
+    /** reselectAttack for each attacking creature (Windshaper Planetar): the ones asked about so far. */
+    reselected?: ObjectId[];
     /** Token copies created attacking: what each one attacks, chosen so far (attackChoices keys). */
     attackPicks?: string[];
     /** "Tapped and attacking that player or a planeswalker they control": each opponent's pick (an attackChoices key). */

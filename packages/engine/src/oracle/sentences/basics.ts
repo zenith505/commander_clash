@@ -342,7 +342,8 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const who: PlayerRef | null = m[1] ? parsePlayer(m[1].toLowerCase(), ctx) : { ref: "you" };
     return who ? [{ type: "shuffleZones", who, hand: true, drawThatMany: true }] : null;
   }
-  if ((m = /^(?:([Tt]arget player|[Ee]ach player|[Tt]arget opponent) shuffles their|[Ss]huffle your) (hand and graveyard|graveyard|hand) into (?:their|your) library(?:, then (?:draws|draw) (\w+) cards?)?$/.exec(s))) {
+  // "..., then that player shuffles their hand into their library" (Jace, the Mind Sculptor): the player targeted before.
+  if ((m = /^(?:([Tt]arget player|[Ee]ach player|[Tt]arget opponent|[Tt]hat player) shuffles their|[Ss]huffle your) (hand and graveyard|graveyard|hand) into (?:their|your) library(?:, then (?:draws|draw) (\w+) cards?)?$/.exec(s))) {
     const who: PlayerRef | null = m[1] ? parsePlayer(m[1].toLowerCase(), ctx) : { ref: "you" };
     if (!who) return null;
     const out: Effect[] = [{ type: "shuffleZones", who, ...(m[2] !== "graveyard" ? { hand: true as const } : {}), ...(m[2] !== "hand" ? { graveyard: true as const } : {}) }];
@@ -481,6 +482,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const filter = pickFilter(m[2]!.replace(/^(?:an?|another) /, ""));
     if (!filter) return null;
     return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: another ? { ...filter, notSource: true, text: `other ${filter.text}` } : filter, n: 1, action: "bounce" }], otherwise: [sacrificeSelf], keep: true, text: `Return ${m[2]} you control to its owner's hand to keep ~` }];
+  }
+  // Command Bridge: "sacrifice it unless you tap an untapped permanent you control". Tapping one keeps it; with none
+  // untapped, or choosing not to, it's sacrificed.
+  if ((m = /^[Ss]acrifice (~|it) unless you tap an untapped ([a-z]+) you control$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+    const filter = pickFilter(m[2]!);
+    if (filter?.kind !== "object") return null;
+    return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: { ...filter, tapped: false, text: `untapped ${filter.text}` }, n: 1, action: "tap" }], otherwise: [sacrificeSelf], keep: true, text: `Tap an untapped ${m[2]} you control to keep ~` }];
   }
   // "Sacrifice ~ unless you sacrifice a land" (Bog Elemental, The Gitrog Monster): sacrificing one keeps it; with none to
   // sacrifice, or choosing not to, it's sacrificed.
@@ -642,6 +650,15 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     const filter = m[2] ? parseTargetPhrase(`${m[2].toLowerCase()} spell`) : undefined;
     if (filter === null || (filter && filter.kind !== "spell")) return null;
     return [{ type: "cantCast", who, ...(filter ? { filter: { ...filter, text: `${m[2]!.toLowerCase()} spell` } } : {}), ...(m[3] !== "this turn" ? { untilYourNextTurnEnds: true as const } : {}) }];
+  }
+  // Hope of Ghirapur: "Until your next turn, target player ... can't cast noncreature spells": until this effect's
+  // controller's next turn begins (CR 611.2b).
+  if ((m = /^Until your next turn, (.+?) can't cast (?:(noncreature) )?spells$/.exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    if (!who || who.ref !== "target") return null;
+    const filter = m[2] ? parseTargetPhrase("noncreature spell") : undefined;
+    if (filter === null || (filter && filter.kind !== "spell")) return null;
+    return [{ type: "cantCast", who, ...(filter ? { filter: { ...filter, text: "noncreature spell" } } : {}), untilYourNextTurn: true }];
   }
   // "Target player can't play lands this turn" (Moonhold): one player, until the turn ends.
   if ((m = /^(target player|that player) can't play lands this turn$/i.exec(s))) {

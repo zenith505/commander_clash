@@ -2514,6 +2514,7 @@ function startNextTurn(s: GameState, skipping = false) {
       p.gainedUntilNextTurn = undefined;
       p.lifeCantChange = undefined;
       p.attackTaxUntil = undefined;
+      p.attackBansUntil = undefined;
     }
   if (s.namedBansUntil) s.namedBansUntil = s.namedBansUntil.filter((r) => !began.has(r.controller));
   if (!s.namedBansUntil?.length) s.namedBansUntil = undefined;
@@ -2564,7 +2565,9 @@ function startNextTurn(s: GameState, skipping = false) {
   s.turnRules = undefined;
   // "Until the end of your next turn" (Single Combat): kept until that player's next turn has ended, or they've left the
   // game (as other such effects, below).
+  // "Until your next turn" (Hope of Ghirapur): until that player's next turn begins, this one (CR 611.2b), or they've left.
   s.cantCastThisTurn = s.cantCastThisTurn?.filter((c) => {
+    if (c.untilTurnOf !== undefined) return !player(s, c.untilTurnOf).lost && s.activePlayer !== c.untilTurnOf;
     if (c.untilEndOfTurnOf === undefined) return false;
     const by = player(s, c.untilEndOfTurnOf);
     return !by.lost && !(by.id !== s.activePlayer && (by.turnBegan ?? 0) > c.turn);
@@ -3947,6 +3950,19 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
     const t = s.objects[id];
     if (t?.zone === "battlefield" && controllerOf(s, t) !== pid) mods.more += abilitiesOf(s, t).targetTax ?? 0;
   }
+  // Killian, Ink Duelist: "Spells you cast that target a creature cost {2} less"; Esior, Wardwing Familiar: "Spells your
+  // opponents cast that target one or more commanders you control cost {3} more". Each such permanent once, with the
+  // targets chosen before the cost is worked out (CR 601.2c, 601.2f).
+  const targeted = [...new Set((how.targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])))].map((id) => s.objects[id]).filter((t) => t?.zone === "battlefield") as GameObject[];
+  if (targeted.length && !how.faceDown)
+    for (const id of s.battlefield) {
+      const src = obj(s, id);
+      const ab = abilitiesOf(s, src);
+      if (!ab.castTargetLess && !ab.commanderTargetTax) continue;
+      const by = controllerOf(s, src);
+      if (by === pid) for (const c of ab.castTargetLess ?? []) if (targeted.some((t) => objectMatches(s, c.filter, t, by, false))) mods.less += c.n;
+      if (ab.commanderTargetTax && by !== pid && opponents(s, by).includes(pid) && targeted.some((t) => t.isCommander && t.owner === by && controllerOf(s, t) === by)) mods.more += ab.commanderTargetTax;
+    }
   // "Aura spells you cast that target enchanted creature cost {3} less to cast" (Strong Back): its target is what it
   // will enchant (CR 303.4a), chosen before the cost is worked out (CR 601.2c, 601.2f).
   const auraTarget = how.targets?.[0]?.kind === "object" ? how.targets[0].id : undefined;
@@ -4536,6 +4552,8 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
     ((s.turnLog ??= {}).payZeroUsed ??= []).push(`${by.id}@${by.zoneChanges ?? 0}`);
     log(s, `${p.name} pays life rather than ${d.name}'s mana cost (${characteristics(s, by).name}).`);
   }
+  // Cast with a permission that says "if that spell would be put into a graveyard, exile it instead" (Dire Fleet Daredevil).
+  const exileAfter = castFrom === "exile" && !!o.mayPlay?.exileAfter && ownExilePermission(s, o, p.id);
   const from = zoneList(s, o)!;
   from.splice(from.indexOf(id), 1);
   o.zone = "stack";
@@ -4556,7 +4574,7 @@ function castSpell(s: GameState, p: Player, id: ObjectId, targets?: TargetChoice
   // A once-each-turn permission's own "exile it instead" (Maestros Ascendancy), not another's it shares the way with.
   const exiles = via?.kind === "turnPermission" ? !!choices.permit && permitExiles(s, choices.permit) : via?.exile;
   if (exiles || (castFrom === "graveyard" && compileCard(d).fromGraveyard?.some((g) => g.kind === "aftermath"))) o.exileIfLeaves = "stack";
-  if (via?.exileIfToGraveyard) o.exileIfToGraveyard = true;
+  if (via?.exileIfToGraveyard || exileAfter) o.exileIfToGraveyard = true;
   o.controller = p.id;
   o.timestamp = s.nextTimestamp++;
   const chosen = spell?.modal ? modes : undefined;
@@ -4715,7 +4733,7 @@ function castLimitProblem(s: GameState, pid: PlayerId, d: CardDef, mv?: number):
   if (named) return named;
   // "Your opponents can't cast spells this turn" (Silence) and the like.
   for (const c of s.cantCastThisTurn ?? [])
-    if (c.player === pid && (c.turn === s.turn || c.untilEndOfTurnOf !== undefined) && (!c.filter || printedMatches(c.filter, d))) return `${c.source}: you can't cast ${c.filter ? `${c.filter.text.replace(/ spell$/, "")} ` : ""}spells ${c.untilEndOfTurnOf !== undefined ? "for now" : "this turn"}`;
+    if (c.player === pid && (c.turn === s.turn || c.untilEndOfTurnOf !== undefined || c.untilTurnOf !== undefined) && (!c.filter || printedMatches(c.filter, d))) return `${c.source}: you can't cast ${c.filter ? `${c.filter.text.replace(/ spell$/, "")} ` : ""}spells ${c.untilEndOfTurnOf !== undefined || c.untilTurnOf !== undefined ? "for now" : "this turn"}`;
   // Permanents, and emblems in the command zone (CR 114.4).
   for (const o of [...s.battlefield.map((id) => obj(s, id)), ...liveEmblems(s)]) {
     // "Each opponent can cast spells only any time they could cast a sorcery" (Teferi, Time Raveler).
@@ -7162,6 +7180,7 @@ export function attackProblem(s: GameState, o: GameObject, defender: PlayerId, p
   if (c.attackDespiteDefenderVs && !c.attackDespiteDefender && objHasKeyword(s, o, "Defender") && (planeswalker || attacked !== undefined || !attackedYouLastTurn(s, defender, c.controller))) return `${c.name} has defender`;
   // "Can't attack you or planeswalkers you control": that player, and their planeswalkers (a battle they protect isn't one).
   const atBattle = !!attacked && !!s.objects[attacked] && objIsType(s, obj(s, attacked), "Battle") && !objIsType(s, obj(s, attacked), "Planeswalker");
+  if (player(s, defender).attackBansUntil?.includes(c.controller) && !atBattle) return `${c.name} can't attack ${player(s, defender).name}${planeswalker ? "'s planeswalkers" : ""} until their next turn`;
   if (c.cantAttackPlayers.includes(defender) && !atBattle) return `${c.name} can't attack ${player(s, defender).name}${planeswalker ? "'s planeswalkers" : ""}`;
   // Alexios: its owner, but not their planeswalkers or the battles they protect (rulings).
   if (c.cantAttackOwner && !planeswalker && attacked === undefined && defender === o.owner) return `${c.name} can't attack its owner`;

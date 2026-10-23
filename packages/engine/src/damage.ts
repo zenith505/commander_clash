@@ -1271,7 +1271,7 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
 }
 
 /** "Whenever one or more Pirates you control deal damage to your opponents": the damage to players dealt at once. */
-function firePlayersDealt(s: GameState, out: { src: DamageSource; to: DamageEvent["to"]; dealt: number }[]) {
-  const hits = out.flatMap((e) => ("player" in e.to && e.dealt > 0 ? [{ player: e.to.player, by: e.src.controller, amount: e.dealt, ...(e.src.id && !e.src.spell ? { source: e.src.id } : {}), types: e.src.types, subtypes: e.src.subtypes }] : []));
+function firePlayersDealt(s: GameState, out: { src: DamageSource; to: DamageEvent["to"]; dealt: number; combat?: boolean }[]) {
+  const hits = out.flatMap((e) => ("player" in e.to && e.dealt > 0 ? [{ player: e.to.player, by: e.src.controller, amount: e.dealt, ...(e.src.id && !e.src.spell ? { source: e.src.id } : {}), types: e.src.types, subtypes: e.src.subtypes, ...(e.combat ? { combat: true as const } : {}) }] : []));
   if (hits.length) fireEvent(s, { type: "playersDealtDamage", hits });
 }

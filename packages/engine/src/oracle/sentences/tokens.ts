@@ -70,7 +70,8 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // "... creature token named Ajani's Pridemate with "Whenever you gain life, ..."" (Ajani, Strength of the Pride): the
   // same as with the name last.
-  if ((m = /^(.+? creature tokens?) named ([A-Z][\w'-]*(?: [A-Z][\w'-]*)*) with (".+")$/.exec(s))) return parseSentence(`${m[1]} with ${m[3]} named ${m[2]}`, ctx);
+  // "... token named Lightning Rager with trample, haste, and "..."" (Rite of the Raging Storm) likewise.
+  if ((m = /^(.+? creature tokens?) named ([A-Z][\w'-]*(?: [A-Z][\w'-]*)*) with (.+)$/.exec(s))) return parseSentence(`${m[1]} with ${m[3]} named ${m[2]}`, ctx);
   if ((m = new RegExp(`^(?:(.+?) creates|(?:You )?[Cc]reate) ${NUMX} (tapped (?:and attacking )?)?(\\d+|X)/(\\d+|X) (.+?) creature tokens?(?: with (.+?))?(?: named ([A-Z][\\w'-]*(?: (?:of |the )?[A-Z][\\w'-]*)*))?(?: that(?:'s| are) (tapped(?: and attacking)?|attacking|blocking that creature))?$`, "i").exec(s))) {
     const xx = m[4] === "X" || m[5] === "X";
     // "An X/1 red Phyrexian Horror creature token" (Urabrask's Forge): only its power is X.
@@ -96,9 +97,12 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   // A named noncreature token with an ability of its own: "create eight colorless snow artifact tokens named Replicated Ring
   // with "{T}: Add one mana of any color."" (Replicating Ring, CR 111.4).
-  if ((m = new RegExp(`^(?:You )?[Cc]reate ${NUMX} colorless (snow )?artifact tokens? named ((?:[A-Z][\\w'-]*)(?: [A-Z][\\w'-]*)*) with "([^"]+)"$`).exec(s))) {
-    const token: TokenSpec = { name: m[3]!, named: true, colors: [], types: ["Artifact"], subtypes: [], keywords: [], abilities: m[4]!, ...(m[2] ? { snow: true as const } : {}) };
-    return compileQuoted(m[4]!) ? [{ type: "createToken", who: { ref: "you" }, n: amt(m[1]!), token }] : null;
+  // Roxanne, Starfall Savant: "create a tapped colorless artifact token named Meteorite with "When this token enters, it
+  // deals 2 damage to any target" and "{T}: Add one mana of any color."": two abilities, entering tapped.
+  if ((m = new RegExp(`^(?:You )?[Cc]reate ${NUMX} (tapped )?colorless (snow )?artifact tokens? named ((?:[A-Z][\\w'-]*)(?: [A-Z][\\w'-]*)*) with "([^"]+)"(?: and "([^"]+)")?$`).exec(s))) {
+    const texts = [m[5]!, ...(m[6] ? [m[6]] : [])].map((x) => x.replace(/^([^.]*[^.])$/, "$1."));
+    const token: TokenSpec = { name: m[4]!, named: true, colors: [], types: ["Artifact"], subtypes: [], keywords: [], abilities: texts.join("\n"), ...(m[3] ? { snow: true as const } : {}) };
+    return texts.every((x) => compileQuoted(x)) ? [{ type: "createToken", who: { ref: "you" }, n: amt(m[1]!), token, ...(m[2] ? { tapped: true as const } : {}) }] : null;
   }
   // Overlord of the Hauntwoods: "create a tapped colorless land token named Everywhere that is every basic land type": a
   // Plains, Island, Swamp, Mountain and Forest, with each one's mana ability (CR 305.6), but not basic (rulings).

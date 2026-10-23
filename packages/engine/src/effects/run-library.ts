@@ -430,8 +430,13 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         // has nothing to order.
         const look = n === 1 && cards.length === 1;
         if (cards.length < 2 && !look) return;
-        s.pending = { kind: "arrangeTop", player: ctx.controller, how: look ? "look" : "order", cards, source: src, ...(owner !== ctx.controller ? { owner } : {}) };
+        s.pending = { kind: "arrangeTop", player: ctx.controller, how: e.mayBottom ? "scry" : look ? "look" : "order", cards, source: src, ...(owner !== ctx.controller ? { owner } : {}) };
         return "paused";
+      }
+      if (e.mayBottom) {
+        const moved = new Set([...arranged.top, ...arranged.away]);
+        lib.library = [...arranged.top, ...lib.library.filter((id) => !moved.has(id)), ...arranged.away];
+        return void log(s, `${player(s, ctx.controller).name} looks at the top card of ${owner === ctx.controller ? "their" : `${lib.name}'s`} library${arranged.away.length ? " and puts it on the bottom" : " and leaves it on top"}.`);
       }
       const looked = new Set(arranged.top);
       lib.library = [...arranged.top, ...lib.library.filter((id) => !looked.has(id))];
@@ -660,6 +665,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // Ruin): each player chooses in APNAP order, then the cards are put where they go at the same time (CR 101.4).
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
+      if (sc.topOrdered) return; // the cards it put on top have been ordered: done
       // "With mana value less than or equal to ..." (TargetSpec.bound): as it resolves.
       // Its text says the number (sayBound).
       const filter0 = e.filter && { ...bindBound(s, e.filter, amountCtx(s, ctx)), text: sayBound(s, e.filter.text, e.filter, amountCtx(s, ctx)) };
@@ -852,6 +858,14 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           shuffleLibrary(s, player(s, pid));
           log(s, `${player(s, pid).name} shuffles their library.`);
         }
+      // "Put those cards on top in any order" (Goblin Recruiter): the searcher orders the cards now on top.
+      const onTop = moves.filter((m) => !e.dest.third && dest(m.pid, m.id).zone === "libraryTop" && obj(s, m.id).zone === "library");
+      if (onTop.length > 1 && searchers.length === 1) {
+        const lib = libOf(onTop[0]!.pid);
+        sc.topOrdered = true;
+        s.pending = { kind: "orderLibrary", player: onTop[0]!.pid, cards: lib.library.filter((id) => onTop.some((m) => m.id === id)), source: src };
+        return "paused";
+      }
       return;
     }
     case "piles": {
@@ -1024,7 +1038,9 @@ function dig(s: GameState, e: Extract<Effect, { type: "dig" }>, ctx: ResolveCtx,
         const filter = chosenFilter?.xRange ? (({ xRange: _, ...r }) => ({ ...r, manaValue: { max: ctx.x ?? 0 } }))(chosenFilter) : chosenFilter && bindBound(s, chosenFilter, amountCtx(s, ctx));
         const mvMax = filter?.manaValue?.max ?? ctx.x ?? 0;
         const options = sc.looked.filter((id) => !filter || printedMatches(filter, defOf(s, obj(s, id))));
-        const max = Math.max(0, Math.min(e.count, options.length, sc.looked.length - (e.minRest ?? 0)));
+        // "If ~ was kicked, put two of those cards into your hand instead" (Consult the Star Charts, CR 702.33e).
+        const count = e.kickedCount !== undefined && ctx.kicked?.length ? e.kickedCount : e.count;
+        const max = Math.max(0, Math.min(count, options.length, sc.looked.length - (e.minRest ?? 0)));
         const min = e.required ? max : e.upTo || e.filter ? 0 : max;
         log(s, `${p.name} ${e.reveal ? "reveals" : "looks at"} the top ${sc.looked.length === 1 ? "card" : `${sc.looked.length} cards`} of their library${e.reveal ? ` (${sc.looked.map((id) => defOf(s, obj(s, id)).name).join(", ")})` : ""}.`);
         if (max > 0 && !(min === max && options.length === max)) {

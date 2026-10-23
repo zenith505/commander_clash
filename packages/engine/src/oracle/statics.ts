@@ -175,7 +175,7 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
  * is ...", "... if you control a Wizard" / "If an opponent controls seven or more lands, ...". Only generic
  * mana: a reduction can't take colored mana off (CR 118.7a).
  */
-export function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition; colored?: Color[] } } | { lessIfTargets: { n: number; filter: TargetSpec } } | { targetTax: number } | { targetLifeTax: number } | "fail" | null {
+export function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition; colored?: Color[] } } | { lessIfTargets: { n: number; filter: TargetSpec } } | { targetTax: number } | { targetLifeTax: number } | { castTargetLess: { n: number; filter: TargetSpec } } | { commanderTargetTax: number } | "fail" | null {
   let text = line.replace(/^[A-Z][A-Za-z' -]+ — (?=~ costs|The second)/, "").replace(/\.$/, ""); // "Domain —" is an ability word
   let m: RegExpExecArray | null;
   // "Each spell you cast that's a Demon, Horror, or Nightmare costs {1} less to cast" (Ancient Cellarspawn): spells of
@@ -211,6 +211,14 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   // their turn (CR 601.2f).
   if ((m = /^Each spell costs \{(\d+)\} more to cast except during its controller's turn$/.exec(text))) return { costMod: { who: "all", filter: { kind: "spell", text: "spells" }, n: Number(m[1]), turn: "notCasters", text: line } };
   if ((m = /^Spells your opponents cast that target ~ cost \{(\d+)\} more to cast$/.exec(text))) return { targetTax: Number(m[1]) };
+  // Killian, Ink Duelist: "Spells you cast that target a creature cost {2} less to cast" (generic mana only, rulings).
+  if ((m = /^Spells you cast that target an? ([a-z]+) cost \{(\d+)\} less to cast$/.exec(text))) {
+    const filter = parseTargetPhrase(m[1]!);
+    return filter?.kind === "object" ? { castTargetLess: { n: Number(m[2]), filter } } : "fail";
+  }
+  // Esior, Wardwing Familiar: "Spells your opponents cast that target one or more commanders you control cost {3} more to
+  // cast": once per spell, however many it targets (rulings).
+  if ((m = /^Spells your opponents cast that target one or more commanders you control cost \{(\d+)\} more to cast$/.exec(text))) return { commanderTargetTax: Number(m[1]) };
   if ((m = /^Spells your opponents cast that target ~ cost an additional (\d+) life to cast$/.exec(text))) return { targetLifeTax: Number(m[1]) };
   if ((m = /^~ costs \{(\d+)\} less to cast for each (.+)$/.exec(text))) {
     const c = parseCount(m[2]!, null, true);
@@ -536,6 +544,7 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
   if ((m = new RegExp(`^a library has ${NUM} or fewer cards in it$`).exec(text))) return { kind: "libraryAtMost", n: num(m[1]!) };
   if (/^your library has no cards in it$/.test(text)) return { kind: "libraryAtMost", n: 0, yours: true };
   if (/^you're the monarch$/.test(text)) return { kind: "monarch" };
+  if (/^you're not the monarch$/.test(text)) return { kind: "monarch", not: true };
   // "If an opponent is the monarch" (Queen Marchesa, CR 725).
   if (/^an opponent is the monarch$/.test(text)) return { kind: "monarch", opponent: true };
   if (/^you have the initiative$/.test(text)) return { kind: "initiative" }; // CR 726.1
@@ -664,6 +673,8 @@ export function parseStaticCondition(text: string, st: StaticAbility): StaticCon
     return { kind: "selfCounter", counter: counterKind(m[1]!) };
   // Dark Depths: "When ~ has no ice counters on it" (a state trigger, CR 603.8).
   if ((m = new RegExp(`^~ has no ${COUNTER} counters on it$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[1]!), min: 0, max: 0 };
+  // Temple of Cyclical Time: "Activate only if it has no time counters on it": it is ~.
+  if ((m = new RegExp(`^it has no ${COUNTER} counters on it$`).exec(text)) && st.affects.kind === "self") return { kind: "selfCounters", counter: counterKind(m[1]!), min: 0, max: 0 };
   // Beastmaster Ascension: "as long as ~ has seven or more quest counters on it".
   // "If ~ has fewer than three +1/+1 counters on it" (Runaway Steam-Kin).
   if ((m = new RegExp(`^~ has fewer than ${NUM} ${COUNTER} counters on it$`).exec(text))) return { kind: "selfCounters", counter: counterKind(m[2]!), min: 0, max: num(m[1]!) - 1 };
@@ -743,6 +754,9 @@ export function parseAffected(subject: string): Affects | null {
   // "Each creature that's attacking one of your opponents has trample" (Oviya, Automech Artisan): any player's creature
   // attacking that player (not their planeswalkers or battles), whichever are now (CR 611.3a).
   if (/^(?:Each creature that's|Creatures) attacking one of your opponents$/.test(x)) return { kind: "filter", types: ["Creature"], spec: { kind: "object", combat: "attackingOpponent", text: "creature attacking one of your opponents" } };
+  // "Creatures named Lightning Rager can't attack you ..." (Rite of the Raging Storm): any player's, by their name.
+  const named = /^Creatures named ([A-Z][A-Za-z' -]+)$/.exec(x);
+  if (named) return { kind: "filter", types: ["Creature"], spec: { kind: "object", named: named[1]!, text: `creature named ${named[1]}` } };
   // "Commander creatures you control get +2/+2", "Commanders you control have ward {2}" (CR 903.3): any player's.
   if (/^Commanders? (?:creatures )?you control$/.test(x))
     return { kind: "filter", types: x.includes("creatures") ? ["Creature"] : [], controller: "you", spec: { kind: "object", commander: true, text: "commander" } };

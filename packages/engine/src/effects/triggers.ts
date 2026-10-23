@@ -207,7 +207,7 @@ export type TriggerSourceEvent =
    * Damage dealt to players at the same time (CR 603.2c): each source's to each player, with the source's controller and
    * its card types and subtypes as it dealt it, and the permanent it was (not for a spell).
    */
-  | { type: "playersDealtDamage"; hits: { player: PlayerId; by: PlayerId; amount: number; source?: ObjectId; types: readonly string[]; subtypes: readonly string[] }[] }
+  | { type: "playersDealtDamage"; hits: { player: PlayerId; by: PlayerId; amount: number; source?: ObjectId; types: readonly string[]; subtypes: readonly string[]; combat?: true }[] }
   /** Damage dealt at the same time was excess damage to these permanents (CR 120.10), under `controller` then. */
   | { type: "excessDamage"; hits: { id: ObjectId; amount: number; controller: PlayerId }[]; combat: boolean }
   /** The Ring tempted a player, who chose `chosen` as their Ring-bearer, if they could choose one (CR 701.54d). */
@@ -1197,7 +1197,7 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         const g = t.event === "groupDealsDamageToPlayers" ? t.damageGroup : undefined;
         if (!g) continue;
         const fits = (h: (typeof ev.hits)[number]) => {
-          if (h.by !== wc || h.source === undefined || (g.opponents && !opponents(s, wc).includes(h.player))) return false;
+          if (h.by !== wc || h.source === undefined || (g.opponents && !opponents(s, wc).includes(h.player)) || (g.combat && !h.combat)) return false;
           const o = s.objects[h.source];
           if (o?.zone === "battlefield") return objectMatches(s, g.filter, o, wc, false);
           const { kind: _k, text: _t, types = [], subtypes = [], ...rest } = g.filter;

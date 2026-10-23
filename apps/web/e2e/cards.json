@@ -5444,6 +5444,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "792e1072-00bf-4f63-b956-5f20cdf09f11",
+  "name": "Goblin Recruiter",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Creature — Goblin",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin"
+  ],
+  "oracleText": "When this creature enters, search your library for any number of Goblin cards, reveal them, then shuffle and put those cards on top in any order.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "vis",
+  "releasedAt": "1997-02-03",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d1960749-c11e-4ac4-97cb-f37d7875d479",
   "name": "Goldbug, Humanity's Ally // Goldbug, Scrappy Scout",
   "manaCost": "{1}{W}{U}",
@@ -6643,6 +6673,37 @@
   "gameChanger": false
  },
  {
+  "oracleId": "7f77a84e-5a4b-4834-aefa-3cecc175ae8e",
+  "name": "Jace, the Mind Sculptor",
+  "manaCost": "{2}{U}{U}",
+  "cmc": 4,
+  "typeLine": "Legendary Planeswalker — Jace",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Planeswalker"
+  ],
+  "subtypes": [
+   "Jace"
+  ],
+  "oracleText": "+2: Look at the top card of target player's library. You may put that card on the bottom of that player's library.\n0: Draw three cards, then put two cards from your hand on top of your library in any order.\n−1: Return target creature to its owner's hand.\n−12: Exile all cards from target player's library, then that player shuffles their hand into their library.",
+  "loyalty": "3",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "blc",
+  "releasedAt": "2024-08-02",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "396b943c-b45d-4e5b-a9c1-f70bc603ee9f",
   "name": "Jester's Scepter",
   "manaCost": "{3}",
@@ -7490,6 +7551,42 @@
   "set": "gtc",
   "releasedAt": "2013-02-01",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d3c56fc4-3611-41b1-952e-4c5311b1510b",
+  "name": "Lathiel, the Bounteous Dawn",
+  "manaCost": "{2}{G}{W}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Unicorn",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Unicorn"
+  ],
+  "oracleText": "Lifelink\nAt the beginning of each end step, if you gained life this turn, distribute up to that many +1/+1 counters among any number of other target creatures.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "G",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "W"
+  ],
+  "keywords": [
+   "Lifelink"
+  ],
+  "commanderLegal": "legal",
+  "set": "mul",
+  "releasedAt": "2023-04-21",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -9247,6 +9344,37 @@
   "commanderLegal": "legal",
   "set": "aer",
   "releasedAt": "2017-01-20",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "d5e9942e-096f-433f-8668-4b594f3c1b02",
+  "name": "Orzhov Advokist",
+  "manaCost": "{2}{W}",
+  "cmc": 3,
+  "typeLine": "Creature — Human Advisor",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Advisor"
+  ],
+  "oracleText": "At the beginning of your upkeep, each player may put two +1/+1 counters on a creature they control. If a player does, creatures that player controls can't attack you or planeswalkers you control until your next turn.",
+  "power": "1",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c16",
+  "releasedAt": "2016-11-11",
   "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
@@ -11997,6 +12125,32 @@
   "gameChanger": false
  },
  {
+  "oracleId": "115bc79e-a109-42d7-ac58-2ee8dc0a959f",
+  "name": "Stinging Study",
+  "manaCost": "{4}{B}",
+  "cmc": 5,
+  "typeLine": "Instant",
+  "supertypes": [],
+  "types": [
+   "Instant"
+  ],
+  "subtypes": [],
+  "oracleText": "You draw X cards and you lose X life, where X is the mana value of a commander you own on the battlefield or in the command zone.",
+  "colors": [
+   "B"
+  ],
+  "colorIdentity": [
+   "B"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "c21",
+  "releasedAt": "2021-04-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "9fbab5bc-c651-46dc-89b6-0bcfeadb3891",
   "name": "Stonerise Spirit",
   "manaCost": "{1}{W}",
@@ -14028,6 +14182,39 @@
   "set": "kld",
   "releasedAt": "2016-09-30",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "c47050c2-9b46-427e-85d6-058fd6a61e67",
+  "name": "Windshaper Planetar",
+  "manaCost": "{4}{W}",
+  "cmc": 5,
+  "typeLine": "Creature — Angel",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Angel"
+  ],
+  "oracleText": "Flash\nFlying\nWhen this creature enters during the declare attackers step, for each attacking creature, you may reselect which player or permanent that creature is attacking. (It can't attack its controller or their permanents.)",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Flying",
+   "Flash"
+  ],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },

@@ -270,6 +270,8 @@ function evalCount(s: GameState, c: Count, ctx: AmountCtx): number {
       return c.of.reduce((n, x) => n + evalCount(s, x, ctx), 0);
     case "cardsToGraveyardThisTurn":
       return refPlayers(s, c.whose, ctx).reduce((n, pid) => n + (s.cardsToGraveyardThisTurn?.[pid] ?? 0), 0);
+    case "chosenCommanderMv":
+      return s.resolving?.commanderMv ?? 0;
     case "commanderCasts":
       return Object.values(s.players[ctx.controller]?.commanderCasts ?? {}).reduce((a, b) => a + b, 0);
     case "party":
@@ -647,6 +649,8 @@ function describeCount(c: Count): string {
       return "#cards put into that graveyard this turn";
     case "commanderCasts":
       return "#times you've cast your commander";
+    case "chosenCommanderMv":
+      return "the chosen commander's mana value";
     case "party":
       return "#creatures in your party";
     case "opponentsLifeLost":

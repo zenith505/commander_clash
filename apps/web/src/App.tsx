@@ -1360,7 +1360,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
           {dividing && (
             <div className="targeting">
               <span>
-                <strong>{dividing.targeting.label}</strong>: {dividing.targeting.specs.find((x) => x.divided)?.divided?.counter ? `distribute the ${dividing.targeting.specs.find((x) => x.divided)!.divided!.counter} counters` : "divide the damage"}
+                <strong>{dividing.targeting.label}</strong>: {dividing.targeting.specs.find((x) => x.divided)?.divided?.atMost ? `distribute up to ${dividing.targeting.specs.find((x) => x.divided)!.divided!.total} ${dividing.targeting.specs.find((x) => x.divided)!.divided!.counter} counters` : dividing.targeting.specs.find((x) => x.divided)?.divided?.counter ? `distribute the ${dividing.targeting.specs.find((x) => x.divided)!.divided!.counter} counters` : "divide the damage"}
               </span>
               {dividing.chosen.map((c, i) => {
                 if ((c.kind !== "object" && c.kind !== "player") || c.amount === undefined) return null;
@@ -3398,7 +3398,9 @@ function ArrangeTop({
                   ? `put these ${cards.length} cards into your graveyard in any order`
                   : how === "wholeGraveyard"
                     ? "reorder your graveyard as you choose"
-                    : `${how} ${cards.length}`}
+                    : how === "scry" && owner
+                      ? `the top card of ${owner}'s library: leave it on top or put it on the bottom`
+                      : `${how} ${cards.length}`}
           </strong>
           {how !== "look" && <span className="muted">{together ? " Use the arrows to order them." : " Click a card to move it between rows."}</span>}
           <button onClick={() => onDone(top, away)}>Done</button>
@@ -4632,7 +4634,9 @@ function Controls({
       <div className="controls">
         <span>
           <strong>{pending.source}:</strong>{" "}
-          {pending.action === "ringBearer"
+          {pending.prompt
+            ? pending.prompt
+            : pending.action === "ringBearer"
             ? `the Ring tempts you: click a creature of yours to be your Ring-bearer. It's legendary and can't be blocked by creatures with greater power, and gains the Ring's other abilities as the Ring tempts you more times.`
             : pending.action === "attach"
             ? `click any number of your Auras and Equipment to attach to ${pending.what}, then attach them (or attach none).`
@@ -4681,7 +4685,7 @@ function Controls({
                 : `click ${what} ${theirs ? `${theirs} controls` : "of yours"} to ${verb}.`}
         </span>
         <button disabled={!ok} onClick={() => dispatch([{ type: "pickPermanents", player: HUMAN, ids: discards }])}>
-          {pending.action === "attach" ? (n ? `Attach ${n}` : "Attach none") : pending.action === "keep" ? (n ? `Keep ${n}` : "Keep none") : pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "encode" ? (n ? "Encode" : "Don't encode") : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "keepTapped" ? (n ? `Keep ${n} tapped` : "Untap all") : pending.action === "untapLimited" ? `Untap ${n}` : pending.action === "phaseOut" ? (n ? `Phase out ${n}` : "Phase out none") : pending.action === "untap" ? (n ? `Untap ${n}` : "Untap none") : pending.action === "tap" ? (n ? `Tap ${n}` : "Tap none") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.action === "pile" ? `First pile: ${n}, second pile: ${pending.count - n}` : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : pending.action === "choose" ? "Choose none" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "exile" ? "Exile" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : pending.action === "choose" ? "Choose" : pending.action === "meld" ? "Meld" : pending.action === "unattach" ? "Unattach" : "Return"}
+          {pending.action === "attach" ? (n ? `Attach ${n}` : "Attach none") : pending.action === "keep" ? (n ? `Keep ${n}` : "Keep none") : pending.action === "ringBearer" ? "Choose Ring-bearer" : pending.action === "encode" ? (n ? "Encode" : "Don't encode") : pending.action === "champion" ? (n ? "Exile" : `Sacrifice ${pending.source}`) : pending.action === "band" ? (n ? `Band ${n}` : "No band") : pending.action === "enlist" ? (n ? "Enlist" : "Don't enlist") : pending.action === "exert" ? (n ? `Exert ${n}` : "Don't exert") : pending.action === "keepTapped" ? (n ? `Keep ${n} tapped` : "Untap all") : pending.action === "untapLimited" ? `Untap ${n}` : pending.action === "phaseOut" ? (n ? `Phase out ${n}` : "Phase out none") : pending.action === "untap" ? (n ? `Untap ${n}` : "Untap none") : pending.action === "tap" ? (n ? `Tap ${n}` : "Tap none") : pending.action === "unblocked" ? (n ? `Assign ${n} as unblocked` : "Damage the blockers") : pending.action === "reveal" ? (n ? `Reveal ${n}` : "Reveal none") : pending.action === "pile" ? `First pile: ${n}, second pile: ${pending.count - n}` : pending.prompt && pending.action === "counters" ? (n ? "Put counters" : "Put none") : pending.min !== undefined && n === 0 ? (pending.action === "pair" ? "Don't pair" : pending.action === "choose" ? "Choose none" : "Sacrifice none") : pending.action === "pair" ? "Pair" : pending.action === "sacrifice" ? "Sacrifice" : pending.action === "exile" ? "Exile" : pending.action === "counters" ? "Put counter" : pending.action === "populate" ? "Copy" : pending.action === "choose" ? "Choose" : pending.action === "meld" ? "Meld" : pending.action === "unattach" ? "Unattach" : "Return"}
         </button>
       </div>
     );

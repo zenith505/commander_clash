@@ -2526,6 +2526,8 @@ export type Effect =
       exileSpell?: true;
       /** "Exile target spell. It becomes plotted." (Aven Interrupter, CR 702.170c). */
       plot?: true;
+      /** With `exileSpell`: airbend (CR 701.65a): while the card stays exiled, its owner may cast it for this rather than its mana cost. */
+      ownerMayCost?: string;
       /** "Any number of target spells": the targets from `index`, this many (see TargetSpec.many, expandMany). */
       n?: number;
       /** "Counter target spell if its mana value is X" (Disrupting Shoal): only then, checked as it resolves. */

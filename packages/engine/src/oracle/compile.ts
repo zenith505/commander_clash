@@ -352,6 +352,12 @@ export function normalizeSelf(d: CardDef): string {
     t = t.replace(re, "~");
   }
   t = t.replace(/\u0001(\d+)\u0001/g, (_, i: string) => tokenNames[Number(i)]!);
+  // A card named for two characters ("Aang and La, Ocean's Fury", "Bebop & Rocksteady") takes plural verbs: "Whenever
+  // Aang and La attack", "Whenever ~ enter or attack". It's still one object (CR 201.5), read as "~ attacks".
+  if (/ (?:and|&) /.test(comma)) {
+    const third = (v: string) => (v === "die" ? "dies" : `${v}s`);
+    t = t.replace(/~ (attack|enter|deal|block|die)(?: or (attack|enter|block|die))?\b/g, (_, a: string, b?: string) => `~ ${third(a)}${b ? ` or ${third(b)}` : ""}`);
+  }
   // A legendary character card refers to itself as "he" or "she" ("Put a +1/+1 counter on Hercules. He gains
   // vigilance", "his power", "attach up to one target Equipment to her"): the card itself, like "it" (CR 201.5). Not in
   // a quoted ability, where it would mean the object given the ability, and not "his or her" (an old way to say "their").

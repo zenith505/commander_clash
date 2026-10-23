@@ -482,3 +482,95 @@ describe("Crovax the Cursed: \"you may sacrifice a creature. If you do, ... If y
     expect(s.objects[id]!.counters["+1/+1"]).toBe(5);
   });
 });
+
+const aang = scry(
+  "transform",
+  [
+    { name: "Aang, Swift Savior", mana_cost: "{1}{W}{U}", type_line: "Legendary Creature — Human Avatar Ally", oracle_text: "Flash\nFlying\nWhen Aang enters, airbend up to one other target creature or spell. (Exile it. While it's exiled, its owner may cast it for {2} rather than its mana cost.)\nWaterbend {8}: Transform Aang. (While paying a waterbend cost, you can tap your artifacts and creatures to help. Each one pays for {1}.)", power: "2", toughness: "3" },
+    { name: "Aang and La, Ocean's Fury", type_line: "Legendary Creature — Avatar Spirit Ally", oracle_text: "Reach, trample\nWhenever Aang and La attack, put a +1/+1 counter on each tapped creature you control.", power: "5", toughness: "5" },
+  ],
+  { keywords: ["Flash", "Flying", "Airbend", "Waterbend", "Reach", "Trample"] },
+);
+
+describe("Aang, Swift Savior // Aang and La, Ocean's Fury", () => {
+  const sorcery = card("Test Sorcery", "Sorcery", "{5}{U}", { oracleText: "Draw two cards." });
+  /** Aang cast in response to our own sorcery, his trigger asking for its target. */
+  const entered = () => {
+    const { s: s0, ap, ids } = setup([sorcery, aang]);
+    const [sorc, a] = ids as [string, string];
+    onlyInHand(s0, ap, ids);
+    addMana(s0, ap, ["W", "U", "U", ...Array<"C">(8).fill("C")]);
+    let s = run(s0, planCast(s0, ap, sorc));
+    s = run(s, planCast(s, ap, a));
+    s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    for (let i = 0; i < 6 && !s.pending && s.objects[a]!.zone !== "battlefield"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    return { s, ap, sorc, a };
+  };
+
+  it("compiles on both faces", () => supported(aang));
+
+  it("airbends a spell: it leaves the stack without resolving, and its owner may cast it from exile for {2}", () => {
+    const { s: s0, ap, sorc } = entered();
+    expect(s0.pending?.kind).toBe("chooseTargets");
+    const item = s0.stack.find((x) => x.objectId === sorc)!;
+    let s = act(s0, { type: "chooseTargets", player: ap, targets: [{ kind: "stack", id: item.id }] });
+    s = passToPending(s);
+    expect(s.objects[sorc]!.zone).toBe("exile");
+    expect(s.objects[sorc]!.mayPlay).toMatchObject({ player: ap, until: "exiled", castOnly: true, cost: "{2}" });
+    expect(s.players[ap]!.hand).toHaveLength(0);
+  });
+
+  it("airbends another creature, but not Aang himself", () => {
+    const { s: s0, ap, a } = entered();
+    const opp = nextOf(s0, ap);
+    const theirs = putOnBattlefield(s0, opp, bear());
+    expect(() => act(s0, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: a }] })).toThrow();
+    const s = passToPending(act(s0, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: theirs }] }));
+    expect(s.objects[theirs]!.zone).toBe("exile");
+    expect(s.objects[theirs]!.mayPlay).toMatchObject({ player: opp, cost: "{2}" });
+  });
+
+  it("Aang and La attack: a +1/+1 counter on each tapped creature you control", () => {
+    const { s: s0, ap } = setup([]);
+    const id = putOnBattlefield(s0, ap, aang);
+    setFace(s0, s0.objects[id]!, 1);
+    const tapped = putOnBattlefield(s0, ap, bear());
+    s0.objects[tapped]!.tapped = true;
+    const untapped = putOnBattlefield(s0, ap, bear({ name: "Untapped Bear" }));
+    invalidateCharacteristics(s0);
+    let s = passUntil(s0, "declareAttackers", ap);
+    const opp = nextOf(s, ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: id, defender: opp }] });
+    s = passToPending(s);
+    expect(s.objects[tapped]!.counters["+1/+1"]).toBe(1);
+    expect(s.objects[untapped]!.counters["+1/+1"] ?? 0).toBe(0);
+    // Aang and La don't have vigilance: tapped as they attack, so they get one too.
+    expect(s.objects[id]!.counters["+1/+1"]).toBe(1);
+  });
+});
+
+describe("cards named for two characters take plural verbs: \"Whenever Aang and Katara enter or attack\"", () => {
+  const aangKatara = card("Aang and Katara", "Legendary Creature — Human Avatar Ally", "{3}{G}{W}{U}", { power: "5", toughness: "5", oracleText: "Whenever Aang and Katara enter or attack, create X 1/1 white Ally creature tokens, where X is the number of tapped artifacts and/or creatures you control." });
+  const falcon = card("Falcon and Redwing", "Legendary Creature — Human Bird Hero", "{2}{W}", { power: "1", toughness: "2", keywords: ["Flying"], oracleText: "Flying\nWhenever Falcon and Redwing deal combat damage to a player, create that many 1/1 white Bird creature tokens with flying, then put a +1/+1 counter on Falcon and Redwing." });
+
+  it("Aang and Katara attack: an Ally for each tapped artifact and creature, themselves included", () => {
+    supported(aangKatara, falcon);
+    const { s: s0, ap } = setup([]);
+    const id = putOnBattlefield(s0, ap, aangKatara);
+    const tapped = putOnBattlefield(s0, ap, bear());
+    s0.objects[tapped]!.tapped = true;
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = passToPending(act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: id, defender: nextOf(s, ap) }] }));
+    expect(s.battlefield.filter((x) => s.objects[x]!.controller === ap && characteristics(s, s.objects[x]!).subtypes.includes("Ally") && s.objects[x]!.isToken)).toHaveLength(2);
+  });
+
+  it("Falcon and Redwing deal combat damage to a player: that many Birds, then a counter", () => {
+    const { s: s0, ap } = setup([]);
+    const id = putOnBattlefield(s0, ap, falcon);
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: id, defender: nextOf(s, ap) }] });
+    for (let i = 0; i < 40 && s.objects[id]!.counters["+1/+1"] === undefined; i++) s = s.pending ? run(s, botActions(s, s.pending.player).slice(0, 1)) : act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.objects[id]!.counters["+1/+1"]).toBe(1);
+    expect(s.battlefield.filter((x) => s.objects[x]!.controller === ap && characteristics(s, s.objects[x]!).name === "Bird Token")).toHaveLength(1);
+  });
+});

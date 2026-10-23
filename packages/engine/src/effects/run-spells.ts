@@ -717,6 +717,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
             o.mayPlay = { player: o.owner, zc: o.zoneChanges ?? 0, until: "plot", turn: s.turn };
             log(s, `${defOf(s, o).name} becomes plotted: ${player(s, o.owner).name} may cast it without paying its mana cost on a later turn.`);
           }
+          if (e.ownerMayCost && o && s.objects[o.id] === o && o.zone === "exile" && !o.isToken) o.mayPlay = { player: o.owner, zc: o.zoneChanges ?? 0, until: "exiled", turn: s.turn, castOnly: true, cost: e.ownerMayCost };
         }
         return;
       }

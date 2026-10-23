@@ -473,6 +473,16 @@ export function bindBound(s: GameState, spec: TargetSpec, ctx: AmountCtx): Targe
 }
 
 /**
+ * Text saying a "with mana value less than or equal to ..." bound as the number it is now (Light-Paws: "with mana value 2
+ * or less", not "... less than or equal to that Aura"), for prompts.
+ */
+export function sayBound(s: GameState, text: string, spec: TargetSpec | undefined, ctx: AmountCtx): string {
+  if (spec?.bound?.key !== "manaValue" || spec.bound.at !== "most") return text;
+  const most = bindBound(s, spec, ctx).manaValue?.max;
+  return most === undefined ? text : text.replace(/ with mana value less than or equal to (?:that|its|the|this|~'s) [^,]+?(?= and |,|$)/, ` with mana value ${most} or less`);
+}
+
+/**
  * What an amount bound of a target is worked out with as the target is chosen: who controls the spell or ability and its
  * source, or the source as it last existed on the battlefield if it has left (CR 608.2h; rulings on Fiendish Panda).
  */

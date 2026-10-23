@@ -649,6 +649,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   if (shield) return shield;
   const deflect = chooseDeflection(s, pid);
   if (deflect) return deflect;
+  const echo = chooseCopyWithTaps(s, pid);
+  if (echo) return echo;
   // Respond to an opponent's spell with a counterspell if we have one: from hand, or an ability
   // like Spiketail Hatchling's. "Unless its controller pays" only if they can't pay.
   const top = s.stack[s.stack.length - 1];
@@ -3203,6 +3205,34 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       if (wb?.type === "activateAbility" && s.activePlayer === pid && (s.step === "main1" || s.step === "upkeep" || s.step === "draw" || s.step === "beginCombat") && wb.tapCreatures?.some((c) => objIsType(s, obj(s, c), "Creature") && !isSummoningSick(s, obj(s, c)))) continue;
       // Not worth sacrificing a Treasure to cash in a Food or Clue.
       if (cashIn && plan?.some((a) => a.type === "activateMana" && manaActionAbility(s, a)?.sacrificeSelf)) continue;
+      if (plan) return plan;
+    }
+  }
+  return null;
+}
+
+/**
+ * "{T}, Tap X untapped artifacts you control: Copy target instant or sorcery spell you control with mana value X"
+ * (Resonance Technician): our own instant or sorcery on top of the stack, with as many artifacts to tap as its mana
+ * value, the ones that make no mana first (Clues before Treasures), then noncreatures.
+ */
+function chooseCopyWithTaps(s: GameState, pid: PlayerId): Action[] | null {
+  const top = s.stack[s.stack.length - 1];
+  if (!top || top.kind !== "spell" || top.controller !== pid || !top.objectId || s.pending) return null;
+  const x = spellManaValue(s, top);
+  if (x < 1) return null;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid) continue;
+    for (const [i, ab] of abilitiesOf(s, o).activated.entries()) {
+      const c = ab.costs?.length === 1 ? ab.costs[0]! : undefined;
+      const spec = ab.body.targets.length === 1 ? ab.body.targets[0]! : undefined;
+      if (c?.kind !== "tap" || !c.x || ab.body.effects.length !== 1 || ab.body.effects[0]!.type !== "copySpell" || spec?.xRange?.key !== "manaValue") continue;
+      const pool = tapCostCandidates(s, pid, o, c)
+        .map((t) => obj(s, t))
+        .sort((a, b) => Number(manaAbilitiesOn(s, a).length > 0 || abilitiesOf(s, a).activated.some((m) => m.mana)) - Number(manaAbilitiesOn(s, b).length > 0 || abilitiesOf(s, b).activated.some((m) => m.mana)) || Number(objIsType(s, a, "Creature")) - Number(objIsType(s, b, "Creature")));
+      if (pool.length < x) continue;
+      const plan = planActivate(s, pid, id, i, [{ kind: "stack", id: top.id }], undefined, undefined, x, { tap: pool.slice(0, x).map((t) => t.id) });
       if (plan) return plan;
     }
   }

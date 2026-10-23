@@ -579,15 +579,71 @@ function tapManaOptions(s: GameState, pid: PlayerId, id: ObjectId): Option[] {
  * more of it or a color we lack (a Signet: "{1}, {T}: Add {W}{U}") are paid for and added.
  */
 export function planMana(s: GameState, pid: PlayerId, cost0: ParsedCost, extraGeneric = 0, exclude?: ObjectId, alsoExclude: ObjectId[] = [], use: ManaUse = "other", harm?: Partial<Record<Color, number>>, wantSnow = false): Action[] | null {
+  const excluded = [...(exclude ? [exclude] : []), ...alsoExclude];
+  return planManaWith(s, pid, cost0, extraGeneric, excluded, use, harm, wantSnow) ?? planXMana(s, pid, cost0, extraGeneric, excluded, use, harm, wantSnow);
+}
+
+/**
+ * Hazel of the Rootbloom's "{T}, Pay 2 life, Tap X untapped tokens you control: Add X mana in any combination of colors":
+ * a mana ability whose X is announced as it's activated (CR 107.3a, 605.1a, 602.2b). It costs life and taps tokens, so
+ * it's used only when the other sources can't pay: the fewest tokens (the ones that make no mana and couldn't attack
+ * first, as for other tap costs), the colors the cost still asks for, the rest of its mana for generic.
+ */
+function planXMana(s: GameState, pid: PlayerId, cost0: ParsedCost, extraGeneric: number, excluded: ObjectId[], use: ManaUse, harm?: Partial<Record<Color, number>>, wantSnow = false): Action[] | null {
+  if (use !== "other" && "spell" in use && use.spell && use.treasureOnly) return null;
+  const only = usableTypes(use);
+  const need = new Map<Color, number>();
+  for (const sym of cost0.symbols) {
+    const named: ManaType[] = sym.kind === "colored" || sym.kind === "phyrexian" || sym.kind === "twoHybrid" ? [sym.color] : sym.kind === "hybrid" ? sym.options : [];
+    for (const c of named) if (c !== "C") need.set(c, (need.get(c) ?? 0) + 1);
+  }
+  const colors = COLORS.filter((c) => need.has(c) && (!only || only.includes(c)));
+  const spare = colors[0] ?? COLORS.find((c) => !only || only.includes(c));
+  if (!spare) return null;
+  const most = manaValue(cost0) + extraGeneric;
+  for (const id of s.battlefield) {
+    if (excluded.includes(id)) continue;
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid) continue;
+    for (const [index, ab] of abilitiesOf(s, o).activated.entries()) {
+      const tapX = ab.costs?.length === 1 && ab.costs[0]!.kind === "tap" && ab.costs[0]!.x ? ab.costs[0]! : undefined;
+      const e = ab.body.effects.length === 1 ? ab.body.effects[0]! : undefined;
+      if (!ab.mana || !tapX || ab.manaCost || ab.body.modal || e?.type !== "addMana" || !e.anyColors || e.only || JSON.stringify(e.times) !== JSON.stringify({ count: { kind: "x" } })) continue;
+      const candidates = tapPreference(s, tapCostCandidates(s, pid, o, tapX).filter((t) => !excluded.includes(t)));
+      for (let k = 1; k <= Math.min(candidates.length, most); k++) {
+        const tokens = candidates.slice(0, k);
+        if (abilityProblem(s, pid, id, index, undefined, undefined, undefined, k, { tap: tokens })) continue;
+        // Each mix: how much of each named color (no more than the cost asks for), the rest in one color for generic.
+        let mixes: Partial<Record<Color, number>>[] = [{}];
+        for (const c of colors) mixes = mixes.flatMap((m) => Array.from({ length: (need.get(c) ?? 0) + 1 }, (_, n) => ({ ...m, [c]: n })));
+        const total = (m: Partial<Record<Color, number>>) => COLORS.reduce((n, c) => n + (m[c] ?? 0), 0);
+        mixes = mixes.filter((m) => total(m) <= k).sort((a, b) => total(b) - total(a));
+        for (const m0 of mixes) {
+          const counts = { ...m0, [spare]: (m0[spare] ?? 0) + k - total(m0) };
+          const bonus = emptyPool();
+          for (const c of COLORS) bonus[c] += counts[c] ?? 0;
+          const taps = planManaWith(s, pid, cost0, extraGeneric, [...excluded, id, ...tokens], use, harm, wantSnow, bonus, ab.lifeCost ?? 0);
+          if (taps) return [...taps, { type: "activateAbility", player: pid, objectId: id, index, x: k, costs: { tap: tokens } }, { type: "manaMix", player: pid, counts: Object.fromEntries(Object.entries(counts).filter(([, n]) => n)) }];
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/** planMana without Hazel's X mana: `bonus` is mana to count on besides the pool, `lifeLess` life already spent. */
+function planManaWith(s: GameState, pid: PlayerId, cost0: ParsedCost, extraGeneric: number, excluded: ObjectId[], use: ManaUse, harm?: Partial<Record<Color, number>>, wantSnow = false, bonus?: ManaPool, lifeLess = 0): Action[] | null {
   const p = player(s, pid);
+  const life = payableLife(s, pid) - lifeLess;
   // Only the mana that can be spent on this counts (CR 106.6); `restricted` is how much of the pool can't be spent
   // on anything else, such as a Signet's cost. `snow`: how much of it is snow mana (CR 107.4h).
   const start = poolFor(s, pid, use);
-  if (payFromPool(cost0, start.pool, extraGeneric, payableLife(s, pid), { snow: start.snow, wantSnow })) return [];
+  if (bonus) for (const m of Object.keys(bonus) as ManaType[]) start.pool[m] += bonus[m];
+  if (payFromPool(cost0, start.pool, extraGeneric, life, { snow: start.snow, wantSnow })) return [];
   // K'rrik's "you may pay 2 life rather than pay that mana" for {B}: mana from the player's sources first, life once
   // they can't make it (planFree).
   const cost = payableCost(s, pid, cost0, use);
-  const sources = manaSources(s, pid, [...(exclude ? [exclude] : []), ...alsoExclude], use);
+  const sources = manaSources(s, pid, excluded, use);
   const unrestricted = sources.map((src) => ({ ...src, options: src.options.filter((x) => !x.restricted) }));
   const needColors = namedColors(cost);
   const demand = colorDemand(s, pid, use);
@@ -597,7 +653,7 @@ export function planMana(s: GameState, pid: PlayerId, cost0: ParsedCost, extraGe
   let used = new Set<ObjectId>();
   const taps: Action[] = [];
   for (let round = 0; round < 8; round++) {
-    const plan = planFree(cost, extraGeneric, payableLife(s, pid), pool, sources, used, undefined, demand, harm, snow, wantSnow);
+    const plan = planFree(cost, extraGeneric, life, pool, sources, used, undefined, demand, harm, snow, wantSnow);
     if (plan) return [...taps, ...plan.chosen.map((x) => toAction(pid, x))];
     // Add one mana ability that costs mana: one making a color the cost names first, then the biggest net gain.
     const costed = sources
@@ -613,7 +669,7 @@ export function planMana(s: GameState, pid: PlayerId, cost0: ParsedCost, extraGe
       const others = unrestricted.filter((src) => src.id !== x.id);
       const free = { ...pool };
       for (const m of Object.keys(free) as ManaType[]) free[m] -= restricted[m];
-      const pay = planFree(x.cost!, 0, payableLife(s, pid), free, others, used, needColors, demand, undefined, snow);
+      const pay = planFree(x.cost!, 0, life, free, others, used, needColors, demand, undefined, snow);
       if (!pay) continue;
       const paid = payFromPool(x.cost!, pay.pool, 0, Infinity, { snow: pay.snow })!;
       const next = paid.pool;
@@ -627,7 +683,7 @@ export function planMana(s: GameState, pid: PlayerId, cost0: ParsedCost, extraGe
         if (x.restricted) nextRestricted[m]++;
       }
       const option = { actions: [...pay.chosen.map((y) => toAction(pid, y)), toAction(pid, x)], pool: next, snow: nextSnow, restricted: nextRestricted, used: new Set([...pay.used, x.id]) };
-      const done = !!planFree(cost, extraGeneric, payableLife(s, pid), next, sources, option.used, undefined, demand, harm, nextSnow, wantSnow);
+      const done = !!planFree(cost, extraGeneric, life, next, sources, option.used, undefined, demand, harm, nextSnow, wantSnow);
       if (!pick || done) pick = option;
       if (done) break;
     }

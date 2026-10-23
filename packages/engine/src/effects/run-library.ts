@@ -6,7 +6,7 @@ import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { castProblem, freeCastable, draw, gainLife, log, loseLife, millCount, moveObject, enterTogether, obj, oneOfEachFits, opponents, payableLife, player } from "../game";
 import { manaValue, parseManaCost } from "../mana";
 import type { GameState, ObjectId, PlayerId } from "../types";
-import { bindBound, bindChosen, objectMatches, printedMatches } from "./targeting";
+import { bindBound, bindChosen, objectMatches, printedMatches, sayBound } from "./targeting";
 import { ResolveCtx, apnap, players, amountNow, amountCtx, amountFor, objects } from "./resolve";
 import { describeDest } from "./describe";
 import { fireEvent } from "./triggers";
@@ -661,7 +661,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
       // "With mana value less than or equal to ..." (TargetSpec.bound): as it resolves.
-      const filter0 = e.filter && bindBound(s, e.filter, amountCtx(s, ctx));
+      // Its text says the number (sayBound).
+      const filter0 = e.filter && { ...bindBound(s, e.filter, amountCtx(s, ctx)), text: sayBound(s, e.filter.text, e.filter, amountCtx(s, ctx)) };
       const filter1 = filter0?.named === "~" ? { ...filter0, named: src } : filter0?.notNamed === "~" ? { ...filter0, notNamed: src } : filter0;
       const filter2 = filter1?.colorOfYourLegend ? legendColors(s, filter1, ctx.controller) : filter1;
       // "With a different name than each Aura you control" (Light-Paws): the names of those you control as it resolves.

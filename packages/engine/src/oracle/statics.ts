@@ -175,7 +175,7 @@ export function parseConditionalStatic(line: string): StaticAbility | null {
  * is ...", "... if you control a Wizard" / "If an opponent controls seven or more lands, ...". Only generic
  * mana: a reduction can't take colored mana off (CR 118.7a).
  */
-export function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition; colored?: Color[] } } | { lessIfTargets: { n: number; filter: TargetSpec } } | { targetTax: number } | { targetLifeTax: number } | "fail" | null {
+export function parseCostChange(line: string): { costMod: CostMod } | { less: Amount } | { lessIf: { n: number; cond: StaticCondition; colored?: Color[] } } | { lessIfTargets: { n: number; filter: TargetSpec } } | { targetTax: number } | { targetLifeTax: number } | { castTargetLess: { n: number; filter: TargetSpec } } | { commanderTargetTax: number } | "fail" | null {
   let text = line.replace(/^[A-Z][A-Za-z' -]+ — (?=~ costs|The second)/, "").replace(/\.$/, ""); // "Domain —" is an ability word
   let m: RegExpExecArray | null;
   // "Each spell you cast that's a Demon, Horror, or Nightmare costs {1} less to cast" (Ancient Cellarspawn): spells of
@@ -211,6 +211,14 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
   // their turn (CR 601.2f).
   if ((m = /^Each spell costs \{(\d+)\} more to cast except during its controller's turn$/.exec(text))) return { costMod: { who: "all", filter: { kind: "spell", text: "spells" }, n: Number(m[1]), turn: "notCasters", text: line } };
   if ((m = /^Spells your opponents cast that target ~ cost \{(\d+)\} more to cast$/.exec(text))) return { targetTax: Number(m[1]) };
+  // Killian, Ink Duelist: "Spells you cast that target a creature cost {2} less to cast" (generic mana only, rulings).
+  if ((m = /^Spells you cast that target an? ([a-z]+) cost \{(\d+)\} less to cast$/.exec(text))) {
+    const filter = parseTargetPhrase(m[1]!);
+    return filter?.kind === "object" ? { castTargetLess: { n: Number(m[2]), filter } } : "fail";
+  }
+  // Esior, Wardwing Familiar: "Spells your opponents cast that target one or more commanders you control cost {3} more to
+  // cast": once per spell, however many it targets (rulings).
+  if ((m = /^Spells your opponents cast that target one or more commanders you control cost \{(\d+)\} more to cast$/.exec(text))) return { commanderTargetTax: Number(m[1]) };
   if ((m = /^Spells your opponents cast that target ~ cost an additional (\d+) life to cast$/.exec(text))) return { targetLifeTax: Number(m[1]) };
   if ((m = /^~ costs \{(\d+)\} less to cast for each (.+)$/.exec(text))) {
     const c = parseCount(m[2]!, null, true);

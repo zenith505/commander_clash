@@ -3950,6 +3950,19 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
     const t = s.objects[id];
     if (t?.zone === "battlefield" && controllerOf(s, t) !== pid) mods.more += abilitiesOf(s, t).targetTax ?? 0;
   }
+  // Killian, Ink Duelist: "Spells you cast that target a creature cost {2} less"; Esior, Wardwing Familiar: "Spells your
+  // opponents cast that target one or more commanders you control cost {3} more". Each such permanent once, with the
+  // targets chosen before the cost is worked out (CR 601.2c, 601.2f).
+  const targeted = [...new Set((how.targets ?? []).flatMap((t) => (t.kind === "object" ? [t.id] : [])))].map((id) => s.objects[id]).filter((t) => t?.zone === "battlefield") as GameObject[];
+  if (targeted.length && !how.faceDown)
+    for (const id of s.battlefield) {
+      const src = obj(s, id);
+      const ab = abilitiesOf(s, src);
+      if (!ab.castTargetLess && !ab.commanderTargetTax) continue;
+      const by = controllerOf(s, src);
+      if (by === pid) for (const c of ab.castTargetLess ?? []) if (targeted.some((t) => objectMatches(s, c.filter, t, by, false))) mods.less += c.n;
+      if (ab.commanderTargetTax && by !== pid && opponents(s, by).includes(pid) && targeted.some((t) => t.isCommander && t.owner === by && controllerOf(s, t) === by)) mods.more += ab.commanderTargetTax;
+    }
   // "Aura spells you cast that target enchanted creature cost {3} less to cast" (Strong Back): its target is what it
   // will enchant (CR 303.4a), chosen before the cost is worked out (CR 601.2c, 601.2f).
   const auraTarget = how.targets?.[0]?.kind === "object" ? how.targets[0].id : undefined;

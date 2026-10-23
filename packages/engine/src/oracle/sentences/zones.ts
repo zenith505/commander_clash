@@ -175,7 +175,8 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if (/^Put ~ on the bottom of its owner's library$/i.test(s) && ctx.spell) return [{ type: "shuffleSpell", bottom: true }];
   // "When ~ dies, shuffle it into its owner's library", "When ~ is put into a graveyard from anywhere, ...": the card where
   // it went. "At the beginning of the end step, ~'s owner shuffles it into their library": the permanent.
-  if (ctx.selfCard && /^[Ss]huffle (?:it|~) into its owner's library$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "selfCard" } }];
+  // Lembas: "When ~ is put into a graveyard from the battlefield, its owner shuffles it into their library."
+  if (ctx.selfCard && /^(?:[Ss]huffle (?:it|~) into its owner's library|[Ii]ts owner shuffles (?:it|~) into their library)$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "selfCard" } }];
   // Kogla and Yidaro: "{2}{R}{G}, Discard this card: ... Shuffle this card into your library from your graveyard": the
   // card discarded to pay for it, while it's still there (CR 400.7).
   if (ctx.discardedSelf && /^[Ss]huffle ~ into your library from your graveyard$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "selfCard", moved: true, yours: true } }];
@@ -183,7 +184,7 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   if (ctx.selfCard && (m = /^[Pp]ut (?:it|~) on (top|the bottom) of its owner's library$/.exec(s))) return [{ type: "putInLibrary", what: { ref: "selfCard" }, position: m[1] === "top" ? "top" : "bottom" }];
   // The God-Eternals: "you may put it into its owner's library third from the top"; Enigma Sphinx's "into your library"
   // (it triggers only from its owner's graveyard); Bookwurm's "Put ~ from your graveyard into your library ...".
-  if (ctx.selfCard && /^[Pp]ut (?:it|~|her|him) (?:from your graveyard )?into (?:its owner's|her owner's|his owner's|your) library third from the top$/.test(s)) return [{ type: "putInLibrary", what: { ref: "selfCard" }, position: "third" }];
+  if (ctx.selfCard && /^[Pp]ut (?:it|~|her|him) (?:from your graveyard )?into (?:its owner's|her owner's|his owner's|~'s owner's|your) library third from the top$/.test(s)) return [{ type: "putInLibrary", what: { ref: "selfCard" }, position: "third" }];
   if (!ctx.spell && !ctx.selfCard && /^~'s owner shuffles (?:it|~) into their library$/.test(s)) return [{ type: "shuffleIntoLibrary", what: { ref: "self" } }];
   // "Shuffle target nontoken permanent you control into its owner's library" (Rishadan Pawnshop): it's put into that
   // library, then that library is shuffled (CR 701.24c).

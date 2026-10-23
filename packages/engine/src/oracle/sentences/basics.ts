@@ -483,6 +483,13 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
     if (!filter) return null;
     return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: another ? { ...filter, notSource: true, text: `other ${filter.text}` } : filter, n: 1, action: "bounce" }], otherwise: [sacrificeSelf], keep: true, text: `Return ${m[2]} you control to its owner's hand to keep ~` }];
   }
+  // Command Bridge: "sacrifice it unless you tap an untapped permanent you control". Tapping one keeps it; with none
+  // untapped, or choosing not to, it's sacrificed.
+  if ((m = /^[Ss]acrifice (~|it) unless you tap an untapped ([a-z]+) you control$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {
+    const filter = pickFilter(m[2]!);
+    if (filter?.kind !== "object") return null;
+    return [{ type: "may", effects: [{ type: "pick", who: { ref: "you" }, filter: { ...filter, tapped: false, text: `untapped ${filter.text}` }, n: 1, action: "tap" }], otherwise: [sacrificeSelf], keep: true, text: `Tap an untapped ${m[2]} you control to keep ~` }];
+  }
   // "Sacrifice ~ unless you sacrifice a land" (Bog Elemental, The Gitrog Monster): sacrificing one keeps it; with none to
   // sacrifice, or choosing not to, it's sacrificed.
   if ((m = /^[Ss]acrifice (~|it) unless you sacrifice (an? .+?|another .+?)$/.exec(s)) && (m[1] === "~" || (ctx.selfIt && ctx.lastObjectTarget === undefined))) {

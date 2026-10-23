@@ -4871,6 +4871,10 @@ export interface CompiledCard {
   strive?: string;
   /** "Spells your opponents cast that target ~ cost {2} more to cast": once per spell however often it targets it (rulings). */
   targetTax?: number;
+  /** "Spells you cast that target a creature cost {2} less to cast" (Killian, Ink Duelist): generic mana only (CR 601.2f). */
+  castTargetLess?: { n: number; filter: TargetSpec }[];
+  /** "Spells your opponents cast that target one or more commanders you control cost {3} more to cast" (Esior): once per spell. */
+  commanderTargetTax?: number;
   /** "Spells your opponents cast that target ~ cost an additional 3 life to cast" (Terror of the Peaks): an additional cost (CR 601.2f, 119.4). */
   targetLifeTax?: number;
   /**

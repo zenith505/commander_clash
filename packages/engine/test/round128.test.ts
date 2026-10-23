@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, scry, setup } from "./helpers";
-import { abilitiesOf, abilityProblem, botActions, characteristics, compileCard, invalidateCharacteristics, isFullySupported, nextRandom, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { abilitiesOf, abilityProblem, botActions, characteristics, compileCard, invalidateCharacteristics, isFullySupported, manaValue, nextRandom, planActivate, planCast, spellCost, waitingOn, type Action, type CardDef, type GameState } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -714,5 +714,95 @@ describe("Counterbalance (rulings)", () => {
   it("a different mana value, or no reveal: the spell resolves", () => {
     expect(castInto(0, true)).toBe("battlefield");
     expect(castInto(2, false)).toBe("battlefield");
+  });
+});
+
+const killian = card("Killian, Ink Duelist", "Legendary Creature — Human Warlock", "{W}{B}", {
+  power: "2",
+  toughness: "2",
+  keywords: ["Lifelink", "Menace"],
+  oracleText: "Lifelink, menace (This creature can't be blocked except by two or more creatures.)\nSpells you cast that target a creature cost {2} less to cast.",
+});
+const esior = card("Esior, Wardwing Familiar", "Legendary Creature — Bird", "{1}{U}", {
+  power: "1",
+  toughness: "3",
+  keywords: ["Flying", "Partner"],
+  oracleText: "Flying\nSpells your opponents cast that target one or more commanders you control cost {3} more to cast.\nPartner (You can have two commanders if both have partner.)",
+});
+const zap = card("Test Zap", "Instant", "{3}{R}", { oracleText: "Test Zap deals 1 damage to target creature." });
+
+describe("Killian, Ink Duelist and Esior, Wardwing Familiar: costs of spells by their targets (rulings)", () => {
+  it("Killian: {2} less for a spell that targets a creature, never its colored mana", () => {
+    supported(killian, esior);
+    const { s, ap, ids, opp } = setup([zap, card("Red Zap", "Instant", "{R}", { oracleText: "Red Zap deals 1 damage to target creature." })]);
+    putOnBattlefield(s, ap, killian);
+    const bear = putOnBattlefield(s, opp, testBear());
+    const total = (id: string) => ((c) => manaValue(c.cost) + c.extra)(spellCost(s, ap, s.objects[id]!, 0, [], { targets: [{ kind: "object", id: bear }] }));
+    expect(total(ids[0]!)).toBe(2);
+    expect(total(ids[1]!)).toBe(1);
+  });
+  it("Esior: {3} more for an opponent's spell that targets your commander, once", () => {
+    const { s, ap, ids, opp } = setup([zap]);
+    putOnBattlefield(s, opp, esior);
+    const cmdr = putOnBattlefield(s, opp, testBear(), { commander: true });
+    const plain = putOnBattlefield(s, opp, testBear());
+    const total = (id: string) => ((c) => manaValue(c.cost) + c.extra)(spellCost(s, ap, s.objects[ids[0]!]!, 0, [], { targets: [{ kind: "object", id }] }));
+    expect(total(cmdr)).toBe(7);
+    expect(total(plain)).toBe(4);
+  });
+});
+
+describe("God-Eternal Bontu: its own name for 'its owner's library'", () => {
+  it("compiles the dies-or-exiled trigger to third from the top", () => {
+    const bontu = card("God-Eternal Bontu", "Legendary Creature — Zombie God", "{3}{B}{B}", {
+      power: "5",
+      toughness: "6",
+      keywords: ["Menace"],
+      oracleText:
+        "Menace\nWhen God-Eternal Bontu enters, sacrifice any number of other permanents, then draw that many cards.\nWhen God-Eternal Bontu dies or is put into exile from the battlefield, you may put it into its owner's library third from the top.",
+    });
+    supported(bontu);
+    const scryText = { ...bontu, oracleText: bontu.oracleText.replace("you may put it into its owner's library", "you may put God-Eternal Bontu into God-Eternal Bontu's owner's library") };
+    supported(scryText);
+    expect(JSON.stringify(compileCard(scryText).triggers)).toContain('"position":"third"');
+  });
+});
+
+const commandBridge = card("Command Bridge", "Land", "", {
+  oracleText: "This land enters tapped.\nWhen this land enters, sacrifice it unless you tap an untapped permanent you control.\n{T}: Add one mana of any color.",
+});
+const lembas = card("Lembas", "Artifact — Food", "{2}", {
+  oracleText:
+    "When this artifact enters, scry 1, then draw a card.\n{2}, {T}, Sacrifice this artifact: You gain 3 life.\nWhen this artifact is put into a graveyard from the battlefield, its owner shuffles it into their library.",
+});
+
+describe("Command Bridge and Lembas", () => {
+  const playBridge = (keep: boolean) => {
+    const { s: s0, ap, ids } = setup([commandBridge]);
+    let s = act(s0, { type: "playLand", player: ap, objectId: ids[0]! });
+    for (let i = 0; i < 20 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
+    s = act(s, { type: "chooseMay", player: ap, yes: keep });
+    if (keep) {
+      expect(s.pending).toMatchObject({ kind: "pickPermanents", player: ap, action: "tap" });
+      const opts = s.pending?.kind === "pickPermanents" ? s.pending.options : [];
+      expect(opts).not.toContain(ids[0]);
+      s = act(s, { type: "pickPermanents", player: ap, ids: [opts[0]!] });
+      expect(s.objects[opts[0]!]!.tapped).toBe(true);
+    }
+    return s.objects[ids[0]!]!.zone;
+  };
+  it("Command Bridge: tap an untapped permanent to keep it, or it's sacrificed", () => {
+    supported(commandBridge, lembas);
+    expect(playBridge(true)).toBe("battlefield");
+    expect(playBridge(false)).toBe("graveyard");
+  });
+  it("Lembas: sacrificed for 3 life, then shuffled into its owner's library", () => {
+    const { s: s0, ap } = setup([]);
+    const l = putOnBattlefield(s0, ap, lembas);
+    const life = s0.players[ap]!.life;
+    const s = settleBots(run(s0, planActivate(s0, ap, l, 0)));
+    expect(s.players[ap]!.life).toBe(life + 3);
+    expect(s.objects[l]!.zone).toBe("library");
   });
 });

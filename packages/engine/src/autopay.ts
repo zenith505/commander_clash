@@ -590,7 +590,7 @@ export function planMana(s: GameState, pid: PlayerId, cost0: ParsedCost, extraGe
  * {3}, then the Cube pays its {3} from the pool and doubles what's left. The plan is tried on a copy of the game, and
  * kept only if the doubled pool pays the whole cost (with whichever way of paying the {3} lets it).
  */
-function planCubeMana(s: GameState, pid: PlayerId, cost0: ParsedCost, extraGeneric: number, excluded: ObjectId[], use: ManaUse, harm?: Partial<Record<Color, number>>, wantSnow = false): Action[] | null {
+export function planCubeMana(s: GameState, pid: PlayerId, cost0: ParsedCost, extraGeneric: number, excluded: ObjectId[], use: ManaUse, harm?: Partial<Record<Color, number>>, wantSnow = false): Action[] | null {
   if (wantSnow || s.priority !== pid || s.pending || s.over) return null;
   const cubes = s.battlefield.filter((id) => {
     if (excluded.includes(id)) return false;

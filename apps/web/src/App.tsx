@@ -2672,6 +2672,7 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
   // A copy (CR 707): it looks like what it copies, so say what it really is.
   const copying = !o.faceDown && cardIdOf(o) !== o.cardId ? cardOf(s, o.id) : undefined;
   const copyEnds = o.copyEffects?.[o.copyEffects.length - 1]?.until;
+  const chosen = chosenText(s, o);
   return (
     <>
       {(m.grantedKeywords.length > 0 || m.grantedAbilities.length > 0 || m.lostKeywords.length > 0 || m.lostAllAbilities) && (
@@ -2777,6 +2778,11 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
             On {s.players[o.attachedToPlayer]!.name}
           </span>
         )}
+        {chosen && (
+          <span className="chip other chosen" title={`Chosen: ${chosen}`}>
+            {chosen}
+          </span>
+        )}
         {copying && (
           <span
             className={`chip ${copyEnds ? "temp" : "other"}`}
@@ -2809,6 +2815,31 @@ function Modified({ s, o }: { s: GameState; o: GameObject }) {
       )}
     </>
   );
+}
+
+/**
+ * What was chosen for a permanent as it entered or by its abilities (CR 614.12): a creature type, a color, a player
+ * (Sower of Discord's two), a card name, a number. A secretly chosen player shows only to its controller.
+ */
+function chosenText(s: GameState, o: GameObject): string {
+  const ch = o.chosen;
+  if (!ch) return "";
+  const name = (pid: PlayerId) => s.players[pid]?.name ?? "?";
+  const parts = [
+    ch.type,
+    ch.color && COLOR_NAMES[ch.color],
+    ch.landType,
+    ch.keyword,
+    ch.cardType,
+    ch.anchor,
+    ch.name,
+    ch.number !== undefined ? String(ch.number) : undefined,
+    ...(ch.types ?? []),
+    ...Object.entries(ch.colorsBy ?? {}).map(([pid, c]) => `${name(Number(pid))}: ${COLOR_NAMES[c]}`),
+    ch.player !== undefined ? (ch.secret && controllerOf(s, o) !== HUMAN ? "a secret player" : name(ch.player)) : undefined,
+    ...(ch.players ?? []).map(name),
+  ];
+  return [...new Set(parts.filter((x): x is string => !!x))].join(", ");
 }
 
 /** The card image, or a text frame when there's no image or it fails to load (offline). */

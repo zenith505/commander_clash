@@ -1,14 +1,17 @@
-import { playerProtectedFrom } from "./effects/targeting";
+import { playerProtectedFrom, playerProtection } from "./effects/targeting";
 import { allEffects, refCovers, timedCondition, type AbilityBody, type ActivatedAbility, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
-import { autoCrew, autoWaterbend, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
+import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, canBeSacrificed, defOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility, manaChoices } from "./manaabilities";
 import { reselectOptions, bindChosen, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, manySlot, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
   applyAction,
+  applyInPlace,
+  cloneState,
+  waitingOn,
   untapChoiceProblem,
   blockCost,
   livingPlayers,
@@ -782,10 +785,13 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       })
       .filter((x): x is { plan: Action[]; mv: number } => !!x)
       .sort((a, b) => b.mv - a.mv);
+    // Detection Tower first, when it lets a spell we'd cast target what has hexproof.
+    const sight = chooseHexproofSight(s, pid);
+    if (sight) return sight;
     // Court of Locthwain's free spell is for this turn only too.
     const expiring = options.find((x) => x.plan.some((a) => a.type === "castSpell" && obj(s, a.objectId).zone === "exile" && (a.alt === "linkedFree" || /Turn$|EndStep$/.test(obj(s, a.objectId).mayPlay?.until ?? ""))));
     if (expiring) return expiring.plan;
-    if (options[0]) return options[0].plan;
+    if (options[0]) return cubeInstead(s, pid, options[0].plan) ?? options[0].plan;
     // Food Chain, Ashnod's Altar: a creature given up for mana, to cast a card that does more.
     const fed = chooseCreatureForMana(s, pid) ?? chooseForageForMana(s, pid);
     if (fed) return fed;
@@ -2456,6 +2462,8 @@ function chooseWord(s: GameState, pid: PlayerId, options: string[]): string {
     const best = Math.max(0, ...s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && objIsType(s, obj(s, id), "Creature")).map((id) => power(s, obj(s, id))));
     return best <= 2 ? "fame" : "fortune";
   }
+  // Prisoner's Dilemma: snitch costs less whatever the others choose (0 or 8 damage, against 4 or 12 for silence).
+  if (options.join() === "silence,snitch") return "snitch";
   // Master of Ceremonies: a card with a short hand, a creature with few of them, else a Treasure.
   if (options.join() === "money,friends,secrets") {
     if (player(s, pid).hand.length <= 3) return "secrets";
@@ -3322,6 +3330,85 @@ function chooseActivation(s: GameState, pid: PlayerId, only?: (ab: ActivatedAbil
       // Not worth sacrificing a Treasure to cash in a Food or Clue.
       if (cashIn && plan?.some((a) => a.type === "activateMana" && manaActionAbility(s, a)?.sacrificeSelf)) continue;
       if (plan) return plan;
+    }
+  }
+  return null;
+}
+
+/**
+ * Doubling Cube's "{3}, {T}: Double the amount of each type of unspent mana you have" instead of paying a spell's whole
+ * cost from our other sources, when that taps fewer of them (a cost of 8 or more: half of it made and the Cube's {3},
+ * then doubled), the rest kept for more spells or for instants. The spell is planned again with that mana in our pool,
+ * which stays there until the step ends (CR 500.4). Only a spell paid with mana abilities, colored and generic mana.
+ */
+function cubeInstead(s: GameState, pid: PlayerId, plan: Action[]): Action[] | null {
+  const cast = plan[plan.length - 1];
+  const taps = plan.slice(0, -1);
+  if (cast?.type !== "castSpell" || taps.length < 8 || taps.some((a) => a.type !== "activateMana")) return null;
+  const printed = parseManaCost(defOf(s, obj(s, cast.objectId)).manaCost);
+  if (printed.hasX || printed.symbols.some((x) => x.kind !== "colored" && x.kind !== "generic")) return null;
+  const t = cloneState(s);
+  const pool = () => Object.values(player(t, pid).manaPool).reduce((n, k) => n + k, 0);
+  const before = pool();
+  try {
+    for (const a of taps) applyInPlace(t, a);
+  } catch {
+    return null;
+  }
+  const colored = printed.symbols.flatMap((x) => (x.kind === "colored" ? [`{${x.color}}`] : []));
+  const made = pool() - before;
+  if (made < colored.length) return null;
+  const doubled = planCubeMana(s, pid, parseManaCost(colored.join("") + `{${made - colored.length}}`), 0, [], "other");
+  if (!doubled?.length) return null;
+  const u = cloneState(s);
+  try {
+    for (const a of doubled) applyInPlace(u, a);
+  } catch {
+    return null;
+  }
+  const again = castPlan(u, pid, cast.objectId, false);
+  const last = again?.[again.length - 1];
+  if (!again || last?.type !== "castSpell" || last.objectId !== cast.objectId) return null;
+  // The Cube itself is the last of `doubled`, tapped for nothing else.
+  return doubled.length - 1 + again.length - 1 < taps.length ? [...doubled, ...again] : null;
+}
+
+/**
+ * Detection Tower's "{1}, {T}: Until end of turn, your opponents and creatures your opponents control with hexproof can
+ * be the targets of spells and abilities you control as though they didn't have hexproof" (CR 702.11e): with the stack
+ * empty, when once it has resolved (tried on a copy of the game, everyone passing) a spell in our hand we could still
+ * pay for would target an opponent or an opponent's creature that has hexproof.
+ */
+function chooseHexproofSight(s: GameState, pid: PlayerId): Action[] | null {
+  if (s.stack.length || (s.turnRules ?? []).some((r) => r.turn === s.turn && r.player === pid && r.rule === "seeHexproof")) return null;
+  const shielded = (t: TargetChoice) =>
+    t.kind === "player" ? t.id !== pid && playerProtection(s, t.id) === "hexproof" : t.kind === "object" && !!s.objects[t.id] && obj(s, t.id).zone === "battlefield" && controllerOf(s, obj(s, t.id)) !== pid && objHasKeyword(s, obj(s, t.id), "Hexproof");
+  const anyShielded = opponents(s, pid).some((p) => shielded({ kind: "player", id: p })) || s.battlefield.some((id) => objIsType(s, obj(s, id), "Creature") && shielded({ kind: "object", id }));
+  if (!anyShielded) return null;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid) continue;
+    const abilities = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const ab = abilities[i]!;
+      if (ab.mana || ab.body.targets.length || !ab.body.effects.some((e) => e.type === "turnRules" && e.rules.includes("seeHexproof"))) continue;
+      const problem = abilityProblem(s, pid, id, i);
+      if (problem && !/not enough mana/.test(problem)) continue;
+      const plan = planActivate(s, pid, id, i);
+      if (!plan) continue;
+      const u = cloneState(s);
+      try {
+        for (const a of plan) applyInPlace(u, a);
+        for (let k = 0; k < 12 && u.stack.length && !u.pending; k++) applyInPlace(u, { type: "passPriority", player: waitingOn(u)! });
+      } catch {
+        continue;
+      }
+      if (u.pending || u.stack.length || u.priority !== pid) continue;
+      for (const h of player(u, pid).hand) {
+        if (isType(defOf(u, obj(u, h)), "Land")) continue;
+        const cast = castPlan(u, pid, h, false)?.find((a) => a.type === "castSpell");
+        if (cast?.type === "castSpell" && cast.targets?.some(shielded)) return plan;
+      }
     }
   }
   return null;

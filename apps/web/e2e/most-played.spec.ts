@@ -29,11 +29,14 @@ test("Arcane Denial: at the next upkeep, buttons to draw two, one or none", asyn
   await card(page, "Arcane Denial", s).click();
   const top = (await state(page)).stack[0]!.id;
   await page.locator(`[data-stack="${top}"]`).click();
+  // Arcane Denial was cast (auto-pass may resolve it at once) before anything is passed.
+  await expect.poll(async () => (await state(page)).objects[denial]!.zone).not.toBe("hand");
   await resolveUntil(page, (st) => st.stack.length === 0 && st.objects[denial]!.zone === "graveyard");
   const resolved = await state(page);
   expect(resolved.objects[divination]!.zone).toBe("graveyard");
   // On to the next upkeep in the engine (for speed).
-  await open(page, playUntil(resolved, (x) => x.pending?.kind === "chooseOption" && x.pending.what === "drawUpTo" && x.pending.player === 0));
+  const upkeep = playUntil(resolved, (x) => x.pending?.kind === "chooseOption" && x.pending.what === "drawUpTo" && x.pending.player === 0);
+  await open(page, upkeep);
   // Both spells left the hand; both of Arcane Denial's draws are yours.
   const hand = s.players[0]!.hand.length - 2;
   const bar = controls(page);
@@ -42,7 +45,9 @@ test("Arcane Denial: at the next upkeep, buttons to draw two, one or none", asyn
   await bar.getByRole("button", { name: "Draw 2 cards" }).click();
   // Two from Arcane Denial's first ability, one from its second.
   const after = await resolveUntil(page, (x) => !x.pending && x.stack.length === 0 && x.triggerQueue.length === 0 && x.players[0]!.hand.length >= hand + 3, 200);
-  expect(after.step).toBe("upkeep");
+  // The draws came in that upkeep: by the time the page is read, the bots may already have passed on to the draw step.
+  expect(after.turn).toBe(upkeep.turn);
+  expect(["upkeep", "draw"]).toContain(after.step);
   expect(after.players[0]!.hand.length).toBe(hand + 3);
   expect(pageErrors(page)).toEqual([]);
 });

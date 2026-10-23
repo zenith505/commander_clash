@@ -2333,7 +2333,7 @@ export type Effect =
    * "Each opponent chooses fame or fortune" (Seize the Spotlight): each of `who`, in APNAP order and knowing the earlier
    * answers (CR 101.4), chooses one of the words; what they chose is kept for "for each player who chose ...". Not a vote.
    */
-  | { type: "eachChooses"; who: PlayerRef; options: string[]; text: string }
+  | { type: "eachChooses"; who: PlayerRef; options: string[]; text: string; /** "Secretly chooses ..., then the choices are revealed": none sees another's word until all have chosen. */ secret?: true }
   /**
    * "Each opponent faces a villainous choice — A, or B" (CR 701.55): each of `who` in APNAP order chooses one of the two
    * options, then all of it is done, that player being the event player in it, before the next one chooses (701.55d).
@@ -3154,7 +3154,9 @@ export type SpellCondition =
    * `orTie`: "If taxes gets more votes or the vote is tied": also when two or more choices tie for the most (rulings on
    * Coercive Portal).
    */
-  | { kind: "voteWins"; option: string; orTie?: true };
+  | { kind: "voteWins"; option: string; orTie?: true }
+  /** "If each opponent chose silence" (Prisoner's Dilemma): every one of them still in the game chose that word (Effect eachChooses). */
+  | { kind: "allChose"; option: string };
 
 /** Every effect, including the ones inside "you may" and "if", in order. */
 export const allEffects = (effects: Effect[]): Effect[] =>

@@ -522,6 +522,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? staticConditionNow(s, e.cond.cond, ctx.sourceId ?? s.resolving!.item.objectId!, ctx.controller, ctx.event?.player, undefined, ctx.sourceId ? ctx.sourceZc : undefined, ctx.subject?.id, ctx.subject?.zc)
             : e.cond.kind === "voteWins"
             ? voteWins(s, e.cond.option, !!e.cond.orTie)
+            : e.cond.kind === "allChose"
+            ? ((option) => { const chose = Object.entries(s.resolving!.chose ?? {}).filter(([p]) => !player(s, Number(p)).lost); return chose.length > 0 && chose.every(([, w]) => w === option); })(e.cond.option)
             : e.cond.kind === "amountNow"
             ? ((n) => (e.cond.kind !== "amountNow" ? false : (e.cond.min === undefined || n >= e.cond.min) && (e.cond.max === undefined || n <= e.cond.max)))(amountNow(s, e.cond.amount, ctx))
             : e.cond.kind === "amountsCompare"

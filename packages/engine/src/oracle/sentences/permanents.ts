@@ -389,6 +389,12 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     const filter = pickFilter(m[3]!.replace(/^an? /i, ""));
     return filter && [{ type: "pick", who: { ref: "you" }, filter, n: 1, action: "counters", counter: { kind: counterKind(m[2]!), n: amt(m[1]!) } }];
   }
+  // Blight N (CR 701.68a): "put N -1/-1 counters on a creature you control", one creature for all of them, chosen as it
+  // resolves, not targeted (rulings on High Perfect Morcant); "each opponent blights 1": each their own, in APNAP order.
+  if ((m = /^(?:(.+?) )?[Bb]lights? (\d+)$/.exec(s))) {
+    const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
+    return who && [{ type: "pick", who, filter: pickFilter("creature")!, n: 1, action: "counters", counter: { kind: "-1/-1", n: amt(m[2]!) } }];
+  }
   // Bolster N (CR 701.39a): "Choose a creature you control with the least toughness or tied for least toughness among
   // creatures you control. Put N +1/+1 counters on that creature." Chosen as it resolves, not targeted (rulings).
   if ((m = /^Bolster (\d+|X)$/i.exec(s))) {
@@ -756,9 +762,11 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // "Put four +1/+1 counters on target noncreature artifact. It becomes a 0/0 Bird creature" (Case of the Filched Falcon): the target.
   // Druid Class: 'becomes a creature with haste and "This creature's power and toughness are each equal to the number of
   // lands you control."': no number of its own; the ability it gains sets them, in layer 7b (CR 604.3a, 613.4b).
-  if ((m = /^(target .+?|It) becomes? (an? \d+\/\d+ .+|a creature with [a-z, ]+ and "(?:This creature|~)'s power and toughness are each equal to [^"]+")$/i.exec(s))) {
+  // Overloaded Rise and Shine: "Each noncreature artifact you control becomes a 0/0 artifact creature": the ones there as
+  // it resolves, locked in (CR 611.2c).
+  if ((m = /^(target .+?|It|each [a-z ]+? you control) becomes? (an? \d+\/\d+ .+|a creature with [a-z, ]+ and "(?:This creature|~)'s power and toughness are each equal to [^"]+")$/i.exec(s))) {
     const what = parseObject(m[1]!, ctx);
-    const mods = what?.ref === "target" && parseChanges(`becomes ${m[2]!}`);
+    const mods = (what?.ref === "target" || (what?.ref === "each" && /^each /i.test(m[1]!))) && parseChanges(`becomes ${m[2]!}`);
     return what && mods ? [{ type: "continuous", what, mods, duration: "game" }] : null;
   }
   // Oko, Thief of Crowns: "Exchange control of target artifact or creature you control and target creature an opponent

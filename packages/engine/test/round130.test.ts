@@ -638,3 +638,29 @@ describe("Andúril, Flame of the West: two Spirits as the equipped creature atta
     for (const sp of attackWith(false)) expect([sp.tapped, sp.attacking]).toEqual([true, undefined]);
   });
 });
+
+describe("\"The number of creatures exiled / destroyed this way\": Sunfall, Phyrexian Rebirth", () => {
+  const board = (s: GameState, ap: PlayerId, opp: PlayerId) => [putOnBattlefield(s, ap, ogre()), putOnBattlefield(s, opp, ogre("Their Ogre")), putOnBattlefield(s, opp, ogre("Other Ogre"))];
+  it("Sunfall: three creatures exiled, an Incubator with three +1/+1 counters", () => {
+    const sunfall = card("Sunfall", "Sorcery", "{3}{W}{W}", { oracleText: "Exile all creatures. Incubate X, where X is the number of creatures exiled this way. (Create an Incubator token with X +1/+1 counters on it and \"{2}: Transform this token.\" It transforms into a 0/0 Phyrexian artifact creature.)" });
+    supported(sunfall);
+    const { s: s0, ap, ids, opp } = setup([sunfall]);
+    const all = board(s0, ap, opp);
+    const s = settleBots(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(all.map((id) => s.objects[id]!.zone)).toEqual(["exile", "exile", "exile"]);
+    const inc = s.battlefield.filter((id) => s.objects[id]!.isToken && characteristics(s, s.objects[id]!).subtypes.includes("Incubator"));
+    expect(inc).toHaveLength(1);
+    expect(s.objects[inc[0]!]!.counters["+1/+1"]).toBe(3);
+  });
+  it("Phyrexian Rebirth: an indestructible creature isn't counted (rulings)", () => {
+    const rebirth = card("Phyrexian Rebirth", "Sorcery", "{4}{W}{W}", { oracleText: "Destroy all creatures, then create an X/X colorless Phyrexian Horror artifact creature token, where X is the number of creatures destroyed this way." });
+    supported(rebirth);
+    const { s: s0, ap, ids, opp } = setup([rebirth]);
+    board(s0, ap, opp);
+    putOnBattlefield(s0, opp, card("Test Golem Guard", "Artifact Creature — Golem", "{4}", { power: "2", toughness: "2", keywords: ["Indestructible"], oracleText: "Indestructible" }));
+    const s = settleBots(run(s0, planCast(s0, ap, ids[0]!)));
+    const horror = s.battlefield.filter((id) => s.objects[id]!.isToken && characteristics(s, s.objects[id]!).subtypes.includes("Horror"));
+    expect(horror).toHaveLength(1);
+    expect([pow(s, horror[0]!), tough(s, horror[0]!)]).toEqual([3, 3]);
+  });
+});

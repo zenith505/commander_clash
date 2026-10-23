@@ -47,7 +47,7 @@ test("Eladamri: tap two creatures, then reveal Hill Giant from your hand: it's p
   await open(page, s);
   await page.locator(`[data-obj="${eladamri}"]`).first().click();
   await menu(page).locator("button", { hasText: "Reveal a card" }).click();
-  const tap = page.locator(".targeting", { hasText: "tap 2 untapped creature you control" });
+  const tap = page.locator(".targeting", { hasText: "tap 2 untapped creatures you control" });
   for (const b of bears) await page.locator(`[data-obj="${b}"]`).click();
   await tap.getByRole("button", { name: "Tap and activate" }).click();
   await resolveUntil(page, (st) => st.pending?.kind === "chooseOption" && st.pending.what === "revealHandOrTop");

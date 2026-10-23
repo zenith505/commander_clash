@@ -762,3 +762,29 @@ describe("Commit: a spell or nonland permanent goes second from the top of its o
     expect(s.players[opp]!.library[1]).toBe(bear);
   });
 });
+
+const ghostVacuum = card("Ghost Vacuum", "Artifact", "{1}", {
+  oracleText: "{T}: Exile target card from a graveyard.\n{6}, {T}, Sacrifice this artifact: Put each creature card exiled with this artifact onto the battlefield under your control with a flying counter on it. Each of them is a 1/1 Spirit in addition to its other types. Activate only as a sorcery.",
+});
+
+describe("Ghost Vacuum: the creature cards it exiled come back as 1/1 Spirits with flying counters (CR 607.2a, 613.4b)", () => {
+  it("exiles a creature card from an opponent's graveyard; later, it's yours as a 1/1 flying Spirit Giant", () => {
+    supported(ghostVacuum);
+    const { s: s0, ap, opp } = setup([]);
+    const gv = putOnBattlefield(s0, ap, ghostVacuum);
+    const giant = putOnBattlefield(s0, opp, card("Dead Giant", "Creature — Giant", "{5}{R}", { power: "6", toughness: "6" }));
+    s0.battlefield.splice(s0.battlefield.indexOf(giant), 1);
+    s0.objects[giant]!.zone = "graveyard";
+    s0.players[opp]!.graveyard.push(giant);
+    let s = passAll(run(s0, planActivate(s0, ap, gv, 0, [target(giant)])));
+    expect(s.objects[giant]!.zone).toBe("exile");
+    s.objects[gv]!.tapped = false;
+    s = passAll(run(s, planActivate(s, ap, gv, 1)));
+    const o = s.objects[giant]!;
+    expect([o.zone, o.controller, o.counters.flying]).toEqual(["battlefield", ap, 1]);
+    const c = characteristics(s, o);
+    expect([c.power, c.toughness]).toEqual([1, 1]);
+    expect(c.subtypes).toEqual(expect.arrayContaining(["Giant", "Spirit"]));
+    expect(objHasKeyword(s, o, "Flying")).toBe(true);
+  });
+});

@@ -3970,10 +3970,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "eachMay", who: prev.what.of, text: `search their library for that many ${settleLands[1]}`, effects: [{ ...sr, n: { count: { kind: "exiledThisWay", filter: exiled } }, who: { ref: "choseThisWay" } }] });
       continue;
     }
-    const isAlso = /^(?:That creature is|It's|It is) (an? .+ in addition to its other (?:colors and )?types)$/.exec(s);
+    const isAlso = /^(?:That creature is|It's|It is|Each of them is) (an? .+ in addition to its other (?:colors and )?types)$/.exec(s);
     if (isAlso) {
       const prev = effects[effects.length - 1];
       const mods = parseBecomes(isAlso[1]!);
+      // Ghost Vacuum: "Each of them is a 1/1 Spirit ...": the cards it put onto the battlefield.
+      if (prev?.type === "moveLinked" && /^Each of them/.test(s)) {
+        if (prev.dest !== "battlefield" || !mods || prev.alsoMods) return null;
+        prev.alsoMods = mods;
+        continue;
+      }
+      if (/^Each of them/.test(s)) return null;
       if (prev?.type !== "putOntoBattlefield" || !mods || (prev.what.ref === "target" && prev.what.n) || prev.alsoMods) return null;
       prev.alsoMods = mods;
       continue;

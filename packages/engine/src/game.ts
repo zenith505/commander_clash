@@ -2055,17 +2055,18 @@ function chooseDig(s: GameState, p: Player, pend: Extract<PendingDecision, { kin
  */
 function archivesFor(s: GameState, pid: PlayerId): number {
   const p = player(s, pid);
-  if (s.step === "draw" && s.activePlayer === pid && p.firstDrawStepDraw !== s.turn) {
-    p.firstDrawStepDraw = s.turn;
-    return 0;
-  }
-  return Math.log2(archiveDraws(s, pid));
+  const n = Math.log2(archiveDraws(s, pid));
+  if (s.step === "draw" && s.activePlayer === pid && p.firstDrawStepDraw !== s.turn) p.firstDrawStepDraw = s.turn;
+  return n;
 }
 
-/** What archivesFor makes of `pid`'s next draw, without counting it. */
+/** What archivesFor makes of `pid`'s next draw, without counting it. Thought Reflection's doubles the first one too. */
 function archiveDraws(s: GameState, pid: PlayerId): number {
-  if (s.step === "draw" && s.activePlayer === pid && player(s, pid).firstDrawStepDraw !== s.turn) return 1;
-  return 2 ** s.battlefield.filter((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawTwoInstead).length;
+  const first = s.step === "draw" && s.activePlayer === pid && player(s, pid).firstDrawStepDraw !== s.turn;
+  return 2 ** s.battlefield.filter((id) => {
+    const two = controllerOf(s, obj(s, id)) === pid ? abilitiesOf(s, obj(s, id)).drawTwoInstead : undefined;
+    return two === "always" || (two && !first);
+  }).length;
 }
 
 function drawOne(s: GameState, pid: PlayerId): boolean {
@@ -3913,6 +3914,16 @@ export function spellCost(s: GameState, pid: PlayerId, o: GameObject, x = 0, kic
     const t = s.objects[id];
     if (t?.zone === "battlefield" && controllerOf(s, t) !== pid) mods.more += abilitiesOf(s, t).targetTax ?? 0;
   }
+  // "Aura spells you cast that target enchanted creature cost {3} less to cast" (Strong Back): its target is what it
+  // will enchant (CR 303.4a), chosen before the cost is worked out (CR 601.2c, 601.2f).
+  const auraTarget = how.targets?.[0]?.kind === "object" ? how.targets[0].id : undefined;
+  const asAura = how.alt === "bestow" && !o.bestowed && !how.faceDown ? bestowedDef(d) : d;
+  if (auraTarget && asAura.subtypes.includes("Aura") && !how.faceDown)
+    for (const id of s.battlefield) {
+      const src = obj(s, id);
+      const n = src.attachedTo === auraTarget ? compileCard(defOf(s, src)).auraLessEnchanted : undefined;
+      if (n && controllerOf(s, src) === pid && characteristics(s, src).hasPrintedAbilities) mods.less += n;
+    }
   // "Without paying its mana cost": additional costs like kicker are still paid, and so are cost
   // increases (CR 118.9d, 601.2f).
   const madness = madnessCastOf(s, pid, o.id);
@@ -5712,6 +5723,8 @@ function activationCostBefore(s: GameState, pid: PlayerId, o: GameObject, ab: Ac
       if (m.if && !staticConditionNow(s, m.if, src.id, pid)) continue;
       // "That target ~": it's a creature you control, so it could be the target (CR 702.6a).
       if (m.targetSelf && (targets ? target !== src.id : !c.types.includes("Creature"))) continue;
+      // "That target enchanted creature" (Strong Back): the creature it's attached to (CR 601.2f, after targets).
+      if (m.targetEnchanted && (!src.attachedTo || (targets ? target !== src.attachedTo : !s.objects[src.attachedTo] || controllerOf(s, obj(s, src.attachedTo)) !== pid))) continue;
       less += m.n;
     }
   }

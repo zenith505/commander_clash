@@ -16,6 +16,8 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   // "For each artifact and/or enchantment you control" (All That Glitters): each that's one or the other, counted once.
   // "For each creature you control that's an Insect, Rat, Spider, or Squirrel" (Swarmyard Massacre): see subtypeClause.
   let p = subtypeClause(text.trim().replace(/\.$/, "").replace(/ and\/or /g, " or "));
+  // "The mana value of that spell" (Ovika, Enigma Goliath): the same as "that spell's mana value".
+  p = p.replace(/^the (power|toughness|mana value) of (that spell|that creature|~)$/, "$2's $1");
   let m: RegExpExecArray | null;
   // "The number of other Squirrels, Bats, Lizards, and Rats you control" (Valley Rotcaller): each that's any of them,
   // counted once, as "A or B" is.

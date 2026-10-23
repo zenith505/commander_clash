@@ -1560,6 +1560,10 @@ export function compile(d: CardDef): CompiledCard {
       out.drawTwoInstead = true;
       continue;
     }
+    if (line === "If you would draw a card, draw two cards instead.") {
+      out.drawTwoInstead = "always";
+      continue;
+    }
     // "You have protection from each of your opponents" (CR 702.16k): their spells and abilities can't target you, their
     // Auras can't enchant you, and damage from their sources is prevented.
     // "You, planeswalkers you control, and other creatures you control have hexproof." (Shalai, Voice of Plenty): you have
@@ -1685,9 +1689,15 @@ export function compile(d: CardDef): CompiledCard {
       out.powerUpLess = Number(powerUpLess[1]);
       continue;
     }
-    const equipLess = /^Equip abilities you activate( of other Equipment| that target ~)? cost \{(\d+)\} less to activate\.$/.exec(line);
+    const equipLess = /^Equip abilities you activate( of other Equipment| that target ~| that target enchanted creature)? cost \{(\d+)\} less to activate\.$/.exec(line);
     if (equipLess) {
-      (out.equipLess ??= []).push({ n: Number(equipLess[2]), ...(equipLess[1] === " that target ~" ? { targetSelf: true as const } : equipLess[1] ? { otherEquipment: true as const } : {}) });
+      (out.equipLess ??= []).push({ n: Number(equipLess[2]), ...(equipLess[1] === " that target ~" ? { targetSelf: true as const } : equipLess[1] === " that target enchanted creature" ? { targetEnchanted: true as const } : equipLess[1] ? { otherEquipment: true as const } : {}) });
+      continue;
+    }
+    // "Aura spells you cast that target enchanted creature cost {3} less to cast." (Strong Back)
+    const auraLess = /^Aura spells you cast that target enchanted creature cost \{(\d+)\} less to cast\.$/.exec(line);
+    if (auraLess) {
+      out.auraLessEnchanted = (out.auraLessEnchanted ?? 0) + Number(auraLess[1]);
       continue;
     }
     const lockEnd = /^You can't (lose|win) the game and your opponents can't (win|lose) the game\.$/.exec(line);
@@ -2409,7 +2419,9 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "Enchantment spells you cast have affinity for Auras" (Pearl-Ear): each such spell costs {1} less to cast for each
     // Aura you control (CR 702.41a); two of them, {2} less (CR 702.41b, rulings).
-    const grantAffinity = /^((?:[A-Z][a-z]+ )?spells) you cast have affinity for ([A-Z][a-z]+s)\.$/.exec(line);
+    // "Creature and planeswalker spells you cast have affinity for artifacts" (Tezzeret, Master of the Bridge), "Artifact
+    // creature spells ..." (Mycosynth Golem).
+    const grantAffinity = /^((?:[A-Z][a-z]+ (?:(?:and )?[a-z]+ )?)?spells) you cast have affinity for ([A-Za-z]+s)\.$/.exec(line);
     if (grantAffinity) line = `${grantAffinity[1]} you cast cost {1} less to cast for each ${grantAffinity[2]!.slice(0, -1)} you control.`;
     const cost = parseCostChange(line);
     if (cost) {

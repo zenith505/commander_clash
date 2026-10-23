@@ -2517,6 +2517,15 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
     }
     return allEffects(after.effects).some((x) => x.type === "damage" || x.type === "loseLife") ? life <= 15 : false;
   }
+  // "Each opponent may sacrifice a nontoken creature of their choice. Each opponent who doesn't loses 2 life for each ..."
+  // (Fandaniel): the creature when the life would hurt (a lot of it, or a quarter of what's left), a spare one sooner.
+  if (r && e?.type === "eachMay" && e.each && e.need && after?.type === "loseLife" && after.who.ref === "notChoseThisWay") {
+    const loss = evalAmount(s, after.n, { controller: r.item.controller, sourceId: r.item.sourceId });
+    const life = player(s, pid).life;
+    const sac = e.effects[0];
+    const spare = sac?.type === "pick" && pickOptions(s, sac, pid, r.item.sourceId).some((id) => !obj(s, id).isCommander && worth(s, pid, obj(s, id)) <= 3);
+    return loss >= life || loss * 4 >= life || (spare && loss >= 4);
+  }
   if (!r || e?.type !== "may") return true;
   // "Sacrifice it unless you discard a creature card", "discard two cards unless you discard an artifact card": the
   // smaller loss (only asked when it can be done).

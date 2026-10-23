@@ -2185,7 +2185,7 @@ export type Effect =
   | { type: "together"; effects: Effect[] }
   | { type: "mill"; who: PlayerRef; n: Amount }
   /** "That player exiles the top card of their library" (ingest, CR 702.115a): face up (CR 406.3), with no permission to play it. */
-  | { type: "exileTop"; who: PlayerRef; n: Amount }
+  | { type: "exileTop"; who: PlayerRef; n: Amount; /** "Put all artifact cards from among them onto the battlefield" (Tezzeret, Master of the Bridge): together, under your control. */ putAll?: TargetSpec }
   /**
    * Dark Confidant: "reveal the top card of your library and put that card into your hand", then maybe "[you] lose
    * (gain) life equal to its mana value" (X is 0 in a library, CR 202.3e).
@@ -4422,8 +4422,9 @@ export interface CompiledCard {
   lifeGainPlus?: number;
   /** "Damage that would reduce your life total to less than 1 reduces it to 1 instead" (Ali from Cairo): that number. */
   lifeFloor?: number;
-  /** "If you would draw a card except the first one you draw in each of your draw steps, draw two cards instead." */
-  drawTwoInstead?: true;
+  /** "If you would draw a card except the first one you draw in each of your draw steps, draw two cards instead";
+   * "always": "If you would draw a card, draw two cards instead" (Thought Reflection), the draw step's first draw too. */
+  drawTwoInstead?: true | "always";
   /**
    * Abundance: "If you would draw a card, you may instead choose land or nonland and reveal cards from the top of your
    * library until you reveal a card of the chosen kind. Put that card into your hand and put all other cards revealed this
@@ -4625,7 +4626,9 @@ export interface CompiledCard {
   powerUpLess?: number;
   /** "Each power-up ability of permanents you control can be activated an additional time." (Wonder Man; CR 702.193a) */
   powerUpAgain?: true;
-  equipLess?: { n: number; targetSelf?: true; otherEquipment?: true; /** Only while this holds (a Class level's). */ if?: StaticCondition }[];
+  equipLess?: { n: number; targetSelf?: true; otherEquipment?: true; /** "That target enchanted creature" (Strong Back): the creature this Aura is attached to. */ targetEnchanted?: true; /** Only while this holds (a Class level's). */ if?: StaticCondition }[];
+  /** "Aura spells you cast that target enchanted creature cost {3} less to cast" (Strong Back, CR 601.2f). */
+  auraLessEnchanted?: number;
   /** "You may activate equip abilities any time you could cast an instant" (Leonin Shikari); Forge Anew's "During your turn, ...". */
   equipAtInstantSpeed?: "always" | "yourTurn";
   /**

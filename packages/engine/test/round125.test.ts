@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
-import { botActions, castProblem, loseLife, power, characteristics, invalidateCharacteristics, compileCard, isFullySupported, manaValue, planActivate, planCast, spellCost, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { activationCost, abilitiesOf, botActions, castProblem, loseLife, power, characteristics, invalidateCharacteristics, compileCard, isFullySupported, manaValue, planActivate, planCast, spellCost, waitingOn, type Action, type CardDef, type GameState } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -928,5 +928,229 @@ describe("Extract from Darkness: a creature card from any graveyard, not targete
     expect(wurm).toBeDefined();
     expect(s.objects[wurm!]!.controller).toBe(ap);
     expect(s.objects[wurm!]!.owner).toBe(opp);
+  });
+});
+
+describe("Tezzeret, Master of the Bridge", () => {
+  const tez = card("Tezzeret, Master of the Bridge", "Legendary Planeswalker — Tezzeret", "{4}{U}{B}", {
+    loyalty: "5",
+    oracleText: "Creature and planeswalker spells you cast have affinity for artifacts. (They cost {1} less to cast for each artifact you control.)\n+2: Tezzeret deals X damage to each opponent, where X is the number of artifacts you control. You gain X life.\n−3: Return target artifact card from your graveyard to your hand.\n−8: Exile the top ten cards of your library. Put all artifact cards from among them onto the battlefield.",
+  });
+  const relic = card("Test Relic", "Artifact", "{2}");
+  it("affinity for artifacts on creature spells only; +2 deals X and gains X", () => {
+    supported(tez);
+    const bear = card("Grizzly Bears", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" });
+    const shock = card("Test Shock", "Instant", "{1}{R}", { oracleText: "Test Shock deals 2 damage to any target." });
+    const { s: s0, ap, ids, opp } = setup([bear, shock]);
+    const t = putOnBattlefield(s0, ap, tez);
+    putOnBattlefield(s0, ap, relic);
+    invalidateCharacteristics(s0);
+    expect(spellCost(s0, ap, s0.objects[ids[0]!]!).extra).toBe(0);
+    expect(spellCost(s0, ap, s0.objects[ids[1]!]!).extra).toBe(1);
+    const life = s0.players[ap]!.life;
+    const oppLife = s0.players[opp]!.life;
+    const s = settleBots(run(s0, planActivate(s0, ap, t, 0)));
+    expect(s.players[ap]!.life).toBe(life + 1);
+    expect(s.players[opp]!.life).toBe(oppLife - 1);
+  });
+  it("−8: the artifact cards among the top ten enter, the rest stay exiled", () => {
+    const { s: s0, ap } = setup([]);
+    const t = putOnBattlefield(s0, ap, tez);
+    s0.objects[t]!.counters.loyalty = 8;
+    const lib = s0.players[ap]!.library;
+    const top = lib.slice(0, 10);
+    const arts = [0, 4].map((i) => {
+      const id = putOnBattlefield(s0, ap, relic);
+      s0.battlefield.splice(s0.battlefield.indexOf(id), 1);
+      s0.objects[id]!.zone = "library";
+      lib.splice(lib.indexOf(top[i]!), 1, id);
+      return id;
+    });
+    const s = settleBots(run(s0, planActivate(s0, ap, t, 2)));
+    for (const id of arts) expect(s.objects[id]!.zone).toBe("battlefield");
+    expect(s.players[ap]!.exile.length).toBe(8);
+  });
+});
+
+describe("Fandaniel, Telophoroi Ascian: each opponent may sacrifice a nontoken creature; the others lose life (rulings)", () => {
+  it("an opponent with no nontoken creature loses 2 life for each instant and sorcery card in your graveyard", () => {
+    const fan = card("Fandaniel, Telophoroi Ascian", "Legendary Creature — Elder Wizard", "{4}{B}", {
+      power: "4",
+      toughness: "5",
+      oracleText: "Whenever you cast an instant or sorcery spell, surveil 1.\nAt the beginning of your end step, each opponent may sacrifice a nontoken creature of their choice. Each opponent who doesn't loses 2 life for each instant and sorcery card in your graveyard.",
+    });
+    supported(fan);
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, fan);
+    for (let i = 0; i < 3; i++) {
+      const id = putOnBattlefield(s0, ap, card("Test Shock", "Instant", "{R}", { oracleText: "Test Shock deals 2 damage to any target." }));
+      s0.battlefield.splice(s0.battlefield.indexOf(id), 1);
+      s0.objects[id]!.zone = "graveyard";
+      s0.players[ap]!.graveyard.push(id);
+    }
+    const [o1, o2] = [nextOf(s0, ap, 1), nextOf(s0, ap, 2)];
+    const bear = putOnBattlefield(s0, o1, card("Grizzly Bears", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    const before = s0.turnOrder.map((p) => s0.players[p]!.life);
+    let s = passUntil(s0, "end", ap);
+    s = settleBots(s);
+    // The bear's controller either sacrifices it or loses the 6, not both.
+    const lost = (p: number) => before[s0.turnOrder.indexOf(p)]! - s.players[p]!.life;
+    expect(lost(o2)).toBe(6);
+    expect(s.objects[bear]!.zone === "graveyard" ? lost(o1) : 6 - lost(o1)).toBe(0);
+  });
+});
+
+describe("Mjölnir, Storm Hammer: damage to each opponent equal to the tapped creatures that opponent controls", () => {
+  it("tap and stun the defending player's creature, then damage by each opponent's tapped creatures", () => {
+    const hammer = card("Mjölnir, Storm Hammer", "Legendary Artifact — Equipment", "{4}", {
+      keywords: ["Equip"],
+      oracleText: "When Mjölnir enters, attach it to target legendary creature you control.\nWhenever equipped creature attacks, tap target creature defending player controls and put a stun counter on it. Then Mjölnir deals damage to each opponent equal to the number of tapped creatures that opponent controls.\nEquip {4}",
+    });
+    supported(hammer);
+    const { s: s0, ap, opp } = setup([]);
+    const bear = () => card("Grizzly Bears", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" });
+    const hero = putOnBattlefield(s0, ap, bear());
+    const h = putOnBattlefield(s0, ap, hammer);
+    s0.objects[h]!.attachedTo = hero;
+    const a = putOnBattlefield(s0, opp, bear());
+    const other = s0.turnOrder.find((p) => p !== ap && p !== opp)!;
+    const b = putOnBattlefield(s0, other, bear());
+    s0.objects[b]!.tapped = true;
+    invalidateCharacteristics(s0);
+    let s = passUntil(s0, "declareAttackers", ap);
+    const [l1, l2] = [s.players[opp]!.life, s.players[other]!.life];
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: hero, defender: opp }] });
+    s = settleBots(s);
+    expect(s.objects[a]!.tapped).toBe(true);
+    expect(s.objects[a]!.counters.stun).toBe(1);
+    expect(s.players[opp]!.life).toBe(l1 - 1);
+    expect(s.players[other]!.life).toBe(l2 - 1);
+  });
+});
+
+describe("Strong Back: equip abilities and Aura spells that target enchanted creature cost {3} less (rulings)", () => {
+  it("only for the enchanted creature, only generic mana", () => {
+    const back = card("Strong Back", "Enchantment — Aura", "{2}{G}", {
+      keywords: ["Enchant"],
+      oracleText: "Enchant creature\nEquip abilities you activate that target enchanted creature cost {3} less to activate.\nAura spells you cast that target enchanted creature cost {3} less to cast.\nEnchanted creature gets +2/+2 for each Aura and Equipment attached to it.",
+    });
+    supported(back);
+    const aura = card("Test Strength", "Enchantment — Aura", "{3}{G}", { keywords: ["Enchant"], oracleText: "Enchant creature\nEnchanted creature gets +1/+1." });
+    const { s, ap, ids } = setup([aura]);
+    const bear = () => card("Grizzly Bears", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" });
+    const [x, y] = [putOnBattlefield(s, ap, bear()), putOnBattlefield(s, ap, bear())];
+    const sb = putOnBattlefield(s, ap, back);
+    s.objects[sb]!.attachedTo = x;
+    const sword = putOnBattlefield(s, ap, card("Test Sword", "Artifact — Equipment", "{2}", { keywords: ["Equip"], oracleText: "Equipped creature gets +1/+1.\nEquip {4}" }));
+    invalidateCharacteristics(s);
+    expect(power(s, s.objects[x]!)).toBe(4);
+    const generic = (c: { symbols: { kind: string; amount?: number }[] }) => c.symbols.reduce((n, y) => n + (y.kind === "generic" ? (y.amount ?? 0) : 0), 0);
+    const eq = abilitiesOf(s, s.objects[sword]!).activated.find((ab) => ab.equip)!;
+    expect(generic(activationCost(s, ap, s.objects[sword]!, eq, [{ kind: "object", id: x }]))).toBe(1);
+    expect(generic(activationCost(s, ap, s.objects[sword]!, eq, [{ kind: "object", id: y }]))).toBe(4);
+    const o = s.objects[ids[0]!]!;
+    expect(spellCost(s, ap, o, 0, [], { targets: [{ kind: "object", id: x }] }).extra).toBe(0);
+    expect(spellCost(s, ap, o, 0, [], { targets: [{ kind: "object", id: y }] }).extra).toBe(3);
+  });
+});
+
+describe("More of the most played cards", () => {
+  const bears = () => card("Grizzly Bears", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" });
+  const inLibrary = (s: GameState, pid: number, d: CardDef) => {
+    const id = putOnBattlefield(s, pid, d);
+    s.battlefield.splice(s.battlefield.indexOf(id), 1);
+    s.objects[id]!.zone = "library";
+    s.players[pid]!.library.unshift(id);
+    return id;
+  };
+  it("Soul's Majesty: draws cards equal to the target creature's power", () => {
+    const majesty = card("Soul's Majesty", "Sorcery", "{4}{G}", { oracleText: "Draw cards equal to the power of target creature you control." });
+    supported(majesty);
+    const { s: s0, ap, ids } = setup([majesty]);
+    const big = putOnBattlefield(s0, ap, card("Test Wurm", "Creature — Wurm", "{6}{G}", { power: "6", toughness: "6" }));
+    s0.players[ap]!.manaPool = { W: 0, U: 0, B: 0, R: 0, G: 5, C: 0 };
+    const hand = s0.players[ap]!.hand.length;
+    const s = settleBots(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: big }])));
+    expect(s.players[ap]!.hand.length).toBe(hand - 1 + 6);
+  });
+  it("Ovika, Enigma Goliath: X tokens for the noncreature spell's mana value, with haste", () => {
+    const ovika = card("Ovika, Enigma Goliath", "Legendary Creature — Phyrexian Nightmare", "{5}{U}{R}", {
+      power: "6",
+      toughness: "6",
+      keywords: ["Flying", "Ward"],
+      oracleText: "Flying\nWard—{3}, Pay 3 life.\nWhenever you cast a noncreature spell, create X 1/1 red Phyrexian Goblin creature tokens, where X is the mana value of that spell. They gain haste until end of turn.",
+    });
+    supported(ovika);
+    const relic = card("Test Relic", "Artifact", "{3}");
+    const { s: s0, ap, ids } = setup([relic]);
+    putOnBattlefield(s0, ap, ovika);
+    s0.players[ap]!.manaPool = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 3 };
+    const s = settleBots(run(s0, planCast(s0, ap, ids[0]!)));
+    const goblins = s.battlefield.filter((id) => s.cards[s.objects[id]!.cardId]!.name === "Phyrexian Goblin Token");
+    expect(goblins.length).toBe(3);
+    expect(goblins.every((id) => characteristics(s, s.objects[id]!).keywords.includes("Haste"))).toBe(true);
+  });
+  it("Rampant Rejuvenator: X is its power as it last existed (rulings)", () => {
+    const rejuv = card("Rampant Rejuvenator", "Creature — Plant Hydra", "{3}{G}", {
+      power: "0",
+      toughness: "0",
+      oracleText: "This creature enters with two +1/+1 counters on it.\nWhen this creature dies, search your library for up to X basic land cards, where X is this creature's power, put them onto the battlefield, then shuffle.",
+    });
+    supported(rejuv);
+    const murder = card("Test Murder", "Instant", "{1}{B}{B}", { oracleText: "Destroy target creature." });
+    const { s: s0, ap, ids } = setup([murder]);
+    const r = putOnBattlefield(s0, ap, rejuv);
+    s0.objects[r]!.counters["+1/+1"] = 3;
+    const forest = card("Forest", "Basic Land — Forest", "", { supertypes: ["Basic"], oracleText: "({T}: Add {G}.)" } as Partial<CardDef>);
+    const lands = [0, 1, 2, 3].map(() => inLibrary(s0, ap, forest));
+    s0.players[ap]!.manaPool = { W: 0, U: 0, B: 3, R: 0, G: 0, C: 0 };
+    invalidateCharacteristics(s0);
+    const s = settleBots(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: r }])));
+    expect(s.objects[r]!.zone).toBe("graveyard");
+    expect(lands.filter((id) => s.objects[id]!.zone === "battlefield").length).toBe(3);
+  });
+  it("Canoptek Spyder: a nontoken Vehicle entering draws a card; a token artifact creature doesn't", () => {
+    const spyder = card("Canoptek Spyder", "Artifact Creature — Spider", "{5}", { power: "4", toughness: "4", keywords: ["Flying"], oracleText: "Flying\nFabricator Claw Array — Whenever another nontoken artifact creature or Vehicle you control enters, draw a card." });
+    supported(spyder);
+    const cart = card("Test Cart", "Artifact — Vehicle", "{1}", { power: "3", toughness: "3", oracleText: "Crew 1" });
+    const thopter = card("Test Thopter", "Artifact Creature — Thopter", "{1}", { power: "1", toughness: "1", oracleText: "Flying", keywords: ["Flying"] });
+    const { s: s0, ap, ids } = setup([cart, thopter]);
+    putOnBattlefield(s0, ap, spyder);
+    s0.players[ap]!.manaPool = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 2 };
+    const hand = s0.players[ap]!.hand.length;
+    let s = settleBots(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.players[ap]!.hand.length).toBe(hand - 1 + 1);
+    s = settleBots(run(s, planCast(s, ap, ids[1]!)));
+    expect(s.players[ap]!.hand.length).toBe(hand - 2 + 2);
+  });
+  it("Godo, Bandit Warlord: untaps itself and all Samurai, then an extra combat", () => {
+    const godo = card("Godo, Bandit Warlord", "Legendary Creature — Human Barbarian", "{5}{R}", {
+      power: "3",
+      toughness: "3",
+      oracleText: "When Godo enters, you may search your library for an Equipment card, put it onto the battlefield, then shuffle.\nWhenever Godo attacks for the first time each turn, untap it and all Samurai you control. After this phase, there is an additional combat phase.",
+    });
+    supported(godo);
+    const { s: s0, ap, opp } = setup([]);
+    const g = putOnBattlefield(s0, ap, godo);
+    const samurai = putOnBattlefield(s0, ap, card("Test Samurai", "Creature — Human Samurai", "{1}{W}", { power: "2", toughness: "2" }));
+    const bear = putOnBattlefield(s0, ap, bears());
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [g, samurai, bear].map((attacker) => ({ attacker, defender: opp })) });
+    s = settleBots(s);
+    expect(s.objects[g]!.tapped).toBe(false);
+    expect(s.objects[samurai]!.tapped).toBe(false);
+    expect(s.objects[bear]!.tapped).toBe(true);
+    expect(s.addedPhases).toEqual(["combat"]);
+  });
+  it("Thought Reflection: every draw is two, the draw step's first too", () => {
+    const reflection = card("Thought Reflection", "Enchantment", "{4}{U}{U}{U}", { oracleText: "If you would draw a card, draw two cards instead." });
+    supported(reflection);
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, reflection);
+    let s = passUntil(s0, "upkeep", nextOf(s0, ap, 1));
+    s = passUntil(s, "upkeep", ap);
+    const hand = s.players[ap]!.hand.length;
+    s = passUntil(s, "main1", ap);
+    expect(s.players[ap]!.hand.length).toBe(hand + 2);
   });
 });

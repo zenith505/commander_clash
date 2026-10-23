@@ -640,14 +640,22 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // shuffle." (Traverse the Outlands): the same as "... put them onto the battlefield tapped, then shuffle, where X is ...".
   text = text.replace(/(^|\. )Search your library for up to X ([^.,]+), where X is ([^.]+)\. Put those cards onto the battlefield( tapped)?, then shuffle\./, "$1Search your library for up to X $2, put them onto the battlefield$4, then shuffle, where X is $3.");
   // Harvest Season: "Search your library for up to X basic land cards, where X is ..., put those cards onto the
-  // battlefield tapped, then shuffle." The same.
-  text = text.replace(/(^|\. )Search your library for up to X ([^.,]+), where X is ([^.,]+), put those cards onto the battlefield( tapped)?, then shuffle\./, "$1Search your library for up to X $2, put them onto the battlefield$4, then shuffle, where X is $3.");
+  // battlefield tapped, then shuffle." The same; "put them" too (Rampant Rejuvenator, its power as it last existed).
+  text = text.replace(/(^|\. )([Ss])earch your library for up to X ([^.,]+), where X is ([^.,]+), put (?:those cards|them) onto the battlefield( tapped)?, then shuffle\./, "$1$2earch your library for up to X $3, put them onto the battlefield$5, then shuffle, where X is $4.");
   // Avatar's Wrath: "Choose up to one target creature, then airbend all other creatures": the target only says which one
   // isn't airbent (CR 701.65a), the same as two sentences.
   // "Put a night counter on ~. Then if it has eight or more night counters on it, remove all of them and create ..."
   // (Replicating Ring): ~'s counters, checked as it resolves (rulings).
   // The Scarab God: "each opponent loses X life and you scry X, where X is the number of Zombies you control": the same X
   // for both, which losing life doesn't change, so two instructions each with it.
+  // "Untap it and all Samurai you control" (Godo, Bandit Warlord): two untaps, nothing in between.
+  text = text.replace(/(^|\. )([Uu])ntap (it|~) and all ([^.]+)\./, "$1$2ntap $3. Untap all $4.");
+  // "~ deals damage to each opponent equal to the number of tapped creatures that opponent controls" (Mjölnir, Storm
+  // Hammer): each opponent's own count.
+  text = text.replace(/(deals damage to each opponent equal to the number of [^.]+?) that opponent controls\b/g, "$1 that player controls");
+  // "~ deals X damage to each opponent, where X is the number of artifacts you control. You gain X life." (Tezzeret, Master
+  // of the Bridge): the same X, counted again (nothing between them changes it).
+  text = text.replace(/(^|\. )(~ deals X damage to [^.]+), where X is ([^.]+)\. You gain X life\./, "$1$2, where X is $3. You gain X life, where X is $3.");
   text = text.replace(/(^|\. )([Ee]ach opponent loses X life) and you (scry X|draw X cards), where X is ([^.]+)\./, (_, lead: string, a: string, b: string, x: string) => `${lead}${a}, where X is ${x}. ${b.charAt(0).toUpperCase()}${b.slice(1)}, where X is ${x}.`);
   // Brass's Tunnel-Grinder: "Then if there are three or more bore counters on it, remove those counters and transform it."
   // Primal Amulet: "..., you may remove those counters and transform it."
@@ -1662,7 +1670,10 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     // "Each player may scry 1" (Eager Construct), "then each opponent may scry 1" (Myr Custodian), "each player may draw a
     // card" (Kwain): each decides in turn order, knowing the earlier answers, then those who did each do it, in turn
     // order (rulings on Eager Construct and Kaya, Intangible Slayer).
-    const alone = offer && !does && /^(?:scry \d+|surveil \d+|draw a card)$/.test(offer[2]!) ? parseOffer(offer[2]!, ctx) : null;
+    // "Each opponent may sacrifice a nontoken creature of their choice. Each opponent who doesn't loses ..." (Fandaniel):
+    // each chooses in turn order, then the chosen ones are sacrificed (rulings); only one who has such a creature can.
+    const sacAlone = offer && !does && /^sacrifice an? [a-z ]+?(?: of their choice)?$/.test(offer[2]!) && /^(?:Then )?[Ee]ach (?:opponent|player) who (?:doesn't|didn't) /.test(sentences[si + 1] ?? "");
+    const alone = offer && !does && (sacAlone || /^(?:scry \d+|surveil \d+|draw a card)$/.test(offer[2]!)) ? parseOffer(offer[2]!.replace(/ of their choice$/, ""), ctx) : null;
     // "Each player may put two +1/+1 counters on a creature they control. Goad each creature that had counters put on
     // it this way." (Agitator Ant): each decides in turn order, then puts them; then those creatures are goaded (rulings).
     const goadPut = offer && !does && /^put .+ counters? on a creature they control$/.test(offer[2]!) && /^Goad each creature that had counters put on it this way$/.test(sentences[si + 1]?.replace(/\.$/, "") ?? "");
@@ -1681,7 +1692,10 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       continue;
     }
     if (offer && alone) {
-      effects.push({ type: "eachMay", who: { ref: offer[1] === "player" ? "eachPlayer" : "eachOpponent" }, effects: alone, text: offer[2]!, each: true });
+      const one = alone.length === 1 ? alone[0]! : undefined;
+      if (sacAlone && (one?.type !== "pick" || one.action !== "sacrifice" || one.n !== 1)) return null;
+      const need = sacAlone && one?.type === "pick" ? { zone: "battlefield" as const, filter: one.filter } : undefined;
+      effects.push({ type: "eachMay", who: { ref: offer[1] === "player" ? "eachPlayer" : "eachOpponent" }, effects: alone, text: offer[2]!.replace(/\btheir\b/g, "your"), each: true, ...(need ? { need } : {}) });
       ctx.eachChose = true;
       continue;
     }
@@ -1894,6 +1908,17 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     if (/^[Ee]xile all cards from your hand$/.test(s) && /^Draw that many cards$/.test(sentences[si + 1] ?? "") && /^Until the end of your next turn, you may play cards exiled this way$/.test(sentences[si + 2] ?? "")) {
       effects.push({ type: "exileHand", until: "nextTurn" }, { type: "draw", who: { ref: "you" }, n: { count: { kind: "exiledFromHandThisWay" } } });
       si += 2;
+      continue;
+    }
+    // "Exile the top ten cards of your library. Put all artifact cards from among them onto the battlefield." (Tezzeret,
+    // Master of the Bridge): the rest stay exiled.
+    const exileTopN = new RegExp(`^[Ee]xile the top ${NUM} cards of your library$`).exec(s);
+    const exilePutAll = exileTopN && /^Put all (.+? cards) from among them onto the battlefield$/.exec(sentences[si + 1] ?? "");
+    if (exileTopN && exilePutAll) {
+      const filter = parseSearchFilter(exilePutAll[1]!.replace(/cards$/, "card"));
+      if (!filter) return null;
+      effects.push({ type: "exileTop", who: { ref: "you" }, n: num(exileTopN[1]!), putAll: filter });
+      si++;
       continue;
     }
     // "Exile the top ten cards of your library. You may cast any number of spells with total mana value 10 or less from
@@ -5220,6 +5245,14 @@ function parseEqualTo(s: string, ctx: Ctx): Effect[] | null {
     const m = re.exec(s);
     if (!m) continue;
     const fx = parseSentence(rewrite(m), ctx);
+    // "Draw cards equal to the power of target creature you control" (Soul's Majesty): that target's power as it resolves,
+    // a target of its own after the sentence's others.
+    const of = /^(?:the (power|toughness) of (target creature(?: you control)?)|(target creature(?: you control)?)'s (power|toughness))$/.exec(m[group ?? m.length - 1]!);
+    if (fx && of) {
+      const what = (of[2] ?? of[3])!;
+      const index = addTarget(ctx, { kind: "object", types: ["Creature"], ...(/you control$/.test(what) ? { controller: "you" as const } : {}), text: what });
+      return replaceX(fx, { count: { kind: (of[1] ?? of[4]) as "power" | "toughness", of: { ref: "target", index } } });
+    }
     const def = fx && parseCount(m[group ?? m.length - 1]!, ctx);
     return fx && def ? replaceX(fx, def) : null;
   }

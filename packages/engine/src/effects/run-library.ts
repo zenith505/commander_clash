@@ -77,6 +77,12 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         if (ids.length === 1 && s.resolving) s.resolving.exiledTop = { id: ids[0]!, zc: s.objects[ids[0]!]!.zoneChanges ?? 0 };
         // An empty library: nothing happens (ingest rulings).
         if (ids.length) log(s, `${p.name} exiles ${ids.map((id) => defOf(s, s.objects[id]!).name).join(", ")} from the top of their library.`);
+        // Only permanent cards can be put onto the battlefield (CR 110.4b); they enter at the same time.
+        const put = e.putAll ? ids.filter((id) => p.exile.includes(id) && printedMatches(e.putAll!, defOf(s, obj(s, id))) && isPermanentCard(defOf(s, obj(s, id)))) : [];
+        if (put.length) {
+          log(s, `${player(s, ctx.controller).name} puts ${put.map((id) => defOf(s, obj(s, id)).name).join(", ")} onto the battlefield.`);
+          enterTogether(s, () => put.forEach((id) => moveObject(s, id, "battlefield", { controller: ctx.controller })));
+        }
       }
       return;
     case "revealTop": {

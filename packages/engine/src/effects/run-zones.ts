@@ -209,6 +209,11 @@ function pickPermanents(s: GameState, e: Extract<Effect, { type: "pick" }>, ctx:
         if (put > 0 && s.resolving) (s.resolving.countersPutThisWay ??= []).push({ id, zc: o.zoneChanges ?? 0, kind: k });
         continue;
       }
+      if (e.action === "exile") {
+        log(s, `${player(s, pid).name} exiles ${defOf(s, o).name}.`);
+        moveObject(s, id, "exile");
+        continue;
+      }
       log(s, e.action === "sacrifice" ? `${player(s, pid).name} sacrifices ${defOf(s, o).name}.` : `${player(s, pid).name} returns ${defOf(s, o).name} to its owner's hand.`);
       // As it last existed, for a reflexive trigger: "When you do, ~ deals damage equal to that creature's power" (CR 608.2h).
       if (e.action === "sacrifice" && s.resolving) {

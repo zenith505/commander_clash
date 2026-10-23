@@ -5,7 +5,7 @@
 // player into poison counters (CR 702.90b), toxic adds poison (CR 702.164c), and
 // deathtouch and lifelink apply (CR 702.2, 702.15).
 
-import { abilitiesOf, defOf, toughness, wasCastThisTurn } from "./cards";
+import { abilitiesOf, cardIdOf, defOf, toughness, wasCastThisTurn } from "./cards";
 import { compileCard } from "./oracle";
 import { liveEmblems } from "./emblems";
 import { commanderOf } from "./mutate";
@@ -18,7 +18,7 @@ import { canPreventDamage, enterTogether, gainLife, log, loseLife, simultaneousL
 import { protectedFrom, toxicValue } from "./keywords";
 import { characteristics, controllerOf, invalidateCharacteristics, staticConditionNow } from "./layers";
 import type { CardDef, Color, DamageRule, GameObject, GameState, ObjectId, PlayerId, RedirectShield } from "./types";
-import type { DamageMod, TargetSpec } from "./abilities";
+import type { AbilityBody, DamageMod, TargetSpec } from "./abilities";
 import { defMv, hasName } from "./faces";
 
 /** What a damage source looks like as it deals damage. */
@@ -284,7 +284,7 @@ const srcKey = (src: DamageSource) => src.id ?? `spell:${src.name}`;
 
 type ShieldOp =
   | { kind: "protection"; srcName: string; toName: string; /** Damage to a player: who, and how much was prevented (Selfless Squire). */ player?: PlayerId; n?: number }
-  | { kind: "preventAll"; srcName: string; toName: string; /** Damage to a player: who (Selfless Squire). */ player?: PlayerId; /** A damage rule's, with what's prevented for its additional effect. */ rule?: string; n?: number; src?: DamageSource; /** A static rule's card, for the log. */ card?: string; /** Vigor's +1/+1 counters, one for each 1 damage prevented, put by `by`. */ plusOnes?: { id: ObjectId; n: number; by: PlayerId; card: string } }
+  | { kind: "preventAll"; srcName: string; toName: string; /** Damage to a player: who (Selfless Squire). */ player?: PlayerId; /** A damage rule's, with what's prevented for its additional effect. */ rule?: string; n?: number; src?: DamageSource; /** A static rule's card, for the log. */ card?: string; /** Vigor's +1/+1 counters, one for each 1 damage prevented, put by `by`. */ plusOnes?: { id: ObjectId; n: number; by: PlayerId; card: string }; /** Phyrexian Vindicator's reflexive trigger, about `n` damage prevented. */ reflect?: { id: ObjectId; n: number; by: PlayerId; card: string; body: AbilityBody } }
   | { kind: "shieldCounter"; id: ObjectId; srcName: string }
   | { kind: "prevent"; to: Rec; n: number; srcName: string; toName: string; rule?: string; src?: DamageSource; card?: string }
   | { kind: "redirect"; to: Rec; shield: string; n: number; srcName: string; fromName: string; toName: string; card: string; rule?: boolean }
@@ -688,7 +688,12 @@ export function planShields(s: GameState, events: DamageEvent[], answers: number
             for (const order of permutations(boost)) n = Math.max(n, order.reduce((a, m) => (a > 0 ? modAmount(s, m, a) : 0), e.n));
           const src = vigor.from ? s.objects[vigor.from] : undefined;
           ops.push({ kind: "preventAll", srcName: e.src.name, toName, plusOnes: { id: to.object, n, by: vigor.you!, card: src ? (s.cards[src.cardId]?.name ?? "") : "" } });
-        } else ops.push({ kind: "preventAll", srcName: e.src.name, toName, n: e.n, ...toPlayer(to) });
+        } else {
+          // Phyrexian Vindicator: "When damage is prevented this way, ..." (CR 603.12), about the damage as it would have
+          // been dealt.
+          const reflect = "object" in to ? characteristics(s, obj(s, to.object)).preventDamage?.find((p) => p.reflect && p.to && (!p.combat || (p.combat === "only") === !!e.combat)) : undefined;
+          ops.push({ kind: "preventAll", srcName: e.src.name, toName, n: e.n, ...toPlayer(to), ...(reflect && "object" in to ? { reflect: { id: reflect.from!, n: e.n, by: reflect.you!, card: s.objects[reflect.from!] ? (s.cards[obj(s, reflect.from!).cardId]?.name ?? "") : "", body: reflect.reflect! } } : {}) });
+        }
         continue;
       }
       if (prev(e) && "player" in to && playerProtectedFrom(s, to.player, e.src.controller, e.src)) {
@@ -1012,6 +1017,8 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
   };
   // Vigor's +1/+1 counters, put once the damage is prevented.
   const plusOnesLater: { id: ObjectId; n: number; by: PlayerId }[] = [];
+  // Phyrexian Vindicator's reflexive triggers: one for each source permanent in this damage event, with all it prevented.
+  const reflectLater = new Map<ObjectId, { n: number; by: PlayerId; body: AbilityBody }>();
   // Inkshield's tokens, one for each 1 damage each rule prevented, created together once the damage is prevented.
   const madeLater = new Map<string, { r: DamageRule; n: number }>();
   const ruleUsed = (id: string, n: number, src?: DamageSource, prevented = false) => {
@@ -1032,6 +1039,7 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
       const r = op.rule ? s.damageRules?.find((x) => x.id === op.rule) : undefined;
       log(s, `Damage from ${op.srcName} to ${op.toName} is prevented${r ? ` (${cardName(s, r)})` : op.card ? ` (${op.card})` : op.plusOnes?.card ? ` (${op.plusOnes.card})` : ""}.`);
       if (op.plusOnes) plusOnesLater.push(op.plusOnes);
+      if (op.reflect && op.reflect.n > 0) reflectLater.set(op.reflect.id, { n: (reflectLater.get(op.reflect.id)?.n ?? 0) + op.reflect.n, by: op.reflect.by, body: op.reflect.body });
       if (r && op.n && op.src) {
         gainLater(r, op.n, op.src);
         if (colorsOk(r.dealBack, op.src)) back.push(backTo(r, op.src, op.n));
@@ -1084,6 +1092,11 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
     if (n > 0 && o.zone === "battlefield") withPutter(by, () => putCounters(s, o, "+1/+1", n));
   }
   if (plusOnesLater.length) invalidateCharacteristics(s);
+  for (const [id, { n, by, body }] of reflectLater) {
+    const o = s.objects[id];
+    if (!o) continue;
+    s.triggerQueue.push({ sourceId: id, sourceCardId: cardIdOf(o), controller: by, index: -1, body, sourceZc: o.zoneChanges ?? 0, event: { amount: n } });
+  }
   if (madeLater.size)
     enterTogether(s, () => {
       for (const { r, n } of madeLater.values()) {

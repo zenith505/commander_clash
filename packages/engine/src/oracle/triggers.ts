@@ -883,6 +883,14 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
     if (!draw) return "fail";
     const body: AbilityBody = { ...draw, effects: [{ type: "if", cond: { kind: "noneAttackedYou" }, effects: draw.effects }], text: m[0].replace(/^[^,]+, /, "") };
     return { event: "creaturesYouControlAttack", body, minAttackers: num(m[1]!), anyoneAttacks: true, anotherPlayer: true };
+  } else if ((m = /^Whenever one or more creatures attack one of your opponents( or a planeswalker they control)?, (.+)$/.exec(line))) {
+    // Frontier Warmonger, Frenzied Gorespawn: any player's creatures (rulings), once for each of your opponents they attack
+    // (with their planeswalkers, when it says so; not battles), as for "whenever you attack a player" (CR 508.3e). "Those
+    // creatures" are the ones attacking that opponent, "defending player" that opponent.
+    if (/\b(they|them|their|it|that player)\b/.test(m[2]!.replace(/\bthose creatures\b/g, ""))) return "fail";
+    const body = parseBody(m[2]!.replace(/\bdefending player\b/g, "that player"), { eventPlayer: true, eventGroup: true });
+    if (!body) return "fail";
+    return { event: "creaturesYouControlAttack", body, anyoneAttacks: true, attacksOpponent: { ...(m[1] ? { orPlaneswalkers: true as const } : {}) } };
   } else if ((m = /^Whenever (?:one or more creatures attack|a player attacks with (two|three|four|five) or more creatures), (.+)$/.exec(line))) {
     // Duelist's Heritage: whoever attacks (rulings), once for each declaration (CR 508.1, 603.2c). "Whenever a player
     // attacks with three or more creatures" (Aurelia, the Law Above): any player's attack, counting all their attackers.

@@ -190,7 +190,10 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       while (sc.mayQueue.length) {
         const pid = sc.mayQueue[0]!;
         if (sc.may === undefined) {
-          s.pending = { kind: "chooseMay", player: pid, prompt: e.text.replace(/~/g, src), source: src, ...(e.wheel !== undefined ? { wheel: e.wheel } : {}), ...(e.pay ? { pay: e.pay } : {}) };
+          // "Each opponent who doesn't loses 2 life for each ..." (Fandaniel): the prompt says what declining costs.
+          const after = e.each ? s.resolving!.body.effects[s.resolving!.next + 1] : undefined;
+          const loss = after?.type === "loseLife" && after.who.ref === "notChoseThisWay" ? amountNow(s, after.n, ctx) : undefined;
+          s.pending = { kind: "chooseMay", player: pid, prompt: e.text.replace(/~/g, src), source: src, ...(e.wheel !== undefined ? { wheel: e.wheel } : {}), ...(e.pay ? { pay: e.pay } : {}), ...(loss !== undefined ? { otherwise: `If you don't, you lose ${loss} life.` } : {}) };
           return "paused";
         }
         if (sc.may) sc.mayers!.push(pid);

@@ -879,6 +879,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     const filter = pickFilter(m[1]!);
     return filter && filter.kind === "object" ? [{ type: "pick", who: { ref: "you" }, filter: { ...filter, notSource: true, text: `other ${filter.text}` }, n: 1, action: "sacrifice" }] : null;
   }
+  // "Defending player exiles two permanents they control" (Bane of Bala Ged): their own, chosen as it resolves, not
+  // targeted; with no more than that many, all of them (rulings).
+  if ((m = new RegExp(`^(.+?) exiles ${NUMX} (.+?) they control$`).exec(s))) {
+    const who = parsePlayer(m[1]!, ctx);
+    const filter = pickFilter(m[3]!);
+    return who && who.ref !== "you" && filter?.kind === "object" ? [{ type: "pick", who, filter, n: amt(m[2]!), action: "exile" }] : null;
+  }
   if ((m = new RegExp(`^(?:(.+?) )?[Ss]acrifices? ${NUMX} (.+?)(?: of (?:their|his or her) choice)?(?: unless (?:they pay|that player pays) (.+))?$`).exec(s)) && !/^(~|it|them|that creature)$/i.test(m[3]!)) {
     const who = m[1] ? parsePlayer(m[1], ctx) : { ref: "you" as const };
     const filter = pickFilter(m[3]!);

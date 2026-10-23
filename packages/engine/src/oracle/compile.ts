@@ -585,6 +585,12 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "Max speed — [Ability]": "As long as your speed is 4, this object has '[Ability]'" (CR 702.178a).
     const maxSpeed = /^Max speed — (.+)$/.exec(line);
+    // Vnwxt: "Max speed — If you would draw a card, draw two cards instead": the replacement only at max speed.
+    if (maxSpeed?.[1] === "If you would draw a card, draw two cards instead.") {
+      out.drawTwoInstead = "always";
+      out.drawTwoIf = { kind: "maxSpeed" };
+      continue;
+    }
     if (maxSpeed) {
       if (!conditionalAbility(d, maxSpeed[1]!, out, { kind: "maxSpeed" })) out.unsupported.push(raw);
       continue;
@@ -840,11 +846,15 @@ export function compile(d: CardDef): CompiledCard {
     // without "other" that could describe itself applies to itself isn't worked out, so that stays out.
     // "Each other creature you control enters with a number of additional +1/+1 counters on it equal to ~'s toughness"
     // (Arwen, Weaver of Hope): its toughness as the creature enters (rulings).
-    const byToughness = new RegExp(`^Each other (creature you control) enters with a number of additional ${COUNTER} counters on it equal to ~'s toughness\\.$`).exec(line);
+    // "Each other creature you control enters with a number of additional +1/+1 counters on it equal to ~'s power and as a
+    // Mutant in addition to its other types" (Master Biomancer): its power as the creature enters (rulings), and the type
+    // whatever that power is.
+    const byToughness = new RegExp(`^Each other (creature you control) enters with a number of additional ${COUNTER} counters on it equal to ~'s (toughness|power)(?: and as an? ([A-Z][a-z]+) in addition to its other types)?\\.$`).exec(line);
     if (byToughness) {
       const g = parseGroup(`each ${byToughness[1]}`);
-      if (!g || g.filter.kind !== "object" || g.filter.controller !== "you") out.unsupported.push(raw);
-      else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(byToughness[2]!), n: 1, perSourceToughness: true, text: line });
+      const sub = byToughness[4];
+      if (!g || g.filter.kind !== "object" || g.filter.controller !== "you" || (sub && !CREATURE_TYPES.has(sub))) out.unsupported.push(raw);
+      else (out.othersEnterWithCounters ??= []).push({ filter: g.filter, counter: counterKind(byToughness[2]!), n: 1, ...(byToughness[3] === "power" ? { perSourcePower: true as const } : { perSourceToughness: true as const }), ...(sub ? { asSubtype: sub } : {}), text: line });
       continue;
     }
     const othersExtra = new RegExp(`^Each (other )?(.+? you control(?: [^,]+?)?) enters with (an|a|one|two|three) additional ${COUNTER} counters? on it( for each [A-Z][a-z]+ you already control)?\\.$`).exec(line);

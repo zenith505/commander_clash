@@ -1080,7 +1080,14 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   for (const [k, n] of Object.entries(opts.counters ?? {})) add(k, n);
   if (characteristics(s, o).types.includes("Creature")) for (const [k, n] of Object.entries(opts.countersIfCreature ?? {})) add(k, n);
   if (characteristics(s, o).types.includes("Planeswalker")) for (const [k, n] of Object.entries(opts.countersIfPlaneswalker ?? {})) add(k, n);
-  for (const [k, n] of Object.entries(othersAddCounters(s, o))) add(k, n);
+  // "And as a Mutant in addition to its other types" (Master Biomancer): a type it has from the moment it enters, for as
+  // long as it's on the battlefield (CR 614.1c, 613.1d).
+  const asTypes: string[] = [];
+  for (const [k, n] of Object.entries(othersAddCounters(s, o, asTypes))) add(k, n);
+  if (asTypes.length) {
+    s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: controllerOf(s, o), sourceName: defOf(s, o).name, duration: "game", affected: [o.id], mods: [{ kind: "addTypes", types: [], subtypes: asTypes, supertypes: [] }] });
+    invalidateCharacteristics(s);
+  }
   // Its own "enters with an additional counter", printed or granted as it enters (Master Chef, CR 614.12).
   for (const e of withGranted(printed, characteristics(s, o).grantedAbilities).entersWithAdditional ?? []) add(e.counter, e.n);
   for (const [k, n] of Object.entries(entering)) putCounters(s, o, k, n, true);
@@ -1372,7 +1379,7 @@ function auraObjectHost(s: GameState, aura: GameObject, pid: PlayerId, enchant: 
  * Globe), judged by the permanent as it would exist there: one entering as a copy of a Human is a Human (CR 614.12,
  * rulings on Grumgully).
  */
-function othersAddCounters(s: GameState, o: GameObject): Record<string, number> {
+function othersAddCounters(s: GameState, o: GameObject, subtypes: string[] = []): Record<string, number> {
   const out: Record<string, number> = {};
   for (const id of s.battlefield) {
     if (id === o.id) continue;
@@ -1386,8 +1393,10 @@ function othersAddCounters(s: GameState, o: GameObject): Record<string, number> 
       if (!filter.chosen && objectMatches(s, filter, o, you, false)) {
         // Giada: "for each Angel you already control", the entering one aside, Giada included (rulings).
         // Arwen: its toughness as the creature enters (rulings), none if 0 or less.
-        const times = r.perControlled ? s.battlefield.filter((x) => x !== o.id && controllerOf(s, obj(s, x)) === you && objectMatches(s, r.perControlled!, obj(s, x), you, false)).length : r.perSourceToughness ? Math.max(0, toughness(s, src)) : 1;
+        // Master Biomancer: its power, likewise.
+        const times = r.perControlled ? s.battlefield.filter((x) => x !== o.id && controllerOf(s, obj(s, x)) === you && objectMatches(s, r.perControlled!, obj(s, x), you, false)).length : r.perSourceToughness ? Math.max(0, toughness(s, src)) : r.perSourcePower ? Math.max(0, power(s, src)) : 1;
         if (times) out[r.counter] = (out[r.counter] ?? 0) + r.n * times;
+        if (r.asSubtype && !subtypes.includes(r.asSubtype)) subtypes.push(r.asSubtype);
       }
     }
   }
@@ -2064,7 +2073,10 @@ function archivesFor(s: GameState, pid: PlayerId): number {
 function archiveDraws(s: GameState, pid: PlayerId): number {
   const first = s.step === "draw" && s.activePlayer === pid && player(s, pid).firstDrawStepDraw !== s.turn;
   return 2 ** s.battlefield.filter((id) => {
-    const two = controllerOf(s, obj(s, id)) === pid ? abilitiesOf(s, obj(s, id)).drawTwoInstead : undefined;
+    const ab = controllerOf(s, obj(s, id)) === pid ? abilitiesOf(s, obj(s, id)) : undefined;
+    const two = ab?.drawTwoInstead;
+    // Vnwxt: only at max speed (CR 702.178a).
+    if (two && ab.drawTwoIf && !staticConditionNow(s, ab.drawTwoIf, id, pid)) return false;
     return two === "always" || (two && !first);
   }).length;
 }

@@ -558,7 +558,7 @@ function splitSentences(text: string): string[] {
 const LIM_DULS_VAULT =
   "Look at the top five cards of your library. As many times as you choose, you may pay 1 life, put those cards on the bottom of your library in any order, then look at the top five cards of your library. Then shuffle and put the last cards you looked at this way on top in any order.";
 
-export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; discardedSelf?: true } = {}): AbilityBody | null {
+export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?: boolean; subject?: boolean; subjectIt?: boolean; subjectLeft?: boolean; selfIt?: boolean; selfCard?: boolean; auraCard?: boolean; activated?: boolean; costLinked?: boolean; spell?: boolean; castSpell?: boolean; activatedAbility?: boolean; eventPlayer?: boolean; defending?: boolean; selfCastSpell?: boolean; ownX?: boolean; revealedFromHand?: boolean; tappedThisWay?: boolean; discardedSelf?: true; /** "Those creatures" are the trigger event's group (Frontier Warmonger). */ eventGroup?: true } = {}): AbilityBody | null {
   // "Put a +1/+1 counter on ~ and untap it" (Gwenna): "it" is ~, the one thing named.
   text = differenceInHand(text).replace(/\b(counters? on ~ and (?:un)?tap) it\b/g, "$1 ~");
   // Witch-king of Angmar: "sacrifices a creature of their choice that dealt combat damage to you this turn" (the
@@ -615,6 +615,7 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     ...(opts.amassed ? { amassed: true } : {}),
     ...(opts.revealedFromHand ? { revealedFromHand: true } : {}),
     ...(opts.tappedThisWay ? { tappedThisWay: true } : {}),
+    ...(opts.eventGroup ? { lastGroup: { ref: "eventGroup" as const } } : {}),
   };
   // "Each player loses half their life, then discards half the cards in their hand, ... Round up each time." (Fraying
   // Omnipotence): the last sentence says how each "half" in the others is rounded (CR 107.1a).
@@ -2415,6 +2416,21 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
       if (!r) return null;
       effects.push({ type: "revealTop", ...(atRandom ? { randomFromHand: true as const } : {}) }, r.effect);
       si = r.next - 1;
+      continue;
+    }
+    // Keen Duelist: "you and target opponent each reveal the top card of your library. You each lose life equal to the mana
+    // value of the card revealed by the other player. You each put the card you revealed into your hand." Parker Luck: "two
+    // target players each reveal ... They each lose life ... Then they each put the card they revealed into their hand."
+    const duel = /^(you and target opponent|two target players) each reveal the top card of (?:your|their) library$/i.exec(s);
+    if (duel) {
+      const you = /^you/i.test(duel[1]!);
+      const loss = you ? /^You each lose life equal to the mana value of the card revealed by the other player\.?$/ : /^They each lose life equal to the mana value of the card revealed by the other player\.?$/;
+      const hand = you ? /^You each put the card you revealed into your hand\.?$/ : /^Then they each put the card they revealed into their hand\.?$/;
+      if (!loss.test(sentences[si + 1] ?? "") || !hand.test(sentences[si + 2] ?? "")) return null;
+      const who = parsePlayer(you ? "target opponent" : "two target players", ctx);
+      if (!who) return null;
+      effects.push({ type: "duelReveal", between: you ? [{ ref: "you" }, who] : [who] });
+      si += 2;
       continue;
     }
     // Dark Confidant: "Reveal the top card of your library and put that card into your hand. You lose life equal to

@@ -143,6 +143,26 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       }
       return;
     }
+    case "duelReveal": {
+      // Both cards are revealed at once; an empty library reveals nothing, a mana value of 0 for the other player. Then
+      // both lose life at once, then each puts their card into their hand.
+      // With one of them no longer a legal target, the other still reveals and takes their card, losing nothing (CR 608.2b).
+      const who = e.between.flatMap((r) => players(s, r, ctx)).slice(0, 2);
+      const top = who.map((pid) => player(s, pid).library[0]);
+      who.forEach((pid, i) => top[i] && log(s, `${player(s, pid).name} reveals ${defOf(s, obj(s, top[i]!)).name}.`));
+      const mv = top.map((id) => (id ? defMv(defOf(s, obj(s, id))) : 0));
+      who.forEach((pid, i) => {
+        const n = mv[1 - i] ?? 0;
+        if (n <= 0) return;
+        loseLife(s, pid, n);
+        log(s, `${player(s, pid).name} loses ${n} life.`);
+      });
+      who.forEach((pid, i) => {
+        const id = top[i];
+        if (id && s.objects[id]?.zone === "library" && player(s, pid).library.includes(id)) moveObject(s, id, "hand");
+      });
+      return;
+    }
     case "discard": {
       const who = players(s, e.who, ctx);
       // "Discards all cards with that name" (Cabal Therapy): the name chosen as it resolved.

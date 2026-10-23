@@ -35,7 +35,7 @@ export interface FaceDownPlay {
 /** "unblocked": blocked attackers that assign their combat damage as though they weren't blocked (CR 510.1). */
 /** "exert": attackers their controller exerts as they attack (CR 701.43d). */
 /** "choose": "Choose a creature you control. It gains indestructible until end of turn": only picked; "it" is that one. */
-export type PickAction = "attach" | "phaseOut" | "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "untapLimited" | "encode" | "keep" | "untap" | "tap" | "choose" | "meld" | "unattach" | /** Liliana of the Veil: the permanents for the first of two piles. */ "pile";
+export type PickAction = "attach" | "phaseOut" | "sacrifice" | "bounce" | "counters" | "populate" | "pair" | "reveal" | "unblocked" | "enlist" | "band" | "ringBearer" | "champion" | "exert" | "keepTapped" | "untapLimited" | "encode" | "keep" | "untap" | "tap" | "choose" | "meld" | "unattach" | /** Liliana of the Veil: the permanents for the first of two piles. */ "pile" | /** "Defending player exiles two permanents they control" (Bane of Bala Ged). */ "exile";
 
 /**
  * What "unless its controller pays ..." asks for (CR 118.12): a mana cost, plus generic mana counted
@@ -1019,7 +1019,7 @@ export type Modification =
    * dealt to and dealt by ~ this turn" (CR 615.1): `to` and/or `by` it; `combat` "only" or "non" (noncombat);
    * `fromTypes`: only damage from sources with all these card types ("by creatures", "by artifact sources").
    */
-  | { kind: "preventDamage"; to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[]; /** "Put a +1/+1 counter on that creature for each 1 damage prevented this way" (Vigor, CR 615.5): the ability's controller puts them. */ plusOnes?: true }
+  | { kind: "preventDamage"; to?: true; by?: true; combat?: "only" | "non"; fromTypes?: string[]; /** "Put a +1/+1 counter on that creature for each 1 damage prevented this way" (Vigor, CR 615.5): the ability's controller puts them. */ plusOnes?: true; /** "When damage is prevented this way, ..." (Phyrexian Vindicator): a reflexive trigger of its source, "that much" being the damage prevented in the event (CR 603.12). */ reflect?: AbilityBody }
   /** "If a source you control would deal damage ..., it deals double that damage instead" (a replacement effect, CR 614.1a). */
   | { kind: "damageMod"; mod: DamageMod }
   /** "Damage that would be dealt by ~ can't be prevented" (CR 615.12); `combat`: combat damage only (Questing Beast). */
@@ -2192,6 +2192,11 @@ export type Effect =
    */
   /** `drain`: "Each opponent loses X life and you gain X life, where X is that card's mana value" (Twilight Prophet). */
   | { type: "revealTopToHand"; life?: { who: PlayerRef; gain?: boolean; drain?: true } }
+  /**
+   * Keen Duelist, Parker Luck: two players each reveal the top card of their library, each loses life equal to the mana
+   * value of the card the other revealed, then each puts the card they revealed into their hand.
+   */
+  | { type: "duelReveal"; between: PlayerRef[] }
   /** "You may repeat this process any number of times" (Ad Nauseam): `effects` (none of which waits on a choice), then the controller decides whether to go again, each time after seeing the result (rulings). */
   | { type: "repeatMay"; effects: Effect[]; text: string }
   /** Sunforger: the card a search with dest "cast" found, cast from the library without paying its mana cost (CR 608.2g). */
@@ -3427,6 +3432,12 @@ export interface TriggeredAbility {
   anyoneAttacks?: true;
   /** For "creaturesYouControlAttack": "Whenever you attack a player", once for each player attacked (CR 508.3e); the event's player is that player. */
   perPlayer?: true;
+  /**
+   * With `anyoneAttacks`: "Whenever one or more creatures attack one of your opponents (or a planeswalker they control)"
+   * (Frontier Warmonger): once for each of its controller's opponents attacked; the event's player is that opponent, its
+   * group the creatures attacking them (and, `orPlaneswalkers`, their planeswalkers).
+   */
+  attacksOpponent?: { orPlaneswalkers?: true };
   /** "Whenever you attack with ~ and/or your commander" (Ainok Strike Leader): once, if it or a commander you own is among the attackers. */
   selfOrCommander?: true;
   /** With `anyoneAttacks`: "Whenever another player attacks" (Firemane Commando), not its controller. The event's player is the attacking player, its amount how many of the attackers attack its controller (not their planeswalkers or battles). */
@@ -4200,7 +4211,7 @@ export interface CompiledCard {
   othersEnterUntapped?: { filter: TargetSpec; text: string }[];
   /** "Each other creature you control enters with an additional +1/+1 counter on it" (Renata): on other permanents entering. */
   /** `perControlled`: "for each Angel you already control" (Giada): `n` times the permanents matching it its controller controls, the entering one aside. */
-  othersEnterWithCounters?: { filter: TargetSpec; counter: CounterKind; n: number; perControlled?: TargetSpec; /** n times the source's toughness (Arwen, Weaver of Hope). */ perSourceToughness?: true; text: string }[];
+  othersEnterWithCounters?: { filter: TargetSpec; counter: CounterKind; n: number; perControlled?: TargetSpec; /** n times the source's toughness (Arwen, Weaver of Hope). */ perSourceToughness?: true; /** n times the source's power (Master Biomancer). */ perSourcePower?: true; /** "And as a Mutant in addition to its other types" (Master Biomancer): it enters with this creature type too (CR 614.1c). */ asSubtype?: string; text: string }[];
   /** "This creature enters with an additional +1/+1 counter on it" (Master Chef's granted ability): on itself entering. */
   entersWithAdditional?: { counter: CounterKind; n: number }[];
   entersTappedUnless?: EntersCondition;
@@ -4425,6 +4436,8 @@ export interface CompiledCard {
   /** "If you would draw a card except the first one you draw in each of your draw steps, draw two cards instead";
    * "always": "If you would draw a card, draw two cards instead" (Thought Reflection), the draw step's first draw too. */
   drawTwoInstead?: true | "always";
+  /** "Max speed — If you would draw a card, draw two cards instead" (Vnwxt): `drawTwoInstead` only while this holds (CR 702.178a). */
+  drawTwoIf?: StaticCondition;
   /**
    * Abundance: "If you would draw a card, you may instead choose land or nonland and reveal cards from the top of your
    * library until you reveal a card of the chosen kind. Put that card into your hand and put all other cards revealed this

@@ -2668,6 +2668,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects[effects.length - 1] = { type: "if", cond: { kind: "subjectIs", filter }, effects: [{ ...prev, effects: [either] }], otherwise: [prev] };
       continue;
     }
+    // Andúril, Flame of the West: "Create two tapped 1/1 white Spirit creature tokens with flying. If that creature is
+    // legendary, instead create two of those tokens that are tapped and attacking." The attacker as it is when this
+    // resolves, or as it last existed (CR 608.2h); one or the other.
+    if ((ctx.subject || ctx.subjectIt) && s === "If that creature is legendary, instead create two of those tokens that are tapped and attacking") {
+      const prev = effects[effects.length - 1];
+      if (prev?.type !== "createToken" || prev.n !== 2 || !prev.tapped || prev.attacking || prev.who.ref !== "you") return null;
+      const filter: TargetSpec = { kind: "object", types: [], notTypes: [], notColors: [], supertypes: ["Legendary"], text: "legendary permanent" };
+      effects[effects.length - 1] = { type: "if", cond: { kind: "subjectIs", filter }, effects: [{ ...prev, attacking: true }], otherwise: [prev] };
+      continue;
+    }
     // Emiel the Blessed: "Whenever another creature you control enters, you may pay {G/W}. If you do, put a +1/+1 counter on
     // it. If it's a Unicorn, put two +1/+1 counters on it instead.": the creature as it is when this resolves (CR 608.2c).
     const subjectType = ctx.subjectIt ? /^If it's an? ([A-Z][a-z]+), put (two|three) \+1\/\+1 counters on it instead$/.exec(s) : null;
@@ -5194,7 +5204,8 @@ function insteadOfAffected(fx: Effect[], previous: Effect[]): Effect[] | null {
  * all under it. Only one of them may wait on a choice, the last, so resuming it doesn't repeat the others.
  */
 function parseThen(s: string, ctx: Ctx): Effect[] | null {
-  const parts = s.split(/, then (?!shuffle)/);
+  // "Then shuffle" ends a search; "then shuffle your graveyard into your library" (The Mending of Dominaria) is its own.
+  const parts = s.split(/, then (?!shuffle(?! your graveyard into your library$))/);
   if (parts.length < 2) return null;
   const out: Effect[] = [];
   for (const [i, p] of parts.entries()) {

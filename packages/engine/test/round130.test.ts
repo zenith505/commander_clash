@@ -571,3 +571,70 @@ describe("Vincent Valentine // Galian Beast", () => {
     expect(characteristics(s, s.objects[v]!).keywords).toEqual(expect.arrayContaining(["Trample", "Lifelink"]));
   });
 });
+
+const mending = card("The Mending of Dominaria", "Enchantment — Saga", "{3}{G}{G}", {
+  oracleText: "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI, II — Mill two cards, then you may return a creature card from your graveyard to your hand.\nIII — Return all land cards from your graveyard to the battlefield, then shuffle your graveyard into your library.",
+});
+const mendingIII = card("Test Mending", "Sorcery", "{G}", { oracleText: "Return all land cards from your graveyard to the battlefield, then shuffle your graveyard into your library." });
+const specialist = card("Species Specialist", "Creature — Human Ranger", "{1}{G}", {
+  power: "2",
+  toughness: "1",
+  oracleText: "As this creature enters, choose a creature type.\nWhenever a creature of the chosen type dies, you may draw a card.",
+});
+const anduril = card("Andúril, Flame of the West", "Legendary Artifact — Equipment", "{3}", {
+  oracleText: "Equipped creature gets +3/+1.\nWhenever equipped creature attacks, create two tapped 1/1 white Spirit creature tokens with flying. If that creature is legendary, instead create two of those tokens that are tapped and attacking.\nEquip {2}",
+});
+
+describe("The Mending of Dominaria III: the lands come back, then the rest of the graveyard is shuffled in", () => {
+  it("lands to the battlefield, other cards into the library", () => {
+    supported(mending, mendingIII);
+    const { s: s0, ap, ids } = setup([mendingIII]);
+    const land = putIn(s0, ap, card("Yard Wastes", "Land"), "graveyard");
+    const o = putIn(s0, ap, ogre("Yard Ogre"), "graveyard");
+    const s = settleBots(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.objects[land]!.zone).toBe("battlefield");
+    expect(s.objects[o]!.zone).toBe("library");
+    // The sorcery itself goes to the graveyard after it has resolved (CR 608.2n).
+    expect(s.players[ap]!.graveyard).toEqual([ids[0]!]);
+  });
+});
+
+describe("Species Specialist: whenever a creature of the chosen type dies, you may draw", () => {
+  it("an Ogre dies with Ogre chosen: the draw is offered; a Bear's death isn't", () => {
+    supported(specialist);
+    const { s: s0, ap, ids, opp } = setup([murder, murder]);
+    const sp = putOnBattlefield(s0, ap, specialist);
+    s0.objects[sp]!.chosen = { type: "Ogre" };
+    const o = putOnBattlefield(s0, opp, ogre());
+    const b = putOnBattlefield(s0, opp, card("Test Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    let s = passToPending(run(s0, planCast(s0, ap, ids[0]!, tgt(b))));
+    expect(s.pending ?? null).toBeNull();
+    s = passToPending(run(s, planCast(s, ap, ids[1]!, tgt(o))));
+    expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap, source: "Species Specialist" });
+    const hand = s.players[ap]!.hand.length;
+    s = settleBots(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+  });
+});
+
+describe("Andúril, Flame of the West: two Spirits as the equipped creature attacks, attacking if it's legendary", () => {
+  const attackWith = (legendary: boolean) => {
+    const { s: s0, ap, opp } = setup([]);
+    const a = putOnBattlefield(s0, ap, anduril);
+    const c = putOnBattlefield(s0, ap, legendary ? card("Test Ranger King", "Legendary Creature — Human Ranger", "{2}{W}", { power: "2", toughness: "2" }) : ogre());
+    s0.objects[a]!.attachedTo = c;
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: c, defender: opp }] });
+    s = settleBots(s);
+    const spirits = s.battlefield.filter((id) => s.objects[id]!.isToken && characteristics(s, s.objects[id]!).subtypes.includes("Spirit"));
+    expect(spirits).toHaveLength(2);
+    return spirits.map((id) => s.objects[id]!);
+  };
+  it("a legendary creature: the Spirits enter tapped and attacking", () => {
+    supported(anduril);
+    for (const sp of attackWith(true)) expect(sp).toMatchObject({ tapped: true, attacking: expect.any(Number) });
+  });
+  it("a nonlegendary one: tapped, not attacking", () => {
+    for (const sp of attackWith(false)) expect([sp.tapped, sp.attacking]).toEqual([true, undefined]);
+  });
+});

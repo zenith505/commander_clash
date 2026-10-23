@@ -676,7 +676,8 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   let phrase = m![2]!;
   const damaged = / dealt damage by ~ this turn$/.exec(phrase);
   if (damaged) phrase = phrase.slice(0, damaged.index);
-  const filter = ench ? enchantedControls(phrase) : parseTargetPhrase(phrase);
+  // "A creature of the chosen type" (Species Specialist): the type chosen as the watcher entered.
+  const filter = ench ? enchantedControls(phrase) : parseTargetPhrase(phrase, / of the chosen type$/.test(phrase) ? { chosen: true } : undefined);
   if (!filter || filter.kind !== "object") return "fail";
   const kind = m![1]!.toLowerCase();
   const had = hadKw && kw ? (hadKw[1] === "had" ? { keywords: [...(filter.keywords ?? []), ...kw] } : { notKeywords: [...(filter.notKeywords ?? []), ...kw] }) : {};

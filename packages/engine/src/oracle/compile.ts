@@ -504,6 +504,13 @@ export function compile(d: CardDef): CompiledCard {
     if (!line) continue;
     // "~ has all activated abilities of ..." (CompiledCard.borrows).
     const borrow = /^(?:As long as ~ is on the battlefield, it|~) has all activated abilities of (.+?)( except mana abilities)?\.( You may spend mana as though it were mana of any color to activate those abilities\.)?$/.exec(line);
+    // Conspicuous Snoop: "As long as the top card of your library is a Goblin card, ~ has all activated abilities of that
+    // card": the printed ones of that card (rulings).
+    const topBorrow = /^As long as the top card of your library is an? ([A-Z][a-z]+) card, ~ has all activated abilities of that card\.$/.exec(line);
+    if (topBorrow && !out.borrows) {
+      out.borrows = { filter: { kind: "object", subtypes: [topBorrow[1]!], text: `${topBorrow[1]} card` }, top: true };
+      continue;
+    }
     if (borrow && !out.borrows) {
       const yard = /^all (.+?) cards in (all graveyards|your graveyard)$/.exec(borrow[1]!);
       const what = yard ? parseTargetPhrase(yard[1]!) : null;

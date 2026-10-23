@@ -372,7 +372,10 @@ export function lendersOf(s: GameState, o: GameObject, b: NonNullable<CompiledCa
   const c = characteristics(s, o);
   borrowing = true;
   try {
-    if (b.graveyard) {
+    if (b.top) {
+      const top = s.objects[s.players[c.controller]!.library[0] ?? ""];
+      if (top && printedMatches(b.filter, defOf(s, top))) out.cards.push(defOf(s, top));
+    } else if (b.graveyard) {
       for (const pid of s.turnOrder)
         if (!b.yours || pid === c.controller)
           for (const id of s.players[pid]!.graveyard) {

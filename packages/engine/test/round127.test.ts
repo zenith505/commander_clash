@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { act, card, cast, passAll, passUntil, putOnBattlefield, setup, target } from "./helpers";
-import { altCostsFor, botActions, characteristics, power, isFullySupported, manaAbilitiesOn, objHasKeyword, objIsType, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { abilitiesOf, altCostsFor, botActions, invalidateCharacteristics, characteristics, power, isFullySupported, manaAbilitiesOn, objHasKeyword, objIsType, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -519,5 +519,46 @@ describe("World at War: a combat and a main phase after the turn's second main p
     s = cast(s, ap, ids[0]!);
     s = passUntil(s, "end");
     expect([s.activePlayer, s.combatsThisTurn]).toEqual([ap, 1]);
+  });
+});
+
+const snoop = card("Conspicuous Snoop", "Creature — Goblin Rogue", "{R}{R}", {
+  power: "2",
+  toughness: "2",
+  oracleText: "Play with the top card of your library revealed.\nYou may cast Goblin spells from the top of your library.\nAs long as the top card of your library is a Goblin card, this creature has all activated abilities of that card.",
+});
+/** A fresh copy of `def` on top of `pid`'s library. */
+const onTop = (s: GameState, pid: number, def: CardDef) => {
+  const id = putOnBattlefield(s, pid, def);
+  s.battlefield.splice(s.battlefield.indexOf(id), 1);
+  s.objects[id]!.zone = "library";
+  s.players[pid]!.library.unshift(id);
+  invalidateCharacteristics(s);
+  return id;
+};
+
+describe("Conspicuous Snoop: the activated abilities of the Goblin card on top of your library", () => {
+  const fanatic = card("Mogg Fanatic", "Creature — Goblin", "{R}", { power: "1", toughness: "1", oracleText: "Sacrifice Mogg Fanatic: It deals 1 damage to any target." });
+  const prospector = card("Skirk Prospector", "Creature — Goblin", "{R}", { power: "1", toughness: "1", oracleText: "Sacrifice a Goblin: Add {R}." });
+  it("Mogg Fanatic on top: Snoop sacrifices itself to deal 1 damage (rulings)", () => {
+    supported(snoop);
+    const { s: s0, ap, opp } = setup([]);
+    const sn = putOnBattlefield(s0, ap, snoop);
+    onTop(s0, ap, fanatic);
+    const ab = abilitiesOf(s0, s0.objects[sn]!).activated;
+    expect(ab).toHaveLength(1);
+    const life = s0.players[opp]!.life;
+    const s = passAll(run(s0, planActivate(s0, ap, sn, 0, [{ kind: "player", id: opp }])));
+    expect(s.battlefield).not.toContain(sn);
+    expect(s.players[opp]!.life).toBe(life - 1);
+  });
+  it("Skirk Prospector's sacrifice-for-mana ability too; nothing while the top card isn't a Goblin", () => {
+    const { s, ap } = setup([]);
+    const sn = putOnBattlefield(s, ap, snoop);
+    onTop(s, ap, prospector);
+    expect(abilitiesOf(s, s.objects[sn]!).activated.map((a) => a.body.text)).toEqual(["Add {R}."]);
+    onTop(s, ap, card("Test Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2", oracleText: "Sacrifice Test Bear: Draw a card." }));
+    expect(abilitiesOf(s, s.objects[sn]!).activated).toHaveLength(0);
+    expect(manaAbilitiesOn(s, s.objects[sn]!)).toHaveLength(0);
   });
 });

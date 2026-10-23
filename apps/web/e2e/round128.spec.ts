@@ -1,10 +1,10 @@
 // Round 128's prompts: Lathiel, the Bounteous Dawn ("distribute up to that many" counters), Windshaper Planetar (each
 // attacking creature, "keep" or another player), Stinging Study (which commander), Orzhov Advokist (each player may
-// put counters on a creature).
+// put counters on a creature), Goblin Recruiter (a search of any number, then their order on top).
 import { expect, test } from "@playwright/test";
 import { applyAction, planCast, waitingOn, type Action, type GameState } from "@cc/engine";
 import { LANDS, idsOf, one, open, pageErrors, playUntil, scene, state } from "./scene";
-import { controls, resolveUntil } from "./ui";
+import { card, controls, modal, resolveUntil } from "./ui";
 
 const run = (s: GameState, plan: Action[] | null) => {
   expect(plan).not.toBeNull();
@@ -92,5 +92,27 @@ test("Orzhov Advokist: at your upkeep, two +1/+1 counters on Grizzly Bears; Ana 
   expect(plusOnes(after, bears)).toBe(2);
   expect(plusOnes(after, giant)).toBe(2);
   expect(after.players[0]!.attackBansUntil).toEqual([1]);
+  expect(pageErrors(page)).toEqual([]);
+});
+
+test("Goblin Recruiter: find Raging Goblin and Goblin Piker, then they go on top in the order shown", async ({ page }) => {
+  const s = scene({ hand: ["Goblin Recruiter"], board: [...LANDS], library: ["Raging Goblin", "Hill Giant", "Goblin Piker"] });
+  const [raging, guide] = [one(s, "Raging Goblin"), one(s, "Goblin Piker")];
+  await open(page, s);
+  await card(page, "Goblin Recruiter", s).click();
+  await resolveUntil(page, (st) => st.pending?.kind === "searchLibrary");
+  await expect(modal(page)).toContainText("Goblin");
+  await expect(modal(page).locator(`[data-pick="${one(s, "Hill Giant")}"]`)).toHaveCount(0);
+  await modal(page).locator(`[data-pick="${raging}"]`).click();
+  await modal(page).locator(`[data-pick="${guide}"]`).click();
+  await modal(page).getByRole("button", { name: "Done" }).click();
+  const st = await resolveUntil(page, (x) => x.pending?.kind === "orderLibrary");
+  const arrange = page.locator(".modal.arrange");
+  await expect(arrange).toContainText("Goblin Recruiter");
+  const start = st.pending?.kind === "orderLibrary" ? st.pending.cards : [];
+  expect(new Set(start)).toEqual(new Set([raging, guide]));
+  await arrange.getByRole("button", { name: "Done" }).click();
+  const after = await resolveUntil(page, (x) => !x.pending && x.stack.length === 0 && x.objects[one(s, "Goblin Recruiter")]!.zone === "battlefield");
+  expect(after.players[0]!.library.slice(0, 2)).toEqual(start);
   expect(pageErrors(page)).toEqual([]);
 });

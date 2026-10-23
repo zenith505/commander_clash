@@ -539,3 +539,33 @@ describe("Dire Fleet Daredevil: an opponent's instant or sorcery card, cast this
     expect(planCast(s, ap, instant)).toBeNull();
   });
 });
+
+const recruiter = card("Goblin Recruiter", "Creature — Goblin", "{1}{R}", {
+  power: "1",
+  toughness: "1",
+  oracleText: "When this creature enters, search your library for any number of Goblin cards, reveal them, then shuffle and put those cards on top in any order.",
+});
+
+describe("Goblin Recruiter: any number of Goblin cards, shuffled, then on top in the order you choose", () => {
+  it("finds two Goblins and puts them on top, in your order", () => {
+    supported(recruiter);
+    const { s: s0, ap, ids } = setup([recruiter]);
+    const gob = (name: string) => {
+      const id = putOnBattlefield(s0, ap, card(name, "Creature — Goblin", "{R}", { power: "1", toughness: "1" }));
+      s0.battlefield.splice(s0.battlefield.indexOf(id), 1);
+      s0.objects[id]!.zone = "library";
+      s0.players[ap]!.library.push(id);
+      return id;
+    };
+    const [a, b] = [gob("Goblin A"), gob("Goblin B")];
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    for (let i = 0; i < 20 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "searchLibrary", player: ap, min: 0 });
+    s = act(s, { type: "searchLibrary", player: ap, found: [a, b] });
+    expect(s.pending).toMatchObject({ kind: "orderLibrary", player: ap });
+    expect(s.pending?.kind === "orderLibrary" && [...s.pending.cards].sort()).toEqual([a, b].sort());
+    s = act(s, { type: "orderLibrary", player: ap, order: [b, a] });
+    expect(s.players[ap]!.library.slice(0, 2)).toEqual([b, a]);
+    expect(logText(s)).toMatch(/Goblin A/);
+  });
+});

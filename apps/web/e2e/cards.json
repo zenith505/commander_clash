@@ -3994,42 +3994,6 @@
   "gameChanger": false
  },
  {
-  "oracleId": "da3e7d3d-2ca0-40c3-9602-fca37c92f507",
-  "name": "Emry, Lurker of the Loch",
-  "manaCost": "{2}{U}",
-  "cmc": 3,
-  "typeLine": "Legendary Creature — Merfolk Wizard",
-  "supertypes": [
-   "Legendary"
-  ],
-  "types": [
-   "Creature"
-  ],
-  "subtypes": [
-   "Merfolk",
-   "Wizard"
-  ],
-  "oracleText": "Affinity for artifacts (This spell costs {1} less to cast for each artifact you control.)\nWhen Emry enters, mill four cards.\n{T}: Choose target artifact card in your graveyard. You may cast that card this turn. (You still pay its costs. Timing rules still apply.)",
-  "power": "1",
-  "toughness": "2",
-  "colors": [
-   "U"
-  ],
-  "colorIdentity": [
-   "U"
-  ],
-  "keywords": [
-   "Affinity",
-   "Mill"
-  ],
-  "commanderLegal": "legal",
-  "set": "mul",
-  "releasedAt": "2023-04-21",
-  "rarity": "rare",
-  "layout": "normal",
-  "gameChanger": false
- },
- {
   "oracleId": "c62a9e10-cfc6-48cc-a3f7-68d624182a5a",
   "name": "Endless Swarm",
   "manaCost": "{5}{G}{G}{G}",
@@ -5440,6 +5404,36 @@
   "set": "p02",
   "releasedAt": "1998-06-24",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "792e1072-00bf-4f63-b956-5f20cdf09f11",
+  "name": "Goblin Recruiter",
+  "manaCost": "{1}{R}",
+  "cmc": 2,
+  "typeLine": "Creature — Goblin",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin"
+  ],
+  "oracleText": "When this creature enters, search your library for any number of Goblin cards, reveal them, then shuffle and put those cards on top in any order.",
+  "power": "1",
+  "toughness": "1",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "vis",
+  "releasedAt": "1997-02-03",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

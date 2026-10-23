@@ -660,6 +660,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       // Ruin): each player chooses in APNAP order, then the cards are put where they go at the same time (CR 101.4).
       const r = s.resolving!;
       const sc = (r.scratch ??= {});
+      if (sc.topOrdered) return; // the cards it put on top have been ordered: done
       // "With mana value less than or equal to ..." (TargetSpec.bound): as it resolves.
       // Its text says the number (sayBound).
       const filter0 = e.filter && { ...bindBound(s, e.filter, amountCtx(s, ctx)), text: sayBound(s, e.filter.text, e.filter, amountCtx(s, ctx)) };
@@ -852,6 +853,14 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
           shuffleLibrary(s, player(s, pid));
           log(s, `${player(s, pid).name} shuffles their library.`);
         }
+      // "Put those cards on top in any order" (Goblin Recruiter): the searcher orders the cards now on top.
+      const onTop = moves.filter((m) => !e.dest.third && dest(m.pid, m.id).zone === "libraryTop" && obj(s, m.id).zone === "library");
+      if (onTop.length > 1 && searchers.length === 1) {
+        const lib = libOf(onTop[0]!.pid);
+        sc.topOrdered = true;
+        s.pending = { kind: "orderLibrary", player: onTop[0]!.pid, cards: lib.library.filter((id) => onTop.some((m) => m.id === id)), source: src };
+        return "paused";
+      }
       return;
     }
     case "piles": {

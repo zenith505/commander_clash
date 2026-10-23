@@ -1858,6 +1858,8 @@ export interface Resolving {
   /** Its last roll (CR 706.2): each die's natural result that counts (not the ignored ones, 706.6), and the result. */
   rolled?: { sides: number; naturals: number[]; result: number; /** "The other result" (Effect roll's chooseOne). */ other?: number };
   scratch?: {
+    /** A search's cards put on top "in any order" (Goblin Recruiter) have been ordered. */
+    topOrdered?: true;
     /** "Each player chooses a creature type": the players asked so far. */
     eachAsked?: PlayerId[];
     /** Secret numbers (Wheel of Misfortune): the players still to choose, each one's number, and where the rest stands. */

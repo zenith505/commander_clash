@@ -902,6 +902,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   text = text.replace(/^(~ deals [^.]+? damage to [^.]+?) and you gain life equal to the damage dealt this way\./, "$1. You gain life equal to the damage dealt this way.");
   // "They lose 1 life and you put a -1/-1 counter on up to one target creature they control" (Persistent Constrictor): the
   // life, then the counter (the target chosen as the ability is put on the stack, CR 603.3d).
+  // Ziatora: "~ deals damage equal to that creature's power to any target and you create three Treasure tokens": two
+  // instructions in order (the amount's words would otherwise swallow the second).
+  text = text.replace(/^(~ deals damage equal to [^.]+? to any target) and you (create|gain|draw) /, (_, a: string, v: string) => `${a}. You ${v} `);
   text = text.replace(/^(they|that player) (loses?) (\d+) life and you (put an? [^.]+? counter on up to one target creature) (they|that player) controls?\./, (_, w: string, v: string, n: string, rest: string) => `${w === "they" ? "They" : "That player"} ${v} ${n} life. ${capital(rest)} that player controls.`);
   // Reckless Handling: "..., put it into your hand, shuffle, then discard a card at random." The discard comes after the
   // shuffle, found or not (rulings).

@@ -745,3 +745,54 @@ describe("Double Major", () => {
     expect(characteristics(s, s.objects[ids[0]!]!).supertypes).toContain("Legendary");
   });
 });
+
+const ziatora = card("Ziatora, the Incinerator", "Legendary Creature — Demon Dragon", "{3}{B}{R}{G}", {
+  power: "6",
+  toughness: "6",
+  keywords: ["Flying", "Treasure"],
+  oracleText: "Flying\nAt the beginning of your end step, you may sacrifice another creature. When you do, Ziatora deals damage equal to that creature's power to any target and you create three Treasure tokens.",
+});
+
+describe("Ziatora, the Incinerator", () => {
+  it("sacrificing a creature at your end step: damage equal to its power, then three Treasures", () => {
+    supported(ziatora);
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, ziatora);
+    const angel = putOnBattlefield(s0, ap, serra);
+    const life = s0.players[opp]!.life;
+    let s = passUntil(s0, "end", ap);
+    for (let i = 0; i < 20 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    if (s.pending?.kind === "chooseMay") s = act(s, { type: "chooseMay", player: ap, yes: true });
+    if (s.pending?.kind === "pickPermanents") s = act(s, { type: "pickPermanents", player: ap, ids: [angel] });
+    for (let i = 0; i < 20 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending?.kind).toBe("chooseTargets");
+    s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] });
+    s = settle(s);
+    expect(s.objects[angel]!.zone).toBe("graveyard");
+    expect(s.players[opp]!.life).toBe(life - 4);
+    expect(treasures(s, ap)).toHaveLength(3);
+  });
+});
+
+const quasit = card("Bothersome Quasit", "Creature — Demon", "{2}{R}", {
+  power: "3",
+  toughness: "2",
+  keywords: ["Goad", "Menace"],
+  oracleText: "Menace\nGoaded creatures your opponents control can't block.\nWhenever you cast a noncreature spell, goad target creature an opponent controls. (Until your next turn, that creature attacks each combat if able and attacks a player other than you if able.)",
+});
+
+describe("Bothersome Quasit", () => {
+  it("a creature it goads can't block; one that isn't goaded can", () => {
+    supported(quasit);
+    const { s: s0, ap, ids, opp } = setup([divination]);
+    putOnBattlefield(s0, ap, quasit);
+    const [a, b] = [putOnBattlefield(s0, opp, bear({ name: "Goaded Bear" })), putOnBattlefield(s0, opp, bear({ name: "Free Bear" }))];
+    let s = run(s0, planCast(s0, ap, ids[0]!));
+    for (let i = 0; i < 20 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: a }] });
+    s = settle(s);
+    expect(characteristics(s, s.objects[a]!).goaded).toBe(true);
+    expect(characteristics(s, s.objects[a]!).cantBlock).toBe(true);
+    expect(characteristics(s, s.objects[b]!).cantBlock).toBeFalsy();
+  });
+});

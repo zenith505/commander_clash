@@ -760,7 +760,8 @@ export function parseAffected(subject: string): Affects | null {
       // "Legendary creatures you control get +2/+2" (supertype, CR 205.4d), "nonlegendary creatures".
       else if (/^(non)?legendary$/i.test(w) && legendary === undefined) legendary = w.toLowerCase() === "legendary";
       // "Enchanted creatures you control get +1/+1", "Equipped creatures", "Modified creatures" (CR 700.9).
-      else if (/^(enchanted|equipped|modified)$/i.test(w) && !status) status = w.toLowerCase() as TargetSpec["status"];
+      // "Goaded creatures your opponents control can't block" (Bothersome Quasit, CR 701.15).
+      else if (/^(enchanted|equipped|modified|goaded)$/i.test(w) && !status) status = w.toLowerCase() as TargetSpec["status"];
       // "Nontoken creatures you control have riot" (Rhythm of the Wild).
       else if (/^nontoken$/i.test(w) && !nontoken) nontoken = true;
       else return null;

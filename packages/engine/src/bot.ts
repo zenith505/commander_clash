@@ -2,7 +2,7 @@ import { playerProtectedFrom } from "./effects/targeting";
 import { allEffects, refCovers, timedCondition, type AbilityBody, type ActivatedAbility, type AdditionalCost, type ChosenTarget, type AltCostKind, type CastFromGraveyardKind, type ChoiceKind, type CompiledCard, type CounterKind, type PickAction, type Effect, type SpellCondition, type ObjRef, type TargetChoice, type TargetSpec, type UnlessPays } from "./abilities";
 import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
-import { autoCrew, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
+import { autoCrew, autoWaterbend, planActivate, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, canBeSacrificed, defOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
 import { manaAbilitiesOn, manaActionAbility, manaChoices } from "./manaabilities";
 import { bindChosen, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
@@ -225,6 +225,9 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
       const generic = [...pend.cost.matchAll(/\{(\d+)\}|\{[^}]+\}/g)].reduce((n, x) => n + (x[1] ? Number(x[1]) : 1), 0);
       if (pu && pu.lose === undefined && generic >= 2 && !planMana(s, pid, parseManaCost(`{${generic + 3}}`))) return [{ type: "payUnless", player: pid, pay: false }];
       const taps = planMana(s, pid, parseManaCost(pend.cost));
+      // Ward—Waterbend: mana first, then artifacts and creatures for the rest (CR 701.67a).
+      const wb = !taps && pend.waterbend ? autoWaterbend(s, pid, parseManaCost(pend.cost), 0, pend.waterbend, []) : null;
+      if (wb) return [...wb.taps, { type: "payUnless", player: pid, pay: true, tap: wb.tapped }];
       return taps ? [...taps, { type: "payUnless", player: pid, pay: true }] : [{ type: "payUnless", player: pid, pay: false }];
     }
     if (pend.kind === "discard") return [{ type: "discard", player: pid, objectIds: chooseDiscards(s, pid, pend.count, undefined, pend.filter, pend.upTo) }];

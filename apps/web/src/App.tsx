@@ -87,6 +87,7 @@ import {
   canGainLife,
   planCast,
   planMana,
+  autoWaterbend,
   objectMatches,
   printedMatches,
   parseManaCost,
@@ -4924,6 +4925,8 @@ function Controls({
     const sac = pending.sacrifice;
     const canSacrifice = !sac || pickOptions(s, sac, HUMAN).length >= sac.n;
     const taps = s.players[HUMAN]!.life >= life && s.players[HUMAN]!.hand.length >= discard && canSacrifice ? planMana(s, HUMAN, parseManaCost(pending.cost)) : null;
+    // Ward—Waterbend: mana first, then your artifacts and creatures pay {1} each of the rest (CR 701.67a).
+    const water = !taps && pending.waterbend ? autoWaterbend(s, HUMAN, parseManaCost(pending.cost), 0, pending.waterbend, []) : null;
     return (
       <div className="controls">
         <span>
@@ -4939,10 +4942,11 @@ function Controls({
               pay <ManaCost cost={pending.cost} size="sm" />
             </>
           )}
-          {life && !(pending.cost === "{0}" && !discard && !sac) ? ` and ${life} life` : ""} or {pending.otherwise ?? `${pending.what} is countered`}.
+          {life && !(pending.cost === "{0}" && !discard && !sac) ? ` and ${life} life` : ""}
+          {pending.waterbend ? ` (waterbend: your artifacts and creatures can each pay {1} of up to ${pending.waterbend})` : ""} or {pending.otherwise ?? `${pending.what} is countered`}.
         </span>
-        <button disabled={!taps} onClick={() => dispatch([...(taps ?? []), { type: "payUnless", player: HUMAN, pay: true }])}>
-          Pay
+        <button disabled={!taps && !water} onClick={() => dispatch(water ? [...water.taps, { type: "payUnless", player: HUMAN, pay: true, tap: water.tapped }] : [...(taps ?? []), { type: "payUnless", player: HUMAN, pay: true }])}>
+          {water ? `Pay, tapping ${water.tapped.length === 1 ? "1 artifact or creature" : `${water.tapped.length} artifacts or creatures`}` : "Pay"}
         </button>
         <button className="ghost" onClick={() => dispatch([{ type: "payUnless", player: HUMAN, pay: false }])}>
           Don&apos;t pay

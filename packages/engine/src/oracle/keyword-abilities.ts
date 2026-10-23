@@ -993,6 +993,14 @@ export function keywordAbilities(line: string, d: CardDef): KeywordParts | null 
         event: "becomesTargetOfOpponent",
         body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: "{0}", discard: n }, ward: true }], text: `Ward—Discard ${m[1]} card${n === 1 ? "" : "s"}: counter that spell or ability unless its controller discards ${m[1]} card${n === 1 ? "" : "s"}.` },
       });
+    } else if ((m = /^ward—waterbend \{(\d+)\}\.?$/i.exec(p))) {
+      // "Ward—Waterbend {4}" (The Unagi of Kyoshi Island): counter it unless that player pays {4}, tapping their
+      // artifacts and creatures for {1} each of it if they like (CR 702.21a, 701.67a).
+      const n = Number(m[1]);
+      out.triggers.push({
+        event: "becomesTargetOfOpponent",
+        body: { targets: [], effects: [{ type: "counterUnlessPays", unless: { cost: `{${n}}`, waterbend: n }, ward: true }], text: `Ward—Waterbend {${n}}: counter that spell or ability unless its controller waterbends {${n}}.` },
+      });
     } else if ((m = /^ward ((?:\{(?:\d+|[WUBRGC])\})+)$/i.exec(p))) {
       // CR 702.21a: "Whenever this permanent becomes the target of a spell or ability an opponent
       // controls, counter that spell or ability unless that player pays [cost]."

@@ -11414,6 +11414,42 @@
   "gameChanger": true
  },
  {
+  "oracleId": "be922360-ee9f-4cfb-bf10-d481c5de5cb1",
+  "name": "The Unagi of Kyoshi Island",
+  "manaCost": "{3}{U}{U}",
+  "cmc": 5,
+  "typeLine": "Legendary Creature — Serpent",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Serpent"
+  ],
+  "oracleText": "Flash\nWard—Waterbend {4}. (Whenever this creature becomes the target of a spell or ability an opponent controls, counter it unless that player pays {4}. They can tap their artifacts and creatures to help. Each one pays for {1}.)\nWhenever an opponent draws their second card each turn, you draw two cards.",
+  "power": "5",
+  "toughness": "5",
+  "colors": [
+   "U"
+  ],
+  "colorIdentity": [
+   "U"
+  ],
+  "keywords": [
+   "Ward",
+   "Flash",
+   "Waterbend"
+  ],
+  "commanderLegal": "legal",
+  "set": "tla",
+  "releasedAt": "2025-11-21",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "7d723a6f-854f-43df-9401-a4eb0c0f639f",
   "name": "The Weatherseed Treaty",
   "manaCost": "{2}{G}",

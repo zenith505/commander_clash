@@ -64,6 +64,8 @@ export interface UnlessPays {
   lifeAmount?: Amount;
   /** "Ward—Sacrifice a creature" (Vein Ripper): `n` permanents of their choice they control that match `filter`. */
   sacrifice?: { n: number; filter: TargetSpec };
+  /** "Ward—Waterbend {4}" (CR 701.67a): up to this much of the cost's generic mana may be paid by tapping untapped artifacts and creatures they control, {1} each. */
+  waterbend?: number;
 }
 
 /**

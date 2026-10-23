@@ -415,7 +415,7 @@ export function applyInPlace(s: GameState, action: Action): void {
       chooseNewTargets(s, p, action.targets);
       break;
     case "payUnless":
-      payUnless(s, p, action.pay);
+      payUnless(s, p, action.pay, action.tap);
       break;
     case "mulligan":
       declareMulligan(s, p, action.keep);
@@ -6770,18 +6770,36 @@ function chooseEvidence(s: GameState, p: Player, ids: ObjectId[]) {
 }
 
 /** "Counter it unless its controller pays": pay from the mana pool, or don't (CR 702.21a, 118.12). */
-function payUnless(s: GameState, p: Player, pay: boolean) {
+function payUnless(s: GameState, p: Player, pay: boolean, tap?: ObjectId[]) {
   const pend = s.pending;
   const r = s.resolving;
   if (pend?.kind !== "payUnless" || pend.player !== p.id || !r) throw new RulesError("nothing to pay for");
+  // Waterbend (CR 701.67a): each untapped artifact or creature they control pays {1} of its generic mana, no more than
+  // the waterbend cost's own, each one once.
+  let due = { cost: parseManaCost(pend.cost), extra: 0 };
+  if (pay && tap?.length) {
+    const cap = pend.waterbend ?? 0;
+    if (tap.length > cap) throw new RulesError(cap ? `no more than ${cap} artifact${cap === 1 ? "" : "s"} or creature${cap === 1 ? "" : "s"} can be tapped to waterbend` : "this cost can't be paid by tapping");
+    if (new Set(tap).size !== tap.length) throw new RulesError("each artifact or creature can only be tapped once to waterbend");
+    for (const id of tap) {
+      const c = s.objects[id];
+      if (!c || c.zone !== "battlefield" || controllerOf(s, c) !== p.id || !(objIsType(s, c, "Artifact") || objIsType(s, c, "Creature"))) throw new RulesError("only artifacts and creatures you control can be tapped to waterbend");
+      if (c.tapped) throw new RulesError(`${nameOf(s, id)} is already tapped`);
+    }
+    due = payGenericWith(due.cost, 0, tap.length) ?? due;
+  }
   if (pay) {
     const life = pend.life ?? 0;
     // You can pay life only if your life total is at least that much (CR 119.4).
     if (life && payableLife(s, p.id) < life) throw new RulesError(`you can't pay ${life} life`); // CR 119.8
     const sacrificeOptions = pend.sacrifice ? pickOptions(s, pend.sacrifice, p.id) : [];
     if (pend.sacrifice && sacrificeOptions.length < pend.sacrifice.n) throw new RulesError(`you don't control enough of ${pend.sacrifice.filter.text} to sacrifice`); // CR 118.3
-    const paid = spendFromPool(s, p.id, parseManaCost(pend.cost), "other", 0, payableLife(s, p.id) - life);
+    const paid = spendFromPool(s, p.id, due.cost, "other", due.extra, payableLife(s, p.id) - life);
     if (!paid) throw new RulesError(`not enough mana in your pool to pay ${pend.cost}`);
+    if (tap?.length) {
+      for (const id of tap) tapPermanent(s, obj(s, id));
+      log(s, `${p.name} taps ${tap.map((id) => nameOf(s, id)).join(", ")} to waterbend.`);
+    }
     loseLife(s, p.id, paid.lifePaid + life);
     log(s, `${p.name} pays ${pend.cost}${life ? ` and ${life} life` : ""} for ${pend.source}.`);
     if (pend.sacrifice) {

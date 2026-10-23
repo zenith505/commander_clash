@@ -2522,6 +2522,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     // first postcombat main phase, if this resolves before it ends).
     const second = /^After the second main phase this turn, there's an additional combat phase followed by an additional main phase$/.test(s);
     const thatCombat = second || /^(?:[Tt]here(?:'s| is) an additional combat phase after this phase|[Aa]fter this phase, there is an additional combat phase)$/.test(s) ? /^At the beginning of that combat, (.+)$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    // Bumi, Unleashed: "After this phase, there is an additional combat phase. Only land creatures can attack during that
+    // combat phase." Only that one (rulings).
+    const onlyAttack = /^(?:[Tt]here(?:'s| is) an additional combat phase after this phase|[Aa]fter this phase, there is an additional combat phase)$/.test(s) ? /^Only (.+?) can attack during that combat phase$/.exec(sentences[si + 1]?.replace(/\.$/, "") ?? "") : null;
+    if (onlyAttack) {
+      const filter = pickFilter(onlyAttack[1]!.replace(/s$/, ""));
+      if (filter?.kind !== "object") return null;
+      effects.push({ type: "addPhases", phases: ["combat"], onlyAttack: filter });
+      si++;
+      continue;
+    }
     if (thatCombat) {
       const before = ctx.targets.length;
       const inner = parseSentence(capital(thatCombat[1]!), ctx);

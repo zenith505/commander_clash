@@ -91,10 +91,12 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
     case "addPhases": {
       // "At the beginning of that combat, ...": a delayed trigger for this added combat phase only (CR 603.7; rulings on
       // Moraug: not the turn's regular combat).
-      const key = e.thatCombat ? (s.combatKeys = (s.combatKeys ?? 0) + 1) : undefined;
+      const key = e.thatCombat || e.onlyAttack ? (s.combatKeys = (s.combatKeys ?? 0) + 1) : undefined;
       const item = s.resolving?.item;
       const me = item?.kind === "spell" && item.objectId ? s.objects[item.objectId] : ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
-      if (addPhases(s, e.phases, e.after, key) && e.thatCombat && me) {
+      const added = addPhases(s, e.phases, e.after, key);
+      if (added && e.onlyAttack && key !== undefined) (s.combatAttackOnly ??= {})[key] = e.onlyAttack;
+      if (added && e.thatCombat && me) {
         addDelayed(s, "thatCombat", ctx.controller, me, { targets: [], effects: e.thatCombat.effects, text: e.thatCombat.text });
         s.delayed![s.delayed!.length - 1]!.combat = key;
       }

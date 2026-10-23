@@ -1484,6 +1484,8 @@ export interface GameState {
   /** The key of the added combat phase going on now (see addedPhases), and the last key given out. */
   thatCombat?: number;
   combatKeys?: number;
+  /** Added combat phases (by key) only creatures matching the filter can attack in (Bumi, Unleashed); this turn only. */
+  combatAttackOnly?: Record<number, TargetSpec>;
   /** While added phases run: the step the turn's own order goes on with once they're done (CR 500.8). */
   resumeStep?: Step;
   /** "Your opponents can't cast spells this turn" (Silence): who can't cast what, until that turn ends (CR 101.2). */

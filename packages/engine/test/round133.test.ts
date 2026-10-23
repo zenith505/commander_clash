@@ -7,7 +7,7 @@ import { addMana } from "../src/spend";
 import { spellCost } from "../src/game";
 import { manaValue as manaValueOf } from "../src/mana";
 import { setFace } from "../src/faces";
-import { abilityProblem, botActions, compileCard, faceDef, legalActions, manaOptions, planActivate, canBeSacrificed, characteristics, controllerOf, isFullySupported, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { abilityProblem, botActions, potentialAttackers, compileCard, faceDef, legalActions, manaOptions, planActivate, canBeSacrificed, characteristics, controllerOf, isFullySupported, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -742,5 +742,35 @@ describe("Sower of Discord: two players chosen as it enters; damage to one makes
     const s = passToPending(run(s0, planCast(s0, ap, boltId, [{ kind: "player", id: ap }])));
     expect(s.players[ap]!.life).toBe(37);
     expect(s.players[opp]!.life).toBe(40);
+  });
+});
+
+describe("Bumi, Unleashed: an additional combat phase only land creatures can attack in", () => {
+  const bumi = card("Bumi, Unleashed", "Legendary Creature — Human Noble Ally", "{3}{R}{G}", { power: "5", toughness: "4", keywords: ["Trample", "Earthbend"], oracleText: "Trample\nWhen Bumi enters, earthbend 4. (Target land you control becomes a 0/0 creature with haste that's still a land. Put four +1/+1 counters on it. When it dies or is exiled, return it to the battlefield tapped.)\nWhenever Bumi deals combat damage to a player, untap all lands you control. After this phase, there is an additional combat phase. Only land creatures can attack during that combat phase." });
+  const arbor = card("Test Arbor", "Land Creature — Forest Dryad", "", { power: "1", toughness: "1" });
+
+  it("after Bumi's damage, lands untap and only the land creature can attack in the added combat; the rule ends with the turn", () => {
+    supported(bumi);
+    const { s: s0, ap } = setup([]);
+    const b = putOnBattlefield(s0, ap, bumi);
+    const a = putOnBattlefield(s0, ap, arbor);
+    const land = putOnBattlefield(s0, ap, forest);
+    s0.objects[land]!.tapped = true;
+    const opp = nextOf(s0, ap);
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: b, defender: opp }] });
+    for (let i = 0; i < 60 && !(s.pending?.kind === "declareAttackers" && s.step === "declareAttackers"); i++) s = s.pending ? run(s, botActions(s, s.pending.player).slice(0, 1)) : act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.players[opp]!.life).toBe(35);
+    expect(s.objects[land]!.tapped).toBe(false);
+    expect(s.objects[b]!.tapped).toBe(true);
+    s.objects[b]!.tapped = false;
+    const ids = potentialAttackers(s, ap).map((o) => o.id);
+    expect(ids).toContain(a);
+    expect(ids).not.toContain(b);
+    expect(() => act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: b, defender: opp }] })).toThrow();
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [] });
+    expect(s.combatAttackOnly).toBeDefined();
+    s = passUntil(s, "upkeep", nextOf(s, ap));
+    expect(s.combatAttackOnly).toBeUndefined();
   });
 });

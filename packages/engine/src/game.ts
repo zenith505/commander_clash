@@ -2614,6 +2614,7 @@ function startNextTurn(s: GameState, skipping = false) {
   s.attackersThisTurn = undefined;
   s.combatsThisTurn = undefined;
   s.mainPhasesThisTurn = undefined;
+  s.combatAttackOnly = undefined;
   s.blockersStep = undefined;
   s.addedPhases = undefined;
   s.afterSecondMain = undefined;
@@ -7299,6 +7300,8 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
       (!objHasKeyword(s, o, "Defender") || characteristics(s, o).attackDespiteDefender || (characteristics(s, o).attackDespiteDefenderVs && opps.some((d) => attackedYouLastTurn(s, d, pid)))) &&
       !characteristics(s, o).cantAttack &&
       !(s.cantAttackThisTurn ?? []).some((r) => objectMatches(s, r.filter, o, r.controller, false)) &&
+      // "Only land creatures can attack during that combat phase" (Bumi, Unleashed): an added combat phase's own rule.
+      !(s.thatCombat !== undefined && s.combatAttackOnly?.[s.thatCombat] && !objectMatches(s, s.combatAttackOnly[s.thatCombat]!, o, pid, false)) &&
       (!(characteristics(s, o).attackUnless.length || characteristics(s, o).cantAttackPlayers.length || characteristics(s, o).cantAttackOwner) || opps.some((d) => !attackProblem(s, o, d))),
   );
 }

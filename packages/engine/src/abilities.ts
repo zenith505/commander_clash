@@ -2859,6 +2859,8 @@ export type Effect =
       after?: "main" | "combat" | "secondMain";
       /** "At the beginning of that combat, untap all creatures you control" (Moraug): a delayed trigger for the added combat phase only (CR 603.7). */
       thatCombat?: { effects: Effect[]; text: string };
+      /** "Only land creatures can attack during that combat phase" (Bumi, Unleashed): the added combat phase only (rulings). */
+      onlyAttack?: TargetSpec;
     }
   /** "You lose the game" (CR 104.3e). */
   | { type: "loseGame"; who: PlayerRef }

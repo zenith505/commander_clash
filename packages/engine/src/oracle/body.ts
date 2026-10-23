@@ -717,6 +717,9 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // Cosmos Elixir: "draw a card if your life total is greater than your starting life total. Otherwise, you gain 2 life."
   text = text.replace(/(^|\. )[Dd]raw a card if (you have no cards in hand|your life total is greater than your starting life total)\. Otherwise,/, (_, lead: string, cond: string) => `${lead}If ${cond}, draw a card. Otherwise,`);
   text = text.replace(/An opponent chooses a card at random in your graveyard\. If it's a creature card, put it onto the battlefield\. Otherwise, exile it\./, "Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise exile it.");
+  // Deadbridge Chant: "choose a card at random in your graveyard. If it's a creature card, put it onto the battlefield.
+  // Otherwise, put it into your hand."
+  text = text.replace(/(^|\. )[Cc]hoose a card at random in your graveyard\. If it's a creature card, put it onto the battlefield\. Otherwise, put it into your hand\./, "$1Put a card chosen at random from your graveyard onto the battlefield if it's a creature card, otherwise into your hand.");
   // Goblin Welder: the card is in the graveyard of the artifact's controller ("that player"); both targets must still be
   // legal as it resolves (rulings), and that player does both at once.
   if (text.trim() === "Choose target artifact a player controls and target artifact card in that player's graveyard. If both targets are still legal as this ability resolves, that player simultaneously sacrifices the artifact and returns the artifact card to the battlefield.")
@@ -2980,6 +2983,20 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       if (!fx || fx.instead) return null;
       effects.push({ type: "if", cond: { kind: "resolvedNth", n: [...nthSeen], not: true }, effects: fx.effects });
       nthSeen.push(0); // nothing may follow "Otherwise"
+      continue;
+    }
+    // Ardyn, the Usurper: "Exile up to one target creature card from a graveyard. If you exiled a card this way, create a token
+    // that's a copy of that card, ...": only once that card is in exile (a commander put into the command zone instead
+    // wasn't exiled, CR 903.9a).
+    const exiledWay = /^If you exiled a card this way, (.+)$/.exec(s);
+    if (exiledWay) {
+      const prev = effects[effects.length - 1];
+      const index = prev?.type === "exile" && prev.what.ref === "target" && !prev.what.n && !prev.until ? prev.what.index : undefined;
+      if (index === undefined || ctx.targets[index]?.kind !== "card") return null;
+      const before = ctx.targets.length;
+      const inner = parseOne(capital(exiledWay[1]!), ctx);
+      if (!inner || ctx.targets.length !== before) return null;
+      effects.push({ type: "if", cond: { kind: "targetExiled", index }, effects: inner });
       continue;
     }
     // "If ~ was kicked, draw a card." / "If ~ was kicked, it deals 5 damage instead." (CR 702.33e)

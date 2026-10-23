@@ -1817,6 +1817,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       } else if (isPermanentCard(d) && d.types.includes("Creature") && !d.subtypes.includes("Aura")) {
         log(s, `${src}: ${d.name} is chosen at random and put onto the battlefield.`);
         moveObject(s, o.id, "battlefield", { controller: ctx.controller }); // CR 110.2a
+      } else if (e.dest === "creatureOrHand") {
+        log(s, `${src}: ${d.name} is chosen at random and put into ${p.name}'s hand.`);
+        moveObject(s, o.id, "hand");
       } else {
         log(s, `${src}: ${d.name} is chosen at random and exiled.`);
         moveObject(s, o.id, "exile");

@@ -828,3 +828,53 @@ describe("Rite of the Raging Storm", () => {
     expect(s.objects[rager]?.zone ?? "gone").not.toBe("battlefield");
   });
 });
+
+const deadbridge = card("Deadbridge Chant", "Enchantment", "{4}{B}{G}", {
+  oracleText:
+    "When this enchantment enters, mill ten cards.\nAt the beginning of your upkeep, choose a card at random in your graveyard. If it's a creature card, put it onto the battlefield. Otherwise, put it into your hand.",
+});
+
+describe("Deadbridge Chant: a card at random from your graveyard", () => {
+  for (const creature of [true, false])
+    it(creature ? "a creature card: onto the battlefield" : "another card: into your hand", () => {
+      supported(deadbridge);
+      const { s: s0, ap } = setup([]);
+      putOnBattlefield(s0, ap, deadbridge);
+      const c = putOnBattlefield(s0, ap, creature ? testBear() : card("Test Spell", "Sorcery", "{1}", { oracleText: "Draw a card." }));
+      s0.battlefield.splice(s0.battlefield.indexOf(c), 1);
+      s0.objects[c]!.zone = "graveyard";
+      s0.players[ap]!.graveyard = [c];
+      const s = passUntil(s0, "draw", ap);
+      expect(s.objects[c]!.zone).toBe(creature ? "battlefield" : "hand");
+    });
+});
+
+const ardyn = card("Ardyn, the Usurper", "Legendary Creature — Elder Human Noble", "{5}{B}{B}{B}", {
+  power: "4",
+  toughness: "4",
+  oracleText:
+    "Demons you control have menace, lifelink, and haste.\nStarscourge — At the beginning of combat on your turn, exile up to one target creature card from a graveyard. If you exiled a card this way, create a token that's a copy of that card, except it's a 5/5 black Demon.",
+});
+
+describe("Ardyn, the Usurper (rulings)", () => {
+  it("exiles a creature card from a graveyard and makes a 5/5 black Demon copy of it, which has menace, lifelink, and haste", () => {
+    supported(ardyn);
+    const { s: s0, ap, opp } = setup([]);
+    putOnBattlefield(s0, ap, ardyn);
+    const dead = putOnBattlefield(s0, opp, card("Grave Hound", "Creature — Dog", "{1}{B}", { power: "1", toughness: "1" }));
+    s0.battlefield.splice(s0.battlefield.indexOf(dead), 1);
+    s0.objects[dead]!.zone = "graveyard";
+    s0.players[opp]!.graveyard.push(dead);
+    let s = passUntil(s0, "beginCombat", ap);
+    for (let i = 0; i < 10 && s.pending?.kind !== "chooseTargets"; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.pending).toMatchObject({ kind: "chooseTargets", player: ap });
+    s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: dead }] });
+    for (let i = 0; i < 10 && (s.stack.length || s.triggerQueue.length) && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.objects[dead]!.zone).toBe("exile");
+    const token = s.battlefield.map((id) => s.objects[id]!).find((o) => o.isToken && s.cards[o.cardId]?.name === "Grave Hound");
+    expect(token).toBeDefined();
+    const ch = characteristics(s, token!);
+    expect(ch).toMatchObject({ power: 5, toughness: 5, colors: ["B"], subtypes: ["Demon"] });
+    expect(ch.keywords).toEqual(expect.arrayContaining(["Menace", "Lifelink", "Haste"]));
+  });
+});

@@ -431,6 +431,8 @@ export function runChoicesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
             ? (s.resolving!.movedLinkedIds ?? []).some((id) => s.objects[id] && printedMatches((e.cond as { filter: TargetSpec }).filter, defOf(s, s.objects[id]!)))
             : e.cond.kind === "revealedSharesCreatureType"
             ? revealedSharesType(s, ctx)
+            : e.cond.kind === "targetExiled"
+            ? ((t) => !!t && t.kind === "object" && !!ctx.legal[e.cond.index] && s.objects[t.id]?.zone === "exile" && (s.objects[t.id]!.zoneChanges ?? 0) === (t.zc ?? 0) + 1)(ctx.targets[e.cond.index])
             : e.cond.kind === "revealedMv"
             ? revealedMv(s) === amountNow(s, e.cond.mv, ctx)
             : e.cond.kind === "createdNone"

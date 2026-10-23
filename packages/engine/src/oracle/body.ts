@@ -3181,6 +3181,16 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push({ type: "if", cond: { kind: "resolvedNth", n: ns }, effects: fx });
       continue;
     }
+    // Rose Room Treasurer: "Otherwise, you may pay {X}. When you do, ~ deals X damage to any target.": the reflexive
+    // trigger (CR 603.12) belongs to the "Otherwise" too, its target chosen when it triggers.
+    if (nthOtherwise && /^you may pay \{X\}$/.test(nthOtherwise[1]!) && /^When you do, /.test(sentences[si + 1] ?? "") && si + 2 === sentences.length) {
+      const sub = parseBody(`You may pay {X}. ${sentences[si + 1]!.replace(/\.$/, "")}.`, {});
+      if (!sub || sub.targets.length || sub.effects.length !== 1 || sub.effects[0]!.type !== "may") return null;
+      effects.push({ type: "if", cond: { kind: "resolvedNth", n: [...nthSeen], not: true }, effects: sub.effects });
+      nthSeen.push(0);
+      si++;
+      continue;
+    }
     if (nthOtherwise) {
       const fx = parseKicked(nthOtherwise[1]!, [], ctx);
       if (!fx || fx.instead) return null;

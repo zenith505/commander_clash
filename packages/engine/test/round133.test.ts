@@ -901,3 +901,29 @@ describe("Communal Brewing: creature spells enter with X more +1/+1 counters, X 
     expect(s.objects[ids[0]!]!.counters.ingredient).toBe(3);
   });
 });
+
+describe("Rose Room Treasurer: a Treasure the first two times each turn, then pay {X} for X damage", () => {
+  const rose = card("Rose Room Treasurer", "Creature — Human Noble", "{1}{R}", { power: "2", toughness: "2", oracleText: "Alliance — Whenever another creature you control enters, create a Treasure token if this is the first or second time this ability has resolved this turn. Otherwise, you may pay {X}. When you do, this creature deals X damage to any target." });
+
+  it("two Treasures, then the third time X damage to a target", () => {
+    supported(rose);
+    const { s: s0, ap, ids } = setup([bear(), bear({ name: "Bear Two" }), bear({ name: "Bear Three" })]);
+    onlyInHand(s0, ap, ids);
+    putOnBattlefield(s0, ap, rose);
+    const opp = nextOf(s0, ap);
+    addMana(s0, ap, ["G", "G", "G", "C", "C", "C", "C", "C"]);
+    let s = s0;
+    for (const id of ids.slice(0, 2)) s = passToPending(run(s, planCast(s, ap, id)));
+    const treasures = () => s.battlefield.filter((x) => characteristics(s, s.objects[x]!).subtypes.includes("Treasure"));
+    expect(treasures()).toHaveLength(2);
+    s = passToPending(run(s, planCast(s, ap, ids[2]!)));
+    expect(treasures()).toHaveLength(2);
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "payX" });
+    s = act(s, { type: "chooseOption", player: ap, choice: "2" });
+    if (s.pending?.kind === "chooseMay") s = act(s, { type: "chooseMay", player: ap, yes: true });
+    s = passToPending(s);
+    expect(s.pending?.kind).toBe("chooseTargets");
+    s = passToPending(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] }));
+    expect(s.players[opp]!.life).toBe(38);
+  });
+});

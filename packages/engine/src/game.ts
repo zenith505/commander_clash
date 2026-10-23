@@ -3635,6 +3635,11 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
   addMana(s, p.id, adds, { only: boundSpend(o, ab.spendOnly), from, ...(spentTrigger ? { spentTrigger } : {}), ...(ab.spentHaste ? { haste: ab.spentHaste, ...(ab.spentHasteType ? { hasteType: ab.spentHasteType } : {}) } : {}), ...(ab.spentCommanderCounters ? { commanderCounters: true as const } : {}), ...(ab.spentCreatureCounter ? { creatureCounter: true as const } : {}), ...(ab.spentUncounterable ? { uncounterableInstantSorcery: true as const } : {}), ...(source ? { source } : {}) });
   // Right after it, without the stack (CR 605.4a), and without the riders of its mana (rulings on Mana Flare).
   addTriggeredMana(s, p.id, picked);
+  // Yuna, Grand Summoner: "When you next cast a creature spell this turn, ..." (a delayed trigger, CR 603.7a).
+  if (ab.nextCast) {
+    const e = ab.nextCast;
+    (s.nextCast ??= []).push({ controller: p.id, filter: e.filter, sourceId: o.id, sourceCardId: cardIdOf(o), body: { targets: [], effects: e.effects, text: e.text.replace(/^./, (c) => c.toUpperCase()) + "." }, turn: s.turn, ...(e.uncounterable ? { uncounterable: true as const } : {}), ...(e.fromHand ? { fromHand: true as const } : {}) });
+  }
   if (ab.skipNextUntap && o.zone === "battlefield") o.skipNextUntap = true;
   // Depletion lands, as the ability resolves: "Put a depletion counter on ~", "If there are no depletion counters on ~,
   // sacrifice it" (checked after the cost removed one).

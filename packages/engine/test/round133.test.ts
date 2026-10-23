@@ -243,3 +243,52 @@ describe("Oscorp Industries: mayhem without a cost, a land played from the grave
     expect(legalActions(s0, ap).some((a) => a.type === "playLand" && a.objectId === id)).toBe(false);
   });
 });
+
+const yuna = card("Yuna, Grand Summoner", "Legendary Creature — Human Cleric Summoner", "{1}{G}{U}", { power: "1", toughness: "5", oracleText: "Grand Summon — {T}: Add one mana of any color. When you next cast a creature spell this turn, that creature enters with two additional +1/+1 counters on it.\nWhenever another permanent you control is put into a graveyard from the battlefield, if it had one or more counters on it, you may put that number of +1/+1 counters on target creature." });
+
+describe("Yuna, Grand Summoner", () => {
+  it("Grand Summon: the next creature spell cast this turn enters with two more +1/+1 counters, only that one", () => {
+    supported(yuna);
+    const bear1 = card("First Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" });
+    const bear2 = card("Second Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" });
+    const { s: s0, ap, ids } = setup([bear1, bear2]);
+    emptyPools(s0);
+    const y = putOnBattlefield(s0, ap, yuna);
+    let s = act(s0, { type: "activateMana", player: ap, objectId: y, mana: "G", ability: 0 });
+    expect(s.players[ap]!.manaPool.G).toBe(1);
+    expect(s.objects[y]!.tapped).toBe(true);
+    s = passToPending(run(s, planCast(s, ap, ids[0]!)));
+    expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
+    expect(s.objects[ids[0]!]!.counters["+1/+1"]).toBe(2);
+    s = passToPending(run(s, planCast(s, ap, ids[1]!)));
+    expect(s.objects[ids[1]!]!.zone).toBe("battlefield");
+    expect(s.objects[ids[1]!]!.counters["+1/+1"] ?? 0).toBe(0);
+  });
+
+  it("another permanent of ours dies with counters on it: that many +1/+1 counters, of every kind it had (rulings)", () => {
+    const murder = card("Murder", "Instant", "{1}{B}{B}", { oracleText: "Destroy target creature." });
+    const { s: s0, ap, ids } = setup([murder]);
+    putOnBattlefield(s0, ap, yuna);
+    const victim = putOnBattlefield(s0, ap, card("Test Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    const other = putOnBattlefield(s0, ap, card("Other Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    s0.objects[victim]!.counters = { "+1/+1": 2, stun: 1 };
+    invalidateCharacteristics(s0);
+    let s = passToPending(run(s0, planCast(s0, ap, ids[0]!, [target(victim)])));
+    if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [target(other)] } as Action);
+    s = passToPending(s);
+    expect(s.pending?.kind).toBe("chooseMay");
+    s = passToPending(act(s, { type: "chooseMay", player: ap, yes: true }));
+    expect(s.objects[other]!.counters["+1/+1"]).toBe(3);
+  });
+
+  it("not for a permanent that had no counters", () => {
+    const murder = card("Murder", "Instant", "{1}{B}{B}", { oracleText: "Destroy target creature." });
+    const { s: s0, ap, ids } = setup([murder]);
+    putOnBattlefield(s0, ap, yuna);
+    const victim = putOnBattlefield(s0, ap, card("Test Bear", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    const s = passToPending(run(s0, planCast(s0, ap, ids[0]!, [target(victim)])));
+    expect(s.objects[victim]!.zone).toBe("graveyard");
+    expect(s.pending).toBeNull();
+    expect(s.stack.length).toBe(0);
+  });
+});

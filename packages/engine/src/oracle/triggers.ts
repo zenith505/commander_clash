@@ -2,6 +2,7 @@ import { allEffects, type AbilityBody, type BatchTrigger, type Effect, type Trig
 import { COUNTER, differenceInHand, NUM, X, num, parseSpentReq, singular, singularWord, SPENT } from "./words";
 import { parseActivateCondition, parseStaticCondition } from "./statics";
 import { parseBody, replaceX } from "./body";
+import { ANY_COUNTER } from "../abilities";
 import { parseGroup, parseKeywordList, parseTargetPhrase } from "./targets";
 import { CREATURE_TYPES } from "../keywords";
 import { parseSearchFilter } from "./search";
@@ -650,6 +651,10 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
   const hadCounter = !attached && new RegExp(`^if it had (?:a counter|one or more counters|counters|an? ${COUNTER} counter|one or more ${COUNTER} counters) on it, `).exec(bodyText);
   const hadKindOf = hadCounter ? (hadCounter[1] ?? hadCounter[2]) : undefined;
   if (hadCounter) bodyText = bodyText.slice(hadCounter[0].length);
+  // Yuna, Grand Summoner: "if it had one or more counters on it, you may put that number of +1/+1 counters on target
+  // creature": the counters of every kind it had as it last existed (rulings, CR 603.10a).
+  const thatNumber = !!hadCounter && !hadKindOf && /^you may put that number of \+1\/\+1 counters on target creature\.$/.test(bodyText);
+  if (thatNumber) bodyText = "you may put X +1/+1 counters on target creature.";
   // "If its toughness was less than 1" (Massacre Girl, Known Killer): as it last existed (CR 603.10a), so it can't change
   // and is part of what dies, like a keyword it had.
   const wasPT = attached ? null : new RegExp(`^if its (power|toughness) was (?:less than ${NUM}|${NUM} or less|greater than ${NUM}|${NUM} or greater), (.+)$`).exec(bodyText);
@@ -670,6 +675,10 @@ function parseDiesTrigger(line: string): TriggeredAbility | "fail" | null {
     ? { targets: [], effects: [{ type: "may" as const, effects: [{ type: "exile" as const, what: { ref: "subjectCard" as const, zone: "graveyard" as const }, linked: true }, { type: "moveLinked" as const, dest: "graveyard" as const, other: true as const, ifLinkedNow: true as const }], text: "exile that card (the other cards exiled with ~ go to their owners' graveyards)" }], text: bodyText }
     : parseBody(bodyText, { subjectIt: true, subjectLeft: true, ...(attached?.[1] === "enchanted" ? { auraCard: true } : {}) });
   if (!body) return "fail";
+  if (thatNumber) {
+    body = { ...replaceX(body, { count: { kind: "counters", counter: ANY_COUNTER, of: { ref: "subject" } } }), text: "you may put that number of +1/+1 counters on target creature." };
+    for (const e of body.effects) if (e.type === "may") e.text = "put that number of +1/+1 counters on target creature";
+  }
   if (lesser) {
     const [t, ...more] = body.targets;
     if (!t || more.length || t.kind !== "card" || t.bound || t.manaValue) return "fail";

@@ -4011,6 +4011,11 @@ export interface ManaAbility {
   spentCommanderCounters?: true;
   /** Biophagus: "If this mana is spent to cast a creature spell, that creature enters with an additional +1/+1 counter on it" (one for each such mana). */
   spentCreatureCounter?: true;
+  /**
+   * Yuna, Grand Summoner: "When you next cast a creature spell this turn, that creature enters with two additional +1/+1
+   * counters on it", a delayed trigger the ability creates as it resolves (CR 603.7a, 605.3b), whatever the mana is spent on.
+   */
+  nextCast?: Extract<Effect, { type: "nextCast" }>;
   /** Depletion lands: "Put a depletion counter on ~." after the mana is added. */
   putCounter?: CounterKind;
   /** Depletion lands: "If there are no depletion counters on ~, sacrifice it." after the mana is added. */

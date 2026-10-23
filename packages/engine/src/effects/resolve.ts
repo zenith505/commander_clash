@@ -663,8 +663,8 @@ function sharedKeywords(s: GameState, pid: PlayerId, keywords: string[]): string
   return [...out];
 }
 
-export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx): Modification[] {
-  const c = amountCtx(s, ctx);
+export function fixMods(s: GameState, mods: Modification[], ctx: ResolveCtx, affected?: ObjectId): Modification[] {
+  const c = { ...amountCtx(s, ctx), ...(affected !== undefined ? { affected } : {}) };
   return mods.map((m) =>
     // "Attacks this combat if able": the combat going on as it resolves.
     m.kind === "attacksIfAble" && m.combat === "this"

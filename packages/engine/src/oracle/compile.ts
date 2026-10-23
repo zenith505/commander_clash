@@ -2861,6 +2861,15 @@ export function compile(d: CardDef): CompiledCard {
     if (out.striatedKeywords) out.striatedKeywords = out.striatedKeywords.filter((k) => !own.has(k.toLowerCase()));
   }
   checkX(d, out);
+  // "For each poison counter its controller has" counts for an affected permanent: a static ability's, or a resolved
+  // continuous effect's (Phyresis Outbreak). Anywhere else there's no "it".
+  const affectedPoison = (v: unknown): boolean => {
+    if (Array.isArray(v)) return v.some(affectedPoison);
+    if (!v || typeof v !== "object") return false;
+    if ((v as { type?: string }).type === "continuous" && (v as { what?: { ref?: string } }).what?.ref === "each") return false;
+    return (v as { kind?: string }).kind === "affectedControllerPoison" || Object.values(v).some(affectedPoison);
+  };
+  if (affectedPoison([out.spell, out.triggers, out.activated])) out.unsupported.push("(poison counters of an affected permanent's controller, with no affected permanent)");
   // Both pay with the same chosen cards: a discard for jump-start on top of a discard the spell asks for isn't modeled.
   const kinds = (costs: AdditionalCost[] = []) => costs.map((c) => c.kind);
   if (out.fromGraveyard?.some((g) => kinds(g.costs).some((k) => kinds(out.additionalCosts).includes(k)))) out.unsupported.push("graveyard cast with a cost like its additional cost");
@@ -3219,7 +3228,8 @@ function checkX(d: CardDef, out: CompiledCard) {
   const cyclingX = out.activated.some((a) => a.cycling && /\{X\}/.test(a.manaCost));
   out.triggers = out.triggers.filter((tr) => {
     // A "when you cast this spell" ability uses the X the spell was cast with (CR 107.3a, 601.2b; rulings on Hydroid Krasis).
-    if (!usesX(tr.body) || ((tr.event === "selfEnters" || tr.event === "selfCast") && cardX) || (tr.event === "selfBecomesMonstrous" && monstrousX) || (tr.event === "selfCycled" && cyclingX)) return true;
+    // "Where X is the number of nonland cards milled this way" (The Wise Mothman): the event's (TriggeredAbility.eventX).
+    if (!usesX(tr.body) || ((tr.event === "selfEnters" || tr.event === "selfCast") && cardX) || (tr.event === "selfBecomesMonstrous" && monstrousX) || (tr.event === "selfCycled" && cyclingX) || tr.eventX) return true;
     bad(tr.body.text);
     return false;
   });

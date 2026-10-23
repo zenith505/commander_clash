@@ -4,7 +4,7 @@ import { topGraveyardCards } from "./graveyard";
 import { chooseVote } from "./bot-votes";
 import { autoCrew, autoWaterbend, planActivate, planCubeMana, planCast, planMana, planForetell, planPlot, planSuspend, planTurnFaceUp, planUnlock } from "./autopay";
 import { abilitiesOf, basePower, baseToughness, canBeSacrificed, defOf, isPermanentCard, isType, objHasKeyword, objIsType, power, realDefOf, shareLandType, toughness } from "./cards";
-import { manaAbilitiesOn, manaActionAbility, manaChoices } from "./manaabilities";
+import { manaAbilitiesOn, manaAbilityProblem, manaActionAbility, manaChoices } from "./manaabilities";
 import { reselectOptions, bindChosen, canChooseTarget, changeTargetOptions, harmfulCounter, triggerBody, choiceOptions, unlessCost, damageTo, doesNothingNow, estimate, harmfulTargets, legalModes, legalTargets, lethalDamage, offerMany, totalOk, modsAreHarmful, objectMatches, printedMatches, pickOptions, spellMatches, sameNamed, sameTarget, sourceQuality, spellManaValue, COLOR_NAMES, ENTERS_COUNTER } from "./effects";
 import { withModes, manySlot, gateBody, hasGatedTargets, castConditionMet, type CastHow } from "./modes";
 import {
@@ -56,6 +56,7 @@ import {
   altCost,
   delveRoom,
   spellTargets,
+  activationLessCost,
   availableMana,
   exilePlayable,
   topPlayable,
@@ -759,7 +760,7 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
   }
   const dial = chooseEndTurnEscape(s, pid);
   if (dial) return dial;
-  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseTimed(s, pid);
+  const regen = chooseRegeneration(s, pid) ?? chooseFlipEscape(s, pid) ?? chooseDeathReturn(s, pid) ?? chooseCommanderReturn(s, pid) ?? chooseRedirect(s, pid) ?? chooseDamageShield(s, pid) ?? chooseProtection(s, pid) ?? chooseNinjutsu(s, pid) ?? chooseSneak(s, pid) ?? chooseTimed(s, pid);
   if (regen) return regen;
   if (canActAtSorcerySpeed(s, pid)) {
     const land = chooseLand(s, pid);
@@ -1617,6 +1618,12 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
     if (!player(s, pid).hand.some((h) => h !== id && !isType(defOf(s, obj(s, h)), "Land") && mv(s, h) > avail && mv(s, h) <= avail + gain)) return null;
   }
   let xs: (number | undefined)[] = cost.hasX ? xChoices(availableMana(s, pid) + delveRoom(s, pid, id, { via, alt }) - totalWithoutX(s, pid, id, via), xCount(cost)) : [undefined];
+  // With Doubling Cube, the bigger X it pays for first (autopay's planCubeMana pays what the other sources can't).
+  if (cost.hasX && !free) {
+    const most = xs[0] ?? 0;
+    const cubed = xChoices(cubeMana(s, pid) + delveRoom(s, pid, id, { via, alt }) - totalWithoutX(s, pid, id, via), xCount(cost)).filter((x) => x > most);
+    xs = [...cubed, ...xs];
+  }
   // "Kicker {X}" (Thieving Skydiver): kicked with as big an X as we can pay, else not kicked.
   const kickX = compileCard(d).kicker?.costs.find((c) => parseManaCost(c).hasX);
   if (!cost.hasX && kickX && !via && !alt) {
@@ -1643,6 +1650,27 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
     if (plan) return plan;
   }
   return null;
+}
+
+/**
+ * The most mana we could have with Doubling Cube's "{3}, {T}: Double the amount of each type of unspent mana you have":
+ * our other sources make all they can, the Cube's cost is paid from that and the rest doubled. 0 without a Cube we
+ * could activate.
+ */
+function cubeMana(s: GameState, pid: PlayerId): number {
+  let most = 0;
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid) continue;
+    manaAbilitiesOn(s, o).forEach((ab, i) => {
+      if (ab.produces.kind !== "doublePool" || manaAbilityProblem(s, pid, o, i, true)) return;
+      const cost = activationLessCost(s, o, parseManaCost(ab.manaCost));
+      if (cost.symbols.some((x) => x.kind !== "generic")) return;
+      // The Cube itself makes nothing on its own, so availableMana counts our other sources only.
+      most = Math.max(most, 2 * (availableMana(s, pid) - manaValue(cost)));
+    });
+  }
+  return most;
 }
 
 /**
@@ -4097,6 +4125,36 @@ function chooseDeathReturn(s: GameState, pid: PlayerId): Action[] | null {
         if ((s.delayed ?? []).some((d) => d.dies && d.subject.id === t.id && d.subject.zc === (t.zoneChanges ?? 0) && d.controller === pid)) continue;
         if (s.stack.some((x) => x.controller === pid && x.sourceId === id && x.targets?.some((y) => !Array.isArray(y) && y.kind === "object" && y.id === t.id))) continue;
         const plan = planActivate(s, pid, id, i, [{ kind: "object", id: t.id }]);
+        if (plan) return plan;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * "Return target commander you own from the battlefield to your hand" (Sanctum of Eternity): a commander of ours that's
+ * about to die or be exiled (doomedNow), or that an opponent controls, back to our hand, where it's cast again without
+ * commander tax (CR 903.8 counts only casts from the command zone).
+ */
+function chooseCommanderReturn(s: GameState, pid: PlayerId): Action[] | null {
+  for (const id of s.battlefield) {
+    const o = obj(s, id);
+    if (controllerOf(s, o) !== pid) continue;
+    const abilities = abilitiesOf(s, o).activated;
+    for (let i = 0; i < abilities.length; i++) {
+      const ab = abilities[i]!;
+      const t = ab.body.targets[0];
+      if (ab.body.targets.length !== 1 || t?.kind !== "object" || !t.commander || t.owner !== "you") continue;
+      if (ab.body.effects.length !== 1 || ab.body.effects[0]!.type !== "bounce" || ab.sacrificeSelf || ab.costs?.length) continue;
+      const problem = abilityProblem(s, pid, id, i);
+      if (problem && !/not enough mana/.test(problem)) continue;
+      for (const c of legalTargets(s, t, pid, undefined, sourceQuality(s, id), id)) {
+        if (c.kind !== "object") continue;
+        const cmd = obj(s, c.id);
+        if (controllerOf(s, cmd) === pid && !doomedNow(s, pid, cmd)) continue;
+        if (s.stack.some((x) => x.controller === pid && x.sourceId === id)) continue;
+        const plan = planActivate(s, pid, id, i, [{ kind: "object", id: cmd.id }]);
         if (plan) return plan;
       }
     }

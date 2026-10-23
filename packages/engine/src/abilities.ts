@@ -105,6 +105,8 @@ export type Count =
   | { kind: "affectedCounters"; counter: CounterKind }
   /** "Becomes an artifact creature with power and toughness each equal to its mana value" (Karn, the Great Creator): the permanent the effect is applied to; X in its mana cost is 0 (CR 202.3e). */
   | { kind: "affectedManaValue" }
+  /** "For each poison counter its controller has" (Phyresis Outbreak): of the affected permanent's controller, counted for each one as the effect is made (rulings). */
+  | { kind: "affectedControllerPoison" }
   | { kind: "cardsInLibrary"; who: PlayerRef }
   /** "That many cards" after discarding a hand (Tolarian Winds); `greatest`: "the greatest number of cards a player discarded this way" (Windfall). */
   | { kind: "discardedThisWay"; greatest?: true; /** Only these players' discards: "each player discards their hand, then draws that many cards" is each their own (Dark Deal). */ who?: PlayerRef }
@@ -3495,6 +3497,8 @@ export type TriggerDuration = "endOfTurn" | "yourNextTurn" | "endOfYourNextTurn"
 export interface TriggeredAbility {
   event: TriggerEvent;
   body: AbilityBody;
+  /** "Where X is the number of nonland cards milled this way" (The Wise Mothman): X is the event's amount, known as it triggers, so it can count targets ("up to X target creatures"). */
+  eventX?: true;
   /** For "permanentIsDealtDamage": what has to be dealt damage. */
   dealtFilter?: TargetSpec;
   /** For "opponentLosesLife": "for the first time during each of their turns" (Valgavoth): their first life loss this turn, on their turn. */
@@ -3812,6 +3816,8 @@ export interface BatchTrigger {
   notPlayed?: true;
   /** `toGraveyard` from the library: "Whenever a player mills one or more creature cards" (Zellix), milled ones only (CR 701.17a). */
   milled?: true;
+  /** With `milled`: once for the whole event, whoever milled them (The Wise Mothman, rulings), not once for each player. */
+  together?: true;
   /** `leaves`: "Whenever you sacrifice one or more Foods" (Camellia): ones `whose` player sacrificed (CR 701.21a). */
   sacrificed?: true;
 }

@@ -2975,8 +2975,15 @@ function linkExile(out: CompiledCard) {
     if (others || impulses.length !== 1) out.unsupported.push("(refers to cards exiled with it that it can't link to one exile ability)");
     else impulses[0]!.linked = true;
   }
-  // "Cast a spell from among cards exiled with ~" with no one impulse to link it to (Idol of Endurance's exile until it leaves).
-  if (!impulses.length && bodies.some((b) => allEffects(b.effects).some((e) => e.type === "castLinkedFree"))) out.unsupported.push("(casts a card exiled with it that it can't link to one exile ability)");
+  // "Cast a spell from among cards exiled with ~" with no impulse: Idol of Endurance's one exile of graveyard cards until
+  // it leaves (CR 607.2a).
+  if (!impulses.length && bodies.some((b) => allEffects(b.effects).some((e) => e.type === "castLinkedFree"))) {
+    const all = bodies.flatMap((b) => allEffects(b.effects));
+    const exiles = all.filter((e): e is Extract<Effect, { type: "exileGraveyard" }> => e.type === "exileGraveyard" && !!e.until);
+    const others = all.some((e) => e.type === "exile" || (e.type === "exileGraveyard" && !e.until) || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
+    if (others || out.spell || exiles.length !== 1) out.unsupported.push("(casts a card exiled with it that it can't link to one exile ability)");
+    else exiles[0]!.linked = true;
+  }
   // Currency Converter: "Whenever you discard a card, you may exile that card from your graveyard" and "Put a card exiled
   // with ~ into its owner's graveyard": the cards its one exile instruction exiled (CR 607.2a).
   if (!impulses.length && bodies.some((b) => allEffects(b.effects).some((e) => e.type === "moveLinked"))) {

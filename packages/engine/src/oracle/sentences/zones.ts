@@ -40,7 +40,19 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return ctx.targets[ctx.lastObjectTarget]!.stackAbilities ? null : [{ type: "counterSpell", index: ctx.lastObjectTarget, bounce: true }];
   // Court of Locthwain: "until end of turn, you may cast a spell from among cards exiled with ~ without paying its mana
   // cost": one spell, from the cards its linked exile took (compile.ts links it, CR 607.2a).
-  if (/^[Uu]ntil end of turn, you may cast a spell from among cards exiled with ~ without paying its mana cost$/.test(s)) return [{ type: "castLinkedFree" }];
+  // Idol of Endurance: "... a creature spell from among ...": only a spell of that kind.
+  // (A leading "Until end of turn," comes here as a trailing one.)
+  if ((m = /^(?:[Uu]ntil end of turn, you|You) may cast an? (?:([a-z]+(?: or [a-z]+)?) )?spell from among cards exiled with ~ without paying its mana cost(?<until> until end of turn)?$/.exec(s)) && (m.groups?.until !== undefined) === /^You/.test(s)) {
+    const filter = m[1] ? parseSearchFilter(`${m[1]} card`) : undefined;
+    if (filter === null || (m[1] && !filter)) return null;
+    return [{ type: "castLinkedFree", ...(filter ? { filter } : {}) }];
+  }
+  // Idol of Endurance: "Exile all creature cards with mana value 3 or less from your graveyard until ~ leaves the
+  // battlefield": they return to the graveyard when it leaves (CR 610.3).
+  if ((m = /^[Ee]xile all (.+?) cards( with mana value \d+ or less)? from your graveyard until ~ leaves the battlefield$/.exec(s)) && !ctx.spell) {
+    const filter = parseSearchFilter(`${m[1]} card${m[2] ?? ""}`);
+    return filter ? [{ type: "exileGraveyard", who: { ref: "you" }, filter, until: "sourceLeaves" }] : null;
+  }
   // Emry: "Choose target artifact card in your graveyard. You may cast that card this turn."
   // The one target so far is that card, in your graveyard.
   if (/^You may cast (?:that card|it) this turn$/.test(s) && ctx.targets.length === 1) {

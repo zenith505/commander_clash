@@ -248,6 +248,9 @@ const checkableMay = (e: Effect) =>
   (e.type === "sacrifice" && e.what.ref === "subject") ||
   // "When ~ dies, you may exile it. When you do, ..." (Undead Butler): only while it's still that card in the graveyard.
   (e.type === "exile" && e.what.ref === "selfCard") ||
+  // "Whenever another nontoken creature you control dies, you may exile it. If you do, ..." (Nightmare Shepherd): only
+  // while it's still that card, in the graveyard it went to (CR 400.7).
+  (e.type === "exile" && e.what.ref === "subjectCard") ||
   // "You may tap it. When you do, ..." (The Fire Nation Drill): only an untapped permanent can be tapped (CR 701.26a).
   (e.type === "tap" && e.what.ref === "self") ||
   // "You may remove a hit counter from a card that player owns in exile. If you do, ..." (Mari): only with one there.
@@ -4235,6 +4238,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // card this turn." The permission is about the card chosen, so it depends on the discard too.
       const choosePlay = ifDid[1] === "do" && /^You may play that card this turn$/.test(sentences[si + 1] ?? "") ? new RegExp(`^exile the top (${NUM}) cards of your library, then choose one of them$`).exec(ifDid[2]!) : null;
       if (choosePlay) si++;
+      // The Master, Gallifrey's End: "If you do, choose an opponent with the most life among your opponents. That player
+      // faces a villainous choice — ...": the choice and what that player does both depend on it.
+      const chooseThat = ifDid[1] === "do" && !choosePlay && /^choose an opponent(?: with the most life among your opponents)?$/.test(ifDid[2]!) && /^That player /.test(sentences[si + 1] ?? "") && !ctx.chosenOpponent && !ctx.eventPlayer && ctx.lastPlayerTarget === undefined;
+      if (chooseThat) {
+        ctx.chosenOpponent = true;
+        const then = parseOne(sentences[si + 1]!.replace(/\.$/, ""), ctx);
+        if (!then) return null;
+        si++;
+        effects.push({ type: "if", cond: { kind: "youDid" }, effects: [{ type: "choose", choice: "opponent", ...(/ most life /.test(ifDid[2]!) ? { mostLife: "opponents" as const } : {}) }, ...then] });
+        continue;
+      }
       const inner = choosePlay ? [{ type: "impulse" as const, n: amt(choosePlay[1]!), until: "thisTurn" as const, choose: true as const }] : parseOne(ifDid[2]!.charAt(0).toUpperCase() + ifDid[2]!.slice(1), ctx);
       if (inner) effects.push(ifDid[1] === "do" ? { type: "if", cond: { kind: sacIt || mustSac ? "sacrificedThisWay" : "youDid" }, effects: inner } : { type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner });
       // Its own "where X is ..." (CR 107.3c).
@@ -4618,9 +4632,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // The Black Gate: "Choose a player with the most life or tied for most life", any of them, you too.
     // The Master, Gallifrey's End: "Choose an opponent with the most life among your opponents", any of those tied.
-    if (/^Choose (?:an opponent(?: with the most life among your opponents)?|a player with the most life or tied for most life)$/.test(s)) {
+    // Lowercase after a trigger's condition ("When ~ enters, choose an opponent").
+    if (/^[Cc]hoose (?:an opponent(?: with the most life among your opponents)?|a player with the most life or tied for most life)$/.test(s)) {
       if (ctx.chosenOpponent || ctx.eventPlayer || ctx.lastPlayerTarget !== undefined) return null;
-      effects.push({ type: "choose", choice: "opponent", ...(/^Choose a player with the most life/.test(s) ? { mostLife: true as const } : / most life /.test(s) ? { mostLife: "opponents" as const } : {}) });
+      effects.push({ type: "choose", choice: "opponent", ...(/^[Cc]hoose a player with the most life/.test(s) ? { mostLife: true as const } : / most life /.test(s) ? { mostLife: "opponents" as const } : {}) });
       ctx.chosenOpponent = true;
       continue;
     }

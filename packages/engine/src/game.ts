@@ -1241,7 +1241,7 @@ function finishEnteringAs(s: GameState, o: GameObject, opts: EnterOpts) {
  * the source leave is over (askAuraReturns), since a choice can't be asked partway through one. It can't enchant
  * anything that returned at the same time, and with nothing it can enchant it stays in exile (CR 303.4g).
  */
-function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: number; hand?: true }[], source: string) {
+function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: number; hand?: true; graveyard?: true }[], source: string) {
   const back = links.filter((l) => {
     const c = s.objects[l.id];
     return !!c && c.zone === "exile" && (c.zoneChanges ?? 0) === l.zc && !c.isToken;
@@ -1254,6 +1254,12 @@ function returnUntilLeaves(s: GameState, links: { id: ObjectId; zc: number; hand
       if (l.hand) {
         log(s, `${d.name} returns to its owner's hand (${source} left).`);
         moveObject(s, c.id, "hand");
+        continue;
+      }
+      // Idol of Endurance: to its owner's graveyard, where it was exiled from (rulings).
+      if (l.graveyard) {
+        log(s, `${d.name} returns to its owner's graveyard (${source} left).`);
+        moveObject(s, c.id, "graveyard");
         continue;
       }
       const r = (s.untilReturns ??= { auras: [], returned: [] });
@@ -3305,7 +3311,7 @@ const mayPlayExiledOtherwise = (s: GameState, o: GameObject, pid: PlayerId): boo
  */
 export function linkedFreeGrant(s: GameState, o: GameObject, pid: PlayerId): number {
   if (o.zone !== "exile" || !s.linkedFreeCasts?.length || isType(defOf(s, o), "Land")) return -1;
-  return s.linkedFreeCasts.findIndex((g) => g.player === pid && g.turn === s.turn && (s.linkedExile?.[g.source] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0)));
+  return s.linkedFreeCasts.findIndex((g) => g.player === pid && g.turn === s.turn && (!g.filter || printedMatches(g.filter, defOf(s, o))) && (s.linkedExile?.[g.source] ?? []).some((l) => l.id === o.id && l.zc === (o.zoneChanges ?? 0)));
 }
 
 /** "You may cast ~ from exile" (Squee): its owner, a face-up card; cast, not played as a land. */
@@ -6776,6 +6782,19 @@ function chooseOption(s: GameState, p: Player, choice: string) {
   }
   if (pend.what === "endure") {
     (r.scratch ??= {}).endure = choice;
+    continueResolution(s);
+    return;
+  }
+  if (pend.what === "copyOrder") {
+    const c = r.scratch?.copies;
+    if (!c?.each) throw new RulesError("no copies to order");
+    const at = c.each.length - c.left;
+    const i = c.each.indexOf(choice);
+    if (i < at) throw new RulesError("not one of the copies still to make");
+    // The next copy targets this one (rulings on Zada: its controller chooses the order the copies go on the stack).
+    c.each.splice(i, 1);
+    c.each.splice(at, 0, choice);
+    c.picked = true;
     continueResolution(s);
     return;
   }

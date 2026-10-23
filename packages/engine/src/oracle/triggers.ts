@@ -1828,7 +1828,7 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   const youPut = /^Whenever you put one or more ((?:\+1\/\+1|-1\/-1|loyalty|time|[a-z]+) )?counters on (~|this (?:creature|artifact|enchantment|permanent)|another creature you control|a creature you control|a creature you don't control|a creature|another creature|a permanent you control|a permanent or player|a planeswalker|another [a-z]+ creature|an? [A-Z][a-z]+(?:, [A-Z][a-z]+,)? or [A-Z][a-z]+ you control), (.+)$/.exec(line);
   // Danny Pink grants "Whenever one or more counters are put on this creature for the first time each turn".
   const firstTime = !youPut && /^Whenever one or more counters are put on ~ for the first time each turn, /.test(line);
-  const put = youPut ?? /^Whenever one or more (\+1\/\+1 )?counters are put on (~|another creature you control|a creature you control), (.+)$/.exec(firstTime ? line.replace(" for the first time each turn,", ",") : line);
+  const put = youPut ?? /^Whenever one or more (\+1\/\+1 )?counters are put on (~|another creature you control|a creature you control|another non-[A-Z][a-z]+ creature you control), (.+)$/.exec(firstTime ? line.replace(" for the first time each turn,", ",") : line);
   if (put) {
     const self = /^(?:~|this [a-z]+)$/.test(put[2]!);
     const byYou = youPut ? { countersByYou: true as const } : {};

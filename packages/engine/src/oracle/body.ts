@@ -982,6 +982,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
   // "You may create a token that's a copy of a nonlegendary enchantment you control" (Calix, Guided by Fate): choosing
   // one is creating it, so "you may choose ... If you do, create a token that's a copy of it."
   text = text.replace(/(^|\. )([Yy]ou may) create a token that's a copy of an? ((?:nonlegendary )?(?:permanent|creature|artifact|enchantment)) you control\./g, "$1$2 choose a $3 you control. If you do, create a token that's a copy of it.");
+  // Sanctum of Eternity: "Return target commander you own from the battlefield to your hand": a target permanent you own
+  // (CR 115.1), so its owner's hand.
+  text = text.replace(/\b([Rr]eturn target [a-z ]+? you own) from the battlefield to your hand\./g, "$1 to its owner's hand.");
+  // Divine Reckoning: "Each player chooses a creature they control. Destroy the rest." One instruction (CR 608.2c).
+  text = text.replace(/(^|\. )(Each player chooses an? [a-z]+ they control)\. Destroy the rest\./g, "$1$2 and the rest are destroyed.");
+  // "Put a quest counter on this enchantment. Then if it has four or more quest counters on it, draw a card." (Waterbender
+  // Ascension): "it" is ~.
+  text = text.replace(/(\bcounters? on ~\. Then if) it has (?=\w+ or more [a-z+\/0-9-]+ counters on it, )/g, "$1 ~ has ");
   // "Choose target battle. If an opponent protects it, remove a defense counter from it. Otherwise, put a defense counter
   // on it." (Portent Tracker) is one instruction about one battle.
   text = text.replace(/Choose target battle\. If an opponent protects it, remove (a|\w+) defense counters? from it\. Otherwise, put \1 defense counters? on it\./, (_, n: string) => `Remove ${n} defense counter${n === "a" ? "" : "s"} from target battle if an opponent protects it, otherwise put that many on it.`);

@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, pt, putOnBattlefield, setup } from "./helpers";
 import { createEmblem } from "../src/emblems";
-import { botActions, characteristics, isFullySupported, objHasKeyword, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
+import { botActions, characteristics, isFullySupported, objHasKeyword, planActivate, planCast, spellCost, waitingOn, type Action, type CardDef, type GameState, type PlayerId } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
 const run = (s: GameState, plan: Action[] | null) => {
@@ -270,6 +270,26 @@ describe("Lux Artillery: artifact creature spells gain sunburst; 10 damage at th
     putOnBattlefield(s0, ap, lux);
     const s = passToPending(run(s0, planCast(s0, ap, ids[0]!)));
     expect(s.objects[ids[0]!]!.counters["+1/+1"] ?? 0).toBe(0);
+  });
+
+  it("Solar Array (the same sunburst, now parsed): its mana's next artifact spell this turn gains sunburst", () => {
+    const array = card("Solar Array", "Artifact", "{3}", {
+      oracleText: "{T}: Add one mana of any color. When you next cast an artifact spell this turn, that spell gains sunburst. (If it's a creature, it enters with a +1/+1 counter on it for each color of mana spent to cast it. Otherwise, it enters with that many charge counters on it.)",
+    });
+    supported(array);
+    const { s: s0, ap, ids } = setup([golem, golem]);
+    emptyPools(s0);
+    const id = putOnBattlefield(s0, ap, array);
+    let s = act(s0, { type: "activateMana", player: ap, objectId: id, mana: "W" });
+    s = passToPending(run(s, planCast(s, ap, ids[0]!)));
+    expect(s.objects[ids[0]!]!.zone).toBe("battlefield");
+    // White from the Array and the lands' colors: as many counters as colors spent.
+    const n = s.objects[ids[0]!]!.counters["+1/+1"] ?? 0;
+    expect(n).toBeGreaterThanOrEqual(1);
+    // Only the next one.
+    emptyPools(s);
+    s = passToPending(run(s, planCast(s, ap, ids[1]!)));
+    expect(s.objects[ids[1]!]!.counters["+1/+1"] ?? 0).toBe(0);
   });
 
   const atEnd = (counters: number) => {
@@ -551,5 +571,173 @@ describe("Transmute Artifact: sacrifice an artifact, search for one; paying the 
     const { s, found } = scene(big, false);
     expect(s.pending).toBeFalsy();
     expect(s.objects[found]!.zone).toBe("library");
+  });
+});
+
+describe("Bladewing the Risen: {B}{R}: Dragon creatures get +1/+1 until end of turn", () => {
+  const bladewing = card("Bladewing the Risen", "Legendary Creature — Zombie Dragon", "{3}{B}{B}{R}{R}", {
+    power: "4",
+    toughness: "4",
+    keywords: ["Flying"],
+    oracleText: "Flying\nWhen Bladewing enters, you may return target Dragon permanent card from your graveyard to the battlefield.\n{B}{R}: Dragon creatures get +1/+1 until end of turn.",
+  });
+  const dragon = (name: string) => card(name, "Creature — Dragon", "{4}{R}", { power: "4", toughness: "4" });
+
+  it("is fully supported", () => supported(bladewing));
+
+  it("every Dragon creature gets +1/+1, an opponent's too; a Bear doesn't", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const id = putOnBattlefield(s0, ap, bladewing);
+    const theirs = putOnBattlefield(s0, opp, dragon("Test Opposing Dragon"));
+    const bearId = putOnBattlefield(s0, ap, bear());
+    const s = resolveAll(run(s0, planActivate(s0, ap, id, 0)));
+    expect(pt(s, id)).toBe("5/5");
+    expect(pt(s, theirs)).toBe("5/5");
+    expect(pt(s, bearId)).toBe("2/2");
+  });
+});
+
+describe("Wildwood Scourge: counters put on another non-Hydra creature you control put one on it", () => {
+  const scourge = card("Wildwood Scourge", "Creature — Hydra", "{X}{G}", {
+    power: "0",
+    toughness: "0",
+    oracleText: "This creature enters with X +1/+1 counters on it.\nWhenever one or more +1/+1 counters are put on another non-Hydra creature you control, put a +1/+1 counter on this creature.",
+  });
+  const growth = card("Test Growth", "Instant", "{G}", { oracleText: "Put two +1/+1 counters on target creature." });
+
+  it("is fully supported", () => supported(scourge));
+
+  it("two counters on a Bear: one on the Scourge; on another Hydra or an opponent's creature: none", () => {
+    const { s: s0, ap, ids, opp } = setup([growth, growth, growth]);
+    const id = putOnBattlefield(s0, ap, scourge);
+    s0.objects[id]!.counters = { "+1/+1": 1 };
+    const bearId = putOnBattlefield(s0, ap, bear());
+    const hydra = putOnBattlefield(s0, ap, card("Test Hydra", "Creature — Hydra", "{G}", { power: "1", toughness: "1" }));
+    const theirs = putOnBattlefield(s0, opp, bear({ name: "Test Opposing Bear" }));
+    let s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: bearId }])));
+    expect(s.objects[bearId]!.counters["+1/+1"]).toBe(2);
+    expect(s.objects[id]!.counters["+1/+1"]).toBe(2);
+    s = resolveAll(run(s, planCast(s, ap, ids[1]!, [{ kind: "object", id: hydra }])));
+    s = resolveAll(run(s, planCast(s, ap, ids[2]!, [{ kind: "object", id: theirs }])));
+    expect(s.objects[id]!.counters["+1/+1"]).toBe(2);
+  });
+});
+
+describe("Astarion, the Decadent: at your end step, an opponent loses again what they lost, or you gain again what you gained", () => {
+  const astarion = card("Astarion, the Decadent", "Legendary Creature — Vampire Elf Rogue", "{4}{W}{B}", {
+    power: "4",
+    toughness: "4",
+    keywords: ["Deathtouch", "Lifelink"],
+    oracleText: "Deathtouch, lifelink\nAt the beginning of your end step, choose one —\n• Feed — Target opponent loses life equal to the amount of life they lost this turn.\n• Friends — You gain life equal to the amount of life you gained this turn.",
+  });
+  const drain = card("Test Drain", "Sorcery", "{B}", { oracleText: "Target opponent loses 3 life and you gain 2 life." });
+  /** At the end step: `ap` chooses mode `mode` (and `opp` as the target, if asked). */
+  const endStepMode = (s: GameState, ap: PlayerId, mode: number, opp: PlayerId) => {
+    s = passUntil(s, "end", ap);
+    expect(s.pending).toMatchObject({ kind: "chooseModes", player: ap });
+    s = act(s, { type: "chooseModes", player: ap, modes: [mode] });
+    if (s.pending?.kind === "chooseTargets") s = act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "player", id: opp }] } as Action);
+    return resolveAll(s);
+  };
+
+  it("is fully supported", () => supported(astarion));
+
+  it("Feed: the opponent who lost 3 this turn loses 3 more", () => {
+    const { s: s0, ap, ids, opp } = setup([drain]);
+    putOnBattlefield(s0, ap, astarion);
+    let s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "player", id: opp }])));
+    expect(s.players[opp]!.life).toBe(37);
+    s = endStepMode(s, ap, 0, opp);
+    s = resolveAll(s);
+    expect(s.players[opp]!.life).toBe(34);
+  });
+
+  it("Friends: having gained 2 this turn, gain 2 more", () => {
+    const { s: s0, ap, ids, opp } = setup([drain]);
+    putOnBattlefield(s0, ap, astarion);
+    let s = resolveAll(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "player", id: opp }])));
+    expect(s.players[ap]!.life).toBe(42);
+    s = endStepMode(s, ap, 1, opp);
+    s = resolveAll(s);
+    expect(s.players[ap]!.life).toBe(44);
+  });
+});
+
+describe("Waterbender Ascension: a quest counter for each combat damage to a player; from four on, also a card", () => {
+  const ascension = card("Waterbender Ascension", "Enchantment", "{1}{U}", {
+    keywords: ["Waterbend"],
+    oracleText:
+      "Whenever a creature you control deals combat damage to a player, put a quest counter on this enchantment. Then if it has four or more quest counters on it, draw a card.\nWaterbend {4}: Target creature can't be blocked this turn. (While paying a waterbend cost, you can tap your artifacts and creatures to help. Each one pays for {1}.)",
+  });
+
+  it("is fully supported", () => supported(ascension));
+
+  it("two creatures connect: the third counter draws nothing, the fourth draws a card", () => {
+    const { s: s0, ap, opp } = setup([]);
+    const id = putOnBattlefield(s0, ap, ascension);
+    s0.objects[id]!.counters = { quest: 2 };
+    const a = putOnBattlefield(s0, ap, bear());
+    const b = putOnBattlefield(s0, ap, bear({ name: "Test Bear Two" }));
+    const hand = s0.players[ap]!.hand.length;
+    const s = resolveAll(attack(s0, ap, [a, b], opp));
+    expect(s.objects[id]!.counters.quest).toBe(4);
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+  });
+});
+
+describe("Divine Reckoning: each player chooses a creature they control; destroy the rest", () => {
+  const reckoning = card("Divine Reckoning", "Sorcery", "{2}{W}{W}", {
+    keywords: ["Flashback"],
+    oracleText: "Each player chooses a creature they control. Destroy the rest.\nFlashback {5}{W}{W} (You may cast this card from your graveyard for its flashback cost. Then exile it.)",
+  });
+
+  it("is fully supported", () => supported(reckoning));
+
+  it("each keeps the one they chose; the rest are destroyed, and an indestructible one survives", () => {
+    const { s: s0, ap, ids, opp } = setup([reckoning]);
+    const mine = [putOnBattlefield(s0, ap, bear()), putOnBattlefield(s0, ap, bear({ name: "Test Bear Two" }))];
+    const theirs = [putOnBattlefield(s0, opp, bear({ name: "Test Opposing Bear" })), putOnBattlefield(s0, opp, bear({ name: "Test Sturdy Bear", keywords: ["Indestructible"], oracleText: "Indestructible" }))];
+    let s = passToPending(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", player: ap, action: "keep", destroy: true });
+    s = act(s, { type: "pickPermanents", player: ap, ids: [mine[1]!] } as Action);
+    expect(s.pending).toMatchObject({ kind: "pickPermanents", player: opp });
+    s = act(s, { type: "pickPermanents", player: opp, ids: [theirs[0]!] } as Action);
+    for (let i = 0; i < 4 && s.pending; i++) s = run(s, botActions(s, waitingOn(s)!));
+    expect(s.objects[mine[0]!]!.zone).toBe("graveyard");
+    expect(s.objects[mine[1]!]!.zone).toBe("battlefield");
+    expect(s.objects[theirs[0]!]!.zone).toBe("battlefield");
+    expect(s.objects[theirs[1]!]!.zone).toBe("battlefield");
+  });
+});
+
+describe("Warden of Evos Isle: creature spells with flying you cast cost {1} less", () => {
+  const warden = card("Warden of Evos Isle", "Creature — Bird Wizard", "{2}{U}", { power: "2", toughness: "2", keywords: ["Flying"], oracleText: "Flying\nCreature spells with flying you cast cost {1} less to cast." });
+
+  it("is fully supported", () => supported(warden));
+
+  it("a flier costs {1} less; a creature that has flying only while attacking doesn't", () => {
+    const flier = card("Test Flier", "Creature — Bird", "{3}{U}", { power: "2", toughness: "2", keywords: ["Flying"], oracleText: "Flying" });
+    const corsair = card("Test Corsair", "Creature — Human Pirate", "{3}{U}", { power: "2", toughness: "1", oracleText: "This creature has flying as long as it's attacking." });
+    const { s, ap, ids } = setup([flier, corsair]);
+    const before = [spellCost(s, ap, s.objects[ids[0]!]!), spellCost(s, ap, s.objects[ids[1]!]!)];
+    putOnBattlefield(s, ap, warden);
+    expect(before[0]!.extra - spellCost(s, ap, s.objects[ids[0]!]!).extra).toBe(1);
+    expect(before[1]!.extra - spellCost(s, ap, s.objects[ids[1]!]!).extra).toBe(0);
+  });
+});
+
+describe("Sanctum of Eternity: return target commander you own from the battlefield to your hand, during your turn", () => {
+  const sanctum = card("Sanctum of Eternity", "Land", "", { oracleText: "{T}: Add {C}.\n{2}, {T}: Return target commander you own from the battlefield to your hand. Activate only during your turn." });
+
+  it("is fully supported", () => supported(sanctum));
+
+  it("returns your commander to your hand; another creature isn't a legal target", () => {
+    const { s: s0, ap } = setup([]);
+    const id = putOnBattlefield(s0, ap, sanctum);
+    const cmd = putOnBattlefield(s0, ap, bear({ name: "Test Commander Bear" }), { commander: true });
+    const other = putOnBattlefield(s0, ap, bear());
+    expect(planActivate(s0, ap, id, 0, [{ kind: "object", id: other }])).toBeNull();
+    const s = resolveAll(run(s0, planActivate(s0, ap, id, 0, [{ kind: "object", id: cmd }])));
+    expect(s.objects[cmd]!.zone).toBe("hand");
   });
 });

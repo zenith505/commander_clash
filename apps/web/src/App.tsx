@@ -5012,7 +5012,7 @@ function Controls({
     return (
       <div className="controls">
         <span>
-          <strong>{pending.source}:</strong> <RulesText text={pending.prompt.charAt(0).toUpperCase() + pending.prompt.slice(1)} />?
+          <strong>{pending.source}:</strong> <RulesText text={pending.prompt.charAt(0).toUpperCase() + pending.prompt.slice(1)} />?{pending.otherwise ? ` ${pending.otherwise}` : ""}
         </span>
         <button disabled={!taps} onClick={() => dispatch([...(taps ?? []), { type: "chooseMay", player: HUMAN, yes: true }])}>
           Pay

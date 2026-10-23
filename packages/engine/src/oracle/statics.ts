@@ -279,6 +279,13 @@ export function parseCostChange(line: string): { costMod: CostMod } | { less: Am
     if (!filter || filter.kind !== "spell") return "fail";
     return { costMod: { who: "you", filter: { ...filter, text: `${m[2]}spells` }, n: -Number(m[3]), nth: m[1] === "first" ? 1 : 2, text: line } };
   }
+  // Warden of Evos Isle: "Creature spells with flying you cast cost {1} less to cast": the spell's own printed flying, not
+  // flying it would get on the battlefield (rulings).
+  if ((m = /^([A-Z][a-z]+) spells with (flying|haste|trample|deathtouch|lifelink|vigilance|reach|defender|menace) you cast cost (\{\d+\} (?:less|more) to cast)$/.exec(text))) {
+    const base = parseCostChange(`${m[1]} spells you cast cost ${m[3]}`);
+    if (!base || base === "fail" || !("costMod" in base)) return "fail";
+    return { costMod: { ...base.costMod, filter: { ...base.costMod.filter, keywords: [capital(m[2]!)], text: `${m[1]!.toLowerCase()} spells with ${m[2]}` }, text: line } };
+  }
   if ((m = /^Spells you cast but don't own cost \{(\d+)\} less to cast$/.exec(text))) return { costMod: { who: "you", filter: { kind: "spell", text: "spells you don't own" }, n: -Number(m[1]), notOwned: true, text: line } };
   if ((m = /^~ costs \{(\d+)\} less to cast if you've cast another spell this turn$/.exec(text))) return { lessIf: { n: Number(m[1]), cond: { kind: "castAnother" } } };
   const self: StaticAbility = { affects: { kind: "self" }, mods: [], text: line };

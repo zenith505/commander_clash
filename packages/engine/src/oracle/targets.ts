@@ -618,7 +618,9 @@ export function parseGroup(phrase: string, bare = false, count?: (text: string) 
   // "Creatures of the chosen type get +3/+3 until end of turn": every creature of that type; "creatures that aren't of
   // the chosen type get -3/-3" (Crippling Fear): every other creature.
   const ofChosen = /^creatures (?:that aren't |not )?of the chosen type$/i.test(p);
-  if (!all && !whose.test(p) && !bare && !combat && !ofChosen) return null;
+  // "Dragon creatures get +1/+1 until end of turn" (Bladewing the Risen): every creature of those types, whoever controls it.
+  const typed = /^(?:[A-Z][a-z]+ )+creatures$/.test(p) && p.split(" ").slice(0, -1).every((w) => CREATURE_TYPES.has(w));
+  if (!all && !whose.test(p) && !bare && !combat && !ofChosen && !typed) return null;
   // The kinds come first; plurals become the singular parseTargetPhrase reads ("Elves" -> "Elf").
   const cut = /\b(with|without|you control|your opponents control|an opponent controls|you don't control|of the chosen|of that|that aren't|that are not|not of|that attacked this turn|that dealt combat damage to you this turn|that didn't attack this turn|that entered (?:the battlefield )?this turn)\b/i.exec(p);
   let head = (cut ? p.slice(0, cut.index) : p).trim();

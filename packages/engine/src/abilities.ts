@@ -1700,6 +1700,8 @@ export type Effect =
       youChoose?: true;
       /** "Each player puts a vow counter on a creature they control and sacrifices the rest" (Promise of Loyalty): one on each kept permanent first; they're "those creatures" afterwards (Resolving.created). */
       counter?: CounterKind;
+      /** Divine Reckoning: "Destroy the rest": destroyed instead of sacrificed. */
+      destroy?: true;
     }
   /** Mount Doom: "Choose up to two creatures, then destroy the rest": the controller picks up to `n` among every player's (not targeted). */
   | { type: "keepDestroyRest"; filter: TargetSpec; n: number }

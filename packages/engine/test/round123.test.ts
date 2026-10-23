@@ -588,3 +588,59 @@ describe("Yenna, Redtooth Regent", () => {
     expect(s.log.some((l) => /scr(y|ies) 2/.test(l.text))).toBe(true);
   });
 });
+
+describe("The Legend of Kyoshi, chapter II", () => {
+  it("earthbend X (cards in hand), and that land becomes an Island in addition to its other types (CR 305.6)", () => {
+    const chapter = card("Test Kyoshi II", "Sorcery", "{1}", { oracleText: "Earthbend X, where X is the number of cards in your hand. That land becomes an Island in addition to its other types." });
+    supported(chapter);
+    const { s: s0, ap, ids } = setup([chapter, bear(), bear()]);
+    const forest = putOnBattlefield(s0, ap, card("Forest", "Basic Land — Forest"));
+    invalidateCharacteristics(s0);
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: forest }])));
+    const f = s.objects[forest]!;
+    expect(characteristics(s, f).subtypes.sort()).toEqual(["Forest", "Island"]);
+    expect(f.counters["+1/+1"]).toBe(s.players.find((x) => x.id === ap)!.hand.length);
+    expect(manaAbilitiesOn(s, f).map((m) => m.produces)).toEqual(expect.arrayContaining([{ kind: "fixed", mana: ["U"] }, { kind: "fixed", mana: ["G"] }]));
+  });
+});
+
+const rivaz = card("Rivaz of the Claw", "Legendary Creature — Lizard Warlock", "{1}{B}{R}", { power: "3", toughness: "3", keywords: ["Menace"], oracleText: "Menace\n{T}: Add two mana in any combination of colors. Spend this mana only to cast Dragon creature spells.\nOnce during each of your turns, you may cast a Dragon creature spell from your graveyard.\nWhenever you cast a Dragon creature spell from your graveyard, it gains \"When this creature dies, exile it.\"" });
+
+describe("Rivaz of the Claw", () => {
+  it("a Dragon cast from the graveyard gains \"When this creature dies, exile it\"; dying, it's exiled", () => {
+    supported(rivaz);
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, rivaz);
+    const dragon = putOnBattlefield(s0, ap, card("Shivan Dragon", "Creature — Dragon", "{4}{R}{R}", { power: "5", toughness: "5", keywords: ["Flying"], oracleText: "Flying" }));
+    moveObject(s0, dragon, "graveyard");
+    s0.triggerQueue = [];
+    invalidateCharacteristics(s0);
+    let s = settle(run(s0, planCast(s0, ap, dragon, undefined, undefined, undefined, undefined, { via: "turnPermission" })));
+    expect(s.objects[dragon]!.zone).toBe("battlefield");
+    expect(characteristics(s, s.objects[dragon]!).grantedAbilities).toEqual(["When ~ dies, exile it."]);
+    moveObject(s, dragon, "graveyard");
+    s = settle(s);
+    expect(s.objects[dragon]!.zone).toBe("exile");
+  });
+});
+
+const comeuppance = card("Comeuppance", "Instant", "{3}{W}", { oracleText: "Prevent all damage that would be dealt to you and planeswalkers you control this turn by sources you don't control. If damage from a creature source is prevented this way, Comeuppance deals that much damage to that creature. If damage from a noncreature source is prevented this way, Comeuppance deals that much damage to the source's controller." });
+
+describe("Comeuppance", () => {
+  it("a creature's damage to you is prevented and dealt to that creature; a noncreature source's goes to its controller", async () => {
+    supported(comeuppance);
+    const { dealDamage, objectSource } = await import("../src/damage");
+    const { s: s0, ap, ids, opp } = setup([comeuppance]);
+    const w = putOnBattlefield(s0, opp, wurm);
+    const rock = putOnBattlefield(s0, opp, card("Test Rock", "Artifact", "{1}"));
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    const life = (pid: number) => s.players.find((x) => x.id === pid)!.life;
+    const [mine, theirs] = [life(ap), life(opp)];
+    dealDamage(s, objectSource(s, s.objects[w]!), { player: ap }, 6);
+    expect(life(ap)).toBe(mine);
+    expect(s.objects[w]!.zone === "graveyard" || s.objects[w]!.damage === 6).toBe(true);
+    dealDamage(s, objectSource(s, s.objects[rock]!), { player: ap }, 2);
+    expect(life(ap)).toBe(mine);
+    expect(life(opp)).toBe(theirs - 2);
+  });
+});

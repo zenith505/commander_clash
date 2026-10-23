@@ -2471,7 +2471,13 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
     const made = perDamage && parseBody(`${perDamage[1]![0]!.toUpperCase()}${perDamage[1]!.slice(1)}.`, {});
     const tokenRider = made && made.targets.length === 0 && made.effects.length === 1 && made.effects[0]!.type === "createToken" ? made.effects[0]! : undefined;
     if (perDamage && !(tokenRider?.type === "createToken" && JSON.stringify(tokenRider.n) === "1" && Object.keys(tokenRider).every((k) => ["type", "token", "n", "who"].includes(k)) && (!tokenRider.who || JSON.stringify(tokenRider.who) === '{"ref":"you"}'))) return null;
-    const rider = tokenRider?.type === "createToken" ? { tokens: tokenRider.token } : parsePreventionRider(s);
+    // Comeuppance: "If damage from a creature source is prevented this way, ~ deals that much damage to that creature. If
+    // damage from a noncreature source is prevented this way, ~ deals that much damage to the source's controller."
+    const toCreature =
+      /^If damage from a creature source is prevented this way, ~ deals that much damage to that creature$/.test(s) &&
+      /^If damage from a noncreature source is prevented this way, ~ deals that much damage to the source's controller\.?$/.test(sentences[si + 1] ?? "");
+    if (toCreature) si++;
+    const rider = toCreature ? { dealBack: { creatureToIt: true as const } } : tokenRider?.type === "createToken" ? { tokens: tokenRider.token } : parsePreventionRider(s);
     if (rider) {
       const prev = effects[effects.length - 1];
       if (prev?.type !== "damageRule" || prev.rule.redirect) return null;

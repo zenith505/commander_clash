@@ -958,7 +958,7 @@ export function moveObject(
     for (const [k, n] of Object.entries(fromZone === "stack" ? (o.extraCounters ?? {}) : {})) counters[k] = (counters[k] ?? 0) + n;
     o.extraCounters = undefined;
     // "It gains haste until end of turn" while it was a spell (Tyvar Kell's emblem): the permanent it becomes has it (CR 400.7a).
-    for (const g of fromZone === "stack" ? (o.spellGains ?? []) : []) s.effects.push({ id: `e${s.nextId++}`, timestamp: g.timestamp, controller: g.controller, sourceName: g.source, duration: "endOfTurn", affected: [o.id], mods: g.mods });
+    for (const g of fromZone === "stack" ? (o.spellGains ?? []) : []) s.effects.push({ id: `e${s.nextId++}`, timestamp: g.timestamp, controller: g.controller, sourceName: g.source, duration: g.forever ? "game" : "endOfTurn", affected: [o.id], mods: g.mods });
     o.spellGains = undefined;
     const how: EnterOpts = { ...(opts.x ? { x: opts.x } : {}), ...(opts.tapped ? { tapped: true } : {}), ...(opts.untapped ? { untapped: true } : {}), ...(Object.keys(counters).length ? { counters } : {}), ...(opts.countersIfCreature ? { countersIfCreature: opts.countersIfCreature } : {}), ...(opts.countersIfPlaneswalker ? { countersIfPlaneswalker: opts.countersIfPlaneswalker } : {}), ...(escaped ? { escaped } : {}), ...(fromZone === "stack" ? { fromStack: true } : {}) };
     // "You may have ~ enter as a copy of ...": it becomes the copy as it enters (CR 707.5), so how it

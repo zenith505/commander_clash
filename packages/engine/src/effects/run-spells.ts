@@ -610,7 +610,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `${defOf(s, o).name} gains rebound.`);
       }
       const mods = e.mods.flatMap((x): Modification[] => (x.kind !== "addKeywords" ? [x] : x.keywords.some((k) => k !== "Rebound") ? [{ ...x, keywords: x.keywords.filter((k) => k !== "Rebound") }] : []));
-      if (mods.length) (o.spellGains ??= []).push({ mods, timestamp: s.nextTimestamp++, controller: ctx.controller, source: src });
+      if (mods.length) (o.spellGains ??= []).push({ mods, timestamp: s.nextTimestamp++, controller: ctx.controller, source: src, ...(e.forever ? { forever: true as const } : {}) });
       return;
     }
     case "counterSpell": {

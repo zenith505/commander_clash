@@ -973,7 +973,18 @@ interface DealBack {
   controller: PlayerId;
   to: PlayerId;
   n: number;
+  /** Comeuppance: to the creature that was the source instead, while it's still that permanent (CR 400.7). */
+  toObject?: { object: ObjectId; zc: number };
 }
+
+/** Where a rule's "deals that much damage" goes for damage from `src` (Comeuppance: a creature source itself). */
+const backTo = (r: DamageRule, src: DamageSource, n: number): DealBack => ({
+  cardId: r.cardId,
+  controller: r.controller,
+  to: src.controller,
+  n,
+  ...(r.dealBack?.creatureToIt && src.types.includes("Creature") && src.ref ? { toObject: src.ref } : {}),
+});
 
 /**
  * Make the plan's changes: use up the shields and counters, and say what happened. Damage rules' additional effects
@@ -1005,7 +1016,7 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
     if (r.nextTime) used.add(r.id);
     if (!prevented || !src) return;
     gainLater(r, n, src);
-    if (colorsOk(r.dealBack, src)) back.push({ cardId: r.cardId, controller: r.controller, to: src.controller, n });
+    if (colorsOk(r.dealBack, src)) back.push(backTo(r, src, n));
   };
   for (const op of plan.ops) {
     if (op.kind === "protection" || op.kind === "preventAll") prevented(op.player, op.n);
@@ -1018,7 +1029,7 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
       if (op.plusOnes) plusOnesLater.push(op.plusOnes);
       if (r && op.n && op.src) {
         gainLater(r, op.n, op.src);
-        if (colorsOk(r.dealBack, op.src)) back.push({ cardId: r.cardId, controller: r.controller, to: op.src.controller, n: op.n });
+        if (colorsOk(r.dealBack, op.src)) back.push(backTo(r, op.src, op.n));
       }
     } else if (op.kind === "shieldCounter") useShieldCounter(s, obj(s, op.id), `${op.srcName} dealing damage to it`);
     else if (op.kind === "modify") {
@@ -1227,7 +1238,12 @@ export function dealPlanned(s: GameState, plan: ShieldPlan, opts: { lifelink?: {
   // "If damage is prevented this way, ~ deals that much damage to that source's controller" (Deflecting Palm), after it.
   for (const b of back) {
     const d = s.cards[b.cardId];
-    if (d && !player(s, b.to).lost) dealDamage(s, cardSource(d, b.controller), { player: b.to }, b.n);
+    if (!d) continue;
+    if (b.toObject) {
+      // Comeuppance deals it, not the creature (rulings): only if the creature is still that permanent (CR 400.7).
+      const o = s.objects[b.toObject.object];
+      if (o?.zone === "battlefield" && (o.zoneChanges ?? 0) === b.toObject.zc) dealDamage(s, cardSource(d, b.controller), { object: o }, b.n);
+    } else if (!player(s, b.to).lost) dealDamage(s, cardSource(d, b.controller), { player: b.to }, b.n);
   }
   return out;
 }

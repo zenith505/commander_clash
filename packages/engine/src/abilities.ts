@@ -805,7 +805,8 @@ export interface DamageRuleSpec {
   /** "You gain life equal to the damage prevented this way" (CR 615.5); `colors`: only for damage from a source of those colors. */
   gainLife?: { colors?: Color[] };
   /** "~ deals that much damage to that source's controller" (CR 615.5); `colors`: only for damage from a source of those colors. */
-  dealBack?: { colors?: Color[] };
+  /** `creatureToIt` (Comeuppance): damage from a creature source is dealt back to that creature instead, if it's still that permanent. */
+  dealBack?: { colors?: Color[]; creatureToIt?: true };
   /** "For each 1 damage prevented this way, create a ... token" (Inkshield, CR 615.5): its controller creates them. */
   tokens?: TokenSpec;
 }
@@ -2346,7 +2347,7 @@ export type Effect =
    */
   | { type: "spellEntersWith"; counter: CounterKind; n: Amount }
   /** "It gains haste until end of turn" about the spell a cast trigger is about (Tyvar Kell's emblem): the permanent it becomes has it, until end of turn (CR 400.7a). */
-  | { type: "spellGains"; mods: Modification[] }
+  | { type: "spellGains"; mods: Modification[]; /** No duration (Rivaz of the Claw's 'it gains "When this creature dies, exile it."'): for as long as that permanent is on the battlefield. */ forever?: true }
   | {
       type: "counterSpell";
       index: number;

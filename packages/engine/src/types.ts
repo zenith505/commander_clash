@@ -43,7 +43,7 @@ export interface DamageRule {
   nextTime?: true;
   redirect?: { object: ObjectId; zc: number } | { player: PlayerId };
   gainLife?: { colors?: Color[] };
-  dealBack?: { colors?: Color[] };
+  dealBack?: { colors?: Color[]; creatureToIt?: true };
   tokens?: TokenSpec;
   /** The Mindskinner: only damage from a source its controller controls; and each opponent mills that much (CR 615.5). */
   sourceYours?: true;
@@ -472,7 +472,7 @@ export interface GameObject {
   /** A spell: "that creature enters with an additional +1/+1 counter on it" (Boreal Outrider, CR 614.1c), as it resolves. */
   extraCounters?: Record<string, number>;
   /** A spell: "it gains haste until end of turn" from a cast trigger (Tyvar Kell's emblem), applying to the permanent it becomes (CR 400.7a). */
-  spellGains?: { mods: Modification[]; timestamp: number; controller: PlayerId; source: string }[];
+  spellGains?: { mods: Modification[]; timestamp: number; controller: PlayerId; source: string; forever?: true }[];
   /** A spell that gained rebound (Narset Transcendent), as it resolves (CR 702.88a). */
   reboundGained?: true;
   /** Tribute (CR 702.104): the opponent chosen as it entered, and whether they put the +1/+1 counters on it. */

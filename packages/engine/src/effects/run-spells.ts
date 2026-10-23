@@ -440,7 +440,7 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         if (e.millFirst) {
           const n = 1 + Math.floor(nextRandom(s) * e.millFirst);
           const milled = p.library.slice(0, millCount(s, p.id, n));
-          for (const id of milled) moveObject(s, id, "graveyard");
+          for (const id of milled) moveObject(s, id, "graveyard", { milled: true });
           log(s, `${n} is chosen at random: ${p.name} mills ${milled.length} card${milled.length === 1 ? "" : "s"}.`);
         }
         // "With a different name than that spell": the countered spell's name (CR 201.2).

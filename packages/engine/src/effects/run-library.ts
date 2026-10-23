@@ -63,7 +63,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const p = player(s, pid);
         const n = millCount(s, pid, amountNow(s, e.n, { ...ctx, eachOne: pid }));
         for (const id of p.library.slice(0, n)) {
-          moveObject(s, id, "graveyard");
+          moveObject(s, id, "graveyard", { milled: true });
           if (obj(s, id).zone === "graveyard") s.resolving!.milled.push({ id, zc: obj(s, id).zoneChanges ?? 0 });
         }
         log(s, `${p.name} mills ${n} card${n === 1 ? "" : "s"}.`);

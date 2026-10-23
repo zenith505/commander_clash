@@ -3561,6 +3561,8 @@ export interface BatchTrigger {
   first?: true;
   /** "Lands enter ... without being played" (Deep Gnome Terramancer): not a land played (CR 305.1). */
   notPlayed?: true;
+  /** `toGraveyard` from the library: "Whenever a player mills one or more creature cards" (Zellix), milled ones only (CR 701.17a). */
+  milled?: true;
   /** `leaves`: "Whenever you sacrifice one or more Foods" (Camellia): ones `whose` player sacrificed (CR 701.21a). */
   sacrificed?: true;
 }
@@ -4366,6 +4368,11 @@ export interface CompiledCard {
    * way on the bottom of your library in any order." (CR 614.1a; each draw of several separately, rulings).
    */
   drawAbundance?: true;
+  /**
+   * Underrealm Lich: "If you would draw a card, instead look at the top three cards of your library, then put one into
+   * your hand and the rest into your graveyard." (CR 614.1a): how many it looks at; each draw of several separately (rulings).
+   */
+  drawDig?: number;
   /** "If you would draw a card while your library has no cards in it, you win the game instead." (Laboratory Maniac, CR 614.1a) */
   drawEmptyWins?: true;
   /** "Your opponents can't cast spells from anywhere other than their hands." (Drannith Magistrate) */

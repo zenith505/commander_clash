@@ -998,6 +998,12 @@ function parseBatchTrigger(line: string): TriggeredAbility | "fail" | null {
     batch = { what: "toGraveyard", whose: "you", ...(filter ? { filter } : {}), ...(m[2] === "your library" ? { from: "library" as const } : {}) };
     yourTurn = !!m[3];
     rest = m[4]!;
+  } else if ((m = /^Whenever a player mills one or more (?:(.+?) )?cards, (.+)$/.exec(line))) {
+    // Zellix, Sanity Flayer: cards a mill instruction put there (CR 701.17a), once for each player who milled them.
+    const filter = batchCards(m[1]);
+    if (filter === null) return "fail";
+    batch = { what: "toGraveyard", from: "library", milled: true, ...(filter ? { filter } : {}) };
+    rest = m[2]!;
   } else if ((m = /^Whenever an? (?:(.+?) )?card (leaves your graveyard|is put into (?:a|your|an opponent's) graveyard from anywhere(?: other than the battlefield)?), (.+)$/.exec(line))) {
     // Syr Konrad: "a creature card is put into a graveyard from anywhere other than the battlefield", "a creature card
     // leaves your graveyard": once for each card (CR 603.2c).

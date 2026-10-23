@@ -3,9 +3,9 @@
 
 import { describe, expect, it } from "vitest";
 import { act, bear, card, passUntil, putOnBattlefield, scry, setup } from "./helpers";
-import { botActions, castProblem, isFullySupported, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
+import { botActions, castProblem, moveObject, isFullySupported, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
 import { characteristics, invalidateCharacteristics } from "../src/layers";
-import { power, toughness } from "../src/cards";
+import { defOf, power, toughness } from "../src/cards";
 import { manaAbilitiesOn } from "../src/manaabilities";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -422,5 +422,94 @@ describe("Machine God's Effigy", () => {
     expect(c.types).toEqual(["Artifact"]);
     expect(c.supertypes).toEqual(["Legendary"]);
     expect(c.subtypes).toEqual(["Treasure"]);
+  });
+});
+
+const zellix = card("Zellix, Sanity Flayer", "Legendary Creature — Horror", "{2}{U}", { power: "2", toughness: "3", oracleText: "Hive Mind — Whenever a player mills one or more creature cards, you create a 1/1 black Horror creature token.\n{1}, {T}: Target player mills three cards.\nChoose a Background (You can have a Background as a second commander.)" });
+const eachMills = card("Test Mill", "Sorcery", "{1}", { oracleText: "Each player mills three cards." });
+
+describe("Zellix, Sanity Flayer", () => {
+  it("each player mills three: one Horror for each player who milled a creature card; lands only, none (CR 701.17a)", () => {
+    supported(zellix);
+    const { s: s0, ap, ids } = setup([eachMills]);
+    putOnBattlefield(s0, ap, zellix);
+    // Creature cards on top for two players, lands for the other two.
+    const isCreature = (id: string) => defOf(s0, s0.objects[id]!).types.includes("Creature");
+    s0.players.forEach((p, i) => {
+      const pick = p.library.filter((id) => isCreature(id) === i < 2).slice(0, 3);
+      p.library = [...pick, ...p.library.filter((id) => !pick.includes(id))];
+    });
+    const s = settle(run(s0, planCast(s0, ap, ids[0]!)));
+    const horrors = s.battlefield.filter((id) => s.objects[id]!.isToken && defOf(s, s.objects[id]!).name === "Horror Token");
+    expect(horrors).toHaveLength(2);
+  });
+});
+
+const lich = card("Underrealm Lich", "Creature — Zombie Elf Shaman", "{3}{B}{G}", { power: "4", toughness: "3", oracleText: "If you would draw a card, instead look at the top three cards of your library, then put one into your hand and the rest into your graveyard.\nPay 4 life: This creature gains indestructible until end of turn. Tap it." });
+const divination = card("Divination", "Sorcery", "{2}{U}", { oracleText: "Draw two cards." });
+const dredger = card("Darkblast", "Instant", "{B}", { oracleText: "Target creature gets -1/-1 until end of turn.\nDredge 3 (If you would draw a card, you may mill 3 cards instead. If you do, return this card from your graveyard to your hand.)" });
+
+describe("Underrealm Lich", () => {
+  const cast = (spell: CardDef, prep?: (s: GameState, ap: number) => void) => {
+    supported(lich, dredger);
+    const { s: s0, ap, ids } = setup([spell]);
+    putOnBattlefield(s0, ap, lich);
+    prep?.(s0, ap);
+    invalidateCharacteristics(s0);
+    return { s: untilChoice(run(s0, planCast(s0, ap, ids[0]!))), ap };
+  };
+
+  it("drawing two: each draw is three cards looked at, one kept, two binned, one at a time (rulings)", () => {
+    let { s, ap } = cast(divination);
+    const p = () => s.players.find((x) => x.id === ap)!;
+    const hand = p().hand.length;
+    const yard = p().graveyard.length;
+    for (let k = 0; k < 2; k++) {
+      const pend = s.pending;
+      if (pend?.kind !== "drawLook" || !pend.keep) throw new Error(JSON.stringify(pend));
+      expect(pend.cards).toEqual(p().library.slice(0, 3));
+      s = act(s, { type: "drawLook", player: ap, objectId: pend.cards[1] });
+      expect(p().hand).toContain(pend.cards[1]);
+      expect(p().graveyard).toEqual(expect.arrayContaining([pend.cards[0], pend.cards[2]]));
+    }
+    s = settle(s);
+    expect(p().hand.length).toBe(hand + 2);
+    expect(p().graveyard.length).toBe(yard + 4 + 1); // and Divination
+  });
+
+  it("an empty library: nothing happens, and no loss for drawing from it (rulings)", () => {
+    let { s, ap } = cast(divination, (s0, pid) => {
+      const p = s0.players.find((x) => x.id === pid)!;
+      for (const id of [...p.library]) moveObject(s0, id, "exile");
+    });
+    s = settle(s);
+    expect(s.players.find((x) => x.id === ap)!.lost).toBeFalsy();
+    s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.players.find((x) => x.id === ap)!.lost).toBeFalsy();
+  });
+
+  it("with a dredge card in the graveyard, the player may dredge instead (CR 616.1)", () => {
+    let dark = "";
+    let { s, ap } = cast(divination, (s0, pid) => {
+      dark = putOnBattlefield(s0, pid, dredger);
+      s0.battlefield.splice(s0.battlefield.indexOf(dark), 1);
+      s0.objects[dark]!.zone = "graveyard";
+      s0.players.find((x) => x.id === pid)!.graveyard.push(dark);
+    });
+    const pend = s.pending;
+    if (pend?.kind !== "drawLook" || !pend.keep) throw new Error(JSON.stringify(pend));
+    expect(pend.instead?.dredge).toEqual([dark]);
+    s = act(s, { type: "drawLook", player: ap, instead: { dredge: dark } });
+    expect(s.objects[dark]!.zone).toBe("hand");
+    // The second draw is the Lich's look again.
+    expect(s.pending).toMatchObject({ kind: "drawLook", keep: true });
+  });
+
+  it("a bot keeps one and goes on", () => {
+    let { s, ap } = cast(divination);
+    const hand = s.players.find((x) => x.id === ap)!.hand.length;
+    for (let i = 0; i < 4 && s.pending; i++) s = botActions(s, ap).reduce((x, a) => act(x, a), s);
+    s = settle(s);
+    expect(s.players.find((x) => x.id === ap)!.hand.length).toBe(hand + 2);
   });
 });

@@ -405,7 +405,7 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
       if (n <= 0) return;
       const milled: ObjectId[] = [];
       for (const id of p.library.slice(0, n)) {
-        moveObject(s, id, "graveyard");
+        moveObject(s, id, "graveyard", { milled: true });
         if (obj(s, id).zone === "graveyard") milled.push(id);
       }
       const k = milled.filter((id) => !isType(defOf(s, obj(s, id)), "Land")).length;

@@ -11985,6 +11985,40 @@
   "gameChanger": false
  },
  {
+  "oracleId": "e1bce9c3-300c-4a9d-abe0-a1f02d3a1105",
+  "name": "Underrealm Lich",
+  "manaCost": "{3}{B}{G}",
+  "cmc": 5,
+  "typeLine": "Creature — Zombie Elf Shaman",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Zombie",
+   "Elf",
+   "Shaman"
+  ],
+  "oracleText": "If you would draw a card, instead look at the top three cards of your library, then put one into your hand and the rest into your graveyard.\nPay 4 life: This creature gains indestructible until end of turn. Tap it.",
+  "power": "4",
+  "toughness": "3",
+  "colors": [
+   "B",
+   "G"
+  ],
+  "colorIdentity": [
+   "B",
+   "G"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "grn",
+  "releasedAt": "2018-10-05",
+  "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "27e0948b-9916-473b-8d8c-a51bdfbc7457",
   "name": "Underworld Breach",
   "manaCost": "{1}{R}",

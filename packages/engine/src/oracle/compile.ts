@@ -1512,6 +1512,10 @@ export function compile(d: CardDef): CompiledCard {
       out.drawAbundance = true;
       continue;
     }
+    if (line === "If you would draw a card, instead look at the top three cards of your library, then put one into your hand and the rest into your graveyard.") {
+      out.drawDig = 3;
+      continue;
+    }
     if (line === "If you would draw a card except the first one you draw in each of your draw steps, draw two cards instead.") {
       out.drawTwoInstead = true;
       continue;

@@ -1029,7 +1029,7 @@ function commitShields(s: GameState, plan: ShieldPlan): DealBack[] {
       for (const pid of turnOrderFrom(s, s.activePlayer).filter((q) => q !== op.by && !player(s, q).lost)) {
         const p = player(s, pid);
         const n = millCount(s, pid, op.n);
-        for (const id of p.library.slice(0, n)) moveObject(s, id, "graveyard");
+        for (const id of p.library.slice(0, n)) moveObject(s, id, "graveyard", { milled: true });
         log(s, `${p.name} mills ${n} card${n === 1 ? "" : "s"} (${op.card}).`);
       }
     } else if (op.kind === "betrayer") {

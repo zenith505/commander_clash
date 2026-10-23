@@ -1111,7 +1111,15 @@ export type PendingDecision =
        * "draw two cards instead" (`archive`, the draws it makes) or dredging one of `dredge`. Either uses up "the
        * first time you would draw", so the look doesn't happen.
        */
-      instead?: { archive?: number; dredge?: ObjectId[] };
+      instead?: { archive?: number; dredge?: ObjectId[]; /** Abundance's "you may instead reveal" (its name). */ abundance?: string; /** Underrealm Lich's look (its name): applied first, the "first time" look is used up. */ dig?: string };
+      /**
+       * Underrealm Lich (CompiledCard.drawDig) instead: which of `cards` goes into the hand, the rest into the graveyard;
+       * no draw follows. `made` are the draws after this one that replacements already made (see draw), `archives` how
+       * many Alhammarret's Archives could still replace this one.
+       */
+      keep?: true;
+      made?: number[];
+      archives?: number;
     }
   | {
       kind: "dredge";
@@ -1289,6 +1297,8 @@ export interface ZoneMove {
   /** A land entering because it was played (CR 305.1), not put onto the battlefield. */
   played?: true;
   discardedBy?: PlayerId;
+  /** Milled (CR 701.17a): put into the graveyard from the library by a mill instruction. */
+  milled?: true;
   /** A token this player created (CR 111.2), for "whenever you create one or more creature tokens". */
   createdBy?: PlayerId;
   /** Torpor Orb: the controllers whose abilities its entering can't trigger (`opponents`: only those of `by`'s opponents). */
@@ -2054,7 +2064,7 @@ export type Action =
   /** Answer to dredge: the card to dredge instead of drawing, or none to draw (CR 702.52a). */
   | { type: "dredge"; player: PlayerId; objectId?: ObjectId; /** Abundance instead: reveal until a card of this kind. */ abundance?: "land" | "nonland" }
   /** Which of the cards looked at instead of drawing goes to the graveyard (Scion of Halaster). */
-  | { type: "drawLook"; player: PlayerId; /** The card to put into the graveyard (none when fewer than two to look at). */ objectId?: ObjectId; /** Apply another replacement first (see the drawLook prompt). */ instead?: "archive" | { dredge: ObjectId } }
+  | { type: "drawLook"; player: PlayerId; /** The card to put into the graveyard, or with Underrealm Lich (`keep`) into the hand (none when fewer than two to look at). */ objectId?: ObjectId; /** Apply another replacement first (see the drawLook prompt). */ instead?: "archive" | "dig" | { dredge: ObjectId } | { abundance: "land" | "nonland" } }
   /** Turn a face-down permanent face up by paying its morph or disguise cost: a special action (CR 116.2b, 702.37e). */
   | { type: "turnFaceUp"; player: PlayerId; objectId: ObjectId; /** Which of faceUpWays (a manifested card with morph has two). */ way?: number }
   /** Answer to payUnless: pay the cost from your mana pool, or let it be countered. */

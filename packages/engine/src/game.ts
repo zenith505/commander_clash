@@ -620,6 +620,8 @@ export function moveObject(
     x?: number;
     /** Its controller is sacrificing it (CR 701.21a), for "whenever you sacrifice" triggers. */
     sacrificed?: boolean;
+    /** Milled (CR 701.17a), for "whenever a player mills one or more creature cards" (Zellix). */
+    milled?: boolean;
     /** "It's an enchantment": the card types it has from the moment it enters, for as long as it's there. */
     becomes?: { types: string[]; subtypes: string[] };
     /** "Those permanents are 4/4 creatures in addition to their other types" (Dance of the Manse): it enters that way (rulings). */
@@ -941,6 +943,7 @@ export function moveObject(
       to,
       owner: o.owner,
       ...(o.isToken || o.spellCopy ? { notCard: true as const } : {}),
+      ...(opts.milled && fromZone === "library" ? { milled: true as const } : {}),
       card: fromZone === "battlefield" ? snapshotKey : o.cardId,
       ...(fromZone === "battlefield" ? { controller: lastController, snapshot, chars: last, hadAbilities, ...(last.grantedAbilities?.length ? { granted: last.grantedAbilities } : {}), ...(opts.sacrificed ? { sacrificed: true as const } : {}) } : {}),
     });
@@ -1789,6 +1792,9 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", mad
       if (look === "paused") return false;
       archives = archivesFor(s, pid);
     } else archives = made.shift()!;
+    const dig = digInstead(s, pid, n, after, made, archives);
+    if (dig === "paused") return false;
+    if (dig) continue;
     const options = dredgeOptions(s, pid);
     // Abundance: "you may instead ..." for each draw (rulings), even with nothing left to draw.
     const abundance = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawAbundance);
@@ -1807,6 +1813,37 @@ export function draw(s: GameState, pid: PlayerId, n = 1, after?: "drawStep", mad
     if (!drawOne(s, pid)) break;
   }
   return true;
+}
+
+/**
+ * Underrealm Lich: "If you would draw a card, instead look at the top three cards of your library, then put one into your
+ * hand and the rest into your graveyard" (CR 614.1a), each draw separately (rulings). Dredge, Abundance or Alhammarret's
+ * Archive could replace the same draw: the player chooses which applies (CR 616.1), so they're offered with it. With one
+ * card or none to look at and nothing else to choose, it just happens (an empty library loses no game: nothing is drawn).
+ * `left` and `made` are the draws after this one. "paused" when it waits for the player, true when it replaced the draw.
+ */
+function digInstead(s: GameState, pid: PlayerId, left: number, after: "drawStep" | undefined, made: number[], archives: number): "paused" | boolean {
+  const src = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawDig);
+  if (!src) return false;
+  const p = player(s, pid);
+  const cards = p.library.slice(0, abilitiesOf(s, obj(s, src)).drawDig!);
+  const dredge = dredgeOptions(s, pid);
+  const abundance = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawAbundance);
+  const instead = archives || dredge.length || abundance ? { ...(archives ? { archive: 2 } : {}), ...(dredge.length ? { dredge } : {}), ...(abundance ? { abundance: nameOf(s, abundance) } : {}) } : undefined;
+  if (cards.length > 1 || instead) {
+    s.pending = { kind: "drawLook", keep: true, player: pid, source: nameOf(s, src), cards, left, made: [...made], ...(archives ? { archives } : {}), ...(after ? { after } : {}), ...(instead ? { instead } : {}) };
+    return "paused";
+  }
+  keepOne(s, p, nameOf(s, src), cards, cards[0]);
+  return true;
+}
+
+function keepOne(s: GameState, p: Player, source: string, cards: ObjectId[], keep?: ObjectId) {
+  log(s, cards.length ? `${p.name} looks at the top ${cards.length === 1 ? "card" : `${cards.length} cards`} of their library instead of drawing (${source}).` : `${p.name} would draw from an empty library; ${source} replaces it, so nothing happens.`);
+  if (keep !== undefined) moveObject(s, keep, "hand");
+  const rest = cards.filter((id) => id !== keep);
+  for (const id of rest) moveObject(s, id, "graveyard");
+  if (cards.length) log(s, `${p.name} puts a card into their hand${rest.length ? ` and ${rest.map((id) => nameOf(s, id)).join(", ")} into their graveyard` : ""}.`);
 }
 
 /** The Notion Thieves that already replaced a draw in the chain of draws being made now (CR 614.5). */
@@ -1864,7 +1901,8 @@ function firstDrawLook(s: GameState, pid: PlayerId, left: number, after?: "drawS
   const cards = p.library.slice(0, 2);
   const archive = archiveDraws(s, pid);
   const dredge = dredgeOptions(s, pid);
-  const instead = archive > 1 || dredge.length ? { ...(archive > 1 ? { archive } : {}), ...(dredge.length ? { dredge } : {}) } : undefined;
+  const dig = s.battlefield.find((id) => controllerOf(s, obj(s, id)) === pid && abilitiesOf(s, obj(s, id)).drawDig);
+  const instead = archive > 1 || dredge.length || dig ? { ...(archive > 1 ? { archive } : {}), ...(dredge.length ? { dredge } : {}), ...(dig ? { dig: nameOf(s, dig) } : {}) } : undefined;
   if (cards.length === 2 || instead) {
     s.pending = { kind: "drawLook", player: pid, source: nameOf(s, src), cards, left, ...(after ? { after } : {}), ...(instead ? { instead } : {}) };
     return "paused";
@@ -1885,11 +1923,18 @@ function lookInstead(s: GameState, p: Player, source: string, cards: ObjectId[],
  * Answering firstDrawLook: that card to the graveyard, the other stays on top; then the draw, the rest, and what was
  * drawing. Or another replacement first: the Archive's draws, or a dredge, then the rest.
  */
-function chooseDrawLook(s: GameState, p: Player, id?: ObjectId, instead?: "archive" | { dredge: ObjectId }) {
+function chooseDrawLook(s: GameState, p: Player, id?: ObjectId, instead?: "archive" | "dig" | { dredge: ObjectId } | { abundance: "land" | "nonland" }) {
   const pend = s.pending;
   if (pend?.kind !== "drawLook" || pend.player !== p.id) throw new RulesError("no cards to choose from");
+  if (pend.keep) return chooseDig(s, p, pend, id, instead);
+  if (instead !== undefined && typeof instead === "object" && "abundance" in instead) throw new RulesError("nothing lets you reveal instead");
   let more: [number, number[]];
-  if (instead === "archive") {
+  if (instead === "dig") {
+    // Underrealm Lich first: the draw is still to come, and the look is used up (the first time you would draw).
+    if (!pend.instead?.dig) throw new RulesError("no other way to replace that draw");
+    s.pending = null;
+    more = [pend.left + 1, []];
+  } else if (instead === "archive") {
     if (!pend.instead?.archive) throw new RulesError("no other way to replace that draw");
     s.pending = null;
     const n = archivesFor(s, p.id) - 1;
@@ -1909,6 +1954,36 @@ function chooseDrawLook(s: GameState, p: Player, id?: ObjectId, instead?: "archi
   if (!draw(s, p.id, more[0], pend.after, more[1])) return;
   if (pend.after === "drawStep") fireEvent(s, { type: "step", step: "draw", active: s.activePlayer });
   else if (s.resolving) continueResolution(s);
+}
+
+/** Answering Underrealm Lich's look (digInstead): the card to keep, or another replacement of that draw first. */
+function chooseDig(s: GameState, p: Player, pend: Extract<PendingDecision, { kind: "drawLook" }>, id?: ObjectId, instead?: "archive" | "dig" | { dredge: ObjectId } | { abundance: "land" | "nonland" }) {
+  const made = [...(pend.made ?? [])];
+  if (instead === "archive") {
+    if (!pend.instead?.archive || !pend.archives) throw new RulesError("no other way to replace that draw");
+    s.pending = null;
+    log(s, `${p.name} draws two cards instead of one.`);
+    made.unshift(pend.archives - 1, pend.archives - 1);
+  } else if (instead === "dig") throw new RulesError("no other way to replace that draw");
+  else if (instead && "dredge" in instead) {
+    if (!pend.instead?.dredge?.includes(instead.dredge) || !dredgeOptions(s, p.id).includes(instead.dredge)) throw new RulesError("that card can't be dredged");
+    s.pending = null;
+    dredgeInstead(s, p, instead.dredge);
+  } else if (instead) {
+    if (!pend.instead?.abundance) throw new RulesError("nothing lets you reveal instead");
+    s.pending = null;
+    const rest = abundanceInstead(s, p, instead.abundance, pend.instead.abundance);
+    if (rest.length > 1) {
+      s.pending = { kind: "orderLibrary", player: p.id, cards: rest, bottom: true, source: pend.instead.abundance, thenDraw: { left: pend.left, made, ...(pend.after ? { after: pend.after } : {}) } };
+      return;
+    }
+  } else {
+    if (pend.cards.length > 1 && (id === undefined || !pend.cards.includes(id))) throw new RulesError("that isn't one of the cards");
+    if (pend.cards.some((c) => !p.library.includes(c))) throw new RulesError("those cards moved");
+    s.pending = null;
+    keepOne(s, p, pend.source, pend.cards, id ?? pend.cards[0]);
+  }
+  continueDraws(s, p.id, pend.left, pend.after, made);
 }
 
 /**
@@ -2013,7 +2088,7 @@ export function dredgeOptions(s: GameState, pid: PlayerId): ObjectId[] {
 function dredgeInstead(s: GameState, p: Player, id: ObjectId) {
   const n = millCount(s, p.id, compileCard(defOf(s, obj(s, id))).dredge!);
   const milled = p.library.slice(0, n);
-  for (const c of milled) moveObject(s, c, "graveyard");
+  for (const c of milled) moveObject(s, c, "graveyard", { milled: true });
   moveObject(s, id, "hand");
   log(s, `${p.name} dredges ${nameOf(s, id)} instead of drawing, milling ${n} card${n === 1 ? "" : "s"}.`);
 }
@@ -5230,7 +5305,7 @@ function payExtraCosts(s: GameState, p: Player, costs: AdditionalCost[], choices
     else if (c.kind === "mill") {
       const n = millCount(s, p.id, c.n);
       log(s, `${p.name} mills ${n === 1 ? "a card" : `${n} cards`}.`);
-      for (const id of p.library.slice(0, n)) moveObject(s, id, "graveyard");
+      for (const id of p.library.slice(0, n)) moveObject(s, id, "graveyard", { milled: true });
     } else if (c.kind === "revealHand") log(s, `${p.name} reveals their hand${p.hand.length ? `: ${p.hand.map((id) => nameOf(s, id)).join(", ")}` : " (it's empty)"}.`);
     else if (c.kind === "giveLife") {
       // Unchosen (a caller that didn't ask), the cost is still paid: by the first opponent who can gain life.

@@ -151,7 +151,7 @@ const CARD_TYPE_WORD = "(?:artifact|battle|creature|enchantment|instant|land|pla
  * The events a delayed triggered ability with a duration can wait for (see GameState.floatingTriggers), and the parts of
  * a trigger it can have: an intervening "if" or a zone would need more about its source than it has.
  */
-const FLOATING_EVENTS = new Set<string>(["castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "eachBeginCombat"]);
+const FLOATING_EVENTS = new Set<string>(["castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "creaturesYouControlDealCombatDamageToPlayer", "eachBeginCombat"]);
 const FLOATING_KEYS = new Set<string>(["event", "cast", "dies", "dealer", "toOpponent", "orPlaneswalker", "body"]);
 
 /**
@@ -200,6 +200,10 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx): Effect | null |
   // same as "This turn, whenever a creature dies, ..." (CR 603.7b).
   const dies = /^Whenever (an?(?: [a-z]+)? creature(?: you control| an opponent controls)?) dies this turn, (.+)$/.exec(s);
   if (dies) return floatingTrigger(`This turn, whenever ${dies[1]!} dies, ${dies[2]!}`, after, ctx);
+  // "Whenever one or more creatures you control deal combat damage to one or more players this turn, you become the
+  // monarch" (Forth Eorlingas!): the same, once for each combat damage step (CR 510.2, 603.2c).
+  const dealt = /^Whenever (one or more creatures you control deal combat damage to one or more players) this turn, (.+)$/.exec(s);
+  if (dealt) return floatingTrigger(`This turn, whenever ${dealt[1]!}, ${dealt[2]!}`, after, ctx);
   const m = /^([Uu]ntil end of turn|[Tt]his turn|[Uu]ntil your next turn|[Uu]ntil the end of your next turn), ([Ww]henever .+)$/.exec(s);
   if (!m) return undefined;
   const text = [m[2]!, ...after.map((x) => x.replace(/\.$/, ""))].join(". ");
@@ -5016,7 +5020,10 @@ function noteLast(ctx: Ctx, fx: Effect[]) {
  * opponent (TargetSpec.perOpponent, CR 601.2c, 115.6), all done at once as it resolves. "Those creatures" after it are
  * all of them; "it" and "that player" aren't any one of them.
  */
-function parsePerOpponent(s: string, ctx: Ctx): Effect[] | null {
+function parsePerOpponent(s0: string, ctx: Ctx): Effect[] | null {
+  // "For any number of opponents, destroy target nonland permanent that player controls" (Windgrace's Judgment): a target
+  // for each opponent chosen, the same as up to one for each opponent (CR 601.2c).
+  const s = s0.replace(/^For any number of opponents, (\w+) target (.+? that player controls)$/, "For each opponent, $1 up to one target $2");
   const m = /^[Ff]or each opponent, (.+)$/.exec(s);
   if (!m || ctx.targets.some((t) => t.many || t.perOpponent)) return null;
   const who = / up to one target (.+?) (?:that player|that opponent|they) controls?\b/;

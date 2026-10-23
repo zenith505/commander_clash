@@ -992,11 +992,12 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
   } else if (ev.type === "groupAttack" || ev.type === "groupCombatDamage") {
     const want = ev.type === "groupAttack" ? "creaturesYouControlAttack" : "creaturesYouControlDealCombatDamageToPlayer";
     causedBy = { event: ev.type === "groupAttack" ? "attacks" : "combatDamage", objs: ev.ids.filter((x) => s.objects[x]).map((x) => ({ o: obj(s, x), controller: ev.controller })) };
-    const groupWatch = (o: GameObject, anyone = false) => {
+    // `list`: a delayed trigger's own (Forth Eorlingas!), not the object's.
+    const groupWatch = (o: GameObject, anyone = false, list?: TriggeredAbility[]) => {
       // Only the creatures that match count ("one or more Rogues you control"): "that much" is what they dealt.
       const fits = (t: TriggeredAbility) =>
         ev.ids.map((x, i) => [x, i] as const).filter(([x]) => s.objects[x] && (!t.group || objectMatches(s, t.group, obj(s, x), ev.controller, false)) && (!t.selfOrCommander || x === o.id || (!!obj(s, x).isCommander && obj(s, x).owner === ev.controller)));
-      for (const t of abilitiesOf(s, o).triggers) {
+      for (const t of list ?? abilitiesOf(s, o).triggers) {
         if (t.event !== want || !!t.anyoneAttacks !== anyone) continue;
         if (t.anotherPlayer && controllerOf(s, o) === ev.controller) continue;
         // "To a player or battle": only those are about a battle dealt it (CR 310).
@@ -1015,10 +1016,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
         if (t.perPlayer) {
           for (const p of s.turnOrder)
             if (hit.filter(([x]) => obj(s, x).attacking === p && !obj(s, x).attackingPermanent).length >= (t.minAttackers ?? 1))
-              add(o, ev.controller, (_, tt) => same(tt), undefined, undefined, undefined, undefined, undefined, undefined, { player: p });
+              add(o, ev.controller, (_, tt) => same(tt), list, undefined, undefined, undefined, undefined, undefined, { player: p });
           continue;
         }
-        add(o, anyone ? watcher : ev.controller, (_, tt) => same(tt) && !(ev.type === "groupCombatDamage" && ev.battle !== undefined && !tt.orBattle), undefined, undefined, undefined, undefined, undefined, undefined, ev.type === "groupCombatDamage" ? { player: ev.player, amount, group } : attacked);
+        add(o, anyone ? watcher : ev.controller, (_, tt) => same(tt) && !(ev.type === "groupCombatDamage" && ev.battle !== undefined && !tt.orBattle), list, undefined, undefined, undefined, undefined, undefined, ev.type === "groupCombatDamage" ? { player: ev.player, amount, group } : attacked);
       }
     };
     for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === ev.controller) groupWatch(obj(s, id));
@@ -1026,6 +1027,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     if (ev.type === "groupAttack") for (const id of s.battlefield) groupWatch(obj(s, id), true);
     fromGraveyards((o, owner) => owner === ev.controller && groupWatch(o));
     fromCommand((o, owner) => owner === ev.controller && groupWatch(o));
+    // "Whenever one or more creatures you control deal combat damage to one or more players this turn" (Forth Eorlingas!).
+    if (ev.type === "groupCombatDamage") fromFloating((src, ctrl, triggers) => ctrl === ev.controller && groupWatch(src, false, triggers));
     // "Whenever an opponent attacks you with two or more creatures" (Mangara): each of the attacker's opponents counts
     // the ones attacking them (and their planeswalkers, for Mangara).
     if (ev.type === "groupAttack") {

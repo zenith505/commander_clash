@@ -812,3 +812,32 @@ describe("Lavinia, Azorius Renegade: no noncreature spells with mana value above
     expect(castProblem(s, ap, ids[2]!, undefined, undefined, undefined, undefined, 3)).toMatch(/Lavinia/);
   });
 });
+
+describe("Windgrace's Judgment: \"for any number of opponents\" is a target for each opponent chosen (CR 601.2c)", () => {
+  it("two of three opponents' permanents destroyed", () => {
+    const judgment = card("Windgrace's Judgment", "Instant", "{3}{B}{G}", { oracleText: "For any number of opponents, destroy target nonland permanent that player controls." });
+    supported(judgment);
+    const { s: s0, ap, ids } = setup([judgment]);
+    // One target per opponent, in turn order from the caster (CR 601.2c).
+    const opps = [1, 2, 3].map((k) => s0.turnOrder[(s0.turnOrder.indexOf(ap) + k) % 4]!);
+    const [a, c] = [putOnBattlefield(s0, opps[0]!, card("Grizzly Bears", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" })), putOnBattlefield(s0, opps[2]!, card("Test Relic", "Artifact", "{2}"))];
+    const s = settleBots(run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: a }, { kind: "none" }, { kind: "object", id: c }])));
+    expect(s.objects[a]!.zone).toBe("graveyard");
+    expect(s.objects[c]!.zone).toBe("graveyard");
+  });
+});
+
+describe("Forth Eorlingas!: \"whenever one or more creatures you control deal combat damage to one or more players this turn\"", () => {
+  it("its Knight connects: you become the monarch", () => {
+    const forth = card("Forth Eorlingas!", "Sorcery", "{X}{R}{W}", { oracleText: "Create X 2/2 red Human Knight creature tokens with trample and haste.\nWhenever one or more creatures you control deal combat damage to one or more players this turn, you become the monarch." });
+    supported(forth);
+    const { s: s0, ap, ids, opp } = setup([forth]);
+    let s = settleBots(run(s0, planCast(s0, ap, ids[0]!, undefined, undefined, "auto", 1)));
+    const knight = s.battlefield.find((id) => s.cards[s.objects[id]!.cardId]!.name === "Human Knight Token")!;
+    expect(knight).toBeDefined();
+    s = passUntil(s, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: knight, defender: opp }] });
+    s = settleBots(passUntil(s, "endCombat"));
+    expect(s.monarch).toBe(ap);
+  });
+});

@@ -3306,6 +3306,8 @@ export type TriggerEvent =
   | "creaturesYouControlAttack"
   /** "Whenever one or more creatures you control deal combat damage to a player": once per player dealt damage. */
   | "creaturesYouControlDealCombatDamageToPlayer"
+  /** "Whenever one or more Pirates you control deal damage to your opponents" (Malcolm, Keen-Eyed Navigator): see `damageGroup`. */
+  | "groupDealsDamageToPlayers"
   /** "Whenever one or more creatures deal combat damage to you" (Witch-king of Angmar). */
   | "creaturesDealCombatDamageToYou"
   /** "Whenever an instant or sorcery spell you control deals damage to an opponent or battle" (Bloodfeather Phoenix): see `spellDamage`; once for each one dealt damage. */
@@ -3436,6 +3438,12 @@ export interface TriggeredAbility {
    * controller); `combat`: only combat damage.
    */
   damagesYou?: { by?: "you" | "opponent" | "any"; combat?: true };
+  /**
+   * For "groupDealsDamageToPlayers": the permanents you control dealing it (`filter`), all damage dealt at the same time
+   * one event (CR 603.2c). `opponents`: to your opponents, "that many" how many of them were dealt damage; `perPlayer`:
+   * once for each player dealt damage, "that player" them.
+   */
+  damageGroup?: { filter: TargetSpec; opponents?: true; perPlayer?: true };
   /** For "sourceYouControlDamagesOpponent": only noncombat damage. */
   noncombatOnly?: true;
   /** For "creaturesYouControlAttack": "Whenever you attack with two or more creatures", at least this many of them. */

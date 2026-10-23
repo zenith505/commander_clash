@@ -1,7 +1,7 @@
 // Round 127: round 126's gaps (Hazel of the Rootbloom's mana in autopay, ...), then the most played cards.
 
 import { describe, expect, it } from "vitest";
-import { act, card, putOnBattlefield, setup } from "./helpers";
+import { act, card, passUntil, putOnBattlefield, setup } from "./helpers";
 import { botActions, isFullySupported, planActivate, planCast, waitingOn, type Action, type CardDef, type GameState } from "../src";
 
 const supported = (...defs: CardDef[]) => defs.forEach((d) => expect(isFullySupported(d), d.name).toBe(true));
@@ -19,6 +19,7 @@ const settleBots = (s: GameState) => {
   }
   return s;
 };
+const logText = (s: GameState) => s.log.map((l) => (typeof l === "string" ? l : l.text)).join("\n");
 /** `ap`'s lands are only `lands`. */
 const onlyLands = (s: GameState, ap: number, ...lands: CardDef[]) => {
   s.battlefield = s.battlefield.filter((id) => !s.cards[s.objects[id]!.cardId]!.types.includes("Land") || s.objects[id]!.controller !== ap);
@@ -127,5 +128,62 @@ describe("Light-Paws' search prompt says the mana value", () => {
     expect(s.pending).toMatchObject({ kind: "chooseMay", player: ap });
     const prompt = s.pending?.kind === "chooseMay" ? s.pending.prompt : "";
     expect(prompt).toContain("with mana value 2 or less and with a different name than each Aura you control");
+  });
+});
+
+const malcolm = card("Malcolm, Keen-Eyed Navigator", "Legendary Creature — Siren Pirate", "{2}{U}", {
+  power: "2",
+  toughness: "1",
+  keywords: ["Flying", "Partner"],
+  oracleText: "Flying\nWhenever one or more Pirates you control deal damage to your opponents, you create a Treasure token for each opponent dealt damage. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")\nPartner (You can have two commanders if both have partner.)",
+});
+const francisco = card("Francisco, Fowl Marauder", "Legendary Creature — Bird Pirate", "{1}{U}{R}", {
+  power: "1",
+  toughness: "1",
+  keywords: ["Flying", "Partner"],
+  oracleText: "Flying\nFrancisco can't block.\nWhenever one or more Pirates you control deal damage to a player, Francisco explores.\nPartner (You can have two commanders if both have partner.)",
+});
+const pinger = (name: string, type: string) => card(name, `Creature — ${type}`, "{1}{R}", { power: "1", toughness: "1", oracleText: "{T}: This creature deals 1 damage to each opponent." });
+
+describe("Malcolm, Keen-Eyed Navigator: one trigger for the damage Pirates deal at once (CR 603.2c)", () => {
+  const treasures = (s: GameState, pid: number) => s.battlefield.filter((id) => s.objects[id]!.controller === pid && s.cards[s.objects[id]!.cardId]?.name === "Treasure Token").length;
+  it("a Pirate deals 1 damage to each opponent: one trigger, three Treasures", () => {
+    supported(malcolm, francisco);
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, malcolm);
+    const p = putOnBattlefield(s0, ap, pinger("Test Corsair", "Human Pirate"));
+    const s = settleBots(run(s0, planActivate(s0, ap, p, 0)));
+    expect(logText(s).match(/Malcolm, Keen-Eyed Navigator's ability triggers/g)).toHaveLength(1);
+    expect(treasures(s, ap)).toBe(3);
+  });
+  it("two Pirates' combat damage to two opponents: one trigger, two Treasures", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, malcolm);
+    const [a, b] = [putOnBattlefield(s0, ap, pinger("Corsair A", "Human Pirate")), putOnBattlefield(s0, ap, pinger("Corsair B", "Human Pirate"))];
+    const [o1, o2] = [1, 2].map((n) => s0.turnOrder[(s0.turnOrder.indexOf(ap) + n) % 4]!);
+    let s = passUntil(s0, "declareAttackers", ap);
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: a, defender: o1! }, { attacker: b, defender: o2! }] });
+    for (let i = 0; i < 60 && s.step !== "end"; i++) {
+      const pid = waitingOn(s)!;
+      s = s.pending?.kind === "declareBlockers" ? act(s, { type: "declareBlockers", player: pid, blocks: [] }) : s.pending ? botActions(s, pid).reduce((x, y) => act(x, y), s) : act(s, { type: "passPriority", player: pid });
+    }
+    expect(logText(s).match(/Malcolm, Keen-Eyed Navigator's ability triggers/g)).toHaveLength(1);
+    expect(treasures(s, ap)).toBe(2);
+  });
+  it("not for a source that isn't a Pirate", () => {
+    const { s: s0, ap } = setup([]);
+    putOnBattlefield(s0, ap, malcolm);
+    const p = putOnBattlefield(s0, ap, pinger("Test Goblin", "Goblin"));
+    const s = settleBots(run(s0, planActivate(s0, ap, p, 0)));
+    expect(treasures(s, ap)).toBe(0);
+  });
+  it("Francisco explores once for each player dealt damage (rulings)", () => {
+    const { s: s0, ap } = setup([]);
+    const f = putOnBattlefield(s0, ap, francisco);
+    const p = putOnBattlefield(s0, ap, pinger("Test Corsair", "Human Pirate"));
+    const s = settleBots(run(s0, planActivate(s0, ap, p, 0)));
+    // Forests on top: each explore puts a land into the hand; nothing else changes Francisco.
+    expect(logText(s).match(/Francisco, Fowl Marauder's ability triggers/g)).toHaveLength(3);
+    expect(s.objects[f]!.zone).toBe("battlefield");
   });
 });

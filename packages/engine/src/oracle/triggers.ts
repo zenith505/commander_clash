@@ -271,6 +271,24 @@ function parseDamagesCreatureTrigger(line: string): TriggeredAbility | "fail" | 
  * (Michiko Konda): once for each source (CR 603.2c). A creature or permanent is "it" and "that creature"; for a source of
  * any kind, "that player" is its controller and "that many" the damage.
  */
+function parseGroupDamagesPlayers(line: string): TriggeredAbility | "fail" | null {
+  // "Whenever one or more Pirates you control deal damage to your opponents, you create a Treasure token for each opponent
+  // dealt damage" (Malcolm, Keen-Eyed Navigator): combat damage or not (rulings), once for the damage dealt at the same
+  // time (CR 603.2c), even to one opponent (rulings). "Whenever one or more Pirates you control deal damage to a player"
+  // (Francisco, Fowl Marauder): once for each player they deal damage to at once (rulings), "that player" them.
+  const m = /^Whenever one or more (.+?) you control deal damage to (your opponents|a player), (.+)$/.exec(line);
+  if (!m) return null;
+  const spec = parseTargetPhrase(m[1]!.split(/\s+/).map(singularWord).join(" "));
+  if (spec?.kind !== "object" || /\b(?:they|them|their|those)\b/.test(m[3]!)) return "fail";
+  const opponents = m[2] === "your opponents";
+  const each = opponents ? /^you create (an?) (.+?) token for each opponent dealt damage(\.?)$/.exec(m[3]!) : null;
+  if (opponents && !each) return "fail";
+  const body0 = parseBody(each ? `Create X ${each[2]} tokens${each[3]}` : m[3]!, { eventPlayer: !opponents });
+  if (!body0) return "fail";
+  const body = each ? { ...replaceX(body0, { count: { kind: "eventAmount" } }), text: m[3]! } : body0;
+  return { event: "groupDealsDamageToPlayers", body, damageGroup: { filter: { ...spec, text: m[1]! }, ...(opponents ? { opponents: true as const } : { perPlayer: true as const }) } };
+}
+
 function parseSourceDamagesOpponent(line: string): TriggeredAbility | "fail" | null {
   // "Whenever a source you control deals noncombat damage to an opponent, you draw that many cards" (Niv-Mizzet,
   // Visionary): "that player" is the opponent, "that many" the damage. Not from a graveyard (Asgardian Inspiration).
@@ -1319,6 +1337,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const host: TargetSpec = { kind: "object", types: ["Creature"], controller: "you", text: "creature you control" };
     return { ...t, body: { targets: [], effects: [{ type: "if", cond: { kind: "state", cond: { kind: "attachedIs", filter: host } }, effects: t.body.effects }, { type: "if", cond: { kind: "createdNone" }, effects: insect.effects }], text: line.replace(/^[^,]+, /, "") } };
   }
+  const groupDamage = parseGroupDamagesPlayers(line);
+  if (groupDamage) return groupDamage;
   const sourceDamage = parseSourceDamagesOpponent(line);
   if (sourceDamage) return sourceDamage;
   // Ruby, Daring Tracker: "Whenever ~ attacks while you control a creature with power 4 or greater, ...": a condition on

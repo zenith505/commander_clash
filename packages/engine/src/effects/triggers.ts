@@ -203,6 +203,11 @@ export type TriggerSourceEvent =
   | { type: "damagedCreature"; source: ObjectId; id: ObjectId; amount: number; combat: boolean; /** The excess damage that creature has been dealt this turn (CR 120.10). */ excess?: number }
   /** A spell (`card`, controlled by `by`) dealt damage to a player or a battle. */
   | { type: "spellDealtDamage"; by: PlayerId; card: CardDef; player?: PlayerId; battle?: ObjectId }
+  /**
+   * Damage dealt to players at the same time (CR 603.2c): each source's to each player, with the source's controller and
+   * its card types and subtypes as it dealt it, and the permanent it was (not for a spell).
+   */
+  | { type: "playersDealtDamage"; hits: { player: PlayerId; by: PlayerId; amount: number; source?: ObjectId; types: readonly string[]; subtypes: readonly string[] }[] }
   /** Damage dealt at the same time was excess damage to these permanents (CR 120.10), under `controller` then. */
   | { type: "excessDamage"; hits: { id: ObjectId; amount: number; controller: PlayerId }[]; combat: boolean }
   /** The Ring tempted a player, who chose `chosen` as their Ring-bearer, if they could choose one (CR 701.54d). */
@@ -1169,6 +1174,29 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
     const watch = (w: GameObject) => add(w, ev.by, (e, t) => e === "spellYouControlDealsDamage" && fits(t));
     for (const id of s.battlefield) if (controllerOf(s, obj(s, id)) === ev.by) watch(obj(s, id));
     fromGraveyards((o, owner) => owner === ev.by && watch(o));
+  } else if (ev.type === "playersDealtDamage") {
+    // "Whenever one or more Pirates you control deal damage to your opponents" (Malcolm): the permanents its controller
+    // controlled as they dealt it; one that has left as it last existed (its types and subtypes then).
+    for (const id of s.battlefield) {
+      const w = obj(s, id);
+      const wc = controllerOf(s, w);
+      for (const t of abilitiesOf(s, w).triggers) {
+        const g = t.event === "groupDealsDamageToPlayers" ? t.damageGroup : undefined;
+        if (!g) continue;
+        const fits = (h: (typeof ev.hits)[number]) => {
+          if (h.by !== wc || h.source === undefined || (g.opponents && !opponents(s, wc).includes(h.player))) return false;
+          const o = s.objects[h.source];
+          if (o?.zone === "battlefield") return objectMatches(s, g.filter, o, wc, false);
+          const { kind: _k, text: _t, types = [], subtypes = [], ...rest } = g.filter;
+          return !Object.values(rest).some((v) => v !== undefined && !(Array.isArray(v) && !v.length)) && types.every((x) => h.types.includes(x)) && subtypes.every((x) => h.subtypes.includes(x));
+        };
+        const hit = [...new Set(ev.hits.filter(fits).map((h) => h.player))];
+        if (!hit.length) continue;
+        const same = (e: string, tt: TriggeredAbility) => e === "groupDealsDamageToPlayers" && tt.body.text === t.body.text && JSON.stringify(tt.damageGroup) === JSON.stringify(g);
+        if (g.perPlayer) for (const p of s.turnOrder.filter((q) => hit.includes(q))) add(w, wc, same, undefined, undefined, undefined, undefined, undefined, undefined, { player: p });
+        else add(w, wc, same, undefined, undefined, undefined, undefined, undefined, undefined, { amount: hit.length });
+      }
+    }
   } else if (ev.type === "excessDamage") {
     // "Whenever a creature an opponent controls is dealt excess damage" (CR 120.10): once for each permanent, which is
     // the subject and its excess "that excess damage"; "one or more creatures ... are dealt" once for all of them.

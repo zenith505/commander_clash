@@ -4271,6 +4271,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       resolvesAnyway = true;
       continue;
     }
+    // Rona, Tolarian Obliterator: "that source's controller exiles a card from their hand at random. If it's a land card,
+    // you may put it onto the battlefield under your control. Otherwise, you may cast it without paying its mana cost."
+    if (/^[Tt]hat player exiles a card from their hand at random$/.test(s) && ctx.eventPlayer && sentences[si + 1]?.replace(/\.$/, "") === "If it's a land card, you may put it onto the battlefield under your control" && sentences[si + 2]?.replace(/\.$/, "") === "Otherwise, you may cast it without paying its mana cost") {
+      effects.push({ type: "exileRandomThenPlay", who: { ref: "eventPlayer" } });
+      si += 2;
+      continue;
+    }
     const ifDid = /^If you (do|don't), (.+)$/.exec(s);
     if (ifDid) {
       const prev = effects[effects.length - 1];
@@ -4283,6 +4290,14 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
         const rest = parseOne(capital(energyThen[2]!), ctx);
         if (!rest) return null;
         effects.push({ type: "if", cond: { kind: "youDid" }, effects: [{ type: "getEnergy", who: { ref: "you" }, n: energyThen[1]!.length / 3 }, ...rest] });
+        continue;
+      }
+      // "You may ... If you do, X. If you don't, Y." (Slicer, Hired Muscle): Y is the other branch of the same check.
+      const before = effects[effects.length - 2];
+      if (ifDid[1] === "don't" && prev?.type === "if" && prev.cond.kind === "youDid" && prev.effects.length && !prev.otherwise && before?.type === "may" && !before.pay && before.effects.every(checkableMay)) {
+        const inner = parseOne(capital(ifDid[2]!), ctx);
+        if (!inner) return null;
+        prev.otherwise = inner;
         continue;
       }
       // "You may exile a creature card from your graveyard. If you do, exile target artifact or enchantment an opponent

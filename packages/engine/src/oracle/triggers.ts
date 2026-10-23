@@ -1734,7 +1734,9 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   if (oppStep) {
     const event = oppStep[1] === "upkeep" ? "eachUpkeep" : oppStep[1] === "draw step" ? "eachDrawStep" : oppStep[1] === "combat" ? "eachBeginCombat" : "eachEndStep";
     // "They lose 2 life", "~ deals 2 damage to them": that player.
-    const body = parseBody(oppStep[2]!.replace(/^they lose /, "that player loses ").replace(/ to them\.$/, " to that player."), { eventPlayer: true });
+    // Slicer, Hired Muscle: "... gain control of ~ until end of turn. If you do, ... If you don't, convert it": ~.
+    const text = oppStep[2]!.replace(/^(you may have that player gain control of ~ until end of turn\. If you do, untap ~, goad it, and it can't be sacrificed this turn\. If you don't, convert) it\.$/, "$1 ~.");
+    const body = parseBody(text.replace(/^they lose /, "that player loses ").replace(/ to them\.$/, " to that player."), { eventPlayer: true });
     return body ? { event, body, opponentsTurn: true } : "fail";
   }
   const enchanted = parseEnchantedPlayerTrigger(line);

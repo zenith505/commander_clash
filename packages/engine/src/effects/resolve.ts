@@ -776,6 +776,7 @@ export function runEffectInner(s: GameState, e: Effect, ctx: ResolveCtx): "pause
     case "returnToBattlefield":
     case "unearth":
     case "castFromExileFree":
+    case "exileRandomThenPlay":
     case "castTargetFree":
     case "destroy":
     case "regenerate":

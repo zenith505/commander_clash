@@ -567,7 +567,16 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
     return who && what?.ref === "target" && !what.n ? [{ type: "continuous", what, mods: [{ kind: "control" }], duration: "game", giveTo: who }] : null;
   }
   // "That player gains control of ~" (Coveted Jewel): the trigger's player, for the rest of the game (layer 2).
-  if (/^[Tt]hat player gains control of ~$/.test(s) && ctx.eventPlayer) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: "game", giveTo: { ref: "eventPlayer" } }];
+  // Slicer, Hired Muscle: "... until end of turn" (CR 611.2a), ending in the cleanup step (514.2).
+  if ((m = /^[Tt]hat player gains control of ~( until end of turn)?$/.exec(s)) && ctx.eventPlayer) return [{ type: "continuous", what: { ref: "self" }, mods: [{ kind: "control" }], duration: m[1] ? "endOfTurn" : "game", giveTo: { ref: "eventPlayer" } }];
+  // Slicer, Hired Muscle: "untap ~, goad it, and it can't be sacrificed this turn". Goaded by the ability's controller
+  // (CR 701.15a), even while another player controls it; "can't be sacrificed" (CR 701.21) until the cleanup step.
+  if (/^Untap ~, goad it, and it can't be sacrificed this turn$/.test(s))
+    return [
+      { type: "untap", what: { ref: "self" } },
+      { type: "continuous", what: { ref: "self" }, mods: [{ kind: "goad" }], duration: "yourNextTurn" },
+      { type: "continuous", what: { ref: "self" }, mods: [{ kind: "cantBeSacrificed" }], duration: "endOfTurn" },
+    ];
   // Alexios: "that player gains control of ~, untaps it, and puts a +1/+1 counter on it": that player puts the counter.
   if ((m = /^[Tt]hat player gains control of ~, untaps it, and puts (a|two|three) \+1\/\+1 counters? on it$/.exec(s)) && ctx.eventPlayer)
     return [

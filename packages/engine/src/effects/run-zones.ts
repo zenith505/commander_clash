@@ -846,6 +846,45 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       log(s, `${src} can't be cast.`);
       return;
     }
+    case "exileRandomThenPlay": {
+      const sc = (s.resolving!.scratch ??= {});
+      if (!sc.exiledAtRandom) {
+        const pid = players(s, e.who, ctx)[0];
+        const hand = pid === undefined ? [] : player(s, pid).hand;
+        if (pid === undefined || !hand.length) return;
+        const id = hand[Math.floor(nextRandom(s) * hand.length)]!;
+        log(s, `${player(s, pid).name} exiles ${defOf(s, obj(s, id)).name} from their hand at random.`);
+        moveObject(s, id, "exile");
+        if (obj(s, id).zone !== "exile") return;
+        sc.exiledAtRandom = { id, zc: obj(s, id).zoneChanges ?? 0 };
+      }
+      const got = sc.exiledAtRandom;
+      const o = s.objects[got.id];
+      // Still that card in exile (CR 400.7).
+      if (!o || o.zone !== "exile" || (o.zoneChanges ?? 0) !== got.zc) return;
+      const name = defOf(s, o).name;
+      const you = player(s, ctx.controller);
+      if (isType(defOf(s, o), "Land")) {
+        if (!got.asked) {
+          got.asked = true;
+          sc.may = undefined;
+          s.pending = { kind: "chooseMay", player: you.id, prompt: `put ${name} onto the battlefield under your control`, source: src, card: o.id };
+          return "paused";
+        }
+        if (!sc.may) return;
+        sc.may = undefined;
+        moveObject(s, o.id, "battlefield", { controller: you.id });
+        log(s, `${you.name} puts ${name} onto the battlefield.`);
+        return;
+      }
+      if (got.asked) return;
+      got.asked = true;
+      s.pending = { kind: "castFree", player: you.id, objectId: o.id, source: src };
+      if (freeCastable(s, you.id, o.id)) return "paused";
+      s.pending = null;
+      log(s, `${name} can't be cast.`);
+      return;
+    }
     case "madness": {
       // CR 702.35a: the owner may cast it for its madness cost as this resolves, ignoring timing (rulings); if they
       // don't (or can't), it goes to the graveyard. It has to still be in exile as the same object (CR 400.7).

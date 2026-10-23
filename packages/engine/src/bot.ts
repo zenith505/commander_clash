@@ -216,6 +216,8 @@ export function botActions(s: GameState, pid: PlayerId): Action[] {
     if (pend.kind === "chooseMay" && pend.card && pend.prompt === landUntappedOffer(s, pid, pend.card)) return [{ type: "chooseMay", player: pid, yes: /^reveal/.test(pend.prompt) || player(s, pid).life >= 16 }];
     // Sepulchral Primordial: each opponent's creature card comes back under our control.
     if (pend.kind === "chooseMay" && pend.eachTarget) return [{ type: "chooseMay", player: pid, yes: true }];
+    // Rona, Tolarian Obliterator: a land exiled from a hand at random, ours to put onto the battlefield.
+    if (pend.kind === "chooseMay" && pend.card && s.resolving?.body.effects[s.resolving.next]?.type === "exileRandomThenPlay") return [{ type: "chooseMay", player: pid, yes: true }];
     if (pend.kind === "chooseMay") return [{ type: "chooseMay", player: pid, yes: pend.card ? (revealedMay(s, pend.card) ?? millExplored(s, pid, pend.card)) : wantsMay(s, pid) }];
     if (pend.kind === "payUnless" && pend.discard) return [{ type: "payUnless", player: pid, pay: player(s, pid).hand.length >= pend.discard }];
     if (pend.kind === "payUnless") {
@@ -2654,6 +2656,10 @@ function wantsMay(s: GameState, pid: PlayerId): boolean {
     const src = r.item.sourceId ? s.objects[r.item.sourceId] : undefined;
     return !!src && t?.kind === "object" && !!s.objects[t.id] && provokeGood(s, src, obj(s, t.id));
   }
+  // Slicer, Hired Muscle: "you may have that player gain control of ~ until end of turn. If you do, ... goad it": only
+  // while there's another opponent for it to attack (goaded, it attacks a player other than us if able, CR 701.15b).
+  if (e.effects.length === 1 && e.effects[0]!.type === "continuous" && e.effects[0]!.what.ref === "self" && e.effects[0]!.giveTo?.ref === "eventPlayer" && e.effects[0]!.mods.some((m) => m.kind === "control"))
+    return opponents(s, pid).filter((p) => p !== r.item.event?.player).length > 0;
   const harm = harmfulTargets(r.body);
   const targets = r.item.targets ?? [];
   let v = 0;

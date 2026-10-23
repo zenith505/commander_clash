@@ -2668,6 +2668,12 @@ export type Effect =
   /** Rebound's delayed trigger (CR 702.88a): "you may cast this card from exile without paying its mana cost". */
   | { type: "castFromExileFree" }
   /**
+   * Rona, Tolarian Obliterator: "that source's controller exiles a card from their hand at random. If it's a land card,
+   * you may put it onto the battlefield under your control. Otherwise, you may cast it without paying its mana cost."
+   * The card is cast as this resolves, ignoring timing (CR 608.2g); X is 0, no alternative costs (rulings).
+   */
+  | { type: "exileRandomThenPlay"; who: PlayerRef }
+  /**
    * Isochron Scepter, Spellbinder: "You may copy the exiled card. If you do, you may cast the copy without paying its mana
    * cost." A copy of the card its linked imprint ability exiled (CR 607.2a), made in exile and cast as this resolves or
    * never (CR 707.12, rulings); not if that card has left exile.

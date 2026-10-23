@@ -997,3 +997,37 @@ describe("Moon-Circuit Hacker: \"If you do, discard a card unless this creature 
     expect(s.players[ap]!.hand.length).toBe(hand + 1);
   });
 });
+
+describe("cards this round's templates also cover", () => {
+  it("Cloudsteel Kirin: the equipped creature's controller can't lose the game", () => {
+    const kirin = card("Cloudsteel Kirin", "Artifact Creature — Equipment Kirin", "{2}{W}", { power: "3", toughness: "2", keywords: ["Flying", "Reconfigure"], oracleText: "Flying\nEquipped creature has flying and \"You can't lose the game and your opponents can't win the game.\"\nReconfigure {5} ({5}: Attach to target creature you control; or unattach from a creature. Reconfigure only as a sorcery. While attached, this isn't a creature.)" });
+    supported(kirin);
+    const { s: s0, ap } = setup([]);
+    const k = putOnBattlefield(s0, ap, kirin);
+    const b = putOnBattlefield(s0, ap, bear());
+    addMana(s0, ap, ["C", "C", "C", "C", "C"]);
+    let s = passToPending(run(s0, planActivate(s0, ap, k, 0, [target(b)])));
+    expect(s.objects[k]!.attachedTo).toBe(b);
+    s.players[ap]!.life = 0;
+    s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    expect(s.players[ap]!.lost).toBeFalsy();
+  });
+
+  it("The Night of the Doctor, chapter II: the legendary creature returns with the counter chosen", () => {
+    const night = card("The Night of the Doctor", "Enchantment — Saga", "{4}{W}{W}", { oracleText: "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after II.)\nI — Destroy all creatures.\nII — Return target legendary creature card from your graveyard to the battlefield. Put your choice of a first strike, vigilance, or lifelink counter on it." });
+    supported(night);
+    const legend = card("Test Legend", "Legendary Creature — Human", "{2}{W}", { power: "3", toughness: "3" });
+    const { s: s0, ap } = setup([]);
+    const n = putOnBattlefield(s0, ap, night);
+    s0.objects[n]!.counters.lore = 1;
+    const l = putOnBattlefield(s0, ap, legend);
+    moveObject(s0, l, "graveyard");
+    let s = passUntil(passUntil(s0, "upkeep", nextOf(s0, ap)), "main1", ap);
+    for (let i = 0; i < 10 && !s.pending; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    if (s.pending?.kind === "chooseTargets") s = passToPending(act(s, { type: "chooseTargets", player: ap, targets: [{ kind: "object", id: l }] }));
+    expect(s.pending).toMatchObject({ kind: "chooseOption", labels: ["Put a first strike counter", "Put a vigilance counter", "Put a lifelink counter"] });
+    s = passToPending(act(s, { type: "chooseOption", player: ap, choice: "2" }));
+    expect(s.objects[l]!.zone).toBe("battlefield");
+    expect(s.objects[l]!.counters).toEqual({ lifelink: 1 });
+  });
+});

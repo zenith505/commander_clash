@@ -819,3 +819,46 @@ describe("Detection Tower, Glaring Spotlight: targeting as though they didn't ha
     expect(canTarget(s, ap, boltId, { kind: "player", id: opp })).toBe(false);
   });
 });
+
+describe("Rashmi, Eternities Crafter: the first spell each turn reveals the top card, cast free if its mana value is lesser", () => {
+  const rashmi = card("Rashmi, Eternities Crafter", "Legendary Creature — Elf Druid", "{2}{G}{U}", { power: "2", toughness: "3", oracleText: "Whenever you cast your first spell each turn, reveal the top card of your library. You may cast it without paying its mana cost if it's a spell with lesser mana value. If you don't cast it, put it into your hand." });
+  const big = card("Test Sorcery", "Sorcery", "{3}{U}", { oracleText: "Draw two cards." });
+  const ogre = card("Test Ogre", "Creature — Ogre", "{2}{R}", { power: "3", toughness: "3" });
+  const giant = card("Test Giant", "Creature — Giant", "{4}{R}", { power: "5", toughness: "5" });
+  /** Rashmi out, our sorcery cast with `top` on top of the library; to the trigger's question. */
+  const revealed = (top: CardDef) => {
+    const { s: s0, ap, ids } = setup([big]);
+    onlyInHand(s0, ap, ids);
+    putOnBattlefield(s0, ap, rashmi);
+    const t = putOnBattlefield(s0, ap, top);
+    s0.battlefield.splice(s0.battlefield.indexOf(t), 1);
+    s0.objects[t]!.zone = "library";
+    s0.players[ap]!.library.unshift(t);
+    addMana(s0, ap, ["U", "C", "C", "C"]);
+    const s = passToPending(run(s0, planCast(s0, ap, ids[0]!)));
+    return { s, ap, t, sorc: ids[0]! };
+  };
+
+  it("lesser mana value: it may be cast free, before the spell that triggered it resolves", () => {
+    supported(rashmi);
+    const { s: s0, ap, t, sorc } = revealed(ogre);
+    expect(s0.pending).toMatchObject({ kind: "chooseOption", what: "castFromAmong", options: [t, "none"] });
+    let s = act(s0, { type: "chooseOption", player: ap, choice: t });
+    for (let i = 0; i < 3 && s.pending; i++) s = run(s, botActions(s, ap).slice(0, 1));
+    expect(s.stack.map((x) => x.objectId)).toEqual([sorc, t]);
+  });
+
+  it("declined, it goes to the hand", () => {
+    const { s: s0, ap, t } = revealed(ogre);
+    const s = act(s0, { type: "chooseOption", player: ap, choice: "none" });
+    expect(s.objects[t]!.zone).toBe("hand");
+  });
+
+  it("an equal or greater mana value, or a land: straight to the hand", () => {
+    for (const top of [giant, forest, card("Test Four", "Creature — Ogre", "{3}{R}", { power: "4", toughness: "4" })]) {
+      const { s, t } = revealed(top);
+      expect(s.pending).toBeFalsy();
+      expect(s.objects[t]!.zone).toBe("hand");
+    }
+  });
+});

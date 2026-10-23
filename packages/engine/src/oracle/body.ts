@@ -2221,6 +2221,18 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       si += 2;
       continue;
     }
+    // Rashmi, Eternities Crafter, in a cast trigger: "Reveal the top card of your library. You may cast it without paying its
+    // mana cost if it's a spell with lesser mana value. If you don't cast it, put it into your hand." Cast from the library
+    // as this resolves (CR 608.2g); "lesser" than the spell's mana value as it last existed, X as chosen for it (rulings);
+    // a land can't be cast, so it goes to the hand.
+    if (/^[Rr]eveal the top card of your library$/.test(s) && ctx.castSpell && sentences[si + 1]?.replace(/\.$/, "") === "You may cast it without paying its mana cost if it's a spell with lesser mana value" && sentences[si + 2]?.replace(/\.$/, "") === "If you don't cast it, put it into your hand") {
+      const mv = parseCount("that spell's mana value", ctx);
+      if (!mv || typeof mv !== "object") return null;
+      // One less, and below 0 for a spell with mana value 0: nothing is lesser (CR 107.1b doesn't apply to a comparison).
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 1, reveal: true, maxMv: { ...mv, plus: (mv.plus ?? 0) - 1, signed: true }, max: 1, rest: { dest: "bottomRandom", toHand: true } });
+      si += 2;
+      continue;
+    }
     // Mind's Dilation, in an opponent's cast trigger: "that player exiles the top card of their library. If it's a nonland
     // card, you may cast it without paying its mana cost." Cast as this resolves (CR 608.2g); a land, or a card not cast,
     // stays exiled (rulings).

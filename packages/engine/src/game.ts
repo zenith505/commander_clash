@@ -1129,6 +1129,7 @@ function finishEntering(s: GameState, o: GameObject, compiled: CompiledCard, opt
   if (printed.entersAnchor) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "anchor" });
   // As a battle enters, its controller chooses its protector (CR 310.9a).
   if (isType(defOf(s, o), "Battle")) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "protector" });
+  if (printed.entersChooseTwoPlayers) for (let i = 0; i < 2; i++) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "player", pair: true });
   if (printed.entersChoosePlayer && !printed.entersLookHand) (s.entersChoices ??= []).push({ id, zc: o.zoneChanges ?? 0, what: "player", ...(printed.entersChoosePlayer === "opponent" ? { except: "you" } : {}), ...(printed.entersChooseSecret ? { secret: true as const } : {}) });
   // Devour, riot and unleash: how many +1/+1 counters it has is part of how it enters (CR 614.12), so what it
   // triggers waits for that choice (evolve compares its power as it entered, CR 702.100a).
@@ -6647,7 +6648,8 @@ function chooseOption(s: GameState, p: Player, choice: string) {
       const pid = Number(choice);
       if (!pend.options.includes(choice)) throw new RulesError("choose one of the players offered");
       // "Secretly choose an opponent": nobody else learns who until it's revealed (Guardian Archon).
-      o.chosen = { ...o.chosen, player: pid, ...(entry?.secret ? { secret: true as const } : {}) };
+      if (entry?.pair) o.chosen = { ...o.chosen, players: [...(o.chosen?.players ?? []), pid] };
+      else o.chosen = { ...o.chosen, player: pid, ...(entry?.secret ? { secret: true as const } : {}) };
       log(s, entry?.secret ? `${p.name} secretly chooses an opponent for ${pend.source}.` : `${p.name} chooses ${player(s, pid).name} for ${pend.source}.`);
       if (entry?.lookHand) {
         log(s, `${p.name} looks at ${player(s, pid).name}'s hand.`);
@@ -7052,12 +7054,14 @@ function askEntersChoice(s: GameState): boolean {
     if (c.what === "player") {
       // "As ~ enters, choose a player" (CR 614.12): one still in the game (CR 800.4a), or an opponent.
       const you = controllerOf(s, o);
-      const options = s.turnOrder.filter((x) => !player(s, x).lost && (c.except !== "you" || x !== you));
+      // "Choose two players" (Sower of Discord): two different ones (rulings).
+      const options = s.turnOrder.filter((x) => !player(s, x).lost && (c.except !== "you" || x !== you) && !(c.pair && o.chosen?.players?.includes(x)));
       if (!options.length) {
         q.shift();
         continue;
       }
-      s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "player", options: options.map(String), labels: options.map((x) => (x === you ? `${player(s, x).name} (you)` : player(s, x).name)), objectId: o.id, prompt: `${c.secret ? "secretly " : ""}choose ${c.except === "you" ? "an opponent" : "a player"}` };
+      const pairPrompt = o.chosen?.players?.length ? "choose the second of two players" : "choose two players: the first";
+      s.pending = { kind: "chooseOption", player: you, source: defOf(s, o).name, what: "player", options: options.map(String), labels: options.map((x) => (x === you ? `${player(s, x).name} (you)` : player(s, x).name)), objectId: o.id, prompt: c.pair ? pairPrompt : `${c.secret ? "secretly " : ""}choose ${c.except === "you" ? "an opponent" : "a player"}` };
       return true;
     }
     if (c.what === "protector") {

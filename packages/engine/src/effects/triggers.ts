@@ -859,6 +859,10 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       const o = obj(s, id);
       const you = controllerOf(s, o);
       add(o, you, (e) => (e === "youAreDealtDamage" && you === ev.player) || (e === "opponentIsDealtDamage" && you !== ev.player) || (e === "enchantedPlayerDealtDamage" && o.attachedToPlayer === ev.player), undefined, undefined, undefined, undefined, undefined, undefined, info);
+      // Sower of Discord: damage to one of the two chosen players; "that player" is the other one, who loses that much.
+      const pair = o.chosen?.players;
+      const other = pair?.length === 2 && pair.includes(ev.player) ? pair.find((p) => p !== ev.player) : undefined;
+      if (other !== undefined) add(o, you, (e) => e === "chosenPlayerDealtDamage", undefined, undefined, undefined, undefined, undefined, undefined, { player: other, amount: ev.amount });
     }
   } else if (ev.type === "damagePreventedToPlayer") {
     // "Whenever damage that would be dealt to you is prevented, put that many +1/+1 counters on ~" (Selfless Squire).

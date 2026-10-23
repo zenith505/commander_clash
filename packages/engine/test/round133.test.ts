@@ -707,3 +707,40 @@ describe("Retether: each Aura card from your graveyard returns, enchanting only 
     expect(s.objects[c]!.zone).toBe("graveyard");
   });
 });
+
+describe("Sower of Discord: two players chosen as it enters; damage to one makes the other lose that much life", () => {
+  const sower = card("Sower of Discord", "Creature — Demon", "{4}{B}{B}", { power: "6", toughness: "6", keywords: ["Flying"], oracleText: "Flying\nAs this creature enters, choose two players.\nWhenever damage is dealt to one of the chosen players, the other chosen player also loses that much life." });
+  const bolt = card("Test Bolt", "Instant", "{R}", { oracleText: "Test Bolt deals 3 damage to any target." });
+
+  /** Sower cast and resolved, its two players chosen: `a`, then `b`. */
+  const entered = (a: (ap: PlayerId, opp: PlayerId) => PlayerId, b: (ap: PlayerId, opp: PlayerId) => PlayerId) => {
+    const { s: s0, ap, ids } = setup([sower, bolt]);
+    onlyInHand(s0, ap, ids);
+    addMana(s0, ap, ["B", "B", "C", "C", "C", "C", "R"]);
+    const opp = nextOf(s0, ap);
+    let s = passToPending(run(s0, planCast(s0, ap, ids[0]!)));
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "player", prompt: "choose two players: the first" });
+    expect(s.pending?.kind === "chooseOption" && s.pending.options).toHaveLength(4);
+    s = act(s, { type: "chooseOption", player: ap, choice: String(a(ap, opp)) });
+    expect(s.pending).toMatchObject({ kind: "chooseOption", what: "player", prompt: "choose the second of two players" });
+    expect(s.pending?.kind === "chooseOption" && s.pending.options).not.toContain(String(a(ap, opp)));
+    s = passToPending(act(s, { type: "chooseOption", player: ap, choice: String(b(ap, opp)) }));
+    return { s, ap, opp, sowerId: ids[0]!, boltId: ids[1]! };
+  };
+
+  it("damage to one chosen player: the other loses that much life (not damage)", () => {
+    supported(sower);
+    const { s: s0, ap, opp, sowerId, boltId } = entered((ap) => ap, (_, opp) => opp);
+    expect(s0.objects[sowerId]!.chosen?.players).toEqual([ap, opp]);
+    const s = passToPending(run(s0, planCast(s0, ap, boltId, [{ kind: "player", id: ap }])));
+    expect(s.players[ap]!.life).toBe(37);
+    expect(s.players[opp]!.life).toBe(37);
+  });
+
+  it("damage to a player who wasn't chosen does nothing", () => {
+    const { s: s0, ap, opp, boltId } = entered((_, opp) => opp, (ap, opp) => [0, 1, 2, 3].find((p) => p !== ap && p !== opp)!);
+    const s = passToPending(run(s0, planCast(s0, ap, boltId, [{ kind: "player", id: ap }])));
+    expect(s.players[ap]!.life).toBe(37);
+    expect(s.players[opp]!.life).toBe(40);
+  });
+});

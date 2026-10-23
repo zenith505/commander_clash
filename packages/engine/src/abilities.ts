@@ -3362,6 +3362,8 @@ export type TriggerEvent =
   | "youDamagePrevented"
   | "opponentIsDealtDamage"
   | "enchantedPlayerDealtDamage"
+  /** Sower of Discord: "Whenever damage is dealt to one of the chosen players" (Chosen.players, two): the event's player is the other one. */
+  | "chosenPlayerDealtDamage"
   /** "Whenever you draw a card", "whenever an opponent draws a card", "your second card each turn": see TriggeredAbility.draws. */
   | "playerDraws"
   /** "Whenever an opponent activates an ability that isn't a mana ability" (see TriggeredAbility.activates). */
@@ -4409,6 +4411,8 @@ export interface CompiledCard {
   flashIfTargetsCommander?: true;
   /** "As ~ enters, choose a player" / "an opponent" (CR 614.12): kept while it's on the battlefield, as Chosen.player. */
   entersChoosePlayer?: "player" | "opponent";
+  /** "As ~ enters, choose two players" (Sower of Discord): two different ones, you too if you like (rulings), as Chosen.players. */
+  entersChooseTwoPlayers?: true;
   /** "As Arachne enters, look at an opponent's hand, then choose ...": the opponent is chosen first, then their hand is seen (CR 614.12). */
   entersLookHand?: true;
   /** "As ~ enters, choose Khans or Dragons" (CR 614.12b): the anchor words, one chosen as it enters (Chosen.anchor). */

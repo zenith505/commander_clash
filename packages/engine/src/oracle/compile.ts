@@ -944,6 +944,10 @@ export function compile(d: CardDef): CompiledCard {
     }
     // "As ~ enters, choose a player." (CR 614.12): True-Name Nemesis's "the chosen player". "Secretly choose an opponent"
     // (Guardian Archon): the same, but only its controller knows who until it's revealed.
+    if (/^As ~ enters, choose two players\.$/.test(line) && !out.entersChoosePlayer) {
+      out.entersChooseTwoPlayers = true;
+      continue;
+    }
     const choosePlayer = /^As (?:~|it) enters, (secretly )?choose (a player|an opponent)\.$/.exec(line);
     if (choosePlayer && !out.entersChoosePlayer) {
       out.entersChoosePlayer = choosePlayer[2] === "a player" ? "player" : "opponent";
@@ -3137,6 +3141,8 @@ function checkCastingLinks(out: CompiledCard) {
   if (out.nameBans || out.protectionFromChosenName) needs.add("cardName");
   if (out.noncreatureChosenMvCantBeCast) needs.add("number");
   if ([...needs].some((k) => !choices.has(k))) bad = true;
+  // Sower of Discord's trigger is about the two players chosen as it entered, and only that.
+  if (out.triggers.some((tr) => tr.event === "chosenPlayerDealtDamage") !== !!out.entersChooseTwoPlayers) bad = true;
   // "If the discarded card ..." needs a discard cost: the spell's, or the activated ability's own.
   const discIn = (v: unknown) => JSON.stringify(v ?? null).includes('"kind":"discardedIs"');
   if (discIn(out.spell) && !out.additionalCosts?.some((c) => c.kind === "discard")) bad = true;

@@ -996,7 +996,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           ids = hits.length < e.untilHits.n ? [...lib] : lib.slice(0, at + 1);
         }
         if (!e.reveal) for (const id of ids) moveObject(s, id, "exile");
-        log(s, `${player(s, whose).name} ${e.reveal ? "reveals" : "exiles"} ${ids.length ? ids.map((id) => defOf(s, obj(s, id)).name).join(", ") : "nothing"} from the top of their library.`);
+        if (e.look) log(s, `${player(s, whose).name} looks at the top ${ids.length === 1 ? "card" : `${ids.length} cards`} of their library.`);
+        else log(s, `${player(s, whose).name} ${e.reveal ? "reveals" : "exiles"} ${ids.length ? ids.map((id) => defOf(s, obj(s, id)).name).join(", ") : "nothing"} from the top of their library.`);
         sc.castAmong = { ids: ids.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [], ...(e.totalMv !== undefined ? { budget: amountNow(s, e.totalMv, ctx) } : {}), ...(e.maxMv !== undefined ? { maxMv: amountNow(s, e.maxMv, ctx) } : {}), ...(e.exactMv !== undefined ? { exactMv: amountNow(s, e.exactMv, ctx) } : {}), ...(hits ? { hits } : {}) };
       }
       const st = sc.castAmong;
@@ -1056,6 +1057,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         else {
           if (st.budget !== undefined) st.budget -= mvOf(st.casting);
           st.cast = (st.cast ?? 0) + 1;
+          // "Do this only once each turn": done (CR 603.2h).
+          const source = e.once && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+          if (source) (source.triggeredThisTurn ??= []).push(`${ctx.sourceZc ?? source.zoneChanges ?? 0}|do:castNow`);
         }
         st.casting = undefined;
       }

@@ -2605,6 +2605,14 @@ export function compile(d: CardDef): CompiledCard {
       out.statics.push({ ...a, text: line }, { ...b, affects: { ...(b.affects as Extract<Affects, { kind: "filter" }>), spec: { kind: "object", notSubtypes: skip, text: `non-${skip[0]}` } }, text: line });
       continue;
     }
+    // Eidolon of Countless Battles: "~ and enchanted creature each get +1/+1 for each ...": the same for each of them (as
+    // a bestowed Aura, ~ isn't a creature and gets nothing, CR 702.103b).
+    const selfAnd = /^~ and (enchanted|equipped) creature each get (.+)$/.exec(line);
+    const both = selfAnd && [parseStatic(`~ gets ${selfAnd[2]}`), parseStatic(`${capital(selfAnd[1]!)} creature gets ${selfAnd[2]}`)];
+    if (both?.every((p) => p)) {
+      for (const p of both) out.statics.push({ ...p!, text: line });
+      continue;
+    }
     // A spell's "When you next cast ... this turn, ..." creates a delayed trigger as it resolves (CR 603.7); it isn't a triggered ability of the card.
     // So does a Pact's "At the beginning of your next upkeep, pay {2}{B}. If you don't, you lose the game." (CR 603.7a), and
     // Glorious End's "At the beginning of your next end step, you lose the game."

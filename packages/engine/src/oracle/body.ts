@@ -151,7 +151,7 @@ const CARD_TYPE_WORD = "(?:artifact|battle|creature|enchantment|instant|land|pla
  * The events a delayed triggered ability with a duration can wait for (see GameState.floatingTriggers), and the parts of
  * a trigger it can have: an intervening "if" or a zone would need more about its source than it has.
  */
-const FLOATING_EVENTS = new Set<string>(["castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "creaturesYouControlDealCombatDamageToPlayer", "eachBeginCombat"]);
+const FLOATING_EVENTS = new Set<string>(["castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "creaturesYouControlDealCombatDamageToPlayer", "eachBeginCombat", "creaturesYouControlAttack"]);
 const FLOATING_KEYS = new Set<string>(["event", "cast", "dies", "dealer", "toOpponent", "orPlaneswalker", "body"]);
 
 /**
@@ -204,6 +204,10 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx): Effect | null |
   // monarch" (Forth Eorlingas!): the same, once for each combat damage step (CR 510.2, 603.2c).
   const dealt = /^Whenever (one or more creatures you control deal combat damage to one or more players) this turn, (.+)$/.exec(s);
   if (dealt) return floatingTrigger(`This turn, whenever ${dealt[1]!}, ${dealt[2]!}`, after, ctx);
+  // "Whenever you attack this turn, create two 1/1 red Warrior creature tokens that are tapped and attacking" (Dalkovan
+  // Encampment): once for each declaration of attackers this turn (CR 508.1, 603.7b).
+  const attack = /^Whenever you attack this turn, (.+)$/.exec(s);
+  if (attack) return floatingTrigger(`This turn, whenever you attack, ${attack[1]!}`, after, ctx);
   const m = /^([Uu]ntil end of turn|[Tt]his turn|[Uu]ntil your next turn|[Uu]ntil the end of your next turn), ([Ww]henever .+)$/.exec(s);
   if (!m) return undefined;
   const text = [m[2]!, ...after.map((x) => x.replace(/\.$/, ""))].join(". ");
@@ -2173,6 +2177,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const who = parsePlayer("that player", ctx);
       if (!who || who.ref === "you") return null;
       effects.push({ type: "castFromAmong", who, n: 1, filter: { kind: "card", types: [], notTypes: ["Land"], notColors: [], text: "nonland card" }, max: 1 });
+      si++;
+      continue;
+    }
+    // Planetarium of Wan Shi Tong: "Look at the top card of your library. You may cast that card without paying its mana
+    // cost." Cast from the library as this resolves, or not at all (CR 608.2g, rulings); a land can't be cast.
+    if (/^[Ll]ook at the top card of your library$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "You may cast that card without paying its mana cost" && si + 2 === sentences.length) {
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 1, reveal: true, look: true, max: 1 });
       si++;
       continue;
     }

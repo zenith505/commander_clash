@@ -73,6 +73,9 @@ const TRIGGERS: [RegExp, TriggerEvent][] = [
   [/^Whenever you create a token, (.+)$/, "youCreateToken"], // once for each token (CR 111.2)
   [/^Whenever you collect evidence, (.+)$/, "youCollectEvidence"],
   [/^Whenever you proliferate, (.+)$/, "youProliferate"],
+  [/^Whenever you scry or surveil, (.+)$/, "youScryOrSurveil"],
+  [/^Whenever you scry, (.+)$/, "youScry"],
+  [/^Whenever you surveil, (.+)$/, "youSurveil"],
   [/^Whenever a spell or ability you control counters a spell, (.+)$/, "youCounterSpell"],
   [/^Whenever you complete a dungeon, (.+)$/, "youCompleteDungeon"],
   [/^Whenever you fully unlock a Room, (.+)$/, "youFullyUnlockRoom"],
@@ -977,7 +980,10 @@ function parseGroupTrigger(line: string): TriggeredAbility | "fail" | null {
   const lookAt = /\b[Ll]ook at the top (?:two|three|four|five) cards of your library\. Put (?:one|two) of them [^.]+\./;
   // "Search your library for up to that many basic land cards, put them onto the battlefield tapped" is about the cards.
   const searched = /\b[Ss]earch your library for [^,.]+ cards, put them onto the battlefield( tapped)?, then shuffle\./;
-  if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(meldThem, "").replace(lookAt, "").replace(searched, "")) && !/that player/.test(bodyText)) return "fail";
+  // "Create two 1/1 red Warrior creature tokens that are tapped and attacking. Sacrifice them at the beginning of the next
+  // end step." (Dalkovan Encampment): the tokens.
+  const sacCreated = /\b[Cc]reate [^.]+ tokens that are tapped and attacking\. Sacrifice them at the beginning of the next end step\./;
+  if (/\b(they|them|those creatures|their)\b/.test(bodyText.replace(meldThem, "").replace(lookAt, "").replace(searched, "").replace(sacCreated, "")) && !/that player/.test(bodyText)) return "fail";
   let group: TargetSpec | undefined;
   if (phrase && !/^creatures$/.test(phrase)) {
     const spec = parseTargetPhrase(phrase.split(/\s+/).map(singularWord).join(" "));
@@ -1337,7 +1343,7 @@ function parseEnchantedPlayerTrigger(line: string): TriggeredAbility | "fail" | 
 }
 
 /** The events that abilities of cards in graveyards see (fireEvent's `fromGraveyards`). */
-const YARD_EVENTS: TriggerEvent[] = ["permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creaturesYouControlDealCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat"];
+const YARD_EVENTS: TriggerEvent[] = ["permanentDies", "castSpell", "spellYouControlDealsDamage", "youCommitCrime", "youScry", "youSurveil", "youScryOrSurveil", "permanentEnters", "landYouControlEnters", "anotherCreatureYouControlEnters", "creaturesYouControlAttack", "creaturesYouControlDealCombatDamageToPlayer", "yourUpkeep", "eachUpkeep", "yourDrawStep", "eachDrawStep", "yourEndStep", "eachEndStep", "yourBeginCombat", "eachBeginCombat", "yourEndCombat", "eachEndCombat"];
 
 export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
   // An ability word ("Magecraft —", "Landfall —") has no rules meaning (CR 207.2c).
@@ -1498,6 +1504,8 @@ export function parseTrigger(raw: string): TriggeredAbility | "fail" | null {
     const may = t.body.effects[0];
     // "You may cast target instant or sorcery card from your graveyard" (Emet-Selch): casting it is doing it.
     if (may?.type === "castNow" && !may.once && t.body.effects.length === 1) return { ...t, body: { ...t.body, effects: [{ ...may, once: true }] } };
+    // "Look at the top card of your library. You may cast that card ..." (Planetarium of Wan Shi Tong): casting it is.
+    if (may?.type === "castFromAmong" && may.look && !may.once && t.body.effects.length === 1) return { ...t, body: { ...t.body, effects: [{ ...may, once: true }] } };
     // "You may discard a card. If you do, draw a card": choosing to discard is doing it.
     if (may?.type !== "may" || may.once || !t.body.effects.slice(1).every((e) => e.type === "if" && e.cond.kind === "youDid")) return "fail";
     return { ...t, body: { ...t.body, effects: [{ ...may, once: true }, ...t.body.effects.slice(1)] } };

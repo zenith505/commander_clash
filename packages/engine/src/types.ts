@@ -1671,6 +1671,8 @@ export interface TurnRule {
    * this turn as though none of its loyalty abilities have been activated this turn": one more each, each time (rulings).
    */
   rule: "cantLoseLife" | "cantLoseGame" | "opponentsCantWin" | "cantWinGame" | "flash" | "spellsUncounterable" | "creatureSpellsUncounterable" | "extraLoyalty";
+  /** "Can't be countered by blue or black spells this turn" (Autumn's Veil): only by spells of these colors, as they resolve. */
+  byColors?: Color[];
 }
 
 /** What a trigger event was about, beyond its object: "you gain that much life", "that player discards a card". */

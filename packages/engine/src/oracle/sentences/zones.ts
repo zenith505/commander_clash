@@ -8,7 +8,7 @@ import { parseSentence } from "../sentence";
 import { parseBoundCount, parseCount, roundOf } from "../counts";
 import { pickFilter, parsePlayer, parseObject, parseTargetPhrase, PERMANENT_TYPES, parseCardTarget } from "../targets";
 import { addTarget, parseUnlessPays, type Ctx } from "../body";
-import { parseStaticCondition, parseStaticMods, parseUntargetable } from "../statics";
+import { parseAffected, parseStaticCondition, parseStaticMods, parseUntargetable } from "../statics";
 
 /**
  * Whole sentences about every player's cards that other templates would take apart (tried before them), or undefined.
@@ -749,6 +749,13 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   }
   // "Target creature can't be the target of spells or abilities your opponents control this turn" (Vines of Vastwood): the
   // opponents of whoever controls the effect, its spell's controller (rulings on Vines of Vastwood).
+  // Autumn's Veil: "creatures you control can't be the targets of blue or black spells this turn": a rule about every
+  // creature you control this turn, those that come later too (rulings; CR 611.2c is only for characteristics).
+  if ((m = /^(Creatures you control) can't be the targets of (.+) this turn$/i.exec(s))) {
+    const affects = parseAffected("Creatures you control");
+    const by = parseUntargetable(m[2]!);
+    return affects && by ? [{ type: "groupRules", affects, text: "creatures you control", mods: [{ kind: "untargetable", by }], duration: "endOfTurn" }] : null;
+  }
   if ((m = /^(.+?) can't be the target of (.+) this turn$/.exec(s))) {
     const what = parseObject(m[1]!, ctx);
     const by = parseUntargetable(m[2]!);

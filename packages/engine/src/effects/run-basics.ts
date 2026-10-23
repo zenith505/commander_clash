@@ -225,12 +225,12 @@ export function runBasicsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
         log(s, `Players${e.rules.map((r) => (r === "cantLoseLife" ? " can't lose life" : r === "cantLoseGame" ? " can't lose the game" : r === "cantWinGame" ? " can't win the game" : "")).join(",")} this turn.`);
         return;
       }
-      for (const rule of e.rules) (s.turnRules ??= []).push({ turn: s.turn, player: ctx.controller, rule });
+      for (const rule of e.rules) (s.turnRules ??= []).push({ turn: s.turn, player: ctx.controller, rule, ...(e.byColors ? { byColors: e.byColors } : {}) });
       if (e.rules[0] === "extraLoyalty") {
         log(s, `${player(s, ctx.controller).name} may activate a loyalty ability of each planeswalker they control once more this turn.`);
         return;
       }
-      log(s, `${player(s, ctx.controller).name}${e.rules.map((r) => (r === "cantLoseLife" ? " can't lose life" : r === "cantLoseGame" ? " can't lose the game" : r === "flash" ? " may cast spells as though they had flash" : r === "spellsUncounterable" ? "'s spells can't be countered" : r === "creatureSpellsUncounterable" ? "'s creature spells can't be countered" : "'s opponents can't win the game")).join(",")} this turn.`);
+      log(s, `${player(s, ctx.controller).name}${e.rules.map((r) => (r === "cantLoseLife" ? " can't lose life" : r === "cantLoseGame" ? " can't lose the game" : r === "flash" ? " may cast spells as though they had flash" : r === "spellsUncounterable" ? `'s spells can't be countered${e.byColors ? ` by ${e.byColors.map((c) => COLOR_NAMES[c].toLowerCase()).join(" or ")} spells` : ""}` : r === "creatureSpellsUncounterable" ? "'s creature spells can't be countered" : "'s opponents can't win the game")).join(",")} this turn.`);
       return;
     case "flashUntilNextTurn":
       (s.flashUntil ??= []).push({ controller: ctx.controller, filter: e.filter });

@@ -626,6 +626,9 @@ export function parseBody(text: string, opts: { sacrificedIt?: boolean; amassed?
   // Night Nurse: "choose target permanent card in your graveyard that was put there from anywhere this turn. Return it to
   // your hand." is one instruction.
   text = text.replace(/^[Cc]hoose (target [^.]+? in your graveyard(?: that was put there (?:from anywhere )?this turn)?)\. Return it to your hand\.$/, "Return $1 to your hand.");
+  // Autumn's Veil: "Spells you control can't be countered by blue or black spells this turn, and creatures you control
+  // can't be the targets of blue or black spells this turn": two instructions.
+  text = text.replace(/^(Spells you control can't be countered by [a-z]+ or [a-z]+ spells this turn), and (creatures you control can't be the targets of [a-z]+ or [a-z]+ spells this turn)\./, "$1. $2.");
   // Meathook Massacre II: "return that card under your control" (its Oracle wording) is from the graveyard to the battlefield.
   text = text.replace(/\breturn that card under your control\b/g, "return that card to the battlefield under your control");
   // Tibalt's Trickery: one instruction about the countered spell's controller (read in parseUntilNonland).

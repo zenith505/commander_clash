@@ -3,7 +3,7 @@
 import { DUNGEONS, UNDERCITY, dungeonSupported } from "../dungeons";
 import { allEffects } from "../../abilities";
 import type { Amount, AmountExpr, DamageRecipient, Effect, ObjRef, PlayerRef, PunisherOption, TargetSpec } from "../../abilities";
-import { NUM, NUMX, amt, isGroup, num, plainMana, sacrificeSelf } from "../words";
+import { COLOR_WORDS, NUM, NUMX, amt, isGroup, num, plainMana, sacrificeSelf } from "../words";
 import { parsePayCost, addTarget, parseUnlessPays } from "../body";
 import { halfX, parseBoundCount, parseCount, roundOf } from "../counts";
 import { parseSearch, parseSearchFilter } from "../search";
@@ -622,6 +622,9 @@ export function parseBasicsSentence(s: string, ctx: Ctx): Effect[] | null | unde
   }
   if (/^Until your next turn, your opponents can't cast spells from anywhere other than their hands$/.test(s)) return [{ type: "opponentsHandOnlyUntilNextTurn" }];
   if (/^Spells you control can't be countered this turn$/i.test(s)) return [{ type: "turnRules", rules: ["spellsUncounterable"] }];
+  // Autumn's Veil: "Spells you control can't be countered by blue or black spells this turn".
+  if ((m = /^Spells you control can't be countered by (white|blue|black|red|green) or (white|blue|black|red|green) spells this turn$/i.exec(s)) && m[1] !== m[2])
+    return [{ type: "turnRules", rules: ["spellsUncounterable"], byColors: [COLOR_WORDS[m[1]!.toLowerCase()]!, COLOR_WORDS[m[2]!.toLowerCase()]!] }];
   // Domri, Anarch of Bolas: "Creature spells you cast this turn can't be countered" (rulings: every one, after it resolves).
   if (/^Creature spells you cast this turn can't be countered$/i.test(s)) return [{ type: "turnRules", rules: ["creatureSpellsUncounterable"] }];
   if ((m = /^(Players|Your opponents) can't gain life this turn$/i.exec(s))) return [{ type: "noLifeGain", players: /^players$/i.test(m[1]!) ? "all" : "opponents" }];

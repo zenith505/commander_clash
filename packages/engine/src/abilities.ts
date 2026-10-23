@@ -2612,7 +2612,7 @@ export type Effect =
   | { type: "noLifeGain"; players: "all" | "opponents" }
   /** "You can't lose life this turn, you can't lose the game this turn, and your opponents can't win the game this turn" (Courageous Resolve). */
   /** `everyone`: "Players can't lose life this turn" (Everybody Lives!), each player in the game as it resolves. */
-  | { type: "turnRules"; rules: TurnRule["rule"][]; everyone?: true }
+  | { type: "turnRules"; rules: TurnRule["rule"][]; everyone?: true; /** "Can't be countered by blue or black spells" (Autumn's Veil): only by spells of these colors. */ byColors?: Color[] }
   /** "Until your next turn, you may cast sorcery spells as though they had flash." (Teferi, Time Raveler; CR 702.8a) */
   | { type: "flashUntilNextTurn"; filter: TargetSpec }
   /**

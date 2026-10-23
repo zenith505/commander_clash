@@ -679,3 +679,40 @@ describe("Betor, Kin to All: total toughness 10, 20, 40 (rulings)", () => {
     void w;
   });
 });
+
+const veil = card("Autumn's Veil", "Instant", "{G}", { oracleText: "Spells you control can't be countered by blue or black spells this turn, and creatures you control can't be the targets of blue or black spells this turn." });
+
+describe("Autumn's Veil (rulings)", () => {
+  const blackKill = card("Test Black Kill", "Instant", "{B}", { colors: ["B"], oracleText: "Destroy target creature." });
+  const greenPump = card("Test Green Pump", "Instant", "{G}", { colors: ["G"], oracleText: "Target creature gets +1/+1 until end of turn." });
+  const blueCounter = card("Test Blue Counter", "Instant", "{U}", { colors: ["U"], oracleText: "Counter target spell." });
+  const redCounter = card("Test Red Counter", "Instant", "{R}", { colors: ["R"], oracleText: "Counter target spell." });
+  it("creatures you control, even ones that come later, can't be the targets of black spells (yours too); green ones are fine", () => {
+    supported(veil);
+    const { s: s0, ap, ids } = setup([veil, blackKill, greenPump]);
+    let s = settleBots(run(s0, planCast(s0, ap, ids[0]!)));
+    const b = putOnBattlefield(s, ap, card("Grizzly Bears", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" }));
+    invalidateCharacteristics(s);
+    expect(planCast(s, ap, ids[1]!, [{ kind: "object", id: b }])).toBeNull();
+    s = settleBots(run(s, planCast(s, ap, ids[2]!, [{ kind: "object", id: b }])));
+    expect(power(s, s.objects[b]!)).toBe(3);
+  });
+  const counterTest = (counterSpell: CardDef, color: string) => {
+    const { s: s0, ap, ids, opp } = setup([veil, card("Grizzly Bears", "Creature — Bear", "{1}{G}", { power: "2", toughness: "2" })]);
+    let s = settleBots(run(s0, planCast(s0, ap, ids[0]!)));
+    putOnBattlefield(s, opp, card(color === "U" ? "Island" : "Mountain", `Basic Land — ${color === "U" ? "Island" : "Mountain"}`, "", { oracleText: `({T}: Add {${color}}.)` }));
+    const c = toHand(s, opp, counterSpell)[0]!;
+    s = run(s, planCast(s, ap, ids[1]!));
+    const spell = s.stack.at(-1)!.id;
+    s = act(s, { type: "passPriority", player: ap });
+    s = run(s, planCast(s, opp, c, [{ kind: "stack", id: spell }]));
+    return { s: settleBots(s), bear: ids[1]! };
+  };
+  it("a blue spell can't counter your spells this turn; a red one can", () => {
+    const blue = counterTest(blueCounter, "U");
+    expect(blue.s.objects[blue.bear]!.zone).toBe("battlefield");
+    expect(logText(blue.s)).toMatch(/can't be countered/);
+    const red = counterTest(redCounter, "R");
+    expect(red.s.objects[red.bear]!.zone).toBe("graveyard");
+  });
+});

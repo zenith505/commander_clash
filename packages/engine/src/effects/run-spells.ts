@@ -1,7 +1,7 @@
 import type { AbilityBody, Effect, Modification, SpellCondition, TargetChoice, TargetSpec, UnlessPays } from "../abilities";
 import { manaValue, parseManaCost, xCount } from "../mana";
 import { abilitiesOf, cardIdOf, defOf, isType } from "../cards";
-import { controllerOf, invalidateCharacteristics } from "../layers";
+import { characteristics, controllerOf, invalidateCharacteristics } from "../layers";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { castProblem, freeCastable, describeTargets, log, millCount, moveObject, newObject, obj, opponents, player } from "../game";
 import { compileCard, spellTargetSpecs } from "../oracle";
@@ -739,7 +739,11 @@ export function cantBeCountered(s: GameState, item: StackItem): boolean {
   const d = defOf(s, o);
   if (compileCard(d).cantBeCountered || (o.uncounterableCast && !item.copy)) return true;
   // "Spells you control can't be countered this turn" (Veil of Summer): those on the stack already too (rulings).
-  if ((s.turnRules ?? []).some((r) => r.turn === s.turn && r.player === item.controller && r.rule === "spellsUncounterable")) return true;
+  // "Can't be countered by blue or black spells this turn" (Autumn's Veil): the countering spell's colors as it resolves
+  // (rulings); abilities still can.
+  const by = s.resolving?.item.kind === "spell" && s.resolving.item.objectId ? s.objects[s.resolving.item.objectId] : undefined;
+  const byColors = by ? characteristics(s, by).colors : [];
+  if ((s.turnRules ?? []).some((r) => r.turn === s.turn && r.player === item.controller && r.rule === "spellsUncounterable" && (!r.byColors || r.byColors.some((c) => byColors.includes(c))))) return true;
   if (!item.copy && isType(d, "Creature") && (s.turnRules ?? []).some((r) => r.turn === s.turn && r.player === item.controller && r.rule === "creatureSpellsUncounterable")) return true;
   return s.battlefield.some((id) => {
     const p = obj(s, id);

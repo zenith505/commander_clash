@@ -5409,6 +5409,17 @@ function parsePutChoice(s: string, ctx: Ctx): Effect[] | null {
   return [{ type: "either", options: [first, ...(rest as Effect[][])], labels: opts.map((o) => `Put ${o}`) }];
 }
 
+/**
+ * "If you do, discard a card unless ~ entered this turn" (Moon-Circuit Hacker): the instruction only while ~ didn't enter
+ * this turn, checked as it resolves.
+ */
+function parseUnlessEntered(s: string, ctx: Ctx): Effect[] | null {
+  const m = /^(.+) unless ~ entered this turn$/.exec(s);
+  if (!m) return null;
+  const fx = parseOne(m[1]!, ctx);
+  return fx && [{ type: "if", cond: { kind: "state", cond: { kind: "self", is: "enteredThisTurn", not: true } }, effects: fx }];
+}
+
 /** One sentence: a plain instruction, two joined by "and", or one with "for each" / "equal to" in it. */
 function parseOne(s: string, ctx: Ctx): Effect[] | null {
   // "{T}: This creature deals 1 damage to itself" (Stuffy Doll): the source is the one dealt the damage.
@@ -5428,7 +5439,7 @@ function parseOne(s: string, ctx: Ctx): Effect[] | null {
     if (look?.length !== 1 || look[0]!.type !== "lookAtHand" || !look[0]!.reveal || filter === null) return null;
     return [look[0]!, { type: "takeFromHand", who: look[0]!.who, ...(filter ? { filter } : {}), action: "discard" }];
   }
-  const fx = attempt(ctx, () => parsePutChoice(s, ctx)) ?? attempt(ctx, () => parsePerOpponent(s, ctx)) ?? attempt(ctx, () => parseSentence(s, ctx)) ?? attempt(ctx, () => parseConjunction(s, ctx)) ?? attempt(ctx, () => parseSharedSubject(s, ctx)) ?? attempt(ctx, () => parseYouList(s, ctx)) ?? attempt(ctx, () => parseForEach(s, ctx)) ?? attempt(ctx, () => parseEqualTo(s, ctx)) ?? attempt(ctx, () => parseThen(s, ctx)) ?? attempt(ctx, () => parseAndYouMay(s, ctx));
+  const fx = attempt(ctx, () => parsePutChoice(s, ctx)) ?? attempt(ctx, () => parseUnlessEntered(s, ctx)) ?? attempt(ctx, () => parsePerOpponent(s, ctx)) ?? attempt(ctx, () => parseSentence(s, ctx)) ?? attempt(ctx, () => parseConjunction(s, ctx)) ?? attempt(ctx, () => parseSharedSubject(s, ctx)) ?? attempt(ctx, () => parseYouList(s, ctx)) ?? attempt(ctx, () => parseForEach(s, ctx)) ?? attempt(ctx, () => parseEqualTo(s, ctx)) ?? attempt(ctx, () => parseThen(s, ctx)) ?? attempt(ctx, () => parseAndYouMay(s, ctx));
   if (fx) noteLast(ctx, fx);
   return fx;
 }

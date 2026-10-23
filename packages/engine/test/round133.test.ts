@@ -969,3 +969,31 @@ describe("Sphinx's Tutelage: mill two, again while two nonland cards share a col
     }
   });
 });
+
+describe("Moon-Circuit Hacker: \"If you do, discard a card unless this creature entered this turn\"", () => {
+  const hacker = card("Moon-Circuit Hacker", "Enchantment Creature — Human Ninja", "{1}{U}", { power: "2", toughness: "1", keywords: ["Ninjutsu"], oracleText: "Ninjutsu {U} ({U}, Return an unblocked attacker you control to hand: Put this card onto the battlefield from your hand tapped and attacking.)\nWhenever this creature deals combat damage to a player, you may draw a card. If you do, discard a card unless this creature entered this turn." });
+  /** It deals combat damage; we draw. `entered`: as though it entered this turn. */
+  const drew = (entered: boolean) => {
+    const { s: s0, ap } = setup([]);
+    const id = putOnBattlefield(s0, ap, hacker);
+    let s = passUntil(s0, "declareAttackers", ap);
+    if (entered) s.objects[id]!.enteredTurn = s.turn;
+    s = act(s, { type: "declareAttackers", player: ap, attacks: [{ attacker: id, defender: nextOf(s, ap) }] });
+    for (let i = 0; i < 40 && s.pending?.kind !== "chooseMay"; i++) s = s.pending ? run(s, botActions(s, s.pending.player).slice(0, 1)) : act(s, { type: "passPriority", player: waitingOn(s)! });
+    const hand = s.players[ap]!.hand.length;
+    s = act(s, { type: "chooseMay", player: ap, yes: true });
+    return { s, ap, hand };
+  };
+
+  it("there since an earlier turn: draw, then discard", () => {
+    supported(hacker);
+    const { s, ap } = drew(false);
+    expect(s.pending).toMatchObject({ kind: "discard", player: ap });
+  });
+
+  it("entered this turn: draw only", () => {
+    const { s, ap, hand } = drew(true);
+    expect(s.pending).toBeFalsy();
+    expect(s.players[ap]!.hand.length).toBe(hand + 1);
+  });
+});

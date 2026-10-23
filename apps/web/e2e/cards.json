@@ -363,6 +363,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "db5380ed-ba28-4ea2-abc3-4998e2022903",
+  "name": "Ancestral Mask",
+  "manaCost": "{2}{G}",
+  "cmc": 3,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nEnchanted creature gets +2/+2 for each other enchantment on the battlefield.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "ema",
+  "releasedAt": "2016-06-10",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "7d79fb4e-2ca0-404a-9663-1f5abce6e733",
   "name": "Ancient Brass Dragon",
   "manaCost": "{5}{B}{B}",
@@ -672,6 +702,43 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9956f9b7-0140-484c-b606-3685690b84cc",
+  "name": "Aryel, Knight of Windgrace",
+  "manaCost": "{2}{W}{B}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Human Knight",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Human",
+   "Knight"
+  ],
+  "oracleText": "Vigilance\n{2}{W}, {T}: Create a 2/2 white Knight creature token with vigilance.\n{B}, {T}, Tap X untapped Knights you control: Destroy target creature with power X or less.",
+  "power": "4",
+  "toughness": "4",
+  "colors": [
+   "B",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "W"
+  ],
+  "keywords": [
+   "Vigilance"
+  ],
+  "commanderLegal": "legal",
+  "set": "dom",
+  "releasedAt": "2018-04-27",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "e4b3e0af-5caa-47c1-b5be-c56a875cbb15",
   "name": "As Foretold",
   "manaCost": "{2}{U}",
@@ -882,6 +949,32 @@
   "set": "cn2",
   "releasedAt": "2016-08-26",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "38839894-1706-4e11-8310-5ea8dd8866d9",
+  "name": "Bane of Bala Ged",
+  "manaCost": "{7}",
+  "cmc": 7,
+  "typeLine": "Creature — Eldrazi",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Eldrazi"
+  ],
+  "oracleText": "Whenever this creature attacks, defending player exiles two permanents they control.",
+  "power": "7",
+  "toughness": "5",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "bfz",
+  "releasedAt": "2015-10-02",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -3499,6 +3592,36 @@
   "gameChanger": false
  },
  {
+  "oracleId": "5715ed43-395c-4877-99a7-8e28e7bf9dce",
+  "name": "Eclipsed Realms",
+  "manaCost": "",
+  "cmc": 0,
+  "typeLine": "Land",
+  "supertypes": [],
+  "types": [
+   "Land"
+  ],
+  "subtypes": [],
+  "oracleText": "As this land enters, choose Elemental, Elf, Faerie, Giant, Goblin, Kithkin, Merfolk, or Treefolk.\n{T}: Add {C}.\n{T}: Add one mana of any color. Spend this mana only to cast a spell of the chosen type or activate an ability of a source of the chosen type.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "C",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "5674f6ae-ed5d-441e-a534-b5dd415165fd",
   "name": "Eerie Ultimatum",
   "manaCost": "{W}{W}{B}{B}{B}{G}{G}",
@@ -3897,6 +4020,64 @@
   "set": "sok",
   "releasedAt": "2005-06-03",
   "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "0114f97f-b196-4af1-90aa-eba164cb8f22",
+  "name": "Etchings of the Chosen",
+  "manaCost": "{1}{W}{B}",
+  "cmc": 3,
+  "typeLine": "Enchantment",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [],
+  "oracleText": "As this enchantment enters, choose a creature type.\nCreatures you control of the chosen type get +1/+1.\n{1}, Sacrifice a creature of the chosen type: Target creature you control gains indestructible until end of turn. (Damage and effects that say \"destroy\" don't destroy it.)",
+  "colors": [
+   "B",
+   "W"
+  ],
+  "colorIdentity": [
+   "B",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "mh1",
+  "releasedAt": "2019-06-14",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "dbba75f5-2404-4bd5-982b-f6c4effa5316",
+  "name": "Ethereal Armor",
+  "manaCost": "{W}",
+  "cmc": 1,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nEnchanted creature gets +1/+1 for each enchantment you control and has first strike.",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "dsk",
+  "releasedAt": "2024-09-27",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -4833,6 +5014,28 @@
   "gameChanger": false
  },
  {
+  "oracleId": "9f6d6e90-7462-46e5-bf2f-725b4badc394",
+  "name": "Gathering Stone",
+  "manaCost": "{4}",
+  "cmc": 4,
+  "typeLine": "Artifact",
+  "supertypes": [],
+  "types": [
+   "Artifact"
+  ],
+  "subtypes": [],
+  "oracleText": "As this artifact enters, choose a creature type.\nSpells you cast of the chosen type cost {1} less to cast.\nWhen this artifact enters and at the beginning of your upkeep, look at the top card of your library. If it's a card of the chosen type, you may reveal it and put it into your hand. If you don't put the card into your hand, you may put it into your graveyard.",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "ecl",
+  "releasedAt": "2026-01-23",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "3dfb0c0a-b68f-43b9-8475-28d0192fc4ed",
   "name": "Gemrazer",
   "manaCost": "{3}{G}",
@@ -4895,6 +5098,35 @@
   "set": "eos",
   "releasedAt": "2025-08-01",
   "rarity": "mythic",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "aaed2f39-6d5d-4880-a7c4-5a045399dab3",
+  "name": "Geode Golem",
+  "manaCost": "{5}",
+  "cmc": 5,
+  "typeLine": "Artifact Creature — Golem",
+  "supertypes": [],
+  "types": [
+   "Artifact",
+   "Creature"
+  ],
+  "subtypes": [
+   "Golem"
+  ],
+  "oracleText": "Trample\nWhenever this creature deals combat damage to a player, you may cast your commander from the command zone without paying its mana cost. (You still pay any additional costs.)",
+  "power": "5",
+  "toughness": "3",
+  "colors": [],
+  "colorIdentity": [],
+  "keywords": [
+   "Trample"
+  ],
+  "commanderLegal": "legal",
+  "set": "clb",
+  "releasedAt": "2022-06-10",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },
@@ -5669,6 +5901,48 @@
   "set": "p02",
   "releasedAt": "1998-06-24",
   "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "845b40b1-dc09-44fa-9910-22544c1424ba",
+  "name": "Hazel of the Rootbloom",
+  "manaCost": "{2}{B}{G}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Squirrel Druid",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Squirrel",
+   "Druid"
+  ],
+  "oracleText": "{T}, Pay 2 life, Tap X untapped tokens you control: Add X mana in any combination of colors.\nAt the beginning of your end step, create a token that's a copy of target token you control. If that token is a Squirrel, instead create two tokens that are copies of it.",
+  "power": "3",
+  "toughness": "5",
+  "colors": [
+   "B",
+   "G"
+  ],
+  "colorIdentity": [
+   "B",
+   "G"
+  ],
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ],
+  "commanderLegal": "legal",
+  "set": "blc",
+  "releasedAt": "2024-08-02",
+  "rarity": "mythic",
   "layout": "normal",
   "gameChanger": false
  },
@@ -6740,6 +7014,73 @@
   "gameChanger": false
  },
  {
+  "oracleId": "c4212ba4-8c43-40ca-aa36-b3b535659fa8",
+  "name": "Knight of Autumn",
+  "manaCost": "{1}{G}{W}",
+  "cmc": 3,
+  "typeLine": "Creature — Dryad Knight",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Dryad",
+   "Knight"
+  ],
+  "oracleText": "When this creature enters, choose one —\n• Put two +1/+1 counters on this creature.\n• Destroy target artifact or enchantment.\n• You gain 4 life.",
+  "power": "2",
+  "toughness": "1",
+  "colors": [
+   "G",
+   "W"
+  ],
+  "colorIdentity": [
+   "G",
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "grn",
+  "releasedAt": "2018-10-05",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "4e6c71e8-aeaf-404e-84c2-c79f2a1cbe4b",
+  "name": "Knight of Meadowgrain",
+  "manaCost": "{W}{W}",
+  "cmc": 2,
+  "typeLine": "Creature — Kithkin Knight",
+  "supertypes": [],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Kithkin",
+   "Knight"
+  ],
+  "oracleText": "First strike\nLifelink (Damage dealt by this creature also causes you to gain that much life.)",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [
+   "Lifelink",
+   "First strike"
+  ],
+  "commanderLegal": "legal",
+  "set": "lrw",
+  "releasedAt": "2007-10-12",
+  "rarity": "uncommon",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "d69b1e68-8d8e-460b-9eb4-6a68be886197",
   "name": "Kodama of the West Tree",
   "manaCost": "{2}{G}",
@@ -7210,6 +7551,39 @@
   "set": "m10",
   "releasedAt": "2009-07-17",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "1718a442-b878-4690-b608-a013de3d79fc",
+  "name": "Light-Paws, Emperor's Voice",
+  "manaCost": "{1}{W}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Fox Advisor",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Fox",
+   "Advisor"
+  ],
+  "oracleText": "Whenever an Aura you control enters, if you cast it, you may search your library for an Aura card with mana value less than or equal to that Aura and with a different name than each Aura you control, put that card onto the battlefield attached to Light-Paws, then shuffle.",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "W"
+  ],
+  "colorIdentity": [
+   "W"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "neo",
+  "releasedAt": "2022-02-18",
+  "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
  },
@@ -9055,6 +9429,44 @@
   "gameChanger": false
  },
  {
+  "oracleId": "25afddd2-6e48-4742-b34e-e3b5def7c0fd",
+  "name": "Pippin, Guard of the Citadel",
+  "manaCost": "{W}{U}",
+  "cmc": 2,
+  "typeLine": "Legendary Creature — Halfling Soldier",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Halfling",
+   "Soldier"
+  ],
+  "oracleText": "Vigilance, ward {1}\n{T}: Another target creature you control gains protection from the card type of your choice until end of turn. (It can't be blocked, targeted, dealt damage, enchanted, or equipped by anything of that type.)",
+  "power": "2",
+  "toughness": "2",
+  "colors": [
+   "U",
+   "W"
+  ],
+  "colorIdentity": [
+   "U",
+   "W"
+  ],
+  "keywords": [
+   "Vigilance",
+   "Ward"
+  ],
+  "commanderLegal": "legal",
+  "set": "ltr",
+  "releasedAt": "2023-06-23",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
   "oracleId": "a188fe7e-68de-4c7c-806c-bfe8fc7b44bf",
   "name": "Pithing Needle",
   "manaCost": "{1}",
@@ -9477,6 +9889,36 @@
   "set": "5dn",
   "releasedAt": "2004-06-04",
   "rarity": "common",
+  "layout": "normal",
+  "gameChanger": false
+ },
+ {
+  "oracleId": "9d2d6479-531c-4ce1-b52b-00e36fa63b64",
+  "name": "Rancor",
+  "manaCost": "{G}",
+  "cmc": 1,
+  "typeLine": "Enchantment — Aura",
+  "supertypes": [],
+  "types": [
+   "Enchantment"
+  ],
+  "subtypes": [
+   "Aura"
+  ],
+  "oracleText": "Enchant creature\nEnchanted creature gets +2/+0 and has trample.\nWhen this Aura is put into a graveyard from the battlefield, return it to its owner's hand.",
+  "colors": [
+   "G"
+  ],
+  "colorIdentity": [
+   "G"
+  ],
+  "keywords": [
+   "Enchant"
+  ],
+  "commanderLegal": "legal",
+  "set": "pip",
+  "releasedAt": "2024-03-08",
+  "rarity": "uncommon",
   "layout": "normal",
   "gameChanger": false
  },

@@ -753,7 +753,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
         // "Tap an untapped creature you control": click what to tap (CR 602.2b).
         if (d.tap !== undefined) continue;
         // "Untap a tapped creature you control" (Halo Fountain) likewise, or one to tap for mana first.
-        return setCostPick({ activate: d, kind: "tap", ...(c.untap ? { untap: true as const } : {}), label: cardOf(s, d.objectId).name, what: `${c.untap ? "untap" : "tap"} ${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.filter.text}`, n: c.n, candidates: [...tapCostCandidates(s, HUMAN, s.objects[d.objectId]!, c), ...(c.untap ? untapViaMana(s, HUMAN, s.objects[d.objectId]!, c) : [])].filter((id) => !d.sacrifice?.includes(id)), chosen: [] });
+        return setCostPick({ activate: d, kind: "tap", ...(c.untap ? { untap: true as const } : {}), label: cardOf(s, d.objectId).name, what: `${c.untap ? "untap" : "tap"} ${c.n === 1 ? (/^[aeiou]/i.test(c.filter.text) ? "an" : "a") : c.n} ${c.n === 1 ? c.filter.text : c.filter.text.replace(/([^s])( you control)$/, "$1s$2")}`, n: c.n, candidates: [...tapCostCandidates(s, HUMAN, s.objects[d.objectId]!, c), ...(c.untap ? untapViaMana(s, HUMAN, s.objects[d.objectId]!, c) : [])].filter((id) => !d.sacrifice?.includes(id)), chosen: [] });
       }
       if (c.kind === "exileFromHand" && c.toLibrary) {
         // "Put a card from your hand on top of your library" (Penance): click the cards in your hand.
@@ -3494,7 +3494,8 @@ function TypePicker({
               </div>
             </>
           )}
-          <h4>{q ? `Types matching “${query.trim()}”` : "All creature types"}</h4>
+          {/* Eclipsed Realms: only the eight types it names. */}
+          <h4>{q ? `Types matching “${query.trim()}”` : pending.options.length <= 20 ? "The creature types it offers" : "All creature types"}</h4>
           <div className="type-list">
             {matches.length === 0 && <span className="muted">No creature type matches.</span>}
             {matches.map((t) => (
@@ -4325,6 +4326,12 @@ function Controls({
             <>
               <strong>Suspend:</strong> the last time counter is gone. Cast <strong>{d.name}</strong> without paying its mana cost? If you don&apos;t, it stays in exile.
             </>
+          ) : o.zone === "command" ? (
+            <>
+              {/* Geode Golem: the commander tax is still paid (CR 903.8). */}
+              <strong>{pending.source}:</strong> cast <strong>{d.name}</strong> from the command zone without paying its mana cost?
+              {commanderTax(s.players[HUMAN]!, o) ? <> You still pay the commander tax, <ManaCost cost={`{${commanderTax(s.players[HUMAN]!, o)}}`} size="sm" />.</> : null}
+            </>
           ) : (
             <>
               <strong>{pending.source}:</strong> cast <strong>{d.name}</strong> without paying its mana cost?
@@ -4333,7 +4340,7 @@ function Controls({
         </span>
         {s.cards[o.cardId]?.layout !== "split" && !transformed && (
           <button
-            disabled={((pending.how === "madness" || pending.how === "miracle" || pending.how === "paid") && planCast(s, HUMAN, pending.objectId, undefined, undefined, "auto") === null) || (!!pending.mv && /mana value/.test(castProblem(s, HUMAN, pending.objectId) ?? ""))}
+            disabled={((pending.how === "madness" || pending.how === "miracle" || pending.how === "paid" || (o.zone === "command" && commanderTax(s.players[HUMAN]!, o) > 0)) && planCast(s, HUMAN, pending.objectId, undefined, undefined, "auto") === null) || (!!pending.mv && /mana value/.test(castProblem(s, HUMAN, pending.objectId) ?? ""))}
             title={pending.how === "madness" || pending.how === "miracle" || pending.how === "paid" || pending.mv ? (castProblem(s, HUMAN, pending.objectId) ?? "") : ""}
             onClick={() => onCastFree(pending.objectId)}
           >

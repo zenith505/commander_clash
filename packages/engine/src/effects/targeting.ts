@@ -84,6 +84,7 @@ export function objectMatches(s: GameState, spec: TargetSpec, o: GameObject, con
   if (spec.equalsChosen && (spec.equals === undefined || !spec.equalsChosen.some((k) => (k === "manaValue" ? defMv(defOf(s, o)) : c.types.includes("Creature") ? c[k] : undefined) === spec.equals))) return false;
   if (spec.mvAtMostControllersGraveyard && defMv(defOf(s, o)) > (s.players[c.controller]?.graveyard.length ?? 0)) return false;
   if (spec.manaCostIn && !spec.manaCostIn.includes(defOf(s, o).manaCost)) return false;
+  if (spec.xInCost && !parseManaCost(defOf(s, o).manaCost).hasX) return false;
   if (spec.combat === "attacking" && o.attacking === undefined) return false;
   if (spec.combat === "attackingYou" && (o.attacking !== controller || o.attackingPermanent)) return false;
   if (spec.combat === "attackingOpponent" && (o.attacking === undefined || o.attacking === controller || o.attackingPermanent || !opponents(s, controller).includes(o.attacking))) return false;
@@ -284,6 +285,7 @@ export function printedMatches(spec: TargetSpec, d: CardDef): boolean {
   if (spec.manaValue && !inRange(defMv(d), spec.manaValue)) return false;
   if (spec.equalsChosen && (spec.equals === undefined || !spec.equalsChosen.some((k) => (k === "manaValue" ? defMv(d) : creature && /^\d+$/.test(d[k] ?? "") ? Number(d[k]) : undefined) === spec.equals))) return false;
   if (spec.manaCostIn && !spec.manaCostIn.includes(d.manaCost)) return false;
+  if (spec.xInCost && !parseManaCost(d.manaCost).hasX) return false;
   if (spec.named !== undefined && !hasName(d.name, spec.named)) return false;
   if (spec.notNamed !== undefined && hasName(d.name, spec.notNamed)) return false;
   if (spec.notNamedAny?.some((n) => sameName(d.name, n))) return false;

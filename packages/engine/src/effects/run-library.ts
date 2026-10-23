@@ -11,6 +11,7 @@ import { ResolveCtx, apnap, players, amountNow, amountCtx, amountFor, objects } 
 import { describeDest } from "./describe";
 import { fireEvent } from "./triggers";
 import { chooseAuraHosts } from "./run-zones";
+import { addDelayed } from "./run-spells";
 import type { AuraHost } from "../game";
 import { defMv, sameName } from "../faces";
 import { characteristics } from "../layers";
@@ -127,6 +128,8 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: [o.id], mods: e.alsoMods });
         invalidateCharacteristics(s);
       }
+      // A delayed trigger about the permanent it became (CR 603.7c, 400.7).
+      if (e.atEndStep && o.zone === "battlefield") addDelayed(s, e.atEndStep, ctx.controller, o, { targets: [], effects: [{ type: "sacrifice", what: { ref: "subject" } }], text: "Sacrifice ~." });
       return;
     }
     case "revealTop": {
@@ -390,8 +393,14 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
       const r = s.resolving!;
       const arranged = r.scratch?.arranged;
       if (!arranged) {
-        const cards = p.library.slice(0, amountNow(s, e.n, ctx));
-        if (!cards.length) return; // scry 0 / empty library: nothing happens (CR 701.22b)
+        const n = amountNow(s, e.n, ctx);
+        const cards = p.library.slice(0, n);
+        // Scry 0: no scry event (CR 701.22b, 701.25c). With an empty library it's done as far as it can be, and "whenever
+        // you scry" triggers anyway (701.22d, 701.25d).
+        if (!cards.length) {
+          if (n > 0) fireEvent(s, { type: "scried", player: p.id, how: e.type, n: 0 });
+          return;
+        }
         s.pending = { kind: "arrangeTop", player: p.id, how: e.type, cards, source: src };
         return "paused";
       }
@@ -406,6 +415,7 @@ export function runLibraryEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: 
         const names = arranged.away.map((id) => defOf(s, obj(s, id)).name);
         log(s, `${p.name} surveils ${looked.size}${names.length ? `, putting ${names.join(" and ")} into their graveyard` : ""}.`);
       }
+      fireEvent(s, { type: "scried", player: p.id, how: e.type, n: looked.size });
       return;
     }
     case "clash": {

@@ -15,6 +15,12 @@ import { ResolveCtx, objects } from "./resolve";
 export function copiedValues(s: GameState, ref: ObjRef, ctx: ResolveCtx): CardDef | undefined {
   const key = (k?: string) => (k ? s.cards[k] : undefined);
   if (ref.ref === "sacrificed") return key(ctx.sacrificed?.[0]?.copyKey);
+  // "A copy of that card" (Myrkul, Lord of Bones): the card as it last existed in the graveyard, wherever it is now
+  // (rulings), not the permanent it was.
+  if (ref.ref === "subjectCard" && ref.printed) {
+    const o = ctx.subject ? s.objects[ctx.subject.id] : undefined;
+    return o && o.zone !== "battlefield" && !o.isToken ? restingDef(s.cards[o.cardId]!) : undefined;
+  }
   if (ref.ref === "subjectCard" && ctx.lki?.copyKey) return key(ctx.lki.copyKey);
   if (ref.ref === "target") {
     const t = ctx.targets[ref.index];

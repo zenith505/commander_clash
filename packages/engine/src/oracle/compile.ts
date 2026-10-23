@@ -1449,7 +1449,13 @@ export function compile(d: CardDef): CompiledCard {
     }
     // Bolas's Citadel: "... If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost."
     const lifeTop = /^(.+?)\. If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost\.$/.exec(line);
-    const top = lifeTop ? ((t) => (t?.spells ? { ...t, payLife: true as const } : t && null))(parseFromTop(lifeTop[1]!)) : parseFromTop(line.replace(/\.$/, ""));
+    // Thundermane Dragon: "... If you cast a creature spell this way, it gains haste until end of turn."
+    const hasteTop = !lifeTop && /^(.+?)\. If you cast a creature spell this way, it gains haste until end of turn\.$/.exec(line);
+    const top = lifeTop
+      ? ((t) => (t?.spells ? { ...t, payLife: true as const } : t && null))(parseFromTop(lifeTop[1]!))
+      : hasteTop
+        ? ((t) => (t?.spells && !t.lands && !t.once ? { ...t, haste: "endOfTurn" as const } : t && null))(parseFromTop(hasteTop[1]!))
+        : parseFromTop(line.replace(/\.$/, ""));
     if (top !== undefined) {
       if (top === null) out.unsupported.push(raw);
       else (out.fromTop ??= []).push(top);
@@ -2605,6 +2611,14 @@ export function compile(d: CardDef): CompiledCard {
       out.statics.push({ ...a, text: line }, { ...b, affects: { ...(b.affects as Extract<Affects, { kind: "filter" }>), spec: { kind: "object", notSubtypes: skip, text: `non-${skip[0]}` } }, text: line });
       continue;
     }
+    // Eidolon of Countless Battles: "~ and enchanted creature each get +1/+1 for each ...": the same for each of them (as
+    // a bestowed Aura, ~ isn't a creature and gets nothing, CR 702.103b).
+    const selfAnd = /^~ and (enchanted|equipped) creature each get (.+)$/.exec(line);
+    const both = selfAnd && [parseStatic(`~ gets ${selfAnd[2]}`), parseStatic(`${capital(selfAnd[1]!)} creature gets ${selfAnd[2]}`)];
+    if (both?.every((p) => p)) {
+      for (const p of both) out.statics.push({ ...p!, text: line });
+      continue;
+    }
     // A spell's "When you next cast ... this turn, ..." creates a delayed trigger as it resolves (CR 603.7); it isn't a triggered ability of the card.
     // So does a Pact's "At the beginning of your next upkeep, pay {2}{B}. If you don't, you lose the game." (CR 603.7a), and
     // Glorious End's "At the beginning of your next end step, you lose the game."
@@ -2975,8 +2989,15 @@ function linkExile(out: CompiledCard) {
     if (others || impulses.length !== 1) out.unsupported.push("(refers to cards exiled with it that it can't link to one exile ability)");
     else impulses[0]!.linked = true;
   }
-  // "Cast a spell from among cards exiled with ~" with no one impulse to link it to (Idol of Endurance's exile until it leaves).
-  if (!impulses.length && bodies.some((b) => allEffects(b.effects).some((e) => e.type === "castLinkedFree"))) out.unsupported.push("(casts a card exiled with it that it can't link to one exile ability)");
+  // "Cast a spell from among cards exiled with ~" with no impulse: Idol of Endurance's one exile of graveyard cards until
+  // it leaves (CR 607.2a).
+  if (!impulses.length && bodies.some((b) => allEffects(b.effects).some((e) => e.type === "castLinkedFree"))) {
+    const all = bodies.flatMap((b) => allEffects(b.effects));
+    const exiles = all.filter((e): e is Extract<Effect, { type: "exileGraveyard" }> => e.type === "exileGraveyard" && !!e.until);
+    const others = all.some((e) => e.type === "exile" || (e.type === "exileGraveyard" && !e.until) || (e.type === "takeFromHand" && e.action === "exile") || e.type === "hideaway" || e.type === "exileFaceDown" || (e.type === "discard" && !!e.exile));
+    if (others || out.spell || exiles.length !== 1) out.unsupported.push("(casts a card exiled with it that it can't link to one exile ability)");
+    else exiles[0]!.linked = true;
+  }
   // Currency Converter: "Whenever you discard a card, you may exile that card from your graveyard" and "Put a card exiled
   // with ~ into its owner's graveyard": the cards its one exile instruction exiled (CR 607.2a).
   if (!impulses.length && bodies.some((b) => allEffects(b.effects).some((e) => e.type === "moveLinked"))) {

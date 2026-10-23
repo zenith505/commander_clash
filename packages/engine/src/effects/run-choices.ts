@@ -687,7 +687,7 @@ function canDoNow(s: GameState, effects: Effect[], ctx: ResolveCtx): boolean {
     if (e.type === "chooseFromGraveyard" && e.dest === "exile" && !e.who && !player(s, ctx.controller).graveyard.some((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))))) return false;
     if (e.type === "loseLife" && !players(s, e.who, ctx).some((pid) => !player(s, pid).lost && canLoseLife(s, pid))) return false;
     if (e.type === "sacrifice" && !objects(s, e.what, ctx).some((o) => e.byController || controllerOf(s, o) === ctx.controller)) return false;
-    if (e.type === "exile" && e.what.ref === "selfCard" && !objects(s, e.what, ctx).length) return false;
+    if (e.type === "exile" && (e.what.ref === "selfCard" || e.what.ref === "subjectCard") && !objects(s, e.what, ctx).length) return false;
     if (e.type === "tap" && e.what.ref === "self" && !objects(s, e.what, ctx).some((o) => !o.tapped)) return false;
     if (e.type === "continuous" && !objects(s, e.what, ctx).length) return false;
     if (e.type === "becomeCopy" && (!objects(s, e.what, ctx).length || !objects(s, e.of, ctx).length)) return false;

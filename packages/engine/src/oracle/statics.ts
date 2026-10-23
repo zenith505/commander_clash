@@ -1432,6 +1432,22 @@ function parseStaticLine(line: string): StaticAbility | null {
   const alsoHas = andHas ? parseStaticMods(andHas[1]!) : [];
   if (!alsoHas) return null;
   if (each && andHas) each[4] = each[4]!.slice(0, andHas.index);
+  // Eidolon of Countless Battles: "gets +1/+1 for each creature you control and +1/+1 for each Aura you control": both,
+  // each counted on its own.
+  const second = each && !andHas ? new RegExp(`^(.+?) and (${PT}/${PT}) for each (.+)$`).exec(each[4]!) : null;
+  if (second) {
+    const first = parseStaticMods(each![1]!);
+    const more = parseStaticMods(`get ${second[2]!}`);
+    const a = counts(parseCount(second[1]!, null, true), second[1]!);
+    const b = counts(parseCount(second[5]!, null, true), second[5]!);
+    const pa = first?.[0];
+    const pb = more?.[0];
+    if (!a || !b || first?.length !== 1 || more?.length !== 1 || pa?.kind !== "modifyPT" || pb?.kind !== "modifyPT") return null;
+    const sa = [scaleAmount(pa.power, a), scaleAmount(pa.toughness, a)];
+    const sb = [scaleAmount(pb.power, b), scaleAmount(pb.toughness, b)];
+    if (sa.some((x) => x === null) || sb.some((x) => x === null)) return null;
+    return { affects, mods: [{ kind: "modifyPT", power: sa[0]!, toughness: sa[1]! }, { kind: "modifyPT", power: sb[0]!, toughness: sb[1]! }], text: line };
+  }
   if (each) {
     // Coat of Arms: "for each other creature on the battlefield that shares at least one creature type with it", "it"
     // each creature it affects, counted for that one.

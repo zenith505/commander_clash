@@ -14627,5 +14627,38 @@
   "rarity": "rare",
   "layout": "normal",
   "gameChanger": false
+ },
+ {
+  "oracleId": "9f7d5e1c-bf5b-4ab9-bd6e-2627b4d22b36",
+  "name": "Zada, Hedron Grinder",
+  "manaCost": "{3}{R}",
+  "cmc": 4,
+  "typeLine": "Legendary Creature — Goblin Ally",
+  "supertypes": [
+   "Legendary"
+  ],
+  "types": [
+   "Creature"
+  ],
+  "subtypes": [
+   "Goblin",
+   "Ally"
+  ],
+  "oracleText": "Whenever you cast an instant or sorcery spell that targets only Zada, copy that spell for each other creature you control that the spell could target. Each copy targets a different one of those creatures.",
+  "power": "3",
+  "toughness": "3",
+  "colors": [
+   "R"
+  ],
+  "colorIdentity": [
+   "R"
+  ],
+  "keywords": [],
+  "commanderLegal": "legal",
+  "set": "j25",
+  "releasedAt": "2024-11-15",
+  "rarity": "rare",
+  "layout": "normal",
+  "gameChanger": false
  }
 ]

@@ -23,7 +23,7 @@ export function parseManaAbility(line0: string): ManaAbility | null {
     .replace(/: Choose a color\. Add an amount of mana of that color equal to (.+?)\./, ": Add X mana of any one color, where X is $1.")
     // "Choose a color. Add one mana of that color for each charge counter on ~." (Astral Cornucopia): the same.
     .replace(/: Choose a color\. Add one mana of that color for each ([^.]+? counter) on ~\./, ": Add X mana of any one color, where X is the number of $1s on ~.");
-  const part = String.raw`\{[^}]+\}|Sacrifice ~|Exert ~|Discard your hand|Pay \d+ life|Pay (?:\{E\})+|Remove (?:a|an|one|two|three|four|five) [a-z]+ counters? from ~|Remove (?:any number of|X) [a-z]+ counters from ~|Tap (?:an|one|two|three) untapped [^,:]+? you control`;
+  const part = String.raw`\{[^}]+\}|Sacrifice ~|Exert ~|Discard your hand|Pay \d+ life|Pay (?:\{E\})+|Remove (?:a|an|one|two|three|four|five) [a-z]+ counters? from ~|Put an? [^,:]+? counter on ~|Remove (?:any number of|X) [a-z]+ counters from ~|Tap (?:an|one|two|three) untapped [^,:]+? you control`;
   const m = new RegExp(`^((?:${part})(?:, (?:${part}))*): Add ([^.]+)\\.((?: [^.]+\\.)*)$`).exec(line);
   if (!m) return null;
   const costs = m[1]!.split(", ");
@@ -37,11 +37,15 @@ export function parseManaAbility(line0: string): ManaAbility | null {
   let removeX: { counter: CounterKind; any: boolean } | undefined;
   let discardHand = false;
   let exert = false;
+  let putCost: CounterKind | undefined;
   for (const c of costs) {
+    const pc = new RegExp(`^Put an? ${COUNTER} counter on ~$`).exec(c);
     const rc = removeCounterCost(c);
     const tc = new RegExp(`^Tap ${NUM} untapped (.+) you control$`).exec(c);
     const rx = new RegExp(`^Remove (any number of|X) ${COUNTER} counters from ~$`).exec(c);
     if (rc) removeCounters = rc;
+    // "Put a -0/-1 counter on ~: Add {G}" (Wall of Roots): put as the cost is paid, with the rest (CR 602.2b, 605.3a).
+    else if (pc && !putCost) putCost = counterKind(pc[1]!);
     else if (rx && !removeX && !removeCounters) removeX = { counter: counterKind(rx[2]!), any: rx[1] === "any number of" };
     else if (tc) {
       const filter = pickFilter(tc[2]!);
@@ -61,7 +65,7 @@ export function parseManaAbility(line0: string): ManaAbility | null {
   }
   const produces = removeX ? removedProduced(m[2]!, removeX.counter, removeX.any) : parseManaProduced(m[2]!);
   if (!produces || (removeCounters && removeX)) return null;
-  const out: ManaAbility = { text: line0, manaCost, tap, sacrificeSelf, produces, ...(lifeCost ? { lifeCost } : {}), ...(energyCost ? { energyCost } : {}), ...(removeCounters ? { removeCounters } : {}), ...(tapCost ? { tapCost } : {}), ...(discardHand ? { discardHand: true as const } : {}), ...(exert ? { skipNextUntap: true } : {}) };
+  const out: ManaAbility = { text: line0, manaCost, tap, sacrificeSelf, produces, ...(lifeCost ? { lifeCost } : {}), ...(energyCost ? { energyCost } : {}), ...(removeCounters ? { removeCounters } : {}), ...(tapCost ? { tapCost } : {}), ...(discardHand ? { discardHand: true as const } : {}), ...(exert ? { skipNextUntap: true } : {}), ...(putCost ? { putCounter: putCost } : {}) };
   let m2: RegExpExecArray | null;
   for (const extra of (m[3] ?? "").split(/(?<=\.) /).map((x) => x.trim()).filter(Boolean)) {
     const dmg = new RegExp(`^~ deals ${NUM} damage to you\\.$`).exec(extra);

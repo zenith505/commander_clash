@@ -332,7 +332,8 @@ describe("Zada, Ink-Treader Nephilim, Precursor Golem: a copy of the spell for e
     const theirs = putOnBattlefield(s0, opp, ogre("Their Ogre"));
     let s = run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: ink }]));
     // The trigger resolves: two copies on the stack above the spell, both under the Nephilim's controller.
-    for (let i = 0; i < 20 && s.stack.length < 3; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    // The copies' controller picks the order (round 131): battlefield order here.
+    for (let i = 0; i < 20 && s.stack.length < 3; i++) s = s.pending?.kind === "chooseOption" ? act(s, { type: "chooseOption", player: s.pending.player, choice: s.pending.options[0]! }) : act(s, { type: "passPriority", player: waitingOn(s)! });
     expect(s.stack.filter((x) => x.copy).map((x) => x.controller)).toEqual([opp, opp]);
     s = settleBots(s);
     expect([ink, mine, theirs].map((id) => pow(s, id))).toEqual([6, 6, 6]);
@@ -344,7 +345,8 @@ describe("Zada, Ink-Treader Nephilim, Precursor Golem: a copy of the spell for e
     const g2 = putOnBattlefield(s0, ap, golem("Golem Two"));
     const o = putOnBattlefield(s0, ap, ogre("Not a Golem"));
     let s = run(s0, planCast(s0, ap, ids[0]!, [{ kind: "object", id: g1 }]));
-    for (let i = 0; i < 20 && s.stack.length < 3; i++) s = act(s, { type: "passPriority", player: waitingOn(s)! });
+    // The copies' controller picks the order (round 131): battlefield order here.
+    for (let i = 0; i < 20 && s.stack.length < 3; i++) s = s.pending?.kind === "chooseOption" ? act(s, { type: "chooseOption", player: s.pending.player, choice: s.pending.options[0]! }) : act(s, { type: "passPriority", player: waitingOn(s)! });
     expect(s.stack.filter((x) => x.copy).map((x) => x.controller)).toEqual([ap, ap]);
     s = settleBots(s);
     expect([p, g1, g2, o].map((id) => pow(s, id))).toEqual([6, 6, 6, 3]);

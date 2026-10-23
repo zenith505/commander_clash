@@ -13,6 +13,7 @@ import { compileCard } from "../oracle";
 import { nextRandom, shuffle, shuffleLibrary } from "../rng";
 import { askWholeGraveyardOrder } from "../graveyard";
 import { foundWith, newObjects } from "../mutate";
+import { attachTo } from "./run-permanents";
 import { addDelayed, paidUnless, removeCopy } from "./run-spells";
 import { toBottom } from "./run-library";
 import { attackDefault, fireEvent, inCombat } from "./triggers";
@@ -996,7 +997,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           ids = hits.length < e.untilHits.n ? [...lib] : lib.slice(0, at + 1);
         }
         if (!e.reveal) for (const id of ids) moveObject(s, id, "exile");
-        log(s, `${player(s, whose).name} ${e.reveal ? "reveals" : "exiles"} ${ids.length ? ids.map((id) => defOf(s, obj(s, id)).name).join(", ") : "nothing"} from the top of their library.`);
+        if (e.look) log(s, `${player(s, whose).name} looks at the top ${ids.length === 1 ? "card" : `${ids.length} cards`} of their library.`);
+        else log(s, `${player(s, whose).name} ${e.reveal ? "reveals" : "exiles"} ${ids.length ? ids.map((id) => defOf(s, obj(s, id)).name).join(", ") : "nothing"} from the top of their library.`);
         sc.castAmong = { ids: ids.map((id) => ({ id, zc: obj(s, id).zoneChanges ?? 0 })), declined: [], ...(e.totalMv !== undefined ? { budget: amountNow(s, e.totalMv, ctx) } : {}), ...(e.maxMv !== undefined ? { maxMv: amountNow(s, e.maxMv, ctx) } : {}), ...(e.exactMv !== undefined ? { exactMv: amountNow(s, e.exactMv, ctx) } : {}), ...(hits ? { hits } : {}) };
       }
       const st = sc.castAmong;
@@ -1056,6 +1058,9 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         else {
           if (st.budget !== undefined) st.budget -= mvOf(st.casting);
           st.cast = (st.cast ?? 0) + 1;
+          // "Do this only once each turn": done (CR 603.2h).
+          const source = e.once && ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+          if (source) (source.triggeredThisTurn ??= []).push(`${ctx.sourceZc ?? source.zoneChanges ?? 0}|do:castNow`);
         }
         st.casting = undefined;
       }
@@ -1134,6 +1139,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
         .map((x) => x.id)
         .filter((id) => exiled(id) && !st.declined.includes(id) && id !== st.excluded && (isLand(id) ? !!e.lands && canPlayLandNow(s, you.id, id) : (!e.filter || printedMatches(e.filter, defOf(s, obj(s, id)))) && (!st.hits || st.hits.includes(id)) && (!e.sharesTypeWithYours || sharesType(id)) && castable(id)));
       if (!options.length || (e.max !== undefined && (st.cast ?? 0) >= e.max)) return finish();
+      if (e.look && options.length === 1) {
+        // Planetarium: the one card looked at is offered as the free cast itself (cast it, or decline).
+        st.pick = options[0];
+        return runEffect(s, e, ctx);
+      }
       const left = st.budget !== undefined ? ` (total mana value ${st.budget} left)` : "";
       s.pending = { kind: "chooseOption", player: you.id, source: src, what: "castFromAmong", options: [...options, "none"], labels: [...options.map((id) => defOf(s, obj(s, id)).name), "Done"], prompt: `${e.lands ? "play a land or " : ""}cast a spell from ${e.fromHand ? (obj(s, options[0]!).owner === you.id ? "your hand" : `among the cards in ${player(s, obj(s, options[0]!).owner).name}'s hand`) : "among "}${e.fromHand ? "" : `the ${e.reveal ? "revealed" : "exiled"} cards`} without paying its mana cost${left}?` };
       return "paused";
@@ -1792,6 +1802,11 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           if (o.zone !== "battlefield") continue;
           s.resolving?.created?.push(o.id);
           if (e.alsoMods) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: "game", affected: [o.id], mods: e.alsoMods });
+          // Nim Deathmantle: attached to it if it could be; otherwise it stays where it is (CR 701.3b; rulings).
+          if (e.attachSelf) {
+            const me = ctx.sourceId ? s.objects[ctx.sourceId] : undefined;
+            if (me?.zone === "battlefield") attachTo(s, me, o);
+          }
           if (e.haste) s.effects.push({ id: `e${s.nextId++}`, timestamp: s.nextTimestamp++, controller: ctx.controller, sourceName: src, duration: e.haste, affected: [o.id], mods: [{ kind: "addKeywords", keywords: ["Haste"] }] });
           if (e.atEndStep)
             addDelayed(s, "nextEndStep", ctx.controller, o, { targets: [], effects: [e.atEndStep === "exile" ? { type: "exile", what: { ref: "subject" } } : { type: "sacrifice", what: { ref: "subject" } }], text: `${e.atEndStep === "exile" ? "Exile" : "Sacrifice"} ~.` });
@@ -2089,7 +2104,13 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
       }
       return;
     }
-    case "exileGraveyard":
+    case "exileGraveyard": {
+      // "Until ~ leaves the battlefield" (Idol of Endurance): if it already left, nothing is exiled (CR 610.3c).
+      const me = e.until ? objects(s, { ref: "self" }, ctx)[0] : undefined;
+      if (e.until && !me) {
+        log(s, `${src} has left the battlefield, so nothing is exiled.`);
+        return;
+      }
       for (const pid of players(s, e.who, ctx)) {
         const p = player(s, pid);
         if (e.library) {
@@ -2098,17 +2119,21 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
           log(s, `${src} exiles ${p.name}'s library (${n} card${n === 1 ? "" : "s"}).`);
           continue;
         }
-        const n = p.graveyard.length;
-        for (const id of [...p.graveyard]) {
+        const cards = p.graveyard.filter((id) => !e.filter || printedMatches(e.filter, defOf(s, obj(s, id))));
+        const n = cards.length;
+        for (const id of cards) {
           // "Creature cards exiled this way": their power as it was in the graveyard (rulings on Szat's Will).
           const o = obj(s, id);
           if (s.resolving && objIsType(s, o, "Creature")) (s.resolving.exiledPowers ??= []).push(power(s, o));
           moveObject(s, id, "exile");
           if (e.linked && ctx.sourceId && o.zone === "exile") ((s.linkedExile ??= {})[`${ctx.sourceId}@${ctx.sourceZc ?? 0}`] ??= []).push({ id, zc: o.zoneChanges ?? 0 });
+          if (me && o.zone === "exile") (me.exiledUntilLeaves ??= []).push({ id, zc: o.zoneChanges ?? 0, graveyard: true });
         }
-        log(s, `${src} exiles ${p.name}'s graveyard (${n} card${n === 1 ? "" : "s"}).`);
+        if (e.filter) log(s, `${src} exiles ${n ? cards.map((id) => defOf(s, obj(s, id)).name).join(", ") : "nothing"} from ${p.name}'s graveyard${e.until ? ` until ${src} leaves the battlefield` : ""}.`);
+        else log(s, `${src} exiles ${p.name}'s graveyard (${n} card${n === 1 ? "" : "s"}).`);
       }
       return;
+    }
     case "flicker": {
       // Exiled, then returned together once any Aura's host is chosen (CR 303.4f). With `at`, one delayed trigger returns
       // all the cards exiled this way together (CR 603.7), those still in exile then (CR 400.7).
@@ -2391,8 +2416,8 @@ export function runZonesEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: st
     case "castLinkedFree": {
       // Court of Locthwain: one spell from among the cards its own exile took (CR 607.2a), for the rest of this turn.
       if (!ctx.sourceId) return;
-      (s.linkedFreeCasts ??= []).push({ player: ctx.controller, source: `${ctx.sourceId}@${ctx.sourceZc ?? 0}`, turn: s.turn, sourceName: src });
-      log(s, `${player(s, ctx.controller).name} may cast a spell from among the cards exiled with ${src} this turn without paying its mana cost.`);
+      (s.linkedFreeCasts ??= []).push({ player: ctx.controller, source: `${ctx.sourceId}@${ctx.sourceZc ?? 0}`, turn: s.turn, sourceName: src, ...(e.filter ? { filter: e.filter } : {}) });
+      log(s, `${player(s, ctx.controller).name} may cast ${e.filter ? `a ${e.filter.text.replace(/ card$/, "")}` : "a"} spell from among the cards exiled with ${src} this turn without paying its mana cost.`);
       return;
     }
     case "impulse": {

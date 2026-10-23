@@ -40,7 +40,19 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
     return ctx.targets[ctx.lastObjectTarget]!.stackAbilities ? null : [{ type: "counterSpell", index: ctx.lastObjectTarget, bounce: true }];
   // Court of Locthwain: "until end of turn, you may cast a spell from among cards exiled with ~ without paying its mana
   // cost": one spell, from the cards its linked exile took (compile.ts links it, CR 607.2a).
-  if (/^[Uu]ntil end of turn, you may cast a spell from among cards exiled with ~ without paying its mana cost$/.test(s)) return [{ type: "castLinkedFree" }];
+  // Idol of Endurance: "... a creature spell from among ...": only a spell of that kind.
+  // (A leading "Until end of turn," comes here as a trailing one.)
+  if ((m = /^(?:[Uu]ntil end of turn, you|You) may cast an? (?:([a-z]+(?: or [a-z]+)?) )?spell from among cards exiled with ~ without paying its mana cost(?<until> until end of turn)?$/.exec(s)) && (m.groups?.until !== undefined) === /^You/.test(s)) {
+    const filter = m[1] ? parseSearchFilter(`${m[1]} card`) : undefined;
+    if (filter === null || (m[1] && !filter)) return null;
+    return [{ type: "castLinkedFree", ...(filter ? { filter } : {}) }];
+  }
+  // Idol of Endurance: "Exile all creature cards with mana value 3 or less from your graveyard until ~ leaves the
+  // battlefield": they return to the graveyard when it leaves (CR 610.3).
+  if ((m = /^[Ee]xile all (.+?) cards( with mana value \d+ or less)? from your graveyard until ~ leaves the battlefield$/.exec(s)) && !ctx.spell) {
+    const filter = parseSearchFilter(`${m[1]} card${m[2] ?? ""}`);
+    return filter ? [{ type: "exileGraveyard", who: { ref: "you" }, filter, until: "sourceLeaves" }] : null;
+  }
   // Emry: "Choose target artifact card in your graveyard. You may cast that card this turn."
   // The one target so far is that card, in your graveyard.
   if (/^You may cast (?:that card|it) this turn$/.test(s) && ctx.targets.length === 1) {
@@ -578,10 +590,11 @@ export function parseZonesSentence(s0: string, ctx: Ctx): Effect[] | null | unde
   // Broodmoth: "... with a flying counter on it" (a keyword counter, CR 122.1b).
   // With no "under ... control" (Daretti's emblem: "return that card to the battlefield"), under the control of the player
   // who puts it there, the ability's controller (CR 110.2a).
-  if ((m = new RegExp(`^(?:Return (that card|it) to|Put (that card) onto) the battlefield( tapped)?(?: under (your|its owner's) control)?(?: with an additional (\\+1\\/\\+1) counter on it| with an? ${COUNTER} counter on it)?$`, "i").exec(s)) && ctx.subjectLeft) {
+  if ((m = new RegExp(`^(?:Return (that card|it) to|Put (that card) onto) the battlefield( tapped)?(?: under (your|its owner's) control)?(?: with an additional (\\+1\\/\\+1) counter on it| with an? ${COUNTER} counter on it)?( and attach ~ to it)?$`, "i").exec(s)) && ctx.subjectLeft && !(m[7] && ctx.spell)) {
+    // Nim Deathmantle: "return that card to the battlefield and attach ~ to it": the permanent it became (CR 701.3).
     const what = parseObject(m[1] ?? m[2]!, ctx);
     const counter = m[5] ?? m[6];
-    return what?.ref === "subjectCard" ? [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}), ...(m[4]?.toLowerCase() === "its owner's" ? { owner: true } : {}), ...(counter ? { counters: { [counterKind(counter)]: 1 } } : {}) }] : null;
+    return what?.ref === "subjectCard" ? [{ type: "putOntoBattlefield", what, ...(m[3] ? { tapped: true } : {}), ...(m[4]?.toLowerCase() === "its owner's" ? { owner: true } : {}), ...(counter ? { counters: { [counterKind(counter)]: 1 } } : {}), ...(m[7] ? { attachSelf: true as const } : {}) }] : null;
   }
   // "... on the bottom of your library in any order" (Bow of Nylea): in the order the targets were chosen, which the
   // controller picks (CR 401.4).

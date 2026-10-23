@@ -12,7 +12,7 @@ export const num = (s: string) => NUMBER_WORDS[s.toLowerCase()] ?? Number(s);
 /** Like NUM, but X too (CR 107.3). */
 export const NUMX = "(a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|\\d+|X)";
 /** Counter kinds effects can put on permanents (see CounterKind). */
-export const COUNTER = "([+-]1/[+-]1|double strike|first strike|(?!(?:additional|each|kind|that|those|the|its|more|fewer|of)\\b)[a-z]+)";
+export const COUNTER = "([+-]\\d+/[+-]\\d+|double strike|first strike|(?!(?:additional|each|kind|that|those|the|its|more|fewer|of)\\b)[a-z]+)";
 export const counterKind = (t: string): CounterKind => t;
 export const X: AmountExpr = { count: { kind: "x" } };
 export const amt = (s: string): Amount => (s === "X" ? X : num(s));

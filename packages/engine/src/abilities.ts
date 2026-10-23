@@ -363,6 +363,8 @@ export interface TargetSpec {
   manaValue?: Range; // "with mana value 3 or less" (CR 202.3)
   /** "With mana cost {0} or {1}" (Urza's Saga): its mana cost is exactly one of these (CR 202.1; not {X} or none, rulings). */
   manaCostIn?: string[];
+  /** "Target spell with {X} in its mana cost" (Frontline Medic; CR 107.3). */
+  xInCost?: true;
   /**
    * "Counter target spell with mana value X", "destroy target creature with power X or less": the X announced for the
    * spell or ability (CR 107.3a), made into that range of `key` as its targets are chosen (settleDivided). Until then,
@@ -680,7 +682,7 @@ export type ObjRef =
   /** "Each creature dealt damage this way" (Aurelia's Fury): `filter` for the kind of permanent. */
   | { ref: "damagedThisWay"; filter?: TargetSpec }
   /** The card a "whenever a creature dies" trigger was about, in the zone it went to, while it's still that object (CR 400.7). */
-  | { ref: "subjectCard"; /** Only while it's in this zone ("exile that card from your graveyard"). */ zone?: "graveyard" } // "a creature dealt damage this way": what this ability's damage hit
+  | { ref: "subjectCard"; /** Only while it's in this zone ("exile that card from your graveyard"). */ zone?: "graveyard"; /** "A copy of that card" (Myrkul): copied as the card, not as the permanent it was. */ printed?: true } // "a creature dealt damage this way": what this ability's damage hit
   | { ref: "subject" } // the object its trigger event was about: exalted's "that creature" (see PendingTrigger.subject)
   /** "Whenever one or more tokens your opponents control enter, for each of them, ..." (Kambal): those that entered, while on the battlefield. */
   | { ref: "eventGroup" }
@@ -1768,6 +1770,8 @@ export type Effect =
       owner?: boolean;
       /** An Aura "attached to that creature": the trigger's subject (CR 303.4f). */
       attachToSubject?: boolean;
+      /** "And attach ~ to it" (Nim Deathmantle): the source, if it's still on the battlefield, attached to the permanent (CR 701.3). */
+      attachSelf?: true;
       /** An Aura "attached to target opponent" (Accursed Witch): this target, if the Aura could enchant it (CR 303.4f). */
       attachToTarget?: number;
       /**
@@ -1804,7 +1808,7 @@ export type Effect =
    * creature's owner puts it on their choice of the top or bottom of their library".
    */
   | { type: "putInLibrary"; what: ObjRef; position: "top" | "bottom" | "ownersChoice" | "second" | "third" }
-  | { type: "exileGraveyard"; who: PlayerRef; /** "Exile all cards from target player's library" (Jace, the Mind Sculptor): that zone instead. */ library?: true; /** The cards are linked to the source (Nautiloid Ship's "a creature card exiled with ~", CR 607.2a). */ linked?: true } // "Exile target player's graveyard"
+  | { type: "exileGraveyard"; who: PlayerRef; /** "Exile all cards from target player's library" (Jace, the Mind Sculptor): that zone instead. */ library?: true; /** The cards are linked to the source (Nautiloid Ship's "a creature card exiled with ~", CR 607.2a). */ linked?: true; /** Only the cards like this ("all creature cards with mana value 3 or less", Idol of Endurance). */ filter?: TargetSpec; /** "Until ~ leaves the battlefield": they return to the graveyard then (CR 610.3). */ until?: "sourceLeaves" } // "Exile target player's graveyard"
   /**
    * Living Death, Living End: "Each player exiles all creature cards from their graveyard, then sacrifices all creatures
    * they control, then puts all cards they exiled this way onto the battlefield." Each part for all players at once
@@ -2002,7 +2006,7 @@ export type Effect =
    * "Until end of turn, you may cast a spell from among cards exiled with ~ without paying its mana cost" (Court of
    * Locthwain): one spell, from the cards its linked exile took (CR 607.2a), cast for its AltCostKind "linkedFree" (CR 118.9).
    */
-  | { type: "castLinkedFree" }
+  | { type: "castLinkedFree"; /** "A creature spell" (Idol of Endurance): only one of these. */ filter?: TargetSpec }
   | { type: "impulse"; n: Amount; until: "thisTurn" | "nextTurn" | "exiled" | "yourNextEndStep"; who?: PlayerRef; castOnly?: true; free?: true; /** "And you may spend mana as though it were mana of any color to cast that spell" (Grenzo, CR 609.4b). */ anyType?: true; /** The cards are "exiled with ~" for its other abilities (CR 607.2a). */ linked?: true; /** "You may play one of those cards" (Nashi, Moon Sage's Scion): once one is played, the rest can't be. */ oneOf?: true; /** "Exile the top two cards of your library, then choose one of them. You may play that card this turn." (Party Thrasher): only the chosen one. */ choose?: true; /** "If you cast a spell this way, pay life equal to its mana value rather than paying its mana cost" (Nashi). */ life?: true; /** "Exile all opponents' graveyards" (Mnemonic Betrayal): every card in each `who` player's graveyard, `n` aside. */ graveyards?: true }
   | { type: "removeSelfCounter"; counter: CounterKind; orSacrifice?: boolean }
   /** "Remove a +1/+1 counter from it", "remove all -1/-1 counters from ~" (CR 122.8): as many as it has, at most. */
@@ -2269,7 +2273,7 @@ export type Effect =
    * control" (Necromantic Selection): one of the cards this resolution's destroy put into graveyards, chosen as it
    * resolves; `alsoMods`: "It's a black Zombie in addition to its other colors and types", for good.
    */
-  | { type: "returnDiedThisWay"; filter: TargetSpec; alsoMods?: Modification[] }
+  | { type: "returnDiedThisWay"; filter: TargetSpec; alsoMods?: Modification[]; /** "Sacrifice it at the beginning of your next end step" (Come Back Wrong). */ atEndStep?: "nextEndStep" | "yourNextEndStep" }
   | { type: "exileTop"; who: PlayerRef; n: Amount; /** "Put all artifact cards from among them onto the battlefield" (Tezzeret, Master of the Bridge): together, under your control. */ putAll?: TargetSpec }
   /**
    * Dark Confidant: "reveal the top card of your library and put that card into your hand", then maybe "[you] lose
@@ -2856,7 +2860,7 @@ export type Effect =
    * graveyard, exiled first; what's cast is a copy of each (CR 707.12), the cards staying exiled.
    */
   /** `reveal`: "reveal the top X cards of your library ... from among cards revealed this way" (Sunbird's Invocation): they stay in the library while revealed, cast from there. */
-  | { type: "castFromAmong"; who: PlayerRef; n: Amount; reveal?: true; each?: true; untilNonland?: true; /** With `each` (Wand of Wonder): "each opponent exiles cards ... until they exile an instant or sorcery card, then shuffles the rest into their library": down to the first card matching this; the others shuffled back. */ untilHit?: TargetSpec; /** With `each`: each opponent, not each player. */ opponents?: true; copies?: true; fromYard?: { target?: number; filter?: TargetSpec; /** Arcane Bombardment: one card matching `filter`, at random, exiled with this source; then a copy of each card exiled with it (CR 607.2a). */ randomLinked?: true }; maxMv?: Amount; /** Powerbalance: "if the two spells have the same mana value": only a card with exactly this mana value. */ exactMv?: Amount; totalMv?: Amount; untilMv?: number; untilHits?: { n: number; filter: TargetSpec }; hitToHand?: true; filter?: TargetSpec; max?: number; rest?: { dest: "graveyard" | "bottomRandom"; toHand?: boolean }; /** "You may play lands and cast spells from among ..." (Gix): lands are played too, on your turn with a land play left (rulings). */ lands?: true; /** Descendants' Path: "that shares a creature type with a creature you control", as it's cast. */ sharesTypeWithYours?: true; /** Plargg and Nassari: "An opponent chooses a nonland card exiled this way": an opponent you choose picks one, which can't be cast. */ opponentExcludes?: true; /** Silent-Blade Oni: "look at that player's hand. You may cast a spell from among those cards": the cards in `who`'s hand, cast from there. */ fromHand?: true }
+  | { type: "castFromAmong"; who: PlayerRef; n: Amount; reveal?: true; /** With `reveal`: only looked at, not revealed (Planetarium of Wan Shi Tong). */ look?: true; /** "Do this only once each turn": casting one is doing it (CR 603.2h, rulings on Planetarium). */ once?: true; each?: true; untilNonland?: true; /** With `each` (Wand of Wonder): "each opponent exiles cards ... until they exile an instant or sorcery card, then shuffles the rest into their library": down to the first card matching this; the others shuffled back. */ untilHit?: TargetSpec; /** With `each`: each opponent, not each player. */ opponents?: true; copies?: true; fromYard?: { target?: number; filter?: TargetSpec; /** Arcane Bombardment: one card matching `filter`, at random, exiled with this source; then a copy of each card exiled with it (CR 607.2a). */ randomLinked?: true }; maxMv?: Amount; /** Powerbalance: "if the two spells have the same mana value": only a card with exactly this mana value. */ exactMv?: Amount; totalMv?: Amount; untilMv?: number; untilHits?: { n: number; filter: TargetSpec }; hitToHand?: true; filter?: TargetSpec; max?: number; rest?: { dest: "graveyard" | "bottomRandom"; toHand?: boolean }; /** "You may play lands and cast spells from among ..." (Gix): lands are played too, on your turn with a land play left (rulings). */ lands?: true; /** Descendants' Path: "that shares a creature type with a creature you control", as it's cast. */ sharesTypeWithYours?: true; /** Plargg and Nassari: "An opponent chooses a nonland card exiled this way": an opponent you choose picks one, which can't be cast. */ opponentExcludes?: true; /** Silent-Blade Oni: "look at that player's hand. You may cast a spell from among those cards": the cards in `who`'s hand, cast from there. */ fromHand?: true }
   /**
    * "You gain shroud until end of turn", "You and permanents you control gain hexproof until end of turn" (the player's
    * half), "you gain protection from the chosen player": see Player.gained (CR 702.11d, 702.16b-e, 702.16k, 702.18d).
@@ -3326,8 +3330,14 @@ export type TriggerEvent =
   | "attackCausesTrigger"
   /** "Whenever you sacrifice another permanent", "a Food", "~ or another creature": see TriggeredAbility.sacrifices. */
   | "youSacrifice"
+  /** "Whenever you expend 4" (CR 700.14): see TriggeredAbility.expend. */
+  | "youExpend"
   /** "Whenever you collect evidence" (CR 701.59a): for any reason, also collecting evidence 0 (rulings). */
   | "youCollectEvidence"
+  /** "Whenever you scry", "whenever you surveil", "whenever you scry or surveil": after it's done (CR 701.22d, 701.25d). */
+  | "youScry"
+  | "youSurveil"
+  | "youScryOrSurveil"
   /** "Whenever you proliferate" (CR 701.27): once for each proliferate action, even with nothing chosen (rulings). */
   | "youProliferate"
   /** "Whenever a spell or ability you control counters a spell" (Baral): once for each spell countered (CR 701.6a). */
@@ -3538,8 +3548,14 @@ export interface TriggeredAbility {
   damageGroup?: { filter: TargetSpec; opponents?: true; perPlayer?: true; /** "Deal combat damage" (Hordewing Skaab): only combat damage. */ combat?: true };
   /** For "sourceYouControlDamagesOpponent": only noncombat damage. */
   noncombatOnly?: true;
+  /** For "sourceYouControlDamagesOpponent": "deals 5 or more damage" at once (Dragonborn Champion). */
+  minDamage?: number;
+  /** For "sourceYouControlDamagesOpponent": "to a player", you included. */
+  anyPlayer?: true;
   /** For "creaturesYouControlAttack": "Whenever you attack with two or more creatures", at least this many of them. */
   minAttackers?: number;
+  /** "Whenever you expend N": the total mana spent casting spells this turn reaching N as a cost is paid (CR 700.14). */
+  expend?: number;
   /** For "creaturesYouControlAttack": "Whenever one or more creatures attack" (Duelist's Heritage), any player's, not only its controller's. */
   anyoneAttacks?: true;
   /** For "creaturesYouControlAttack": "Whenever you attack a player", once for each player attacked (CR 508.3e); the event's player is that player. */
@@ -5088,4 +5104,6 @@ export interface FromTop {
    * spell cast with this permission is cast for that alternative cost (AltCostKind "citadel", CR 118.9).
    */
   payLife?: true;
+  /** "If you cast a creature spell this way, it gains haste until end of turn" (Thundermane Dragon). */
+  haste?: "endOfTurn";
 }

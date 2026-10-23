@@ -151,7 +151,7 @@ const CARD_TYPE_WORD = "(?:artifact|battle|creature|enchantment|instant|land|pla
  * The events a delayed triggered ability with a duration can wait for (see GameState.floatingTriggers), and the parts of
  * a trigger it can have: an intervening "if" or a zone would need more about its source than it has.
  */
-const FLOATING_EVENTS = new Set<string>(["castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "creaturesYouControlDealCombatDamageToPlayer", "eachBeginCombat"]);
+const FLOATING_EVENTS = new Set<string>(["castSpell", "permanentDies", "selfDealsCombatDamageToPlayer", "creatureYouControlDealsCombatDamageToPlayer", "creaturesYouControlDealCombatDamageToPlayer", "eachBeginCombat", "creaturesYouControlAttack"]);
 const FLOATING_KEYS = new Set<string>(["event", "cast", "dies", "dealer", "toOpponent", "orPlaneswalker", "body"]);
 
 /**
@@ -204,6 +204,10 @@ function floatingTrigger(s: string, after: string[], ctx?: Ctx): Effect | null |
   // monarch" (Forth Eorlingas!): the same, once for each combat damage step (CR 510.2, 603.2c).
   const dealt = /^Whenever (one or more creatures you control deal combat damage to one or more players) this turn, (.+)$/.exec(s);
   if (dealt) return floatingTrigger(`This turn, whenever ${dealt[1]!}, ${dealt[2]!}`, after, ctx);
+  // "Whenever you attack this turn, create two 1/1 red Warrior creature tokens that are tapped and attacking" (Dalkovan
+  // Encampment): once for each declaration of attackers this turn (CR 508.1, 603.7b).
+  const attack = /^Whenever you attack this turn, (.+)$/.exec(s);
+  if (attack) return floatingTrigger(`This turn, whenever you attack, ${attack[1]!}`, after, ctx);
   const m = /^([Uu]ntil end of turn|[Tt]his turn|[Uu]ntil your next turn|[Uu]ntil the end of your next turn), ([Ww]henever .+)$/.exec(s);
   if (!m) return undefined;
   const text = [m[2]!, ...after.map((x) => x.replace(/\.$/, ""))].join(". ");
@@ -248,6 +252,9 @@ const checkableMay = (e: Effect) =>
   (e.type === "sacrifice" && e.what.ref === "subject") ||
   // "When ~ dies, you may exile it. When you do, ..." (Undead Butler): only while it's still that card in the graveyard.
   (e.type === "exile" && e.what.ref === "selfCard") ||
+  // "Whenever another nontoken creature you control dies, you may exile it. If you do, ..." (Nightmare Shepherd): only
+  // while it's still that card, in the graveyard it went to (CR 400.7).
+  (e.type === "exile" && e.what.ref === "subjectCard") ||
   // "You may tap it. When you do, ..." (The Fire Nation Drill): only an untapped permanent can be tapped (CR 701.26a).
   (e.type === "tap" && e.what.ref === "self") ||
   // "You may remove a hit counter from a card that player owns in exile. If you do, ..." (Mari): only with one there.
@@ -1429,6 +1436,19 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       effects.push(diedBack[1] ? { type: "if", cond: { kind: "xAtLeast", n: Number(diedBack[1]) }, effects: [back] } : back);
       continue;
     }
+    // Come Back Wrong: "Destroy target creature. If a creature card is put into a graveyard this way, return it to the
+    // battlefield under your control. Sacrifice it at the beginning of your next end step." The card the destroy put
+    // there (a token isn't a card), with no chance to act in between (rulings).
+    const cardBack = /^If an? (creature card) is put into a graveyard this way, return it to the battlefield under your control$/.exec(s);
+    const lastDestroy = effects[effects.length - 1];
+    if (cardBack && lastDestroy?.type === "destroy" && lastDestroy.what.ref === "target" && effects.filter((x) => x.type === "destroy").length === 1) {
+      const filter = parseSearchFilter(cardBack[1]!);
+      if (!filter) return null;
+      const sac = /^Sacrifice it at the beginning of (the|your) next end step$/.exec(sentences[si + 1] ?? "");
+      effects.push({ type: "returnDiedThisWay", filter, ...(sac ? { atEndStep: sac[1] === "your" ? ("yourNextEndStep" as const) : ("nextEndStep" as const) } : {}) });
+      if (sac) si++;
+      continue;
+    }
     // Nissa's Pilgrimage: "If there are two or more instant and/or sorcery cards in your graveyard, search your library
     // for up to three basic Forest cards instead of two": the same search, for more cards while that's true as it resolves.
     const moreIf = /^If (.+), search your library for up to (two|three|four|five) (.+?) instead of (one|two|three|four)$/.exec(s);
@@ -2170,6 +2190,13 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       const who = parsePlayer("that player", ctx);
       if (!who || who.ref === "you") return null;
       effects.push({ type: "castFromAmong", who, n: 1, filter: { kind: "card", types: [], notTypes: ["Land"], notColors: [], text: "nonland card" }, max: 1 });
+      si++;
+      continue;
+    }
+    // Planetarium of Wan Shi Tong: "Look at the top card of your library. You may cast that card without paying its mana
+    // cost." Cast from the library as this resolves, or not at all (CR 608.2g, rulings); a land can't be cast.
+    if (/^[Ll]ook at the top card of your library$/.test(s) && sentences[si + 1]?.replace(/\.$/, "") === "You may cast that card without paying its mana cost" && si + 2 === sentences.length) {
+      effects.push({ type: "castFromAmong", who: { ref: "you" }, n: 1, reveal: true, look: true, max: 1 });
       si++;
       continue;
     }
@@ -4235,6 +4262,17 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
       // card this turn." The permission is about the card chosen, so it depends on the discard too.
       const choosePlay = ifDid[1] === "do" && /^You may play that card this turn$/.test(sentences[si + 1] ?? "") ? new RegExp(`^exile the top (${NUM}) cards of your library, then choose one of them$`).exec(ifDid[2]!) : null;
       if (choosePlay) si++;
+      // The Master, Gallifrey's End: "If you do, choose an opponent with the most life among your opponents. That player
+      // faces a villainous choice — ...": the choice and what that player does both depend on it.
+      const chooseThat = ifDid[1] === "do" && !choosePlay && /^choose an opponent(?: with the most life among your opponents)?$/.test(ifDid[2]!) && /^That player /.test(sentences[si + 1] ?? "") && !ctx.chosenOpponent && !ctx.eventPlayer && ctx.lastPlayerTarget === undefined;
+      if (chooseThat) {
+        ctx.chosenOpponent = true;
+        const then = parseOne(sentences[si + 1]!.replace(/\.$/, ""), ctx);
+        if (!then) return null;
+        si++;
+        effects.push({ type: "if", cond: { kind: "youDid" }, effects: [{ type: "choose", choice: "opponent", ...(/ most life /.test(ifDid[2]!) ? { mostLife: "opponents" as const } : {}) }, ...then] });
+        continue;
+      }
       const inner = choosePlay ? [{ type: "impulse" as const, n: amt(choosePlay[1]!), until: "thisTurn" as const, choose: true as const }] : parseOne(ifDid[2]!.charAt(0).toUpperCase() + ifDid[2]!.slice(1), ctx);
       if (inner) effects.push(ifDid[1] === "do" ? { type: "if", cond: { kind: sacIt || mustSac ? "sacrificedThisWay" : "youDid" }, effects: inner } : { type: "if", cond: { kind: "youDid" }, effects: [], otherwise: inner });
       // Its own "where X is ..." (CR 107.3c).
@@ -4618,9 +4656,10 @@ function parseBodyText(text: string, opts: { sacrificedIt?: boolean; amassed?: b
     }
     // The Black Gate: "Choose a player with the most life or tied for most life", any of them, you too.
     // The Master, Gallifrey's End: "Choose an opponent with the most life among your opponents", any of those tied.
-    if (/^Choose (?:an opponent(?: with the most life among your opponents)?|a player with the most life or tied for most life)$/.test(s)) {
+    // Lowercase after a trigger's condition ("When ~ enters, choose an opponent").
+    if (/^[Cc]hoose (?:an opponent(?: with the most life among your opponents)?|a player with the most life or tied for most life)$/.test(s)) {
       if (ctx.chosenOpponent || ctx.eventPlayer || ctx.lastPlayerTarget !== undefined) return null;
-      effects.push({ type: "choose", choice: "opponent", ...(/^Choose a player with the most life/.test(s) ? { mostLife: true as const } : / most life /.test(s) ? { mostLife: "opponents" as const } : {}) });
+      effects.push({ type: "choose", choice: "opponent", ...(/^[Cc]hoose a player with the most life/.test(s) ? { mostLife: true as const } : / most life /.test(s) ? { mostLife: "opponents" as const } : {}) });
       ctx.chosenOpponent = true;
       continue;
     }
@@ -5528,6 +5567,9 @@ function parseEqualTo(s: string, ctx: Ctx): Effect[] | null {
     [/^(.*?)([Dd]raws?) cards equal to (.+)$/, (m) => `${m[1]}${m[2]} X cards`],
     [/^(.*?)([Mm]ills?) cards equal to (.+)$/, (m) => `${m[1]}${m[2]} X cards`],
     [/^Put a number of ([+-]1\/[+-]1|[a-z]+) counters on (.+) equal to (.+)$/i, (m) => `Put X ${m[1]} counters on ${m[2]}`],
+    // "Put a number of +1/+1 counters equal to ~'s power on another target creature you control" (Maester Seymour).
+    // "Equal to its power on up to one target creature" (Galuf's Final Act): "its" comes before the target, so it's ~'s.
+    [/^Put a number of ([+-]1\/[+-]1|[a-z]+) counters equal to (.+?) on (.+)$/i, (m) => `Put X ${m[1]} counters on ${m[3]}`, 2],
     [/^(?:You )?[Cc]reate a number of (.+?) tokens( with [^,]+?)? equal to (.+)$/, (m) => `Create X ${m[1]} tokens${m[2] ?? ""}`],
   ];
   // "You gain life and draw cards equal to its power" (Lifeblood Hydra): both by that much.
@@ -5541,6 +5583,7 @@ function parseEqualTo(s: string, ctx: Ctx): Effect[] | null {
   for (const [re, rewrite, group] of forms) {
     const m = re.exec(s);
     if (!m) continue;
+    if (group === 2 && /^Put a number of /i.test(s)) m[2] = m[2]!.replace(/^its (power|toughness)$/, "~'s $1");
     const fx = parseSentence(rewrite(m), ctx);
     // "Draw cards equal to the power of target creature you control" (Soul's Majesty): that target's power as it resolves,
     // a target of its own after the sentence's others.

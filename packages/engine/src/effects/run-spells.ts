@@ -16,7 +16,7 @@ import { copyKey, type CopyExcept } from "../copies";
 
 /**
  * Zada, Ink-Treader Nephilim, Precursor Golem: the permanents a copy of `orig` is made for (see Effect copySpell's
- * `eachOther`), in the order they're on the battlefield. Each must be one every target of the spell could name, as its
+ * `eachOther`), in the order they're on the battlefield (the copies' controller then picks the order, see copySpell). Each must be one every target of the spell could name, as its
  * caster and with the spell as the source (rulings: shroud, protection and targeting restrictions leave one out).
  */
 function eachOtherTargets(s: GameState, orig: StackItem, eo: NonNullable<Extract<Effect, { type: "copySpell" }>["eachOther"]>, ctx: ResolveCtx): ObjectId[] {
@@ -369,6 +369,14 @@ export function runSpellsEffect(s: GameState, e: Effect, ctx: ResolveCtx, src: s
           s.pending = { kind: "copyTargets", player: ctx.controller, source: src, copyOf: orig.description, specs, current: orig.targets ?? [], left: c.left };
           return "paused";
         }
+        // The copies' controller chooses the order they go on the stack (rulings on Zada, Ink-Treader Nephilim and
+        // Precursor Golem): which creature the next copy targets. Copies put on the stack later resolve first.
+        if (c.each && c.left > 1 && !c.picked) {
+          const rest = c.each.slice(c.each.length - c.left);
+          s.pending = { kind: "chooseOption", player: c.by ?? ctx.controller, source: src, what: "copyOrder", options: rest, labels: rest.map((id) => `${defOf(s, obj(s, id)).name} (${player(s, controllerOf(s, obj(s, id))).name})`), prompt: `choose the creature the next copy of ${orig.description} targets (copies put on the stack later resolve first)` };
+          return "paused";
+        }
+        c.picked = undefined;
         // "Each copy targets a different one of those creatures": that one in each target the spell has.
         const one = c.each?.[c.each.length - c.left];
         const aimed = one !== undefined ? (orig.targets ?? []).map((t): TargetChoice => (t.kind === "object" ? { kind: "object", id: one } : t)) : undefined;

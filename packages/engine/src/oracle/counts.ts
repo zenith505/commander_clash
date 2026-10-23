@@ -293,7 +293,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
   }
   // "The number of +1/+1 counters on lands you control" (Toph, the Blind Bandit), "counters on permanents you control"
   // (Hydra Trainer): the counters on those permanents added up.
-  if ((m = new RegExp(`^(?:${COUNTER} )?counters on ((?:creatures|lands|permanents|artifacts) you control)$`).exec(p))) {
+  if ((m = new RegExp(`^(?:${COUNTER} )?counters (?:on|among) ((?:creatures|lands|permanents|artifacts) you control)$`).exec(p))) {
     const c = parseCount(m[2]!, ctx, each);
     return c && typeof c === "object" && "count" in c && c.count.kind === "permanents" && !c.count.differentNames ? { count: { ...c.count, counter: m[1] ? counterKind(m[1]) : ANY_COUNTER } } : null;
   }

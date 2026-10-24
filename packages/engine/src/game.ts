@@ -10,7 +10,7 @@ import { checkDayNight, dayNightUntapCheck } from "./daynight";
 import { becomePrepared, checkPrepared, preparedCopyCastable, unprepareFor } from "./prepare";
 import { GRANTED_WAY_COSTS } from "./abilities";
 import { abilitiesOf, canBeSacrificed, withCastThisTurn, NO_ABILITIES, bestowedDef, mutatingDef, prototypedDef, overloadedDef, cleavedDef, cardIdOf, defOf, lockIfRoom, roomOf, pairedWith, FACE_DOWN, FACE_DOWN_WARD, FACE_DOWN_FOREST, faceUpDefOf, realDefOf, describeAbility, hasKeyword, isPermanentCard, isType, objHasKeyword, objIsType, power, shareLandType, toughness, withGranted } from "./cards";
-import { MANA_ABILITY_OFFSET, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
+import { MANA_ABILITY_OFFSET, revealable, abolisherBan, commanderIdentity, activatedAsMana, activatedManaOptions, payableActivatedMana, manaAbilitiesOn, manaAbilityProblem, manaCombos, mayExhaustAgain, manaChoices, manaOptions, manaProduced, manaTriggerResults, pickManaAbility } from "./manaabilities";
 import { untapStepPhasing, releasePhased } from "./phasing";
 import { bindBound, pickOptions, playerProtectedFrom, spellManaValue, spellMatches, targetsMatch } from "./effects/targeting";
 import { takeInitiative, dungeonSBAs, loseRingBearer, addDelayed, canChooseTarget, sameTarget, modsAreHarmful, becomeMonarch, triggerBody, canChooseModes, choiceOptions, ENTERS_COUNTER, describePay, withChoice, discardCards, printedMatches, bindChosen, sourceQuality, spellQuality, stampTargets, fireEvent, hasLegalTargets, isLegalTarget, modesProblem, objectMatches, processTriggerQueue, pushTrigger, checkStateTriggers, checkLostControl, closeZoneBatch, noteModesChosen, settleDivided, beginResolution, continueResolution, resolveManaAbility, targetProblem, enterAttacking, attackingYouNow, COLOR_NAMES } from "./effects";
@@ -18,7 +18,7 @@ import { describeCount, entwined, withModes, withSplices, gateBody, hasGatedTarg
 import { dealDamage, dealPlanned, objectSource, planShields, protectedFrom, protectionHolder, unpreventable, type DamageEvent } from "./damage";
 import { countersStay, putCounters, removableCounters, tokenBatch } from "./counters";
 import { createToken, createExtraTokens } from "./effects/run-tokens";
-import { addCopyEffect, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
+import { addCopyEffect, copiableDef, copyEnterCounters, copyKey, endCopyEffects, exceptFor } from "./copies";
 import { characteristics, controllerOf, everyCreatureType, invalidateCharacteristics, staticConditionNow } from "./layers";
 import { compileCard, compileGranted, mutateTarget, spellTargetSpecs } from "./oracle";
 import { convokeReduce, emptyPool, manaValue, parseManaCost, payGenericWith, reduceByManaCost, reduceColored, splitGeneric, xCount, xProblem, type ParsedCost } from "./mana";
@@ -587,8 +587,32 @@ export function enterTogether(s: GameState, run: () => void) {
     s.battlefield = [...batch.ids.filter((id) => s.objects[id]?.zone === "battlefield").reverse(), ...s.battlefield];
     invalidateCharacteristics(s);
     for (const c of s.entersChoices ?? []) if (batch.ids.includes(c.id) && batch.ids.length > 1) c.together = batch.ids.filter((id) => id !== c.id);
+    // Mystic Reflection's replacement is used up once that event is over.
+    if (s.nextEntersAsCopy?.some((r) => r.used)) s.nextEntersAsCopy = s.nextEntersAsCopy.filter((r) => !r.used);
   }
   for (const ev of batch.events) fireEvent(s, ev);
+}
+
+/**
+ * Mystic Reflection's copy for a permanent entering now (GameState.nextEntersAsCopy): if it's a creature or planeswalker as
+ * it would enter (CR 614.12), the copiable values of the chosen creature as it is now or last existed (rulings). With
+ * several waiting, the latest applies last and wins (its controller could choose the order, rulings: not offered).
+ * Used up by the first such event; the others entering with it too (enterTogether).
+ */
+function reflectionKey(s: GameState, o: GameObject): string | undefined {
+  const waiting = (s.nextEntersAsCopy ?? []).filter((r) => r.turn === s.turn && (!r.used || together));
+  if (!waiting.length) return undefined;
+  invalidateCharacteristics(s);
+  if (!objIsType(s, o, "Creature") && !objIsType(s, o, "Planeswalker")) return undefined;
+  let key: string | undefined;
+  for (const r of [...waiting].sort((a, b) => a.timestamp - b.timestamp)) {
+    const t = s.objects[r.id];
+    const lk = s.lastKnown?.[r.id];
+    key = t && t.zone === "battlefield" && (t.zoneChanges ?? 0) === r.zc && t.id !== o.id ? copyKey(s, copiableDef(s, t)) : lk && lk.zc === r.zc && lk.copyKey ? lk.copyKey : r.key;
+    r.used = true;
+  }
+  if (!together) s.nextEntersAsCopy = s.nextEntersAsCopy!.filter((r) => !r.used);
+  return key;
 }
 
 /** Move an object between zones. It becomes a new object with no memory of its old one (CR 400.7). */
@@ -978,6 +1002,13 @@ export function moveObject(
   // A countered Serra Paragon spell doesn't keep the ability for later (CR 400.7).
   if (to !== "battlefield" && to !== "stack") o.entersGaining = undefined;
   if (to === "battlefield") {
+    // Mystic Reflection: a creature or planeswalker enters as a copy (CR 614.1c, 707.5), before the rest of how it enters.
+    const reflected = reflectionKey(s, o);
+    if (reflected) {
+      o.copyOf = reflected;
+      invalidateCharacteristics(s);
+      log(s, `${realDefOf(s, o).name} enters as a copy of ${s.cards[reflected]!.name}.`);
+    }
     const printed = compileCard(defOf(s, o));
     // A spell that will "enter with an additional +1/+1 counter" (Boreal Outrider) as it resolves.
     const counters = { ...opts.counters };
@@ -2661,6 +2692,7 @@ function startNextTurn(s: GameState, skipping = false) {
   s.afterSecondMain = undefined;
   s.resumeStep = undefined;
   s.lostLifeThisTurn = undefined;
+  s.nextEntersAsCopy = undefined; // Mystic Reflection: "this turn"
   s.permanentLeftThisTurn = undefined;
   s.freerunningThisTurn = undefined;
   s.voidThisTurn = undefined;
@@ -3669,6 +3701,10 @@ function activateMana(s: GameState, p: Player, id: ObjectId, mana: ManaType, ind
     removeCountersCost(s, o, { counter: ab.produces.counter, n });
     log(s, `${p.name} removes ${n} ${ab.produces.counter} counter${n === 1 ? "" : "s"} from ${name}.`);
   }
+  if (ab.produces.kind === "revealX") {
+    const shown = revealable(s, o, ab.produces).slice(0, combo!);
+    log(s, shown.length ? `${p.name} reveals ${shown.map((c) => nameOf(s, c)).join(", ")} for ${name}.` : `${p.name} reveals no cards for ${name}.`);
+  }
   if (ab.oncePerTurn) (o.activatedThisTurn ??= []).push(MANA_ABILITY_OFFSET + i);
   if (ab.onceEver) (o.activatedEver ??= []).push(MANA_ABILITY_OFFSET + i); // exhaust (CR 702.177a)
   if (ab.exhaust) p.exhaustTurn = s.turn; // CR 702.177b
@@ -3896,7 +3932,7 @@ export function castProblem(
     if (((via && !permissionWay(via)) || free || plotted) && choices.alt !== "prototype") return `${d.name} can't be cast for its ${choices.alt} cost this way`;
     if (via && (choices.alt === "foretell" || choices.alt === "citadel" || choices.alt === "omniscience" || choices.alt === "miracle")) return `${d.name} can't be cast for its ${choices.alt} cost from a graveyard`;
     // "If you control a Swamp, you may pay 4 life rather than pay ~'s mana cost": only while that's true (CR 601.2b).
-    const cond = altCost(d, choices.alt)?.if;
+    const cond = altCost(d, choices.alt, s, pid)?.if;
     if (cond && !staticConditionNow(s, cond, id, pid)) return `${d.name}'s alternative cost can't be paid now`;
     // Paying an alternative cost that has no X, X is 0 (CR 107.3b); the Shoals' "a red card with mana value X" has one.
     const paid = altCost(d, choices.alt, s, pid)!;
@@ -4427,7 +4463,20 @@ export function altCost(d: CardDef, alt?: AltCostKind, s?: GameState, pid?: Play
     const n = s && pid !== undefined ? payEvidenceOf(s, pid) : undefined;
     return n === undefined ? undefined : { kind: "evidence", mana: "", costs: [{ kind: "collectEvidence", n }], text: `collect evidence ${n}` };
   }
+  // Prowl (CR 702.76a): the card's own, else one a permanent of `pid`'s gives it ("Dinosaur spells you cast have prowl").
+  if (alt === "prowl") return compileCard(d).altCosts?.find((a) => a.kind === alt) ?? (s && pid !== undefined ? grantedProwl(s, pid, d) : undefined);
   return alt ? compileCard(d).altCosts?.find((a) => a.kind === alt) : undefined;
+}
+
+/** The prowl cost a permanent `pid` controls gives this spell, checked by its characteristics as a spell (CR 702.76a). */
+function grantedProwl(s: GameState, pid: PlayerId, d: CardDef): NonNullable<CompiledCard["altCosts"]>[number] | undefined {
+  for (const id of s.battlefield) {
+    const p = obj(s, id);
+    if (controllerOf(s, p) !== pid) continue;
+    const g = (abilitiesOf(s, p).spellsHaveProwl ?? []).find((x) => printedMatches(x.filter, d));
+    if (g) return { kind: "prowl", mana: g.mana, if: { kind: "prowl" } };
+  }
+  return undefined;
 }
 
 const controlsPayWUBRG = (s: GameState, pid: PlayerId, what: "payWUBRG" | "castFromHandFree" = "payWUBRG") =>
@@ -4482,7 +4531,8 @@ export function payZeroSource(s: GameState, pid: PlayerId, o: GameObject, life =
 export function altCostsFor(s: GameState, pid: PlayerId, o: GameObject): NonNullable<CompiledCard["altCosts"]> {
   const own = compileCard(defOf(s, o)).altCosts ?? [];
   if (isType(defOf(s, o), "Land")) return own;
-  return [...own, ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(linkedFreeGrant(s, o, pid) >= 0 ? [altCost(defOf(s, o), "linkedFree", s, pid)!] : []), ...(["evidence" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
+  const prowl = own.some((a) => a.kind === "prowl") ? undefined : grantedProwl(s, pid, defOf(s, o));
+  return [...own, ...(prowl ? [prowl] : []), ...(controlsPayWUBRG(s, pid) ? [{ kind: "wubrg" as const, mana: "{W}{U}{B}{R}{G}" }] : []), ...(payZeroSource(s, pid, o) ? [{ kind: "payZero" as const, mana: "{0}" }] : []), ...(payZeroSource(s, pid, o, true) ? [altCost(defOf(s, o), "lifeForMv", s, pid)!] : []), ...(o.zone === "hand" ? [altCost(defOf(s, o), "omniscience", s, pid)].filter((a) => !!a) : []), ...(linkedFreeGrant(s, o, pid) >= 0 ? [altCost(defOf(s, o), "linkedFree", s, pid)!] : []), ...(["evidence" as const].flatMap((k) => altCost(defOf(s, o), k, s, pid) ?? [])), ...(o.zone === "library" || castFromExileForLife(s, o, pid) ? [altCost(defOf(s, o), "citadel", s, pid)].filter((a) => !!a) : [])];
 }
 
 /** Artifacts tapped for improvise: untapped artifacts you control, each once, not also tapped for convoke. */
@@ -7375,19 +7425,24 @@ export function potentialAttackers(s: GameState, pid: PlayerId) {
  * declared (CR 508.1g-h). Attacking their planeswalkers isn't attacking them, except for "you or planeswalkers you
  * control" (Sphere of Safety); a battle they protect never is.
  */
-export function attackTaxPer(s: GameState, defender: PlayerId, planeswalker = false): number {
-  const { generic, mana } = attackTaxParts(s, defender, planeswalker);
+export function attackTaxPer(s: GameState, defender: PlayerId, planeswalker = false, attacker?: ObjectId): number {
+  const { generic, mana } = attackTaxParts(s, defender, planeswalker, attacker);
   return generic + mana.length;
 }
 
-/** The generic mana and the other symbols ({W/P}, Norn's Annex) attacking `defender` costs for each creature. */
-function attackTaxParts(s: GameState, defender: PlayerId, planeswalker: boolean): { generic: number; mana: string[] } {
+/**
+ * The generic mana and the other symbols ({W/P}, Norn's Annex) attacking `defender` costs for each creature; with the
+ * `attacker`, what it costs for that one ("each creature with one or more counters on it", Nils).
+ */
+function attackTaxParts(s: GameState, defender: PlayerId, planeswalker: boolean, attacker?: ObjectId): { generic: number; mana: string[] } {
   let generic = 0;
   const mana: string[] = [];
+  const counters = attacker !== undefined && s.objects[attacker] ? Object.values(obj(s, attacker).counters).reduce((a, b) => a + Math.max(0, b ?? 0), 0) : 0;
   for (const id of s.battlefield) {
     const c = characteristics(s, obj(s, id));
     if (c.controller !== defender) continue;
     generic += planeswalker ? c.attackTaxPlaneswalkers : c.attackTax;
+    generic += counters * (planeswalker ? c.attackTaxCountersPlaneswalkers : c.attackTaxCounters);
     mana.push(...(planeswalker ? c.attackTaxManaPlaneswalkers : c.attackTaxMana));
   }
   // "Until your next turn, creatures can't attack you unless ..." (Summon: Yojimbo): the defender's own effects.
@@ -7396,10 +7451,10 @@ function attackTaxParts(s: GameState, defender: PlayerId, planeswalker: boolean)
 }
 
 /** What one attack costs: at a player, or at a planeswalker or battle (`planeswalker`, the permanent attacked). */
-export function attackTaxOf(s: GameState, a: { defender: PlayerId; planeswalker?: ObjectId }): number {
-  if (a.planeswalker === undefined) return attackTaxPer(s, a.defender);
+export function attackTaxOf(s: GameState, a: { attacker?: ObjectId; defender: PlayerId; planeswalker?: ObjectId }): number {
+  if (a.planeswalker === undefined) return attackTaxPer(s, a.defender, false, a.attacker);
   const pw = s.objects[a.planeswalker];
-  return pw && objIsType(s, pw, "Planeswalker") && controllerOf(s, pw) === a.defender ? attackTaxPer(s, a.defender, true) : 0;
+  return pw && objIsType(s, pw, "Planeswalker") && controllerOf(s, pw) === a.defender ? attackTaxPer(s, a.defender, true, a.attacker) : 0;
 }
 
 /** What blocking with `n` creatures costs, "{2}" ("" when blocking is free): Archangel of Tithes (CR 509.1d). */
@@ -7409,17 +7464,17 @@ export function blockCost(s: GameState, n: number): string {
 }
 
 /** The total attack tax for a declaration: how many mana symbols (generic mana, and {W/P} each for Norn's Annex). */
-export function attackTax(s: GameState, attacks: { defender: PlayerId; planeswalker?: ObjectId }[]): number {
+export function attackTax(s: GameState, attacks: { attacker?: ObjectId; defender: PlayerId; planeswalker?: ObjectId }[]): number {
   return attacks.reduce((n, a) => n + attackTaxOf(s, a), 0);
 }
 
 /** The total attack cost of a declaration as a mana cost, "{4}{W/P}{W/P}" ("" when attacking is free). */
-export function attackCost(s: GameState, attacks: { defender: PlayerId; planeswalker?: ObjectId }[]): string {
+export function attackCost(s: GameState, attacks: { attacker?: ObjectId; defender: PlayerId; planeswalker?: ObjectId }[]): string {
   let generic = 0;
   const mana: string[] = [];
   for (const a of attacks) {
     if (!attackTaxOf(s, a)) continue;
-    const parts = attackTaxParts(s, a.defender, a.planeswalker !== undefined);
+    const parts = attackTaxParts(s, a.defender, a.planeswalker !== undefined, a.attacker);
     generic += parts.generic;
     mana.push(...parts.mana);
   }
@@ -7581,7 +7636,7 @@ function declareAttackers(s: GameState, p: Player, attacks: { attacker: ObjectId
     const cap = s.objects[pw] ? abilitiesOf(s, obj(s, pw)).combatLimit?.attackSelf : undefined;
     if (cap !== undefined && attacks.filter((a) => a.planeswalker === pw).length > cap) throw new RulesError(`no more than ${cap === 1 ? "one creature" : `${cap} creatures`} can attack ${nameOf(s, pw)} each combat`);
   }
-  const free = (o: GameObject, d: PlayerId) => !attackProblem(s, o, d) && !attackTaxPer(s, d) && atPlayer(d, o.id) < youLimits.get(d)!;
+  const free = (o: GameObject, d: PlayerId) => !attackProblem(s, o, d) && !attackTaxPer(s, d, false, o.id) && atPlayer(d, o.id) < youLimits.get(d)!;
   // "No more than one creature can attack each combat" (Silent Arbiter): a restriction, which requirements can't break;
   // as many of the creatures that have to attack as the limit allows do (CR 508.1c-d).
   const limit = combatLimit(s, "attack");

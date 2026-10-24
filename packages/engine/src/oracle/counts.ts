@@ -346,13 +346,14 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     return c && typeof c === "object" && "count" in c && c.count.kind === "permanents" && !c.count.other ? { count: { ...c.count, differentNames: true, filter: { ...c.count.filter, text: `differently named ${c.count.filter.text}` } } } : null;
   }
   // Permanents: "creature you control", "other Elf you control", "land on the battlefield", "artifacts your opponents control".
+  // "Nontoken creatures you control that entered this turn" (Tromell, Seymour's Butler): ones that entered this turn.
   // "Creatures target player controls" (Will of the Mardu), "that player controls": that player's permanents.
   // "Damage to defending player equal to the number of artifacts they control" (Generous Plunderer): the defending player's.
   if (ctx?.defending) p = p.replace(/ (?:they control|defending player controls)$/, " that player controls");
   // "Target player draws X cards and loses X life, where X is the number of creatures they control of the chosen type"
   // (Pact of the Serpent): the player targeted.
   else if (ctx?.lastPlayerTarget !== undefined && !ctx.eventPlayer) p = p.replace(/ they control( of the chosen type)?$/, " that player controls$1");
-  if ((m = /^(other )?(.+?) (you control|on the battlefield|your opponents control|an opponent controls|target player controls|target opponent controls|that player controls|those players control|those opponents control)(?: ((?:with|of the chosen|of that|that aren't|that's attached to|that are attached to) .+))?$/i.exec(p))) {
+  if ((m = /^(other )?(.+?) (you control|on the battlefield|your opponents control|an opponent controls|target player controls|target opponent controls|that player controls|those players control|those opponents control)(?: ((?:with|of the chosen|of that|that aren't|that's attached to|that are attached to|that entered) .+))?$/i.exec(p))) {
     const words = m[2]!.split(/\s+/).map(singularWord).join(" ");
     const who = m[3]!.toLowerCase();
     const theirs = /^(target|that|those) /.test(who);
@@ -361,7 +362,7 @@ export function parseCount(text: string, ctx: Ctx | null, each = false): AmountE
     if (spec?.kind !== "object") return null;
     const whose = theirs ? whosePlayer(who.replace(/ controls$/, "'s").replace(/^(those \w+) control$/, "$1'"), ctx) : undefined;
     if (whose === null) return null;
-    return count({ kind: "permanents", filter: { ...spec, text: `${m[1] ?? ""}${m[2]} ${m[3]}` }, ...(m[1] ? { other: true } : {}), ...(whose ? { whose } : {}) });
+    return count({ kind: "permanents", filter: { ...spec, text: `${m[1] ?? ""}${m[2]} ${m[3]}${m[4]?.startsWith("that entered") ? ` ${m[4]}` : ""}` }, ...(m[1] ? { other: true } : {}), ...(whose ? { whose } : {}) });
   }
   // "The number of creatures attacking you" (Arachnogenesis): attacking you, not your planeswalkers (CR 506.3).
   if (/^creatures? attacking you$/i.test(p)) return count({ kind: "permanents", filter: { kind: "object", types: ["Creature"], combat: "attackingYou", text: p } });

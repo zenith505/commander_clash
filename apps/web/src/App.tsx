@@ -876,7 +876,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
       return setCostPick({ draft: d, kind: "lifeFor", label: card.name, what: `you may pay ${lifeOffers[0]!.life} life for each to make it cost one colored mana less`, n: lifeOffers.length, min: 0, candidates: lifeOffers.map((l) => l.id), chosen: [] });
     const costX = costsHaveX(card, d);
     // An alternative cost with X in it: overloaded Street Spasm's {X}{X}{R}{R} (CR 107.3a).
-    const altMana = d.alt ? altCost(card, d.alt)?.mana : undefined;
+    const altMana = d.alt ? altCost(card, d.alt, s, HUMAN)?.mana : undefined;
     const altX = !!altMana && parseManaCost(altMana).hasX;
     if (d.x === undefined && ((parseManaCost(card.manaCost).hasX && (!free || parseManaCost(madnessCastOf(s, HUMAN, d.objectId) ?? "").hasX) && !d.via && !d.alt) || altX || costX)) {
       // Rottenmouth Viper: with as many sacrificed as X (the ones picked later may differ).
@@ -1317,7 +1317,7 @@ function Table({ initial, onQuit }: { initial: GameState; onQuit: () => void }) 
               <span>
                 <strong>{targeting.label}</strong>: choose {nextSpec?.text}{" "}
                 {inRun
-                  ? `(optional, one for each opponent: ${targeting.specs
+                  ? `(optional, one for each ${targeting.specs.slice(targeting.chosen.length, runEnd).some((sp) => sp.controlledBy === HUMAN) ? "player" : "opponent"}: ${targeting.specs
                       .slice(targeting.chosen.length, runEnd)
                       .map((sp, k) => {
                         const c = targeting.ahead?.[targeting.chosen.length + k];
@@ -1914,7 +1914,7 @@ function canUseFace(s: GameState, id: string) {
 
 /** Alternative costs that aren't the card's own, which a prototype card may be cast prototyped for (CR 718.3). */
 const PROTOTYPE_WITH: AltCostKind[] = ["payZero", "wubrg", "omniscience", "citadel"];
-const ALT_NAMES: Record<AltCostKind, string> = { payZero: "Cast it for", impending: "Impending", citadel: "Cast it:", foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate", convert: "More Than Meets the Eye", omniscience: "Cast it:", cleave: "Cleave", lifeForMv: "Cast it:", linkedFree: "Cast it:" };
+const ALT_NAMES: Record<AltCostKind, string> = { payZero: "Cast it for", impending: "Impending", citadel: "Cast it:", foretell: "Cast it for its foretell cost", evoke: "Evoke", dash: "Dash", bestow: "Bestow", madness: "Madness", blitz: "Blitz", warp: "Warp", alternative: "Cast it for", prototype: "Prototype", wubrg: "Cast it for", evidence: "Cast it:", emerge: "Emerge", freerunning: "Freerunning", sneak: "Sneak", surge: "Surge", spectacle: "Spectacle", overload: "Overload", awaken: "Awaken", miracle: "Miracle", mutate: "Mutate", convert: "More Than Meets the Eye", omniscience: "Cast it:", cleave: "Cleave", lifeForMv: "Cast it:", linkedFree: "Cast it:", prowl: "Prowl" };
 const ALT_NOTES: Record<AltCostKind, string> = {
   impending: "enters with time counters and isn't a creature until the last is removed (one at each of your end steps)",
   citadel: "life equal to its mana value instead of its mana cost (Bolas's Citadel, Valgavoth); X is 0",
@@ -1935,6 +1935,7 @@ const ALT_NOTES: Record<AltCostKind, string> = {
   sneak: "during your declare blockers step: return an unblocked attacker to your hand; a creature enters tapped and attacking",
   surge: "only if you've cast another spell this turn",
   spectacle: "only if an opponent lost life this turn",
+  prowl: "only if a player was dealt combat damage this turn by a creature you controlled with one of its creature types",
   overload: "\"target\" in its text becomes \"each\": no targets, it affects all of them",
   cleave: "the words in square brackets are gone from its text",
   awaken: "also put +1/+1 counters on target land you control: it becomes a 0/0 Elemental creature with haste",
@@ -4304,7 +4305,8 @@ function AbilityMenu({
           }
           // A storage land's: how many counters this button removes.
           // Doubling Cube's text doesn't say "Add": its costs end at the first colon.
-          const cost = ab.text
+          // Metalworker's: how many cards this button reveals.
+          const cost = ab.produces.kind === "revealX" ? `${ab.text.slice(0, ab.text.indexOf(": "))}, reveal ${x.combo === 0 ? "no" : x.combo} ${ab.produces.filter.text}${x.combo === 1 ? "" : "s"}` : ab.text
             .slice(0, ab.text.includes(": Add") ? ab.text.indexOf(": Add") : ab.text.indexOf(": "))
             .replace(/~/g, "it")
             .replace(/Remove (?:any number of|X) (\S+) counters/, (_, k: string) => (x.removes === 1 ? `Remove a ${k} counter` : `Remove ${x.removes === 0 ? "no" : x.removes} ${k} counters`));
@@ -4597,7 +4599,7 @@ function Controls({
   if (pending?.kind === "declareAttackers") {
     // Creatures that attack each combat if able have to be declared (CR 508.1d).
     // Not when attacking would cost something (Ghostly Prison): nothing obliges paying (CR 508.1d).
-    const free = (o: GameObject, d: PlayerId) => !attackProblem(s, o, d) && !attackTaxPer(s, d);
+    const free = (o: GameObject, d: PlayerId) => !attackProblem(s, o, d) && !attackTaxPer(s, d, false, o.id);
     const must = potentialAttackers(s, HUMAN).filter((o) => characteristics(s, o).attacksIfAble && !(o.id in attacks) && opponents(s, HUMAN).some((d) => free(o, d)));
     // Encore tokens attack their opponent if able (CR 508.1d).
     const bound = potentialAttackers(s, HUMAN).flatMap((o) => {

@@ -40,6 +40,15 @@ export function copiedValues(s: GameState, ref: ObjRef, ctx: ResolveCtx): CardDe
 
 /** "Becomes a copy" (CR 707.4). */
 export function runCopiesEffect(s: GameState, e: Effect, ctx: ResolveCtx): "paused" | void {
+  if (e.type === "nextEntersAsCopy") {
+    // Mystic Reflection: waits for the next creatures or planeswalkers to enter this turn (game.ts reflectionKey).
+    const o = objects(s, e.of, ctx)[0];
+    if (!o || o.zone !== "battlefield") return;
+    const base = copiableDef(s, o);
+    (s.nextEntersAsCopy ??= []).push({ id: o.id, zc: o.zoneChanges ?? 0, key: copyKey(s, base), turn: s.turn, timestamp: s.nextTimestamp++, source: ctx.sourceDef.name });
+    log(s, `The next time one or more creatures or planeswalkers enter this turn, they enter as copies of ${base.name}.`);
+    return;
+  }
   if (e.type !== "becomeCopy") return;
   const base = copiedValues(s, e.of, ctx);
   if (!base) return;

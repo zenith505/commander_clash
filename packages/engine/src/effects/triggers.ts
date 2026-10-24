@@ -583,8 +583,8 @@ export function fireEvent(s: GameState, ev: TriggerSourceEvent) {
       ev.x,
       entering.kicked,
       // Whom its spell's gift was promised to: "the chosen player" (CR 702.174b).
-      entering.gift !== undefined || entering.evidence || entering.treasureSpent || entering.spent || entering.castAlt === "surge" || entering.castAlt === "spectacle"
-        ? { ...(entering.gift !== undefined ? { gift: entering.gift } : {}), ...(entering.evidence ? { evidence: true as const } : {}), ...(entering.treasureSpent ? { treasureSpent: entering.treasureSpent } : {}), ...(entering.spent ? { spent: entering.spent } : {}), ...(entering.castAlt === "surge" || entering.castAlt === "spectacle" ? { castAlt: entering.castAlt } : {}) }
+      entering.gift !== undefined || entering.evidence || entering.treasureSpent || entering.spent || entering.castAlt === "surge" || entering.castAlt === "spectacle" || entering.castAlt === "prowl"
+        ? { ...(entering.gift !== undefined ? { gift: entering.gift } : {}), ...(entering.evidence ? { evidence: true as const } : {}), ...(entering.treasureSpent ? { treasureSpent: entering.treasureSpent } : {}), ...(entering.spent ? { spent: entering.spent } : {}), ...(entering.castAlt === "surge" || entering.castAlt === "spectacle" || entering.castAlt === "prowl" ? { castAlt: entering.castAlt } : {}) }
         : undefined,
       entering.colorsSpent?.length,
     );

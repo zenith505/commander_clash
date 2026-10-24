@@ -973,6 +973,8 @@ export interface LastKnown {
   suspected?: true;
   /** It was legendary as it last existed: "if the sacrificed creature was legendary" (Nasty End). */
   legendary?: true;
+  /** It was a commander: "if the sacrificed permanent was a commander" (Tevesh Szat, CR 903.3). */
+  commander?: true;
   /** The player chosen for it as it entered ("the chosen player"), as it last existed. */
   chosenPlayer?: PlayerId;
   /** The Equipment attached to it as it last existed (Zack Fair: "an Equipment that was attached to ~"). */
@@ -1289,6 +1291,8 @@ export interface TurnLog {
   combatDamagedBy?: Record<number, string[]>;
   /** The creature types of the creatures that dealt combat damage to a player, as they dealt it (Lost Monarch of Ifnir). */
   combatDamageSubtypes?: string[];
+  /** Prowl (CR 702.76a): for each player, the creature types of the sources they controlled that dealt a player combat damage, as they dealt it ("*": every creature type). */
+  combatDamageTypesBy?: Record<number, string[]>;
   /** The players dealt combat damage by a legendary creature, legendary as it dealt it (Blitzball). */
   legendaryCombatDamaged?: PlayerId[];
   /**
@@ -1618,6 +1622,12 @@ export interface GameState {
   /** How permanents were as they last existed on the battlefield (CR 608.2h); `attachedTo` with that permanent's zoneChanges then. */
   lastKnown?: Record<ObjectId, { zc: number; power: number; toughness: number; controller: PlayerId; attachedTo?: { id: ObjectId; zc: number }; attachedToPlayer?: PlayerId; /** Its copiable values (CR 707.2), a key into `cards`. */ copyKey?: string; counters?: Record<string, number>; /** Its creature types ("all" for changeling-like), for kinship once it's gone. */ creatureTypes?: string[] | "all"; /** The player chosen as it entered (Saskia's "the chosen player" once it's gone, CR 608.2h). */ chosenPlayer?: PlayerId; /** The creatures it was blocking ("target creature it's blocking" once it's sacrificed, Tinder Wall). */ blocking?: ObjectId[]; /** What it was attacking (Myr Battlesphere's "the player or planeswalker it's attacking"). */ attacking?: PlayerId; attackingPermanent?: { id: ObjectId; zc: number; battleController?: PlayerId }; /** What it was as a source of damage, for "it deals damage" once it's gone (CR 608.2h): its lifelink, deathtouch, colors, and a "can't be prevented" that applied to it (Questing Beast). */ source?: { name: string; colors: Color[]; types: string[]; subtypes: string[]; keywords: string[]; unpreventable?: "all" | "combat" } }>;
   nextTimestamp: number;
+  /**
+   * Mystic Reflection: the next time one or more creatures or planeswalkers enter this turn, they enter as copies of this
+   * permanent (`id`, `zc`): its copiable values as they are then, or as it last existed (`key` as the spell resolved if
+   * neither is known). `used` once some have, so the others entering with them still do (enterTogether).
+   */
+  nextEntersAsCopy?: { id: ObjectId; zc: number; key: string; turn: number; timestamp: number; source: string; used?: true }[];
   /** Something happened during the cleanup step, so players get priority and then there's another one (CR 514.3a). */
   cleanupAgain?: boolean;
   /**
@@ -1765,8 +1775,8 @@ export interface TriggerEventInfo {
   evidence?: true;
   /** A permanent's enters trigger, or a cast trigger: how much mana from Treasures was spent to cast that spell (CR 106.3). */
   treasureSpent?: number;
-  /** A permanent's enters trigger: its spell's surge or spectacle cost was paid (CR 702.117a, 702.137a). */
-  castAlt?: "surge" | "spectacle";
+  /** A permanent's enters trigger: its spell's surge, spectacle or prowl cost was paid (CR 702.117a, 702.137a, 702.76a). */
+  castAlt?: "surge" | "spectacle" | "prowl";
   /** A permanent's enters trigger, or a cast trigger: the mana spent to cast that spell by type (CR 601.2h). */
   spent?: SpentMana;
 }

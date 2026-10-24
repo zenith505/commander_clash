@@ -216,7 +216,7 @@ export function expandPerOpponent(body: AbilityBody, opponents: PlayerId[]): Abi
     ...(t.differentManaValueFrom ? { differentManaValueFrom: t.differentManaValueFrom.map(shift) } : {}),
     ...(t.divided ? { divided: { ...t.divided, first: shift(t.divided.first) } } : {}),
   });
-  const { perOpponent: _p, controller: _c, ...spec } = body.targets[i]!;
+  const { perOpponent: _p, perPlayer: _e, controller: _c, ...spec } = body.targets[i]!;
   const copies: TargetSpec[] = opponents.length ? opponents.map((pid) => ({ ...spec, optional: true, controlledBy: pid })) : [{ ...spec, skip: true }];
   return { ...body, targets: [...body.targets.slice(0, i).map(fix), ...copies, ...body.targets.slice(i + 1).map(fix)], effects: body.effects.map((e) => spreadRefs(e, i, n)) };
 }

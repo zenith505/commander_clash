@@ -1729,7 +1729,7 @@ function castPlan(s: GameState, pid: PlayerId, id: string, free: boolean, via?: 
   if (!free && !via && alt === undefined && foretoldCast(s, pid, obj(s, id))) alt = "foretell";
   // Cast as madness or miracle resolves, for that cost (CR 702.35a, 702.94a): its X is paid then.
   const paidAs = free ? madnessCastOf(s, pid, id) : undefined;
-  const cost = parseManaCost(paidAs ?? graveyardWay(s, obj(s, id), via, pid)?.mana ?? altCost(d, alt)?.mana ?? d.manaCost);
+  const cost = parseManaCost(paidAs ?? graveyardWay(s, obj(s, id), via, pid)?.mana ?? altCost(d, alt, s, pid)?.mana ?? d.manaCost);
   // X spells: as big an X as we can pay for. Cast for free, X is 0 (CR 107.3b), which is rarely worth it.
   if (cost.hasX && free && !paidAs) return null;
   // A ritual, a spell that only adds mana (Dark Ritual): worth it when what it nets lets us cast a card we can't yet.
@@ -1907,6 +1907,12 @@ function cheaperAltPlan(s: GameState, pid: PlayerId, id: string): Action[] | nul
   for (const kind of ["surge", "spectacle"] as const) {
     if (!altCost(defOf(s, o), kind)) continue;
     const plan = castPlan(s, pid, id, false, undefined, kind);
+    if (plan) return plan;
+  }
+  // Prowl (CR 702.76a): the card's own (it may do more then), or one given to it that costs less than the mana cost.
+  const prowl = altCost(defOf(s, o), "prowl", s, pid);
+  if (prowl && staticConditionNow(s, prowl.if!, id, pid) && (compileCard(defOf(s, o)).altCosts?.some((a) => a.kind === "prowl") || manaValue(parseManaCost(prowl.mana)) < mv(s, id))) {
+    const plan = castPlan(s, pid, id, false, undefined, "prowl");
     if (plan) return plan;
   }
   return null;
@@ -4912,7 +4918,7 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
     declared = declared.flatMap((a) => {
       if (!extra.includes(a)) return [a];
       const o = obj(s, a.attacker);
-      const other = opps.find((x) => x !== d && !attackProblem(s, o, x) && !attackTaxPer(s, x) && declared.filter((y) => y.defender === x && y.planeswalker === undefined).length < attackYouLimit(s, x));
+      const other = opps.find((x) => x !== d && !attackProblem(s, o, x) && !attackTaxPer(s, x, false, o.id) && declared.filter((y) => y.defender === x && y.planeswalker === undefined).length < attackYouLimit(s, x));
       return other === undefined ? [] : [{ attacker: a.attacker, defender: other }];
     });
   }
@@ -4929,7 +4935,7 @@ function chooseAttacks(s: GameState, pid: PlayerId): Action[] {
     }
     const taxed = declared.filter((a) => attackTaxOf(s, a)).sort((a, b) => power(s, obj(s, a.attacker)) - power(s, obj(s, b.attacker)))[0]!;
     const o = obj(s, taxed.attacker);
-    const elsewhere = opps.find((d) => !attackTaxPer(s, d) && !attackProblem(s, o, d) && !characteristics(s, o).goadedBy.includes(d));
+    const elsewhere = opps.find((d) => !attackTaxPer(s, d, false, o.id) && !attackProblem(s, o, d) && !characteristics(s, o).goadedBy.includes(d));
     declared = declared.flatMap((a) => (a !== taxed ? [a] : elsewhere !== undefined ? [{ attacker: a.attacker, defender: elsewhere }] : []));
   }
 }

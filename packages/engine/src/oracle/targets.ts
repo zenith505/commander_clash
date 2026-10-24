@@ -138,6 +138,8 @@ export function parsePlayer(p: string, ctx: Ctx): PlayerRef | null {
   // "Whenever a player casts their first multicolored spell each turn, each other player draws a card" (Zenith Chronicler):
   // every player but that one.
   if (x === "each other player" && ctx.eventPlayer) return { ref: "otherPlayers" };
+  // "Each of that player's opponents" (Heartwood Storyteller): with no teams, every other player (CR 102.2, 800.4).
+  if (x === "each of that player's opponents" && ctx.eventPlayer) return { ref: "otherPlayers" };
   // "Whenever ~ deals combat damage to a player, they lose half their life" (Unstoppable Slasher): that player, while no
   // other player has been named.
   if (x === "they" && ctx.eventPlayer && ctx.lastPlayerTarget === undefined && !ctx.chosenOpponent) return { ref: "eventPlayer" };
@@ -578,6 +580,7 @@ const PLURAL_TYPES: Record<string, string> = {
   enchantments: "enchantment",
   lands: "land",
   permanents: "permanent",
+  commanders: "commander", // CR 903.3
   tokens: "token", // "tokens you control", "creature tokens you control" (CR 111.1)
   planeswalkers: "planeswalker",
   battles: "battle",

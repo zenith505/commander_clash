@@ -258,6 +258,9 @@ export function parseTokensSentence(s: string, ctx: Ctx): Effect[] | null | unde
   // Proliferate (CR 701.27), amass (CR 701.47).
   if (/^Proliferate$/i.test(s)) return [{ type: "proliferate" }];
   if (/^Proliferate twice$/i.test(s)) return [{ type: "proliferate", twice: true }];
+  // "Proliferate X times, where X is ..." (Tromell, Seymour's Butler): X separate proliferate actions; X is defined by the
+  // text (defineX in body.ts), never the X announced.
+  if (/^Proliferate X times$/.test(s) && ctx.whereX) return [{ type: "proliferate", n: amt("X") }];
   // Populate (CR 701.36): copy a creature token you control, not targeted; with none, nothing happens.
   if (/^Populate$/i.test(s)) return [{ type: "pick", who: { ref: "you" }, filter: { kind: "object", types: ["Creature"], token: true, text: "creature token" }, n: 1, action: "populate" }];
   if ((m = new RegExp(`^[Aa]mass ([A-Z][a-z]+) ${NUMX}$`).exec(s))) return [{ type: "amass", subtype: singularWord(m[1]!), n: amt(m[2]!) }];

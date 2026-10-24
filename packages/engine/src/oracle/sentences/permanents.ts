@@ -1,6 +1,6 @@
 // Sentences that act on permanents: destroy, tap, connive, regenerate, counters, gaining control, continuous changes until end of turn.
 
-import type { AmountExpr, Effect, ObjRef } from "../../abilities";
+import type { AmountExpr, Count, Effect, ObjRef } from "../../abilities";
 import { NUM, NUMX, COUNTER, counterKind, amt, isGroup, num, capital, singular } from "../words";
 import { pickFilter, parseGroup, parseObject, parsePlayer, parseTargetPhrase } from "../targets";
 import { addTarget } from "../body";
@@ -564,6 +564,15 @@ export function parsePermanentsSentence(s: string, ctx: Ctx): Effect[] | null | 
   // targeted (rulings); any creatures but ~, whoever controls them.
   if ((m = new RegExp(`^(?:[Yy]ou may )?[Mm]ove any number of ${COUNTER} counters from ~ onto other creatures$`).exec(s)))
     return [{ type: "distribute", counter: counterKind(m[1]!), n: { count: { kind: "counters", counter: counterKind(m[1]!), of: { ref: "self" } } }, filter: { kind: "object", types: ["Creature"], notTypes: [], notColors: [], text: "other creatures" }, move: true }];
+  // Conformer Shuriken: "If that creature has greater power than this creature, put a number of +1/+1 counters on this
+  // creature equal to the difference": both as they are as it resolves.
+  if ((m = new RegExp(`^If (that creature) has greater power than ~, put a number of ${COUNTER} counters on ~ equal to the difference$`).exec(s))) {
+    const of = parseObject(m[1]!, ctx);
+    if (!of || isGroup(of)) return null;
+    const theirs: Count = { kind: "power", of };
+    const mine: Count = { kind: "power", of: { ref: "self" } };
+    return [{ type: "if", cond: { kind: "amountsCompare", a: { count: theirs }, atLeast: { count: mine, plus: 1 } }, effects: [{ type: "counters", what: { ref: "self" }, counter: counterKind(m[2]!), n: { count: { kind: "difference", of: [theirs, mine] } } }] }];
+  }
   // Sovereign Okinec Ahau: "for each creature you control with power greater than that creature's base power, put a number
   // of +1/+1 counters on that creature equal to the difference": each its own number, all worked out first.
   if (/^[Ff]or each creature you control with power greater than that creature's base power, put a number of \+1\/\+1 counters on that creature equal to the difference$/.test(s))

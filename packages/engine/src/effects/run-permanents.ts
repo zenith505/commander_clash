@@ -406,7 +406,7 @@ export function runPermanentsEffect(s: GameState, e: Effect, ctx: ResolveCtx, sr
       return;
     }
     case "proliferate": {
-      const times = proliferateTimes(s, ctx.controller, e.twice ? 2 : 1);
+      const times = proliferateTimes(s, ctx.controller, e.n ? amountNow(s, e.n, ctx) : e.twice ? 2 : 1);
       if (!e.thenPhaseOut) {
         for (let i = 0; i < times; i++) proliferate(s, ctx.controller, src);
         return;

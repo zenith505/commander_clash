@@ -8,6 +8,7 @@ import { parseBody } from "./body";
 import { allEffects } from "../abilities";
 import { CREATURE_TYPES } from "../keywords";
 import { parseOnlyClauses, parseStaticCondition } from "./statics";
+import { parseSearchFilter } from "./search";
 
 /**
  * A mana ability (CR 605.1a): "{T}: Add {G}.", "{T}: Add {W} or {U}. ~ deals 1 damage to you.",
@@ -22,6 +23,15 @@ export function parseManaAbility(line0: string): ManaAbility | null {
   if (chosen) {
     const ab = parseManaAbility(`${chosen[1]}: Add ${chosen[2]}.`);
     return ab && { ...ab, text: line0, toChosenPlayer: true };
+  }
+  // Metalworker: "{T}: Reveal any number of artifact cards in your hand. Add {C}{C} for each card revealed this way." A
+  // mana ability (rulings): how many is chosen as it's activated.
+  const reveal = /^(.+): Reveal any number of ([a-z]+) cards in your hand\. Add ((?:\{[WUBRGC]\})+) for each card revealed this way\.$/.exec(line0);
+  if (reveal) {
+    const ab = parseManaAbility(`${reveal[1]}: Add ${reveal[3]}.`);
+    const filter = parseSearchFilter(`${reveal[2]} card`);
+    if (!ab || !filter || ab.produces.kind !== "fixed") return null;
+    return { ...ab, text: line0, produces: { kind: "revealX", filter, per: ab.produces.mana } };
   }
   // "{T}: For each color among permanents you control, add one mana of that color." (Bloom Tender), "{2}, {T}: Choose a
   // color. Add an amount of mana of that color equal to ..." (Nykthos, Three Tree City: the color is chosen as it resolves,

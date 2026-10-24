@@ -1365,6 +1365,9 @@ function parseStaticLine(line: string): StaticAbility | null {
     if (tax[3] && !amount) return null;
     return { affects: { kind: "self" }, mods: [{ kind: "attackTax", n: amount ? 0 : Number(tax[2]), ...(amount ? { amount } : {}), ...(tax[1] ? { planeswalkers: true as const } : {}) }], text: line };
   }
+  // Nils, Discipline Enforcer: each creature with counters on it, {X} for it (CR 508.1g-h), X all its counters (rulings).
+  const counterTax = /^Each creature with one or more counters on it can't attack you( or planeswalkers you control)? unless its controller pays \{X\}, where X is the number of counters on that creature$/.exec(text);
+  if (counterTax) return { affects: { kind: "self" }, mods: [{ kind: "attackTax", n: 0, perCounter: true, ...(counterTax[1] ? { planeswalkers: true as const } : {}) }], text: line };
   // Archangel of Tithes (as long as it's attacking): each blocking creature costs its controller {1} (CR 509.1d).
   const blockTax = /^Creatures can't block unless their controller pays \{(\d+)\} for each of those creatures$/.exec(text);
   if (blockTax) return { affects: { kind: "self" }, mods: [{ kind: "blockTax", n: Number(blockTax[1]) }], text: line };
